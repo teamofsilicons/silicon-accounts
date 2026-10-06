@@ -21,7 +21,7 @@ accounts_apps::imports::run_pending_jobs(&state)         // process queued impor
 
 | route | auth | notes |
 |---|---|---|
-| `GET /v1/apps/{app_id}/public` | public | `Access-Control-Allow-Origin: *` (errors too), `Cache-Control: no-cache`. `methods` = enabled methods in order, managed Google/Apple hidden without managed credentials. |
+| `GET /v1/apps/{app_id}/public` | public | `{"app_id","name","logo_url","logo_dark_url","homepage_url","methods","branding","copy","allowed_origins"}`. `Access-Control-Allow-Origin: *` (errors too), `Cache-Control: no-cache`. `methods` = enabled methods in order, managed Google/Apple hidden without managed credentials. `allowed_origins` are the origins that may frame the embed and use the SDK: the account site builds the embed page's `frame-ancestors` from them (a CSP is public anyway). |
 | `GET /v1/me/owned-apps` | Carbon session | `users` = live members (active + imported, deleted accounts excluded). Paginated. |
 | `GET /v1/apps/{app_id}` | app-or-owner | + `updated_at`. `signin_config` has `google.client_secret_set` / `apple.private_key_set`; `webhook {url, secret_set}`; `stats {users, active_last_30d, imported_unclaimed}` (deleted accounts are never counted). |
 | `PATCH /v1/apps/{app_id}/signin-config` | app-or-owner, Idempotency-Key | see below; returns the GET body. 512 KB body limit. |
@@ -31,10 +31,10 @@ accounts_apps::imports::run_pending_jobs(&state)         // process queued impor
 | `POST /v1/apps/{app_id}/imports` | app-or-owner, Idempotency-Key | CSV or JSON → 202 `{"job": ImportJob}`. 50 MB / 100,000 rows; budgets below. |
 | `GET /v1/apps/{app_id}/imports`, `…/imports/{job_id}` | app-or-owner | list / `{"job": ImportJob}`; 404 `import_not_found`. |
 | `GET /v1/apps/{app_id}/imports/{job_id}/rows` | app-or-owner | `outcome, level, code, limit, cursor`; file order. In a dry run, matched rows have `account_uuid` and `id` null. |
-| `PUT /v1/apps/{app_id}/webhook` | app-or-owner, Idempotency-Key | `{"url"}` → `{"url","secret"}`, new secret every time; `no-store`. Responses carrying a secret are replayable for 10 minutes and stored sealed with the keyring (core's `idempotency::run`), never in clear. |
+| `PUT /v1/apps/{app_id}/webhook` | app-or-owner, Idempotency-Key | `{"url"}` → `{"url","secret"}`, new secret every time; `no-store`. A retry with the same key (and body) gets the same secret back instead of a new one (`Idempotent-Replayed: true`); the same key with another URL is 409 `idempotency_key_reused`. Responses carrying a secret are replayable for 10 minutes and stored sealed with the keyring (core's `idempotency::run`), never in clear. |
 | `DELETE /v1/apps/{app_id}/webhook` | app-or-owner | 204; pending deliveries become `failed` (replayable). Idempotent. |
 | `POST /v1/apps/{app_id}/webhook/rotate-secret` | app-or-owner, Idempotency-Key | `{"secret"}`; 409 `webhook_not_set`. |
-| `POST /v1/apps/{app_id}/webhook/test` | app-or-owner, Idempotency-Key | 202 `{"event_id","delivery_id","type":"ping"}`. |
+| `POST /v1/apps/{app_id}/webhook/test` | app-or-owner, Idempotency-Key | 202 `{"event_id","delivery_id","type":"ping"}`; a retry with the same key queues no second ping. |
 | `GET /v1/apps/{app_id}/webhook/deliveries[/{id}]` | app-or-owner | `status, limit, cursor`; detail adds `attempts` (list), `payload` and `payload_redacted` (+ `payload_redacted_reason`). |
 | `POST /v1/apps/{app_id}/webhook/replay` | app-or-owner, Idempotency-Key | `{"delivery_ids":[…]}` or `{"status":"failed","since"?}` (max 100) → `{"replayed":[ids],"skipped":[{delivery_id,reason,message}],"remaining","not_replayable","url"}`. |
 | `POST /v1/internal/apps/sync` | `Bearer ACCOUNTS_INTERNAL_TOKEN` | `{"apps":[…]}` or a bare array → `{"apps":[SyncedApp]}`. 5 MB body limit. 403 `internal_api_disabled` when the token isn't configured. |
@@ -49,7 +49,8 @@ escapes are accepted), stored AES-GCM-encrypted in the `*_enc` columns, never in
 never returned. The read-only masks `client_secret_set` / `private_key_set` are accepted and
 ignored, so a client can PATCH back what it GETs. Validation is core's
 (`SigninConfig::apply_patch`): 422 `validation_failed` with `details.fields` keyed by path
-(`branding.light.primary`, `redirect_uris[0]`, contrast ratio in the message). No change → no new
+(`branding.light.primary`, `redirect_uris[0]`; button and page text below 4.5:1 contrast — WCAG AA —
+is refused with the measured ratio in the message). No change → no new
 version. Each change → `version + 1`, `app_config_history` row `changes: [{path, before, after}]`
 (secrets as `"[redacted]"` with `"secret": true`), audit `app.signin_config.updated`.
 

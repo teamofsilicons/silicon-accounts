@@ -2,7 +2,8 @@
 // (scripts/dev.sh or scripts/journeys.sh) with the testkit helpers and the real `accounts` CLI.
 //
 // Environment (defaults = scripts/dev.sh's ports):
-//   ACCOUNTS_URL         server-side URL of accounts-api      (http://127.0.0.1:8590)
+//   ACCOUNTS_URL         where these calls go: accounts-api   (http://127.0.0.1:8589), or the public
+//                        site/proxy in front of it (scripts/journeys.sh --proxy / --next)
 //   ACCOUNTS_PUBLIC_URL  browser-facing URL (CLI --url)       (/v1/meta public_url)
 //   MOCK_OIDC_URL / MOCK_MESSAGING_URL / FAKE_APPS_URL       (127.0.0.1:8591 / 8592 / 8593)
 //   ACCOUNTS_CLI         the `accounts` binary                ($CARGO_TARGET_DIR or target)/debug/accounts
@@ -26,7 +27,7 @@ import {
 
 export * from '../lib/index.ts';
 
-export const accounts = new AccountsClient(process.env.ACCOUNTS_URL ?? 'http://127.0.0.1:8590');
+export const accounts = new AccountsClient(process.env.ACCOUNTS_URL ?? 'http://127.0.0.1:8589');
 export const messaging = new MockMessagingClient(process.env.MOCK_MESSAGING_URL ?? 'http://127.0.0.1:8592');
 export const oidc = new MockOidcClient(process.env.MOCK_OIDC_URL ?? 'http://127.0.0.1:8591');
 export const fakeAppsUrl = process.env.FAKE_APPS_URL ?? 'http://127.0.0.1:8593';

@@ -1,7 +1,8 @@
 // Protocol and security details apps and the sign-in pages rely on: the OIDC id_token
 // (quill-docs), prompt=none/login, refused redirect URIs, PKCE, code reuse, refresh rotation and
 // reuse detection, OTP send limit and verify lockout, the CSRF Origin guard, audience confusion,
-// the embed page's frame-ancestors, SDK/discovery CORS.
+// the embed origins in an app's public config (and, behind the Next.js site, the embed page's
+// frame-ancestors), SDK/discovery CORS, the docs link in /v1/meta.
 import { accounts, check, codeFrom, codeStep, done, driveFlow, fakeAppsUrl, HttpClient, messaging, newBrowser, randomEmail, section, signUpCarbon, startAppSignIn } from './_common.ts';
 
 section('quill-docs: scope openid → an id_token the fake app verifies (EdDSA, iss, aud, nonce)');
@@ -97,22 +98,37 @@ section('an app\'s access token is not an account-site token');
   check(r.status === 401 && r.body?.error?.code === 'token_wrong_audience', `app token on /v1/me → ${r.status} ${r.body?.error?.code}`, r.body);
 }
 
-section('embed frame-ancestors, SDK + discovery CORS');
+section('embed origins (public config), SDK + discovery CORS');
 {
-  const e = await fetch(`${accounts.url}/embed/v1/buttons?app_id=orbit-games`);
-  const csp = e.headers.get('content-security-policy') ?? '';
+  // The site builds the embed page's frame-ancestors from the app's public config.
   const allowed = new URL(fakeAppsUrl).origin;
-  check(e.status === 200 && (/frame-ancestors[^;]*/.exec(csp)?.[0] ?? '') === `frame-ancestors 'self' ${allowed}`, `orbit-games embed: ${/frame-ancestors[^;]*/.exec(csp)?.[0]} (allowed origin ${allowed})`, csp);
-  check(/frame-ancestors 'none'/.test((await fetch(`${accounts.url}/embed/v1/buttons?app_id=no-such-app`)).headers.get('content-security-policy') ?? ''), "unknown app → frame-ancestors 'none'");
-  const sdk = await fetch(`${accounts.url}/sdk/v1.js`);
-  check(sdk.headers.get('access-control-allow-origin') === '*', `sdk/v1.js → ${sdk.status}, CORS *`);
+  const pub = await fetch(`${accounts.url}/v1/apps/orbit-games/public`, { headers: { Origin: 'https://anywhere.example' } });
+  const pubBody: any = await pub.json();
+  check(pub.headers.get('access-control-allow-origin') === '*', 'GET /v1/apps/{id}/public is CORS *');
+  check(pub.status === 200 && Array.isArray(pubBody.allowed_origins) && pubBody.allowed_origins.includes(allowed), `orbit-games public config lists its embed origins ${JSON.stringify(pubBody.allowed_origins)} (fake apps ${allowed})`, pubBody);
+  const unknown = await fetch(`${accounts.url}/v1/apps/no-such-app/public`);
+  check(unknown.status === 404 && unknown.headers.get('access-control-allow-origin') === '*', `unknown app → ${unknown.status}, still readable cross-origin`);
+  if (process.env.JOURNEYS_FRONT === 'next') {
+    // Behind the Next.js site, the site serves the embed page and the SDK itself.
+    const e = await fetch(`${accounts.url}/embed/v1/buttons?app_id=orbit-games`);
+    const ancestors = /frame-ancestors[^;]*/.exec(e.headers.get('content-security-policy') ?? '')?.[0] ?? '';
+    check(e.status === 200 && ancestors.includes(allowed) && !ancestors.includes("'none'"), `orbit-games embed (site): ${ancestors}`);
+    const none = /frame-ancestors[^;]*/.exec((await fetch(`${accounts.url}/embed/v1/buttons?app_id=no-such-app`)).headers.get('content-security-policy') ?? '')?.[0] ?? '';
+    check(none.includes("'none'"), `unknown app embed (site): ${none}`);
+    const sdk = await fetch(`${accounts.url}/sdk/v1.js`);
+    check(sdk.status === 200 && sdk.headers.get('access-control-allow-origin') === '*', `sdk/v1.js (site) → ${sdk.status}, CORS ${sdk.headers.get('access-control-allow-origin')}`);
+  }
   const disc = await accounts.discovery();
   check(disc.issuer === (await accounts.publicUrl()) && String(disc.authorization_endpoint).endsWith('/authorize'), `discovery issuer ${disc.issuer}`);
   check((await accounts.jwks()).keys[0]?.alg === 'EdDSA', 'JWKS: one Ed25519 key');
-  const pub = await fetch(`${accounts.url}/v1/apps/briefcase/public`, { headers: { Origin: 'https://anywhere.example' } });
-  check(pub.headers.get('access-control-allow-origin') === '*', 'GET /v1/apps/{id}/public is CORS *');
   const me = await fetch(`${accounts.url}/v1/me`, { headers: { Origin: 'https://anywhere.example' } });
   check(!me.headers.get('access-control-allow-origin'), '/v1/me sends no CORS headers');
+}
+
+section('meta: the docs link');
+{
+  const meta: any = await accounts.meta(true);
+  check(typeof meta.docs_url === 'string' && /^https?:\/\//.test(meta.docs_url), `GET /v1/meta docs_url ${meta.docs_url}`, meta);
 }
 
 done();

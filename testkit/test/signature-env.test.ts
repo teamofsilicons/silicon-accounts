@@ -4,8 +4,9 @@ import { createHmac } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
-import { accountsEnvForMocks, toDotenv, toShellExports } from '../lib/env.ts';
+import { accountsEnvForMocks, accountsTopologyEnv, toDotenv, toShellExports } from '../lib/env.ts';
 import { codeChallengeS256, createPkcePair, pkceMatches } from '../lib/pkce.ts';
 import { computeWebhookSignature, parseSignatureHeader, signWebhookDelivery, verifyWebhookSignature, webhookSignatureHeader } from '../lib/signature.ts';
 
@@ -98,5 +99,31 @@ describe('Accounts env for the mocks', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('Accounts topology env', () => {
+  test('accounts-api on 8589 behind the site on 8590, trusting X-Forwarded-For', () => {
+    assert.deepEqual(accountsTopologyEnv(), {
+      ACCOUNTS_BIND_ADDR: '127.0.0.1:8589',
+      ACCOUNTS_PUBLIC_URL: 'http://localhost:8590',
+      ACCOUNTS_TRUST_FORWARDED_FOR: 'true',
+    });
+    assert.equal(accountsTopologyEnv({ apiPort: 9689, publicUrl: 'http://localhost:9690/' }).ACCOUNTS_PUBLIC_URL, 'http://localhost:9690');
+    assert.throws(() => accountsTopologyEnv({ apiPort: 0 }), /port/);
+  });
+
+  test('print-env prints the mocks and the topology (or the mocks only)', () => {
+    const tsx = fileURLToPath(new URL('../node_modules/.bin/tsx', import.meta.url));
+    const script = fileURLToPath(new URL('../src/print-env.ts', import.meta.url));
+    const run = (...args: string[]) => JSON.parse(execFileSync(tsx, [script, '--format', 'json', ...args], { env: { ...process.env, ACCOUNTS_PUBLIC_URL: '', ACCOUNTS_API_PORT: '', ACCOUNTS_PORT: '' } }).toString());
+    const env = run('--api-port', '9589', '--public-url', 'http://localhost:9590');
+    assert.equal(env.ACCOUNTS_BIND_ADDR, '127.0.0.1:9589');
+    assert.equal(env.ACCOUNTS_PUBLIC_URL, 'http://localhost:9590');
+    assert.equal(env.ACCOUNTS_TRUST_FORWARDED_FOR, 'true');
+    assert.equal(env.ACCOUNTS_DELIVERY, 'providers');
+    const mocksOnly = run('--no-topology');
+    assert.equal(mocksOnly.ACCOUNTS_BIND_ADDR, undefined);
+    assert.equal(mocksOnly.ACCOUNTS_DELIVERY, 'providers');
   });
 });

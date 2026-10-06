@@ -41,6 +41,9 @@ pub struct AppPublic {
     /// Custom page copy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub copy: Option<CopyText>,
+    /// Origins allowed to embed the sign-in iframe (its `frame-ancestors`) and use the SDK.
+    #[serde(default, deserialize_with = "lenient_vec")]
+    pub allowed_origins: Vec<String>,
 }
 
 /// Branding variables for the hosted sign-in pages. `None` means the Silicon Accounts
@@ -101,8 +104,9 @@ pub struct Branding {
     pub extra: BTreeMap<String, Value>,
 }
 
-/// Colours for one theme. The service rejects primary/primary_foreground or
-/// foreground/background pairs with contrast below 3:1.
+/// Colours for one theme. The service rejects primary/primary_foreground (button text) or
+/// foreground/background (page text) pairs with contrast below 4.5:1 (WCAG AA for text). The
+/// defaults fill buttons with `#1F5FB8` under `#FFFDF9` in both themes.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ThemeColors {

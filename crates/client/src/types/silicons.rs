@@ -9,7 +9,7 @@ use time::OffsetDateTime;
 
 use crate::secret::Secret;
 use crate::serde_util::{lenient_opt_string, lenient_string};
-use crate::types::account::{AccountRef, AccountSummary, Me};
+use crate::types::account::{AccountRef, AccountSummary, Me, PhotoInfo};
 
 /// `POST /v1/silicons`: a Silicon creates its own account and names its custodian.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -281,6 +281,20 @@ impl<'de> Deserialize<'de> for ManagedSilicon {
             pending_transfer,
         })
     }
+}
+
+/// `POST /v1/me/silicons/{uuid}/photo`: the photo a custodian uploaded for its Silicon.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SiliconPhotoUploaded {
+    /// The Silicon's new profile photo URL.
+    pub pfp_url: String,
+    /// The stored image.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub photo: Option<PhotoInfo>,
+    /// The Silicon after the change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub silicon: Option<ManagedSilicon>,
 }
 
 /// A pending custodian transfer.

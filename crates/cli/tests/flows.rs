@@ -416,3 +416,96 @@ fn app_import_waits_and_shows_first_errors() {
         .stderr(predicate::str::contains("--format"));
     assert_eq!(mock.count("POST", "/v1/apps/briefcase/imports"), 1);
 }
+
+#[test]
+fn a_custodian_checks_an_id_for_its_silicon() {
+    let mock = Mock::start();
+    let env = Env::new();
+    // Not signed in: the CLI says what is needed before calling anything.
+    let output = env
+        .cmd()
+        .args([
+            "--url",
+            &mock.url,
+            "id",
+            "available",
+            "si:old",
+            "--for",
+            "si:scout",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(3), "auth required");
+
+    env.cmd()
+        .args(["--url", &mock.url, "login", "--email", CARBON_EMAIL])
+        .assert()
+        .success();
+    env.cmd()
+        .args([
+            "--url",
+            &mock.url,
+            "login",
+            "--email",
+            CARBON_EMAIL,
+            "--code",
+            "123456",
+        ])
+        .assert()
+        .success();
+    let output = env
+        .cmd()
+        .args([
+            "--url",
+            &mock.url,
+            "id",
+            "available",
+            "si:old",
+            "--for",
+            "si:scout",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json = stdout_json(&output);
+    assert_eq!(json["available"], true);
+    assert_eq!(json["reclaimable"], true);
+    env.cmd()
+        .args([
+            "--url",
+            &mock.url,
+            "id",
+            "available",
+            "si:old",
+            "--for",
+            "si:scout",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "accounts silicon id si:scout si:old",
+        ));
+    // Someone else's Silicon: not found (exit 4).
+    env.cmd()
+        .args([
+            "--url",
+            &mock.url,
+            "id",
+            "available",
+            "si:old",
+            "--for",
+            "si:other",
+        ])
+        .assert()
+        .code(4)
+        .stderr(
+            predicate::str::contains("silicon_not_found")
+                .or(predicate::str::contains("not the custodian")),
+        );
+}

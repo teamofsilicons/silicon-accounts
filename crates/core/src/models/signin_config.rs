@@ -216,10 +216,12 @@ impl Palette {
         }
     }
 
-    /// The Silicon Accounts dark palette.
+    /// The Silicon Accounts dark palette. Filled buttons keep the brand blue `#1F5FB8` under
+    /// `#FFFDF9` text (6.1:1, WCAG AA for text); the lighter `#5B8FE0` is only an ink for links
+    /// and accents on dark surfaces and would put button text at 3.2:1.
     pub fn default_dark() -> Palette {
         Palette {
-            primary: "#5B8FE0".into(),
+            primary: "#1F5FB8".into(),
             primary_foreground: "#FFFDF9".into(),
             background: "#2A2927".into(),
             surface: "#353432".into(),
@@ -465,6 +467,12 @@ pub struct ConfigSecretsPresent {
     pub google_client_secret: bool,
     pub apple_private_key: bool,
 }
+
+/// Smallest contrast ratio accepted for text on the hosted pages: button text
+/// (`primary_foreground` on `primary`) and page text (`foreground` on `background`), in both
+/// themes. 4.5:1 is WCAG 2 level AA for normal-size text; the default palettes meet it
+/// (6.1:1 or more).
+pub const MIN_TEXT_CONTRAST: f64 = 4.5;
 
 /// Maximum list sizes.
 pub const MAX_REDIRECT_URIS: usize = 50;
@@ -989,12 +997,12 @@ fn validate_branding(b: &Branding, e: &mut FieldErrors) {
                 ),
             ] {
                 if let Some(ratio) = contrast_ratio(fg, bg)
-                    && ratio < 3.0
+                    && ratio < MIN_TEXT_CONTRAST
                 {
                     e.add(
                             format!("branding.{theme}.{fg_name}"),
                             format!(
-                                "contrast between branding.{theme}.{fg_name} ({fg}) and branding.{theme}.{bg_name} ({bg}) is {:.2}:1; it must be at least 3:1 because {why}",
+                                "contrast between branding.{theme}.{fg_name} ({fg}) and branding.{theme}.{bg_name} ({bg}) is {:.2}:1; it must be at least 4.5:1 (WCAG AA for text) because {why}",
                                 (ratio * 100.0).floor() / 100.0
                             ),
                         );
@@ -1293,7 +1301,66 @@ mod tests {
         let msg = err
             .get("branding.light.primary_foreground")
             .expect("contrast error");
-        assert!(msg.contains(":1") && msg.contains("at least 3:1"), "{msg}");
+        assert!(
+            msg.contains(":1") && msg.contains("at least 4.5:1"),
+            "{msg}"
+        );
+
+        // The old default dark pair (#FFFDF9 on #5B8FE0) is 3.2:1: readable for large text only,
+        // so it is refused now, with the measured ratio.
+        let err = SigninConfig::default()
+            .apply_patch(
+                &json!({"branding": {"dark": {"primary": "#5B8FE0"}}}),
+                no_secrets(),
+            )
+            .expect_err("3.2:1 button text");
+        let msg = err
+            .get("branding.dark.primary_foreground")
+            .expect("contrast error");
+        assert!(msg.contains("is 3.20:1"), "{msg}");
+        // Page text is held to the same bar.
+        let err = SigninConfig::default()
+            .apply_patch(
+                &json!({"branding": {"light": {"foreground": "#8A8580"}}}),
+                no_secrets(),
+            )
+            .expect_err("pale page text");
+        assert!(err.get("branding.light.foreground").is_some(), "{err:?}");
+        // Just above the bar passes.
+        assert!(
+            SigninConfig::default()
+                .apply_patch(
+                    &json!({"branding": {"light": {"primary": "#E5007E", "primary_foreground": "#FFFFFF"}}}),
+                    no_secrets(),
+                )
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn default_palettes_meet_wcag_aa_for_text() {
+        for (theme, p) in [
+            ("light", Palette::default_light()),
+            ("dark", Palette::default_dark()),
+        ] {
+            for (fg, bg) in [
+                (&p.primary_foreground, &p.primary),
+                (&p.foreground, &p.background),
+                (&p.foreground, &p.surface),
+            ] {
+                let ratio = contrast_ratio(fg, bg).expect("hex colours");
+                assert!(
+                    ratio >= MIN_TEXT_CONTRAST,
+                    "{theme}: {fg} on {bg} is {ratio:.2}:1"
+                );
+            }
+        }
+        // Filled buttons are the brand blue in both themes.
+        assert_eq!(Palette::default_dark().primary, "#1F5FB8");
+        assert_eq!(Palette::default_dark().primary_foreground, "#FFFDF9");
+        // A stored document without a dark palette gets the new default.
+        let c = SigninConfig::from_stored(&json!({"branding": {}}));
+        assert_eq!(c.branding.dark.primary, "#1F5FB8");
     }
 
     #[test]

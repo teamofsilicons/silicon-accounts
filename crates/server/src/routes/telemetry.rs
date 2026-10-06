@@ -4,9 +4,10 @@
 //! Body `{"events":[{"source":"cli","step":"login.device.approved","name":"cli.step",
 //! "progress":0.9,"data":{…}}]}`: at most 50 events, names `^[a-z0-9_.]{1,64}$`, `progress`
 //! 0..1, `data` a JSON object of at most 8 KB. Answers `202 {"accepted":n,"forwarded":bool}`.
-//! Nothing is forwarded when the caller sends `X-Accounts-Telemetry: off` or when this
-//! deployment has telemetry disabled (ACCOUNTS_TELEMETRY_ENABLED / _TABLE_KEY); the batch is
-//! still validated so clients learn about mistakes. 120 batches per minute per IP.
+//! Nothing is forwarded when the caller opted out (`X-Accounts-Telemetry: off` or the cookie
+//! `sa_telemetry=off`) or when this deployment has telemetry disabled
+//! (ACCOUNTS_TELEMETRY_ENABLED / _TABLE_KEY); the batch is still validated so clients learn
+//! about mistakes. 120 batches per minute per IP.
 
 use accounts_core::http::{ClientMeta, Json};
 use accounts_core::repo::rate_limit;

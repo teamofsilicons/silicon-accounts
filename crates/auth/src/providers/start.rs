@@ -10,7 +10,7 @@ use axum::http::{HeaderMap, Method as HttpMethod};
 use axum::response::{IntoResponse, Response};
 use serde_json::json;
 
-use super::{callback_url, endpoints, resolve_client};
+use super::{ProviderClient, callback_url, endpoints, resolve_client};
 use crate::flow::model::{self, ProviderLeg, Step};
 use crate::flow::{FlowApp, load_bound};
 use crate::util::{encrypt_text, no_store, telemetry};
@@ -54,16 +54,41 @@ pub async fn start_provider(
     )?;
     let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
     fa.ensure_active()?;
+    let (url, client) = begin_leg(&mut tx, &state, &mut flow, &fa, provider).await?;
+    model::save(&mut tx, &flow).await?;
+    tx.commit().await?;
+    telemetry(
+        &state,
+        "flow.provider_started",
+        Some(0.3),
+        json!({"app_id": fa.app.app_id, "provider": provider.as_str(), "mode": client.mode.as_str()}),
+    );
+    let mut response = Json(json!({ "authorize_url": url })).into_response();
+    no_store(response.headers_mut());
+    Ok(response)
+}
+
+/// Starts the provider leg of `flow` (the caller saves the flow): checks the method is enabled
+/// for the app, resolves its client (managed or bring-your-own), builds the provider's
+/// authorize URL (state bound to the flow, nonce, PKCE S256 for Google, `form_post` for Apple)
+/// and records the leg on the flow. Returns the URL and the client.
+///
+/// Errors: 403 `method_not_enabled`, 503 `provider_not_configured`.
+pub(crate) async fn begin_leg(
+    conn: &mut sqlx::PgConnection,
+    state: &AppState,
+    flow: &mut model::Flow,
+    fa: &FlowApp,
+    provider: Provider,
+) -> ApiResult<(String, ProviderClient)> {
     let method = match provider {
         Provider::Google => Method::Google,
         Provider::Apple => Method::Apple,
     };
     if !fa.config.methods.is_enabled(method) {
-        return Err(crate::flow::handlers::method_not_enabled(
-            &state, &fa, method,
-        ));
+        return Err(crate::flow::handlers::method_not_enabled(state, fa, method));
     }
-    let client = resolve_client(&mut tx, &state, &fa, provider).await?;
+    let client = resolve_client(conn, state, fa, provider).await?;
     let ep = endpoints(&state.settings, provider);
     let state_param = provider_state(&flow.id);
     let nonce = b64url(&random_bytes::<32>());
@@ -118,17 +143,7 @@ pub async fn start_provider(
         client_id: client.client_id.clone(),
         parked: None,
     });
-    model::save(&mut tx, &flow).await?;
-    tx.commit().await?;
-    telemetry(
-        &state,
-        "flow.provider_started",
-        Some(0.3),
-        json!({"app_id": fa.app.app_id, "provider": provider.as_str(), "mode": client.mode.as_str()}),
-    );
-    let mut response = Json(json!({ "authorize_url": url.to_string() })).into_response();
-    no_store(response.headers_mut());
-    Ok(response)
+    Ok((url.to_string(), client))
 }
 
 #[cfg(test)]

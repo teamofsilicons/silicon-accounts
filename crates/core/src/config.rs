@@ -29,6 +29,9 @@ pub const CONTRACT_OTP_TTL_SECONDS: i64 = 600;
 pub const CONTRACT_OTP_LOCK_SECONDS: i64 = 60;
 pub const CONTRACT_ACCESS_TOKEN_TTL_SECONDS: i64 = 1800;
 
+/// Where the published docs live unless ACCOUNTS_DOCS_URL says otherwise.
+pub const DEFAULT_DOCS_URL: &str = "https://account.teamofsilicons.com/docs";
+
 /// Every environment variable the service reads (all documented in `.env.example`).
 pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_ACCESS_TOKEN_TTL_SECONDS",
@@ -45,6 +48,7 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_DATABASE_MAX_CONNECTIONS",
     "ACCOUNTS_DATABASE_URL",
     "ACCOUNTS_DELIVERY",
+    "ACCOUNTS_DOCS_URL",
     "ACCOUNTS_ENCRYPTION_CURRENT_VERSION",
     "ACCOUNTS_ENCRYPTION_KEYRING",
     "ACCOUNTS_ENVIRONMENT",
@@ -216,7 +220,8 @@ impl AppleSettings {
 pub struct Settings {
     /// ACCOUNTS_ENVIRONMENT (development | test | production).
     pub environment: Environment,
-    /// ACCOUNTS_BIND_ADDR.
+    /// ACCOUNTS_BIND_ADDR. Default `127.0.0.1:8589`: the account site (Next.js) serves the public
+    /// origin and proxies `/v1/*` and `/.well-known/*` to this address.
     pub bind_addr: SocketAddr,
     /// ACCOUNTS_PUBLIC_URL without a trailing slash; also the token issuer.
     pub public_url: String,
@@ -262,6 +267,8 @@ pub struct Settings {
     pub trust_forwarded_for: bool,
     /// ACCOUNTS_SILICON_APPS_URL.
     pub silicon_apps_url: String,
+    /// ACCOUNTS_DOCS_URL: where the published docs live (`GET /v1/meta` `docs_url`).
+    pub docs_url: String,
     /// ACCOUNTS_INTERNAL_TOKEN (service token for `/v1/internal/*`).
     pub internal_token: Option<SecretString>,
     /// ACCOUNTS_REPORT_RECIPIENTS.
@@ -465,7 +472,7 @@ impl Settings {
         let prod = environment.is_production();
         Settings {
             environment,
-            bind_addr: SocketAddr::from(([127, 0, 0, 1], 8590)),
+            bind_addr: SocketAddr::from(([127, 0, 0, 1], 8589)),
             public_url: "http://localhost:8590".into(),
             public_origin: "http://localhost:8590".into(),
             extra_allowed_origins: Vec::new(),
@@ -520,6 +527,7 @@ impl Settings {
             ],
             trust_forwarded_for: false,
             silicon_apps_url: "https://apps.teamofsilicons.com".into(),
+            docs_url: DEFAULT_DOCS_URL.into(),
             internal_token: None,
             report_recipients: vec![
                 "saketdev12@gmail.com".into(),
@@ -594,7 +602,7 @@ impl Settings {
                 Some(addr) => s.bind_addr = addr,
                 None => r.problem(
                     "ACCOUNTS_BIND_ADDR",
-                    format!("'{v}' is not a host:port address like 127.0.0.1:8590"),
+                    format!("'{v}' is not a host:port address like 127.0.0.1:8589"),
                 ),
             }
         }
@@ -811,6 +819,7 @@ impl Settings {
             "ACCOUNTS_SILICON_APPS_URL",
             "https://apps.teamofsilicons.com",
         );
+        s.docs_url = r.http_url("ACCOUNTS_DOCS_URL", DEFAULT_DOCS_URL);
         s.internal_token = r.secret("ACCOUNTS_INTERNAL_TOKEN");
         if let Some(t) = &s.internal_token
             && t.expose_secret().len() < 32
@@ -984,6 +993,9 @@ mod tests {
     fn development_defaults_work_out_of_the_box() {
         let s = Settings::from_lookup(lookup(&[])).expect("defaults are valid");
         assert_eq!(s.environment, Environment::Development);
+        // The API listens on 8589 behind the account site, which serves the public 8590.
+        assert_eq!(s.bind_addr, SocketAddr::from(([127, 0, 0, 1], 8589)));
+        assert_eq!(s.docs_url, "https://account.teamofsilicons.com/docs");
         assert_eq!(s.public_url, "http://localhost:8590");
         assert_eq!(s.public_origin, "http://localhost:8590");
         assert!(!s.cookie_secure);
@@ -1004,8 +1016,10 @@ mod tests {
             ),
             ("ACCOUNTS_DELIVERY", "providers"),
             ("ACCOUNTS_IP_TIMEZONE_HEADERS", "X-Test-TZ"),
+            ("ACCOUNTS_DOCS_URL", "https://docs.example.test/accounts/"),
         ]))
         .expect("valid");
+        assert_eq!(s.docs_url, "https://docs.example.test/accounts");
         assert_eq!(s.public_url, "https://account.example.test");
         assert_eq!(
             s.extra_allowed_origins,
@@ -1125,7 +1139,8 @@ mod tests {
         let s = Settings::from_lookup(|k| map.get(k).cloned()).expect(".env.example parses");
         assert_eq!(s.environment, Environment::Development);
         assert_eq!(s.token_pepper.expose_secret(), DEV_TOKEN_PEPPER);
-        assert_eq!(s.extra_allowed_origins, vec!["http://localhost:5190"]);
+        assert_eq!(s.extra_allowed_origins, vec!["http://127.0.0.1:8590"]);
+        assert_eq!(s.bind_addr.port(), 8589);
         assert!(s.dev_outbox_enabled());
     }
 }

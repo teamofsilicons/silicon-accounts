@@ -226,6 +226,18 @@ pub struct PendingSignup {
     pub claim_account_uuid: Option<String>,
 }
 
+/// A flow that connects a Google or Apple account to a signed-in Carbon (the account site's
+/// "Connect Google", `POST /v1/me/identities/{provider}`) instead of signing anyone in. The
+/// provider's verified email is added to the account without a code (UNDERSTANDING.md: an email
+/// added via Google or Apple needs no extra verification).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LinkIntent {
+    /// The Carbon that asked; the browser must still be signed in as it when the answer comes.
+    pub account_uuid: String,
+    /// Where the browser goes afterwards (on the public origin), with `linked=` or `link_error=`.
+    pub return_to: String,
+}
+
 /// Flow state that has no column of its own; stored as JSON in `signin_flows.provider_state`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -246,6 +258,8 @@ pub struct FlowExtras {
     pub switched: bool,
     /// The browser session the flow signed in with (recorded on the authorization code).
     pub browser_session_id: Option<Uuid>,
+    /// Set when this flow connects a provider to a signed-in Carbon (see [`LinkIntent`]).
+    pub link: Option<LinkIntent>,
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]

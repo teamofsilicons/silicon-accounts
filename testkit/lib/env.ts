@@ -48,6 +48,30 @@ export function accountsEnvForMocks(urls: MockUrls = {}, credentials: DevCredent
   };
 }
 
+export interface Topology {
+  /** accounts-api's port on 127.0.0.1 (default 8589). */
+  apiPort?: number;
+  /** The public origin browsers, apps and the CLI use: the account site (default http://localhost:8590). */
+  publicUrl?: string;
+}
+
+/**
+ * The topology of a local stack: accounts-api listens on 127.0.0.1:<apiPort> behind the account
+ * site (Next.js) on the public URL, which proxies /v1/* and /.well-known/* to it. The site passes
+ * X-Forwarded-For through, so accounts-api takes the client address from it
+ * (ACCOUNTS_TRUST_FORWARDED_FOR=true; the right-most entry wins).
+ */
+export function accountsTopologyEnv(topology: Topology = {}): Record<string, string> {
+  const apiPort = topology.apiPort ?? 8589;
+  if (!Number.isInteger(apiPort) || apiPort < 1 || apiPort > 65_535) throw new Error(`apiPort must be a port number, got ${apiPort}`);
+  const publicUrl = (topology.publicUrl ?? 'http://localhost:8590').replace(/\/+$/, '');
+  return {
+    ACCOUNTS_BIND_ADDR: `127.0.0.1:${apiPort}`,
+    ACCOUNTS_PUBLIC_URL: publicUrl,
+    ACCOUNTS_TRUST_FORWARDED_FOR: 'true',
+  };
+}
+
 /**
  * Renders env vars as a .env file for dotenvy (what accounts-api loads in development):
  * values needing quotes are double-quoted with \\, \", \$ and \n escapes, so the multi-line

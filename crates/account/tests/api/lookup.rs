@@ -116,6 +116,81 @@ async fn id_availability_reports_each_reason() {
 }
 
 #[tokio::test]
+async fn a_custodian_checks_ids_for_its_silicon() {
+    let ctx = TestContext::new().await;
+    let custodian = ctx.carbon().await;
+    let (silicon, _) = ctx.silicon(&custodian.uuid).await;
+    let old_id = silicon.handle.clone().expect("si:id");
+    let mut conn = ctx.conn().await;
+    let new_id =
+        AccountId::new(AccountKind::Silicon, &format!("renamed-{}", rand_suffix())).expect("id");
+    accounts::change_id(&mut conn, &silicon.uuid, &new_id, &custodian.uuid)
+        .await
+        .expect("change id");
+    drop(conn);
+    let tok = token(&ctx, &custodian).await;
+    let for_silicon = |id: &str, target: &str| {
+        Req::get(&format!(
+            "/v1/ids/available?id={}&for={}",
+            id.replace(':', "%3A"),
+            target.replace(':', "%3A")
+        ))
+    };
+
+    // As the custodian itself the old id is someone else's reservation…
+    let r = call(&ctx, available(&old_id).bearer(&tok)).await;
+    assert_eq!(r.json["reason"], "reserved", "{}", r.json);
+    // …but for the Silicon (by uuid or by its current si:id) it can be taken back.
+    for target in [silicon.uuid.clone(), new_id.to_string()] {
+        let r = call(&ctx, for_silicon(&old_id, &target).bearer(&tok)).await;
+        assert_status(&r, 200);
+        assert_eq!(r.json["available"], true, "{target}: {}", r.json);
+        assert_eq!(r.json["reclaimable"], true);
+        let message = r.json["message"].as_str().expect("message");
+        assert!(
+            message.contains(&format!("was an id of {new_id}"))
+                && message.contains("take it back for it"),
+            "{message}"
+        );
+    }
+    // Its current id is its own.
+    let r = call(
+        &ctx,
+        for_silicon(&new_id.to_string(), &silicon.uuid).bearer(&tok),
+    )
+    .await;
+    assert_eq!(r.json["reason"], "taken");
+    assert_eq!(
+        r.json["message"],
+        format!("{new_id} is already the id of {new_id}.")
+    );
+    // The caller's own uuid is allowed (same as leaving for= out).
+    let r = call(&ctx, for_silicon(&old_id, &custodian.uuid).bearer(&tok)).await;
+    assert_eq!(r.json["reason"], "reserved");
+
+    // Another Carbon can't ask for someone else's Silicon, and nobody can without a session.
+    let stranger = ctx.carbon().await;
+    let r = call(
+        &ctx,
+        for_silicon(&old_id, &silicon.uuid).bearer(&token(&ctx, &stranger).await),
+    )
+    .await;
+    assert_error(&r, 404, "silicon_not_found");
+    let r = call(&ctx, for_silicon(&old_id, &silicon.uuid)).await;
+    assert_error(&r, 401, "unauthenticated");
+    // A blank for= is the same as leaving it out.
+    let r = call(
+        &ctx,
+        Req::get(&format!(
+            "/v1/ids/available?id={}&for=",
+            old_id.replace(':', "%3A")
+        )),
+    )
+    .await;
+    assert_eq!(r.json["reason"], "reserved");
+}
+
+#[tokio::test]
 async fn id_availability_is_rate_limited_per_ip() {
     let ctx = TestContext::new().await;
     ctx.exec(

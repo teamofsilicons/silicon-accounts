@@ -7,6 +7,7 @@
 //! | `POST /v1/me/silicons` (IDEMPOTENT) | create a Silicon with me as custodian (active at once) |
 //! | `GET /v1/me/silicons/{uuid}` | one Silicon |
 //! | `PATCH /v1/me/silicons/{uuid}` | display name, timezone, photo (`null` = default) |
+//! | `POST /v1/me/silicons/{uuid}/photo` (IDEMPOTENT) | upload its profile photo (raw image, ≤ 2 MB; owned by the Silicon) |
 //! | `POST /v1/me/silicons/{uuid}/id` | change its si:id (old id reserved 10 days) |
 //! | `PUT`/`DELETE /v1/me/silicons/{uuid}/webhook` | its webhook (new secret each time) |
 //! | `POST /v1/me/silicons/{uuid}/stk` | rotate its STK: old STK dead, every session revoked |
@@ -25,15 +26,17 @@ use accounts_core::events::{self, signout_reason};
 use accounts_core::http::{CarbonAuth, ClientMeta, IdempotencyKey, Json, PageParams, Path, Query};
 use accounts_core::ids::AccountId;
 use accounts_core::models::{Account, AccountKind, AccountStatus};
-use accounts_core::pfp::default_pfp_url;
+use accounts_core::pfp::{self, default_pfp_url};
+use accounts_core::photo_upload;
 use accounts_core::repo::accounts::{self, NewSilicon, ProfileUpdate};
 use accounts_core::repo::rate_limit::{self, Limit};
 use accounts_core::repo::{idempotency, photos, sessions, tokens};
 use accounts_core::state::AppState;
 use accounts_core::timefmt::format_rfc3339_ms;
 use accounts_core::views::Page;
+use axum::body::Body;
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -355,6 +358,91 @@ pub async fn update(
     tx.commit().await?;
     let mut conn = state.db.acquire().await?;
     Ok(Json(views::silicon_item(&mut conn, &updated).await?))
+}
+
+/// `POST /v1/me/silicons/{uuid}/photo`: the custodian uploads a profile photo for its Silicon.
+/// The body is the raw image, with the same rules as `POST /v1/me/photo` (PNG, JPEG, WebP or
+/// GIF, at most 2 MB and 8192 px per side); it counts toward the custodian's 20 uploads per
+/// hour. The photo belongs to the Silicon (it stays its photo after a transfer, and the
+/// Silicon's older uploads nobody shows are deleted). Apps that see the Silicon's photo get
+/// `account.updated`, the Silicon's own webhook `silicon.updated`.
+/// → 201 `{"pfp_url","photo":{id,content_type,bytes,width,height},"silicon":SiliconItem}`.
+/// Accepts `Idempotency-Key`.
+pub async fn upload_photo(
+    State(state): State<AppState>,
+    me: CarbonAuth,
+    meta: ClientMeta,
+    idem: Option<IdempotencyKey>,
+    Path(key): Path<String>,
+    headers: HeaderMap,
+    body: Body,
+) -> Result<Response, ApiError> {
+    let upload = photo_upload::read(&headers, body, "/v1/me/silicons/{uuid}/photo").await?;
+    let scope = idempotency::scope(
+        &format!("account:{}", me.uuid()),
+        "POST",
+        &format!("/v1/me/silicons/{}/photo", key.trim()),
+    );
+    let fingerprint = upload.fingerprint();
+    idempotency::run(
+        &state,
+        idem.as_deref(),
+        &scope,
+        &fingerprint,
+        false,
+        || async {
+            // Not the custodian (or no such Silicon) is a 404 before anything is counted.
+            {
+                let mut conn = state.db.acquire().await?;
+                crate::common::my_silicon(&mut conn, me.uuid(), &key).await?;
+            }
+            photo_upload::count_account_upload(&state.db, me.uuid()).await?;
+            let mut tx = state.db.begin().await?;
+            // The Silicon's row lock: its uploads are pruned under it (core's repo::photos).
+            let silicon = lock_my_silicon(&mut tx, me.uuid(), &key).await?;
+            let photo_id = photos::insert_for_account(&mut tx, &silicon.uuid, &upload).await?;
+            let pfp_url = pfp::photo_url(&state.settings, photo_id);
+            let (updated, changed) = accounts::update_profile(
+                &mut tx,
+                &silicon.uuid,
+                &ProfileUpdate {
+                    pfp_url: Some(pfp_url.clone()),
+                    ..Default::default()
+                },
+            )
+            .await?;
+            events::notify_profile_updated(&mut tx, &updated, &changed).await?;
+            let deleted = photos::prune(&mut tx, &state.settings, &silicon.uuid).await?;
+            Actor::account(me.uuid(), meta.ip.as_deref())
+                .record_for(
+                    &mut tx,
+                    "silicon.photo.uploaded",
+                    &[Some(&silicon.uuid), Some(me.uuid())],
+                    &silicon.uuid,
+                    json!({
+                        "photo_id": photo_id.to_string(),
+                        "content_type": upload.info.kind.mime(),
+                        "bytes": upload.bytes.len(),
+                        "width": upload.info.width,
+                        "height": upload.info.height,
+                        "deleted_photos": deleted,
+                    }),
+                )
+                .await?;
+            tx.commit().await?;
+            let mut conn = state.db.acquire().await?;
+            let item = views::silicon_item(&mut conn, &updated).await?;
+            Ok((
+                StatusCode::CREATED,
+                json!({
+                    "pfp_url": pfp_url,
+                    "photo": upload.view(photo_id),
+                    "silicon": serde_json::to_value(item)?,
+                }),
+            ))
+        },
+    )
+    .await
 }
 
 /// `{"id": "si:new"}`.

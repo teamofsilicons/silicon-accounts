@@ -9,7 +9,7 @@
 //! | `POST /v1/silicons/login` | public | si:id + STK → first-party tokens |
 //! | `POST /v1/me/short-lived-tokens` | session | a 2-minute single-use token to sign into one app |
 //! | `PUT`/`DELETE /v1/me/webhook`, `POST /v1/me/webhook/test` | session (Silicon) | the Silicon's own webhook |
-//! | `/v1/me/silicons…` | session (Carbon) | the custodian's side: create, view, edit, id, webhook, STK, transfer, delete |
+//! | `/v1/me/silicons…` | session (Carbon) | the custodian's side: create, view, edit, photo upload, id, webhook, STK, transfer, delete |
 //! | `/v1/me/custodian-requests…` | session (Carbon) | requests addressed to me: list, accept, decline |
 //!
 //! [`spawn_background`] starts the custodian-request expiry sweep (every minute). Overdue
@@ -85,6 +85,10 @@ pub fn router() -> Router<AppState> {
                 .delete(custodian::delete),
         )
         .route("/v1/me/silicons/{uuid}/id", post(custodian::change_id))
+        .route(
+            "/v1/me/silicons/{uuid}/photo",
+            post(custodian::upload_photo),
+        )
         .route(
             "/v1/me/silicons/{uuid}/webhook",
             put(custodian::set_webhook).delete(custodian::remove_webhook),

@@ -96,6 +96,10 @@ async fn health_ready_and_meta() {
     assert_eq!(r.json["environment"], "test");
     assert_eq!(r.json["public_url"], "http://localhost:8590");
     assert_eq!(
+        r.json["docs_url"],
+        "https://account.teamofsilicons.com/docs"
+    );
+    assert_eq!(
         r.json["silicon_apps_url"],
         "https://apps.teamofsilicons.com"
     );
@@ -684,6 +688,81 @@ async fn telemetry_accepts_cli_events_and_rejects_bad_ones() {
     assert_eq!(r.status, 422, "events is required");
 }
 
+/// Names of the captured telemetry events (and empties the sink).
+fn drain(sink: &accounts_core::telemetry::CapturedEvents) -> Vec<String> {
+    let mut events = sink.lock().expect("sink");
+    let names = events
+        .iter()
+        .map(|e| e["event"].as_str().unwrap_or_default().to_string())
+        .collect();
+    events.clear();
+    names
+}
+
+#[tokio::test]
+async fn telemetry_opt_out_covers_every_event_of_the_request() {
+    let mut ctx = TestContext::new().await;
+    let (telemetry, sink) = accounts_core::telemetry::Telemetry::capturing();
+    ctx.state.telemetry = telemetry;
+    let carbon = ctx.carbon().await;
+    let token = ctx.first_party_tokens(&carbon).await.access_token;
+    let rename = |name: &str| {
+        Req::patch("/v1/me")
+            .bearer(&token)
+            .json(json!({"display_name": name}))
+    };
+
+    // Opted in: the request event and the event the handler records.
+    let r = send(&ctx, rename("Telemetry One")).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let events = drain(&sink);
+    assert!(
+        events.contains(&"http.request".to_string())
+            && events.contains(&"account.profile.updated".to_string()),
+        "{events:?}"
+    );
+
+    // X-Accounts-Telemetry: off drops both.
+    let r = send(
+        &ctx,
+        rename("Telemetry Two").header("x-accounts-telemetry", "off"),
+    )
+    .await;
+    assert_eq!(r.status, 200);
+    assert_eq!(drain(&sink), Vec::<String>::new());
+
+    // So does the account site's cookie, even next to a Bearer token.
+    let r = send(
+        &ctx,
+        rename("Telemetry Three").header("cookie", "sa_telemetry=off"),
+    )
+    .await;
+    assert_eq!(r.status, 200);
+    assert_eq!(drain(&sink), Vec::<String>::new());
+
+    // Client events are not forwarded for an opted-out caller either.
+    let batch = json!({"events": [{"source": "web", "step": "settings", "name": "web.step"}]});
+    let r = send(
+        &ctx,
+        Req::post("/v1/telemetry/events")
+            .header("cookie", "sa_telemetry=off")
+            .json(batch.clone()),
+    )
+    .await;
+    assert_eq!(r.status, 202);
+    assert_eq!(r.json["forwarded"], false);
+    assert_eq!(drain(&sink), Vec::<String>::new());
+    let r = send(&ctx, Req::post("/v1/telemetry/events").json(batch)).await;
+    assert_eq!(r.json["forwarded"], true);
+    assert!(drain(&sink).contains(&"web.step".to_string()));
+
+    // Background work (outside any request) is the service's own and keeps reporting.
+    ctx.state
+        .telemetry
+        .record("worker", "test", "worker.event", json!({}));
+    assert_eq!(drain(&sink), vec!["worker.event".to_string()]);
+}
+
 async fn enqueue(ctx: &TestContext, to: &str, purpose: &str, text: &str) {
     let mut conn = ctx.conn().await;
     delivery::enqueue(
@@ -826,6 +905,107 @@ async fn body_limits_per_route() {
             .as_str()
             .is_some_and(|m| m.contains("at most 2 MB"))
     );
+}
+
+/// A valid 100×100 PNG padded past the 64 KB default body limit (the image check only reads
+/// the header chunks).
+fn big_png() -> Vec<u8> {
+    let mut v = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    v.extend_from_slice(&13u32.to_be_bytes());
+    v.extend_from_slice(b"IHDR");
+    v.extend_from_slice(&100u32.to_be_bytes());
+    v.extend_from_slice(&100u32.to_be_bytes());
+    v.extend_from_slice(&[8, 6, 0, 0, 0, 0x1F, 0x15, 0xC4, 0x89]);
+    v.extend_from_slice(&[0, 0, 0, 0, b'I', b'E', b'N', b'D', 0xAE, 0x42, 0x60, 0x82]);
+    v.resize(100 * 1024, 0);
+    v
+}
+
+#[tokio::test]
+async fn silicon_photos_and_their_history_through_the_whole_service() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let token = ctx.first_party_tokens(&carbon).await.access_token;
+    let id = format!("si:shot-{}", accounts_core::test_support::rand_suffix());
+    let r = send(
+        &ctx,
+        Req::post("/v1/me/silicons")
+            .bearer(&token)
+            .json(json!({"id": id, "display_name": "Shot"})),
+    )
+    .await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    let uuid = r.json["silicon"]["uuid"]
+        .as_str()
+        .expect("uuid")
+        .to_string();
+
+    // A 100 KB photo: the custodian's photo route takes 2 MB like POST /v1/me/photo.
+    let mut req = Req::post(&format!("/v1/me/silicons/{uuid}/photo"))
+        .bearer(&token)
+        .header("content-type", "image/png");
+    req.body = big_png();
+    let r = send(&ctx, req).await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    let pfp_url = r.json["pfp_url"].as_str().expect("pfp_url").to_string();
+    let path = &pfp_url[pfp_url.find("/v1/photos/").expect("photo path")..];
+    let r = send(&ctx, Req::get(path)).await;
+    assert_eq!(r.status, 200);
+    assert_eq!(r.body.len(), 100 * 1024);
+
+    // The sign-up page's photo route takes 2 MB too (this flow doesn't exist, so the answer is
+    // the flow's error, not the body limit).
+    let mut req =
+        Req::post("/v1/flows/no-such-flow/signup/photo").header("content-type", "image/png");
+    req.body = big_png();
+    let r = send(&ctx, req).await;
+    assert_ne!(r.status, 413, "{}", r.json);
+
+    // Everything the custodian did to the Silicon names it in the custodian's history.
+    let r = send(
+        &ctx,
+        Req::post(&format!("/v1/me/silicons/{uuid}/stk"))
+            .bearer(&token)
+            .json(json!({})),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let r = send(
+        &ctx,
+        Req::put(&format!("/v1/me/silicons/{uuid}/webhook"))
+            .bearer(&token)
+            .json(json!({"url": "https://hooks.example.test/shot"})),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let r = send(
+        &ctx,
+        Req::get("/v1/me/history?kind=security").bearer(&token),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let items = r.json["items"].as_array().expect("items").clone();
+    let titles: Vec<&str> = items.iter().filter_map(|i| i["title"].as_str()).collect();
+    for expected in [
+        format!("STK of {id} rotated"),
+        format!("New profile photo for {id}"),
+        format!("Webhook of {id} set"),
+    ] {
+        assert!(
+            titles.contains(&expected.as_str()),
+            "{expected}: {titles:?}"
+        );
+    }
+    let webhook = items
+        .iter()
+        .find(|i| i["meta"]["action"] == "silicon.webhook.set")
+        .expect("webhook entry");
+    assert_eq!(webhook["detail"], "Events go to https://hooks.example.test");
+    for item in &items {
+        assert_eq!(item["meta"]["silicon"]["uuid"], uuid.as_str(), "{item}");
+        assert_eq!(item["meta"]["silicon"]["id"], id.as_str());
+        assert_eq!(item["meta"]["silicon"]["kind"], "silicon");
+    }
 }
 
 async fn panics() -> &'static str {

@@ -41,6 +41,66 @@ async fn count_lookup(state: &AppState, caller: &Caller) -> ApiResult<()> {
 #[derive(Debug, Deserialize)]
 pub(crate) struct AvailableQuery {
     id: Option<String>,
+    /// Answer for a Silicon the caller is custodian of (its uuid or si:id): an id reserved for
+    /// that Silicon (one of its recent ids) is `available: true, reclaimable: true`.
+    #[serde(rename = "for")]
+    for_account: Option<String>,
+}
+
+/// The account an availability answer is for, and how messages name it (`None` = "you").
+struct Requester {
+    uuid: String,
+    label: Option<String>,
+}
+
+/// Whose point of view `?for=` asks for: the caller itself (its uuid or id), or a Silicon the
+/// caller is custodian of. Anything else is 404 `silicon_not_found` (other Carbons' Silicons
+/// are not revealed); without a session it is 401.
+async fn requester_for(
+    conn: &mut PgConnection,
+    auth: Option<&AccountAuth>,
+    target: &str,
+) -> ApiResult<Requester> {
+    let Some(auth) = auth else {
+        return Err(ApiError::unauthenticated(
+            "unauthenticated",
+            format!(
+                "?for={} asks whether an id is free for one of your Silicons, which needs you signed in as its custodian.",
+                clip(target, 40)
+            ),
+        )
+        .hint("Send the session cookie or an Authorization: Bearer access token, or leave out ?for= to check the id for anyone."));
+    };
+    let lower = target.to_lowercase();
+    if target == auth.uuid() || auth.account.handle.as_deref() == Some(lower.as_str()) {
+        return Ok(Requester {
+            uuid: auth.uuid().to_string(),
+            label: None,
+        });
+    }
+    let found = if target.contains(':') {
+        accounts::by_handle(conn, &lower).await?
+    } else {
+        accounts::get(conn, target).await?
+    };
+    match found {
+        Some(a)
+            if a.kind == AccountKind::Silicon
+                && a.status != AccountStatus::Deleted
+                && a.custodian_uuid.as_deref() == Some(auth.uuid()) =>
+        {
+            Ok(Requester {
+                label: Some(a.display_id()),
+                uuid: a.uuid,
+            })
+        }
+        _ => Err(ApiError::not_found(
+            "silicon_not_found",
+            format!("You are not the custodian of a Silicon '{}'.", clip(target, 40)),
+        )
+        .hint("Pass the uuid or si:id of a Silicon you are custodian of (GET /v1/me/silicons), or leave out ?for= to check the id for yourself.")
+        .detail("silicon", clip(target, 40))),
+    }
 }
 
 /// The `GET /v1/ids/available` body: core's [`IdAvailability`] plus `suggestions`, up to three
@@ -67,6 +127,8 @@ fn suggestion_seed(input: &str) -> Option<(AccountKind, String)> {
 
 /// `GET /v1/ids/available?id=c:saket` — public, 120 requests per minute per IP. With a session,
 /// an id reserved for the caller (one of its recent ids) is `available: true, reclaimable: true`.
+/// A custodian adds `&for=<the Silicon's uuid or si:id>` to ask the same for one of its Silicons
+/// (whose reserved ids it may take back for it).
 pub(crate) async fn id_available(
     State(state): State<AppState>,
     meta: ClientMeta,
@@ -103,8 +165,25 @@ pub(crate) async fn id_available(
         }));
     }
     let mut conn = state.db.acquire().await?;
-    let availability =
-        accounts::id_availability(&mut conn, &input, auth.as_ref().map(|a| a.uuid())).await?;
+    let requester = match q
+        .for_account
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+    {
+        None => auth.as_ref().map(|a| Requester {
+            uuid: a.uuid().to_string(),
+            label: None,
+        }),
+        Some(target) => Some(requester_for(&mut conn, auth.as_ref(), target).await?),
+    };
+    let availability = accounts::id_availability_for(
+        &mut conn,
+        &input,
+        requester.as_ref().map(|r| r.uuid.as_str()),
+        requester.as_ref().and_then(|r| r.label.as_deref()),
+    )
+    .await?;
     let suggestions = match (availability.available, suggestion_seed(&input)) {
         (false, Some((kind, seed))) if !seed.trim().is_empty() => {
             accounts::suggest_ids(&mut conn, kind, &[seed.as_str()], 3)

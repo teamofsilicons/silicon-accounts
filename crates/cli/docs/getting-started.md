@@ -69,7 +69,8 @@ State goes in `{home}/.accounts/`. The home is `--home`, else `ACCOUNTS_HOME`, e
 directory set with `accounts config home <dir>`, else `$SILICON_HOME`, else `~`.
 `accounts config get` shows every setting and where it came from. Use `--url` (or
 `ACCOUNTS_URL`, or `accounts config set url …`) to talk to another Silicon Accounts
-instance, e.g. a local one at `http://127.0.0.1:8590`.
+instance, e.g. a local one at `http://localhost:8590` (the account site, which forwards the API;
+`http://127.0.0.1:8589` reaches accounts-api directly).
 
 ## Output, errors and exit codes
 

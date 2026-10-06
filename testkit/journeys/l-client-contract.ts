@@ -25,6 +25,7 @@ import {
   rid,
   section,
   signUpCarbon,
+  sleep,
   startAppSignIn,
 } from './_common.ts';
 
@@ -125,7 +126,16 @@ compare('app users ↔ GET …/users', await appRaw('/v1/apps/briefcase/users', 
 compare('app user ↔ GET …/users/{uuid}', await appRaw(`/v1/apps/briefcase/users/${carbon.me.uuid}`), await cliJson(homeA, ['app', 'user', carbon.me.uuid], env));
 const dmEnv = { ACCOUNTS_APP_ID: 'dm', ACCOUNTS_APP_SECRET: fakeApp('dm').secret };
 compare('app proof list ↔ GET …/proofs', (await accounts.app('dm').request('GET', '/v1/apps/dm/proofs')).body, await cliJson(homeA, ['app', 'proof', 'list'], dmEnv));
-await app.request('POST', '/v1/apps/briefcase/webhook/test');
+{
+  // Compare settled deliveries: the worker sends the ping right away, and a delivery read while
+  // pending (next_attempt_at, no attempts) and again once delivered would differ by timing alone.
+  const ping: any = (await app.request('POST', '/v1/apps/briefcase/webhook/test')).body;
+  for (let i = 0; i < 100; i++) {
+    const d: any = await appRaw(`/v1/apps/briefcase/webhook/deliveries/${ping.delivery_id}`);
+    if (d?.status && d.status !== 'pending') break;
+    await sleep(100);
+  }
+}
 compare('app webhook deliveries ↔ GET …/webhook/deliveries', await appRaw('/v1/apps/briefcase/webhook/deliveries', { limit: 3 }), await cliJson(homeA, ['app', 'webhook', 'deliveries', '--limit', '3'], env));
 {
   const one: any = await appRaw('/v1/apps/briefcase/webhook/deliveries', { limit: 1 });

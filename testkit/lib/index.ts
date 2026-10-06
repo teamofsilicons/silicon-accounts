@@ -6,6 +6,7 @@ export * from './env.ts';
 export * from './fake-apps.ts';
 export * from './fixtures.ts';
 export * from './http.ts';
+export * from './images.ts';
 export * from './mocks.ts';
 export * from './pkce.ts';
 export * from './signature.ts';

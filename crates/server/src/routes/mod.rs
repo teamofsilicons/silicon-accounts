@@ -4,7 +4,7 @@
 //! |---|---|---|
 //! | `GET /healthz` | public | liveness: `200 ok` |
 //! | `GET /readyz` | public | readiness: `200 {"database":"ok"}` or `503` |
-//! | `GET /v1/meta` | public | service name, version, environment, URLs, providers, delivery |
+//! | `GET /v1/meta` | public | service name, version, environment, URLs (public, Silicon Apps, docs), providers, delivery |
 //! | `POST /v1/reports` | optional session | bug report mailed to the report recipients |
 //! | `POST /v1/telemetry/events` | public | client telemetry forwarded to Space Station |
 //! | `GET /v1/dev/outbox` | public, dev only | messages recorded by the service (with OTP codes) |

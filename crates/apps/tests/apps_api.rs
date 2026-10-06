@@ -19,7 +19,12 @@ async fn public_config_is_cors_open_and_lists_available_methods() {
     assert_eq!(r.json["app_id"], a.app_id.as_str());
     assert_eq!(r.json["methods"], json!(["email"]));
     assert_eq!(r.json["branding"]["light"]["primary"], "#1F5FB8");
+    assert_eq!(
+        r.json["branding"]["dark"]["primary"], "#1F5FB8",
+        "filled buttons keep the brand blue in dark mode too"
+    );
     assert_eq!(r.json["copy"]["title"], serde_json::Value::Null);
+    assert_eq!(r.json["allowed_origins"], json!([]));
     assert!(
         r.json.get("signin_config").is_none(),
         "public config never shows the setup"
@@ -31,7 +36,8 @@ async fn public_config_is_cors_open_and_lists_available_methods() {
         Req::patch(&format!("/v1/apps/{}/signin-config", a.app_id))
             .basic(&a.app_id, &a.secret)
             .json(json!({"methods": {"google": true, "phone": true}, "method_order": ["phone", "google", "email"],
-                         "branding": {"radius": 28}, "copy": {"title": "Sign in to Pub"}})),
+                         "branding": {"radius": 28}, "copy": {"title": "Sign in to Pub"},
+                         "allowed_origins": ["https://pub.example.com/", "http://localhost:3000"]})),
     )
     .await;
     assert_eq!(r.status, 200, "{}", r.json);
@@ -39,6 +45,11 @@ async fn public_config_is_cors_open_and_lists_available_methods() {
     assert_eq!(r.json["methods"], json!(["phone", "email"]));
     assert_eq!(r.json["branding"]["radius"], 28);
     assert_eq!(r.json["copy"]["title"], "Sign in to Pub");
+    // What the embed page needs for its frame-ancestors (normalized, no trailing slash).
+    assert_eq!(
+        r.json["allowed_origins"],
+        json!(["https://pub.example.com", "http://localhost:3000"])
+    );
 
     let r = call(&ctx, Req::get("/v1/apps/nope-nope/public")).await;
     assert_eq!(r.status, 404);

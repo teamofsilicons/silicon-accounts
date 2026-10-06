@@ -1058,8 +1058,12 @@ async fn run_webhook(
     command: AppWebhookCommand,
 ) -> CliResult<Outcome> {
     match command {
-        AppWebhookCommand::Set { endpoint } => {
-            let hook = app.set_webhook(&endpoint).await?;
+        AppWebhookCommand::Set {
+            endpoint,
+            idempotency_key,
+        } => {
+            let key = idempotency_key.unwrap_or_else(util::idempotency_key);
+            let hook = app.set_webhook(&endpoint, Some(&key)).await?;
             let secret = hook
                 .secret
                 .as_ref()
@@ -1083,8 +1087,9 @@ async fn run_webhook(
                 format!("Removed the webhook of {app_id}."),
             ))
         }
-        AppWebhookCommand::Rotate => {
-            let secret = app.rotate_webhook_secret().await?;
+        AppWebhookCommand::Rotate { idempotency_key } => {
+            let key = idempotency_key.unwrap_or_else(util::idempotency_key);
+            let secret = app.rotate_webhook_secret(Some(&key)).await?;
             Ok(Outcome::new(
                 to_json(&secret),
                 format!(
@@ -1093,8 +1098,9 @@ async fn run_webhook(
                 ),
             ))
         }
-        AppWebhookCommand::Test => {
-            let result = app.test_webhook().await?;
+        AppWebhookCommand::Test { idempotency_key } => {
+            let key = idempotency_key.unwrap_or_else(util::idempotency_key);
+            let result = app.test_webhook(Some(&key)).await?;
             Ok(Outcome::new(
                 to_json(&result),
                 format!(

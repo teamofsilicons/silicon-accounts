@@ -58,6 +58,8 @@ export interface Meta {
   environment: string;
   public_url: string;
   silicon_apps_url: string;
+  /** Where the published docs live (ACCOUNTS_DOCS_URL). */
+  docs_url?: string;
   providers: { google: boolean; apple: boolean };
   delivery: 'local' | 'providers';
 }

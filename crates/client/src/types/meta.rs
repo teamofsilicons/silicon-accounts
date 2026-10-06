@@ -28,6 +28,13 @@ pub struct Meta {
     /// Where apps are created.
     #[serde(default, deserialize_with = "lenient_string")]
     pub silicon_apps_url: String,
+    /// Where the published docs live (absent on servers that don't report it).
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub docs_url: Option<String>,
     /// Which managed sign-in providers are configured.
     #[serde(default)]
     pub providers: Providers,

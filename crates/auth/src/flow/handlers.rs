@@ -330,11 +330,29 @@ pub async fn switch_account(
         "switch account",
     )?;
     let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    // "Not you?" on the sign-up step: that sign-up ends here (its verified email, phone or
+    // provider account can't be resumed by the next flow in this browser) and the browser
+    // forgets it. The cookie is cleared only when it names that sign-up, so a stale tab never
+    // ends a newer sign-up of the same browser.
+    let mut cookies = Vec::new();
+    if flow.step == Step::Signup
+        && let Some(session_id) = flow.signup_session_id
+    {
+        signup::expire_session(&mut tx, session_id).await?;
+        accounts_core::repo::photos::discard_signup_photos(&mut tx, session_id).await?;
+        let browser_session = signup::from_cookie(&mut tx, &state, &headers).await?;
+        if browser_session.is_none_or(|s| s.id == session_id || !s.is_live()) {
+            cookies.push(accounts_core::http::cookies::clear_cookie(
+                &state.settings,
+                accounts_core::http::cookies::SIGNUP_COOKIE,
+            ));
+        }
+    }
     flow.reset_to_choose_method();
     flow.extras.error = None;
     flow.extras.switched = true;
     model::save(&mut tx, &flow).await?;
-    let response = respond(&mut tx, &state, &meta, None, &flow, &fa, Vec::new()).await?;
+    let response = respond(&mut tx, &state, &meta, None, &flow, &fa, cookies).await?;
     tx.commit().await?;
     Ok(response)
 }

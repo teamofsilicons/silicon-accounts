@@ -16,12 +16,14 @@ let tasks = accounts_auth::spawn_background(state.clone());        // sweep of e
 | `POST /v1/flows` | public, same Origin | validates the authorize request, creates the flow (60 min), sets `sa_flow`, `201 {"flow": FlowView}` |
 | `GET /v1/flows/{id}` | flow | the flow; also **claims** a Google/Apple outcome (sets `sa_session` / `sa_signup`, see below) |
 | `POST /v1/flows/{id}/continue` | flow + session | continue as the browser's Carbon |
-| `POST /v1/flows/{id}/switch` | flow | forget the chosen account → `choose_method` (the browser's account is not offered again) |
+| `POST /v1/flows/{id}/switch` | flow | forget the chosen account → `choose_method` (the browser's account is not offered again). At the `signup` step ("Not you?") that sign-up ends: its session expires (no later flow resumes it), its photo upload is dropped and `sa_signup` is cleared when it names that sign-up (a newer sign-up of the same browser keeps its cookie). A signed-in browser stays signed in |
 | `POST /v1/flows/{id}/email` · `/phone` | flow | send a 6-digit sign-in code (`{"email"}` · `{"phone","country"?}`) → `verify_code` |
 | `POST /v1/flows/{id}/resend` | flow | new code to the same destination (sign-in code, or the requirement code) |
 | `POST /v1/flows/{id}/verify` | flow | `{"code"}` → signs in / sign-up / finishing an import |
 | `POST /v1/flows/{id}/oauth/{google\|apple}` | flow | `{"authorize_url"}` |
-| `GET\|POST /v1/oauth/callback/{google\|apple}` | the starting browser | provider answer → 302 `{PUBLIC_URL}/authorize/flow/{id}`; a cookieless form_post → 303 `GET …?ticket=` (see below) |
+| `GET\|POST /v1/oauth/callback/{google\|apple}` | the starting browser | provider answer → 302 `{PUBLIC_URL}/authorize/flow/{id}`; a cookieless form_post → 303 `GET …?ticket=` (see below); a connection (next row) → 302 back to its `return_to` |
+| `POST /v1/me/identities/{google\|apple}` | session (Carbon, browser cookie + Origin) | connect Google/Apple to the signed-in Carbon (the account site's "Connect Google"): optional `{"return_to":"/sign-in-methods"}` (a path or URL on the site; default `/sign-in-methods`) → 201 `{"authorize_url","flow_id","provider","expires_at"}` + `sa_flow`. The browser navigates to `authorize_url`; the callback connects the provider account to this Carbon and adds its verified email **without a code** (UNDERSTANDING.md), then redirects to `return_to?linked={provider}&email_added=true\|false`, or `return_to?link_error={code}&provider={provider}&flow={flow_id}` (`GET /v1/flows/{flow_id}` → step `complete` with `error{code,message,hint}`). Refusals change nothing: `identity_in_use` (connected to another account), `email_in_use`, `email_limit_reached`, `email_not_verified`, `provider_email_invalid`, `session_changed` (the browser is no longer signed in as that Carbon), `provider_cancelled` / `provider_error` / `provider_token_invalid`. Errors at the start: 400 `browser_session_required` (an access token, not the site's cookie), 403 `method_not_enabled` (no managed Google/Apple credentials), 404 `unknown_provider`, 422 `return_to`, 429 after 30 per hour |
+| `POST /v1/flows/{id}/signup/photo` | flow + `sa_signup` | the photo picked on the sign-up page, before the account exists: raw image, same rules as `POST /v1/me/photo` (≤ 2 MB, PNG/JPEG/WebP/GIF, 20 per sign-up per hour) → 201 `{"pfp_url","photo":{…}}`; replaces the sign-up's earlier upload and becomes `signup.pfp_url` |
 | `POST /v1/flows/{id}/signup` | flow + `sa_signup` | create the Carbon (or finish the imported one) |
 | `POST /v1/flows/{id}/requirements/email` · `/phone` · `/verify` | flow + session | add a missing required detail with an inline code |
 | `POST /v1/flows/{id}/consent` | flow + session | `{"approve","optional_scopes"}` → code (or `error=access_denied`) |
@@ -61,10 +63,13 @@ prompt=none that can't sign in silently ─────────────�
   (`repo::accounts::suggest_id` from the email local part then the name), timezone (IP header →
   browser `timezone` sent to `POST /v1/flows` → UTC), dob (18 years ago), photo (our default Carbon
   photo from Iris, as UNDERSTANDING.md says; a Google picture is offered separately as
-  `signup.provider_pfp_url` and stored only when sent back as `pfp_url`). A new account has no
-  uploads, so a `pfp_url` naming a photo uploaded to this service is refused (422; keeping an
+  `signup.provider_pfp_url` and stored only when sent back as `pfp_url`; a photo uploaded with
+  `POST …/signup/photo` replaces the default as the prefill). The only photo of this service a
+  sign-up may use is its own upload (`POST …/signup/photo`): it becomes the new (or finished
+  imported) account's own upload; any other photo of this service is refused (422; keeping an
   imported account's current photo is fine). `POST …/signup` fields are
-  all optional: missing ones keep the prefill; `pfp_url: null` = our default photo. A live sign-up
+  all optional: missing ones keep the prefill; `pfp_url: null` = our default photo (the upload is
+  dropped). Uploads of sign-ups that expire or finish without them are swept. A live sign-up
   session resumes in a new flow in the same browser (48 h), when the app allows sign-up, has the
   method enabled and accepts the email domain.
 - **Only verified emails and phones identify an account** (core's `repo::contacts::lookup` /

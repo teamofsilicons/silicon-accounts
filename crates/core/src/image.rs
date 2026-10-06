@@ -1,6 +1,6 @@
 //! Profile photo inspection: recognizes PNG, JPEG, GIF and WebP by their bytes (never by the
 //! declared Content-Type alone) and reads the pixel dimensions from the headers, without
-//! decoding the image.
+//! decoding the image. Every photo upload goes through it (see [`crate::photo_upload`]).
 //!
 //! Why: photos are served from our own origin, so only real raster images may be stored (an SVG
 //! or HTML body labelled `image/png` must never be served), and absurd canvases

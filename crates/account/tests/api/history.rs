@@ -295,8 +295,14 @@ async fn custodian_changes_from_each_side() {
         "custodian",
         &format!("Custodian changed from {first_id} to {second_id}"),
     );
-    let requested = find(&mine, "custodian", "Silicon transfer requested");
+    let requested = find(
+        &mine,
+        "custodian",
+        &format!("Transfer of {silicon_id} requested"),
+    );
     assert_eq!(requested["detail"], format!("By {first_id}"));
+    assert_eq!(requested["meta"]["silicon"]["uuid"], silicon.uuid.as_str());
+    assert_eq!(requested["meta"]["silicon"]["id"], silicon_id.as_str());
     assert_eq!(
         mine.len(),
         3,
@@ -309,7 +315,12 @@ async fn custodian_changes_from_each_side() {
     .await;
     let security = items(&r.json);
     assert_eq!(security.len(), 1, "{security:#?}");
-    assert_eq!(security[0]["title"], "STK rotated");
+    assert_eq!(
+        security[0]["title"],
+        format!("STK of {silicon_id} rotated"),
+        "entries about a Silicon name it"
+    );
+    assert_eq!(security[0]["meta"]["silicon"]["kind"], "silicon");
 
     let r = call(
         &ctx,
@@ -401,9 +412,97 @@ async fn entries_written_by_someone_else_hide_their_ip_and_contacts() {
             seen["detail"],
             format!("By {}", custodian.handle.clone().expect("id"))
         );
+        // The title names the Silicon and shows the recipient's address only masked.
+        assert_eq!(
+            seen["title"],
+            format!(
+                "Transfer of {} to n***@example.test requested",
+                silicon.handle.clone().expect("si:id")
+            )
+        );
+        assert_eq!(seen["meta"]["silicon"]["uuid"], silicon.uuid.as_str());
     }
     // The custodian sees its own entry in full.
     let own = entry(custodian.clone()).await;
     assert_eq!(own["meta"]["ip"], "203.0.113.77");
     assert_eq!(own["meta"]["details"]["to"], "Next.Owner@Example.test");
+    assert_eq!(
+        own["title"],
+        format!(
+            "Transfer of {} to Next.Owner@Example.test requested",
+            silicon.handle.clone().expect("si:id")
+        )
+    );
+}
+
+#[tokio::test]
+async fn entries_about_a_silicon_name_it() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let (silicon, _) = ctx.silicon(&carbon.uuid).await;
+    let silicon_id = silicon.handle.clone().expect("si:id");
+    let mut conn = ctx.conn().await;
+    for (action, actor, details) in [
+        // A self-created Silicon names this Carbon as its custodian.
+        (
+            "silicon.custodian.requested",
+            &silicon.uuid,
+            json!({"kind": "initial"}),
+        ),
+        (
+            "silicon.webhook.set",
+            &carbon.uuid,
+            json!({"url_origin": "https://hooks.example.test", "by": "custodian"}),
+        ),
+        (
+            "silicon.profile.updated",
+            &carbon.uuid,
+            json!({"changed": ["display_name", "pfp_url"]}),
+        ),
+    ] {
+        audit::record(
+            &mut conn,
+            &AuditEntry {
+                account_uuid: Some(&carbon.uuid),
+                target_kind: Some("silicon"),
+                target_id: Some(&silicon.uuid),
+                details,
+                ..AuditEntry::new(ActorKind::Account, Some(actor), action)
+            },
+        )
+        .await
+        .expect("audit");
+    }
+    drop(conn);
+    let r = call(
+        &ctx,
+        Req::get("/v1/me/history").bearer(&token(&ctx, &carbon).await),
+    )
+    .await;
+    assert_status(&r, 200);
+    let all = items(&r.json);
+    let by_action = |a: &str| {
+        all.iter()
+            .find(|i| i["meta"]["action"] == a)
+            .unwrap_or_else(|| panic!("no {a} in {all:#?}"))
+            .clone()
+    };
+    let asked = by_action("silicon.custodian.requested");
+    assert_eq!(
+        asked["title"],
+        format!("{silicon_id} asked you to be its custodian")
+    );
+    assert_eq!(
+        asked["detail"],
+        Value::Null,
+        "the title already names the actor"
+    );
+    assert_eq!(asked["meta"]["silicon"]["uuid"], silicon.uuid.as_str());
+    let hook = by_action("silicon.webhook.set");
+    assert_eq!(hook["title"], format!("Webhook of {silicon_id} set"));
+    assert_eq!(hook["detail"], "Events go to https://hooks.example.test");
+    let profile = by_action("silicon.profile.updated");
+    assert_eq!(profile["title"], format!("Profile of {silicon_id} updated"));
+    assert_eq!(profile["detail"], "Changed: display name, photo");
+    assert_eq!(profile["meta"]["silicon"]["id"], silicon_id.as_str());
 }

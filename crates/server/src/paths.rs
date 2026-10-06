@@ -65,7 +65,8 @@ pub fn is_oauth_rfc6749_path(path: &str) -> bool {
 pub enum RouteClass {
     /// Everything else: 64 KB, 30 s.
     Default,
-    /// `POST /v1/me/photo`: 2 MB, 60 s.
+    /// The photo uploads (`POST /v1/me/photo`, `POST /v1/me/silicons/{uuid}/photo`,
+    /// `POST /v1/flows/{id}/signup/photo`): 2 MB, 60 s.
     PhotoUpload,
     /// `POST /v1/apps/{app_id}/imports`: 50 MB of rows (+64 KB for the JSON envelope, so the
     /// import handler can answer with its own precise row/byte errors), 5 min.
@@ -103,9 +104,21 @@ impl Timeouts {
 
 /// Splits `/v1/apps/{x}/{tail}` into `(x, tail)`.
 fn app_route(path: &str) -> Option<(&str, &str)> {
-    let rest = path.strip_prefix("/v1/apps/")?;
+    one_segment_route(path, "/v1/apps/")
+}
+
+/// Splits `{prefix}{x}/{tail}` into `(x, tail)` for a non-empty single segment `x`.
+fn one_segment_route<'a>(path: &'a str, prefix: &str) -> Option<(&'a str, &'a str)> {
+    let rest = path.strip_prefix(prefix)?;
     let (id, tail) = rest.split_once('/')?;
     (!id.is_empty()).then_some((id, tail))
+}
+
+/// True for the photo upload routes other than `/v1/me/photo`: a custodian's
+/// `/v1/me/silicons/{uuid}/photo` and the sign-up page's `/v1/flows/{id}/signup/photo`.
+fn is_scoped_photo_upload(path: &str) -> bool {
+    one_segment_route(path, "/v1/me/silicons/").is_some_and(|(_, tail)| tail == "photo")
+        || one_segment_route(path, "/v1/flows/").is_some_and(|(_, tail)| tail == "signup/photo")
 }
 
 impl RouteClass {
@@ -123,6 +136,7 @@ impl RouteClass {
         }
         match path {
             "/v1/me/photo" => RouteClass::PhotoUpload,
+            _ if is_scoped_photo_upload(path) => RouteClass::PhotoUpload,
             "/v1/internal/apps/sync" => RouteClass::InternalSync,
             _ if app_route(path).is_some_and(|(_, tail)| tail == "imports") => RouteClass::Import,
             _ => RouteClass::Default,
@@ -243,6 +257,29 @@ mod tests {
             RouteClass::of(&Method::DELETE, "/v1/me/photo"),
             RouteClass::Default
         );
+        for p in [
+            "/v1/me/silicons/a8K/photo",
+            "/v1/me/silicons/si:scout/photo",
+            "/v1/flows/0199aaaa-0000-7000-8000-000000000000/signup/photo",
+        ] {
+            assert_eq!(
+                RouteClass::of(&Method::POST, p),
+                RouteClass::PhotoUpload,
+                "{p}"
+            );
+            assert_eq!(
+                RouteClass::of(&Method::POST, p).body_limit(),
+                2 * 1024 * 1024
+            );
+        }
+        for p in [
+            "/v1/me/silicons//photo",
+            "/v1/me/silicons/a8K/photo/x",
+            "/v1/flows/x/signup",
+            "/v1/flows/x/photo",
+        ] {
+            assert_eq!(RouteClass::of(&Method::POST, p), RouteClass::Default, "{p}");
+        }
         assert_eq!(
             RouteClass::of(&Method::POST, "/v1/apps/legacy-crm/imports"),
             RouteClass::Import

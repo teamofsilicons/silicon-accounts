@@ -39,15 +39,40 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
             display_name,
             timezone,
             pfp_url,
+            photo,
         } => {
-            let managed = resolve(ctx, &silicon).await?;
             let update = UpdateSilicon {
                 display_name,
                 timezone,
                 pfp_url,
             };
+            if update.is_empty() && photo.is_none() {
+                return Err(CliError::invalid(
+                    "Nothing to change: pass at least one of --display-name, --timezone, --pfp-url or --photo.",
+                    "See `accounts silicon update --help`.",
+                ));
+            }
+            let managed = resolve(ctx, &silicon).await?;
             let uuid = managed.silicon.uuid.clone();
-            let updated = with_session!(ctx, |s| s.update_silicon(&uuid, &update))?;
+            let mut updated = managed.silicon.clone();
+            if let Some(path) = &photo {
+                let (bytes, content_type) = super::account::read_photo(path)?;
+                let key = util::idempotency_key();
+                let uploaded = with_session!(ctx, |s| s.set_silicon_photo(
+                    &uuid,
+                    bytes.clone(),
+                    content_type,
+                    Some(&key)
+                ))?;
+                if let Some(after) = uploaded.silicon {
+                    updated = after.silicon;
+                } else {
+                    updated.pfp_url = uploaded.pfp_url;
+                }
+            }
+            if !update.is_empty() {
+                updated = with_session!(ctx, |s| s.update_silicon(&uuid, &update))?;
+            }
             Ok(Outcome::new(
                 to_json(&updated),
                 format!(

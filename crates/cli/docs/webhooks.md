@@ -13,7 +13,9 @@ accounts app webhook test                                     # sends a `ping`
 
 A new signing secret is generated every time you set the URL; `accounts app webhook
 rotate` makes a new one without changing the URL. Store it where your receiver can
-read it.
+read it. `set`, `rotate` and `test` send an idempotency key (random, or yours with
+`--idempotency-key`): a retried request returns the same secret, or queues no second ping,
+instead of doing it twice.
 
 ## Verify every delivery
 

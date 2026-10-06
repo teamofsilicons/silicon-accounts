@@ -342,6 +342,14 @@ impl Lookups {
                     {
                         uuids.insert(actor.clone());
                     }
+                    if let Some(silicon) = silicon_target(r) {
+                        uuids.insert(silicon.to_string());
+                    }
+                    if let Some(to) = detail_str(r.extra.as_ref(), "to")
+                        && ids::is_account_uuid(&to)
+                    {
+                        uuids.insert(to);
+                    }
                 }
                 _ => {}
             }
@@ -422,6 +430,31 @@ impl Lookups {
             },
             None => Value::Null,
         }
+    }
+}
+
+/// The Silicon an audit row is about: rows the silicons crate writes target `silicon`; older
+/// rows (and tests) may target the Silicon's `account`.
+fn silicon_target(r: &Row) -> Option<&str> {
+    let action = r.c1.as_deref().unwrap_or_default();
+    match (r.c4.as_deref(), r.c5.as_deref()) {
+        (Some("silicon"), Some(uuid)) => Some(uuid),
+        (Some("account"), Some(uuid)) if action.starts_with("silicon.") => Some(uuid),
+        _ => None,
+    }
+}
+
+impl Lookups {
+    /// How a history title names a Silicon: its current si:id, else the id the entry recorded
+    /// (a deleted Silicon's id is released), else its uuid.
+    fn silicon_name(&self, uuid: &str, details: Option<&Value>) -> String {
+        if let Some(id) = self.accounts.get(uuid).and_then(|a| a.id.clone()) {
+            return id;
+        }
+        ["id", "silicon_id", "released_id"]
+            .iter()
+            .find_map(|k| detail_str(details, k).filter(|v| v.starts_with("si:")))
+            .unwrap_or_else(|| format!("the Silicon {uuid}"))
     }
 }
 
@@ -517,6 +550,94 @@ fn mask_contacts(v: Value) -> Value {
                 .collect(),
         ),
         other => other,
+    }
+}
+
+/// Title and detail of an audit entry about the Silicon `uuid` (seen by the Silicon itself, its
+/// custodian, or a Carbon a request was addressed to).
+fn silicon_entry(
+    action: &str,
+    uuid: &str,
+    r: &Row,
+    me: &Account,
+    l: &Lookups,
+) -> (String, Option<String>) {
+    let details = r.extra.as_ref();
+    let si = l.silicon_name(uuid, details);
+    let by_me = r.c2.as_deref() == Some("account") && r.c3.as_deref() == Some(me.uuid.as_str());
+    let transfer = detail_str(details, "kind").as_deref() == Some("transfer");
+    match action {
+        "silicon.stk.rotated" => (format!("STK of {si} rotated"), None),
+        "silicon.webhook.set" => (
+            format!("Webhook of {si} set"),
+            detail_str(details, "url_origin").map(|o| format!("Events go to {o}")),
+        ),
+        "silicon.webhook.removed" => (format!("Webhook of {si} removed"), None),
+        "silicon.profile.updated" => (
+            format!("Profile of {si} updated"),
+            field_names(details).map(|f| format!("Changed: {f}")),
+        ),
+        "silicon.photo.uploaded" => (format!("New profile photo for {si}"), None),
+        "silicon.transfer.requested" => {
+            let to = detail_str(details, "to").map(|to| {
+                if ids::is_account_uuid(&to) {
+                    l.who(&to)
+                } else if by_me {
+                    to
+                } else {
+                    masked_contact(&to).unwrap_or_else(|| "another Carbon".to_string())
+                }
+            });
+            match to {
+                Some(to) if to == me.id() => (format!("Transfer of {si} to you requested"), None),
+                Some(to) => (format!("Transfer of {si} to {to} requested"), None),
+                None => (format!("Transfer of {si} requested"), None),
+            }
+        }
+        "silicon.transfer.cancelled" => (format!("Transfer of {si} cancelled"), None),
+        "silicon.custodian.requested" => {
+            if uuid == me.uuid {
+                (format!("{si} asked for a custodian"), None)
+            } else {
+                (format!("{si} asked you to be its custodian"), None)
+            }
+        }
+        "silicon.custodian.declined" if transfer => (format!("Transfer of {si} declined"), None),
+        "silicon.custodian.declined" => (
+            format!("Custodian request of {si} declined"),
+            detail_str(details, "released_id")
+                .map(|id| format!("{id} was released: the Silicon never became active")),
+        ),
+        "silicon.custodian.expired" if transfer => (
+            format!("Transfer of {si} expired"),
+            Some("Nobody accepted it within 14 days, so nothing changed".to_string()),
+        ),
+        "silicon.custodian.expired" => (
+            format!("Custodian request of {si} expired"),
+            Some("Nobody accepted it within 14 days".to_string()),
+        ),
+        "silicon.custodian_request.closed" => (
+            format!("Custodian request of {si} closed"),
+            match detail_str(details, "reason").as_deref() {
+                Some("custodian_account_deleted") => {
+                    Some("The Carbon it named deleted their account".to_string())
+                }
+                _ => None,
+            },
+        ),
+        "silicon.deleted" => (format!("Silicon {si} deleted"), None),
+        "silicon.self_created" => (
+            format!("{si} created its own account"),
+            detail_str(details, "custodian").map(|c| {
+                let shown = if by_me {
+                    c
+                } else {
+                    masked_contact(&c).unwrap_or(c)
+                };
+                format!("Named {shown} as its custodian")
+            }),
+        ),
+        other => (format!("{} ({si})", action_title(other)), None),
     }
 }
 
@@ -762,39 +883,49 @@ fn describe(r: Row, me: &Account, l: &Lookups) -> HistoryItem {
                     },
                     None,
                 ),
-                "silicon.stk.rotated" => ("STK rotated".to_string(), None),
-                other => (action_title(other), None),
+                other => match silicon_target(&r) {
+                    // Every entry about a Silicon names it (custodians see many Silicons).
+                    Some(uuid) => silicon_entry(other, uuid, &r, me, l),
+                    None => (action_title(other), None),
+                },
             };
-            if detail.is_none()
+            // "By …" names another actor, unless the title already does (a Silicon acting on
+            // itself, e.g. asking a Carbon to be its custodian).
+            if let Some(actor) = r.c3.as_deref()
                 && r.c2.as_deref() == Some("account")
-                && let Some(actor) = r.c3.as_deref()
                 && actor != me.uuid
+                && silicon_target(&r) != Some(actor)
             {
-                detail = Some(format!("By {}", l.who(actor)));
+                let by = format!("By {}", l.who(actor));
+                detail = Some(match detail {
+                    Some(d) => format!("{d} · {by}"),
+                    None => by,
+                });
             }
             // Rows written by someone else (a custodian, the Silicon that named this Carbon, an
             // app, the service) never show that actor's IP, and their details show email
             // addresses and phone numbers only masked.
             let by_me =
                 r.c2.as_deref() == Some("account") && r.c3.as_deref() == Some(me.uuid.as_str());
+            let silicon = silicon_target(&r).map(|uuid| l.summary(Some(uuid)));
             let (ip, details) = if by_me {
                 (r.c6, r.extra)
             } else {
                 (None, r.extra.map(mask_contacts))
             };
-            (
-                title,
-                detail,
-                json!({
-                    "action": action,
-                    "actor_kind": r.c2,
-                    "actor_id": r.c3,
-                    "target_kind": r.c4,
-                    "target_id": r.c5,
-                    "ip": ip,
-                    "details": details,
-                }),
-            )
+            let mut meta = json!({
+                "action": action,
+                "actor_kind": r.c2,
+                "actor_id": r.c3,
+                "target_kind": r.c4,
+                "target_id": r.c5,
+                "ip": ip,
+                "details": details,
+            });
+            if let Some(summary) = silicon {
+                meta["silicon"] = summary;
+            }
+            (title, detail, meta)
         }
     };
     HistoryItem {

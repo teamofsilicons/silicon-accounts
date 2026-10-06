@@ -349,13 +349,16 @@ pub struct IdArgs {
 pub enum IdCommand {
     /// Check whether a c:id or si:id can be taken (exit 0 available, 5 taken/reserved, 2 invalid).
     ///
-    /// Ids are c: or si: plus 3 to 30 of a-z, 0-9, - and _ (case-insensitive). When signed in, an id reserved for you after a change shows as reclaimable.
+    /// Ids are c: or si: plus 3 to 30 of a-z, 0-9, - and _ (case-insensitive). When signed in, an id reserved for you after a change shows as reclaimable. A custodian adds --for <si:…> to ask for one of its Silicons: an old id of that Silicon shows as reclaimable for it (take it back with `accounts silicon id`).
     #[command(
-        after_long_help = "Examples:\n  accounts id available c:saket\n  accounts id available si:scout --json"
+        after_long_help = "Examples:\n  accounts id available c:saket\n  accounts id available si:scout --json\n  accounts id available si:scout --for si:scout_v2"
     )]
     Available {
         /// The id, e.g. c:saket or si:scout.
         id: String,
+        /// Ask for one of your Silicons (its si:id or uuid) instead of yourself.
+        #[arg(long = "for", value_name = "SILICON")]
+        for_silicon: Option<String>,
     },
     /// Change your own c:id / si:id (the prefix is added if you omit it).
     ///
@@ -655,7 +658,12 @@ pub enum SiliconCommand {
         silicon: String,
     },
 
-    /// Change one of your Silicons' display name, timezone or photo URL.
+    /// Change one of your Silicons' display name, timezone or photo (a URL, or upload a file).
+    ///
+    /// --photo uploads a PNG, JPEG, WebP or GIF of at most 2 MB (`-` reads stdin); the photo belongs to the Silicon. Apps it signed into and the Silicon's webhook are told what changed.
+    #[command(
+        after_long_help = "Examples:\n  accounts silicon update si:scout --display-name Scout\n  accounts silicon update si:scout --photo ./scout.png\n  accounts silicon update si:scout --timezone Europe/Paris --pfp-url https://cdn.example.com/scout.png"
+    )]
     Update {
         /// si:id or uuid.
         silicon: String,
@@ -666,8 +674,11 @@ pub enum SiliconCommand {
         #[arg(long, value_name = "TZ")]
         timezone: Option<String>,
         /// New photo URL (https).
-        #[arg(long, value_name = "URL")]
+        #[arg(long, value_name = "URL", conflicts_with = "photo")]
         pfp_url: Option<String>,
+        /// Upload this image as its photo (`-` = stdin).
+        #[arg(long, value_name = "FILE")]
+        photo: Option<std::path::PathBuf>,
     },
 
     /// Change one of your Silicons' si:id (apps it signed into are notified).
@@ -1233,18 +1244,33 @@ pub struct AppWebhookArgs {
 #[derive(Debug, Subcommand)]
 pub enum AppWebhookCommand {
     /// Set the endpoint (a new signing secret is printed once).
+    ///
+    /// A retry with the same --idempotency-key (within 10 minutes) prints the same secret instead of generating another.
     Set {
         /// The endpoint URL.
         // Not named `url`: that id is the global --url flag (see SiliconWebhookCommand::Set).
         #[arg(value_name = "URL")]
         endpoint: String,
+        /// Idempotency key [default: random].
+        #[arg(long, value_name = "KEY")]
+        idempotency_key: Option<String>,
     },
     /// Remove the endpoint.
     Remove,
     /// Rotate the signing secret (printed once; the old one stops immediately).
-    Rotate,
-    /// Queue a test `ping` delivery.
-    Test,
+    ///
+    /// A retry with the same --idempotency-key (within 10 minutes) prints the same new secret instead of rotating again.
+    Rotate {
+        /// Idempotency key [default: random].
+        #[arg(long, value_name = "KEY")]
+        idempotency_key: Option<String>,
+    },
+    /// Queue a test `ping` delivery (a retry with the same --idempotency-key queues no second ping).
+    Test {
+        /// Idempotency key [default: random].
+        #[arg(long, value_name = "KEY")]
+        idempotency_key: Option<String>,
+    },
     /// List deliveries.
     Deliveries {
         /// pending, delivered or failed.

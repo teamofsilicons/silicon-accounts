@@ -111,7 +111,51 @@ pub async fn whoami(ctx: &Ctx) -> CliResult<Outcome> {
 
 pub async fn id(ctx: &Ctx, args: IdArgs) -> CliResult<Outcome> {
     match args.command {
-        IdCommand::Available { id } => {
+        IdCommand::Available {
+            id,
+            for_silicon: Some(silicon),
+        } => {
+            ctx.session_of(
+                AccountKind::Carbon,
+                "Checking an id for one of your Silicons",
+            )
+            .await?;
+            let availability = with_session!(ctx, |s| s.silicon_id_available(&silicon, &id))?;
+            let shown = if availability.id.is_empty() {
+                id.clone()
+            } else {
+                availability.id.clone()
+            };
+            let message = availability.message.clone().unwrap_or_default();
+            let (text, exit) = if availability.available && availability.reclaimable {
+                (
+                    format!(
+                        "{shown} is reserved for {silicon} after its id change: you can take it back for it with `accounts silicon id {silicon} {shown}`."
+                    ),
+                    0,
+                )
+            } else if availability.available {
+                (format!("{shown} is available for {silicon}."), 0)
+            } else {
+                let reason = availability
+                    .reason
+                    .clone()
+                    .unwrap_or_else(|| "taken".to_owned());
+                let exit = if reason == "invalid" {
+                    EXIT_INVALID
+                } else {
+                    EXIT_CONFLICT
+                };
+                (
+                    format!("{shown} is not available ({reason}). {message}")
+                        .trim_end()
+                        .to_owned(),
+                    exit,
+                )
+            };
+            Ok(Outcome::new(to_json(&availability), text).exit(exit))
+        }
+        IdCommand::Available { id, .. } => {
             let session = ctx.current_session().ok().flatten();
             let availability = match session {
                 Some(_) => match with_session!(ctx, |s| s.id_available(&id)) {
@@ -309,7 +353,7 @@ fn parse_date(text: &str) -> CliResult<time::Date> {
     })
 }
 
-fn read_photo(path: &Path) -> CliResult<(bytes::Bytes, &'static str)> {
+pub(crate) fn read_photo(path: &Path) -> CliResult<(bytes::Bytes, &'static str)> {
     let bytes = util::read_file_or_stdin(path, "the photo")?;
     let content_type = match bytes.as_slice() {
         [0x89, b'P', b'N', b'G', ..] => "image/png",

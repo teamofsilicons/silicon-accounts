@@ -8,166 +8,38 @@
 //! happens when a custodian sets a Silicon's photo to one of its own uploads, including after the
 //! Silicon is transferred to another Carbon.
 
-use accounts_core::crypto;
 use accounts_core::events;
 use accounts_core::http::{AccountAuth, ClientMeta, IdempotencyKey, Json, Path};
 use accounts_core::pfp;
+use accounts_core::photo_upload;
 use accounts_core::repo::accounts::{self, ProfileUpdate};
-use accounts_core::repo::rate_limit::{self, Limit};
+use accounts_core::repo::rate_limit::Limit;
 use accounts_core::repo::{idempotency, photos};
 use accounts_core::views::{self, MeView};
 use accounts_core::{ApiError, ApiResult, AppState};
-use axum::body::{Body, Bytes};
+use axum::body::Body;
 use axum::extract::State;
 use axum::http::header::{
-    CACHE_CONTROL, CONTENT_LENGTH, CONTENT_SECURITY_POLICY, CONTENT_TYPE, ETAG, IF_NONE_MATCH,
+    CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE, ETAG, IF_NONE_MATCH,
     X_CONTENT_TYPE_OPTIONS,
 };
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
-use futures::StreamExt;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::image::{self, ImageError, ImageInfo, ImageKind};
 use crate::util::{audit_self, idem_scope, track};
 
-/// Largest accepted photo body: 2 MB.
-pub const MAX_PHOTO_BYTES: usize = 2 * 1024 * 1024;
+/// Largest accepted photo body: 2 MB (core's `photo_upload` rules, shared by every photo
+/// upload).
+pub const MAX_PHOTO_BYTES: usize = photo_upload::MAX_PHOTO_BYTES;
 
-/// Photo uploads allowed per account per hour.
-pub const PHOTO_UPLOADS_PER_HOUR: Limit = Limit::new(20, 3600);
+/// Photo uploads allowed per account per hour (also counts the uploads a custodian makes for
+/// its Silicons).
+pub const PHOTO_UPLOADS_PER_HOUR: Limit = photo_upload::UPLOADS_PER_HOUR;
 
 /// `Cache-Control` of served photos: a photo id never changes content.
 const PHOTO_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
-
-fn too_large(bytes: Option<u64>) -> ApiError {
-    let size = bytes
-        .map(|b| format!("{b} bytes"))
-        .unwrap_or_else(|| "more than 2 MB".to_string());
-    ApiError::new(
-        StatusCode::PAYLOAD_TOO_LARGE,
-        "photo_too_large",
-        format!(
-            "The photo is {size}; profile photos are limited to 2 MB ({MAX_PHOTO_BYTES} bytes)."
-        ),
-    )
-    .hint("Resize or compress the image below 2 MB (512×512 pixels is plenty for a profile photo).")
-    .detail("max_bytes", MAX_PHOTO_BYTES as u64)
-}
-
-/// The declared image type from Content-Type (415 when missing or not an accepted image type).
-fn declared_kind(headers: &HeaderMap) -> ApiResult<ImageKind> {
-    let raw = headers
-        .get(CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .map(str::trim)
-        .unwrap_or("");
-    if raw.is_empty() {
-        return Err(ApiError::new(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            "unsupported_media_type",
-            format!(
-                "The photo upload has no Content-Type; send the image's raw bytes as the body with Content-Type {}.",
-                ImageKind::accepted_list()
-            ),
-        )
-        .hint("For example: curl -X POST --data-binary @me.png -H 'Content-Type: image/png' …/v1/me/photo"));
-    }
-    ImageKind::from_content_type(raw).ok_or_else(|| {
-        let shown = crate::util::clip(raw, 80);
-        let hint = if raw.to_ascii_lowercase().starts_with("multipart/") {
-            "Send the image's raw bytes as the request body (not a multipart form) with Content-Type image/png, image/jpeg, image/webp or image/gif."
-        } else {
-            "Convert the image to PNG, JPEG, WebP or GIF and send it with the matching Content-Type."
-        };
-        ApiError::new(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            "unsupported_media_type",
-            format!(
-                "Content-Type '{shown}' is not accepted for profile photos; use {}.",
-                ImageKind::accepted_list()
-            ),
-        )
-        .hint(hint)
-    })
-}
-
-/// Reads the body, stopping as soon as it passes [`MAX_PHOTO_BYTES`].
-async fn read_limited(body: Body) -> ApiResult<Bytes> {
-    let mut stream = body.into_data_stream();
-    let mut buf: Vec<u8> = Vec::new();
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| {
-            // The server wraps this route's body in a 2 MB `Limited` (the same limit as here);
-            // overflowing it surfaces as a "length limit exceeded" read error.
-            if e.to_string().to_ascii_lowercase().contains("length limit") {
-                too_large(None)
-            } else {
-                ApiError::bad_request(
-                    "invalid_body",
-                    format!("The photo body could not be read: {e}."),
-                )
-                .hint("Send the image's raw bytes as the request body.")
-            }
-        })?;
-        if buf.len() + chunk.len() > MAX_PHOTO_BYTES {
-            return Err(too_large(None));
-        }
-        buf.extend_from_slice(&chunk);
-    }
-    Ok(Bytes::from(buf))
-}
-
-fn image_error(e: ImageError, declared: ImageKind) -> ApiError {
-    match e {
-        ImageError::Unrecognized { looks_like } => ApiError::unprocessable(
-            "invalid_image",
-            match looks_like {
-                Some(what) => format!(
-                    "The body is not a PNG, JPEG, WebP or GIF image: it looks like {what}. Content-Type said {}.",
-                    declared.mime()
-                ),
-                None => format!(
-                    "The body is not a PNG, JPEG, WebP or GIF image (its first bytes match none of them). Content-Type said {}.",
-                    declared.mime()
-                ),
-            },
-        )
-        .hint("Upload the image file's raw bytes as the body, unchanged (no base64, no form encoding)."),
-        ImageError::Mismatch { declared, actual } => ApiError::unprocessable(
-            "photo_type_mismatch",
-            format!(
-                "The body is a {} image, but Content-Type says {}.",
-                actual.name(),
-                declared.mime()
-            ),
-        )
-        .hint(format!("Send it with Content-Type: {}.", actual.mime()))
-        .detail("detected_content_type", actual.mime()),
-        ImageError::Corrupt { kind, why } => ApiError::unprocessable(
-            "invalid_image",
-            format!("The {} image is damaged or incomplete: {why}.", kind.name()),
-        )
-        .hint("Re-export the image and upload the complete file."),
-        ImageError::TooLarge {
-            kind,
-            width,
-            height,
-        } => ApiError::unprocessable(
-            "photo_dimensions_too_large",
-            format!(
-                "The {} image is {width}×{height} pixels; profile photos can be at most {max}×{max} pixels and {mp} megapixels.",
-                kind.name(),
-                max = image::MAX_DIMENSION,
-                mp = image::MAX_PIXELS / 1_000_000
-            ),
-        )
-        .hint("Resize it; 512×512 pixels is plenty for a profile photo.")
-        .detail("width", width)
-        .detail("height", height),
-    }
-}
 
 /// `POST /v1/me/photo` — the body is the raw image (Content-Type image/png, image/jpeg,
 /// image/webp or image/gif; at most 2 MB). The bytes must really be that format; dimensions
@@ -182,30 +54,9 @@ pub(crate) async fn upload(
     headers: HeaderMap,
     body: Body,
 ) -> Result<Response, ApiError> {
-    let declared = declared_kind(&headers)?;
-    let content_length = headers
-        .get(CONTENT_LENGTH)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.trim().parse::<u64>().ok());
-    if let Some(len) = content_length
-        && len > MAX_PHOTO_BYTES as u64
-    {
-        return Err(too_large(Some(len)));
-    }
-    let bytes = read_limited(body).await?;
-    if bytes.is_empty() {
-        return Err(ApiError::unprocessable(
-            "empty_photo",
-            "The photo body is empty; send the image's raw bytes as the request body.",
-        )
-        .hint("For example: curl -X POST --data-binary @me.png -H 'Content-Type: image/png' …/v1/me/photo"));
-    }
-    let info: ImageInfo = image::inspect(&bytes, declared).map_err(|e| image_error(e, declared))?;
-    let fingerprint = json!({
-        "content_type": info.kind.mime(),
-        "bytes": bytes.len(),
-        "sha256": crypto::b64url(&crypto::sha256(&bytes)),
-    });
+    let upload = photo_upload::read(&headers, body, "/v1/me/photo").await?;
+    let info = upload.info;
+    let fingerprint = upload.fingerprint();
     let scope = idem_scope(me.uuid(), "POST", "/v1/me/photo");
     idempotency::run(
         &state,
@@ -214,27 +65,12 @@ pub(crate) async fn upload(
         &fingerprint,
         false,
         || async {
-            rate_limit::enforce_pool(
-                &state.db,
-                &rate_limit::bucket("photo_upload:account", me.uuid()),
-                PHOTO_UPLOADS_PER_HOUR,
-                "profile photo uploads for this account",
-            )
-            .await?;
-            let photo_id = Uuid::now_v7();
-            let pfp_url = pfp::photo_url(&state.settings, photo_id);
+            photo_upload::count_account_upload(&state.db, me.uuid()).await?;
             let mut tx = state.db.begin().await?;
             // One upload at a time per account, so pruning never races another upload.
             accounts::lock(&mut tx, me.uuid()).await?;
-            sqlx::query(
-                "insert into photos (id, account_uuid, content_type, bytes) values ($1, $2, $3, $4)",
-            )
-            .bind(photo_id)
-            .bind(me.uuid())
-            .bind(info.kind.mime())
-            .bind(bytes.as_ref())
-            .execute(&mut *tx)
-            .await?;
+            let photo_id = photos::insert_for_account(&mut tx, me.uuid(), &upload).await?;
+            let pfp_url = pfp::photo_url(&state.settings, photo_id);
             let (account, changed) = accounts::update_profile(
                 &mut tx,
                 me.uuid(),
@@ -253,7 +89,7 @@ pub(crate) async fn upload(
                 None,
                 json!({
                     "photo_id": photo_id.to_string(), "content_type": info.kind.mime(),
-                    "bytes": bytes.len(), "width": info.width, "height": info.height,
+                    "bytes": upload.bytes.len(), "width": info.width, "height": info.height,
                 }),
                 meta.ip.as_deref(),
             )
@@ -264,7 +100,7 @@ pub(crate) async fn upload(
                 "photo",
                 "account.photo.uploaded",
                 json!({
-                    "kind": me.kind(), "content_type": info.kind.mime(), "bytes": bytes.len(),
+                    "kind": me.kind(), "content_type": info.kind.mime(), "bytes": upload.bytes.len(),
                     "width": info.width, "height": info.height,
                 }),
             );
@@ -274,13 +110,7 @@ pub(crate) async fn upload(
                 StatusCode::CREATED,
                 json!({
                     "pfp_url": pfp_url,
-                    "photo": {
-                        "id": photo_id.to_string(),
-                        "content_type": info.kind.mime(),
-                        "bytes": bytes.len(),
-                        "width": info.width,
-                        "height": info.height,
-                    },
+                    "photo": upload.view(photo_id),
                     "me": serde_json::to_value(me_view)?,
                 }),
             ))

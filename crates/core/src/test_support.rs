@@ -56,6 +56,16 @@ pub struct TestDb {
 impl TestDb {
     /// Creates `accounts_test_<random>` and runs every migration.
     pub async fn new() -> TestDb {
+        let db = TestDb::empty().await;
+        crate::db::migrate(&db.pool)
+            .await
+            .unwrap_or_else(|e| panic!("migrations failed on {}: {e}", db.name));
+        db
+    }
+
+    /// Creates `accounts_test_<random>` without running any migration (for migration tests:
+    /// `crate::db::MIGRATOR.run_to(n, &db.pool)`, add rows, then run the rest).
+    pub async fn empty() -> TestDb {
         let admin = admin_url();
         let name = format!(
             "accounts_test_{}",
@@ -78,9 +88,6 @@ impl TestDb {
         let pool = crate::db::connect_url(&url, 8)
             .await
             .unwrap_or_else(|e| panic!("could not connect to {name}: {e}"));
-        crate::db::migrate(&pool)
-            .await
-            .unwrap_or_else(|e| panic!("migrations failed on {name}: {e}"));
         TestDb {
             pool,
             name,

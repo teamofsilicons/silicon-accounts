@@ -373,6 +373,18 @@ pub async fn id_availability(
     input: &str,
     requester_uuid: Option<&str>,
 ) -> ApiResult<IdAvailability> {
+    id_availability_for(conn, input, requester_uuid, None).await
+}
+
+/// [`id_availability`] from the point of view of another account the caller manages (a
+/// custodian asking for one of its Silicons): `requester_label` (e.g. `si:scout`) names it in
+/// the messages instead of "you".
+pub async fn id_availability_for(
+    conn: &mut PgConnection,
+    input: &str,
+    requester_uuid: Option<&str>,
+    requester_label: Option<&str>,
+) -> ApiResult<IdAvailability> {
     let id = match AccountId::parse(input) {
         Ok(id) => id,
         Err(e) => {
@@ -396,24 +408,29 @@ pub async fn id_availability(
             id: full.clone(),
             available: false,
             reason: Some("taken"),
-            message: if mine {
-                format!("{full} is already your id.")
-            } else {
-                format!("{full} is taken by another account.")
+            message: match (mine, requester_label) {
+                (true, Some(label)) => format!("{full} is already the id of {label}."),
+                (true, None) => format!("{full} is already your id."),
+                (false, _) => format!("{full} is taken by another account."),
             },
             reclaimable: false,
         });
     }
     if let Some((holder, until)) = active_reservation(conn, &full).await? {
         if requester_uuid == Some(holder.as_str()) {
+            let until = crate::timefmt::format_rfc3339_ms(until);
             return Ok(IdAvailability {
                 id: full.clone(),
                 available: true,
                 reason: None,
-                message: format!(
-                    "{full} was your id; it is reserved for you until {} and you can take it back.",
-                    crate::timefmt::format_rfc3339_ms(until)
-                ),
+                message: match requester_label {
+                    Some(label) => format!(
+                        "{full} was an id of {label}; it is reserved for {label} until {until} and you can take it back for it."
+                    ),
+                    None => format!(
+                        "{full} was your id; it is reserved for you until {until} and you can take it back."
+                    ),
+                },
                 reclaimable: true,
             });
         }

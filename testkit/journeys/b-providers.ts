@@ -15,6 +15,7 @@ import {
   oidc,
   randomEmail,
   section,
+  signUpCarbon,
   startAppSignIn,
   type BrowserSession,
 } from './_common.ts';
@@ -43,6 +44,26 @@ async function providerSignIn(appId: string, provider: 'google' | 'apple', ident
   let flow = await browser.flow(flowId);
   if (flow.step !== 'failed' && flow.step !== 'choose_method') flow = await driveFlow(browser, flow, { messaging });
   return { ...s, authorizeUrl, flow };
+}
+
+section('the account site connects Google and Apple to a signed-in Carbon');
+{
+  const c = await signUpCarbon({ accounts, messaging });
+  const g = await oidc.randomIdentity('google');
+  const linked = await c.browser.connectProvider('google', oidc, g.email);
+  check(new URL(linked.location).pathname === '/sign-in-methods' && new URL(linked.location).search === '?linked=google&email_added=true', `Google connected → ${linked.location}`);
+  const me: any = await c.account.me();
+  check(me.identities?.some((i: any) => i.provider === 'google' && i.email === g.email.toLowerCase()), 'the account lists its Google identity', me.identities);
+  check(me.emails?.some((e: any) => e.email === g.email.toLowerCase() && e.verified_via === 'google' && !e.is_primary), 'the Google email was added (verified by Google, no code)', me.emails);
+  const a = await oidc.randomIdentity('apple');
+  const apple = await c.browser.connectProvider('apple', oidc, a.email, '/settings');
+  check(/\/settings\?linked=apple&email_added=true$/.test(apple.location), `Apple connected (form_post) → ${apple.location}`);
+  // The same Google account can't be connected to a second Carbon.
+  const d = await signUpCarbon({ accounts, messaging });
+  const refused = await d.browser.connectProvider('google', oidc, g.email);
+  check(new URL(refused.location).searchParams.get('link_error') === 'identity_in_use', `a second Carbon is refused: ${refused.location}`);
+  const flow = await d.browser.flow(refused.flow_id);
+  check(flow.step === 'complete' && flow.error?.code === 'identity_in_use' && !!flow.error?.message, 'the flow carries the reason', flow.error);
 }
 
 section('interface: managed Google');

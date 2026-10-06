@@ -49,6 +49,8 @@ pub struct Meta {
     pub environment: &'static str,
     pub public_url: String,
     pub silicon_apps_url: String,
+    /// Where the published docs live (ACCOUNTS_DOCS_URL).
+    pub docs_url: String,
     pub providers: Providers,
     pub delivery: &'static str,
 }
@@ -69,6 +71,7 @@ pub async fn meta(State(state): State<AppState>) -> Json<Meta> {
         environment: s.environment.as_str(),
         public_url: s.public_url.clone(),
         silicon_apps_url: s.silicon_apps_url.clone(),
+        docs_url: s.docs_url.clone(),
         providers: Providers {
             google: s.google.managed_configured(),
             apple: s.apple.managed_configured(),

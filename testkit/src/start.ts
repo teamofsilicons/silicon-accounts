@@ -6,7 +6,7 @@
 //   --oidc-port <n>          [MOCK_OIDC_PORT]        default 8591
 //   --messaging-port <n>     [MOCK_MESSAGING_PORT]   default 8592
 //   --fake-apps-port <n>     [FAKE_APPS_PORT]        default 8593
-//   --accounts-url <url>     [ACCOUNTS_URL]          Silicon Accounts for the fake apps (default http://127.0.0.1:8590)
+//   --accounts-url <url>     [ACCOUNTS_URL]          Silicon Accounts for the fake apps (default http://127.0.0.1:8589)
 //   --ready-file <path>                              write {"oidc","messaging","fake_apps"} URLs as JSON once listening
 //   --log                    [TESTKIT_LOG=1]         one line per request on stderr
 //   --quiet                                          only print errors
@@ -15,7 +15,7 @@ import { writeFileSync } from 'node:fs';
 import { startTestkit } from './testkit.ts';
 
 function usage(problem: string): never {
-  process.stderr.write(`error: ${problem}\nhint: pnpm -C testkit start [--host 127.0.0.1] [--oidc-port 8591] [--messaging-port 8592] [--fake-apps-port 8593] [--accounts-url http://127.0.0.1:8590] [--ready-file path] [--log] [--quiet]\n`);
+  process.stderr.write(`error: ${problem}\nhint: pnpm -C testkit start [--host 127.0.0.1] [--oidc-port 8591] [--messaging-port 8592] [--fake-apps-port 8593] [--accounts-url http://127.0.0.1:8589] [--ready-file path] [--log] [--quiet]\n`);
   process.exit(2);
 }
 
@@ -54,7 +54,7 @@ function port(flag: string, envName: string, fallback: number): number {
 const quiet = flags.has('quiet');
 const log = flags.has('log') || process.env.TESTKIT_LOG === '1';
 const host = (flags.get('host') as string | undefined) ?? process.env.TESTKIT_HOST ?? '127.0.0.1';
-const accountsUrl = (flags.get('accounts-url') as string | undefined) ?? process.env.ACCOUNTS_URL ?? 'http://127.0.0.1:8590';
+const accountsUrl = (flags.get('accounts-url') as string | undefined) ?? process.env.ACCOUNTS_URL ?? 'http://127.0.0.1:8589';
 
 let kit: Awaited<ReturnType<typeof startTestkit>>;
 try {

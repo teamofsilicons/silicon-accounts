@@ -15,7 +15,7 @@ Timestamps are RFC 3339 UTC with milliseconds. Lists are `{"items":[…],"next_c
 
 | route | auth | response |
 |---|---|---|
-| `GET /v1/ids/available?id=c:saket` | public, 120/min per IP (429 `rate_limited`) | `{"id","available","reason":"taken"\|"reserved"\|"reserved_word"\|"invalid"\|null,"message","reclaimable","suggestions":[…]}`; `suggestions` holds up to 3 free ids close to the one asked for (empty when it is available or has no prefix); with a session, an id reserved for the caller is `available:true, reclaimable:true`; invalid ids are a 200 answer; missing `id` → 400 `invalid_query` |
+| `GET /v1/ids/available?id=c:saket` | public, 120/min per IP (429 `rate_limited`) | `{"id","available","reason":"taken"\|"reserved"\|"reserved_word"\|"invalid"\|null,"message","reclaimable","suggestions":[…]}`; `suggestions` holds up to 3 free ids close to the one asked for (empty when it is available or has no prefix); with a session, an id reserved for the caller is `available:true, reclaimable:true`; a custodian adds `&for=<uuid or si:id>` of one of its Silicons to ask for that Silicon (an id reserved for it is `available:true, reclaimable:true`, and the message names the Silicon; another Carbon's Silicon → 404 `silicon_not_found`; no session → 401 `unauthenticated`; a blank `for` is ignored); invalid ids are a 200 answer; missing `id` → 400 `invalid_query` |
 | `GET /v1/accounts/{uuid}` | app or session; 600 per minute per app or per account, both lookup routes together (429 `rate_limited`) | AccountSummary `{"uuid","kind","id","display_name","pfp_url","status"}`; Silicons add `"custodian": AccountSummary\|null`. 400 `invalid_uuid` (the hint points to by-id when given an id), 404 `account_not_found`, 404 `account_deleted` |
 | `GET /v1/accounts/by-id/{id}` | app or session; same limit | same view; current ids only. 400 `invalid_id`, 404 `account_not_found` (hint says when the id was released recently) |
 
@@ -51,7 +51,9 @@ Timestamps are RFC 3339 UTC with milliseconds. Lists are `{"items":[…],"next_c
 
 ## Photos
 
-- `POST /v1/me/photo` — raw image body, `Content-Type` image/png, image/jpeg (also image/jpg),
+- `POST /v1/me/photo` — (the reading rules live in core's `photo_upload`, shared with a custodian's
+  `POST /v1/me/silicons/{uuid}/photo` and the sign-up page's `POST /v1/flows/{id}/signup/photo`)
+  raw image body, `Content-Type` image/png, image/jpeg (also image/jpg),
   image/webp or image/gif, at most 2 MB (2 097 152 bytes). The bytes must be that format
   (checked by signature) and at most 8192 px a side / 50 megapixels. → **201**
   `{"pfp_url":"{PUBLIC_URL}/v1/photos/{photo_id}","photo":{"id","content_type","bytes","width","height"},"me":Me}`.
@@ -91,6 +93,8 @@ primary that gets verified (apps see `email_verified` / `phone_verified` change)
 ## Identities, apps, sessions
 
 - `GET /v1/me/identities` (Carbon) → `{"items":[{"provider","subject","email","created_at","last_used_at"}],"next_cursor":null}`.
+  Connecting one from the account site is the auth crate's `POST /v1/me/identities/{provider}`
+  (a browser round trip through Google or Apple that also adds the provider's verified email).
 - `DELETE /v1/me/identities/{provider}/{subject}` → 204. 400 `invalid_provider`, 404
   `identity_not_found`, 409 `last_sign_in_method` (no email or phone left to sign in with).
 - `GET /v1/me/apps?status=active|access_removed|imported&limit&cursor` → items
@@ -118,8 +122,13 @@ security. To avoid duplicates, audit actions `proof.*`, `account.id.*`, `silicon
 custodian/transfer actions ending in `.accepted` are not shown. Audit rows that another actor
 wrote into the account's history (a custodian's action on its Silicon, a Silicon naming this
 Carbon as custodian, an app, the service) show `meta.ip: null` and mask email addresses and
-phone numbers in `meta.details`; only the account's own actions show their IP. 400
-`invalid_history_kind`, 400 `invalid_cursor`.
+phone numbers in `meta.details`; only the account's own actions show their IP; a row written by
+another account adds `By c:…` to `detail`. Every audit row about a Silicon (target `silicon`)
+names it in its title by its current si:id (or the id the row recorded once it was deleted):
+"STK of si:scout rotated", "Webhook of si:scout set" (detail "Events go to https://…"),
+"Profile of si:scout updated", "New profile photo for si:scout", "Transfer of si:scout to c:x
+requested", "Custodian request of si:scout declined"…, and carries the Silicon's AccountSummary
+in `meta.silicon`. 400 `invalid_history_kind`, 400 `invalid_cursor`.
 
 ## Deleting the account
 

@@ -188,6 +188,66 @@ async fn set_rotate_test_and_remove_the_webhook() {
 }
 
 #[tokio::test]
+async fn set_and_test_accept_an_idempotency_key() {
+    let ctx = TestContext::new().await;
+    let a = owned_app(&ctx, "whk").await;
+    let base = format!("/v1/apps/{}/webhook", a.app_id);
+    let set = |key: &str, url: &str| {
+        Req::put(&base)
+            .session(&ctx.state.settings, &a.cookie)
+            .header("idempotency-key", key)
+            .json(json!({"url": url}))
+    };
+
+    // A double-click on "Set" (same key, same body) sets one secret, shown to both.
+    let first = call(&ctx, set("set-1", "http://127.0.0.1:8593/whk/webhooks")).await;
+    assert_eq!(first.status, 200, "{}", first.json);
+    let again = call(&ctx, set("set-1", "http://127.0.0.1:8593/whk/webhooks")).await;
+    assert_eq!(again.status, 200);
+    assert_eq!(again.headers["idempotent-replayed"], "true");
+    assert_eq!(again.headers["cache-control"], "no-store");
+    assert_eq!(again.json["secret"], first.json["secret"]);
+    assert_eq!(
+        stored_secret(&ctx, &a.app_id).await.as_deref(),
+        first.json["secret"].as_str(),
+        "the secret was not rotated by the retry"
+    );
+    let sets: i64 = sqlx::query_scalar(
+        "select count(*) from audit_log where app_id = $1 and action = 'app.webhook.set'",
+    )
+    .bind(&a.app_id)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("audit");
+    assert_eq!(sets, 1);
+    // The same key with another URL is refused rather than applied.
+    let other = call(&ctx, set("set-1", "http://127.0.0.1:8593/whk/other")).await;
+    assert_eq!(other.status, 409);
+    assert_eq!(other.error_code(), Some("idempotency_key_reused"));
+
+    // A retried test ping queues one ping.
+    let ping = || {
+        Req::post(&format!("{base}/test"))
+            .basic(&a.app_id, &a.secret)
+            .header("idempotency-key", "ping-1")
+    };
+    let p1 = call(&ctx, ping()).await;
+    assert_eq!(p1.status, 202, "{}", p1.json);
+    let p2 = call(&ctx, ping()).await;
+    assert_eq!(p2.status, 202);
+    assert_eq!(p2.headers["idempotent-replayed"], "true");
+    assert_eq!(p2.json["event_id"], p1.json["event_id"]);
+    let pings: i64 = sqlx::query_scalar(
+        "select count(*) from webhook_events where target_kind = 'app' and target_id = $1 and type = 'ping'",
+    )
+    .bind(&a.app_id)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("pings");
+    assert_eq!(pings, 1);
+}
+
+#[tokio::test]
 async fn production_refuses_private_webhook_urls() {
     let mut settings = Settings::for_tests();
     settings.webhook_allow_private = false;

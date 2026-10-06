@@ -19,10 +19,18 @@
 //!    SPA's `GET /v1/flows/{id}`), which sets the session or sign-up cookie.
 //! 5. The browser is redirected (302) to `{PUBLIC_URL}/authorize/flow/{flow_id}`; provider
 //!    errors end there too, carried on the flow as `error`.
+//!
+//! A flow started by `POST /v1/me/identities/{provider}` (connecting Google or Apple to a
+//! signed-in Carbon, [`LinkIntent`]) resolves differently at step 4: nobody is signed in; the
+//! provider account is connected to the Carbon that asked (the browser must still be signed in
+//! as it) and its verified email is added without a code. The flow completes there and the
+//! browser goes straight back to the account site (`return_to?linked=…` or `?link_error=…`).
 
 use accounts_core::crypto::{b64url, b64url_decode, constant_time_eq};
 use accounts_core::http::{ClientMeta, Path};
-use accounts_core::models::{Account, AccountKind, AccountStatus, ActorKind, Provider};
+use accounts_core::models::{
+    Account, AccountField, AccountKind, AccountStatus, ActorKind, Provider,
+};
 use accounts_core::normalize::{normalize_email, validate_https_url};
 use accounts_core::repo::audit::{self, AuditEntry, SigninRecord};
 use accounts_core::repo::contacts::{self, ContactKind, Holder};
@@ -40,9 +48,9 @@ use super::id_token::{self, Expectations, ProviderClaims};
 use super::start::{flow_id_of_state, provider_state, unknown_provider};
 use super::{Credential, ProviderClient, apple, callback_url, endpoints, resolve_client};
 use crate::flow::model::{
-    self, Flow, FlowError, ParkedAnswer, Pending, PendingSignup, ProviderLeg, Step,
+    self, Flow, FlowError, LinkIntent, ParkedAnswer, Pending, PendingSignup, ProviderLeg, Step,
 };
-use crate::flow::{FlowApp, next};
+use crate::flow::{FlowApp, browser, next};
 use crate::util::{decrypt_text, encrypt_text, no_store, telemetry, with_query};
 
 /// What arrives at the callback (query string or form fields).
@@ -94,6 +102,8 @@ enum Next {
     Flow(String),
     /// 303 to this same-site URL (a parked form_post continues there with its cookies).
     Continue(String),
+    /// 302 to this URL on the site (a finished connection goes back to the account site).
+    Redirect(String),
 }
 
 /// `GET /v1/oauth/callback/{provider}` (Google's redirect, or a parked form_post coming back).
@@ -143,6 +153,7 @@ async fn handle(
     match result {
         Ok(Next::Flow(flow_id)) => redirect_to_flow(&state.settings, &flow_id),
         Ok(Next::Continue(location)) => see_other(&location),
+        Ok(Next::Redirect(location)) => found(&location),
         Err(e) => error_page(&state.settings, headers, e),
     }
 }
@@ -209,7 +220,7 @@ async fn receive(
     };
     let answer = Answer::from(params);
     if model::check_binding(state, headers, &flow).is_ok() {
-        return process(state, meta, tx, flow, leg, answer).await;
+        return process(state, meta, headers, tx, flow, leg, answer).await;
     }
     if via == Via::Post {
         if leg.parked.is_some() {
@@ -275,7 +286,7 @@ async fn resume(
     }
     let answer: Answer =
         serde_json::from_str(&decrypt_text(&state.keys.keyring, &parked.answer_enc)?)?;
-    process(state, meta, tx, flow, leg, answer).await
+    process(state, meta, headers, tx, flow, leg, answer).await
 }
 
 /// The answer reached a browser that didn't start the sign-in. It is thrown away: the leg is
@@ -322,10 +333,12 @@ async fn discard(
     )))
 }
 
-/// The bound answer: consume the leg, exchange the code, resolve the identity.
+/// The bound answer: consume the leg, exchange the code, resolve the identity (or, for a
+/// connection, link it to the Carbon that asked).
 async fn process(
     state: &AppState,
     meta: &ClientMeta,
+    headers: &HeaderMap,
     mut tx: sqlx::Transaction<'static, sqlx::Postgres>,
     mut flow: Flow,
     leg: ProviderLeg,
@@ -334,6 +347,7 @@ async fn process(
     let provider = leg.provider;
     let name = provider.display_name();
     let flow_id = flow.id.clone();
+    let linking = flow.extras.link.is_some();
 
     // 1. Consume the leg.
     flow.extras.provider = None;
@@ -368,6 +382,21 @@ async fn process(
                 Some(0.4),
                 json!({"app_id": flow.app_id, "provider": provider.as_str(), "error": e.code}),
             );
+            if linking {
+                return finish_link(state, &flow_id, provider, Err(e.clone())).await;
+            }
+        }
+        if linking && flow.expired && !flow.step.is_terminal() {
+            // A connection that ran out goes back to the account site too.
+            let expired = FlowError::new(
+                "flow_expired",
+                format!(
+                    "Connecting {name} took longer than {} minutes, so it was not finished.",
+                    model::FLOW_TTL_MINUTES
+                ),
+                format!("Connect {name} again from the account site."),
+            );
+            return finish_link(state, &flow_id, provider, Err(expired)).await;
         }
         return Ok(Next::Flow(flow_id));
     }
@@ -377,6 +406,7 @@ async fn process(
     let outcome = exchange_and_verify(state, &flow.app_id, provider, &leg, code.trim()).await;
     let (fa, client, claims) = match outcome {
         Ok(v) => v,
+        Err(e) if linking => return finish_link(state, &flow_id, provider, Err(e)).await,
         Err(e) => {
             record_error(state, &flow_id, provider, e).await?;
             return Ok(Next::Flow(flow_id));
@@ -392,6 +422,36 @@ async fn process(
     {
         // A newer attempt started (or the flow moved on) while we talked to the provider.
         return Ok(Next::Flow(flow_id));
+    }
+    if let Some(link) = flow.extras.link.clone() {
+        // Connect the provider account to the Carbon that asked; nothing of it stays when the
+        // connection is refused (savepoint).
+        let mut attempt = sqlx::Acquire::begin(&mut tx).await?;
+        let outcome =
+            link_identity(&mut attempt, state, meta, headers, &link, &client, &claims).await?;
+        match &outcome {
+            Ok(_) => attempt.commit().await?,
+            Err(_) => attempt.rollback().await?,
+        }
+        let redirect = link_redirect(&link, provider, &flow.id, &outcome);
+        flow.extras.error = outcome.as_ref().err().cloned();
+        next::complete_with(state, &mut flow, &redirect)?;
+        model::save(&mut tx, &flow).await?;
+        tx.commit().await?;
+        telemetry(
+            state,
+            "identity.link_finished",
+            Some(1.0),
+            json!({
+                "provider": provider.as_str(),
+                "outcome": match &outcome {
+                    Ok(done) if done.email_added => "linked_email_added",
+                    Ok(_) => "linked",
+                    Err(e) => e.code.as_str(),
+                },
+            }),
+        );
+        return Ok(Next::Redirect(redirect));
     }
     let apple_name = answer.user.as_deref().and_then(apple_user_name);
     match resolve_identity(&mut tx, meta, &fa, &client, &claims, apple_name).await? {
@@ -424,6 +484,206 @@ async fn process(
         }),
     );
     Ok(Next::Flow(flow_id))
+}
+
+/// What a connection did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LinkDone {
+    /// The provider's verified email was added to the account (it wasn't on it yet).
+    email_added: bool,
+}
+
+/// Where a finished connection sends the browser: `return_to?linked={provider}&email_added=…`,
+/// or `return_to?link_error={code}&provider={provider}&flow={flow_id}` (the flow carries the
+/// message and hint).
+fn link_redirect(
+    link: &LinkIntent,
+    provider: Provider,
+    flow_id: &str,
+    outcome: &Result<LinkDone, FlowError>,
+) -> String {
+    match outcome {
+        Ok(done) => with_query(
+            &link.return_to,
+            &[
+                ("linked", Some(provider.as_str())),
+                (
+                    "email_added",
+                    Some(if done.email_added { "true" } else { "false" }),
+                ),
+            ],
+        ),
+        Err(e) => with_query(
+            &link.return_to,
+            &[
+                ("link_error", Some(&e.code)),
+                ("provider", Some(provider.as_str())),
+                ("flow", Some(flow_id)),
+            ],
+        ),
+    }
+}
+
+/// Ends a connection that failed before the provider's answer could be used (cancelled, a
+/// provider error, an id_token that can't be trusted): the flow completes with the error and
+/// the browser goes back to the account site.
+async fn finish_link(
+    state: &AppState,
+    flow_id: &str,
+    provider: Provider,
+    outcome: Result<LinkDone, FlowError>,
+) -> ApiResult<Next> {
+    let mut tx = state.db.begin().await?;
+    let Some(mut flow) = model::lock(&mut tx, flow_id).await? else {
+        return Ok(Next::Flow(flow_id.to_string()));
+    };
+    let Some(link) = flow.extras.link.clone() else {
+        return Ok(Next::Flow(flow_id.to_string()));
+    };
+    if flow.step.is_terminal() || flow.extras.provider.is_some() {
+        // Already finished, or a newer attempt started meanwhile.
+        return Ok(Next::Flow(flow_id.to_string()));
+    }
+    let redirect = link_redirect(&link, provider, &flow.id, &outcome);
+    flow.extras.error = outcome.err();
+    next::complete_with(state, &mut flow, &redirect)?;
+    model::save(&mut tx, &flow).await?;
+    tx.commit().await?;
+    Ok(Next::Redirect(redirect))
+}
+
+/// Connects a verified provider identity to the Carbon of a [`LinkIntent`] and adds the
+/// provider's verified email to it (no code needed). `Ok(Err(..))` = a refusal for the account
+/// site to show; the caller rolls everything back then.
+async fn link_identity(
+    conn: &mut PgConnection,
+    state: &AppState,
+    meta: &ClientMeta,
+    headers: &HeaderMap,
+    link: &LinkIntent,
+    client: &ProviderClient,
+    claims: &ProviderClaims,
+) -> ApiResult<Result<LinkDone, FlowError>> {
+    let provider = client.provider;
+    let name = provider.display_name();
+    // The browser must still be signed in as the Carbon that asked.
+    let me = match browser::current(conn, state, headers).await? {
+        Some(b) if b.account.uuid == link.account_uuid && b.is_active_carbon() => b.account,
+        _ => {
+            return Ok(Err(FlowError::new(
+                "session_changed",
+                format!(
+                    "This browser is no longer signed in as the account that asked to connect {name}, so nothing was connected."
+                ),
+                format!("Sign in on the account site again, then connect {name} again."),
+            )));
+        }
+    };
+    if let Some(existing) = identities::find(conn, provider, &claims.sub).await?
+        && existing.account_uuid != me.uuid
+    {
+        return Ok(Err(FlowError::new(
+            "identity_in_use",
+            format!(
+                "This {name} account is already connected to another Silicon Accounts account."
+            ),
+            format!(
+                "Sign in with {name} to use that account (and disconnect it there), or connect a different {name} account."
+            ),
+        )));
+    }
+    let email = match claims
+        .email
+        .as_deref()
+        .map(str::trim)
+        .filter(|e| !e.is_empty())
+    {
+        None => None,
+        Some(raw) => match normalize_email(raw) {
+            Ok(e) => Some(e),
+            Err(err) => {
+                return Ok(Err(FlowError::new(
+                    "provider_email_invalid",
+                    format!(
+                        "{name} returned an email address Silicon Accounts can't use: {}",
+                        err.message
+                    ),
+                    format!("Connect a different {name} account."),
+                )));
+            }
+        },
+    };
+    if let Some(e) = &email
+        && claims.email_verified != Some(true)
+    {
+        return Ok(Err(FlowError::new(
+            "email_not_verified",
+            format!("{name} says {e} is not verified, so it can't be added to your account."),
+            format!("Verify the address with {name} first, then connect it again."),
+        )));
+    }
+    let mut email_added = false;
+    if let Some(e) = &email {
+        match contacts::add_verified_email(conn, &me.uuid, e, provider.verified_via()).await {
+            Ok(outcome) => {
+                email_added = true;
+                // Apps see the primary email: a first email (a phone-only Carbon) is news.
+                let primary_now = outcome.became_primary
+                    || (outcome.was_unverified
+                        && contacts::primary(conn, ContactKind::Email, &me.uuid)
+                            .await?
+                            .is_some_and(|p| &p.value == e));
+                if primary_now {
+                    let account = accounts::bump_version(conn, &me.uuid).await?;
+                    accounts_core::events::account_updated(conn, &account, &[AccountField::Email])
+                        .await?;
+                }
+                audit::record(
+                    conn,
+                    &AuditEntry {
+                        account_uuid: Some(&me.uuid),
+                        target_kind: Some("account"),
+                        target_id: Some(&me.uuid),
+                        details: json!({"email": e, "primary": outcome.became_primary, "verified_via": provider.as_str()}),
+                        ip: meta.ip.as_deref(),
+                        ..AuditEntry::new(ActorKind::Account, Some(&me.uuid), "account.email.added")
+                    },
+                )
+                .await?;
+            }
+            // Already on the account and verified: nothing to add.
+            Err(err) if err.code == "email_already_added" => {}
+            Err(err) if !err.is_server_error() => return Ok(Err(FlowError::from_api(&err))),
+            Err(err) => return Err(err),
+        }
+    }
+    match identities::link(
+        conn,
+        provider,
+        &claims.sub,
+        &client.client_id,
+        &me.uuid,
+        email.as_deref(),
+    )
+    .await
+    {
+        Ok(_) => {}
+        Err(err) if !err.is_server_error() => return Ok(Err(FlowError::from_api(&err))),
+        Err(err) => return Err(err),
+    }
+    audit::record(
+        conn,
+        &AuditEntry {
+            account_uuid: Some(&me.uuid),
+            target_kind: Some("identity"),
+            target_id: Some(&claims.sub),
+            details: json!({"provider": provider.as_str(), "linked_by": "account_site", "email_added": email_added}),
+            ip: meta.ip.as_deref(),
+            ..AuditEntry::new(ActorKind::Account, Some(&me.uuid), "identity.linked")
+        },
+    )
+    .await?;
+    Ok(Ok(LinkDone { email_added }))
 }
 
 /// Compares a presented secret (state or ticket) with its stored HMAC.
@@ -921,9 +1181,13 @@ async fn resolve_identity(
 }
 
 fn redirect_to_flow(settings: &Settings, flow_id: &str) -> Response {
-    let location = settings.url(&format!("/authorize/flow/{flow_id}"));
+    found(&settings.url(&format!("/authorize/flow/{flow_id}")))
+}
+
+/// 302 to a URL on the site.
+fn found(location: &str) -> Response {
     let mut response = StatusCode::FOUND.into_response();
-    if let Ok(v) = HeaderValue::from_str(&location) {
+    if let Ok(v) = HeaderValue::from_str(location) {
         response.headers_mut().insert(header::LOCATION, v);
     }
     no_store(response.headers_mut());

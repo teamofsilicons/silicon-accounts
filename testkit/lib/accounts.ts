@@ -29,7 +29,8 @@ import type {
   TokenResponse,
 } from './types.ts';
 
-export const DEFAULT_ACCOUNTS_URL = 'http://127.0.0.1:8590';
+/** accounts-api in a local stack (scripts/dev.sh); the public site on :8590 proxies to it too. */
+export const DEFAULT_ACCOUNTS_URL = 'http://127.0.0.1:8589';
 
 /** An RFC 6749 error from /v1/oauth/token (or revoke/introspect). */
 export class OAuthError extends Error {
@@ -559,6 +560,15 @@ export class BrowserSession {
     return this.step(`/v1/flows/${encodeURIComponent(id)}/signup`, fields);
   }
 
+  /** POST /v1/flows/{id}/signup/photo — the sign-up page uploads the chosen photo (raw image) before the account exists. */
+  async signupPhotoRaw(id: string, bytes: Uint8Array, contentType = 'image/png'): Promise<HttpResponse<{ pfp_url: string; photo: { id: string; content_type: string; bytes: number; width: number; height: number } }>> {
+    return this.http.post(`/v1/flows/${encodeURIComponent(id)}/signup/photo`, { body: bytes, contentType });
+  }
+
+  async signupPhoto(id: string, bytes: Uint8Array, contentType = 'image/png'): Promise<{ pfp_url: string; photo: { id: string; content_type: string; bytes: number; width: number; height: number } }> {
+    return expectStatus(await this.signupPhotoRaw(id, bytes, contentType), 201).body;
+  }
+
   requirement(id: string, kind: 'email' | 'phone', value: string, country?: string): Promise<FlowView> {
     return this.step(`/v1/flows/${encodeURIComponent(id)}/requirements/${kind}`, { [kind]: value, ...(country ? { country } : {}) });
   }
@@ -582,6 +592,30 @@ export class BrowserSession {
   async oauthStart(id: string, provider: Provider): Promise<string> {
     const res = expectStatus(await this.http.post<{ authorize_url: string }>(`/v1/flows/${encodeURIComponent(id)}/oauth/${provider}`, {}), 200);
     return res.body.authorize_url;
+  }
+
+  /**
+   * The account site's "Connect Google/Apple": POST /v1/me/identities/{provider}, the provider (mock-oidc) picks
+   * `identityEmail`, and its answer goes to the callback in this browser. Returns where the callback sent the browser
+   * (`return_to?linked=…&email_added=…` or `?link_error=…&provider=…&flow=…`).
+   */
+  async connectProvider(provider: Provider, oidc: MockOidcClient, identityEmail: string, returnTo?: string): Promise<{ flow_id: string; location: string }> {
+    const started = expectStatus(
+      await this.http.post<{ authorize_url: string; flow_id: string }>(`/v1/me/identities/${provider}`, { json: returnTo ? { return_to: returnTo } : {} }),
+      201,
+    ).body;
+    const outcome = await oidc.authorize(started.authorize_url, { email: identityEmail });
+    let res: HttpResponse;
+    if (outcome.kind === 'redirect') {
+      res = await this.http.get(await this.accounts.toServerUrl(outcome.location), { headers: { Accept: 'text/html' } });
+    } else if (outcome.kind === 'form_post') {
+      const posted = await this.http.post(await this.accounts.toServerUrl(outcome.action), { form: outcome.fields, headers: { Accept: 'text/html' }, origin: new URL(started.authorize_url).origin });
+      res = posted.status === 303 && posted.location ? await this.http.get(await this.accounts.toServerUrl(posted.location), { headers: { Accept: 'text/html' } }) : posted;
+    } else {
+      throw new Error(`mock-oidc answered ${outcome.kind} instead of an identity: ${JSON.stringify(outcome).slice(0, 300)}`);
+    }
+    if (res.status !== 302 || !res.location) throw new HttpExpectationError(res, '302 back to the account site');
+    return { flow_id: started.flow_id, location: res.location };
   }
 
   /** Delivers the provider's answer (redirect or form_post) to Silicon Accounts' callback and returns the flow id it sends the browser to. */

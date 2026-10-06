@@ -353,6 +353,30 @@ impl ProfileUpdate {
 pub struct PhotoUploaded {
     /// The new profile photo URL.
     pub pfp_url: String,
+    /// The stored image (when the service reports it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub photo: Option<PhotoInfo>,
+}
+
+/// An uploaded photo as stored: `{id, content_type, bytes, width, height}`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct PhotoInfo {
+    /// The photo id (its URL is `{PUBLIC_URL}/v1/photos/{id}`).
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub id: String,
+    /// `image/png`, `image/jpeg`, `image/webp` or `image/gif`.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub content_type: String,
+    /// Size in bytes.
+    #[serde(default, deserialize_with = "lenient_u64")]
+    pub bytes: u64,
+    /// Width in pixels.
+    #[serde(default, deserialize_with = "lenient_u64")]
+    pub width: u64,
+    /// Height in pixels.
+    #[serde(default, deserialize_with = "lenient_u64")]
+    pub height: u64,
 }
 
 /// A verification code was sent; finish with the matching `verify_*` call.

@@ -1,6 +1,9 @@
 // The custodian side of the CLI: a Silicon's life (create with a chosen STK, show, update, id,
 // webhooks, rotate, transfer/cancel, delete), a self-created Silicon declined by email, device
 // show/deny, config, and deleting accounts.
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   accounts,
   check,
@@ -11,6 +14,7 @@ import {
   fakeAppsUrl,
   messaging,
   newHome,
+  pngBytes,
   rid,
   run,
   section,
@@ -37,6 +41,17 @@ await run('silicon show by si:id', homeA, ['silicon', 'show', `si:${h}`], (r) =>
 await run('silicon update', homeA, ['silicon', 'update', `si:${h}`, '--display-name', 'Journey Si 2', '--timezone', 'Asia/Tokyo'], (r) => r.code === 0 && r.json?.display_name === 'Journey Si 2');
 const h2 = `cj-${rid()}`;
 await run('silicon id', homeA, ['silicon', 'id', `si:${h}`, `si:${h2}`], (r) => r.code === 0 && r.json?.id === `si:${h2}`);
+await run('id available: the old si:id is reserved (for someone else)', homeA, ['id', 'available', `si:${h}`], (r) => r.code === 5 && r.json?.reason === 'reserved');
+await run('id available --for <the Silicon>: reclaimable for it', homeA, ['id', 'available', `si:${h}`, '--for', `si:${h2}`], (r) => r.code === 0 && r.json?.available === true && r.json?.reclaimable === true);
+await run('id available --for another Carbon\'s Silicon → exit 4', homeB, ['id', 'available', `si:${h}`, '--for', `si:${h2}`], (r) => r.code === 4 && r.json?.error?.code === 'silicon_not_found');
+{
+  const dir = mkdtempSync(join(tmpdir(), 'journey-photo-'));
+  const png = join(dir, 'si.png');
+  writeFileSync(png, pngBytes(80, 80));
+  const up = await run('silicon update --photo uploads its photo', homeA, ['silicon', 'update', `si:${h2}`, '--photo', png], (r) => r.code === 0 && /\/v1\/photos\//.test(r.json?.pfp_url ?? ''));
+  const served = await fetch(await accounts.toServerUrl(String(up.json?.pfp_url)));
+  check(served.status === 200 && served.headers.get('content-type') === 'image/png', `the Silicon's photo is served (${served.status})`);
+}
 const wh = await run('silicon webhook set (custodian)', homeA, ['silicon', 'webhook', 'set', `si:${h2}`, fake.hookUrl(hookKey)], (r) => r.code === 0 && /^whsec_/.test(r.json?.webhook_secret ?? ''));
 await fake.setHookSecret(hookKey, wh.json?.webhook_secret ?? null);
 const homeS = newHome('custodian-s');

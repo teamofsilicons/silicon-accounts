@@ -9,6 +9,7 @@ mod custodian;
 mod custodian_requests;
 mod login;
 mod own_webhook;
+mod photo;
 mod races;
 mod request_status;
 mod self_create;

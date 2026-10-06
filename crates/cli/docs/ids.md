@@ -32,7 +32,10 @@ When an id can't be taken, `accounts id available` lists free ids close to it
 
 When an id changes, the old one stays reserved for **10 days**: nobody else can take
 it, and its previous owner can take it back (`accounts id available` shows
-`reclaimable: true` to them). After that it becomes available again. Every app the
+`reclaimable: true` to them). A custodian asks for one of its Silicons with
+`accounts id available si:scout --for si:scout_v2`: an old id of that Silicon shows as
+reclaimable for it, and `accounts silicon id si:scout_v2 si:scout` takes it back. After the
+10 days it becomes available again. Every app the
 account signed into gets `account.id_changed`, which is why apps key on the uuid.
 An account's id can change at most 5 times in any 24 hours (a Silicon's custodian's
 changes count too; taking back a reserved id counts; asking for the current id doesn't):

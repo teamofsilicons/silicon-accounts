@@ -14,9 +14,9 @@
 //  - OBO demo (dm → briefcase) and ATA demo (commit → remind + waveform) with timings.
 //  - /<app>/_state, /_events, /_webhook-secret, /_webhook-faults … for test assertions.
 //
-// Silicon Accounts is reached at ACCOUNTS_URL (server to server, default
-// http://127.0.0.1:8590); browser links use ACCOUNTS_PUBLIC_URL, else /v1/meta's
-// public_url, else ACCOUNTS_URL.
+// Silicon Accounts is reached at ACCOUNTS_URL (server to server, default accounts-api at
+// http://127.0.0.1:8589; the public site, which proxies /v1/*, works too); browser links use
+// ACCOUNTS_PUBLIC_URL, else /v1/meta's public_url, else ACCOUNTS_URL.
 
 import { createLocalJWKSet, decodeJwt, jwtVerify, type JSONWebKeySet, type JWTPayload } from 'jose';
 import { createPkcePair, randomNonce, randomState } from '../lib/pkce.ts';
@@ -28,7 +28,7 @@ import { apiError, jsonObject, Router, serializeCookie, serve, type Ctx } from '
 import { basicAuthHeader, isRecord, nowIso, randomToken, roundMs, str, uuid } from './shared/util.ts';
 
 export const DEFAULT_FAKE_APPS_PORT = 8593;
-export const DEFAULT_ACCOUNTS_URL = 'http://127.0.0.1:8590';
+export const DEFAULT_ACCOUNTS_URL = 'http://127.0.0.1:8589';
 export const SESSION_COOKIE = 'fakeapp_sid';
 const PENDING_TTL_MS = 60 * 60_000;
 const MAX_RECORDS = 500;
@@ -112,7 +112,7 @@ export interface FakeAppServerOptions {
   host?: string;
   /** This server's browser-facing base URL (default http://<host>:<port>); redirect URIs derive from it. */
   publicUrl?: string;
-  /** Silicon Accounts for server-to-server calls (default $ACCOUNTS_URL or http://127.0.0.1:8590). */
+  /** Silicon Accounts for server-to-server calls (default $ACCOUNTS_URL or http://127.0.0.1:8589). */
   accountsUrl?: string;
   /** Silicon Accounts as the browser sees it (default $ACCOUNTS_PUBLIC_URL, else /v1/meta public_url, else accountsUrl). */
   accountsPublicUrl?: string;

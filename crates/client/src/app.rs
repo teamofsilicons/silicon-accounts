@@ -480,12 +480,22 @@ impl<'a> AppClient<'a> {
     // ---- webhooks -------------------------------------------------------------------------
 
     /// `PUT /v1/apps/{app_id}/webhook`: sets the endpoint; a new signing secret is
-    /// generated every time and returned once.
-    pub async fn set_webhook(&self, url: &str) -> Result<AppWebhook> {
+    /// generated every time and returned once. With an idempotency key, a retry within 10
+    /// minutes returns the same secret instead of generating another.
+    pub async fn set_webhook(
+        &self,
+        url: &str,
+        idempotency_key: Option<&str>,
+    ) -> Result<AppWebhook> {
         let body = json!({ "url": url.trim() });
-        self.send(Method::PUT, self.app_url(&["webhook"]), Some(&body), None)
-            .await?
-            .json()
+        self.send(
+            Method::PUT,
+            self.app_url(&["webhook"]),
+            Some(&body),
+            idempotency_key,
+        )
+        .await?
+        .json()
     }
 
     /// `DELETE /v1/apps/{app_id}/webhook`.
@@ -496,22 +506,32 @@ impl<'a> AppClient<'a> {
     }
 
     /// `POST /v1/apps/{app_id}/webhook/rotate-secret`: the old secret stops signing
-    /// immediately.
-    pub async fn rotate_webhook_secret(&self) -> Result<WebhookSecret> {
+    /// immediately. With an idempotency key, a retry within 10 minutes returns the same new
+    /// secret instead of rotating again.
+    pub async fn rotate_webhook_secret(
+        &self,
+        idempotency_key: Option<&str>,
+    ) -> Result<WebhookSecret> {
         self.send(
             Method::POST,
             self.app_url(&["webhook", "rotate-secret"]),
             None,
-            None,
+            idempotency_key,
         )
         .await?
         .json()
     }
 
-    /// `POST /v1/apps/{app_id}/webhook/test`: queues a `ping` event.
-    pub async fn test_webhook(&self) -> Result<WebhookTestResult> {
+    /// `POST /v1/apps/{app_id}/webhook/test`: queues a `ping` event. With an idempotency key,
+    /// a retry queues no second ping.
+    pub async fn test_webhook(&self, idempotency_key: Option<&str>) -> Result<WebhookTestResult> {
         let response = self
-            .send(Method::POST, self.app_url(&["webhook", "test"]), None, None)
+            .send(
+                Method::POST,
+                self.app_url(&["webhook", "test"]),
+                None,
+                idempotency_key,
+            )
             .await?;
         Ok(serde_json::from_value(response.value()?).unwrap_or_default())
     }

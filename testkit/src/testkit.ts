@@ -17,7 +17,7 @@ export interface TestkitOptions {
   oidcPort?: number;
   messagingPort?: number;
   fakeAppsPort?: number;
-  /** Silicon Accounts for the fake apps' server-to-server calls (default $ACCOUNTS_URL or http://127.0.0.1:8590). */
+  /** Silicon Accounts for the fake apps' server-to-server calls (default $ACCOUNTS_URL or http://127.0.0.1:8589). */
   accountsUrl?: string;
   /** Silicon Accounts as browsers see it (default $ACCOUNTS_PUBLIC_URL, else discovered via /v1/meta). */
   accountsPublicUrl?: string;

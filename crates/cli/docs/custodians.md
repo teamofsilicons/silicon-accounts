@@ -28,6 +28,8 @@ and from custodians transferring a Silicon to you. They expire after 14 days.
 accounts silicon list
 accounts silicon show si:scout
 accounts silicon update si:scout --display-name "Scout" --timezone Europe/Berlin
+accounts silicon update si:scout --photo ./scout.png    # uploads its photo (≤ 2 MB; it belongs to the Silicon)
+accounts id available si:scout --for si:scout_v2  # is an old id of this Silicon free to take back?
 accounts silicon id si:scout si:scout_v2          # apps are told; the uuid never changes
 accounts silicon rotate-stk si:scout              # prints the new STK once
 accounts silicon webhook set si:scout https://scout.example/hooks

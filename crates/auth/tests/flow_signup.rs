@@ -647,3 +647,278 @@ async fn a_claim_that_lost_the_race_becomes_an_ordinary_sign_up() {
     assert_eq!(r.json["flow"]["step"], "choose_method");
     assert_eq!(r.json["flow"]["error"]["code"], "signup_not_allowed");
 }
+
+/// A minimal valid PNG of the given size.
+fn png(width: u32, height: u32) -> Vec<u8> {
+    let mut v = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    v.extend_from_slice(&13u32.to_be_bytes());
+    v.extend_from_slice(b"IHDR");
+    v.extend_from_slice(&width.to_be_bytes());
+    v.extend_from_slice(&height.to_be_bytes());
+    v.extend_from_slice(&[8, 6, 0, 0, 0, 0x1F, 0x15, 0xC4, 0x89]);
+    v.extend_from_slice(&[0, 0, 0, 0, b'I', b'E', b'N', b'D', 0xAE, 0x42, 0x60, 0x82]);
+    v
+}
+
+fn photo_upload(flow_id: &str, body: Vec<u8>) -> Req {
+    let mut req =
+        Req::post(&format!("/v1/flows/{flow_id}/signup/photo")).header("content-type", "image/png");
+    req.body = body;
+    req
+}
+
+/// (account_uuid, signup_session_id is set) of the photo behind a photo URL, if it exists.
+async fn photo_row(ctx: &TestContext, url: &str) -> Option<(Option<String>, bool)> {
+    let id = uuid::Uuid::parse_str(url.rsplit('/').next().expect("id")).expect("uuid");
+    sqlx::query_as::<_, (Option<String>, bool)>(
+        "select account_uuid, signup_session_id is not null from photos where id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&ctx.state.db)
+    .await
+    .expect("photo row")
+}
+
+#[tokio::test]
+async fn not_you_at_the_sign_up_step_ends_that_sign_up() {
+    let ctx = TestContext::new().await;
+    let (app, _) = ctx.app("briefcase").await;
+    let mut b = Browser::new(&ctx);
+    // A browser where someone is signed in keeps that session; only the sign-up ends.
+    let someone = ctx.carbon().await;
+    b.cookies
+        .insert("sa_session".into(), ctx.browser_session(&someone).await);
+    let email = random_email("notyou");
+    let (id, _) = to_signup(&ctx, &mut b, &app.app_id, &email).await;
+    let old_cookie = b.cookie("sa_signup").expect("sign-up cookie").to_string();
+
+    let r = b
+        .post(&ctx, &format!("/v1/flows/{id}/switch"), json!({}))
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["flow"]["step"], "choose_method");
+    assert!(
+        b.cookie("sa_signup").is_none(),
+        "the sign-up cookie is cleared"
+    );
+    assert!(b.cookie("sa_session").is_some(), "nobody is signed out");
+    let ended: bool = sqlx::query_scalar(
+        "select expires_at <= now() from signup_sessions where verified_email = $1",
+    )
+    .bind(&email)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("session");
+    assert!(ended, "the sign-up session expired");
+
+    // Even with the old cookie back, no new flow resumes it.
+    let mut replay = b.clone();
+    replay.cookies.insert("sa_signup".into(), old_cookie);
+    let f = new_flow(&ctx, &mut replay, &app.app_id, json!({})).await;
+    assert_eq!(f["step"], "choose_method", "{f}");
+}
+
+#[tokio::test]
+async fn not_you_in_a_stale_tab_leaves_the_newer_sign_up_alone() {
+    let ctx = TestContext::new().await;
+    let (app, _) = ctx.app("briefcase").await;
+    let mut b = Browser::new(&ctx);
+    let (stale, _) = to_signup(&ctx, &mut b, &app.app_id, &random_email("stale")).await;
+    // A second tab resumes that sign-up, says "Not you?" and verifies another address: the
+    // browser's live sign-up is now that one, while the first tab still shows the old step.
+    let f = new_flow(&ctx, &mut b, &app.app_id, json!({})).await;
+    assert_eq!(f["step"], "signup", "{f}");
+    let fresh = id_of(&f);
+    let r = b
+        .post(&ctx, &format!("/v1/flows/{fresh}/switch"), json!({}))
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let r = email_and_verify(&ctx, &mut b, &fresh, &random_email("fresh")).await;
+    assert_eq!(r.json["flow"]["step"], "signup", "{}", r.json);
+    let r = b
+        .post(&ctx, &format!("/v1/flows/{stale}/switch"), json!({}))
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert!(
+        b.cookie("sa_signup").is_some(),
+        "the newer sign-up's cookie stays"
+    );
+    let r = b
+        .post(&ctx, &format!("/v1/flows/{fresh}/signup"), json!({}))
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+}
+
+#[tokio::test]
+async fn the_sign_up_page_uploads_the_photo_before_the_account_exists() {
+    let ctx = TestContext::new().await;
+    let (app, _) = ctx.app("briefcase").await;
+    let mut b = Browser::new(&ctx);
+    let (id, _) = to_signup(&ctx, &mut b, &app.app_id, &random_email("photo")).await;
+
+    let r = b.call(&ctx, photo_upload(&id, png(128, 128))).await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    assert_eq!(r.headers["cache-control"], "no-store");
+    let first = r.json["pfp_url"].as_str().expect("pfp_url").to_string();
+    assert!(
+        first.starts_with(&format!("{}/v1/photos/", ctx.state.settings.public_url)),
+        "{first}"
+    );
+    assert_eq!(r.json["photo"]["width"], 128);
+    assert_eq!(photo_row(&ctx, &first).await, Some((None, true)));
+    // It is the sign-up's photo now (a reload shows it).
+    let r = b.get(&ctx, &format!("/v1/flows/{id}")).await;
+    assert_eq!(r.json["flow"]["signup"]["pfp_url"], first.as_str());
+
+    // A new upload replaces it.
+    let r = b.call(&ctx, photo_upload(&id, png(64, 64))).await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    let second = r.json["pfp_url"].as_str().expect("pfp_url").to_string();
+    assert_eq!(
+        photo_row(&ctx, &first).await,
+        None,
+        "the first upload is gone"
+    );
+    let r = b
+        .post(
+            &ctx,
+            &format!("/v1/flows/{id}/signup"),
+            json!({"pfp_url": first}),
+        )
+        .await;
+    assert_eq!(r.status, 422, "{}", r.json);
+    assert!(
+        r.json["error"]["details"]["fields"]["pfp_url"]
+            .as_str()
+            .is_some_and(|m| m.contains("not the photo uploaded on this sign-up page")),
+        "{}",
+        r.json
+    );
+
+    // Another sign-up's upload is not this one's.
+    let mut other = Browser::new(&ctx);
+    let (other_id, _) = to_signup(&ctx, &mut other, &app.app_id, &random_email("other")).await;
+    let r = other.call(&ctx, photo_upload(&other_id, png(32, 32))).await;
+    let theirs = r.json["pfp_url"].as_str().expect("pfp_url").to_string();
+    let r = b
+        .post(
+            &ctx,
+            &format!("/v1/flows/{id}/signup"),
+            json!({"pfp_url": theirs}),
+        )
+        .await;
+    assert_eq!(r.status, 422, "{}", r.json);
+
+    // The upload belongs to the browser that verified: no sign-up cookie, no upload.
+    let mut stolen = b.clone();
+    stolen.cookies.remove("sa_signup");
+    let r = stolen.call(&ctx, photo_upload(&id, png(8, 8))).await;
+    assert_eq!(r.error_code(), Some("signup_not_bound"));
+    let r = b
+        .call(
+            &ctx,
+            Req::post(&format!("/v1/flows/{id}/signup/photo"))
+                .header("content-type", "image/svg+xml"),
+        )
+        .await;
+    assert_eq!(r.status, 415);
+
+    // Accepting the prefill keeps the upload: it becomes the new account's own photo.
+    let r = b
+        .post(&ctx, &format!("/v1/flows/{id}/signup"), json!({}))
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let uuid = r.json["flow"]["signed_in_as"]["uuid"]
+        .as_str()
+        .expect("uuid")
+        .to_string();
+    assert_eq!(r.json["flow"]["signed_in_as"]["pfp_url"], second.as_str());
+    assert_eq!(photo_row(&ctx, &second).await, Some((Some(uuid), false)));
+
+    // The sign-up is over, and so is its photo upload.
+    let r = b.call(&ctx, photo_upload(&id, png(8, 8))).await;
+    assert_eq!(r.status, 409, "{}", r.json);
+}
+
+#[tokio::test]
+async fn sign_up_photos_go_when_the_sign_up_ends_without_them() {
+    let ctx = TestContext::new().await;
+    let (app, _) = ctx.app("briefcase").await;
+
+    // Choosing the default photo (null) discards the upload at sign-up.
+    let mut b = Browser::new(&ctx);
+    let (id, _) = to_signup(&ctx, &mut b, &app.app_id, &random_email("nullpfp")).await;
+    let r = b.call(&ctx, photo_upload(&id, png(16, 16))).await;
+    let url = r.json["pfp_url"].as_str().expect("pfp_url").to_string();
+    let r = b
+        .post(
+            &ctx,
+            &format!("/v1/flows/{id}/signup"),
+            json!({"pfp_url": null}),
+        )
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert!(
+        r.json["flow"]["signed_in_as"]["pfp_url"]
+            .as_str()
+            .is_some_and(|u| u.starts_with("https://iris.teamofsilicons.com/pfp/carbon?id=")),
+        "{}",
+        r.json
+    );
+    assert_eq!(photo_row(&ctx, &url).await, None);
+
+    // A sign-up that runs out: the sweep deletes its upload.
+    let mut b = Browser::new(&ctx);
+    let (id, _) = to_signup(&ctx, &mut b, &app.app_id, &random_email("expire")).await;
+    let r = b.call(&ctx, photo_upload(&id, png(16, 16))).await;
+    let url = r.json["pfp_url"].as_str().expect("pfp_url").to_string();
+    let report = accounts_auth::sweep::run_once(&ctx.state.db)
+        .await
+        .expect("sweep");
+    assert_eq!(report.signup_photos, 0, "a live sign-up keeps its photo");
+    ctx.exec("update signup_sessions set expires_at = now() - interval '1 second'")
+        .await;
+    let report = accounts_auth::sweep::run_once(&ctx.state.db)
+        .await
+        .expect("sweep");
+    assert_eq!(report.signup_photos, 1);
+    assert_eq!(photo_row(&ctx, &url).await, None);
+}
+
+#[tokio::test]
+async fn finishing_an_import_keeps_the_photo_chosen_at_sign_up() {
+    let ctx = TestContext::new().await;
+    let email = random_email("crm-photo");
+    let (app, _) = app_with(&ctx, "legacy", json!({"allow_signup": false})).await;
+    let imported = ctx
+        .carbon_with(CarbonSpec {
+            email: Some(email.clone()),
+            status: Some(AccountStatus::Unclaimed),
+            ..Default::default()
+        })
+        .await;
+    let mut b = Browser::new(&ctx);
+    let (id, f) = to_signup(&ctx, &mut b, &app.app_id, &email).await;
+    assert_eq!(f["signup"]["finishing_import"], true);
+    assert_eq!(f["signup"]["pfp_url"], imported.pfp_url.as_str());
+    let r = b.call(&ctx, photo_upload(&id, png(40, 40))).await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    let url = r.json["pfp_url"].as_str().expect("pfp_url").to_string();
+    // The upload replaces the imported photo as the prefill, and is kept on finishing.
+    let r = b.get(&ctx, &format!("/v1/flows/{id}")).await;
+    assert_eq!(r.json["flow"]["signup"]["pfp_url"], url.as_str());
+    let r = b
+        .post(&ctx, &format!("/v1/flows/{id}/signup"), json!({}))
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(
+        r.json["flow"]["signed_in_as"]["uuid"],
+        imported.uuid.as_str()
+    );
+    assert_eq!(r.json["flow"]["signed_in_as"]["pfp_url"], url.as_str());
+    assert_eq!(
+        photo_row(&ctx, &url).await,
+        Some((Some(imported.uuid.clone()), false)),
+        "the photo is now the finished account's own upload"
+    );
+}

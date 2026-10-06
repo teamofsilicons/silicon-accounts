@@ -292,8 +292,30 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
         }
         ("POST", "/v1/oauth/revoke") => (200, json!({})),
         ("GET", "/v1/ids/available") => {
-            let id = form(&query).get("id").cloned().unwrap_or_default();
-            if id == "c:taken" {
+            let q = form(&query);
+            let id = q.get("id").cloned().unwrap_or_default();
+            if let Some(silicon) = q.get("for") {
+                if !carbon_bearer {
+                    error(
+                        401,
+                        "unauthenticated",
+                        "?for= needs the custodian's session.",
+                        "Sign in as the custodian.",
+                    )
+                } else if silicon == SILICON_ID || silicon == SILICON_UUID {
+                    (
+                        200,
+                        json!({ "id": id, "available": true, "reason": null, "message": format!("{id} was an id of {SILICON_ID}; you can take it back for it."), "reclaimable": true }),
+                    )
+                } else {
+                    error(
+                        404,
+                        "silicon_not_found",
+                        &format!("You are not the custodian of a Silicon '{silicon}'."),
+                        "List your Silicons with `accounts silicon list`.",
+                    )
+                }
+            } else if id == "c:taken" {
                 (
                     200,
                     json!({ "id": id, "available": false, "reason": "taken", "message": "c:taken belongs to another account.", "reclaimable": false }),

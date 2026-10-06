@@ -167,7 +167,13 @@ let job = app
     .await?;
 let job = app.wait_for_import(&job.id, std::time::Duration::from_secs(1)).await?;
 let details = app.update_signin_config(&serde_json::json!({"methods": {"google": true}}), Some(7), None).await?;
+// Webhook calls take an idempotency key: a retried set/rotate returns the same secret, a
+// retried test queues one ping.
+let hook = app.set_webhook("https://app.example.com/hooks/accounts", Some("wh-set-1")).await?;
 ```
+
+`client.app_public("briefcase")` returns what a sign-in page needs (methods, branding, copy) and
+`allowed_origins`, the origins that may frame the embed and use the SDK.
 
 An app's owner can do the same through their own session without the app secret:
 `client.with_token(owner_token).app("briefcase")`. Calls that need the app's own
@@ -185,8 +191,19 @@ let me = client.with_token(tokens.access_token.expose()).me().await?;
 
 `AccountSession` covers the whole account: profile, id changes, emails and phones,
 linked identities, apps you signed into, sessions, history, OBO proofs about you, the
-Silicons you are custodian of (create, rotate STK, transfer, delete), custodian
+Silicons you are custodian of (create, update, upload their photo with `set_silicon_photo`,
+check an id for one with `silicon_id_available`, rotate STK, transfer, delete), custodian
 requests, device approvals and the apps you own.
+
+```rust
+let s = client.with_token(carbon_token);
+// Can si:scout take back its old id? (A reservation held by that Silicon is reclaimable for it.)
+let check = s.silicon_id_available("si:scout_v2", "si:scout").await?;
+if check.reclaimable { s.change_silicon_id("si:scout_v2", "si:scout").await?; }
+let uploaded = s.set_silicon_photo("si:scout", png_bytes, "image/png", Some("photo-1")).await?;
+```
+
+`client.meta()` reports the deployment, including `docs_url` (where the docs live).
 
 ## Configuration
 

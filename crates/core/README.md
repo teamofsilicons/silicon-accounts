@@ -114,9 +114,11 @@ async fn change_my_id(
 | `views` | API shapes | `AccountSummary`, `MeView` + `load_me`, `AccountForApp` + `load_account_for_app`, `TokenResponse`, `AppSummary`, `Page<T>` |
 | `normalize` | input rules, the webhook SSRF guard | `normalize_email`, `normalize_phone`, `normalize_timezone`, `validate_display_name`, `validate_dob`, `default_dob`, `parse_date_flexible`, `validate_https_url`, `validate_pfp_url`, `validate_webhook_url`, `is_public_ip`, `resolve_checked` (+ `BlockedAddress`, `LookupFailed`), `MAX_URL_LEN`, `mask_email`, `mask_phone`, `display_name_from_email/phone` |
 | `pfp` | photo URLs | `default_pfp_url(iris, kind, uuid)`, `is_default_pfp`, `photo_url_prefix`, `photo_url`, `photo_ref` → `PhotoRef::{External, Exact, Inexact}` |
-| `repo::accounts` | accounts and ids | `create_carbon`, `create_silicon`, `get`, `require`, `lock`, `by_handle`, `by_email`/`by_phone` (any row: uniqueness only), `by_uuid_or_id`, `id_availability`, `is_id_free`, `suggest_ids`, `suggest_id`, `change_id` (+ `ID_CHANGES_PER_DAY`), `update_profile`, `bump_version`, `set_status`, `set_custodian`, `finish_claim`, `set_stk`, `begin_stk_attempt` → `StkAttempt`, `stk_attempt_failed`, `clear_stk_failures` (+ `MAX_STK_FAILURES`, `STK_LOCK_SECONDS`), `set_silicon_webhook`, `delete_account` → `DeletedAccount`, `release_silicon`, `count/list_silicons_in_custody`, `active_reservation`, `reservations_of`, `invalid_id_error` |
+| `image` | photo bytes | `inspect(bytes, declared)` → `ImageInfo` (PNG/JPEG/GIF/WebP by their bytes, dimensions from the headers), `ImageKind`, `ImageError`, `MAX_DIMENSION`, `MAX_PIXELS` |
+| `photo_upload` | reading a photo upload | `read(&headers, body, route)` → `UploadedPhoto { bytes, info }` (`fingerprint()` for idempotency, `view(id)` for responses), `MAX_PHOTO_BYTES`, `count_account_upload` (20/hour per uploader), `count_signup_upload` (20/hour per sign-up), `too_large` |
+| `repo::accounts` | accounts and ids | `create_carbon`, `create_silicon`, `get`, `require`, `lock`, `by_handle`, `by_email`/`by_phone` (any row: uniqueness only), `by_uuid_or_id`, `id_availability`, `id_availability_for` (for a Silicon its custodian manages), `is_id_free`, `suggest_ids`, `suggest_id`, `change_id` (+ `ID_CHANGES_PER_DAY`), `update_profile`, `bump_version`, `set_status`, `set_custodian`, `finish_claim`, `set_stk`, `begin_stk_attempt` → `StkAttempt`, `stk_attempt_failed`, `clear_stk_failures` (+ `MAX_STK_FAILURES`, `STK_LOCK_SECONDS`), `set_silicon_webhook`, `delete_account` → `DeletedAccount`, `release_silicon`, `count/list_silicons_in_custody`, `active_reservation`, `reservations_of`, `invalid_id_error` |
 | `repo::contacts` | emails/phones | `lookup` → `Holder` (who an address signs in to), `after_proof`, `prove`, `drop_unverified`, `list_emails`, `list_phones`, `primary_email`, `primary_phone`, `owner`, `check_can_add`, `add_verified(_email/_phone)`, `mark_verified`, `set_primary(_email/_phone)`, `remove(_email/_phone)`, `verified_emails` |
-| `repo::photos` | uploaded photos | `check_usable` (an account's own or its custodian's upload), `prune` |
+| `repo::photos` | uploaded photos | `insert_for_account`, `check_usable` (an account's own or its custodian's upload), `prune`; sign-up uploads: `insert_for_signup`, `signup_photo`, `check_usable_for_signup`, `attach_signup_photo`, `discard_signup_photos`, `sweep_signup_photos` |
 | `repo::identities` | Google/Apple links | `find`, `link`, `touch`, `list_for_account`, `remove` |
 | `repo::apps` | apps | `get`, `require_active`, `owned_by`, `signin_row` → `AppSigninRow`, `effective_config`, `webhook_target`, `AppCredentialCache`, `AppAuthError`, `unknown_app`, `app_disabled` |
 | `repo::memberships` | `{app_id}:{uuid}` | `get`, `upsert_signin` (+`GrantMode`), `upsert_imported`, `list_for_account`, `remove_access`, `webhook_targets` |
@@ -128,7 +130,7 @@ async fn change_my_id(
 | `repo::audit` | history | `record(AuditEntry)`, `signin(SigninRecord)`, `handle_history`, `method::*`, `outcome::*` |
 | `events` | webhooks | `notify_id_changed`, `notify_profile_updated`, `account_deleted`, `membership_signed_out`, `signed_out_for_families`, `membership_access_removed`, `notify_custodian_changed`, `silicon_custodian_declined`, `silicon_custodian_expired`, `emit_to_app`, `emit_to_silicon`, `ping_app`, `ping_silicon`, `current_url`, `current_secret`, `new_webhook_secret`, `retry_delay_seconds`, `signout_reason::*`, `declined_reason::*`, header constants |
 | `delivery` | email/SMS | `enqueue`, `enqueue_otp`, `spawn_deliver`, `deliver_now`, `claim_due`, `deliver_claimed` (claim-checked), `CLAIM_SECONDS`, `Sender`, `PostmarkSender`, `TwilioSender`, `LocalSender`, `templates::*`, `extract_code` |
-| `telemetry` | Space Station + logs | `Telemetry::record`, `init_logging` |
+| `telemetry` | Space Station + logs | `Telemetry::record`, `record_progress`, `Telemetry::capturing` (tests), `request_opts_out(&headers)` (`X-Accounts-Telemetry: off` or cookie `sa_telemetry=off`), `with_request_opt_out` (the server wraps each request; every event recorded inside an opted-out request is dropped), `init_logging` |
 | `http` | extractors and helpers | `AccountAuth`, `CarbonAuth`, `SiliconAuth`, `AppAuth`, `AppOrOwner`, `authenticate_client`, `ClientMeta`, `IdempotencyKey`, `Json`, `Query`, `Path`, `parse_form_or_json`, `check_origin`, `cookies::*`, `pagination::*`, `request_id::middleware` |
 | `test_support` (feature) | tests | `TestContext`, `TestDb`, `Req`, `call`, factories |
 
@@ -252,13 +254,20 @@ let updated = cfg_stored.apply_patch(&patch_without_secrets, secrets_present)
 ```
 
 `SigninConfig::from_stored(&json)` never fails; `parse_strict` validates a full document;
-`validate` checks colours (`#RRGGBB`), WCAG contrast ≥ 3:1 for `primary_foreground`/`primary` and
-`foreground`/`background` in both themes (message includes the measured ratio), font allowlist,
+`validate` checks colours (`#RRGGBB`), WCAG contrast ≥ 4.5:1 (AA for text, `MIN_TEXT_CONTRAST`)
+for `primary_foreground`/`primary` (button text) and `foreground`/`background` (page text) in both
+themes (message includes the measured ratio), font allowlist,
 radius 0..40, logo height 16..96, https/data-image logos, background image required for
 `image`, redirect URIs (https; http only on localhost/127.0.0.1/[::1]; reverse-domain native
 schemes), origins, disjoint required/optional fields, domains, copy lengths, BYO requirements
 (`google.client_id` + `google.client_secret`; `apple.services_id`/`team_id`/`key_id` + `apple.private_key`).
 `first_party_redirect_allowed(settings, uri)` compares parsed origins.
+
+Default palettes (`Palette::default_light`, `default_dark`): filled buttons are the brand blue
+`#1F5FB8` under `#FFFDF9` text in both themes (6.1:1). The dark default was `#5B8FE0` (3.2:1 under
+`#FFFDF9`, below AA); migration 0003 moved every stored config still carrying that old default pair
+to `#1F5FB8` (a new config version and a `system` history entry). `#5B8FE0` remains the site's ink
+for links and accents on dark surfaces, not a fill.
 
 ## views
 
@@ -362,11 +371,23 @@ must be normalized first.
 
 A photo of this service is `{PUBLIC_URL}/v1/photos/{photo_id}` written exactly as
 `POST /v1/me/photo` returns it (`pfp::photo_ref`; `normalize::validate_pfp_url` refuses other
-spellings). `check_usable(&mut tx, &settings, url, &[uploader uuids], "you")` (422
+spellings). Read uploads with `photo_upload::read`, store them with
+`insert_for_account(&mut tx, owner_uuid, &upload)` (hold the owner's row lock).
+`check_usable(&mut tx, &settings, url, &[uploader uuids], "you")` (422
 `validation_failed`, `details.fields.pfp_url`) lets an account show only its own uploads (a
 Silicon: also its custodian's); it share-locks the uploader's row so the photo can't be pruned
 before the change commits. `prune(&mut tx, &settings, uuid)` deletes the account's uploads that no
 account that isn't deleted shows (hold the uploader's row lock).
+
+Sign-up uploads (`POST /v1/flows/{id}/signup/photo`) belong to the sign-up session until the
+account exists (`photos.signup_session_id`; a photo always has exactly one owner). Hold the
+session's row lock (`select … for update`) around all of these: `insert_for_signup` (replaces the
+session's earlier upload), `signup_photo` (the current choice, the sign-up prefill),
+`check_usable_for_signup(&mut tx, &settings, url, session_id, route)` → `Some(photo_id)` for the
+session's upload, `None` for an external URL, 422 otherwise, then `attach_signup_photo(&mut tx,
+session_id, photo_id, account_uuid)` once the account exists (it becomes that account's own
+upload). `discard_signup_photos` drops a session's uploads; `sweep_signup_photos(&pool)` deletes
+the uploads of sessions that expired or were used.
 
 ## repo::apps — credentials
 
@@ -602,4 +623,8 @@ cargo run -p silicon-accounts-server --bin accounts-migrate  # applies migration
 - Migrations: `0001_init` (the spec schema) and `0002_hardening` (removes unverified rows left on
   non-imported accounts, `browser_sessions.authenticated_at`, `authorization_codes.auth_time`,
   `token_families.auth_time`, `webhook_deliveries.requeued_at`, and indexes for proof listings and
-  sweeps, photo pruning and webhook attempts). Never edit an applied migration.
+  sweeps, photo pruning and webhook attempts) and `0003_signup_photos_and_dark_palette`
+  (`photos.signup_session_id` with one owner per photo; moves stored sign-in configs off the old
+  default dark primary `#5B8FE0` to `#1F5FB8` with a `system` history entry). Never edit an applied
+  migration. Test a data migration with `TestDb::empty()`, `db::MIGRATOR.run_to(n, &db.pool)`,
+  rows, then `db::migrate` (see `tests/migrations.rs`).

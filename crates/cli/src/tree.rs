@@ -291,7 +291,7 @@ mod tests {
         match cli.command {
             Some(Commands::App(args)) => match args.command {
                 AppCommand::Webhook(w) => match w.command {
-                    AppWebhookCommand::Set { endpoint } => assert_eq!(endpoint, hook),
+                    AppWebhookCommand::Set { endpoint, .. } => assert_eq!(endpoint, hook),
                     other => panic!("{other:?}"),
                 },
                 other => panic!("{other:?}"),

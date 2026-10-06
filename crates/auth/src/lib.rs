@@ -11,6 +11,9 @@
 //!   `/v1/oauth/callback/{provider}`): one-click (managed) or bring-your-own credentials, the
 //!   Apple ES256 client secret, id_token verification against the provider's JWKS and identity
 //!   linking. See [`providers`].
+//! - **Connecting Google or Apple to a signed-in Carbon** (`POST /v1/me/identities/{provider}`,
+//!   the account site's "Connect Google"): a provider round trip in the browser that links the
+//!   provider account and adds its verified email without a code. See [`link`].
 //! - **Browser sessions** (`/v1/session`, `/v1/session/signout`).
 //! - **Device approval** (`/v1/device/{user_code}`, `…/approve`, `…/deny`): the browser half of
 //!   the CLI device flow (the oauth crate owns `/v1/device/authorize` and the polling grant).
@@ -38,10 +41,11 @@ use tokio::task::JoinHandle;
 mod cli_login;
 mod device;
 pub mod flow;
+pub mod link;
 pub mod providers;
 mod session;
 pub mod suggest;
-mod sweep;
+pub mod sweep;
 mod util;
 
 /// HTTP routes of this crate (see the build spec 02-api.md, sections marked `[auth]`).
@@ -65,7 +69,13 @@ pub fn router() -> Router<AppState> {
         )
         .route("/v1/flows/{id}/resend", post(flow::handlers::resend_code))
         .route("/v1/flows/{id}/verify", post(flow::handlers::verify_code))
+        // Connecting Google/Apple to the signed-in Carbon (account site).
+        .route("/v1/me/identities/{provider}", post(link::start_link))
         .route("/v1/flows/{id}/signup", post(flow::signup::submit_signup))
+        .route(
+            "/v1/flows/{id}/signup/photo",
+            post(flow::signup::upload_signup_photo),
+        )
         .route(
             "/v1/flows/{id}/requirements/email",
             post(flow::requirements::send_email_requirement),

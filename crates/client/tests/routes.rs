@@ -92,6 +92,32 @@ async fn public_calls() {
         Reply::json(200, json!({"app_id": "briefcase"})),
         c.app_public("briefcase")
     );
+    // Newer fields: the docs link in meta and an app's embed origins.
+    let mock = Mock::start().await;
+    let c = AccountsClient::new(&mock.url).unwrap();
+    mock.on(
+        "GET",
+        "/v1/meta",
+        Reply::json(
+            200,
+            json!({"name": "Silicon Accounts", "docs_url": "https://account.teamofsilicons.com/docs"}),
+        ),
+    );
+    let meta = c.meta().await.unwrap();
+    assert_eq!(
+        meta.docs_url.as_deref(),
+        Some("https://account.teamofsilicons.com/docs")
+    );
+    mock.on(
+        "GET",
+        "/v1/apps/orbit/public",
+        Reply::json(
+            200,
+            json!({"app_id": "orbit", "allowed_origins": ["https://orbit.example"]}),
+        ),
+    );
+    let public = c.app_public("orbit").await.unwrap();
+    assert_eq!(public.allowed_origins, vec!["https://orbit.example"]);
     check!(
         mock,
         "GET",
@@ -501,6 +527,35 @@ async fn custodian_calls() {
     let r = check!(
         mock,
         "POST",
+        "/v1/me/silicons/b9Z/photo",
+        Reply::json(
+            201,
+            json!({"pfp_url": "https://x/v1/photos/2", "photo": {"id": "2", "content_type": "image/png", "bytes": 4, "width": 1, "height": 1}, "silicon": silicon()})
+        ),
+        s.set_silicon_photo(
+            "b9Z",
+            vec![0x89, b'P', b'N', b'G'],
+            "image/png",
+            Some("ph-1")
+        )
+    );
+    assert_eq!(r.header("content-type"), Some("image/png"));
+    assert_eq!(r.header("idempotency-key"), Some("ph-1"));
+    assert_eq!(r.body, vec![0x89, b'P', b'N', b'G']);
+    let r = check!(
+        mock,
+        "GET",
+        "/v1/ids/available",
+        Reply::json(
+            200,
+            json!({"id": "si:old", "available": true, "reclaimable": true})
+        ),
+        s.silicon_id_available("b9Z", "si:old")
+    );
+    assert_eq!(r.query.as_deref(), Some("id=si%3Aold&for=b9Z"));
+    let r = check!(
+        mock,
+        "POST",
         "/v1/me/silicons/b9Z/stk",
         Reply::json(
             200,
@@ -734,8 +789,16 @@ async fn app_calls() {
         "PUT",
         "/v1/apps/briefcase/webhook",
         Reply::json(200, json!({"url": "https://x", "secret": "whsec_x"})),
-        a.set_webhook("https://x")
+        a.set_webhook("https://x", None)
     );
+    let r = check!(
+        mock,
+        "PUT",
+        "/v1/apps/briefcase/webhook",
+        Reply::json(200, json!({"url": "https://x", "secret": "whsec_x"})),
+        a.set_webhook("https://x", Some("wh-set-1"))
+    );
+    assert_eq!(r.header("idempotency-key"), Some("wh-set-1"));
     check!(
         mock,
         "DELETE",
@@ -748,15 +811,24 @@ async fn app_calls() {
         "POST",
         "/v1/apps/briefcase/webhook/rotate-secret",
         Reply::json(200, json!({"secret": "whsec_y"})),
-        a.rotate_webhook_secret()
+        a.rotate_webhook_secret(None)
     );
-    check!(
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/apps/briefcase/webhook/rotate-secret",
+        Reply::json(200, json!({"secret": "whsec_y"})),
+        a.rotate_webhook_secret(Some("wh-rot-1"))
+    );
+    assert_eq!(r.header("idempotency-key"), Some("wh-rot-1"));
+    let r = check!(
         mock,
         "POST",
         "/v1/apps/briefcase/webhook/test",
         Reply::json(200, json!({"event_id": "e"})),
-        a.test_webhook()
+        a.test_webhook(Some("wh-test-1"))
     );
+    assert_eq!(r.header("idempotency-key"), Some("wh-test-1"));
     check!(
         mock,
         "GET",

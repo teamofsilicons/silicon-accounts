@@ -319,6 +319,12 @@ pub fn error_redirect(flow: &Flow, error: &str, description: &str) -> String {
     )
 }
 
+/// Ends a flow at `complete` with `redirect` as its `redirect_to` (used by flows that don't end
+/// with an authorization code, such as connecting Google or Apple to an account).
+pub(crate) fn complete_with(state: &AppState, flow: &mut Flow, redirect: &str) -> ApiResult<()> {
+    finish(state, flow, Step::Complete, redirect)
+}
+
 fn finish(state: &AppState, flow: &mut Flow, step: Step, redirect: &str) -> ApiResult<()> {
     flow.step = step;
     flow.result_redirect = Some(encrypt_text(&state.keys.keyring, redirect)?);

@@ -1,7 +1,9 @@
 //! App identity routes:
 //!
 //! - `GET /v1/apps/{app_id}/public` (public, `Access-Control-Allow-Origin: *`): what the embed
-//!   buttons and the SDK need to render an app's sign-in buttons.
+//!   buttons and the SDK need to render an app's sign-in buttons, including the
+//!   `allowed_origins` that may frame the embed (the account site turns them into the embed
+//!   page's `frame-ancestors`; a CSP is public anyway).
 //! - `GET /v1/me/owned-apps` (Carbon session): the apps the Carbon owns.
 //! - `GET /v1/apps/{app_id}` (app or owner): the app, its sign-in setup with secrets masked,
 //!   its webhook (secret masked) and user base statistics.
@@ -61,6 +63,8 @@ async fn public_body(state: &AppState, app_id: &str) -> ApiResult<Value> {
         "methods": config.available_methods(&state.settings),
         "branding": config.branding,
         "copy": config.copy,
+        // Origins that may embed the sign-in iframe (frame-ancestors) and use the SDK.
+        "allowed_origins": config.allowed_origins,
     }))
 }
 

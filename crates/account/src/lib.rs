@@ -32,13 +32,16 @@ mod contacts;
 mod deletion;
 mod history;
 mod identities;
-pub mod image;
 mod lookup;
 mod my_apps;
 mod photos;
 mod profile;
 mod sessions;
 mod util;
+
+/// Photo inspection lives in core (every photo upload shares it); re-exported for callers of
+/// this crate's former `image` module.
+pub use accounts_core::image;
 
 pub use contacts::{CONTACT_ADDS_PER_ACCOUNT, CONTACT_ADDS_PER_IP};
 pub use lookup::LOOKUPS_PER_MINUTE;

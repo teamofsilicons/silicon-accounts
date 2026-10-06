@@ -40,7 +40,10 @@ async fn patch_deep_merges_replaces_arrays_and_records_history() {
         cfg["branding"]["light"]["background"], "#FFFDF9",
         "untouched keys keep their values"
     );
-    assert_eq!(cfg["branding"]["dark"]["primary"], "#5B8FE0");
+    assert_eq!(
+        cfg["branding"]["dark"]["primary"], "#1F5FB8",
+        "the default dark fill keeps button text at WCAG AA"
+    );
     assert_eq!(cfg["methods"]["email"], true);
     assert_eq!(cfg["required_fields"], json!(["email"]));
 
@@ -209,7 +212,7 @@ async fn validation_errors_name_the_field() {
         assert!(msg.contains(fragment), "{body}: {msg}");
     }
 
-    // Contrast below 3:1 is refused with the measured ratio.
+    // Text contrast below 4.5:1 (WCAG AA) is refused with the measured ratio.
     let r = call(
         &ctx,
         patch(
@@ -223,8 +226,26 @@ async fn validation_errors_name_the_field() {
         .as_str()
         .expect("contrast error");
     assert!(
-        msg.contains("1.16:1") && msg.contains("at least 3:1"),
+        msg.contains("1.16:1") && msg.contains("at least 4.5:1"),
         "{msg}"
+    );
+    // The old default dark pair (#FFFDF9 on #5B8FE0, 3.2:1) is below the bar too.
+    let r = call(
+        &ctx,
+        patch(
+            &a.app_id,
+            &a.secret,
+            json!({"branding": {"dark": {"primary": "#5B8FE0"}}}),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, 422, "{}", r.json);
+    assert!(
+        r.json["error"]["details"]["fields"]["branding.dark.primary_foreground"]
+            .as_str()
+            .is_some_and(|m| m.contains("3.20:1")),
+        "{}",
+        r.json
     );
 
     // Not an object, not JSON.

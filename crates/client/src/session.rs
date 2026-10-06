@@ -16,8 +16,8 @@ use crate::types::{
     AccountKind, AccountSummary, Contact, ContactChallenge, CreateSilicon, CustodianRequest,
     DeviceRequest, EmailAddress, HistoryItem, HistoryQuery, IdAvailability, Identity,
     ManagedSilicon, Me, MyApp, MyProof, OwnedApp, Page, PhoneNumber, PhotoUploaded, ProfileUpdate,
-    SessionInfo, ShortLivedToken, SiliconCreated, SiliconView, SiliconWebhook, StkRotated,
-    UpdateSilicon, WebhookTestResult,
+    SessionInfo, ShortLivedToken, SiliconCreated, SiliconPhotoUploaded, SiliconView,
+    SiliconWebhook, StkRotated, UpdateSilicon, WebhookTestResult,
 };
 
 /// A signed-in Carbon or Silicon, authenticated with a first-party access token
@@ -145,31 +145,27 @@ impl<'a> AccountSession<'a> {
         self.client.get(url, self.auth()).await
     }
 
+    /// `GET /v1/ids/available?id=…&for=…` as a custodian: whether `id` can be taken by the
+    /// Silicon `silicon` (its uuid or si:id) you are custodian of. An id reserved for that
+    /// Silicon (one of its recent ids) is `available: true, reclaimable: true`.
+    pub async fn silicon_id_available(&self, silicon: &str, id: &str) -> Result<IdAvailability> {
+        let url = self.client.endpoint_with_query(
+            &["v1", "ids", "available"],
+            &[
+                ("id", Some(id.trim().to_owned())),
+                ("for", Some(silicon.trim().to_owned())),
+            ],
+        );
+        self.client.get(url, self.auth()).await
+    }
+
     /// `POST /v1/me/photo`: upload a profile photo (png, jpeg, webp or gif, at most 2 MB).
     pub async fn set_photo(
         &self,
         bytes: impl Into<Bytes>,
         content_type: &str,
     ) -> Result<PhotoUploaded> {
-        let bytes = bytes.into();
-        const ALLOWED: [&str; 4] = ["image/png", "image/jpeg", "image/webp", "image/gif"];
-        if !ALLOWED.contains(&content_type) {
-            return Err(Error::invalid_input(
-                format!(
-                    "Profile photos must be PNG, JPEG, WebP or GIF; `{content_type}` is not supported."
-                ),
-                "Convert the image to one of those formats.",
-            ));
-        }
-        if bytes.len() > 2 * 1024 * 1024 {
-            return Err(Error::invalid_input(
-                format!(
-                    "The photo is {} bytes; profile photos are limited to 2 MB.",
-                    bytes.len()
-                ),
-                "Resize or compress the image below 2 MB.",
-            ));
-        }
+        let bytes = check_photo(bytes.into(), content_type)?;
         let request = Request::new(Method::POST, self.url(&["v1", "me", "photo"]), self.auth())
             .raw(bytes, content_type);
         self.client.execute(request).await?.json()
@@ -480,6 +476,27 @@ impl<'a> AccountSession<'a> {
         self.silicon_or_refetch(&response, uuid).await
     }
 
+    /// `POST /v1/me/silicons/{uuid}/photo`: upload a Silicon's profile photo as its
+    /// custodian (png, jpeg, webp or gif, at most 2 MB; the photo belongs to the Silicon).
+    /// Pass an idempotency key so a retried upload doesn't upload twice.
+    pub async fn set_silicon_photo(
+        &self,
+        uuid: &str,
+        bytes: impl Into<Bytes>,
+        content_type: &str,
+        idempotency_key: Option<&str>,
+    ) -> Result<SiliconPhotoUploaded> {
+        let bytes = check_photo(bytes.into(), content_type)?;
+        let request = Request::new(
+            Method::POST,
+            self.url(&["v1", "me", "silicons", uuid, "photo"]),
+            self.auth(),
+        )
+        .raw(bytes, content_type)
+        .idempotency_key(idempotency_key)?;
+        self.client.execute(request).await?.json()
+    }
+
     /// `POST /v1/me/silicons/{uuid}/id`: change a Silicon's si:id.
     pub async fn change_silicon_id(&self, uuid: &str, new_id: &str) -> Result<SiliconView> {
         let body = json!({ "id": new_id.trim() });
@@ -703,6 +720,29 @@ fn list_field<T: DeserializeOwned>(response: &Response, field: &str) -> Result<V
         }
     };
     response.json_from(list)
+}
+
+/// Checks a photo upload before sending it: an accepted image type, at most 2 MB.
+fn check_photo(bytes: Bytes, content_type: &str) -> Result<Bytes> {
+    const ALLOWED: [&str; 4] = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+    if !ALLOWED.contains(&content_type) {
+        return Err(Error::invalid_input(
+            format!(
+                "Profile photos must be PNG, JPEG, WebP or GIF; `{content_type}` is not supported."
+            ),
+            "Convert the image to one of those formats.",
+        ));
+    }
+    if bytes.len() > 2 * 1024 * 1024 {
+        return Err(Error::invalid_input(
+            format!(
+                "The photo is {} bytes; profile photos are limited to 2 MB.",
+                bytes.len()
+            ),
+            "Resize or compress the image below 2 MB.",
+        ));
+    }
+    Ok(bytes)
 }
 
 #[cfg(test)]

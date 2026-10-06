@@ -1,5 +1,12 @@
 //! Sign-up: the 48-hour sign-up session (`signup_sessions` + the `sa_signup` cookie), the
-//! prefilled details page and `POST /v1/flows/{id}/signup`.
+//! prefilled details page, the photo picked on it (`POST /v1/flows/{id}/signup/photo`) and
+//! `POST /v1/flows/{id}/signup`.
+//!
+//! The sign-up photo: the page uploads the chosen image before the account exists. It belongs to
+//! the sign-up session (one at a time; a new upload replaces it), is the prefilled `pfp_url`
+//! from then on, and moves to the new account when the sign-up finishes with it (core's
+//! `repo::photos`). The session row is locked (`for update`) by both the upload and the
+//! submission, so the photo that was checked is the one attached.
 //!
 //! A sign-up session ties a verified email, phone or provider identity to the browser that
 //! proved it, so the right verification goes to the right sign-up (UNDERSTANDING.md). It
@@ -22,14 +29,17 @@ use accounts_core::models::{
 use accounts_core::normalize::{
     normalize_timezone, validate_display_name, validate_dob, validate_pfp_url,
 };
+use accounts_core::photo_upload;
 use accounts_core::repo::accounts::{self, NewCarbon, NewContact, ProfileUpdate};
 use accounts_core::repo::audit::{self, AuditEntry};
 use accounts_core::repo::contacts::{self, ContactKind};
 use accounts_core::repo::{identities, photos};
 use accounts_core::timefmt::{date, format_rfc3339_ms, parse_date, rfc3339_ms};
 use accounts_core::{ApiError, ApiResult, AppState, FieldErrors, events};
+use axum::body::Body;
 use axum::extract::State;
-use axum::http::{HeaderMap, Method};
+use axum::http::{HeaderMap, Method, StatusCode};
+use axum::response::{IntoResponse, Response};
 use cookie::Cookie;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::json;
@@ -46,6 +56,9 @@ use crate::util::telemetry;
 
 /// Sign-up sessions last 48 hours (UNDERSTANDING.md "Sign up").
 pub const SIGNUP_TTL_HOURS: i64 = 48;
+
+/// The sign-up page's photo upload (named in hints).
+pub const SIGNUP_PHOTO_ROUTE: &str = "/v1/flows/{id}/signup/photo";
 
 /// A row of `signup_sessions`.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -221,6 +234,16 @@ pub async fn expire_session(conn: &mut PgConnection, id: Uuid) -> ApiResult<()> 
     Ok(())
 }
 
+/// Row-locks a sign-up session (`for update`) for the rest of the transaction: the photo
+/// upload and the submission of one sign-up never interleave.
+async fn lock_session(conn: &mut PgConnection, id: Uuid) -> ApiResult<()> {
+    sqlx::query("select 1 from signup_sessions where id = $1 for update")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
 async fn consume_session(conn: &mut PgConnection, id: Uuid, account_uuid: &str) -> ApiResult<()> {
     sqlx::query("update signup_sessions set consumed_at = now(), account_uuid = $2 where id = $1")
         .bind(id)
@@ -306,7 +329,8 @@ pub struct SignupView {
     #[serde(with = "date")]
     pub dob: Date,
     /// Our default Carbon photo from Iris (UNDERSTANDING.md), or the imported account's photo
-    /// when finishing an import.
+    /// when finishing an import; the photo uploaded on this sign-up page
+    /// (`POST /v1/flows/{id}/signup/photo`) once there is one.
     pub pfp_url: Option<String>,
     /// The Google picture of the provider account, which the page may offer as an alternative
     /// (send it as `pfp_url` to use it).
@@ -339,6 +363,10 @@ pub async fn prefill(
     flow: &Flow,
     session: &SignupSession,
 ) -> ApiResult<SignupView> {
+    // A photo uploaded on this sign-up page is the Carbon's own choice: it is the prefill.
+    let uploaded = photos::signup_photo(conn, session.id)
+        .await?
+        .map(|photo_id| accounts_core::pfp::photo_url(&state.settings, photo_id));
     if let Some(a) = claimable(conn, session).await? {
         // Finishing an imported account: the app's imported data is the prefill.
         return Ok(SignupView {
@@ -346,7 +374,7 @@ pub async fn prefill(
             id: a.id().to_string(),
             timezone: a.timezone.clone(),
             dob: a.dob,
-            pfp_url: Some(a.pfp_url.clone()),
+            pfp_url: Some(uploaded.unwrap_or_else(|| a.pfp_url.clone())),
             provider_pfp_url: session.suggested_pfp_url.clone(),
             email: session.email().map(str::to_string),
             phone: session.verified_phone.clone(),
@@ -370,8 +398,9 @@ pub async fn prefill(
         ),
         dob: suggest::dob(view::today()),
         // UNDERSTANDING.md: "`pfp` - our default Carbon profile photo from Iris". The
-        // provider's picture is only offered (and stored only when the Carbon picks it).
-        pfp_url: Some(suggest::default_pfp_preview(&state.settings)),
+        // provider's picture is only offered (and stored only when the Carbon picks it); a photo
+        // uploaded on this page replaces the default.
+        pfp_url: Some(uploaded.unwrap_or_else(|| suggest::default_pfp_preview(&state.settings))),
         provider_pfp_url: session.suggested_pfp_url.clone(),
         email: session.email().map(str::to_string),
         phone: session.verified_phone.clone(),
@@ -542,15 +571,26 @@ pub async fn submit_signup(
         tx.commit().await?;
         return Err(e);
     }
+    // The photo upload of this sign-up can't change while it is checked and attached.
+    lock_session(&mut tx, session.id).await?;
     let prefill = prefill(&mut tx, &state, &meta, &flow, &session).await?;
     let details = validate_details(&state, &body, &prefill)?;
-    // A new (or imported) account has no uploads, so a photo of this service can't be its own;
-    // keeping the imported account's current photo changes nothing.
-    if let Some(url) = details.pfp_url.as_deref()
-        && claimed.as_ref().is_none_or(|c| c.pfp_url != url)
-    {
-        photos::check_usable(&mut tx, &state.settings, url, &[], "you").await?;
-    }
+    // A new (or imported) account has no uploads yet: the only photo of this service it may show
+    // is the one uploaded on this sign-up page. Keeping the imported account's current photo
+    // changes nothing.
+    let signup_photo = match details.pfp_url.as_deref() {
+        Some(url) if claimed.as_ref().is_none_or(|c| c.pfp_url != url) => {
+            photos::check_usable_for_signup(
+                &mut tx,
+                &state.settings,
+                url,
+                session.id,
+                SIGNUP_PHOTO_ROUTE,
+            )
+            .await?
+        }
+        _ => None,
+    };
 
     let account = match claimed {
         Some(current) => {
@@ -558,6 +598,15 @@ pub async fn submit_signup(
         }
         None => create_account(&mut tx, &state, &meta, &fa, &session, details).await?,
     };
+    // The chosen upload becomes the account's own photo; any other upload of this sign-up goes.
+    match signup_photo {
+        Some(photo_id) => {
+            photos::attach_signup_photo(&mut tx, session.id, photo_id, &account.uuid).await?
+        }
+        None => {
+            photos::discard_signup_photos(&mut tx, session.id).await?;
+        }
+    }
 
     consume_session(&mut tx, session.id, &account.uuid).await?;
     let signed = browser::sign_in(&mut tx, &state, &headers, &meta, &account.uuid).await?;
@@ -592,6 +641,64 @@ pub async fn submit_signup(
     let mut cookies: Vec<Cookie<'static>> = signed.cookie.into_iter().collect();
     cookies.push(clear_cookie(&state.settings, SIGNUP_COOKIE));
     Ok(FlowResponse::ok(view, cookies))
+}
+
+/// `POST /v1/flows/{id}/signup/photo` (flow + sign-up cookie): the photo picked on the sign-up
+/// page, uploaded before the account exists. The body is the raw image with the same rules as
+/// `POST /v1/me/photo` (PNG, JPEG, WebP or GIF, at most 2 MB and 8192 px per side); 20 uploads
+/// per sign-up per hour. It replaces any earlier upload of this sign-up and becomes the
+/// prefilled `signup.pfp_url`. → 201 `{"pfp_url","photo":{id,content_type,bytes,width,height}}`;
+/// send that `pfp_url` (or leave `pfp_url` out) with `POST /v1/flows/{id}/signup` and the new
+/// account keeps the photo as its own upload.
+///
+/// Errors: as `POST /v1/flows/{id}/signup` for the flow and sign-up (`invalid_step`,
+/// `signup_not_bound`, `signup_expired`, …), and the photo errors of core's `photo_upload`.
+pub async fn upload_signup_photo(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    body: Body,
+) -> ApiResult<Response> {
+    let upload = photo_upload::read(&headers, body, SIGNUP_PHOTO_ROUTE).await?;
+    let mut tx = state.db.begin().await?;
+    let mut flow = load_bound(&mut tx, &state, &headers, &Method::POST, &id, true).await?;
+    model::ensure_live(&flow)?;
+    model::ensure_step(&flow, &[Step::Signup], "upload a sign-up photo")?;
+    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    fa.ensure_active()?;
+    let session = match bound_session(&mut tx, &state, &headers, &flow).await {
+        Ok(s) => s,
+        Err(e) if e.code == "signup_expired" => {
+            flow.reset_to_choose_method();
+            flow.extras.error = Some(model::FlowError::from_api(&e));
+            model::save(&mut tx, &flow).await?;
+            tx.commit().await?;
+            return Err(e);
+        }
+        Err(e) => return Err(e),
+    };
+    lock_session(&mut tx, session.id).await?;
+    photo_upload::count_signup_upload(&state.db, session.id).await?;
+    let photo_id = photos::insert_for_signup(&mut tx, session.id, &upload).await?;
+    tx.commit().await?;
+    let pfp_url = accounts_core::pfp::photo_url(&state.settings, photo_id);
+    telemetry(
+        &state,
+        "flow.signup_photo_uploaded",
+        Some(0.6),
+        json!({
+            "app_id": fa.app.app_id,
+            "content_type": upload.info.kind.mime(),
+            "bytes": upload.bytes.len(),
+        }),
+    );
+    let mut response = (
+        StatusCode::CREATED,
+        axum::Json(json!({ "pfp_url": pfp_url, "photo": upload.view(photo_id) })),
+    )
+        .into_response();
+    crate::util::no_store(response.headers_mut());
+    Ok(response)
 }
 
 /// A brand-new Carbon.

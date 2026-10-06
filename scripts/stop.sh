@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Stops what scripts/dev.sh started: accounts-api and the testkit (mock Google/Apple, mock
-# Postmark/Twilio, the fake app server).
+# Stops what scripts/dev.sh started: the site (Next.js) or its stand-in proxy, accounts-api and
+# the testkit (mock Google/Apple, mock Postmark/Twilio, the fake app server).
 #
-#   scripts/stop.sh            the stack on ACCOUNTS_PORT (default 8590)
+#   scripts/stop.sh            the stack on ACCOUNTS_PORT (the public site port, default 8590)
 #   scripts/stop.sh --all      every stack scripts/dev.sh started (all ports)
 #   scripts/stop.sh --db       also stop the local Postgres (scripts/dev-db.sh stop)
 #   scripts/stop.sh --quiet    print nothing unless something goes wrong
@@ -38,6 +38,8 @@ expected_command() {
   case "$1" in
     accounts-api) echo 'accounts-api' ;;
     testkit) echo 'start.ts' ;;
+    web) echo "pnpm" ;;
+    proxy) echo 'dev-proxy.mjs' ;;
     *) echo "$1" ;;
   esac
 }
@@ -45,10 +47,12 @@ expected_command() {
 alive() { kill -0 "$1" 2>/dev/null; }
 
 stop_one() { # pid file
-  local file="$1" name pid cmd grace
+  local file="$1" name pid cmd grace expected
   name="$(basename "$file" .pid)"
   pid="$(tr -dc '0-9' <"$file")"
-  rm -f "$file"
+  # dev.sh may record what the command line must contain (<name>.match), e.g. the site's directory.
+  expected="$(cat "${file%.pid}.match" 2>/dev/null || expected_command "$name")"
+  rm -f "$file" "${file%.pid}.match"
   [ -n "$pid" ] || return 0
   if ! alive "$pid"; then
     say "$name (pid $pid) was not running"
@@ -56,14 +60,19 @@ stop_one() { # pid file
   fi
   cmd="$(ps -p "$pid" -o command= 2>/dev/null || true)"
   case "$cmd" in
-    *"$(expected_command "$name")"*) ;;
+    *"$expected"*) ;;
     *)
       say "pid $pid is no longer $name (it is: ${cmd:-unknown}); leaving it alone"
       return 0
       ;;
   esac
-  # accounts-api drains in-flight requests and the worker within 30 s; the testkit within 5 s.
-  if [ "$name" = accounts-api ]; then grace=35; else grace=8; fi
+  # accounts-api drains in-flight requests and the worker within 30 s; the site within 10 s;
+  # the testkit and the proxy within 5 s.
+  case "$name" in
+    accounts-api) grace=35 ;;
+    web) grace=12 ;;
+    *) grace=8 ;;
+  esac
   # dev.sh starts each service as its own process group (pgid = pid); fall back to the pid.
   kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
   local waited=0
@@ -82,8 +91,9 @@ stop_one() { # pid file
 
 stop_stack() { # run dir
   local dir="$1" f
-  # accounts-api first (it talks to the fake apps while it drains), then the testkit.
-  for f in "$dir/accounts-api.pid" "$dir/testkit.pid"; do
+  # The site first (it fronts accounts-api), then accounts-api (it talks to the fake apps while
+  # it drains), then the testkit.
+  for f in "$dir/web.pid" "$dir/proxy.pid" "$dir/accounts-api.pid" "$dir/testkit.pid"; do
     [ -f "$f" ] && stop_one "$f"
   done
   for f in "$dir"/*.pid; do

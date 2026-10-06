@@ -18,7 +18,9 @@ Everything is TypeScript run with `tsx` on Node ≥ 24, state is in memory, and 
 ## Quick start
 
 `scripts/dev.sh` at the repo root starts everything (Postgres, migrations, the seeded fake apps, this
-testkit and accounts-api pointed at it). To run the pieces yourself:
+testkit, accounts-api pointed at it on `127.0.0.1:8589`, and the account site on
+`http://localhost:8590` in front of it — or `scripts/dev-proxy.mjs` with `--web=proxy`). To run the
+pieces yourself:
 
 ```sh
 pnpm -C testkit install
@@ -30,18 +32,19 @@ In another terminal, point Silicon Accounts at the mocks and seed the fake apps:
 ```sh
 pnpm -s -C testkit accounts-env >> .env      # or: eval "$(pnpm -s -C testkit accounts-env --format shell)"
 cargo run -p silicon-accounts-server --bin accounts-seed -- --fake-apps testkit/fake-apps.json
-cargo run -p silicon-accounts-server --bin accounts-api
+cargo run -p silicon-accounts-server --bin accounts-api        # 127.0.0.1:8589
+PORT=8590 ACCOUNTS_API_URL=http://127.0.0.1:8589 pnpm -C web dev   # the site (or: node scripts/dev-proxy.mjs --port 8590 --target http://127.0.0.1:8589)
 open http://127.0.0.1:8593/                  # the fake apps; sign in to any of them
 ```
 
-Run the testkit's own tests: `pnpm -C testkit test` (94 node:test tests, ~1 s) and `pnpm -C testkit typecheck`.
+Run the testkit's own tests: `pnpm -C testkit test` (96 node:test tests, ~1 s) and `pnpm -C testkit typecheck`.
 
 ## Commands
 
 | command | does |
 |---|---|
-| `pnpm -C testkit start` (alias `mocks`) | starts all three servers on their default ports until SIGINT/SIGTERM, then stops them gracefully. Flags: `--host` (`TESTKIT_HOST`), `--oidc-port` (`MOCK_OIDC_PORT`), `--messaging-port` (`MOCK_MESSAGING_PORT`), `--fake-apps-port` (`FAKE_APPS_PORT`), `--accounts-url` (`ACCOUNTS_URL`, default `http://127.0.0.1:8590`), `--ready-file <path>` (writes the URLs as JSON once listening), `--log` (`TESTKIT_LOG=1`, one line per request on stderr), `--quiet`. Port `0` picks a free port. Always prints one line `testkit ready {"oidc":…,"messaging":…,"fake_apps":…}` when listening. |
-| `pnpm -s -C testkit accounts-env [--format dotenv\|shell\|json] [--oidc-url URL] [--messaging-url URL]` | prints the `ACCOUNTS_*` variables that point Silicon Accounts at the mocks (below) |
+| `pnpm -C testkit start` (alias `mocks`) | starts all three servers on their default ports until SIGINT/SIGTERM, then stops them gracefully. Flags: `--host` (`TESTKIT_HOST`), `--oidc-port` (`MOCK_OIDC_PORT`), `--messaging-port` (`MOCK_MESSAGING_PORT`), `--fake-apps-port` (`FAKE_APPS_PORT`), `--accounts-url` (`ACCOUNTS_URL`, default accounts-api at `http://127.0.0.1:8589`; the public site works too), `--ready-file <path>` (writes the URLs as JSON once listening), `--log` (`TESTKIT_LOG=1`, one line per request on stderr), `--quiet`. Port `0` picks a free port. Always prints one line `testkit ready {"oidc":…,"messaging":…,"fake_apps":…}` when listening. |
+| `pnpm -s -C testkit accounts-env [--format dotenv\|shell\|json] [--oidc-url URL] [--messaging-url URL] [--api-port N] [--public-url URL] [--no-topology]` | prints the `ACCOUNTS_*` variables that point Silicon Accounts at the mocks (below) and the local topology: `ACCOUNTS_BIND_ADDR=127.0.0.1:8589` (`--api-port`, `ACCOUNTS_API_PORT`), `ACCOUNTS_PUBLIC_URL=http://localhost:8590` (the site; `--public-url`, `ACCOUNTS_PUBLIC_URL`), `ACCOUNTS_TRUST_FORWARDED_FOR=true`; `--no-topology` leaves those three out |
 | `pnpm -C testkit test` | all unit/integration tests |
 | `pnpm -C testkit journeys [name…]` | the journeys against a running stack (default ports = `scripts/dev.sh`); `scripts/journeys.sh` starts a fresh isolated stack, runs them and tears it down |
 | `pnpm -C testkit typecheck` | `tsc --noEmit` (strict) |
@@ -78,8 +81,9 @@ Run the testkit's own tests: `pnpm -C testkit test` (94 node:test tests, ~1 s) a
 | `ACCOUNTS_APPLE_ISSUER` | `http://127.0.0.1:8591/apple` (both the id_token `iss` and the `aud` Accounts must put in its client_secret JWT) |
 | `ACCOUNTS_WEBHOOK_ALLOW_PRIVATE` | `true` (webhooks go to the fake app server on 127.0.0.1) |
 
-Programmatically: `accountsEnvForMocks({ oidcUrl, messagingUrl })` from `lib/env.ts`, or
-`startTestkit()` which returns `accountsEnv` for the ports it actually bound.
+Programmatically: `accountsEnvForMocks({ oidcUrl, messagingUrl })` and
+`accountsTopologyEnv({ apiPort, publicUrl })` from `lib/env.ts`, or `startTestkit()` which returns
+`accountsEnv` (the mocks) for the ports it actually bound.
 
 ## dev-credentials.json
 
@@ -207,7 +211,7 @@ well above the server's 3:1 floor.
 ## fake app server (port 8593)
 
 One server hosts every app by path prefix. It calls Silicon Accounts server-to-server at `ACCOUNTS_URL`
-(default `http://127.0.0.1:8590`) and builds browser links with `ACCOUNTS_PUBLIC_URL`, else `/v1/meta`'s
+(default accounts-api at `http://127.0.0.1:8589`; the public site, which proxies `/v1/*`, works too) and builds browser links with `ACCOUNTS_PUBLIC_URL`, else `/v1/meta`'s
 `public_url`, else `ACCOUNTS_URL`. Its own base is `FAKE_APPS_PUBLIC_URL` or the address it listens on.
 Each app keeps a session cookie `fakeapp_sid` scoped to `Path=/<app_id>`, so apps on the one origin
 behave like separate sites.
@@ -259,7 +263,7 @@ import {
   startTestkit, createPkcePair, verifyWebhookSignature, expectedImportOutcomes, measure,
 } from '@silicon-accounts/testkit';
 
-const accounts = new AccountsClient();           // $ACCOUNTS_URL or http://127.0.0.1:8590
+const accounts = new AccountsClient();           // $ACCOUNTS_URL or accounts-api at http://127.0.0.1:8589
 const messaging = new MockMessagingClient();     // $MOCK_MESSAGING_URL or :8592
 const oidc = new MockOidcClient();               // $MOCK_OIDC_URL or :8591
 const fakeApps = new FakeAppsClient();           // $FAKE_APPS_URL or :8593
@@ -297,7 +301,8 @@ const stats = await measure(1000, 1, () => accounts.app('briefcase').verifyProof
 | `lib/http.ts` | `HttpClient` (cookie jar, Origin, Basic/Bearer, timing), `CookieJar`, `HttpExpectationError` (message includes method, URL, status, error code/message/hint and request id), `expectStatus` |
 | `lib/fake-apps.ts` | `fakeApps()`, `fakeApp(id)`, `appCredentials(id)`, `redirectUri(id)` |
 | `lib/fixtures.ts` | `importFixturePath/Bytes/Rows`, `expectedImportOutcomes`, `uniquifyEmails`, `bigCsvLines`, `generateBigCsv` |
-| `lib/env.ts` | `accountsEnvForMocks`, `toDotenv`, `toShellExports` |
+| `lib/env.ts` | `accountsEnvForMocks`, `accountsTopologyEnv`, `toDotenv`, `toShellExports` |
+| `lib/images.ts` | `pngBytes(width, height)`: a tiny well-formed PNG for photo uploads |
 | `lib/bench.ts` | `measure(count, concurrency, fn)` → `{count, errors, min/mean/p50/p95/p99/max_ms, throughput_per_s}`, `percentile`, `summarize` (for the proof-verify latency benchmark) |
 | `lib/index.ts` | all of the above + `startMockOidc`, `startMockMessaging`, `startFakeAppServer`, `startTestkit`, `loadDevCredentials` |
 
@@ -317,16 +322,23 @@ or all together (`pnpm -C testkit journeys`, which exits 1 when any check failed
 
 | journey | covers |
 |---|---|
-| `a-hosted-signin` | sign-up through the hosted flow (briefcase, the fake app exchanges the code), requirements step (dm asks for a phone), "continue as" on a third app, consent skipped when already granted |
+| `a-hosted-signin` | sign-up through the hosted flow (briefcase, with a photo uploaded on the sign-up page that the new account keeps; the fake app exchanges the code), requirements step (dm asks for a phone), "continue as" on a third app, consent skipped when already granted, "Not you?" at sign-up ends that sign-up |
 | `b-providers` | managed Google (interface), bring-your-own Google (acme-notes: mock saw acme's client_id), Apple form_post bring-your-own (orbit-games, cookieless POST → 303 → GET) and managed (waveform), `allowed_email_domains`, `allow_signup: false` |
 | `c-cli-silicons` | device flow approved with the browser session, `silicon create` (STK once), `login --silicon`, `login --app remind` + SLT exchange, self-create `--wait` accepted meanwhile, transfer + accept, STK rotation (old STK refused, apps signed out), Silicon webhook events on `/hooks/<key>` |
 | `d-proofs` | OBO dm → briefcase and ATA commit → remind + waveform through the fake apps (timings), non-audience verification `{valid:false, expires_at:null}`, verify latency |
 | `e-import` | `accounts app import dirty.csv --wait` compared row by row with `expected.json`, then an imported Carbon finishes setup (`finishing_import`) and the membership turns active (needs a database dirty.csv was never imported into) |
 | `f-app-webhooks` | signed app webhooks: id change, scope-limited `account.updated`, primary email change, revoke → `membership.signed_out`, access removal |
 | `g-report` | `accounts report` → mock Postmark gets exactly the three recipients |
-| `h-protocol` | OIDC id_token, `prompt=none/login`, refused redirect URIs, PKCE, code reuse, refresh rotation + reuse detection, code send limit + verify lockout, CSRF Origin guard, audience confusion, embed `frame-ancestors`, CORS |
-| `i-cli-account`, `j-cli-custodian`, `k-cli-app` | every CLI command family against the real service (account, Silicons and custodian requests, device, config, deletion, app mode with credentials and as the owner) |
+| `h-protocol` | OIDC id_token, `prompt=none/login`, refused redirect URIs, PKCE, code reuse, refresh rotation + reuse detection, code send limit + verify lockout, CSRF Origin guard, audience confusion, an app's `allowed_origins` in its public config (and, behind the Next.js site, the embed page's `frame-ancestors` and the SDK's CORS), CORS, `docs_url` in `/v1/meta` |
+| `i-cli-account`, `j-cli-custodian`, `k-cli-app` | every CLI command family against the real service (account, Silicons and custodian requests — including `silicon update --photo` and `id available --for` — device, config, deletion, app mode with credentials and as the owner) |
 | `l-client-contract` | the Rust client's typed values (CLI `--json`) against the raw API: no field dropped or invented |
+
+`scripts/journeys.sh` runs them on a fresh stack in one of three topologies: API only (default:
+every call goes straight to accounts-api), `--proxy` (through `scripts/dev-proxy.mjs`, which
+forwards `/v1/*` and `/.well-known/*` exactly like the Next.js site's rewrites, so cookies,
+`Set-Cookie`, `Location`, `Origin`, `X-Forwarded-For` and Apple's `form_post` all cross a proxy) and
+`--next` (through the real site). The journeys read `ACCOUNTS_URL` (where calls go),
+`ACCOUNTS_PUBLIC_URL` and `JOURNEYS_FRONT` (`none`, `proxy` or `next`).
 
 They need the per-network code limit (30 per 10 minutes) to apply per journey: run accounts-api
 with `ACCOUNTS_TRUST_FORWARDED_FOR=true`, and every `AccountsClient` sends `X-Forwarded-For` from
