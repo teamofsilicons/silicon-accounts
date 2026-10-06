@@ -12,7 +12,7 @@ pub const SESSION_DAYS: i64 = 900;
 
 macro_rules! session_columns {
     () => {
-        "id, account_uuid, created_at, last_seen_at, expires_at, revoked_at, ip, user_agent"
+        "id, account_uuid, created_at, last_seen_at, expires_at, revoked_at, ip, user_agent, authenticated_at"
     };
 }
 
@@ -27,6 +27,10 @@ pub struct BrowserSession {
     pub revoked_at: Option<OffsetDateTime>,
     pub ip: Option<String>,
     pub user_agent: Option<String>,
+    /// When the account last proved who it is in this browser (a code, Google, Apple, a
+    /// finished sign-up): the session's creation, moved by [`mark_authenticated`] when the same
+    /// account signs in again in the browser. Authorization codes carry it as `auth_time`.
+    pub authenticated_at: OffsetDateTime,
 }
 
 /// Creates a session; returns the cookie value (`sas_…`) and the row.
@@ -72,6 +76,29 @@ pub async fn lookup(
     .bind(pepper.hash(token))
     .fetch_optional(&mut *conn)
     .await?)
+}
+
+/// Records that the session's account just proved who it is again (the browser kept its
+/// session): moves `authenticated_at` to now.
+pub async fn mark_authenticated(conn: &mut PgConnection, id: Uuid) -> ApiResult<()> {
+    sqlx::query("update browser_sessions set authenticated_at = now() where id = $1")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// When the session's account last authenticated (`None` for an unknown session).
+pub async fn authenticated_at(
+    conn: &mut PgConnection,
+    id: Uuid,
+) -> ApiResult<Option<OffsetDateTime>> {
+    Ok(
+        sqlx::query_scalar("select authenticated_at from browser_sessions where id = $1")
+            .bind(id)
+            .fetch_optional(&mut *conn)
+            .await?,
+    )
 }
 
 /// Fetches a session by id (any state).

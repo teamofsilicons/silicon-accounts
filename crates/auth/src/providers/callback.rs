@@ -25,7 +25,7 @@ use accounts_core::http::{ClientMeta, Path};
 use accounts_core::models::{Account, AccountKind, AccountStatus, ActorKind, Provider};
 use accounts_core::normalize::{normalize_email, validate_https_url};
 use accounts_core::repo::audit::{self, AuditEntry, SigninRecord};
-use accounts_core::repo::contacts::ContactKind;
+use accounts_core::repo::contacts::{self, ContactKind, Holder};
 use accounts_core::repo::{accounts, identities};
 use accounts_core::{ApiError, ApiResult, AppState, Settings};
 use axum::body::Bytes;
@@ -39,7 +39,6 @@ use sqlx::PgConnection;
 use super::id_token::{self, Expectations, ProviderClaims};
 use super::start::{flow_id_of_state, provider_state, unknown_provider};
 use super::{Credential, ProviderClient, apple, callback_url, endpoints, resolve_client};
-use crate::contact::{self, Holder};
 use crate::flow::model::{
     self, Flow, FlowError, ParkedAnswer, Pending, PendingSignup, ProviderLeg, Step,
 };
@@ -690,7 +689,7 @@ async fn attributed(
     let Some(e) = verified_email else {
         return Ok(None);
     };
-    Ok(match contact::lookup(conn, ContactKind::Email, e).await? {
+    Ok(match contacts::lookup(conn, ContactKind::Email, e).await? {
         Holder::Active(a) => Some(a),
         _ => None,
     })
@@ -872,7 +871,7 @@ async fn resolve_identity(
     // A verified email of an account: that account, now linked to the identity. (The provider
     // proved the address, so an unverified leftover elsewhere is removed: it identifies nobody.)
     if let Some(e) = &email {
-        match contact::after_proof(conn, ContactKind::Email, e, meta.ip.as_deref()).await? {
+        match contacts::after_proof(conn, ContactKind::Email, e, meta.ip.as_deref()).await? {
             Holder::Active(a) => {
                 match identities::link(
                     conn,

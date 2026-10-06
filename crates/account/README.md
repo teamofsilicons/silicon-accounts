@@ -31,16 +31,18 @@ Timestamps are RFC 3339 UTC with milliseconds. Lists are `{"items":[…],"next_c
   `POST /v1/me/photo` returned it: `{PUBLIC_URL}/v1/photos/{photo_id}` with a lowercase id and
   no query string, `#fragment` or extra path. Any other spelling is a 422 whose message gives
   the exact URL. Sending back the current `pfp_url` unchanged is always accepted, even when it
-  isn't the caller's upload (a Silicon whose custodian set its photo). The check runs under the
-  account's row lock, so a photo can't be pruned between the check and the update. Every bad
+  isn't the caller's upload (a Silicon whose custodian set its photo). The check is core's
+  `repo::photos::check_usable`, run under the account's row lock, so a photo can't be pruned
+  between the check and the update. Every bad
   field is reported at once: 422 `validation_failed` with `details.fields` (fields that live
   elsewhere, like `id` or `email`, say which endpoint to use). A Silicon's dob: 422
   `dob_immutable` (sending the current value is fine). Accepts `Idempotency-Key`.
 - `POST /v1/me/id` `{"id":"c:new"}` (bare handle → the account's prefix) → Me. Old id reserved
   10 days for this account; reclaiming one's own reserved id removes that reservation. Apps get
   `account.id_changed`, a Silicon `silicon.id_changed`. At most 5 id changes per account in any
-  24 hours (`ID_CHANGES_PER_DAY`), counting every change of the account's id by anyone (a
-  Silicon's custodian too) and reclaims. Asking for the current id again is a no-op and always
+  24 hours (`ID_CHANGES_PER_DAY`, enforced by core's `accounts::change_id` for every caller, so
+  `POST /v1/me/silicons/{uuid}/id` shares it), counting every change of the account's id by
+  anyone (a Silicon's custodian too) and reclaims. Asking for the current id again is a no-op and always
   allowed. Over the limit: 429 `rate_limited` with `Retry-After` and `details.limit`,
   `details.window_seconds`, `details.retry_at`. This bounds the reserved ids one account can
   hold (at most 50) and the webhooks it can cause. 422 `invalid_id` (`details.reason`), 409
@@ -53,7 +55,8 @@ Timestamps are RFC 3339 UTC with milliseconds. Lists are `{"items":[…],"next_c
   image/webp or image/gif, at most 2 MB (2 097 152 bytes). The bytes must be that format
   (checked by signature) and at most 8192 px a side / 50 megapixels. → **201**
   `{"pfp_url":"{PUBLIC_URL}/v1/photos/{photo_id}","photo":{"id","content_type","bytes","width","height"},"me":Me}`.
-  Apps get `account.updated` (`pfp_url`). Older uploads of the account are deleted, except
+  Apps get `account.updated` (`pfp_url`). Older uploads of the account are deleted (core's
+  `repo::photos::prune`), except
   those another account that isn't deleted still shows. That is a Silicon its custodian gave the
   photo to, even after the Silicon was transferred; such an upload goes at the uploader's next
   photo change once nobody shows it. 20 uploads per account per hour. Errors: 415
@@ -75,7 +78,7 @@ Timestamps are RFC 3339 UTC with milliseconds. Lists are `{"items":[…],"next_c
 |---|---|
 | `GET /v1/me/emails` | `{"items":[{"email","is_primary","verified_at","verified_via","created_at"}],"next_cursor":null}` (primary first) |
 | `POST /v1/me/emails` `{"email"}` | **201** `{"challenge_id","channel":"email","destination","expires_at","resend_available_at"}` — a 6-digit code (purpose `add_email`) goes to the address. 409 `email_in_use` / `email_already_added`, 422 `email_limit_reached` (10) / `invalid_email`, 429 `rate_limited` (10 codes per address per 10 minutes; and every add attempt counts before any 409/422 answer: 20 per account per 10 minutes for emails and phones together, `CONTACT_ADDS_PER_ACCOUNT`, and 30 per client IP per 10 minutes, `CONTACT_ADDS_PER_IP`, so `email_in_use` can't be used to check addresses without limit). Accepts `Idempotency-Key` |
-| `POST /v1/me/emails/verify` `{"challenge_id","code"}` | the updated list. 422 `invalid_code` (`details.remaining_attempts`), 423 `verification_locked`, 410 `code_expired`, 409 `code_already_used`, 404 `challenge_not_found`, 409 `email_in_use` if someone proved it first, 409 `account_deleted` if the account was deleted while the request was in flight (nothing is added). Accepts `Idempotency-Key` |
+| `POST /v1/me/emails/verify` `{"challenge_id","code"}` | the updated list. 422 `invalid_code` (`details.remaining_attempts`), 423 `verification_locked`, 410 `code_expired`, 409 `code_already_used`, 404 `challenge_not_found`, 409 `email_in_use` if someone proved it first, 409 `account_deleted` if the account was deleted while the request was in flight (nothing is added). Wrong codes count **per address** (core's `otp::verify`), together with every sign-in code and every other account's add code to the same address: 10 wrong in a row lock the address for 60 s, so adding someone else's address never buys more guesses than signing in with it. Accepts `Idempotency-Key` |
 | `POST /v1/me/emails/{email}/primary` | the updated list. 404 `email_not_found`, 409 `email_not_verified` |
 | `DELETE /v1/me/emails/{email}` | the updated list. 409 `cannot_remove_primary`, 404 `email_not_found` |
 
@@ -123,18 +126,21 @@ phone numbers in `meta.details`; only the account's own actions show their IP. 4
 `DELETE /v1/me` `{"confirm":"c:saket"}` (Carbons; case-insensitive, bare handle accepted) → 204
 (+ cookie cleared for cookie sessions). 422 `confirmation_required` / `confirmation_mismatch`;
 409 `custodian_of_silicons` (`details.silicons`: AccountSummary list) while custodian of any
-non-deleted Silicon; Silicons get 403 `custodian_required` (their custodian deletes them). In one
-transaction: status `deleted`, id reserved 10 days, emails/phones/identities removed, sessions,
-token families and OBO proofs revoked, pending custodian requests cancelled, `pfp_url` reset
-and the uploads no other account shows deleted, `account.deleted` to every live member app. A
-second `DELETE /v1/me` already in flight waits for the first and answers 204 without doing
-anything, so apps hear about the deletion once. If the id changed while the request waited, it
-answers 422 `confirmation_mismatch` and nothing is deleted. Self-created Silicons still waiting
-for this Carbon to accept are released (id free at once) and get `silicon.custodian.declined`
-`{uuid,id,request_id,custodian,decided_at,reason:"custodian_account_deleted",released:true}`.
-That payload, the release steps and the `silicon.custodian_request.closed` audit entry are the
-same as the silicons crate's `lifecycle::release_orphan`. Their webhook URL/secret are kept so
-that notice can be delivered.
+non-deleted Silicon; Silicons get 403 `custodian_required` (their custodian deletes them). The
+deletion is core's `accounts::delete_account`, in one transaction: status `deleted`, id reserved
+10 days, emails/phones/identities removed, sessions, token families and OBO proofs revoked,
+pending custodian requests cancelled, `pfp_url` reset and the uploads no other account shows
+deleted, the apps' imported personal data about the account dropped (`imported_profile`; their
+`external_id` stays), `account.deleted` to every live member app. A second `DELETE /v1/me`
+already in flight waits for the first and answers 204 without doing anything, so apps hear about
+the deletion once. If the id changed while the request waited, it answers 422
+`confirmation_mismatch` and nothing is deleted. Self-created Silicons still waiting for this
+Carbon to accept are released (id free at once) and get `silicon.custodian.declined`
+`{uuid,id,request_id,custodian,decided_at,reason:"custodian_account_deleted",released:true}`
+(core's `events::silicon_custodian_declined`, the payload the silicons crate sends), with the
+`silicon.custodian_request.closed` audit entry. Their webhook URL/secret are kept so that notice
+can be delivered. The `account.deleted` audit entry lists `released_silicons` and
+`deleted_photos`.
 
 ## Tests
 

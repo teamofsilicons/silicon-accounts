@@ -378,8 +378,9 @@ pub async fn custodian_accepted(
     Ok(())
 }
 
-/// `silicon.custodian.declined`: emitted before the Silicon is released, while it still has its
-/// id. `reason` is `declined` (the Carbon said no) or `custodian_account_deleted` (the Carbon
+/// `silicon.custodian.declined` (core's `events::silicon_custodian_declined`, the same payload
+/// account deletion sends): emitted before the Silicon is released, while it still has its id.
+/// `reason` is `declined` (the Carbon said no) or `custodian_account_deleted` (the Carbon
 /// deleted their account before answering).
 pub async fn custodian_declined(
     conn: &mut PgConnection,
@@ -388,39 +389,32 @@ pub async fn custodian_declined(
     custodian_label: &str,
     reason: &str,
 ) -> ApiResult<()> {
-    events::emit_to_silicon(
+    events::silicon_custodian_declined(
         conn,
-        &silicon.uuid,
-        types::SILICON_CUSTODIAN_DECLINED,
-        json!({
-            "uuid": silicon.uuid, "id": silicon.handle, "request_id": request.id.to_string(),
-            "custodian": custodian_label,
-            "decided_at": request.decided_at.map(format_rfc3339_ms),
-            "reason": reason,
-            "released": true,
-        }),
+        silicon,
+        request.id,
+        custodian_label,
+        request.decided_at,
+        reason,
     )
     .await?;
     Ok(())
 }
 
-/// `silicon.custodian.expired`: the custodian didn't accept within 14 days.
+/// `silicon.custodian.expired` (core's `events::silicon_custodian_expired`): the custodian
+/// didn't accept within 14 days.
 pub async fn custodian_expired(
     conn: &mut PgConnection,
     silicon: &Account,
     request: &CustodianRequest,
     custodian_label: &str,
 ) -> ApiResult<()> {
-    events::emit_to_silicon(
+    events::silicon_custodian_expired(
         conn,
-        &silicon.uuid,
-        types::SILICON_CUSTODIAN_EXPIRED,
-        json!({
-            "uuid": silicon.uuid, "id": silicon.handle, "request_id": request.id.to_string(),
-            "custodian": custodian_label,
-            "expired_at": format_rfc3339_ms(request.expires_at),
-            "released": true,
-        }),
+        silicon,
+        request.id,
+        custodian_label,
+        request.expires_at,
     )
     .await?;
     Ok(())

@@ -459,3 +459,46 @@ async fn a_graceful_stop_claims_nothing_new_and_finishes_the_sends_in_flight() {
     );
     assert_eq!(claimed_unfinished(&ctx).await, 0);
 }
+
+/// A send that finishes after its claim ran out, when another node has claimed the message
+/// again meanwhile, records nothing: the newer claim's result counts.
+#[tokio::test]
+async fn a_result_after_the_claim_was_taken_over_is_not_recorded() {
+    let ctx = providers_ctx().await;
+    let id = enqueue(&ctx, "late@example.test", "custodian_request").await;
+    let claimed = delivery::claim_due(&ctx.state.db, 1).await.expect("claim");
+    let stale = claimed.into_iter().next().expect("the message");
+    assert_eq!(stale.id, id);
+    // The claim runs out and another node claims the message again.
+    make_due(&ctx, id).await;
+    let fresh = delivery::claim_due(&ctx.state.db, 1)
+        .await
+        .expect("claim again");
+    assert_eq!(fresh.len(), 1);
+    // The stale sender finishes now: its result must not overwrite the newer claim.
+    let sender = ScriptedSender::with(vec![Err(SendError::permanent("422 bad address"))]);
+    let outcome =
+        delivery::deliver_claimed(&ctx.state.db, sender.as_ref(), &ctx.state.settings, &stale)
+            .await
+            .expect("deliver");
+    assert_eq!(outcome, delivery::DeliveryOutcome::ClaimLost);
+    let r = row(&ctx, id).await;
+    assert_eq!(
+        (r.status.as_str(), r.attempts),
+        ("pending", 2),
+        "still the newer claim's"
+    );
+    assert!(r.last_error.is_none());
+    // The current claim records normally.
+    let current = fresh.into_iter().next().expect("fresh");
+    let ok = delivery::deliver_claimed(
+        &ctx.state.db,
+        ScriptedSender::with(vec![]).as_ref(),
+        &ctx.state.settings,
+        &current,
+    )
+    .await
+    .expect("deliver");
+    assert!(matches!(ok, delivery::DeliveryOutcome::Sent { .. }));
+    assert_eq!(row(&ctx, id).await.status, "sent");
+}

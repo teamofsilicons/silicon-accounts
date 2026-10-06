@@ -875,6 +875,12 @@ impl Settings {
                     "must be false in production: it would expose sign-in codes",
                 );
             }
+            if s.webhook_allow_private {
+                r.problem(
+                    "ACCOUNTS_WEBHOOK_ALLOW_PRIVATE",
+                    "must be false in production: it turns off the SSRF guard, so anyone who can set a webhook URL could make the service call private, loopback and cloud-metadata addresses",
+                );
+            }
             if !s.public_url.starts_with("https://") {
                 r.problem(
                     "ACCOUNTS_PUBLIC_URL",
@@ -1032,6 +1038,7 @@ mod tests {
             ),
             ("ACCOUNTS_JWT_PRIVATE_KEY", DEV_JWT_SEED),
             ("ACCOUNTS_EXPOSE_DEV_OUTBOX", "true"),
+            ("ACCOUNTS_WEBHOOK_ALLOW_PRIVATE", "true"),
         ]))
         .expect_err("must refuse");
         let vars: Vec<_> = err.problems.iter().map(|p| p.var.as_str()).collect();
@@ -1042,6 +1049,7 @@ mod tests {
             "ACCOUNTS_DELIVERY",
             "ACCOUNTS_EXPOSE_DEV_OUTBOX",
             "ACCOUNTS_PUBLIC_URL",
+            "ACCOUNTS_WEBHOOK_ALLOW_PRIVATE",
         ] {
             assert!(vars.contains(&v), "expected a problem for {v}: {err}");
         }

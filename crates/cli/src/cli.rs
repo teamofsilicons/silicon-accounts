@@ -182,7 +182,7 @@ pub enum Commands {
 
     /// App mode: an app's sign-in setup, user base, imports, tokens, webhooks and proofs.
     ///
-    /// Acts with the app's credentials (--app-id/--app-secret, ACCOUNTS_APP_ID/ACCOUNTS_APP_SECRET, or `accounts app use <app_id> --secret-stdin`), or as the app's owner when you are signed in as the Carbon who owns it. Token exchange and proof issuing/verifying need the app's own credentials. Apps are created in Silicon Apps (`accounts app new`).
+    /// Acts with the app's credentials (--app-id/--app-secret, ACCOUNTS_APP_ID/ACCOUNTS_APP_SECRET, or `accounts app use <app_id> --secret-stdin`), or as the app's owner when you are signed in as the Carbon who owns it. Token calls, OBO proofs, proof verification and refresh need the app's own credentials; an owner can issue ATA proofs (the app's ATA page) and revoke the app's proofs by id. Apps are created in Silicon Apps (`accounts app new`).
     #[command(after_long_help = APP_EXAMPLES)]
     App(AppArgs),
 
@@ -782,7 +782,10 @@ pub enum SiliconWebhookCommand {
         /// si:id or uuid.
         silicon: String,
         /// The https endpoint.
-        url: String,
+        // Not named `url`: that id belongs to the global --url flag, and clap would merge
+        // the two (the endpoint would become the service URL).
+        #[arg(value_name = "URL")]
+        endpoint: String,
     },
     /// Remove the endpoint.
     Remove {
@@ -831,7 +834,9 @@ pub enum OwnWebhookCommand {
     /// Set your webhook endpoint (prints the signing secret once).
     Set {
         /// The https endpoint.
-        url: String,
+        // Not named `url`: that id is the global --url flag (see SiliconWebhookCommand::Set).
+        #[arg(value_name = "URL")]
+        endpoint: String,
     },
     /// Remove your webhook endpoint.
     Remove,
@@ -1230,7 +1235,9 @@ pub enum AppWebhookCommand {
     /// Set the endpoint (a new signing secret is printed once).
     Set {
         /// The endpoint URL.
-        url: String,
+        // Not named `url`: that id is the global --url flag (see SiliconWebhookCommand::Set).
+        #[arg(value_name = "URL")]
+        endpoint: String,
     },
     /// Remove the endpoint.
     Remove,

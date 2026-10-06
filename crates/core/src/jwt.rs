@@ -314,6 +314,45 @@ impl JwtKeys {
         self.verify(token, audience)
     }
 
+    /// Verifies an access token's signature, `kid` and issuer, but **not** its expiry, `nbf` or
+    /// audience: for ending a sign-in with an access token that already expired (token
+    /// revocation). Never use it to authorize a request.
+    pub fn verify_access_ignoring_expiry(&self, token: &str) -> Result<AccessClaims, JwtError> {
+        let header =
+            jsonwebtoken::decode_header(token).map_err(|e| JwtError::Malformed(e.to_string()))?;
+        if header.alg != Algorithm::EdDSA {
+            return Err(JwtError::Malformed(format!(
+                "alg is {:?}, expected EdDSA",
+                header.alg
+            )));
+        }
+        if let Some(kid) = &header.kid
+            && kid != &self.kid
+        {
+            return Err(JwtError::UnknownKey(kid.clone()));
+        }
+        let mut validation = Validation::new(Algorithm::EdDSA);
+        validation.validate_exp = false;
+        validation.validate_nbf = false;
+        validation.validate_aud = false;
+        validation.set_required_spec_claims(&["iss", "sub", "aud"]);
+        let data = jsonwebtoken::decode::<Value>(token, &self.decoding, &validation)
+            .map_err(map_jwt_error)?;
+        let claims = data.claims;
+        let iss = claims
+            .get("iss")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if iss != self.issuer {
+            return Err(JwtError::WrongIssuer {
+                expected: self.issuer.clone(),
+                got: iss.to_string(),
+            });
+        }
+        serde_json::from_value(claims)
+            .map_err(|e| JwtError::Malformed(format!("unexpected claims: {e}")))
+    }
+
     /// Signs an id_token (the caller fills `iss`, `aud`, times and contact claims).
     pub fn sign_id_token(&self, claims: &IdTokenClaims) -> Result<String, JwtError> {
         self.sign(claims)
@@ -395,8 +434,18 @@ mod tests {
 
         let mut expired = input(uuid::Uuid::now_v7());
         expired.ttl_seconds = -120;
-        let (jwt, _) = k.sign_access(&expired).expect("sign");
+        let (jwt, claims) = k.sign_access(&expired).expect("sign");
         assert_eq!(k.verify_access(&jwt, None), Err(JwtError::Expired));
+        // Revocation still recognizes an expired token of ours (signature, kid and issuer
+        // checked), but nothing foreign.
+        assert_eq!(k.verify_access_ignoring_expiry(&jwt), Ok(claims));
+        let (foreign, _) = other
+            .sign_access(&input(uuid::Uuid::now_v7()))
+            .expect("sign");
+        assert_eq!(
+            k.verify_access_ignoring_expiry(&foreign),
+            Err(JwtError::BadSignature)
+        );
 
         let other_issuer =
             JwtKeys::from_private_key(DEV_JWT_SEED, DEV_JWT_KEY_ID, "https://evil.test")

@@ -16,19 +16,19 @@
 //!   the CLI device flow (the oauth crate owns `/v1/device/authorize` and the polling grant).
 //! - **CLI code sign-in** (`/v1/cli/login/start`, `/v1/cli/login/verify`).
 //!
-//! Two rules every sign-in path here follows:
+//! Two rules every sign-in path here follows, both enforced by core:
 //!
 //! - only a **verified** email or phone identifies an account (an unfinished import is the one
-//!   exception); see [`contact`];
-//! - the 10-tries code lockout counts **per address**, across flows, the CLI and requirement
-//!   codes; see [`codes`].
+//!   exception), and whoever proves an address takes over an unproven row of it: core's
+//!   `repo::contacts::lookup` / `after_proof`; finishing an import removes its unproven
+//!   addresses (`repo::accounts::finish_claim`);
+//! - the 10-tries code lockout counts **per address**, across flows, the CLI, requirement codes
+//!   and the account site's add codes: core's `repo::otp::verify`.
 //!
 //! Everything shared (extractors, repositories, events, errors, cookies) comes from
 //! `accounts_core`; this crate only adds what is specific to signing in. The only tables it
-//! owns are `signin_flows` and `signup_sessions` (it also reads and writes the shared ones
-//! through core's repositories, and directly for what core has no function for: the
-//! per-address lock in `otp_challenges` and removing unproven rows of `account_emails` /
-//! `account_phones`).
+//! owns are `signin_flows` and `signup_sessions`; it reads and writes the shared ones through
+//! core's repositories.
 
 use accounts_core::AppState;
 use axum::Router;
@@ -36,8 +36,6 @@ use axum::routing::{get, post};
 use tokio::task::JoinHandle;
 
 mod cli_login;
-pub mod codes;
-pub mod contact;
 mod device;
 pub mod flow;
 pub mod providers;

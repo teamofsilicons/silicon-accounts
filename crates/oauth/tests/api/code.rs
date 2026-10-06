@@ -13,6 +13,8 @@ async fn exchange_issues_tokens_and_an_id_token_that_verifies_with_the_jwks() {
     let ctx = TestContext::new().await;
     let carbon = ctx.carbon().await;
     let (app, secret) = ctx.app("quill-docs").await;
+    // The Carbon proved who they are 2 hours before this sign-in completed (continue-as).
+    let authenticated = time::OffsetDateTime::now_utc() - time::Duration::hours(2);
     let code = signed_in_code(
         &ctx,
         &app.app_id,
@@ -21,6 +23,7 @@ async fn exchange_issues_tokens_and_an_id_token_that_verifies_with_the_jwks() {
             scopes: &[Scope::Profile, Scope::Email, Scope::Openid],
             nonce: Some("n-0S6_WzA2Mj"),
             pkce: Some((CHALLENGE, "S256")),
+            auth_time: Some(authenticated),
             ..Default::default()
         },
     )
@@ -72,7 +75,8 @@ async fn exchange_issues_tokens_and_an_id_token_that_verifies_with_the_jwks() {
         id["preferred_username"],
         carbon.handle.as_deref().expect("handle")
     );
-    assert!(id["auth_time"].is_i64());
+    // auth_time is when the Carbon authenticated, not when the code was exchanged.
+    assert_eq!(id["auth_time"], authenticated.unix_timestamp());
     assert!(id.get("phone_number").is_none(), "phone scope not granted");
     let access = verify_with_jwks(&jwks, &issuer, &app.app_id, s(body, "access_token"));
     assert_eq!(access["sub"], carbon.uuid.as_str());
@@ -587,9 +591,15 @@ async fn an_exchange_during_an_account_deletion_waits_for_it_and_is_refused() {
         .await
         .expect("lock the account")
         .expect("the account exists");
-    accounts::delete_account(&mut deletion, &carbon.uuid, &carbon.uuid, true)
-        .await
-        .expect("delete the account");
+    accounts::delete_account(
+        &mut deletion,
+        &ctx.state.settings,
+        &carbon.uuid,
+        &carbon.uuid,
+        true,
+    )
+    .await
+    .expect("delete the account");
     let exchange = spawn_token_request(&ctx, exchange_req(&app.app_id, &secret, &code));
     wait_for_lock_waiters(&ctx, 1).await;
     assert!(!exchange.is_finished());

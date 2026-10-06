@@ -29,6 +29,7 @@
     "lib/**/*.ts",
     "test/**/*.ts",
     "scripts/**/*.ts",
-    "fixtures/**/*.ts"
+    "fixtures/**/*.ts",
+    "journeys/**/*.ts"
   ]
 }

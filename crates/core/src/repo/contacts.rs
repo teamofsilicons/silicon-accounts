@@ -2,17 +2,33 @@
 //!
 //! Rules (UNDERSTANDING.md): up to 10 of each; any can sign in; exactly one primary; the primary
 //! can't be removed (make another primary first); an email/phone belongs to one account only;
-//! everything is verified before it's added (imported unclaimed rows are the only unverified
-//! ones, and become verified when proven).
+//! everything is verified before it's added.
+//!
+//! **Unverified rows.** The only unverified rows are the addresses an app import attached to an
+//! account nobody has finished yet (status `unclaimed`): proving one of them is how its Carbon
+//! finishes the account (`repo::accounts::finish_claim`, which removes the import's other,
+//! unproven addresses). An unverified row on any other account is *unproven*: nobody showed they
+//! own the address, so it identifies nobody ([`lookup`] treats it as no owner) and whoever proves
+//! the address takes it over ([`after_proof`], [`add_verified`]). Migration 0002 removed the
+//! unproven rows that existed before this rule.
+//!
+//! **Who an address signs in to** is [`lookup`] (or [`after_proof`] once the address was
+//! proven): only a verified address of an active Carbon, or an address of an unfinished import.
+//! Never authenticate with `repo::accounts::by_email` / `by_phone`, which match any row.
 //!
 //! Every function takes a [`ContactKind`]; `*_email` / `*_phone` wrappers exist for the common
 //! calls. Values must already be normalized (`normalize::normalize_email` / `normalize_phone`).
 
+use serde_json::json;
 use sqlx::{Connection, PgConnection};
 
 use crate::error::{ApiError, ApiResult};
-use crate::models::{AccountEmail, AccountPhone, VerifiedVia};
-use crate::repo::is_unique_violation;
+use crate::models::{
+    Account, AccountEmail, AccountField, AccountKind, AccountPhone, AccountStatus, ActorKind,
+    VerifiedVia,
+};
+use crate::repo::audit::{self, AuditEntry};
+use crate::repo::{accounts, is_unique_violation};
 use crate::views::PrimaryContact;
 
 /// Maximum emails (and, separately, phones) per Carbon.
@@ -39,6 +55,55 @@ impl ContactKind {
         match self {
             ContactKind::Email => "email",
             ContactKind::Phone => "phone number",
+        }
+    }
+
+    /// The account field a change of this kind shows up as (`account.updated`).
+    pub fn field(&self) -> AccountField {
+        match self {
+            ContactKind::Email => AccountField::Email,
+            ContactKind::Phone => AccountField::Phone,
+        }
+    }
+
+    fn sql_detach(&self) -> &'static str {
+        match self {
+            ContactKind::Email => {
+                "delete from account_emails where email = $1 and account_uuid = $2 and verified_at is null \
+                 returning is_primary"
+            }
+            ContactKind::Phone => {
+                "delete from account_phones where phone = $1 and account_uuid = $2 and verified_at is null \
+                 returning is_primary"
+            }
+        }
+    }
+
+    fn sql_drop_unverified(&self) -> &'static str {
+        match self {
+            ContactKind::Email => {
+                "delete from account_emails where account_uuid = $1 and verified_at is null returning is_primary"
+            }
+            ContactKind::Phone => {
+                "delete from account_phones where account_uuid = $1 and verified_at is null returning is_primary"
+            }
+        }
+    }
+
+    fn sql_promote_oldest_verified(&self) -> &'static str {
+        match self {
+            ContactKind::Email => {
+                "update account_emails set is_primary = true where account_uuid = $1 and email = ( \
+                   select email from account_emails where account_uuid = $1 and verified_at is not null \
+                   order by created_at, email limit 1) \
+                 and not exists (select 1 from account_emails where account_uuid = $1 and is_primary)"
+            }
+            ContactKind::Phone => {
+                "update account_phones set is_primary = true where account_uuid = $1 and phone = ( \
+                   select phone from account_phones where account_uuid = $1 and verified_at is not null \
+                   order by created_at, phone limit 1) \
+                 and not exists (select 1 from account_phones where account_uuid = $1 and is_primary)"
+            }
         }
     }
 
@@ -222,23 +287,30 @@ pub async fn owner(
 
 /// Checks, before sending a verification code, that `value` can be added to the account.
 ///
-/// Errors: 409 `{email|phone}_in_use` (another account has it), 409 `{kind}_already_added`
-/// (already verified on this account), 422 `{kind}_limit_reached` (10 already).
-/// An unverified (imported) row on the same account passes: verifying it marks it verified.
+/// Errors: 409 `{email|phone}_in_use` (another account has it, verified, or as the address of
+/// an unfinished import), 409 `{kind}_already_added` (already verified on this account), 422
+/// `{kind}_limit_reached` (10 already). An unverified (imported) row on the same account passes:
+/// verifying it marks it verified. An unproven row on another account (see the module docs)
+/// passes too: proving the address takes it over.
 pub async fn check_can_add(
     conn: &mut PgConnection,
     kind: ContactKind,
     account_uuid: &str,
     value: &str,
 ) -> ApiResult<()> {
-    if let Some((holder, verified)) = owner(conn, kind, value).await? {
-        if holder != account_uuid {
+    match owner(conn, kind, value).await? {
+        Some((holder, verified)) if holder == account_uuid => {
+            return if verified {
+                Err(already_added(kind, value))
+            } else {
+                Ok(())
+            };
+        }
+        // Taken by another account, unless it is an unproven row there (the prover takes it).
+        Some((holder, verified)) if verified || !is_unproven_on(conn, &holder).await? => {
             return Err(in_use(kind, value));
         }
-        if verified {
-            return Err(already_added(kind, value));
-        }
-        return Ok(());
+        Some(_) | None => {}
     }
     let count: i64 = sqlx::query_scalar(kind.sql_count())
         .bind(account_uuid)
@@ -248,6 +320,14 @@ pub async fn check_can_add(
         return Err(limit_reached(kind));
     }
     Ok(())
+}
+
+/// True when an unverified row held by `holder_uuid` is unproven: the account is not an
+/// unfinished import (see the module docs).
+async fn is_unproven_on(conn: &mut PgConnection, holder_uuid: &str) -> ApiResult<bool> {
+    Ok(accounts::get(conn, holder_uuid)
+        .await?
+        .is_none_or(|a| !(a.kind == AccountKind::Carbon && a.status == AccountStatus::Unclaimed)))
 }
 
 /// What [`add_verified`] did.
@@ -260,7 +340,9 @@ pub struct AddOutcome {
 }
 
 /// Adds a proven email/phone to a Carbon (first one becomes primary). Same errors as
-/// [`check_can_add`]; serialized per account so the limit holds under concurrency.
+/// [`check_can_add`], plus 409 `account_deleted`; serialized per account so the limit holds
+/// under concurrency. An unproven row of the address on another account is removed first (the
+/// Carbon in front of us proved it; see [`after_proof`]).
 pub async fn add_verified(
     conn: &mut PgConnection,
     kind: ContactKind,
@@ -270,6 +352,21 @@ pub async fn add_verified(
 ) -> ApiResult<AddOutcome> {
     let mut tx = conn.begin().await?;
     lock_account(&mut tx, account_uuid).await?;
+    if let Some((holder, verified)) = owner(&mut tx, kind, value).await?
+        && holder != account_uuid
+    {
+        let unproven = if verified {
+            None
+        } else {
+            accounts::get(&mut tx, &holder).await?.filter(|a| {
+                !(a.kind == AccountKind::Carbon && a.status == AccountStatus::Unclaimed)
+            })
+        };
+        match unproven {
+            Some(other) => detach(&mut tx, kind, value, &other, None).await?,
+            None => return Err(in_use(kind, value)),
+        }
+    }
     if let Some((holder, verified)) = owner(&mut tx, kind, value).await? {
         if holder != account_uuid {
             return Err(in_use(kind, value));
@@ -507,18 +604,187 @@ pub async fn verified_emails(
     .await?)
 }
 
+/// Row-locks the account (`for update`). Errors: 404 `account_not_found`, 409
+/// `account_deleted` (a request that authenticated just before the account was deleted must not
+/// attach an address to it, where nobody could ever use it again).
 async fn lock_account(conn: &mut PgConnection, account_uuid: &str) -> ApiResult<()> {
-    let found: Option<String> =
-        sqlx::query_scalar("select uuid from accounts where uuid = $1 for update")
+    let found: Option<AccountStatus> =
+        sqlx::query_scalar("select status from accounts where uuid = $1 for update")
             .bind(account_uuid)
             .fetch_optional(&mut *conn)
             .await?;
-    found.map(|_| ()).ok_or_else(|| {
-        ApiError::not_found(
+    match found {
+        None => Err(ApiError::not_found(
             "account_not_found",
             format!("No account has the uuid '{account_uuid}'."),
+        )),
+        Some(AccountStatus::Deleted) => Err(ApiError::conflict(
+            "account_deleted",
+            format!(
+                "The account {account_uuid} was deleted (possibly while this request was being handled), so nothing can be added to it."
+            ),
         )
+        .hint("Nothing was changed. Sign in with an account that still exists.")),
+        Some(_) => Ok(()),
+    }
+}
+
+/// Where an email address or phone number leads, for signing in (see the module docs).
+#[derive(Debug, Clone)]
+pub enum Holder {
+    /// No account has it.
+    Free,
+    /// A verified email/phone of an active Carbon: proving it signs that Carbon in.
+    Active(Account),
+    /// Listed by an imported account nobody finished yet: proving it finishes that account.
+    Unclaimed(Account),
+    /// A verified email/phone of an account that can't sign in.
+    Unavailable(Account),
+    /// An unverified row on an account that isn't an unfinished import. It identifies nobody.
+    Unproven(Account),
+}
+
+/// The account field an email/phone change shows up as.
+pub fn field_of(kind: ContactKind) -> AccountField {
+    kind.field()
+}
+
+/// Who `value` (normalized) leads to. Read-only. The only lookup to authenticate with.
+pub async fn lookup(conn: &mut PgConnection, kind: ContactKind, value: &str) -> ApiResult<Holder> {
+    let Some((uuid, verified)) = owner(conn, kind, value).await? else {
+        return Ok(Holder::Free);
+    };
+    let Some(account) = accounts::get(conn, &uuid).await? else {
+        return Ok(Holder::Free);
+    };
+    Ok(match (account.kind, account.status, verified) {
+        (AccountKind::Carbon, AccountStatus::Unclaimed, _) => Holder::Unclaimed(account),
+        (AccountKind::Carbon, AccountStatus::Active, true) => Holder::Active(account),
+        (_, _, false) => Holder::Unproven(account),
+        _ => Holder::Unavailable(account),
     })
+}
+
+/// Who `value` leads to once the Carbon in front of us has **proven** it (a code, or Google /
+/// Apple): an unproven row on someone else's account is removed first, because it was never
+/// theirs, which leaves the address free for the Carbon who proved it (the answer is then
+/// [`Holder::Free`]).
+pub async fn after_proof(
+    conn: &mut PgConnection,
+    kind: ContactKind,
+    value: &str,
+    ip: Option<&str>,
+) -> ApiResult<Holder> {
+    match lookup(conn, kind, value).await? {
+        Holder::Unproven(account) => {
+            detach(conn, kind, value, &account, ip).await?;
+            Ok(Holder::Free)
+        }
+        other => Ok(other),
+    }
+}
+
+/// Removes one unproven row from an account (it stays in the importing app's own records,
+/// `memberships.imported_profile`). Apps that could see it as the primary hear about it.
+async fn detach(
+    conn: &mut PgConnection,
+    kind: ContactKind,
+    value: &str,
+    account: &Account,
+    ip: Option<&str>,
+) -> ApiResult<()> {
+    let removed: Option<bool> = sqlx::query_scalar(kind.sql_detach())
+        .bind(value)
+        .bind(&account.uuid)
+        .fetch_optional(&mut *conn)
+        .await?;
+    let Some(was_primary) = removed else {
+        return Ok(());
+    };
+    if was_primary {
+        promote_oldest_verified(conn, kind, &account.uuid).await?;
+        let updated = accounts::bump_version(conn, &account.uuid).await?;
+        crate::events::account_updated(conn, &updated, &[kind.field()]).await?;
+    }
+    audit::record(
+        conn,
+        &AuditEntry {
+            account_uuid: Some(&account.uuid),
+            target_kind: Some(kind.code()),
+            details: json!({
+                "kind": kind.code(),
+                "was_primary": was_primary,
+                "reason": "an unverified address left by an import was proven by another sign-in",
+            }),
+            ip,
+            ..AuditEntry::new(ActorKind::System, None, "contact.unverified_removed")
+        },
+    )
+    .await?;
+    Ok(())
+}
+
+/// Removes every unverified email and phone of an account: what an import listed and the
+/// Carbon who finished the account never proved. Returns the fields whose primary changed.
+pub async fn drop_unverified(
+    conn: &mut PgConnection,
+    account_uuid: &str,
+) -> ApiResult<Vec<AccountField>> {
+    let mut changed = Vec::new();
+    for kind in [ContactKind::Email, ContactKind::Phone] {
+        let removed: Vec<bool> = sqlx::query_scalar(kind.sql_drop_unverified())
+            .bind(account_uuid)
+            .fetch_all(&mut *conn)
+            .await?;
+        if removed.iter().any(|primary| *primary) {
+            promote_oldest_verified(conn, kind, account_uuid).await?;
+            changed.push(kind.field());
+        }
+    }
+    Ok(changed)
+}
+
+/// After a primary was removed: the oldest verified email/phone of that kind becomes primary
+/// ("one of them is always the primary").
+async fn promote_oldest_verified(
+    conn: &mut PgConnection,
+    kind: ContactKind,
+    account_uuid: &str,
+) -> ApiResult<()> {
+    sqlx::query(kind.sql_promote_oldest_verified())
+        .bind(account_uuid)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Records that the account's Carbon proved `value` (a code, Google or Apple): marks it verified
+/// when it is already on the account, adds it otherwise ([`add_verified`]), and makes it the
+/// primary when the current primary of that kind isn't verified. Returns true when the primary
+/// changed or became verified (apps holding the email/phone scope must hear about it).
+///
+/// Errors: as [`add_verified`] (409 `email_in_use` when another account has it meanwhile).
+pub async fn prove(
+    conn: &mut PgConnection,
+    kind: ContactKind,
+    account_uuid: &str,
+    value: &str,
+    via: VerifiedVia,
+) -> ApiResult<bool> {
+    let before = primary(conn, kind, account_uuid).await?;
+    let on_account = owner(conn, kind, value)
+        .await?
+        .is_some_and(|(holder, _)| holder == account_uuid);
+    if on_account {
+        mark_verified(conn, kind, account_uuid, value, via).await?;
+    } else {
+        add_verified(conn, kind, account_uuid, value, via).await?;
+    }
+    if !before.as_ref().is_some_and(|p| p.verified) {
+        set_primary(conn, kind, account_uuid, value).await?;
+    }
+    let after = primary(conn, kind, account_uuid).await?;
+    Ok(before.map(|p| (p.value, p.verified)) != after.map(|p| (p.value, p.verified)))
 }
 
 fn in_use(kind: ContactKind, value: &str) -> ApiError {

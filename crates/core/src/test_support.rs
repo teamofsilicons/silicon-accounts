@@ -402,6 +402,63 @@ impl TestContext {
         (account, stk)
     }
 
+    /// A self-created Silicon waiting for the Carbon `custodian_uuid` to accept it (status
+    /// `pending_custodian`, a pending `initial` custodian request addressed to the Carbon's uuid,
+    /// 14 days), with an optional own webhook (secret `whsec_test`). Returns the Silicon and the
+    /// request id.
+    pub async fn pending_silicon(
+        &self,
+        custodian_uuid: &str,
+        webhook_url: Option<&str>,
+    ) -> (Account, uuid::Uuid) {
+        let hash = self
+            .state
+            .keys
+            .stk
+            .hash(&crate::crypto::stk::generate())
+            .unwrap_or_else(|e| panic!("hash STK: {e}"));
+        let id = AccountId::new(AccountKind::Silicon, &format!("p-{}", rand_suffix()))
+            .unwrap_or_else(|e| panic!("{e}"));
+        let secret = webhook_url.map(|_| {
+            self.state
+                .keys
+                .keyring
+                .encrypt_str("whsec_test")
+                .unwrap_or_else(|e| panic!("encrypt: {e}"))
+        });
+        let mut conn = self.conn().await;
+        let account = crate::repo::accounts::create_silicon(
+            &mut conn,
+            &self.state.settings,
+            NewSilicon {
+                id,
+                display_name: "Waiting Silicon".into(),
+                pfp_url: None,
+                timezone: "UTC".into(),
+                status: AccountStatus::PendingCustodian,
+                custodian_uuid: None,
+                stk_hash: hash,
+                webhook_url: webhook_url.map(str::to_string),
+                webhook_secret_enc: secret,
+                actor: "self".into(),
+            },
+        )
+        .await
+        .unwrap_or_else(|e| panic!("create pending Silicon: {e}"));
+        let request_id = uuid::Uuid::now_v7();
+        sqlx::query(
+            "insert into custodian_requests (id, silicon_uuid, kind, to_uuid, status, expires_at) \
+             values ($1, $2, 'initial', $3, 'pending', now() + interval '14 days')",
+        )
+        .bind(request_id)
+        .bind(&account.uuid)
+        .bind(custodian_uuid)
+        .execute(&mut *conn)
+        .await
+        .unwrap_or_else(|e| panic!("custodian request: {e}"));
+        (account, request_id)
+    }
+
     /// An active app `<prefix>-<rand>` with a default sign-in config (email); returns it and its
     /// secret.
     pub async fn app(&self, prefix_: &str) -> (App, String) {
@@ -497,6 +554,7 @@ impl TestContext {
                 ip: None,
                 user_agent: None,
                 nonce: None,
+                auth_time: None,
             },
         )
         .await

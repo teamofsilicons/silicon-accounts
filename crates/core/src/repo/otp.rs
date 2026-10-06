@@ -2,34 +2,50 @@
 //!
 //! Contract (UNDERSTANDING.md): sending is limited to 10 codes per destination per rolling 10
 //! minutes (plus 30 per IP per 10 minutes), then 429 until the window passes. Verifying: after 10
-//! consecutive wrong codes there is a 60 s cooldown (423), then 10 more tries.
+//! failed tries there is a 60 s cooldown (423), then 10 more tries.
+//!
+//! Both limits count **per destination** (the email address or phone number), whichever flow,
+//! account or purpose a code was sent for:
+//! - [`send`] serializes the sends to one destination (an advisory lock held until the caller's
+//!   transaction ends), so a burst of parallel requests can't all pass the count;
+//! - [`verify`] row-locks every live code of the destination in one order, so parallel guesses
+//!   are counted one after another; wrong codes of every live code to the address add up to one
+//!   streak, and the 10th in a row locks all of them. Opening more sign-in flows (or adding the
+//!   address to an account) therefore never buys more guesses.
 //!
 //! Exact behaviour of [`verify`]:
-//! - wrong code, tries 1–9 of a streak → 422 `invalid_code`, `details.remaining_attempts` 9..1;
+//! - wrong code, tries 1–9 of the address's streak → 422 `invalid_code`,
+//!   `details.remaining_attempts` 9..1;
 //! - the 10th wrong code in a row → 422 `invalid_code` with `remaining_attempts: 0`,
-//!   `details.locked_until` and `details.retry_after_seconds` (the cooldown starts now);
+//!   `details.locked_until` and `Retry-After` (the cooldown starts now, for every live code to the
+//!   address);
 //! - any attempt during the cooldown (even the right code) → 423 `verification_locked`;
-//! - after the cooldown the streak starts again from 0.
+//! - after the cooldown the streak starts again from 0; a right code ends the streak.
 //!
 //! A resend creates a new challenge and retires the previous one for the same destination,
 //! purpose and flow/account (its code stops working); the failure streak and any running
-//! cooldown carry over, so resending never bypasses the lock.
+//! cooldown carry over, so resending never bypasses the lock. Times are compared with the
+//! database clock.
 
-use sqlx::{PgConnection, PgPool};
+use serde_json::json;
+use sqlx::{Connection, PgConnection, PgPool};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::config::Settings;
 use crate::crypto::{Pepper, constant_time_eq, generate_otp};
 use crate::error::{ApiError, ApiResult};
-use crate::models::{OtpChannel, OtpPurpose};
+use crate::models::{ActorKind, OtpChannel, OtpPurpose};
+use crate::repo::audit::{self, AuditEntry, SigninRecord};
+use crate::repo::contacts::{self, ContactKind, Holder};
 use crate::repo::rate_limit;
+use crate::timefmt::format_rfc3339_ms;
 
 /// Codes per destination per window.
 pub const MAX_SENDS_PER_DESTINATION: i64 = 10;
 /// The send window.
 pub const SEND_WINDOW_SECONDS: i64 = 600;
-/// Consecutive wrong codes before the cooldown.
+/// Consecutive wrong codes (per destination) before the cooldown.
 pub const MAX_FAILED_STREAK: i32 = 10;
 /// Suggested wait before offering "resend" in UIs (not enforced).
 pub const RESEND_HINT_SECONDS: i64 = 30;
@@ -90,39 +106,56 @@ pub struct NewChallenge<'a> {
     pub ip: Option<&'a str>,
 }
 
-/// A new challenge and its plaintext code (deliver it, never log it).
-#[derive(Debug, Clone)]
+/// A new challenge and its plaintext code (deliver it, never log it). `Debug` hides the code.
+#[derive(Clone)]
 pub struct CreatedChallenge {
     pub challenge: OtpChallenge,
     pub code: String,
 }
 
-/// Creates a challenge after enforcing the send limits (429 `rate_limited` with
-/// `Retry-After`). Deliver `code` with `delivery::enqueue_otp` in the same transaction.
+impl std::fmt::Debug for CreatedChallenge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CreatedChallenge")
+            .field("challenge", &self.challenge)
+            .field("code", &"[redacted]")
+            .finish()
+    }
+}
+
+/// Creates a challenge after enforcing the send limits (429 `rate_limited` with `Retry-After`).
+/// Deliver `code` with `delivery::enqueue_otp` in the same transaction.
+///
+/// Sends to one destination are serialized: the advisory lock taken here is held until the
+/// caller's transaction ends, so concurrent sends are counted one after another and the
+/// per-destination limit holds exactly. Call it inside a transaction (with a plain connection
+/// the lock lasts only for this function, which still serializes the count and the insert).
 pub async fn send(
     conn: &mut PgConnection,
     pepper: &Pepper,
     settings: &Settings,
     new: &NewChallenge<'_>,
 ) -> ApiResult<CreatedChallenge> {
-    let (recent, oldest): (i64, Option<OffsetDateTime>) = sqlx::query_as(
-        "select count(*), min(created_at) from (select created_at from otp_challenges \
-           where destination = $1 and created_at > now() - make_interval(secs => $2) \
-           order by created_at desc limit $3) r",
+    let mut tx = conn.begin().await?;
+    sqlx::query("select pg_advisory_xact_lock(hashtextextended('otp_send:' || $1, 0))")
+        .bind(new.destination)
+        .execute(&mut *tx)
+        .await?;
+    let (recent, retry_after): (i64, Option<f64>) = sqlx::query_as(
+        "select count(*), \
+                extract(epoch from (min(created_at) + make_interval(secs => $2) - now()))::float8 \
+           from (select created_at from otp_challenges \
+                  where destination = $1 and created_at > now() - make_interval(secs => $2) \
+                  order by created_at desc limit $3) r",
     )
     .bind(new.destination)
     .bind(SEND_WINDOW_SECONDS as f64)
     .bind(MAX_SENDS_PER_DESTINATION)
-    .fetch_one(&mut *conn)
+    .fetch_one(&mut *tx)
     .await?;
     if recent >= MAX_SENDS_PER_DESTINATION {
-        let retry = match oldest {
-            Some(t) => {
-                let free_at = t + time::Duration::seconds(SEND_WINDOW_SECONDS);
-                (free_at - OffsetDateTime::now_utc()).whole_seconds().max(1) as u64
-            }
-            None => SEND_WINDOW_SECONDS as u64,
-        };
+        let retry = retry_after
+            .map(|s| s.ceil().max(1.0) as u64)
+            .unwrap_or(SEND_WINDOW_SECONDS as u64);
         let masked = match new.channel {
             OtpChannel::Email => crate::normalize::mask_email(new.destination),
             OtpChannel::Phone => crate::normalize::mask_phone(new.destination),
@@ -138,7 +171,7 @@ pub async fn send(
     }
     if let Some(ip) = new.ip {
         rate_limit::enforce(
-            conn,
+            &mut tx,
             &rate_limit::bucket("otp_send:ip", ip),
             rate_limit::limits::OTP_SEND_PER_IP,
             "verification codes requested from this network",
@@ -160,7 +193,7 @@ pub async fn send(
     .bind(new.purpose)
     .bind(new.flow_id)
     .bind(new.account_uuid)
-    .fetch_all(&mut *conn)
+    .fetch_all(&mut *tx)
     .await?
     .into_iter()
     .reduce(|a, b| (a.0.max(b.0), a.1.max(b.1), a.2.max(b.2)));
@@ -184,8 +217,9 @@ pub async fn send(
     .bind(total)
     .bind(locked_until)
     .bind(settings.otp_ttl_seconds as f64)
-    .fetch_one(&mut *conn)
+    .fetch_one(&mut *tx)
     .await?;
+    tx.commit().await?;
     Ok(CreatedChallenge { challenge, code })
 }
 
@@ -209,8 +243,25 @@ pub struct Expect<'a> {
     pub account_uuid: Option<&'a str>,
 }
 
+/// Who is trying to sign in with a code, for the sign-in history of the address's owner. Pass it
+/// for sign-in codes (`signin`, `cli_login`): when such a code starts a lock and the address
+/// belongs to an active Carbon, its sign-in history gets a `failed` row and the audit log
+/// `signin.locked` (UNDERSTANDING.md "History").
+#[derive(Debug, Clone, Copy)]
+pub struct Attempt<'a> {
+    /// The app being signed into (`accounts` for the CLI).
+    pub app_id: &'a str,
+    pub ip: Option<&'a str>,
+    pub user_agent: Option<&'a str>,
+}
+
 /// Checks a code (see the module docs for the exact responses). Returns the consumed challenge.
 /// Takes the pool so failure counts persist although the request fails.
+///
+/// Errors: 422 `invalid_code` (not 6 digits: not counted; wrong: `details.remaining_attempts`,
+/// and on the 10th `locked_until` + `Retry-After`), 423 `verification_locked`, 410
+/// `code_expired`, 409 `code_already_used`, 404 `challenge_not_found` (unknown, or bound to
+/// another flow/account/purpose).
 pub async fn verify(
     pool: &PgPool,
     pepper: &Pepper,
@@ -218,6 +269,7 @@ pub async fn verify(
     challenge_id: Uuid,
     code: &str,
     expect: &Expect<'_>,
+    attempt: Option<Attempt<'_>>,
 ) -> ApiResult<OtpChallenge> {
     let code = code.trim();
     if code.len() != 6 || !code.chars().all(|c| c.is_ascii_digit()) {
@@ -231,33 +283,32 @@ pub async fn verify(
         .hint("Type the 6-digit code from the message."));
     }
     let mut tx = pool.begin().await?;
-    let row = sqlx::query_as::<_, OtpChallenge>(concat!(
+    let (destination, now): (Option<String>, OffsetDateTime) =
+        sqlx::query_as("select (select destination from otp_challenges where id = $1), now()")
+            .bind(challenge_id)
+            .fetch_one(&mut *tx)
+            .await?;
+    let Some(destination) = destination else {
+        return Err(not_found(challenge_id));
+    };
+    // This challenge and every code to the address that counts (live, or still locked), locked
+    // in one order so concurrent checks of the address run one after another.
+    let rows: Vec<OtpChallenge> = sqlx::query_as(concat!(
         "select ",
         challenge_columns!(),
-        " from otp_challenges where id = $1 for update"
+        " from otp_challenges where destination = $1 \
+           and (id = $2 or (consumed_at is null and expires_at > now()) or locked_until > now()) \
+         order by id for update"
     ))
+    .bind(&destination)
     .bind(challenge_id)
-    .fetch_optional(&mut *tx)
+    .fetch_all(&mut *tx)
     .await?;
-    let not_found = || {
-        ApiError::not_found(
-            "challenge_not_found",
-            format!("No verification code '{challenge_id}' is waiting here."),
-        )
-        .hint("Request a new code.")
+    let Some(c) = rows.iter().find(|r| r.id == challenge_id).cloned() else {
+        return Err(not_found(challenge_id));
     };
-    let Some(c) = row else {
-        return Err(not_found());
-    };
-    let bound_ok = expect.purpose.is_none_or(|p| p == c.purpose)
-        && expect
-            .flow_id
-            .is_none_or(|f| c.flow_id.as_deref() == Some(f))
-        && expect
-            .account_uuid
-            .is_none_or(|a| c.account_uuid.as_deref() == Some(a));
-    if !bound_ok {
-        return Err(not_found());
+    if !is_bound(&c, expect) {
+        return Err(not_found(challenge_id));
     }
     if c.consumed_at.is_some() {
         return Err(ApiError::conflict(
@@ -266,88 +317,205 @@ pub async fn verify(
         )
         .hint("Request a new code if you need to verify again."));
     }
-    let now = OffsetDateTime::now_utc();
-    if let Some(until) = c.locked_until
-        && until > now
+    if let Some(until) = rows
+        .iter()
+        .filter_map(|r| r.locked_until)
+        .filter(|l| *l > now)
+        .max()
     {
-        let secs = (until - now).whole_seconds().max(1) as u64;
-        return Err(ApiError::locked(
-                "verification_locked",
-                format!(
-                    "Too many wrong codes in a row: verification is locked for {secs} more seconds (until {}).",
-                    crate::timefmt::format_rfc3339_ms(until)
-                ),
-                secs,
-            )
-            .hint(format!("Wait {secs} seconds, then type the code again.")));
+        return Err(locked(&c, until, now));
     }
     if c.expires_at <= now {
         return Err(ApiError::gone(
             "code_expired",
             format!(
                 "This code expired at {} (codes last {} minutes), or a newer code replaced it.",
-                crate::timefmt::format_rfc3339_ms(c.expires_at),
+                format_rfc3339_ms(c.expires_at),
                 settings.otp_ttl_seconds / 60
             ),
         )
         .hint("Use the most recent code, or request a new one."));
     }
+
     if constant_time_eq(&pepper.hash(code), &c.code_hash) {
-        let done = sqlx::query_as::<_, OtpChallenge>(concat!(
-            "update otp_challenges set consumed_at = now(), failed_streak = 0, locked_until = null where id = $1 returning ",
+        let done: OtpChallenge = sqlx::query_as(concat!(
+            "update otp_challenges set consumed_at = now(), failed_streak = 0, locked_until = null \
+             where id = $1 returning ",
             challenge_columns!()
         ))
         .bind(c.id)
         .fetch_one(&mut *tx)
         .await?;
+        // A right code ends the streak for the whole address.
+        sqlx::query(
+            "update otp_challenges set failed_streak = 0 where destination = $1 and id <> $2 \
+             and consumed_at is null and expires_at > now() and failed_streak > 0",
+        )
+        .bind(&destination)
+        .bind(c.id)
+        .execute(&mut *tx)
+        .await?;
         tx.commit().await?;
         return Ok(done);
     }
-    // Wrong code: a streak that started after an expired lock begins again from zero.
-    let streak = c.failed_streak + 1;
-    let locks_now = streak >= MAX_FAILED_STREAK;
-    let locked_until: Option<OffsetDateTime> = sqlx::query_scalar(
-        "update otp_challenges set total_failures = total_failures + 1, \
-           failed_streak = case when $2 then 0 else $3 end, \
-           locked_until = case when $2 then now() + make_interval(secs => $4) else null end \
-         where id = $1 returning locked_until",
+
+    // A wrong code: one more for the address's streak.
+    sqlx::query(
+        "update otp_challenges set failed_streak = failed_streak + 1, total_failures = total_failures + 1 \
+         where id = $1",
     )
     .bind(c.id)
-    .bind(locks_now)
-    .bind(streak)
-    .bind(settings.otp_lock_seconds as f64)
+    .execute(&mut *tx)
+    .await?;
+    let streak: i64 = sqlx::query_scalar(
+        "select coalesce(sum(failed_streak), 0)::bigint from otp_challenges \
+         where destination = $1 and consumed_at is null and expires_at > now()",
+    )
+    .bind(&destination)
     .fetch_one(&mut *tx)
     .await?;
-    tx.commit().await?;
-    let remaining = if locks_now {
-        0
+    let lock_seconds = settings.otp_lock_seconds;
+    let max = i64::from(MAX_FAILED_STREAK);
+    let until = if streak >= max {
+        // The 10th in a row: every live code to the address waits out the cooldown, and the
+        // streak starts again after it.
+        let locked: Vec<Option<OffsetDateTime>> = sqlx::query_scalar(
+            "update otp_challenges set locked_until = now() + make_interval(secs => $2), failed_streak = 0 \
+             where destination = $1 and consumed_at is null and expires_at > now() returning locked_until",
+        )
+        .bind(&destination)
+        .bind(lock_seconds as f64)
+        .fetch_all(&mut *tx)
+        .await?;
+        let until = locked.into_iter().flatten().max();
+        if let Some(attempt) = attempt
+            && matches!(c.purpose, OtpPurpose::Signin | OtpPurpose::CliLogin)
+        {
+            record_lock(&mut tx, &c, attempt, until).await?;
+        }
+        until
     } else {
-        MAX_FAILED_STREAK - streak
+        None
     };
-    let mut err = ApiError::unprocessable(
-        "invalid_code",
-        if locks_now {
-            format!(
-                "That code is wrong. It was the {MAX_FAILED_STREAK}th wrong code in a row, so verification is locked for {} seconds.",
-                settings.otp_lock_seconds
+    tx.commit().await?;
+
+    Err(match until {
+        Some(until) => {
+            let secs = seconds_until(until, now);
+            ApiError::unprocessable(
+                "invalid_code",
+                format!(
+                    "That code is wrong. It was the {MAX_FAILED_STREAK}th wrong code in a row for {}, so verification is locked for {lock_seconds} seconds.",
+                    c.masked_destination()
+                ),
             )
-        } else {
-            format!("That code is wrong; {remaining} more tries before a {} second cooldown.", settings.otp_lock_seconds)
+            .detail("remaining_attempts", 0)
+            .detail("locked_until", format_rfc3339_ms(until))
+            .retry_after(secs)
+            .hint(format!("Wait {secs} seconds, then try again."))
+        }
+        None => {
+            let remaining = (max - streak).max(1);
+            ApiError::unprocessable(
+                "invalid_code",
+                format!(
+                    "That code is wrong; {remaining} more tries for {} before a {lock_seconds} second cooldown.",
+                    c.masked_destination()
+                ),
+            )
+            .detail("remaining_attempts", remaining)
+            .hint("Check the latest code you received and type it again.")
+        }
+    })
+}
+
+/// The binding test (a mismatch looks like "not found").
+fn is_bound(c: &OtpChallenge, expect: &Expect<'_>) -> bool {
+    expect.purpose.is_none_or(|p| p == c.purpose)
+        && expect
+            .flow_id
+            .is_none_or(|f| c.flow_id.as_deref() == Some(f))
+        && expect
+            .account_uuid
+            .is_none_or(|a| c.account_uuid.as_deref() == Some(a))
+}
+
+/// 404 `challenge_not_found`.
+fn not_found(challenge_id: Uuid) -> ApiError {
+    ApiError::not_found(
+        "challenge_not_found",
+        format!("No verification code '{challenge_id}' is waiting here."),
+    )
+    .hint("Request a new code.")
+}
+
+/// Whole seconds from `now` until `until` (rounded up, at least 1): a fresh 60 s lock says 60.
+fn seconds_until(until: OffsetDateTime, now: OffsetDateTime) -> u64 {
+    ((until - now).as_seconds_f64().ceil() as u64).max(1)
+}
+
+/// 423 `verification_locked` for the address.
+fn locked(c: &OtpChallenge, until: OffsetDateTime, now: OffsetDateTime) -> ApiError {
+    let secs = seconds_until(until, now);
+    ApiError::locked(
+        "verification_locked",
+        format!(
+            "Too many wrong codes in a row for {}: verification is locked for {secs} more seconds (until {}).",
+            c.masked_destination(),
+            format_rfc3339_ms(until)
+        ),
+        secs,
+    )
+    .hint(format!(
+        "Wait {secs} seconds, then type the code again. Every code sent to this address waits out the same cooldown."
+    ))
+    .detail("locked_until", format_rfc3339_ms(until))
+}
+
+/// A lock started on a sign-in code: the owner of the address (if any) sees a failed sign-in
+/// in its history, and the audit log keeps the lock.
+async fn record_lock(
+    conn: &mut PgConnection,
+    c: &OtpChallenge,
+    attempt: Attempt<'_>,
+    until: Option<OffsetDateTime>,
+) -> ApiResult<()> {
+    let (kind, method) = match c.channel {
+        OtpChannel::Email => (ContactKind::Email, audit::method::EMAIL),
+        OtpChannel::Phone => (ContactKind::Phone, audit::method::PHONE),
+    };
+    let Holder::Active(owner) = contacts::lookup(conn, kind, &c.destination).await? else {
+        return Ok(());
+    };
+    audit::signin(
+        conn,
+        &SigninRecord {
+            account_uuid: Some(&owner.uuid),
+            app_id: Some(attempt.app_id),
+            method,
+            outcome: audit::outcome::FAILED,
+            ip: attempt.ip,
+            user_agent: attempt.user_agent,
         },
     )
-    .detail("remaining_attempts", remaining);
-    if let (true, Some(until)) = (locks_now, locked_until) {
-        err = err
-            .detail("locked_until", crate::timefmt::format_rfc3339_ms(until))
-            .retry_after(settings.otp_lock_seconds as u64)
-            .hint(format!(
-                "Wait {} seconds, then try again.",
-                settings.otp_lock_seconds
-            ));
-    } else {
-        err = err.hint("Check the latest code you received and type it again.");
-    }
-    Err(err)
+    .await?;
+    audit::record(
+        conn,
+        &AuditEntry {
+            account_uuid: Some(&owner.uuid),
+            app_id: Some(attempt.app_id),
+            target_kind: Some(kind.code()),
+            details: json!({
+                "destination": c.masked_destination(),
+                "purpose": c.purpose.as_str(),
+                "wrong_codes": MAX_FAILED_STREAK,
+                "locked_until": until.map(format_rfc3339_ms),
+            }),
+            ip: attempt.ip,
+            ..AuditEntry::new(ActorKind::System, None, "signin.locked")
+        },
+    )
+    .await
 }
 
 /// Deletes challenges that expired over a day ago (sweep).

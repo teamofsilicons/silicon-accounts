@@ -117,9 +117,11 @@ pub fn init_logging(settings: &Settings) {
             .with_current_span(false)
             .try_init();
     } else {
+        // Colours only for a terminal: log files and CI output stay free of escape codes.
         let _ = tracing_subscriber::fmt()
             .with_env_filter(filter)
             .with_target(true)
+            .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stdout()))
             .try_init();
     }
 }

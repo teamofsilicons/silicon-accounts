@@ -28,7 +28,7 @@ use accounts_core::models::{Account, AccountKind, AccountStatus};
 use accounts_core::pfp::default_pfp_url;
 use accounts_core::repo::accounts::{self, NewSilicon, ProfileUpdate};
 use accounts_core::repo::rate_limit::{self, Limit};
-use accounts_core::repo::{idempotency, sessions, tokens};
+use accounts_core::repo::{idempotency, photos, sessions, tokens};
 use accounts_core::state::AppState;
 use accounts_core::timefmt::format_rfc3339_ms;
 use accounts_core::views::Page;
@@ -37,8 +37,6 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sqlx::PgConnection;
-use time::OffsetDateTime;
 
 use crate::common::{
     ensure_id_free, lock_my_silicon, lock_own_account, my_silicon, set_silicon_webhook,
@@ -50,7 +48,7 @@ use crate::own_webhook::{WebhookBody, webhook_url};
 use crate::requests::{self, NewRequest, kind};
 use crate::self_create::idempotency_fingerprint;
 use crate::views::{self, SiliconItem};
-use crate::{idempotent, lifecycle, stk};
+use crate::{lifecycle, stk};
 
 /// Transfer requests a custodian may send per hour: every request emails the receiving Carbon,
 /// so cancel-and-resend loops must not turn into a way to flood someone's inbox.
@@ -109,7 +107,8 @@ pub async fn create(
 ) -> Result<Response, ApiError> {
     let scope = idempotency::scope(&format!("account:{}", me.uuid()), "POST", "/v1/me/silicons");
     let fingerprint = idempotency_fingerprint(&body, &state.keys.pepper);
-    idempotent::run_secret(&state, key.as_deref(), &scope, &fingerprint, || {
+    // Secret-bearing: core stores the response sealed with the keyring (10-minute replay).
+    idempotency::run(&state, key.as_deref(), &scope, &fingerprint, true, || {
         create_silicon(&state, &me, &meta, body)
     })
     .await
@@ -165,6 +164,10 @@ async fn create_silicon(
     // The custodian must still exist when the Silicon is stored: this serializes with the
     // Carbon's own account deletion (see `common::lock_own_account`).
     let custodian = lock_own_account(&mut tx, &me.account, "create a Silicon").await?;
+    // A photo of this service must be one the custodian uploaded (the Silicon has none yet).
+    if let Some(url) = &pfp_url {
+        photos::check_usable(&mut tx, settings, url, &[me.uuid()], "you").await?;
+    }
     let silicon = accounts::create_silicon(
         &mut tx,
         settings,
@@ -314,6 +317,18 @@ pub async fn update(
         .flatten(),
     };
     fields.into_result()?;
+    // Sending back the current photo changes nothing (it may be a former custodian's upload);
+    // a new photo of this service must be the custodian's or the Silicon's own upload.
+    if let Some(url) = pfp_url.as_deref().filter(|u| *u != silicon.pfp_url) {
+        photos::check_usable(
+            &mut tx,
+            &state.settings,
+            url,
+            &[me.uuid(), &silicon.uuid],
+            &format!("you or {}", silicon.display_id()),
+        )
+        .await?;
+    }
     let (updated, changed) = accounts::update_profile(
         &mut tx,
         &silicon.uuid,
@@ -456,30 +471,10 @@ pub async fn rotate_stk(
         &format!("/v1/me/silicons/{}/stk", silicon_key.trim()),
     );
     let fingerprint = idempotency_fingerprint(&body, &state.keys.pepper);
-    idempotent::run_secret(&state, key.as_deref(), &scope, &fingerprint, || {
+    idempotency::run(&state, key.as_deref(), &scope, &fingerprint, true, || {
         rotate(&state, &me, &meta, &silicon_key, body)
     })
     .await
-}
-
-/// Stamps `stk_rotated_at` with the moment the rotation takes effect (the statement's clock,
-/// `clock_timestamp()`, now that the Silicon's row is locked) instead of the transaction's start
-/// time (`now()`) that core's `set_stk` writes. Returns the stamp.
-///
-/// The token endpoint refuses a short-lived token whose `created_at` is not later than
-/// `stk_rotated_at`: it was minted by a sign-in the rotation ended. Every SLT is stored under a
-/// share lock on this row (`common::lock_live_session`), so an SLT stored before the rotation
-/// committed before the rotation got its row lock, and its `created_at` (its own transaction's
-/// start) is earlier than this stamp. With the rotation's start time instead, an SLT whose
-/// transaction began after the rotation's but committed before the rotation took its lock would
-/// look newer than the rotation and could still be exchanged for tokens afterwards.
-async fn stamp_rotation(conn: &mut PgConnection, silicon_uuid: &str) -> ApiResult<OffsetDateTime> {
-    Ok(sqlx::query_scalar(
-        "update accounts set stk_rotated_at = clock_timestamp() where uuid = $1 returning stk_rotated_at",
-    )
-    .bind(silicon_uuid)
-    .fetch_one(&mut *conn)
-    .await?)
 }
 
 async fn rotate(
@@ -502,8 +497,9 @@ async fn rotate(
 
     let mut tx = state.db.begin().await?;
     let silicon = lock_my_silicon(&mut tx, me.uuid(), silicon_key).await?;
-    accounts::set_stk(&mut tx, &silicon.uuid, &new_stk.hash).await?;
-    let rotated_at = stamp_rotation(&mut tx, &silicon.uuid).await?;
+    // Core stamps `stk_rotated_at` with the statement's clock once the row is locked, so every
+    // SLT stored before this rotation is older than it (see `accounts::set_stk`).
+    let rotated_at = accounts::set_stk(&mut tx, &silicon.uuid, &new_stk.hash).await?;
     let families = tokens::revoke_families(
         &mut tx,
         &tokens::RevokeFilter {
@@ -729,24 +725,11 @@ pub async fn delete(
             "Send {{\"confirm\": \"{current}\"}} to delete it; deleting can't be undone."
         )));
     }
-    let deleted = accounts::delete_account(&mut tx, &silicon.uuid, me.uuid(), true).await?;
-    events::account_deleted(&mut tx, &silicon.uuid).await?;
-    // Like a Carbon deleting its own account (`DELETE /v1/me`): uploaded photos are personal
-    // data and stop being served, and the photo goes back to the default one.
-    let deleted_photos = sqlx::query("delete from photos where account_uuid = $1")
-        .bind(&silicon.uuid)
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
-    sqlx::query("update accounts set pfp_url = $2 where uuid = $1")
-        .bind(&silicon.uuid)
-        .bind(default_pfp_url(
-            &state.settings.iris_base_url,
-            AccountKind::Silicon,
-            &silicon.uuid,
-        ))
-        .execute(&mut *tx)
-        .await?;
+    // Core does all of it, as for a Carbon's own deletion: sign-ins and proofs revoked, the
+    // photo back to the default and its uploads deleted, apps told `account.deleted`.
+    let deleted =
+        accounts::delete_account(&mut tx, &state.settings, &silicon.uuid, me.uuid(), true).await?;
+    let deleted_photos = deleted.deleted_photos;
     Actor::account(me.uuid(), meta.ip.as_deref())
         .record_for(
             &mut tx,

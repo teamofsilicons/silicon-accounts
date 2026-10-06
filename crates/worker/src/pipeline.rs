@@ -25,9 +25,9 @@ use tokio::time::Instant;
 
 use crate::Shutdown;
 
-/// How long a claim is exclusive: core's message claim (`next_attempt_at = now() + 60 s`) and
-/// the webhook lease ([`crate::webhooks::LEASE_SECONDS`]).
-pub const CLAIM_SECONDS: u64 = 60;
+/// How long a claim is exclusive: core's message claim (`delivery::CLAIM_SECONDS`) and the
+/// webhook lease ([`crate::webhooks::LEASE_SECONDS`]).
+pub const CLAIM_SECONDS: u64 = accounts_core::delivery::CLAIM_SECONDS as u64;
 
 /// Longest one claimed row may be worked on, counted from just before the claim was requested:
 /// 10 s inside the 60 s claim, leaving room for clock and database latency. A send takes at most

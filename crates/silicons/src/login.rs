@@ -5,18 +5,20 @@
 //!   work, so ids can't be probed.
 //! - 10 wrong STKs in a row lock sign-in for 1 minute (423 `login_locked`, also during the lock
 //!   even with the right STK); a success resets the count. Attempts are counted before the STK
-//!   is checked, so a burst of parallel guesses gets no more than 10 checks either.
+//!   is checked (core's `accounts::begin_stk_attempt`), so a burst of parallel guesses gets no
+//!   more than 10 checks either. Argon2id runs on the blocking pool.
 //! - The right STK on an account that can't sign in yet says why: 403 `custodian_pending`
 //!   (with the request to poll) or `custodian_expired`.
 //! - An id whose Silicon is gone says why: 403 `custodian_declined`, `custodian_expired` or
 //!   `account_deleted` (that account's STK no longer exists, so nothing is verified).
 //! - 60 attempts per minute per IP on top of the per-Silicon lock.
 
-use accounts_core::crypto::stk::normalize as normalize_stk;
+use accounts_core::crypto::stk::{StkHasher, normalize as normalize_stk};
 use accounts_core::error::{ApiError, ApiResult};
 use accounts_core::http::{ClientMeta, Json};
 use accounts_core::ids::{AccountId, IdError};
 use accounts_core::models::{AccountKind, AccountStatus, Scope, TokenOrigin};
+use accounts_core::repo::accounts::StkAttempt;
 use accounts_core::repo::audit::{self, SigninRecord};
 use accounts_core::repo::{accounts, rate_limit, tokens};
 use accounts_core::state::AppState;
@@ -28,12 +30,12 @@ use sqlx::PgConnection;
 use time::OffsetDateTime;
 
 use crate::requests::{self, status};
-use crate::{input, lifecycle, stk, views};
+use crate::{input, lifecycle, views};
 
-/// Consecutive wrong STKs that lock sign-in.
-pub const MAX_STK_FAILURES: i32 = 10;
-/// How long sign-in stays locked after that.
-pub const LOCK_SECONDS: i64 = 60;
+/// Consecutive wrong STKs that lock sign-in (core's `accounts::MAX_STK_FAILURES`).
+pub const MAX_STK_FAILURES: i32 = accounts::MAX_STK_FAILURES;
+/// How long sign-in stays locked after that (core's `accounts::STK_LOCK_SECONDS`).
+pub const LOCK_SECONDS: i64 = accounts::STK_LOCK_SECONDS;
 /// Label of the token family when the caller sends no `client_label`.
 pub const DEFAULT_LABEL: &str = "Silicon sign-in";
 
@@ -126,53 +128,41 @@ pub async fn login(
             return Err(gone);
         }
         drop(conn);
-        stk::burn(state.keys.stk).await;
+        state.keys.stk.burn_async().await;
         let mut conn = state.db.acquire().await?;
         record_attempt(&mut conn, &meta, None, audit::outcome::FAILED).await?;
         return Err(invalid_credentials());
     };
+    drop(conn);
 
     // Count the attempt *before* checking the STK (and refuse while locked): checking first and
     // counting afterwards would let a burst of parallel guesses all pass the lock check before
     // any failure is recorded.
-    let attempt: Option<i32> = sqlx::query_scalar(
-        "update accounts set stk_failed_attempts = stk_failed_attempts + 1 \
-         where uuid = $1 and (stk_locked_until is null or stk_locked_until <= now()) \
-         returning stk_failed_attempts",
-    )
-    .bind(&account.uuid)
-    .fetch_optional(&mut *conn)
-    .await?;
-    let Some(attempt) = attempt else {
-        let seconds = lock_remaining(&mut conn, &account.uuid).await?.unwrap_or(1);
-        record_attempt(
-            &mut conn,
-            &meta,
-            Some(&account.uuid),
-            audit::outcome::FAILED,
-        )
-        .await?;
-        return Err(login_locked(&full, seconds));
-    };
-    if attempt > MAX_STK_FAILURES {
-        // More guesses in flight than the lock allows: lock now without checking this one.
-        lock_sign_in(&mut conn, &account.uuid).await?;
-        record_attempt(
-            &mut conn,
-            &meta,
-            Some(&account.uuid),
-            audit::outcome::FAILED,
-        )
-        .await?;
-        return Err(login_locked(&full, LOCK_SECONDS as u64));
-    }
-    drop(conn);
+    let attempt =
+        match accounts::begin_stk_attempt(&state.db, &account.uuid, MAX_STK_FAILURES, LOCK_SECONDS)
+            .await?
+        {
+            StkAttempt::Check { attempt } => attempt,
+            StkAttempt::Locked {
+                retry_after_seconds,
+            } => {
+                let mut conn = state.db.acquire().await?;
+                record_attempt(
+                    &mut conn,
+                    &meta,
+                    Some(&account.uuid),
+                    audit::outcome::FAILED,
+                )
+                .await?;
+                return Err(login_locked(&full, retry_after_seconds));
+            }
+        };
 
     let verified_hash = account.stk_hash.clone();
     let correct = match &verified_hash {
-        Some(phc) => stk::verify(presented, phc.clone()).await,
+        Some(phc) => StkHasher::verify_async(presented, phc.clone()).await,
         None => {
-            stk::burn(state.keys.stk).await;
+            state.keys.stk.burn_async().await;
             false
         }
     };
@@ -185,8 +175,17 @@ pub async fn login(
             audit::outcome::FAILED,
         )
         .await?;
-        if attempt >= MAX_STK_FAILURES {
-            lock_sign_in(&mut conn, &account.uuid).await?;
+        drop(conn);
+        if accounts::stk_attempt_failed(
+            &state.db,
+            &account.uuid,
+            attempt,
+            MAX_STK_FAILURES,
+            LOCK_SECONDS,
+        )
+        .await?
+        .is_some()
+        {
             tracing::warn!(silicon = %account.uuid, "Silicon sign-in locked after {MAX_STK_FAILURES} wrong STKs in a row");
             return Err(login_locked(&full, LOCK_SECONDS as u64));
         }
@@ -239,6 +238,7 @@ pub async fn login(
             ip: meta.ip.as_deref(),
             user_agent: meta.user_agent.as_deref(),
             nonce: None,
+            auth_time: None,
         },
     )
     .await?;
@@ -251,31 +251,6 @@ pub async fn login(
         serde_json::json!({"labelled": body.client_label.is_some()}),
     );
     Ok(Json(response))
-}
-
-/// Locks sign-in for [`LOCK_SECONDS`] and starts the failure count over.
-async fn lock_sign_in(conn: &mut PgConnection, uuid: &str) -> ApiResult<()> {
-    sqlx::query(
-        "update accounts set stk_locked_until = now() + make_interval(secs => $2), stk_failed_attempts = 0 \
-         where uuid = $1",
-    )
-    .bind(uuid)
-    .bind(LOCK_SECONDS as f64)
-    .execute(&mut *conn)
-    .await?;
-    Ok(())
-}
-
-/// Seconds left on the sign-in lock, if locked (database clock).
-async fn lock_remaining(conn: &mut PgConnection, uuid: &str) -> ApiResult<Option<u64>> {
-    let seconds: Option<f64> = sqlx::query_scalar(
-        "select extract(epoch from (stk_locked_until - now()))::float8 from accounts \
-         where uuid = $1 and stk_locked_until > now()",
-    )
-    .bind(uuid)
-    .fetch_optional(&mut *conn)
-    .await?;
-    Ok(seconds.map(|s| s.ceil().max(1.0) as u64))
 }
 
 /// Why a pending Silicon (right STK) can't sign in yet, from its row-locked pending request. An

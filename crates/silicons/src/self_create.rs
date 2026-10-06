@@ -24,8 +24,8 @@ use accounts_core::events;
 use accounts_core::http::{ClientMeta, IdempotencyKey, Json, Path};
 use accounts_core::models::AccountStatus;
 use accounts_core::repo::accounts::{self, NewSilicon};
-use accounts_core::repo::idempotency;
 use accounts_core::repo::rate_limit::{self, Limit};
+use accounts_core::repo::{idempotency, photos};
 use accounts_core::state::AppState;
 use accounts_core::views::load_me;
 use axum::extract::State;
@@ -38,7 +38,6 @@ use sqlx::PgConnection;
 
 use crate::common::{ensure_id_free, ensure_rate_room};
 use crate::history::Actor;
-use crate::idempotent;
 use crate::input::{self, CarbonTarget, check};
 use crate::notify::{self, Recipient};
 use crate::requests::{self, MAX_PENDING_PER_CUSTODIAN, NewRequest, kind};
@@ -95,7 +94,8 @@ pub async fn create(
         "/v1/silicons",
     );
     let fingerprint = idempotency_fingerprint(&body, &state.keys.pepper);
-    idempotent::run_secret(&state, key.as_deref(), &scope, &fingerprint, || {
+    // Secret-bearing: core stores the response sealed with the keyring (10-minute replay).
+    idempotency::run(&state, key.as_deref(), &scope, &fingerprint, true, || {
         self_create(&state, &meta, body)
     })
     .await
@@ -192,6 +192,11 @@ async fn self_create(
     let request_token = crypto::random_token(prefix::SILICON_REQUEST);
 
     let mut tx = state.db.begin().await?;
+    // A Silicon creating its own account has no uploads (and no custodian) yet: a photo of
+    // this service can't be its own.
+    if let Some(url) = &pfp_url {
+        photos::check_usable(&mut tx, settings, url, &[], "this new Silicon").await?;
+    }
     lock_recipient(&mut tx, &recipient).await?;
     // A Carbon named by c:id must still be there when the request is stored (it could have
     // deleted its account since it was resolved above).

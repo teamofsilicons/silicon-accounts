@@ -24,7 +24,7 @@
 //!
 //! Responses carrying a freshly generated secret (STK, `sarq_` request token, `whsec_` webhook
 //! secret) are replayable with an Idempotency-Key for 10 minutes and stored sealed with the
-//! keyring meanwhile, never in clear.
+//! keyring meanwhile, never in clear (core's `idempotency::run` with `secret_bearing`).
 //!
 //! Generic self-service (`GET/PATCH /v1/me`, `POST /v1/me/id`) for Silicons lives in the account
 //! crate. Shared rules (ids, STK format, events, delivery, extractors) come from `accounts_core`.
@@ -33,7 +33,6 @@ mod common;
 mod custodian;
 mod custodian_requests;
 mod history;
-mod idempotent;
 mod input;
 mod lifecycle;
 mod login;

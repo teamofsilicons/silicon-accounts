@@ -384,9 +384,15 @@ async fn deleted_accounts_are_history_without_data() {
         )
         .await
         .expect("external id");
-        accounts_core::repo::accounts::delete_account(&mut conn, &gone.uuid, &gone.uuid, true)
-            .await
-            .expect("delete");
+        accounts_core::repo::accounts::delete_account(
+            &mut conn,
+            &ctx.state.settings,
+            &gone.uuid,
+            &gone.uuid,
+            true,
+        )
+        .await
+        .expect("delete");
     }
 
     let page = list(&ctx, &a.app_id, &a.secret, "").await;

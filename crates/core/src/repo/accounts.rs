@@ -1,18 +1,38 @@
 //! Accounts: creation (uuid from `account_number_seq`), lookups, ids (availability, change,
-//! 10-day reservations, reclaim, history), profile updates, STK bookkeeping, deletion/release.
+//! 10-day reservations, reclaim, history, the per-day change limit), profile updates, finishing
+//! an imported account, the STK sign-in lock, deletion and releasing a Silicon that never became
+//! active.
 
 use serde::Serialize;
+use serde_json::json;
 use sqlx::{Connection, PgConnection, PgPool};
 use time::{Date, OffsetDateTime};
+use uuid::Uuid;
 
 use crate::config::Settings;
 use crate::error::{ApiError, ApiResult};
 use crate::ids::{AccountId, IdError, handle_candidates, uuid_for_number};
-use crate::models::{Account, AccountField, AccountKind, AccountStatus, VerifiedVia};
+use crate::models::{Account, AccountField, AccountKind, AccountStatus, ActorKind, VerifiedVia};
+use crate::repo::contacts::{self, ContactKind};
 use crate::repo::{audit, is_unique_violation};
+use crate::views::AccountSummary;
 
 /// Days an old id stays reserved for its previous owner.
 pub const HANDLE_RESERVATION_DAYS: i64 = 10;
+
+/// Most id changes one account can make in [`ID_CHANGE_WINDOW_SECONDS`], whoever makes them (a
+/// Silicon's custodian counts too) and including reclaims. Every change keeps the old id
+/// reserved for 10 days and notifies every member app, so without a limit one account could hold
+/// any number of ids and flood its apps with webhooks; with it, an account holds at most 50
+/// reserved ids at a time.
+pub const ID_CHANGES_PER_DAY: i64 = 5;
+/// The rolling window of [`ID_CHANGES_PER_DAY`]: 24 hours.
+pub const ID_CHANGE_WINDOW_SECONDS: i64 = 86_400;
+
+/// Consecutive wrong STKs that lock a Silicon's sign-in ([`begin_stk_attempt`]).
+pub const MAX_STK_FAILURES: i32 = 10;
+/// How long the STK sign-in lock lasts.
+pub const STK_LOCK_SECONDS: i64 = 60;
 
 /// Fetches an account by uuid (any status).
 pub async fn get(conn: &mut PgConnection, uuid: &str) -> ApiResult<Option<Account>> {
@@ -61,7 +81,10 @@ pub async fn by_handle(conn: &mut PgConnection, full_id: &str) -> ApiResult<Opti
     .await?)
 }
 
-/// The account that has this (normalized) email, verified or not.
+/// The account that has a row for this (normalized) email, **verified or not**: for uniqueness
+/// checks only. Never authenticate with it: an unverified row proves nothing about who someone
+/// is. Who an address signs in to is `repo::contacts::lookup` (verified addresses of active
+/// Carbons, and the addresses of an unfinished import).
 pub async fn by_email(conn: &mut PgConnection, email: &str) -> ApiResult<Option<Account>> {
     Ok(sqlx::query_as::<_, Account>(concat!(
         "select ",
@@ -73,7 +96,8 @@ pub async fn by_email(conn: &mut PgConnection, email: &str) -> ApiResult<Option<
     .await?)
 }
 
-/// The account that has this E.164 phone number, verified or not.
+/// The account that has a row for this E.164 phone number, **verified or not**: for uniqueness
+/// checks only (see [`by_email`]; authenticate with `repo::contacts::lookup`).
 pub async fn by_phone(conn: &mut PgConnection, phone: &str) -> ApiResult<Option<Account>> {
     Ok(sqlx::query_as::<_, Account>(concat!(
         "select ",
@@ -123,7 +147,8 @@ pub async fn list_silicons_in_custody(
     .await?)
 }
 
-/// A contact to attach at creation. `verified_via: None` = unverified (imports only).
+/// A contact to attach at creation. `verified_via: None` = unverified, which only an `unclaimed`
+/// (imported) account may have.
 #[derive(Debug, Clone)]
 pub struct NewContact {
     /// Normalized email or E.164 phone.
@@ -173,8 +198,9 @@ pub struct NewSilicon {
 
 /// Creates a Carbon: takes the next uuid, claims the id, attaches emails/phones.
 ///
-/// Errors: 422 `invalid_id` (not a c: id), 409 `id_taken` (with `details.suggestions`),
-/// 409 `id_reserved`, 409 `email_in_use` / `phone_in_use`.
+/// Errors: 422 `invalid_id` (not a c: id), 422 `email_limit_reached` / `phone_limit_reached`
+/// (more than 10 of a kind), 409 `id_taken` (with `details.suggestions`), 409 `id_reserved`,
+/// 409 `email_in_use` / `phone_in_use`.
 pub async fn create_carbon(
     conn: &mut PgConnection,
     settings: &Settings,
@@ -191,6 +217,36 @@ pub async fn create_carbon(
             "create_carbon called with status {}",
             new.status
         )));
+    }
+    for (kind, list) in [
+        (ContactKind::Email, &new.emails),
+        (ContactKind::Phone, &new.phones),
+    ] {
+        if list.len() as i64 > contacts::MAX_PER_KIND {
+            return Err(ApiError::unprocessable(
+                format!("{}_limit_reached", kind.code()),
+                format!(
+                    "An account can have at most {} {}s, but {} were given.",
+                    contacts::MAX_PER_KIND,
+                    kind.noun(),
+                    list.len()
+                ),
+            )
+            .hint(format!(
+                "Keep at most {} {}s for the account; the others can be added later.",
+                contacts::MAX_PER_KIND,
+                kind.noun()
+            ))
+            .detail("limit", contacts::MAX_PER_KIND));
+        }
+        // Unverified addresses exist only on imported accounts nobody finished yet.
+        if new.status != AccountStatus::Unclaimed && list.iter().any(|c| c.verified_via.is_none()) {
+            return Err(ApiError::internal(format!(
+                "create_carbon: an unverified {} on a new {} account",
+                kind.noun(),
+                new.status
+            )));
+        }
     }
     let mut tx = conn.begin().await?;
     let full = new.id.to_string();
@@ -478,10 +534,15 @@ pub struct IdChange {
 
 /// Changes an account's id. The old id is reserved for 10 days for this account; reclaiming one
 /// of the account's own reserved ids removes that reservation. Bumps `version` and writes
-/// `handle_history`. Emit the webhooks (`events::account_id_changed`) after this succeeds.
+/// `handle_history`. Emit the webhooks (`events::notify_id_changed`) after this succeeds.
+///
+/// At most [`ID_CHANGES_PER_DAY`] changes per rolling 24 hours, counted from `handle_history`
+/// under the account's row lock (so concurrent changes are counted exactly), whoever makes them.
+/// Asking for the current id again changes nothing and never counts.
 ///
 /// Errors: 404 `account_not_found`, 409 `account_deleted`, 422 `invalid_id` (wrong prefix),
-/// 409 `id_taken` (with `details.suggestions`), 409 `id_reserved`.
+/// 429 `rate_limited` (with `Retry-After`, `details.retry_at`), 409 `id_taken` (with
+/// `details.suggestions`), 409 `id_reserved`.
 pub async fn change_id(
     conn: &mut PgConnection,
     account_uuid: &str,
@@ -524,6 +585,7 @@ pub async fn change_id(
             reclaimed: false,
         });
     }
+    check_id_change_budget(&mut tx, &account).await?;
     lock_handles(&mut tx, &[&old, &new_full]).await?;
     let claim = ensure_claimable(&mut tx, new_id, Some(account_uuid)).await?;
     if claim == Claim::ReclaimOwn {
@@ -551,6 +613,50 @@ pub async fn change_id(
         changed: true,
         reclaimed: claim == Claim::ReclaimOwn,
     })
+}
+
+/// Refuses a new id change when the account's id already changed [`ID_CHANGES_PER_DAY`] times
+/// in the last 24 hours (429 `rate_limited`). The caller holds the account's row lock.
+async fn check_id_change_budget(conn: &mut PgConnection, account: &Account) -> ApiResult<()> {
+    let (recent, retry_seconds, retry_at): (i64, Option<f64>, Option<OffsetDateTime>) =
+        sqlx::query_as(
+            "select count(*), \
+                    extract(epoch from (min(changed_at) + make_interval(secs => $2) - now()))::float8, \
+                    min(changed_at) + make_interval(secs => $2) \
+               from (select changed_at from handle_history \
+                      where account_uuid = $1 and old_handle is not null and new_handle is not null \
+                        and changed_at > now() - make_interval(secs => $2) \
+                      order by changed_at desc limit $3) recent",
+        )
+        .bind(&account.uuid)
+        .bind(ID_CHANGE_WINDOW_SECONDS as f64)
+        .bind(ID_CHANGES_PER_DAY)
+        .fetch_one(&mut *conn)
+        .await?;
+    if recent < ID_CHANGES_PER_DAY {
+        return Ok(());
+    }
+    // With `limit` the oldest row kept is the change that has to leave the window first.
+    let retry = retry_seconds
+        .map(|s| s.ceil().max(1.0) as u64)
+        .unwrap_or(ID_CHANGE_WINDOW_SECONDS as u64);
+    let when = retry_at
+        .map(crate::timefmt::format_rfc3339_ms)
+        .unwrap_or_else(|| format!("in {retry} seconds"));
+    Err(ApiError::rate_limited(
+        format!(
+            "{} has already changed its id {ID_CHANGES_PER_DAY} times in the last 24 hours, which is the most an account can. Every change keeps the old id reserved for 10 days, so changes are limited to {ID_CHANGES_PER_DAY} per 24 hours.",
+            account.display_id()
+        ),
+        retry,
+    )
+    .hint(format!(
+        "Try again at {when} ({retry} seconds from now); {} stays the id until then.",
+        account.display_id()
+    ))
+    .detail("limit", ID_CHANGES_PER_DAY)
+    .detail("window_seconds", ID_CHANGE_WINDOW_SECONDS)
+    .detail("retry_at", retry_at.map(crate::timefmt::format_rfc3339_ms)))
 }
 
 /// Validated profile changes (`None` = keep). Validate inputs with `normalize::*` first.
@@ -684,14 +790,23 @@ pub async fn set_custodian(
 
 /// Replaces a Silicon's STK hash: the old STK stops working immediately; failures reset.
 /// Returns `stk_rotated_at`.
+///
+/// `stk_rotated_at` is the statement's clock (`clock_timestamp()`), taken once the Silicon's row
+/// is locked by this update, not the start of the caller's transaction (`now()`). The token
+/// endpoint refuses a short-lived token whose `created_at` is not later than `stk_rotated_at`
+/// (it was minted by a sign-in the rotation ended), and every SLT is stored under a share lock
+/// on this row: an SLT stored before the rotation committed before this lock was granted, so
+/// it is older than this stamp. With the transaction's start time instead, an SLT whose
+/// transaction began after the rotation's but committed before the rotation got the lock would
+/// look newer than the rotation and stay usable.
 pub async fn set_stk(
     conn: &mut PgConnection,
     silicon_uuid: &str,
     stk_hash: &str,
 ) -> ApiResult<OffsetDateTime> {
     let at: Option<OffsetDateTime> = sqlx::query_scalar(
-        "update accounts set stk_hash = $2, stk_rotated_at = now(), stk_failed_attempts = 0, stk_locked_until = null, \
-         updated_at = now() where uuid = $1 and kind = 'silicon' returning stk_rotated_at",
+        "update accounts set stk_hash = $2, stk_rotated_at = clock_timestamp(), stk_failed_attempts = 0, \
+         stk_locked_until = null, updated_at = now() where uuid = $1 and kind = 'silicon' returning stk_rotated_at",
     )
     .bind(silicon_uuid)
     .bind(stk_hash)
@@ -706,33 +821,96 @@ pub async fn set_stk(
     })
 }
 
-/// Records a wrong STK. After `max_failures` consecutive failures the login locks for
-/// `lock_seconds` and the counter restarts. Returns the lock expiry when this failure locked it.
-/// Takes the pool so the failure persists even though the request fails.
-pub async fn record_stk_failure(
+/// The answer of [`begin_stk_attempt`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StkAttempt {
+    /// Check the STK now. `attempt` is this attempt's place in the current run of failures
+    /// (1-based, already counted); report a wrong STK with [`stk_attempt_failed`].
+    Check { attempt: i32 },
+    /// Sign-in is locked (`login_locked`) for this many more seconds; don't check the STK.
+    Locked { retry_after_seconds: u64 },
+}
+
+/// Charges one sign-in attempt to a Silicon **before** its STK is checked, atomically: one
+/// statement counts the attempt unless sign-in is locked. So a burst of parallel guesses gets at
+/// most `max_failures` STK checks per lock window, however many arrive at once: the attempt
+/// beyond `max_failures` locks sign-in for `lock_seconds` right away, without being checked.
+///
+/// Then: a right STK → [`clear_stk_failures`] (inside the sign-in's transaction is fine); a
+/// wrong one → [`stk_attempt_failed`] with the returned `attempt`. Takes the pool: the charge
+/// must stick even though the request fails. Times are the database clock.
+pub async fn begin_stk_attempt(
     pool: &PgPool,
     silicon_uuid: &str,
     max_failures: i32,
     lock_seconds: i64,
-) -> ApiResult<Option<OffsetDateTime>> {
-    let row: Option<(i32, Option<OffsetDateTime>)> = sqlx::query_as(
-        "update accounts set \
-           stk_failed_attempts = case when stk_failed_attempts + 1 >= $2 then 0 else stk_failed_attempts + 1 end, \
-           stk_locked_until = case when stk_failed_attempts + 1 >= $2 then now() + make_interval(secs => $3) else stk_locked_until end \
-         where uuid = $1 returning stk_failed_attempts, stk_locked_until",
+) -> ApiResult<StkAttempt> {
+    let mut conn = pool.acquire().await?;
+    let attempt: Option<i32> = sqlx::query_scalar(
+        "update accounts set stk_failed_attempts = stk_failed_attempts + 1 \
+         where uuid = $1 and (stk_locked_until is null or stk_locked_until <= now()) \
+         returning stk_failed_attempts",
     )
     .bind(silicon_uuid)
-    .bind(max_failures)
-    .bind(lock_seconds as f64)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?;
-    Ok(match row {
-        Some((0, Some(until))) => Some(until),
-        _ => None,
-    })
+    let Some(attempt) = attempt else {
+        let seconds: Option<f64> = sqlx::query_scalar(
+            "select extract(epoch from (stk_locked_until - now()))::float8 from accounts \
+             where uuid = $1 and stk_locked_until > now()",
+        )
+        .bind(silicon_uuid)
+        .fetch_optional(&mut *conn)
+        .await?;
+        return Ok(StkAttempt::Locked {
+            retry_after_seconds: seconds.map(|s| s.ceil().max(1.0) as u64).unwrap_or(1),
+        });
+    };
+    if attempt > max_failures {
+        // More guesses in flight than the lock allows: lock now without checking this one.
+        lock_stk_sign_in(&mut conn, silicon_uuid, lock_seconds).await?;
+        return Ok(StkAttempt::Locked {
+            retry_after_seconds: lock_seconds.max(1) as u64,
+        });
+    }
+    Ok(StkAttempt::Check { attempt })
 }
 
-/// Clears STK failure tracking after a successful login.
+/// Reports that the STK of attempt `attempt` (from [`begin_stk_attempt`]) was wrong. The
+/// attempt was already counted; when it was the `max_failures`th in a row, sign-in locks for
+/// `lock_seconds` (the count starts over) and the lock's end is returned.
+pub async fn stk_attempt_failed(
+    pool: &PgPool,
+    silicon_uuid: &str,
+    attempt: i32,
+    max_failures: i32,
+    lock_seconds: i64,
+) -> ApiResult<Option<OffsetDateTime>> {
+    if attempt < max_failures {
+        return Ok(None);
+    }
+    let mut conn = pool.acquire().await?;
+    lock_stk_sign_in(&mut conn, silicon_uuid, lock_seconds)
+        .await
+        .map(Some)
+}
+
+async fn lock_stk_sign_in(
+    conn: &mut PgConnection,
+    silicon_uuid: &str,
+    lock_seconds: i64,
+) -> ApiResult<OffsetDateTime> {
+    Ok(sqlx::query_scalar(
+        "update accounts set stk_locked_until = now() + make_interval(secs => $2), stk_failed_attempts = 0 \
+         where uuid = $1 returning stk_locked_until",
+    )
+    .bind(silicon_uuid)
+    .bind(lock_seconds as f64)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Clears STK failure tracking after a successful sign-in.
 pub async fn clear_stk_failures(conn: &mut PgConnection, silicon_uuid: &str) -> ApiResult<()> {
     sqlx::query(
         "update accounts set stk_failed_attempts = 0, stk_locked_until = null where uuid = $1 \
@@ -763,6 +941,92 @@ pub async fn set_silicon_webhook(
     .await?)
 }
 
+/// What [`finish_claim`] did.
+#[derive(Debug, Clone)]
+pub struct ClaimFinished {
+    /// The account, now active.
+    pub account: Account,
+    /// `email` / `phone` when the primary of that kind changed or became verified (apps holding
+    /// that scope must hear about it, with the caller's other changes).
+    pub changed: Vec<AccountField>,
+}
+
+/// Finishes an `unclaimed` Carbon an app imported, for the Carbon who just proved `proven`
+/// (each `(kind, normalized value, how)`): every proven address becomes verified (added when it
+/// isn't on the account; primary when the primary of its kind isn't verified), **every other
+/// unverified email and phone is removed** (the import listed them and nobody proved them: an
+/// unproven address must never sign anyone into this account; the importing app keeps its copy
+/// in `memberships.imported_profile`), the status becomes `active` and `version` bumps when an
+/// address changed. One transaction (a savepoint inside the caller's).
+///
+/// Profile and id changes are the caller's (`update_profile`, `change_id`), as are the webhooks
+/// (`events::notify_profile_updated` with [`ClaimFinished::changed`] and the profile fields).
+///
+/// Errors: 404 `account_not_found`, 409 `account_not_unclaimed` (someone finished it already,
+/// or it isn't an imported Carbon), and [`contacts::add_verified`]'s errors for a proven address
+/// another account holds.
+pub async fn finish_claim(
+    conn: &mut PgConnection,
+    account_uuid: &str,
+    proven: &[(ContactKind, &str, VerifiedVia)],
+) -> ApiResult<ClaimFinished> {
+    let mut tx = conn.begin().await?;
+    let current = lock(&mut tx, account_uuid).await?.ok_or_else(|| {
+        ApiError::not_found(
+            "account_not_found",
+            format!("No account has the uuid '{account_uuid}'."),
+        )
+    })?;
+    if current.kind != AccountKind::Carbon || current.status != AccountStatus::Unclaimed {
+        tx.rollback().await?;
+        return Err(ApiError::conflict(
+            "account_not_unclaimed",
+            format!(
+                "{} is {}, not an imported account waiting to be finished, so it can't be claimed.",
+                current.display_id(),
+                current.status
+            ),
+        )
+        .hint("Sign in with the account instead."));
+    }
+    let mut changed: Vec<AccountField> = Vec::new();
+    for (kind, value, via) in proven {
+        if contacts::prove(&mut tx, *kind, account_uuid, value, *via).await?
+            && !changed.contains(&kind.field())
+        {
+            changed.push(kind.field());
+        }
+    }
+    for field in contacts::drop_unverified(&mut tx, account_uuid).await? {
+        if !changed.contains(&field) {
+            changed.push(field);
+        }
+    }
+    let account = sqlx::query_as::<_, Account>(concat!(
+        "update accounts set status = 'active', updated_at = now(), \
+           version = version + case when $2 then 1 else 0 end \
+         where uuid = $1 returning ",
+        crate::account_columns!()
+    ))
+    .bind(account_uuid)
+    .bind(!changed.is_empty())
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(ClaimFinished { account, changed })
+}
+
+/// A self-created Silicon released by [`delete_account`] because the Carbon it named as its
+/// custodian was deleted before accepting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReleasedSilicon {
+    pub uuid: String,
+    /// The si:id it had (now free, without a reservation).
+    pub old_id: Option<String>,
+    /// Its initial custodian request (now `cancelled`).
+    pub request_id: Uuid,
+}
+
 /// What [`delete_account`] did.
 #[derive(Debug, Clone)]
 pub struct DeletedAccount {
@@ -772,21 +1036,57 @@ pub struct DeletedAccount {
     pub old_id: Option<String>,
     pub revoked_families: u64,
     pub revoked_proofs: u64,
+    /// Uploaded photos deleted (those no other account shows).
+    pub deleted_photos: u64,
+    /// Self-created Silicons that were waiting for this Carbon to accept them.
+    pub released_silicons: Vec<ReleasedSilicon>,
+    /// False when the account was already deleted (nothing was done).
+    pub deleted_now: bool,
 }
 
-/// Deletes an account: status `deleted`, id reserved for 10 days (`reserve_id = true`) or
-/// released immediately (`false`: a Silicon whose custodian declined / never accepted), emails,
-/// phones and identities removed, browser sessions, token families and OBO proofs revoked,
-/// pending custodian requests cancelled, STK and Silicon webhook cleared. Memberships stay as
-/// history. Idempotent for already-deleted accounts. Check custody rules and emit
-/// `events::account_deleted` in the caller.
+/// Deletes an account, all in one transaction (a savepoint inside the caller's):
+///
+/// - status `deleted`, `version` bumps; the id is reserved for 10 days (`reserve_id`), or
+///   released at once (`false`);
+/// - emails, phones and Google/Apple identities removed; browser sessions, token families
+///   (`account_deleted`) and the OBO proofs about the account revoked (each with a
+///   `proof.revoked` audit entry);
+/// - the photo back to the Iris default, and its uploads that no other account shows deleted;
+/// - memberships stay as the apps' history, without the personal data an app imported
+///   (`imported_profile`; the app's own `external_id` stays, so it can match the deletion to its
+///   records); every app with a live membership gets `account.deleted` (emitted here);
+/// - a Silicon's STK is cleared, but its **webhook is kept**: the worker delivers to a target's
+///   current webhook, and events emitted before the deletion must still reach it;
+/// - a Carbon's pending custodian requests are cancelled. A Silicon that self-created naming
+///   this Carbon can never be accepted now: it is told on its webhook
+///   (`silicon.custodian.declined`, reason `custodian_account_deleted`) and released like a
+///   decline ([`release_silicon`]; returned in [`DeletedAccount::released_silicons`], audit
+///   `silicon.custodian_request.closed`).
+///
+/// "Every Silicon always has exactly one custodian": a Carbon who is still the custodian of a
+/// Silicon that isn't deleted can't be deleted (409 `custodian_of_silicons`, `details.silicons`).
+/// The check runs under the Carbon's row lock, and accepting a Silicon (or a transfer)
+/// share-locks the accepting Carbon's row, so the two serialize.
+///
+/// Lock order: the pending custodian requests addressed to the account first, then the account
+/// row (the order accepting or expiring a request uses). Idempotent: an already deleted account
+/// is left as it is (`deleted_now: false`).
 pub async fn delete_account(
     conn: &mut PgConnection,
+    settings: &Settings,
     account_uuid: &str,
     actor: &str,
     reserve_id: bool,
 ) -> ApiResult<DeletedAccount> {
     let mut tx = conn.begin().await?;
+    // Lock order: the pending requests addressed to the account first (accepting or expiring a
+    // request locks the request before anything else), then the account.
+    sqlx::query(
+        "select id from custodian_requests where status = 'pending' and to_uuid = $1 order by id for update",
+    )
+    .bind(account_uuid)
+    .fetch_all(&mut *tx)
+    .await?;
     let before = lock(&mut tx, account_uuid).await?.ok_or_else(|| {
         ApiError::not_found(
             "account_not_found",
@@ -800,18 +1100,94 @@ pub async fn delete_account(
             before,
             revoked_families: 0,
             revoked_proofs: 0,
+            deleted_photos: 0,
+            released_silicons: Vec::new(),
+            deleted_now: false,
         });
+    }
+    if before.kind == AccountKind::Carbon {
+        let silicons = list_silicons_in_custody(&mut tx, account_uuid).await?;
+        if !silicons.is_empty() {
+            tx.rollback().await?;
+            return Err(custodian_of_silicons(&before, &silicons));
+        }
     }
     let old = before.handle.clone();
     if let Some(h) = &old {
         lock_handles(&mut tx, &[h]).await?;
     }
+    // Silicons waiting for this Carbon are told while both still have their ids. Read under the
+    // account's lock: a self-creation naming this Carbon share-locks its row before it stores
+    // its request, so every such request has committed by now and none is left out.
+    let waiting: Vec<(Uuid, String)> = sqlx::query_as(
+        "select id, silicon_uuid from custodian_requests \
+         where status = 'pending' and to_uuid = $1 and kind = 'initial' order by id for update",
+    )
+    .bind(account_uuid)
+    .fetch_all(&mut *tx)
+    .await?;
+    let custodian_label = old.clone().unwrap_or_else(|| account_uuid.to_string());
+    let mut released_silicons = Vec::new();
+    for (request_id, silicon_uuid) in &waiting {
+        let Some(silicon) = lock(&mut tx, silicon_uuid).await? else {
+            continue;
+        };
+        if silicon.status != AccountStatus::PendingCustodian {
+            continue;
+        }
+        let decided_at: OffsetDateTime = sqlx::query_scalar(
+            "update custodian_requests set status = 'cancelled', decided_at = now(), decided_by = $2 \
+             where id = $1 returning decided_at",
+        )
+        .bind(request_id)
+        .bind(account_uuid)
+        .fetch_one(&mut *tx)
+        .await?;
+        crate::events::silicon_custodian_declined(
+            &mut tx,
+            &silicon,
+            *request_id,
+            &custodian_label,
+            Some(decided_at),
+            crate::events::declined_reason::CUSTODIAN_ACCOUNT_DELETED,
+        )
+        .await?;
+        let released_id = release_silicon(&mut tx, silicon_uuid, "system").await?;
+        audit::record(
+            &mut tx,
+            &audit::AuditEntry {
+                target_kind: Some("silicon"),
+                target_id: Some(silicon_uuid),
+                account_uuid: Some(silicon_uuid),
+                details: json!({
+                    "request_id": request_id.to_string(),
+                    "reason": crate::events::declined_reason::CUSTODIAN_ACCOUNT_DELETED,
+                    "custodian": custodian_label,
+                    "released_id": released_id,
+                }),
+                ..audit::AuditEntry::new(
+                    ActorKind::System,
+                    None,
+                    "silicon.custodian_request.closed",
+                )
+            },
+        )
+        .await?;
+        released_silicons.push(ReleasedSilicon {
+            uuid: silicon_uuid.clone(),
+            old_id: released_id,
+            request_id: *request_id,
+        });
+    }
+    let default_pfp =
+        crate::pfp::default_pfp_url(&settings.iris_base_url, before.kind, account_uuid);
     sqlx::query(
         "update accounts set status = 'deleted', handle = null, deleted_at = now(), updated_at = now(), \
          version = version + 1, stk_hash = null, stk_failed_attempts = 0, stk_locked_until = null, \
-         webhook_url = null, webhook_secret_enc = null where uuid = $1",
+         pfp_url = $2 where uuid = $1",
     )
     .bind(account_uuid)
+    .bind(&default_pfp)
     .execute(&mut *tx)
     .await?;
     if let Some(h) = &old {
@@ -840,14 +1216,17 @@ pub async fn delete_account(
     .execute(&mut *tx)
     .await?
     .rows_affected();
-    let revoked_proofs = sqlx::query(
-        "update proof_families set revoked_at = now(), revoked_by = 'system', revoke_reason = 'account_deleted' \
-         where account_uuid = $1 and revoked_at is null",
+    let revoked_proofs = revoke_proofs(
+        &mut tx,
+        "account_uuid = $1",
+        account_uuid,
+        None,
+        "system",
+        "account_deleted",
+        ActorKind::System,
+        None,
     )
-    .bind(account_uuid)
-    .execute(&mut *tx)
-    .await?
-    .rows_affected();
+    .await?;
     sqlx::query(
         "update custodian_requests set status = 'cancelled', decided_at = now(), decided_by = $1 \
          where status = 'pending' and (silicon_uuid = $1 or to_uuid = $1)",
@@ -855,23 +1234,148 @@ pub async fn delete_account(
     .bind(account_uuid)
     .execute(&mut *tx)
     .await?;
+    sqlx::query(
+        "update memberships set imported_profile = null, updated_at = now() \
+         where account_uuid = $1 and imported_profile is not null",
+    )
+    .bind(account_uuid)
+    .execute(&mut *tx)
+    .await?;
+    let deleted_photos = crate::repo::photos::prune(&mut tx, settings, account_uuid).await?;
+    crate::events::account_deleted(&mut tx, account_uuid).await?;
     tx.commit().await?;
     Ok(DeletedAccount {
         before,
         old_id: old,
         revoked_families,
         revoked_proofs,
+        deleted_photos,
+        released_silicons,
+        deleted_now: true,
     })
 }
 
-/// Releases a Silicon that never became active (custodian declined or never accepted): deleted,
-/// id free immediately (no reservation).
+/// 409 `custodian_of_silicons`: a Carbon who still has Silicons in custody can't be deleted.
+fn custodian_of_silicons(carbon: &Account, silicons: &[Account]) -> ApiError {
+    let ids: Vec<String> = silicons.iter().map(|s| s.display_id()).collect();
+    let summaries: Vec<AccountSummary> =
+        silicons.iter().map(AccountSummary::from_account).collect();
+    ApiError::conflict(
+        "custodian_of_silicons",
+        format!(
+            "{} is the custodian of {} Silicon(s) ({}), and every Silicon must always have a custodian, so the account can't be deleted yet.",
+            carbon.display_id(),
+            silicons.len(),
+            ids.join(", ")
+        ),
+    )
+    .hint("Transfer each Silicon to another Carbon (POST /v1/me/silicons/{uuid}/transfer, accepted by them) or delete it (DELETE /v1/me/silicons/{uuid}), then delete the account.")
+    .detail("silicons", serde_json::to_value(summaries).unwrap_or_default())
+}
+
+/// Revokes the live proofs matching `filter` (`account_uuid = $1`, optionally `and issuing_app =
+/// $2`) with `reason`, each with a `proof.revoked` audit entry (target `proof`, the issuing app,
+/// the account; details `{kind, reason, via, audiences, revoked_at}`) like the proofs crate
+/// writes for its own revocations. One statement, so a proof is never revoked without its entry.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn revoke_proofs(
+    conn: &mut PgConnection,
+    filter: &'static str,
+    account_uuid: &str,
+    issuing_app: Option<&str>,
+    revoked_by: &str,
+    reason: &str,
+    actor_kind: ActorKind,
+    actor_id: Option<&str>,
+) -> ApiResult<u64> {
+    let sql = format!(
+        "with revoked as ( \
+           update proof_families f set revoked_at = now(), revoked_by = $3, revoke_reason = $4 \
+            where {filter} and ($2::text is null or issuing_app = $2) and revoked_at is null \
+           returning f.id, f.kind, f.issuing_app, f.account_uuid, f.audiences, f.revoked_at) \
+         insert into audit_log (actor_kind, actor_id, action, target_kind, target_id, app_id, account_uuid, details) \
+         select $5, $6, 'proof.revoked', 'proof', r.id::text, r.issuing_app, r.account_uuid, \
+                jsonb_build_object('kind', r.kind, 'reason', $4::text, 'via', $4::text, 'audiences', r.audiences, \
+                  'revoked_at', to_char(r.revoked_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')) \
+           from revoked r"
+    );
+    Ok(sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(account_uuid)
+        .bind(issuing_app)
+        .bind(revoked_by)
+        .bind(reason)
+        .bind(actor_kind)
+        .bind(actor_id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected())
+}
+
+/// Releases a self-created Silicon that never became active (its custodian declined, never
+/// accepted within 14 days, or deleted their account before answering): status `deleted`, the
+/// id freed at once (no reservation: it was never active), the STK cleared, `handle_history`
+/// written, any still-pending request of the Silicon cancelled (decided by `actor`). Returns the
+/// released id, or `None` when the Silicon isn't waiting for a custodian (nothing is done).
+///
+/// Its webhook URL and secret are **kept**: the `silicon.custodian.declined` / `.expired` event
+/// is delivered by the worker to the Silicon's *current* webhook, after this commits.
+///
+/// Order for the decline and expiry handlers: decide the request first (`declined` /
+/// `expired`), emit the event while the Silicon still has its id, then release. Releasing first
+/// would cancel the still-pending request.
 pub async fn release_silicon(
     conn: &mut PgConnection,
     silicon_uuid: &str,
     actor: &str,
-) -> ApiResult<DeletedAccount> {
-    delete_account(conn, silicon_uuid, actor, false).await
+) -> ApiResult<Option<String>> {
+    let mut tx = conn.begin().await?;
+    let Some(silicon) = lock(&mut tx, silicon_uuid).await? else {
+        tx.commit().await?;
+        return Ok(None);
+    };
+    if silicon.kind != AccountKind::Silicon || silicon.status != AccountStatus::PendingCustodian {
+        tx.commit().await?;
+        return Ok(None);
+    }
+    let old = silicon.handle.clone();
+    if let Some(h) = &old {
+        lock_handles(&mut tx, &[h]).await?;
+    }
+    sqlx::query(
+        "update accounts set status = 'deleted', handle = null, deleted_at = now(), updated_at = now(), \
+         version = version + 1, stk_hash = null, stk_failed_attempts = 0, stk_locked_until = null \
+         where uuid = $1",
+    )
+    .bind(silicon_uuid)
+    .execute(&mut *tx)
+    .await?;
+    if let Some(h) = &old {
+        audit::handle_history(&mut tx, silicon_uuid, Some(h), None, actor).await?;
+    }
+    // A waiting Silicon can't sign in, so these find nothing; they make sure of it.
+    sqlx::query(
+        "update token_families set revoked_at = now(), revoke_reason = 'account_released' \
+         where account_uuid = $1 and revoked_at is null",
+    )
+    .bind(silicon_uuid)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        "update browser_sessions set revoked_at = now() where account_uuid = $1 and revoked_at is null",
+    )
+    .bind(silicon_uuid)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        "update custodian_requests set status = 'cancelled', decided_at = now(), decided_by = $2 \
+         where silicon_uuid = $1 and status = 'pending'",
+    )
+    .bind(silicon_uuid)
+    .bind(actor)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(old)
 }
 
 /// The live reservation of an id: (holder uuid, reserved_until).

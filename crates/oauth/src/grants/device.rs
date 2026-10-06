@@ -76,6 +76,7 @@ pub(crate) async fn exchange(
             ip: meta.ip.as_deref(),
             user_agent: meta.user_agent.as_deref(),
             nonce: None,
+            auth_time: None,
         },
     )
     .await?;

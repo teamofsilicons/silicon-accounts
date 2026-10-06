@@ -405,8 +405,8 @@ pub async fn load_account_for_app(
     ))
 }
 
-/// The token endpoint response.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// The token endpoint response. `Debug` never prints the tokens themselves.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TokenResponse {
     pub access_token: String,
     pub token_type: String,
@@ -419,6 +419,22 @@ pub struct TokenResponse {
     pub id_token: Option<String>,
     pub membership_id: String,
     pub account: AccountForApp,
+}
+
+impl std::fmt::Debug for TokenResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TokenResponse")
+            .field("access_token", &"[redacted]")
+            .field("token_type", &self.token_type)
+            .field("expires_in", &self.expires_in)
+            .field("refresh_token", &"[redacted]")
+            .field("refresh_token_expires_at", &self.refresh_token_expires_at)
+            .field("scope", &self.scope)
+            .field("id_token", &self.id_token.as_ref().map(|_| "[redacted]"))
+            .field("membership_id", &self.membership_id)
+            .field("account", &self.account)
+            .finish()
+    }
 }
 
 /// `{"app_id","name","logo_url","logo_dark_url","homepage_url"}`.

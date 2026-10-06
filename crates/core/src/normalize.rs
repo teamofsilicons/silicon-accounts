@@ -5,7 +5,8 @@
 //! - timezones: [`normalize_timezone`] (IANA, canonical case)
 //! - names and dates: [`validate_display_name`], [`validate_dob`], [`default_dob`],
 //!   [`parse_date_flexible`] (imports)
-//! - URLs: [`validate_https_url`], [`validate_pfp_url`], [`validate_webhook_url`], [`is_public_ip`]
+//! - URLs: [`validate_https_url`], [`validate_pfp_url`], [`validate_webhook_url`]
+//! - the webhook SSRF guard: [`is_public_ip`], [`resolve_checked`] ([`BlockedAddress`])
 //! - suggestions: [`display_name_from_email`], [`display_name_from_phone`]
 
 use std::fmt;
@@ -376,11 +377,14 @@ pub fn parse_date_flexible(input: &str) -> Result<Date, String> {
         .map_err(|_| format!("'{s}' is not a real calendar date"))
 }
 
-/// Validates an absolute https URL (≤ 2048 chars, no credentials).
+/// The longest URL accepted anywhere (photos, webhooks), counted as it is stored.
+pub const MAX_URL_LEN: usize = 2048;
+
+/// Validates an absolute https URL (≤ 2048 chars as stored, no credentials).
 pub fn validate_https_url(input: &str) -> Result<Url, String> {
     let s = input.trim();
-    if s.len() > 2048 {
-        return Err("the URL is longer than 2048 characters".into());
+    if s.len() > MAX_URL_LEN {
+        return Err(format!("the URL is longer than {MAX_URL_LEN} characters"));
     }
     let u = Url::parse(s)
         .map_err(|_| format!("'{s}' is not an absolute URL like https://example.com/image.png"))?;
@@ -393,25 +397,39 @@ pub fn validate_https_url(input: &str) -> Result<Url, String> {
     if !u.username().is_empty() || u.password().is_some() {
         return Err(format!("'{s}' must not contain credentials"));
     }
+    // Non-ASCII input is percent-encoded when stored, which can make it much longer.
+    if u.as_str().len() > MAX_URL_LEN {
+        return Err(format!(
+            "the URL is longer than {MAX_URL_LEN} characters once encoded ({} characters); shorten it",
+            u.as_str().len()
+        ));
+    }
     Ok(u)
 }
 
-/// Validates a profile photo URL: https, or a photo served by this service (under PUBLIC_URL).
+/// Validates a profile photo URL: an https URL, or a photo served by this service written
+/// exactly as `POST /v1/me/photo` returns it (`{PUBLIC_URL}/v1/photos/{photo_id}`, see
+/// [`crate::pfp::photo_ref`]). Whether such a photo may be used by an account (its own upload,
+/// or its custodian's) is checked against the database by `repo::photos::check_usable`.
 pub fn validate_pfp_url(settings: &Settings, input: &str) -> Result<String, String> {
     let s = input.trim();
-    if s.starts_with(&format!("{}/v1/photos/", settings.public_url)) {
-        return Ok(s.to_string());
+    match crate::pfp::photo_ref(settings, s) {
+        crate::pfp::PhotoRef::Exact(_) => Ok(s.to_string()),
+        crate::pfp::PhotoRef::Inexact(problem) => Err(problem),
+        crate::pfp::PhotoRef::External => validate_https_url(s).map(|u| u.to_string()),
     }
-    validate_https_url(s).map(|u| u.to_string())
 }
 
 /// Validates a webhook URL. With `webhook_allow_private` (dev/test) http and private hosts are
-/// fine; otherwise it must be https and must not name a private, loopback or link-local IP.
-/// (Hostnames are re-checked after DNS resolution at delivery time.)
+/// fine; otherwise it must be https and must not name a local host or a literal IP that isn't
+/// public ([`is_public_ip`]). Host names are checked again at delivery time, after DNS
+/// resolution ([`resolve_checked`]).
 pub fn validate_webhook_url(settings: &Settings, input: &str) -> Result<Url, String> {
     let s = input.trim();
-    if s.len() > 2048 {
-        return Err("the webhook URL is longer than 2048 characters".into());
+    if s.len() > MAX_URL_LEN {
+        return Err(format!(
+            "the webhook URL is longer than {MAX_URL_LEN} characters"
+        ));
     }
     let u = Url::parse(s)
         .map_err(|_| format!("'{s}' is not an absolute URL like https://example.com/webhooks"))?;
@@ -420,6 +438,11 @@ pub fn validate_webhook_url(settings: &Settings, input: &str) -> Result<Url, Str
     }
     if !u.username().is_empty() || u.password().is_some() {
         return Err(format!("'{s}' must not contain credentials"));
+    }
+    if u.as_str().len() > MAX_URL_LEN {
+        return Err(format!(
+            "the webhook URL is longer than {MAX_URL_LEN} characters once encoded"
+        ));
     }
     let host = u.host_str().ok_or_else(|| format!("'{s}' has no host"))?;
     if settings.webhook_allow_private {
@@ -440,7 +463,13 @@ pub fn validate_webhook_url(settings: &Settings, input: &str) -> Result<Url, Str
             "'{s}' points at a local host; webhooks must reach a public server"
         ));
     }
-    if let Ok(ip) = bare.parse::<IpAddr>()
+    // The URL parser has normalized the host, so every spelling of a literal IP lands here.
+    let literal = match u.host() {
+        Some(url::Host::Ipv4(v4)) => Some(IpAddr::V4(v4)),
+        Some(url::Host::Ipv6(v6)) => Some(IpAddr::V6(v6)),
+        _ => None,
+    };
+    if let Some(ip) = literal
         && !is_public_ip(ip)
     {
         return Err(format!(
@@ -450,73 +479,160 @@ pub fn validate_webhook_url(settings: &Settings, input: &str) -> Result<Url, Str
     Ok(u)
 }
 
-/// Resolves a webhook URL's host and checks every address (SSRF guard at delivery time).
-/// Returns the addresses so the caller can pin them (`reqwest::ClientBuilder::resolve_to_addrs`)
-/// and avoid DNS rebinding between this check and the request. With `webhook_allow_private`
-/// every address is accepted.
-pub async fn resolve_webhook_addrs(
-    settings: &Settings,
-    url: &Url,
-) -> Result<Vec<std::net::SocketAddr>, String> {
-    let host = url
-        .host_str()
-        .ok_or_else(|| format!("'{url}' has no host"))?
-        .trim_start_matches('[')
-        .trim_end_matches(']')
-        .to_string();
-    let port = url.port_or_known_default().unwrap_or(443);
-    let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host.as_str(), port))
-        .await
-        .map_err(|e| format!("the webhook host '{host}' could not be resolved: {e}"))?
-        .collect();
-    if addrs.is_empty() {
-        return Err(format!(
-            "the webhook host '{host}' resolved to no addresses"
-        ));
-    }
-    if !settings.webhook_allow_private
-        && let Some(bad) = addrs.iter().find(|a| !is_public_ip(a.ip()))
-    {
-        return Err(format!(
-            "the webhook host '{host}' resolves to {}, a private or reserved address; webhooks must reach a public server",
-            bad.ip()
-        ));
-    }
-    Ok(addrs)
+/// The SSRF guard refused a webhook host name (ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=false): it has no
+/// address a webhook may be sent to.
+///
+/// Its message is stored where the app owner (or the Silicon) reads it, a delivery's
+/// `last_error`, so it never names the addresses the host resolved to, nor whether the name
+/// resolved at all: either would let anyone who can set a webhook URL map the service's internal
+/// DNS. [`BlockedAddress::ip`] and [`BlockedAddress::lookup_error`] carry the details for the
+/// server log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlockedAddress {
+    pub host: String,
+    /// The first address that isn't [public](is_public_ip); `None` when the name didn't resolve.
+    pub ip: Option<IpAddr>,
+    /// Why the name didn't resolve, when it didn't.
+    pub lookup_error: Option<String>,
 }
 
-/// True for globally routable addresses (not private, loopback, link-local, CGNAT, multicast,
-/// documentation, unspecified or unique-local).
+impl fmt::Display for BlockedAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "the webhook host '{}' has no public address (it doesn't resolve, or it resolves to a private or reserved address); webhooks must reach a public server",
+            self.host
+        )
+    }
+}
+
+impl std::error::Error for BlockedAddress {}
+
+/// DNS lookup failure with the host name in the message (only while private targets are
+/// allowed, in development; with the SSRF guard on, a lookup failure is a [`BlockedAddress`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LookupFailed {
+    pub host: String,
+    pub message: String,
+}
+
+impl fmt::Display for LookupFailed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "the webhook host '{}' could not be resolved ({})",
+            self.host, self.message
+        )
+    }
+}
+
+impl std::error::Error for LookupFailed {}
+
+/// Resolves a webhook `host` (the SSRF guard at delivery time). Unless `allow_private`
+/// (ACCOUNTS_WEBHOOK_ALLOW_PRIVATE), refuses it with a [`BlockedAddress`] when it doesn't resolve
+/// or when *any* of its addresses isn't [public](is_public_ip). The caller must connect to
+/// exactly the returned addresses (the worker's HTTP client uses this as its DNS resolver), so
+/// DNS rebinding can't slip between the check and the request. The port of the returned
+/// addresses is 0 (the connector applies the URL's port).
+pub async fn resolve_checked(
+    host: &str,
+    allow_private: bool,
+) -> Result<Vec<std::net::SocketAddr>, Box<dyn std::error::Error + Send + Sync>> {
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    let resolved = tokio::net::lookup_host((host, 0))
+        .await
+        .map(|addrs| addrs.collect::<Vec<std::net::SocketAddr>>())
+        .map_err(|e| e.to_string())
+        .and_then(|addrs| {
+            if addrs.is_empty() {
+                Err("no addresses".to_string())
+            } else {
+                Ok(addrs)
+            }
+        });
+    if allow_private {
+        return resolved.map_err(|message| {
+            Box::new(LookupFailed {
+                host: host.to_string(),
+                message,
+            }) as Box<dyn std::error::Error + Send + Sync>
+        });
+    }
+    let refused = |ip: Option<IpAddr>, lookup_error: Option<String>| {
+        Box::new(BlockedAddress {
+            host: host.to_string(),
+            ip,
+            lookup_error,
+        }) as Box<dyn std::error::Error + Send + Sync>
+    };
+    match resolved {
+        Err(message) => Err(refused(None, Some(message))),
+        Ok(addrs) => match addrs.iter().find(|a| !is_public_ip(a.ip())) {
+            Some(bad) => Err(refused(Some(bad.ip()), None)),
+            None => Ok(addrs),
+        },
+    }
+}
+
+/// True for addresses a webhook may be sent to while private targets are refused: globally
+/// routable unicast.
+///
+/// IPv4: not private, loopback, link-local, CGNAT (100.64/10), benchmarking (198.18/15),
+/// documentation, IETF protocol assignments (192.0.0/24), broadcast, multicast, unspecified,
+/// `0/8` or reserved (240/4).
+///
+/// IPv6 is judged strictly, because some IPv6 forms carry an IPv4 address that a dual-stack
+/// host, a NAT64 gateway or a 6to4 relay delivers to — a way into private IPv4 networks:
+/// - IPv4-mapped `::ffff:a.b.c.d`, NAT64 `64:ff9b::a.b.c.d` (RFC 6052) and 6to4
+///   `2002:aabb:ccdd::/48` (RFC 3056) count as the IPv4 address they carry;
+/// - anything else outside global unicast `2000::/3` is refused: IPv4-compatible `::/96`,
+///   IPv4-translated `::ffff:0:0:0/96`, local-use NAT64 `64:ff9b:1::/48`, discard-only
+///   `100::/64`, unique-local, link-local, site-local `fec0::/10`, multicast, loopback,
+///   unspecified;
+/// - inside `2000::/3`, `2001::/23` (IETF protocol assignments: Teredo, benchmarking, ORCHID)
+///   and the documentation ranges `2001:db8::/32` and `3fff::/20` are refused.
 pub fn is_public_ip(ip: IpAddr) -> bool {
     match ip {
-        IpAddr::V4(v4) => {
-            let o = v4.octets();
-            !(v4.is_private()
-                || v4.is_loopback()
-                || v4.is_link_local()
-                || v4.is_broadcast()
-                || v4.is_documentation()
-                || v4.is_unspecified()
-                || v4.is_multicast()
-                || o[0] == 0
-                || (o[0] == 100 && (64..=127).contains(&o[1]))
-                || (o[0] == 192 && o[1] == 0 && o[2] == 0)
-                || (o[0] == 198 && (18..=19).contains(&o[1]))
-                || o[0] >= 240)
-        }
-        IpAddr::V6(v6) => {
-            if let Some(v4) = v6.to_ipv4_mapped() {
-                return is_public_ip(IpAddr::V4(v4));
-            }
-            let seg = v6.segments();
-            !(v6.is_loopback()
-                || v6.is_unspecified()
-                || v6.is_multicast()
-                || (seg[0] & 0xfe00) == 0xfc00
-                || (seg[0] & 0xffc0) == 0xfe80
-                || (seg[0] == 0x2001 && seg[1] == 0x0db8))
-        }
+        IpAddr::V4(v4) => is_public_v4(v4),
+        IpAddr::V6(v6) => is_public_v6(v6),
     }
+}
+
+fn is_public_v4(v4: std::net::Ipv4Addr) -> bool {
+    let o = v4.octets();
+    !(v4.is_private()
+        || v4.is_loopback()
+        || v4.is_link_local()
+        || v4.is_broadcast()
+        || v4.is_documentation()
+        || v4.is_unspecified()
+        || v4.is_multicast()
+        || o[0] == 0
+        || (o[0] == 100 && (64..=127).contains(&o[1]))
+        || (o[0] == 192 && o[1] == 0 && o[2] == 0)
+        || (o[0] == 198 && (18..=19).contains(&o[1]))
+        || o[0] >= 240)
+}
+
+fn is_public_v6(v6: std::net::Ipv6Addr) -> bool {
+    use std::net::Ipv4Addr;
+    if let Some(v4) = v6.to_ipv4_mapped() {
+        return is_public_v4(v4);
+    }
+    let s = v6.segments();
+    let o = v6.octets();
+    if s[..6] == [0x0064, 0xff9b, 0, 0, 0, 0] {
+        return is_public_v4(Ipv4Addr::new(o[12], o[13], o[14], o[15]));
+    }
+    if s[0] & 0xe000 != 0x2000 {
+        return false;
+    }
+    if s[0] == 0x2002 {
+        return is_public_v4(Ipv4Addr::new(o[2], o[3], o[4], o[5]));
+    }
+    let ietf_protocol = s[0] == 0x2001 && s[1] < 0x0200;
+    let documentation = (s[0] == 0x2001 && s[1] == 0x0db8) || (s[0] == 0x3fff && s[1] < 0x1000);
+    !ietf_protocol && !documentation
 }
 
 /// Display-name suggestion from an email: local part split on `. _ - +`, title-cased.
@@ -667,7 +783,22 @@ mod tests {
         assert!(validate_https_url("https://iris.teamofsilicons.com/pfp/carbon?id=a8K").is_ok());
         assert!(validate_https_url("http://example.com/x.png").is_err());
         assert!(validate_https_url("https://user:pw@example.com/").is_err());
-        assert!(validate_pfp_url(&settings, "http://localhost:8590/v1/photos/0190").is_ok());
+        // Short input whose stored (percent-encoded) form is over the limit.
+        let wide = format!("https://example.com/{}", "\u{00e9}".repeat(1000));
+        assert!(wide.len() <= MAX_URL_LEN);
+        let e = validate_https_url(&wide).expect_err("encoded too long");
+        assert!(e.contains("once encoded"), "{e}");
+        let photo = format!(
+            "{}0190f0f0-0000-7000-8000-000000000001",
+            crate::pfp::photo_url_prefix(&settings)
+        );
+        assert_eq!(
+            validate_pfp_url(&settings, &photo).as_deref(),
+            Ok(photo.as_str())
+        );
+        let e = validate_pfp_url(&settings, &format!("{photo}?v=2")).expect_err("inexact");
+        assert!(e.contains(&photo), "{e}");
+        assert!(validate_pfp_url(&settings, "http://localhost:8590/v1/photos/0190").is_err());
         assert!(validate_pfp_url(&settings, "http://localhost:9999/x.png").is_err());
         assert!(
             validate_webhook_url(&settings, "http://127.0.0.1:8593/briefcase/webhooks").is_ok()
@@ -677,30 +808,106 @@ mod tests {
         assert!(validate_webhook_url(&prod, "http://hooks.example.com/x").is_err());
         assert!(validate_webhook_url(&prod, "https://127.0.0.1/x").is_err());
         assert!(validate_webhook_url(&prod, "https://10.1.2.3/x").is_err());
+        assert!(validate_webhook_url(&prod, "https://0x7f.1/x").is_err());
         assert!(validate_webhook_url(&prod, "https://[::1]/x").is_err());
+        assert!(validate_webhook_url(&prod, "https://[64:ff9b::a00:1]/x").is_err());
+        assert!(validate_webhook_url(&prod, "https://[2002:a00:1::1]/x").is_err());
+        assert!(validate_webhook_url(&prod, "https://[::a00:1]/x").is_err());
         assert!(validate_webhook_url(&prod, "https://localhost/x").is_err());
         assert!(validate_webhook_url(&prod, "https://hooks.example.com/x").is_ok());
-        assert!(is_public_ip("8.8.8.8".parse().expect("ip")));
-        assert!(!is_public_ip("169.254.169.254".parse().expect("ip")));
-        assert!(!is_public_ip("100.64.0.1".parse().expect("ip")));
-        assert!(!is_public_ip("::ffff:10.0.0.1".parse().expect("ip")));
+        assert!(validate_webhook_url(&prod, "https://[2606:4700:4700::1111]/x").is_ok());
+    }
+
+    #[test]
+    fn public_addresses() {
+        let refused = [
+            "10.0.0.1",
+            "127.0.0.1",
+            "169.254.169.254",
+            "100.64.0.1",
+            "0.0.0.0",
+            "192.0.0.8",
+            "192.0.2.1",
+            "198.18.0.1",
+            "224.0.0.1",
+            "240.0.0.1",
+            "255.255.255.255",
+            "::",
+            "::1",
+            "::127.0.0.1",        // IPv4-compatible loopback
+            "::a00:1",            // IPv4-compatible 10.0.0.1
+            "::ffff:127.0.0.1",   // IPv4-mapped loopback
+            "::ffff:10.0.0.1",    // IPv4-mapped private
+            "::ffff:0:7f00:1",    // IPv4-translated (SIIT) loopback
+            "64:ff9b::a9fe:a9fe", // NAT64 of 169.254.169.254
+            "64:ff9b::a00:1",     // NAT64 of 10.0.0.1
+            "64:ff9b:1::808:808", // local-use NAT64 prefix
+            "2002:7f00:1::",      // 6to4 of 127.0.0.1
+            "2002:a00:1::1",      // 6to4 of 10.0.0.1
+            "2001::1",            // Teredo
+            "2001:2::1",          // benchmarking
+            "2001:10::1",         // ORCHID
+            "2001:20::1",         // ORCHIDv2
+            "2001:db8::1",        // documentation
+            "3fff::1",            // documentation (RFC 9637)
+            "100::1",             // discard-only
+            "5f00::1",            // SRv6 SIDs
+            "fc00::1",            // unique-local
+            "fd12:3456::1",       // unique-local
+            "fe80::1",            // link-local
+            "fec0::1",            // site-local (deprecated)
+            "ff02::1",            // multicast
+        ];
+        for ip in refused {
+            let parsed: IpAddr = ip.parse().expect(ip);
+            assert!(!is_public_ip(parsed), "{ip} must be refused");
+        }
+        let allowed = [
+            "8.8.8.8",
+            "1.1.1.1",
+            "2606:4700:4700::1111",
+            "2001:4860:4860::8888",
+            "2a00:1450:4001::64",
+            "64:ff9b::808:808", // NAT64 of 8.8.8.8
+            "::ffff:8.8.8.8",   // IPv4-mapped 8.8.8.8
+            "2002:808:808::1",  // 6to4 of 8.8.8.8
+        ];
+        for ip in allowed {
+            let parsed: IpAddr = ip.parse().expect(ip);
+            assert!(is_public_ip(parsed), "{ip} must be allowed");
+        }
     }
 
     #[tokio::test]
     async fn resolving_webhook_hosts() {
-        let mut s = Settings::for_tests();
-        let url = Url::parse("http://localhost:8593/hooks").expect("url");
-        let addrs = resolve_webhook_addrs(&s, &url)
+        let addrs = resolve_checked("localhost", true)
             .await
             .expect("dev allows loopback");
-        assert!(addrs.iter().all(|a| a.port() == 8593));
-        s.webhook_allow_private = false;
-        let err = resolve_webhook_addrs(&s, &url)
+        assert!(!addrs.is_empty());
+        let err = resolve_checked("localhost", false)
             .await
             .expect_err("loopback refused");
-        assert!(err.contains("private or reserved"), "{err}");
-        let url = Url::parse("https://127.0.0.1/hooks").expect("url");
-        assert!(resolve_webhook_addrs(&s, &url).await.is_err());
+        let blocked = err
+            .downcast_ref::<BlockedAddress>()
+            .expect("a BlockedAddress error");
+        assert!(blocked.ip.is_some_and(|ip| ip.is_loopback()));
+        assert!(
+            !err.to_string().contains("127.0.0.1") && !err.to_string().contains("::1"),
+            "the stored text never names the address: {err}"
+        );
+        assert!(resolve_checked("127.0.0.1", false).await.is_err());
+        // A name that doesn't resolve reads like a private one under the guard.
+        let err = resolve_checked("does-not-exist.invalid", false)
+            .await
+            .expect_err("no address");
+        let blocked = err
+            .downcast_ref::<BlockedAddress>()
+            .expect("a BlockedAddress error");
+        assert!(blocked.ip.is_none() && blocked.lookup_error.is_some());
+        let dev = resolve_checked("does-not-exist.invalid", true)
+            .await
+            .expect_err("does not resolve");
+        assert!(dev.to_string().contains("could not be resolved"), "{dev}");
     }
 
     #[test]

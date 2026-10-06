@@ -88,7 +88,7 @@ pub async fn create(
         None => format!("ip:{}", meta.ip_or_unknown()),
     };
     let scope = idempotency::scope(&caller, "POST", "/v1/reports");
-    idempotency::run(&state.db, key.as_deref(), &scope, &body, false, || async {
+    idempotency::run(&state, key.as_deref(), &scope, &body, false, || async {
         // Inside the idempotent work so a replay never counts against the limit.
         rate_limit::enforce_pool(
             &state.db,

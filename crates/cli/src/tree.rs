@@ -191,3 +191,112 @@ pub fn command_path(matches: &ArgMatches) -> String {
     }
     parts.join(" ")
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use clap::FromArgMatches;
+
+    use super::*;
+    use crate::cli::{
+        AppCommand, AppWebhookCommand, Commands, OwnWebhookCommand, SiliconCommand,
+        SiliconWebhookCommand,
+    };
+
+    /// Every argument id below the root, with the command path that defines it.
+    fn arg_ids(cmd: &Command, path: &str, out: &mut Vec<(String, String, bool)>) {
+        for arg in cmd.get_arguments() {
+            out.push((
+                path.to_owned(),
+                arg.get_id().to_string(),
+                arg.is_global_set(),
+            ));
+        }
+        for sub in cmd.get_subcommands() {
+            arg_ids(sub, &format!("{path} {}", sub.get_name()), out);
+        }
+    }
+
+    /// clap merges an argument into a global one with the same id, so a positional named
+    /// `url` silently became the service URL (`accounts webhook set <URL>` then talked to the
+    /// webhook endpoint instead of Silicon Accounts).
+    #[test]
+    fn no_command_reuses_a_global_argument_id() {
+        let mut cmd = command();
+        cmd.build();
+        let globals: Vec<String> = cmd
+            .get_arguments()
+            .filter(|a| a.is_global_set())
+            .map(|a| a.get_id().to_string())
+            .collect();
+        assert!(globals.contains(&"url".to_owned()), "{globals:?}");
+        let mut all = Vec::new();
+        for sub in cmd.get_subcommands() {
+            arg_ids(sub, sub.get_name(), &mut all);
+        }
+        let clashes: Vec<String> = all
+            .iter()
+            .filter(|(_, id, global)| !global && globals.contains(id))
+            .map(|(path, id, _)| format!("`accounts {path}` defines `{id}`"))
+            .collect();
+        assert!(clashes.is_empty(), "{clashes:?}");
+    }
+
+    fn parse(args: &[&str]) -> crate::cli::Cli {
+        let matches = command()
+            .try_get_matches_from(std::iter::once("accounts").chain(args.iter().copied()))
+            .unwrap();
+        crate::cli::Cli::from_arg_matches(&matches).unwrap()
+    }
+
+    #[test]
+    fn webhook_endpoints_are_not_the_service_url() {
+        let hook = "https://hooks.example/silicon";
+        let cli = parse(&["webhook", "set", hook]);
+        assert_eq!(cli.global.url, None);
+        match cli.command {
+            Some(Commands::Webhook(args)) => match args.command {
+                OwnWebhookCommand::Set { endpoint } => assert_eq!(endpoint, hook),
+                other => panic!("{other:?}"),
+            },
+            other => panic!("{other:?}"),
+        }
+
+        let cli = parse(&[
+            "--url",
+            "http://localhost:8590",
+            "silicon",
+            "webhook",
+            "set",
+            "si:scout",
+            hook,
+        ]);
+        assert_eq!(cli.global.url.as_deref(), Some("http://localhost:8590"));
+        match cli.command {
+            Some(Commands::Silicon(args)) => match args.command {
+                SiliconCommand::Webhook(w) => match w.command {
+                    SiliconWebhookCommand::Set { silicon, endpoint } => {
+                        assert_eq!(silicon, "si:scout");
+                        assert_eq!(endpoint, hook);
+                    }
+                    other => panic!("{other:?}"),
+                },
+                other => panic!("{other:?}"),
+            },
+            other => panic!("{other:?}"),
+        }
+
+        let cli = parse(&["app", "webhook", "set", hook]);
+        assert_eq!(cli.global.url, None);
+        match cli.command {
+            Some(Commands::App(args)) => match args.command {
+                AppCommand::Webhook(w) => match w.command {
+                    AppWebhookCommand::Set { endpoint } => assert_eq!(endpoint, hook),
+                    other => panic!("{other:?}"),
+                },
+                other => panic!("{other:?}"),
+            },
+            other => panic!("{other:?}"),
+        }
+    }
+}

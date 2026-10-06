@@ -58,7 +58,7 @@ pub async fn issue_obo(
         "/v1/proofs/obo",
     );
     let issuer = Issuer::app(&auth.app, meta.ip.as_deref());
-    let response = idempotency::run(&state.db, key.as_deref(), &scope, &body, true, || async {
+    let response = idempotency::run(&state, key.as_deref(), &scope, &body, true, || async {
         let proof = issue::obo(&state, &issuer, &body).await?;
         Ok((StatusCode::CREATED, serde_json::to_value(&proof)?))
     })
@@ -80,7 +80,7 @@ pub async fn issue_ata(
         "/v1/proofs/ata",
     );
     let issuer = Issuer::app(&auth.app, meta.ip.as_deref());
-    let response = idempotency::run(&state.db, key.as_deref(), &scope, &body, true, || async {
+    let response = idempotency::run(&state, key.as_deref(), &scope, &body, true, || async {
         let proof = issue::ata(&state, &issuer, &body).await?;
         Ok((StatusCode::CREATED, serde_json::to_value(&proof)?))
     })
@@ -113,7 +113,7 @@ pub async fn issue_ata_for_app(
         actor_id,
         ip: meta.ip.as_deref(),
     };
-    let response = idempotency::run(&state.db, key.as_deref(), &scope, &body, true, || async {
+    let response = idempotency::run(&state, key.as_deref(), &scope, &body, true, || async {
         let proof = issue::ata(&state, &issuer, &body).await?;
         Ok((StatusCode::CREATED, serde_json::to_value(&proof)?))
     })
@@ -148,7 +148,7 @@ pub async fn refresh(
         "POST",
         "/v1/proofs/refresh",
     );
-    let response = idempotency::run(&state.db, key.as_deref(), &scope, &body, true, || async {
+    let response = idempotency::run(&state, key.as_deref(), &scope, &body, true, || async {
         let proof = crate::refresh::refresh(
             &state,
             &auth.app,

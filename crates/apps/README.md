@@ -31,7 +31,7 @@ accounts_apps::imports::run_pending_jobs(&state)         // process queued impor
 | `POST /v1/apps/{app_id}/imports` | app-or-owner, Idempotency-Key | CSV or JSON → 202 `{"job": ImportJob}`. 50 MB / 100,000 rows; budgets below. |
 | `GET /v1/apps/{app_id}/imports`, `…/imports/{job_id}` | app-or-owner | list / `{"job": ImportJob}`; 404 `import_not_found`. |
 | `GET /v1/apps/{app_id}/imports/{job_id}/rows` | app-or-owner | `outcome, level, code, limit, cursor`; file order. In a dry run, matched rows have `account_uuid` and `id` null. |
-| `PUT /v1/apps/{app_id}/webhook` | app-or-owner, Idempotency-Key | `{"url"}` → `{"url","secret"}`, new secret every time; `no-store`. |
+| `PUT /v1/apps/{app_id}/webhook` | app-or-owner, Idempotency-Key | `{"url"}` → `{"url","secret"}`, new secret every time; `no-store`. Responses carrying a secret are replayable for 10 minutes and stored sealed with the keyring (core's `idempotency::run`), never in clear. |
 | `DELETE /v1/apps/{app_id}/webhook` | app-or-owner | 204; pending deliveries become `failed` (replayable). Idempotent. |
 | `POST /v1/apps/{app_id}/webhook/rotate-secret` | app-or-owner, Idempotency-Key | `{"secret"}`; 409 `webhook_not_set`. |
 | `POST /v1/apps/{app_id}/webhook/test` | app-or-owner, Idempotency-Key | 202 `{"event_id","delivery_id","type":"ping"}`. |
@@ -90,7 +90,7 @@ its text — or a column name over 200 bytes), `too_many_items` (a JSON array wi
 items, nested ones included). Values of ignored columns aren't limited because they are never
 stored. NUL characters (which `jsonb` refuses) become U+FFFD.
 
-Budgets (`limits.rs`): 60 import requests per app per hour (dry runs and refused files count; an
+Budgets (`limits.rs`, on core's `rate_limit::peek` / `hit` / weighted `take`): 60 import requests per app per hour (dry runs and refused files count; an
 app at the limit is refused before its body is read, except an Idempotency-Key retry, which still
 gets its stored 202), 2,000,000 rows per app per 24 hours taken in the job's own transaction (dry
 runs count; a refused import costs nothing) → 429 `rate_limited` with `Retry-After` and
@@ -102,7 +102,10 @@ Per row (`rules.rs`, `engine.rs`), in file order, chunks of 500 rows per transac
 trim everything; emails lowercased/validated/de-duplicated (max 10), phones to E.164 with
 `default_country` (max 10); a row without a usable email or phone → `error missing_identifier`;
 an email/phone seen in an earlier row → `skipped duplicate_in_file` (names the row); identifiers
-of two accounts → `error ambiguous_match` (accounts are not named); one account → `matched`
+of two accounts → `error ambiguous_match` (accounts are not named; only addresses that identify an
+account count — a verified one, or another unfinished import's — as core's
+`repo::contacts::lookup` decides, so an import never links through an address nobody proved);
+one account → `matched`
 (membership `imported`, an existing active membership stays active, imported_profile only filled
 when new or with `update_existing`, which makes the outcome `updated` for an existing membership;
 an existing member's external_id is only replaced with `update_existing` — otherwise it is kept
@@ -127,7 +130,8 @@ c:saket, assigned c:saket-2: …"); invalid → `invalid_username`; reserved wor
 `reserved_username` (suggestions from username, email, display name). Warnings: `invalid_email`,
 `invalid_phone`, `invalid_dob` (formats YYYY-MM-DD, YYYY/MM/DD, DD/MM/YYYY and MM/DD/YYYY when
 unambiguous; ambiguous → warning + default dob), `invalid_timezone` (→ UTC), `invalid_pfp_url`
-(https only → default photo), `unknown_columns`, `extra_fields`, `missing_fields`,
+(https only, and never a photo an account uploaded to Silicon Accounts, which would keep someone
+else's removed photo alive → default photo), `unknown_columns`, `extra_fields`, `missing_fields`,
 `display_name_truncated`, `too_many_emails/phones`, `invalid_value`, `external_id_differs`.
 Messages are bounded: at most 5 per kind of invalid list item and row (then one "…and N more"
 summary), quoted values cut to 80 characters, no message over 2,000 characters. Display names
@@ -158,8 +162,9 @@ account's memberships as history). `ping`, `membership.access_removed`, `members
 and `account.deleted` carry no account data and are always replayable and shown.
 
 Replay re-queues `failed`/`delivered` deliveries (pending ones are reported `already_pending`):
-status pending, attempts 0, `manual_replays + 1`, same event id and payload, `url` = the current URL
-(the worker signs with the current secret). By ids: withheld ones are `skipped` with reason
+status pending, attempts 0, `manual_replays + 1`, `requeued_at` = now (the worker retries it for 72
+hours from the replay), same event id and payload, `url` = the current URL (the worker signs with
+the current secret). By ids: withheld ones are `skipped` with reason
 `membership_inactive` or `account_deleted`. By status: the SQL picks only replayable failed
 deliveries (oldest first, 100 per call), so withheld ones never block newer ones; `remaining` =
 replayable failed deliveries still waiting (call again until 0), `not_replayable` = failed ones

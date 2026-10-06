@@ -155,9 +155,22 @@ pub async fn id(ctx: &Ctx, args: IdArgs) -> CliResult<Outcome> {
                     exit,
                 )
             };
+            let text = if !availability.available && !availability.suggestions.is_empty() {
+                format!(
+                    "{text}\nAvailable instead: {}",
+                    availability.suggestions.join(", ")
+                )
+            } else {
+                text
+            };
             let mut outcome = Outcome::new(to_json(&availability), text).exit(exit);
             if availability.available {
                 outcome = outcome.next(format!("accounts id change {shown}"), "take it as your id");
+            } else if let Some(first) = availability.suggestions.first() {
+                outcome = outcome.next(
+                    format!("accounts id change {first}"),
+                    "take a free id instead",
+                );
             }
             Ok(outcome)
         }

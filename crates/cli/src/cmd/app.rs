@@ -1058,8 +1058,8 @@ async fn run_webhook(
     command: AppWebhookCommand,
 ) -> CliResult<Outcome> {
     match command {
-        AppWebhookCommand::Set { url } => {
-            let hook = app.set_webhook(&url).await?;
+        AppWebhookCommand::Set { endpoint } => {
+            let hook = app.set_webhook(&endpoint).await?;
             let secret = hook
                 .secret
                 .as_ref()

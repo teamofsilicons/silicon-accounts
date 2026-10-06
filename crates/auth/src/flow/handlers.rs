@@ -5,7 +5,7 @@ use accounts_core::delivery;
 use accounts_core::http::{ClientMeta, Json, Path};
 use accounts_core::models::{AccountKind, AccountStatus, Method, OtpChannel, OtpPurpose};
 use accounts_core::normalize::{normalize_email, normalize_phone};
-use accounts_core::repo::contacts::ContactKind;
+use accounts_core::repo::contacts::{self, ContactKind, Holder};
 use accounts_core::repo::{accounts, otp};
 use accounts_core::{ApiError, ApiResult, AppState};
 use axum::extract::State;
@@ -20,8 +20,6 @@ use super::model::{self, Flow, FlowError, Pending, Step};
 use super::signup::{self, NewSignupSession};
 use super::view::{self, ViewContext};
 use super::{FlowApp, FlowResponse, load_bound, next, requirements};
-use crate::codes;
-use crate::contact::{self, Holder};
 use crate::util::telemetry;
 
 /// Builds the response view for a flow.
@@ -585,8 +583,10 @@ pub async fn verify_code(
         (challenge_id, flow.app_id)
     };
     // Verification persists failures on its own (the lockout must survive this request).
-    let challenge = codes::verify(
-        &state,
+    let challenge = otp::verify(
+        &state.db,
+        &state.keys.pepper,
+        &state.settings,
         challenge_id,
         &body.code,
         &otp::Expect {
@@ -594,7 +594,7 @@ pub async fn verify_code(
             flow_id: Some(&id),
             account_uuid: None,
         },
-        Some(codes::Attempt {
+        Some(otp::Attempt {
             app_id: &app_id,
             ip: meta.ip.as_deref(),
             user_agent: meta.user_agent.as_deref(),
@@ -627,7 +627,7 @@ pub async fn verify_code(
         return persist_failure(tx, &mut flow, e).await;
     }
     // The code proves the address: only a verified email/phone signs into an account.
-    let holder = contact::after_proof(&mut tx, kind, &destination, meta.ip.as_deref()).await?;
+    let holder = contacts::after_proof(&mut tx, kind, &destination, meta.ip.as_deref()).await?;
     let browser_before = browser::current(&mut tx, &state, &headers).await?;
     let mut cookies = Vec::new();
     match holder {

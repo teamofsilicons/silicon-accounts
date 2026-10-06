@@ -80,6 +80,8 @@ export interface FlowSignup {
   email: string | null;
   phone: string | null;
   provider: 'google' | 'apple' | null;
+  /** The photo Google reported (offered as an alternative to the Iris default in pfp_url). */
+  provider_pfp_url?: string | null;
   finishing_import: boolean;
   expires_at: string;
 }
@@ -101,6 +103,10 @@ export interface FlowView {
   } | null;
   redirect_to: string | null;
   error: { code: string; message: string; hint?: string } | null;
+  /** What the app asked for at POST /v1/flows. */
+  prompt?: string | null;
+  login_hint?: string | null;
+  method_hint?: string | null;
 }
 
 export interface ProofIssued {
@@ -172,6 +178,11 @@ export interface ImportJob {
   started_at: string | null;
   finished_at: string | null;
   error: string | null;
+  app_id?: string;
+  dry_run?: boolean;
+  options?: ImportOptions;
+  /** `app`, or the uuid of the owner who started it. */
+  created_by?: string;
 }
 
 export interface ImportRowResult {

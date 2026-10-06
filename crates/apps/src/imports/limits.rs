@@ -13,7 +13,7 @@
 //!   reads its body, then gets 503 `imports_busy` with `Retry-After`.
 //!
 //! Windows are fixed and live in the shared `rate_limits` table (one row per bucket), so every
-//! API node enforces the same budget.
+//! API node enforces the same budget (core's `rate_limit::peek`, `hit` and the weighted `take`).
 
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -28,6 +28,7 @@ pub const SUBMISSIONS_PER_HOUR: Limit = Limit::new(60, 3600);
 /// Imported rows (dry runs included) per app per 24 hours.
 pub const ROWS_PER_DAY: i64 = 2_000_000;
 const ROWS_WINDOW_SECONDS: i64 = 86_400;
+const ROWS_LIMIT: Limit = Limit::new(ROWS_PER_DAY as i32, ROWS_WINDOW_SECONDS);
 /// Import bodies one process reads and parses at once.
 pub const MAX_CONCURRENT_IMPORTS: usize = 2;
 /// How long a request waits for a free slot.
@@ -61,19 +62,12 @@ fn too_many_submissions(app_id: &str, retry_after: u64) -> ApiError {
 /// Refuses an app that already used its hourly submissions, before its body is read. Does not
 /// count anything.
 pub async fn precheck_submissions(pool: &PgPool, app_id: &str) -> ApiResult<()> {
-    let row: Option<(i32, f64)> = sqlx::query_as(
-        "select count, extract(epoch from (window_started_at + make_interval(secs => $2) - now()))::float8 \
-         from rate_limits where bucket = $1",
-    )
-    .bind(submissions_bucket(app_id))
-    .bind(SUBMISSIONS_PER_HOUR.window_seconds as f64)
-    .fetch_optional(pool)
-    .await?;
-    match row {
-        Some((count, left)) if left > 0.0 && count >= SUBMISSIONS_PER_HOUR.max => {
-            Err(too_many_submissions(app_id, left.ceil().max(1.0) as u64))
-        }
-        _ => Ok(()),
+    let mut conn = pool.acquire().await?;
+    match rate_limit::peek(&mut conn, &submissions_bucket(app_id), SUBMISSIONS_PER_HOUR).await? {
+        rate_limit::Decision::Limited {
+            retry_after_seconds,
+        } => Err(too_many_submissions(app_id, retry_after_seconds)),
+        rate_limit::Decision::Allowed { .. } => Ok(()),
     }
 }
 
@@ -92,48 +86,28 @@ pub async fn count_submission(pool: &PgPool, app_id: &str) -> ApiResult<()> {
 /// stays locked until it commits, so concurrent imports of one app can't overspend it).
 pub async fn take_rows(conn: &mut PgConnection, app_id: &str, rows: i64) -> ApiResult<()> {
     let bucket = rows_bucket(app_id);
-    sqlx::query(
-        "insert into rate_limits (bucket, window_started_at, count) values ($1, now(), 0) \
-         on conflict (bucket) do nothing",
-    )
-    .bind(&bucket)
-    .execute(&mut *conn)
-    .await?;
-    let (used, elapsed): (i32, f64) = sqlx::query_as(
-        "select count, extract(epoch from (now() - window_started_at))::float8 from rate_limits \
-         where bucket = $1 for update",
-    )
-    .bind(&bucket)
-    .fetch_one(&mut *conn)
-    .await?;
-    let expired = elapsed >= ROWS_WINDOW_SECONDS as f64;
-    let used = if expired { 0 } else { i64::from(used) };
-    if used + rows > ROWS_PER_DAY {
-        let left = (ROWS_PER_DAY - used).max(0);
-        let retry_after = (ROWS_WINDOW_SECONDS as f64 - elapsed).ceil().max(1.0) as u64;
+    let n = i32::try_from(rows).unwrap_or(i32::MAX);
+    if let rate_limit::Decision::Limited {
+        retry_after_seconds,
+    } = rate_limit::take(conn, &bucket, n, ROWS_LIMIT).await?
+    {
+        let left = match rate_limit::peek(conn, &bucket, ROWS_LIMIT).await? {
+            rate_limit::Decision::Allowed { remaining } => i64::from(remaining),
+            rate_limit::Decision::Limited { .. } => 0,
+        };
         return Err(ApiError::rate_limited(
             format!(
                 "The app '{app_id}' can import at most {ROWS_PER_DAY} rows per 24 hours (dry runs included); this import has {rows} rows and {left} are left in the current window."
             ),
-            retry_after,
+            retry_after_seconds,
         )
         .hint(format!(
-            "Import at most {left} rows now, or wait {retry_after} seconds for the window to reset."
+            "Import at most {left} rows now, or wait {retry_after_seconds} seconds for the window to reset."
         ))
         .detail("limit_rows", ROWS_PER_DAY)
         .detail("remaining_rows", left)
         .detail("import_rows", rows));
     }
-    sqlx::query(
-        "update rate_limits set count = $2, \
-           window_started_at = case when $3 then now() else window_started_at end \
-         where bucket = $1",
-    )
-    .bind(&bucket)
-    .bind(i32::try_from(used + rows).unwrap_or(i32::MAX))
-    .bind(expired)
-    .execute(&mut *conn)
-    .await?;
     Ok(())
 }
 

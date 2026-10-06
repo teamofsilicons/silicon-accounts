@@ -221,6 +221,30 @@ pub struct JobCtx {
     pub options: ImportOptions,
     pub today: Date,
     pub iris_base_url: String,
+    /// `{PUBLIC_URL}/v1/photos/`: photos accounts uploaded here, which an import can't use.
+    pub photo_url_prefix: String,
+}
+
+/// The per-row rules ([`prepare`]) plus what needs this service's settings: a `pfp_url` pointing
+/// at a photo an account uploaded to Silicon Accounts is dropped with a warning (an app has no
+/// uploads here, and such a reference would keep someone else's removed photo alive).
+fn prepare_row(input: &Value, ctx: &JobCtx) -> Prepared {
+    let mut p = prepare(input, &ctx.options, ctx.today);
+    if p.pfp_url
+        .as_deref()
+        .is_some_and(|u| u.trim().starts_with(&ctx.photo_url_prefix))
+    {
+        p.pfp_url = None;
+        p.messages.push(RowMessage::warning(
+            codes::INVALID_PFP_URL,
+            format!(
+                "The pfp_url points at a photo an account uploaded to Silicon Accounts ({}…), which an import can't use; a new account gets the default Carbon photo. Use an https URL of your own.",
+                ctx.photo_url_prefix
+            ),
+            Some("pfp_url"),
+        ));
+    }
+    p
 }
 
 /// Why processing rows stopped.
@@ -361,9 +385,13 @@ pub async fn process_rows(
     }
     let mut owners: HashMap<String, Owner> = HashMap::new();
     if !emails.is_empty() {
+        // Only addresses that identify an account (core's rule, `repo::contacts::lookup`): a
+        // verified one, or the address of another unfinished import. Core never leaves an
+        // unverified address on any other account, so this changes nothing today; it makes sure
+        // an import never links a membership through an address nobody proved.
         let found: Vec<(String, String, Option<String>)> = sqlx::query_as(
             "select e.email, a.uuid, a.handle from account_emails e join accounts a on a.uuid = e.account_uuid \
-             where e.email = any($1)",
+             where e.email = any($1) and (e.verified_at is not null or a.status = 'unclaimed')",
         )
         .bind(&emails)
         .fetch_all(&mut *conn)
@@ -376,7 +404,7 @@ pub async fn process_rows(
     if !phones.is_empty() {
         let found: Vec<(String, String, Option<String>)> = sqlx::query_as(
             "select p.phone, a.uuid, a.handle from account_phones p join accounts a on a.uuid = p.account_uuid \
-             where p.phone = any($1)",
+             where p.phone = any($1) and (p.verified_at is not null or a.status = 'unclaimed')",
         )
         .bind(&phones)
         .fetch_all(&mut *conn)
@@ -1144,7 +1172,7 @@ pub async fn rebuild_state(conn: &mut PgConnection, ctx: &JobCtx) -> ApiResult<J
         let warnings = msgs.iter().filter(|m| m.level == Level::Warning).count() as i64;
         st.counts.add(outcome, warnings);
         st.last_row = st.last_row.max(n);
-        let p = prepare(&input, &ctx.options, ctx.today);
+        let p = prepare_row(&input, ctx);
         if p.fatal {
             continue;
         }
@@ -1184,7 +1212,7 @@ pub async fn process_chunk(
 ) -> ApiResult<()> {
     let prepared: Vec<(i32, Prepared)> = chunk
         .iter()
-        .map(|(n, v)| (*n, prepare(v, &ctx.options, ctx.today)))
+        .map(|(n, v)| (*n, prepare_row(v, ctx)))
         .collect();
     let mut tx = conn.begin().await?;
     let empty = Claims::default();

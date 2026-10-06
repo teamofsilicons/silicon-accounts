@@ -3,7 +3,7 @@
 use accounts_core::models::ActorKind;
 use accounts_core::repo::audit::{self, AuditEntry};
 use accounts_core::repo::idempotency;
-use accounts_core::{ApiError, ApiResult, AppState, Settings};
+use accounts_core::{ApiError, ApiResult, AppState};
 use serde::Serialize;
 use serde_json::{Value, json};
 use sqlx::PgConnection;
@@ -68,11 +68,6 @@ pub(crate) fn from_micros(micros: i64) -> ApiResult<OffsetDateTime> {
 
 /// A timestamp later than anything stored: the keyset start of a newest-first list.
 pub(crate) const END_OF_TIME: OffsetDateTime = datetime!(9999-12-31 23:59:59 UTC);
-
-/// The URL prefix of photos served by this service: `{PUBLIC_URL}/v1/photos/`.
-pub(crate) fn photo_url_prefix(settings: &Settings) -> String {
-    format!("{}/v1/photos/", settings.public_url)
-}
 
 /// Formats a timestamp the API way (`2026-10-06T12:00:00.000Z`).
 pub(crate) fn ts(t: OffsetDateTime) -> String {

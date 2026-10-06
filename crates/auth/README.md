@@ -61,29 +61,38 @@ prompt=none that can't sign in silently ─────────────�
   (`repo::accounts::suggest_id` from the email local part then the name), timezone (IP header →
   browser `timezone` sent to `POST /v1/flows` → UTC), dob (18 years ago), photo (our default Carbon
   photo from Iris, as UNDERSTANDING.md says; a Google picture is offered separately as
-  `signup.provider_pfp_url` and stored only when sent back as `pfp_url`). `POST …/signup` fields are
+  `signup.provider_pfp_url` and stored only when sent back as `pfp_url`). A new account has no
+  uploads, so a `pfp_url` naming a photo uploaded to this service is refused (422; keeping an
+  imported account's current photo is fine). `POST …/signup` fields are
   all optional: missing ones keep the prefill; `pfp_url: null` = our default photo. A live sign-up
   session resumes in a new flow in the same browser (48 h), when the app allows sign-up, has the
   method enabled and accepts the email domain.
-- **Only verified emails and phones identify an account** (`contact`). The one exception is an
-  imported account nobody finished yet (`unclaimed`): proving one of its addresses finishes it.
-  Any other unverified row is *unproven* and never signs anyone in (hosted codes, Google/Apple
-  email linking, CLI code sign-in); whoever proves such an address takes it over (the row is
-  removed from the other account, audit `contact.unverified_removed`).
+- **Only verified emails and phones identify an account** (core's `repo::contacts::lookup` /
+  `after_proof`). The one exception is an imported account nobody finished yet (`unclaimed`):
+  proving one of its addresses finishes it. Any other unverified row is *unproven* and never signs
+  anyone in (hosted codes, Google/Apple email linking, CLI code sign-in); whoever proves such an
+  address takes it over (the row is removed from the other account, audit
+  `contact.unverified_removed`). Core keeps unverified rows on unfinished imports only.
 - **Imported (unclaimed) accounts** go to sign-up with `finishing_import: true`, prefilled from the
-  account the import created; completing keeps the uuid, verifies the proven email/phone (primary if
-  the old primary wasn't verified), **removes the import's other (unproven) emails and phones** (the
-  app keeps them in `memberships.imported_profile`), changes id/profile (member apps get webhooks)
-  and activates it. The claim only holds while the account is unclaimed: other sign-ups that pointed
+  account the import created; completing keeps the uuid and runs core's
+  `repo::accounts::finish_claim`: the proven email/phone becomes verified (primary if the old
+  primary wasn't), **the import's other (unproven) emails and phones are removed** (the app keeps
+  them in `memberships.imported_profile`), and the account is activated; this crate changes the
+  id/profile (member apps get webhooks). The claim only holds while the account is unclaimed: other sign-ups that pointed
   at it become ordinary sign-ups of their own proven address (they never see the finished account's
   data); in an app that takes no new accounts such a sign-up ends with `signup_not_allowed` and the
   flow goes back to the methods.
-- **Codes** (`codes`): the 10-tries lockout counts per address, not per flow. Wrong codes of every
-  live code to the same email/phone (any flow, the CLI, requirements) add up; the 10th in a row
-  locks all of them for 60 s (`details.remaining_attempts` counts down for the address), and while
-  one is locked no code to the address is checked (423). A right code ends the streak. When a lock
-  starts on a sign-in code for an account's address, its sign-in history gets a `failed` row and
-  the audit log `signin.locked`.
+- **Codes** (core's `repo::otp`): the 10-tries lockout counts per address, not per flow. Wrong
+  codes of every live code to the same email/phone (any flow, the CLI, requirements, the account
+  site's add codes) add up; the 10th in a row locks all of them for 60 s
+  (`details.remaining_attempts` counts down for the address), and while one is locked no code to the
+  address is checked (423). A right code ends the streak. Sends to one address are serialized, so
+  the 10-per-10-minutes limit holds under bursts. When a lock starts on a sign-in code for an
+  account's address, its sign-in history gets a `failed` row and the audit log `signin.locked`.
+- **auth_time**: a browser session records when its Carbon last proved who they are
+  (`authenticated_at`: a code, Google, Apple or a finished sign-up moves it, also when the session
+  is reused). The authorization code carries it, so the id_token's `auth_time` is the real
+  authentication (continue-as and `prompt=none` keep the earlier time).
 - **App rules**: `allowed_email_domains` (checked before sending a code, at verify, for provider
   emails, and for "continue as": a verified email in the domains), `allow_signup: false` (new accounts
   refused after the code proves the address: `signup_not_allowed`; imported accounts still finish).
@@ -146,7 +155,8 @@ and echoed exactly as sent (never trimmed; control characters are refused).
 
 ## Storage
 
-Owns `signin_flows` and `signup_sessions`. Flow fields without a column live as JSON in
+Owns `signin_flows` and `signup_sessions` (and sets `browser_sessions.authenticated_at` /
+`authorization_codes.auth_time`, migration 0002). Flow fields without a column live as JSON in
 `signin_flows.provider_state` (`FlowExtras`: provider leg, pending outcome, error, browser timezone,
 auth method, …). The binding cookie value is reused for every flow of a browser, so parallel
 sign-ins stay bound. History: `signin_history` at completion (method email/phone/google/apple/

@@ -6,7 +6,7 @@ Background work of Silicon Accounts. `accounts-api` runs it when `ACCOUNTS_WORKE
 ## Claims (`pipeline`)
 
 Webhook deliveries and outbound messages are claimed with `FOR UPDATE SKIP LOCKED` for 60 s
-(the webhook `locked_until` lease; core's message claim). A worker never holds a claim it isn't
+(the webhook `locked_until` lease; core's message claim, `delivery::CLAIM_SECONDS`). A worker never holds a claim it isn't
 working on: each loop claims only as many rows as it has free send slots (16 webhooks, 8
 messages) and starts each one the moment it is claimed, so no claim runs down while its row waits
 in a queue, and no other node can claim a row while it is being sent. A send is cut at its 10 s
@@ -29,27 +29,33 @@ run out and another node retries them: delivery is at-least-once, and webhook re
 - 2xx within 10 s → `delivered`. Anything else (status, timeout, connection error) is recorded in
   `webhook_attempts` and `last_error` (precise text, e.g. `HTTP 500 Internal Server Error: … Response
   body: …`) and retried after 10 s, 30 s, 1 min, 5 min, 15 min, 30 min, then hourly until 72 h after
-  the event → `failed` (replayable). A replayed delivery gets a fresh 72 h of retries. Results are
-  recorded only while the worker still holds the lease.
+  the event → `failed` (replayable). A replayed delivery gets a fresh 72 h of retries, counted from
+  the replay (`requeued_at`, set by the apps crate's replay; a replay made before that column
+  existed is measured along the retry schedule). Results are recorded only while the worker still
+  holds the lease.
 - Not sent: a disabled app (held and retried, so it resumes if re-enabled), a target without a
   webhook URL or signing secret (failed at once with a hint to set one and replay).
 - Redirects are not followed and no proxy is used.
-- **SSRF guard** (`ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=false`, the production default): only https;
-  local host names and literal IPs that aren't deliverable are refused; host names resolve through
-  `GuardedResolver`, which refuses the host when it doesn't resolve or any address isn't
-  deliverable — inside the connector, so the checked address is the connected one. Deliverable
-  (`is_deliverable_ip`) is core's public-IP check tightened for IPv6: IPv4-mapped, NAT64
-  (`64:ff9b::/96`) and 6to4 (`2002::/16`) addresses count as the IPv4 address they carry, nothing
-  outside global unicast `2000::/3` passes (IPv4-compatible, IPv4-translated, local NAT64,
-  discard-only, ULA, link/site-local, multicast), nor do `2001::/23` (Teredo, benchmarking, ORCHID)
-  and the documentation ranges. The refusal stored in `last_error` (which app owners read) never
-  names the resolved addresses or whether the name resolved at all; the server log has them.
+- **SSRF guard** (`ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=false`, the production default, which production
+  can't turn off): only https; local host names and literal IPs that aren't deliverable are
+  refused; host names resolve through `GuardedResolver` (core's `normalize::resolve_checked`),
+  which refuses the host when it doesn't resolve or any address isn't deliverable — inside the
+  connector, so the checked address is the connected one. Deliverable (`is_deliverable_ip`) is
+  core's `normalize::is_public_ip`, the same rule core applies when a webhook URL is set:
+  IPv4-mapped, NAT64 (`64:ff9b::/96`) and 6to4 (`2002::/16`) addresses count as the IPv4 address
+  they carry, nothing outside global unicast `2000::/3` passes (IPv4-compatible, IPv4-translated,
+  local NAT64, discard-only, ULA, link/site-local, multicast), nor do `2001::/23` (Teredo,
+  benchmarking, ORCHID) and the documentation ranges. The refusal stored in `last_error` (which app
+  owners read) never names the resolved addresses or whether the name resolved at all; the server
+  log has them.
 
 ## Outbound email and SMS (`messages`)
 
 Sends pending `outbound_messages` through core's sender (Postmark / Twilio) with core's
 `claim_due` + `deliver_claimed`: retries with the webhook backoff, at most 8 attempts, OTP messages
-stop once their code expired. With `ACCOUNTS_DELIVERY=local` nothing is sent; leftover `pending`
+stop once their code expired. Core records a result only while its claim still holds; a send that
+finished after another node claimed the message again is `claim_lost` (not recorded; counted in
+`SendSummary::claim_lost`). With `ACCOUNTS_DELIVERY=local` nothing is sent; leftover `pending`
 messages are marked `local` (the dev outbox shows them).
 
 ## Cleanup (`cleanup`)

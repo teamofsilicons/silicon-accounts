@@ -98,6 +98,78 @@ pub async fn enforce(
     }
 }
 
+/// Whether `bucket` has room for one more hit, **without counting anything**: callers that
+/// count only successful requests (`enforce` once the work succeeded) use it to refuse a flood
+/// of over-limit requests before doing any real work.
+pub async fn peek(conn: &mut PgConnection, bucket: &str, limit: Limit) -> ApiResult<Decision> {
+    let row: Option<(i32, f64)> = sqlx::query_as(
+        "select count, extract(epoch from (window_started_at + make_interval(secs => $2) - now()))::float8 \
+         from rate_limits where bucket = $1 and window_started_at > now() - make_interval(secs => $2)",
+    )
+    .bind(bucket)
+    .bind(limit.window_seconds as f64)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(match row {
+        Some((count, retry_after)) if count >= limit.max => Decision::Limited {
+            retry_after_seconds: retry_after.ceil().max(1.0) as u64,
+        },
+        Some((count, _)) => Decision::Allowed {
+            remaining: limit.max - count,
+        },
+        None => Decision::Allowed {
+            remaining: limit.max,
+        },
+    })
+}
+
+/// Takes `n` units at once from `bucket`'s budget (a weighted hit, e.g. imported rows): refused
+/// as a whole (nothing taken) when it would go over `limit.max` in the current window. The
+/// bucket row stays locked until the caller's transaction ends, so concurrent takes can't
+/// overspend it; take it inside the transaction whose success it pays for.
+pub async fn take(
+    conn: &mut PgConnection,
+    bucket: &str,
+    n: i32,
+    limit: Limit,
+) -> ApiResult<Decision> {
+    sqlx::query(
+        "insert into rate_limits (bucket, window_started_at, count) values ($1, now(), 0) \
+         on conflict (bucket) do nothing",
+    )
+    .bind(bucket)
+    .execute(&mut *conn)
+    .await?;
+    let (used, elapsed): (i32, f64) = sqlx::query_as(
+        "select count, extract(epoch from (now() - window_started_at))::float8 from rate_limits \
+         where bucket = $1 for update",
+    )
+    .bind(bucket)
+    .fetch_one(&mut *conn)
+    .await?;
+    let expired = elapsed >= limit.window_seconds as f64;
+    let used = if expired { 0 } else { used };
+    if i64::from(used) + i64::from(n) > i64::from(limit.max) {
+        let retry_after = (limit.window_seconds as f64 - elapsed).ceil().max(1.0) as u64;
+        return Ok(Decision::Limited {
+            retry_after_seconds: retry_after,
+        });
+    }
+    sqlx::query(
+        "update rate_limits set count = $2, \
+           window_started_at = case when $3 then now() else window_started_at end \
+         where bucket = $1",
+    )
+    .bind(bucket)
+    .bind(used + n)
+    .bind(expired)
+    .execute(&mut *conn)
+    .await?;
+    Ok(Decision::Allowed {
+        remaining: limit.max - used - n,
+    })
+}
+
 /// Same as [`enforce`] on a pool connection (the hit is committed immediately).
 pub async fn enforce_pool(pool: &PgPool, bucket: &str, limit: Limit, what: &str) -> ApiResult<()> {
     let mut conn = pool.acquire().await?;

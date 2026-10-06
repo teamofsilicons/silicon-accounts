@@ -284,17 +284,27 @@ fn describe_char(c: char) -> String {
     }
 }
 
+/// `s` without `prefix` (an ASCII prefix, compared ASCII-case-insensitively).
+fn strip_prefix_ascii<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
+    let head = s.get(..prefix.len())?;
+    head.eq_ignore_ascii_case(prefix)
+        .then(|| &s[prefix.len()..])
+}
+
 /// Validates and lowercases a bare handle (no prefix). Reserved words are an error.
+///
+/// Every character is checked as written, before lowercasing: only ASCII letters (either case),
+/// digits, `-` and `_` pass. Lowercasing is ASCII-only, so no non-ASCII character can fold into
+/// an allowed one (U+212A KELVIN SIGN would otherwise become `k`).
 pub fn validate_handle(handle: &str) -> Result<String, IdError> {
     let h = handle.trim();
     if h.is_empty() {
         return Err(IdError::Empty);
     }
-    let lower = h.to_lowercase();
-    if let Some((i, ch)) = lower
+    if let Some((i, ch)) = h
         .chars()
         .enumerate()
-        .find(|(_, c)| !(c.is_ascii_lowercase() || c.is_ascii_digit() || *c == '-' || *c == '_'))
+        .find(|(_, c)| !(c.is_ascii_alphanumeric() || *c == '-' || *c == '_'))
     {
         return Err(IdError::InvalidChar {
             handle: h.to_string(),
@@ -302,6 +312,7 @@ pub fn validate_handle(handle: &str) -> Result<String, IdError> {
             position: i + 1,
         });
     }
+    let lower = h.to_ascii_lowercase();
     let len = lower.chars().count();
     if len < HANDLE_MIN {
         return Err(IdError::TooShort { handle: lower });
@@ -324,15 +335,15 @@ pub struct AccountId {
 
 impl AccountId {
     /// Parses `c:<handle>` or `si:<handle>` (prefix case-insensitive, surrounding spaces trimmed).
+    /// The handle is validated exactly as written ([`validate_handle`]).
     pub fn parse(input: &str) -> Result<AccountId, IdError> {
         let s = input.trim();
         if s.is_empty() {
             return Err(IdError::Empty);
         }
-        let lower = s.to_lowercase();
-        let (kind, rest) = if let Some(rest) = lower.strip_prefix("c:") {
+        let (kind, rest) = if let Some(rest) = strip_prefix_ascii(s, "c:") {
             (AccountKind::Carbon, rest)
-        } else if let Some(rest) = lower.strip_prefix("si:") {
+        } else if let Some(rest) = strip_prefix_ascii(s, "si:") {
             (AccountKind::Silicon, rest)
         } else {
             return Err(IdError::MissingPrefix {
@@ -346,8 +357,7 @@ impl AccountId {
     /// Parses an id that must be of `kind`. A bare handle gets `kind`'s prefix added.
     pub fn parse_for_kind(input: &str, kind: AccountKind) -> Result<AccountId, IdError> {
         let s = input.trim();
-        let lower = s.to_lowercase();
-        if lower.starts_with("c:") || lower.starts_with("si:") {
+        if strip_prefix_ascii(s, "c:").is_some() || strip_prefix_ascii(s, "si:").is_some() {
             let id = AccountId::parse(s)?;
             if id.kind != kind {
                 return Err(IdError::WrongKind {
@@ -492,7 +502,7 @@ pub fn handle_candidates(seeds: &[&str]) -> impl Iterator<Item = String> {
 
 /// Picks the first candidate for which `is_available` returns `Ok(true)`, checking at most
 /// `max_checks` candidates. The callback usually asks the database (see
-/// `repo::accounts::suggest_handle`).
+/// `repo::accounts::suggest_ids` / `repo::accounts::suggest_id`).
 pub async fn pick_available<F, Fut, E>(
     kind: AccountKind,
     seeds: &[&str],
@@ -615,7 +625,7 @@ mod tests {
                 "{input}"
             );
         }
-        let bad: [(&str, &str); 9] = [
+        let bad: [(&str, &str); 12] = [
             ("", "empty"),
             ("saket", "no prefix"),
             ("c:ab", "at least 3"),
@@ -625,6 +635,10 @@ mod tests {
             ("c:josé", "non-ASCII"),
             ("c:admin", "reserved word"),
             ("x:abc", "no prefix"),
+            // Non-ASCII letters whose lowercase is ASCII are refused as written.
+            ("c:\u{212A}elvin", "non-ASCII, U+212A) at position 1"),
+            ("c:ma\u{0130}l", "non-ASCII, U+0130) at position 3"),
+            ("si:\u{FF41}bc", "non-ASCII, U+FF41) at position 1"),
         ];
         for (input, fragment) in bad {
             let err = AccountId::parse(input).expect_err(input);

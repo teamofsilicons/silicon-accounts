@@ -94,10 +94,10 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
             .next(format!("accounts login --silicon {} --stk-stdin", managed.silicon.id), "the Silicon signs in with the new STK"))
         }
         SiliconCommand::Webhook(webhook) => match webhook.command {
-            SiliconWebhookCommand::Set { silicon, url } => {
+            SiliconWebhookCommand::Set { silicon, endpoint } => {
                 let managed = resolve(ctx, &silicon).await?;
                 let uuid = managed.silicon.uuid.clone();
-                let hook = with_session!(ctx, |s| s.set_silicon_webhook(&uuid, &url))?;
+                let hook = with_session!(ctx, |s| s.set_silicon_webhook(&uuid, &endpoint))?;
                 Ok(Outcome::new(
                     to_json(&hook),
                     webhook_text(&managed.silicon.id, &hook),
@@ -489,6 +489,16 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
     let mut result = created_json;
     result["final_status"] = json!(final_status.status);
     result["decided_at"] = json_time(final_status.decided_at);
+    // The creation response said `pending`; report the request and the Silicon as they are now.
+    if let Some(request) = result.get_mut("request").and_then(Value::as_object_mut) {
+        request.insert("status".into(), json!(final_status.status));
+        request.insert("decided_at".into(), json_time(final_status.decided_at));
+    }
+    if !final_status.silicon.status.is_empty()
+        && let Some(silicon) = result.get_mut("silicon").and_then(Value::as_object_mut)
+    {
+        silicon.insert("status".into(), json!(final_status.silicon.status));
+    }
 
     if !final_status.is_accepted() {
         return Err(decision_error(&final_status, &stored));
@@ -750,8 +760,8 @@ pub async fn own_webhook(ctx: &Ctx, args: OwnWebhookArgs) -> CliResult<Outcome> 
         .session_of(AccountKind::Silicon, "A Silicon's own webhook")
         .await?;
     match args.command {
-        OwnWebhookCommand::Set { url } => {
-            let hook = with_session!(ctx, |s| s.set_my_webhook(&url))?;
+        OwnWebhookCommand::Set { endpoint } => {
+            let hook = with_session!(ctx, |s| s.set_my_webhook(&endpoint))?;
             Ok(
                 Outcome::new(to_json(&hook), webhook_text(session.who(), &hook))
                     .next("accounts webhook test", "send a test ping"),

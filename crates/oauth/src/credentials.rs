@@ -1,12 +1,9 @@
 //! Recognizing and looking up the tokens apps present to revoke and introspect, and to refresh.
 
-use std::collections::HashSet;
-
 use accounts_core::ApiResult;
 use accounts_core::crypto::{Pepper, describe_token, prefix};
 use accounts_core::jwt::{AccessClaims, JwtKeys};
 use accounts_core::models::MembershipStatus;
-use jsonwebtoken::{Algorithm, DecodingKey, Validation};
 use sqlx::PgConnection;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -90,30 +87,11 @@ pub(crate) fn where_to_revoke(prefix: &str) -> &'static str {
 }
 
 /// Verifies an access token's signature, key id and issuer but not its expiry, so an app can
-/// still end a sign-in with an access token that already expired. `None` when it is not a
-/// genuine Silicon Accounts access token.
+/// still end a sign-in with an access token that already expired (core's
+/// `JwtKeys::verify_access_ignoring_expiry`). `None` when it is not a genuine Silicon Accounts
+/// access token.
 pub(crate) fn access_claims_ignoring_expiry(jwt: &JwtKeys, token: &str) -> Option<AccessClaims> {
-    let header = jsonwebtoken::decode_header(token).ok()?;
-    if header.alg != Algorithm::EdDSA {
-        return None;
-    }
-    if header.kid.as_deref().is_some_and(|kid| kid != jwt.kid()) {
-        return None;
-    }
-    let jwk = jwt.jwk();
-    let decoding = DecodingKey::from_ed_components(jwk["x"].as_str()?).ok()?;
-    let mut validation = Validation::new(Algorithm::EdDSA);
-    validation.validate_exp = false;
-    validation.validate_nbf = false;
-    validation.validate_aud = false;
-    validation.required_spec_claims = ["iss", "sub", "aud"]
-        .into_iter()
-        .map(str::to_string)
-        .collect::<HashSet<_>>();
-    validation.set_issuer(&[jwt.issuer()]);
-    jsonwebtoken::decode::<AccessClaims>(token, &decoding, &validation)
-        .ok()
-        .map(|data| data.claims)
+    jwt.verify_access_ignoring_expiry(token).ok()
 }
 
 /// A refresh token with its family and the membership of that family's account at its app.

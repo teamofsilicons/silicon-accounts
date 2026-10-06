@@ -7,8 +7,8 @@
 //!
 //! A few functions take `&PgPool` because they must persist a failure even when the request
 //! fails: [`otp::verify`], [`tokens::refresh`], [`tokens::consume_code`],
-//! [`tokens::consume_slt`], [`tokens::poll_device`], [`accounts::record_stk_failure`] and
-//! the [`idempotency`] helpers.
+//! [`tokens::consume_slt`], [`tokens::poll_device`], [`accounts::begin_stk_attempt`],
+//! [`accounts::stk_attempt_failed`] and the [`idempotency`] helpers.
 
 pub mod accounts;
 pub mod apps;
@@ -18,6 +18,7 @@ pub mod idempotency;
 pub mod identities;
 pub mod memberships;
 pub mod otp;
+pub mod photos;
 pub mod rate_limit;
 pub mod sessions;
 pub mod tokens;

@@ -623,26 +623,38 @@ async fn deleted_accounts_get_no_data_replayed_or_shown() {
         .await
         .expect("emit")
         .remove(0);
-    accounts_core::repo::accounts::delete_account(&mut conn, &gone.uuid, &gone.uuid, true)
-        .await
-        .expect("delete");
-    let deleted = events::account_deleted(&mut conn, &gone.uuid)
-        .await
-        .expect("emit")
-        .remove(0);
+    // Core's deletion tells every member app itself (`account.deleted`).
+    accounts_core::repo::accounts::delete_account(
+        &mut conn,
+        &ctx.state.settings,
+        &gone.uuid,
+        &gone.uuid,
+        true,
+    )
+    .await
+    .expect("delete");
+    let deleted_delivery: uuid::Uuid = sqlx::query_scalar(
+        "select d.id from webhook_deliveries d join webhook_events e on e.event_id = d.event_id \
+          where e.type = 'account.deleted' and e.target_id = $1 and e.account_uuid = $2",
+    )
+    .bind(&a.app_id)
+    .bind(&gone.uuid)
+    .fetch_one(&mut *conn)
+    .await
+    .expect("account.deleted was emitted by the deletion");
     drop(conn);
     finish(&ctx, update.delivery_id, "failed", 7).await;
-    finish(&ctx, deleted.delivery_id, "failed", 7).await;
+    finish(&ctx, deleted_delivery, "failed", 7).await;
 
     let r = call(
         &ctx,
         Req::post(&format!("/v1/apps/{}/webhook/replay", a.app_id))
             .basic(&a.app_id, &a.secret)
-            .json(json!({"delivery_ids": [update.delivery_id, deleted.delivery_id]})),
+            .json(json!({"delivery_ids": [update.delivery_id, deleted_delivery]})),
     )
     .await;
     assert_eq!(r.status, 200, "{}", r.json);
-    assert_eq!(r.json["replayed"], json!([deleted.delivery_id]));
+    assert_eq!(r.json["replayed"], json!([deleted_delivery]));
     assert_eq!(r.json["skipped"][0]["reason"], "account_deleted");
     assert!(
         r.json["skipped"][0]["message"]

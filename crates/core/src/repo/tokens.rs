@@ -5,6 +5,10 @@
 //! A token family is one sign-in of one account to one app. It lives 900 days from creation
 //! (absolute) and holds a chain of refresh tokens: every refresh marks the presented token used
 //! and issues the next generation. Presenting a used refresh token revokes the whole family.
+//!
+//! Every expiry stored in the database (families, codes, SLTs, device codes) is compared with
+//! the database clock (`now()`), so the API nodes' clocks never matter for them. Only an access
+//! token's own `exp`/`nbf` are checked with the node's clock (with leeway), as JWTs are.
 
 use sqlx::{Connection, PgConnection, PgPool};
 use time::OffsetDateTime;
@@ -35,7 +39,7 @@ pub const DEVICE_POLL_INTERVAL_SECONDS: i64 = 5;
 macro_rules! family_columns {
     () => {
         "id, app_id, account_uuid, origin, scopes, browser_session_id, label, created_at, expires_at, last_used_at, \
-         revoked_at, revoke_reason, ip, user_agent"
+         revoked_at, revoke_reason, ip, user_agent, auth_time"
     };
 }
 
@@ -56,10 +60,14 @@ pub struct TokenFamily {
     pub revoke_reason: Option<String>,
     pub ip: Option<String>,
     pub user_agent: Option<String>,
+    /// When the account actually authenticated for this sign-in (OIDC `auth_time`); `None` =
+    /// at `created_at` (every grant except an authorization code authenticates at issuance).
+    pub auth_time: Option<OffsetDateTime>,
 }
 
 impl TokenFamily {
-    /// Not revoked and not past its absolute expiry.
+    /// Not revoked and not past its absolute expiry (judged with this node's clock; the
+    /// repository functions use the database clock).
     pub fn is_active(&self) -> bool {
         self.revoked_at.is_none() && self.expires_at > OffsetDateTime::now_utc()
     }
@@ -67,6 +75,19 @@ impl TokenFamily {
     pub fn scope_list(&self) -> Vec<Scope> {
         scopes_from_strings(&self.scopes)
     }
+
+    /// When the account authenticated for this sign-in: `auth_time`, else `created_at`.
+    pub fn authenticated_at(&self) -> OffsetDateTime {
+        self.auth_time.unwrap_or(self.created_at)
+    }
+}
+
+/// A family with its expiry judged by the database clock.
+#[derive(sqlx::FromRow)]
+struct FamilyRow {
+    #[sqlx(flatten)]
+    family: TokenFamily,
+    expired: bool,
 }
 
 /// Why a grant (code, refresh token, SLT, device code) was refused. Converts to [`OAuthError`].
@@ -154,13 +175,15 @@ pub struct NewFamily<'a> {
     pub label: Option<&'a str>,
     pub ip: Option<&'a str>,
     pub user_agent: Option<&'a str>,
+    /// When the account authenticated (see [`TokenFamily::auth_time`]); `None` = now.
+    pub auth_time: Option<OffsetDateTime>,
 }
 
 /// Creates a token family (expires 900 days from now).
 pub async fn create_family(conn: &mut PgConnection, new: &NewFamily<'_>) -> ApiResult<TokenFamily> {
     Ok(sqlx::query_as::<_, TokenFamily>(concat!(
-        "insert into token_families (id, app_id, account_uuid, origin, scopes, browser_session_id, label, expires_at, ip, user_agent) \
-         values ($1, $2, $3, $4, $5, $6, $7, now() + make_interval(days => $8), $9, $10) returning ",
+        "insert into token_families (id, app_id, account_uuid, origin, scopes, browser_session_id, label, expires_at, ip, user_agent, auth_time) \
+         values ($1, $2, $3, $4, $5, $6, $7, now() + make_interval(days => $8), $9, $10, $11) returning ",
         family_columns!()
     ))
     .bind(Uuid::now_v7())
@@ -173,6 +196,7 @@ pub async fn create_family(conn: &mut PgConnection, new: &NewFamily<'_>) -> ApiR
     .bind(REFRESH_TOKEN_DAYS as i32)
     .bind(new.ip)
     .bind(new.user_agent.map(|u| u.chars().take(400).collect::<String>()))
+    .bind(new.auth_time)
     .fetch_one(&mut *conn)
     .await?)
 }
@@ -209,6 +233,10 @@ pub struct IssueRequest<'a> {
     pub user_agent: Option<&'a str>,
     /// OIDC nonce from the authorization request.
     pub nonce: Option<&'a str>,
+    /// When the account actually authenticated, if earlier than now: an authorization code's
+    /// [`AuthCode::auth_time`]. Kept on the family for every id_token it issues (OIDC
+    /// `auth_time`), also after refreshes. `None` = now.
+    pub auth_time: Option<OffsetDateTime>,
 }
 
 /// Starts a sign-in: creates the family and returns the full token response (access token,
@@ -242,6 +270,7 @@ pub async fn issue_tokens(
             label: req.label,
             ip: req.ip,
             user_agent: req.user_agent,
+            auth_time: req.auth_time,
         },
     )
     .await?;
@@ -286,7 +315,7 @@ async fn build_response(
             aud: family.app_id.clone(),
             exp: claims.exp,
             iat: claims.iat,
-            auth_time: Some(family.created_at.unix_timestamp()),
+            auth_time: Some(family.authenticated_at().unix_timestamp()),
             nonce: nonce.map(str::to_string),
             name: Some(account.display_name.clone()),
             picture: Some(account.pfp_url.clone()),
@@ -353,10 +382,10 @@ pub async fn refresh(
                 .into(),
         ));
     };
-    let family = sqlx::query_as::<_, TokenFamily>(concat!(
+    let FamilyRow { family, expired } = sqlx::query_as::<_, FamilyRow>(concat!(
         "select ",
         family_columns!(),
-        " from token_families where id = $1 for update"
+        ", expires_at <= now() as expired from token_families where id = $1 for update"
     ))
     .bind(family_id)
     .fetch_one(&mut *tx)
@@ -373,8 +402,7 @@ pub async fn refresh(
             family.revoke_reason.as_deref().unwrap_or("revoked")
         )));
     }
-    let now = OffsetDateTime::now_utc();
-    if family.expires_at <= now {
+    if expired {
         return Err(GrantError::Invalid(format!(
             "The refresh token expired at {} (refresh tokens last {REFRESH_TOKEN_DAYS} days from sign-in); sign in again.",
             crate::timefmt::format_rfc3339_ms(family.expires_at)
@@ -588,7 +616,15 @@ pub async fn verify_access_token(
             "The access token has no valid family id (fid).",
         )
     })?;
-    let family = find_family(conn, family_id).await?.ok_or_else(|| {
+    let FamilyRow { family, expired } = sqlx::query_as::<_, FamilyRow>(concat!(
+        "select ",
+        family_columns!(),
+        ", expires_at <= now() as expired from token_families where id = $1"
+    ))
+    .bind(family_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or_else(|| {
         ApiError::unauthenticated(
             "token_revoked",
             "The sign-in behind this access token no longer exists.",
@@ -613,7 +649,7 @@ pub async fn verify_access_token(
         )
         .hint("Sign in again."));
     }
-    if family.expires_at <= OffsetDateTime::now_utc() {
+    if expired {
         return Err(ApiError::unauthenticated(
             "token_revoked",
             "The sign-in behind this access token expired.",
@@ -654,6 +690,9 @@ pub struct NewAuthCode<'a> {
     pub scopes: &'a [Scope],
     pub nonce: Option<&'a str>,
     pub browser_session_id: Option<Uuid>,
+    /// When the account authenticated in the browser that completed the flow (the browser
+    /// session's `authenticated_at`). The token family issued from the code keeps it.
+    pub auth_time: Option<OffsetDateTime>,
 }
 
 /// A stored authorization code.
@@ -672,6 +711,18 @@ pub struct AuthCode {
     pub created_at: OffsetDateTime,
     pub expires_at: OffsetDateTime,
     pub consumed_at: Option<OffsetDateTime>,
+    /// When the account authenticated (see [`NewAuthCode::auth_time`]); pass it as
+    /// [`IssueRequest::auth_time`].
+    pub auth_time: Option<OffsetDateTime>,
+}
+
+/// Columns of [`AuthCode`], in its field order (for `select`s of other crates).
+#[macro_export]
+macro_rules! auth_code_columns {
+    () => {
+        "code_hash, flow_id, app_id, account_uuid, redirect_uri, code_challenge, code_challenge_method, scopes, \
+         nonce, browser_session_id, created_at, expires_at, consumed_at, auth_time"
+    };
 }
 
 impl AuthCode {
@@ -698,8 +749,8 @@ pub async fn create_code(
     let code = random_token(prefix::AUTH_CODE);
     sqlx::query(
         "insert into authorization_codes (code_hash, flow_id, app_id, account_uuid, redirect_uri, code_challenge, \
-         code_challenge_method, scopes, nonce, browser_session_id, expires_at) \
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now() + make_interval(secs => $11))",
+         code_challenge_method, scopes, nonce, browser_session_id, expires_at, auth_time) \
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now() + make_interval(secs => $11), $12)",
     )
     .bind(pepper.hash(&code))
     .bind(new.flow_id)
@@ -712,14 +763,22 @@ pub async fn create_code(
     .bind(new.nonce)
     .bind(new.browser_session_id)
     .bind(AUTH_CODE_TTL_SECONDS as f64)
+    .bind(new.auth_time)
     .execute(&mut *conn)
     .await?;
     Ok(code)
 }
 
 /// Redeems an authorization code for `app_id`. Checks single use, expiry, app, exact
-/// `redirect_uri`, and PKCE when the flow had a challenge. Any failed attempt burns the code; a
-/// reused code also revokes the tokens issued from it. Takes the pool so that sticks.
+/// `redirect_uri`, and PKCE: a `code_verifier` is required when the flow had a challenge, and
+/// refused when it had none (RFC 9700 §2.1.1: otherwise a client relying on PKCE could be fed a
+/// code an attacker obtained without one). Any failed attempt burns the code; a reused code also
+/// revokes the tokens issued from it. Takes the pool so that sticks.
+///
+/// The consumption commits before the caller issues tokens, so a concurrent reuse can miss the
+/// tokens the winner issues afterwards. The token endpoint (the oauth crate) therefore consumes
+/// and issues in one transaction under the code's row lock instead; use this only where that
+/// doesn't matter (tests, tools).
 pub async fn consume_code(
     pool: &PgPool,
     pepper: &Pepper,
@@ -737,15 +796,19 @@ pub async fn consume_code(
         )));
     }
     let mut tx = pool.begin().await?;
-    let row = sqlx::query_as::<_, AuthCode>(
-        "select code_hash, flow_id, app_id, account_uuid, redirect_uri, code_challenge, code_challenge_method, scopes, \
-         nonce, browser_session_id, created_at, expires_at, consumed_at from authorization_codes \
-         where code_hash = $1 for update",
-    )
+    let row = sqlx::query_as::<_, CodeRow>(concat!(
+        "select ",
+        auth_code_columns!(),
+        ", expires_at <= now() as expired from authorization_codes where code_hash = $1 for update"
+    ))
     .bind(pepper.hash(code))
     .fetch_optional(&mut *tx)
     .await?;
-    let Some(auth) = row else {
+    let Some(CodeRow {
+        code: auth,
+        expired,
+    }) = row
+    else {
         return Err(GrantError::Invalid(
             "The authorization code is not known: it is mistyped or was never issued.".into(),
         ));
@@ -766,7 +829,7 @@ pub async fn consume_code(
                 .into(),
         ));
     }
-    let failure = if auth.expires_at <= OffsetDateTime::now_utc() {
+    let failure = if expired {
         Some(format!(
             "The authorization code expired at {} (codes are valid for {AUTH_CODE_TTL_SECONDS} seconds); start the sign-in again.",
             crate::timefmt::format_rfc3339_ms(auth.expires_at)
@@ -800,6 +863,11 @@ pub async fn consume_code(
                 }
             }
         }
+    } else if code_verifier.is_some() {
+        Some(
+            "code_verifier was sent, but the authorization request had no code_challenge. It is refused to prevent PKCE downgrade attacks (RFC 9700 section 2.1.1): send code_challenge with code_challenge_method=S256 to /authorize, or omit code_verifier."
+                .to_string(),
+        )
     } else {
         None
     };
@@ -812,6 +880,14 @@ pub async fn consume_code(
         Some(msg) => Err(GrantError::Invalid(msg)),
         None => Ok(auth),
     }
+}
+
+/// An authorization code with its expiry judged by the database clock.
+#[derive(sqlx::FromRow)]
+struct CodeRow {
+    #[sqlx(flatten)]
+    code: AuthCode,
+    expired: bool,
 }
 
 /// A stored short-lived token.
@@ -873,14 +949,16 @@ pub async fn consume_slt(
         )));
     }
     let mut tx = pool.begin().await?;
-    let row = sqlx::query_as::<_, ShortLivedToken>(
-        "select token_hash, account_uuid, app_id, scopes, created_at, expires_at, consumed_at from short_lived_tokens \
+    let row: Option<(ShortLivedToken, bool)> = sqlx::query_as::<_, SltRow>(
+        "select token_hash, account_uuid, app_id, scopes, created_at, expires_at, consumed_at, \
+                expires_at <= now() as expired from short_lived_tokens \
          where token_hash = $1 for update",
     )
     .bind(pepper.hash(slt))
     .fetch_optional(&mut *tx)
-    .await?;
-    let Some(t) = row else {
+    .await?
+    .map(|r| (r.token, r.expired));
+    let Some((t, expired)) = row else {
         return Err(GrantError::Invalid(
             "The short-lived token is not known: it is mistyped or was never issued.".into(),
         ));
@@ -890,7 +968,7 @@ pub async fn consume_slt(
             "The short-lived token was already used; each one works once. Get a new one.".into(),
         ));
     }
-    let failure = if t.expires_at <= OffsetDateTime::now_utc() {
+    let failure = if expired {
         Some(format!(
             "The short-lived token expired at {} (they last {SLT_TTL_SECONDS} seconds); get a new one with `accounts login --app {}`.",
             crate::timefmt::format_rfc3339_ms(t.expires_at),
@@ -915,6 +993,14 @@ pub async fn consume_slt(
     }
 }
 
+/// A short-lived token with its expiry judged by the database clock.
+#[derive(sqlx::FromRow)]
+struct SltRow {
+    #[sqlx(flatten)]
+    token: ShortLivedToken,
+    expired: bool,
+}
+
 /// A device authorization (CLI device flow).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct DeviceAuthorization {
@@ -931,13 +1017,34 @@ pub struct DeviceAuthorization {
     pub last_polled_at: Option<OffsetDateTime>,
 }
 
-/// Result of [`create_device`].
-#[derive(Debug, Clone)]
+/// Result of [`create_device`]. `Debug` hides the device code (a bearer credential).
+#[derive(Clone)]
 pub struct DeviceStart {
     pub device_code: String,
     pub user_code: String,
     pub expires_at: OffsetDateTime,
     pub interval: i64,
+}
+
+impl std::fmt::Debug for DeviceStart {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DeviceStart")
+            .field("device_code", &"[redacted]")
+            .field("user_code", &self.user_code)
+            .field("expires_at", &self.expires_at)
+            .field("interval", &self.interval)
+            .finish()
+    }
+}
+
+/// A device authorization with its expiry judged by the database clock.
+#[derive(sqlx::FromRow)]
+struct DeviceRow {
+    #[sqlx(flatten)]
+    device: DeviceAuthorization,
+    expired: bool,
+    /// Milliseconds since the previous poll (database clock), if any.
+    since_last_poll_ms: Option<f64>,
 }
 
 macro_rules! device_columns {
@@ -1023,6 +1130,8 @@ pub async fn device_by_user_code(
 }
 
 /// Approves (`approve = true`) or denies a pending device authorization as `account_uuid`.
+/// The code's row is locked first, so of concurrent decisions exactly one wins and the others
+/// get 409 `device_code_used`.
 /// Errors: 404 `device_code_not_found`, 410 `device_code_expired`, 409 `device_code_used`.
 pub async fn decide_device(
     conn: &mut PgConnection,
@@ -1031,8 +1140,24 @@ pub async fn decide_device(
     approve: bool,
 ) -> ApiResult<DeviceAuthorization> {
     let mut tx = conn.begin().await?;
-    let current = device_by_user_code(&mut tx, user_code).await?;
-    if current.expires_at <= OffsetDateTime::now_utc() {
+    let found = device_by_user_code(&mut tx, user_code).await?;
+    let DeviceRow {
+        device: current,
+        expired,
+        ..
+    } = sqlx::query_as::<_, DeviceRow>(concat!(
+        "select ",
+        device_columns!(),
+        ", expires_at <= now() as expired, null::float8 as since_last_poll_ms \
+         from device_authorizations where user_code = $1 for update"
+    ))
+    .bind(&found.user_code)
+    .fetch_one(&mut *tx)
+    .await?;
+    if expired {
+        // End the transaction now: a dropped one would keep the row lock until the caller's
+        // connection is used again.
+        tx.rollback().await?;
         return Err(ApiError::gone(
             "device_code_expired",
             format!(
@@ -1044,6 +1169,7 @@ pub async fn decide_device(
         .hint("Run `accounts login` again for a new code."));
     }
     if current.status != "pending" {
+        tx.rollback().await?;
         return Err(ApiError::conflict(
             "device_code_used",
             format!(
@@ -1077,21 +1203,27 @@ pub async fn poll_device(
 ) -> Result<DeviceAuthorization, GrantError> {
     let device_code = device_code.trim();
     let mut tx = pool.begin().await?;
-    let row = sqlx::query_as::<_, DeviceAuthorization>(concat!(
+    let row = sqlx::query_as::<_, DeviceRow>(concat!(
         "select ",
         device_columns!(),
-        " from device_authorizations where device_code_hash = $1 for update"
+        ", expires_at <= now() as expired, \
+           extract(epoch from (now() - last_polled_at))::float8 * 1000 as since_last_poll_ms \
+         from device_authorizations where device_code_hash = $1 for update"
     ))
     .bind(pepper.hash(device_code))
     .fetch_optional(&mut *tx)
     .await?;
-    let Some(d) = row else {
+    let Some(DeviceRow {
+        device: d,
+        expired,
+        since_last_poll_ms,
+    }) = row
+    else {
         return Err(GrantError::Invalid(
             "The device_code is not known: it is mistyped or was never issued.".into(),
         ));
     };
-    let now = OffsetDateTime::now_utc();
-    if d.expires_at <= now && d.status != "consumed" {
+    if expired && d.status != "consumed" {
         return Err(GrantError::ExpiredToken(format!(
             "The device code expired at {}; run `accounts login` again.",
             crate::timefmt::format_rfc3339_ms(d.expires_at)
@@ -1116,9 +1248,8 @@ pub async fn poll_device(
             Ok(consumed)
         }
         _ => {
-            let too_fast = d.last_polled_at.is_some_and(|t| {
-                (now - t).whole_milliseconds() < (DEVICE_POLL_INTERVAL_SECONDS * 1000 - 250) as i128
-            });
+            let too_fast = since_last_poll_ms
+                .is_some_and(|ms| ms < (DEVICE_POLL_INTERVAL_SECONDS * 1000 - 250) as f64);
             sqlx::query("update device_authorizations set last_polled_at = now() where device_code_hash = $1")
                 .bind(&d.device_code_hash)
                 .execute(&mut *tx)

@@ -24,6 +24,7 @@
     "mocks": "tsx src/start.ts",
     "accounts-env": "tsx src/print-env.ts",
     "test": "tsx --test --test-reporter=spec \"test/**/*.test.ts\"",
+    "journeys": "tsx journeys/run.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check:generated": "tsx scripts/build-fake-apps.ts --check && tsx scripts/build-import-fixtures.ts --check",
     "gen:apps": "tsx scripts/build-fake-apps.ts",

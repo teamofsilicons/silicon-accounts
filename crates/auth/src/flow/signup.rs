@@ -8,15 +8,16 @@
 //!
 //! Finishing an imported account: the session names the `unclaimed` account its proven email
 //! or phone belongs to (`claim_account_uuid`). The claim only holds while that account is
-//! still unclaimed: the first Carbon to finish it gets it, the import's other (unproven)
-//! emails and phones are removed from it, and every other sign-up that pointed at it becomes
-//! an ordinary sign-up (it never sees or reaches the finished account).
+//! still unclaimed: the first Carbon to finish it gets it (core's `accounts::finish_claim`,
+//! which also removes the import's other, unproven emails and phones), and every other sign-up
+//! that pointed at it becomes an ordinary sign-up (it never sees or reaches the finished
+//! account).
 
 use accounts_core::http::cookies::{SIGNUP_COOKIE, clear_cookie, read_cookie, signup_cookie};
 use accounts_core::http::{ClientMeta, Json, Path};
 use accounts_core::ids::AccountId;
 use accounts_core::models::{
-    Account, AccountField, AccountKind, AccountStatus, ActorKind, Provider, VerifiedVia,
+    Account, AccountKind, AccountStatus, ActorKind, Provider, VerifiedVia,
 };
 use accounts_core::normalize::{
     normalize_timezone, validate_display_name, validate_dob, validate_pfp_url,
@@ -24,7 +25,7 @@ use accounts_core::normalize::{
 use accounts_core::repo::accounts::{self, NewCarbon, NewContact, ProfileUpdate};
 use accounts_core::repo::audit::{self, AuditEntry};
 use accounts_core::repo::contacts::{self, ContactKind};
-use accounts_core::repo::identities;
+use accounts_core::repo::{identities, photos};
 use accounts_core::timefmt::{date, format_rfc3339_ms, parse_date, rfc3339_ms};
 use accounts_core::{ApiError, ApiResult, AppState, FieldErrors, events};
 use axum::extract::State;
@@ -40,7 +41,6 @@ use super::browser;
 use super::model::{self, Flow, Step};
 use super::view::{self, ViewContext};
 use super::{FlowApp, FlowResponse, load_bound, next};
-use crate::contact;
 use crate::suggest;
 use crate::util::telemetry;
 
@@ -544,6 +544,13 @@ pub async fn submit_signup(
     }
     let prefill = prefill(&mut tx, &state, &meta, &flow, &session).await?;
     let details = validate_details(&state, &body, &prefill)?;
+    // A new (or imported) account has no uploads, so a photo of this service can't be its own;
+    // keeping the imported account's current photo changes nothing.
+    if let Some(url) = details.pfp_url.as_deref()
+        && claimed.as_ref().is_none_or(|c| c.pfp_url != url)
+    {
+        photos::check_usable(&mut tx, &state.settings, url, &[], "you").await?;
+    }
 
     let account = match claimed {
         Some(current) => {
@@ -602,10 +609,10 @@ async fn create_account(
     // This sign-up proved its email/phone: an unverified row an import left on another account
     // identifies nobody and is removed (otherwise the new account couldn't have the address).
     if let Some(e) = session.email() {
-        contact::after_proof(conn, ContactKind::Email, e, meta.ip.as_deref()).await?;
+        contacts::after_proof(conn, ContactKind::Email, e, meta.ip.as_deref()).await?;
     }
     if let Some(p) = &session.verified_phone {
-        contact::after_proof(conn, ContactKind::Phone, p, meta.ip.as_deref()).await?;
+        contacts::after_proof(conn, ContactKind::Phone, p, meta.ip.as_deref()).await?;
     }
     let mut emails = Vec::new();
     if let Some(e) = &session.verified_email {
@@ -702,29 +709,21 @@ async fn finish_import(
     )
     .await?;
 
-    // The email/phone proven in this sign-up becomes verified (and primary if needed).
-    let mut contact_changed: Vec<AccountField> = Vec::new();
+    // The email/phone proven in this sign-up becomes verified (and primary if needed), what the
+    // import listed and this Carbon didn't prove is removed (an unproven address must never
+    // sign anyone into this account), and the account becomes active: core's finish_claim.
+    let mut proven: Vec<(ContactKind, &str, VerifiedVia)> = Vec::new();
     if let Some(email) = session.email() {
         let via = match (&session.verified_email, session.provider) {
             (Some(_), _) | (None, None) => VerifiedVia::Code,
             (None, Some(p)) => p.verified_via(),
         };
-        if prove_contact(conn, ContactKind::Email, uuid, email, via).await? {
-            contact_changed.push(AccountField::Email);
-        }
+        proven.push((ContactKind::Email, email, via));
     }
-    if let Some(phone) = &session.verified_phone
-        && prove_contact(conn, ContactKind::Phone, uuid, phone, VerifiedVia::Code).await?
-    {
-        contact_changed.push(AccountField::Phone);
+    if let Some(phone) = &session.verified_phone {
+        proven.push((ContactKind::Phone, phone, VerifiedVia::Code));
     }
-    // What the import listed and this Carbon didn't prove can't stay: an unproven address
-    // must never sign anyone into this account.
-    for field in contact::drop_unverified(conn, uuid).await? {
-        if !contact_changed.contains(&field) {
-            contact_changed.push(field);
-        }
-    }
+    let claimed = accounts::finish_claim(conn, uuid, &proven).await?;
     // Other sign-ups that were about to finish this account are ordinary sign-ups now.
     sqlx::query(
         "update signup_sessions set claim_account_uuid = null \
@@ -735,12 +734,9 @@ async fn finish_import(
     .execute(&mut *conn)
     .await?;
     link_provider_identity(conn, session, &current).await?;
-    let mut account = accounts::set_status(conn, uuid, AccountStatus::Active).await?;
-    if !contact_changed.is_empty() {
-        account = accounts::bump_version(conn, uuid).await?;
-    }
+    let account = claimed.account;
     let mut all_changed = changed;
-    all_changed.extend(contact_changed);
+    all_changed.extend(claimed.changed);
     if !all_changed.is_empty() {
         events::notify_profile_updated(conn, &account, &all_changed).await?;
     }
@@ -758,32 +754,6 @@ async fn finish_import(
     )
     .await?;
     Ok(account)
-}
-
-/// Marks a proven email/phone verified on the account (adding it when it isn't there yet) and
-/// makes it primary when the current primary of that kind isn't verified. Returns true when
-/// the primary changed (apps with the matching scope must hear about it).
-pub async fn prove_contact(
-    conn: &mut PgConnection,
-    kind: ContactKind,
-    account_uuid: &str,
-    value: &str,
-    via: VerifiedVia,
-) -> ApiResult<bool> {
-    let before = contacts::primary(conn, kind, account_uuid).await?;
-    let on_account = contacts::owner(conn, kind, value)
-        .await?
-        .is_some_and(|(owner, _)| owner == account_uuid);
-    if on_account {
-        contacts::mark_verified(conn, kind, account_uuid, value, via).await?;
-    } else {
-        contacts::add_verified(conn, kind, account_uuid, value, via).await?;
-    }
-    if !before.as_ref().is_some_and(|p| p.verified) {
-        contacts::set_primary(conn, kind, account_uuid, value).await?;
-    }
-    let after = contacts::primary(conn, kind, account_uuid).await?;
-    Ok(before.map(|p| (p.value, p.verified)) != after.map(|p| (p.value, p.verified)))
 }
 
 async fn link_provider_identity(

@@ -27,7 +27,7 @@ async fn change_my_id(
     Json(body): Json<ChangeId>,
 ) -> Result<Response, ApiError> {
     let scope = idempotency::scope(&format!("account:{}", me.uuid()), "POST", "/v1/me/id");
-    idempotency::run(&state.db, key.as_deref(), &scope, &body, false, || async {
+    idempotency::run(&state, key.as_deref(), &scope, &body, false, || async {
         let new_id = AccountId::parse_for_kind(&body.id, me.kind())
             .map_err(|e| accounts::invalid_id_error(&e))?;
         let mut tx = state.db.begin().await?;

@@ -3,8 +3,10 @@
 //! Requests store messages in `outbound_messages` (core `delivery::enqueue`) and try to send
 //! them right after their transaction commits. This loop sends whatever is still `pending` and
 //! due. It claims messages with core's `delivery::claim_due` (`FOR UPDATE SKIP LOCKED`; a claim
-//! bumps `attempts` and holds the message for 60 s) and sends each through core's
-//! `delivery::deliver_claimed`, which records `sent`, schedules the retry or marks `failed`.
+//! bumps `attempts` and holds the message for `delivery::CLAIM_SECONDS`, 60 s) and sends each
+//! through core's `delivery::deliver_claimed`, which records `sent`, schedules the retry or marks
+//! `failed` — only while the claim still holds: a result that comes back after another node
+//! claimed the message again is not recorded (`claim_lost`).
 //!
 //! A claim never outlives its send: the loop runs on the [claim pipeline](crate::pipeline),
 //! which claims only as many messages as it has free send slots ([`CONCURRENCY`]) and starts
@@ -53,6 +55,9 @@ pub struct SendSummary {
     pub abandoned: usize,
     /// Sends whose result could not be recorded (database error); retried when their claim ends.
     pub errors: usize,
+    /// Sends that finished after their claim ran out and another node claimed the message again;
+    /// their result was not recorded (the other node's counts).
+    pub claim_lost: usize,
     /// Pending messages marked `local` (local mode).
     pub marked_local: u64,
 }
@@ -77,6 +82,7 @@ impl SendResult {
             SendResult::Done(DeliveryOutcome::Retrying { .. }) => "retrying",
             SendResult::Done(DeliveryOutcome::Failed { .. }) => "failed",
             SendResult::Done(DeliveryOutcome::Skipped) => "skipped",
+            SendResult::Done(DeliveryOutcome::ClaimLost) => "claim_lost",
             SendResult::Abandoned => "abandoned",
             SendResult::Error(_) => "error",
         }
@@ -146,6 +152,7 @@ pub async fn send_due_within(state: &AppState, budget: Duration) -> ApiResult<Se
             SendResult::Done(DeliveryOutcome::Retrying { .. }) => summary.retrying += 1,
             SendResult::Done(DeliveryOutcome::Failed { .. }) => summary.failed += 1,
             SendResult::Done(DeliveryOutcome::Skipped) => {}
+            SendResult::Done(DeliveryOutcome::ClaimLost) => summary.claim_lost += 1,
             SendResult::Abandoned => summary.abandoned += 1,
             SendResult::Error(_) => summary.errors += 1,
         }

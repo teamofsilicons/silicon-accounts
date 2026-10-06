@@ -66,8 +66,9 @@ pub use sweep::{GRANT_RETENTION_DAYS, PurgedGrants, purge_expired_grants};
 pub use token::{DEVICE_CODE_GRANT_TYPE, SLT_GRANT_TYPE};
 
 /// The `membership.signed_out` reason sent when a reused authorization code revokes the
-/// tokens issued from it.
-pub const SIGNOUT_REASON_CODE_REUSE: &str = "authorization_code_reuse";
+/// tokens issued from it (core's `events::signout_reason::AUTHORIZATION_CODE_REUSE`).
+pub const SIGNOUT_REASON_CODE_REUSE: &str =
+    accounts_core::events::signout_reason::AUTHORIZATION_CODE_REUSE;
 
 /// HTTP routes of this crate (merged into the API router by the server crate).
 pub fn router() -> Router<AppState> {

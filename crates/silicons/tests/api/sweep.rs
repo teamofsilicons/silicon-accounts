@@ -152,7 +152,7 @@ async fn spawn_background_starts_the_sweep() {
 }
 
 #[tokio::test]
-async fn silicons_named_by_a_deleted_carbon_are_released() {
+async fn silicons_named_by_a_deleted_carbon_are_released_by_the_deletion() {
     let ctx = TestContext::new().await;
     let gone = ctx.carbon().await;
     let cid = gone.handle.clone().expect("id");
@@ -163,16 +163,23 @@ async fn silicons_named_by_a_deleted_carbon_are_released() {
     )
     .await;
     let signs_in = self_created(&ctx, &cid, json!({})).await;
-    let swept = self_created(&ctx, &cid, json!({})).await;
 
-    // The named Carbon deletes their account (core cancels requests addressed to them).
+    // The named Carbon deletes their account: core cancels the requests addressed to them and
+    // releases the Silicons that were waiting, telling them on their webhooks.
     let mut conn = ctx.conn().await;
-    accounts_core::repo::accounts::delete_account(&mut conn, &gone.uuid, &gone.uuid, true)
-        .await
-        .expect("delete");
+    let deleted = accounts_core::repo::accounts::delete_account(
+        &mut conn,
+        &ctx.state.settings,
+        &gone.uuid,
+        &gone.uuid,
+        true,
+    )
+    .await
+    .expect("delete");
     drop(conn);
+    assert_eq!(deleted.released_silicons.len(), 2);
 
-    // Polling shows the cancelled request and releases the Silicon at once.
+    // Polling shows the cancelled request and the released Silicon.
     let r = call(
         &ctx,
         Req::get(&format!(
@@ -190,8 +197,9 @@ async fn silicons_named_by_a_deleted_carbon_are_released() {
     let (t, p) = events.last().expect("event");
     assert_eq!(t, "silicon.custodian.declined");
     assert_eq!(p["data"]["reason"], "custodian_account_deleted");
+    assert_eq!(p["data"]["custodian"], cid.as_str());
 
-    // Signing in (right STK) explains it and releases the Silicon.
+    // Signing in (right STK) explains it.
     let r = login(
         &ctx,
         signs_in["silicon"]["id"].as_str().expect("id"),
@@ -212,15 +220,27 @@ async fn silicons_named_by_a_deleted_carbon_are_released() {
             .status,
         AccountStatus::Deleted
     );
-    let again = login(
-        &ctx,
-        signs_in["silicon"]["id"].as_str().expect("id"),
-        signs_in["stk"].as_str().expect("stk"),
-    )
-    .await;
-    assert_eq!(again.error_code(), Some("custodian_declined"));
 
-    // The sweep releases the rest.
+    // Nothing is left for the sweep.
+    assert_eq!(
+        expire_overdue(&ctx.state).await.expect("sweep"),
+        SweepReport::default()
+    );
+}
+
+/// The safety net: a request cancelled without releasing its Silicon (as account deletions
+/// did before core released them) is still released by the sweep.
+#[tokio::test]
+async fn the_sweep_releases_silicons_left_waiting_on_a_cancelled_request() {
+    let ctx = TestContext::new().await;
+    let named = ctx.carbon().await;
+    let cid = named.handle.clone().expect("id");
+    let swept = self_created(&ctx, &cid, json!({})).await;
+    let request_id = swept["request"]["id"].as_str().expect("id").to_string();
+    ctx.exec(&format!(
+        "update custodian_requests set status = 'cancelled', decided_at = now() where id = '{request_id}'"
+    ))
+    .await;
     let report = expire_overdue(&ctx.state).await.expect("sweep");
     assert_eq!(
         report,

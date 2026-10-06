@@ -369,6 +369,28 @@ pub mod stk {
                 .verify_password(stk.as_bytes(), &parsed)
                 .is_ok()
         }
+
+        /// [`StkHasher::hash`] on the blocking thread pool: Argon2id is deliberately slow and
+        /// memory-hard, so it must not stall the async runtime's threads. Use this in handlers.
+        pub async fn hash_async(self, stk: String) -> Result<String, CryptoError> {
+            tokio::task::spawn_blocking(move || self.hash(&stk))
+                .await
+                .map_err(|e| CryptoError::Hash(format!("the STK hashing task failed: {e}")))?
+        }
+
+        /// [`StkHasher::verify`] on the blocking thread pool (false if the task fails).
+        pub async fn verify_async(stk: String, phc: String) -> bool {
+            tokio::task::spawn_blocking(move || StkHasher::verify(&stk, &phc))
+                .await
+                .unwrap_or(false)
+        }
+
+        /// Spends the same Argon2id work as a verification without checking anything, so a
+        /// sign-in with an unknown si:id takes as long as one with a wrong STK (no timing
+        /// oracle for ids).
+        pub async fn burn_async(self) {
+            let _ = self.hash_async("stk-000000000000".to_string()).await;
+        }
     }
 }
 

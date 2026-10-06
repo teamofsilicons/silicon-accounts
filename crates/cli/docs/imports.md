@@ -34,7 +34,7 @@ These are the only columns accepted (the user base has fixed columns):
 | `username` | wanted handle (`john` or `c:john`) |
 | `dob` | `YYYY-MM-DD`, `DD/MM/YYYY`, `MM/DD/YYYY` (when unambiguous), `YYYY/MM/DD` |
 | `timezone` | IANA name; invalid → UTC with a warning |
-| `pfp_url` | https only |
+| `pfp_url` | https only, and not a photo uploaded to Silicon Accounts (→ default photo, with a warning) |
 | `email_verified` | informational; imported emails are never trusted as verified |
 
 Any other column makes the import fail with `unknown_columns` (listing them), unless

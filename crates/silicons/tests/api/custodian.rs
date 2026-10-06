@@ -794,3 +794,112 @@ async fn deleting_a_silicon_deletes_its_uploaded_photos() {
     .expect("audit");
     assert_eq!(details["deleted_photos"], 1);
 }
+
+/// A custodian's renames count toward the Silicon's 24-hour limit (core's `change_id`), the
+/// same limit `POST /v1/me/id` applies.
+#[tokio::test]
+async fn a_custodian_renames_a_silicon_at_most_five_times_a_day() {
+    let ctx = TestContext::new().await;
+    let saket = ctx.carbon().await;
+    let t = token(&ctx, &saket).await;
+    let (silicon, _) = ctx.silicon(&saket.uuid).await;
+    let base = format!("ren{}", accounts_core::test_support::rand_suffix());
+    let rename = |n: String| {
+        Req::post(&format!("/v1/me/silicons/{}/id", silicon.uuid))
+            .bearer(&t)
+            .json(json!({ "id": format!("si:{base}-{n}") }))
+    };
+    for i in 0..5 {
+        let r = call(&ctx, rename(i.to_string())).await;
+        assert_eq!(r.status, 200, "{}", r.json);
+    }
+    let r = call(&ctx, rename("six".into())).await;
+    assert_eq!(r.status, 429, "{}", r.json);
+    assert_eq!(r.error_code(), Some("rate_limited"));
+    assert!(r.headers.get("retry-after").is_some());
+    assert_eq!(r.json["error"]["details"]["limit"], 5);
+    // The current id again changes nothing and is always fine.
+    let r = call(&ctx, rename("4".into())).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+}
+
+/// A photo of this service on a Silicon must be one its custodian (or the Silicon itself)
+/// uploaded, written exactly as uploads are returned.
+#[tokio::test]
+async fn silicon_photos_must_be_the_custodians_or_its_own_uploads() {
+    let ctx = TestContext::new().await;
+    let saket = ctx.carbon().await;
+    let stranger = ctx.carbon().await;
+    let t = token(&ctx, &saket).await;
+    let upload = |owner: String| {
+        let db = ctx.state.db.clone();
+        async move {
+            let id = uuid::Uuid::now_v7();
+            sqlx::query(
+                "insert into photos (id, account_uuid, content_type, bytes) values ($1, $2, 'image/png', '\\x89504e47'::bytea)",
+            )
+            .bind(id)
+            .bind(owner)
+            .execute(&db)
+            .await
+            .expect("photo");
+            id
+        }
+    };
+    let url = |id: uuid::Uuid| accounts_core::pfp::photo_url(&ctx.state.settings, id);
+    let mine = upload(saket.uuid.clone()).await;
+    let theirs = upload(stranger.uuid.clone()).await;
+
+    // Create: the custodian's own upload works, another account's doesn't.
+    let create = |pfp: String| {
+        Req::post("/v1/me/silicons").bearer(&t).json(json!({
+            "id": silicon_id("pic"), "display_name": "Pic", "pfp_url": pfp,
+        }))
+    };
+    let r = call(&ctx, create(url(theirs))).await;
+    assert_eq!(r.status, 422, "{}", r.json);
+    assert!(
+        r.json["error"]["details"]["fields"]["pfp_url"]
+            .as_str()
+            .is_some_and(|m| m.contains("not a photo you uploaded")),
+        "{}",
+        r.json
+    );
+    let r = call(&ctx, create(format!("{}?v=2", url(mine)))).await;
+    assert_eq!(r.status, 422, "inexact spelling: {}", r.json);
+    let r = call(&ctx, create(url(mine))).await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    let uuid = r.json["silicon"]["uuid"]
+        .as_str()
+        .expect("uuid")
+        .to_string();
+
+    // Update: the Silicon's own upload works too; a stranger's never.
+    let own = upload(uuid.clone()).await;
+    let patch = |pfp: String| {
+        Req::patch(&format!("/v1/me/silicons/{uuid}"))
+            .bearer(&t)
+            .json(json!({ "pfp_url": pfp }))
+    };
+    let r = call(&ctx, patch(url(theirs))).await;
+    assert_eq!(r.status, 422, "{}", r.json);
+    let r = call(&ctx, patch(url(own))).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["pfp_url"], url(own).as_str());
+
+    // A self-created Silicon has no uploads yet: no photo of this service is its own.
+    let r = self_create(
+        &ctx,
+        json!({"id": silicon_id("selfpic"), "display_name": "Self", "custodian": saket.handle,
+               "pfp_url": url(mine)}),
+    )
+    .await;
+    assert_eq!(r.status, 422, "{}", r.json);
+    let r = self_create(
+        &ctx,
+        json!({"id": silicon_id("selfpic"), "display_name": "Self", "custodian": saket.handle,
+               "pfp_url": "https://cdn.example.com/scout.png"}),
+    )
+    .await;
+    assert_eq!(r.status, 201, "external https photos are fine: {}", r.json);
+}

@@ -99,7 +99,7 @@ async fn add(
     request: &impl Serialize,
 ) -> Result<Response, ApiError> {
     let scope = idem_scope(me.uuid(), "POST", route(kind));
-    idempotency::run(&state.db, key, &scope, request, false, || async {
+    idempotency::run(state, key, &scope, request, false, || async {
         // Counted on their own connections, before any answer about who has the address: a
         // 409 rolls the transaction below back, but these hits stay counted.
         rate_limit::enforce_pool(
@@ -193,8 +193,11 @@ async fn verify(
         return Err(ApiError::validation(f));
     };
     let scope = idem_scope(me.uuid(), "POST", &format!("{}/verify", route(kind)));
-    idempotency::run(&state.db, key, &scope, body, false, || async {
+    idempotency::run(state, key, &scope, body, false, || async {
         // Commits the attempt on its own, so wrong codes count even though this request fails.
+        // Wrong codes count per address (core's `otp::verify`): with every sign-in code and
+        // every other account's add code to the same address, so adding someone else's address
+        // never buys more guesses than signing in with it.
         let challenge = otp::verify(
             &state.db,
             &state.keys.pepper,
@@ -206,6 +209,7 @@ async fn verify(
                 flow_id: None,
                 account_uuid: Some(me.uuid()),
             },
+            None,
         )
         .await?;
         let mut tx = state.db.begin().await?;

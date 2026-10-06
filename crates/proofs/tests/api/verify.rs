@@ -292,10 +292,15 @@ async fn cascade_when_the_account_is_deleted_or_inactive() {
     let w = World::new().await;
     let p = w.issue_obo().await;
     let mut conn = w.ctx.conn().await;
-    let deleted =
-        accounts_core::repo::accounts::delete_account(&mut conn, &w.carbon.uuid, "test", true)
-            .await
-            .expect("delete");
+    let deleted = accounts_core::repo::accounts::delete_account(
+        &mut conn,
+        &accounts_core::Settings::for_tests(),
+        &w.carbon.uuid,
+        "test",
+        true,
+    )
+    .await
+    .expect("delete");
     drop(conn);
     assert_eq!(deleted.revoked_proofs, 1);
     assert_eq!(w.verify_bc(&token(&p)).await, invalid());

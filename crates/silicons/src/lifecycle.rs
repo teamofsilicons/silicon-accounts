@@ -8,14 +8,16 @@
 //! | transfer | custodian = acceptor, history `transfer`, `silicon.custodian.changed` + apps `silicon.custodian_changed` | nothing changes | nothing changes |
 //!
 //! "Released" = the Silicon never became active, so it is deleted with its id freed immediately
-//! (no 10-day reservation). A self-created Silicon whose named Carbon deletes their account
-//! before answering (account deletion cancels the request) is released the same way
-//! ([`release_orphan`]).
+//! (no 10-day reservation) by core's `accounts::release_silicon`, which keeps its webhook so the
+//! `silicon.custodian.declined` / `.expired` event emitted just before can still be delivered.
+//! A self-created Silicon whose named Carbon deletes their account before answering is released
+//! by that deletion itself (core's `accounts::delete_account`); [`release_orphan`] is the safety
+//! net for requests that were cancelled without it (accounts deleted before that existed).
 
 use accounts_core::error::{ApiError, ApiResult};
 use accounts_core::events;
 use accounts_core::models::{Account, AccountStatus};
-use accounts_core::repo::{accounts, audit};
+use accounts_core::repo::accounts;
 use accounts_core::views::AccountSummary;
 use serde_json::json;
 use sqlx::PgConnection;
@@ -183,7 +185,7 @@ pub async fn decline(
         {
             // Told before the release, while the Silicon still has its id.
             notify::custodian_declined(conn, &silicon, &decided, &label, "declined").await?;
-            released_id = release_pending_silicon(conn, &silicon.uuid, &me.uuid).await?;
+            released_id = accounts::release_silicon(conn, &silicon.uuid, &me.uuid).await?;
         }
     }
     actor
@@ -213,7 +215,7 @@ pub async fn expire(conn: &mut PgConnection, request: &CustodianRequest) -> ApiR
             && silicon.status == AccountStatus::PendingCustodian
         {
             notify::custodian_expired(conn, &silicon, &decided, &label).await?;
-            released_id = release_pending_silicon(conn, &silicon.uuid, "system").await?;
+            released_id = accounts::release_silicon(conn, &silicon.uuid, "system").await?;
         }
     }
     Actor::system()
@@ -257,7 +259,7 @@ pub async fn release_orphan(
     let label = views::custodian_label(conn, request).await?;
     notify::custodian_declined(conn, &silicon, request, &label, "custodian_account_deleted")
         .await?;
-    let released_id = release_pending_silicon(conn, &silicon.uuid, "system").await?;
+    let released_id = accounts::release_silicon(conn, &silicon.uuid, "system").await?;
     // Same action and details as the account crate's release at deletion time.
     Actor::system()
         .record_for(
@@ -295,67 +297,4 @@ pub async fn cancel_transfer(
         )
         .await?;
     Ok(())
-}
-
-/// Releases a self-created Silicon whose custodian declined or never accepted: status
-/// `deleted`, id freed immediately (no reservation, it never became active), STK cleared,
-/// `handle_history` written. Returns the released id.
-///
-/// Unlike `accounts::delete_account` this keeps the Silicon's webhook URL and secret: the
-/// `silicon.custodian.declined` / `.expired` event emitted just before is delivered by the
-/// worker to the *current* webhook of the Silicon, so clearing it would drop the very
-/// notification the Silicon is waiting for. A pending Silicon never signed in and never had an
-/// email, so nothing else is left to revoke; the statements below only make sure of it.
-pub async fn release_pending_silicon(
-    conn: &mut PgConnection,
-    silicon_uuid: &str,
-    actor: &str,
-) -> ApiResult<Option<String>> {
-    let Some(silicon) = accounts::lock(conn, silicon_uuid).await? else {
-        return Ok(None);
-    };
-    if silicon.status != AccountStatus::PendingCustodian {
-        return Ok(None);
-    }
-    let old = silicon.handle.clone();
-    if let Some(h) = &old {
-        // Same advisory key as core's id claims, so a concurrent claim of this id waits for us.
-        sqlx::query("select pg_advisory_xact_lock(hashtextextended('handle:' || $1, 0))")
-            .bind(h)
-            .execute(&mut *conn)
-            .await?;
-    }
-    sqlx::query(
-        "update accounts set status = 'deleted', handle = null, deleted_at = now(), updated_at = now(), \
-         version = version + 1, stk_hash = null, stk_failed_attempts = 0, stk_locked_until = null \
-         where uuid = $1",
-    )
-    .bind(silicon_uuid)
-    .execute(&mut *conn)
-    .await?;
-    if let Some(h) = &old {
-        audit::handle_history(conn, silicon_uuid, Some(h), None, actor).await?;
-    }
-    sqlx::query(
-        "update token_families set revoked_at = now(), revoke_reason = 'account_released' \
-         where account_uuid = $1 and revoked_at is null",
-    )
-    .bind(silicon_uuid)
-    .execute(&mut *conn)
-    .await?;
-    sqlx::query(
-        "update browser_sessions set revoked_at = now() where account_uuid = $1 and revoked_at is null",
-    )
-    .bind(silicon_uuid)
-    .execute(&mut *conn)
-    .await?;
-    sqlx::query(
-        "update custodian_requests set status = 'cancelled', decided_at = now(), decided_by = $2 \
-         where silicon_uuid = $1 and status = 'pending'",
-    )
-    .bind(silicon_uuid)
-    .bind(actor)
-    .execute(&mut *conn)
-    .await?;
-    Ok(old)
 }

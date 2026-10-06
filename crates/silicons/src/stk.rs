@@ -1,8 +1,8 @@
-//! STK hashing and verification off the async runtime: Argon2id is deliberately slow and
-//! memory-hard, so it runs on the blocking pool instead of stalling other requests.
+//! A new STK for a Silicon: generated (`stk-` + 12 hex) or chosen, hashed with Argon2id on the
+//! blocking pool (core's `StkHasher::hash_async`) instead of stalling other requests.
 
-use accounts_core::crypto::stk::{self, StkHasher};
-use accounts_core::error::{ApiError, ApiResult};
+use accounts_core::crypto::stk;
+use accounts_core::error::ApiResult;
 use accounts_core::state::AppState;
 
 /// A new STK ready to store: the plain value (returned to the caller only when generated) and
@@ -35,31 +35,10 @@ pub async fn prepare(state: &AppState, chosen: Option<String>) -> ApiResult<NewS
         Some(s) => (s, false),
         None => (stk::generate(), true),
     };
-    let hash = hash(state.keys.stk, plain.clone()).await?;
+    let hash = state.keys.stk.hash_async(plain.clone()).await?;
     Ok(NewStk {
         plain,
         generated,
         hash,
     })
-}
-
-/// Argon2id PHC string of `stk`.
-pub async fn hash(hasher: StkHasher, stk: String) -> ApiResult<String> {
-    tokio::task::spawn_blocking(move || hasher.hash(&stk))
-        .await
-        .map_err(|e| ApiError::internal(format!("STK hashing task failed: {e}")))?
-        .map_err(ApiError::from)
-}
-
-/// True when `stk` matches the stored PHC string.
-pub async fn verify(stk: String, phc: String) -> bool {
-    tokio::task::spawn_blocking(move || StkHasher::verify(&stk, &phc))
-        .await
-        .unwrap_or(false)
-}
-
-/// Spends the same Argon2id work as a verification without checking anything, so a sign-in
-/// with an unknown si:id takes as long as one with a wrong STK (no timing oracle for ids).
-pub async fn burn(hasher: StkHasher) {
-    let _ = hash(hasher, "stk-000000000000".to_string()).await;
 }

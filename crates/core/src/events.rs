@@ -50,6 +50,17 @@ pub mod signout_reason {
     pub const USER_SIGNED_OUT: &str = "user_signed_out";
     pub const SESSION_REVOKED: &str = "session_revoked";
     pub const REFRESH_TOKEN_REUSE: &str = "refresh_token_reuse";
+    /// A used authorization code was presented again: the tokens issued from it were revoked
+    /// (RFC 6749 §4.1.2).
+    pub const AUTHORIZATION_CODE_REUSE: &str = "authorization_code_reuse";
+}
+
+/// `silicon.custodian.declined` reasons.
+pub mod declined_reason {
+    /// The Carbon declined the request.
+    pub const DECLINED: &str = "declined";
+    /// The Carbon deleted their account before answering.
+    pub const CUSTODIAN_ACCOUNT_DELETED: &str = "custodian_account_deleted";
 }
 
 /// Delivery request headers.
@@ -509,6 +520,58 @@ pub async fn notify_custodian_changed(
         .await?,
     );
     Ok(out)
+}
+
+/// `silicon.custodian.declined` to a self-created Silicon's own webhook: `{uuid, id, request_id,
+/// custodian, decided_at, reason, released: true}`. `custodian` labels the Carbon it asked (its
+/// c:id, or the masked email it was named by); `reason` is a [`declined_reason`]. Emit it before
+/// the Silicon is released (`repo::accounts::release_silicon`), while it still has its id; the
+/// release keeps the webhook so the worker can deliver this.
+pub async fn silicon_custodian_declined(
+    conn: &mut PgConnection,
+    silicon: &Account,
+    request_id: Uuid,
+    custodian_label: &str,
+    decided_at: Option<OffsetDateTime>,
+    reason: &str,
+) -> ApiResult<Option<EmittedEvent>> {
+    emit_to_silicon(
+        conn,
+        &silicon.uuid,
+        types::SILICON_CUSTODIAN_DECLINED,
+        json!({
+            "uuid": silicon.uuid, "id": silicon.handle, "request_id": request_id.to_string(),
+            "custodian": custodian_label,
+            "decided_at": decided_at.map(crate::timefmt::format_rfc3339_ms),
+            "reason": reason,
+            "released": true,
+        }),
+    )
+    .await
+}
+
+/// `silicon.custodian.expired` to a self-created Silicon's own webhook: `{uuid, id, request_id,
+/// custodian, expired_at, released: true}` (nobody accepted within 14 days). Emit it before the
+/// release, like [`silicon_custodian_declined`].
+pub async fn silicon_custodian_expired(
+    conn: &mut PgConnection,
+    silicon: &Account,
+    request_id: Uuid,
+    custodian_label: &str,
+    expired_at: OffsetDateTime,
+) -> ApiResult<Option<EmittedEvent>> {
+    emit_to_silicon(
+        conn,
+        &silicon.uuid,
+        types::SILICON_CUSTODIAN_EXPIRED,
+        json!({
+            "uuid": silicon.uuid, "id": silicon.handle, "request_id": request_id.to_string(),
+            "custodian": custodian_label,
+            "expired_at": crate::timefmt::format_rfc3339_ms(expired_at),
+            "released": true,
+        }),
+    )
+    .await
 }
 
 /// `ping` to an app (`{}`), for the webhook test button.

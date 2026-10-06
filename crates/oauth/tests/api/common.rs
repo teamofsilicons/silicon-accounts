@@ -36,6 +36,8 @@ pub struct Authorize<'a> {
     pub pkce: Option<(&'a str, &'a str)>,
     /// Skip recording the membership (the consent step normally does).
     pub no_membership: bool,
+    /// When the Carbon authenticated in the browser that completed the flow.
+    pub auth_time: Option<time::OffsetDateTime>,
 }
 
 /// A finished hosted sign-in of `account` to `app_id`: the membership the consent step records
@@ -69,6 +71,7 @@ pub async fn signed_in_code(
             scopes: &scopes,
             nonce: a.nonce,
             browser_session_id: None,
+            auth_time: a.auth_time,
         },
     )
     .await

@@ -84,6 +84,11 @@ pub async fn upsert_signin(
 /// active; `external_id` is set when given; `imported_profile` is written when the membership is
 /// new or `overwrite_profile` is true. Error: 409 `external_id_conflict` when another account of
 /// this app already uses the external id.
+///
+/// A membership whose account **removed the app's access** is returned untouched (status
+/// `access_removed`; check it to report the row as skipped): an import must never undo that
+/// decision, nor bring back the app's webhooks about the account or put it back in the app's
+/// user base. Only the account signing in to the app again (`upsert_signin`) reactivates it.
 pub async fn upsert_imported(
     conn: &mut PgConnection,
     app_id: &str,
@@ -99,8 +104,8 @@ pub async fn upsert_imported(
            external_id = coalesce($3, memberships.external_id), \
            imported_profile = case when $5 or memberships.imported_profile is null then coalesce($4, memberships.imported_profile) \
                                    else memberships.imported_profile end, \
-           status = case when memberships.status = 'access_removed' then 'imported' else memberships.status end, \
            updated_at = now() \
+         where memberships.status <> 'access_removed' \
          returning ",
         crate::membership_columns!()
     ))
@@ -109,10 +114,15 @@ pub async fn upsert_imported(
     .bind(external_id)
     .bind(imported_profile)
     .bind(overwrite_profile)
-    .fetch_one(&mut *conn)
+    .fetch_optional(&mut *conn)
     .await;
     match result {
-        Ok(m) => Ok(m),
+        Ok(Some(m)) => Ok(m),
+        Ok(None) => get(conn, app_id, account_uuid).await?.ok_or_else(|| {
+            ApiError::internal(format!(
+                "membership {app_id}:{account_uuid} vanished during an import upsert"
+            ))
+        }),
         Err(e) if crate::repo::is_unique_violation(&e, Some("memberships_external_idx")) => {
             Err(ApiError::conflict(
                 "external_id_conflict",
@@ -152,7 +162,8 @@ pub struct AccessRemoved {
 
 /// Removes an app's access to an account: membership `access_removed`, the app's token families
 /// for the account revoked (`access_removed`), and OBO proofs that app issued about the account
-/// revoked. Emit `events::membership_access_removed` after. Error: 404 `membership_not_found`.
+/// revoked (by `actor`, each with a `proof.revoked` audit entry). Emit
+/// `events::membership_access_removed` after. Error: 404 `membership_not_found`.
 pub async fn remove_access(
     conn: &mut PgConnection,
     app_id: &str,
@@ -182,16 +193,22 @@ pub async fn remove_access(
     .execute(&mut *tx)
     .await?
     .rows_affected();
-    let revoked_proofs = sqlx::query(
-        "update proof_families set revoked_at = now(), revoked_by = $3, revoke_reason = 'access_removed' \
-         where issuing_app = $1 and account_uuid = $2 and revoked_at is null",
+    let (actor_kind, actor_id) = if actor == account_uuid {
+        (crate::models::ActorKind::Account, Some(actor))
+    } else {
+        (crate::models::ActorKind::System, None)
+    };
+    let revoked_proofs = crate::repo::accounts::revoke_proofs(
+        &mut tx,
+        "account_uuid = $1",
+        account_uuid,
+        Some(app_id),
+        actor,
+        "access_removed",
+        actor_kind,
+        actor_id,
     )
-    .bind(app_id)
-    .bind(account_uuid)
-    .bind(actor)
-    .execute(&mut *tx)
-    .await?
-    .rows_affected();
+    .await?;
     tx.commit().await?;
     Ok(AccessRemoved {
         membership,

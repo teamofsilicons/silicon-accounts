@@ -298,7 +298,7 @@ async fn patch_signin_config(
         "PATCH",
         &format!("/v1/apps/{app_id}/signin-config"),
     );
-    idempotency::run(&state.db, key.as_deref(), &scope, &body, false, || async {
+    idempotency::run(&state, key.as_deref(), &scope, &body, false, || async {
         let parts = split_patch(&body, true).map_err(ApiError::validation)?;
         apply(&state, &auth, parts, meta.ip.as_deref()).await?;
         let mut conn = state.db.acquire().await?;

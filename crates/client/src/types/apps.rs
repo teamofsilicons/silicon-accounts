@@ -226,6 +226,13 @@ pub struct AppDetails {
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
+    /// Last change to the app (identity or sign-in setup).
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub updated_at: Option<OffsetDateTime>,
     /// The sign-in setup.
     #[serde(default)]
     pub signin_config: SigninConfig,
@@ -441,9 +448,17 @@ pub struct AppUser {
     /// Timezone (within granted scopes, or as imported).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
-    /// `active`, `access_removed` or `imported`.
+    /// `active`, `access_removed`, `imported`, or `deleted` when the account was deleted.
     #[serde(default, deserialize_with = "lenient_string")]
     pub status: String,
+    /// The account's own status: `active`, `unclaimed` (imported, not finished yet),
+    /// `pending_custodian` or `deleted`.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub account_status: Option<String>,
     /// `signin`, `slt` or `import`.
     #[serde(default, deserialize_with = "lenient_string")]
     pub source: String,
@@ -648,6 +663,26 @@ pub struct ImportJob {
         skip_serializing_if = "Option::is_none"
     )]
     pub error: Option<String>,
+    /// The app it imports into.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub app_id: Option<String>,
+    /// True for a dry run (nothing was written).
+    #[serde(default, deserialize_with = "lenient_bool")]
+    pub dry_run: bool,
+    /// The options the job ran with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub options: Option<ImportOptions>,
+    /// Who started it: `app` or the owner's uuid.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub created_by: Option<String>,
 }
 
 impl ImportJob {
@@ -833,6 +868,35 @@ pub struct WebhookDelivery {
     /// How many times it was replayed by hand.
     #[serde(default, deserialize_with = "lenient_u64")]
     pub manual_replays: u64,
+    /// The endpoint it goes to (the app's current webhook URL).
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub url: Option<String>,
+    /// The account the event is about, if any.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub account_uuid: Option<String>,
+    /// When the last attempt was made.
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_attempt_at: Option<OffsetDateTime>,
+    /// Detail view: true when the payload is withheld because the account deleted itself or
+    /// removed the app's access.
+    #[serde(
+        default,
+        deserialize_with = "lenient_bool",
+        skip_serializing_if = "std::ops::Not::not"
+    )]
+    pub payload_redacted: bool,
 }
 
 fn count_or_len<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {

@@ -27,10 +27,16 @@ accounts id available c:saket        # exit 0 available, 5 taken or reserved, 2 
 accounts id change c:saket_dev
 ```
 
+When an id can't be taken, `accounts id available` lists free ids close to it
+(`suggestions` in `--json`), and the next-step hint offers the first one.
+
 When an id changes, the old one stays reserved for **10 days**: nobody else can take
 it, and its previous owner can take it back (`accounts id available` shows
 `reclaimable: true` to them). After that it becomes available again. Every app the
 account signed into gets `account.id_changed`, which is why apps key on the uuid.
+An account's id can change at most 5 times in any 24 hours (a Silicon's custodian's
+changes count too; taking back a reserved id counts; asking for the current id doesn't):
+more answers 429 `rate_limited` with the time it is possible again.
 
 ## Memberships
 

@@ -14,7 +14,6 @@ path = "src/lib.rs"
 [dependencies]
 silicon-accounts-core.workspace = true
 axum.workspace = true
-jsonwebtoken.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
@@ -25,6 +24,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 silicon-accounts-core = { workspace = true, features = ["test-support"] }
+jsonwebtoken.workspace = true
 tokio.workspace = true
 
 [lints]

@@ -476,7 +476,7 @@ async fn generated_secrets_are_replayed_but_never_stored_in_clear() {
 
     // What the database keeps is sealed with the keyring: no secret, not even its prefix.
     let stored = stored_idempotent_response(&ctx, "self-create-sealed").await;
-    assert!(stored.contains("\"sealed\""), "{stored}");
+    assert!(stored.contains("\"$sealed\""), "{stored}");
     for needle in secrets
         .iter()
         .map(String::as_str)
@@ -501,7 +501,7 @@ async fn generated_secrets_are_replayed_but_never_stored_in_clear() {
     assert_eq!(again.json, first.json);
 
     // A stored result that can't be opened is never run again nor shown: precise 409.
-    sqlx::query("update idempotency_keys set response = '{\"sealed\": \"AAAA\"}'::jsonb where key = 'self-create-sealed'")
+    sqlx::query("update idempotency_keys set response = '{\"$sealed\": \"AAAA\"}'::jsonb where key = 'self-create-sealed'")
         .execute(&ctx.state.db)
         .await
         .expect("tamper");

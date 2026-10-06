@@ -179,3 +179,125 @@ async fn imported_unverified_emails_get_verified_when_proven() {
         .expect("list");
     assert!(list[0].verified_at.is_some() && list[0].is_primary);
 }
+
+/// Only a verified address of an active Carbon (or an unfinished import's address) identifies
+/// an account; an unverified row anywhere else is unproven, and whoever proves the address takes
+/// it over.
+#[tokio::test]
+async fn unproven_rows_identify_nobody_and_are_taken_over_by_proof() {
+    use accounts_core::repo::accounts;
+    use accounts_core::repo::contacts::Holder;
+    let ctx = TestContext::new().await;
+    let holder = ctx
+        .carbon_with(CarbonSpec {
+            email: Some("holder@example.test".into()),
+            ..Default::default()
+        })
+        .await;
+    let mut conn = ctx.conn().await;
+    // A row left unverified on an active account (what claims before the fix could leave).
+    sqlx::query(
+        "insert into account_emails (email, account_uuid, is_primary) values ('left@example.test', $1, false)",
+    )
+    .bind(&holder.uuid)
+    .execute(&mut *conn)
+    .await
+    .expect("leftover");
+    assert!(matches!(
+        contacts::lookup(&mut conn, ContactKind::Email, "left@example.test")
+            .await
+            .expect("q"),
+        Holder::Unproven(_)
+    ));
+    assert!(matches!(
+        contacts::lookup(&mut conn, ContactKind::Email, "holder@example.test")
+            .await
+            .expect("q"),
+        Holder::Active(_)
+    ));
+    // by_email still sees the row (uniqueness), which is why it must never authenticate.
+    assert!(
+        accounts::by_email(&mut conn, "left@example.test")
+            .await
+            .expect("q")
+            .is_some()
+    );
+    // The real owner proves it: it passes the pre-check and moves to their account.
+    let owner = ctx.carbon().await;
+    contacts::check_can_add(
+        &mut conn,
+        ContactKind::Email,
+        &owner.uuid,
+        "left@example.test",
+    )
+    .await
+    .expect("unproven elsewhere passes");
+    contacts::add_verified_email(
+        &mut conn,
+        &owner.uuid,
+        "left@example.test",
+        VerifiedVia::Code,
+    )
+    .await
+    .expect("taken over");
+    assert_eq!(
+        contacts::owner(&mut conn, ContactKind::Email, "left@example.test")
+            .await
+            .expect("q"),
+        Some((owner.uuid.clone(), true))
+    );
+    let removed: i64 = sqlx::query_scalar(
+        "select count(*) from audit_log where account_uuid = $1 and action = 'contact.unverified_removed'",
+    )
+    .bind(&holder.uuid)
+    .fetch_one(&mut *conn)
+    .await
+    .expect("q");
+    assert_eq!(removed, 1);
+
+    // An unfinished import keeps its address: nobody else can add it.
+    let imported = ctx
+        .carbon_with(CarbonSpec {
+            email: Some("import@example.test".into()),
+            status: Some(AccountStatus::Unclaimed),
+            ..Default::default()
+        })
+        .await;
+    assert!(matches!(
+        contacts::lookup(&mut conn, ContactKind::Email, "import@example.test")
+            .await
+            .expect("q"),
+        Holder::Unclaimed(ref a) if a.uuid == imported.uuid
+    ));
+    let err = contacts::check_can_add(
+        &mut conn,
+        ContactKind::Email,
+        &owner.uuid,
+        "import@example.test",
+    )
+    .await
+    .expect_err("in use");
+    assert_eq!(err.code, "email_in_use");
+}
+
+#[tokio::test]
+async fn nothing_is_added_to_a_deleted_account() {
+    let ctx = TestContext::new().await;
+    let c = ctx.carbon().await;
+    let mut conn = ctx.conn().await;
+    accounts_core::repo::accounts::delete_account(
+        &mut conn,
+        &ctx.state.settings,
+        &c.uuid,
+        &c.uuid,
+        true,
+    )
+    .await
+    .expect("delete");
+    let err =
+        contacts::add_verified_email(&mut conn, &c.uuid, "late@example.test", VerifiedVia::Code)
+            .await
+            .expect_err("deleted");
+    assert_eq!(err.code, "account_deleted");
+    assert_eq!(err.status.as_u16(), 409);
+}

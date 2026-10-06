@@ -273,9 +273,15 @@ pub async fn finish_account_deletion(
         tx.rollback().await.expect("rollback");
         return Err("custodian_of_silicons".into());
     }
-    accounts_core::repo::accounts::delete_account(&mut tx, carbon_uuid, carbon_uuid, true)
-        .await
-        .expect("delete");
+    accounts_core::repo::accounts::delete_account(
+        &mut tx,
+        &accounts_core::Settings::for_tests(),
+        carbon_uuid,
+        carbon_uuid,
+        true,
+    )
+    .await
+    .expect("delete");
     tx.commit().await.expect("commit");
     Ok(())
 }

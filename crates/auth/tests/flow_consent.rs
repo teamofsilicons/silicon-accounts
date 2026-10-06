@@ -668,3 +668,90 @@ async fn an_app_that_stops_requiring_a_detail_releases_waiting_flows() {
     let r = b.get(&ctx, &format!("/v1/flows/{id}")).await;
     assert_eq!(r.json["flow"]["step"], "consent", "{}", r.json);
 }
+
+/// The authorization code carries when the Carbon actually authenticated (OIDC `auth_time`): the
+/// browser session's last proof of identity. Continue-as keeps the earlier time; signing in
+/// again with a code in the same browser (the session is reused) moves it to now.
+#[tokio::test]
+async fn codes_carry_when_the_carbon_actually_authenticated() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let (first, _) = ctx.app("commit").await;
+    let (second, _) = ctx.app("remind").await;
+    let mut b = Browser::new(&ctx);
+    let (id, _) = code_sign_in(&ctx, &mut b, &first.app_id, &email_of(&carbon), json!({})).await;
+    let r = b
+        .post(
+            &ctx,
+            &format!("/v1/flows/{id}/consent"),
+            json!({"approve": true}),
+        )
+        .await;
+    let code = redeem(
+        &ctx,
+        &code_of(r.json["flow"]["redirect_to"].as_str().expect("redirect")),
+        &first.app_id,
+    )
+    .await;
+    let session_id = code.browser_session_id.expect("the flow's browser session");
+    let authenticated: time::OffsetDateTime =
+        sqlx::query_scalar("select authenticated_at from browser_sessions where id = $1")
+            .bind(session_id)
+            .fetch_one(&ctx.state.db)
+            .await
+            .expect("session");
+    assert_eq!(code.auth_time, Some(authenticated));
+
+    // Two hours later the browser continues as the Carbon at another app: no new proof, so
+    // the code says when the Carbon last authenticated.
+    sqlx::query(
+        "update browser_sessions set authenticated_at = authenticated_at - interval '2 hours' where id = $1",
+    )
+    .bind(session_id)
+    .execute(&ctx.state.db)
+    .await
+    .expect("time travel");
+    let f = new_flow(&ctx, &mut b, &second.app_id, json!({})).await;
+    b.post(
+        &ctx,
+        &format!("/v1/flows/{}/continue", id_of(&f)),
+        json!({}),
+    )
+    .await;
+    let r = b
+        .post(
+            &ctx,
+            &format!("/v1/flows/{}/consent", id_of(&f)),
+            json!({"approve": true}),
+        )
+        .await;
+    let code = redeem(
+        &ctx,
+        &code_of(r.json["flow"]["redirect_to"].as_str().expect("redirect")),
+        &second.app_id,
+    )
+    .await;
+    let earlier = authenticated - time::Duration::hours(2);
+    assert_eq!(code.auth_time, Some(earlier));
+
+    // A new code sign-in in the same browser keeps the session but records the new proof.
+    let (id, f) = code_sign_in(&ctx, &mut b, &second.app_id, &email_of(&carbon), json!({})).await;
+    assert_eq!(f["step"], "complete", "{f}");
+    let code = redeem(
+        &ctx,
+        &code_of(f["redirect_to"].as_str().expect("redirect")),
+        &second.app_id,
+    )
+    .await;
+    assert_eq!(
+        code.browser_session_id,
+        Some(session_id),
+        "same session {id}"
+    );
+    let now = time::OffsetDateTime::now_utc();
+    let at = code.auth_time.expect("auth_time");
+    assert!(
+        at > earlier + time::Duration::hours(1) && (now - at).abs() < time::Duration::minutes(5),
+        "auth_time {at} must be the new sign-in"
+    );
+}

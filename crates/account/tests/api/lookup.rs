@@ -233,7 +233,7 @@ async fn lookup_by_uuid_with_app_or_session() {
 
     let gone = ctx.carbon().await;
     let mut conn = ctx.conn().await;
-    accounts::delete_account(&mut conn, &gone.uuid, &gone.uuid, true)
+    accounts::delete_account(&mut conn, &ctx.state.settings, &gone.uuid, &gone.uuid, true)
         .await
         .expect("delete");
     drop(conn);

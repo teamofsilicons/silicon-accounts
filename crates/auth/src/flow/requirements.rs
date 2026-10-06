@@ -23,8 +23,7 @@ use serde_json::json;
 use super::handlers::{CodeBody, EmailBody, PhoneBody};
 use super::model::{self, Flow, Step};
 use super::view::{self, ViewContext};
-use super::{FlowApp, FlowResponse, browser, load_bound, next, signup};
-use crate::codes;
+use super::{FlowApp, FlowResponse, browser, load_bound, next};
 use crate::util::telemetry;
 
 /// Moves a flow at `requirements` on (consent or complete) when its account no longer misses
@@ -154,8 +153,7 @@ async fn send_requirement(
         Err(e) if e.code == format!("{}_already_added", kind.code()) => {
             // Already verified on the account (just not primary): no code needed.
             let primary_changed =
-                signup::prove_contact(&mut tx, kind, &account.uuid, &value, VerifiedVia::Code)
-                    .await?;
+                contacts::prove(&mut tx, kind, &account.uuid, &value, VerifiedVia::Code).await?;
             if primary_changed {
                 let updated = accounts::bump_version(&mut tx, &account.uuid).await?;
                 events::account_updated(&mut tx, &updated, &[account_field(kind)]).await?;
@@ -243,9 +241,11 @@ pub async fn verify_requirement(
         let account = browser::require_flow_account(&mut conn, &state, &headers, &flow).await?;
         (challenge_id, account.uuid)
     };
-    // The lockout counts every code sent to the address (see `codes`).
-    let challenge = codes::verify(
-        &state,
+    // The lockout counts every code sent to the address (core's `otp::verify`).
+    let challenge = otp::verify(
+        &state.db,
+        &state.keys.pepper,
+        &state.settings,
         challenge_id,
         &body.code,
         &otp::Expect {
@@ -275,7 +275,7 @@ pub async fn verify_requirement(
         OtpChannel::Phone => ContactKind::Phone,
     };
     // 409 email_in_use / phone_in_use when another account took it meanwhile.
-    let primary_changed = signup::prove_contact(
+    let primary_changed = contacts::prove(
         &mut tx,
         kind,
         &account_uuid,

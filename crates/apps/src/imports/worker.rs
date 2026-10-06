@@ -279,6 +279,7 @@ async fn process_job(state: &AppState, conn: &mut PgConnection, job: &JobRecord)
         options,
         today: accounts_core::timefmt::today_utc(),
         iris_base_url: state.settings.iris_base_url.clone(),
+        photo_url_prefix: accounts_core::pfp::photo_url_prefix(&state.settings),
     };
     // This connection runs the same few statements hundreds of times while the tables they read
     // grow by up to 100k rows. A generic plan cached while the tables were small (sequential

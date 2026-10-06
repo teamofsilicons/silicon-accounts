@@ -1,15 +1,15 @@
 //! Headless code sign-in for the accounts CLI (Carbons): `POST /v1/cli/login/start` sends a
 //! code to a verified email or phone of an existing active Carbon; `POST /v1/cli/login/verify`
-//! returns first-party tokens (aud = accounts). An unverified address an import left on an
-//! account never signs into it (see [`crate::contact`]); the 10-tries lockout counts every
-//! code sent to the address (see [`crate::codes`]).
+//! returns first-party tokens (aud = accounts). Only a verified address of an active Carbon
+//! signs in (core's `contacts::lookup`); the 10-tries lockout counts every code sent to the
+//! address (core's `otp::verify`).
 
 use accounts_core::delivery;
 use accounts_core::http::{ClientMeta, Json};
 use accounts_core::models::{ActorKind, OtpChannel, OtpPurpose, Scope, TokenOrigin};
 use accounts_core::normalize::{normalize_email, normalize_phone};
 use accounts_core::repo::audit::{self, AuditEntry, SigninRecord};
-use accounts_core::repo::contacts::ContactKind;
+use accounts_core::repo::contacts::{self, ContactKind, Holder};
 use accounts_core::repo::rate_limit::{self, Limit};
 use accounts_core::repo::{otp, tokens};
 use accounts_core::timefmt::format_rfc3339_ms;
@@ -20,8 +20,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::codes;
-use crate::contact::{self, Holder};
 use crate::util::{no_store, telemetry};
 
 /// Lookups a network may make per 10 minutes (sends are also limited by the OTP rules).
@@ -94,7 +92,7 @@ pub async fn start(
         OtpChannel::Phone => ContactKind::Phone,
     };
     // Only a verified email/phone of an active Carbon signs in.
-    let Holder::Active(account) = contact::lookup(&mut tx, kind, &destination).await? else {
+    let Holder::Active(account) = contacts::lookup(&mut tx, kind, &destination).await? else {
         // Commit the rate-limit hit: lookups of unknown addresses count too.
         tx.commit().await?;
         return Err(account_not_found(&destination, &state.settings));
@@ -164,15 +162,17 @@ pub async fn verify(
         ))
         .hint("Pass the challenge_id from the start response unchanged.")
     })?;
-    let challenge = codes::verify(
-        &state,
+    let challenge = otp::verify(
+        &state.db,
+        &state.keys.pepper,
+        &state.settings,
         challenge_id,
         &body.code,
         &otp::Expect {
             purpose: Some(OtpPurpose::CliLogin),
             ..Default::default()
         },
-        Some(codes::Attempt {
+        Some(otp::Attempt {
             app_id: FIRST_PARTY_APP_ID,
             ip: meta.ip.as_deref(),
             user_agent: meta.user_agent.as_deref(),
@@ -190,7 +190,7 @@ pub async fn verify(
     let mut tx = state.db.begin().await?;
     // The address must still be a verified email/phone of that active Carbon (it may have been
     // removed, or the account deleted, since the code was sent).
-    let account = match contact::lookup(&mut tx, kind, &challenge.destination).await? {
+    let account = match contacts::lookup(&mut tx, kind, &challenge.destination).await? {
         Holder::Active(a) if a.uuid == account_uuid => a,
         _ => {
             return Err(ApiError::not_found(
@@ -223,6 +223,7 @@ pub async fn verify(
             ip: meta.ip.as_deref(),
             user_agent: meta.user_agent.as_deref(),
             nonce: None,
+            auth_time: None,
         },
     )
     .await?;

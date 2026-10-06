@@ -7,7 +7,7 @@ use accounts_core::models::{Account, AccountField, AccountKind};
 use accounts_core::normalize;
 use accounts_core::pfp;
 use accounts_core::repo::accounts::{self, ProfileUpdate};
-use accounts_core::repo::idempotency;
+use accounts_core::repo::{idempotency, photos};
 use accounts_core::timefmt;
 use accounts_core::views::{self, MeView};
 use accounts_core::{ApiError, ApiResult, AppState, FieldErrors, Settings};
@@ -16,12 +16,9 @@ use axum::http::StatusCode;
 use axum::response::Response;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sqlx::PgConnection;
-use time::{Date, OffsetDateTime};
-use uuid::Uuid;
+use time::Date;
 
-use crate::photos::prune_photos;
-use crate::util::{audit_self, clip, idem_scope, json_type, photo_url_prefix, track, ts};
+use crate::util::{audit_self, idem_scope, json_type, track};
 
 /// `GET /v1/me` — the full own view (Carbon: emails, phones, identities, custodian_of;
 /// Silicon: custodian, webhook_url, stk_rotated_at).
@@ -187,80 +184,6 @@ fn parse_patch(settings: &Settings, account: &Account, body: &Value) -> ApiResul
     Ok(out)
 }
 
-/// What a validated `pfp_url` says about this service's own photos.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum PhotoRef {
-    /// Not a URL under `{PUBLIC_URL}/v1/photos/`.
-    External,
-    /// Exactly `{PUBLIC_URL}/v1/photos/{id}` with the id lowercase and hyphenated, which is the
-    /// form `POST /v1/me/photo` returns and the only form pruning recognizes.
-    Exact(Uuid),
-    /// Under the photos prefix but not in that exact form; the message says why.
-    Inexact(String),
-}
-
-/// Classifies a `pfp_url` (already validated by `normalize::validate_pfp_url`). Other spellings
-/// of a photo URL (a `?query`, a `#fragment`, an upper-case id) would still load the photo, but
-/// pruning compares URLs exactly and would delete the photo they point at. So they are refused.
-fn photo_ref(settings: &Settings, url: &str) -> PhotoRef {
-    let prefix = photo_url_prefix(settings);
-    let Some(rest) = url.strip_prefix(&prefix) else {
-        return PhotoRef::External;
-    };
-    let (id_part, extra) = match rest.find(['?', '#', '/']) {
-        Some(i) => rest.split_at(i),
-        None => (rest, ""),
-    };
-    match Uuid::try_parse(id_part) {
-        Ok(id) => {
-            let exact = id.hyphenated().to_string();
-            if extra.is_empty() && id_part == exact {
-                PhotoRef::Exact(id)
-            } else {
-                PhotoRef::Inexact(format!(
-                    "{} is not written the way photo URLs are issued; use {prefix}{exact} exactly (a lowercase photo id with no query string, #fragment or extra path)",
-                    clip(url, 160)
-                ))
-            }
-        }
-        Err(_) => PhotoRef::Inexact(format!(
-            "{} doesn't name a photo: photo URLs are {prefix}{{photo_id}}, exactly as POST /v1/me/photo returns them",
-            clip(url, 160)
-        )),
-    }
-}
-
-/// A `pfp_url` on this service must be, exactly, a photo this account uploaded. Run it under the
-/// account's row lock: uploads and photo removals prune under the same lock, so the photo can't
-/// be deleted between this check and the update.
-async fn check_own_photo(
-    conn: &mut PgConnection,
-    settings: &Settings,
-    account_uuid: &str,
-    url: &str,
-) -> ApiResult<()> {
-    let problem = match photo_ref(settings, url) {
-        PhotoRef::External => return Ok(()),
-        PhotoRef::Inexact(problem) => problem,
-        PhotoRef::Exact(photo_id) => {
-            let owner: Option<String> =
-                sqlx::query_scalar("select account_uuid from photos where id = $1")
-                    .bind(photo_id)
-                    .fetch_optional(&mut *conn)
-                    .await?;
-            if owner.as_deref() == Some(account_uuid) {
-                return Ok(());
-            }
-            format!(
-                "{url} is not a photo you uploaded (it doesn't exist, was replaced, or belongs to another account); upload yours with POST /v1/me/photo"
-            )
-        }
-    };
-    let mut f = FieldErrors::new();
-    f.add("pfp_url", problem);
-    Err(ApiError::validation(f))
-}
-
 /// `PATCH /v1/me` `{"display_name"?,"timezone"?,"dob"?,"pfp_url"?}` → Me. Only real changes
 /// are written; then `version` bumps, member apps get `account.updated` with the changed fields
 /// they can see (apps that can see none are skipped), and a Silicon's own webhook gets
@@ -275,7 +198,7 @@ pub(crate) async fn patch_me(
 ) -> Result<Response, ApiError> {
     let patch = parse_patch(&state.settings, &me.account, &body)?;
     let scope = idem_scope(me.uuid(), "PATCH", "/v1/me");
-    idempotency::run(&state.db, key.as_deref(), &scope, &body, false, || async {
+    idempotency::run(&state, key.as_deref(), &scope, &body, false, || async {
         let mut tx = state.db.begin().await?;
         // The row lock comes first: photo uploads and removals prune under it, so a photo
         // checked below stays in place until this change commits.
@@ -291,9 +214,12 @@ pub(crate) async fn patch_me(
             )),
             Some(PfpChange::Set(url)) => {
                 // Sending back the current pfp_url changes nothing, even when it's a photo the
-                // account didn't upload (such as a Silicon's photo set by its custodian).
+                // account didn't upload (such as a Silicon's photo set by its custodian). A new
+                // photo of this service must be one this account uploaded (core's check, under
+                // the row lock taken above, so pruning can't remove it before this commits).
                 if *url != current.pfp_url {
-                    check_own_photo(&mut tx, &state.settings, me.uuid(), url).await?;
+                    photos::check_usable(&mut tx, &state.settings, url, &[me.uuid()], "you")
+                        .await?;
                 }
                 Some(url.clone())
             }
@@ -312,7 +238,7 @@ pub(crate) async fn patch_me(
         if !changed.is_empty() {
             events::notify_profile_updated(&mut tx, &account, &changed).await?;
             if changed.contains(&AccountField::PfpUrl) {
-                prune_photos(&mut tx, &state.settings, me.uuid()).await?;
+                photos::prune(&mut tx, &state.settings, me.uuid()).await?;
             }
             audit_self(
                 &mut tx,
@@ -347,60 +273,13 @@ fn account_not_found(uuid: &str) -> ApiError {
     )
 }
 
-/// Most id changes one account can make in [`ID_CHANGE_WINDOW_SECONDS`]. Every change keeps the
-/// old id reserved for its owner for 10 days and notifies every member app, so without a limit
-/// one account could hold any number of ids and flood its apps with webhooks. With this limit
-/// an account holds at most 50 reserved ids at a time (5 a day for 10 days).
-pub const ID_CHANGES_PER_DAY: i64 = 5;
+/// Most id changes one account can make per rolling 24 hours (core's
+/// `accounts::ID_CHANGES_PER_DAY`, enforced by `accounts::change_id` for every caller, a Silicon's
+/// custodian included).
+pub const ID_CHANGES_PER_DAY: i64 = accounts::ID_CHANGES_PER_DAY;
 
 /// The rolling window of [`ID_CHANGES_PER_DAY`]: 24 hours.
-pub const ID_CHANGE_WINDOW_SECONDS: i64 = 86_400;
-
-/// Refuses a new id change when the account's id already changed [`ID_CHANGES_PER_DAY`] times
-/// in the last 24 hours, whoever made the changes (a Silicon's custodian counts too). Reclaims
-/// count, because each one reserves the id the account had until then. The caller holds the
-/// account row lock, so concurrent changes are counted exactly.
-async fn check_id_change_budget(conn: &mut PgConnection, account: &Account) -> ApiResult<()> {
-    let (recent, retry_seconds, retry_at): (i64, Option<f64>, Option<OffsetDateTime>) =
-        sqlx::query_as(
-            "select count(*), \
-                    extract(epoch from (min(changed_at) + make_interval(secs => $2) - now()))::float8, \
-                    min(changed_at) + make_interval(secs => $2) \
-               from (select changed_at from handle_history \
-                      where account_uuid = $1 and old_handle is not null and new_handle is not null \
-                        and changed_at > now() - make_interval(secs => $2) \
-                      order by changed_at desc limit $3) recent",
-        )
-        .bind(&account.uuid)
-        .bind(ID_CHANGE_WINDOW_SECONDS as f64)
-        .bind(ID_CHANGES_PER_DAY)
-        .fetch_one(&mut *conn)
-        .await?;
-    if recent < ID_CHANGES_PER_DAY {
-        return Ok(());
-    }
-    // With `limit` the oldest row kept is the change that has to leave the window first.
-    let retry = retry_seconds
-        .map(|s| s.ceil().max(1.0) as u64)
-        .unwrap_or(ID_CHANGE_WINDOW_SECONDS as u64);
-    let when = retry_at
-        .map(ts)
-        .unwrap_or_else(|| format!("in {retry} seconds"));
-    Err(ApiError::rate_limited(
-        format!(
-            "{} has already changed its id {ID_CHANGES_PER_DAY} times in the last 24 hours, which is the most an account can. Every change keeps the old id reserved for 10 days, so changes are limited to {ID_CHANGES_PER_DAY} per 24 hours.",
-            account.display_id()
-        ),
-        retry,
-    )
-    .hint(format!(
-        "Try again at {when} ({retry} seconds from now); {} stays yours until then.",
-        account.display_id()
-    ))
-    .detail("limit", ID_CHANGES_PER_DAY)
-    .detail("window_seconds", ID_CHANGE_WINDOW_SECONDS)
-    .detail("retry_at", retry_at.map(ts)))
-}
+pub const ID_CHANGE_WINDOW_SECONDS: i64 = accounts::ID_CHANGE_WINDOW_SECONDS;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct ChangeIdBody {
@@ -420,19 +299,13 @@ pub(crate) async fn change_id(
     Json(body): Json<ChangeIdBody>,
 ) -> Result<Response, ApiError> {
     let scope = idem_scope(me.uuid(), "POST", "/v1/me/id");
-    idempotency::run(&state.db, key.as_deref(), &scope, &body, false, || async {
+    idempotency::run(&state, key.as_deref(), &scope, &body, false, || async {
         let new_id = AccountId::parse_for_kind(&body.id, me.kind())
             .map_err(|e| accounts::invalid_id_error(&e))?;
         let mut tx = state.db.begin().await?;
-        // One change at a time per account, so the budget below counts exactly. Asking for the
-        // current id again is a no-op and never uses up the budget; a deleted account gets
-        // core's 409 `account_deleted` from change_id.
-        let current = accounts::lock(&mut tx, me.uuid())
-            .await?
-            .ok_or_else(|| account_not_found(me.uuid()))?;
-        if !current.is_deleted() && current.handle.as_deref() != Some(new_id.as_full().as_str()) {
-            check_id_change_budget(&mut tx, &current).await?;
-        }
+        // Core counts the change against the 24-hour budget under the account's row lock (429
+        // `rate_limited`); asking for the current id again is a no-op that never counts, and a
+        // deleted account gets 409 `account_deleted`.
         let change = accounts::change_id(&mut tx, me.uuid(), &new_id, me.uuid()).await?;
         if change.changed {
             events::notify_id_changed(&mut tx, &change.account, &change.old_id, &change.new_id)
@@ -541,42 +414,6 @@ mod tests {
                 .as_str()
                 .is_some_and(|m| m.contains("a list"))
         );
-    }
-
-    #[test]
-    fn photo_urls_must_be_written_exactly() {
-        let s = Settings::for_tests();
-        let prefix = photo_url_prefix(&s);
-        let id = Uuid::now_v7();
-        let exact = format!("{prefix}{id}");
-        assert_eq!(photo_ref(&s, &exact), PhotoRef::Exact(id));
-        assert_eq!(
-            photo_ref(&s, "https://cdn.example.com/me.png"),
-            PhotoRef::External
-        );
-        for variant in [
-            format!("{exact}?v=2"),
-            format!("{exact}#x"),
-            format!("{exact}/"),
-            format!("{prefix}{}", id.to_string().to_uppercase()),
-            format!("{prefix}{}", id.simple()),
-            format!("{prefix}{}", id.urn()),
-        ] {
-            match photo_ref(&s, &variant) {
-                PhotoRef::Inexact(m) => assert!(m.contains(&exact), "{variant}: {m}"),
-                other => panic!("{variant} was taken as {other:?}"),
-            }
-        }
-        for junk in [
-            format!("{prefix}nope"),
-            prefix.clone(),
-            format!("{prefix}?x"),
-        ] {
-            match photo_ref(&s, &junk) {
-                PhotoRef::Inexact(m) => assert!(m.contains("doesn't name a photo"), "{m}"),
-                other => panic!("{junk} was taken as {other:?}"),
-            }
-        }
     }
 
     #[test]

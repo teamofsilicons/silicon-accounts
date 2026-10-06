@@ -65,6 +65,9 @@ pub struct CustodianRequestInfo {
     /// `pending`.
     #[serde(default, deserialize_with = "lenient_string")]
     pub status: String,
+    /// `initial` (a self-created Silicon's request).
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub kind: String,
     /// The custodian has 14 days to accept.
     #[serde(
         default,
@@ -87,6 +90,19 @@ pub struct CustodianRequestStatus {
     /// `pending`, `accepted`, `declined`, `expired` or `cancelled`.
     #[serde(deserialize_with = "lenient_string")]
     pub status: String,
+    /// `initial` for a self-created Silicon.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub kind: String,
+    /// Who was asked (`c:saket` or a masked email).
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub custodian: String,
+    /// When the request was made.
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub created_at: Option<OffsetDateTime>,
     /// When the request expires (14 days after creation).
     #[serde(
         default,

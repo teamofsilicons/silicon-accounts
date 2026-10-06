@@ -155,32 +155,26 @@ pub async fn set_silicon_webhook(
 }
 
 /// 429 when `bucket` has already used up its current window, without counting this request
-/// (requests are counted with `rate_limit::enforce` only once they succeed). This keeps a flood
-/// of over-limit requests from costing any real work.
+/// (core's `rate_limit::peek`; requests are counted with `rate_limit::enforce` only once they
+/// succeed). This keeps a flood of over-limit requests from costing any real work.
 pub async fn ensure_rate_room(
     conn: &mut PgConnection,
     bucket: &str,
     limit: rate_limit::Limit,
     what: &str,
 ) -> ApiResult<()> {
-    let row: Option<(i32, f64)> = sqlx::query_as(
-        "select count, extract(epoch from (window_started_at + make_interval(secs => $2) - now()))::float8 \
-         from rate_limits where bucket = $1 and window_started_at > now() - make_interval(secs => $2)",
-    )
-    .bind(bucket)
-    .bind(limit.window_seconds as f64)
-    .fetch_optional(&mut *conn)
-    .await?;
-    match row {
-        Some((count, retry_after)) if count >= limit.max => Err(ApiError::rate_limited(
+    match rate_limit::peek(conn, bucket, limit).await? {
+        rate_limit::Decision::Limited {
+            retry_after_seconds,
+        } => Err(ApiError::rate_limited(
             format!(
                 "Too many {what}: the limit is {} per {}.",
                 limit.max,
                 rate_limit::describe_window(limit.window_seconds)
             ),
-            retry_after.ceil().max(1.0) as u64,
+            retry_after_seconds,
         )),
-        _ => Ok(()),
+        rate_limit::Decision::Allowed { .. } => Ok(()),
     }
 }
 

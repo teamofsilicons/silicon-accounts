@@ -1058,3 +1058,62 @@ async fn a_racing_signup_is_resolved_row_by_row() {
             .expect("count");
     assert_eq!(owners, 1);
 }
+
+/// An import can't point an account at a photo uploaded to Silicon Accounts (that would keep
+/// someone else's removed photo alive), and never links a row through an address nobody proved.
+#[tokio::test]
+async fn imports_refuse_this_services_photos_and_unproven_addresses() {
+    let ctx = TestContext::new().await;
+    let a = owned_app(&ctx, "pics").await;
+    let holder = ctx.carbon().await;
+    // A row left unverified on an active account (what claims before migration 0002 could leave).
+    sqlx::query(
+        "insert into account_emails (email, account_uuid, is_primary) values ('left@pics.test', $1, false)",
+    )
+    .bind(&holder.uuid)
+    .execute(&ctx.state.db)
+    .await
+    .expect("leftover");
+    let photo = format!(
+        "{}0190f0f0-0000-7000-8000-000000000001",
+        accounts_core::pfp::photo_url_prefix(&ctx.state.settings)
+    );
+    let rows = json!([
+        {"external_id": "p-1", "email": "pic@pics.test", "pfp_url": photo},
+        {"external_id": "p-2", "email": "left@pics.test"}
+    ]);
+    let (_, out) = run_import(
+        &ctx,
+        &a.app_id,
+        &a.secret,
+        import_json(&a.app_id, &a.secret, rows, json!({})),
+    )
+    .await;
+    assert_eq!(out[0]["outcome"], "created", "{}", out[0]);
+    assert!(
+        codes(&out[0]).contains(&"invalid_pfp_url".to_string()),
+        "{}",
+        out[0]
+    );
+    let uuid = out[0]["account_uuid"].as_str().expect("uuid");
+    let pfp: String = sqlx::query_scalar("select pfp_url from accounts where uuid = $1")
+        .bind(uuid)
+        .fetch_one(&ctx.state.db)
+        .await
+        .expect("pfp");
+    assert!(
+        accounts_core::pfp::is_default_pfp(&ctx.state.settings.iris_base_url, &pfp),
+        "{pfp}"
+    );
+    // The unproven address identifies nobody, so the row is never matched to its holder.
+    assert_ne!(out[1]["outcome"], "matched", "{}", out[1]);
+    let linked: i64 = sqlx::query_scalar(
+        "select count(*) from memberships where app_id = $1 and account_uuid = $2",
+    )
+    .bind(&a.app_id)
+    .bind(&holder.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("count");
+    assert_eq!(linked, 0);
+}

@@ -7,8 +7,11 @@
 //!   transaction committed);
 //! - the worker calls [`claim_due`] + [`deliver_claimed`] for everything still pending.
 //!
-//! Claiming bumps `attempts` and pushes `next_attempt_at` 60 s ahead in one statement, so a
-//! message is never sent by two nodes at once.
+//! Claiming bumps `attempts` and pushes `next_attempt_at` [`CLAIM_SECONDS`] ahead in one
+//! statement, so a message is never sent by two nodes at once. The result is recorded only while
+//! the claim still holds (`attempts` and `next_attempt_at` unchanged since the claim): a sender
+//! that outlived its claim, after another node claimed the message again, records nothing
+//! ([`DeliveryOutcome::ClaimLost`]).
 
 use std::sync::Arc;
 
@@ -27,6 +30,10 @@ use crate::state::AppState;
 
 /// Give up after this many attempts.
 pub const MAX_ATTEMPTS: i32 = 8;
+
+/// How long a claim keeps a message exclusive to the node that claimed it (seconds). A send is
+/// bounded by the provider client's 10 s timeout, far inside it.
+pub const CLAIM_SECONDS: i64 = 60;
 
 /// A message to store.
 #[derive(Debug, Clone)]
@@ -408,35 +415,47 @@ pub enum DeliveryOutcome {
     },
     /// Not pending/due (already sent, local, or another node holds it).
     Skipped,
+    /// The send finished after this claim had run out and another node claimed the message
+    /// again, so this result was not recorded (that node's result counts). Delivery is
+    /// at-least-once: the message may have been sent twice.
+    ClaimLost,
 }
 
-/// Claims one pending message by id (if due).
+/// Claims one pending message by id (if due) for [`CLAIM_SECONDS`].
 pub async fn claim(pool: &PgPool, id: Uuid) -> ApiResult<Option<OutboundMessage>> {
     Ok(sqlx::query_as::<_, OutboundMessage>(concat!(
-        "update outbound_messages set attempts = attempts + 1, next_attempt_at = now() + interval '60 seconds' \
+        "update outbound_messages set attempts = attempts + 1, next_attempt_at = now() + make_interval(secs => $2) \
          where id = $1 and status = 'pending' and next_attempt_at <= now() returning ",
         message_columns!()
     ))
     .bind(id)
+    .bind(CLAIM_SECONDS as f64)
     .fetch_optional(pool)
     .await?)
 }
 
-/// Claims up to `limit` due pending messages (for the worker), oldest first.
+/// Claims up to `limit` due pending messages (for the worker), oldest first, each for
+/// [`CLAIM_SECONDS`].
 pub async fn claim_due(pool: &PgPool, limit: i64) -> ApiResult<Vec<OutboundMessage>> {
     Ok(sqlx::query_as::<_, OutboundMessage>(concat!(
-        "update outbound_messages set attempts = attempts + 1, next_attempt_at = now() + interval '60 seconds' \
+        "update outbound_messages set attempts = attempts + 1, next_attempt_at = now() + make_interval(secs => $2) \
          where id in (select id from outbound_messages where status = 'pending' and next_attempt_at <= now() \
                       order by next_attempt_at limit $1 for update skip locked) returning ",
         message_columns!()
     ))
     .bind(limit)
+    .bind(CLAIM_SECONDS as f64)
     .fetch_all(pool)
     .await?)
 }
 
 /// Sends a claimed message and records the result (sent / retry with backoff / failed).
 /// OTP messages are not retried once their code would have expired.
+///
+/// The result is recorded only while `msg`'s claim still holds: the row must still be `pending`
+/// with the `attempts` and `next_attempt_at` the claim set. If the claim ran out and another
+/// node claimed the message again meanwhile, nothing is recorded and the outcome is
+/// [`DeliveryOutcome::ClaimLost`].
 pub async fn deliver_claimed(
     pool: &PgPool,
     sender: &dyn Sender,
@@ -445,13 +464,20 @@ pub async fn deliver_claimed(
 ) -> ApiResult<DeliveryOutcome> {
     match sender.send(msg).await {
         Ok(provider_id) => {
-            sqlx::query(
-                "update outbound_messages set status = 'sent', sent_at = now(), provider_message_id = $2, last_error = null where id = $1",
+            let recorded = sqlx::query(
+                "update outbound_messages set status = 'sent', sent_at = now(), provider_message_id = $2, last_error = null \
+                 where id = $1 and status = 'pending' and attempts = $3 and next_attempt_at = $4",
             )
             .bind(msg.id)
             .bind(&provider_id)
+            .bind(msg.attempts)
+            .bind(msg.next_attempt_at)
             .execute(pool)
-            .await?;
+            .await?
+            .rows_affected();
+            if recorded == 0 {
+                return Ok(claim_lost(msg));
+            }
             tracing::info!(message_id = %msg.id, purpose = %msg.purpose, channel = %msg.channel, sender = sender.name(), "message sent");
             Ok(DeliveryOutcome::Sent {
                 provider_message_id: provider_id,
@@ -459,37 +485,61 @@ pub async fn deliver_claimed(
         }
         Err(e) => {
             let otp_stale = msg.purpose.starts_with("otp_")
-                && OffsetDateTime::now_utc() - msg.created_at
-                    > time::Duration::seconds(settings.otp_ttl_seconds);
+                && msg.created_at + time::Duration::seconds(settings.otp_ttl_seconds)
+                    < OffsetDateTime::now_utc();
             if e.retryable && msg.attempts < MAX_ATTEMPTS && !otp_stale {
                 let delay = crate::events::retry_delay_seconds(msg.attempts);
-                let next: OffsetDateTime = sqlx::query_scalar(
+                let next: Option<OffsetDateTime> = sqlx::query_scalar(
                     "update outbound_messages set status = 'pending', last_error = $2, \
-                     next_attempt_at = now() + make_interval(secs => $3) where id = $1 returning next_attempt_at",
+                     next_attempt_at = now() + make_interval(secs => $3) \
+                     where id = $1 and status = 'pending' and attempts = $4 and next_attempt_at = $5 \
+                     returning next_attempt_at",
                 )
                 .bind(msg.id)
                 .bind(&e.message)
                 .bind(delay as f64)
-                .fetch_one(pool)
+                .bind(msg.attempts)
+                .bind(msg.next_attempt_at)
+                .fetch_optional(pool)
                 .await?;
+                let Some(next) = next else {
+                    return Ok(claim_lost(msg));
+                };
                 tracing::warn!(message_id = %msg.id, purpose = %msg.purpose, error = %e.message, "message send failed; will retry");
                 Ok(DeliveryOutcome::Retrying {
                     next_attempt_at: next,
                     error: e.message,
                 })
             } else {
-                sqlx::query(
-                    "update outbound_messages set status = 'failed', last_error = $2 where id = $1",
+                let recorded = sqlx::query(
+                    "update outbound_messages set status = 'failed', last_error = $2 \
+                     where id = $1 and status = 'pending' and attempts = $3 and next_attempt_at = $4",
                 )
                 .bind(msg.id)
                 .bind(&e.message)
+                .bind(msg.attempts)
+                .bind(msg.next_attempt_at)
                 .execute(pool)
-                .await?;
+                .await?
+                .rows_affected();
+                if recorded == 0 {
+                    return Ok(claim_lost(msg));
+                }
                 tracing::error!(message_id = %msg.id, purpose = %msg.purpose, error = %e.message, "message send failed permanently");
                 Ok(DeliveryOutcome::Failed { error: e.message })
             }
         }
     }
+}
+
+fn claim_lost(msg: &OutboundMessage) -> DeliveryOutcome {
+    tracing::warn!(
+        message_id = %msg.id,
+        purpose = %msg.purpose,
+        attempt = msg.attempts,
+        "a message send finished after its claim ran out and another node claimed it again; this result was not recorded"
+    );
+    DeliveryOutcome::ClaimLost
 }
 
 /// Sends one message now if it is pending and due (call after the transaction that enqueued it

@@ -122,10 +122,11 @@ async fn access_tokens_verify_audience_family_and_account() {
 }
 
 #[tokio::test]
-async fn openid_scope_adds_an_id_token_with_the_nonce() {
+async fn openid_scope_adds_an_id_token_with_the_nonce_and_auth_time() {
     let ctx = TestContext::new().await;
     let c = ctx.carbon().await;
     let (app, _) = ctx.app("quill-docs").await;
+    let authenticated = time::OffsetDateTime::now_utc() - time::Duration::hours(3);
     let mut conn = ctx.conn().await;
     let t = tokens::issue_tokens(
         &mut conn,
@@ -141,11 +142,17 @@ async fn openid_scope_adds_an_id_token_with_the_nonce() {
             ip: None,
             user_agent: None,
             nonce: Some("n-0S6_WzA2Mj"),
+            auth_time: Some(authenticated),
         },
     )
     .await
     .expect("issue");
-    let id_token = t.id_token.expect("id_token");
+    let printed = format!("{t:?}");
+    assert!(
+        !printed.contains(&t.access_token) && !printed.contains(&t.refresh_token),
+        "Debug must not print tokens: {printed}"
+    );
+    let id_token = t.id_token.clone().expect("id_token");
     let claims: serde_json::Value = ctx
         .state
         .keys
@@ -156,6 +163,26 @@ async fn openid_scope_adds_an_id_token_with_the_nonce() {
     assert_eq!(claims["sub"], c.uuid);
     assert_eq!(claims["email_verified"], true);
     assert!(claims.get("phone_number").is_none());
+    // auth_time is when the Carbon authenticated, not when the code was exchanged...
+    assert_eq!(claims["auth_time"], authenticated.unix_timestamp());
+    drop(conn);
+    // ...and stays so on refresh.
+    let refreshed = tokens::refresh(
+        &ctx.state.db,
+        &ctx.state.keys,
+        &ctx.state.settings,
+        &t.refresh_token,
+        &app.app_id,
+    )
+    .await
+    .expect("refresh");
+    let claims: serde_json::Value = ctx
+        .state
+        .keys
+        .jwt
+        .verify(&refreshed.id_token.expect("id_token"), Some(&app.app_id))
+        .expect("verify");
+    assert_eq!(claims["auth_time"], authenticated.unix_timestamp());
 }
 
 #[tokio::test]
@@ -178,6 +205,7 @@ async fn authorization_codes_are_single_use_and_pkce_bound() {
         scopes: &[Scope::Profile],
         nonce: None,
         browser_session_id: None,
+        auth_time: None,
     };
 
     // Wrong verifier burns the code.
@@ -276,6 +304,7 @@ async fn authorization_codes_are_single_use_and_pkce_bound() {
             ip: None,
             user_agent: None,
             nonce: None,
+            auth_time: auth.auth_time,
         },
     )
     .await
@@ -296,6 +325,56 @@ async fn authorization_codes_are_single_use_and_pkce_bound() {
         .await
         .expect_err("revoked");
     assert_eq!(err.code, "token_revoked");
+
+    // PKCE downgrade (RFC 9700 §2.1.1): a code issued without a challenge is refused (and
+    // burned) when a code_verifier is presented anyway.
+    let no_pkce = NewAuthCode {
+        code_challenge: None,
+        code_challenge_method: None,
+        ..new("f6")
+    };
+    let code = tokens::create_code(&mut conn, pepper, &no_pkce)
+        .await
+        .expect("code");
+    match tokens::consume_code(
+        &ctx.state.db,
+        pepper,
+        &code,
+        &app.app_id,
+        Some(&redirect),
+        Some(&verifier),
+    )
+    .await
+    {
+        Err(GrantError::Invalid(m)) => assert!(m.contains("downgrade"), "{m}"),
+        other => panic!("{other:?}"),
+    }
+    match tokens::consume_code(
+        &ctx.state.db,
+        pepper,
+        &code,
+        &app.app_id,
+        Some(&redirect),
+        None,
+    )
+    .await
+    {
+        Err(GrantError::Invalid(m)) => assert!(m.contains("already used"), "{m}"),
+        other => panic!("{other:?}"),
+    }
+    let code = tokens::create_code(&mut conn, pepper, &new_no_pkce(&no_pkce, "f7"))
+        .await
+        .expect("code");
+    tokens::consume_code(
+        &ctx.state.db,
+        pepper,
+        &code,
+        &app.app_id,
+        Some(&redirect),
+        None,
+    )
+    .await
+    .expect("no PKCE at all is fine");
 
     // Expired codes.
     let code = tokens::create_code(&mut conn, pepper, &new("f5"))
@@ -432,4 +511,47 @@ async fn device_flow_states() {
         .await
         .expect_err("unknown");
     assert_eq!(err.code, "device_code_not_found");
+}
+
+fn new_no_pkce<'a>(base: &NewAuthCode<'a>, flow: &'a str) -> NewAuthCode<'a> {
+    NewAuthCode {
+        flow_id: flow,
+        ..base.clone()
+    }
+}
+
+#[tokio::test]
+async fn concurrent_device_decisions_have_one_winner_and_precise_losers() {
+    let ctx = TestContext::new().await;
+    let c = ctx.carbon().await;
+    let start = {
+        let mut conn = ctx.conn().await;
+        tokens::create_device(&mut conn, &ctx.state.keys.pepper, Some("mac"))
+            .await
+            .expect("device")
+    };
+    assert!(
+        !format!("{start:?}").contains(&start.device_code),
+        "Debug must not print the device code"
+    );
+    let mut tasks = Vec::new();
+    for i in 0..10 {
+        let pool = ctx.state.db.clone();
+        let (user_code, uuid) = (start.user_code.clone(), c.uuid.clone());
+        tasks.push(tokio::spawn(async move {
+            let mut conn = pool.acquire().await.expect("conn");
+            tokens::decide_device(&mut conn, &user_code, &uuid, i % 2 == 0)
+                .await
+                .map(|_| ())
+                .map_err(|e| e.code)
+        }));
+    }
+    let mut ok = 0;
+    for t in tasks {
+        match t.await.expect("join") {
+            Ok(()) => ok += 1,
+            Err(code) => assert_eq!(code, "device_code_used"),
+        }
+    }
+    assert_eq!(ok, 1, "exactly one decision wins");
 }

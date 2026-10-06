@@ -1,22 +1,22 @@
 //! Profile photos: `POST /v1/me/photo` (raw image body, at most 2 MB), `DELETE /v1/me/photo`
 //! (back to the default Iris photo) and the public `GET /v1/photos/{id}`.
 //!
-//! Uploads nobody shows are deleted: uploading a new photo, switching `pfp_url` away or removing
-//! the photo deletes the account's older uploads, so storage stays bounded and removed photos
-//! disappear. An upload that another account still shows is kept, because deleting it would
-//! leave that account's `pfp_url` pointing at a 404. This happens when a custodian sets a
-//! Silicon's photo to one of its own uploads, including after the Silicon is transferred to
-//! another Carbon.
+//! Uploads nobody shows are deleted (core's `repo::photos::prune`): uploading a new photo,
+//! switching `pfp_url` away or removing the photo deletes the account's older uploads, so storage
+//! stays bounded and removed photos disappear. An upload that another account still shows is
+//! kept, because deleting it would leave that account's `pfp_url` pointing at a 404. This
+//! happens when a custodian sets a Silicon's photo to one of its own uploads, including after the
+//! Silicon is transferred to another Carbon.
 
 use accounts_core::crypto;
 use accounts_core::events;
 use accounts_core::http::{AccountAuth, ClientMeta, IdempotencyKey, Json, Path};
 use accounts_core::pfp;
 use accounts_core::repo::accounts::{self, ProfileUpdate};
-use accounts_core::repo::idempotency;
 use accounts_core::repo::rate_limit::{self, Limit};
+use accounts_core::repo::{idempotency, photos};
 use accounts_core::views::{self, MeView};
-use accounts_core::{ApiError, ApiResult, AppState, Settings};
+use accounts_core::{ApiError, ApiResult, AppState};
 use axum::body::{Body, Bytes};
 use axum::extract::State;
 use axum::http::header::{
@@ -27,11 +27,10 @@ use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use futures::StreamExt;
 use serde_json::json;
-use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::image::{self, ImageError, ImageInfo, ImageKind};
-use crate::util::{audit_self, idem_scope, photo_url_prefix, track};
+use crate::util::{audit_self, idem_scope, track};
 
 /// Largest accepted photo body: 2 MB.
 pub const MAX_PHOTO_BYTES: usize = 2 * 1024 * 1024;
@@ -170,31 +169,6 @@ fn image_error(e: ImageError, declared: ImageKind) -> ApiError {
     }
 }
 
-/// Deletes the account's uploaded photos that no account shows any more. An upload stays while
-/// any account that isn't deleted has it as its `pfp_url`: the uploader itself, or a Silicon
-/// whose custodian gave it that photo, even after the Silicon was transferred to another Carbon.
-/// Deleted accounts don't keep photos alive. Returns how many photos were deleted.
-///
-/// Callers hold the uploader's account row lock (`accounts::lock`). Every handler in this crate
-/// that changes an account's `pfp_url` or deletes its photos takes that lock first, so a photo
-/// that `PATCH /v1/me` has just checked can't be pruned before the change commits.
-pub(crate) async fn prune_photos(
-    conn: &mut PgConnection,
-    settings: &Settings,
-    account_uuid: &str,
-) -> ApiResult<u64> {
-    // `a.pfp_url = <url>` is a plain equality, so an index on accounts.pfp_url can serve it.
-    Ok(sqlx::query(
-        "delete from photos p where p.account_uuid = $1 and not exists ( \
-           select 1 from accounts a where a.pfp_url = ($2 || p.id::text) and a.status <> 'deleted')",
-    )
-    .bind(account_uuid)
-    .bind(photo_url_prefix(settings))
-    .execute(&mut *conn)
-    .await?
-    .rows_affected())
-}
-
 /// `POST /v1/me/photo` — the body is the raw image (Content-Type image/png, image/jpeg,
 /// image/webp or image/gif; at most 2 MB). The bytes must really be that format; dimensions
 /// are capped (see [`image`]). Sets the account's `pfp_url` to
@@ -234,7 +208,7 @@ pub(crate) async fn upload(
     });
     let scope = idem_scope(me.uuid(), "POST", "/v1/me/photo");
     idempotency::run(
-        &state.db,
+        &state,
         key.as_deref(),
         &scope,
         &fingerprint,
@@ -248,7 +222,7 @@ pub(crate) async fn upload(
             )
             .await?;
             let photo_id = Uuid::now_v7();
-            let pfp_url = format!("{}{photo_id}", photo_url_prefix(&state.settings));
+            let pfp_url = pfp::photo_url(&state.settings, photo_id);
             let mut tx = state.db.begin().await?;
             // One upload at a time per account, so pruning never races another upload.
             accounts::lock(&mut tx, me.uuid()).await?;
@@ -271,7 +245,7 @@ pub(crate) async fn upload(
             )
             .await?;
             events::notify_profile_updated(&mut tx, &account, &changed).await?;
-            prune_photos(&mut tx, &state.settings, me.uuid()).await?;
+            photos::prune(&mut tx, &state.settings, me.uuid()).await?;
             audit_self(
                 &mut tx,
                 me.uuid(),
@@ -335,7 +309,7 @@ pub(crate) async fn remove(
     )
     .await?;
     events::notify_profile_updated(&mut tx, &account, &changed).await?;
-    let deleted = prune_photos(&mut tx, &state.settings, me.uuid()).await?;
+    let deleted = photos::prune(&mut tx, &state.settings, me.uuid()).await?;
     if !changed.is_empty() || deleted > 0 {
         audit_self(
             &mut tx,

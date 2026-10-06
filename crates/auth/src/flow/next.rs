@@ -18,6 +18,7 @@ use accounts_core::models::{
 use accounts_core::repo::audit::{self, SigninRecord};
 use accounts_core::repo::contacts::{self, ContactKind};
 use accounts_core::repo::memberships::{self, GrantMode};
+use accounts_core::repo::sessions;
 use accounts_core::repo::tokens::{self, NewAuthCode};
 use accounts_core::{ApiError, ApiResult, AppState};
 use serde_json::json;
@@ -190,6 +191,12 @@ pub async fn complete(
         scopes.push(Scope::Openid);
     }
     let scopes = normalize_scopes(scopes);
+    // When the Carbon actually authenticated: the browser session's last proof of identity
+    // (just now for a code, Google or Apple; earlier for continue-as and prompt=none).
+    let auth_time = match flow.extras.browser_session_id {
+        Some(id) => sessions::authenticated_at(conn, id).await?,
+        None => None,
+    };
     audit::signin(
         conn,
         &SigninRecord {
@@ -223,6 +230,7 @@ pub async fn complete(
             scopes: &scopes,
             nonce: flow.nonce.as_deref(),
             browser_session_id: flow.extras.browser_session_id,
+            auth_time,
         },
     )
     .await?;

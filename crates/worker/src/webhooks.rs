@@ -23,8 +23,9 @@
 //! 4. **Record** a `webhook_attempts` row and the result: a 2xx within 10 s → `delivered`;
 //!    anything else → retried after 10 s, 30 s, 1 min, 5 min, 15 min, 30 min, then hourly, until
 //!    72 h after the event was created → `failed` (apps replay failed deliveries). A replayed
-//!    delivery (`manual_replays > 0`, attempts reset to 0) gets a fresh 72 h of retries,
-//!    measured along the retry schedule because the schema keeps no replay timestamp.
+//!    delivery (attempts reset to 0) gets a fresh 72 h of retries counted from the replay
+//!    (`requeued_at`); a replay made before that column existed is measured along the retry
+//!    schedule instead.
 //!
 //! SSRF guard: with ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=false only `https` URLs are contacted, local
 //! host names and literal IPs that aren't [deliverable](is_deliverable_ip) (private, loopback,
@@ -37,7 +38,7 @@
 //! has the details.
 
 use std::fmt;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::IpAddr;
 use std::time::Duration;
 
 use accounts_core::config::Settings;
@@ -82,6 +83,8 @@ pub struct ClaimedDelivery {
     pub attempts: i32,
     pub manual_replays: i32,
     pub created_at: OffsetDateTime,
+    /// When the delivery was last replayed (its fresh 72 h window starts there).
+    pub requeued_at: Option<OffsetDateTime>,
     /// The lease (`locked_until`) this worker set; results are recorded only while it holds.
     pub lease: OffsetDateTime,
     /// The exact body to sign and send.
@@ -145,7 +148,7 @@ pub async fn claim_due(
            from due, webhook_events e \
           where d.id = due.id and e.event_id = d.event_id \
          returning d.id, d.event_id, e.type as event_type, d.target_kind, d.target_id, d.url, d.attempts, \
-                   d.manual_replays, d.created_at, d.locked_until as lease, e.payload",
+                   d.manual_replays, d.created_at, d.requeued_at, d.locked_until as lease, e.payload",
     )
     .bind(limit)
     .bind(lease_seconds as f64)
@@ -161,8 +164,8 @@ pub fn schedule_elapsed_seconds(attempts: i32) -> i64 {
 
 /// Telemetry progress of a delivery after an attempt: 1.0 once it is settled (delivered, or
 /// failed for good), otherwise the share of its 72 h retry window used so far — since the event
-/// was created, or along the retry schedule for a replay (which gets a fresh window) — capped
-/// below 1.0.
+/// was created, or since its last replay (a replay gets a fresh window; one made before
+/// `requeued_at` existed is measured along the retry schedule) — capped below 1.0.
 pub fn delivery_progress(
     outcome: &DeliveryOutcome,
     d: &ClaimedDelivery,
@@ -174,10 +177,12 @@ pub fn delivery_progress(
         | DeliveryOutcome::LeaseLost { .. }
         | DeliveryOutcome::Abandoned { .. } => {
             let window = (GIVE_UP_AFTER_HOURS * 3600) as f64;
-            let used = if d.manual_replays > 0 {
-                schedule_elapsed_seconds(d.attempts.saturating_add(1)) as f64
-            } else {
-                (now - d.created_at).as_seconds_f64()
+            let used = match d.requeued_at {
+                Some(at) => (now - at).as_seconds_f64(),
+                None if d.manual_replays > 0 => {
+                    schedule_elapsed_seconds(d.attempts.saturating_add(1)) as f64
+                }
+                None => (now - d.created_at).as_seconds_f64(),
             };
             (used / window).clamp(0.0, 0.99)
         }
@@ -530,14 +535,15 @@ impl WebhookDeliverer {
             Some(error) => {
                 let attempts_after = d.attempts.saturating_add(1);
                 let delay = events::retry_delay_seconds(attempts_after);
-                // A replay restarts the 72 h window; without a replay timestamp it is measured
-                // along the retry schedule.
+                // A replay restarts the 72 h window from `requeued_at`; a replay made before that
+                // column existed (no timestamp) is measured along the retry schedule.
                 let replay_window_over = d.manual_replays > 0
+                    && d.requeued_at.is_none()
                     && schedule_elapsed_seconds(attempts_after) > GIVE_UP_AFTER_HOURS * 3600;
                 let row: Option<(String, OffsetDateTime)> = sqlx::query_as(
                     "with cur as ( \
-                       select id, ($5 or $6 or (manual_replays = 0 and \
-                                   now() + make_interval(secs => $7) > created_at + make_interval(hours => $8))) as give_up \
+                       select id, ($5 or $6 or ((manual_replays = 0 or requeued_at is not null) and \
+                                   now() + make_interval(secs => $7) > coalesce(requeued_at, created_at) + make_interval(hours => $8))) as give_up \
                          from webhook_deliveries \
                         where id = $1 and status = 'pending' and locked_until = $9 \
                         for update) \
@@ -646,76 +652,28 @@ impl WebhookDeliverer {
 }
 
 /// The URL rules at delivery time: always http(s) without credentials; with
-/// ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=false only https to non-local hosts and
-/// [deliverable](is_deliverable_ip) literal IPs (host names are checked again by
-/// [`GuardedResolver`] when connecting).
+/// ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=false only https to non-local hosts and public literal IPs
+/// (core's `normalize::validate_webhook_url`, which judges literal IPs with
+/// [`is_deliverable_ip`]); host names are checked again by [`GuardedResolver`] when connecting.
 pub fn check_url(settings: &Settings, raw: &str) -> Result<reqwest::Url, String> {
-    let url = match normalize::validate_webhook_url(settings, raw) {
-        Ok(u) => u,
+    match normalize::validate_webhook_url(settings, raw) {
+        Ok(u) => Ok(u),
         Err(why) if settings.webhook_allow_private => {
-            return Err(format!("Not sent: the webhook URL is invalid: {why}."));
+            Err(format!("Not sent: the webhook URL is invalid: {why}."))
         }
-        Err(why) => {
-            return Err(format!(
-                "Not sent: refused by the SSRF guard (ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=false): {why}."
-            ));
-        }
-    };
-    if !settings.webhook_allow_private {
-        // Core checks literal IPs too, but not the IPv6 forms that carry an IPv4 address
-        // (NAT64, 6to4, IPv4-compatible…); the URL parser has already normalized the host.
-        let literal = match url.host() {
-            Some(url::Host::Ipv4(v4)) => Some(IpAddr::V4(v4)),
-            Some(url::Host::Ipv6(v6)) => Some(IpAddr::V6(v6)),
-            _ => None,
-        };
-        if let Some(ip) = literal
-            && !is_deliverable_ip(ip)
-        {
-            return Err(format!(
-                "Not sent: refused by the SSRF guard (ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=false): '{}' points at a private or reserved IP address; webhooks must reach a public server.",
-                raw.trim()
-            ));
-        }
+        Err(why) => Err(format!(
+            "Not sent: refused by the SSRF guard (ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=false): {why}."
+        )),
     }
-    Ok(url)
 }
 
-/// True when a webhook may be sent to `ip` while private targets are refused.
-///
-/// Core's [`normalize::is_public_ip`] decides IPv4 (private, loopback, link-local, CGNAT,
-/// documentation, benchmarking, multicast, reserved…). For IPv6 it is tightened here, because
-/// some IPv6 forms carry an IPv4 address that a dual-stack host, a NAT64 gateway or a 6to4
-/// relay delivers to — a way into private IPv4 networks:
-/// - IPv4-mapped `::ffff:a.b.c.d`, NAT64 `64:ff9b::a.b.c.d` (RFC 6052) and 6to4
-///   `2002:aabb:ccdd::/48` (RFC 3056) count as the IPv4 address they carry;
-/// - anything else outside global unicast `2000::/3` is refused: IPv4-compatible `::/96`,
-///   IPv4-translated `::ffff:0:0:0/96`, local-use NAT64 `64:ff9b:1::/48`, discard-only
-///   `100::/64`, unique-local, link-local, site-local, multicast;
-/// - inside `2000::/3`, `2001::/23` (IETF protocol assignments: Teredo, benchmarking, ORCHID)
-///   and the documentation ranges `2001:db8::/32` and `3fff::/20` are refused.
+/// True when a webhook may be sent to `ip` while private targets are refused: core's
+/// [`normalize::is_public_ip`], the one rule shared by URL validation (when a URL is set) and
+/// delivery (literal IPs and every resolved address). IPv4-mapped, NAT64 and 6to4 addresses
+/// count as the IPv4 address they carry; other IPv6 outside global unicast, Teredo, ORCHID,
+/// benchmarking and documentation ranges are refused.
 pub fn is_deliverable_ip(ip: IpAddr) -> bool {
-    let v6 = match ip {
-        IpAddr::V4(_) => return normalize::is_public_ip(ip),
-        IpAddr::V6(v6) => v6,
-    };
-    if let Some(v4) = v6.to_ipv4_mapped() {
-        return is_deliverable_ip(IpAddr::V4(v4));
-    }
-    let s = v6.segments();
-    let o = v6.octets();
-    if s[..6] == [0x0064, 0xff9b, 0, 0, 0, 0] {
-        return is_deliverable_ip(IpAddr::V4(Ipv4Addr::new(o[12], o[13], o[14], o[15])));
-    }
-    if s[0] & 0xe000 != 0x2000 {
-        return false;
-    }
-    if s[0] == 0x2002 {
-        return is_deliverable_ip(IpAddr::V4(Ipv4Addr::new(o[2], o[3], o[4], o[5])));
-    }
-    let ietf_protocol = s[0] == 0x2001 && s[1] < 0x0200;
-    let documentation = (s[0] == 0x2001 && s[1] == 0x0db8) || (s[0] == 0x3fff && s[1] < 0x1000);
-    !ietf_protocol && !documentation && normalize::is_public_ip(ip)
+    normalize::is_public_ip(ip)
 }
 
 async fn read_snippet(mut response: reqwest::Response) -> String {
@@ -818,95 +776,9 @@ fn truncate(s: &str, max_chars: usize) -> String {
     }
 }
 
-/// The SSRF guard refused a host name (ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=false): it has no address
-/// a webhook may be sent to.
-///
-/// Its message is stored where the app owner reads it (a delivery's `last_error`), so it never
-/// names the addresses the host resolved to, nor whether the name resolved at all: either would
-/// let anyone who can set a webhook URL map the service's internal DNS. [`BlockedAddress::ip`]
-/// and [`BlockedAddress::lookup_error`] carry the details for the server log.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BlockedAddress {
-    pub host: String,
-    /// The first address that isn't [deliverable](is_deliverable_ip); `None` when the name
-    /// didn't resolve.
-    pub ip: Option<IpAddr>,
-    /// Why the name didn't resolve, when it didn't.
-    pub lookup_error: Option<String>,
-}
-
-impl fmt::Display for BlockedAddress {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "the webhook host '{}' has no public address (it doesn't resolve, or it resolves to a private or reserved address); webhooks must reach a public server",
-            self.host
-        )
-    }
-}
-
-impl std::error::Error for BlockedAddress {}
-
-/// DNS lookup failure with the host name in the message (only while private targets are
-/// allowed, in development; with the SSRF guard on, a lookup failure is a [`BlockedAddress`]).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LookupFailed {
-    pub host: String,
-    pub message: String,
-}
-
-impl fmt::Display for LookupFailed {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "the webhook host '{}' could not be resolved ({})",
-            self.host, self.message
-        )
-    }
-}
-
-impl std::error::Error for LookupFailed {}
-
-/// Resolves `host`. Unless `allow_private`, refuses it ([`BlockedAddress`]) when it doesn't
-/// resolve or when any of its addresses isn't [deliverable](is_deliverable_ip).
-pub async fn resolve_checked(
-    host: &str,
-    allow_private: bool,
-) -> Result<Vec<SocketAddr>, Box<dyn std::error::Error + Send + Sync>> {
-    let resolved = tokio::net::lookup_host((host, 0))
-        .await
-        .map(|addrs| addrs.collect::<Vec<SocketAddr>>())
-        .map_err(|e| e.to_string())
-        .and_then(|addrs| {
-            if addrs.is_empty() {
-                Err("no addresses".to_string())
-            } else {
-                Ok(addrs)
-            }
-        });
-    if allow_private {
-        return resolved.map_err(|message| {
-            Box::new(LookupFailed {
-                host: host.to_string(),
-                message,
-            }) as Box<dyn std::error::Error + Send + Sync>
-        });
-    }
-    let refused = |ip: Option<IpAddr>, lookup_error: Option<String>| {
-        Box::new(BlockedAddress {
-            host: host.to_string(),
-            ip,
-            lookup_error,
-        }) as Box<dyn std::error::Error + Send + Sync>
-    };
-    match resolved {
-        Err(message) => Err(refused(None, Some(message))),
-        Ok(addrs) => match addrs.iter().find(|a| !is_deliverable_ip(a.ip())) {
-            Some(bad) => Err(refused(Some(bad.ip()), None)),
-            None => Ok(addrs),
-        },
-    }
-}
+/// The SSRF guard's resolver and its refusals live in core (`normalize`), shared with URL
+/// validation; re-exported here for the delivery client.
+pub use accounts_core::normalize::{BlockedAddress, LookupFailed, resolve_checked};
 
 /// The delivery client's DNS resolver: plain system resolution plus, when private targets are
 /// not allowed, a refusal of any host that has an address that isn't deliverable. Because the
@@ -1126,6 +998,7 @@ mod tests {
             attempts,
             manual_replays,
             created_at: now - time::Duration::hours(created_hours_ago),
+            requeued_at: None,
             lease: now,
             payload: Value::Null,
         };
@@ -1143,7 +1016,13 @@ mod tests {
         assert_eq!(delivery_progress(&retrying, &d(0, 0, 0), now), 0.0);
         assert!((delivery_progress(&retrying, &d(36, 5, 0), now) - 0.5).abs() < 1e-9);
         assert_eq!(delivery_progress(&retrying, &d(100, 5, 0), now), 0.99);
-        // A replay of an old event starts a fresh window, measured along the schedule.
+        // A replay of an old event starts a fresh window, from the replay...
+        let replayed = ClaimedDelivery {
+            requeued_at: Some(now - time::Duration::hours(18)),
+            ..d(100, 3, 1)
+        };
+        assert!((delivery_progress(&retrying, &replayed, now) - 0.25).abs() < 1e-9);
+        // ...or, for a replay made before the replay time was stored, along the schedule.
         let replay = delivery_progress(&retrying, &d(100, 0, 1), now);
         assert!(replay > 0.0 && replay < 0.01, "{replay}");
     }

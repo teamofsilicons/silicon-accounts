@@ -195,6 +195,21 @@ pub struct Introspection {
     /// `access_token` or `refresh_token`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token_type: Option<String>,
+    /// Issuer (the service's public URL).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub iss: Option<String>,
+    /// The app the token was issued to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    /// Not before (unix seconds).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nbf: Option<i64>,
+    /// Token id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jti: Option<String>,
+    /// The account's current public id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
 }
 
 /// `POST /v1/device/authorize`: show `user_code` and `verification_uri` to the Carbon,

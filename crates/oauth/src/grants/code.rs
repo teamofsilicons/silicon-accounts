@@ -75,12 +75,11 @@ pub(crate) async fn exchange(
     let app_id = client.app.app_id.as_str();
 
     let mut tx = state.db.begin().await?;
-    let row = sqlx::query_as::<_, CodeRow>(
-        "select code_hash, flow_id, app_id, account_uuid, redirect_uri, code_challenge, code_challenge_method, \
-                scopes, nonce, browser_session_id, created_at, expires_at, consumed_at, \
-                (expires_at <= now()) as expired \
-         from authorization_codes where code_hash = $1 for update",
-    )
+    let row = sqlx::query_as::<_, CodeRow>(concat!(
+        "select ",
+        accounts_core::auth_code_columns!(),
+        ", (expires_at <= now()) as expired from authorization_codes where code_hash = $1 for update"
+    ))
     .bind(state.keys.pepper.hash(code))
     .fetch_optional(&mut *tx)
     .await?;
@@ -144,6 +143,8 @@ pub(crate) async fn exchange(
             ip: meta.ip.as_deref(),
             user_agent: meta.user_agent.as_deref(),
             nonce: auth.nonce.as_deref(),
+            // When the Carbon actually authenticated (id_token auth_time, also after refreshes).
+            auth_time: auth.auth_time,
         },
     )
     .await?;

@@ -162,7 +162,7 @@ async fn create_import(
         &format!("/v1/apps/{app_id}/imports"),
     );
     idempotency::run(
-        &state.db,
+        &state,
         key.as_deref(),
         &scope,
         &fingerprint,

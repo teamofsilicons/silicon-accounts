@@ -251,6 +251,13 @@ pub struct EmailAddress {
     /// `code`, `google` or `apple`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verified_via: Option<String>,
+    /// When it was added to the account.
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub created_at: Option<OffsetDateTime>,
 }
 
 /// A phone number on a Carbon account.
@@ -272,6 +279,13 @@ pub struct PhoneNumber {
     /// How it was verified (`code`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verified_via: Option<String>,
+    /// When it was added to the account.
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub created_at: Option<OffsetDateTime>,
 }
 
 /// A Google or Apple identity linked to a Carbon.
@@ -409,6 +423,9 @@ pub struct AppSummary {
     /// Logo URL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logo_url: Option<String>,
+    /// Logo URL for dark backgrounds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logo_dark_url: Option<String>,
     /// Homepage URL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub homepage_url: Option<String>,
@@ -426,6 +443,20 @@ pub struct MyApp {
     /// `active`, `access_removed` or `imported`.
     #[serde(default, deserialize_with = "lenient_string")]
     pub status: String,
+    /// How the membership started: `signin`, `slt` or `import`.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub source: Option<String>,
+    /// When the account removed the app's access (status `access_removed`).
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub access_removed_at: Option<OffsetDateTime>,
     /// The scopes this account shared with the app.
     #[serde(default, deserialize_with = "lenient_vec")]
     pub granted_scopes: Vec<String>,
@@ -458,6 +489,13 @@ pub struct SessionInfo {
     /// `browser` or `cli`.
     #[serde(default, deserialize_with = "lenient_string")]
     pub kind: String,
+    /// How it was created, e.g. `browser`, `device`, `cli_code` or `silicon_login`.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub origin: Option<String>,
     /// Client label, e.g. `accounts CLI on build-box (linux)`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -481,6 +519,13 @@ pub struct SessionInfo {
         skip_serializing_if = "Option::is_none"
     )]
     pub last_seen_at: Option<OffsetDateTime>,
+    /// When it ends unless used or revoked.
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub expires_at: Option<OffsetDateTime>,
     /// True for the session making this request.
     #[serde(default, deserialize_with = "lenient_bool")]
     pub current: bool,
@@ -555,7 +600,7 @@ pub struct DeviceRequest {
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,
-    /// `pending`, `approved`, `denied` or `consumed`.
+    /// `pending`, `approved`, `denied`, `consumed` or `expired`.
     #[serde(default, deserialize_with = "lenient_string")]
     pub status: String,
 }

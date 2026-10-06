@@ -54,14 +54,38 @@ function tokenOrThrow(res: HttpResponse<unknown>): TokenResponse {
   return res.body as TokenResponse;
 }
 
+export interface AccountsClientOptions {
+  /** Extra headers on every request this client (and its browsers, sessions and apps) sends. */
+  headers?: Record<string, string>;
+  /**
+   * Sends `X-Forwarded-For: <ip>` so Silicon Accounts (run with ACCOUNTS_TRUST_FORWARDED_FOR=true)
+   * counts its per-network limits (e.g. 30 codes per 10 minutes) per test instead of for all of
+   * 127.0.0.1. `'random'` picks a private address for this client. Default: $TESTKIT_FORWARDED_FOR.
+   */
+  forwardedFor?: string | null;
+}
+
+/** A random address in 10.0.0.0/8 (for X-Forwarded-For in tests). */
+export function randomPrivateIp(): string {
+  const b = randomUUID().replaceAll('-', '');
+  return `10.${parseInt(b.slice(0, 2), 16)}.${parseInt(b.slice(2, 4), 16)}.${(parseInt(b.slice(4, 6), 16) % 254) + 1}`;
+}
+
 export class AccountsClient {
   readonly url: string;
   readonly http: HttpClient;
+  /** Headers every request carries (see AccountsClientOptions). */
+  readonly headers: Record<string, string>;
   private metaCache: Meta | null = null;
 
-  constructor(url: string = process.env.ACCOUNTS_URL ?? DEFAULT_ACCOUNTS_URL) {
+  constructor(url: string = process.env.ACCOUNTS_URL ?? DEFAULT_ACCOUNTS_URL, options: AccountsClientOptions = {}) {
     this.url = url.replace(/\/+$/, '');
-    this.http = new HttpClient({ baseUrl: this.url });
+    const forwardedFor = options.forwardedFor === undefined ? (process.env.TESTKIT_FORWARDED_FOR ?? null) : options.forwardedFor;
+    this.headers = {
+      ...(forwardedFor ? { 'X-Forwarded-For': forwardedFor === 'random' ? randomPrivateIp() : forwardedFor } : {}),
+      ...options.headers,
+    };
+    this.http = new HttpClient({ baseUrl: this.url, headers: this.headers });
   }
 
   /** Polls /readyz until Silicon Accounts answers 200. */
@@ -122,7 +146,7 @@ export class AccountsClient {
 
   /** A first-party session from an access token with aud=accounts (CLI / Silicon login). */
   withToken(accessToken: string): AccountSession {
-    return new AccountSession(new HttpClient({ baseUrl: this.url, headers: { Authorization: `Bearer ${accessToken}` } }));
+    return new AccountSession(new HttpClient({ baseUrl: this.url, headers: { ...this.headers, Authorization: `Bearer ${accessToken}` } }));
   }
 
   async siliconLogin(id: string, stk: string, clientLabel?: string): Promise<TokenResponse> {
@@ -478,7 +502,7 @@ export class BrowserSession {
   constructor(accounts: AccountsClient, publicUrl: string, jar: CookieJar = new CookieJar()) {
     this.accounts = accounts;
     this.publicUrl = publicUrl;
-    this.http = new HttpClient({ baseUrl: accounts.url, jar, origin: publicUrl });
+    this.http = new HttpClient({ baseUrl: accounts.url, jar, origin: publicUrl, headers: accounts.headers });
   }
 
   get jar(): CookieJar {

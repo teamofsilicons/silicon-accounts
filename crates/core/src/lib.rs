@@ -12,12 +12,16 @@
 //! Conventions every module follows:
 //! - Repository functions take `&mut PgConnection`; pass `&mut tx` (a transaction) or
 //!   `&mut conn` (a pooled connection). The few that must persist a failure even when the
-//!   request fails (OTP verification, refresh-token reuse, code consumption, idempotency) take
-//!   `&PgPool` and manage their own transaction.
+//!   request fails (OTP verification, refresh-token reuse, code consumption, the STK attempt
+//!   gate, idempotency) take `&PgPool` and manage their own transaction.
 //! - Errors are [`ApiError`] (non-OAuth endpoints) or [`OAuthError`] (`/v1/oauth/*`). Every
 //!   message says exactly what was wrong and why; every hint says what to do next.
-//! - Time comes from Postgres `now()` wherever a TTL is enforced, so tests can time-travel by
-//!   editing rows and app/database clock skew never matters.
+//! - Expiries and locks stored in the database (codes, SLTs, device codes, token families, OTP
+//!   challenges and their cooldowns, sign-up sessions, reservations, rate limits) are stamped and
+//!   compared with Postgres `now()`, so tests can time-travel by editing rows and the API nodes'
+//!   clocks don't matter for them. A JWT's own `exp`/`nbf` are checked with the node's clock
+//!   (30 s leeway on `nbf`), as JWTs are; timestamps written into payloads (`occurred_at`) and
+//!   telemetry also use the node's clock.
 
 pub mod config;
 pub mod crypto;

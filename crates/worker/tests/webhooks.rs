@@ -994,3 +994,45 @@ async fn a_graceful_stop_claims_nothing_new_and_finishes_the_attempts_in_flight(
     assert!(d.locked_until.is_none(), "not claimed after the stop");
     assert_eq!(leased_now(&ctx).await, 0);
 }
+
+#[tokio::test]
+async fn a_replay_gets_seventy_two_hours_from_the_replay_itself() {
+    let ctx = TestContext::new().await;
+    let rx = start_receiver().await;
+    let (app, _) = ctx.app("requeue").await;
+    ctx.set_app_webhook(&app.app_id, &rx.url("hook")).await;
+    rx.fail_next(100, 500);
+    let deliverer = WebhookDeliverer::new(&ctx.state).expect("client");
+    let ev = ping(&ctx, &app.app_id).await;
+    // Replayed 71 hours ago (the apps crate stamps requeued_at), and the next retry (10 s
+    // later) still falls inside its window, although the event itself is 300 hours old.
+    sqlx::query(
+        "update webhook_deliveries set created_at = now() - interval '300 hours', status = 'pending', \
+         attempts = 0, manual_replays = 1, requeued_at = now() - interval '71 hours', \
+         next_attempt_at = now() where id = $1",
+    )
+    .bind(ev.delivery_id)
+    .execute(&mut *ctx.conn().await)
+    .await
+    .expect("replay");
+    assert!(
+        matches!(
+            deliverer.deliver_due(10).await.expect("cycle").as_slice(),
+            [DeliveryOutcome::Retrying { .. }]
+        ),
+        "71 hours after the replay it is still retried"
+    );
+    // 73 hours after the replay the next failure is final, whatever the attempt count.
+    sqlx::query(
+        "update webhook_deliveries set attempts = 1, requeued_at = now() - interval '73 hours', \
+         next_attempt_at = now() where id = $1",
+    )
+    .bind(ev.delivery_id)
+    .execute(&mut *ctx.conn().await)
+    .await
+    .expect("time travel");
+    assert!(matches!(
+        deliverer.deliver_due(10).await.expect("cycle").as_slice(),
+        [DeliveryOutcome::Failed { .. }]
+    ));
+}

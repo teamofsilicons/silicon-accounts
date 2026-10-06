@@ -11,6 +11,18 @@ middleware stack, serves the account site, and ships the three binaries.
 
 ## Run it locally
 
+One command brings up the whole stack (Postgres, migrations, the fake apps, the testkit's mock
+Google/Apple and Postmark/Twilio, the fake app server, and accounts-api wired to them):
+
+```bash
+scripts/dev.sh             # foreground, Ctrl-C stops everything; --detach + scripts/stop.sh otherwise
+scripts/journeys.sh        # the non-browser journeys against a fresh stack on ports 9690-9693
+```
+
+`scripts/dev.sh --help` lists the flags (`--no-build`, `--release`, `--reseed`, `--reset-db`) and
+the port/database overrides; it serves the account site from `web/dist` when it has been built
+(`pnpm -C web build`). By hand:
+
 ```bash
 scripts/dev-db.sh                                   # Postgres on 127.0.0.1:5444
 cargo run -p silicon-accounts-server --bin accounts-migrate

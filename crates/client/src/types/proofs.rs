@@ -273,6 +273,27 @@ pub struct AppProof {
         skip_serializing_if = "Option::is_none"
     )]
     pub revoked_at: Option<OffsetDateTime>,
+    /// `active`, `revoked` or `expired` (a proof whose sign-in, membership or account
+    /// ended reads `revoked` with the matching `revoke_reason`).
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub status: String,
+    /// Why it ended, e.g. `revoked_by_app`, `sign_in_revoked`, `access_removed`.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub revoke_reason: Option<String>,
+    /// When the current proof token expires.
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub token_expires_at: Option<OffsetDateTime>,
+    /// Lifetime of each proof token, in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub access_ttl_seconds: Option<u64>,
 }
 
 /// An OBO proof issued about the signed-in account (`GET /v1/me/proofs`).
@@ -313,6 +334,27 @@ pub struct MyProof {
     /// `active`, `revoked` or `expired`.
     #[serde(default, deserialize_with = "lenient_string")]
     pub status: String,
+    /// When it was revoked.
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub revoked_at: Option<OffsetDateTime>,
+    /// Why it ended, e.g. `revoked_by_account`, `sign_in_revoked`, `access_removed`.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub revoke_reason: Option<String>,
+    /// When the current proof token expires.
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub token_expires_at: Option<OffsetDateTime>,
 }
 
 /// Filters for an app's proofs.

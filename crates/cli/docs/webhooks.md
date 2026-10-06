@@ -80,7 +80,7 @@ accounts app webhook replay <delivery-id>…
 accounts app webhook replay --failed --since 2026-10-01T00:00:00Z
 ```
 
-A replay keeps the event id (so your dedupe works), goes to the current URL and is
-signed with the current secret. Deliveries about accounts that no longer have a
+A replay keeps the event id (so your dedupe works), goes to the current URL, is
+signed with the current secret and gets a fresh 72 hours of retries from the replay. Deliveries about accounts that no longer have a
 membership with your app are skipped: data is never replayed to an app that lost
 access.

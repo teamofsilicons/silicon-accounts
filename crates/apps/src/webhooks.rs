@@ -9,9 +9,9 @@
 //! - `GET /v1/apps/{app_id}/webhook/deliveries?status&limit&cursor`, `GET …/deliveries/{id}`
 //!   (+ attempts + the payload, `payload_redacted` when the app may no longer see it).
 //! - `POST /v1/apps/{app_id}/webhook/replay` (Idempotency-Key) `{"delivery_ids":[…]}` or
-//!   `{"status":"failed","since":"…"}` (max 100): re-queues with attempts 0 and manual_replays+1,
-//!   keeping the event id and payload; the worker sends it to the CURRENT url signed with the
-//!   CURRENT secret. Response `{"replayed":[ids],"skipped":[{delivery_id,reason,message}],
+//!   `{"status":"failed","since":"…"}` (max 100): re-queues with attempts 0, manual_replays+1
+//!   and `requeued_at` = now (a fresh 72 h of retries from the replay), keeping the event id and
+//!   payload; the worker sends it to the CURRENT url signed with the CURRENT secret. Response `{"replayed":[ids],"skipped":[{delivery_id,reason,message}],
 //!   "remaining","not_replayable","url"}`.
 //!
 //! Account data and lost access (one rule, [`DataAccess`]): a delivery whose payload carries
@@ -102,7 +102,7 @@ async fn set_webhook(
     );
     // The response carries a fresh secret: a retry with the same key gets the same secret for
     // 10 minutes instead of rotating it again.
-    let mut r = idempotency::run(&state.db, key.as_deref(), &scope, &body, true, || async {
+    let mut r = idempotency::run(&state, key.as_deref(), &scope, &body, true, || async {
         let url = validate_webhook_url(&state.settings, &body.url).map_err(|m| {
             let mut f = FieldErrors::new();
             f.add("url", m);
@@ -218,7 +218,7 @@ async fn rotate_secret(
         "POST",
         &format!("/v1/apps/{app_id}/webhook/rotate-secret"),
     );
-    let mut r = idempotency::run(&state.db, key.as_deref(), &scope, &json!({}), true, || async {
+    let mut r = idempotency::run(&state, key.as_deref(), &scope, &json!({}), true, || async {
         let (secret, enc) = events::new_webhook_secret(&state.keys.keyring)?;
         let mut tx = state.db.begin().await?;
         let url: Option<Option<String>> = sqlx::query_scalar(
@@ -268,7 +268,7 @@ async fn test_webhook(
         "POST",
         &format!("/v1/apps/{app_id}/webhook/test"),
     );
-    idempotency::run(&state.db, key.as_deref(), &scope, &json!({}), false, || async {
+    idempotency::run(&state, key.as_deref(), &scope, &json!({}), false, || async {
         let mut tx = state.db.begin().await?;
         let emitted = events::ping_app(&mut tx, &app_id)
             .await?
@@ -602,7 +602,7 @@ async fn replay(
         "POST",
         &format!("/v1/apps/{app_id}/webhook/replay"),
     );
-    idempotency::run(&state.db, key.as_deref(), &scope, &body, false, || async {
+    idempotency::run(&state, key.as_deref(), &scope, &body, false, || async {
         let result = run_replay(&state, &auth, &body, meta.ip.as_deref()).await?;
         Ok((StatusCode::OK, result))
     })
@@ -782,7 +782,8 @@ async fn run_replay(
     if !replay_ids.is_empty() {
         sqlx::query(
             "update webhook_deliveries set status = 'pending', attempts = 0, next_attempt_at = now(), \
-             locked_until = null, delivered_at = null, manual_replays = manual_replays + 1, url = $3 \
+             locked_until = null, delivered_at = null, manual_replays = manual_replays + 1, url = $3, \
+             requeued_at = now() \
              where target_kind = 'app' and target_id = $1 and id = any($2)",
         )
         .bind(app_id)

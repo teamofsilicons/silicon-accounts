@@ -769,6 +769,7 @@ async fn a_code_verified_while_the_account_is_deleted_adds_nothing() {
         wait_for_lock_waiters(&ctx, 1).await;
         accounts_core::repo::accounts::delete_account(
             &mut deletion,
+            &ctx.state.settings,
             &carbon.uuid,
             &carbon.uuid,
             true,

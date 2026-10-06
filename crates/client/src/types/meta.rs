@@ -75,6 +75,13 @@ pub struct IdAvailability {
     /// take it back within the 10-day reservation.
     #[serde(default, deserialize_with = "lenient_bool")]
     pub reclaimable: bool,
+    /// Available ids close to the one asked for (when it can't be taken).
+    #[serde(
+        default,
+        deserialize_with = "lenient_vec",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub suggestions: Vec<String>,
 }
 
 /// A JSON Web Key Set (`GET /.well-known/jwks.json`).

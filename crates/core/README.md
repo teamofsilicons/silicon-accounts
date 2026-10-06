@@ -45,7 +45,7 @@ async fn change_my_id(
     Json(body): Json<ChangeId>,           // 400 invalid_json / 422 validation_failed with paths
 ) -> Result<Response, ApiError> {
     let scope = idempotency::scope(&format!("account:{}", me.uuid()), "POST", "/v1/me/id");
-    idempotency::run(&state.db, key.as_deref(), &scope, &body, false, || async {
+    idempotency::run(&state, key.as_deref(), &scope, &body, false, || async {
         let new_id = AccountId::parse_for_kind(&body.id, me.kind())
             .map_err(|e| accounts::invalid_id_error(&e))?;                   // 422 invalid_id
         let mut tx = state.db.begin().await?;
@@ -71,13 +71,21 @@ async fn change_my_id(
   nested transaction themselves (a savepoint inside yours), so they are atomic either way.
   Functions that must persist a failure even when the request fails take `&PgPool` and commit on
   their own: `otp::verify`, `tokens::refresh`, `tokens::consume_code`, `tokens::consume_slt`,
-  `tokens::poll_device`, `accounts::record_stk_failure`, `idempotency::*`. Never call those inside
-  your own transaction.
+  `tokens::poll_device`, `accounts::begin_stk_attempt`, `accounts::stk_attempt_failed`,
+  `idempotency::begin`/`complete`/`abandon`. Never call those inside your own transaction.
+- **Locks.** A function that row-locks and then fails ends its savepoint itself (rollback), so a
+  caller that keeps its connection never holds a lock it doesn't know about. Lock order
+  everywhere: custodian requests, then account rows (the Silicon before its custodian), then
+  membership rows.
 - **SQL.** sqlx 0.9 runtime queries only (no `query!` macros). `sqlx::query(...)` takes a
   `&'static str`; for built strings wrap in `sqlx::AssertSqlSafe(...)` (and never interpolate input).
   Column lists for `concat!`: `accounts_core::account_columns!()`, `app_columns!()`,
   `membership_columns!()` (field order of `Account`, `App`, `Membership`).
-- **Time.** TTLs are enforced with Postgres `now()` so tests can time-travel by editing rows.
+- **Time.** Every expiry, lock and window stored in the database is stamped and compared with
+  Postgres `now()` (the repository selects `expires_at <= now()` rather than comparing with the
+  node's clock), so tests can time-travel by editing rows and node clock skew doesn't matter. A
+  JWT's own `exp`/`nbf` are checked with the node's clock (as JWTs are; 30 s leeway on `nbf`).
+  `stk_rotated_at` is `clock_timestamp()` (the moment the rotation holds the row lock).
   JSON timestamps are RFC 3339 UTC with milliseconds: every `OffsetDateTime` field in a view needs
   `#[serde(with = "accounts_core::timefmt::rfc3339_ms")]` (`rfc3339_ms_option`), every `Date`
   `#[serde(with = "accounts_core::timefmt::date")]` (`date_option`). The `time` crate's own serde
@@ -100,25 +108,26 @@ async fn change_my_id(
 | `db` | pool + embedded migrations | `connect`, `connect_url`, `migrate` → `MigrationReport`, `pending_migrations`, `ping`, `MIGRATOR` |
 | `error` | API errors | `ApiError`, `ApiResult`, `FieldErrors`, `OAuthError` |
 | `ids` | uuid scramble, `c:`/`si:` ids, suggestions | `uuid_for_number`, `number_for_uuid`, `AccountId`, `IdError`, `validate_handle`, `handle_candidates`, `pick_available`, `membership_id`, `validate_app_id` |
-| `crypto` | tokens, pepper, keyring, STK, PKCE, codes, signatures | `random_token` + `prefix::*`, `Pepper`, `Keyring`, `stk::{generate, normalize, StkHasher}`, `pkce::*`, `generate_otp`, `generate_user_code`, `normalize_user_code`, `webhook_signature`, `verify_webhook_signature`, `describe_token`, `constant_time_eq` |
-| `jwt` | Ed25519 JWTs | `JwtKeys` (`sign_access`, `verify_access`, `sign_id_token`, `verify`, `jwks`), `AccessClaims`, `IdTokenClaims`, `parse_private_key` |
+| `crypto` | tokens, pepper, keyring, STK, PKCE, codes, signatures | `random_token` + `prefix::*`, `Pepper`, `Keyring`, `stk::{generate, normalize, StkHasher}` (`hash_async`, `verify_async`, `burn_async` on the blocking pool), `pkce::*`, `generate_otp`, `generate_user_code`, `normalize_user_code`, `webhook_signature`, `verify_webhook_signature`, `describe_token`, `constant_time_eq` |
+| `jwt` | Ed25519 JWTs | `JwtKeys` (`sign_access`, `verify_access`, `verify_access_ignoring_expiry` (revocation only), `sign_id_token`, `verify`, `jwks`), `AccessClaims`, `IdTokenClaims`, `parse_private_key` |
 | `models` | enums + rows + sign-in config | `Account`, `App`, `Membership`, `AccountKind`, `AccountStatus`, `Scope`, `ContactField`, `Method`, `TokenOrigin`, `OtpPurpose`, `AccountField`, `SigninConfig`, `Branding`, … |
 | `views` | API shapes | `AccountSummary`, `MeView` + `load_me`, `AccountForApp` + `load_account_for_app`, `TokenResponse`, `AppSummary`, `Page<T>` |
-| `normalize` | input rules | `normalize_email`, `normalize_phone`, `normalize_timezone`, `validate_display_name`, `validate_dob`, `default_dob`, `parse_date_flexible`, `validate_https_url`, `validate_pfp_url`, `validate_webhook_url`, `is_public_ip`, `mask_email`, `mask_phone`, `display_name_from_email/phone` |
-| `pfp` | default photos | `default_pfp_url(iris, kind, uuid)`, `is_default_pfp` |
-| `repo::accounts` | accounts and ids | `create_carbon`, `create_silicon`, `get`, `require`, `lock`, `by_handle`, `by_email`, `by_phone`, `by_uuid_or_id`, `id_availability`, `is_id_free`, `suggest_ids`, `suggest_id`, `change_id`, `update_profile`, `bump_version`, `set_status`, `set_custodian`, `set_stk`, `record_stk_failure`, `clear_stk_failures`, `set_silicon_webhook`, `delete_account`, `release_silicon`, `count/list_silicons_in_custody`, `active_reservation`, `reservations_of`, `invalid_id_error` |
-| `repo::contacts` | emails/phones | `list_emails`, `list_phones`, `primary_email`, `primary_phone`, `owner`, `check_can_add`, `add_verified(_email/_phone)`, `mark_verified`, `set_primary(_email/_phone)`, `remove(_email/_phone)`, `verified_emails` |
+| `normalize` | input rules, the webhook SSRF guard | `normalize_email`, `normalize_phone`, `normalize_timezone`, `validate_display_name`, `validate_dob`, `default_dob`, `parse_date_flexible`, `validate_https_url`, `validate_pfp_url`, `validate_webhook_url`, `is_public_ip`, `resolve_checked` (+ `BlockedAddress`, `LookupFailed`), `MAX_URL_LEN`, `mask_email`, `mask_phone`, `display_name_from_email/phone` |
+| `pfp` | photo URLs | `default_pfp_url(iris, kind, uuid)`, `is_default_pfp`, `photo_url_prefix`, `photo_url`, `photo_ref` → `PhotoRef::{External, Exact, Inexact}` |
+| `repo::accounts` | accounts and ids | `create_carbon`, `create_silicon`, `get`, `require`, `lock`, `by_handle`, `by_email`/`by_phone` (any row: uniqueness only), `by_uuid_or_id`, `id_availability`, `is_id_free`, `suggest_ids`, `suggest_id`, `change_id` (+ `ID_CHANGES_PER_DAY`), `update_profile`, `bump_version`, `set_status`, `set_custodian`, `finish_claim`, `set_stk`, `begin_stk_attempt` → `StkAttempt`, `stk_attempt_failed`, `clear_stk_failures` (+ `MAX_STK_FAILURES`, `STK_LOCK_SECONDS`), `set_silicon_webhook`, `delete_account` → `DeletedAccount`, `release_silicon`, `count/list_silicons_in_custody`, `active_reservation`, `reservations_of`, `invalid_id_error` |
+| `repo::contacts` | emails/phones | `lookup` → `Holder` (who an address signs in to), `after_proof`, `prove`, `drop_unverified`, `list_emails`, `list_phones`, `primary_email`, `primary_phone`, `owner`, `check_can_add`, `add_verified(_email/_phone)`, `mark_verified`, `set_primary(_email/_phone)`, `remove(_email/_phone)`, `verified_emails` |
+| `repo::photos` | uploaded photos | `check_usable` (an account's own or its custodian's upload), `prune` |
 | `repo::identities` | Google/Apple links | `find`, `link`, `touch`, `list_for_account`, `remove` |
 | `repo::apps` | apps | `get`, `require_active`, `owned_by`, `signin_row` → `AppSigninRow`, `effective_config`, `webhook_target`, `AppCredentialCache`, `AppAuthError`, `unknown_app`, `app_disabled` |
 | `repo::memberships` | `{app_id}:{uuid}` | `get`, `upsert_signin` (+`GrantMode`), `upsert_imported`, `list_for_account`, `remove_access`, `webhook_targets` |
 | `repo::tokens` | grants | `issue_tokens`, `refresh`, `verify_access_token`, `create_family`, `find_family`, `family_for_refresh_token`, `revoke_family`, `revoke_families` (+`RevokeFilter`), `list_families`, `count_active_families`, `create_code`/`consume_code`, `create_slt`/`consume_slt`, `create_device`/`device_by_user_code`/`decide_device`/`poll_device`, `GrantError` |
-| `repo::sessions` | browser sessions | `create`, `lookup`, `get`, `touch`, `revoke`, `revoke_all`, `list_active` |
-| `repo::otp` | 6-digit codes | `send`, `verify` (+`Expect`), `get`, `purge` |
-| `repo::rate_limit` | fixed windows | `enforce`, `enforce_pool`, `hit`, `bucket`, `limits::*`, `purge` |
-| `repo::idempotency` | Idempotency-Key | `run`, `scope`, `begin`/`complete`/`abandon`, `request_hash`, `purge` |
+| `repo::sessions` | browser sessions | `create`, `lookup`, `get`, `touch`, `mark_authenticated`, `authenticated_at`, `revoke`, `revoke_all`, `list_active` |
+| `repo::otp` | 6-digit codes | `send`, `verify` (+`Expect`, `Attempt`), `get`, `purge` |
+| `repo::rate_limit` | fixed windows | `enforce`, `enforce_pool`, `hit`, `peek` (no count), `take` (weighted), `bucket`, `limits::*`, `purge` |
+| `repo::idempotency` | Idempotency-Key | `run` (sealed when secret-bearing), `scope`, `begin`/`complete`/`abandon`, `seal`/`unseal`, `request_hash`, `purge` |
 | `repo::audit` | history | `record(AuditEntry)`, `signin(SigninRecord)`, `handle_history`, `method::*`, `outcome::*` |
-| `events` | webhooks | `notify_id_changed`, `notify_profile_updated`, `account_deleted`, `membership_signed_out`, `signed_out_for_families`, `membership_access_removed`, `notify_custodian_changed`, `emit_to_app`, `emit_to_silicon`, `ping_app`, `ping_silicon`, `current_url`, `current_secret`, `new_webhook_secret`, `retry_delay_seconds`, header constants |
-| `delivery` | email/SMS | `enqueue`, `enqueue_otp`, `spawn_deliver`, `deliver_now`, `claim_due`, `deliver_claimed`, `Sender`, `PostmarkSender`, `TwilioSender`, `LocalSender`, `templates::*`, `extract_code` |
+| `events` | webhooks | `notify_id_changed`, `notify_profile_updated`, `account_deleted`, `membership_signed_out`, `signed_out_for_families`, `membership_access_removed`, `notify_custodian_changed`, `silicon_custodian_declined`, `silicon_custodian_expired`, `emit_to_app`, `emit_to_silicon`, `ping_app`, `ping_silicon`, `current_url`, `current_secret`, `new_webhook_secret`, `retry_delay_seconds`, `signout_reason::*`, `declined_reason::*`, header constants |
+| `delivery` | email/SMS | `enqueue`, `enqueue_otp`, `spawn_deliver`, `deliver_now`, `claim_due`, `deliver_claimed` (claim-checked), `CLAIM_SECONDS`, `Sender`, `PostmarkSender`, `TwilioSender`, `LocalSender`, `templates::*`, `extract_code` |
 | `telemetry` | Space Station + logs | `Telemetry::record`, `init_logging` |
 | `http` | extractors and helpers | `AccountAuth`, `CarbonAuth`, `SiliconAuth`, `AppAuth`, `AppOrOwner`, `authenticate_client`, `ClientMeta`, `IdempotencyKey`, `Json`, `Query`, `Path`, `parse_form_or_json`, `check_origin`, `cookies::*`, `pagination::*`, `request_id::middleware` |
 | `test_support` (feature) | tests | `TestContext`, `TestDb`, `Req`, `call`, factories |
@@ -131,8 +140,9 @@ Constants: `FIRST_PARTY_APP_ID = "accounts"`, `PRODUCT_NAME`, `PRODUCT_SITE`, `V
 variables (`config::VARIABLES`, documented in `/.env.example`) and returns every problem at once.
 Without a `.env`, development uses built-in DEV ONLY secrets, so local runs work out of the box.
 Production refuses: missing/dev pepper, keyring or JWT key; `ACCOUNTS_DELIVERY=local`; no Postmark
-token; `ACCOUNTS_EXPOSE_DEV_OUTBOX=true`; a non-https public URL; insecure cookies; non-contract
-TTLs (`OTP_TTL 600`, `OTP_LOCK 60`, `ACCESS_TOKEN_TTL 1800`).
+token; `ACCOUNTS_EXPOSE_DEV_OUTBOX=true`; `ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=true` (the SSRF guard
+off); a non-https public URL; insecure cookies; non-contract TTLs (`OTP_TTL 600`, `OTP_LOCK 60`,
+`ACCESS_TOKEN_TTL 1800`).
 
 Useful methods: `settings.issuer()`, `settings.url("/v1/photos/x")`, `settings.public_origin`,
 `settings.is_allowed_origin(o)`, `settings.allowed_origins()`, `settings.google.managed_configured()`,
@@ -172,9 +182,11 @@ Responses always echo `X-Request-Id` (install `http::request_id::middleware`, th
   at `uuid_for_number(0) == "zQo"`. The constants are fixed forever. `create_carbon/silicon` call it
   with `nextval('account_number_seq')`; nobody else needs to.
 - `AccountId::parse("C:Saket")` → `c:saket`; `AccountId::parse_for_kind("scout", AccountKind::Silicon)`
-  → `si:scout` (a bare handle gets the prefix; the wrong prefix is an error). `IdError` explains
-  exactly why (`Empty`, `MissingPrefix`, `WrongKind`, `TooShort`, `TooLong`, `InvalidChar` with
-  position, `ReservedWord`); `.reason()` is `invalid` | `reserved_word`; `.hint()`.
+  → `si:scout` (a bare handle gets the prefix; the wrong prefix is an error). The handle is checked
+  as written: only ASCII letters, digits, `-` and `_` (no Unicode case folding: `c:\u{212A}elvin`
+  is refused, not read as `c:kelvin`). `IdError` explains exactly why (`Empty`, `MissingPrefix`,
+  `WrongKind`, `TooShort`, `TooLong`, `InvalidChar` with position, `ReservedWord`); `.reason()` is
+  `invalid` | `reserved_word`; `.hint()`.
   `id.to_string()` / `as_full()` is what `accounts.handle` stores; `id.handle()` has no prefix.
 - `handle_candidates(&[email_local, name])` yields `base`, other bases, `base-2..base-20`, then
   `base-NNNN`; `repo::accounts::suggest_id(s)` checks them against the database (taken + live
@@ -189,8 +201,8 @@ let enc = state.keys.keyring.encrypt_str(&secret)?;          // version || nonce
 let secret = state.keys.keyring.decrypt_string(&enc)?;
 let stk = crypto::stk::generate();                           // "stk-" + 12 hex (show once)
 let stk = crypto::stk::normalize(input).map_err(|m| ApiError::unprocessable("invalid_stk", m))?;
-let phc = state.keys.stk.hash(&stk)?;                         // Argon2id
-crypto::stk::StkHasher::verify(&stk, &phc);                   // bool
+let phc = state.keys.stk.hash_async(stk.clone()).await?;     // Argon2id on the blocking pool
+crypto::stk::StkHasher::verify_async(stk, phc).await;         // bool (also off the runtime)
 crypto::pkce::verify(Some("S256"), verifier, challenge);
 crypto::generate_otp();                                      // "042424"
 crypto::webhook_signature(&secret, unix_ts, &body_bytes);    // "v1=<hex>"
@@ -203,6 +215,11 @@ Webhook signature key = the full secret string including `whsec_`, message = `"{
 returns `(jwt, AccessClaims)`; `verify_access(token, Some(aud))` checks signature, `kid`, `iss`,
 `exp`/`nbf` (30 s leeway) and audience (`JwtError::WrongAudience { expected, got }`). Most code
 should call `repo::tokens::verify_access_token` instead (also checks the family and the account).
+`verify_access_ignoring_expiry(token)` checks signature, `kid` and `iss` only: for revoking a
+sign-in with an access token that already expired, never to authorize a request.
+
+Debug output of `TokenResponse`, `otp::CreatedChallenge` and `tokens::DeviceStart` redacts the
+tokens and codes they carry (like `Account`, `Pepper` and `Keyring`).
 
 ## models
 
@@ -261,8 +278,10 @@ schemes), origins, disjoint required/optional fields, domains, copy lengths, BYO
 - `create_carbon(&mut conn, &settings, NewCarbon { id, display_name, pfp_url: None, dob, timezone,
   status: Active|Unclaimed, emails: vec![NewContact { value, verified_via: Some(VerifiedVia::Code) }],
   phones, actor })` → `Account`. The first email/phone becomes primary. `verified_via: None` =
-  unverified (imports). Errors: `invalid_id` (422), `id_taken` (409, `details.suggestions` ×3),
-  `id_reserved` (409, `details.reserved_until`), `email_in_use` / `phone_in_use` (409).
+  unverified, allowed only for an `Unclaimed` (imported) account. Errors: `invalid_id` (422),
+  `email_limit_reached` / `phone_limit_reached` (422, more than 10 of a kind), `id_taken` (409,
+  `details.suggestions` ×3), `id_reserved` (409, `details.reserved_until`), `email_in_use` /
+  `phone_in_use` (409).
 - `create_silicon(&mut conn, &settings, NewSilicon { id, display_name, pfp_url, timezone, status:
   Active (with custodian_uuid) | PendingCustodian, custodian_uuid, stk_hash, webhook_url,
   webhook_secret_enc, actor })` — dob = today; `stk_rotated_at` = now.
@@ -271,34 +290,83 @@ schemes), origins, disjoint required/optional fields, domains, copy lengths, BYO
   `GET /v1/ids/available` body (invalid input is a 200 answer, not an error).
 - `change_id(&mut conn, uuid, &new_id, actor)` → `IdChange { account, old_id, new_id, changed,
   reclaimed }`: old id reserved 10 days for this account, reclaiming one's own reserved id deletes
-  the reservation, `version` bumps, `handle_history` written; same id = `changed: false`. Then
-  `events::notify_id_changed`.
+  the reservation, `version` bumps, `handle_history` written; same id = `changed: false`. **At most
+  `ID_CHANGES_PER_DAY` (5) changes per rolling 24 hours** per account, whoever makes them (a
+  Silicon's custodian too) and reclaims included, counted under the row lock: 429 `rate_limited`
+  with `Retry-After` and `details.{limit, window_seconds, retry_at}`. Then `events::notify_id_changed`.
 - `update_profile(&mut conn, uuid, &ProfileUpdate { display_name, timezone, dob, pfp_url })` →
   `(Account, Vec<AccountField>)` — only real changes, version bump, a Silicon's dob is immutable
-  (422 `dob_immutable`). Validate inputs with `normalize::*` first. Then
-  `events::notify_profile_updated(&mut tx, &account, &changed)`.
+  (422 `dob_immutable`). Validate inputs with `normalize::*` first, and a photo of this service
+  with `repo::photos::check_usable`. Then `events::notify_profile_updated(&mut tx, &account, &changed)`.
 - `bump_version` after app-visible changes stored elsewhere (new primary email/phone), then
   `events::account_updated(&mut tx, &account, &[AccountField::Email])`.
-- `delete_account(&mut conn, uuid, actor, reserve_id)` → `DeletedAccount`: status deleted, handle
-  null (reserved 10 days when `reserve_id`), emails/phones/identities removed, sessions + token
-  families + OBO proofs revoked, pending custodian requests cancelled, STK + Silicon webhook cleared,
-  memberships kept as history. Check "custodian of Silicons" (`count_silicons_in_custody`) before
-  calling and emit `events::account_deleted` after. `release_silicon` = delete without reservation
-  (declined/expired initial custodian request).
-- Silicon helpers: `set_stk` (returns `stk_rotated_at`, resets failures), `record_stk_failure(&pool,
-  uuid, 10, 60)` → `Some(locked_until)` when this failure locked login, `clear_stk_failures`,
-  `set_silicon_webhook(&mut conn, uuid, url, secret_enc)`, `set_custodian(&mut conn, silicon,
-  carbon, AccountStatus::Active)`, `set_status`.
+- `by_email` / `by_phone` match **any** row, verified or not: uniqueness checks only. Who an
+  address signs in to is `repo::contacts::lookup`.
+- `finish_claim(&mut conn, uuid, &[(ContactKind::Email, "a@x.test", VerifiedVia::Code)])` →
+  `ClaimFinished { account, changed }`: finishes an `unclaimed` (imported) Carbon for the Carbon who
+  proved those addresses — they become verified (primary when the primary of their kind wasn't),
+  **every other unverified email/phone is removed** (an unproven address must never sign anyone in),
+  status `active`, `version` bumps when an address changed. Profile/id changes and the webhooks
+  (`notify_profile_updated` with `changed` + the profile fields) are the caller's. 409
+  `account_not_unclaimed` when someone finished it already.
+- `delete_account(&mut conn, &settings, uuid, actor, reserve_id)` → `DeletedAccount { before, old_id,
+  revoked_families, revoked_proofs, deleted_photos, released_silicons, deleted_now }`, one
+  transaction: status deleted, handle null (reserved 10 days when `reserve_id`), emails/phones/
+  identities removed, sessions + token families (`account_deleted`) + OBO proofs revoked (with
+  `proof.revoked` audit rows), the photo back to the Iris default and uploads nobody else shows
+  deleted, memberships kept as history without `imported_profile` (the app's `external_id` stays),
+  STK cleared, the Silicon webhook **kept** (events emitted before still reach it), pending custodian
+  requests cancelled, and `events::account_deleted` emitted. A Carbon who is still custodian of a
+  Silicon that isn't deleted is refused: 409 `custodian_of_silicons` (`details.silicons`), checked
+  under its row lock. Self-created Silicons waiting for this Carbon are told
+  (`silicon.custodian.declined`, reason `custodian_account_deleted`) and released
+  (`released_silicons`; audit `silicon.custodian_request.closed`). Lock order: pending requests
+  addressed to the account, then the account. Idempotent (`deleted_now: false`).
+- `release_silicon(&mut conn, uuid, actor)` → `Option<old id>`: a self-created Silicon that never
+  became active (declined, expired, named Carbon deleted) is deleted with its id freed at once (no
+  reservation), its STK cleared, its webhook kept, still-pending requests cancelled. `None` (and
+  nothing done) unless it is `pending_custodian`. Decline/expiry order: decide the request, emit
+  `events::silicon_custodian_declined` / `_expired` (while it still has its id), then release.
+- Silicon sign-in lock: `begin_stk_attempt(&pool, uuid, MAX_STK_FAILURES, STK_LOCK_SECONDS)` →
+  `StkAttempt::Check { attempt }` (counted before the STK is checked, so parallel guesses get at
+  most 10 checks per lock window) or `StkAttempt::Locked { retry_after_seconds }`; verify with
+  `StkHasher::verify_async`; then `clear_stk_failures` on success or
+  `stk_attempt_failed(&pool, uuid, attempt, 10, 60)` → `Some(locked_until)` when it locked.
+- Silicon helpers: `set_stk` (returns `stk_rotated_at` = `clock_timestamp()` under the row lock,
+  resets failures), `set_silicon_webhook(&mut conn, uuid, url, secret_enc)`, `set_custodian(&mut
+  conn, silicon, carbon, AccountStatus::Active)`, `set_status`.
 
 ## repo::contacts
+
+Only the addresses an app import attached to an account nobody finished yet (`unclaimed`) are
+unverified. `lookup(&mut conn, ContactKind::Email, email)` → `Holder::{Free, Active(account),
+Unclaimed(account), Unavailable(account), Unproven(account)}` is the one lookup to authenticate
+with: a verified address of an active Carbon signs it in, an unfinished import's address finishes
+it, an unverified row anywhere else (`Unproven`) identifies nobody. `after_proof(...)` is the same
+once the Carbon proved the address, and first removes an unproven row (audit
+`contact.unverified_removed`), so the prover can have it. `prove(&mut conn, kind, uuid, value,
+via)` → primary changed? (verified, added when missing, primary when the primary wasn't verified).
+`drop_unverified(&mut conn, uuid)` → fields whose primary changed.
 
 `check_can_add(&mut conn, ContactKind::Email, uuid, email)` before sending a code (409
 `email_in_use`, 409 `email_already_added`, 422 `email_limit_reached` at 10); after the code
 verifies, `add_verified(...)` / `add_verified_email(&mut conn, uuid, email, VerifiedVia::Code)` →
-`AddOutcome { became_primary, was_unverified }` (re-checks everything under a row lock). Imported
-unverified rows pass the check and become verified. `set_primary` (404 `{kind}_not_found`, 409
-`{kind}_not_verified`; returns false if already primary). `remove` (409 `cannot_remove_primary`).
-Error codes use `email`/`phone` prefixes. Values must be normalized first.
+`AddOutcome { became_primary, was_unverified }` (re-checks everything under the account's row
+lock; 409 `account_deleted` for a deleted account). An imported unverified row on the same account
+passes and becomes verified; an unproven row on another account passes and moves to the prover.
+`set_primary` (404 `{kind}_not_found`, 409 `{kind}_not_verified`; returns false if already
+primary). `remove` (409 `cannot_remove_primary`). Error codes use `email`/`phone` prefixes. Values
+must be normalized first.
+
+## repo::photos
+
+A photo of this service is `{PUBLIC_URL}/v1/photos/{photo_id}` written exactly as
+`POST /v1/me/photo` returns it (`pfp::photo_ref`; `normalize::validate_pfp_url` refuses other
+spellings). `check_usable(&mut tx, &settings, url, &[uploader uuids], "you")` (422
+`validation_failed`, `details.fields.pfp_url`) lets an account show only its own uploads (a
+Silicon: also its custodian's); it share-locks the uploader's row so the photo can't be pruned
+before the change commits. `prune(&mut tx, &settings, uuid)` deletes the account's uploads that no
+account that isn't deleted shows (hold the uploader's row lock).
 
 ## repo::apps — credentials
 
@@ -312,10 +380,12 @@ use it for you.
 - `upsert_signin(&mut conn, app_id, uuid, MembershipSource::Signin|Slt, &scopes, GrantMode::Replace|Union)`
   — active, sign-in times, granted scopes (Replace for the consent screen, Union for SLT/continue-as).
 - `upsert_imported(&mut conn, app_id, uuid, external_id, imported_profile, overwrite)` — status
-  `imported` unless already active; 409 `external_id_conflict`.
+  `imported` unless already active; 409 `external_id_conflict`. A membership whose account removed
+  the app's access is returned untouched (`access_removed`): an import never undoes that; only a
+  new sign-in (`upsert_signin`) does.
 - `remove_access(&mut conn, app_id, uuid, actor)` → `AccessRemoved` (membership `access_removed`,
-  the app's families revoked, OBO proofs that app issued about the account revoked). Then
-  `events::membership_access_removed`.
+  the app's families revoked, OBO proofs that app issued about the account revoked with
+  `proof.revoked` audit rows). Then `events::membership_access_removed`.
 - `webhook_targets(&mut conn, uuid)` — live members (active/imported) of active apps with a webhook.
 
 ## repo::tokens — grants
@@ -325,16 +395,20 @@ use it for you.
 let resp: TokenResponse = tokens::issue_tokens(&mut tx, &state.keys, &state.settings, tokens::IssueRequest {
     account: &account, app_id, origin: TokenOrigin::Slt, scopes: &scopes,
     browser_session_id: None, label: Some("accounts CLI on mac"), ip, user_agent, nonce: None,
+    auth_time: None,   // code exchanges pass the code's auth_time (id_token auth_time, kept on refresh)
 }).await?;   // family (900 days) + refresh token + access JWT + id_token if `openid` + scoped account view
 
 // grant_type=refresh_token (pool, not a transaction):
 let resp = tokens::refresh(&state.db, &state.keys, &state.settings, refresh_token, &client.app.app_id)
     .await.map_err(|e| e.to_oauth())?;   // reuse → GrantError::Reused (family revoked)
 
-// grant_type=authorization_code:
+// grant_type=authorization_code (the oauth crate consumes and issues in ONE transaction under the
+// code's row lock; consume_code commits first, so use it only where a reuse race doesn't matter):
 let code = tokens::consume_code(&state.db, &state.keys.pepper, code, app_id, redirect_uri, code_verifier)
-    .await.map_err(|e| e.to_oauth())?;   // single use; any failure burns it; PKCE when challenged
-// …then issue_tokens with label: Some(&code.family_label()) so a reused code revokes these tokens.
+    .await.map_err(|e| e.to_oauth())?;   // single use; any failure burns it; PKCE when challenged,
+                                         // and a code_verifier without a challenge is refused (RFC 9700)
+// …then issue_tokens with label: Some(&code.family_label()) and auth_time: code.auth_time.
+// Other crates select codes with `accounts_core::auth_code_columns!()`.
 
 // SLTs and device codes:
 let (slt, expires_at) = tokens::create_slt(&mut conn, &state.keys.pepper, &uuid, app_id, &scopes).await?;
@@ -344,6 +418,10 @@ tokens::decide_device(&mut conn, user_code, &me_uuid, approve).await?;
 let approved = tokens::poll_device(&state.db, &state.keys.pepper, device_code).await.map_err(|e| e.to_oauth())?;
 ```
 
+`create_code` takes `NewAuthCode { …, auth_time }` (the browser session's `authenticated_at`).
+A missing `code_challenge_method` is stored as `S256` (stricter than RFC 7636's `plain`
+default; every client of ours sends S256). `decide_device` locks the code's row, so concurrent
+decisions get one winner and 409 `device_code_used`.
 `verify_access_token(&mut conn, &state.keys, jwt, Some(app_id))` → `VerifiedAccess { claims,
 family, account }` with 401 `invalid_token` / `token_wrong_audience` / `token_revoked` /
 `account_deleted`. `revoke_families(&mut conn, &RevokeFilter { account_uuid, app_id, origin, except },
@@ -362,15 +440,23 @@ tx.commit().await?;
 delivery::spawn_deliver(&state, msg_id);    // send now; the worker retries
 // later
 let ch = otp::verify(&state.db, &state.keys.pepper, &state.settings, challenge_id, code,
-    &otp::Expect { purpose: Some(OtpPurpose::Signin), flow_id: Some(&flow.id), ..Default::default() }).await?;
+    &otp::Expect { purpose: Some(OtpPurpose::Signin), flow_id: Some(&flow.id), ..Default::default() },
+    Some(otp::Attempt { app_id, ip, user_agent })).await?;   // None for codes that don't sign in
 ```
 
-Verify responses: wrong code → 422 `invalid_code` with `details.remaining_attempts` (9..1); the
-10th wrong code in a row → 422 `invalid_code`, `remaining_attempts: 0`, `details.locked_until`,
-`Retry-After: 60`; any attempt during the cooldown → 423 `verification_locked`; expired or replaced
-by a resend → 410 `code_expired`; reused → 409 `code_already_used`; unknown or bound elsewhere →
-404 `challenge_not_found`; not 6 digits → 422 `invalid_code` (not counted). A resend retires the
-previous code and carries the failure streak and cooldown. `challenge.masked_destination()`,
+Both limits count **per destination**, whatever flow, account or purpose sent the code. `send`
+serializes the sends to one address (an advisory lock held until your transaction ends), so a
+burst of parallel requests never passes the 10. `verify` row-locks every live code to the address:
+wrong codes of all of them add up to one streak, the 10th in a row locks every one for 60 s.
+Verify responses: wrong code → 422 `invalid_code` with `details.remaining_attempts` (9..1, for the
+address); the 10th wrong code in a row → 422 `invalid_code`, `remaining_attempts: 0`,
+`details.locked_until`, `Retry-After: 60`; any attempt during the cooldown → 423
+`verification_locked` (`details.locked_until`); expired or replaced by a resend → 410
+`code_expired`; reused → 409 `code_already_used`; unknown or bound elsewhere → 404
+`challenge_not_found`; not 6 digits → 422 `invalid_code` (not counted). A right code ends the
+streak. With an `Attempt`, a lock on a `signin`/`cli_login` code of an active Carbon's address adds
+a `failed` row to its sign-in history and audit `signin.locked`. A resend retires the previous code
+and carries the failure streak and cooldown. `challenge.masked_destination()`,
 `challenge.resend_available_at()` (UI hint, +30 s) for FlowView.
 
 ## repo::rate_limit / idempotency / audit
@@ -379,9 +465,14 @@ previous code and carries the failure streak and cooldown. `challenge.masked_des
   → 429 with `Retry-After`. Limits: `IDS_AVAILABLE_PER_IP` 120/min, `SILICON_SELF_CREATE_PER_IP`
   10/h, `REPORTS_PER_IP` 5/h, `OTP_SEND_PER_IP` 30/10 min (applied by `otp::send`),
   `SILICON_LOGIN_PER_IP` 60/min, `TELEMETRY_PER_IP` 120/min. Use `enforce_pool` outside transactions.
-- `idempotency::run(&state.db, key.as_deref(), &scope, &body, secret_bearing, || async { Ok((status, json)) })`
+  `peek` answers without counting (refuse a flood before any work, count successes only);
+  `take(&mut tx, bucket, n, limit)` takes `n` at once (weighted budgets such as imported rows).
+- `idempotency::run(&state, key.as_deref(), &scope, &body, secret_bearing, || async { Ok((status, json)) })`
   — replay with `Idempotent-Replayed: true`, 409 `idempotency_key_reused`, 409
-  `idempotency_in_progress`, 24 h window (10 min when `secret_bearing`), errors not stored.
+  `idempotency_in_progress`, 24 h window (10 min when `secret_bearing`), errors not stored. A
+  secret-bearing response is stored **sealed** with the keyring (`{"$sealed": …}`, bound to its
+  scope and key), never in clear; one that can't be opened any more answers 409
+  `idempotency_result_unavailable` instead of running again.
   Scope = `idempotency::scope("account:{uuid}" | "app:{app_id}" | "ip:{ip}", "POST", route)`.
 - `audit::record(&mut conn, &AuditEntry { … })` (dotted actions such as `silicon.stk.rotated`,
   `app.signin_config.updated`; never secrets in `details`), `audit::signin(&mut conn, &SigninRecord
@@ -401,23 +492,29 @@ Call inside the transaction of the change. Each returns the `EmittedEvent`s it s
 | signed out / families revoked | `events::membership_signed_out(&mut tx, app, uuid, signout_reason::APP_REVOKED)` / `signed_out_for_families` |
 | access removed | `events::membership_access_removed(&mut tx, app, uuid)` |
 | transfer accepted | `events::notify_custodian_changed(&mut tx, &silicon, &from, &to)` |
-| Silicon lifecycle | `events::emit_to_silicon(&mut tx, uuid, types::SILICON_CREATED / SILICON_CUSTODIAN_ACCEPTED / _DECLINED / _EXPIRED / SILICON_STK_ROTATED, json!({...}))` |
+| initial request declined / expired | `events::silicon_custodian_declined(&mut tx, &silicon, request_id, label, decided_at, declined_reason::DECLINED)` / `silicon_custodian_expired(...)` (before `release_silicon`) |
+| Silicon lifecycle | `events::emit_to_silicon(&mut tx, uuid, types::SILICON_CREATED / SILICON_CUSTODIAN_ACCEPTED / SILICON_STK_ROTATED, json!({...}))` |
 | test buttons | `events::ping_app`, `events::ping_silicon` |
 
 The worker: deliveries are rows in `webhook_deliveries` (`pending`); body = `webhook_events.payload`
 serialized; headers `events::HEADER_*`, `User-Agent: events::USER_AGENT`; sign with
 `crypto::webhook_signature(&events::current_secret(..)?, ts, body)`; post to
-`events::current_url(..)` (replays go to the current URL); 2xx within 10 s = delivered; retry with
-`events::retry_delay_seconds(attempts)` until `GIVE_UP_AFTER_HOURS` (72) → `failed`. New secrets:
+`events::current_url(..)` (replays go to the current URL; a deleted or released Silicon keeps its
+webhook so its last events still arrive); connect only to addresses `normalize::resolve_checked`
+returned (the SSRF guard); 2xx within 10 s = delivered; retry with
+`events::retry_delay_seconds(attempts)` until `GIVE_UP_AFTER_HOURS` (72, counted from the event,
+or from `requeued_at` after a replay) → `failed`. New secrets:
 `events::new_webhook_secret(&state.keys.keyring)` → `(whsec_…, ciphertext)`.
 
 ## delivery
 
 `enqueue(&mut tx, &settings, &NewMessage { channel, to, subject, text_body, html_body, purpose })`
 → id (status `local` in local mode — never sent, shown by the dev outbox; `pending` with
-providers). After commit: `spawn_deliver(&state, id)`. Worker: `claim_due(&pool, 50)` then
-`deliver_claimed(&pool, state.sender.as_ref(), &settings, &msg)` (retries with backoff, OTP
-messages stop retrying once their code would have expired). Templates: `templates::otp_email`,
+providers). After commit: `spawn_deliver(&state, id)`. Worker: `claim_due(&pool, n)` (each claim
+holds the message `CLAIM_SECONDS`, 60 s) then `deliver_claimed(&pool, state.sender.as_ref(),
+&settings, &msg)` (retries with backoff, OTP messages stop retrying once their code would have
+expired). Results are recorded only while the claim still holds; a send that outlived its claim
+after another node claimed the message again records nothing (`DeliveryOutcome::ClaimLost`). Templates: `templates::otp_email`,
 `otp_sms`, `custodian_request_email`, `custodian_invite_email`, `custodian_transfer_email`,
 `bug_report_email` (subjects/text/html). `extract_code(text)` finds the 6-digit code (dev outbox).
 Postmark posts to `{ACCOUNTS_POSTMARK_API_URL}/email`; Twilio to
@@ -461,6 +558,7 @@ async fn my_endpoint() {
     let carbon = ctx.carbon().await;                     // active, random c:t-xxxx, verified t-xxxx@example.test
     let named = ctx.carbon_with(CarbonSpec { handle: Some("saket".into()), ..Default::default() }).await;
     let (silicon, stk) = ctx.silicon(&carbon.uuid).await;
+    let (waiting, request_id) = ctx.pending_silicon(&carbon.uuid, Some("http://127.0.0.1:8593/hooks")).await;
     let (app, secret) = ctx.app_owned("briefcase", Some(&carbon.uuid)).await;   // app_id "briefcase-<rand>"
     let whsec = ctx.set_app_webhook(&app.app_id, "http://127.0.0.1:8593/x/webhooks").await;
     ctx.membership(&app.app_id, &carbon.uuid, &[Scope::Profile, Scope::Email]).await;
@@ -497,6 +595,11 @@ cargo run -p silicon-accounts-server --bin accounts-migrate  # applies migration
 - `c:saket` and `si:saket` are different ids; reserved words apply to both.
 - The first-party app `accounts` exists after migration; its redirect URIs are not stored
   (`SigninConfig::effective` + `redirect_allowed` handle it) and it never shows consent.
-- Contract numbers live in code: OTP 600 s / 60 s lock / 10 tries / 10 sends per 10 min;
-  access token 1800 s; refresh 900 days; codes and SLTs 120 s; device codes 600 s (poll 5 s);
-  id reservations 10 days; 10 emails and 10 phones.
+- Contract numbers live in code: OTP 600 s / 60 s lock / 10 tries / 10 sends per 10 min (both per
+  address); access token 1800 s; refresh 900 days; codes and SLTs 120 s; device codes 600 s (poll
+  5 s); id reservations 10 days; 10 emails and 10 phones. Beyond the contract: 5 id changes per
+  24 hours; 10 wrong STKs lock a Silicon's sign-in for 60 s.
+- Migrations: `0001_init` (the spec schema) and `0002_hardening` (removes unverified rows left on
+  non-imported accounts, `browser_sessions.authenticated_at`, `authorization_codes.auth_time`,
+  `token_families.auth_time`, `webhook_deliveries.requeued_at`, and indexes for proof listings and
+  sweeps, photo pruning and webhook attempts). Never edit an applied migration.

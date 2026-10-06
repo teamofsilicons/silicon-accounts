@@ -11,10 +11,14 @@ tested end to end on one machine, without real Google, Apple, Postmark, Twilio o
 | **fake-apps.json** | — | the 15 fake apps "as Silicon Apps would deliver them": fixed app ids and secrets, owners, logos, sign-in setups |
 | **fixtures/imports/** | — | CSV/JSON files for the user import flow, with the expected outcome of every row |
 | **lib/** | — | a TypeScript helper library for the e2e suites (sign-in flows over HTTP, OTP codes, webhooks, PKCE, signatures) |
+| **journeys/** | — | non-browser walks through the whole product against a running stack, with the helpers and the real `accounts` CLI (`scripts/journeys.sh`) |
 
 Everything is TypeScript run with `tsx` on Node ≥ 24, state is in memory, and nothing needs Docker.
 
 ## Quick start
+
+`scripts/dev.sh` at the repo root starts everything (Postgres, migrations, the seeded fake apps, this
+testkit and accounts-api pointed at it). To run the pieces yourself:
 
 ```sh
 pnpm -C testkit install
@@ -30,7 +34,7 @@ cargo run -p silicon-accounts-server --bin accounts-api
 open http://127.0.0.1:8593/                  # the fake apps; sign in to any of them
 ```
 
-Run the testkit's own tests: `pnpm -C testkit test` (91 node:test tests, ~1 s) and `pnpm -C testkit typecheck`.
+Run the testkit's own tests: `pnpm -C testkit test` (94 node:test tests, ~1 s) and `pnpm -C testkit typecheck`.
 
 ## Commands
 
@@ -39,6 +43,7 @@ Run the testkit's own tests: `pnpm -C testkit test` (91 node:test tests, ~1 s) a
 | `pnpm -C testkit start` (alias `mocks`) | starts all three servers on their default ports until SIGINT/SIGTERM, then stops them gracefully. Flags: `--host` (`TESTKIT_HOST`), `--oidc-port` (`MOCK_OIDC_PORT`), `--messaging-port` (`MOCK_MESSAGING_PORT`), `--fake-apps-port` (`FAKE_APPS_PORT`), `--accounts-url` (`ACCOUNTS_URL`, default `http://127.0.0.1:8590`), `--ready-file <path>` (writes the URLs as JSON once listening), `--log` (`TESTKIT_LOG=1`, one line per request on stderr), `--quiet`. Port `0` picks a free port. Always prints one line `testkit ready {"oidc":…,"messaging":…,"fake_apps":…}` when listening. |
 | `pnpm -s -C testkit accounts-env [--format dotenv\|shell\|json] [--oidc-url URL] [--messaging-url URL]` | prints the `ACCOUNTS_*` variables that point Silicon Accounts at the mocks (below) |
 | `pnpm -C testkit test` | all unit/integration tests |
+| `pnpm -C testkit journeys [name…]` | the journeys against a running stack (default ports = `scripts/dev.sh`); `scripts/journeys.sh` starts a fresh isolated stack, runs them and tears it down |
 | `pnpm -C testkit typecheck` | `tsc --noEmit` (strict) |
 | `pnpm -C testkit check:generated` | fails when `fake-apps.json` or the import fixtures are stale |
 | `pnpm -C testkit gen:apps` | regenerates `fake-apps.json` from `src/fake-apps/definitions.ts` |
@@ -301,6 +306,32 @@ Each server module also exports `start(options) → {url, port, stop(), …}` (`
 accountsUrl, accountsPublicUrl, host})` starts all three wired to the dev credentials and returns
 `{oidc, messaging, fakeApps, credentials, accountsEnv, stop()}`. Defaults are the standard ports; pass
 `0` for free ports.
+
+## Journeys (journeys/)
+
+Scripts that walk through the product the way apps, Carbons and Silicons do, without a browser:
+the hosted-flow API (`BrowserSession`), the fake app server's own callbacks and proof demos, and
+the real `accounts` CLI binary (`ACCOUNTS_CLI`, default `target/debug/accounts`). Each file is one
+journey with numbered checks (`ok` / `FAIL`), runnable on its own (`tsx journeys/c-cli-silicons.ts`)
+or all together (`pnpm -C testkit journeys`, which exits 1 when any check failed).
+
+| journey | covers |
+|---|---|
+| `a-hosted-signin` | sign-up through the hosted flow (briefcase, the fake app exchanges the code), requirements step (dm asks for a phone), "continue as" on a third app, consent skipped when already granted |
+| `b-providers` | managed Google (interface), bring-your-own Google (acme-notes: mock saw acme's client_id), Apple form_post bring-your-own (orbit-games, cookieless POST → 303 → GET) and managed (waveform), `allowed_email_domains`, `allow_signup: false` |
+| `c-cli-silicons` | device flow approved with the browser session, `silicon create` (STK once), `login --silicon`, `login --app remind` + SLT exchange, self-create `--wait` accepted meanwhile, transfer + accept, STK rotation (old STK refused, apps signed out), Silicon webhook events on `/hooks/<key>` |
+| `d-proofs` | OBO dm → briefcase and ATA commit → remind + waveform through the fake apps (timings), non-audience verification `{valid:false, expires_at:null}`, verify latency |
+| `e-import` | `accounts app import dirty.csv --wait` compared row by row with `expected.json`, then an imported Carbon finishes setup (`finishing_import`) and the membership turns active (needs a database dirty.csv was never imported into) |
+| `f-app-webhooks` | signed app webhooks: id change, scope-limited `account.updated`, primary email change, revoke → `membership.signed_out`, access removal |
+| `g-report` | `accounts report` → mock Postmark gets exactly the three recipients |
+| `h-protocol` | OIDC id_token, `prompt=none/login`, refused redirect URIs, PKCE, code reuse, refresh rotation + reuse detection, code send limit + verify lockout, CSRF Origin guard, audience confusion, embed `frame-ancestors`, CORS |
+| `i-cli-account`, `j-cli-custodian`, `k-cli-app` | every CLI command family against the real service (account, Silicons and custodian requests, device, config, deletion, app mode with credentials and as the owner) |
+| `l-client-contract` | the Rust client's typed values (CLI `--json`) against the raw API: no field dropped or invented |
+
+They need the per-network code limit (30 per 10 minutes) to apply per journey: run accounts-api
+with `ACCOUNTS_TRUST_FORWARDED_FOR=true`, and every `AccountsClient` sends `X-Forwarded-For` from
+`TESTKIT_FORWARDED_FOR` (`random` = its own 10.x address; `pnpm -C testkit journeys` sets it).
+`new AccountsClient(url, { forwardedFor, headers })` does the same in code.
 
 ## Using it from the e2e harness
 

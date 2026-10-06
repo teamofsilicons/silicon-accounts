@@ -47,7 +47,9 @@ Issued proof (OBO; ATA has `receiving_apps: [...]` instead of `receiving_app` an
 
 Lifetimes are absolute timestamps only (no relative `expires_in`): an `Idempotency-Key` retry
 replays the first response verbatim for up to 10 minutes, and `expires_at` stays exact on a
-replay where a relative lifetime would overstate what is left.
+replay where a relative lifetime would overstate what is left. The stored response holds the
+proof tokens, so core keeps it sealed with the keyring (`idempotency::run` with
+`secret_bearing`), never in clear.
 
 Valid verification (the `receiving_app` is the verifying app; `user.membership_id` is the
 account's membership with the *issuing* app, the grant the proof stands on; `user.id` is the
@@ -133,19 +135,16 @@ ANALYZE` on 50k proofs: only primary-key index scans, 0.03 ms execution). Measur
 p95 ≈ 0.18–0.20 ms; 2,000 more from 100 concurrent callers (pool of 32) p50 ≈ 2.2–2.6 ms,
 p95 ≈ 5–13 ms, which is pool queueing.
 
-Listings without a status filter take the page from the `(issuing_app, created_at desc)` index
-first and join the grant state of that page only; a status filter has to evaluate the grant
+Listings without a status filter take the page from the `(issuing_app, created_at desc, id desc)`
+index first and join the grant state of that page only; a status filter has to evaluate the grant
 state before the limit, so it reads all of the app's (or account's) proofs.
 
-Known cost until the index below exists: `token_expires_at` is `max(expires_at)` over the
-proof's `access` tokens, and the only index is `proof_tokens (family_id)`, so every listed proof
-reads all of its token rows, including the used refresh tokens a live proof keeps for reuse
-detection (one per refresh). `EXPLAIN ANALYZE` of a 50-proof page on Postgres 16: 0.1–0.4 ms
-for fresh proofs; 382 ms when each proof was refreshed every 25 minutes for a year (21,000 used
-refresh tokens each, interleaved in the heap as real refreshes are; ≈ 7 ms per proof per year
-of refreshes); 0.06–0.2 ms for that same data with
-`create index proof_tokens_family_kind_exp_idx on proof_tokens (family_id, kind, expires_at desc)`
-(an index-only probe per proof). Requested as a `0002` migration.
+`token_expires_at` is `max(expires_at)` over the proof's `access` tokens, read through
+`proof_tokens_family_kind_exp_idx (family_id, kind, expires_at desc)` (migration `0002`): one
+index probe per listed proof, however many used refresh tokens a live proof keeps for reuse
+detection. Measured before and with that index (`EXPLAIN ANALYZE` of a 50-proof page, Postgres 16,
+each proof refreshed every 25 minutes for a year): 382 ms without, 0.06–0.2 ms with it. The sweep
+uses `proof_tokens_access_expires_idx` and `proof_families_unrevoked_obo_idx` (also `0002`).
 
 ## Background
 

@@ -227,3 +227,106 @@ async fn silicon_webhooks_and_custodian_changes() {
     assert_eq!(payload["data"]["account"]["custodian"]["uuid"], old.uuid);
     assert_eq!(payload["data"]["account"]["timezone"], "UTC");
 }
+
+/// Re-importing an account that removed the app's access changes nothing: the app gets no
+/// webhooks about it and it stays out of the user base until it signs in again.
+#[tokio::test]
+async fn a_reimport_never_undoes_a_removed_access() {
+    let ctx = TestContext::new().await;
+    let c = ctx.carbon().await;
+    let (crm, _) = ctx.app("crm").await;
+    ctx.set_app_webhook(&crm.app_id, "http://127.0.0.1:8593/crm/webhooks")
+        .await;
+    ctx.membership(&crm.app_id, &c.uuid, &[Scope::Profile])
+        .await;
+    let mut conn = ctx.conn().await;
+    memberships::remove_access(&mut conn, &crm.app_id, &c.uuid, &c.uuid)
+        .await
+        .expect("remove");
+    let m = memberships::upsert_imported(
+        &mut conn,
+        &crm.app_id,
+        &c.uuid,
+        Some("crm-7"),
+        Some(&serde_json::json!({"email": "x@corp.test"})),
+        true,
+    )
+    .await
+    .expect("import");
+    assert_eq!(m.status, MembershipStatus::AccessRemoved);
+    assert_eq!(m.external_id, None, "nothing was written");
+    assert!(
+        memberships::webhook_targets(&mut conn, &c.uuid)
+            .await
+            .expect("targets")
+            .is_empty()
+    );
+    // Signing in again is what brings the app back.
+    let back = memberships::upsert_signin(
+        &mut conn,
+        &crm.app_id,
+        &c.uuid,
+        accounts_core::models::MembershipSource::Signin,
+        &[Scope::Profile],
+        memberships::GrantMode::Replace,
+    )
+    .await
+    .expect("sign in");
+    assert_eq!(back.status, MembershipStatus::Active);
+}
+
+/// Core's own proof revocations (access removed, account deleted) leave `proof.revoked` audit
+/// entries like the proofs crate writes, so the raw audit trail is complete.
+#[tokio::test]
+async fn core_proof_revocations_are_audited() {
+    let ctx = TestContext::new().await;
+    let c = ctx.carbon().await;
+    let (issuer, _) = ctx.app("dm").await;
+    let (other, _) = ctx.app("briefcase").await;
+    ctx.membership(&issuer.app_id, &c.uuid, &[Scope::Profile])
+        .await;
+    let mut conn = ctx.conn().await;
+    for app in [&issuer.app_id, &other.app_id] {
+        sqlx::query(
+            "insert into proof_families (id, kind, issuing_app, audiences, account_uuid, access_ttl_seconds, expires_at) \
+             values ($1, 'obo', $2, array['receiver'], $3, 1800, now() + interval '1 day')",
+        )
+        .bind(uuid::Uuid::now_v7())
+        .bind(app)
+        .bind(&c.uuid)
+        .execute(&mut *conn)
+        .await
+        .expect("proof");
+    }
+    let removed = memberships::remove_access(&mut conn, &issuer.app_id, &c.uuid, &c.uuid)
+        .await
+        .expect("remove");
+    assert_eq!(removed.revoked_proofs, 1);
+    let deleted = accounts_core::repo::accounts::delete_account(
+        &mut conn,
+        &ctx.state.settings,
+        &c.uuid,
+        &c.uuid,
+        true,
+    )
+    .await
+    .expect("delete");
+    assert_eq!(deleted.revoked_proofs, 1);
+    let audited: Vec<(String, Option<String>, String, Value)> = sqlx::query_as(
+        "select actor_kind, actor_id, app_id, details from audit_log \
+         where action = 'proof.revoked' and account_uuid = $1 order by id",
+    )
+    .bind(&c.uuid)
+    .fetch_all(&mut *conn)
+    .await
+    .expect("audit");
+    assert_eq!(audited.len(), 2, "{audited:?}");
+    assert_eq!(audited[0].0, "account");
+    assert_eq!(audited[0].1.as_deref(), Some(c.uuid.as_str()));
+    assert_eq!(audited[0].2, issuer.app_id);
+    assert_eq!(audited[0].3["reason"], "access_removed");
+    assert_eq!(audited[1].0, "system");
+    assert_eq!(audited[1].2, other.app_id);
+    assert_eq!(audited[1].3["reason"], "account_deleted");
+    assert_eq!(audited[1].3["kind"], "obo");
+}
