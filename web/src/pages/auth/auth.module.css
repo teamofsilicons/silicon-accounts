@@ -1,5 +1,0 @@
-.hosted { position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; }
-.hosted > :first-child { flex: 1; }
-.center { display: grid; min-height: 100vh; min-height: 100dvh; place-items: center; padding: var(--space-6) var(--gutter); }
-.center > * { width: min(100%, 440px); }
-.note { margin: 0; padding: var(--space-12) var(--gutter); color: var(--text-secondary); font-size: var(--text-sm); text-align: center; }

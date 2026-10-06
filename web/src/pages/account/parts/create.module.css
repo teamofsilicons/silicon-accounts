@@ -1,0 +1,7 @@
+/* The create-a-Silicon form in its drawer. */
+/* The drawer panel squares its right corners through --sq-tr/--sq-br, which every squircle inside would inherit:
+   the form and the footer buttons set the corner factors back. */
+.form, .footer { --sq-tl: 1; --sq-tr: 1; --sq-br: 1; --sq-bl: 1; }
+.form { display: grid; min-width: 0; gap: var(--space-6); }
+.footer { display: contents; }
+.stk { display: grid; min-width: 0; gap: var(--space-3); }

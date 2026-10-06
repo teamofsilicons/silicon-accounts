@@ -78,6 +78,10 @@ body {
 .embed-problem .embed-hint { color: var(--text-secondary); }
 .embed-problem code { justify-self: start; margin-top: 4px; color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
 
+/* Opened on its own: a configuration note, not an error (the buttons above still work here). */
+.embed-note { --sq-stroke: color-mix(in oklab, var(--warning) 40%, var(--border)); }
+.embed-note strong { color: var(--foreground); }
+
 /* Loading: one button-sized placeholder so the frame has a height before the config arrives. */
 .embed-skeleton {
   --sq-r: var(--radius-control);
@@ -86,25 +90,36 @@ body {
   animation: embed-shimmer 1.4s linear infinite;
 }
 
-/* "Powered by Silicon Accounts": fixed colours per tone, never the app's branding. */
+/*
+ * "Powered by Silicon Accounts": fixed colours per tone, never the app's branding, on an opaque pill of its own so it
+ * reads on whatever the app's page puts behind the frame.
+ */
 .embed-powered {
   display: flex !important;
-  min-height: 20px;
+  justify-self: center !important;
+  min-height: 26px;
   align-items: center !important;
-  justify-content: center !important;
   gap: 6px;
   margin: 0;
+  padding: 0 11px !important;
+  border: 1px solid #E8E3DA !important;
+  border-radius: 999px !important;
+  background: #FFFDF9 !important;
   color: #5E5A55 !important;
   font: 400 12px/1.4 "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important;
   letter-spacing: -.01em;
   white-space: nowrap;
   visibility: visible !important;
   opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  clip-path: none !important;
 }
+@supports (corner-shape: squircle) { .embed-powered { corner-shape: squircle; } }
 .embed-powered svg { display: block; flex: none; }
 .embed-powered a { color: #353432 !important; font-weight: 500; text-decoration: none; }
 .embed-powered a:is(:hover, :focus-visible) { outline: none; text-decoration: underline; text-underline-offset: .2em; }
-.embed-powered[data-tone="dark"] { color: #C9C4BC !important; }
+.embed-powered[data-tone="dark"] { border-color: #4A4845 !important; background: #2A2927 !important; color: #C9C4BC !important; }
 .embed-powered[data-tone="dark"] a { color: #FFFDF9 !important; }
 
 @keyframes embed-in { from { opacity: 0; } }

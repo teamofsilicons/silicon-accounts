@@ -1,0 +1,96 @@
+/* A Silicon's drawer: its profile on top, then one block per thing a custodian does. */
+.body {
+  /* The drawer panel squares its two right corners through --sq-tr/--sq-br, and custom properties inherit: without
+     this every squircle inside (inputs, buttons, cards, avatars) would lose its right-hand curve too. */
+  --sq-tl: 1;
+  --sq-tr: 1;
+  --sq-br: 1;
+  --sq-bl: 1;
+  display: grid;
+  min-width: 0;
+  gap: var(--space-8);
+  /* A guard against sideways scrolling on phones: nothing in here may widen the drawer. The 4px of padding (taken back
+     by the margin) keeps hover shadows at the edges from being clipped. */
+  overflow-x: clip;
+  margin-inline: -4px;
+  padding-inline: 4px;
+}
+.reveals { display: grid; gap: var(--space-4); }
+.mono { font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0; overflow-wrap: anywhere; }
+
+.profile { display: grid; min-width: 0; gap: var(--space-5); }
+.identity { display: flex; min-width: 0; align-items: center; gap: var(--space-4); }
+.identityText { display: grid; min-width: 0; flex: 1; gap: var(--space-1); }
+.idLine { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--foreground); font-size: var(--text-sm); }
+/* The id morphs when it changes; held to the space there is, its soft trailing mask fades what does not fit. */
+.idText { display: block; min-width: 0; max-width: 100%; font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0; }
+.idMorph { display: block; max-width: 100%; }
+.idMorph > [aria-hidden="true"] { max-width: 100%; }
+.facts { display: grid; margin: 0; }
+.facts > div { display: grid; grid-template-columns: minmax(5.5rem, 7rem) minmax(0, 1fr); align-items: center; gap: var(--space-3); min-height: 44px; padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
+.facts > div:last-child { border-bottom: 1px solid var(--border-subtle); }
+.facts dt { color: var(--text-secondary); font-size: var(--text-xs); }
+.facts dd { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); margin: 0; color: var(--foreground); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.idScope, .scope { min-width: 0; }
+/* The inline detail editor and "Change its id" share one grid row of the profile, so a closed editor adds no gap. */
+.below { display: grid; min-width: 0; }
+.editorSlot { min-width: 0; }
+.editorSlot[data-open] { padding-bottom: var(--space-5); }
+.idForm { padding-top: var(--space-1); }
+
+.block { display: grid; min-width: 0; gap: var(--space-4); padding-top: var(--space-6); border-top: 1px solid var(--border); }
+.blockHead { display: grid; gap: var(--space-1); }
+.blockTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: 1.3; }
+/* Focus lands on a heading only from script (after a secret is stored); keyboard position shows as the accent ink. */
+.blockTitle:focus { outline: none; }
+.blockTitle:focus-visible { color: var(--accent-ink); }
+.block[data-danger] .blockTitle { color: var(--danger); }
+.blockText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.stack { display: grid; min-width: 0; gap: var(--space-3); }
+.fact { margin: 0; color: var(--foreground); font-size: var(--text-sm); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.holdRow { display: flex; min-width: 0; flex-wrap: wrap; justify-content: flex-start; }
+.holdRow > * { max-width: 100%; }
+.error { margin: 0; color: var(--danger); font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
+
+.urlBox { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); position: relative; display: flex; min-width: 0; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); background: var(--sq-fill); }
+.url { min-width: 0; flex: 1; overflow: hidden; color: var(--foreground); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Transfer: the Silicon's card, an arrow, and the person it goes to. */
+.transfer { display: grid; min-width: 0; gap: var(--space-3); }
+.route { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: var(--space-3); }
+.mini {
+  --sq-r: var(--radius-control);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border-strong);
+  position: relative;
+  display: inline-flex;
+  max-width: 11rem;
+  min-height: var(--control-height-md);
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.mini .mono { min-width: 0; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.routeArrow { color: var(--text-muted); }
+.routeField { min-width: 0; }
+.pending { --sq-r: var(--radius-panel); --sq-fill: var(--accent-subtle); --sq-stroke: color-mix(in oklab, var(--accent) 30%, transparent); position: relative; display: flex; min-width: 0; align-items: center; gap: var(--space-4); padding: var(--space-4); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+/* Focus arrives here after a transfer is sent; it shows through the card's edge, never a ring. */
+.pending:focus { outline: none; }
+.pending:focus-visible { --sq-stroke: var(--accent); }
+.pendingRoute { display: inline-flex; flex: none; align-items: center; gap: var(--space-2); color: var(--accent-ink); }
+.pendingText { min-width: 0; margin: 0; color: var(--foreground); font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.pendingText strong { font-weight: 500; }
+.personMark { display: inline-grid; width: 28px; height: 28px; place-items: center; }
+
+@media (max-width: 480px) {
+  .route { grid-template-columns: minmax(0, 1fr); }
+  .routeArrow { display: none; }
+  .mini { max-width: 100%; justify-self: start; }
+  .pending { align-items: flex-start; flex-direction: column; }
+}

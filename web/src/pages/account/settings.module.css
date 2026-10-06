@@ -1,0 +1,51 @@
+/* Settings: grouped rows (Arc composition), the session list, and the account deletion card. */
+.group {
+  --sq-r: var(--radius-panel);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+}
+.group [role="list"] > [role="listitem"] + [role="listitem"] { border-top: 1px solid var(--border-subtle); }
+
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); min-height: 72px; padding: var(--space-4) var(--space-5); }
+.rowMain { display: flex; min-width: 0; flex: 1 1 260px; align-items: flex-start; gap: var(--space-3); }
+.sessionIcon { display: inline-grid; width: 20px; flex: none; place-items: center; padding-top: 1px; color: var(--text-secondary); }
+.rowText { display: grid; min-width: 0; gap: 3px; }
+.rowTitle { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.name { min-width: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; overflow-wrap: anywhere; }
+.rowMeta { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.rowError { color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
+.rowAction { display: flex; flex: 0 1 auto; justify-content: flex-end; margin-inline-start: auto; }
+
+.danger {
+  --sq-r: var(--radius-surface);
+  --sq-fill: var(--surface);
+  --sq-stroke: color-mix(in oklab, var(--danger) 22%, var(--border));
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+}
+.dangerText { margin: 0; color: var(--foreground); font-size: var(--text-sm); line-height: 1.55; }
+.code { font-family: var(--font-mono); font-size: .92em; letter-spacing: 0; }
+.blocked { display: grid; min-width: 0; justify-items: start; gap: var(--space-4); }
+.blockers { display: grid; width: 100%; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.blocker { display: flex; min-width: 0; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm); }
+.blocker :global(.mono) { margin-inline-start: auto; color: var(--text-secondary); font-size: var(--text-xs); }
+.blockerName { min-width: 0; overflow: hidden; color: var(--foreground); text-overflow: ellipsis; white-space: nowrap; }
+.error { margin: 0; color: var(--danger); font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.dangerAction { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+.disabledNote { color: var(--text-secondary); font-size: var(--text-xs); }
+
+@media (max-width: 560px) {
+  .row { align-items: flex-start; padding: var(--space-4); }
+  .rowMain { flex-basis: 100%; }
+  .rowAction { justify-content: flex-start; margin-inline-start: 28px; }
+  .danger { padding: var(--space-5); }
+}
