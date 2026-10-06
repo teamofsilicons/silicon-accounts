@@ -1,0 +1,100 @@
+/* No grid gap: the error row and the file list carry their own spacing, so each can open from a true zero height. */
+.wrapper { position: relative; display: grid; min-width: 0; color: var(--foreground); }
+.dropzone { --sq-r: var(--radius-surface); --sq-fill: var(--surface); --sq-stroke: transparent; --edge-r: 34; position: relative; display: grid; min-width: 0; background: var(--sq-fill); transition: background-color var(--duration-standard) var(--ease-standard); }
+/* A folded prompt is a slimmer surface, so its corners step down to the panel radius. */
+.dropzone.compact { --sq-r: var(--radius-panel); --edge-r: 26; }
+/* The edge is a drawn stroke along the squircle, fitted to the perimeter in script, so a drag can close its dashes. */
+.edge { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.edge path { fill: none; stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 3.5 3.5; stroke-dashoffset: 0; transition: stroke var(--duration-fast) var(--ease-standard), stroke-dasharray var(--duration-standard) var(--ease-standard), stroke-dashoffset var(--duration-standard) var(--ease-standard); }
+.trigger { display: flex; width: 100%; flex-direction: column; align-items: stretch; justify-content: center; border: 0; border-radius: inherit; padding: 26px var(--space-5) 34px; background: transparent; color: inherit; font: inherit; letter-spacing: var(--tracking-body); text-align: center; cursor: pointer; }
+.compact .trigger { padding-block: 16px; }
+.trigger > * { pointer-events: none; }
+@media (hover: hover) and (pointer: fine) {
+  .dropzone:has(.trigger:hover) { --sq-fill: var(--surface-muted); }
+  .dropzone:has(.trigger:hover) .edge path { stroke: var(--text-muted); }
+}
+.dropzone:has(.trigger:focus-visible) { --sq-fill: var(--surface-muted); }
+.dropzone:has(.trigger:focus-visible) .edge path { stroke: var(--foreground); }
+/* Colour is the only press response: the target never scales. */
+.dropzone:has(.trigger:active) { --sq-fill: var(--surface-muted); }
+/* A file over the target closes the dashes into a solid edge and the target breathes, slowly, while it waits. */
+.dropzone.dragging { --sq-fill: color-mix(in oklab, var(--accent) 3%, var(--surface)); animation: breathe 2.2s var(--ease-in-out) infinite; }
+@keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.012); } }
+/* Light that follows the pointer: a wash inside, and a brighter stretch of the edge nearest the file. */
+.wash, .glow { position: absolute; inset: 0; border-radius: calc(var(--radius-surface) * 1); opacity: 0; pointer-events: none; transition: opacity var(--duration-standard) var(--ease-standard); }
+@supports (corner-shape: squircle) { .wash, .glow { corner-shape: squircle; border-radius: calc(var(--sq-r) * var(--sq-k)); } }
+.glow { padding: 1.5px; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.dragging .wash, .dragging .glow { opacity: 1; }
+.dragging .edge path { stroke: color-mix(in oklab, var(--accent) 40%, var(--border)); stroke-dasharray: 7 0; stroke-dashoffset: 1.75; }
+/* No gaps between the prompt's parts: each slot carries its own space, so a folding slot takes its space with it. */
+.iconSlot, .noteSlot { display: flex; flex-direction: column; overflow: hidden; }
+/* Three sheets of paper, the target's one illustration. */
+.sheets { position: relative; display: block; width: 36px; height: 44px; align-self: center; margin: 10px 0 14px; }
+.sheet { --r: 0deg; --x: 0px; --y: 0px; position: absolute; inset: 0; display: grid; place-items: end center; padding: 0 0 5px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--text-muted); box-shadow: 0 1px 2px rgb(53 46 38 / .05), 0 3px 8px rgb(53 46 38 / .04); transform: translate(var(--x), var(--y)) rotate(var(--r)); transform-origin: 50% 100%; transition: transform var(--duration-spring) var(--ease-spring), color var(--duration-standard) var(--ease-standard), border-color var(--duration-standard) var(--ease-standard); }
+@supports (corner-shape: squircle) { .sheet { corner-shape: squircle; border-radius: 11px; } }
+.sheet::before, .sheet::after { position: absolute; top: 8px; left: 7px; width: 16px; height: 2px; border-radius: 2px; background: currentColor; content: ""; opacity: .3; }
+.sheet::after { top: 13px; width: 11px; }
+.sheet > svg { transition: transform var(--duration-spring) var(--ease-spring); }
+.dragging .sheet > svg { transform: translateY(-3px); }
+.sheet[data-sheet="back"] { --r: -10deg; --x: -9px; --y: 2px; }
+.sheet[data-sheet="side"] { --r: 10deg; --x: 9px; --y: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .dropzone:has(.trigger:hover) .sheet[data-sheet="back"] { --r: -15deg; --x: -13px; }
+  .dropzone:has(.trigger:hover) .sheet[data-sheet="side"] { --r: 15deg; --x: 13px; }
+  .dropzone:has(.trigger:hover) .sheet[data-sheet="front"] { --y: -2px; }
+}
+.dragging .sheet { color: var(--text-secondary); border-color: var(--border-strong); }
+.dropzone.dragging .sheet[data-sheet="back"] { --r: -22deg; --x: -20px; --y: -2px; }
+.dropzone.dragging .sheet[data-sheet="side"] { --r: 22deg; --x: 20px; --y: -2px; }
+.dropzone.dragging .sheet[data-sheet="front"] { --y: -8px; }
+.label { position: relative; display: block; font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+.labelText { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top; white-space: nowrap; }
+.hint { margin-top: 6px; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.note { padding-top: 6px; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
+.input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.list { display: grid; min-width: 0; margin: 0; padding: 0; list-style: none; container: dropzone-list / inline-size; }
+/* Rows animate height; the gap lives inside the clipped row as margin, so a closing row reaches a true zero. */
+.item { min-width: 0; overflow: hidden; }
+.row { --sq-r: var(--radius-control); --sq-fill: var(--surface); --sq-stroke: var(--border); position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; column-gap: 12px; min-height: 58px; margin-top: 8px; border: 1px solid var(--sq-stroke); background: var(--sq-fill); padding: 8px 8px 8px 9px; transition: border-color var(--duration-standard) var(--ease-standard); }
+.row.isFailed { --sq-stroke: color-mix(in oklab, var(--danger) 26%, var(--border)); }
+.fileIcon { display: grid; width: 40px; height: 40px; place-items: center; color: var(--text-secondary); }
+.thumb { --sq-r: 10px; display: block; width: 40px; height: 40px; overflow: hidden; background: var(--surface-muted); }
+.thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.copy { display: grid; min-width: 0; }
+.name { overflow: hidden; font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); text-overflow: ellipsis; white-space: nowrap; }
+.meta { display: flex; min-width: 0; align-items: center; margin-top: 1px; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dot { padding-inline: 6px; }
+.phase { position: relative; display: flex; min-width: 0; flex: 1; }
+.state { display: inline-flex; min-width: 0; align-items: center; gap: 5px; animation: state-in var(--duration-standard) var(--ease-enter) both; }
+.uploaded { color: var(--text-secondary); }
+.uploaded .stateIcon { color: var(--success); }
+.failed { color: var(--danger); }
+.stateIcon { flex: 0 0 auto; }
+.circleCheck path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 340ms var(--ease-enter) forwards; }
+.circleCheck path + path { animation-delay: 160ms; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes state-in { from { opacity: 0; transform: translateY(.3em); filter: blur(4px); } }
+.reason { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.percent { font-variant-numeric: tabular-nums; }
+.barFrame { display: block; overflow: hidden; }
+.bar { display: block; height: 4px; margin: 7px 0 2px; overflow: hidden; border-radius: var(--radius-pill); background: var(--border); }
+.barFill { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--accent); transform: translateX(-100%); }
+.actions { display: flex; align-items: center; gap: 4px; }
+.retry, .remove { display: grid; place-items: center; border: 0; color: var(--text-secondary); font: inherit; cursor: pointer; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-spring) var(--ease-spring); }
+.retry { display: flex; height: 30px; align-items: center; gap: 5px; border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 0 12px 0 10px; background: var(--surface); color: var(--foreground); font-size: var(--text-xs); font-weight: 500; letter-spacing: var(--tracking-body); white-space: nowrap; animation: state-in var(--duration-standard) var(--ease-enter) both; }
+@container dropzone-list (max-width: 440px) { .retry { width: 30px; justify-content: center; padding: 0; } .retryLabel { display: none; } }
+@container dropzone-list (max-width: 300px) { .row { grid-template-columns: minmax(0, 1fr) auto; padding-left: 14px; } .fileIcon, .thumb { display: none; } }
+.remove { width: 32px; height: 32px; border-radius: var(--radius-pill); background: transparent; }
+@media (hover: hover) and (pointer: fine) {
+  .retry:hover { border-color: var(--border-strong); background: var(--surface-muted); }
+  .remove:hover { background: var(--surface-muted); color: var(--foreground); }
+}
+.retry:focus-visible { border-color: var(--border-strong); background: var(--surface-muted); }
+.remove:focus-visible { background: var(--surface-muted); color: var(--foreground); }
+.retry:active, .remove:active { transform: scale(.97); transition-duration: var(--duration-instant); transition-timing-function: var(--ease-standard); }
+@media (prefers-reduced-motion: reduce) {
+  .dropzone, .edge path, .sheet, .sheet > svg, .row, .retry, .remove, .wash, .glow { transition: none; }
+  .dropzone.dragging { animation: none; }
+  .retry:active, .remove:active { transform: none; }
+  .state, .retry, .circleCheck path { animation: none; stroke-dashoffset: 0; }
+}

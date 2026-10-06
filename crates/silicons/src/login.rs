@@ -1,0 +1,403 @@
+//! `POST /v1/silicons/login`: a Silicon signs in with its si:id and STK and gets first-party
+//! tokens (`aud = accounts`, token family origin `silicon_login`).
+//!
+//! - Unknown si:id and wrong STK get the same 401 `invalid_credentials`, after the same Argon2id
+//!   work, so ids can't be probed.
+//! - 10 wrong STKs in a row lock sign-in for 1 minute (423 `login_locked`, also during the lock
+//!   even with the right STK); a success resets the count. Attempts are counted before the STK
+//!   is checked, so a burst of parallel guesses gets no more than 10 checks either.
+//! - The right STK on an account that can't sign in yet says why: 403 `custodian_pending`
+//!   (with the request to poll) or `custodian_expired`.
+//! - An id whose Silicon is gone says why: 403 `custodian_declined`, `custodian_expired` or
+//!   `account_deleted` (that account's STK no longer exists, so nothing is verified).
+//! - 60 attempts per minute per IP on top of the per-Silicon lock.
+
+use accounts_core::crypto::stk::normalize as normalize_stk;
+use accounts_core::error::{ApiError, ApiResult};
+use accounts_core::http::{ClientMeta, Json};
+use accounts_core::ids::{AccountId, IdError};
+use accounts_core::models::{AccountKind, AccountStatus, Scope, TokenOrigin};
+use accounts_core::repo::audit::{self, SigninRecord};
+use accounts_core::repo::{accounts, rate_limit, tokens};
+use accounts_core::state::AppState;
+use accounts_core::timefmt::format_rfc3339_ms;
+use accounts_core::views::TokenResponse;
+use axum::extract::State;
+use serde::{Deserialize, Serialize};
+use sqlx::PgConnection;
+use time::OffsetDateTime;
+
+use crate::requests::{self, status};
+use crate::{input, lifecycle, stk, views};
+
+/// Consecutive wrong STKs that lock sign-in.
+pub const MAX_STK_FAILURES: i32 = 10;
+/// How long sign-in stays locked after that.
+pub const LOCK_SECONDS: i64 = 60;
+/// Label of the token family when the caller sends no `client_label`.
+pub const DEFAULT_LABEL: &str = "Silicon sign-in";
+
+/// `POST /v1/silicons/login` body.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LoginBody {
+    pub id: String,
+    pub stk: String,
+    #[serde(default)]
+    pub client_label: Option<String>,
+}
+
+fn invalid_credentials() -> ApiError {
+    ApiError::unauthenticated(
+        "invalid_credentials",
+        "Sign-in failed: no Silicon has this si:id, or the STK is wrong. Both cases get this same answer, so ids can't be probed.",
+    )
+    .hint("Check the si:id (use the current one; ids can change) and the STK (stk- followed by the hex characters shown once at creation or rotation). 10 wrong STKs in a row lock sign-in for 1 minute. A lost STK can be replaced by the Silicon's custodian (`accounts silicon rotate-stk`).")
+}
+
+fn login_locked(full_id: &str, seconds: u64) -> ApiError {
+    ApiError::locked(
+        "login_locked",
+        format!(
+            "Sign-in to {full_id} is locked for {seconds} more seconds because {MAX_STK_FAILURES} wrong STKs were sent in a row."
+        ),
+        seconds,
+    )
+    .hint("Wait until the lock ends (details.retry_after_seconds), then sign in with the correct STK. If the STK is lost, the Silicon's custodian can rotate it (`accounts silicon rotate-stk`).")
+}
+
+fn parse_login_id(input: &str) -> ApiResult<AccountId> {
+    match AccountId::parse_for_kind(input, AccountKind::Silicon) {
+        Ok(id) => Ok(id),
+        Err(e @ IdError::WrongKind { .. }) => Err(ApiError::unprocessable("invalid_id", e.to_string())
+            .hint("Carbons sign in with `accounts login` (a code by email or phone, or the browser device flow); this endpoint signs Silicons in with their si:id and STK.")
+            .detail("reason", e.reason())),
+        Err(e) => Err(accounts::invalid_id_error(&e)),
+    }
+}
+
+async fn record_attempt(
+    conn: &mut PgConnection,
+    meta: &ClientMeta,
+    account_uuid: Option<&str>,
+    outcome: &str,
+) -> ApiResult<()> {
+    audit::signin(
+        conn,
+        &SigninRecord {
+            account_uuid,
+            app_id: Some(accounts_core::FIRST_PARTY_APP_ID),
+            method: audit::method::SILICON_STK,
+            outcome,
+            ip: meta.ip.as_deref(),
+            user_agent: meta.user_agent.as_deref(),
+        },
+    )
+    .await
+}
+
+/// `POST /v1/silicons/login`.
+pub async fn login(
+    State(state): State<AppState>,
+    meta: ClientMeta,
+    Json(body): Json<LoginBody>,
+) -> Result<Json<TokenResponse>, ApiError> {
+    rate_limit::enforce_pool(
+        &state.db,
+        &rate_limit::bucket("silicon_login:ip", meta.ip_or_unknown()),
+        rate_limit::limits::SILICON_LOGIN_PER_IP,
+        "Silicon sign-in attempts from this network",
+    )
+    .await?;
+    let id = parse_login_id(&body.id)?;
+    let presented = normalize_stk(&body.stk).map_err(|m| {
+        ApiError::unprocessable("invalid_stk", m)
+            .hint("Send the STK exactly as it was shown: stk- followed by 8 to 32 hexadecimal characters.")
+    })?;
+    let full = id.to_string();
+
+    let mut conn = state.db.acquire().await?;
+    let found = accounts::by_handle(&mut conn, &full)
+        .await?
+        .filter(|a| a.kind == AccountKind::Silicon);
+    let Some(account) = found else {
+        if let Some(gone) = former_silicon_error(&mut conn, &full).await? {
+            record_attempt(&mut conn, &meta, None, audit::outcome::FAILED).await?;
+            return Err(gone);
+        }
+        drop(conn);
+        stk::burn(state.keys.stk).await;
+        let mut conn = state.db.acquire().await?;
+        record_attempt(&mut conn, &meta, None, audit::outcome::FAILED).await?;
+        return Err(invalid_credentials());
+    };
+
+    // Count the attempt *before* checking the STK (and refuse while locked): checking first and
+    // counting afterwards would let a burst of parallel guesses all pass the lock check before
+    // any failure is recorded.
+    let attempt: Option<i32> = sqlx::query_scalar(
+        "update accounts set stk_failed_attempts = stk_failed_attempts + 1 \
+         where uuid = $1 and (stk_locked_until is null or stk_locked_until <= now()) \
+         returning stk_failed_attempts",
+    )
+    .bind(&account.uuid)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let Some(attempt) = attempt else {
+        let seconds = lock_remaining(&mut conn, &account.uuid).await?.unwrap_or(1);
+        record_attempt(
+            &mut conn,
+            &meta,
+            Some(&account.uuid),
+            audit::outcome::FAILED,
+        )
+        .await?;
+        return Err(login_locked(&full, seconds));
+    };
+    if attempt > MAX_STK_FAILURES {
+        // More guesses in flight than the lock allows: lock now without checking this one.
+        lock_sign_in(&mut conn, &account.uuid).await?;
+        record_attempt(
+            &mut conn,
+            &meta,
+            Some(&account.uuid),
+            audit::outcome::FAILED,
+        )
+        .await?;
+        return Err(login_locked(&full, LOCK_SECONDS as u64));
+    }
+    drop(conn);
+
+    let verified_hash = account.stk_hash.clone();
+    let correct = match &verified_hash {
+        Some(phc) => stk::verify(presented, phc.clone()).await,
+        None => {
+            stk::burn(state.keys.stk).await;
+            false
+        }
+    };
+    if !correct {
+        let mut conn = state.db.acquire().await?;
+        record_attempt(
+            &mut conn,
+            &meta,
+            Some(&account.uuid),
+            audit::outcome::FAILED,
+        )
+        .await?;
+        if attempt >= MAX_STK_FAILURES {
+            lock_sign_in(&mut conn, &account.uuid).await?;
+            tracing::warn!(silicon = %account.uuid, "Silicon sign-in locked after {MAX_STK_FAILURES} wrong STKs in a row");
+            return Err(login_locked(&full, LOCK_SECONDS as u64));
+        }
+        return Err(invalid_credentials());
+    }
+
+    let mut tx = state.db.begin().await?;
+    // Locks go request first, then account, as everywhere else in this crate.
+    let pending_request = if account.status == AccountStatus::PendingCustodian {
+        requests::pending_for_silicon(&mut tx, &account.uuid, true).await?
+    } else {
+        None
+    };
+    // Re-read under a lock: a rotation between the check and now must win.
+    let account = accounts::lock(&mut tx, &account.uuid)
+        .await?
+        .filter(|a| a.stk_hash == verified_hash && a.status != AccountStatus::Deleted)
+        .ok_or_else(invalid_credentials)?;
+    accounts::clear_stk_failures(&mut tx, &account.uuid).await?;
+    match account.status {
+        AccountStatus::Active => {}
+        AccountStatus::PendingCustodian => {
+            let refusal = not_yet_active(
+                &mut tx,
+                &account.uuid,
+                pending_request,
+                &full,
+                &state.settings.public_url,
+            )
+            .await?;
+            record_attempt(&mut tx, &meta, Some(&account.uuid), audit::outcome::FAILED).await?;
+            tx.commit().await?;
+            return Err(refusal);
+        }
+        _ => return Err(invalid_credentials()),
+    }
+    let label = input::client_label(body.client_label.as_deref())
+        .unwrap_or_else(|| DEFAULT_LABEL.to_string());
+    let response = tokens::issue_tokens(
+        &mut tx,
+        &state.keys,
+        &state.settings,
+        tokens::IssueRequest {
+            account: &account,
+            app_id: accounts_core::FIRST_PARTY_APP_ID,
+            origin: TokenOrigin::SiliconLogin,
+            scopes: &[Scope::Profile],
+            browser_session_id: None,
+            label: Some(&label),
+            ip: meta.ip.as_deref(),
+            user_agent: meta.user_agent.as_deref(),
+            nonce: None,
+        },
+    )
+    .await?;
+    record_attempt(&mut tx, &meta, Some(&account.uuid), audit::outcome::SUCCESS).await?;
+    tx.commit().await?;
+    state.telemetry.record(
+        "api",
+        "silicon.login",
+        "silicon_signed_in",
+        serde_json::json!({"labelled": body.client_label.is_some()}),
+    );
+    Ok(Json(response))
+}
+
+/// Locks sign-in for [`LOCK_SECONDS`] and starts the failure count over.
+async fn lock_sign_in(conn: &mut PgConnection, uuid: &str) -> ApiResult<()> {
+    sqlx::query(
+        "update accounts set stk_locked_until = now() + make_interval(secs => $2), stk_failed_attempts = 0 \
+         where uuid = $1",
+    )
+    .bind(uuid)
+    .bind(LOCK_SECONDS as f64)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Seconds left on the sign-in lock, if locked (database clock).
+async fn lock_remaining(conn: &mut PgConnection, uuid: &str) -> ApiResult<Option<u64>> {
+    let seconds: Option<f64> = sqlx::query_scalar(
+        "select extract(epoch from (stk_locked_until - now()))::float8 from accounts \
+         where uuid = $1 and stk_locked_until > now()",
+    )
+    .bind(uuid)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(seconds.map(|s| s.ceil().max(1.0) as u64))
+}
+
+/// Why a pending Silicon (right STK) can't sign in yet, from its row-locked pending request. An
+/// overdue request is expired here and now (releasing the Silicon), exactly as the sweep would;
+/// so is a request cancelled because the named Carbon deleted their account.
+async fn not_yet_active(
+    conn: &mut PgConnection,
+    silicon_uuid: &str,
+    pending_request: Option<requests::CustodianRequest>,
+    full: &str,
+    site: &str,
+) -> ApiResult<ApiError> {
+    let Some(request) = pending_request else {
+        if let Some(latest) = requests::latest_initial(conn, silicon_uuid).await?
+            && lifecycle::release_orphan(conn, &latest).await?
+        {
+            return Ok(custodian_gone(full));
+        }
+        return Ok(ApiError::forbidden(
+            "custodian_pending",
+            format!("{full} can't sign in yet: no Carbon has accepted to be its custodian."),
+        )
+        .hint("Create the account again naming a custodian (POST /v1/silicons), or ask a Carbon to create it for you (POST /v1/me/silicons)."));
+    };
+    let label = views::custodian_label(conn, &request).await?;
+    if request.is_overdue() {
+        lifecycle::expire(conn, &request).await?;
+        return Ok(custodian_expired(full, request.expires_at));
+    }
+    Ok(ApiError::forbidden(
+        "custodian_pending",
+        format!(
+            "Silicon {full} can't sign in yet: its custodian {label} hasn't accepted the request (expires {}).",
+            format_rfc3339_ms(request.expires_at)
+        ),
+    )
+    .hint(format!(
+        "Wait for {label} to accept on {site}, or poll GET /v1/silicons/requests/{} with the request token (`accounts silicon request status {} --wait`).",
+        request.id,
+        request.id
+    ))
+    .detail("request_id", request.id.to_string())
+    .detail("expires_at", format_rfc3339_ms(request.expires_at))
+    .detail("custodian", label))
+}
+
+fn custodian_gone(full: &str) -> ApiError {
+    ApiError::forbidden(
+        "custodian_declined",
+        format!(
+            "{full} can't sign in: the Carbon it named as custodian deleted their account before accepting, so the account was never activated and the id was released."
+        ),
+    )
+    .hint("Create the account again with POST /v1/silicons (`accounts silicon create`), naming a Carbon who will accept.")
+}
+
+fn custodian_expired(full: &str, expired_at: OffsetDateTime) -> ApiError {
+    ApiError::forbidden(
+        "custodian_expired",
+        format!(
+            "{full} can't sign in: its custodian didn't accept within 14 days (the request expired at {}), so the account was never activated and the id was released.",
+            format_rfc3339_ms(expired_at)
+        ),
+    )
+    .hint("Create the account again with POST /v1/silicons (`accounts silicon create`), naming a Carbon who will accept.")
+}
+
+/// The account that last held an id (from `handle_history`).
+#[derive(sqlx::FromRow)]
+struct FormerHolder {
+    account_uuid: String,
+    /// Set when the id was changed to another one (not released).
+    new_handle: Option<String>,
+    kind: AccountKind,
+    status: AccountStatus,
+    deleted_at: Option<OffsetDateTime>,
+}
+
+/// When `full` names no current account, explains what happened to the Silicon that last had it
+/// (declined, expired, deleted), if any. Renamed ids and ids that never existed get `None`.
+async fn former_silicon_error(conn: &mut PgConnection, full: &str) -> ApiResult<Option<ApiError>> {
+    let holder = sqlx::query_as::<_, FormerHolder>(
+        "select h.account_uuid, h.new_handle, a.kind, a.status, a.deleted_at from handle_history h \
+         join accounts a on a.uuid = h.account_uuid where h.old_handle = $1 \
+         order by h.changed_at desc, h.id desc limit 1",
+    )
+    .bind(full)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let Some(holder) = holder else {
+        return Ok(None);
+    };
+    if holder.new_handle.is_some()
+        || holder.kind != AccountKind::Silicon
+        || holder.status != AccountStatus::Deleted
+    {
+        return Ok(None);
+    }
+    let initial = requests::latest_initial(conn, &holder.account_uuid).await?;
+    Ok(Some(match initial {
+        Some(r) if r.status == status::DECLINED => ApiError::forbidden(
+            "custodian_declined",
+            format!(
+                "{full} can't sign in: the Carbon it named as custodian declined{}, so the account was never activated and the id was released.",
+                r.decided_at
+                    .map(|t| format!(" on {}", format_rfc3339_ms(t)))
+                    .unwrap_or_default()
+            ),
+        )
+        .hint("Create the account again with POST /v1/silicons (`accounts silicon create`), naming a Carbon who will accept."),
+        Some(r) if r.status == status::EXPIRED => custodian_expired(full, r.expires_at),
+        Some(r) if r.status == status::CANCELLED => custodian_gone(full),
+        _ => ApiError::forbidden(
+            "account_deleted",
+            format!(
+                "{full} belonged to a Silicon account that was deleted{}; deleted accounts can't sign in.",
+                holder
+                    .deleted_at
+                    .map(|t| format!(" on {}", format_rfc3339_ms(t)))
+                    .unwrap_or_default()
+            ),
+        )
+        .hint("Ask its former custodian, or create a new Silicon account."),
+    }))
+}

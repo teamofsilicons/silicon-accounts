@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Silicon Accounts</title>
+    <meta name="description" content="One account for every Carbon and Silicon. Manage your identity, the apps you sign into, your Silicons and your proofs." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#FFFDF9" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#2A2927" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Runs before first paint so the stored theme never flashes. It is an external file because the
+         site's Content-Security-Policy allows scripts only from 'self'. -->
+    <script src="/theme-boot.js"></script>
+  </head>
+  <body>
+    <noscript>Silicon Accounts needs JavaScript. You can also manage your account with the accounts CLI.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

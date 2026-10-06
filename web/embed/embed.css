@@ -1,0 +1,117 @@
+/*
+ * The embedded sign-in buttons. The page paints no background of its own, so the buttons sit on the app's page; the
+ * branding variables (applyBranding on #silicon-accounts-embed) colour the buttons and text. Squircles come from
+ * squircle.css / squircle.ts (native corner-shape, SVG-path fallback elsewhere).
+ */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: transparent; }
+body {
+  color: var(--foreground);
+  font-family: var(--font-body);
+  letter-spacing: var(--tracking-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* A little room so hover shadows and the press scale are never clipped by the frame. */
+.embed { display: grid; gap: 10px; padding: 3px; }
+.embed.sa-brand { min-height: 0; background: transparent; transition: none; }
+.embed.sa-brand::before { content: none; }
+.embed[data-ready] { animation: embed-in var(--duration-standard) var(--ease-standard) both; }
+
+.embed-buttons { display: grid; gap: calc(var(--brand-gap, 16px) * .625); }
+
+.embed-button {
+  --sq-r: var(--radius-control);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  position: relative;
+  display: flex;
+  min-height: calc(var(--control-height-md) + 4px);
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard);
+}
+.embed-button svg { display: block; flex: none; }
+.embed-button span { overflow: hidden; text-overflow: ellipsis; }
+.embed-button[data-variant="primary"] { --sq-fill: var(--primary); --sq-stroke: var(--primary); color: var(--primary-foreground); }
+
+/* Arc draws no focus rings: keyboard position shows with the same fills as hover. */
+.embed-button:focus-visible { outline: none; }
+.embed-button[data-variant="secondary"]:is(:hover, :focus-visible) { --sq-fill: var(--surface-muted); --sq-stroke: var(--border-strong); box-shadow: var(--shadow-resting); }
+.embed-button[data-variant="primary"]:is(:hover, :focus-visible) { --sq-fill: var(--primary-hover); --sq-stroke: var(--primary-hover); box-shadow: var(--shadow-resting); }
+.embed-button[data-variant="primary"]:active { --sq-fill: var(--primary-pressed); --sq-stroke: var(--primary-pressed); }
+.embed-button:active { transform: scale(.985); }
+
+/* Configuration problems, in the server's own words. */
+.embed-problem {
+  --sq-r: var(--radius-panel);
+  --sq-fill: var(--surface);
+  --sq-stroke: color-mix(in oklab, var(--danger) 35%, var(--border));
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.embed-problem strong { color: var(--danger); font-weight: 500; }
+.embed-problem p { margin: 0; text-wrap: pretty; }
+.embed-problem .embed-hint { color: var(--text-secondary); }
+.embed-problem code { justify-self: start; margin-top: 4px; color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
+
+/* Loading: one button-sized placeholder so the frame has a height before the config arrives. */
+.embed-skeleton {
+  --sq-r: var(--radius-control);
+  height: calc(var(--control-height-md) + 4px);
+  background: linear-gradient(90deg, var(--surface-muted) 25%, color-mix(in oklab, var(--surface-muted) 40%, var(--surface)) 50%, var(--surface-muted) 75%) 0 0 / 200% 100%;
+  animation: embed-shimmer 1.4s linear infinite;
+}
+
+/* "Powered by Silicon Accounts": fixed colours per tone, never the app's branding. */
+.embed-powered {
+  display: flex !important;
+  min-height: 20px;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px;
+  margin: 0;
+  color: #5E5A55 !important;
+  font: 400 12px/1.4 "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+.embed-powered svg { display: block; flex: none; }
+.embed-powered a { color: #353432 !important; font-weight: 500; text-decoration: none; }
+.embed-powered a:is(:hover, :focus-visible) { outline: none; text-decoration: underline; text-underline-offset: .2em; }
+.embed-powered[data-tone="dark"] { color: #C9C4BC !important; }
+.embed-powered[data-tone="dark"] a { color: #FFFDF9 !important; }
+
+@keyframes embed-in { from { opacity: 0; } }
+@keyframes embed-shimmer { to { background-position: -200% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .embed[data-ready], .embed-skeleton { animation: none; }
+  .embed-button { transition: none; }
+  .embed-button:active { transform: none; }
+}

@@ -1,0 +1,6 @@
+/* The row's space is padding inside the clipped slot, so the height animates from a true zero. */
+.slot { display: block; }
+.hint, .error { display: block; padding-top: var(--space-2); font-size: var(--text-xs); line-height: var(--leading-body); }
+.hint { color: var(--text-muted); }
+.error { color: var(--danger); }
+.words { display: inline-flex; flex-wrap: wrap; white-space: normal !important; }

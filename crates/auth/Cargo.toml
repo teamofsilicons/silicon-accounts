@@ -1,0 +1,36 @@
+[package]
+name = "silicon-accounts-auth"
+description = "Silicon Accounts service: the hosted sign-in flow, Google and Apple sign-in, browser sessions, device approval and CLI code sign-in"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "accounts_auth"
+path = "src/lib.rs"
+
+[dependencies]
+silicon-accounts-core.workspace = true
+axum.workspace = true
+cookie.workspace = true
+jsonwebtoken.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_urlencoded.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+silicon-accounts-core = { workspace = true, features = ["test-support"] }
+tokio.workspace = true
+
+[lints]
+workspace = true

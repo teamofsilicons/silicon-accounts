@@ -1,0 +1,140 @@
+/*
+ * Silicon Accounts brand tokens, mapped onto Arc's semantic tokens (src/arc/foundation.css).
+ *
+ * Brand: primary #1F5FB8, warm paper #FFFDF9, warm charcoal #353432.
+ * Contrast (WCAG 2.2, measured): every text token clears 4.5:1 on --background, --surface and --surface-raised in
+ * its theme, and on --surface-muted in light. Two additions to Arc's set exist because of that:
+ *   --accent-ink   accent-coloured text. In dark mode the brand accent #5B8FE0 is 3.8:1 on --surface, so text that
+ *                  wants the accent uses a lighter ink (4.75:1 on --surface-raised). Fills and indicators keep --accent.
+ *   --primary*     filled primary buttons stay brand blue with paper text in both themes (6.1:1).
+ *
+ * Themes apply to the document (<html data-theme>) and to any subtree that sets data-theme itself, so a preview or a
+ * style-guide column can show the other theme. Floating layers (menus, dialogs) portal to <body> and follow the page.
+ */
+:root, [data-theme="light"] {
+  color-scheme: light;
+  --brand-blue: #1F5FB8;
+  --brand-paper: #FFFDF9;
+  --brand-charcoal: #353432;
+
+  --background: #FFFDF9;
+  --surface: #FFFFFF;
+  --surface-raised: #FFFFFF;
+  --surface-muted: #F5F2EC;
+  --foreground: #353432;
+  --text-secondary: #6F6B66;
+  --text-muted: #726E68;
+  --border: #E8E3DA;
+  --border-subtle: #F0ECE5;
+  --border-strong: #D6CFC4;
+
+  --accent: #1F5FB8;
+  --accent-strong: #174E99;
+  --accent-subtle: rgb(31 95 184 / .1);
+  --accent-foreground: #FFFDF9;
+  --accent-ink: #1F5FB8;
+
+  --primary: #1F5FB8;
+  --primary-hover: #1B56A7;
+  --primary-pressed: #184C93;
+  --primary-foreground: #FFFDF9;
+
+  --control-on: #1F5FB8;
+  --control-glyph: #FFFDF9;
+  --control-track: #E6E1D8;
+  --control-track-hover: #DCD6CB;
+  --control-thumb: #FFFFFF;
+  --control-thumb-on: #FFFFFF;
+  --control-thumb-shadow: 0 0 0 .5px rgb(53 52 50 / .08), 0 1px 2px rgb(53 52 50 / .16), 0 2px 6px rgb(53 52 50 / .07);
+  --control-fill: var(--control-on);
+  --control-on-subtle: color-mix(in oklab, var(--control-on) 10%, transparent);
+  --focus-ring: transparent;
+
+  --success: #217A4B;
+  --warning: #A15C07;
+  --danger: #B42318;
+
+  /* Near-neutral, faintly warm shadows so they sit naturally on paper. Only floating layers use them. */
+  --shadow-resting: 0 1px 2px rgb(53 46 38 / .05);
+  --shadow-raised: 0 6px 18px rgb(53 46 38 / .07), 0 1px 3px rgb(53 46 38 / .04);
+  --shadow-floating: 0 20px 48px rgb(53 46 38 / .12), 0 3px 10px rgb(53 46 38 / .05);
+  /* The same shadows as filter chains, for squircle surfaces drawn with SVG (see src/arc/lib/squircle.ts). */
+  --drop-resting: drop-shadow(0 1px 1px rgb(53 46 38 / .06));
+  --drop-raised: drop-shadow(0 6px 9px rgb(53 46 38 / .07)) drop-shadow(0 1px 1.5px rgb(53 46 38 / .04));
+  --drop-floating: drop-shadow(0 18px 22px rgb(53 46 38 / .12)) drop-shadow(0 3px 5px rgb(53 46 38 / .05));
+
+  --series-1: #1F5FB8; --series-2: #8A4FB8; --series-3: #C77A12; --series-4: #1E8A73;
+
+  --font-body: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Squircle tuning: corner-shape radius multiplier (matches Figma's 60 % corner smoothing). */
+  --sq-k: 1.6;
+
+  /* Paper grain and dot grid, used sparingly (identity card, landing illustration). */
+  --grain-opacity: .07;
+  --dot-color: rgb(53 52 50 / .12);
+  --overlay: rgb(42 41 39 / .38);
+
+  /* Page chrome. */
+  --page-max: 1200px;
+  --page-narrow: 720px;
+  --gutter: clamp(16px, 4vw, 32px);
+  --dock-height: 64px;
+  --dock-clearance: calc(var(--dock-height) + 40px);
+}
+
+:root[data-theme="dark"], [data-theme="dark"] {
+  color-scheme: dark;
+  --background: #2A2927;
+  --surface: #353432;
+  --surface-raised: #3E3C3A;
+  --surface-muted: #464441;
+  --foreground: #FFFDF9;
+  --text-secondary: #B5B0A8;
+  --text-muted: #ADA8A0;
+  --border: #4A4845;
+  --border-subtle: #403E3B;
+  --border-strong: #5E5B57;
+
+  --accent: #5B8FE0;
+  --accent-strong: #86AFEF;
+  --accent-subtle: rgb(91 143 224 / .18);
+  --accent-foreground: #FFFDF9;
+  --accent-ink: #82ACEE;
+
+  --primary: #1F5FB8;
+  --primary-hover: #2766C2;
+  --primary-pressed: #1B55A6;
+  --primary-foreground: #FFFDF9;
+
+  --control-on: #2F6BC4;
+  --control-glyph: #FFFDF9;
+  --control-track: #524F4B;
+  --control-track-hover: #5C5955;
+  --control-thumb: #F5F2EC;
+  --control-thumb-on: #FFFDF9;
+  --control-thumb-shadow: 0 0 0 .5px rgb(0 0 0 / .3), 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .2);
+  --control-fill: var(--control-on);
+  --control-on-subtle: color-mix(in oklab, var(--control-on) 14%, transparent);
+  --focus-ring: transparent;
+
+  --success: #4CC38A;
+  --warning: #E9B24F;
+  --danger: #FF8A80;
+
+  --shadow-resting: 0 1px 2px rgb(0 0 0 / .2);
+  --shadow-raised: 0 8px 22px rgb(0 0 0 / .26);
+  --shadow-floating: 0 22px 55px rgb(0 0 0 / .4), 0 3px 10px rgb(0 0 0 / .18);
+  --drop-resting: drop-shadow(0 1px 1px rgb(0 0 0 / .22));
+  --drop-raised: drop-shadow(0 8px 11px rgb(0 0 0 / .26));
+  --drop-floating: drop-shadow(0 20px 26px rgb(0 0 0 / .4)) drop-shadow(0 3px 5px rgb(0 0 0 / .18));
+
+  --series-1: #5B8FE0; --series-2: #B58BE0; --series-3: #E9B24F; --series-4: #4CC3A6;
+
+  --grain-opacity: .09;
+  --dot-color: rgb(255 253 249 / .1);
+  --overlay: rgb(16 15 14 / .55);
+}

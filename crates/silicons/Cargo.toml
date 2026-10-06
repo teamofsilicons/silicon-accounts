@@ -1,0 +1,33 @@
+[package]
+name = "silicon-accounts-silicons"
+description = "Silicon Accounts service: Silicon self-create, Silicon login, short-lived tokens, custodians and the custodian-request expiry sweep"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "accounts_silicons"
+path = "src/lib.rs"
+
+[dependencies]
+silicon-accounts-core.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+time.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+silicon-accounts-core = { workspace = true, features = ["test-support"] }
+# The end-to-end test drives this crate's router over real HTTP with the published Rust
+# package, so response shapes stay compatible with the client and the CLI.
+silicon-accounts-client.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

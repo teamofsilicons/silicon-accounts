@@ -1,0 +1,32 @@
+.layout { display: grid; grid-template-columns: minmax(0, 640px) minmax(0, 1fr); align-items: start; gap: clamp(32px, 5vw, 72px); }
+.glance { display: grid; align-content: start; padding-top: var(--space-2); }
+.glanceRow { display: grid; grid-template-columns: minmax(3.5rem, auto) minmax(0, 1fr) auto; align-items: baseline; gap: var(--space-4); padding: var(--space-4) 0; border-top: 1px solid var(--border); color: var(--foreground); text-decoration: none; }
+.glanceRow:last-child { border-bottom: 1px solid var(--border); }
+.glanceValue { font-family: var(--font-serif); font-size: var(--text-3xl); line-height: 1; font-variant-numeric: tabular-nums; }
+.glanceLabel { color: var(--text-secondary); font-size: var(--text-sm); }
+.glanceArrow { align-self: center; color: var(--text-muted); transition: transform var(--duration-spring) var(--ease-spring), color var(--duration-fast) var(--ease-standard); }
+@media (hover: hover) and (pointer: fine) { .glanceRow:hover .glanceArrow { color: var(--foreground); transform: translateX(3px); } .glanceRow:hover .glanceLabel { color: var(--foreground); } }
+.glanceRow:focus-visible .glanceLabel, .glanceRow:focus-visible .glanceArrow { color: var(--foreground); }
+@media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .glanceArrow { transition: none; } }
+.front, .back { display: grid; min-width: 0; gap: var(--space-6); }
+.who { display: flex; min-width: 0; align-items: center; gap: var(--space-5); }
+.names { display: grid; min-width: 0; gap: var(--space-2); }
+.name { margin: 0; overflow-wrap: anywhere; font-family: var(--font-serif); font-size: clamp(var(--text-3xl), 5vw, 2.75rem); font-weight: 400; letter-spacing: -.01em; line-height: 1; }
+.badges { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.since { color: var(--text-secondary); font-size: var(--text-xs); }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-4) var(--space-6); padding-top: var(--space-5); border-top: 1px dashed color-mix(in oklab, var(--border) 85%, transparent); }
+.foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.backHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.backTitle { margin: 0; font-family: var(--font-serif); font-size: var(--text-3xl); font-weight: 400; line-height: 1; }
+.details { display: grid; margin: 0; }
+.details > div { display: grid; grid-template-columns: minmax(7rem, 1fr) minmax(0, 2.4fr); gap: var(--space-4); padding: var(--space-3) 0; border-top: 1px solid color-mix(in oklab, var(--border) 70%, transparent); font-size: var(--text-sm); }
+.details > div:first-child { border-top: 0; }
+.details dt { color: var(--text-secondary); }
+.details dd { display: grid; min-width: 0; gap: var(--space-2); margin: 0; overflow-wrap: anywhere; }
+.contact { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.muted { color: var(--text-muted); }
+@media (max-width: 520px) {
+  .who { flex-direction: column; align-items: flex-start; }
+  .details > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+}

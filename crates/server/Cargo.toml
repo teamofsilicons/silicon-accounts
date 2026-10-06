@@ -1,0 +1,58 @@
+[package]
+name = "silicon-accounts-server"
+description = "Silicon Accounts service binaries: accounts-api, accounts-migrate, accounts-seed"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "accounts_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "accounts-api"
+path = "src/bin/accounts_api.rs"
+
+[[bin]]
+name = "accounts-migrate"
+path = "src/bin/accounts_migrate.rs"
+
+[[bin]]
+name = "accounts-seed"
+path = "src/bin/accounts_seed.rs"
+
+[dependencies]
+silicon-accounts-core.workspace = true
+silicon-accounts-auth.workspace = true
+silicon-accounts-oauth.workspace = true
+silicon-accounts-account.workspace = true
+silicon-accounts-silicons.workspace = true
+silicon-accounts-apps.workspace = true
+silicon-accounts-proofs.workspace = true
+silicon-accounts-worker.workspace = true
+axum.workspace = true
+bytes.workspace = true
+dotenvy.workspace = true
+futures.workspace = true
+http-body-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+time.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+url.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+silicon-accounts-core = { workspace = true, features = ["test-support"] }
+tempfile.workspace = true
+tokio.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true

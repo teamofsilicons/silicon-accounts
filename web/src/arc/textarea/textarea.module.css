@@ -1,0 +1,10 @@
+.field { display: grid; min-width: 0; }
+.label { margin-bottom: var(--space-2); font-size: var(--text-sm); font-weight: 500; }
+.control { --sq-r: var(--radius-control); --sq-fill: var(--surface); --sq-stroke: var(--border-strong); width: 100%; min-height: 110px; resize: vertical; border: 1px solid var(--sq-stroke); background: var(--sq-fill); padding: var(--space-3); color: var(--foreground); font: inherit; font-size: var(--text-sm); line-height: var(--leading-body); outline: none; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+.control::placeholder { color: var(--text-muted); }
+@media (hover: hover) and (pointer: fine) { .control:hover:not(:disabled, [aria-invalid="true"]) { --sq-stroke: var(--foreground); } }
+.control:focus-visible, .control:focus { --sq-stroke: var(--foreground); }
+.control[aria-invalid="true"] { --sq-stroke: var(--danger); }
+.control:disabled { cursor: not-allowed; --sq-fill: var(--surface-muted); opacity: .6; }
+.mono { font-family: var(--font-mono); letter-spacing: 0; }
+@media (prefers-reduced-motion: reduce) { .control { transition: none; } }

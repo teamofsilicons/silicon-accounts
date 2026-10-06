@@ -1,0 +1,4 @@
+.check path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw var(--duration-standard) var(--ease-enter) 50ms forwards; }
+.slow path { animation-duration: 500ms; animation-timing-function: var(--ease-standard); }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .check path { animation: none; stroke-dashoffset: 0; } }

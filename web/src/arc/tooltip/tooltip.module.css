@@ -1,0 +1,13 @@
+.tooltip { --tooltip-y: 3px; --sq-r: var(--radius-control); --sq-fill: var(--foreground); --sq-stroke: color-mix(in oklab, var(--background) 14%, var(--foreground)); z-index: 90; max-width: 15rem; padding: var(--space-2) var(--space-3); border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--background); box-shadow: var(--shadow-raised); font-size: var(--text-xs); font-weight: 400; line-height: var(--leading-body); transform-origin: var(--kb-tooltip-content-transform-origin); transition: opacity var(--duration-fast) var(--ease-enter), transform var(--duration-fast) var(--ease-enter); }
+.tooltip[data-side="bottom"] { --tooltip-y: -3px; }
+@starting-style {
+  .tooltip[data-expanded] { opacity: 0; transform: translateY(var(--tooltip-y)) scale(.97); }
+  .tooltip[data-instant][data-expanded] { transform: none; }
+}
+.tooltip[data-instant][data-expanded] { transition: opacity var(--duration-instant) var(--ease-standard), transform var(--duration-instant) var(--ease-standard); }
+/* Kobalte unmounts when the exit animation ends, so a no-op keyframe times the exit while the transition does the visual work. */
+.tooltip[data-closed] { opacity: 0; transform: scale(.98); transition: opacity var(--duration-instant) var(--ease-standard), transform var(--duration-instant) var(--ease-standard); animation: tooltip-exit var(--duration-instant) linear both; }
+.text { position: relative; display: block; }
+.line { display: block; }
+@keyframes tooltip-exit { to { --tooltip-exit: 1; } }
+@media (prefers-reduced-motion: reduce) { .tooltip, .tooltip[data-closed], .tooltip[data-instant][data-expanded] { transform: none; transition: opacity var(--duration-instant) var(--ease-standard); } }

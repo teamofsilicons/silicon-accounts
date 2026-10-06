@@ -1,0 +1,22 @@
+/* The button hugs its label; the fill is a second, inverted copy of the face revealed by clip-path, so the text flips
+   colour exactly at the edge. */
+.button { --hold-ink: var(--foreground); --hold-fill: var(--accent); --hold-on-fill: var(--accent-foreground); --hold-border: var(--border-strong); --sq-r: var(--radius-control); --sq-fill: var(--surface); --sq-stroke: var(--hold-border); position: relative; display: inline-flex; min-height: var(--control-height-md); align-items: center; justify-content: center; padding: 0 var(--space-5); border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--hold-ink); font: inherit; font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), opacity var(--duration-fast) var(--ease-standard); }
+.button[data-tone="danger"] { --hold-ink: var(--danger); --hold-fill: var(--danger); --hold-on-fill: var(--background); --hold-border: color-mix(in oklab, var(--danger) 32%, var(--border)); }
+.button[data-tone="neutral"] { --hold-ink: var(--foreground); --hold-fill: var(--foreground); --hold-on-fill: var(--background); --hold-border: var(--border-strong); }
+.button[data-tone="accent"] { --hold-fill: var(--primary); --hold-on-fill: var(--primary-foreground); }
+@media (hover: hover) and (pointer: fine) { .button:not(:disabled):not([aria-disabled="true"]):hover { --sq-fill: color-mix(in oklab, var(--hold-fill) 6%, var(--surface)); } }
+.button:focus-visible { --sq-fill: color-mix(in oklab, var(--hold-fill) 8%, var(--surface)); }
+.button[aria-disabled="true"] { cursor: default; }
+.button:disabled { cursor: not-allowed; opacity: .5; }
+.face { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+/* Covers the border too, and keeps its own corners; the clip only ever cuts a straight leading edge. */
+.fill { position: absolute; inset: -1px; z-index: 1; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-control); background: var(--hold-fill); color: var(--hold-on-fill); pointer-events: none; }
+@supports (corner-shape: squircle) { .fill { corner-shape: squircle; border-radius: calc(var(--radius-control) * var(--sq-k)); } }
+.iconSlot { position: relative; display: grid; width: 18px; height: 18px; flex: none; place-items: center; }
+.iconPhase { display: grid; grid-area: 1 / 1; place-items: center; }
+.iconPhase svg { width: 18px; height: 18px; }
+/* Clips the outgoing label while the frame narrows, with room for the rise and the soft blur. */
+.labelFrame { position: relative; display: inline-flex; min-width: 0; clip-path: inset(-.6em -3px); }
+.label { display: block; white-space: nowrap; }
+.measure { position: absolute; top: 0; left: 0; visibility: hidden; white-space: nowrap; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .button { transition: none; } }

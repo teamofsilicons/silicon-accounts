@@ -1,0 +1,75 @@
+/* The account site's frame: a quiet top row, the page, and the dock. */
+.shell { position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; }
+
+.top {
+  display: flex;
+  width: 100%;
+  max-width: var(--page-max);
+  height: 68px;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-inline: auto;
+  padding: 0 var(--gutter);
+}
+.brand { display: inline-flex; min-width: 0; align-items: center; gap: 10px; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; letter-spacing: -.01em; text-decoration: none; }
+.brand:hover { color: var(--foreground); }
+.brandMark { --sq-r: 9px; display: grid; width: 28px; height: 28px; flex: none; place-items: center; background: var(--primary); color: var(--primary-foreground); }
+.brandMark svg { width: 18px; height: 18px; }
+.brandText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brandMuted { color: var(--text-secondary); font-weight: 400; }
+
+.search {
+  --sq-r: var(--radius-pill);
+  --sq-fill: transparent;
+  --sq-stroke: var(--border);
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+@media (hover: hover) and (pointer: fine) { .search:hover { --sq-fill: var(--surface); --sq-stroke: var(--border-strong); color: var(--foreground); } }
+.search:focus-visible { --sq-fill: var(--surface); --sq-stroke: var(--border-strong); color: var(--foreground); }
+.search kbd { display: inline-flex; height: 24px; min-width: 38px; align-items: center; justify-content: center; padding: 0 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); color: var(--text-muted); font-family: var(--font-body); font-size: var(--text-xs); }
+@supports (corner-shape: squircle) { .search kbd { corner-shape: squircle; border-radius: 12px; } }
+@media (max-width: 639px) { .search { display: none; } }
+
+.main { position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; outline: none; }
+.main > * { min-width: 0; }
+
+/* Loading and failure states of the shell itself. */
+.loading { display: grid; width: 100%; max-width: var(--page-max); gap: var(--space-8); margin-inline: auto; padding: var(--space-6) var(--gutter) var(--dock-clearance); }
+.loadingHeader { display: grid; gap: var(--space-3); }
+.problem { width: 100%; max-width: calc(var(--page-narrow) + 2 * var(--gutter)); margin: var(--space-12) auto; padding: 0 var(--gutter); }
+
+/* Command palette layer. */
+.paletteOverlay { position: fixed; inset: 0; z-index: 70; background: var(--overlay); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.paletteOverlay[data-expanded] { animation: palette-fade-in var(--duration-standard) var(--ease-enter) both; }
+.paletteOverlay[data-closed] { animation: palette-fade-out var(--duration-fast) var(--ease-standard) both; }
+.palettePositioner { position: fixed; inset: 0; z-index: 71; display: flex; justify-content: center; padding: min(14vh, 120px) var(--space-4) var(--space-4); pointer-events: none; }
+.palettePanel { width: min(100%, 640px); height: fit-content; outline: none; pointer-events: auto; transform-origin: top center; }
+.palettePanel[data-expanded] { animation: palette-in var(--duration-spring) var(--ease-spring) both; }
+.palettePanel[data-closed] { animation: palette-out var(--duration-fast) var(--ease-standard) both; }
+@keyframes palette-fade-in { from { opacity: 0; } }
+@keyframes palette-fade-out { to { opacity: 0; } }
+@keyframes palette-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
+@keyframes palette-out { to { opacity: 0; transform: translateY(-4px) scale(.985); } }
+
+/* A hosted (non-shell) page fills the viewport. */
+.bare { min-height: 100vh; min-height: 100dvh; }
+
+@media (prefers-reduced-motion: reduce) {
+  .search { transition: none; }
+  .paletteOverlay[data-expanded], .palettePanel[data-expanded] { animation: palette-fade-in var(--duration-instant) linear both; }
+  .paletteOverlay[data-closed], .palettePanel[data-closed] { animation: palette-fade-out var(--duration-instant) linear both; }
+}

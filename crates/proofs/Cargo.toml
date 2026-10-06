@@ -1,0 +1,32 @@
+[package]
+name = "silicon-accounts-proofs"
+description = "Silicon Accounts service: OBO and ATA proofs (issue, refresh, verify, revoke, listings)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "accounts_proofs"
+path = "src/lib.rs"
+
+[dependencies]
+silicon-accounts-core.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+time.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+silicon-accounts-core = { workspace = true, features = ["test-support"] }
+# Contract test: every response must parse with the published Rust package's types.
+silicon-accounts-client.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

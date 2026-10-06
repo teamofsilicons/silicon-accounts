@@ -1,0 +1,31 @@
+[package]
+name = "silicon-accounts-oauth"
+description = "Silicon Accounts service: the OAuth 2.0 / OpenID Connect endpoints (token, revoke, introspect, userinfo, discovery, JWKS, device authorization)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "accounts_oauth"
+path = "src/lib.rs"
+
+[dependencies]
+silicon-accounts-core.workspace = true
+axum.workspace = true
+jsonwebtoken.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+time.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+silicon-accounts-core = { workspace = true, features = ["test-support"] }
+tokio.workspace = true
+
+[lints]
+workspace = true

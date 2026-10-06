@@ -1,0 +1,39 @@
+[package]
+name = "silicon-accounts-apps"
+description = "Silicon Accounts service: apps (public config, sign-in setup, user base, imports, app webhooks, Silicon Apps sync)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "accounts_apps"
+path = "src/lib.rs"
+
+[dependencies]
+silicon-accounts-core.workspace = true
+axum.workspace = true
+csv.workspace = true
+hex.workspace = true
+http-body-util.workspace = true
+p256.workspace = true
+phonenumber.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+silicon-accounts-core = { workspace = true, features = ["test-support"] }
+tokio.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true
