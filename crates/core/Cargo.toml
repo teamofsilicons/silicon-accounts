@@ -1,0 +1,67 @@
+[package]
+name = "silicon-accounts-core"
+description = "Shared foundation of the Silicon Accounts service: config, database, ids, crypto, tokens, repositories, events, delivery and HTTP extractors"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "accounts_core"
+path = "src/lib.rs"
+
+[features]
+# Exposes `accounts_core::test_support` (throwaway databases, test AppState, factories).
+# Feature crates enable it from their [dev-dependencies].
+test-support = ["dep:tower"]
+
+[dependencies]
+aes-gcm.workspace = true
+anyhow.workspace = true
+argon2.workspace = true
+async-trait.workspace = true
+axum.workspace = true
+base64.workspace = true
+bytes.workspace = true
+chrono-tz.workspace = true
+cookie.workspace = true
+dotenvy.workspace = true
+ed25519-dalek.workspace = true
+futures.workspace = true
+hex.workspace = true
+hmac.workspace = true
+http.workspace = true
+jsonwebtoken.workspace = true
+mime.workspace = true
+percent-encoding.workspace = true
+phonenumber.workspace = true
+rand.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+secrecy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+serde_urlencoded.workspace = true
+sha2.workspace = true
+space-station.workspace = true
+sqlx.workspace = true
+subtle.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tower = { workspace = true, optional = true }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url.workspace = true
+uuid.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+# Integration tests in tests/ use the test-support module of this same crate.
+silicon-accounts-core = { path = ".", features = ["test-support"] }
+tower.workspace = true
+
+[lints]
+workspace = true

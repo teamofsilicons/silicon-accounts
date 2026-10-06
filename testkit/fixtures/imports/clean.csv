@@ -1,0 +1,26 @@
+external_id,email,phone,display_name,username,dob,timezone
+clean-001,clean.ada@legacy-crm.test,+13035550101,Ada King,clean_ada,1985-12-10,Europe/London
+clean-002,clean.grace@legacy-crm.test,+13035550102,Grace Brewster,clean_grace,1976-12-09,America/New_York
+clean-003,clean.alan@legacy-crm.test,,Alan Mathers,clean_alan,1982-06-23,Europe/London
+clean-004,clean.katherine@legacy-crm.test,+13035550104,Katherine Goble,clean_katherine,1968-08-26,America/New_York
+clean-005,clean.dorothy@legacy-crm.test,,Dorothy Mann,clean_dorothy,1970-09-20,America/Chicago
+clean-006,,+13035550106,Linus Benedict,clean_linus,1989-12-28,Europe/Helsinki
+clean-007,clean.margaret@legacy-crm.test,+13035550107,Margaret Heafield,clean_margaret,1986-08-17,America/Los_Angeles
+clean-008,clean.edsger@legacy-crm.test,,Edsger Wybe,clean_edsger,1980-05-11,Europe/Amsterdam
+clean-009,clean.barbara@legacy-crm.test,+13035550109,Barbara Jane,clean_barbara,1979-11-07,America/Los_Angeles
+clean-010,clean.donald@legacy-crm.test,,Donald Ervin,clean_donald,1988-01-10,America/Los_Angeles
+clean-011,clean.radia@legacy-crm.test,+13035550111,Radia Joy,clean_radia,1991-12-18,America/New_York
+clean-012,clean.ken@legacy-crm.test,,Ken Lane,clean_ken,1983-02-04,America/Los_Angeles
+clean-013,clean.frances@legacy-crm.test,+13035550113,Frances Elizabeth,clean_frances,1972-08-04,America/New_York
+clean-014,clean.tim@legacy-crm.test,,Tim John,clean_tim,1975-06-08,Europe/London
+clean-015,clean.hedy@legacy-crm.test,+13035550115,Hedy Kiesler,clean_hedy,1974-11-09,Europe/Vienna
+clean-016,clean.claude@legacy-crm.test,,Claude Elwood,clean_claude,1976-04-30,America/New_York
+clean-017,clean.sophie@legacy-crm.test,+13035550117,Sophie Mary,clean_sophie,1987-06-28,Europe/London
+clean-018,clean.niklaus@legacy-crm.test,,Niklaus Emil,clean_niklaus,1984-02-15,Europe/Zurich
+clean-019,clean.joan@legacy-crm.test,+13035550119,Joan Elisabeth,clean_joan,1977-09-17,Europe/London
+clean-020,clean.dennis@legacy-crm.test,,Dennis MacAlistair,clean_dennis,1981-09-09,America/New_York
+clean-021,clean.anita@legacy-crm.test,+13035550121,Anita Borg,clean_anita,1979-01-17,America/Chicago
+clean-022,clean.priya@legacy-crm.test,+919876543210,Priya Raman,clean_priya,1993-03-21,Asia/Kolkata
+clean-023,clean.wei@legacy-crm.test,,Wei Zhang,clean_wei,1990-10-01,Asia/Shanghai
+clean-024,clean.olu@legacy-crm.test,+4915123456789,Olu Adeyemi,clean_olu,1992-05-05,Europe/Berlin
+clean-025,clean.aiko@legacy-crm.test,,Aiko Tanaka,clean_aiko,1995-07-07,Asia/Tokyo

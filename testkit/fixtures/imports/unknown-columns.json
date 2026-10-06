@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "external_id": "unknown-001",
+      "email": "unknown.one@legacy-crm.test",
+      "display_name": "Unknown One",
+      "favorite_color": "teal",
+      "plan": "pro",
+      "last_login_at": "2026-09-30T10:00:00Z"
+    },
+    {
+      "external_id": "unknown-002",
+      "email": "unknown.two@legacy-crm.test",
+      "display_name": "Unknown Two",
+      "favorite_color": "amber",
+      "plan": "free",
+      "last_login_at": "2026-09-29T08:30:00Z"
+    },
+    {
+      "external_id": "unknown-003",
+      "email": "unknown.three@legacy-crm.test",
+      "display_name": "Unknown Three",
+      "favorite_color": "violet",
+      "plan": "business",
+      "last_login_at": "2026-08-01T12:00:00Z"
+    },
+    {
+      "external_id": "unknown-004",
+      "email": "unknown.four@legacy-crm.test",
+      "display_name": "Unknown Four",
+      "favorite_color": "pink",
+      "plan": "pro",
+      "last_login_at": "2026-07-15T09:45:00Z"
+    },
+    {
+      "external_id": "unknown-005",
+      "email": "unknown.five@legacy-crm.test",
+      "display_name": "Unknown Five",
+      "favorite_color": "green",
+      "plan": "enterprise",
+      "last_login_at": "2026-06-01T00:00:00Z"
+    }
+  ]
+}

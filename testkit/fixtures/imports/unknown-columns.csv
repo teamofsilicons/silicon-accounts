@@ -1,0 +1,6 @@
+external_id,email,display_name,favorite_color,plan,last_login_at
+unknown-001,unknown.one@legacy-crm.test,Unknown One,teal,pro,2026-09-30T10:00:00Z
+unknown-002,unknown.two@legacy-crm.test,Unknown Two,amber,free,2026-09-29T08:30:00Z
+unknown-003,unknown.three@legacy-crm.test,Unknown Three,violet,business,2026-08-01T12:00:00Z
+unknown-004,unknown.four@legacy-crm.test,Unknown Four,pink,pro,2026-07-15T09:45:00Z
+unknown-005,unknown.five@legacy-crm.test,Unknown Five,green,enterprise,2026-06-01T00:00:00Z

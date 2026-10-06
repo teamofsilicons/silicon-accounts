@@ -1,0 +1,102 @@
+{
+  "rows": [
+    {
+      "external_id": "json-001",
+      "email": "Json.Mixed@Legacy-CRM.TEST",
+      "name": "Json Mixed",
+      "username": "json_mixed"
+    },
+    {
+      "external_id": "json-002",
+      "emails": [
+        "json.multi1@legacy-crm.test",
+        "json.multi2@legacy-crm.test"
+      ],
+      "display_name": "Json Multi",
+      "username": "json_multi"
+    },
+    {
+      "external_id": "json-003",
+      "emails": "json.semi1@legacy-crm.test;json.semi2@legacy-crm.test",
+      "display_name": "Json Semi",
+      "username": "json_semi"
+    },
+    {
+      "external_id": "json-004",
+      "phones": [
+        "(415) 555-0144",
+        "+14155550145"
+      ],
+      "display_name": "Json Phones",
+      "username": "json_phones"
+    },
+    {
+      "external_id": "json-005",
+      "email": "  json.spaces@legacy-crm.test  ",
+      "display_name": "  Json Spaces  ",
+      "username": " json_spaces ",
+      "timezone": " Asia/Tokyo "
+    },
+    {
+      "external_id": "json-006",
+      "email": null,
+      "phone": null,
+      "display_name": "Json Nulls"
+    },
+    {
+      "external_id": "json-007",
+      "email": "json.verified@legacy-crm.test",
+      "email_verified": true,
+      "display_name": "Json Verified",
+      "username": "json_verified"
+    },
+    {
+      "external_id": "json-008",
+      "email": "json.unicode@legacy-crm.test",
+      "display_name": "Siobhán Ní Bhriain",
+      "username": "c:siobhan"
+    },
+    {
+      "external_id": "json-009",
+      "email": "json.mixed@legacy-crm.test",
+      "display_name": "Json Mixed Again"
+    },
+    {
+      "external_id": "json-010",
+      "email": "not an email",
+      "display_name": "Json Invalid"
+    },
+    {
+      "external_id": "json-011",
+      "email": "shubhastro2@example.test",
+      "display_name": "Shubham In JSON"
+    },
+    {
+      "external_id": "json-012",
+      "email": "json.bad.fields@legacy-crm.test",
+      "display_name": "Json Bad Fields",
+      "username": "json_bad_fields",
+      "timezone": "Moon/Tranquility",
+      "dob": "1990-13-45"
+    },
+    {
+      "external_id": "json-013",
+      "email": "json.pfp@legacy-crm.test",
+      "display_name": "Json Pfp",
+      "username": "json_pfp",
+      "pfp_url": "https://images.legacy-crm.test/avatars/13.png"
+    },
+    {},
+    {
+      "external_id": "json-015",
+      "email": "json.taken@legacy-crm.test",
+      "display_name": "Json Taken",
+      "username": "saket"
+    },
+    {
+      "external_id": "json-016",
+      "email": "json.dup.external@legacy-crm.test",
+      "display_name": "Json Dup External"
+    }
+  ]
+}

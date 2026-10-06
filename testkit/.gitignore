@@ -1,0 +1,4 @@
+node_modules/
+.state/
+# 100k-row perf fixture; regenerate with `pnpm -C testkit gen:big`
+fixtures/imports/big.csv

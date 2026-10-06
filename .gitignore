@@ -1,0 +1,13 @@
+/target/
+/.dev/
+node_modules/
+dist/
+dist-server/
+.env
+*.log
+.DS_Store
+/e2e/.artifacts/
+/web/.screens/
+/testkit/.state/
+playwright-report/
+test-results/

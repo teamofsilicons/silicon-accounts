@@ -1,0 +1,39 @@
+[package]
+name = "silicon-accounts-client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Stateless Rust client for Silicon Accounts: sign Carbons and Silicons in, exchange tokens, verify proofs and webhooks."
+repository.workspace = true
+readme = "README.md"
+keywords = ["auth", "oauth", "oidc", "silicon", "accounts"]
+categories = ["authentication", "api-bindings"]
+
+[lib]
+name = "silicon_accounts_client"
+path = "src/lib.rs"
+
+[dependencies]
+base64.workspace = true
+bytes.workspace = true
+hex.workspace = true
+hmac.workspace = true
+jsonwebtoken.workspace = true
+rand.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+url.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+ed25519-dalek.workspace = true
+
+[lints]
+workspace = true
