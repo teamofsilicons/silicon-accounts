@@ -1,0 +1,48 @@
+/* An app's developer page: back link, the app's identity, the tab frame, and full-page problems. */
+
+.header { display: grid; min-width: 0; gap: var(--space-4); }
+.back { display: inline-flex; width: fit-content; align-items: center; gap: var(--space-1); color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; transition: color var(--duration-fast) var(--ease-standard); }
+.back:hover, .back:focus-visible { color: var(--foreground); }
+.identity { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-4) var(--space-5); }
+.identityText { display: grid; min-width: 0; gap: var(--space-2); }
+.title { margin: 0; overflow-wrap: anywhere; color: var(--foreground); font-family: var(--font-serif); font-size: clamp(var(--text-3xl), 4.8vw, var(--text-4xl)); font-weight: 400; letter-spacing: -.012em; line-height: 1.02; text-wrap: balance; }
+.facts { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); color: var(--text-secondary); font-size: var(--text-sm); }
+.appId { display: inline-flex; min-width: 0; align-items: center; gap: var(--space-1); color: var(--foreground); font-family: var(--font-mono); letter-spacing: 0; }
+.factDivider { width: 3px; height: 3px; flex: none; border-radius: 50%; background: var(--text-muted); }
+.headerActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+@media (max-width: 560px) { .factDivider { display: none; } }
+@media (max-width: 720px) {
+  .identity { grid-template-columns: auto minmax(0, 1fr); }
+  .headerActions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/* The tab frame: the tab list, then the active tab's page. */
+.tabFrame { min-width: 0; scroll-margin-top: var(--space-4); }
+.tabs { display: grid; min-width: 0; gap: var(--space-8); }
+.tabLabel { display: inline-flex; align-items: center; gap: 6px; }
+.tabDot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--accent); }
+.panel { display: grid; min-width: 0; }
+.panel > * { min-width: 0; }
+
+/* Full-page problems (unknown app, not the owner). */
+.problem { display: grid; gap: var(--space-4); }
+.alertActions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+
+.loadingHeader { display: grid; gap: var(--space-4); }
+.loadingIdentity { display: flex; align-items: center; gap: var(--space-5); }
+.loadingLines { display: grid; flex: 1; gap: 10px; }
+
+/* The leave dialog. */
+.leaveBody { display: grid; gap: var(--space-4); }
+.leaveBody p { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+/* Wide enough for the three choices on one row: discarding sits apart on the left, staying and leaving on the right. */
+.leaveDialog.leaveDialog { width: min(calc(100vw - var(--space-8)), 520px); }
+.leaveActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.leaveDiscard { margin-inline-end: auto; }
+@media (max-width: 520px) {
+  .leaveActions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .leaveActions > * { width: 100%; }
+  .leaveDiscard { order: 3; margin-inline-end: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) { .back { transition: none; } }

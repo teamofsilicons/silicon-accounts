@@ -1,0 +1,22 @@
+/* The create-a-Silicon form in its drawer: fields, then the actions held at the bottom of the drawer while it scrolls. */
+/* The panel clips rather than hides its overflow, so focus and scrollIntoView can only ever scroll the body. */
+.panel.panel { overflow: clip; }
+.form { --drawer-pad: var(--space-6); display: grid; min-width: 0; gap: var(--space-6); }
+.field { display: grid; min-width: 0; gap: var(--space-2); }
+.error { margin: 0; color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
+.stk { display: grid; min-width: 0; gap: var(--space-3); }
+.mono.mono { font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0; }
+.footer {
+  position: sticky;
+  bottom: calc(-1 * var(--drawer-pad));
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin: 0 calc(-1 * var(--drawer-pad)) calc(-1 * var(--drawer-pad));
+  padding: var(--space-4) var(--drawer-pad) var(--drawer-pad);
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+@media (max-width: 40rem) { .form { --drawer-pad: var(--space-5); } }

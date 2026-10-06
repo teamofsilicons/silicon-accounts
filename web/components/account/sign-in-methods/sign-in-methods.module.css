@@ -1,0 +1,94 @@
+/* Sign-in methods: one bordered group per kind (emails, phone numbers, Google and Apple), rows divided by hairlines,
+   and the add form folded into the end of the group. */
+.alertAction { display: block; margin-top: var(--space-3); }
+.group {
+  --sq-r: var(--radius-panel);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  position: relative;
+  display: grid;
+  min-width: 0;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+}
+.group [role="list"] > [role="listitem"] + [role="listitem"] { border-top: 1px solid var(--border-subtle); }
+/* Grid items size to their content by default; a long confirm question must not widen the group. */
+.group > * { min-width: 0; }
+.count { display: inline-flex; align-items: baseline; gap: .3em; color: var(--text-secondary); font-size: var(--text-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The rolling count sits in the line at the line's size. */
+.count > span:first-child { color: var(--foreground); font-family: inherit; font-size: inherit; font-weight: 500; letter-spacing: 0; line-height: inherit; }
+
+/* Actions sit on the right and wrap under the text when they need more room (a confirm question), instead of
+   squeezing the address. */
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); min-height: 72px; padding: var(--space-4) var(--space-5); }
+.row > :first-child { flex: 1 1 260px; }
+.rowLead { display: flex; min-width: 0; align-items: flex-start; gap: var(--space-3); }
+.rowMain { display: grid; min-width: 0; gap: 3px; }
+.rowTitle { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.value { min-width: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; overflow-wrap: anywhere; }
+.valueSecondary { min-width: 0; color: var(--text-secondary); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.rowMeta { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.rowError { margin: 0; color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.rowActions { display: flex; min-width: 0; max-width: 100%; flex: 0 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); margin-inline-start: auto; }
+/* A confirm question longer than the row (a long address) shortens its words instead of widening the page. */
+.rowActions > * { max-width: 100%; }
+.emptyRow { margin: 0; padding: var(--space-5); color: var(--text-secondary); font-size: var(--text-sm); }
+.limit { margin: 0; padding: var(--space-3); color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+
+.providerMark { display: inline-grid; width: 20px; height: 20px; flex: none; place-items: center; color: var(--foreground); }
+.rowLead .providerMark { margin-top: 1px; }
+
+/* The add form at the end of a group. */
+.adderRow { padding: var(--space-2); border-top: 1px solid var(--border-subtle); }
+.group > .adderRow:first-child, .emptyRow + .adderRow { border-top: 0; }
+.adderFrame { min-width: 0; }
+.addButton {
+  --sq-r: calc(var(--radius-panel) - var(--space-2));
+  --sq-fill: transparent;
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: var(--control-height-md);
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 0;
+  background: var(--sq-fill);
+  color: var(--accent-ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.addButton:hover, .addButton:focus-visible { --sq-fill: var(--accent-subtle); outline: none; }
+.adder { display: grid; min-width: 0; gap: var(--space-4); padding: var(--space-3); }
+.adderActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.sentTo { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.sentTo strong { color: var(--foreground); font-weight: 500; }
+.codeActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.codeRight { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.resendNote { color: var(--text-secondary); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.linkButton { padding: 0; border: 0; background: none; color: var(--accent-ink); font-size: var(--text-sm); text-decoration: underline; text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); text-underline-offset: .2em; cursor: pointer; }
+.linkButton:hover, .linkButton:focus-visible { color: var(--accent-strong); text-decoration-color: currentColor; outline: none; }
+
+/* Connecting Google or Apple. */
+.connect { display: grid; gap: var(--space-3); padding: var(--space-4) var(--space-5) var(--space-5); border-top: 1px solid var(--border-subtle); }
+.emptyRow + .connect { border-top: 0; padding-top: 0; }
+.connectText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.connectButtons { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.connectButtons .providerMark { width: 18px; height: 18px; }
+.connectButtons .providerMark svg { width: 18px; height: 18px; }
+
+.skeleton { display: grid; gap: var(--space-10); }
+.skeletonSection { display: grid; gap: var(--space-4); }
+
+@media (max-width: 560px) {
+  .row { align-items: flex-start; padding: var(--space-4); }
+  .row > :first-child { flex-basis: 100%; }
+  .rowActions { justify-content: flex-start; margin-inline-start: 0; }
+  .codeActions { align-items: flex-start; flex-direction: column; }
+  .connect { padding: var(--space-4); }
+}
+
+@media (prefers-reduced-motion: reduce) { .addButton { transition: none; } }

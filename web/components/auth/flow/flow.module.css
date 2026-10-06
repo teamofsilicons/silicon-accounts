@@ -1,0 +1,419 @@
+/*
+ * The hosted sign-in pages. Only semantic tokens: inside BrandingScope they are the app's colours, radii, fonts and
+ * density (lib/branding/apply.ts), so every step follows the app's branding without knowing it. Rounded surfaces are
+ * squircles (data-sq + --sq-r / --sq-fill / --sq-stroke).
+ */
+
+/* ------------------------------------------------------------------------------------------------ page frame */
+.hosted {
+  container: hosted / inline-size;
+  position: relative;
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
+}
+.scope { flex: 1; }
+/* The step fades in once the branding's fonts are ready, so headings never jump from a fallback face. */
+.panel > * { transition: opacity var(--duration-standard) var(--ease-standard); }
+.panel[data-fonts="loading"] > * { opacity: 0; }
+.asideCopy { display: grid; gap: var(--space-3); }
+
+/*
+ * "Powered by Silicon Accounts" pins to the bottom of the page (foundation PoweredBy, outside the branded subtree).
+ * In the split layout it belongs to the form's column, never straddling the line between the app's side and the form.
+ */
+@container hosted (min-width: 860px) {
+  .hosted[data-layout="split"] .powered { left: 50% !important; width: 50% !important; }
+}
+/* Its link shows keyboard focus as the embed's pill does (the foundation pill underlines only on hover). */
+.powered a:focus-visible { text-decoration: underline !important; text-underline-offset: .2em; }
+/*
+ * An open list or calendar (the timezone, the date of birth, the phone number's countries) can reach the bottom of the
+ * page, where it would run under the pill: while one is open the card stacks above it, and the pill is back as soon
+ * as the list closes.
+ */
+.hosted:has(.scope [aria-expanded="true"]) .scope { z-index: 6; }
+
+/* ------------------------------------------------------------------------------------------------ the morph */
+.morph { min-width: 0; }
+.track { position: relative; }
+.step { display: grid; min-width: 0; gap: var(--brand-gap, var(--space-4)); }
+
+/* ------------------------------------------------------------------------------------------------ headings */
+.heading { display: grid; gap: var(--space-2); }
+.title {
+  margin: 0;
+  color: var(--foreground);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 400;
+  letter-spacing: var(--tracking-display);
+  line-height: 1.15;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  outline: none;
+}
+.description { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); text-wrap: pretty; overflow-wrap: anywhere; }
+:global(.sa-brand[data-density="compact"]) .title { font-size: var(--text-xl); }
+/*
+ * The split layout already shows the app's title beside the form: there the h1 is for screen readers only, and a
+ * short visible "Sign in" heads the form instead.
+ */
+.splitLabel { display: none; }
+@container sa-brand (min-width: 860px) {
+  :global(.sa-brand[data-layout="split"]) .appTitle .title,
+  :global(.sa-brand[data-layout="split"]) .appTitle .description {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  :global(.sa-brand[data-layout="split"]) .splitLabel {
+    display: block;
+    margin: 0;
+    color: var(--foreground);
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 400;
+    letter-spacing: var(--tracking-display);
+    line-height: 1.2;
+  }
+}
+/* Phones: the card keeps a little more room for its content. */
+@container sa-brand (max-width: 480px) {
+  .hosted .panel { padding: var(--space-6) var(--space-5); }
+}
+/* The narrowest phones (320 px): six code cells need every pixel the card can spare. */
+@container sa-brand (max-width: 352px) {
+  .hosted .panel { padding: var(--space-5) var(--space-4); }
+}
+
+.muted { color: var(--text-secondary); }
+.mono { font-family: var(--font-mono); letter-spacing: 0; }
+.wide { width: 100%; }
+.stack { display: grid; min-width: 0; gap: var(--brand-gap, var(--space-4)); }
+/* A chosen timezone longer than a narrow field ("Kolkata, Asia · UTC+05:30" at 320 px) ends in an ellipsis. */
+.stack input[role="combobox"]:not(:focus) { text-overflow: ellipsis; }
+/* ComboboxField's wrapper around Arc's Combobox: no box of its own in the layout. */
+.comboboxField { display: grid; min-width: 0; }
+
+/* An Arc field whose label is visually hidden (the segmented control above already says what it is). */
+.quietLabel { display: grid; min-width: 0; }
+.quietLabel > div > label:first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* A line under a field (FieldNote). The row's space is padding inside the clipped slot, so it opens from zero. */
+.noteSlot { display: block; overflow: hidden; }
+.note { display: block; padding-top: var(--space-2); color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.note[data-tone="error"] { color: var(--danger); }
+.note[data-tone="status"] { color: var(--text-secondary); }
+
+/* An alert's one-click fix ("Sign in again"). */
+.alertAction { display: flex; margin-top: var(--space-3); }
+
+/* ------------------------------------------------------------------------------------------------ methods */
+.methods { display: grid; min-width: 0; gap: var(--brand-gap, var(--space-4)); }
+.providers { display: grid; gap: var(--space-2); }
+.providerLabel { display: inline-flex; align-items: center; gap: 10px; }
+.mark { display: block; flex: none; }
+.form { display: grid; min-width: 0; gap: var(--space-4); }
+:global(.sa-brand[data-density="compact"]) .form { gap: var(--space-3); }
+/* Email | Phone share the row equally (Arc's control sizes to its labels by default). */
+.segments { width: 100%; }
+.segments > div { flex: 1 1 auto; }
+.segments button { flex: 1 1 0; }
+/*
+ * Keyboard focus (Arc's segmented control shows none): the focused option's pill takes the text colour on its edge, as
+ * a focused field does. Only the chosen option is a Tab stop, so focus is on the pill.
+ */
+.segments button:focus-visible [data-sq] { --sq-stroke: var(--foreground); }
+.segments button:focus-visible:not([aria-pressed="true"]) { color: var(--foreground); }
+.continueAs { display: grid; gap: var(--space-3); }
+
+.divider { display: flex; align-items: center; gap: var(--space-3); color: var(--text-muted); font-size: var(--text-xs); line-height: 1; }
+.divider::before, .divider::after { flex: 1; height: 1px; background: var(--border); content: ""; }
+
+/* The phone field and its "Country not in the list?" switch. */
+.phoneField { display: grid; min-width: 0; gap: var(--space-2); }
+.fieldLink {
+  justify-self: start;
+  min-height: 28px;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), text-decoration-color var(--duration-fast) var(--ease-standard);
+}
+.fieldLink:is(:hover, :focus-visible) { outline: none; color: var(--foreground); text-decoration-color: currentColor; }
+
+/* A quiet text action ("Other ways to sign in", "Back to the code"). */
+.textButton {
+  justify-self: center;
+  min-height: var(--control-height-sm);
+  border: 0;
+  padding: 0 var(--space-2);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), text-decoration-color var(--duration-fast) var(--ease-standard);
+}
+.textButton:is(:hover, :focus-visible) { outline: none; color: var(--foreground); text-decoration-color: currentColor; }
+
+/* ------------------------------------------------------------------------------------------------ rows */
+.accountRow,
+.destination {
+  --sq-r: var(--radius-control);
+  --sq-fill: transparent;
+  --sq-stroke: var(--border);
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+}
+.accountRow { --sq-r: var(--radius-panel); flex-wrap: wrap; padding: var(--space-3); }
+.destination { min-height: calc(var(--control-height-md) + 4px); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); }
+.accountText { display: grid; min-width: 0; flex: 1; gap: 2px; }
+/*
+ * The name and id keep room to be read: when the row cannot give them 5rem (an 11 character id) beside the action (a
+ * 320 or 360 px phone with "Switch account"), the action moves under them, at the end, instead of cutting them to a few
+ * letters.
+ */
+.accountRow > .accountText { flex: 1 1 5rem; }
+.accountRow > .rowAction { margin-left: auto; }
+.accountName { overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.accountId { overflow: hidden; color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+.destinationIcon { display: grid; flex: none; place-items: center; color: var(--text-secondary); }
+.provenNote { color: var(--text-secondary); font-size: var(--text-xs); }
+.destinationText { min-width: 0; flex: 1; overflow: hidden; color: var(--foreground); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.rowAction { display: flex; flex: none; align-items: center; }
+
+/* ------------------------------------------------------------------------------------------------ code entry */
+.codeEntry { display: grid; min-width: 0; gap: var(--space-3); }
+/*
+ * The row of six cells may not be wider than the card: without a zero minimum, the grid that holds it grows to the
+ * cells' natural width (6 × 42 px + gaps) on the narrowest phones and the last cell sticks out. The cells shrink instead.
+ */
+.otp { grid-template-columns: minmax(0, 1fr); }
+.otp > [role="group"] { width: 100%; min-width: 0; }
+/* The six cells share the card's width (one row as wide as the button under it); Arc's focus ring follows them. */
+.otp > [role="group"] > div { width: auto; flex: 1 1 0; }
+.resendRow { display: flex; min-height: var(--control-height-sm); flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
+.resendNote { color: var(--text-secondary); font-size: var(--text-xs); }
+.resend {
+  position: relative;
+  display: inline-flex;
+  min-height: var(--control-height-sm);
+  align-items: center;
+  margin-left: calc(var(--space-2) * -1);
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-2);
+  background: none;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: var(--leading-body);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.resend[aria-disabled="true"] { color: var(--text-muted); font-weight: 400; cursor: default; }
+.resend:not([aria-disabled="true"]):focus-visible { outline: none; background: var(--surface-muted); }
+.resendLabel { display: inline-flex; align-items: baseline; gap: .3em; white-space: nowrap; }
+.time { display: inline-flex; font-variant-numeric: tabular-nums; }
+.timeColumn { position: relative; display: inline-flex; justify-content: center; }
+.timeColumn > span { display: inline-block; }
+@media (hover: hover) and (pointer: fine) {
+  .resend:not([aria-disabled="true"]):hover { background: var(--surface-muted); }
+}
+
+/* ------------------------------------------------------------------------------------------------ sign-up */
+.photoField { display: flex; min-width: 0; align-items: center; gap: var(--space-4); }
+.photoFrame { position: relative; display: grid; flex: none; }
+.photoBusy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--foreground);
+  pointer-events: none;
+}
+.photoBusy svg { filter: drop-shadow(0 1px 2px rgb(0 0 0 / .25)); }
+.photoText { display: grid; min-width: 0; flex: 1; gap: var(--space-2); }
+.fieldLabel { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+.photoActions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.buttonIcon { display: inline-flex; align-items: center; gap: 6px; }
+
+/* The c:id field: Arc's input look, with the c: prefix and a live status mark. */
+.idField { display: grid; min-width: 0; }
+.idField > label { margin-bottom: var(--space-2); }
+.idControl {
+  --sq-r: var(--radius-control);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border-strong);
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: var(--control-height-md);
+  align-items: center;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+@media (hover: hover) and (pointer: fine) { .idControl:hover:not([data-invalid]) { --sq-stroke: var(--foreground); } }
+.idControl:focus-within { --sq-stroke: var(--foreground); }
+.idControl[data-invalid] { --sq-stroke: var(--danger); }
+.idPrefix { flex: none; padding-left: var(--space-3); color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); letter-spacing: 0; user-select: none; }
+.idInput {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  min-height: calc(var(--control-height-md) - 2px);
+  border: 0;
+  padding: 0 var(--space-2) 0 1px;
+  background: transparent;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+  outline: none;
+}
+.idStatus { display: grid; width: 36px; flex: none; place-items: center; }
+.suggestions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding-top: var(--space-2); font-size: var(--text-xs); }
+.suggestion {
+  --sq-r: 10px;
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  position: relative;
+  min-height: 28px;
+  border: 1px solid var(--sq-stroke);
+  padding: 0 var(--space-2);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.suggestion:is(:hover, :focus-visible) { outline: none; --sq-fill: var(--surface-muted); --sq-stroke: var(--border-strong); }
+.ok { color: var(--success); }
+.bad { color: var(--danger); }
+.spin { animation: spin 900ms linear infinite; }
+.fieldError { display: block; padding-top: var(--space-2); color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
+
+/* ------------------------------------------------------------------------------------------------ requirements */
+.progressLine { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); }
+
+/* ------------------------------------------------------------------------------------------------ consent */
+.shareList {
+  --sq-r: var(--radius-panel);
+  --sq-fill: transparent;
+  --sq-stroke: var(--border);
+  position: relative;
+  display: grid;
+  margin: 0;
+  border: 1px solid var(--sq-stroke);
+  padding: 0;
+  overflow: clip;
+  background: var(--sq-fill);
+  list-style: none;
+}
+.shareRow {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 60px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+/* The rule between rows stays inside the list's padding (the row itself reaches the edges for its focus fill). */
+.shareRow + .shareRow::before { position: absolute; top: 0; right: var(--space-4); left: var(--space-4); border-top: 1px solid var(--border); content: ""; }
+/*
+ * Keyboard focus on a row's switch fills the row (Arc's switch shows no focus of its own): the list clips the fill to
+ * its curve, the way a menu highlights its focused item.
+ */
+.shareRow:has(:focus-visible) { background: var(--surface-muted); }
+.shareText { display: grid; min-width: 0; flex: 1; gap: 2px; }
+.shareLabel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+.shareValue { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.shareLock { display: inline-flex; flex: none; align-items: center; gap: 4px; color: var(--text-muted); font-size: var(--text-xs); }
+.actions { display: grid; gap: var(--space-2); }
+
+/* ------------------------------------------------------------------------------------------------ complete */
+.complete { display: grid; justify-items: start; gap: var(--space-5); }
+.complete > :last-child { justify-self: stretch; }
+.success { position: relative; width: 96px; height: 96px; margin-left: -4px; color: var(--success); }
+.successRing { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transform: rotate(-90deg); }
+.successPhoto { position: absolute; inset: 4px; display: grid; }
+.successPhoto > span { width: 100% !important; height: 100% !important; }
+.successBadge {
+  position: absolute;
+  right: 2px;
+  bottom: 4px;
+  z-index: 2;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 2px solid var(--surface);
+  border-radius: var(--radius-pill);
+  background: var(--success);
+  color: var(--surface);
+}
+
+/* ------------------------------------------------------------------------------------------------ footer + states */
+.footer { display: grid; gap: var(--space-1); }
+.footer a { color: inherit; transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+/* Keyboard focus: the link takes the text colour, a full underline and a soft fill (no rings on these pages). */
+.footer a:focus-visible { background: var(--surface-muted); color: var(--foreground); text-decoration-color: currentColor; box-shadow: 0 0 0 2px var(--surface-muted); }
+.skeleton { display: grid; gap: var(--space-4); }
+.problem { display: grid; gap: var(--brand-gap, var(--space-4)); }
+.details {
+  display: grid;
+  margin: 0;
+  gap: 2px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.details div { display: flex; flex-wrap: wrap; gap: 0 var(--space-2); }
+.details dt { color: var(--text-secondary); }
+.details dd { margin: 0; color: var(--foreground); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel > * { transition: none; }
+  .textButton, .suggestion, .fieldLink, .resend, .idControl, .shareRow, .footer a { transition: none; }
+  .spin { animation: none; }
+}

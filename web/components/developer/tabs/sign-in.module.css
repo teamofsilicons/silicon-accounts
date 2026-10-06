@@ -1,0 +1,83 @@
+/* Sign-in tab: a reading-width form with an "on this page" rail on wide screens. */
+.layout { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); gap: var(--space-12); align-items: start; }
+.layout[data-room] { padding-bottom: 88px; }
+@media (min-width: 1180px) { .layout { grid-template-columns: minmax(0, 760px) 200px; justify-content: space-between; } }
+
+.form { display: grid; min-width: 0; gap: var(--space-12); }
+.section { scroll-margin-top: var(--space-6); }
+.section h2:focus { outline: none; }
+.stack { display: grid; min-width: 0; gap: var(--space-6); }
+.grid2 { display: grid; min-width: 0; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: var(--space-4) var(--space-5); align-items: start; }
+.grid3 { display: grid; min-width: 0; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: var(--space-4); align-items: start; }
+.note { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.fieldError { margin: 0; color: var(--danger); font-size: var(--text-sm); line-height: var(--leading-body); }
+.historyButton { font-variant-numeric: tabular-nums; }
+@media (min-width: 1180px) { .historyButton { display: none; } }
+.mono { font-family: var(--font-mono); letter-spacing: 0; font-variant-ligatures: none; }
+
+/* Methods: one bordered list, rows divided by hairlines; the handle reorders. */
+.methods { display: grid; min-width: 0; gap: var(--space-2); }
+.methodList { --sq-r: var(--radius-panel); --sq-fill: var(--surface); --sq-stroke: var(--border); position: relative; display: grid; margin: 0; padding: 4px; list-style: none; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.methodRow {
+  --sq-r: calc(var(--radius-panel) - 4px);
+  --sq-fill: var(--surface);
+  --sq-stroke: transparent;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-1);
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  list-style: none;
+}
+.methodRow + .methodRow::before { content: ""; position: absolute; top: -1px; right: var(--space-4); left: 52px; height: 1px; background: var(--border-subtle); }
+.methodRow[data-dragging] { z-index: 2; --sq-stroke: var(--border-strong); box-shadow: var(--shadow-raised); }
+.methodRow[data-dragging]::before, .methodRow[data-dragging] + .methodRow::before { opacity: 0; }
+.handle { --sq-r: 10px; --sq-fill: transparent; --sq-stroke: transparent; position: relative; display: grid; width: 32px; height: 40px; place-items: center; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--text-muted); cursor: grab; touch-action: none; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
+.handle:hover, .handle:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
+.handle:active { cursor: grabbing; }
+.methodIcon { display: grid; width: 36px; height: 36px; place-items: center; color: var(--text-secondary); }
+.methodRow[data-on] .methodIcon { color: var(--foreground); }
+.methodRow:not([data-on]) .methodIcon { opacity: .7; }
+.methodText { display: grid; min-width: 0; gap: 2px; }
+.methodName { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.methodRow:not([data-on]) .methodName { color: var(--text-secondary); }
+.methodDescription { color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.methodWarning { color: var(--warning); font-size: var(--text-xs); line-height: var(--leading-body); }
+@media (max-width: 480px) {
+  .methodRow { gap: var(--space-2); padding-right: var(--space-3); }
+  .methodIcon { width: 24px; }
+}
+
+/* Providers. */
+.provider { display: grid; gap: var(--space-6); }
+.steps { display: grid; gap: var(--space-4); margin: 0; padding: 0 0 0 1.25em; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.steps li { padding-left: var(--space-1); }
+.steps li > span { display: block; margin-bottom: var(--space-2); }
+.steps li::marker { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Shared details. */
+.details { display: grid; gap: var(--space-6); }
+.detailGroup { display: grid; gap: var(--space-2); }
+.detailLabel { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.detailHint { margin-top: -6px; color: var(--text-secondary); font-size: var(--text-sm); }
+
+.texts { display: grid; gap: var(--space-5); }
+
+/* The rail. */
+.rail { position: sticky; top: var(--space-6); display: none; gap: var(--space-8); }
+@media (min-width: 1180px) { .rail { display: grid; } }
+.railNav { display: grid; gap: 2px; }
+.railTitle { margin-bottom: var(--space-2); color: var(--text-secondary); font-size: var(--text-xs); }
+.railLink { position: relative; display: block; padding: 6px 0 6px 14px; border-left: 1px solid var(--border); color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard); }
+.railLink:hover, .railLink:focus-visible { border-left-color: var(--foreground); color: var(--foreground); }
+.railLink[data-problem] { color: var(--danger); }
+.railLink[data-problem]::after { content: ""; position: absolute; top: 50%; right: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); translate: 0 -50%; }
+.railVersion { display: grid; gap: var(--space-2); justify-items: start; color: var(--text-secondary); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  .handle, .railLink { transition: none; }
+}

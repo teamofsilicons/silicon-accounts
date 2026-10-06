@@ -31,7 +31,7 @@
  * color-scheme), read again when the page changes its theme. Everything the SDK draws is opaque, the "Powered by
  * Silicon Accounts" pill included, so it reads on any page.
  */
-import { METHOD_LABEL, METHOD_MARK, POWERED_BY_HREF, POWERED_MARK, isButtonMethod, primaryMethod, visibleMethods, type ButtonMethod } from "../embed/methods";
+import { METHOD_LABEL, METHOD_MARK, POWERED_BY_HREF, POWERED_MARK, isButtonMethod, primaryMethod, visibleMethods, type ButtonMethod } from "./methods";
 
 type Theme = "light" | "dark" | "auto";
 type Prompt = "login" | "consent" | "select_account" | "none";

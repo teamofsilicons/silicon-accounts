@@ -1,0 +1,129 @@
+/*
+ * The embedded sign-in buttons. The page paints no background of its own (the root layout makes the embed surface's
+ * document transparent), so the buttons sit on the app's page; the branding variables on the root colour the buttons
+ * and text. Squircles come from styles/squircle.css and the squircle runtime (SVG-path fallback where needed).
+ */
+
+/* A little room so hover shadows and the press scale are never clipped by the frame. */
+.embed {
+  display: grid;
+  gap: 10px;
+  padding: 3px;
+  color: var(--foreground);
+  font-family: var(--font-body);
+  letter-spacing: var(--tracking-body);
+}
+.embed:global(.sa-brand) { display: grid; min-height: 0; background: transparent; transition: none; }
+.embed:global(.sa-brand)::before { content: none; }
+.embed[data-ready] { animation: embed-in var(--duration-standard) var(--ease-standard) both; }
+
+.buttons { display: grid; gap: calc(var(--brand-gap, 16px) * .625); }
+
+.button {
+  --sq-r: var(--radius-control);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  position: relative;
+  display: flex;
+  min-height: calc(var(--control-height-md) + 4px);
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard);
+}
+.button:hover { color: var(--foreground); }
+.button span { overflow: hidden; text-overflow: ellipsis; }
+.button[data-variant="primary"] { --sq-fill: var(--primary); --sq-stroke: var(--primary); color: var(--primary-foreground); }
+.button[data-variant="primary"]:hover { color: var(--primary-foreground); }
+
+/* Arc draws no focus rings: keyboard position shows with the same fills as hover. */
+.button[data-variant="secondary"]:is(:hover, :focus-visible) { --sq-fill: var(--surface-muted); --sq-stroke: var(--border-strong); box-shadow: var(--shadow-resting); }
+.button[data-variant="primary"]:is(:hover, :focus-visible) { --sq-fill: var(--primary-hover); --sq-stroke: var(--primary-hover); box-shadow: var(--shadow-resting); }
+.button[data-variant="primary"]:active { --sq-fill: var(--primary-pressed); --sq-stroke: var(--primary-pressed); }
+.button:active { transform: scale(.985); }
+
+.mark { display: grid; flex: none; place-items: center; }
+.mark svg { display: block; }
+
+/* Configuration problems, in the server's own words. */
+.problem {
+  --sq-r: var(--radius-panel);
+  --sq-fill: var(--surface);
+  --sq-stroke: color-mix(in oklab, var(--danger) 35%, var(--border));
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.problem strong { color: var(--danger); font-weight: 500; }
+.problem p { margin: 0; text-wrap: pretty; }
+.problem .hint { color: var(--text-secondary); }
+.problem code { justify-self: start; margin-top: 4px; color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
+
+/* Opened on its own: a configuration note, not an error (the buttons above still work here). */
+.note { --sq-stroke: color-mix(in oklab, var(--warning) 40%, var(--border)); }
+.note strong { color: var(--foreground); }
+
+/* Loading: one button-sized placeholder so the frame has a height before the config arrives. */
+.skeleton {
+  --sq-r: var(--radius-control);
+  height: calc(var(--control-height-md) + 4px);
+  background: linear-gradient(90deg, var(--surface-muted) 25%, color-mix(in oklab, var(--surface-muted) 40%, var(--surface)) 50%, var(--surface-muted) 75%) 0 0 / 200% 100%;
+  animation: embed-shimmer 1.4s linear infinite;
+}
+
+/* "Powered by Silicon Accounts": fixed colours per tone, never the app's branding, on an opaque pill of its own so it
+   reads on whatever the app's page puts behind the frame. */
+.powered {
+  display: flex !important;
+  justify-self: center !important;
+  min-height: 26px;
+  align-items: center !important;
+  gap: 6px;
+  margin: 0;
+  padding: 0 11px !important;
+  border: 1px solid #E8E3DA !important;
+  border-radius: 999px !important;
+  background: #FFFDF9 !important;
+  color: #5E5A55 !important;
+  font: 400 12px/1.4 var(--font-geist), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  clip-path: none !important;
+}
+@supports (corner-shape: squircle) { .powered { corner-shape: squircle; } }
+.powered a { color: #353432 !important; font-weight: 500; text-decoration: none; }
+.powered a:is(:hover, :focus-visible) { outline: none; text-decoration: underline; text-underline-offset: .2em; }
+.powered[data-tone="dark"] { border-color: #4A4845 !important; background: #2A2927 !important; color: #C9C4BC !important; }
+.powered[data-tone="dark"] a { color: #FFFDF9 !important; }
+
+@keyframes embed-in { from { opacity: 0; } }
+@keyframes embed-shimmer { to { background-position: -200% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .embed[data-ready], .skeleton { animation: none; }
+  .button { transition: none; }
+  .button:active { transform: none; }
+}

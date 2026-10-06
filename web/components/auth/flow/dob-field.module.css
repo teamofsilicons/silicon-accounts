@@ -1,0 +1,77 @@
+/*
+ * The date of birth field: Arc's date picker (its trigger and popover styles come from date-picker.module.css), with a
+ * header of our own whose month title opens a grid of years. The calendar's own header is hidden (ours replaces it).
+ */
+.field { min-width: 0; }
+.value { min-width: 0; flex: 1; overflow: hidden; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.popover { display: grid; }
+
+.header { display: flex; min-height: 34px; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.titleButton {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 0 8px;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: var(--leading-body);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.titleButton:focus-visible { outline: none; background: var(--surface-muted); }
+@media (hover: hover) and (pointer: fine) { .titleButton:hover { background: var(--surface-muted); } }
+.titleChevron { color: var(--text-muted); transition: transform var(--duration-spring) var(--ease-spring); }
+.titleChevron[data-open] { transform: rotate(180deg); }
+
+/* Arc's calendar without its header (ours above has the month, the year grid and the arrows). */
+.days > section > div:first-child { display: none; }
+
+.years {
+  display: grid;
+  max-height: 272px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 -4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 4px;
+  scrollbar-gutter: stable;
+}
+.year {
+  --sq-r: var(--radius-control);
+  --sq-fill: transparent;
+  --sq-stroke: transparent;
+  min-height: 40px;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.year:focus-visible { outline: none; --sq-fill: var(--surface-muted); --sq-stroke: var(--border-strong); }
+@media (hover: hover) and (pointer: fine) { .year:hover:not([aria-selected="true"]) { --sq-fill: var(--surface-muted); } }
+.year[aria-selected="true"] { --sq-fill: var(--primary); --sq-stroke: var(--primary); color: var(--primary-foreground); font-weight: 500; }
+
+@media (prefers-reduced-motion: reduce) {
+  .titleButton, .titleChevron, .year { transition: none; }
+}
+
+/* A missing or refused date: the trigger's edge says so, like Arc's invalid inputs. */
+.field button[data-invalid] { --sq-stroke: var(--danger); }
+/*
+ * Keyboard focus on the trigger: its edge takes the text colour, as Arc's inputs and the id field do (Arc's date picker
+ * trigger shows none). A refused date keeps its danger edge and gains the hover fill.
+ */
+.field button[aria-haspopup="dialog"]:focus-visible { --sq-stroke: var(--foreground); }
+.field button[aria-haspopup="dialog"][data-invalid]:focus-visible { --sq-stroke: var(--danger); --sq-fill: var(--surface-muted); }

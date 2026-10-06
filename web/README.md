@@ -1,262 +1,250 @@
-# Silicon Accounts web
+# Silicon Accounts: the account site
 
-Everything Silicon Accounts shows in a browser:
+The public site of Silicon Accounts (account.teamofsilicons.com): the account pages Carbons and Silicons use, the
+hosted sign-in pages apps send people to, the developer pages, the embeddable sign-in buttons and the SDK script.
 
-- the **account site**, where Carbons and Silicons manage their identity, sign-in methods, apps, Silicons,
-  proofs and activity (`/`, `/identity`, `/apps`, …);
-- the **hosted sign-in pages** apps send people to (`/sign-in`, `/authorize`, `/authorize/flow/:id`) and CLI
-  device approval (`/device`);
-- the **developer pages** for apps a Carbon owns (`/developer`, `/developer/:appId/:tab`);
-- the **embed page** apps put in an iframe (`/embed/v1/buttons`) and the **SDK** script (`/sdk/v1.js`).
+Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Arc UI installed with the shadcn
+CLI, TanStack Query for data. The product contract is `understanding/UNDERSTANDING.md`; nothing here overrides it.
 
-SolidJS, `@solidjs/router`, Kobalte and Motion, styled with Arc (uiarc.dev) ported to Solid and set in the Silicon
-Accounts brand. The product contract is `understanding/UNDERSTANDING.md`; the API this talks to is described in
-the build spec (02-api.md) and mirrored in `src/api/types.ts`.
-
-## Run it
-
-```sh
-pnpm -C web install
-pnpm -C web dev          # http://localhost:5190, proxies the API to http://127.0.0.1:8590
-pnpm -C web typecheck    # browser code (tsconfig.json) and Node code (tsconfig.node.json)
-pnpm -C web build        # writes web/dist (see "Serving" below)
-pnpm -C web screens      # screenshots into web/.screens for review
-pnpm -C web smoke        # interaction checks in a real browser
+```
+pnpm install
+pnpm dev            # http://localhost:8590 (builds the SDK first; PORT=… to change)
+pnpm typecheck      # next typegen + tsc --noEmit
+pnpm lint           # eslint, zero warnings
+pnpm build          # builds the SDK, then next build (output: standalone)
+pnpm start          # the production build on $PORT (8590)
+pnpm screens        # Playwright screenshots into .screens/ (see "Screens")
 ```
 
-Development needs the API server on port 8590 (`ACCOUNTS_API_URL` points the proxy elsewhere) started with
-`ACCOUNTS_EXTRA_ALLOWED_ORIGINS=http://localhost:5190`, so its CSRF origin check and the first-party sign-in
-redirect (`http://localhost:5190/`) accept the dev origin. The dev server proxies `/v1/`, `/.well-known/`,
-`/embed/v1/`, `/sdk/v1.js`, `/healthz` and `/readyz`; everything else is the app.
+Node 24 or newer. Read the bundled Next docs in `node_modules/next/dist/docs/` before relying on memory: this Next has
+breaking changes (`proxy.ts` instead of `middleware.ts`, async `params`/`searchParams`, `PageProps<"/route">` from
+`next typegen`, Turbopack by default).
 
-No API at hand? `pnpm screens` and `pnpm smoke` run against a mock API (below), and `/__kitchen` is the style
-guide with every component in both themes.
+## Topology
+
+Next serves the whole public origin and proxies the API, so the browser only ever talks to one origin (cookies, the
+API's Origin check):
+
+| Path | Served by |
+| --- | --- |
+| `/v1/*`, `/.well-known/*` | rewritten to `ACCOUNTS_API_URL` (default `http://127.0.0.1:8589`), unchanged: method, body, cookies, `Set-Cookie`, `Location` |
+| `/sdk/v1.js` | `public/sdk/v1.js`, built from `sdk/v1.ts` by `pnpm build:sdk` (runs before `dev` and `build`); `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=300` |
+| everything else | the pages below |
+
+The rewrite proxy accepts bodies up to 52 MB and waits up to 5 minutes (`experimental.proxyClientMaxBodySize`,
+`proxyTimeout` in `next.config.ts`): user imports send up to 50 MB, and Next's default 10 MB limit fails them with a
+500 after 30 s.
+
+**`ACCOUNTS_API_URL` is read at build time.** Next bakes rewrites into the build: `next dev` reads it at start,
+`next build` fixes it for `next start` and the standalone server. Build with the address production will use;
+`instrumentation.ts` warns at start when the runtime value differs.
+
+`proxy.ts` (Next 16's middleware) gives every page a per-request nonce and these headers: a nonce CSP
+(`script-src 'self' 'nonce-…' 'strict-dynamic'`, `frame-ancestors 'none'`, …), `X-Frame-Options: DENY`,
+`X-Content-Type-Options: nosniff`, a strict referrer policy. The root layout puts the nonce on the inline theme boot
+script; Next adds it to its own scripts. It skips `/v1`, `/.well-known`, `/_next` and static files.
+
+The embed page `/embed/v1/buttons` is the one page other sites may frame: `proxy.ts` reads the app's
+`GET /v1/apps/{app_id}/public` and answers `frame-ancestors 'self' <allowed_origins>` (none listed, unknown app or API
+unreachable: `'none'` plus `X-Frame-Options: DENY`). The page renders on a transparent document, reports its height to
+the parent (`{type: "silicon-accounts:resize", height}`) and its buttons navigate the top window to `/authorize`.
+
+## Local stack
+
+From the repository root, `scripts/dev.sh` runs everything: Postgres on 127.0.0.1:5444, migrations, the testkit apps
+(`testkit/fake-apps.json`), the mocks, accounts-api on 8589 and this site on http://localhost:8590.
+`scripts/dev.sh --web=external` leaves the site to you:
+
+```
+PORT=8590 ACCOUNTS_API_URL=http://127.0.0.1:8589 pnpm -C web dev
+```
+
+Rust binaries share one target directory: `CARGO_TARGET_DIR=target/integration scripts/dev.sh --no-build` reuses
+binaries that are already built there. Running a second stack on other ports: the API needs `ACCOUNTS_BIND_ADDR`,
+`ACCOUNTS_PUBLIC_URL` (this site's origin, for example `http://localhost:8690`) and `ACCOUNTS_EXTRA_ALLOWED_ORIGINS`;
+start this site with `PORT=8690 ACCOUNTS_API_URL=http://127.0.0.1:8689 pnpm dev`. Next allows one `next dev` per
+project directory at a time.
 
 ## Who owns what
 
-The web foundation built the shell, the components, the API client, the branding runtime and one file per route.
-Each page area belongs to one builder. **Inside your area you may change, add and delete any file. Everything
-outside it is read-only for you**: if a shared piece is wrong or missing, work around it inside your folder (for
-example call `request()` from `src/api` directly for an endpoint shape that differs) and report it.
+Routes live in `app/`, grouped by area; an area's components live in `components/<area>/`. The foundation built the
+shared parts and a first version of each route; each area's builder owns its routes and components from there.
 
-| Area | Owner | Files | Routes |
-| --- | --- | --- | --- |
-| Hosted sign-in and device | web-auth | `src/pages/auth/**`, `src/pages/device/**`, `embed/**`, `sdk/**` | `/sign-in`, `/authorize`, `/authorize/flow/:id`, `/device`, `/embed/v1/buttons`, `/sdk/v1.js` |
-| Account | web-account | `src/pages/account/**`, `src/pages/landing/**` | `/` (both), `/identity`, `/sign-in-methods`, `/apps`, `/silicons`, `/proofs`, `/activity`, `/settings` |
-| Developer | web-developer | `src/pages/developer/**` | `/developer`, `/developer/:appId/:tab?` |
-| Foundation | web-foundation | everything else: `src/api`, `src/app`, `src/arc`, `src/branding`, `src/lib`, `src/styles`, `src/theme`, `src/main.tsx`, `src/pages/kitchen`, `scripts/`, `public/`, `index.html`, `vite.config.ts`, `tsconfig*.json`, `package.json` | `/__kitchen`, the shell, 404 |
-
-The route table is `src/app/App.tsx` and nobody else edits it. Every route already has its page file, loaded
-lazily; **keep these file names and their default export** and the router never needs touching:
-
-| Route | Page file (default export) | Frame |
+| Area | Routes | Code |
 | --- | --- | --- |
-| `/` signed out | `src/pages/landing/Landing.tsx` | bare (no shell) |
-| `/` signed in, `/identity` | `src/pages/account/Identity.tsx` | account shell |
-| `/sign-in-methods` | `src/pages/account/SignInMethods.tsx` | account shell |
-| `/apps` | `src/pages/account/Apps.tsx` | account shell |
-| `/silicons` | `src/pages/account/Silicons.tsx` | account shell |
-| `/proofs` | `src/pages/account/Proofs.tsx` | account shell |
-| `/activity` | `src/pages/account/Activity.tsx` | account shell |
-| `/settings` | `src/pages/account/Settings.tsx` | account shell |
-| `/developer` | `src/pages/developer/Developer.tsx` | account shell |
-| `/developer/:appId/:tab?` | `src/pages/developer/AppDetail.tsx` (tabs: `DEVELOPER_TABS` in `src/app/navigation.ts`) | account shell |
-| `/sign-in` | `src/pages/auth/SignIn.tsx` | bare |
-| `/authorize` | `src/pages/auth/Authorize.tsx` | bare |
-| `/authorize/flow/:id` | `src/pages/auth/Flow.tsx` | bare |
-| `/device` | `src/pages/device/Device.tsx` | bare |
-| `/__kitchen` (development only) | `src/pages/kitchen/Kitchen.tsx` | bare |
-| anything else | `src/app/NotFound.tsx` | bare |
+| web-account | `/` (landing when signed out, identity home when signed in), `/sign-in-methods`, `/apps`, `/silicons`, `/proofs`, `/activity`, `/settings` | `app/(shell)/(account)/`, `components/account/` |
+| web-auth | `/sign-in`, `/authorize`, `/authorize/flow/[id]`, `/device`, `/embed/v1/buttons` (polish) | `app/(auth)/`, `components/auth/` |
+| web-developer | `/developer`, `/developer/[appId]/[[...tab]]` | `app/(shell)/(developer)/`, `components/developer/` |
+| foundation | root layout, providers, shell, dock, command palette, theme, squircles, branding runtime, API client and hooks, SDK, `proxy.ts`, `/__kitchen`, screens | `app/layout.tsx`, `components/foundation/`, `components/kitchen/`, `lib/`, `styles/`, `sdk/`, `scripts/` |
+| Arc UI | the installed components (local edits below) | `components/arc/` |
 
-Account-shell routes are guarded: a visitor without a session is sent to `/sign-in?return_to=…` and comes back to
-the page they asked for. Link with `paths` from `src/app/navigation.ts` (`paths.developerApp("briefcase",
-"webhooks")`), never string literals. Placeholders render `PagePlaceholder` (`src/app/PagePlaceholder.tsx`); replace
-the whole file. `Identity.tsx`, `Landing.tsx`, `Flow.tsx`, `Authorize.tsx`, `SignIn.tsx` and `AppDetail.tsx` already
-hold working first versions that show how the shell, the card and the branding runtime fit together; rewrite them
-freely.
-
-## Code map
-
-```
-web/
-  index.html            the app's HTML (loads public/theme-boot.js before paint; no inline scripts)
-  public/               favicon.svg, theme-boot.js (copied as is)
-  embed/                the iframe page: buttons.html + embed.ts + embed.css, methods.ts (shared with the SDK)
-  sdk/v1.ts             the SDK, built as one IIFE at dist/sdk/v1.js
-  scripts/              screens.ts, smoke.ts, screens-types.ts, mock/ (mock API + fixtures)
-  src/
-    main.tsx            fonts, Arc foundation, brand tokens, squircles, base styles, <App />
-    api/                typed client: types.ts (every 02-api.md shape), endpoints.ts (`api.*`), http.ts, errors.ts, solid.ts
-    app/                App.tsx (routes), session.ts, navigation.ts, commands.ts, notify.ts, layout/, identity/, shell/
-    arc/                Arc components ported to Solid (one folder each), lib/ (squircles, motion, presence, flip…), blocks/sign-in
-    branding/           applyBranding, BrandingScope, PoweredBy, fonts, contrast, defaults, branding.css
-    lib/                format.ts (dates, counts, labels), timezones.ts
-    pages/<area>/       route pages (see "Who owns what")
-    styles/             tokens.css (brand), base.css, fonts.ts
-    theme/              theme.ts (preference, system), theme-transition.ts
-```
+`app/(shell)/layout.tsx` wraps account and developer pages in the account shell (dock, ⌘K palette, sign-in gate).
+`app/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
+development only: production answers 404 unless the server runs with `ACCOUNTS_KITCHEN=1`.
 
 ## Conventions
 
-**Words.** People are **Carbons**, AI agents are **Silicons**, and every account belongs to exactly one of them
-(there are no group accounts). Name the parts of the product by what they are: the account site, the hosted
-pages, the API. Sentence case, no em dashes, and every message says what happened and what to do next.
+- **Words.** Accounts are Carbons and Silicons, in copy, docs and comments alike; no other words for them or for
+  groups of them (the vocabulary of UNDERSTANDING.md). Name parts of the system by what they are: the account site,
+  the API, the SDK, the embed. Errors say what happened and what to do next, in the server's words when it sent them
+  (`message` + `hint`).
+- **Styling.** CSS modules next to each component, tokens from `styles/tokens.css` (the brand mapped onto Arc's
+  semantic roles, light and dark), no Tailwind. Filled primary actions use `--primary*` (brand blue with paper text,
+  readable in both themes); `--accent` is for indicators, `--accent-ink` for accent-coloured text.
+- **Themes.** `lib/theme.ts` + `useTheme()` (`components/foundation/theme/use-theme.ts`); light, dark or device,
+  stored per browser, painted before first paint by the nonce'd boot script (no flash). Change it with
+  `change(next, triggerElement)` for the eclipse transition from the switch.
+- **Data.** Never `fetch` the API from components: use the hooks in `lib/query/` (or `api` from `lib/api` inside
+  them). Errors are `ApiError` (`status`, `code`, `message`, `hint`, `requestId`, `retryAfter`, `lockedUntil`,
+  `redirectTo`). Failed mutations toast message + hint unless `meta: { toast: false }` (show those inline); failed
+  queries render inline. Any 401 marks the session gone and the shell sends the visitor to sign in.
+- **Idempotency.** Every create/act endpoint takes an `Idempotency-Key`: `useIdempotentMutation(fn)` or
+  `useIdempotencyKey()` keep one key per logical action and input, so retrying never does it twice.
+- **Telemetry.** Opted in by default; turning it off (settings) sends `X-Accounts-Telemetry: off` on every API call
+  from the first request on, and sets the `sa_telemetry=off` cookie for requests without headers.
+- **Navigation.** `lib/navigation.ts` has every path and the dock's sections. Page changes use View Transitions
+  (`router.push(href, { transitionTypes: ["page-forward"] })`); the dock morphs its highlight.
+- **Signing out** waits for the server, then leaves with a full load (`useSignOut()`): no account page stays mounted
+  without a session.
+- **Arc rules.** One primary action per surface; destructive actions ask in place (ConfirmMorph) or need a hold;
+  focus is shown by borders and fills, never rings; toasts are for background work.
 
-**Arc rules.** Semantic tokens only (`var(--surface)`, `var(--text-secondary)`, `var(--accent-ink)`…), one accent
-(brand blue), one primary action per surface. No focus rings: keyboard position shows through fills and borders
-(the components already do this; do the same in your own controls). Motion uses the tokens in
-`src/arc/lib/motion.ts` (`spring.smooth`, `spring.snappy`, `spring.morph`) and every animation has a
-reduced-motion branch (`prefersReducedMotion()`).
+### Hooks (`lib/query/`)
 
-**Squircles.** Every rounded surface is a squircle. Give the element `ref={el => useSquircle(el)}` (or
-`{ mode: "clip" }` for images and media) and style it through three variables, never `border-radius`:
+| File | Hooks |
+| --- | --- |
+| `session.ts` | `useSession`, `useMe`, `useMeta`, `useSignOut`, `useRefreshSession`, `useTelemetryEnabled`, `firstPartySignInUrl`, `beginSignIn`, `consumeSignInReturn`, `safeReturnPath` |
+| `account.ts` | profile (`useUpdateProfile`, `useUploadPhoto`, `useRemovePhoto`, `useChangeId`, `useIdAvailability`, `useDeleteAccount`), emails, phones, identities, apps (`useMyApps`, `useRemoveAppAccess`), sessions, history, proofs, the Carbon's own webhook |
+| `silicons.ts` | `useSilicons`, `useSilicon`, create, update, change id, photo, `useRotateStk`, webhook, transfer, delete, custodian requests |
+| `developer.ts` | owned apps, app detail and public config, sign-in config and its history, users, imports and rows, webhook deliveries and replays, proofs (ATA, revoke) |
+| `auth.ts` | `useCreateFlow`, `useFlow`, `useFlowAction`, `useRefreshFlow`, `useDeviceRequest`, `useDecideDevice` |
+| `keys.ts`, `client.ts`, `idempotency.ts` | query keys, the shared client, idempotency helpers |
+
+`lib/notify.ts` raises toasts from anywhere (`notify.success`, `notify.error(apiError, title)`, `notify.loading` then
+`notify.update`). `lib/format.ts` formats dates, relative times, phones and scopes; `lib/timezones.ts` lists zones.
+
+## Squircles
+
+Every rounded surface is a squircle (Figma-style corner smoothing). Mark the element and style it through variables:
 
 ```css
-.card { --sq-r: var(--radius-surface); --sq-fill: var(--surface); --sq-stroke: var(--border);
+.card { --sq-r: var(--radius-panel); --sq-fill: var(--surface); --sq-stroke: var(--border);
         border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
-.card:hover { --sq-fill: var(--surface-muted); }
+.card:hover { --sq-stroke: var(--border-strong); }   /* change the variables, never border-radius */
 ```
-
-Chromium draws them natively (`corner-shape: squircle`); Safari and Firefox get an SVG-path fallback painted on
-`::before`/`::after`, so do not use those pseudo-elements on a squircled element. Review the fallback in Chromium
-with `?squircle=fallback`. Code without Solid (the embed) uses `attachSquircle` from `src/arc/lib/squircle-core.ts`.
-
-**JSX in data.** A JSX value is a real DOM node; rendering the same one twice moves it. Store icons as functions
-(`icon: () => <Mail />`) or pass them through `freshJSX()` from `src/arc/lib/clone.ts`.
-
-**Themes.** `theme()` / `themePreference()` from `src/theme/theme.ts`; change with `changeTheme(preference,
-trigger)` (animated). Any subtree can be themed with `data-theme="light" | "dark"`; tokens follow.
-
-**Layout.** `src/app/layout/layout.tsx`: `Page` (width `narrow | reading | default`), `PageHeader` (h1 in the
-display serif, description, actions, back link), `Section`, `Stack`, `Cluster`, `Grid`, `Surface` (never nested),
-`SettingsGroup`/`SettingsRow`, `DescriptionList`/`DescriptionItem`. Pages render inside the shell's `<main>`.
-
-**Shell.** The floating dock (bottom sheet on phones), the ⌘K palette, number keys 1 to 7 for the sections and
-page transitions come from `src/app/shell`. Add page commands with
-`registerCommands(() => [{ id, label, group, run }])` (removed when the page unmounts).
-
-**Session.** `src/app/session.ts`: `sessionStatus()`, `signedInAccount()`, `me()` (the shared Me resource),
-`refreshMe()`, `setMe(next)`, `signOut()`, `beginSignIn(returnTo)` and `firstPartySignInUrl(returnTo, { prompt,
-login_hint, method })` for the account site's own sign-in (app `accounts`, redirect `{origin}/`).
-
-**Identity card.** `src/app/identity/IdentityCard.tsx`: `IdentityCard` (front/back, tilt, flip, grain;
-`useIdentityCard().toggle()` inside a face), `IdentityField`, `Stamp`/`StampRow`, `LiveClock`.
-
-**Feedback.** A foreground action confirms in place (ActionButton, ConfirmMorph, inline errors). Toasts are for
-background work and failures: `notify.success(title, description)`, `notifyError(error, title)`.
-
-### API client
-
-```ts
-import { api, ApiError, createApiResource, createAction, createPagedList } from "../../api";
-
-const [apps] = createApiResource(() => api.me.apps.list({ limit: 50 }));      // Suspense + skeletons
-const remove = createAction((appId: string) => api.me.apps.removeAccess(appId), { report: "Could not remove access" });
-const users = createPagedList(query => api.apps.users("briefcase", { ...query, q: search() }));
-// remove.run(id) resolves undefined on failure (toasted); remove.pending(), remove.error() drive the UI.
-```
-
-Same origin, cookies included, JSON in and out. Every failure is an `ApiError` with the server's `code`,
-`message` (what and why), `hint` (what to do), `details`, `requestId` and `retryAfter`; show message and hint.
-Creating calls marked IDEMPOTENT in the spec send a fresh `Idempotency-Key` (pass `{ idempotencyKey }` to reuse
-one across retries of the same action). A 401 from any call marks the session gone and the shell sends the visitor to sign in. `authorizeUrl()`
-builds `/authorize` links. Types mirror 02-api.md; `endpoints.ts` normalizes a few equivalent response shapes
-(noted where it does).
-
-### Branding runtime
-
-Hosted pages paint an app's `Branding` onto one subtree and nowhere else:
-
 ```tsx
-<BrandingScope branding={flow.app.branding} theme={resolveBrandTheme(branding.theme, theme())}>
-  <BrandStage>
-    <BrandAside>…</BrandAside>                      {/* split layout only: the app's side */}
-    <BrandPanel as="main">
-      <div class="sa-brand-header">logo + name</div>
-      <h1 class="sa-brand-title">…</h1> <p class="sa-brand-subtitle">…</p>
-      <div class="sa-brand-body">step content</div>
-      <p class="sa-brand-legal">terms and privacy</p>
-    </BrandPanel>
-  </BrandStage>
-</BrandingScope>
-<PoweredBy theme={paintTheme} overlay />            {/* outside the branded subtree, always */}
+<div data-sq="surface" className={styles.card} />        // fill and border follow the curve
+<img data-sq="clip" className={styles.photo} … />        // clips the element and its content (avatars, logos)
+<div data-sq-native="" className={styles.morph} />       // native only: elements that draw their own ::before/::after
 ```
 
-`applyBranding(el, branding, theme)` (used by `BrandingScope`, usable directly) sets the palette, radii, fonts and
-density as Arc tokens in inline custom properties, and `data-theme`, `data-corner`, `data-layout`, `data-bg`,
-`data-button-style`, `data-density` for `branding.css` and `squircle.css`; it returns a function that removes them.
-Fonts load on demand (`loadBrandingFonts`, self-hosted, CSP-safe). `.sa-brand` is an inline-size container, so the
-split layout folds by the branded area's own width (a phone-wide preview inside a wide page folds correctly); give
-it a definite width rather than a shrink-to-fit parent. `brandingContrastIssues()` and `contrastRatio()` check a
-palette the way the server does. "Powered by Silicon Accounts" is not configurable: render `PoweredBy` outside
-`BrandingScope`, never restyle it.
+- **Native** (Chromium, Safari with `corner-shape`): `styles/squircle.css` sets `corner-shape: squircle` with the
+  radius scaled by `--sq-k` (1.6), so backgrounds, borders, shadows and overflow clipping follow the curve. No script.
+- **Fallback** (Firefox, older Safari): the runtime (`<SquircleRuntime>` in the root providers) watches every
+  `[data-sq]` element, computes the smoothed path for its size (one ResizeObserver) and paints it with `::before`
+  (fill) and `::after` (border ring); an outer box-shadow becomes a drop-shadow filter. Nothing changes layout. Replaced
+  elements (inputs, images) in `surface` mode keep plain rounded corners. Plain-styled elements still render, but only
+  the `--sq-*` variables follow state changes. Review it in Chromium with `?squircle=fallback` on any page.
+- `--sq-r` never inherits (an element without its own radius gets `--radius-control`, not its parent's). Square
+  individual corners with `--sq-tl`, `--sq-tr`, `--sq-br`, `--sq-bl` (`0` or `1`; non-inheriting), as drawers and
+  sheets do on the screen edge.
+- `squircleRadiusScale(el)` (lib/squircle/core.ts) is the native multiplier for script that animates pixel radii;
+  `squirclePath()` draws the same curve as SVG (the file dropzone's dashed edge); `useSquircle()` / `<Squircle>` in
+  `components/foundation/squircle/` for refs and one-off surfaces.
+- Branded pages may opt out (`corner_style` rounded or sharp): `[data-corner]` on the branding scope overrides both
+  paths.
 
-### Embed and SDK (minimal, working; web-auth completes them)
+## Branding runtime
 
-- `/embed/v1/buttons?app_id=…&redirect_uri=…&state=…&theme=light|dark|auto` (`embed/`): reads the authorize
-  parameters from its query (`app_id`/`client_id`, `redirect_uri`, `response_type`, `state`, `code_challenge`,
-  `code_challenge_method`, `scope`, `nonce`, `prompt`, `login_hint`; nothing else is forwarded), loads
-  `GET /v1/apps/{app_id}/public`, renders one squircle button per enabled method in the app's branding (email,
-  else phone, is the one primary), and each button is a `target=_top` link to `/authorize?…&method=<method>`.
-  It posts `{type: "silicon-accounts:resize", height}` to the parent whenever its height changes. A missing
-  parameter, an unknown or disabled app or a method the app does not offer shows a configuration error with a
-  `data-error-code`. The server sets `frame-ancestors` from the app's `allowed_origins`.
-- `/sdk/v1.js` (`sdk/v1.ts`, < 12 KB gzipped, no dependencies): `<script src=…/sdk/v1.js data-app-id
-  data-redirect-uri data-target …>` renders the same buttons in an open Shadow DOM. It honours `data-state`,
-  `data-code-challenge`, `data-code-challenge-method`, `data-nonce`, `data-scope`, `data-prompt`,
-  `data-login-hint`, `data-method`, `data-theme` and `data-pkce="S256"`. `window.SiliconAccounts` has
-  `authorizeUrl(options)`, `signIn(options)` and `renderButtons(target, options)`. When the SDK creates the state
-  (or the PKCE verifier) it stores `{state, code_verifier, nonce, redirect_uri, app_id}` as JSON in
-  `sessionStorage["silicon-accounts:auth:<state>"]` before leaving the page.
-- In development the sources are served as is: open `/embed/buttons.html?app_id=…`, and import `sdk/v1.ts` as a
-  module (the style guide's "Embed and SDK" section does both). The proxied `/embed/v1/buttons` and `/sdk/v1.js`
-  are the built files the API server serves.
+`lib/branding/` maps an app's `Branding` (palette per theme, radius, corner and button style, fonts, density, layout,
+background, logos) onto Arc's tokens for one subtree: `brandingVariables(branding, theme)` and
+`brandingAttributes(branding, theme)`, rendered by `<BrandingScope>` (`components/foundation/branding/`) with
+`<BrandStage>`, `<BrandAside>` (split layout) and `<BrandPanel>` (the squircle card). Every Arc component inside
+follows it without knowing about branding, and nothing leaks out. `resolveBrandTheme(mode, visitorTheme)` picks the
+painted theme (a forced light/dark, else the visitor's). Fonts load lazily (`loadBrandingFonts`, Fontsource files
+bundled with the site). `brandingContrastIssues()` checks text against the 4.5:1 minimum the server enforces.
 
-## Screenshots, mocks and smoke tests
+`<PoweredBy>` ("Powered by Silicon Accounts", linking to account.teamofsilicons.com) renders outside the scope with
+its own fixed palette, so an app can neither restyle nor hide it.
 
-`pnpm screens` starts Vite on a free port, mocks the API, and saves `web/.screens/<name>--<theme>-<width>.png`
-(both themes, 1440 and 390 px by default). Options: `--only kitchen,shell`, `--themes dark`, `--widths 390`,
-`--engine webkit`, `--split 1600` (tall pages in parts), `--live` (no mocks; uses the dev proxy), `--base URL`,
-`--list`. Console errors fail the run.
+## SDK
 
-Each page area adds its own screens in `src/pages/<area>/screens.ts` (picked up automatically, type-checked with
-the Node config):
+`sdk/v1.ts` → `public/sdk/v1.js` (esbuild, IIFE, ES2019, ≤ 12 KB gzipped, checked by `sdk/build.mjs`;
+`node sdk/build.mjs --watch` while working on it). `window.SiliconAccounts` offers `authorizeUrl`, `signIn` (PKCE),
+`renderButtons` (Shadow DOM buttons in the app's branding), `mountFrame` (the iframe, auto-sized) and
+`handleCallback`; a script tag with `data-app-id` and `data-redirect-uri` renders the buttons by itself.
+`sdk/methods.ts` (labels, marks, ordering) is shared with the embed page.
+
+## Arc UI
+
+Installed with the shadcn CLI from the `@uiarc` registry (`components.json`), every free item: React components with
+CSS modules, Motion and Radix. They are local source: edit them in place, and do not re-add one with `--overwrite`
+without re-applying the edits below. `theme-switch` covers both the reveal and the eclipse variants (the page
+animation is `lib/theme.ts`).
+
+### Local edits
+
+All edits are of three kinds, and keep Arc's behaviour and motion:
+
+- **Squircle:** the element gets `data-sq="surface"` (or `"clip"` for photos and containers whose children paint into
+  the corners, or `data-sq-native` where Arc draws a border with `::after`), its `border-radius` becomes `--sq-r`, and
+  its background and border colours move into `--sq-fill` / `--sq-stroke` so the fallback follows hover, focus,
+  selected and invalid states.
+- **Brand:** filled primary actions use `--primary`, `--primary-hover`, `--primary-pressed` and
+  `--primary-foreground` (Arc fills them with the foreground colour or the accent).
+- **Keyboard focus:** controls Arc left without any visible keyboard position get one, in fills and edges (never
+  rings), so every control passes WCAG 2.4.7.
+
+| Component | What changed |
+| --- | --- |
+| button, action-button | squircle; primary is brand blue (rest, hover, focus, pressed); `data-variant` on the element; keyboard focus shows as the hover fill |
+| hold-to-confirm | squircle; the hold fill is `--primary` and inherits the curve (`corner-shape: inherit`) |
+| confirm-morph | native-only squircle on the morphing pill (its border is a `::after`) and its buttons; the confirm button is brand primary |
+| input, textarea, otp-input | squircle on the field (native; the fallback keeps rounded corners on inputs) and on the OTP focus ring |
+| search-field, select, combobox, date-picker, dropdown-menu, color-picker | squircle on the control and its menu or panel |
+| phone-input, morph-select | squircle shell; the morphing shape animates `--sq-r` (a Motion value) under `data-sq-native` |
+| tag-input, chip-group, filter-toolbar, badge, metric-card | squircle shells and chips (chips stay pill-shaped); filter menu surface morphs its radius |
+| card | squircle (clip) card and quick-look panel; the morph scales the panel's token radius by `squircleRadiusScale` |
+| dialog, drawer, bottom-sheet, popover, tooltip, user-menu, command-palette, toast, toast-stack | squircle panels and close buttons; drawers and sheets keep the screen-edge corners square (per-corner factors); the user menu portrait is a 30 % squircle and its highlight is concentric with the panel |
+| avatar, avatar-group, skeleton | 30 % squircle avatars (clip; the image follows the curve natively); the status dot moves inside the curve in the fallback |
+| alert, empty-state, code-block, json-viewer, sortable-data-table, file-dropzone, inline-edit, pagination, radio-group, radio-cards, segmented-control, tabs, checkbox | squircle surfaces, highlights and rings; the file dropzone's dashed edge is drawn along the squircle path; tabs' edge buttons take the frame's curve |
+| calendar | the selected day is brand primary (paper digits stay readable in dark mode) |
+| blocks/sign-in, blocks/empty-states | squircle card, rows and tab rail |
+| theme-switch | the icon-only size sets `--sq-r` |
+| avatar-group, lib/media, blocks/sign-in | wording only: the group's default label is "Members"; sample people and a comment use the site's vocabulary |
+| switch, segmented-control, timeline, inline-edit | keyboard focus (web-account fix round): an off switch's track takes the hover fill and an inner accent edge, an on track's fill deepens a step; the selected segment's highlight takes an accent edge (another segment, the hover ink and a soft fill); a timeline row's button and inline-edit's text take their hover fill on every device |
+
+## Style guide and screens
+
+`/__kitchen` shows every installed Arc component with sample data in the brand, the shell's building blocks, the
+branding runtime and the embed/SDK. `?compare=1` renders each specimen in a light and a dark pane side by side;
+`?squircle=fallback` shows the Firefox squircle path.
+
+`pnpm screens` takes Playwright screenshots (Chromium by default) into `.screens/<name>--<theme>-<width>.png`, both
+themes at 1440 and 390 px. It uses `--base URL`, or a server on `http://localhost:$PORT` (8590), or starts `next dev`
+(and reuses the project's running one, since Next allows only one). The browser's `/v1` calls are answered by
+`scripts/mock/` (fixtures from `testkit/fake-apps.json`); `--live` uses the real API behind the server. Console
+errors fail the run.
+
+```
+pnpm screens --only kitchen --split 1600     # tall pages also in 1600 px parts
+pnpm screens --only shell --widths 390 --themes dark
+pnpm screens --list
+```
+
+Areas add their own screens in `components/<area>/screens.ts`:
 
 ```ts
-import type { ScreenSpec } from "../../../scripts/screens-types";
-
+import type { ScreenSpec } from "@/scripts/screens-types";
 export const screens: ScreenSpec[] = [
-  { name: "account-silicons", path: "/silicons" },
-  { name: "account-silicons-create", path: "/silicons", fullPage: false,
-    prepare: async page => { await page.getByRole("button", { name: "Create a Silicon" }).click(); } },
-  { name: "auth-flow-ledgerly-signup", path: "/authorize/flow/flow_ledgerly", as: "signed-out",
-    routes: [["GET /v1/flows/:id", () => ({ json: { flow: myFlowFixture } })]] },
+  { name: "account-apps", path: "/apps", routes: [["GET /v1/me/apps", () => ({ json: { items: [], next_cursor: null } })]] },
+  { name: "auth-flow-briefcase", path: "/authorize/flow/flow_briefcase", as: "signed-out" },
 ];
 ```
 
-The mock API (`scripts/mock/api.ts`) answers the account endpoints with fixtures built from
-`testkit/fake-apps.json` (`scripts/mock/fixtures.ts`): a signed-in Carbon (`c:saket`), Silicons, apps, proofs,
-history, the 15 fake apps' public configs and details, and `GET /v1/flows/flow_<app_id>` flows. `routes`
-entries override or add endpoints (`"METHOD /v1/path/:param"`, later entries win); an unmocked call answers 404
-`not_found` naming the route to add.
+## Notes
 
-`pnpm smoke` drives every style-guide component, the shell, the embed (framed by a page on another origin) and the
-SDK (the production IIFE on another origin) in a real browser, and fails on any console or page error. Options:
-`--engine webkit`, `--reduced-motion`, `--only <name>`.
-
-## Serving
-
-`pnpm build` writes:
-
-```
-dist/index.html               the app (served for every non-API path, Cache-Control: no-store)
-dist/assets/*                 hashed JS, CSS and fonts (immutable)
-dist/embed/v1/buttons.html    the iframe page (served at /embed/v1/buttons)
-dist/sdk/v1.js                the SDK (served at /sdk/v1.js, CORS *)
-dist/theme-boot.js, dist/favicon.svg
-```
-
-The server (`crates/server/src/web.rs`) serves it from `ACCOUNTS_WEB_DIST` with the site CSP
-(`default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; …`). Keep it that way: no inline
-scripts (the theme boot is an external file), self-hosted fonts only, images over https or data URLs.
-`/__kitchen` is left out of production builds (`VITE_ACCOUNTS_KITCHEN=1` includes it for a review build).
+- `output: "standalone"`: deploy `.next/standalone` with `.next/static` and `public/` copied beside it. `next start`
+  still works locally (it prints a warning).
+- Every route renders per request (the nonce CSP needs it).
+- `.screens/`, `public/sdk/` and `.next/` are build output and git-ignored.

@@ -1,0 +1,120 @@
+/* A Silicon's drawer: its profile on top, then one block per thing a custodian does. */
+/* The panel clips rather than hides its overflow: a hidden overflow can still be scrolled by focus and scrollIntoView,
+   which would slide the drawer's header out of sight; only the body scrolls. */
+.panel.panel { overflow: clip; }
+.body {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-8);
+  /* A guard against sideways scrolling on phones: nothing in here may widen the drawer. The 4px of padding (taken back
+     by the margin) keeps hover shadows at the edges from being clipped. */
+  overflow-x: clip;
+  margin-inline: -4px;
+  padding-inline: 4px;
+}
+.reveals { display: grid; gap: var(--space-4); }
+.mono { font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0; overflow-wrap: anywhere; }
+.monoInput.monoInput { font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0; }
+
+.profile { display: grid; min-width: 0; gap: var(--space-5); }
+.identity { display: flex; min-width: 0; align-items: center; gap: var(--space-4); }
+.photo { position: relative; display: inline-grid; flex: none; }
+.photo[data-busy] > [role="img"] { opacity: .55; }
+.busy { position: absolute; inset: 0; display: grid; place-items: center; color: var(--foreground); pointer-events: none; }
+.spinner { animation: spin 900ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.identityText { display: grid; min-width: 0; flex: 1; gap: var(--space-1); }
+/* The display name wraps instead of being cut off (names run to 100 characters); while it is edited the field is one
+   line again and scrolls (Arc InlineEdit marks the text layer data-layer and its root data-editing). */
+.name:not([data-editing]) [data-layer] { overflow: visible; text-overflow: clip; white-space: pre-wrap; overflow-wrap: anywhere; }
+.idLine { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--foreground); font-size: var(--text-sm); }
+/* The id morphs when it changes; held to the space there is, so a long one never widens the drawer. */
+.idText { display: block; min-width: 0; max-width: 100%; overflow: hidden; font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0; white-space: nowrap; }
+.idMorph { display: block; max-width: 100%; }
+.idWrap { min-width: 0; max-width: 100%; font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0; overflow-wrap: anywhere; }
+.facts { display: grid; margin: 0; }
+.facts > div { display: grid; grid-template-columns: minmax(5.5rem, 7rem) minmax(0, 1fr); align-items: center; gap: var(--space-3); min-height: 44px; padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
+.facts > div:last-child { border-bottom: 1px solid var(--border-subtle); }
+.facts dt { color: var(--text-secondary); font-size: var(--text-xs); }
+.facts dd { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); margin: 0; color: var(--foreground); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.facts dd > button { margin-inline-start: 0; }
+/* The photo row: what it is now, then what can be done about it. */
+.photoValue.photoValue { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.photoActions { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); margin-inline-start: calc(-1 * var(--space-2)); }
+.photoActions > button { margin-inline-start: 0; }
+.idScope, .scope { min-width: 0; }
+/* The inline detail editor and "Change its id" share one grid row of the profile, so a closed editor adds no gap. */
+.below { display: grid; min-width: 0; }
+.editorSlot { min-width: 0; }
+.editorSlot[data-open] { padding-bottom: var(--space-5); }
+.idForm { padding-top: var(--space-1); }
+
+.block { display: grid; min-width: 0; gap: var(--space-4); padding-top: var(--space-6); border-top: 1px solid var(--border); }
+.blockHead { display: grid; gap: var(--space-1); }
+.blockTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: 1.3; }
+/* Focus lands on a heading only from script (after a secret is stored); keyboard position shows as the accent ink. */
+.blockTitle:focus { outline: none; }
+.blockTitle:focus-visible { color: var(--accent-ink); }
+.block[data-danger] .blockTitle { color: var(--danger); }
+.blockText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.stack { display: grid; min-width: 0; gap: var(--space-3); }
+.fact { margin: 0; color: var(--foreground); font-size: var(--text-sm); }
+.actions { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.actions > * { max-width: 100%; }
+.holdRow { display: flex; min-width: 0; flex-wrap: wrap; justify-content: flex-start; }
+.holdRow > * { max-width: 100%; }
+.error { margin: 0; color: var(--danger); font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
+
+.urlBox { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); position: relative; display: flex; min-width: 0; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); background: var(--sq-fill); }
+.url { min-width: 0; flex: 1; overflow: hidden; color: var(--foreground); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Transfer: the Silicon's card, an arrow, and the person it goes to. */
+.transfer { display: grid; min-width: 0; gap: var(--space-3); }
+.route { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: var(--space-3); }
+.mini {
+  --sq-r: var(--radius-control);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border-strong);
+  position: relative;
+  display: inline-flex;
+  max-width: 11rem;
+  min-height: var(--control-height-md);
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.mini .mono { min-width: 0; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.routeArrow { color: var(--text-muted); }
+.routeField { position: relative; min-width: 0; }
+/* The recipient field is named by its label for assistive technology; the route itself says what it is for. */
+.routeField label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.pending { --sq-r: var(--radius-panel); --sq-fill: var(--accent-subtle); --sq-stroke: color-mix(in oklab, var(--accent) 30%, transparent); position: relative; display: flex; min-width: 0; align-items: center; gap: var(--space-4); padding: var(--space-4); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+/* Focus arrives here after a transfer is sent; it shows through the card's edge, never a ring. */
+.pending:focus { outline: none; }
+.pending:focus-visible { --sq-stroke: var(--accent); }
+.pendingRoute { display: inline-flex; flex: none; align-items: center; gap: var(--space-2); color: var(--accent-ink); }
+.pendingText { min-width: 0; margin: 0; color: var(--foreground); font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.pendingText strong { font-weight: 500; }
+.personMark { display: inline-grid; width: 28px; height: 28px; place-items: center; }
+
+/* On a phone each fact takes the drawer's width, label above value: a confirm question beside the photo ("Remove its
+   photo?" with Cancel and Remove) needs more room than the value column beside a label leaves. */
+@media (max-width: 520px) {
+  .facts > div { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 2px; padding: var(--space-3) 0; }
+}
+
+@media (max-width: 480px) {
+  /* The photo above the name, so a long name has the drawer's width to wrap in (not a column beside the photo). */
+  .identity { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+  .identityText { width: 100%; }
+  .route { grid-template-columns: minmax(0, 1fr); }
+  .routeArrow { display: none; }
+  .mini { max-width: 100%; justify-self: start; }
+  .pending { align-items: flex-start; flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

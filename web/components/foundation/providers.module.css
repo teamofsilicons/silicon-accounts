@@ -1,0 +1,5 @@
+/* The toast stack sits beside the floating dock on wide screens and above it where the dock would cover it. */
+.toasts.toasts { bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px)); }
+@media (max-width: 1023px) {
+  .toasts.toasts { bottom: calc(var(--dock-height) + 34px + env(safe-area-inset-bottom, 0px)); }
+}

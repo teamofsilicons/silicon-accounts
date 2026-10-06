@@ -1,0 +1,28 @@
+# Dependencies
+/node_modules
+
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Built by `pnpm build:sdk` (sdk/v1.ts → public/sdk/v1.js) before dev and build
+/public/sdk/
+
+# Screenshots from `pnpm screens`
+/.screens/
+
+# Playwright and test output
+/test-results/
+/playwright-report/
+
+# Local environment
+.env*
+!.env.example
+
+# Misc
+.DS_Store
+*.pem
+npm-debug.log*
+.pnpm-debug.log*

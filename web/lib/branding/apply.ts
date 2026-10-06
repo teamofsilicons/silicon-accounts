@@ -1,0 +1,138 @@
+/**
+ * The branding runtime (framework-free). `brandingVariables(branding, theme)` maps an app's Branding onto the Arc
+ * semantic tokens for one subtree: colours from the palette of `theme`, radii from `radius`, fonts, density; and
+ * `brandingAttributes` gives the data attributes styles/branding.css and styles/squircle.css read (layout, background,
+ * corner and button styles). The React <BrandingScope> (components/foundation/branding) renders both on its root, so
+ * every Arc component inside it (buttons, inputs, OTP cells, cards) follows them without knowing about branding, and
+ * nothing leaks into the account site.
+ */
+import type { AppPublic, Branding, FlowView, Palette, ThemeMode } from "../api/types";
+import { normalizeBranding } from "./defaults";
+import { FONT_STACKS } from "./fonts";
+
+export type PaintTheme = "light" | "dark";
+
+/** The theme a branded page should paint: the branding's forced theme, else the visitor's theme. */
+export function resolveBrandTheme(mode: ThemeMode | undefined, visitorTheme: PaintTheme): PaintTheme {
+  return mode === "light" || mode === "dark" ? mode : visitorTheme;
+}
+
+const mix = (a: string, percent: number, b: string) => `color-mix(in oklab, ${a} ${percent}%, ${b})`;
+const px = (value: number) => `${Math.round(value * 100) / 100}px`;
+
+/** `url("…")` for https and data:image URLs only; anything else is ignored (the server allows https only). */
+function cssUrl(value: string | null): string | null {
+  if (!value) return null;
+  if (!/^https:\/\//i.test(value) && !/^data:image\//i.test(value)) return null;
+  return `url(${JSON.stringify(value)})`;
+}
+
+/** The custom properties a branding paints in one theme. */
+export function brandingVariables(input: Branding | Partial<Branding> | null | undefined, theme: PaintTheme): Record<string, string> {
+  const branding = normalizeBranding(input as Partial<Branding>);
+  const p: Palette = branding[theme];
+  const dark = theme === "dark";
+  const radius = branding.radius;
+  const compact = branding.density === "compact";
+  const vars: Record<string, string> = {
+    "--background": p.background,
+    "--surface": p.surface,
+    "--surface-raised": dark ? mix(p.surface, 94, p.foreground) : p.surface,
+    "--surface-muted": mix(p.foreground, dark ? 9 : 5, p.surface),
+    "--foreground": p.foreground,
+    "--text-secondary": p.muted,
+    "--text-muted": p.muted,
+    "--border": p.border,
+    "--border-subtle": mix(p.border, 55, p.surface),
+    "--border-strong": mix(p.border, 74, p.foreground),
+    "--accent": p.primary,
+    "--accent-strong": mix(p.primary, 78, p.foreground),
+    "--accent-subtle": mix(p.primary, dark ? 18 : 11, "transparent"),
+    "--accent-foreground": p.primary_foreground,
+    // Accent-coloured text on dark surfaces needs a lighter ink than a fill does.
+    "--accent-ink": dark ? mix(p.primary, 50, p.foreground) : p.primary,
+    "--primary": p.primary,
+    "--primary-hover": mix(p.primary, 90, p.foreground),
+    "--primary-pressed": mix(p.primary, 82, p.foreground),
+    "--primary-foreground": p.primary_foreground,
+    "--control-on": p.primary,
+    "--control-glyph": p.primary_foreground,
+    "--control-fill": p.primary,
+    "--control-on-subtle": mix(p.primary, 12, "transparent"),
+    "--control-track": mix(p.foreground, dark ? 22 : 13, p.surface),
+    "--control-track-hover": mix(p.foreground, dark ? 28 : 19, p.surface),
+    "--control-thumb": dark ? mix(p.foreground, 92, p.surface) : "#FFFFFF",
+    "--control-thumb-on": p.primary_foreground,
+    "--danger": p.danger,
+    "--dot-color": mix(p.foreground, dark ? 14 : 12, "transparent"),
+    "--overlay": mix(p.background, 55, "transparent"),
+    "--radius-control": px(radius),
+    "--radius-panel": px(radius * (26 / 18)),
+    "--radius-surface": px(radius * (34 / 18)),
+    "--font-body": FONT_STACKS[branding.font_family],
+    "--font-display": FONT_STACKS[branding.heading_font_family ?? branding.font_family],
+    "--brand-logo-height": px(branding.logo_height),
+    "--brand-pad": compact ? "24px" : "32px",
+    "--brand-gap": compact ? "12px" : "16px",
+    "--brand-panel-width": compact ? "380px" : "420px",
+    "--control-height-sm": compact ? "2rem" : "2.25rem",
+    "--control-height-md": compact ? "2.5rem" : "2.75rem",
+    "--control-height-lg": compact ? "2.75rem" : "3.125rem",
+  };
+  const image = branding.background_style === "image" ? cssUrl(branding.background_image_url) : null;
+  if (image) vars["--brand-bg-image"] = image;
+  return vars;
+}
+
+/** The data attributes styles/branding.css and styles/squircle.css read. */
+export function brandingAttributes(input: Branding | Partial<Branding> | null | undefined, theme: PaintTheme): Record<string, string> {
+  const branding = normalizeBranding(input as Partial<Branding>);
+  return {
+    "data-brand": "",
+    "data-theme": theme,
+    "data-corner": branding.corner_style,
+    "data-layout": branding.layout,
+    "data-bg": branding.background_style === "image" && !cssUrl(branding.background_image_url) ? "plain" : branding.background_style,
+    "data-button-style": branding.button_style,
+    "data-density": branding.density,
+  };
+}
+
+const applied = new WeakMap<HTMLElement, { vars: string[]; attrs: string[] }>();
+
+/**
+ * Paints `branding` in `theme` onto `el` imperatively (for code without React) and returns a function that removes
+ * it again. Calling it again on the same element replaces the previous branding, so it can follow a live draft.
+ */
+export function applyBranding(el: HTMLElement, branding: Branding | Partial<Branding> | null | undefined, theme: PaintTheme): () => void {
+  const vars = brandingVariables(branding, theme);
+  const attrs = brandingAttributes(branding, theme);
+  const previous = applied.get(el);
+  if (previous) {
+    for (const name of previous.vars) if (!(name in vars)) el.style.removeProperty(name);
+    for (const name of previous.attrs) if (!(name in attrs)) el.removeAttribute(name);
+  }
+  for (const [name, value] of Object.entries(vars)) el.style.setProperty(name, value);
+  for (const [name, value] of Object.entries(attrs)) el.setAttribute(name, value);
+  el.style.colorScheme = theme;
+  applied.set(el, { vars: Object.keys(vars), attrs: Object.keys(attrs) });
+  return () => {
+    const current = applied.get(el);
+    if (!current) return;
+    for (const name of current.vars) el.style.removeProperty(name);
+    for (const name of current.attrs) el.removeAttribute(name);
+    el.style.removeProperty("color-scheme");
+    applied.delete(el);
+  };
+}
+
+/** The logo for a theme: the branding's own logo, else the app's logo; null when neither exists. */
+export function brandLogo(
+  branding: Pick<Branding, "logo_url" | "logo_dark_url"> | null | undefined,
+  app: Pick<AppPublic, "logo_url" | "logo_dark_url"> | FlowView["app"] | null | undefined,
+  theme: PaintTheme,
+): string | null {
+  const own = theme === "dark" ? branding?.logo_dark_url ?? branding?.logo_url : branding?.logo_url;
+  const fallback = theme === "dark" ? app?.logo_dark_url ?? app?.logo_url : app?.logo_url;
+  return own ?? fallback ?? null;
+}

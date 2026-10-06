@@ -1,0 +1,72 @@
+/**
+ * Toasts for results of background work and API failures, callable from anywhere (components, query caches, plain
+ * functions). A foreground action still confirms in place (Arc rule); use these for what happens out of view, and for
+ * errors in addition to an inline message near the cause.
+ *
+ *   notifyError(error, "Could not remove access")      // title + the server's message and hint
+ *   notify.success("Copied", "c:saket is on your clipboard")
+ *
+ * The Arc toast stack (components/arc/toast-stack) lives in the root providers; <ToastBridge> hands its API to this
+ * module. Toasts raised before it mounts are queued and shown once it does.
+ */
+import type { ToastOptions, ToastStackApi } from "@/components/arc/toast-stack/toast-stack";
+import { ApiError } from "./api/errors";
+
+let api: ToastStackApi | null = null;
+const queue: ToastOptions[] = [];
+let counter = 0;
+
+const newId = () => {
+  counter += 1;
+  return `toast-${Date.now().toString(36)}-${counter}`;
+};
+
+/** Connects the mounted toast stack (called by ToastBridge). Returns a disconnect function. */
+export function connectToasts(next: ToastStackApi): () => void {
+  api = next;
+  for (const options of queue.splice(0)) next.toast(options);
+  return () => {
+    if (api === next) api = null;
+  };
+}
+
+function show(options: ToastOptions): string {
+  const id = options.id ?? newId();
+  const full = { ...options, id };
+  if (api) api.toast(full);
+  else queue.push(full);
+  return id;
+}
+
+function titleFor(error: ApiError): string {
+  if (error.isNetwork) return "Silicon Accounts is unreachable";
+  if (error.status === 401) return "You are signed out";
+  if (error.status === 403) return "Not allowed";
+  if (error.status === 404) return "Not found";
+  if (error.status === 409) return "That conflicts with what is there";
+  if (error.status === 410) return "That has expired";
+  if (error.status === 422) return "Check the details";
+  if (error.status === 423 || error.status === 429) return "Slow down for a moment";
+  if (error.status >= 500) return "Silicon Accounts had a problem";
+  return "That did not work";
+}
+
+/** Shows an API failure: the server's message says what and why, the hint says what to do next. Returns the toast id. */
+export function notifyError(error: unknown, title?: string): string {
+  const failure = ApiError.from(error);
+  const retry = failure.retryAfter && !failure.hint ? ` Try again in ${failure.retryAfter} s.` : "";
+  const description = [failure.message, failure.hint].filter(Boolean).join(" ") + retry;
+  // One network toast at a time: every failing request would otherwise stack its own.
+  return show({ type: "error", title: title ?? titleFor(failure), description, id: failure.isNetwork ? "network_error" : undefined });
+}
+
+export const notify = {
+  success: (title: string, description?: string) => show({ type: "success", title, description }),
+  info: (title: string, description?: string) => show({ type: "info", title, description }),
+  warning: (title: string, description?: string) => show({ type: "warning", title, description }),
+  error: notifyError,
+  /** A loading toast that stays until updated: `const id = notify.loading("Importing"); notify.update(id, {type: "success", …})`. */
+  loading: (title: string, description?: string) => show({ type: "loading", title, description }),
+  update: (id: string, patch: Partial<Omit<ToastOptions, "id">>) => api?.update(id, patch),
+  dismiss: (id?: string) => api?.dismiss(id),
+};

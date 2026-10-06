@@ -1,0 +1,69 @@
+/* One column that never grows past the page: a wide control inside (the status filter) scrolls in its own track. */
+.proofs { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); gap: var(--space-12); }
+.muted { color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.problemList { display: grid; gap: var(--space-1); margin: var(--space-2) 0 0; padding: 0 0 0 1.1em; }
+
+/* The ATA creator. */
+.creator { display: grid; gap: var(--space-6); }
+.audiences { display: grid; gap: var(--space-3); }
+.resolved { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.suggestions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.suggestion { --sq-r: var(--radius-pill); --sq-fill: transparent; --sq-stroke: var(--border-strong); position: relative; min-height: 30px; padding: 0 var(--space-3); border: 1px dashed var(--sq-stroke); background: var(--sq-fill); color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; cursor: pointer; transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+.suggestion:hover, .suggestion:focus-visible { --sq-fill: var(--accent-subtle); --sq-stroke: var(--accent); border-style: solid; color: var(--foreground); }
+.ttl { display: grid; gap: var(--space-2); justify-items: start; }
+.ttlLabel { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.creatorActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+
+/* App chips. */
+.appChip { --sq-r: 12px; --sq-fill: var(--surface-muted); --sq-stroke: var(--border); position: relative; display: inline-flex; max-width: 100%; min-height: 36px; align-items: center; gap: var(--space-2); padding: 4px var(--space-2) 4px 5px; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.appChip[data-state="missing"], .appChip[data-state="error"] { --sq-fill: color-mix(in oklab, var(--danger) 7%, var(--surface)); --sq-stroke: color-mix(in oklab, var(--danger) 30%, var(--border)); }
+.appChip[data-state="loading"] { opacity: .7; }
+.appChipText { display: inline-flex; min-width: 0; align-items: baseline; gap: 6px; }
+.appChipName { overflow: hidden; color: var(--foreground); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.appChipId { color: var(--text-secondary); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; }
+.appChipRemove { --sq-r: 8px; --sq-fill: transparent; position: relative; display: grid; width: 24px; height: 24px; place-items: center; border: 0; background: var(--sq-fill); color: var(--text-secondary); cursor: pointer; }
+.appChipRemove:hover, .appChipRemove:focus-visible { --sq-fill: var(--surface); color: var(--foreground); }
+
+/* The list of issued proofs: issuing app → receiving apps, who, scopes, when, status. */
+.filters { display: flex; min-width: 0; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.filters > * { min-width: 0; max-width: 100%; }
+.proofList { --sq-r: var(--radius-panel); --sq-fill: var(--surface); --sq-stroke: var(--border); position: relative; display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--sq-stroke); background: var(--sq-fill); container-type: inline-size; }
+/* The end column keeps one width (badge plus Revoke) so the middle column lines up from row to row. */
+.proof { position: relative; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(10rem, auto); align-items: center; gap: var(--space-3) var(--space-5); padding: var(--space-4) var(--space-5); }
+.proof + .proof { border-top: 1px solid var(--border-subtle); }
+@media (max-width: 900px) { .proof { grid-template-columns: minmax(0, 1fr); } }
+.flow { display: grid; min-width: 0; grid-template-columns: 44px auto auto minmax(0, 1fr); align-items: center; gap: var(--space-2); }
+.flow > :first-child { justify-self: start; }
+.connector { position: relative; display: inline-flex; width: 44px; align-items: center; color: var(--text-muted); }
+.connector i { flex: 1; height: 0; border-top: 1.5px dashed currentColor; }
+.connector[data-active] { color: var(--accent); }
+.connector[data-active] i { border-top-style: solid; background-image: linear-gradient(90deg, currentColor 50%, transparent 0); background-size: 8px 1.5px; border-top-color: transparent; height: 1.5px; animation: flow 900ms linear infinite; }
+@keyframes flow { to { background-position: 8px 0; } }
+.receivers { display: flex; min-width: 0; flex-wrap: wrap; gap: var(--space-1); }
+/* A narrow list puts the receiving apps on their own line, so their names stay whole beside their ids. */
+@container (max-width: 440px) {
+  .flow { grid-template-columns: 44px auto minmax(0, 1fr); }
+  .receivers { grid-column: 1 / -1; }
+}
+.proofMeta { display: grid; min-width: 0; gap: var(--space-1); font-size: var(--text-sm); }
+.onBehalf { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); }
+.onBehalf code { color: var(--foreground); font-size: var(--text-xs); }
+.scopes { display: flex; flex-wrap: wrap; gap: 4px; }
+.scope { --sq-r: 6px; --sq-fill: var(--surface-muted); position: relative; display: inline-block; padding: 1px 6px; background: var(--sq-fill); color: var(--foreground); font-size: 11px; letter-spacing: 0; }
+.dates { display: flex; flex-wrap: wrap; gap: 4px; color: var(--text-secondary); font-size: var(--text-xs); }
+.proofEnd { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+/* The status takes focus after a revoke (no ring: the row shows a short accent bar on its edge instead). */
+.statusFocus { display: inline-flex; outline: none; }
+.proof:has(.statusFocus:focus-visible)::before { content: ""; position: absolute; top: var(--space-3); bottom: var(--space-3); left: 6px; width: 3px; border-radius: 2px; background: var(--accent); }
+@media (max-width: 900px) { .proofEnd { justify-content: flex-start; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .connector[data-active] i { animation: none; }
+  .suggestion { transition: none; }
+}
+
+.alertLine { display: block; margin: 0; }
+.problemLines { display: grid; gap: var(--space-1); margin-top: var(--space-2); }
+.problemLines > span { display: block; }
+.wrapCode pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.footnote { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); }

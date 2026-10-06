@@ -1,0 +1,44 @@
+/* The signed-out home: a hero with a living identity card, three plain facts, and a quiet footer. */
+.landing { display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; }
+.top { display: flex; width: 100%; max-width: var(--page-max); height: 68px; align-items: center; justify-content: space-between; margin-inline: auto; padding: 0 var(--gutter); }
+/* The brand is a link home; keyboard position shows as a soft fill behind it (Arc draws no rings). */
+.brand { --sq-r: var(--radius-pill); --sq-fill: transparent; position: relative; display: inline-flex; min-height: 36px; align-items: center; gap: 10px; margin-inline-start: -8px; padding: 0 12px 0 8px; background: var(--sq-fill); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+.brand:hover { color: var(--foreground); }
+.brand:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
+.muted { color: var(--text-secondary); font-weight: 400; }
+
+.main { display: grid; width: 100%; max-width: var(--page-max); flex: 1; align-content: center; gap: clamp(48px, 9vh, 96px); margin-inline: auto; padding: clamp(24px, 6vh, 72px) var(--gutter) clamp(40px, 8vh, 88px); }
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: center; gap: clamp(32px, 6vw, 96px); }
+.copy { display: grid; min-width: 0; gap: var(--space-6); }
+.title { margin: 0; font-family: var(--font-serif); font-size: clamp(var(--text-4xl), 6.4vw, 5.25rem); font-weight: 400; letter-spacing: -.02em; line-height: .98; text-wrap: balance; }
+.lede { max-width: 46ch; margin: 0; color: var(--text-secondary); font-size: var(--text-lg); line-height: 1.5; text-wrap: pretty; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.note { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); }
+.art { display: grid; min-width: 0; place-items: center; }
+
+.cardFace { display: grid; min-width: 0; gap: var(--space-6); }
+.cardWho { display: flex; min-width: 0; align-items: center; gap: var(--space-4); }
+.cardNames { display: grid; min-width: 0; gap: var(--space-2); }
+.cardName { margin: 0; font-family: var(--font-serif); font-size: var(--text-3xl); line-height: 1; }
+.cardKind { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); }
+.cardFields { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--space-4); padding-top: var(--space-5); border-top: 1px dashed color-mix(in oklab, var(--border) 85%, transparent); }
+.cardSilicons { display: grid; gap: var(--space-2); }
+.cardLabel { color: var(--text-secondary); font-size: var(--text-xs); }
+.cardChips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.cardChip { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--foreground); font-family: var(--font-mono); font-size: var(--text-sm); letter-spacing: 0; }
+
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-6) clamp(24px, 4vw, 48px); padding-top: var(--space-8); border-top: 1px solid var(--border); }
+.fact { display: grid; align-content: start; gap: var(--space-2); }
+.factTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; }
+.factText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.55; }
+
+.footer { display: flex; width: 100%; max-width: var(--page-max); align-items: center; justify-content: space-between; gap: var(--space-4); margin-inline: auto; padding: var(--space-6) var(--gutter) var(--space-8); color: var(--text-secondary); font-size: var(--text-sm); }
+.footer a { --sq-r: 6px; --sq-fill: transparent; position: relative; margin-inline: -4px; padding: 2px 4px; background: var(--sq-fill); color: var(--text-secondary); transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
+.footer a:hover { color: var(--foreground); }
+.footer a:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: minmax(0, 1fr); align-content: start; }
+  .facts { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { .brand, .footer a { transition: none; } }
