@@ -9,7 +9,11 @@
 .nav .step { transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), opacity var(--duration-fast) var(--ease-standard), transform var(--duration-spring) var(--ease-spring); }
 .nav .step:active:not(:disabled) { transform: scale(.96); transition-duration: var(--duration-fast), var(--duration-fast), var(--duration-fast), 100ms; transition-timing-function: var(--ease-standard), var(--ease-standard), var(--ease-standard), ease-out; }
 .nav button:disabled { opacity: .4; cursor: not-allowed; }
-.nav button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* Silicon Accounts: keyboard position in fills and edges (Arc's ring is transparent here, and foundation.css removes
+   every outline): a page takes the hover fill and a firm edge; the current page, drawn by the travelling mark, an
+   accent edge over it. */
+.nav button:focus-visible { --sq-fill: var(--surface-muted); --sq-stroke: var(--border-strong); color: var(--foreground); }
+.nav[data-mark-ready] button[aria-current="page"]:focus-visible { --sq-fill: transparent; --sq-stroke: var(--accent); }
 @media (hover: hover) and (pointer: fine) {
   .nav button:hover:not(:disabled) { --sq-fill: var(--surface-muted); color: var(--foreground); }
   .nav[data-mark-ready] button[aria-current="page"]:hover { --sq-fill: transparent; }

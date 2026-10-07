@@ -32,8 +32,11 @@ web/e2e/
   journeys/*.ts      the "core" suite: the product's main journeys
   suites/<suite>/    one folder per suite; every *.ts file in it holds journeys
   suites/harness/    the harness checks itself (isolation, forwarded addresses, mock Iris)
+  test/, suites/<suite>/test/   unit tests (node:test, no stack needed) of the harness and of a suite's helpers
   .artifacts/        reports, screenshots and logs (git-ignored)
 ```
+
+The unit tests run with `web/node_modules/.bin/tsx --test web/e2e/test/*.test.ts web/e2e/suites/*/test/*.test.ts`.
 
 **Adding a suite** is adding a folder: `web/e2e/suites/<suite>/` (lowercase letters, digits, `.`, `_`, `-`; not
 `core`) with one or more `*.ts` files, each exporting `journey` (one) or `journeys` (an array). Files whose name starts
@@ -85,7 +88,8 @@ data: `results.check(name, ok, detail)` never throws, so a journey keeps going a
 `postJson`, `api` (a call with the journey's own address, through the site or `direct` to accounts-api), `lastSeq` and
 `codeFor` (codes from the mock email/SMS server), `cli` and `cliHome` (the real `accounts` CLI), `signInOnSite`,
 `finishSignup`, `afterConsent`, `appAccount` (what a fake app received), `sql` and `forgetRateLimits` (the stack's
-database), `randomIp`, `forwardAs`. The testkit's own helpers (`testkit/lib`) work too, pointed at `ctx.env`.
+database), `randomIp`, `forwardAs`, `withBenchSlot`, `waitForCalm` and `watchStalls` (benchmarks, below). The
+testkit's own helpers (`testkit/lib`) work too, pointed at `ctx.env`.
 
 ## Port bases
 
@@ -206,14 +210,51 @@ The schema is in `migrations/`; background sweeps run inside accounts-api (custo
 every 10 minutes, webhook retries on their backoff), so after moving time either wait for the sweep or read through
 the API, whose read paths apply expiry themselves. `psql "$E2E_DB"` works by hand on a `--keep` stack.
 
+## Benchmarks on a shared machine
+
+Stacks share one machine and one Postgres, so a timing taken while other stacks walk, build or benchmark measures the
+machine as much as the endpoint. In the run that first failed the verify latency gate (load average 46 to 112 on 14
+cores, about ten stacks), GET /readyz (one database round trip) had p95 74 ms from 50 concurrent callers; on a quiet
+machine it has 2 ms. A journey that times something therefore:
+
+- holds the machine's benchmark slot while it measures: `await withBenchSlot("<base> <journey>", async slot => …)`
+  (`.dev/locks/e2e-bench`, mkdir-atomic, a dead holder's slot is taken over; waits up to `E2E_BENCH_SLOT_WAIT_MS`,
+  default 6 minutes, then runs without it and says so in `slot.held`). `scripts/e2e-all.sh` walks each suite in both
+  browsers side by side, so without it a suite's benchmark runs at the very moment its twin's does;
+- times its subject interleaved with a control on the same callers and the same path, so both see the same moments of
+  the machine, and judges the subject against the control when the control shows the machine was too busy to measure
+  an absolute budget (a busy machine slows both alike; extra work in the subject keeps it slower however busy it is);
+- may wait for a calmer machine between runs: `await waitForCalm(maxMs)` returns once the 1-minute load average is at
+  most the core count, or after `maxMs`, and says which;
+- sets aside a run during which its own process stood still: `const watch = watchStalls()` … `watch.stop()` returns
+  the longest stretch (ms) in which a 50 ms timer could not fire. Load delays it by milliseconds; seconds
+  (`FROZEN_STALL_MS`, 5 s) mean the machine was asleep. The Mac sleeps with every stack up when it runs on battery with
+  the lid closed (about 15 minutes at a time between short maintenance wakes; `pmset -g log | grep -E "Sleep|Wake"`):
+  in one run a control request then "took" 900 s (the Mac slept 12:19:36–12:34:37 and accounts-api logged nothing in
+  between), the run's throughput read 2 req/s, and in another a keep-alive connection was reset at wake. Such a run
+  measured the sleep, so it is measured again and never judged. Long walks are best run awake (`caffeinate -i`, on
+  power with the lid open).
+
+`proofs-perf-latency-verify` does all four (a run its process stood still in is measured again, up to three tries, and
+a measurement frozen every time fails as "not measured"; no request waits more than 30 s for an answer): its gate
+(`suites/proofs-perf/_latency-gate.ts`) is p95 ≤ 25 ms whenever the interleaved one-query control (GET
+`/v1/photos/<unknown id>`, one primary-key lookup, 404) has p95 ≤ 8 ms, and otherwise verify p50 and p95 ≤ 3 × the
+control's + 1 ms (room for one more query, not for several: measured at load 48 to 172, the real verify was 0.95–1.53×
+the control, a verify followed by three more queries 4.6–6.3× at p50); best of three runs, with up to
+`E2E_BENCH_CALM_WAIT_MS` (default 3 minutes) of waiting for calm after busy runs. `E2E_LATENCY_GATE=strict` keeps only
+p95 ≤ 25 ms, for a benchmark on a machine kept quiet on purpose (for example `E2E_LATENCY_GATE=strict scripts/e2e.sh
+proofs-perf-latency-verify` with no other stack running). The gate's and the measuring's unit tests run with
+`web/node_modules/.bin/tsx --test web/e2e/suites/proofs-perf/test/*.test.ts`.
+
 ## Environment
 
 `pnpm -C web e2e` (run.ts) finds the stack from the environment. `E2E_PORT_BASE=<base>` names a stack started by
 `scripts/e2e.sh --keep` (or by dev.sh with those ports); without it the defaults are `scripts/dev.sh`'s (site 8590,
 database `silicon_accounts`). One by one: `E2E_SITE`, `E2E_API`, `E2E_OIDC`, `E2E_MESSAGING`, `E2E_APPS`, `E2E_IRIS`,
 `E2E_DB`, `E2E_PG_BIN`, `E2E_CLI` (default `target/debug/accounts`, or `$CARGO_TARGET_DIR/debug/accounts`),
-`E2E_ENGINE`, `E2E_ARTIFACTS` (default `e2e/.artifacts/<base>`), `E2E_SHOTS`. Options: `--suite`, `--engine`,
-`--webkit`, `--list`, `--list-suites`, and journey prefixes.
+`E2E_ENGINE`, `E2E_ARTIFACTS` (default `e2e/.artifacts/<base>`), `E2E_SHOTS`. Benchmarks: `E2E_BENCH_SLOT_WAIT_MS`,
+`E2E_BENCH_CALM_WAIT_MS`, `E2E_LATENCY_GATE=strict` (see above). Options: `--suite`, `--engine`, `--webkit`, `--list`,
+`--list-suites`, and journey prefixes.
 
 ## Browser problems
 

@@ -178,7 +178,9 @@ export function WebhooksTab() {
   const [secret, setSecret] = useState<{ value: string; reason: "set" | "rotated" } | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<string[]>([]);
-  const [opened, setOpened] = useState<string | null>(null);
+  // The delivery the drawer shows, with its event type: the drawer names it even after a replay or a refresh moved the
+  // delivery out of the list filtered now (a replayed failure leaves the Failed filter).
+  const [opened, setOpened] = useState<{ id: string; type: string } | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [replayResult, setReplayResult] = useState<ReplayResult | null>(null);
 
@@ -254,8 +256,8 @@ export function WebhooksTab() {
     delivery,
   })), [deliveries]);
 
-  const openDelivery = (id: string) => {
-    setOpened(id);
+  const openDelivery = (row: Row) => {
+    setOpened({ id: row.id, type: row.type });
     setDrawerOpen(true);
   };
 
@@ -283,10 +285,9 @@ export function WebhooksTab() {
         : row.delivery.delivered_at ? <span title={formatDateTime(row.delivery.delivered_at)}>{`delivered ${formatRelative(row.delivery.delivered_at)}`}</span> : <span className={styles.muted}>Gave up</span>),
       width: 196,
     },
-    { key: "id", label: "Details", sortable: false, render: (_, row) => <Button size="sm" variant="ghost" onClick={() => openDelivery(row.id)} aria-label={`Open delivery ${shortId(row.id)} of ${row.type}`}>Open</Button>, width: 92 },
+    { key: "id", label: "Details", sortable: false, render: (_, row) => <Button size="sm" variant="ghost" onClick={() => openDelivery(row)} aria-label={`Open delivery ${shortId(row.id)} of ${row.type}`}>Open</Button>, width: 92 },
   ];
 
-  const openedRow = rows.find(row => row.id === opened);
   const skipped = replayResult?.skipped ?? [];
   const replayed = replayResult?.replayed.length ?? 0;
 
@@ -451,8 +452,8 @@ export function WebhooksTab() {
 
       <Drawer open={drawerOpen && !!opened} onOpenChange={setDrawerOpen}>
         {opened ? (
-          <DrawerContent title={openedRow?.type ?? "Delivery"} description={`Delivery ${shortId(opened)}`} className={styles.wideDrawer}>
-            <DeliveryDrawerBody appId={appId} id={opened} onReplay={ids => replay({ delivery_ids: ids }, false)} />
+          <DrawerContent title={opened.type} description={`Delivery ${shortId(opened.id)}`} className={styles.wideDrawer}>
+            <DeliveryDrawerBody appId={appId} id={opened.id} onReplay={ids => replay({ delivery_ids: ids }, false)} />
           </DrawerContent>
         ) : null}
       </Drawer>

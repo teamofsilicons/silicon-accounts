@@ -9,12 +9,13 @@
  * dev@acme-notes.test, the precondition phone…). So journeys never collide with each other or with an earlier walk
  * of a kept stack, and expected.json still describes every row.
  */
-import { execFile } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { request as httpRequest } from "node:http";
-import { join, resolve } from "node:path";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import { request as httpRequest, type IncomingHttpHeaders } from "node:http";
+import { connect } from "node:net";
+import { dirname, join, resolve } from "node:path";
 import type { Browser } from "@playwright/test";
-import { E2E_DIR, api, codeFor, json, lastSeq, newContext, sleep, type ApiInit, type Env, type JsonAnswer, type Results } from "../../lib";
+import { E2E_DIR, api, codeFor, json, lastSeq, newContext, sleep, type ApiInit, type CliRun, type Env, type JsonAnswer, type Results } from "../../lib";
 
 export const ROOT = resolve(E2E_DIR, "../..");
 export const FIXTURES = join(ROOT, "testkit/fixtures/imports");
@@ -658,3 +659,346 @@ export function defaultDob(now = new Date()): string {
 
 /** A display name as the importer cleans it: control characters and runs of whitespace become one space, trimmed. */
 export const cleanName = (raw: string) => raw.replace(/[\s\p{Cc}]+/gu, " ").trim();
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* Raw uploads: no Expect, chunked, slow                                                                               */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+export interface RawAnswer {
+  /** 0 when the connection broke before any answer (then `error` says how). */
+  status: number;
+  text: string;
+  headers: IncomingHttpHeaders;
+  ms: number;
+  /** Bytes of the body handed to the socket before the answer (or the break). */
+  wrote: number;
+  error?: string;
+}
+
+/**
+ * POSTs `body` the way fetch, browsers, proxies and the CLI do: no `Expect: 100-continue`, the body written right after
+ * the headers (1 MB at a time, following backpressure), with a Content-Length, or chunked when `chunked` (no length
+ * declared, so only the body stream can be refused). Resolves with the first answer; a connection that broke before
+ * any answer resolves with status 0 and the socket error (ECONNRESET, EPIPE…), never a throw.
+ */
+export function postPlain(url: string, headers: Record<string, string>, body: Buffer, options: { chunked?: boolean; timeoutMs?: number } = {}): Promise<RawAnswer> {
+  return new Promise(done => {
+    const target = new URL(url);
+    const started = Date.now();
+    let wrote = 0;
+    let settled = false;
+    const finish = (answer: Omit<RawAnswer, "ms" | "wrote">) => {
+      if (settled) return;
+      settled = true;
+      done({ ...answer, ms: Date.now() - started, wrote });
+    };
+    const head: Record<string, string> = { ...headers };
+    if (options.chunked) head["transfer-encoding"] = "chunked";
+    else head["content-length"] = String(body.length);
+    const req = httpRequest({ hostname: target.hostname, port: target.port, path: `${target.pathname}${target.search}`, method: "POST", headers: head });
+    req.on("socket", socket => socket.on("error", () => undefined));
+    req.setTimeout(options.timeoutMs ?? 120_000, () => req.destroy(new Error("no answer within the timeout")));
+    req.on("response", response => {
+      let text = "";
+      response.setEncoding("utf8");
+      response.on("data", chunk => (text += chunk));
+      const end = () => finish({ status: response.statusCode ?? 0, text, headers: response.headers });
+      response.on("end", end);
+      response.on("error", end);
+      response.on("close", end);
+    });
+    req.on("error", error => finish({ status: 0, text: "", headers: {}, error: `${(error as NodeJS.ErrnoException).code ?? "error"}: ${error.message}` }));
+    const step = 1024 * 1024;
+    const pump = () => {
+      while (wrote < body.length && !settled) {
+        const piece = body.subarray(wrote, Math.min(body.length, wrote + step));
+        wrote += piece.length;
+        if (!req.write(piece)) {
+          req.once("drain", pump);
+          return;
+        }
+      }
+      if (wrote >= body.length) req.end();
+    };
+    pump();
+  });
+}
+
+/**
+ * An upload that declares `declaredBytes` and then trickles: `bytesPerTick` every `tickMs`. It holds whatever the
+ * server gives a request while it reads the body (an import slot) until `abort()` (the connection is destroyed, as a
+ * client that went away). `answered` resolves when the server answers (or the connection breaks).
+ */
+export function postTrickle(url: string, headers: Record<string, string>, declaredBytes: number, options: { tickMs?: number; bytesPerTick?: number } = {}): { answered: Promise<RawAnswer>; abort: () => void } {
+  const target = new URL(url);
+  const started = Date.now();
+  let wrote = 0;
+  let timer: NodeJS.Timeout | null = null;
+  let settle: (answer: RawAnswer) => void = () => undefined;
+  const answered = new Promise<RawAnswer>(done => (settle = done));
+  let settled = false;
+  const finish = (answer: Omit<RawAnswer, "ms" | "wrote">) => {
+    if (timer) clearInterval(timer);
+    if (settled) return;
+    settled = true;
+    settle({ ...answer, ms: Date.now() - started, wrote });
+  };
+  const req = httpRequest({ hostname: target.hostname, port: target.port, path: `${target.pathname}${target.search}`, method: "POST", headers: { ...headers, "content-length": String(declaredBytes) } });
+  req.on("socket", socket => socket.on("error", () => undefined));
+  req.on("response", response => {
+    let text = "";
+    response.setEncoding("utf8");
+    response.on("data", chunk => (text += chunk));
+    response.on("end", () => finish({ status: response.statusCode ?? 0, text, headers: response.headers }));
+    response.on("error", () => finish({ status: response.statusCode ?? 0, text, headers: response.headers }));
+  });
+  req.on("error", error => finish({ status: 0, text: "", headers: {}, error: `${(error as NodeJS.ErrnoException).code ?? "error"}: ${error.message}` }));
+  req.flushHeaders();
+  const bytesPerTick = options.bytesPerTick ?? 16;
+  timer = setInterval(() => {
+    if (settled || wrote + bytesPerTick >= declaredBytes) return;
+    req.write(Buffer.alloc(bytesPerTick, 0x61));
+    wrote += bytesPerTick;
+  }, options.tickMs ?? 1000);
+  return {
+    answered,
+    abort: () => {
+      if (timer) clearInterval(timer);
+      req.destroy();
+      finish({ status: 0, text: "", headers: {}, error: "aborted by the test" });
+    },
+  };
+}
+
+/** The error object of a raw answer body, or null when it is not a Silicon Accounts error (a proxy's own page). */
+export function errorOfText(text: string): ApiErrorBody["error"] | null {
+  try {
+    return (JSON.parse(text) as ApiErrorBody).error ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** `413 payload_too_large` in a raw answer, else what came back instead. */
+export function describeRaw(answer: RawAnswer): string {
+  const error = errorOfText(answer.text);
+  if (answer.status === 0) return `no answer (${answer.error}) after ${answer.ms} ms, ${answer.wrote} bytes written`;
+  return `${answer.status} ${error?.code ?? answer.text.replace(/\s+/g, " ").slice(0, 80)} after ${answer.ms} ms`;
+}
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* The CLI with a binary stdin and its own environment, and the stack's API log                                         */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+/**
+ * Runs the `accounts` CLI like lib's cli(), but `stdin` may be a Buffer (a file piped in) and `extraEnv` is added to
+ * its environment (ACCOUNTS_APP_ID / ACCOUNTS_APP_SECRET, so stdin stays free for the file). A CLI that stops reading
+ * stdin early (it refused the input) is fine: the broken pipe is ignored.
+ */
+export function cliRaw(env: Env, home: string, args: string[], options: { stdin?: Buffer | string; extraEnv?: Record<string, string> } = {}): Promise<CliRun> {
+  return new Promise(done => {
+    const started = Date.now();
+    const child = spawn(env.cli, ["--url", env.site, "--home", home, ...args], { env: { ...process.env, NO_COLOR: "1", ...options.extraEnv } });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", chunk => (stdout += chunk));
+    child.stderr.on("data", chunk => (stderr += chunk));
+    child.stdin.on("error", () => undefined);
+    child.stdin.end(options.stdin ?? "");
+    child.on("close", code => {
+      let parsed: Record<string, unknown> | null = null;
+      try {
+        parsed = JSON.parse(stdout.trim()) as Record<string, unknown>;
+      } catch {
+        parsed = null;
+      }
+      done({ code, stdout, stderr, ms: Date.now() - started, json: parsed });
+    });
+  });
+}
+
+/** The stack's accounts-api log (scripts/dev.sh writes .dev/logs/<base>/accounts-api.log), or null when absent. */
+export function apiLogPath(env: Env): string {
+  return join(ROOT, ".dev", "logs", String(env.base), "accounts-api.log");
+}
+
+/** How many lines of the stack's accounts-api log match `pattern` (null when the log isn't there). */
+export function countApiLog(env: Env, pattern: RegExp): number | null {
+  const path = apiLogPath(env);
+  if (!existsSync(path)) return null;
+  return readFileSync(path, "utf8").split("\n").filter(line => pattern.test(line)).length;
+}
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* A second accounts-api on the same database (another API node), for worker failure modes                             */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+export interface Instance {
+  /** http://127.0.0.1:<port> */
+  url: string;
+  port: number;
+  pid: number;
+  logPath: string;
+  /** SIGKILL, as a crash or an OOM kill would: no shutdown, no cleanup. Resolves once it is gone. */
+  kill(): Promise<void>;
+  alive(): boolean;
+}
+
+const instances = new Set<ChildProcess>();
+// A journey that throws must never leave a second API node running behind the stack.
+process.once("exit", () => {
+  for (const child of instances) {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      // Already gone.
+    }
+  }
+});
+
+function portBusy(port: number): Promise<boolean> {
+  return new Promise(done => {
+    const socket = connect({ host: "127.0.0.1", port });
+    socket.once("connect", () => {
+      socket.destroy();
+      done(true);
+    });
+    socket.once("error", () => done(false));
+  });
+}
+
+/**
+ * Starts another accounts-api process on the stack's own database with the stack's own environment
+ * (.dev/run/<base>/accounts-api.env, written by scripts/dev.sh) on a free port between base+5 and base+8 (the gap
+ * between two stacks' bases), with its own import worker, as a second API node in production would be. Its log goes
+ * to .dev/logs/<base>/accounts-api-<label>.log, which scripts/e2e.sh copies into the artifacts.
+ */
+export async function startInstance(env: Env, label: string): Promise<Instance> {
+  const envFile = join(ROOT, ".dev", "run", String(env.base), "accounts-api.env");
+  const bin = join(dirname(env.cli), "accounts-api");
+  if (!existsSync(envFile)) throw new Error(`${envFile} is missing: the stack must have been started by scripts/dev.sh (scripts/e2e.sh)`);
+  if (!existsSync(bin)) throw new Error(`${bin} is missing (E2E_CLI points at ${env.cli})`);
+  let port = 0;
+  for (let offset = 5; offset <= 8; offset++) {
+    if (!(await portBusy(env.base + offset))) {
+      port = env.base + offset;
+      break;
+    }
+  }
+  if (!port) throw new Error(`ports ${env.base + 5}–${env.base + 8} are all in use`);
+  const logDir = join(ROOT, ".dev", "logs", String(env.base));
+  mkdirSync(logDir, { recursive: true });
+  const logPath = join(logDir, `accounts-api-${label}.log`);
+  const fd = openSync(logPath, "w");
+  const child = spawn("bash", ["-c", 'set -a; . "$1"; set +a; export ACCOUNTS_BIND_ADDR="127.0.0.1:$3"; exec "$2"', `accounts-api-${label}`, envFile, bin, String(port)], { stdio: ["ignore", fd, fd] });
+  closeSync(fd);
+  instances.add(child);
+  let exited = false;
+  const gone = new Promise<void>(done => child.once("exit", () => {
+    exited = true;
+    instances.delete(child);
+    done();
+  }));
+  const url = `http://127.0.0.1:${port}`;
+  const deadline = Date.now() + 90_000;
+  for (;;) {
+    if (exited) throw new Error(`the second accounts-api exited during start-up (log: ${logPath})`);
+    const ready = await fetch(`${url}/readyz`).then(answer => answer.status === 200, () => false);
+    if (ready) break;
+    if (Date.now() > deadline) {
+      child.kill("SIGKILL");
+      throw new Error(`the second accounts-api was not ready within 90 s (log: ${logPath})`);
+    }
+    await sleep(250);
+  }
+  return {
+    url,
+    port,
+    pid: child.pid ?? 0,
+    logPath,
+    alive: () => !exited,
+    kill: async () => {
+      if (!exited) child.kill("SIGKILL");
+      await gone;
+    },
+  };
+}
+
+/** The pid of the process listening on `port` (lsof), or null. */
+export function listenerPid(port: number): Promise<number | null> {
+  return new Promise(done => {
+    execFile("lsof", ["-nP", "-t", `-iTCP:${port}`, "-sTCP:LISTEN"], (_error, stdout) => {
+      const pid = Number(stdout.trim().split("\n")[0]);
+      done(Number.isInteger(pid) && pid > 0 ? pid : null);
+    });
+  });
+}
+
+/** Local ports of `pid`'s TCP connections to the database (lsof), to tell which process a backend serves. */
+export function databasePortsOf(pid: number, dbPort = 5444): Promise<Set<number>> {
+  return new Promise(done => {
+    execFile("lsof", ["-nP", "-a", "-p", String(pid), `-iTCP:${dbPort}`, "-F", "n"], (_error, stdout) => {
+      const ports = new Set<number>();
+      for (const line of stdout.split("\n")) {
+        const match = /^n(?:127\.0\.0\.1|\[::1\]|localhost):(\d+)->/.exec(line);
+        if (match) ports.add(Number(match[1]));
+      }
+      done(ports);
+    });
+  });
+}
+
+/**
+ * The client port of the database session that holds an import job's worker lock (the session-level advisory lock
+ * `hashtextextended('import_job:' || id, 0)`, see crates/apps/src/imports/worker.rs), or null when nobody holds it.
+ */
+export async function jobLockPort(env: Env, jobId: string): Promise<number | null> {
+  const out = await psql(env, `select a.client_port from pg_locks l join pg_stat_activity a on a.pid = l.pid
+    where l.locktype = 'advisory' and l.granted and l.objsubid = 1 and l.database = (select oid from pg_database where datname = current_database())
+      and ((l.classid::bigint << 32) | l.objid::bigint) = hashtextextended('import_job:' || ${lit(jobId)}, 0) limit 1`);
+  const port = Number(out.trim());
+  return Number.isInteger(port) && port > 0 ? port : null;
+}
+
+/** Which process works on a job right now: its pid (from the lock's session), or null when no one does. */
+export async function jobWorkerPid(env: Env, jobId: string, candidates: number[]): Promise<number | null> {
+  const port = await jobLockPort(env, jobId);
+  if (port === null) return null;
+  for (const pid of candidates) if ((await databasePortsOf(pid)).has(port)) return pid;
+  return null;
+}
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* Hosted flows and one-off imports                                                                                    */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+export interface FlowView {
+  step?: string;
+  app?: { app_id?: string; name?: string };
+  signup?: {
+    finishing_import?: boolean;
+    imported_by?: { app_id: string; name: string } | null;
+    id?: string;
+    display_name?: string;
+    timezone?: string;
+    dob?: string;
+    email?: string | null;
+    phone?: string | null;
+  };
+}
+
+/** The hosted flow's own view (GET /v1/flows/{id}) of the page's current flow, read with the page's cookies. */
+export async function flowView(page: import("@playwright/test").Page): Promise<FlowView | null> {
+  const id = /\/authorize\/flow\/([^/?#]+)/.exec(page.url())?.[1];
+  if (!id) return null;
+  const view: unknown = await page.evaluate(async flow => ((await (await fetch(`/v1/flows/${flow}`)).json()) as { flow?: unknown }).flow ?? null, id);
+  return (view ?? null) as FlowView | null;
+}
+
+/** Imports `rows` as JSON (a fresh Idempotency-Key), waits for the job and returns it with its row results. */
+export async function importRows(ctx: Caller, app: FakeApp, rows: Array<Record<string, unknown>>, options: Record<string, unknown> = {}): Promise<{ job: ImportJob; rows: RowResult[] }> {
+  const answer = await postJson(ctx, app, { rows, options }, { key: crypto.randomUUID() });
+  if (!answer.body.job) throw new Error(`the import was refused: ${answer.status} ${JSON.stringify(answer.body).slice(0, 400)}`);
+  const job = await waitJob(ctx, app, answer.body.job.id);
+  return { job, rows: await allRows(ctx, app, job.id) };
+}

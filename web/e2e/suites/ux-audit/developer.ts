@@ -11,8 +11,8 @@
  */
 import type { Cookie, Page } from "@playwright/test";
 import type { Ctx, Journey } from "../../context";
-import { appAccount, signInOnSite, sql, tag } from "../../lib";
-import { VARIANTS, auditContext, auditVariants, checkDock, collectConsole, findingsFor, freshEmail, hostedLink, pageFetch, saveFindings, sendEmailCode, settle, signedInCarbon, waitUntil, type Findings } from "./_audit";
+import { appAccount, sql, tag } from "../../lib";
+import { VARIANTS, auditContext, auditVariants, checkDock, collectConsole, findingsFor, freshEmail, hostedLink, pageFetch, saveFindings, sendEmailCode, settle, signInAsSeededOwner, signedInCarbon, waitUntil, type Findings } from "./_audit";
 
 const TABS = ["overview", "sign-in", "branding", "users", "import", "webhooks", "proofs", "embed"] as const;
 
@@ -158,11 +158,12 @@ export const journeys: Journey[] = [
         await context.close();
       }
 
+      // The seeded owner's photo is test data on the production Iris (a harness defect): this stack's mock Iris draws it.
       const context = await auditContext(browser);
       const page = await context.newPage();
       results.watch(page, "developer-briefcase");
       collectConsole(page);
-      await signInOnSite(env, page, "saketdev12@example.test");
+      await signInAsSeededOwner(ctx, page, findings);
       const rows = [
         { email: `uxa.import.${tag()}@example.test`, display_name: "Imported Carbon", external_id: `ext-${tag()}` },
         { email: "not-an-email", display_name: "Bad Row" },

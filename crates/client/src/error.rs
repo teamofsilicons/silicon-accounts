@@ -49,6 +49,20 @@ pub enum Error {
         /// How to fix it.
         hint: String,
     },
+    /// A request body is larger than the service accepts (an import over
+    /// [`crate::MAX_IMPORT_BYTES`]), so it was never sent. Its code is
+    /// `payload_too_large`, the code the service answers with when it refuses a body
+    /// itself, so `error.is_code("payload_too_large")` covers both.
+    #[error("{message} Hint: {hint}")]
+    #[non_exhaustive]
+    PayloadTooLarge {
+        /// What is too large, how large it is, and the limit.
+        message: String,
+        /// How to make it fit.
+        hint: String,
+        /// `{"size_bytes": …, "limit_bytes": …}` (as [`Error::details`] returns them).
+        details: Value,
+    },
     /// Local verification of an access token failed (see [`crate::verify_access_token`]).
     #[error("{0}")]
     Token(TokenError),
@@ -377,7 +391,7 @@ impl Error {
 
     /// Stable machine-readable code: the service's error code, the OAuth error, or a
     /// client-side code (`connection_failed`, `request_timeout`, `unexpected_response`,
-    /// `invalid_input`, `timed_out`, `token_*`).
+    /// `invalid_input`, `payload_too_large`, `timed_out`, `token_*`).
     pub fn code(&self) -> &str {
         match self {
             Self::Api(e) => &e.code,
@@ -386,6 +400,7 @@ impl Error {
             Self::Http { .. } => "connection_failed",
             Self::Decode { .. } => "unexpected_response",
             Self::InvalidInput { .. } => "invalid_input",
+            Self::PayloadTooLarge { .. } => "payload_too_large",
             Self::Token(e) => e.code(),
             Self::TimedOut { .. } => "timed_out",
         }
@@ -399,6 +414,7 @@ impl Error {
             Self::Http { message, .. }
             | Self::Decode { message, .. }
             | Self::InvalidInput { message, .. }
+            | Self::PayloadTooLarge { message, .. }
             | Self::TimedOut { message, .. } => message.clone(),
             Self::Token(e) => e.message(),
         }
@@ -412,6 +428,7 @@ impl Error {
             Self::Http { hint, .. }
             | Self::Decode { hint, .. }
             | Self::InvalidInput { hint, .. }
+            | Self::PayloadTooLarge { hint, .. }
             | Self::TimedOut { hint, .. } => Some(hint.clone()),
             Self::Token(e) => Some(e.hint().to_owned()),
         }
@@ -435,10 +452,12 @@ impl Error {
         }
     }
 
-    /// Structured error details (`details` in the service's error body).
+    /// Structured error details (`details` in the service's error body, or the size and
+    /// the limit of a body refused before it was sent).
     pub fn details(&self) -> Option<&Value> {
         match self {
             Self::Api(e) => e.details.as_ref(),
+            Self::PayloadTooLarge { details, .. } => Some(details),
             _ => None,
         }
     }

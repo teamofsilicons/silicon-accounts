@@ -23,7 +23,7 @@ import { describe } from "../flow/errors";
 import { useNow } from "../flow/hooks";
 import { cleanHandle, handleProblem, useIdCheck } from "../flow/id-check";
 import { IdField } from "../flow/id-field";
-import type { HostedFlow } from "../flow/model";
+import { importerName, type HostedFlow } from "../flow/model";
 import { AppleMark, DestinationRow, FieldNote, FlowAlert, GoogleMark, StepHeading, useStepErrors } from "../flow/parts";
 import styles from "../flow/flow.module.css";
 
@@ -73,6 +73,12 @@ export function Signup(props: SignupProps) {
 function SignupForm({ flow, ctl, notice, prefill }: SignupProps & { prefill: FlowSignup }) {
   const app = flow.app;
   const destinationName = app.first_party ? "your account" : app.name;
+  /**
+   * Who added the Carbon, when finishing an import: the app whose import created the account, which need not be the
+   * app being signed into (legacy-crm imported them, they first sign into briefcase). Never the flow's app by default.
+   */
+  const importer = importerName(prefill.imported_by?.name);
+  const importedHere = !!prefill.imported_by && prefill.imported_by.app_id === app.app_id;
   const [name, setName] = useState(prefill.display_name);
   const [handle, setHandle] = useState(cleanHandle(prefill.id));
   // Some browsers report legacy zone names (Asia/Calcutta): the page offers the name people know (Asia/Kolkata).
@@ -182,7 +188,7 @@ function SignupForm({ flow, ctl, notice, prefill }: SignupProps & { prefill: Flo
       case "checking":
         return `Checking c:${handle}…`;
       case "own":
-        return `This is the id ${app.name} set up for you. Keep it, or pick another.`;
+        return importer ? `This is the id ${importer} set up for you. Keep it, or pick another.` : "This is the id set up for you when you were added. Keep it, or pick another.";
       case "unknown":
         return ids.message ?? "Your id is how people find you. You can change it later.";
       default:
@@ -268,7 +274,9 @@ function SignupForm({ flow, ctl, notice, prefill }: SignupProps & { prefill: Flo
       <StepHeading
         title={prefill.finishing_import ? "Finish setting up your account" : "Set up your account"}
         description={prefill.finishing_import
-          ? `${app.name} added you to Silicon Accounts. Check the details it gave us, then continue.`
+          ? importedHere && importer
+            ? `${importer} added you to Silicon Accounts. Check the details it gave us, then continue.`
+            : `${importer ?? "An app you use"} added you to Silicon Accounts. Check the details it gave us, then continue to ${destinationName}.`
           : `This is your first time here, so we filled it all in. Check it, then continue to ${destinationName}. You can change any of it later.`}
       />
       <FlowAlert error={errors.current} app={app.name} onSwitch={() => ctl.switchAccount()} />

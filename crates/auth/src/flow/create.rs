@@ -139,6 +139,19 @@ pub async fn create_flow(
             "Add redirect_uri=<one of the app's registered redirect URIs> to the authorize URL.",
         ));
     };
+    // RFC 6749 §3.1.2: a redirection URI never has a fragment. Registered URIs can't carry one
+    // (the sign-in setup refuses them), but the loopback rule matches on host, path and query
+    // only, so check the URI itself: the result would otherwise go to `…?code=…&state=…#…`.
+    if redirect_uri.contains('#') {
+        return Err(ApiError::bad_request(
+            "redirect_uri_not_registered",
+            format!(
+                "redirect_uri '{redirect_uri}' is not registered for the app '{app_id}': it has a #fragment, and a redirect URI must never have one (RFC 6749 §3.1.2), so no registered URI can match it."
+            ),
+        )
+        .hint("Send the registered redirect URI without the #… part; keep client-side state in the state parameter instead.")
+        .detail("app_id", app_id.as_str()));
+    }
     if !fa
         .config
         .redirect_allowed(&state.settings, &app_id, &redirect_uri)

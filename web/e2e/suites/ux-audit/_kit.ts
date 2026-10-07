@@ -290,8 +290,8 @@ export const KIT_SOURCE = String.raw`
     for (var i = 0; i < all.length && out.length < 15; i++) {
       var el = all[i];
       if (el.closest("[aria-hidden=true],[inert],.sr-only,[hidden]")) continue;
-      // Icon-only controls that show on hover or focus (a row's copy buttons) are hidden by design.
-      if (el.matches("button,a[href]") && !short(el.textContent, 5)) continue;
+      // Icon-only controls that show on hover or focus (a row's copy buttons, a heading's "#" link) are hidden by design.
+      if (el.matches("button,a[href]") && !/[A-Za-z0-9]/.test(short(el.textContent, 20))) continue;
       var r = el.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
       var cs = getComputedStyle(el);
@@ -410,15 +410,27 @@ export const KIT_SOURCE = String.raw`
     for (var i = 0; i < all.length; i++) looks.set(all[i], look(all[i]));
     return all.length;
   }
+  /** An element's text without its aria-hidden parts (a label drawn twice, once for the eyes and once for the name). */
+  function spokenText(el) {
+    var out = "";
+    (function walk(node) {
+      for (var i = 0; i < node.childNodes.length; i++) {
+        var c = node.childNodes[i];
+        if (c.nodeType === 3) out += c.textContent;
+        else if (c.nodeType === 1 && c.getAttribute("aria-hidden") !== "true") walk(c);
+      }
+    })(el);
+    return out;
+  }
   function nameOf(el) {
     var label = el.getAttribute("aria-label");
     if (label) return short(label, 80);
     var by = el.getAttribute("aria-labelledby");
-    if (by) return short(by.split(/\s+/).map(function (id) { var n = document.getElementById(id); return n ? n.textContent : ""; }).join(" "), 80);
-    if (el.id) { var l = document.querySelector('label[for="' + el.id + '"]'); if (l) return short(l.textContent, 80); }
+    if (by) return short(by.split(/\s+/).map(function (id) { var n = document.getElementById(id); return n ? spokenText(n) : ""; }).join(" "), 80);
+    if (el.id) { var l = document.querySelector('label[for="' + el.id + '"]'); if (l) return short(spokenText(l), 80); }
     var wrap = el.closest("label");
-    if (wrap) return short(wrap.textContent, 80);
-    return short(el.textContent || el.getAttribute("placeholder") || el.getAttribute("title") || el.getAttribute("value"), 80);
+    if (wrap) return short(spokenText(wrap), 80);
+    return short(spokenText(el) || el.getAttribute("placeholder") || el.getAttribute("title") || el.getAttribute("value"), 80);
   }
   function activeFocus() {
     var el = document.activeElement;

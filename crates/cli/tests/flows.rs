@@ -417,6 +417,132 @@ fn app_import_waits_and_shows_first_errors() {
     assert_eq!(mock.count("POST", "/v1/apps/briefcase/imports"), 1);
 }
 
+/// A file over the 50 MB import limit gets the precise refusal (exit 2, payload_too_large,
+/// the limit and how to split) and is never uploaded. Uploading it anyway raced with the
+/// service's early 413: through the site's proxy the CLI got a reset connection or an
+/// HTTP 500 instead of the refusal.
+#[test]
+fn app_import_refuses_files_over_50_mb_before_sending_anything() {
+    const LIMIT: u64 = 50 * 1024 * 1024;
+    let mock = Mock::start();
+    let env = Env::new();
+    let import = |file: &std::path::Path, extra: &[&str]| {
+        let mut cmd = env.cmd();
+        cmd.args([
+            "--url",
+            &mock.url,
+            "app",
+            "--app-id",
+            APP_ID,
+            "--app-secret",
+            APP_SECRET,
+            "import",
+        ])
+        .arg(file)
+        .args(extra);
+        cmd
+    };
+
+    // A 51 MB CSV, refused from its size on disk.
+    let big = env.path().join("big.csv");
+    std::fs::write(&big, b"email,display_name\n").unwrap();
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&big)
+        .unwrap()
+        .set_len(51 * 1024 * 1024)
+        .unwrap();
+    let output = import(&big, &["--dry-run", "--json"]).output().unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let error = stdout_json(&output)["error"].clone();
+    assert_eq!(error["code"], "payload_too_large", "{error}");
+    assert_eq!(error["exit_code"], 2);
+    let message = error["message"].as_str().unwrap();
+    assert!(
+        message.starts_with("The import is over the 50 MB limit: ")
+            && message.contains("big.csv is 53477376 bytes (51.0 MB), and one import accepts at most 52428800 bytes, so it was not uploaded."),
+        "{message}"
+    );
+    assert!(
+        error["hint"]
+            .as_str()
+            .unwrap()
+            .contains("files of at most 50 MB and 100,000 rows each"),
+        "{error}"
+    );
+    assert_eq!(error["details"]["size_bytes"], 51 * 1024 * 1024);
+    assert_eq!(error["details"]["limit_bytes"], LIMIT);
+    assert!(error.get("status").is_none(), "nothing was sent: {error}");
+
+    // Text mode: the error and the hint on stderr, nothing on stdout.
+    let output = import(&big, &[]).output().unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("error: The import is over the 50 MB limit: ")
+            && stderr.contains("hint: Split it into files of at most 50 MB and 100,000 rows each"),
+        "{stderr}"
+    );
+
+    // From stdin: refused as soon as more than 50 MB came in.
+    let mut piped = b"email,display_name\n".to_vec();
+    piped.resize(usize::try_from(LIMIT).unwrap() + 4096, b'a');
+    let output = import(std::path::Path::new("-"), &["--json"])
+        .write_stdin(piped)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let error = stdout_json(&output)["error"].clone();
+    assert_eq!(error["code"], "payload_too_large", "{error}");
+    assert!(
+        error["message"]
+            .as_str()
+            .unwrap()
+            .contains("the CSV on stdin carries more than the 52428800 bytes one import accepts"),
+        "{error}"
+    );
+
+    // JSON is re-encoded before it is sent, so the encoded body is what counts: 51 rows of
+    // 1 MB each, refused by the client package.
+    let rows: Vec<Value> = (0..51)
+        .map(|i| {
+            serde_json::json!({ "email": format!("u{i}@example.com"), "display_name": "x".repeat(1024 * 1024) })
+        })
+        .collect();
+    let json_file = env.path().join("big.json");
+    std::fs::write(&json_file, serde_json::to_vec(&rows).unwrap()).unwrap();
+    let output = import(&json_file, &["--json"]).output().unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let error = stdout_json(&output)["error"].clone();
+    assert_eq!(error["code"], "payload_too_large", "{error}");
+    assert!(
+        error["message"]
+            .as_str()
+            .unwrap()
+            .starts_with("The import is over the 50 MB limit: its JSON body (51 rows) is "),
+        "{error}"
+    );
+    assert_eq!(error["details"]["limit_bytes"], LIMIT);
+    assert!(error["details"]["size_bytes"].as_u64().unwrap() > LIMIT);
+
+    assert_eq!(
+        mock.count("POST", "/v1/apps/briefcase/imports"),
+        0,
+        "no import was uploaded"
+    );
+}
+
 #[test]
 fn a_custodian_checks_an_id_for_its_silicon() {
     let mock = Mock::start();

@@ -1,11 +1,18 @@
 /**
- * ATA (app to app): Commit gets one proof for Remind and Waveform through the fake apps, and each verifies it as its
- * own audience; nobody else can. Audience rules, the ATA page stand-in, refresh, the issuing app disabled and back,
- * and revocation for every audience at once.
+ * ATA (app to app). UNDERSTANDING.md: "An ATA proof is always for exactly one app; a proof can't be made for several
+ * apps at once. If App A wants to talk to App B and App C, it makes one proof for App B and another one for App C, and
+ * each of them verifies its own proof with us." So Commit → [remind, waveform] is two proofs, one per app: each app
+ * verifies its own, and gets exactly {valid:false, expires_at:null} for the other's, as does every other app.
+ *
+ * Checked through the fake apps (Commit's notify one app at a time, and for both apps at once, which must still come
+ * out as a proof per app), straight at the API (a proof per app; a proof for two apps refused, on POST /v1/proofs/ata
+ * and on the ATA page's endpoint), the receiving-app rules, the listing, refresh, the issuing app disabled and back,
+ * and revocation, which ends only the proof revoked.
  */
+import { randomUUID } from "node:crypto";
 import type { Journey } from "../../context";
-import { json, sql } from "../../lib";
-import { appListing, asApp, errorCode, isExactlyInvalid, issueAta, refreshAs, revokeAs, secondsBetween, short, verifyAs, type IssuedProof, type Verification } from "./_helpers";
+import { json, sql, tag } from "../../lib";
+import { appListing, asApp, errorCode, isExactlyInvalid, issueAta, issueAtaFor, namesOnly, refreshAs, revokeAs, secondsBetween, short, verifyAs, type ApiErrorBody, type IssuedProof, type Verification } from "./_helpers";
 
 interface NotifyAnswer {
   ok?: boolean;
@@ -14,108 +21,170 @@ interface NotifyAnswer {
   timings?: { issue_ms?: number; total_ms?: number; verify_ms?: Record<string, number | null> };
 }
 
+/** The two apps Commit talks to (testkit/fake-apps.json: commit's ATA audiences). */
+const APPS = ["remind", "waveform"] as const;
+/** Apps that are neither of them; the issuer itself among them. */
+const OTHERS = ["briefcase", "dm", "commit", "spacestation", "interface"];
+const other = (app: string) => (app === "remind" ? "waveform" : "remind");
+
 export const journey: Journey = {
   name: "proofs-perf-ata",
-  title: "ATA commit → [remind, waveform] through the fake apps: each audience verifies the one proof as its own receiver, every other app gets exactly invalid; audience rules, the ATA page stand-in, refresh, issuing app disabled and back, revocation reaches every audience",
+  title: "ATA commit → [remind, waveform] is one proof per app (UNDERSTANDING.md: an ATA proof is always for exactly one app): through the fake apps and straight at the API each app verifies its own proof and gets exactly invalid for the other's; a proof for two apps at once is refused; receiving-app rules, the ATA page endpoint, listing, refresh, issuing app disabled and back, revoking one app's proof leaves the other's",
   async run(ctx) {
     const { env, results } = ctx;
-    const message = `pp ata ${Date.now()}`;
+    const notify = (audiences: string[], message: string) =>
+      json<NotifyAnswer>(`${env.apps}/commit/actions/notify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ audiences, message }) });
+    const verifiedOwn = (v: Verification | null | undefined, app: string) =>
+      v?.valid === true && v.kind === "ata" && v.issuing_app?.app_id === "commit" && v.issuing_app.name === "Commit" && v.receiving_app?.app_id === app && v.user === null && JSON.stringify(v.scopes) === '["notifications.send"]';
 
-    // Through the fake apps: Commit's notify gets one proof and pings both audiences, each of which verifies it.
-    const notify = await json<NotifyAnswer>(`${env.apps}/commit/actions/notify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ audiences: ["remind", "waveform"], message }) });
-    const r = notify.body.results ?? {};
-    results.check("Commit's notify succeeded: one ATA proof, both pings accepted", notify.status === 200 && notify.body.ok === true && r.remind?.ok === true && r.waveform?.ok === true, short(notify.body, 600));
-    for (const audience of ["remind", "waveform"] as const) {
-      const v = r[audience]?.verification;
-      results.check(`${audience} verified it: valid, kind ata, issuing commit, receiving ${audience}, no user, the scopes`, v?.valid === true && v.kind === "ata" && v.issuing_app?.app_id === "commit" && v.issuing_app.name === "Commit" && v.receiving_app?.app_id === audience && v.user === null && JSON.stringify(v.scopes) === '["notifications.send"]', short(v));
-    }
-    results.check("both verified the same proof (one proof for both audiences)", !!notify.body.proof?.proof_id && r.remind?.verification?.proof_id === notify.body.proof.proof_id && r.waveform?.verification?.proof_id === notify.body.proof.proof_id, short(notify.body.proof));
-    for (const audience of ["remind", "waveform"]) {
-      const state = await json<{ pings: Array<{ message: string | null; from: string | null; kind: string | null; proof_id: string | null }> }>(`${env.apps}/${audience}/_state`);
+    // 1. Through the fake apps, the contract's way: Commit talks to Remind with one proof and to Waveform with another.
+    const viaApps: Record<string, string | undefined> = {};
+    for (const app of APPS) {
+      const message = `pp ata ${app} ${tag()}`;
+      const answer = await notify([app], message);
+      const result = answer.body.results?.[app];
+      results.check(`Commit's notify to ${app} alone: one ATA proof naming only ${app}, the ping accepted`, answer.status === 200 && answer.body.ok === true && result?.ok === true && namesOnly(answer.body.proof, app), short(answer.body, 600));
+      results.check(`${app} verified it as its own: valid, kind ata, issuing commit, receiving ${app}, no user, the scopes`, verifiedOwn(result?.verification, app) && result?.verification?.proof_id === answer.body.proof?.proof_id, short(result?.verification));
+      const state = await json<{ pings: Array<{ message: string | null; from: string | null; kind: string | null; proof_id: string | null }> }>(`${env.apps}/${app}/_state`);
       const ping = state.body.pings?.find(item => item.message === message);
-      results.check(`${audience} recorded the ping from commit under that proof`, ping?.from === "commit" && ping.kind === "ata" && ping.proof_id === notify.body.proof?.proof_id, short(ping));
+      results.check(`${app} recorded the ping from commit under that proof`, ping?.from === "commit" && ping.kind === "ata" && !!ping.proof_id && ping.proof_id === answer.body.proof?.proof_id, short(ping));
+      viaApps[app] = answer.body.proof?.proof_id;
+      const t = answer.body.timings;
+      if (typeof t?.issue_ms === "number") results.metric(`ATA via the fake apps, commit → ${app}: issue`, t.issue_ms);
+      if (typeof t?.verify_ms?.[app] === "number") results.metric(`ATA via the fake apps, commit → ${app}: verify at ${app}`, t.verify_ms[app]!);
+      if (typeof t?.total_ms === "number") results.metric(`ATA via the fake apps, commit → ${app}: total`, t.total_ms);
     }
-    for (const [name, value] of Object.entries(notify.body.timings ?? {})) {
-      if (typeof value === "number") results.metric(`ATA via the fake apps: ${name}`, value);
-      else for (const [audience, ms] of Object.entries(value ?? {})) if (typeof ms === "number") results.metric(`ATA via the fake apps: verify at ${audience}`, ms);
+    results.check("…two proofs through the fake apps, one per app", !!viaApps.remind && !!viaApps.waveform && viaApps.remind !== viaApps.waveform, JSON.stringify(viaApps));
+
+    // 2. The fake Commit's notify for both apps at once (its configured audiences) must still talk to each app with a
+    // proof of its own.
+    const both = await notify([...APPS], `pp ata both ${tag()}`);
+    const bothIds = APPS.map(app => both.body.results?.[app]?.verification?.proof_id);
+    // What each verified proof names, from Commit's own listing (a verification only says who is verifying).
+    const bothListed = await Promise.all(APPS.map((_, i) => (bothIds[i] ? appListing(ctx, "commit", bothIds[i]!, "&kind=ata") : Promise.resolve(null))));
+    results.check(
+      'Commit\'s notify for [remind, waveform] at once talks to each app with a proof of its own: both pings accepted, each app verified a different proof, and Commit\'s listing shows each naming only that app (UNDERSTANDING.md: "it makes one proof for App B and another one for App C, and each of them verifies its own proof")',
+      both.status === 200 && both.body.ok === true && APPS.every((app, i) => verifiedOwn(both.body.results?.[app]?.verification, app) && namesOnly(bothListed[i], app)) && !!bothIds[0] && !!bothIds[1] && bothIds[0] !== bothIds[1],
+      `${both.status} ok=${String(both.body.ok)}; proof verified by remind ${bothIds[0]} (lists ${JSON.stringify(bothListed[0]?.audiences)}), by waveform ${bothIds[1]} (lists ${JSON.stringify(bothListed[1]?.audiences)})${bothIds[0] && bothIds[0] === bothIds[1] ? ": the same proof, one proof for both apps" : ""}`,
+    );
+
+    // 3. A proof for two apps at once is refused and makes nothing: on the API and on the ATA page's endpoint.
+    for (const [where, path] of [
+      ["POST /v1/proofs/ata", "/v1/proofs/ata"],
+      ["the ATA page's POST /v1/apps/commit/proofs/ata", "/v1/apps/commit/proofs/ata"],
+    ] as const) {
+      const scope = `pp.two-apps.${tag()}`;
+      const answer = await asApp<IssuedProof>(ctx, "commit", "POST", path, { audiences: [...APPS], scopes: [scope] }, { key: randomUUID() });
+      const [[made] = []] = await sql(env, `select count(*) from proof_families where issuing_app = 'commit' and '${scope}' = any(scopes)`);
+      let evidence = "";
+      if (answer.status === 201 && answer.body.proof_token) {
+        const verdicts = await Promise.all(APPS.map(app => verifyAs(ctx, app, answer.body.proof_token)));
+        evidence = `; that one proof token verifies valid at ${APPS.filter((_, i) => verdicts[i]!.body.valid === true).join(" and ") || "neither"}`;
+      }
+      results.check(
+        `${where} for two apps (remind and waveform) is refused and makes no proof (UNDERSTANDING.md: "An ATA proof is always for exactly one app; a proof can't be made for several apps at once")`,
+        answer.status >= 400 && answer.status < 500 && made === "0",
+        `${answer.status} ${short(answer.body.error ?? { proof_id: answer.body.proof_id, kind: answer.body.kind, receiving_apps: answer.body.receiving_apps })}; proofs stored: ${made}${evidence}`,
+      );
     }
 
-    // Directly: the issue answer.
-    const issued = await issueAta(ctx, "commit", { audiences: ["remind", "waveform"], scopes: ["notifications.send"], access_ttl_seconds: 300 });
-    const p = issued.body;
-    results.check("POST /v1/proofs/ata → 201: kind ata, receiving_apps [remind, waveform], no receiving_app, user null", issued.status === 201 && p.kind === "ata" && JSON.stringify(p.receiving_apps) === '["remind","waveform"]' && p.receiving_app === undefined && p.user === null && p.issuing_app === "commit", short(p));
-    const lifeDays = secondsBetween(p.refresh_expires_at, new Date().toISOString()) / 86_400;
-    results.check("an ATA proof can be refreshed for 900 days; its token lives the 300 s asked for", lifeDays > 899.9 && lifeDays <= 900.01 && Math.abs(secondsBetween(p.expires_at, new Date().toISOString()) - 300) < 30, `${lifeDays.toFixed(3)} days, ${p.expires_at}`);
-    for (const audience of ["remind", "waveform"]) {
-      const v = await verifyAs(ctx, audience, p.proof_token);
-      results.check(`${audience} verifies the direct ATA proof as its own receiver`, v.body.valid === true && v.body.receiving_app?.app_id === audience && v.body.expires_at === p.expires_at, short(v.body));
+    // 4. Straight at the API, a proof per app: each app verifies its own and only its own.
+    const issued: Record<string, IssuedProof> = {};
+    for (const app of APPS) {
+      const answer = await issueAtaFor(ctx, "commit", app, { scopes: ["notifications.send"], access_ttl_seconds: 300 });
+      issued[app] = answer.body;
+      results.check(`an ATA proof for ${app} → 201: kind ata, issuing commit, naming only ${app}, user null`, answer.status === 201 && answer.body.kind === "ata" && answer.body.issuing_app === "commit" && namesOnly(answer.body, app) && answer.body.user === null, `${answer.status} ${short(answer.body)}`);
     }
-    for (const app of ["briefcase", "dm", "commit", "spacestation", "interface"]) {
-      const v = await verifyAs(ctx, app, p.proof_token);
-      results.check(`${app} (not an audience${app === "commit" ? ", the issuer" : ""}) → exactly invalid`, v.status === 200 && isExactlyInvalid(v.body), `${v.status} ${JSON.stringify(v.body)}`);
+    const toRemind = issued.remind!;
+    const toWaveform = issued.waveform!;
+    const lifeDays = secondsBetween(toRemind.refresh_expires_at, new Date().toISOString()) / 86_400;
+    results.check("an ATA proof can be refreshed for 900 days; its token lives the 300 s asked for", lifeDays > 899.9 && lifeDays <= 900.01 && Math.abs(secondsBetween(toRemind.expires_at, new Date().toISOString()) - 300) < 30, `${lifeDays.toFixed(3)} days, ${toRemind.expires_at}`);
+    for (const app of APPS) {
+      const own = issued[app]!;
+      const v = await verifyAs(ctx, app, own.proof_token);
+      results.check(`${app} verifies its own proof: valid, receiving_app ${app}, that proof's id and expires_at`, v.status === 200 && v.body.valid === true && v.body.receiving_app?.app_id === app && v.body.proof_id === own.proof_id && v.body.expires_at === own.expires_at, short(v.body));
+      const crossed = await verifyAs(ctx, app, issued[other(app)]!.proof_token);
+      results.check(`${app} verifying the proof made for ${other(app)} → exactly invalid (each app verifies only its own proof)`, crossed.status === 200 && isExactlyInvalid(crossed.body), `${crossed.status} ${JSON.stringify(crossed.body)}`);
+    }
+    for (const app of OTHERS) {
+      const v = await verifyAs(ctx, app, toRemind.proof_token);
+      results.check(`${app} (not the receiver${app === "commit" ? "; the issuer" : ""}) verifying Commit's proof for remind → exactly invalid`, v.status === 200 && isExactlyInvalid(v.body), `${v.status} ${JSON.stringify(v.body)}`);
     }
 
-    // Audience rules.
-    const cases: Array<[string, string[], number, string]> = [
-      ["no audience", [], 422, "validation_failed"],
-      ["Commit itself", ["remind", "commit"], 400, "invalid_receiving_app"],
-      ["Silicon Accounts itself", ["accounts"], 400, "invalid_receiving_app"],
-      ["an unknown app", ["remind", "nope-pp-app"], 400, "unknown_receiving_app"],
-      ["a malformed app id", ["Not An App!"], 422, "validation_failed"],
-      ["21 apps", Array.from({ length: 21 }, (_, i) => `app-${i}`), 422, "validation_failed"],
+    // 5. Receiving-app rules, one app at a time.
+    const none = await issueAta(ctx, "commit", { audiences: [] });
+    results.check("an ATA proof for no app → 422 validation_failed", none.status === 422 && errorCode(none.body) === "validation_failed", `${none.status} ${short(none.body.error)}`);
+    const cases: Array<[string, string, number, string]> = [
+      ["Commit itself", "commit", 400, "invalid_receiving_app"],
+      ["Silicon Accounts itself", "accounts", 400, "invalid_receiving_app"],
+      ["an unknown app", "nope-pp-app", 400, "unknown_receiving_app"],
+      ["a malformed app id", "Not An App!", 422, "validation_failed"],
     ];
-    for (const [what, audiences, status, codeName] of cases) {
-      const answer = await issueAta(ctx, "commit", { audiences });
-      results.check(`audiences with ${what} → ${status} ${codeName}`, answer.status === status && errorCode(answer.body) === codeName, `${answer.status} ${short(answer.body.error)}`);
+    for (const [what, app, status, codeName] of cases) {
+      const answer = await issueAtaFor(ctx, "commit", app);
+      results.check(`an ATA proof for ${what} → ${status} ${codeName}`, answer.status === status && errorCode(answer.body) === codeName, `${answer.status} ${short(answer.body.error)}`);
+      if (codeName === "unknown_receiving_app") results.check("…the unknown app is named in details.app_ids", JSON.stringify(answer.body.error?.details?.app_ids) === '["nope-pp-app"]', short(answer.body.error?.details));
     }
-    const unknown = await issueAta(ctx, "commit", { audiences: ["remind", "nope-pp-app"] });
-    results.check("…the unknown one is named in details.app_ids", JSON.stringify(unknown.body.error?.details?.app_ids) === '["nope-pp-app"]', short(unknown.body.error?.details));
-    const deduped = await issueAta(ctx, "commit", { audiences: [" Remind", "remind", "WAVEFORM"] });
-    results.check("audiences are trimmed, lower-cased and de-duplicated in order", deduped.status === 201 && JSON.stringify(deduped.body.receiving_apps) === '["remind","waveform"]', `${deduped.status} ${short(deduped.body.receiving_apps ?? deduped.body.error)}`);
+    const normalized = await issueAtaFor(ctx, "commit", " Remind");
+    results.check('the app id is trimmed and lower-cased (" Remind" → a proof for remind)', normalized.status === 201 && namesOnly(normalized.body, "remind"), `${normalized.status} ${short(normalized.body.receiving_apps ?? normalized.body.receiving_app ?? normalized.body.error)}`);
     await sql(env, "update apps set status = 'disabled' where app_id = 'waveform'");
     try {
-      const disabled = await issueAta(ctx, "commit", { audiences: ["remind", "waveform"] });
-      results.check("a disabled audience → 403 receiving_app_disabled naming it", disabled.status === 403 && errorCode(disabled.body) === "receiving_app_disabled" && JSON.stringify(disabled.body.error?.details?.app_ids) === '["waveform"]', `${disabled.status} ${short(disabled.body.error)}`);
+      const disabled = await issueAtaFor(ctx, "commit", "waveform");
+      results.check("a disabled receiving app → 403 receiving_app_disabled naming it", disabled.status === 403 && errorCode(disabled.body) === "receiving_app_disabled" && JSON.stringify(disabled.body.error?.details?.app_ids) === '["waveform"]', `${disabled.status} ${short(disabled.body.error)}`);
     } finally {
       await sql(env, "update apps set status = 'active' where app_id = 'waveform'");
     }
 
-    // The ATA page stand-in (POST /v1/apps/{app_id}/proofs/ata): for the app itself, not for another app.
-    const page = await asApp<IssuedProof>(ctx, "commit", "POST", "/v1/apps/commit/proofs/ata", { audiences: ["remind"] }, { key: crypto.randomUUID() });
-    results.check("the ATA page endpoint issues for Commit with Commit's credentials (201, same shape)", page.status === 201 && page.body.kind === "ata" && JSON.stringify(page.body.receiving_apps) === '["remind"]' && (await verifyAs(ctx, "remind", page.body.proof_token)).body.valid === true, `${page.status} ${short(page.body.error ?? page.body.receiving_apps)}`);
-    const stranger = await asApp<IssuedProof>(ctx, "briefcase", "POST", "/v1/apps/commit/proofs/ata", { audiences: ["remind"] }, { key: crypto.randomUUID() });
+    // 6. The ATA page's endpoint (POST /v1/apps/{app_id}/proofs/ata): Commit's own proofs, one app at a time.
+    const page = await issueAtaFor(ctx, "commit", "remind", {}, { path: "/v1/apps/commit/proofs/ata" });
+    results.check("the ATA page endpoint makes Commit a proof for remind with Commit's credentials (201, naming only remind, valid at remind)", page.status === 201 && page.body.kind === "ata" && namesOnly(page.body, "remind") && (await verifyAs(ctx, "remind", page.body.proof_token)).body.valid === true, `${page.status} ${short(page.body.error ?? page.body.receiving_apps ?? page.body.receiving_app)}`);
+    const stranger = await issueAtaFor(ctx, "commit", "remind", {}, { path: "/v1/apps/commit/proofs/ata", as: "briefcase" });
     results.check("Briefcase can't use Commit's ATA page → 403", stranger.status === 403, `${stranger.status} ${short(stranger.body.error)}`);
-    const listed = await appListing(ctx, "commit", p.proof_id, "&kind=ata");
-    results.check("Commit's listing (kind=ata) has the proof: audiences [remind, waveform], no user, active, 300 s tokens", listed?.kind === "ata" && JSON.stringify(listed.audiences) === '["remind","waveform"]' && listed.user === null && listed.status === "active" && listed.access_ttl_seconds === 300, short(listed));
 
-    // Refresh: a new token for every audience.
-    const refreshed = await refreshAs(ctx, "commit", p.proof_refresh_token);
-    results.check("Commit refreshes it: same proof, receiving_apps kept, new token verified by both audiences", refreshed.status === 200 && refreshed.body.proof_id === p.proof_id && JSON.stringify(refreshed.body.receiving_apps) === '["remind","waveform"]' && (await verifyAs(ctx, "remind", refreshed.body.proof_token)).body.valid === true && (await verifyAs(ctx, "waveform", refreshed.body.proof_token)).body.valid === true, `${refreshed.status} ${short(refreshed.body.error)}`);
+    // 7. The listing.
+    const listed = await appListing(ctx, "commit", toRemind.proof_id, "&kind=ata");
+    results.check("Commit's listing (kind=ata) has its proof for remind: naming only remind, no user, active, 300 s tokens", listed?.kind === "ata" && namesOnly(listed, "remind") && listed.user === null && listed.status === "active" && listed.access_ttl_seconds === 300, short(listed));
+
+    // 8. Refresh: still the one app's proof.
+    const refreshed = await refreshAs(ctx, "commit", toRemind.proof_refresh_token);
+    const atRemind = refreshed.status === 200 ? await verifyAs(ctx, "remind", refreshed.body.proof_token) : null;
+    const atWaveform = refreshed.status === 200 ? await verifyAs(ctx, "waveform", refreshed.body.proof_token) : null;
+    results.check(
+      "Commit refreshes its proof for remind: the same proof, still remind's only (the new token is valid at remind, exactly invalid at waveform)",
+      refreshed.status === 200 && refreshed.body.proof_id === toRemind.proof_id && namesOnly(refreshed.body, "remind") && atRemind?.body.valid === true && isExactlyInvalid(atWaveform?.body),
+      `${refreshed.status} ${short(refreshed.body.error ?? refreshed.body.receiving_apps)}; remind ${short(atRemind?.body)}; waveform ${JSON.stringify(atWaveform?.body)}`,
+    );
     const remindRefresh = await refreshAs(ctx, "remind", refreshed.body.proof_refresh_token);
-    results.check("an audience can't refresh it → 403 not_issuing_app", remindRefresh.status === 403 && errorCode(remindRefresh.body) === "not_issuing_app", `${remindRefresh.status} ${short(remindRefresh.body.error)}`);
+    results.check("the receiving app can't refresh it → 403 not_issuing_app", remindRefresh.status === 403 && errorCode(remindRefresh.body) === "not_issuing_app", `${remindRefresh.status} ${short(remindRefresh.body.error)}`);
 
-    // The issuing app disabled, then back.
+    // 9. The issuing app disabled, then back.
     await sql(env, "update apps set status = 'disabled' where app_id = 'commit'");
     try {
       const off = await verifyAs(ctx, "remind", refreshed.body.proof_token);
-      results.check("Commit disabled → Remind's verify is exactly invalid", isExactlyInvalid(off.body), JSON.stringify(off.body));
+      results.check("Commit disabled → remind's verify is exactly invalid", isExactlyInvalid(off.body), JSON.stringify(off.body));
     } finally {
       await sql(env, "update apps set status = 'active' where app_id = 'commit'");
     }
     results.check("Commit active again → valid again", (await verifyAs(ctx, "remind", refreshed.body.proof_token)).body.valid === true);
 
-    // Revocation reaches every audience at once.
-    const revoke = await revokeAs(ctx, "commit", { proof_id: p.proof_id });
-    results.check("Commit revokes the proof → 204", revoke.status === 204, `${revoke.status} ${short(revoke.body)}`);
-    for (const audience of ["remind", "waveform"]) {
-      for (const [label, token] of [["first", p.proof_token], ["refreshed", refreshed.body.proof_token]] as const) {
-        const v = await verifyAs(ctx, audience, token);
-        results.check(`${audience}: the ${label} token → exactly invalid`, isExactlyInvalid(v.body), JSON.stringify(v.body));
-      }
+    // 10. Revoking one app's proof ends it alone; the ATA page's revoke ends the other.
+    const revoke = await revokeAs(ctx, "commit", { proof_id: toRemind.proof_id });
+    results.check("Commit revokes its proof for remind → 204", revoke.status === 204, `${revoke.status} ${short(revoke.body)}`);
+    for (const [label, token] of [
+      ["first", toRemind.proof_token],
+      ["refreshed", refreshed.body.proof_token],
+    ] as const) {
+      const v = await verifyAs(ctx, "remind", token);
+      results.check(`remind: the ${label} token → exactly invalid`, isExactlyInvalid(v.body), JSON.stringify(v.body));
     }
+    const untouched = await verifyAs(ctx, "waveform", toWaveform.proof_token);
+    results.check("waveform's own proof is untouched and still verifies (each app's proof lives and ends on its own)", untouched.body.valid === true && untouched.body.proof_id === toWaveform.proof_id, short(untouched.body));
     const after = await refreshAs(ctx, "commit", refreshed.body.proof_refresh_token);
-    results.check("Commit can't refresh it any more → 410 proof_revoked (revoked_by_app)", after.status === 410 && errorCode(after.body) === "proof_revoked" && after.body.error?.details?.reason === "revoked_by_app", `${after.status} ${short(after.body.error)}`);
-    const [[audited] = []] = await sql(env, `select count(*) from audit_log where target_id = '${p.proof_id}' and action in ('proof.issued', 'proof.refreshed', 'proof.revoked') and account_uuid is null`);
+    results.check("Commit can't refresh the revoked one any more → 410 proof_revoked (revoked_by_app)", after.status === 410 && errorCode(after.body) === "proof_revoked" && after.body.error?.details?.reason === "revoked_by_app", `${after.status} ${short(after.body.error)}`);
+    const deleted = await asApp<ApiErrorBody | null>(ctx, "commit", "DELETE", `/v1/apps/commit/proofs/${toWaveform.proof_id}`);
+    const gone = await verifyAs(ctx, "waveform", toWaveform.proof_token);
+    results.check("the ATA page's revoke (DELETE /v1/apps/commit/proofs/{id}) ends waveform's proof: 204, then exactly invalid", deleted.status === 204 && isExactlyInvalid(gone.body), `${deleted.status} ${short(deleted.body)}; ${JSON.stringify(gone.body)}`);
+    const [[audited] = []] = await sql(env, `select count(*) from audit_log where target_id = '${toRemind.proof_id}' and action in ('proof.issued', 'proof.refreshed', 'proof.revoked') and account_uuid is null`);
     results.check("issued, refreshed and revoked are audited for the app, tied to no account", audited === "3", String(audited));
   },
 };

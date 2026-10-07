@@ -29,7 +29,7 @@ export const Checkbox = forwardRef<ElementRef<typeof CheckboxPrimitive.Root>, Ch
   const change = (next: CheckboxPrimitive.CheckedState) => { if (checked === undefined) setInternal(next); onCheckedChange?.(next); };
   const fade: Transition = { duration: on ? motionTokens.duration.instant : motionTokens.duration.fast, ease: [...motionTokens.ease.standard] };
   return <div className={styles.field}>
-    <CheckboxPrimitive.Root {...props} id={controlId} ref={ref} checked={state} onCheckedChange={change} className={[styles.box, className].filter(Boolean).join(" ")} aria-describedby={description ? `${controlId}-description` : undefined} aria-label={props["aria-label"] ?? (label ? undefined : "Checkbox")}>
+    <CheckboxPrimitive.Root {...props} id={controlId} ref={ref} checked={state} onCheckedChange={change} data-sq-native="" className={[styles.box, className].filter(Boolean).join(" ")} aria-describedby={description ? `${controlId}-description` : undefined} aria-label={props["aria-label"] ?? (label ? undefined : "Checkbox")}>
       <span className={styles.visual} data-sq="clip" aria-hidden="true">
         <motion.span className={styles.fill} initial={false} animate={{ opacity: on ? 1 : 0, scale: on ? 1 : .6 }} transition={reduced ? { duration: 0 } : { scale: motionTokens.spring.snappy, opacity: fade }} />
         <svg className={styles.mark} viewBox="0 0 18 18" fill="none" focusable="false">

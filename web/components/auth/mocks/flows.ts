@@ -128,7 +128,8 @@ export function sampleFlow(app: AppPublic, scenario: Scenario, extra: Partial<Fl
     case "signup_google":
       return step({ step: "signup", signup: { ...signup, provider: "google", provider_pfp_url: portrait("S D", 38), email: "saketdev12@gmail.com", id: "c:saketdev12" } });
     case "signup_import":
-      return step({ step: "signup", signup: { ...signup, display_name: "Saket D.", id: "c:saket-crm", timezone: "America/New_York", dob: "1994-07-21", finishing_import: true } });
+      // Legacy CRM imported the Carbon; they may finish the account while signing into any app.
+      return step({ step: "signup", signup: { ...signup, display_name: "Saket D.", id: "c:saket-crm", timezone: "America/New_York", dob: "1994-07-21", finishing_import: true, imported_by: { app_id: "legacy-crm", name: "Legacy CRM" } } });
     case "requirements":
       return step({ step: "requirements", signed_in_as: SAMPLE_ACCOUNT, requirements: { missing: ["phone"], challenge: null } });
     case "requirements_code":

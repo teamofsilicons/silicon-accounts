@@ -23,7 +23,7 @@ const exactly = (reply: Reply, expected: Record<string, unknown>) => reply.statu
 
 export const journey: Journey = {
   name: "security-tokens",
-  title: "token confusion: briefcase's access token gets 401 on /v1/me, /v1/session and every account endpoint; refresh/id/SLT/proof tokens, cookies and secrets are no Bearer token; forged JWTs (alg none, HS256 key confusion, foreign key, edited claims) are refused; introspection by another app says exactly {active:false}; another app can't revoke, refresh or redeem briefcase's tokens, codes, SLTs or proofs",
+  title: "token confusion: briefcase's access token gets 401 on /v1/me, /v1/session and every account endpoint; refresh/id/SLT/proof tokens, cookies and secrets are no Bearer token; forged JWTs (alg none, HS256 key confusion, foreign key, edited claims, the attacker's key in jwk/jku/x5u, a path as kid) are refused; introspection by another app says exactly {active:false}; another app can't revoke, refresh or redeem briefcase's tokens, codes, SLTs or proofs",
   engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
@@ -104,6 +104,17 @@ export const journey: Journey = {
     const [h, , s] = bc.access_token.split(".");
     const audSwapped = `${h}.${b64json({ ...claims, aud: "accounts" })}.${s}`;
     const subSwapped = `${h}.${b64json({ ...claims, sub: "AAA" })}.${s}`;
+    // Tokens that bring their own key: the header names the attacker's key (embedded jwk, a jku URL) or a kid that
+    // looks like a path; a verifier that trusts the header would accept them.
+    const attackerPublic = generateKeyPairSync("ed25519");
+    const selfSigned = (header: Record<string, unknown>) => {
+      const signingInput = `${b64json({ alg: "EdDSA", typ: "JWT", ...header })}.${b64json(forgedClaims)}`;
+      return `${signingInput}.${base64url(sign(null, Buffer.from(signingInput), attackerPublic.privateKey))}`;
+    };
+    const embeddedJwk = selfSigned({ kid, jwk: attackerPublic.publicKey.export({ format: "jwk" }) });
+    const jku = selfSigned({ kid: "attacker-1", jku: "https://evil.example/.well-known/jwks.json" });
+    const kidPath = selfSigned({ kid: "../../../../../../dev/null" });
+    const x5u = selfSigned({ kid, x5u: "https://evil.example/cert.pem" });
     const forged: Array<[string, string]> = [
       ['alg "none"', none],
       ["HS256 keyed with the public key's bytes (algorithm confusion)", hs],
@@ -111,13 +122,19 @@ export const journey: Journey = {
       ["EdDSA signed by another key under the service's kid", foreignKey],
       ["briefcase's token with aud edited to accounts", audSwapped],
       ["briefcase's token with sub edited", subSwapped],
+      ["signed by the attacker's key, embedded in the header (jwk)", embeddedJwk],
+      ["signed by the attacker's key, published at a jku URL", jku],
+      ["signed by the attacker's key, x5u URL under the service's kid", x5u],
+      ["a kid that is a path (../../dev/null)", kidPath],
     ];
     const forgedOk: string[] = [];
     for (const [label, jwt] of forged) {
       const reply = await call(`${env.site}/v1/me`, { bearer: jwt, ip: ctx.ip });
       if (reply.status !== 401) forgedOk.push(`${label}: ${brief(reply)}`);
+      const introspected = await call(`${env.site}/v1/oauth/introspect`, { form: { token: jwt }, basic: appCredentials("briefcase"), ip: ctx.ip });
+      if (!exactly(introspected, { active: false })) forgedOk.push(`${label}: introspection ${introspected.status} ${introspected.text.slice(0, 80)}`);
     }
-    results.check(`forged JWTs are refused on /v1/me (${forged.length}: alg none, HS256 key confusion ×2, a foreign Ed25519 key, edited aud, edited sub)`, forgedOk.length === 0, forgedOk.join(" | ") || "all 401");
+    results.check(`forged JWTs are refused on /v1/me and introspect as exactly {active:false} (${forged.length}: alg none, HS256 key confusion ×2, a foreign Ed25519 key, edited aud, edited sub, the attacker's key in jwk / jku / x5u, a path as kid)`, forgedOk.length === 0, forgedOk.join(" | ") || "all 401 and inactive");
 
     // 4. Introspection: only the calling app's own tokens are ever active.
     const introspect = (app: string, value: string, credentials: [string, string] = appCredentials(app)) => call(`${env.site}/v1/oauth/introspect`, { form: { token: value }, basic: credentials, ip: ctx.ip });

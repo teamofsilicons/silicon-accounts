@@ -5,11 +5,13 @@
  * own colours everywhere, invisible borders, an 80-character title, a 200-character subtitle, huge logo). Each is
  * walked to the end by a fresh Carbon at 1440 px and at 390 px, with a screenshot of every step; at every step the
  * line is there once, visible by computed style, with a real box in the viewport, uncovered, outside the app's
- * branded subtree, and links Silicon Accounts to https://account.teamofsilicons.com.
+ * branded subtree, and links Silicon Accounts to the account site in a new tab; that link's host is the one
+ * UNDERSTANDING.md names (https://accounts.teamofsilicons.com since its 2026-10-07 edit). The main action reads at
+ * 4.5:1 on every step whatever the palette, and an outline button's edge stands out at 3:1.
  */
 import type { Journey } from "../../context";
 import { json } from "../../lib";
-import { appBasic, fakeApp, readHostedLook, walkHosted, type WalkOptions } from "./_helpers";
+import { appBasic, checkPoweredByHost, fakeApp, readHostedLook, walkHosted, type WalkOptions } from "./_helpers";
 
 /** dm's hostile branding: everything the pill could blend into, and copy long enough to push it far down. */
 const HOSTILE = {
@@ -74,6 +76,7 @@ export const journey: Journey = {
     });
     results.check("dm's own credentials store the hostile branding (it passes the contrast rules)", hostile.status === 200, `${hostile.status} ${JSON.stringify(hostile.body).slice(0, 200)}`);
 
+    const hrefs: Array<string | null> = [];
     try {
       for (const walk of WALKS) {
         const label = `dvb-f-${walk.name}-${walk.width}-${walk.via}`;
@@ -91,17 +94,26 @@ export const journey: Journey = {
             themes.add(look?.attrs["data-theme"] ?? "none");
             layouts.add(look?.attrs["data-layout"] ?? "none");
           },
-        }).catch(error => ({ steps: [] as string[], account: null, ms: 0, readability: [], error: error instanceof Error ? error.message.split("\n")[0] : String(error) }));
+        }).catch(error => ({ steps: [] as string[], account: null, ms: 0, readability: [], hrefs: [] as Array<string | null>, error: error instanceof Error ? error.message.split("\n")[0] : String(error) }));
         const failed = "error" in result ? (result as { error: string }).error : "";
+        hrefs.push(...result.hrefs);
         const expected = walk.via === "apple" ? ["methods", "signup", "consent", "complete"] : [walk.via === "email" ? "email-code" : "phone-code"];
         results.check(`${walk.name} at ${walk.width} px (${walk.via}): the walk reached the app through every step`, !failed && typeof result.account?.uuid === "string" && expected.every(step => result.steps.includes(step)) && result.steps.includes("complete"), failed || result.steps.join(" → "));
         results.check(`${walk.name} at ${walk.width} px: every step painted the app's look (${walk.theme}, ${walk.layout})`, themes.size === 1 && themes.has(walk.theme) && layouts.size === 1 && layouts.has(walk.layout), `themes ${[...themes].join(",")} layouts ${[...layouts].join(",")}`);
         const worst = [...result.readability].sort((a, b) => a.ratio - b.ratio)[0];
         results.check(`${walk.name} at ${walk.width} px: the main action reads at 4.5:1 or better on every step`, !!worst && worst.ratio >= 4.5, worst ? `lowest ${worst.ratio.toFixed(2)}:1 on ${worst.step} ("${worst.label}": ${worst.text} on ${worst.background}); ${result.readability.map(entry => `${entry.step} ${entry.ratio.toFixed(2)}`).join(", ")}` : "no main action seen");
         if (worst) results.metric(`${walk.name} ${walk.width}px: lowest main-action contrast`, worst.ratio, ":1");
+        // An outline button has no fill: its edge is what shows where it is (WCAG 1.4.11, 3:1 against the ground).
+        const edges = result.readability.flatMap(entry => (entry.edge ? [{ step: entry.step, background: entry.background, ...entry.edge }] : []));
+        if (edges.length) {
+          const faintest = [...edges].sort((a, b) => a.ratio - b.ratio)[0]!;
+          results.check(`${walk.name} at ${walk.width} px: the outline main action's edge stands out from what is behind it at 3:1 or better on every step (WCAG 1.4.11)`, faintest.ratio >= 3, `lowest ${faintest.ratio.toFixed(2)}:1 on ${faintest.step} (${faintest.color} on ${faintest.background}); ${edges.map(edge => `${edge.step} ${edge.ratio.toFixed(2)}`).join(", ")}`);
+          results.metric(`${walk.name} ${walk.width}px: lowest outline-edge contrast`, faintest.ratio, ":1");
+        }
         if (walk.app === "dm" && walk.via === "email") results.check("the hostile walk went through dm's requirements (a phone with its own code)", result.steps.includes("requirements") && result.steps.includes("requirements-code"), result.steps.join(" → "));
         results.metric(`${walk.name} ${walk.width}px ${walk.via}: walk to the app`, result.ms);
       }
+      checkPoweredByHost(ctx, "the hosted pages (every step of the 10 walks)", hrefs);
     } finally {
       // dm's seeded look and texts again.
       const seeded = fakeApp("dm").signin_defaults ?? {};

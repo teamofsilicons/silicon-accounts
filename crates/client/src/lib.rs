@@ -57,7 +57,7 @@ pub mod types;
 mod wait;
 mod webhook;
 
-pub use app::AppClient;
+pub use app::{AppClient, MAX_IMPORT_BYTES};
 pub use client::{
     AccountsClient, ClientBuilder, DEFAULT_BASE_URL, FIRST_PARTY_APP_ID, IDEMPOTENCY_HEADER,
     IDEMPOTENT_REPLAYED_HEADER, REQUEST_ID_HEADER, TELEMETRY_HEADER, VERSION,

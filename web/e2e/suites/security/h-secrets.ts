@@ -14,7 +14,7 @@ const rand = (prefix: string) => `${prefix}${base64url(randomBytes(32))}`;
 
 export const journey: Journey = {
   name: "security-secrets",
-  title: "no secret in any answer: wrong/unknown codes, STKs, auth codes, refresh tokens (also reused), SLTs, device codes, verifiers, app secrets, polling and proof tokens and Bearer tokens are never echoed (nor the right values); app and account reads show secret_set flags, never secrets, STKs or hashes",
+  title: "no secret in any answer: wrong/unknown codes, STKs (also self-chosen ones, refused or accepted), auth codes, refresh tokens (also reused), SLTs, device codes, verifiers, app secrets, polling and proof tokens and Bearer tokens are never echoed (nor the right values); app and account reads show secret_set flags, never secrets, STKs or hashes",
   engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
@@ -73,6 +73,22 @@ export const journey: Journey = {
     probe("Silicon sign-in: a wrong STK", await siliconLogin(t, silicon.id, wrongStk), wrongStk, silicon.stk);
     const longStk = `stk-${randomBytes(16).toString("hex")}`;
     probe("Silicon sign-in: an unknown si:id with a 32-hex STK", await siliconLogin(t, `si:nobody-${tag()}`, longStk), longStk);
+    // A self-chosen STK (the Silicon's own password, 8 to 32 hex): refused for its shape or with the rest of the request.
+    const tooLong = `stk-${randomBytes(17).toString("hex")}`;
+    const notHex = `stk-${randomBytes(8).toString("hex")}zz`;
+    const chosen = `stk-${randomBytes(16).toString("hex")}`;
+    const custodianCreate = (stk: string, id = `si:chosen-${tag()}${tag()}`.slice(0, 33)) => call(`${env.site}/v1/me/silicons`, { json: { id, display_name: "Chosen", stk }, jar: carbon.jar, origin: env.site, ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}${tag()}` } });
+    probe("a self-chosen STK with 34 hex digits", await custodianCreate(tooLong), tooLong);
+    probe("a self-chosen STK that isn't hex", await custodianCreate(notHex), notHex);
+    probe("a valid self-chosen STK with an si:id that is taken", await custodianCreate(chosen, silicon.id), chosen);
+    probe("a self-created Silicon's chosen STK with a custodian that doesn't exist", await call(`${env.site}/v1/silicons`, { json: { id: `si:chosen-${tag()}${tag()}`.slice(0, 33), display_name: "Chosen", custodian: `c:nobody-${tag()}${tag()}`, stk: chosen }, ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}` } }), chosen);
+    const chosenId = `si:chosen-${tag()}${tag()}`.slice(0, 33);
+    const acceptedChosen = await custodianCreate(chosen, chosenId);
+    remember(ctx, "stk", chosen, tooLong, notHex);
+    const chosenLogin = await siliconLogin(t, chosenId, chosen);
+    remember(ctx, "access token", chosenLogin.body.access_token);
+    remember(ctx, "refresh token", chosenLogin.body.refresh_token);
+    results.check("a Silicon created with its own STK gets an answer that never repeats it (stk null), and that STK signs it in", acceptedChosen.status === 201 && (acceptedChosen.body as { stk?: string | null }).stk == null && !acceptedChosen.text.includes(chosen.slice(4)) && chosenLogin.status === 200, `create ${brief(acceptedChosen)} stk=${JSON.stringify((acceptedChosen.body as { stk?: string | null }).stk)}; login ${chosenLogin.status}`);
     const pending = await call<{ request?: { id: string }; request_token?: string; stk?: string }>(`${env.site}/v1/silicons`, { json: { id: `si:secrets-${tag()}${tag()}`.slice(0, 33), display_name: "Secrets", custodian: carbon.id }, ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}` } });
     remember(ctx, "request token", pending.body.request_token);
     remember(ctx, "stk", pending.body.stk);
@@ -113,7 +129,7 @@ export const journey: Journey = {
     probe("Bearer: briefcase's refresh token on /v1/me", await call(`${env.site}/v1/me`, { bearer: rotated.body.refresh_token ?? unknownRefresh, ip: ctx.ip }), rotated.body.refresh_token);
     const madeUpSession = rand("sas_");
     probe("a made-up session cookie", await call(`${env.site}/v1/me`, { headers: { cookie: `sa_session=${madeUpSession}` }, ip: ctx.ip }), madeUpSession);
-    results.check(`${probes} refusals echo neither the secret that was sent nor the right one (codes ×3, STKs ×2, polling token, auth code, refresh ×2, SLT, device code, app secret ×3, verifier, proof refresh, Bearer ×2, session cookie)`, echoed.length === 0, echoed.join(" | ") || `${probes} probes`);
+    results.check(`${probes} refusals echo neither the secret that was sent nor the right one (codes ×3, STKs ×2, chosen STKs ×4, polling token, auth code, refresh ×2, SLT, device code, app secret ×3, verifier, proof refresh, Bearer ×2, session cookie)`, echoed.length === 0, echoed.join(" | ") || `${probes} probes`);
 
     // 5. An idempotent replay is only ever for the same caller: another account (or network) re-sending the same
     //    Idempotency-Key and body never gets the first caller's answer, which carries a freshly made STK.

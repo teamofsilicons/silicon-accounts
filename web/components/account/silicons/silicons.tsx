@@ -199,6 +199,7 @@ export function Silicons() {
             onReveal={addReveal}
             onRevealDone={dismissReveal}
             onDeleted={deleted}
+            focusOnClose={uuid => tileOf(uuid) ?? fallbackFocus()}
           />
           <CreateSilicon open={creating} onOpenChange={setCreating} me={carbon} onCreated={onCreated} />
         </>
@@ -214,17 +215,23 @@ function Tile({ silicon, now, fresh, onOpen }: { silicon: ManagedSilicon; now: n
       : { tone: "success" as const, text: "Active" };
   const transferLeft = msUntil(silicon.pending_transfer?.expires_at, now);
   const rotated = stkRotatedAt(silicon);
+  // The tile is one target, but its button holds only the words that name it: the id and the display name, read as
+  // "Manage si:scout, Scout" (shown name first, id below, by CSS). Every word the button shows is part of its name
+  // (WCAG 2.5.3); the status and the facts are the tile's own text, outside the button, and its ::before stretches over
+  // the whole tile so a click anywhere on it opens the Silicon.
   return (
-    <button data-sq="surface" type="button" className={styles.tile} data-silicon={silicon.uuid} data-fresh={fresh || undefined} onClick={onOpen} aria-label={`Manage ${id}, ${silicon.display_name}`}>
+    <div data-sq="surface" className={styles.tile} data-fresh={fresh || undefined}>
       <span className={styles.tileTop}>
         <Avatar name={silicon.display_name} src={silicon.pfp_url} size="lg" />
         <Badge size="sm" tone={status.tone}>{status.text}</Badge>
       </span>
-      <span className={styles.tileText}>
-        <span className={styles.tileName} title={silicon.display_name}>{silicon.display_name}</span>
-        {/* A short id morphs when it changes; a long one wraps rather than being cut off at the tile's edge. */}
+      <button type="button" className={styles.tileOpen} data-silicon={silicon.uuid} onClick={onOpen} aria-label={`Manage ${id}, ${silicon.display_name}`}>
+        {/* A short id morphs when it changes; a long one wraps rather than being cut off at the tile's edge. The space
+            keeps the id and the name two words apart for anything that reads the button's text (it never renders). */}
         {id.length > LONG_ID ? <span className={styles.tileIdWrap}>{id}</span> : <TextMorph className={styles.tileId}>{id}</TextMorph>}
-      </span>
+        {" "}
+        <span className={styles.tileName} title={silicon.display_name}>{silicon.display_name}</span>
+      </button>
       <span className={styles.tileFacts}>
         <span className={styles.tileFact}>
           <span className={styles.tileLabel}>STK</span>
@@ -240,7 +247,7 @@ function Tile({ silicon, now, fresh, onOpen }: { silicon: ManagedSilicon; now: n
           Waiting for {personLabel(silicon.pending_transfer.to)} to accept{transferLeft > 0 ? `, ${spanText(transferLeft)} left` : ""}
         </span>
       ) : null}
-    </button>
+    </div>
   );
 }
 

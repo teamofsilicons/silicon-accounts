@@ -9,7 +9,8 @@
 //! | `POST /v1/silicons/login` | public | si:id + STK → first-party tokens |
 //! | `POST /v1/me/short-lived-tokens` | session | a 2-minute single-use token to sign into one app |
 //! | `PUT`/`DELETE /v1/me/webhook`, `POST /v1/me/webhook/test` | session (Silicon) | the Silicon's own webhook |
-//! | `/v1/me/silicons…` | session (Carbon) | the custodian's side: create, view, edit, photo upload, id, webhook, STK, transfer, delete |
+//! | `GET /v1/me/webhook/deliveries[/{id}]`, `POST /v1/me/webhook/replay` (IDEMPOTENT) | session (Silicon) | its webhook's deliveries: list, inspect, replay |
+//! | `/v1/me/silicons…` | session (Carbon) | the custodian's side: create, view, edit, photo upload, id, webhook (and its deliveries), STK, transfer, delete |
 //! | `/v1/me/custodian-requests…` | session (Carbon) | requests addressed to me: list, accept, decline |
 //!
 //! [`spawn_background`] starts the custodian-request expiry sweep (every minute). Overdue
@@ -44,6 +45,7 @@ mod slt;
 mod stk;
 pub mod sweep;
 mod views;
+mod webhook_deliveries;
 
 use accounts_core::AppState;
 use axum::Router;
@@ -58,6 +60,7 @@ pub use own_webhook::WEBHOOK_TESTS_PER_SILICON;
 pub use requests::{MAX_PENDING_PER_CUSTODIAN, REQUEST_TTL_DAYS};
 pub use self_create::SELF_CREATE_ATTEMPTS_PER_IP;
 pub use sweep::{SWEEP_INTERVAL, SweepReport, expire_overdue};
+pub use webhook_deliveries::MAX_REPLAY;
 
 /// HTTP routes of this crate (see the table above and the build spec 02-api.md).
 pub fn router() -> Router<AppState> {
@@ -74,6 +77,18 @@ pub fn router() -> Router<AppState> {
             put(own_webhook::set).delete(own_webhook::remove),
         )
         .route("/v1/me/webhook/test", post(own_webhook::test))
+        .route(
+            "/v1/me/webhook/deliveries",
+            get(webhook_deliveries::own_list),
+        )
+        .route(
+            "/v1/me/webhook/deliveries/{id}",
+            get(webhook_deliveries::own_show),
+        )
+        .route(
+            "/v1/me/webhook/replay",
+            post(webhook_deliveries::own_replay),
+        )
         .route(
             "/v1/me/silicons",
             get(custodian::list).post(custodian::create),
@@ -92,6 +107,18 @@ pub fn router() -> Router<AppState> {
         .route(
             "/v1/me/silicons/{uuid}/webhook",
             put(custodian::set_webhook).delete(custodian::remove_webhook),
+        )
+        .route(
+            "/v1/me/silicons/{uuid}/webhook/deliveries",
+            get(webhook_deliveries::custodian_list),
+        )
+        .route(
+            "/v1/me/silicons/{uuid}/webhook/deliveries/{id}",
+            get(webhook_deliveries::custodian_show),
+        )
+        .route(
+            "/v1/me/silicons/{uuid}/webhook/replay",
+            post(webhook_deliveries::custodian_replay),
         )
         .route("/v1/me/silicons/{uuid}/stk", post(custodian::rotate_stk))
         .route(

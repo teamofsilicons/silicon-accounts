@@ -25,7 +25,7 @@ function dotenv(path: string): Record<string, string> {
 
 export const journey: Journey = {
   name: "security-prod-config",
-  title: "production refuses dev secrets: accounts-api with ACCOUNTS_ENVIRONMENT=production and the .env.example secrets (or none, or dev conveniences) exits 2 naming every variable, prints no secret and never listens; with real secrets it starts with __Host- Secure cookies, HSTS, no dev outbox, and ignores a stray .env",
+  title: "production refuses dev secrets: accounts-api with ACCOUNTS_ENVIRONMENT=production and the .env.example secrets (as written, or the same keys written differently: another keyring version, a PEM, padded or standard base64), no secrets, or dev conveniences exits 2 naming every variable, prints no secret and never listens; with real secrets it starts with __Host- Secure cookies, HSTS, no dev outbox, and ignores a stray .env",
   engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
@@ -107,6 +107,40 @@ export const journey: Journey = {
       ],
       [pepper, jwt],
     );
+
+    // 3b. The DEV ONLY keys in disguise: the same key material, written differently. The service decodes its keys
+    //     leniently (base64url with or without padding, or standard base64), so the check must compare what they decode
+    //     to, not the text.
+    const devKey = (JSON.parse(devKeyring) as Record<string, string>)["1"] ?? "";
+    const devSeedPem = `-----BEGIN PRIVATE KEY-----\n${Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), Buffer.from(devJwt, "base64url")]).toString("base64")}\n-----END PRIVATE KEY-----\n`;
+    await refuse(
+      "the DEV ONLY encryption key under another keyring version (next to a real current key) and the DEV ONLY JWT seed as a PKCS#8 PEM",
+      { ...real, ACCOUNTS_ENCRYPTION_KEYRING: JSON.stringify({ "7": key32(), "1": devKey }), ACCOUNTS_ENCRYPTION_CURRENT_VERSION: "7", ACCOUNTS_JWT_PRIVATE_KEY: devSeedPem },
+      [
+        ["ACCOUNTS_ENCRYPTION_KEYRING", /DEV ONLY/],
+        ["ACCOUNTS_JWT_PRIVATE_KEY", /DEV ONLY/],
+      ],
+      [devKey, devJwt],
+    );
+    const standard = devPepper.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(devPepper.length / 4) * 4, "=");
+    const disguisedPeppers: Array<[string, string]> = [
+      ["padded base64url (a trailing =)", devPepper.padEnd(Math.ceil(devPepper.length / 4) * 4, "=")],
+      ["standard base64 (+ / and =)", standard],
+    ];
+    for (const [label, pepperText] of disguisedPeppers) {
+      const sameKey = Buffer.from(pepperText.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""), "base64url").equals(Buffer.from(devPepper, "base64url"));
+      const started = Date.now();
+      const server = runBinary(env, "accounts-api", { ...real, ACCOUNTS_TOKEN_PEPPER: pepperText });
+      const outcome = await Promise.race([
+        server.exited.then(code => `exit ${code}`),
+        waitReady(`http://127.0.0.1:${port}/readyz`, server, 20_000).then(ms => `STARTED (ready after ${ms} ms)`, () => "neither exited nor became ready within 20 s"),
+      ]);
+      await server.stop();
+      const output = server.output();
+      results.metric(`the DEV ONLY pepper as ${label}: decided after`, Date.now() - started);
+      const named = output.split("\n").some(line => line.includes("ACCOUNTS_TOKEN_PEPPER") && /DEV ONLY/.test(line));
+      results.check(`production with the DEV ONLY token pepper written as ${label} (the same 32 bytes) exits with code 2 naming ACCOUNTS_TOKEN_PEPPER as the DEV ONLY value`, sameKey && outcome === "exit 2" && named, `${sameKey ? "decodes to the dev pepper's bytes" : "NOT the same bytes (test bug)"}; ${outcome}${named ? "" : "; ACCOUNTS_TOKEN_PEPPER not named"}${output.includes(devPepper) || output.includes(pepperText) ? "; the pepper was PRINTED" : ""}`);
+    }
 
     // 4. Real secrets and safe settings: it starts. A stray .env in its directory is ignored in production.
     const dir = mkdtempSync(join(tmpdir(), "sa-sec-prod-"));

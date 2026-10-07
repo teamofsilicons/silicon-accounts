@@ -90,7 +90,8 @@
   background: var(--sq-fill);
 }
 .secretCard:focus { outline: none; }
-.secretCard:focus-visible { box-shadow: 0 0 0 3px var(--focus-ring); }
+/* Focus arrives here when the secret is revealed: an accent edge shows it (the site's --focus-ring is transparent). */
+.secretCard:focus-visible { --sq-stroke: var(--accent); }
 .secretHead { display: flex; min-width: 0; gap: var(--space-3); }
 .secretIcon { display: grid; width: 20px; height: 20px; flex: none; place-items: center; margin-top: 1px; color: var(--accent-ink); }
 .secretText { display: grid; min-width: 0; gap: 2px; }
@@ -186,7 +187,7 @@
 /* Alerts the save bar scrolls to; a keyboard user who lands on one sees a ring that follows its curve. */
 .alertTarget { scroll-margin-block: var(--space-12); }
 .alertTarget:focus { outline: none; }
-.alertTarget:focus-visible { box-shadow: 0 0 0 3px var(--focus-ring); }
+.alertTarget:focus-visible { --sq-stroke: var(--foreground); }
 .alertMeta { display: block; margin-top: var(--space-2); color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
 .pathList { color: var(--foreground); }
 .problemList { display: grid; gap: var(--space-1); margin-top: var(--space-2); }

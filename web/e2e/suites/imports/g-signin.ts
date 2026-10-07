@@ -15,6 +15,7 @@ import {
   appCall,
   describeRow,
   fakeApp,
+  flowView,
   forgetImportBudgets,
   freshExchange,
   lit,
@@ -51,19 +52,6 @@ async function prefill(page: Page) {
     timezone: await page.getByRole("combobox", { name: "Timezone" }).inputValue(),
     dob: (await page.getByRole("button", { name: "Date of birth" }).innerText()).replace(/\s+/g, " "),
   };
-}
-
-interface FlowView {
-  step?: string;
-  signup?: { finishing_import?: boolean; id?: string; display_name?: string; timezone?: string; dob?: string; email?: string | null; phone?: string | null };
-}
-
-/** The hosted flow's own view (GET /v1/flows/{id}), read from the page (its cookies). */
-async function flowView(page: Page): Promise<FlowView | null> {
-  const id = /\/authorize\/flow\/([^/?#]+)/.exec(page.url())?.[1];
-  if (!id) return null;
-  const view: unknown = await page.evaluate(async flow => ((await (await fetch(`/v1/flows/${flow}`)).json()) as { flow?: unknown }).flow ?? null, id);
-  return (view ?? null) as FlowView | null;
 }
 
 export const journeys: Journey[] = [
@@ -105,6 +93,7 @@ export const journeys: Journey[] = [
       results.check("it is prefilled with what legacy-crm imported: id, name, timezone, date of birth", seen.id === `fin_${t}` && seen.name === "Fin Ward" && /Paris/.test(seen.timezone) && /March 14, 1991/.test(seen.dob), JSON.stringify(seen).slice(0, 300));
       const flow = await flowView(page);
       results.check("the flow (API) is at signup with finishing_import true and the imported details", flow?.step === "signup" && flow.signup?.finishing_import === true && flow.signup.id === `c:fin_${t}` && flow.signup.display_name === "Fin Ward" && flow.signup.timezone === "Europe/Paris" && flow.signup.dob === "1991-03-14", JSON.stringify(flow).slice(0, 400));
+      results.check("…and names the app that imported them (imported_by legacy-crm), which the page repeats for the id (\"This is the id Legacy CRM set up for you.\")", flow?.signup?.imported_by?.app_id === "legacy-crm" && flow.signup.imported_by.name === "Legacy CRM" && seen.text.includes("This is the id Legacy CRM set up for you."), `${JSON.stringify(flow?.signup?.imported_by)}; ${/This is the id[^.]*\./.exec(seen.text)?.[0] ?? seen.text.slice(0, 200)}`);
       await page.getByRole("button", { name: "Finish setup" }).click();
       await afterConsent(env, page, "legacy-crm", "imports-signin-02");
       const account = await appAccount(page);

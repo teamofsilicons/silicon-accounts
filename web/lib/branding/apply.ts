@@ -7,7 +7,8 @@
  * nothing leaks into the account site.
  */
 import type { AppPublic, Branding, FlowView, Palette, ThemeMode } from "../api/types";
-import { normalizeBranding } from "./defaults";
+import { legibleTint, mixHex, mixOklab } from "./contrast";
+import { LIMITS, normalizeBranding } from "./defaults";
 import { FONT_STACKS } from "./fonts";
 
 export type PaintTheme = "light" | "dark";
@@ -25,6 +26,33 @@ function cssUrl(value: string | null): string | null {
   if (!value) return null;
   if (!/^https:\/\//i.test(value) && !/^data:image\//i.test(value)) return null;
   return `url(${JSON.stringify(value)})`;
+}
+
+/** What a hovered outline button lays under its words: its fill (the primary at 8 % opacity) over the ground. */
+const hoverTint = (ground: string, primary: string) => mixHex(ground, primary, 0.08);
+
+/**
+ * Accent-coloured text (links, and the words of soft and outline buttons) that reads at 4.5:1 on everything it is
+ * painted on: the page, the card, and the tint a soft button (14 %, 20 % on hover) or a hovered outline button (8 %)
+ * lays under it. The server only holds button text on the primary and text on the page to 4.5:1, so a primary close
+ * to the page colour (pixel-studio's #E5007E on #FFF5FA is 4.25:1; a primary equal to the page is 1:1) would leave an
+ * outline button's words faint or invisible. Null when the theme's own ink (light: the primary; dark: half-way to the
+ * text colour) already reads, so every such palette keeps exactly its look; else that ink moved toward the text colour
+ * just far enough (legibleTint).
+ */
+function accentInk(p: Palette, dark: boolean, buttonStyle: Branding["button_style"]): string | null {
+  const grounds = [p.background, p.surface];
+  if (buttonStyle === "soft") grounds.push(mixOklab(p.surface, p.primary, 0.14), mixOklab(p.surface, p.primary, 0.2));
+  if (buttonStyle === "outline") grounds.push(hoverTint(p.background, p.primary), hoverTint(p.surface, p.primary));
+  return legibleTint(p.primary, p.foreground, grounds, LIMITS.minContrast, dark ? 0.5 : 0);
+}
+
+/**
+ * The edge of an outline button (WCAG 1.4.11: 3:1 for a control's boundary): the primary, or, when the primary is
+ * under 3:1 on the page or the card, the primary moved toward the text colour until it is not. Null keeps the primary.
+ */
+function accentLine(p: Palette): string | null {
+  return legibleTint(p.primary, p.foreground, [p.background, p.surface], 3);
 }
 
 /** The custom properties a branding paints in one theme. */
@@ -49,8 +77,10 @@ export function brandingVariables(input: Branding | Partial<Branding> | null | u
     "--accent-strong": mix(p.primary, 78, p.foreground),
     "--accent-subtle": mix(p.primary, dark ? 18 : 11, "transparent"),
     "--accent-foreground": p.primary_foreground,
-    // Accent-coloured text on dark surfaces needs a lighter ink than a fill does.
-    "--accent-ink": dark ? mix(p.primary, 50, p.foreground) : p.primary,
+    // Accent-coloured text on dark surfaces needs a lighter ink than a fill does; on any palette it must read (accentInk).
+    "--accent-ink": accentInk(p, dark, branding.button_style) ?? (dark ? mix(p.primary, 50, p.foreground) : p.primary),
+    // The edge of an outline button: the primary, unless it vanishes into the page (accentLine).
+    "--accent-line": accentLine(p) ?? p.primary,
     "--primary": p.primary,
     "--primary-hover": mix(p.primary, 90, p.foreground),
     "--primary-pressed": mix(p.primary, 82, p.foreground),

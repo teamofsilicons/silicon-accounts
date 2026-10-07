@@ -11,6 +11,11 @@
 //!   (with the request to poll) or `custodian_expired`.
 //! - An id whose Silicon is gone says why: 403 `custodian_declined`, `custodian_expired` or
 //!   `account_deleted` (that account's STK no longer exists, so nothing is verified).
+//! - So does the right STK of a Silicon that ends while its STK is being checked (Argon2 takes
+//!   about a second): released because its request expired (the sweep, or a read of the
+//!   request), was declined or lost its Carbon, or deleted by its custodian. The account is
+//!   re-read under a lock after the check, and the answer is the one an id that was already gone
+//!   gets. An STK rotated meanwhile is dead, so that one is `invalid_credentials`.
 //! - 60 attempts per minute per IP on top of the per-Silicon lock.
 
 use accounts_core::crypto::stk::{StkHasher, normalize as normalize_stk};
@@ -199,11 +204,27 @@ pub async fn login(
     } else {
         None
     };
-    // Re-read under a lock: a rotation between the check and now must win.
-    let account = accounts::lock(&mut tx, &account.uuid)
-        .await?
-        .filter(|a| a.stk_hash == verified_hash && a.status != AccountStatus::Deleted)
-        .ok_or_else(invalid_credentials)?;
+    // Re-read under a lock: whatever happened to the Silicon while its STK was being checked wins.
+    let Some(account) = accounts::lock(&mut tx, &account.uuid).await? else {
+        return Err(ApiError::internal(format!(
+            "the Silicon {} disappeared while its STK was being checked",
+            account.uuid
+        )));
+    };
+    if account.status == AccountStatus::Deleted {
+        // Released (its request expired, was declined or lost its Carbon) or deleted meanwhile.
+        // The STK was right, so it is told why, exactly as if the id had been gone already.
+        let gone = released_error(&mut tx, &full, &account.uuid, account.deleted_at).await?;
+        record_attempt(&mut tx, &meta, Some(&account.uuid), audit::outcome::FAILED).await?;
+        tx.commit().await?;
+        return Err(gone);
+    }
+    if account.stk_hash != verified_hash {
+        // Rotated meanwhile: the STK that was checked is dead, so it is a wrong STK now.
+        record_attempt(&mut tx, &meta, Some(&account.uuid), audit::outcome::FAILED).await?;
+        tx.commit().await?;
+        return Err(invalid_credentials());
+    }
     accounts::clear_stk_failures(&mut tx, &account.uuid).await?;
     match account.status {
         AccountStatus::Active => {}
@@ -349,8 +370,22 @@ async fn former_silicon_error(conn: &mut PgConnection, full: &str) -> ApiResult<
     {
         return Ok(None);
     }
-    let initial = requests::latest_initial(conn, &holder.account_uuid).await?;
-    Ok(Some(match initial {
+    released_error(conn, full, &holder.account_uuid, holder.deleted_at)
+        .await
+        .map(Some)
+}
+
+/// Why the deleted Silicon `silicon_uuid`, last known as `full`, can't sign in, from its latest
+/// initial custodian request: 403 `custodian_declined` (declined, or the Carbon it named deleted
+/// their account), `custodian_expired`, else `account_deleted`.
+async fn released_error(
+    conn: &mut PgConnection,
+    full: &str,
+    silicon_uuid: &str,
+    deleted_at: Option<OffsetDateTime>,
+) -> ApiResult<ApiError> {
+    let initial = requests::latest_initial(conn, silicon_uuid).await?;
+    Ok(match initial {
         Some(r) if r.status == status::DECLINED => ApiError::forbidden(
             "custodian_declined",
             format!(
@@ -367,12 +402,11 @@ async fn former_silicon_error(conn: &mut PgConnection, full: &str) -> ApiResult<
             "account_deleted",
             format!(
                 "{full} belonged to a Silicon account that was deleted{}; deleted accounts can't sign in.",
-                holder
-                    .deleted_at
+                deleted_at
                     .map(|t| format!(" on {}", format_rfc3339_ms(t)))
                     .unwrap_or_default()
             ),
         )
         .hint("Ask its former custodian, or create a new Silicon account."),
-    }))
+    })
 }

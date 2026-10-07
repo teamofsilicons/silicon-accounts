@@ -19,7 +19,9 @@
  * address the browser was sent to, and that origin is in the fake apps' allowed_origins.
  */
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { deflateSync } from "node:zlib";
@@ -28,7 +30,7 @@ import { chromium, expect, webkit, type Browser, type BrowserContext, type Locat
 import type { FlowView } from "../../lib/api/types";
 import { mockApi, type MockRequest } from "../../scripts/mock/api";
 import type { MockRoute } from "../../scripts/screens-types";
-import { sampleFlow } from "./mocks/flows";
+import { SAMPLE_ACCOUNT, sampleFlow } from "./mocks/flows";
 import { apiError, appOf, deviceRoutes, flowJson, flowPath, flowRoutes } from "./screens";
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -64,6 +66,8 @@ export interface MockCheck {
   dark?: boolean;
   /** The browser's timezone (default Asia/Kolkata): it decides the phone field's starting country. */
   timezone?: string;
+  /** Console errors the check provokes on purpose (anything else still fails it). */
+  allowConsole?: RegExp[];
   run: (env: CheckEnv) => Promise<void>;
 }
 
@@ -128,6 +132,45 @@ async function pixel(page: Page, x: number, y: number): Promise<[number, number,
     const [r = 0, g = 0, b = 0] = context.getImageData(0, 0, 1, 1).data;
     return [r, g, b] as [number, number, number];
   }, png.toString("base64"));
+}
+
+/**
+ * Moves keyboard focus from `start` to `target` (Tab, or Option+Tab in WebKit) and tells whether what `area` (default:
+ * the target, with 4 px around it) paints differs between focused and blurred.
+ */
+async function focusPaintShows(page: Page, target: Locator, start: Locator, area?: Locator): Promise<boolean> {
+  await start.focus();
+  for (let press = 0; press < 30 && !(await target.evaluate(el => el === document.activeElement)); press++) await page.keyboard.press(tabKey(page));
+  if (!(await target.evaluate(el => el === document.activeElement && el.matches(":focus-visible")))) throw new Error("Tab never reached the control with keyboard focus");
+  const box = await (area ?? target).boundingBox();
+  if (!box) throw new Error("the focused part is not laid out");
+  const clip = { x: Math.max(0, box.x - 4), y: Math.max(0, box.y - 4), width: box.width + 8, height: box.height + 8 };
+  await page.waitForTimeout(250);
+  const focused = await page.screenshot({ clip });
+  await target.evaluate(el => (el as HTMLElement).blur());
+  await page.waitForTimeout(250);
+  return !focused.equals(await page.screenshot({ clip }));
+}
+
+let axeSource: string | undefined;
+/** axe-core's browser build from the site's node_modules (eslint-config-next brings it). */
+function axeCode(): string {
+  if (axeSource) return axeSource;
+  const store = join(webRoot, "node_modules/.pnpm");
+  const version = readdirSync(store).filter(name => /^axe-core@\d/.test(name)).sort().pop();
+  if (!version) throw new Error("axe-core is not in web/node_modules/.pnpm: run pnpm -C web install");
+  axeSource = readFileSync(join(store, version, "node_modules/axe-core/axe.min.js"), "utf8");
+  return axeSource;
+}
+
+/** The nodes `rules` of axe-core flag in the page's main (evaluated, so the page's CSP does not apply). */
+async function axeViolations(page: Page, rules: string[]): Promise<string[]> {
+  if (!(await page.evaluate(() => "axe" in window))) await page.evaluate(axeCode());
+  return page.evaluate(async ruleIds => {
+    const axe = (window as unknown as { axe: { run: (context: Element, options: unknown) => Promise<{ violations: Array<{ id: string; nodes: Array<{ html: string }> }> }> } }).axe;
+    const result = await axe.run(document.querySelector("main") ?? document.body, { runOnly: { type: "rule", values: ruleIds } });
+    return result.violations.flatMap(violation => violation.nodes.map(node => `${violation.id}: ${node.html}`));
+  }, rules);
 }
 
 /** What the SDK drew in `#sa`: its theme and the "Powered by" pill's colours. */
@@ -486,6 +529,120 @@ const hostedChecks: MockCheck[] = [
     },
   },
   {
+    name: "sign-up: finishing an import names the app that imported the Carbon, never the app being signed into by default",
+    path: flowPath("briefcase", "signup_import"),
+    run: async ({ page, base }) => {
+      const text = async () => (await page.locator("main").innerText()).replace(/\s+/g, " ");
+      // Legacy CRM imported them; they first sign into Briefcase.
+      await expect(heading(page, "Finish setting up your account")).toBeVisible();
+      await expect(page.getByText("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Briefcase.")).toBeVisible();
+      await expect(page.getByText("This is the id Legacy CRM set up for you. Keep it, or pick another.")).toBeVisible();
+      expect(await text()).not.toMatch(/Briefcase added you|id Briefcase set up/);
+      // At Legacy CRM itself.
+      await page.goto(`${base}${flowPath("legacy-crm", "signup_import")}`, { waitUntil: "networkidle" });
+      await expect(heading(page, "Finish setting up your account")).toBeVisible();
+      await expect(page.getByText("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue.", { exact: true })).toBeVisible();
+      // The split layout's hero says the same (Acme Notes, finishing Legacy CRM's import).
+      await page.goto(`${base}${flowPath("acme-notes", "signup_import")}`, { waitUntil: "networkidle" });
+      await expect(page.getByText("Legacy CRM set up an account for you. Check what it filled in, and you are in.")).toBeVisible();
+      expect(await page.locator("body").innerText()).not.toMatch(/Acme Notes (added you|set up an account)/);
+    },
+  },
+  {
+    name: "sign-up: finishing an import the server names no app for credits no app",
+    path: flowPath("briefcase", "signup_import"),
+    routes: [routeFlow(() => {
+      const flow = sampleFlow(appOf("briefcase"), "signup_import");
+      return { ...flow, signup: flow.signup ? { ...flow.signup, imported_by: null } : null };
+    })],
+    run: async ({ page }) => {
+      await expect(page.getByText("An app you use added you to Silicon Accounts. Check the details it gave us, then continue to Briefcase.")).toBeVisible();
+      await expect(page.getByText("This is the id set up for you when you were added. Keep it, or pick another.")).toBeVisible();
+      expect(await page.locator("main").innerText()).not.toMatch(/Briefcase added you|id Briefcase set up/);
+    },
+  },
+  {
+    name: "sign-up: a sign-up that expired reads as sentences on the methods (no 'expired at:' where the time was)",
+    path: flowPath("briefcase", "signup"),
+    routes: () => {
+      const message = `The sign-up session expired at ${isoIn(-1)}: a verified email, phone or provider account stays ready for sign-up for 48 hours.`;
+      const hint = "Verify the email or phone (or sign in with Google/Apple) again to start a new sign-up.";
+      let expired = false;
+      return [
+        routeFlow(() => (expired ? sampleFlow(appOf("briefcase"), "choose_method", { error: { code: "signup_expired", message, hint } }) : sampleFlow(appOf("briefcase"), "signup"))),
+        ["POST /v1/flows/:id/signup", () => {
+          expired = true;
+          return apiError(410, "signup_expired", message, hint);
+        }],
+      ];
+    },
+    run: async ({ page }) => {
+      await page.getByRole("button", { name: "Create account" }).click();
+      const alert = page.locator('[data-error-code="signup_expired"]').first();
+      await expect(alert).toContainText("Your sign-up expired");
+      await expect(page.getByRole("textbox", { name: "Email" })).toBeVisible();
+      const words = (await alert.innerText()).replace(/\s+/g, " ");
+      expect(words).toContain("The sign-up session expired. A verified email, phone or provider account stays ready for sign-up for 48 hours.");
+      expect(words).toContain("Verify the email or phone");
+      expect(words).not.toMatch(/expired at|\d{4}-\d{2}-\d{2}T|\s[:;,.]/);
+    },
+  },
+  {
+    name: "sign-up: the timezone's clear button shows keyboard focus",
+    path: flowPath("briefcase", "signup"),
+    run: async ({ page }) => {
+      const clear = page.getByRole("button", { name: "Clear selection" });
+      await expect(clear).toBeVisible();
+      expect(await focusPaintShows(page, clear, page.getByRole("combobox", { name: "Timezone" }))).toBe(true);
+    },
+  },
+  {
+    name: "rows: a long name, id and address are never cut short (the action moves under them), at 1440 and 390 px",
+    path: flowPath("ledgerly", "requirements"),
+    routes: () => {
+      const account = { ...SAMPLE_ACCOUNT, display_name: "Uxa Ledgerly Z82ldxq5mwt2", id: "c:uxa-ledgerly-z82ldxq5mwt2" };
+      const flows: Record<string, () => FlowView> = {
+        requirements: () => sampleFlow(appOf("ledgerly"), "requirements", { signed_in_as: account }),
+        consent: () => sampleFlow(appOf("acme-notes"), "consent", { signed_in_as: account }),
+        signup: () => {
+          const flow = sampleFlow(appOf("briefcase"), "signup");
+          return { ...flow, signup: flow.signup ? { ...flow.signup, email: "uxa.default.lfmko9byhscr2tq@example.test" } : null };
+        },
+      };
+      return [["GET /v1/flows/:id", ({ params }) => flowJson((flows[(params.id ?? "").split("~")[1] ?? ""] ?? flows.requirements!)())]];
+    },
+    run: async ({ page, base }) => {
+      /** The row's text lines (photo or icon, text, action) that hide part of their words; anything sticking out. */
+      const rowState = (row: Locator) => row.evaluate(el => {
+        const text = el.children[1] as HTMLElement | undefined;
+        const lines = text ? (text.children.length ? Array.from(text.children as HTMLCollectionOf<HTMLElement>) : [text]) : [];
+        const cut = lines.filter(line => line.scrollWidth > line.clientWidth + 1 || getComputedStyle(line).textOverflow === "ellipsis").map(line => line.textContent);
+        const box = el.getBoundingClientRect();
+        const out = Array.from(el.querySelectorAll("*")).some(child => child.getBoundingClientRect().right > box.right + 0.5);
+        return { cut, text: lines.map(line => line.textContent ?? "").join(" "), out };
+      });
+      const notYou = page.getByRole("button", { name: "Not you? Use another account" });
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const [path, expected] of [
+          [flowPath("ledgerly", "requirements"), ["Uxa Ledgerly Z82ldxq5mwt2", "c:uxa-ledgerly-z82ldxq5mwt2"]],
+          [flowPath("acme-notes", "consent"), ["Uxa Ledgerly Z82ldxq5mwt2", "c:uxa-ledgerly-z82ldxq5mwt2"]],
+          [flowPath("briefcase", "signup"), ["uxa.default.lfmko9byhscr2tq@example.test"]],
+        ] as const) {
+          await page.goto(`${base}${path}`, { waitUntil: "networkidle" });
+          // The account row, or (signing up) the innermost surface around "Not you?": where the code went.
+          const row = path.endsWith("signup") ? page.locator("main [data-sq]", { has: notYou }).last() : page.locator("main [data-account]");
+          await expect(row).toBeVisible();
+          const state = await rowState(row);
+          expect(state.cut, `${path} at ${width}: lines cut short`).toEqual([]);
+          expect(state.out, `${path} at ${width}: something sticks out of the row`).toBe(false);
+          for (const words of expected) expect(state.text, `${path} at ${width}`).toContain(words);
+        }
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      }
+    },
+  },
+  {
     name: "sign-up: 'Not you?' ends the waiting sign-up through the flow alone (the server clears it)",
     path: flowPath("briefcase", "signup"),
     run: async ({ page, requests }) => {
@@ -637,6 +794,29 @@ const hostedChecks: MockCheck[] = [
       await page.getByRole("button", { name: "Send a new code" }).click();
       await expect(page.getByText(/It works for 10 minutes/)).toBeVisible();
       await expect(page.getByRole("button", { name: /^Resend code/ })).toBeVisible();
+    },
+  },
+  {
+    name: "verify: the Resend button is named by exactly the words it shows while it counts down (WCAG 2.5.3) and shows keyboard focus then",
+    path: flowPath("briefcase", "verify_code"),
+    run: async ({ page }) => {
+      const resend = page.getByRole("button", { name: /^Resend code in 0:\d\d$/ });
+      await expect(resend).toBeVisible();
+      expect(await resend.getAttribute("aria-label")).toBeNull();
+      expect(await resend.getAttribute("aria-disabled")).toBe("true");
+      // The words on screen are the name (Playwright's role/name match above), whatever the rolling digits are doing.
+      const seen = await resend.evaluate(el => ({ shown: el.querySelector('[aria-hidden="true"]')?.textContent?.replace(/\s+/g, " ").trim(), named: el.querySelector(".sr-only")?.textContent }));
+      expect(seen.shown).toBe(seen.named);
+      const axeFound = await axeViolations(page, ["label-content-name-mismatch"]);
+      expect(axeFound).toEqual([]);
+      // Keyboard focus shows while it waits (it stays a Tab stop): its fill changes, its muted ink stays.
+      const look = () => resend.evaluate(el => getComputedStyle(el).backgroundColor);
+      const resting = await look();
+      await page.getByRole("button", { name: "Change where the code goes (now s***@gmail.com)" }).focus();
+      for (let press = 0; press < 12 && !(await resend.evaluate(el => el === document.activeElement)); press++) await page.keyboard.press(tabKey(page));
+      expect(await resend.evaluate(el => el === document.activeElement && el.matches(":focus-visible"))).toBe(true);
+      expect(await look()).not.toBe(resting);
+      expect(await resend.getAttribute("aria-disabled")).toBe("true");
     },
   },
   {
@@ -1016,7 +1196,134 @@ const deviceChecks: MockCheck[] = [
 const sdkTag = (base: string, appOrigin: string, attributes = "", appId = "briefcase") =>
   `<div id="sa" style="width:360px"></div><script src="${base}/sdk/v1.js" data-app-id="${appId}" data-redirect-uri="${appOrigin}/${appId}/callback" data-target="#sa" ${attributes}></script>`;
 
+/** The start of briefcase's public config: an answer whose body was cut off on its way (headers said 200). */
+const CUT_CONFIG = '{"app_id":"briefcase","name":"Briefcase","methods":["email"';
+/** GET /v1/apps/briefcase/public answering 200 with a cut-off body the first `times` times, then as usual. */
+const cutConfig = (times: number): MockRoute[] => {
+  let left = times;
+  return [["GET /v1/apps/:appId/public", () => (left-- > 0 ? { status: 200, text: CUT_CONFIG, headers: { "content-type": "application/json", "access-control-allow-origin": "*" } } : null)]];
+};
+/** Counts the page's (and its frames') reads of briefcase's public config from now on. */
+function configReads(page: Page): () => number {
+  let count = 0;
+  page.on("request", request => {
+    if (new URL(request.url()).pathname === "/v1/apps/briefcase/public") count++;
+  });
+  return () => count;
+}
+
+/**
+ * A server on loopback that answers every request with 200 and the first half of a JSON body, and holds the rest back
+ * for `holdMs`: what a browser has of an answer whose body is still on its way.
+ */
+async function stallingServer(holdMs = 8000): Promise<{ url: string; headersSent: Promise<void>; close: () => Promise<void> }> {
+  let sent: () => void = () => undefined;
+  const headersSent = new Promise<void>(done => (sent = done));
+  const open = new Set<import("node:http").ServerResponse>();
+  const server: Server = createServer((_, response) => {
+    response.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*", "cache-control": "no-store" });
+    response.write(CUT_CONFIG);
+    open.add(response);
+    sent();
+    setTimeout(() => {
+      open.delete(response);
+      response.end("]}");
+    }, holdMs).unref();
+  });
+  await new Promise<void>(done => server.listen(0, "127.0.0.1", done));
+  const { port } = server.address() as AddressInfo;
+  return {
+    url: `http://127.0.0.1:${port}`,
+    headersSent,
+    close: () => new Promise<void>(done => {
+      for (const response of open) response.destroy();
+      server.close(() => done());
+    }),
+  };
+}
+
 const embedChecks: MockCheck[] = [
+  {
+    name: "embed: the page around the buttons leaving while their config is still arriving logs nothing (Safari cuts the body off after its 200)",
+    run: async ({ page, base, appOrigin, host }) => {
+      const reads = configReads(page);
+      const stall = await stallingServer();
+      try {
+        // The embed page may frame on the app's origin and connect to the stalling server (WebKit checks a request's
+        // rewritten address against the page's connect-src).
+        await page.route(url => url.pathname === "/embed/v1/buttons", async route => {
+          const response = await route.fetch();
+          const headers = { ...response.headers() };
+          headers["content-security-policy"] = (headers["content-security-policy"] ?? "")
+            .replace(/frame-ancestors [^;]*/, `frame-ancestors 'self' ${appOrigin}`)
+            .replace(/connect-src ([^;]*)/, `connect-src $1 ${stall.url}`);
+          delete headers["x-frame-options"];
+          return route.fulfill({ response, headers });
+        });
+        let first = true;
+        // The first read of the config goes to a server that sends its headers and half its body, then waits.
+        await page.route(url => url.pathname === "/v1/apps/briefcase/public", route => {
+          if (!first) return route.fallback();
+          first = false;
+          return route.continue({ url: `${stall.url}/v1/apps/briefcase/public` });
+        });
+        const query = new URLSearchParams({ app_id: "briefcase", redirect_uri: `${appOrigin}/briefcase/callback`, state: "st-race", theme: "light" });
+        const away = host("/__checks/embed-race-away", doc("<p>The hosted sign-in would be here.</p>"));
+        // Like the hosted page, the next page takes a moment to answer: the frame lives on while the page is leaving.
+        await page.route(away, async route => {
+          await new Promise(done => setTimeout(done, 700));
+          await route.fallback();
+        });
+        await page.goto(host("/__checks/embed-race", doc(`<a id="away" href="${away}">Sign in</a><iframe id="embed" title="Sign in" src="${base}/embed/v1/buttons?${query}" style="display:block;width:360px;border:0"></iframe>`)));
+        await Promise.race([stall.headersSent, new Promise((_, fail) => setTimeout(() => fail(new Error("the embed never asked the stalling server for its config")), 20_000).unref())]);
+        await page.locator("#away").click();
+        await page.waitForURL(away);
+        // Past both tries again (0.5 s and 1.5 s): a false report would be in the console by now.
+        await page.waitForTimeout(2500);
+        expect(reads()).toBeGreaterThanOrEqual(1);
+        expect(reads()).toBeLessThanOrEqual(3);
+      } finally {
+        await stall.close();
+      }
+    },
+  },
+  {
+    name: "embed: a config answer cut off after its headers is read again, and the buttons load without an error",
+    routes: () => cutConfig(1),
+    run: async ({ page, base, appOrigin, host }) => {
+      const reads = configReads(page);
+      const query = new URLSearchParams({ app_id: "briefcase", redirect_uri: `${appOrigin}/briefcase/callback`, state: "st-cut", theme: "light" });
+      await page.goto(host("/__checks/embed-cut", doc(`<iframe id="embed" title="Sign in" src="${base}/embed/v1/buttons?${query}" style="display:block;width:360px;border:0"></iframe>`)));
+      const frame = page.frameLocator("#embed");
+      await expect(frame.getByRole("link", { name: "Continue with email" })).toBeVisible();
+      await expect(frame.locator("[data-error-code]")).toHaveCount(0);
+      expect(reads()).toBe(2);
+    },
+  },
+  {
+    name: "embed: an answer that stays unreadable is reported after the tries, with its status",
+    routes: () => cutConfig(10),
+    allowConsole: [/^Silicon Accounts embed: The sign-in config of "briefcase" could not be read \(HTTP 200, the answer was cut off or was not JSON\)\..*\(http_200\)$/],
+    run: async ({ page, base, appOrigin, host }) => {
+      const reads = configReads(page);
+      const query = new URLSearchParams({ app_id: "briefcase", redirect_uri: `${appOrigin}/briefcase/callback`, state: "st-broken", theme: "light" });
+      await page.goto(host("/__checks/embed-broken", doc(`<iframe id="embed" title="Sign in" src="${base}/embed/v1/buttons?${query}" style="display:block;width:360px;border:0"></iframe>`)));
+      const alert = page.frameLocator("#embed").locator('[data-error-code="http_200"]');
+      await expect(alert).toContainText("could not be read (HTTP 200, the answer was cut off or was not JSON)", { timeout: 8000 });
+      expect(reads()).toBe(3);
+    },
+  },
+  {
+    name: "sdk: a config answer cut off after its headers is read again, and the buttons load without an error",
+    routes: () => cutConfig(1),
+    run: async ({ page, base, appOrigin, host }) => {
+      const reads = configReads(page);
+      await page.goto(host("/__checks/sdk-cut", doc(sdkTag(base, appOrigin))));
+      await expect(page.locator("#sa").getByRole("button", { name: "Continue with email" })).toBeVisible();
+      await expect(page.locator("#sa").getByRole("alert")).toHaveCount(0);
+      expect(reads()).toBe(2);
+    },
+  },
   {
     name: "sdk: on a light page with a dark device the buttons follow the page, and 'Powered by' reads",
     dark: true,
@@ -1802,7 +2109,8 @@ async function runMockChecks(selected: MockCheck[], base: string, engine: "chrom
       const problems: string[] = [];
       const requests: MockRequest[] = [];
       page.on("console", message => {
-        if (message.type() === "error" && !expectedConsole(message.text())) problems.push(`console: ${message.text()}`);
+        const text = message.text();
+        if (message.type() === "error" && !expectedConsole(text) && !check.allowConsole?.some(pattern => pattern.test(text))) problems.push(`console: ${text}`);
       });
       page.on("pageerror", failure => problems.push(`page error: ${failure.message} (at ${page.url()})`));
       const extra = typeof check.routes === "function" ? check.routes() : check.routes ?? [];

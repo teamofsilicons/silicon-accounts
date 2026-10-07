@@ -2,9 +2,10 @@
  * commit's user base as its owner sees it, after six fresh members of every kind arrive: two Carbons who signed in
  * (one also shared their timezone), one who later removed commit's access, two imported users (one with a phone)
  * and a Silicon that signed in with a short-lived token. The table lists them with kind, status, contact and source;
- * search finds them by name, c:id, email, phone and external id, but never by contact details the app may no longer
- * see; the status, kind and source filters narrow them; each row's drawer shows the membership, what it shares and its
- * sign-ins. The overview's numbers move with them.
+ * search finds them by name, c:id, email, phone and external id, but never by data the app may no longer see (the
+ * member who removed access stays as history, listed as "Access removed" with their id and none of their own data:
+ * not their name, nor their email); the status, kind and source filters narrow them; each row's drawer shows the
+ * membership, what it shares and its sign-ins. The overview's numbers move with them.
  */
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
@@ -34,11 +35,14 @@ interface Stats {
   imported_unclaimed: number;
 }
 
-/** The names in the table now (after the debounce and the request). */
+/** The rows in the table now (after the debounce and the request), as their names say them: "<name>, <id>". */
 async function rowNames(page: Page): Promise<string[]> {
-  // Each row's name button is labelled "Open <name> (<id>)".
+  // Each row's name button is labelled "<name>, <id>" (what it shows; it used to be "Open <name> (<id>)").
   return page.locator("table tbody tr [data-open-user]").evaluateAll(buttons => buttons.map(button => (button.getAttribute("aria-label") ?? "").replace(/^Open /, "")));
 }
+
+/** The display name an app sees for an account that removed its access (crates/apps users.rs). */
+const ACCESS_REMOVED = "Access removed";
 
 export const journey: Journey = {
   name: "developer-branding-users",
@@ -83,11 +87,14 @@ export const journey: Journey = {
     results.metric("user base setup (3 sign-ins, 1 removal, 2 imports, 1 Silicon)", Date.now() - setupStarted);
     const siliconUuid = created.body.silicon?.uuid ?? "";
 
-    // The API's view of the same people (what the table shows comes from here).
+    // The API's view of the same people (what the table shows comes from here). The tag is in every new member's id,
+    // so it finds Brook too (by id: Brook's name is no longer the app's to see).
     const listed = (await asApp<{ items: AppUser[] }>(ctx, APP, `/v1/apps/${APP}/users?q=${t}&limit=50`)).body.items ?? [];
     const by = (needle: string) => listed.find(user => user.display_name.includes(needle));
-    results.check("the user base lists all six, each with the right kind, status and source", listed.length === 6 && by("Ada")?.status === "active" && by("Brook")?.status === "access_removed" && by("Imported One")?.status === "imported" && by("Imported One")?.source === "import" && by("Scout")?.kind === "silicon" && by("Scout")?.source === "slt" && by("Cara")?.source === "signin", listed.map(user => `${user.display_name}:${user.kind}/${user.status}/${user.source}`).join(", "));
-    results.check("contact fields follow what each member shares: Ada's email; Cara's email and timezone; Brook nothing any more; the import's own values; the Silicon none", by("Ada")?.email === ada.email && !by("Ada")?.timezone && by("Cara")?.timezone === "Asia/Kolkata" && by("Brook")?.email === undefined && by("Imported One")?.phone === importPhone && by("Scout")?.email === undefined, JSON.stringify(listed.map(user => [user.display_name, user.email ?? null, user.phone ?? null, user.timezone ?? null])).slice(0, 400));
+    const brookRow = listed.find(user => user.uuid === brook.uuid);
+    results.check("the user base lists all six, each with the right kind, status and source", listed.length === 6 && by("Ada")?.status === "active" && brookRow?.status === "access_removed" && by("Imported One")?.status === "imported" && by("Imported One")?.source === "import" && by("Scout")?.kind === "silicon" && by("Scout")?.source === "slt" && by("Cara")?.source === "signin", listed.map(user => `${user.display_name}:${user.kind}/${user.status}/${user.source}`).join(", "));
+    results.check("contact fields follow what each member shares: Ada's email; Cara's email and timezone; Brook nothing any more; the import's own values; the Silicon none", by("Ada")?.email === ada.email && !by("Ada")?.timezone && by("Cara")?.timezone === "Asia/Kolkata" && !!brookRow && brookRow.email === undefined && brookRow.phone === undefined && brookRow.timezone === undefined && by("Imported One")?.phone === importPhone && by("Scout")?.email === undefined, JSON.stringify(listed.map(user => [user.display_name, user.email ?? null, user.phone ?? null, user.timezone ?? null])).slice(0, 400));
+    results.check(`the member who removed access stays listed as "${ACCESS_REMOVED}" with their id, and none of their own data (not their name)`, !!brookRow && brookRow.display_name === ACCESS_REMOVED && brookRow.id === brook.id && !JSON.stringify(brookRow).includes(`Brook Leaving ${t}`) && !JSON.stringify(brookRow).includes(brook.email), JSON.stringify(brookRow ?? null).slice(0, 300));
 
     // The owner's table.
     const owner = await ownerSignIn(ctx, APP, "dvb-i-owner");
@@ -109,8 +116,11 @@ export const journey: Journey = {
       }
       return { names, ms: Date.now() - started };
     };
-    const all = await searchFor(t, ["Ada", "Brook", "Cara", "Imported One", "Imported Two", "Scout"]);
-    results.check("searching the run's tag shows the six new members", all.names.length === 6 && ["Ada", "Brook", "Cara", "Imported One", "Imported Two", "Scout"].every(name => all.names.some(row => row.includes(name))), all.names.join(" | "));
+    // Rows are named "<name>, <id>"; Brook's says "Access removed, <Brook's id>".
+    const six = ["Ada", brook.id, "Cara", "Imported One", "Imported Two", "Scout"];
+    const all = await searchFor(t, six);
+    results.check("searching the run's tag shows the six new members", all.names.length === 6 && six.every(name => all.names.some(row => row.includes(name))), all.names.join(" | "));
+    results.check(`the row of the member who removed access reads "${ACCESS_REMOVED}, ${brook.id}"`, all.names.includes(`${ACCESS_REMOVED}, ${brook.id}`) && !all.names.some(row => row.includes("Brook Leaving")), all.names.find(row => row.includes(brook.id)) ?? "no row");
     results.metric("user search (typing → rows)", all.ms);
     const table = (await page.locator("table tbody").innerText()).replace(/\s+/g, " ");
     results.check("the rows show kind, status, contact and source in words (Silicon, Imported, Access removed, Not shared, Import, Silicon token)", /Silicon/.test(table) && /Imported/.test(table) && /Access removed/.test(table) && /Not shared/.test(table) && /Silicon token/.test(table) && /Import/.test(table) && table.includes(ada.email), table.slice(0, 300));
@@ -128,9 +138,11 @@ export const journey: Journey = {
     await finds("the imported phone", importPhone, ["Imported One"]);
     await finds("the email of a member who removed access (the app may no longer see it)", brook.email, []);
     results.check("with no match the table says so", (await page.getByText("No user matches this search and these filters.").count()) > 0);
+    await finds("the former name of a member who removed access (the app may no longer see it)", `Brook Leaving ${t}`, []);
+    await finds("the id of a member who removed access (it stays the app's to see)", brook.id, [brook.id]);
 
     // Filters, on top of the tag search.
-    await searchFor(t, ["Ada", "Brook", "Cara", "Imported One", "Imported Two", "Scout"]);
+    await searchFor(t, six);
     const filterBy = async (field: string, value: string, wanted: string[]) => {
       await page.getByRole("button", { name: "Add filter" }).click();
       await page.getByRole("menuitem", { name: field }).click();
@@ -147,7 +159,7 @@ export const journey: Journey = {
       for (let attempt = 0; attempt < 40 && (await rowNames(page)).length !== 6; attempt++) await sleep(250);
     };
     await filterBy("Status", "Imported", ["Imported One", "Imported Two"]);
-    await filterBy("Status", "Access removed", ["Brook"]);
+    await filterBy("Status", "Access removed", [brook.id]);
     await filterBy("Kind", "Silicon", ["Scout"]);
     await filterBy("Source", "Import", ["Imported One", "Imported Two"]);
     await filterBy("Source", "Silicon token", ["Scout"]);
@@ -180,7 +192,7 @@ export const journey: Journey = {
     results.check("the Silicon's drawer: a Silicon, joined through a Silicon token, no email or phone, its short-lived-token sign-in", /Silicon/.test(siliconDrawer) && /Joined through Silicon token/.test(siliconDrawer) && !/Email/.test(siliconDrawer.replace(/Email code/g, "")) && /Short-lived token/.test(siliconDrawer), siliconDrawer.slice(0, 400));
     await page.keyboard.press("Escape");
     const brookDrawer = await openDrawer(brook);
-    results.check("the removed member's drawer: Access removed, and none of their contact details", /Access removed/.test(brookDrawer) && !brookDrawer.includes(brook.email), brookDrawer.slice(0, 300));
+    results.check("the removed member's drawer: Access removed, their id, and none of their data (name, contact details)", /Access removed/.test(brookDrawer) && brookDrawer.includes(brook.id) && !brookDrawer.includes(brook.email) && !brookDrawer.includes(`Brook Leaving ${t}`), brookDrawer.slice(0, 300));
     await page.keyboard.press("Escape");
 
     // The overview's numbers moved by exactly the new live members.

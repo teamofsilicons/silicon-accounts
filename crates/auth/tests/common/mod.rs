@@ -1,7 +1,9 @@
 //! Shared helpers for the auth integration tests: a cookie-keeping "browser", app setup,
-//! flow drivers and an in-process mock of Google and Apple ([`mock_oidc`]).
+//! flow drivers, an in-process mock of Google and Apple ([`mock_oidc`]) and a provider front
+//! that drops kept-alive connections ([`dropping_front`]).
 #![allow(dead_code)]
 
+pub mod dropping_front;
 pub mod mock_oidc;
 
 use std::collections::BTreeMap;

@@ -195,6 +195,32 @@ const checks: Check[] = [
     },
   },
   {
+    name: "tabs: when the window narrows to a phone's width, the selected tab scrolls into view in the tab strip",
+    run: async env => {
+      const { page } = env;
+      // How much of the selected tab its scrolling strip shows, in px, and its width.
+      const shown = () => page.evaluate(() => {
+        const tab = document.querySelector<HTMLElement>("[role=tablist] [role=tab][data-state=active]");
+        if (!tab) return { shown: -1, width: 0 };
+        let strip = tab.parentElement;
+        while (strip && getComputedStyle(strip).overflowX === "visible") strip = strip.parentElement;
+        const t = tab.getBoundingClientRect();
+        const s = (strip ?? document.documentElement).getBoundingClientRect();
+        return { shown: Math.round(Math.max(0, Math.min(t.right, s.right) - Math.max(t.left, s.left))), width: Math.round(t.width) };
+      });
+      try {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.goto(tab(env, "embed"));
+        await expect(page.getByRole("tab", { name: /^Embed/ })).toHaveAttribute("aria-selected", "true");
+        await page.setViewportSize({ width: 390, height: 844 });
+        // It used to stay where the wide strip had it: past the strip's right edge, 0 px of it shown.
+        await expect.poll(async () => { const now = await shown(); return now.shown >= now.width - 2 && now.width > 0; }, { timeout: 5000 }).toBe(true);
+      } finally {
+        await page.setViewportSize({ width: 1440, height: 900 });
+      }
+    },
+  },
+  {
     name: "sign-in: a toggle saves as the next version",
     run: async env => {
       const { page } = env;
@@ -208,6 +234,54 @@ const checks: Check[] = [
       await expect(saveBar(page)).toContainText(`Saved as version ${version + 1}`);
       await expect(page.getByText(`Stored version ${version + 1}`)).toBeVisible();
       expect(await phone.getAttribute("aria-checked")).not.toBe(before);
+    },
+  },
+  {
+    name: "sign-in: a bring-your-own secret's field says it is stored again after Save, Discard and Keep, with focus on its Replace",
+    run: async env => {
+      const { page, run } = env;
+      await page.goto(tab(env, "sign-in"));
+      const google = page.getByRole("region", { name: "Google" });
+      const byo = google.getByRole("radio", { name: /^Bring your own/ });
+      const stored = google.getByText("A client secret is stored");
+      const replace = google.getByRole("button", { name: "Replace" });
+      const wasByo = (await byo.getAttribute("aria-checked")) === "true";
+      if (!wasByo || !(await stored.count())) {
+        // Bring your own Google with a stored secret first (a first save closes the field by itself).
+        await byo.click();
+        await google.getByRole("textbox", { name: "Client ID" }).fill(`checks-${run}.apps.googleusercontent.com`);
+        await google.getByLabel("Client secret").fill(`GOCSPX-checks-${run}-first`);
+        await saveBar(page).getByRole("button", { name: "Save changes" }).click();
+        await expect(stored).toBeVisible();
+      }
+      // Replace, a new secret, Save: the field closes back to "stored" (it used to stay an empty replace field, as if
+      // nothing were stored), and focus goes to its Replace, not to the start of the page.
+      const version = await storedVersion(page);
+      await replace.click();
+      await google.getByLabel("Client secret").fill(`GOCSPX-checks-${run}-second`);
+      await saveBar(page).getByRole("button", { name: "Save changes" }).click();
+      await expect(saveBar(page)).toContainText(`Saved as version ${version + 1}`);
+      await expect(stored).toBeVisible();
+      await expect(google.getByRole("button", { name: "Keep the stored secret" })).toHaveCount(0);
+      await expect(replace, `focus is on ${await focused(page)}`).toBeFocused();
+      // Replace, a new secret, Discard: the same, and nothing is saved.
+      await replace.click();
+      await google.getByLabel("Client secret").fill(`GOCSPX-checks-${run}-third`);
+      await saveBar(page).getByRole("button", { name: "Discard" }).click();
+      await expect(stored).toBeVisible();
+      await expect(replace, `focus is on ${await focused(page)}`).toBeFocused();
+      expect(await storedVersion(page)).toBe(version + 1);
+      // "Keep the stored secret" closes it as well.
+      await replace.click();
+      await google.getByRole("button", { name: "Keep the stored secret" }).click();
+      await expect(stored).toBeVisible();
+      await expect(replace, `focus is on ${await focused(page)}`).toBeFocused();
+      if (!wasByo) {
+        // Back to one click, as the other checks found it.
+        await google.getByRole("radio", { name: /^One click/ }).click();
+        await saveBar(page).getByRole("button", { name: "Save changes" }).click();
+        await expect(saveBar(page)).toContainText(`Saved as version ${version + 2}`);
+      }
     },
   },
   {
@@ -581,6 +655,29 @@ const checks: Check[] = [
       await expect(page.getByText(/must use https/).first()).toBeVisible();
       await page.getByRole("button", { name: "Cancel" }).click();
       await expect(page.getByRole("button", { name: "Change URL" })).toBeFocused();
+    },
+  },
+  {
+    name: "webhooks: the drawer keeps naming its event after a replay takes the delivery out of the filter shown",
+    run: async env => {
+      const { page } = env;
+      await page.goto(tab(env, "webhooks"));
+      await webhookFaults(0);
+      await page.getByRole("button", { name: "Send test ping" }).click();
+      await newestDelivery(page, /Delivered/);
+      const filter = page.getByRole("group", { name: "Show deliveries" });
+      await filter.getByRole("button", { name: "Delivered" }).click();
+      await page.locator("table tbody tr").first().getByRole("button", { name: /^Open delivery .+ of ping$/ }).click();
+      const drawer = page.getByRole("dialog");
+      await expect(drawer.getByRole("heading").first()).toHaveText("ping");
+      await drawer.getByRole("button", { name: "Replay this delivery" }).click();
+      // Queued again it is pending, so the Delivered list read again leaves it out; the drawer still names it (its
+      // title used to come from that list and turned into "Delivery").
+      await expect(drawer.getByText(/replayed 1 time/)).toBeVisible({ timeout: 15_000 });
+      await expect(drawer.getByRole("heading").first()).toHaveText("ping");
+      await page.keyboard.press("Escape");
+      await expect(drawer).toBeHidden();
+      await filter.getByRole("button", { name: "All" }).click();
     },
   },
   {

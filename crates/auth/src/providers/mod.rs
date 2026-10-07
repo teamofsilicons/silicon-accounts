@@ -96,6 +96,114 @@ pub fn callback_url(settings: &Settings, provider: Provider) -> String {
     settings.url(&format!("/v1/oauth/callback/{}", provider.as_str()))
 }
 
+/// A provider request that got no answer at all (connection refused or dropped, TLS failure,
+/// timeout): its whole chain of causes, and how many times it was sent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TransportError {
+    /// E.g. `error sending request: client error (SendRequest): connection closed before
+    /// message completed` (never the URL).
+    pub(crate) reason: String,
+    /// 1, or 2 when it was sent again on a new connection.
+    pub(crate) tries: u8,
+}
+
+impl std::fmt::Display for TransportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.reason)?;
+        if self.tries > 1 {
+            f.write_str("; tried twice, the second time on a new connection")?;
+        }
+        Ok(())
+    }
+}
+
+/// Sends a request to Google or Apple (the code exchange, the JWKS fetch) with the shared client.
+///
+/// When it fails before any answer came back, it is sent once more on a new connection. The
+/// usual cause is a kept-alive connection the provider had already closed: servers drop idle
+/// connections after a few seconds (Node after 5 s) while reqwest's pool reuses them for 90 s,
+/// so a sign-in can write its request to a dead connection and get "connection closed before
+/// message completed". Sending again is safe for every provider call made here: a JWKS GET is
+/// idempotent, and an authorization code the provider never received is still unused (had it
+/// received it, the second exchange is refused with invalid_grant and nothing is signed in
+/// twice). Timeouts are not retried: the provider may still be working on the first request,
+/// and the Carbon has already waited for it.
+pub(crate) async fn send(
+    http: &reqwest::Client,
+    what: &str,
+    request: impl Fn(&reqwest::Client) -> reqwest::RequestBuilder,
+) -> Result<reqwest::Response, TransportError> {
+    let first = match request(http).send().await {
+        Ok(response) => return Ok(response),
+        Err(e) => e,
+    };
+    let first_reason = describe_error(&first);
+    if first.is_timeout() || !first.is_request() {
+        tracing::warn!(what, error = %first_reason, "provider request failed");
+        return Err(TransportError {
+            reason: first_reason,
+            tries: 1,
+        });
+    }
+    tracing::warn!(
+        what,
+        error = %first_reason,
+        "provider request failed before any answer; sending it once more on a new connection"
+    );
+    let fresh = new_connection_client().unwrap_or_else(|| http.clone());
+    match request(&fresh).send().await {
+        Ok(response) => {
+            tracing::info!(what, "provider request answered on a new connection");
+            Ok(response)
+        }
+        Err(e) => {
+            let reason = describe_error(&e);
+            tracing::warn!(what, error = %reason, first_error = %first_reason, "provider request failed again on a new connection");
+            Err(TransportError { reason, tries: 2 })
+        }
+    }
+}
+
+/// A client that never reuses a connection, for the second try of [`send`]. Same rules as the
+/// shared client (`accounts_core::state::build_http_client`): 10 s timeout, 5 s to connect, no
+/// redirects.
+fn new_connection_client() -> Option<reqwest::Client> {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .redirect(reqwest::redirect::Policy::none())
+        .user_agent(format!("SiliconAccounts/{}", accounts_core::VERSION))
+        .pool_max_idle_per_host(0)
+        .build()
+        .map_err(|e| tracing::error!(error = %e, "could not build a provider client"))
+        .ok()
+}
+
+/// A reqwest error with its causes, outermost first, without the URL: `error sending request:
+/// client error (Connect): tcp connect error: Connection refused (os error 61)`. reqwest's own
+/// message stops at "error sending request", which says nothing about what went wrong.
+pub(crate) fn describe_error(e: &reqwest::Error) -> String {
+    let mut parts = vec![without_url(e)];
+    let mut source = std::error::Error::source(e);
+    while let Some(cause) = source {
+        let text = cause.to_string();
+        if !text.is_empty() && !parts.iter().any(|p| p.contains(&text)) {
+            parts.push(text);
+        }
+        source = cause.source();
+    }
+    parts.join(": ")
+}
+
+/// reqwest's message without its ` for url (…)` suffix.
+fn without_url(e: &reqwest::Error) -> String {
+    let mut text = e.to_string();
+    if let Some(i) = text.find(" for url (") {
+        text.truncate(i);
+    }
+    text
+}
+
 fn not_configured(message: String, hint: &str) -> ApiError {
     ApiError::unavailable("provider_not_configured", message).hint(hint)
 }

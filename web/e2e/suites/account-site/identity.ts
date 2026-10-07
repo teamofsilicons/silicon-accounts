@@ -5,7 +5,7 @@
  */
 import type { Journey } from "../../context";
 import { json, shot, sleep, tag } from "../../lib";
-import { addContact, call, codeOf, confirmMorph, deliveredAfter, formatDate, getMe, inbox, jpegHeader, mainText, newCarbon, oversizedUploads, queuedEvents, requestSent, signIntoApp, solidPng, timezoneLabel, until, utcOffset, waitEvent } from "./_helpers";
+import { addContact, call, codeOf, confirmMorph, deliveredAfter, expectContinuePost, formatDate, getMe, inbox, jpegHeader, mainText, newCarbon, oversizedUploads, queuedEvents, requestSent, signIntoApp, solidPng, timezoneLabel, until, utcOffset, waitEvent } from "./_helpers";
 
 /** A PNG header that claims width×height (no pixels): the service reads only the header. */
 function pngHeader(width: number, height: number): Buffer {
@@ -284,6 +284,18 @@ const profileEdits: Journey = {
     const directBody = (await direct.json().catch(() => null)) as { error?: { code?: string } } | null;
     results.check("straight at accounts-api, 2 MB + 1 byte is refused with 413 payload_too_large", direct.status === 413 && directBody?.error?.code === "payload_too_large", `${direct.status} ${JSON.stringify(directBody).slice(0, 160)}`);
     results.check("through the site, every 2 MB + 1 byte upload gets the API's 413 (20 tries)", bare.length === 0 && tries.every(entry => /payload_too_large|photo_too_large/.test(entry.text)), `statuses ${statuses.join(",")}; first other answer: ${bare[0] ? `${bare[0].status} ${JSON.stringify(bare[0].text)}` : "none"}`);
+    // An API client that asks before sending a big body (Expect: 100-continue, as curl does over 1 MB) gets the same
+    // 413: through the site (which says 100 Continue itself and passes the body on) and straight at accounts-api.
+    const cookie = (await carbon.context.cookies(env.site)).map(entry => `${entry.name}=${entry.value}`).join("; ");
+    const asking = { "content-type": "image/png", cookie, origin: env.site, "x-forwarded-for": carbon.ip };
+    const askedSite: Array<{ status: number; text: string; continued: boolean; ms: number }> = [];
+    for (let i = 0; i < 5; i++) askedSite.push(await expectContinuePost(`${env.site}/v1/me/photo`, huge, asking));
+    const askedApi = await expectContinuePost(`${env.api}/v1/me/photo`, huge, asking);
+    results.check("a client sending Expect: 100-continue with 2 MB + 1 byte gets the 413 too, through the site (5 tries) and straight at accounts-api", askedSite.every(entry => entry.status === 413 && /payload_too_large/.test(entry.text)) && askedApi.status === 413 && /payload_too_large/.test(askedApi.text), `site ${askedSite.map(entry => `${entry.status}${entry.continued ? "+100" : ""}`).join(",")}; direct ${askedApi.status} (100 Continue sent: ${askedApi.continued}, ${askedApi.ms} ms) ${askedApi.status === 413 ? "" : askedApi.text}`);
+    // The 64 KB limit of every other write, through the site.
+    const bigJson = await oversizedUploads(probe, "/v1/me", Buffer.from('{"display_name":"'), 64 * 1024 + 1, 10, "application/json", { method: "PATCH", fill: 0x78 });
+    results.check("through the site, a JSON body over 64 KB (PATCH /v1/me) gets the API's 413 every time (10 tries)", bigJson.every(entry => entry.status === 413 && /payload_too_large/.test(entry.text)), `statuses ${bigJson.map(entry => entry.status).join(",")}; ${bigJson.find(entry => entry.status !== 413)?.text ?? ""}`);
+    results.check("…and the refused bodies changed nothing", (await getMe(probe)).display_name === newName);
     const giant = await call(probe, "/v1/me/photo", { method: "POST", bytes: pngHeader(9000, 9000), contentType: "image/png" });
     results.check("the API refuses a PNG of 9000×9000 pixels (dimensions capped)", giant.status === 422, `${giant.status} ${codeOf(giant.body)}`);
     const httpUrl = await call(probe, "/v1/me", { method: "PATCH", json: { pfp_url: "http://example.com/a.png" } });
@@ -300,6 +312,53 @@ const profileEdits: Journey = {
     const gone = await json(withPhoto.pfp_url);
     results.check("the removed upload is no longer served (404)", gone.status === 404, String(gone.status));
     await page.keyboard.press("Escape");
+
+    // The other formats the site takes (the PNG was above): a JPEG, and a WebP where the browser can encode one, drawn
+    // on a canvas in the page, and a GIF; each uploads and is served as itself, byte for byte.
+    const drawn = await probe.evaluate(async () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 48;
+      const pen = canvas.getContext("2d");
+      if (pen) {
+        pen.fillStyle = "#1f5fb8";
+        pen.fillRect(0, 0, 64, 48);
+        pen.fillStyle = "#f2c14e";
+        pen.fillRect(8, 8, 24, 24);
+      }
+      const out: Record<string, string> = {};
+      for (const type of ["image/jpeg", "image/webp"]) {
+        const blob = await new Promise<Blob | null>(done => canvas.toBlob(done, type, 0.9));
+        if (!blob || blob.type !== type) continue;
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let raw = "";
+        for (let i = 0; i < bytes.length; i++) raw += String.fromCharCode(bytes[i] ?? 0);
+        out[type] = btoa(raw);
+      }
+      return out;
+    });
+    const gif = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+    const gifDecodes = await probe.evaluate(async b64 => {
+      const raw = atob(b64);
+      const bytes = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      return createImageBitmap(new Blob([bytes], { type: "image/gif" })).then(bitmap => `${bitmap.width}x${bitmap.height}`, error => `not decodable: ${String(error)}`);
+    }, gif.toString("base64"));
+    const samples: Array<[string, Buffer]> = [...Object.entries(drawn).map(([type, b64]): [string, Buffer] => [type, Buffer.from(b64, "base64")]), ["image/gif", gif]];
+    const formatsSeen: string[] = [];
+    let formatsOk = true;
+    for (const [type, bytes] of samples) {
+      const up = await call(probe, "/v1/me/photo", { method: "POST", bytes, contentType: type });
+      const url = (await getMe(probe)).pfp_url;
+      const served = await fetch(url);
+      const back = Buffer.from(await served.arrayBuffer());
+      const same = served.status === 200 && served.headers.get("content-type") === type && back.equals(bytes);
+      formatsOk &&= up.status === 201 && same;
+      formatsSeen.push(`${type} ${bytes.length} B: ${up.status} ${up.status === 201 ? "" : codeOf(up.body)} → ${served.status} ${served.headers.get("content-type")} ${back.equals(bytes) ? "same bytes" : "other bytes"}`);
+    }
+    results.check(`a JPEG${drawn["image/webp"] ? ", a WebP" : ""} and a GIF upload too, each served as itself, byte for byte`, formatsOk && samples.length >= 2 && gifDecodes === "1x1", `${formatsSeen.join(" | ")}; the GIF decodes in the browser as ${gifDecodes}`);
+    const cleared = await call(probe, "/v1/me/photo", { method: "DELETE" });
+    results.check("DELETE /v1/me/photo puts the Iris default back", cleared.status < 300 && (await getMe(probe)).pfp_url === `${env.iris}/pfp/carbon?id=${uuid}`, String(cleared.status));
 
     results.check("Briefcase refused no delivery (every webhook carried a valid signature)", (await inbox(env, "briefcase")).rejected.length === refusedAtStart, `${(await inbox(env, "briefcase")).rejected.length - refusedAtStart} refused`);
 

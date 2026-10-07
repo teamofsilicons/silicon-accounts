@@ -122,7 +122,7 @@ Rules every flow endpoint follows:
 | `methods` | the enabled methods, in the app's order (managed Google/Apple are hidden when this deployment has no credentials for them) |
 | `signed_in_as` | the browser's signed-in Carbon (offered as "Continue as"), or null |
 | `challenge` | at `verify_code`: `{channel, destination (masked), expires_at, resend_available_at}` |
-| `signup` | at `signup`: the prefilled details `{display_name, id, timezone, dob, pfp_url, email, phone, provider, provider_pfp_url, finishing_import, expires_at}` |
+| `signup` | at `signup`: the prefilled details `{display_name, id, timezone, dob, pfp_url, email, phone, provider, provider_pfp_url, finishing_import, imported_by, expires_at}`; `imported_by` is `{app_id, name}` of the app whose import created the account when `finishing_import` is true (it can be another app than the one being signed into), else null |
 | `requirements` | at `requirements`: `{missing: ["phone"], challenge}` — required details the account lacks |
 | `consent` | at `consent`: `required` and `optional` items `{scope, label, value}` (values masked like code destinations; `optional[].granted` is the toggle's starting state), `previously_granted` |
 | `redirect_to` | at `complete`/`failed`: where to send the browser (your `redirect_uri` with `code` and `state`, or an error) |
@@ -242,6 +242,7 @@ page (30 seconds after a send), not enforced.
     "provider": null,
     "provider_pfp_url": null,
     "finishing_import": false,
+    "imported_by": null,
     "expires_at": "2026-10-09T02:32:46.324Z"
   }
 }

@@ -174,6 +174,65 @@ async fn app_and_redirect_errors_never_offer_a_redirect() {
 }
 
 #[tokio::test]
+async fn a_redirect_uri_with_a_fragment_is_never_accepted() {
+    // RFC 6749 §3.1.2: a redirection URI must not include a fragment. Loopback URIs match on
+    // any port, and that comparison must not let a fragment through either: the result would
+    // be `…/callback?code=…&state=…#fragment`.
+    let ctx = TestContext::new().await;
+    let (app, _) = ctx.app("briefcase").await;
+    set_config(
+        &ctx,
+        &app.app_id,
+        json!({"redirect_uris": [redirect_uri(&app.app_id), "https://app.example.test/auth/callback"]}),
+    )
+    .await;
+    let mut b = Browser::new(&ctx);
+    let registered = redirect_uri(&app.app_id);
+    let r = start_flow(
+        &ctx,
+        &mut b,
+        &app.app_id,
+        json!({"redirect_uri": registered}),
+    )
+    .await;
+    assert_eq!(r.status, 201, "control: the registered URI: {}", r.json);
+    for bad in [
+        format!("{registered}#fragment"),
+        format!("{registered}#"),
+        format!("{registered}?x=1#y"),
+        format!("{}#fragment", registered.replace(":8593", ":4567")),
+        "https://app.example.test/auth/callback#fragment".to_string(),
+    ] {
+        let r = start_flow(&ctx, &mut b, &app.app_id, json!({"redirect_uri": bad})).await;
+        assert_eq!(r.status, 400, "{bad}: {}", r.json);
+        assert_eq!(r.error_code(), Some("redirect_uri_not_registered"), "{bad}");
+        assert!(
+            r.json["error"]["details"].get("redirect_to").is_none(),
+            "{bad}: never redirect to it"
+        );
+    }
+    let r = start_flow(
+        &ctx,
+        &mut b,
+        &app.app_id,
+        json!({"redirect_uri": format!("{registered}#fragment")}),
+    )
+    .await;
+    let message = r.json["error"]["message"].as_str().expect("message");
+    assert!(
+        message.contains("fragment") && message.contains("RFC 6749"),
+        "the refusal says why: {message}"
+    );
+    let flows = scalar_i64(
+        &ctx,
+        "select count(*) from signin_flows where app_id = $1",
+        &app.app_id,
+    )
+    .await;
+    assert_eq!(flows, 1, "only the control flow was created");
+}
+
+#[tokio::test]
 async fn first_party_redirects_stay_on_the_site() {
     let ctx = TestContext::new().await;
     let mut b = Browser::new(&ctx);

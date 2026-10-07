@@ -281,7 +281,7 @@ export function SortableDataTable<T extends Record<string, unknown>>({ rows, col
             const active = sort?.key === column.key;
             const sortable = column.sortable !== false;
             return <th key={column.key} scope="col" role="columnheader" data-key={column.key} data-primary={index === 0 || undefined} data-sorted={active || undefined} data-numeric={numeric.has(column.key) || undefined} data-sortable={sortable || undefined} aria-sort={!sortable ? undefined : active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-              {sortable ? <button className={styles.sortButton} type="button" data-nav="head" onClick={() => sortBy(column)} aria-label={`Sort by ${column.label}${active ? `, currently ${sort.direction === "asc" ? "ascending" : "descending"}` : ""}`}>
+              {sortable ? <button className={styles.sortButton} data-sq="surface" type="button" data-nav="head" onClick={() => sortBy(column)} aria-label={`Sort by ${column.label}${active ? `, currently ${sort.direction === "asc" ? "ascending" : "descending"}` : ""}`}>
                 <span className={styles.sortInner}><span>{column.label}</span><SortGlyph active={active} descending={active && sort.direction === "desc"} reduced={reduced} /></span>
               </button> : column.label}
             </th>;

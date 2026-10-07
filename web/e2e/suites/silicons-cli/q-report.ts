@@ -72,15 +72,22 @@ export const journey: Journey = {
     const storedSigned = await sql(env, `select count(*) from bug_reports where account_uuid = '${uuid}'`);
     results.check("…and the stored report carries the account", storedSigned[0]?.[0] === "1", short(storedSigned));
 
-    // 3. From stdin, without diagnostics.
+    // 3. From stdin, without diagnostics (the same Silicon, this time with a PR).
     const marker3 = `scli-stdin-${t}`;
     after = await lastSeq(env);
-    const piped = await accounts(env, ["report", "-", "--no-diagnostics", "--json"], { home: freshDir(), stdin: `${marker3}: piped in\n` });
+    const piped = await accounts(env, ["report", "-", "--no-diagnostics", "--pr", PR, "--json"], { home, stdin: `${marker3}: piped in\n` });
     const pipedMails = await until(async () => {
       const found = await mailsWith(env, marker3, after);
       return found.length >= 3 ? found : null;
     }, 20_000, 300);
     results.check("`accounts report - --no-diagnostics` reads stdin and appends nothing", piped.code === 0 && !!pipedMails && pipedMails.every(mail => !/accounts CLI \d/.test(str(mail.text))), said(piped));
+    const history = await accounts(env, ["history", "--kind", "security", "--json"], { home });
+    const sentReports = ((history.json?.items ?? []) as Json[]).filter(item => item.title === "Bug report sent");
+    results.check(
+      "the Silicon's history lists both of its reports ('Bug report sent'; the one with a PR: 'With a pull request that fixes it')",
+      sentReports.length === 2 && sentReports.some(item => item.detail === "With a pull request that fixes it") && sentReports.some(item => !item.detail),
+      short(sentReports.map(item => [item.title, item.detail])),
+    );
 
     // 4. A retry with the same Idempotency-Key sends nothing new.
     const marker4 = `scli-retry-${t}`;

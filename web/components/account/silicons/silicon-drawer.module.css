@@ -68,7 +68,7 @@
 .urlBox { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); position: relative; display: flex; min-width: 0; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); background: var(--sq-fill); }
 .url { min-width: 0; flex: 1; overflow: hidden; color: var(--foreground); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Transfer: the Silicon's card, an arrow, and the person it goes to. */
+/* Transfer: the Silicon's card, an arrow, and the Carbon it goes to. */
 .transfer { display: grid; min-width: 0; gap: var(--space-3); }
 .route { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: var(--space-3); }
 .mini {

@@ -7,11 +7,16 @@
 //! Account deletion is the account crate's `DELETE /v1/me`; it is reproduced here step by step
 //! with its exact locks (see `common::begin_account_deletion`), because that locking protocol is
 //! what this crate's locks serialize with.
+//!
+//! A Silicon signing in with the right STK while its account ends (released because its request
+//! expired, was declined or lost its Carbon; deleted; STK rotated) is told exactly why, as an id
+//! that was already gone is.
 
 use accounts_core::models::{AccountStatus, Scope};
-use accounts_core::repo::tokens;
-use accounts_core::test_support::{Req, TestContext};
-use serde_json::json;
+use accounts_core::repo::{accounts, tokens};
+use accounts_core::test_support::{Req, Resp, TestContext};
+use serde_json::{Value, json};
+use tokio::task::JoinHandle;
 
 use crate::common::*;
 
@@ -431,4 +436,220 @@ async fn the_rotation_is_stamped_when_it_takes_effect_so_older_tokens_are_refuse
         .await
         .expect("unspent");
     assert!(row.created_at < stored);
+}
+
+// ---- POST /v1/silicons/login vs the end of its Silicon ----------------------------------------
+//
+// A sign-in reads the account (id → uuid, status, STK hash), counts the attempt on the Silicon's
+// row, checks the STK (Argon2: about a second in production, up to 3 s under load) and only then
+// re-reads the row under a lock. Holding the Silicon's row pauses it at the count, after it read
+// the account; whatever ends the Silicon then commits before that locked re-read. The right STK
+// must still be told why it can't sign in (403), never that it is wrong (401).
+
+/// Spawns `POST /v1/silicons/login`.
+fn spawn_login(ctx: &TestContext, id: &str, stk: &str) -> JoinHandle<Resp> {
+    spawn_call(
+        ctx,
+        Req::post("/v1/silicons/login").json(json!({"id": id, "stk": stk})),
+    )
+}
+
+/// Signs in with the right STK while `change` (spawned) ends the Silicon: the sign-in has read
+/// the account and waits behind a lock on the Silicon's row; `change` queues behind it, holding
+/// the Silicon's custodian request (so the sign-in's locked re-read comes after it commits).
+async fn sign_in_racing<T: Send + 'static>(
+    ctx: &TestContext,
+    silicon_uuid: &str,
+    id: &str,
+    stk: &str,
+    change: impl FnOnce() -> JoinHandle<T>,
+) -> (Resp, T) {
+    let held = hold_row_lock(ctx, silicon_uuid, "update").await;
+    let login = spawn_login(ctx, id, stk);
+    wait_for_lock_waiters(ctx, 1).await;
+    let change = change();
+    wait_for_lock_waiters(ctx, 2).await;
+    held.rollback().await.expect("release");
+    (
+        login.await.expect("sign-in task"),
+        change.await.expect("change task"),
+    )
+}
+
+/// (uuid, si:id, STK) of a `POST /v1/silicons` answer.
+fn self_created_parts(created: &Value) -> (String, String, String) {
+    let s = |v: &Value| v.as_str().expect("string").to_string();
+    (
+        s(&created["silicon"]["uuid"]),
+        s(&created["silicon"]["id"]),
+        s(&created["stk"]),
+    )
+}
+
+/// The Silicon's sign-in attempts (outcomes) and its live token families.
+async fn sign_in_record(ctx: &TestContext, uuid: &str) -> (Vec<String>, i64) {
+    let outcomes: Vec<String> = sqlx::query_scalar(
+        "select outcome from signin_history where account_uuid = $1 and method = 'silicon_stk' order by id",
+    )
+    .bind(uuid)
+    .fetch_all(&ctx.state.db)
+    .await
+    .expect("signin history");
+    let live: i64 = sqlx::query_scalar(
+        "select count(*) from token_families where account_uuid = $1 and revoked_at is null",
+    )
+    .bind(uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("families");
+    (outcomes, live)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_sign_in_whose_request_expires_while_its_stk_is_checked_says_custodian_expired() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let created = self_created(&ctx, carbon.handle.as_deref().expect("id"), json!({})).await;
+    let (uuid, id, stk) = self_created_parts(&created);
+    let request_id = created["request"]["id"].as_str().expect("request id");
+    let request_token = created["request_token"].as_str().expect("request token");
+    make_overdue(&ctx, request_id).await;
+
+    // The Silicon polls its overdue request (as the minute sweep would expire it): the read
+    // expires it and releases the Silicon while the sign-in is being checked.
+    let (signed, read) = sign_in_racing(&ctx, &uuid, &id, &stk, || {
+        spawn_call(
+            &ctx,
+            Req::get(&format!("/v1/silicons/requests/{request_id}")).bearer(request_token),
+        )
+    })
+    .await;
+    assert_eq!(read.status, 200, "{}", read.json);
+    assert_eq!(read.json["status"], "expired");
+    assert_eq!(read.json["silicon"]["status"], "deleted");
+    assert_eq!(signed.status, 403, "{}", signed.json);
+    assert_eq!(signed.error_code(), Some("custodian_expired"));
+    let message = signed.json["error"]["message"].as_str().expect("message");
+    assert!(
+        message.contains(&id) && message.contains("didn't accept within 14 days"),
+        "{message}"
+    );
+    // Exactly what the same STK hears once the id is gone.
+    let again = login(&ctx, &id, &stk).await;
+    assert_eq!(again.error_code(), Some("custodian_expired"));
+    assert_eq!(
+        sign_in_record(&ctx, &uuid).await,
+        (vec!["failed".to_string()], 0),
+        "the attempt is in the Silicon's history and nothing was issued"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_sign_in_whose_custodian_declines_while_its_stk_is_checked_says_custodian_declined() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let t = token(&ctx, &carbon).await;
+    let created = self_created(&ctx, carbon.handle.as_deref().expect("id"), json!({})).await;
+    let (uuid, id, stk) = self_created_parts(&created);
+    let request_id = created["request"]["id"].as_str().expect("request id");
+
+    let (signed, declined) = sign_in_racing(&ctx, &uuid, &id, &stk, || {
+        spawn_call(
+            &ctx,
+            Req::post(&format!("/v1/me/custodian-requests/{request_id}/decline")).bearer(&t),
+        )
+    })
+    .await;
+    assert_eq!(declined.status, 204, "{}", declined.json);
+    assert_eq!(signed.status, 403, "{}", signed.json);
+    assert_eq!(signed.error_code(), Some("custodian_declined"));
+    let message = signed.json["error"]["message"].as_str().expect("message");
+    assert!(message.contains("declined on "), "{message}");
+    assert_eq!(account(&ctx, &uuid).await.status, AccountStatus::Deleted);
+    assert_eq!(sign_in_record(&ctx, &uuid).await.1, 0);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_sign_in_whose_named_carbon_deletes_their_account_meanwhile_says_why() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let created = self_created(&ctx, carbon.handle.as_deref().expect("id"), json!({})).await;
+    let (uuid, id, stk) = self_created_parts(&created);
+
+    // The deletion locks the requests addressed to the Carbon first, then releases the Silicon.
+    let (signed, deleted) = sign_in_racing(&ctx, &uuid, &id, &stk, || {
+        spawn_account_deletion(&ctx, &carbon.uuid)
+    })
+    .await;
+    assert_eq!(deleted, Ok(()));
+    assert_eq!(signed.status, 403, "{}", signed.json);
+    assert_eq!(signed.error_code(), Some("custodian_declined"));
+    let message = signed.json["error"]["message"].as_str().expect("message");
+    assert!(message.contains("deleted their account"), "{message}");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_sign_in_whose_silicon_is_deleted_meanwhile_says_account_deleted() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let (silicon, stk) = ctx.silicon(&carbon.uuid).await;
+    let id = silicon.handle.clone().expect("id");
+
+    // The custodian's deletion (core's delete_account, as DELETE /v1/me/silicons/{uuid} runs it)
+    // holds the Silicon's row while the sign-in waits to count its attempt.
+    let mut deletion = hold_row_lock(&ctx, &silicon.uuid, "update").await;
+    let signing_in = spawn_login(&ctx, &id, &stk);
+    wait_for_lock_waiters(&ctx, 1).await;
+    accounts::delete_account(
+        &mut deletion,
+        &ctx.state.settings,
+        &silicon.uuid,
+        &carbon.uuid,
+        true,
+    )
+    .await
+    .expect("delete");
+    deletion.commit().await.expect("commit");
+
+    let r = signing_in.await.expect("task");
+    assert_eq!(r.status, 403, "{}", r.json);
+    assert_eq!(r.error_code(), Some("account_deleted"));
+    assert_eq!(
+        sign_in_record(&ctx, &silicon.uuid).await,
+        (vec!["failed".to_string()], 0)
+    );
+    assert_eq!(
+        login(&ctx, &id, &stk).await.error_code(),
+        Some("account_deleted")
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_sign_in_whose_stk_is_rotated_meanwhile_is_refused_as_a_wrong_stk() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let (silicon, stk) = ctx.silicon(&carbon.uuid).await;
+    let id = silicon.handle.clone().expect("id");
+
+    // A rotation (core's set_stk, as POST /v1/me/silicons/{uuid}/stk runs it) commits while the
+    // sign-in waits: the STK it checked is dead by the time it would be accepted.
+    let mut rotation = hold_row_lock(&ctx, &silicon.uuid, "update").await;
+    let signing_in = spawn_login(&ctx, &id, &stk);
+    wait_for_lock_waiters(&ctx, 1).await;
+    let new_stk = accounts_core::crypto::stk::generate();
+    let hash = ctx.state.keys.stk.hash(&new_stk).expect("hash");
+    accounts::set_stk(&mut rotation, &silicon.uuid, &hash)
+        .await
+        .expect("rotate");
+    rotation.commit().await.expect("commit");
+
+    let r = signing_in.await.expect("task");
+    assert_eq!(r.status, 401, "{}", r.json);
+    assert_eq!(r.error_code(), Some("invalid_credentials"));
+    assert_eq!(
+        sign_in_record(&ctx, &silicon.uuid).await,
+        (vec!["failed".to_string()], 0),
+        "nothing issued from the old STK"
+    );
+    assert_eq!(login(&ctx, &id, &new_stk).await.status, 200);
 }

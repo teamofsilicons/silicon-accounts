@@ -121,6 +121,134 @@ async fn signing_out_revokes_the_session_and_clears_cookies() {
     assert_eq!(n, 2);
 }
 
+/// The cookies a response clears (`Set-Cookie: name=; Max-Age=0`), by name.
+fn cleared_cookies(r: &accounts_core::test_support::Resp) -> Vec<String> {
+    r.headers
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .filter(|c| c.contains("Max-Age=0"))
+        .filter_map(|c| c.split('=').next())
+        .map(str::to_string)
+        .collect()
+}
+
+#[tokio::test]
+async fn a_foreign_page_cannot_clear_the_browsers_cookies() {
+    // Logout CSRF: a cross-site top-level form POST carries no SameSite=Lax cookie, so it
+    // reaches sign-out without a session, yet the browser applies the answer's Set-Cookie.
+    // Clearing cookies there would let any website sign its visitors out of the account site
+    // and drop a sign-up in progress. Only the site's own pages may clear them.
+    let ctx = TestContext::new().await;
+    let signout = || Req::post("/v1/session/signout");
+    for (label, req) in [
+        (
+            "a foreign origin",
+            signout().header("origin", "https://evil.example"),
+        ),
+        (
+            "another port of the site's host",
+            signout().header("origin", "http://localhost:9"),
+        ),
+        ("an opaque origin", signout().header("origin", "null")),
+        ("no Origin at all", signout()),
+    ] {
+        let r = ctx.call(router(), req).await;
+        assert_eq!(r.status, 401, "{label}: {}", r.json);
+        assert_eq!(r.error_code(), Some("unauthenticated"), "{label}");
+        assert!(
+            r.headers.get("set-cookie").is_none(),
+            "{label}: a cookieless sign-out from outside the site must not touch the browser's cookies: {:?}",
+            cleared_cookies(&r)
+        );
+    }
+
+    // A stale session cookie sent from a foreign page: nothing to end, nothing cleared.
+    let carbon = ctx.carbon().await;
+    let cookie = ctx.browser_session(&carbon).await;
+    let r = ctx
+        .call(router(), signout().session(&ctx.state.settings, &cookie))
+        .await;
+    assert_eq!(r.status, 204, "{}", r.json);
+    let r = ctx
+        .call(
+            router(),
+            signout()
+                .header("cookie", &format!("sa_session={cookie}"))
+                .header("origin", "https://evil.example"),
+        )
+        .await;
+    assert_eq!(r.status, 401, "{}", r.json);
+    assert!(
+        r.headers.get("set-cookie").is_none(),
+        "{:?}",
+        cleared_cookies(&r)
+    );
+
+    // A live session from a foreign page is refused by the CSRF guard, also without Set-Cookie.
+    let live = ctx.browser_session(&carbon).await;
+    let r = ctx
+        .call(
+            router(),
+            signout()
+                .header("cookie", &format!("sa_session={live}"))
+                .header("origin", "https://evil.example"),
+        )
+        .await;
+    assert_eq!(r.status, 403, "{}", r.json);
+    assert_eq!(r.error_code(), Some("origin_not_allowed"));
+    assert!(r.headers.get("set-cookie").is_none());
+
+    // A sign-up waiting in the browser survives a forged sign-out.
+    let (app, _) = ctx.app("briefcase").await;
+    let mut b = Browser::new(&ctx);
+    let id = id_of(&new_flow(&ctx, &mut b, &app.app_id, json!({})).await);
+    let email = random_email("csrf-signup");
+    let r = email_and_verify(&ctx, &mut b, &id, &email).await;
+    assert_eq!(r.json["flow"]["step"], "signup", "{}", r.json);
+    let signup_cookie = b.cookie("sa_signup").expect("sign-up cookie").to_string();
+    let r = ctx
+        .call(
+            router(),
+            signout()
+                .header("cookie", &format!("sa_signup={signup_cookie}"))
+                .header("origin", "https://evil.example"),
+        )
+        .await;
+    assert_eq!(r.status, 401, "{}", r.json);
+    assert!(
+        r.headers.get("set-cookie").is_none(),
+        "{:?}",
+        cleared_cookies(&r)
+    );
+    let r = b.get(&ctx, &format!("/v1/flows/{id}")).await;
+    assert_eq!(
+        r.json["flow"]["step"], "signup",
+        "the sign-up goes on: {}",
+        r.json
+    );
+    assert!(b.cookie("sa_signup").is_some());
+
+    // Control: the site's own page with a stale or missing cookie still gets them cleared.
+    let r = ctx
+        .call(router(), signout().session(&ctx.state.settings, &cookie))
+        .await;
+    assert_eq!(r.status, 401);
+    let cleared = cleared_cookies(&r);
+    assert!(
+        cleared.iter().any(|c| c == "sa_session") && cleared.iter().any(|c| c == "sa_signup"),
+        "{cleared:?}"
+    );
+    let r = ctx
+        .call(
+            router(),
+            signout().header("origin", &ctx.state.settings.public_origin),
+        )
+        .await;
+    assert_eq!(r.status, 401);
+    assert_eq!(cleared_cookies(&r).len(), 2, "{:?}", cleared_cookies(&r));
+}
+
 #[tokio::test]
 async fn signing_out_ends_a_pending_sign_up_in_that_browser() {
     let ctx = TestContext::new().await;

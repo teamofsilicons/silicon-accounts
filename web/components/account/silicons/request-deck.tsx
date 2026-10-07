@@ -78,7 +78,7 @@ interface DeckCardProps {
 }
 
 function DeckCard({ request, index, total, now, decide, onDecided }: DeckCardProps) {
-  const card = useRef<HTMLElement>(null);
+  const card = useRef<HTMLDivElement>(null);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const top = index === 0;
@@ -127,8 +127,9 @@ function DeckCard({ request, index, total, now, decide, onDecided }: DeckCardPro
     ? `${id} created its own account and named you as its custodian. Accepting makes you responsible for its account: its details, its id and its STK. Declining releases its account.`
     : `${sender ?? "Its custodian"} wants to hand ${id} over to you. Accept and you become its custodian; ${sender ? `${sender} stops` : "they stop"} being one.`;
 
+  // A list item of the deck (a div: an <article> may not take the listitem role).
   return (
-    <article
+    <div
       ref={card}
       data-sq="surface"
       className={styles.card}
@@ -171,6 +172,6 @@ function DeckCard({ request, index, total, now, decide, onDecided }: DeckCardPro
         />
         <Button data-deck-primary="" onClick={() => void accept()} loading={accepting}>{request.kind === "initial" ? "Accept and become custodian" : "Accept the transfer"}</Button>
       </div>
-    </article>
+    </div>
   );
 }

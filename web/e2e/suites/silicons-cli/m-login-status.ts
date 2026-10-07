@@ -39,6 +39,8 @@ export const journey: Journey = {
     results.check("…its access token lasts 30 minutes, the session 900 days", accessIn > 28 && accessIn <= 30.1 && refreshIn > 899 && refreshIn <= 900.01, `${accessIn.toFixed(2)} min, ${refreshIn.toFixed(3)} days`);
     const offlineIn = await accounts(env, ["login", "status", "--offline", "--json"], { home });
     results.check("--offline reports the stored session without checking it (verified: false)", offlineIn.code === 0 && offlineIn.json?.authenticated === true && offlineIn.json?.verified === false, said(offlineIn));
+    const siliconHistory = await accounts(env, ["history", "--kind", "signin", "--json"], { home });
+    const siliconSignin = ((siliconHistory.json?.items ?? []) as Json[]).find(item => obj(item.meta).method === "silicon_stk" && obj(item.meta).outcome === "success");
     const elsewhere = await accounts(env, ["login", "status", "--json"], { home, url: env.api });
     results.check("asked about another URL: exit 1, signed_in_elsewhere, naming where the session is", elsewhere.code === 1 && elsewhere.json?.authenticated === false && elsewhere.json?.reason === "signed_in_elsewhere" && elsewhere.json?.session_url === env.site, said(elsewhere));
 
@@ -93,6 +95,14 @@ export const journey: Journey = {
     // 7. The account's history tells the CLI sign-ins apart from browsers.
     const history = await asCarbon<Json>(env, carbon, "GET", "/v1/me/history?kind=signin");
     const cliSignins = ((obj(history.body).items ?? []) as Json[]).filter(item => str(obj(item.meta).user_agent).startsWith("accounts-cli/"));
-    results.check("the history names a CLI sign-in's client as the CLI, not as 'A browser'", cliSignins.length >= 2 && cliSignins.every(item => !str(item.detail).includes("A browser")), short(cliSignins.map(item => [item.title, item.detail, obj(item.meta).user_agent])));
+    results.check(
+      "the history names a CLI sign-in's client as the CLI ('from 127.0.0.1 · accounts CLI <version>'), not as 'A browser'",
+      cliSignins.length >= 2 && cliSignins.every(item => /^from \S+ · accounts CLI \d+\.\d+\.\d+$/.test(str(item.detail)) && !/browser/i.test(str(item.detail))),
+      short(cliSignins.map(item => [item.title, item.detail, obj(item.meta).user_agent])),
+    );
+    const security = await asCarbon<Json>(env, carbon, "GET", "/v1/me/history?kind=security");
+    const created = ((obj(security.body).items ?? []) as Json[]).filter(item => item.title === "New CLI sign-in");
+    results.check("…and each new CLI sign-in is listed with its label and how it signed in ('… · with an email code')", created.length >= 2 && created.every(item => / · with an email code$/.test(str(item.detail))), short(created.map(item => item.detail)));
+    results.check("the Silicon's own history names its STK sign-in from the CLI the same way", siliconSignin?.title === "Signed in to Silicon Accounts with the STK" && /^from \S+ · accounts CLI \d+\.\d+\.\d+$/.test(str(siliconSignin?.detail)), short(siliconSignin));
   },
 };

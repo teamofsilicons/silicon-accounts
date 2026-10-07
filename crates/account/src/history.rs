@@ -323,6 +323,10 @@ impl Lookups {
                     for a in string_list(r.extra.as_ref(), "audiences") {
                         app_ids.insert(a);
                     }
+                    // A proof revoked with an app's credentials: `revoked_by` is `app:{app_id}`.
+                    if let Some(app) = r.c3.as_deref().and_then(|b| b.strip_prefix("app:")) {
+                        app_ids.insert(app.to_string());
+                    }
                 }
                 "h" => {
                     if let Some(by) = &r.c3
@@ -641,6 +645,230 @@ fn silicon_entry(
     }
 }
 
+/// How a revoked proof ended, in the words the Proofs page uses: one sentence per
+/// `revoke_reason` (the proofs crate's codes, plus core's `access_removed` / `account_deleted`),
+/// never the raw code. `revoked_by` is an account uuid, `app:{app_id}` or `system`.
+fn proof_end(
+    revoked_by: Option<&str>,
+    reason: Option<&str>,
+    issuer: &str,
+    me: &Account,
+    l: &Lookups,
+) -> Option<String> {
+    let by_me = revoked_by == Some(me.uuid.as_str());
+    let revoking_app = || {
+        revoked_by
+            .and_then(|b| b.strip_prefix("app:"))
+            .map(|app| l.app_name(app))
+            .unwrap_or_else(|| issuer.to_string())
+    };
+    Some(match reason {
+        // Only the account a proof speaks for revokes it this way, and this is its history.
+        Some("revoked_by_account") => "Revoked by you".to_string(),
+        Some("revoked_by_app") => format!("Revoked by {}", revoking_app()),
+        Some("revoked_by_owner") if by_me => format!("Revoked by you, as {issuer}'s owner"),
+        Some("revoked_by_owner") => format!("Revoked by {issuer}'s owner"),
+        Some("refresh_token_reuse") => {
+            "Revoked because its refresh token was used twice, which can mean it leaked".to_string()
+        }
+        Some("sign_in_revoked") => format!("Ended when your sign-in at {issuer} ended"),
+        Some("access_removed") if by_me => format!("Ended when you removed {issuer}'s access"),
+        Some("access_removed") => format!("Ended when {issuer}'s access was removed"),
+        Some("account_deleted") => "Ended when the account was deleted".to_string(),
+        other => {
+            let by = match revoked_by {
+                None | Some("system") => None,
+                Some(_) if by_me => Some("by you".to_string()),
+                Some(b) if b.starts_with("app:") => Some(format!("by {}", revoking_app())),
+                Some(b) if l.accounts.contains_key(b) => Some(format!("by {}", l.who(b))),
+                Some(_) => Some("by another account".to_string()),
+            };
+            let reason = other.map(|x| x.replace('_', " "));
+            match (by, reason) {
+                (Some(b), Some(x)) => format!("Revoked {b} ({x})"),
+                (Some(b), None) => format!("Revoked {b}"),
+                (None, Some(x)) => format!("Revoked: {x}"),
+                (None, None) => return None,
+            }
+        }
+    })
+}
+
+/// "google" → "Google".
+fn provider_name(provider: &str) -> String {
+    match provider {
+        "google" => "Google".to_string(),
+        "apple" => "Apple".to_string(),
+        other => action_title(other),
+    }
+}
+
+/// "Email" / "Phone number" for a contact kind code (`email` / `phone`).
+fn contact_noun(kind: &str) -> &'static str {
+    match kind {
+        "email" => "Email",
+        "phone" => "Phone number",
+        _ => "Email or phone number",
+    }
+}
+
+/// Title and detail of the audit actions written outside this crate (sign-up, sign-in flows,
+/// the CLI's sign-ins, OAuth, the service itself), so none of them reads as a bare action code.
+/// `None` for actions this doesn't know.
+fn other_entry(
+    action: &str,
+    r: &Row,
+    app: Option<&str>,
+    by_me: bool,
+) -> Option<(String, Option<String>)> {
+    let details = r.extra.as_ref();
+    let shown = |v: String| {
+        if by_me {
+            v
+        } else {
+            masked_contact(&v).unwrap_or(v)
+        }
+    };
+    Some(match action {
+        "account.created" => ("Account created".to_string(), None),
+        "account.claimed" => (
+            "Finished setting up your account".to_string(),
+            Some("An app's import of its existing accounts had made it".to_string()),
+        ),
+        // auth's requirement step: an app needs an email or phone number the account didn't
+        // have yet, so the Carbon proved one while signing in to it.
+        "contact.added" => {
+            let kind = detail_str(details, "kind")
+                .or_else(|| r.c4.clone())
+                .unwrap_or_default();
+            let noun = contact_noun(&kind);
+            let what = match detail_str(details, &kind).map(shown) {
+                Some(value) => format!("{noun} {value}"),
+                None => noun.to_string(),
+            };
+            match app {
+                Some(a) => (format!("{what} added while signing in to {a}"), None),
+                None => (format!("{what} added"), None),
+            }
+        }
+        "contact.unverified_removed" => (
+            format!(
+                "Unverified {} removed",
+                contact_noun(&detail_str(details, "kind").unwrap_or_default()).to_lowercase()
+            ),
+            Some(
+                "An app's import had added it without a check, and someone else proved it is theirs"
+                    .to_string(),
+            ),
+        ),
+        "identity.linked" => {
+            let provider = provider_name(&detail_str(details, "provider").unwrap_or_default());
+            let detail = if detail_str(details, "linked_by").as_deref() == Some("verified_email") {
+                Some("Connected when you signed in with it: its verified email is on your account")
+            } else if details.and_then(|d| d.get("email_added")) == Some(&Value::Bool(true)) {
+                Some("Its verified email was added to your emails")
+            } else {
+                None
+            };
+            (
+                format!("{provider} account connected"),
+                detail.map(str::to_string),
+            )
+        }
+        "session.created" => {
+            let mut parts: Vec<String> = detail_str(details, "label").into_iter().collect();
+            if let Some(via) = detail_str(details, "via") {
+                parts.push(format!("with {}", method_phrase(&via)));
+            }
+            (
+                "New CLI sign-in".to_string(),
+                (!parts.is_empty()).then(|| parts.join(" · ")),
+            )
+        }
+        "session.signed_out" => (
+            match detail_str(details, "kind").as_deref() {
+                Some("browser") => "Signed out of a browser session".to_string(),
+                _ => "Signed out of a CLI sign-in".to_string(),
+            },
+            None,
+        ),
+        "device.approved" => (
+            "Approved a terminal sign-in".to_string(),
+            detail_str(details, "client_label"),
+        ),
+        "device.denied" => (
+            "Denied a terminal sign-in".to_string(),
+            detail_str(details, "client_label"),
+        ),
+        "signin.locked" => {
+            let to = detail_str(details, "destination")
+                .map(shown)
+                .map(|d| format!(" for {d}"))
+                .unwrap_or_default();
+            let wrong = details
+                .and_then(|d| d.get("wrong_codes"))
+                .and_then(Value::as_i64)
+                .unwrap_or(10);
+            (
+                format!("Too many wrong codes{to}"),
+                Some(match detail_str(details, "locked_until") {
+                    Some(until) => {
+                        format!("After {wrong} wrong codes in a row, tries were paused until {until}")
+                    }
+                    None => format!("After {wrong} wrong codes in a row, tries were paused"),
+                }),
+            )
+        }
+        "signin.refused" => {
+            let provider = provider_name(&detail_str(details, "provider").unwrap_or_default());
+            (
+                match app {
+                    Some(a) => format!("{provider} sign-in to {a} refused"),
+                    None => format!("{provider} sign-in refused"),
+                },
+                detail_str(details, "reason").map(|x| format!("Reason: {}", x.replace('_', " "))),
+            )
+        }
+        "oauth.token_revoked" => {
+            if r.app_id.as_deref() == Some(accounts_core::FIRST_PARTY_APP_ID) {
+                (
+                    "Signed out of a CLI sign-in".to_string(),
+                    detail_str(details, "label"),
+                )
+            } else {
+                let name = app.unwrap_or("An app");
+                (format!("{name} signed you out"), None)
+            }
+        }
+        "oauth.refresh_reuse_detected" => (
+            match app {
+                Some(a) => format!("Sign-in at {a} ended"),
+                None => "A sign-in ended".to_string(),
+            },
+            Some(
+                "Its refresh token was used twice, which can mean it leaked; sign in again to continue"
+                    .to_string(),
+            ),
+        ),
+        "oauth.code_reuse_detected" => (
+            match app {
+                Some(a) => format!("Sign-in at {a} ended"),
+                None => "A sign-in ended".to_string(),
+            },
+            Some(
+                "Its sign-in code was used twice, which can mean it leaked; sign in again to continue"
+                    .to_string(),
+            ),
+        ),
+        "report.submitted" => (
+            "Bug report sent".to_string(),
+            (details.and_then(|d| d.get("has_pr")) == Some(&Value::Bool(true)))
+                .then(|| "With a pull request that fixes it".to_string()),
+        ),
+        _ => return None,
+    })
+}
+
 fn describe(r: Row, me: &Account, l: &Lookups) -> HistoryItem {
     let id = format!("{}:{}", src_name(&r.src), r.row_key);
     let app = l.app(r.app_id.as_deref());
@@ -770,19 +998,7 @@ fn describe(r: Row, me: &Account, l: &Lookups) -> HistoryItem {
                     None => scope_part,
                 })
             } else {
-                let by = match r.c3.as_deref() {
-                    Some(b) if b == me.uuid => Some("by you".to_string()),
-                    Some("system") | None => None,
-                    Some(b) if l.accounts.contains_key(b) => Some(format!("by {}", l.who(b))),
-                    Some(b) => Some(format!("by {}", l.app_name(b))),
-                };
-                let reason = r.c4.as_deref().map(|x| x.replace('_', " "));
-                match (by, reason) {
-                    (Some(b), Some(x)) => Some(format!("Revoked {b} ({x})")),
-                    (Some(b), None) => Some(format!("Revoked {b}")),
-                    (None, Some(x)) => Some(format!("Reason: {x}")),
-                    (None, None) => None,
-                }
+                proof_end(r.c3.as_deref(), r.c4.as_deref(), &issuer, me, l)
             };
             (
                 title,
@@ -816,6 +1032,8 @@ fn describe(r: Row, me: &Account, l: &Lookups) -> HistoryItem {
             let action = r.c1.clone().unwrap_or_default();
             let details = r.extra.as_ref();
             let name = app_name.clone().unwrap_or_else(|| "An app".to_string());
+            let by_me =
+                r.c2.as_deref() == Some("account") && r.c3.as_deref() == Some(me.uuid.as_str());
             let (title, mut detail) = match action.as_str() {
                 "membership.access_removed" => (
                     format!("Removed {name}'s access"),
@@ -886,7 +1104,8 @@ fn describe(r: Row, me: &Account, l: &Lookups) -> HistoryItem {
                 other => match silicon_target(&r) {
                     // Every entry about a Silicon names it (custodians see many Silicons).
                     Some(uuid) => silicon_entry(other, uuid, &r, me, l),
-                    None => (action_title(other), None),
+                    None => other_entry(other, &r, app_name.as_deref(), by_me)
+                        .unwrap_or_else(|| (action_title(other), None)),
                 },
             };
             // "By …" names another actor, unless the title already does (a Silicon acting on
@@ -905,8 +1124,6 @@ fn describe(r: Row, me: &Account, l: &Lookups) -> HistoryItem {
             // Rows written by someone else (a custodian, the Silicon that named this Carbon, an
             // app, the service) never show that actor's IP, and their details show email
             // addresses and phone numbers only masked.
-            let by_me =
-                r.c2.as_deref() == Some("account") && r.c3.as_deref() == Some(me.uuid.as_str());
             let silicon = silicon_target(&r).map(|uuid| l.summary(Some(uuid)));
             let (ip, details) = if by_me {
                 (r.c6, r.extra)

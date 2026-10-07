@@ -2,8 +2,8 @@
 
 /**
  * /developer: the apps this Carbon owns, as a grid of app icons; each opens the app's sign-in setup. New apps are
- * created in Silicon Apps (ACCOUNTS_SILICON_APPS_URL, from /v1/meta); as soon as one exists there it can sign people
- * in and shows up here.
+ * created in Silicon Apps (ACCOUNTS_SILICON_APPS_URL, from /v1/meta); once an app exists there it can sign Carbons and
+ * Silicons in and shows up here.
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,25 +30,30 @@ const usersLabel = (count: number) => `${formatCount(count)} ${count === 1 ? "us
 
 function AppTile({ app }: { app: OwnedApp }) {
   const status = appStatus(app.status);
+  const source = SOURCE_LABEL[app.source] ?? app.source;
+  // The link's name is what the tile shows, in the order it shows it, with pauses (WCAG 2.5.3: a Carbon who says what
+  // they see, "Space Station", reaches it by voice). The {" "} between the parts keep the tile's own text in words too
+  // ("spacestation 0 users", not "spacestation0 users"); the grid and flex boxes ignore them in layout.
+  const name = [app.status !== "active" ? status.label : null, app.name, app.app_id, usersLabel(app.users), source].filter(Boolean).join(", ");
   return (
     <Link
       href={paths.developerApp(app.app_id)}
       data-sq="surface"
       className={styles.tile}
       data-status={app.status}
-      aria-label={`${app.name} (${app.app_id}), ${usersLabel(app.users)}${app.status !== "active" ? `, ${status.label.toLowerCase()}` : ""}`}
+      aria-label={name}
     >
       <span className={styles.tileTop}>
         <AppIcon name={app.name} src={app.logo_url} size={56} decorative />
         {app.status !== "active" ? <Badge size="sm" tone={status.tone}>{status.label}</Badge> : null}
-      </span>
+      </span>{" "}
       <span className={styles.tileText}>
-        <span className={styles.tileName}>{app.name}</span>
+        <span className={styles.tileName}>{app.name}</span>{" "}
         <span className={styles.tileId}>{app.app_id}</span>
-      </span>
+      </span>{" "}
       <span className={styles.tileFoot}>
-        <span className={styles.tileStat}><Users size={14} strokeWidth={1.75} aria-hidden="true" />{usersLabel(app.users)}</span>
-        <span className={styles.tileSource}>{SOURCE_LABEL[app.source] ?? app.source}</span>
+        <span className={styles.tileStat}><Users size={14} strokeWidth={1.75} aria-hidden="true" />{usersLabel(app.users)}</span>{" "}
+        <span className={styles.tileSource}>{source}</span>
         <ArrowRight className={styles.tileArrow} size={16} strokeWidth={1.75} aria-hidden="true" />
       </span>
     </Link>
@@ -59,10 +64,11 @@ function NewAppTile({ href }: { href: string }) {
   return (
     <a href={href} target="_blank" rel="noopener" data-sq="surface" className={styles.newTile}>
       <span className={styles.newMark} aria-hidden="true"><Plus size={20} strokeWidth={1.75} /></span>
+      {/* The {" "} keep the link's name in words ("New app Apps are…", not "New appApps are…"). */}
       <span className={styles.tileText}>
-        <span className={styles.tileName}>New app</span>
-        <span className={styles.newText}>Apps are created in Silicon Apps. One can sign people in as soon as it exists there, and its sign-in setup appears here.</span>
-      </span>
+        <span className={styles.tileName}>New app</span>{" "}
+        <span className={styles.newText}>Apps are created in Silicon Apps. Once an app exists there, it can sign Carbons and Silicons in, and its sign-in setup appears here.</span>
+      </span>{" "}
       <span className={styles.newLink}>Open Silicon Apps<ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" /></span>
     </a>
   );

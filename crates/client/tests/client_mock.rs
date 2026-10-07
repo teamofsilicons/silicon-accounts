@@ -10,7 +10,8 @@ use common::{Mock, Reply};
 use serde_json::json;
 use silicon_accounts_client::{
     AccountKind, AccountsClient, Contact, CreateSilicon, DevicePoll, Error, ImportInput,
-    ImportOptions, IssueAta, ProofVerification, SiliconSelfCreate, WaitEvent, WaitOptions,
+    ImportOptions, IssueAta, MAX_IMPORT_BYTES, ProofVerification, SiliconSelfCreate, WaitEvent,
+    WaitOptions,
 };
 
 fn token_body(aud_id: &str) -> serde_json::Value {
@@ -515,6 +516,85 @@ async fn imports_upload_csv_and_wait_with_progress() {
         seen,
         vec![("running".to_owned(), 2), ("completed".to_owned(), 4)]
     );
+}
+
+/// An import body over 50 MB is refused before anything is sent (the service would refuse
+/// it too, often before the upload ends, so the caller saw a reset connection or a proxy's
+/// 500 instead of the reason); a body of exactly 50 MB is sent.
+#[tokio::test]
+async fn imports_over_50_mb_are_refused_before_anything_is_sent() {
+    assert_eq!(MAX_IMPORT_BYTES, 52_428_800);
+    let mock = Mock::start().await;
+    mock.on(
+        "POST",
+        "/v1/apps/legacy-crm/imports",
+        Reply::json(
+            202,
+            json!({"job": {"id": "job-1", "status": "queued", "format": "csv", "total_rows": 1, "processed_rows": 0}}),
+        ),
+    );
+    let client = AccountsClient::new(&mock.url).unwrap();
+    let app = client.as_app("legacy-crm", "sa_app_legacy");
+    let options = ImportOptions {
+        dry_run: true,
+        ..Default::default()
+    };
+    let csv = |len: usize| {
+        let mut body = b"email,display_name\n".to_vec();
+        body.resize(len, b'a');
+        ImportInput::Csv(bytes::Bytes::from(body))
+    };
+
+    let err = app
+        .start_import(&csv(MAX_IMPORT_BYTES + 1), &options, Some("imp-big"))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, Error::PayloadTooLarge { .. }), "{err:?}");
+    assert_eq!(err.code(), "payload_too_large");
+    assert!(err.is_code("payload_too_large"));
+    assert_eq!(err.status(), None);
+    assert!(!err.is_transport());
+    assert_eq!(
+        err.message(),
+        "The import is over the 50 MB limit: its CSV is 52428801 bytes (50.1 MB), and one import accepts at most 52428800 bytes, so it was not uploaded."
+    );
+    assert!(
+        err.hint()
+            .unwrap()
+            .contains("files of at most 50 MB and 100,000 rows each"),
+        "{err}"
+    );
+    assert_eq!(
+        err.details(),
+        Some(&json!({"size_bytes": 52_428_801, "limit_bytes": 52_428_800}))
+    );
+
+    // JSON rows count by their encoded body: 51 rows of 1 MB each.
+    let rows: Vec<serde_json::Value> = (0..51)
+        .map(|i| json!({"email": format!("u{i}@x.test"), "display_name": "x".repeat(1024 * 1024)}))
+        .collect();
+    let err = app
+        .start_import(&ImportInput::Json(rows), &options, None)
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "payload_too_large");
+    assert!(
+        err.message()
+            .starts_with("The import is over the 50 MB limit: its JSON body (51 rows) is "),
+        "{err}"
+    );
+    assert!(err.details().unwrap()["size_bytes"].as_u64().unwrap() > 52_428_800);
+    assert!(mock.requests().is_empty(), "nothing was sent");
+
+    // Exactly 50 MB is within the limit: sent as it is.
+    let job = app
+        .start_import(&csv(MAX_IMPORT_BYTES), &options, None)
+        .await
+        .unwrap();
+    assert_eq!(job.id, "job-1");
+    let sent = mock.requests_to("POST", "/v1/apps/legacy-crm/imports");
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].body.len(), MAX_IMPORT_BYTES);
 }
 
 #[tokio::test]

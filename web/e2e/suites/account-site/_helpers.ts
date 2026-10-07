@@ -6,6 +6,7 @@
  * Every journey of the suite makes its own Carbons (random emails), so journeys never depend on each other.
  */
 import { readFileSync } from "node:fs";
+import { request as httpRequest } from "node:http";
 import { resolve } from "node:path";
 import { deflateSync } from "node:zlib";
 import type { BrowserContext, Locator, Page } from "@playwright/test";
@@ -139,21 +140,61 @@ export async function call<T = Record<string, unknown>>(page: Page, path: string
 export const getMe = async (probe: Page): Promise<Me> => (await call<Me>(probe, "/v1/me")).body;
 
 /**
- * Sends `times` uploads of `size` bytes (starting with `head`, then zeros) to `path` from inside `page`, one after
- * another, and returns each status and the start of each answer (the bytes are made in the page, not shipped to it).
+ * Sends `times` requests of `size` bytes (starting with `head`, the rest `fill` bytes) to `path` from inside `page`, one
+ * after another, and returns each status and the start of each answer (the bytes are made in the page, not shipped to
+ * it). A request the browser could not complete (a reset connection) is status 0 with the error.
  */
-export async function oversizedUploads(page: Page, path: string, head: Buffer, size: number, times: number, contentType: string): Promise<Array<{ status: number; text: string }>> {
+export async function oversizedUploads(page: Page, path: string, head: Buffer, size: number, times: number, contentType: string, options: { method?: string; fill?: number } = {}): Promise<Array<{ status: number; text: string }>> {
   return page.evaluate(async p => {
     const raw = atob(p.head);
     const bytes = new Uint8Array(p.size);
+    if (p.fill) bytes.fill(p.fill);
     for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
     const out: Array<{ status: number; text: string }> = [];
     for (let i = 0; i < p.times; i++) {
-      const response = await fetch(p.path, { method: "POST", headers: { "content-type": p.contentType }, body: bytes, credentials: "same-origin" });
-      out.push({ status: response.status, text: (await response.text()).slice(0, 160) });
+      try {
+        const response = await fetch(p.path, { method: p.method, headers: { "content-type": p.contentType }, body: bytes, credentials: "same-origin" });
+        out.push({ status: response.status, text: (await response.text()).slice(0, 160) });
+      } catch (error) {
+        out.push({ status: 0, text: String(error).slice(0, 160) });
+      }
     }
     return out;
-  }, { path, head: head.toString("base64"), size, times, contentType });
+  }, { path, head: head.toString("base64"), size, times, contentType, method: options.method ?? "POST", fill: options.fill ?? 0 });
+}
+
+/**
+ * POSTs `body` to `url` from this process the way curl sends a big upload: with `Expect: 100-continue`, the body only
+ * once the server says `100 Continue`. Returns the answer, whether the server asked for the body (`continued`), and how
+ * long the whole exchange took. A request that breaks (a reset connection, no answer within 30 s) is status 0.
+ */
+export function expectContinuePost(url: string, body: Buffer, headers: Record<string, string>): Promise<{ status: number; text: string; continued: boolean; ms: number }> {
+  return new Promise(done => {
+    const started = Date.now();
+    const target = new URL(url);
+    let continued = false;
+    let settled = false;
+    const finish = (status: number, text: string) => {
+      if (settled) return;
+      settled = true;
+      done({ status, text: text.slice(0, 200), continued, ms: Date.now() - started });
+      request.destroy();
+    };
+    const request = httpRequest({ host: target.hostname, port: target.port, path: `${target.pathname}${target.search}`, method: "POST", headers: { ...headers, "content-length": String(body.length), expect: "100-continue" } });
+    request.on("continue", () => {
+      continued = true;
+      request.end(body);
+    });
+    request.on("response", response => {
+      const chunks: Buffer[] = [];
+      response.on("data", (chunk: Buffer) => chunks.push(chunk));
+      response.on("end", () => finish(response.statusCode ?? 0, Buffer.concat(chunks).toString("utf8")));
+      response.on("error", error => finish(0, `the answer broke off: ${String(error)}`));
+    });
+    request.on("error", error => finish(0, String(error)));
+    request.setTimeout(30_000, () => finish(0, "no answer within 30 s"));
+    request.flushHeaders();
+  });
 }
 
 /** `error.code` of an API error body, or "". */
@@ -162,6 +203,7 @@ export const codeOf = (body: unknown): string => {
   return typeof error === "string" ? error : error?.code ?? "";
 };
 export const messageOf = (body: unknown): string => ((body as { error?: { message?: string } } | null)?.error?.message ?? "");
+export const hintOf = (body: unknown): string => ((body as { error?: { hint?: string } } | null)?.error?.hint ?? "");
 
 /** Adds and verifies an email (or phone) through the API, the way the site does: POST, the code, POST …/verify. */
 export async function addContact(env: Env, probe: Page, channel: "email" | "phone", value: string): Promise<Answer<unknown>> {
@@ -213,14 +255,15 @@ const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\:/]/g, "\\$&")
 /**
  * Signs the browser's Carbon into a fake app through the app's hosted link: "Continue as" (the browser is signed in to
  * the account site), the consent ("Share and continue") when the app asks, back at the app. Returns the account the app
- * received (its `<pre id="account">`).
+ * received (its `<pre id="account">`). `share` names optional details (their labels, e.g. "Timezone") to switch on at
+ * the consent; the others stay off, as they start.
  */
-export async function signIntoApp(env: Env, page: Page, app: string): Promise<Record<string, unknown> | null> {
+export async function signIntoApp(env: Env, page: Page, app: string, options: { share?: string[] } = {}): Promise<Record<string, unknown> | null> {
   await page.goto(`${env.apps}/${app}/`);
-  // The app's page also holds the embed iframe and the SDK. Leaving the page while the embed is still reading its
-  // config can make WebKit cut that read off, and the embed then reports a false "could not be loaded (HTTP 200)"
-  // (an embed defect this suite reports, not one it tests): let the page settle first.
-  await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
+  // Clicked as soon as the page has loaded, as a Carbon would. The app's page also holds the embed iframe and the SDK,
+  // which may still be reading the app's config: leaving cuts those reads off (WebKit cuts them before or after the
+  // answer's headers). The embed and the SDK retry a cut-off read before they report anything, so a click this early
+  // must not leave a browser problem behind (round 1 waited for the page to settle, to step around that defect).
   await page.locator("#signin-hosted").click();
   const back = new RegExp(`^${escapeRe(env.apps)}/${app}/(callback|signed-in)`);
   const continueAs = page.getByRole("button", { name: /^Continue as/ });
@@ -235,8 +278,15 @@ export async function signIntoApp(env: Env, page: Page, app: string): Promise<Re
     if (next === "back") break;
     if (next === "timeout") throw new Error(`signing into ${app}: no Continue as, consent or return within 30 s (at ${page.url()})`);
     await sleep(250);
-    if (next === "continue") await continueAs.click();
-    else await share.click();
+    if (next === "continue") {
+      await continueAs.click();
+    } else {
+      for (const label of options.share ?? []) {
+        const toggle = page.getByRole("switch", { name: new RegExp(`^${escapeRe(label)}`) });
+        if ((await toggle.getAttribute("aria-checked", { timeout: 5_000 })) !== "true") await toggle.click();
+      }
+      await share.click();
+    }
     await sleep(400);
   }
   await page.locator("#account").waitFor({ timeout: 30_000 });
@@ -353,6 +403,38 @@ export async function hold(page: Page, button: Locator, ms: number): Promise<voi
   await sleep(ms);
   await page.mouse.up();
 }
+
+/**
+ * The headings inside `main` in document order, as assistive tech lists them (visually hidden ones included, anything
+ * under aria-hidden, `hidden` or display:none left out), with every place the outline skips a level ("h1 → h3", or a
+ * first heading that is not an h1), the number of h1s, and the number of main landmarks on the page.
+ */
+export async function headingOutline(page: Page): Promise<{ headings: string[]; skips: string[]; h1: number; mains: number }> {
+  return page.evaluate(() => {
+    const found: Array<{ level: number; text: string }> = [];
+    for (const element of Array.from(document.querySelectorAll("main h1, main h2, main h3, main h4, main h5, main h6, main [role=heading]"))) {
+      let hidden = false;
+      for (let node: Element | null = element; node && !hidden; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        hidden = node.getAttribute("aria-hidden") === "true" || node.hasAttribute("hidden") || style.display === "none" || style.visibility === "hidden";
+      }
+      if (hidden) continue;
+      const tag = /^H([1-6])$/.exec(element.tagName);
+      found.push({ level: Number(element.getAttribute("aria-level") ?? tag?.[1] ?? 2), text: (element.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 48) });
+    }
+    const skips: string[] = [];
+    if (found[0] && found[0].level !== 1) skips.push(`starts at h${found[0].level} "${found[0].text}"`);
+    for (let i = 1; i < found.length; i++) {
+      const before = found[i - 1]!;
+      const now = found[i]!;
+      if (now.level > before.level + 1) skips.push(`h${before.level} "${before.text}" → h${now.level} "${now.text}"`);
+    }
+    return { headings: found.map(item => `h${item.level} ${item.text}`), skips, h1: found.filter(item => item.level === 1).length, mains: document.querySelectorAll("main").length };
+  });
+}
+
+/** How many CSS pixels the page is wider than the window (0 or less: no horizontal scroll). */
+export const overflowX = (page: Page): Promise<number> => page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth);
 
 /** The activity timeline's rows on /activity (title and meta of each), whitespace collapsed. */
 export async function timelineRows(page: Page): Promise<string[]> {

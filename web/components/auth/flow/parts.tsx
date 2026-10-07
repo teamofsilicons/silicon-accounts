@@ -192,10 +192,13 @@ export function useStepErrors(carried: ErrorLike | null | undefined) {
 /* Rows and buttons                                                                                                    */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-/** The account this flow signs in as: photo, name and c:id, with an optional action (switch account). */
+/**
+ * The account this flow signs in as: photo, name and c:id, with an optional action (switch account). The name and id
+ * are never cut short (the action moves under them when they need the room).
+ */
 export function AccountRow({ account, action, size = "md" }: { account: AccountSummary; action?: ReactNode; size?: "sm" | "md" }) {
   return (
-    <div data-sq="surface" className={styles.accountRow} data-account={account.uuid}>
+    <div data-sq="surface" className={styles.accountRow} data-account={account.uuid} data-size={size}>
       <Avatar name={account.display_name} src={account.pfp_url || undefined} size={size === "sm" ? "md" : "lg"} />
       <span className={styles.accountText}>
         <span className={styles.accountName}>{account.display_name}</span>
@@ -206,7 +209,22 @@ export function AccountRow({ account, action, size = "md" }: { account: AccountS
   );
 }
 
-/** Where a code went: the channel's icon, the masked address and "Change". */
+/**
+ * An address that may break across lines where people expect it to: after the "@" (so the domain moves down whole),
+ * else before a "." of the part before it. A part longer than the line still breaks anywhere (overflow-wrap).
+ */
+function breakable(address: string): ReactNode {
+  const at = address.lastIndexOf("@");
+  const local = at >= 0 ? address.slice(0, at + 1) : address;
+  const nodes: ReactNode[] = local.split(/(?=\.)/).map((part, index) => (index ? [<wbr key={`dot-${index}`} />, part] : part));
+  if (at >= 0 && at < address.length - 1) nodes.push(<wbr key="at" />, address.slice(at + 1));
+  return nodes;
+}
+
+/**
+ * Where a code went (or what was proven): the channel's icon, the address and "Change". The address is never cut
+ * short: the action moves under it when it needs the room, and a very long one breaks after "@" or before a ".".
+ */
 export function DestinationRow({ channel, destination, action, icon, note }: { channel: "email" | "phone"; destination: string; action?: ReactNode; icon?: ReactNode; note?: string }) {
   return (
     <div data-sq="surface" className={styles.destination}>
@@ -215,11 +233,11 @@ export function DestinationRow({ channel, destination, action, icon, note }: { c
       </span>
       {note ? (
         <span className={styles.accountText}>
-          <span className={styles.accountName}>{destination}</span>
+          <span className={styles.accountName}>{breakable(destination)}</span>
           <span className={styles.provenNote}>{note}</span>
         </span>
       ) : (
-        <span className={styles.destinationText}>{destination}</span>
+        <span className={styles.destinationText}>{breakable(destination)}</span>
       )}
       {action ? <span className={styles.rowAction}>{action}</span> : null}
     </div>
@@ -300,7 +318,12 @@ export interface ResendButtonProps {
   label?: string;
 }
 
-/** "Resend code in 0:27", then "Resend code": a quiet text button that waits for the server's resend time. */
+/**
+ * "Resend code in 0:27", then "Resend code": a quiet text button that waits for the server's resend time. It is named
+ * by exactly the words it shows (WCAG 2.5.3, Label in Name): the rolling label is drawn for the eyes only (a digit on
+ * its way out stays in the DOM for a moment), and a visually hidden copy of the same words names the button. While it
+ * waits it stays focusable (aria-disabled) and shows keyboard focus like any other control.
+ */
 export function ResendButton({ availableAt, onResend, label = "Resend code" }: ResendButtonProps) {
   const reduce = !!useReducedMotion();
   const now = useNow(250);
@@ -309,6 +332,8 @@ export function ResendButton({ availableAt, onResend, label = "Resend code" }: R
   const remaining = now && Number.isFinite(target) ? Math.max(0, Math.ceil((target - now) / 1000)) : 0;
   const waiting = remaining > 0;
   const state = waiting ? "wait" : busy ? "busy" : "ready";
+  /** What the button says right now, as one string: its accessible name. */
+  const words = state === "wait" ? `${label} in ${formatCountdown(remaining)}` : state === "busy" ? "Sending a new code" : label;
   const resend = async () => {
     if (waiting || busy) return;
     setBusy(true);
@@ -324,13 +349,14 @@ export function ResendButton({ availableAt, onResend, label = "Resend code" }: R
       className={styles.resend}
       aria-disabled={waiting || busy || undefined}
       aria-busy={busy || undefined}
-      aria-label={waiting ? `${label}, available in ${remaining} seconds` : label}
       onClick={() => void resend()}
     >
+      <span className="sr-only">{words}</span>
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.span
           key={state}
           className={styles.resendLabel}
+          aria-hidden="true"
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6, filter: `blur(${blur.soft}px)` }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           exit={reduce ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: -4, filter: `blur(${blur.subtle}px)`, transition: { duration: duration.fast } }}

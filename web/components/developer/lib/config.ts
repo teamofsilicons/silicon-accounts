@@ -79,13 +79,21 @@ export interface SecretsDraft {
   googleSecret: string;
   /** Remove the stored Google client secret. */
   googleRemove: boolean;
+  /**
+   * The stored Google secret's field is open for a replacement (Replace was pressed). Not a change by itself: it only
+   * decides what the field shows. It lives in the draft, not in the field, so a save or Discard (which empty the draft
+   * secrets) puts the field back to "A client secret is stored" instead of leaving an empty replace field.
+   */
+  googleReplace: boolean;
   /** A new Apple .p8 key ("" = keep what is stored). */
   appleKey: string;
   /** Remove the stored Apple key. */
   appleRemove: boolean;
+  /** The stored Apple key's field is open for a replacement (see googleReplace). */
+  appleReplace: boolean;
 }
 
-export const NO_SECRETS: SecretsDraft = { googleSecret: "", googleRemove: false, appleKey: "", appleRemove: false };
+export const NO_SECRETS: SecretsDraft = { googleSecret: "", googleRemove: false, googleReplace: false, appleKey: "", appleRemove: false, appleReplace: false };
 
 /** Secret changes that will be sent: a typed secret only counts while that provider is set to bring your own. */
 export function secretsChanged(secrets: SecretsDraft, draft: Pick<EditableConfig, "google" | "apple">): string[] {

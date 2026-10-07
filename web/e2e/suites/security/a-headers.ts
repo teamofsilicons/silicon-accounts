@@ -95,7 +95,7 @@ async function frameOf(page: Page, id: string): Promise<Frame | null> {
 
 export const journey: Journey = {
   name: "security-headers",
-  title: "security headers: nonce CSP / frame-ancestors / X-Frame-Options / nosniff on every HTML page, per-app frame-ancestors on the embed, default-src 'none' + no-store on API JSON (site and direct), CORS only on public endpoints; no CSP violation in the browser and no framing from another origin",
+  title: "security headers: nonce CSP / frame-ancestors / X-Frame-Options / nosniff on every HTML page, per-app frame-ancestors on the embed, default-src 'none' + no-store on API JSON (site and direct), the API's own HTML error page framed by nobody and escaping its input, CORS only on public endpoints; no CSP violation in the browser and no framing from another origin",
   async run({ env, results, browser }) {
     const callback = callbackOf(env, "briefcase");
 
@@ -158,6 +158,36 @@ export const journey: Journey = {
       }
     }
     results.check("every API answer (200, 401, 404, 405, reflected input), through the site and direct, is JSON with nosniff, CSP default-src 'none' + frame-ancestors 'none', no-store, the referrer policy, a request id, and no CORS headers even for a foreign Origin", apiFailures.length === 0, apiFailures.join(" | ") || `${apiCases.length * 2} answers`);
+
+    // accounts-api's own HTML: the page a provider callback shows when the sign-in can't go on (Google and Apple send
+    // the browser there, with whatever the query or form carried).
+    const hostileCallbacks: Array<[string, string]> = [
+      ["an unknown provider name carrying markup", `/v1/oauth/callback/${encodeURIComponent("<img src=x onerror=alert(1)>")}?state=x&code=y`],
+      ["a made-up state carrying markup", `/v1/oauth/callback/google?state=${encodeURIComponent('"><script>alert(1)</script>')}&code=y`],
+      ["a provider error carrying markup", `/v1/oauth/callback/apple?state=${encodeURIComponent("<svg onload=alert(1)>")}&error=${encodeURIComponent("<b>x</b>")}&error_description=${encodeURIComponent("<iframe src=//evil.example>")}`],
+    ];
+    const callbackFailures: string[] = [];
+    for (const [where, url] of [["site", env.site], ["accounts-api", env.api]] as const) {
+      for (const [label, path] of hostileCallbacks) {
+        const reply = await call(`${url}${path}`, { headers: { accept: "text/html" } });
+        const problems: string[] = [];
+        if (reply.status < 400 || reply.status >= 500) problems.push(`status ${reply.status}`);
+        if (!/^text\/html/.test(header(reply, "content-type"))) problems.push(`Content-Type ${header(reply, "content-type")}`);
+        const csp = directives(header(reply, "content-security-policy"));
+        if ((csp.get("frame-ancestors") ?? []).join(" ") !== "'none'") problems.push(`frame-ancestors ${(csp.get("frame-ancestors") ?? []).join(" ") || "missing"}`);
+        const scripts = csp.get("script-src") ?? csp.get("default-src") ?? [];
+        if (!scripts.length || scripts.some(value => value === "'unsafe-inline'" || value === "'unsafe-eval'" || value === "*")) problems.push(`scripts allowed by "${scripts.join(" ") || "nothing (no CSP)"}"`);
+        if ((csp.get("base-uri") ?? []).join(" ") !== "'none'") problems.push(`base-uri ${(csp.get("base-uri") ?? []).join(" ") || "missing"}`);
+        if (header(reply, "x-frame-options").toUpperCase() !== "DENY") problems.push(`X-Frame-Options ${header(reply, "x-frame-options") || "missing"}`);
+        if (header(reply, "x-content-type-options") !== "nosniff") problems.push("no nosniff");
+        if (!/no-store/.test(header(reply, "cache-control"))) problems.push(`Cache-Control ${header(reply, "cache-control") || "missing"}`);
+        if (header(reply, "referrer-policy") !== "strict-origin-when-cross-origin") problems.push(`Referrer-Policy ${header(reply, "referrer-policy") || "missing"}`);
+        const markup = ["<img src=x", "<script>alert", "<svg onload", "<b>x</b>", "<iframe src"].filter(needle => reply.text.includes(needle));
+        if (markup.length) problems.push(`reflects ${markup.join(", ")} unescaped`);
+        if (problems.length) callbackFailures.push(`${where} ${label}: ${problems.join("; ")}`);
+      }
+    }
+    results.check(`accounts-api's own HTML (the provider callback's error page, ${hostileCallbacks.length} hostile inputs, through the site and direct) is a 4xx with frame-ancestors 'none' + X-Frame-Options DENY, a CSP without inline script, base-uri 'none', nosniff, no-store and the referrer policy, and shows the input escaped`, callbackFailures.length === 0, callbackFailures.join(" | ") || `${hostileCallbacks.length * 2} pages`);
 
     const preflight = await call(`${env.site}/v1/me`, { method: "OPTIONS", origin: "https://evil.example", headers: { "access-control-request-method": "PATCH", "access-control-request-headers": "content-type" } });
     results.check("a CORS preflight from another origin on a credentialed endpoint gets no CORS permission", !header(preflight, "access-control-allow-origin") && !header(preflight, "access-control-allow-credentials") && !header(preflight, "access-control-allow-methods"), `${preflight.status} ${[...preflight.headers].filter(([name]) => name.startsWith("access-control")).map(([n, v]) => `${n}: ${v}`).join(", ") || "no access-control headers"}`);

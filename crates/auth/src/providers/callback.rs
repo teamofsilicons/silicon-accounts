@@ -736,7 +736,7 @@ async fn record_error(
             Some(0.4),
             json!({"app_id": flow.app_id, "provider": provider.as_str(), "error": error.code}),
         );
-        tracing::info!(flow_id, provider = provider.as_str(), code = %error.code, "provider sign-in failed");
+        tracing::info!(flow_id, provider = provider.as_str(), code = %error.code, reason = %error.message, "provider sign-in failed");
         flow.reset_to_choose_method();
         flow.extras.error = Some(error);
         model::save(&mut tx, &flow).await?;
@@ -864,20 +864,17 @@ async fn exchange_code(
             "Try again in a moment, or use another sign-in method.",
         )
     };
-    let response = state
-        .http
-        .post(&ep.token_url)
-        .header(header::ACCEPT, "application/json")
-        .form(&form)
-        .send()
-        .await
-        .map_err(|e| {
-            let mut m = e.to_string();
-            if let Some(i) = m.find(" for url (") {
-                m.truncate(i);
-            }
-            unavailable(m)
-        })?;
+    let response = super::send(
+        &state.http,
+        &format!("{} token exchange", provider.as_str()),
+        |http| {
+            http.post(&ep.token_url)
+                .header(header::ACCEPT, "application/json")
+                .form(&form)
+        },
+    )
+    .await
+    .map_err(|e| unavailable(e.to_string()))?;
     let status = response.status();
     let body: Value = response.json().await.map_err(|_| {
         unavailable(format!(

@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join, resolve } from "node:path";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import type { Ctx } from "../../context";
-import { E2E_DIR, codeFor, lastSeq, newContext, shot, sleep, tag, type ContextOptions, type Env } from "../../lib";
+import { E2E_DIR, codeFor, lastSeq, newContext, shot, signInOnSite, sleep, sql, tag, type ContextOptions, type Env } from "../../lib";
 import { KIT_SOURCE } from "./_kit";
 
 export type Theme = "light" | "dark";
@@ -133,6 +133,11 @@ export function collectConsole(page: Page, expected: RegExp[] = []): void {
 /** The same browser noise lib.ts ignores (see BENIGN there). */
 const BENIGN = [/_rsc=.* due to access control checks/, /Frame load interrupted/, /ResizeObserver loop completed with undelivered notifications/];
 
+/** This page's console problems and loads from other machines collected since the last audit (and forgets them). */
+export function drainProblems(page: Page): { console: string[]; away: string[] } {
+  return { console: takeConsole(page), away: takeAway(page) };
+}
+
 function takeAway(page: Page): string[] {
   const away = awayHosts.get(page);
   if (!away) return [];
@@ -197,13 +202,14 @@ export async function settle(page: Page, pause = 300): Promise<void> {
   await sleep(pause);
 }
 
-export async function applyVariant(page: Page, entry: Variant): Promise<void> {
+/** Sets the variant's size and theme; scrolls to the top unless `keepScroll` (an open popover stays where it is). */
+export async function applyVariant(page: Page, entry: Variant, keepScroll = false): Promise<void> {
   // The pointer stays where the last click was; parked in the corner it hovers nothing in the screenshots.
   await page.mouse.move(0, 0).catch(() => undefined);
   const size = page.viewportSize();
   if (!size || size.width !== entry.width || size.height !== entry.height) await page.setViewportSize({ width: entry.width, height: entry.height });
   await page.emulateMedia({ colorScheme: entry.theme });
-  await page.evaluate("window.scrollTo({ left: 0, top: 0, behavior: 'instant' })").catch(() => undefined);
+  if (!keepScroll) await page.evaluate("window.scrollTo({ left: 0, top: 0, behavior: 'instant' })").catch(() => undefined);
   await settle(page);
 }
 
@@ -258,6 +264,8 @@ export interface AuditOptions {
   expectedConsole?: RegExp[];
   /** Skip the vocabulary check (pages that show an app's own words). */
   skipWords?: boolean;
+  /** Leave the scroll position as it is (an open popover in view), instead of starting from the top. */
+  keepScroll?: boolean;
 }
 
 /** axe's rule for WCAG 2.5.3 Label in Name, reported as a check of its own. */
@@ -291,7 +299,7 @@ export interface AuditSummary {
 export async function auditPage(ctx: Ctx, page: Page, findings: Findings, options: AuditOptions): Promise<AuditSummary> {
   const { results, env } = ctx;
   const v = options.variant;
-  await applyVariant(page, v);
+  await applyVariant(page, v, !!options.keepScroll);
   const label = `${options.name} ${v.key}`;
   const shotName = `uxa-${options.name}-${v.key}`;
   await shot(env, page, shotName, !!options.fullPage);
@@ -339,7 +347,8 @@ export async function auditPage(ctx: Ctx, page: Page, findings: Findings, option
   results.check(`${label}: nothing the page loads leaves this machine`, away.length === 0, away.slice(0, 5).join(" | "));
 
   const text = await kit<string>(page, "words()");
-  const cleaned = text.replace(VENDOR, " ").replace(/teamofsilicons/gi, " ");
+  // Google Workspace keeps its name even a few words after "Google" or its hosted_domain setting ("another Workspace").
+  const cleaned = text.replace(VENDOR, " ").replace(/teamofsilicons/gi, " ").replace(/(Google|hosted_domain)([^\n]{0,60}?)\bWorkspaces?\b/gi, "$1$2 ");
   const banned = [...new Set([...cleaned.matchAll(BANNED)].map(match => match[0]))];
   const soft = [...new Set([...cleaned.matchAll(SOFT)].map(match => contextOf(cleaned, match.index ?? 0)))].slice(0, 12);
   if (!options.skipWords) results.check(`${label}: vocabulary: no org, team, workspace or human words`, banned.length === 0, banned.map(word => contextOf(cleaned, cleaned.indexOf(word))).join(" | "));
@@ -581,9 +590,14 @@ function near(a: { x: number; y: number; w: number; h: number }, b: { x: number;
 export function focusVerdict(stop: FocusStop): "shows" | "none" | "inconclusive" {
   if (stop.moves === "same") return "none";
   if (stop.pixels === "differs") return "shows";
+  // A field you type in shows focus with its caret (WCAG 2.4.7 counts it), which screenshots leave out.
+  if (TEXT_ENTRY(stop)) return "shows";
   if (stop.pixels === "same") return "none";
   return stop.changed && stop.changed.length > 0 ? "shows" : "inconclusive";
 }
+
+/** A field that takes typed text (its caret shows where focus is). */
+const TEXT_ENTRY = (stop: FocusStop) => stop.tag === "textarea" || (stop.tag === "input" && /^(|text|search|email|tel|url|password|number)$/.test(stop.type ?? ""));
 
 /** Whether a stop shows where focus is (not "none"). */
 export const showsFocus = (stop: FocusStop) => focusVerdict(stop) !== "none";
@@ -679,6 +693,41 @@ export async function signedInCarbon(ctx: Ctx, who: string, options: ContextOpti
   await page.waitForURL(`${env.site}/`, { timeout: 30_000 });
   const me = (await (await page.request.get(`${env.site}/v1/me`)).json()) as { id?: string; uuid?: string };
   return { context, page, email, id: me.id ?? "", uuid: me.uuid ?? "" };
+}
+
+/** Where production keeps the default photos (ACCOUNTS_IRIS_BASE_URL's default in crates/core/src/config.rs). */
+const PRODUCTION_IRIS = "https://iris.teamofsilicons.com";
+
+/**
+ * Test data, not the site: the harness seeds the fake apps' owners (c:saket, c:shubham, c:acme-dev, …) with photos on
+ * the production Iris, because scripts/dev.sh runs accounts-seed with base_env(), which exports no
+ * ACCOUNTS_IRIS_BASE_URL (Settings then falls back to https://iris.teamofsilicons.com), while accounts-api and the site
+ * get this stack's mock Iris. A page showing a seeded owner would load a photo from the internet, which says nothing
+ * about the site and breaks the README's "no page loads a photo from the internet". This points those photos at this
+ * stack's mock Iris (same path and id), in this stack's own database, before a journey shows them, and records how
+ * many it moved (the harness defect stays in the findings and the metrics). Idempotent.
+ */
+export async function localSeedPhotos(ctx: Ctx, findings?: Findings): Promise<number> {
+  const rows = await sql(ctx.env, `with moved as (update accounts set pfp_url = '${ctx.env.iris}' || substr(pfp_url, ${PRODUCTION_IRIS.length + 1}) where pfp_url like '${PRODUCTION_IRIS}/%' returning handle) select handle from moved order by handle`);
+  const handles = rows.map(row => row[0] ?? "").filter(Boolean);
+  ctx.results.metric("seeded accounts whose photo pointed at the production Iris (harness: scripts/dev.sh seeds without ACCOUNTS_IRIS_BASE_URL)", handles.length, "count");
+  if (handles.length) findings?.notes.push(`harness: ${handles.length} seeded accounts had photos on ${PRODUCTION_IRIS} (${handles.join(", ")}); moved to this stack's mock Iris ${ctx.env.iris} before the walk. Cause: scripts/dev.sh base_env() exports no ACCOUNTS_IRIS_BASE_URL for accounts-seed.`);
+  return handles.length;
+}
+
+/** briefcase's seeded owner (c:saket), whose apps the developer pages need populated. */
+export const SEEDED_OWNER_EMAIL = "saketdev12@example.test";
+
+/**
+ * Signs `page` in as briefcase's seeded owner. Every sign-in sends a code to the same address, and the suite signs in
+ * as this owner in several journeys (more on a stack walked again with --keep), so the per-address limit (10 codes in
+ * 10 minutes) would refuse the suite's own later sign-ins: the window of the codes this suite already had sent there is
+ * moved past (README "Time travel"), then the seeded photos are made local (localSeedPhotos).
+ */
+export async function signInAsSeededOwner(ctx: Ctx, page: Page, findings?: Findings): Promise<void> {
+  await sql(ctx.env, `update otp_challenges set created_at = created_at - interval '11 minutes' where destination = '${SEEDED_OWNER_EMAIL}' and created_at > now() - interval '11 minutes'`);
+  await localSeedPhotos(ctx, findings);
+  await signInOnSite(ctx.env, page, SEEDED_OWNER_EMAIL);
 }
 
 /** A same-origin fetch from the page itself (the browser sends Origin, which cookie mutations need). */

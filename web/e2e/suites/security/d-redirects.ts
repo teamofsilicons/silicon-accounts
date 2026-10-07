@@ -9,14 +9,14 @@
 import type { Page, Route } from "@playwright/test";
 import type { Journey } from "../../context";
 import { codeFor, lastSeq, newContext, shot, sleep, tag } from "../../lib";
-import { appCredentials, brief, call, callbackOf, errorOf, remember, signInWithEmail, viaSite, Jar } from "./_helpers";
+import { appCredentials, brief, call, callbackOf, errorOf, raw, remember, signInWithEmail, viaSite, Jar } from "./_helpers";
 
 /** Requests to the attacker's host (by host: the site's own URLs carry "evil.example" in their query strings). */
 const EVIL = (url: URL) => url.hostname === "evil.example" || url.hostname.endsWith(".evil.example");
 
 export const journey: Journey = {
   name: "security-redirects",
-  title: "open redirects: /authorize refuses unregistered, look-alike, scheme-changed, path-changed and query-added redirect URIs (and never error-redirects to them), the first-party app only its own origin; in the browser /authorize, /sign-in?return_to and Connect Google never leave the site, and hostile parameters are never executed",
+  title: "open redirects: /authorize refuses unregistered, look-alike, scheme-changed, path-changed and query-added redirect URIs (and never error-redirects to them), the first-party app only its own origin; the site's own redirects stay on the site for //, /\\ and encoded paths; forged Host / X-Forwarded-Host / Forwarded headers change no published URL; in the browser /authorize, /sign-in?return_to and Connect Google never leave the site, and hostile parameters are never executed",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const t = viaSite(ctx);
@@ -130,6 +130,61 @@ export const journey: Journey = {
     const ownReturn = await call<{ authorize_url?: string }>(`${env.site}/v1/me/identities/google`, { json: { return_to: "/sign-in-methods" }, jar: carbon.jar, origin: env.site, ip: ctx.ip });
     results.check(`Connect Google refuses ${returns.length} foreign return_to values (422 with details.fields.return_to) and accepts a path on the site`, returnAccepted.length === 0 && ownReturn.status === 201 && (ownReturn.body.authorize_url ?? "").startsWith(env.oidc), returnAccepted.join(" | ") || `own: ${ownReturn.status} → ${(ownReturn.body.authorize_url ?? "").slice(0, 60)}`);
 
+    // The site's own redirects (trailing slashes, /identity, /docs/index): a path that starts with //, /\ or their
+    // encodings must never become a Location that leaves the site (sent byte for byte: fetch would normalize them).
+    const tricky = ["//evil.example/", "///evil.example/a/", "//evil.example/%2e%2e", "/\\evil.example/", "/%5Cevil.example/", "/%2F%2Fevil.example/", "/.//evil.example/", "//evil.example/sign-in/", "/identity//evil.example", "/%09/evil.example", "/sign-in/?next=//evil.example/", "/\\/evil.example/"];
+    const offSite: string[] = [];
+    const seen: string[] = [];
+    for (const path of tricky) {
+      const reply = await raw(env.site, path);
+      const location = String(reply.headers.location ?? "");
+      if (reply.status === -1) offSite.push(`${path}: ${reply.text}`);
+      if (!location) continue;
+      seen.push(`${path} → ${reply.status} ${location}`);
+      let leaves = /^\s*[/\\]{2}/.test(location) || /^\s*\/\\/.test(location);
+      try {
+        leaves ||= new URL(location, env.site).origin !== env.site;
+      } catch {
+        leaves = true;
+      }
+      if (leaves) offSite.push(`${path} → ${reply.status} ${location}`);
+    }
+    results.check(`the site's own redirects never point off the site: ${tricky.length} paths starting with //, ///, /\\, /\\/, encoded // and \\, /./, or a tab are answered with a path on the site (or not redirected)`, offSite.length === 0, offSite.join(" | ") || `${seen.length} redirects, e.g. ${seen.slice(0, 3).join(", ")}`);
+
+    // A forged Host, X-Forwarded-Host or Forwarded header never reaches a Location or a URL the service publishes: the
+    // discovery document, the device flow's verification URLs and the site's redirects come out exactly as without it.
+    const forgedHosts: Array<[string, string, Record<string, string>]> = [
+      ["Host: evil.example at the site", env.site, { host: "evil.example" }],
+      ["X-Forwarded-Host: evil.example (+ X-Forwarded-Proto: https) at the site", env.site, { "x-forwarded-host": "evil.example", "x-forwarded-proto": "https" }],
+      ["Forwarded: host=evil.example at the site", env.site, { forwarded: "host=evil.example;proto=https" }],
+      ["Host: evil.example straight at accounts-api", env.api, { host: "evil.example" }],
+      ["X-Forwarded-Host: evil.example straight at accounts-api", env.api, { "x-forwarded-host": "evil.example" }],
+    ];
+    const published = async (base: string, headers: Record<string, string>) => {
+      const discovery = await raw(base, "/.well-known/openid-configuration", { headers });
+      const device = await raw(base, "/v1/device/authorize", { method: "POST", headers: { ...headers, "content-type": "application/json", "x-forwarded-for": ctx.ip }, body: JSON.stringify({ client_label: "host header probe" }) });
+      let deviceBody: { device_code?: string; verification_uri?: string; verification_uri_complete?: string; user_code?: string } = {};
+      try {
+        deviceBody = JSON.parse(device.text) as typeof deviceBody;
+      } catch {
+        // Not JSON: compared as missing.
+      }
+      remember(ctx, "device code", deviceBody.device_code);
+      const redirects: string[] = [];
+      if (base === env.site) for (const path of ["/identity", "/docs/index", "/sign-in/"]) redirects.push(`${path} ${(await raw(base, path, { headers })).headers.location ?? ""}`);
+      return { discovery: `${discovery.status} ${discovery.text}`, device: `${device.status} ${deviceBody.verification_uri ?? ""} ${(deviceBody.verification_uri_complete ?? "").replace(deviceBody.user_code ?? "\u0000", "<code>")}`, redirects: redirects.join(", ") };
+    };
+    const poisoned: string[] = [];
+    for (const [label, base, headers] of forgedHosts) {
+      const control = await published(base, {});
+      const forged = await published(base, headers);
+      for (const part of ["discovery", "device", "redirects"] as const) {
+        if (forged[part] !== control[part] || /evil\.example/.test(forged[part])) poisoned.push(`${label}: ${part} differs (${forged[part].slice(0, 120)} vs ${control[part].slice(0, 120)})`);
+      }
+      if (!control.discovery.startsWith("200") || !control.device.startsWith("200")) poisoned.push(`${label}: control ${control.discovery.slice(0, 40)} / ${control.device.slice(0, 60)}`);
+    }
+    results.check(`a forged Host, X-Forwarded-Host or Forwarded header (${forgedHosts.length} cases, site and accounts-api) changes nothing the service publishes: the discovery document, the device flow's verification URLs and the site's redirects are byte-identical to those without it`, poisoned.length === 0, poisoned.join(" | ") || "identical in every case");
+
     // 2. In the browser. Anything aimed at evil.example is answered here and counted.
     const context = await newContext(browser);
     const hits: string[] = [];
@@ -213,6 +268,8 @@ export const journey: Journey = {
       `/sign-in?state=${encodeURIComponent("x")}&error=${encodeURIComponent(`<img src=x onerror=${marker}>`)}&error_description=${encodeURIComponent(`<script>${marker}</script>`)}`,
       `/device?code=${encodeURIComponent(`<img src=x onerror=${marker}>`)}`,
       `/embed/v1/buttons?app_id=briefcase&redirect_uri=${encodeURIComponent(cb)}&state=${encodeURIComponent(`</script><script>${marker}</script>`)}&theme=${encodeURIComponent(`"><img src=x onerror=${marker}>`)}`,
+      `/v1/oauth/callback/${encodeURIComponent(`<img src=x onerror=${marker}>`)}?state=${encodeURIComponent(`"><img src=x onerror=${marker}>`)}`,
+      `/v1/oauth/callback/google?state=${encodeURIComponent(`<svg onload=${marker}>`)}&error=${encodeURIComponent(`<img src=x onerror=${marker}>`)}&error_description=${encodeURIComponent(`<script>${marker}</script>`)}`,
     ];
     const executed: string[] = [];
     const xss = await newContext(browser);
@@ -232,7 +289,7 @@ export const journey: Journey = {
       if (state.pwned !== null || state.injected) executed.push(`${path.slice(0, 60)}: pwned=${state.pwned} injected elements=${state.injected}`);
     }
     await shot(env, probe, "security-redirects-02-hostile");
-    results.check(`hostile values in ${hostile.length} pages' query strings (app_id, redirect_uri, state, login_hint, error, error_description, device code, embed theme) never become markup or script`, executed.length === 0 && dialogs.length === 0 && violations.length === 0, executed.join(" | ") || `no element injected, no dialog, ${violations.length} CSP refusals${violations[0] ? ` (${violations[0]})` : ""}`);
+    results.check(`hostile values in ${hostile.length} pages' query strings and paths (app_id, redirect_uri, state, login_hint, error, error_description, device code, embed theme, the provider callback's provider name, state and error) never become markup or script`, executed.length === 0 && dialogs.length === 0 && violations.length === 0, executed.join(" | ") || `no element injected, no dialog, ${violations.length} CSP refusals${violations[0] ? ` (${violations[0]})` : ""}`);
     await xss.close();
     await context.close();
   },

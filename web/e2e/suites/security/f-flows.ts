@@ -2,9 +2,9 @@
  * A hosted sign-in flow belongs to the browser that started it (its `sa_flow` binding cookie). Someone who learns a
  * flow's id (from a URL, a screenshot, a log) can't read it, drive it, verify a code in it, continue in it as their own
  * account, or collect the authorization code it ends with; a made-up or another flow's binding cookie doesn't help; the
- * sign-up step also needs the browser's own sign-up cookie; and a Google answer delivered by another browser is
- * discarded (no login CSRF, no session for the wrong browser). In the browser, opening someone else's flow page never
- * redirects to the app.
+ * sign-up step also needs the browser's own sign-up cookie; and a Google answer, or an Apple form_post answer (parked
+ * and continued with a same-site ticket), delivered by another browser is discarded and used up (no login CSRF, no
+ * session for the wrong browser). In the browser, opening someone else's flow page never redirects to the app.
  */
 import type { Journey } from "../../context";
 import { codeFor, lastSeq, newContext, shot, sleep, tag } from "../../lib";
@@ -12,9 +12,20 @@ import { appCredentials, brief, call, callbackOf, errorOf, flowOf, flowStep, pkc
 
 const notBound = (reply: Reply) => reply.status === 403 && errorOf(reply).code === "flow_not_bound" && !(reply.body as { flow?: unknown } | null)?.flow;
 
+/** Decodes the HTML entities a form attribute may carry (named and numeric). */
+const unescapeHtml = (text: string) =>
+  text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(Number(dec)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+
 export const journey: Journey = {
   name: "security-flow-binding",
-  title: "flow binding: a stolen flow id without the browser's sa_flow cookie (none, another flow's, made up) can't read, drive, verify, continue or collect the code (403 flow_not_bound); sign-up needs the sa_signup cookie; a Google answer delivered by another browser is discarded; another browser opening the flow page is never sent to the app",
+  title: "flow binding: a stolen flow id without the browser's sa_flow cookie (none, another flow's, made up) can't read, drive, verify, continue or collect the code (403 flow_not_bound); sign-up needs the sa_signup cookie; a Google answer and a parked Apple form_post delivered by another browser are discarded and used up; another browser opening the flow page is never sent to the app",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const t = viaSite(ctx);
@@ -113,6 +124,60 @@ export const journey: Journey = {
     const delivered = await call(controlLocation.startsWith(env.site) ? controlLocation : `${env.site}${new URL(controlLocation, env.site).pathname}${new URL(controlLocation, env.site).search}`, { jar: gJar, ip: ctx.ip, headers: { accept: "text/html" } });
     const claimed = flowOf(await call(`${env.site}/v1/flows/${gFlow?.id}`, { jar: gJar, ip: ctx.ip }));
     results.check("control: a new Google leg delivered by the browser that started it goes through (302 back to the flow, which moves on to sign-up)", delivered.status === 302 && (delivered.headers.get("location") ?? "").includes(`/authorize/flow/${gFlow?.id}`) && claimed?.step === "signup", `${delivered.status} → ${delivered.headers.get("location")}; flow ${claimed?.step}`);
+
+    // An Apple answer comes back as a form_post: a cross-site POST, which carries no SameSite=Lax cookie. It is parked
+    // and continued with a same-site GET (?ticket=…), which must carry the binding cookie of the browser that started
+    // the sign-in. Delivered by another browser (a forwarded or intercepted answer, or login CSRF), it is discarded.
+    const aJar = new Jar();
+    const aFlow = flowOf(await startFlow(t, aJar, { app_id: "briefcase", redirect_uri: callback, state: `ap-${tag()}`, prompt: "login" }));
+    const aId = aFlow?.id ?? "";
+    const aEmail = randomEmail("apple");
+    const appleAnswer = async () => {
+      const legReply = await flowStep(t, aJar, aId, "oauth/apple");
+      const authorize = new URL(String((legReply.body as { authorize_url?: string } | null)?.authorize_url ?? `${env.oidc}/apple/authorize`));
+      authorize.searchParams.set("_auto", aEmail);
+      const html = await (await fetch(authorize, { redirect: "manual" })).text();
+      const action = unescapeHtml(/<form id="apple-form-post" method="post" action="([^"]+)"/.exec(html)?.[1] ?? "");
+      const fields = Object.fromEntries([...html.matchAll(/<input type="hidden" name="([^"]+)" value="([^"]*)">/g)].map(match => [unescapeHtml(match[1]!), unescapeHtml(match[2]!)]));
+      remember(ctx, "code", fields.code);
+      return { leg: legReply.status, action, fields };
+    };
+    /** Apple's form_post as the browser sends it: cross-site, so without the site's cookies. */
+    const formPost = (answer: { action: string; fields: Record<string, string> }) => call(answer.action, { form: answer.fields, origin: "https://appleid.apple.com", ip: ctx.ip, headers: { accept: "text/html" } });
+    const errorCode = (reply: Reply) => /data-error="([^"]+)"/.exec(reply.text)?.[1] ?? errorOf(reply).code ?? "";
+    const signsIn = (reply: Reply) => reply.setCookies.some(cookie => /sa_session|sa_signup/.test(cookie.name) && cookie.value);
+
+    const intercepted = await appleAnswer();
+    const parked = await formPost(intercepted);
+    const missingTicket = `${env.site}/v1/oauth/callback/apple?ticket=no-ticket-was-issued`;
+    const ticketUrl = parked.headers.get("location") ?? "";
+    const ticketElsewhere = await call(ticketUrl || missingTicket, { jar: new Jar(), ip: ctx.ip, headers: { accept: "text/html" } });
+    const aView = flowOf(await call(`${env.site}/v1/flows/${aId}`, { jar: aJar, ip: ctx.ip }));
+    results.check(
+      "an Apple answer (form_post) delivered by another browser is parked (303 to a same-site ticket URL, no cookie set) and its ticket without the starting browser's binding cookie is refused (403 flow_not_bound): no session or sign-up cookie anywhere, and the real flow says provider_answer_elsewhere",
+      intercepted.leg === 200 && !!intercepted.fields.code && parked.status === 303 && ticketUrl.startsWith(`${env.site}/v1/oauth/callback/apple?ticket=`) && parked.setCookies.length === 0 && ticketElsewhere.status === 403 && errorCode(ticketElsewhere) === "flow_not_bound" && !signsIn(ticketElsewhere) && aView?.error?.code === "provider_answer_elsewhere" && !aView.signed_in_as && !aJar.get("sa_session") && !aJar.get("sa_signup"),
+      `leg ${intercepted.leg}; form_post ${parked.status} → ${ticketUrl.replace(/ticket=.*/, "ticket=…")} (Set-Cookie ${parked.setCookies.length}); ticket elsewhere ${ticketElsewhere.status} ${errorCode(ticketElsewhere)}; flow ${aView?.step} ${aView?.error?.code ?? ""}`,
+    );
+    const ticketReplayed = await call(ticketUrl || missingTicket, { jar: aJar, ip: ctx.ip, headers: { accept: "text/html" } });
+    const postedAgain = await formPost(intercepted);
+    const afterReplays = flowOf(await call(`${env.site}/v1/flows/${aId}`, { jar: aJar, ip: ctx.ip }));
+    results.check("…and the discarded answer is used up: its ticket replayed in the right browser and the same form_post sent again are refused (400 invalid_state) and sign nobody in", ticketReplayed.status === 400 && errorCode(ticketReplayed) === "invalid_state" && postedAgain.status === 400 && !signsIn(ticketReplayed) && !signsIn(postedAgain) && afterReplays?.step === "choose_method" && !aJar.get("sa_session") && !aJar.get("sa_signup"), `ticket replay ${ticketReplayed.status} ${errorCode(ticketReplayed)}; form_post again ${postedAgain.status} ${errorCode(postedAgain)}; flow ${afterReplays?.step}`);
+
+    // Control: the browser that started it continues its own parked answer, exactly once.
+    const ownAnswer = await appleAnswer();
+    const ownParked = await formPost(ownAnswer);
+    const ownTicket = ownParked.headers.get("location") || missingTicket;
+    const parkedTwice = await formPost(ownAnswer);
+    const ticketByPost = await call(ownTicket, { method: "POST", body: "", contentType: "application/x-www-form-urlencoded", jar: aJar.clone(), ip: ctx.ip, headers: { accept: "text/html" } });
+    const continued = await call(ownTicket, { jar: aJar, ip: ctx.ip, headers: { accept: "text/html" } });
+    const claimedApple = flowOf(await call(`${env.site}/v1/flows/${aId}`, { jar: aJar, ip: ctx.ip }));
+    remember(ctx, "sa_signup cookie", aJar.get("sa_signup"));
+    const ticketReused = await call(ownTicket, { jar: aJar, ip: ctx.ip, headers: { accept: "text/html" } });
+    results.check(
+      "control: the browser that started the sign-in continues its parked Apple answer (303 → ticket GET with its binding cookie → 302 to the flow, which moves on to sign-up); the answer can't be parked twice, its ticket can't come back by POST, and a used ticket is refused",
+      ownParked.status === 303 && parkedTwice.status === 400 && ticketByPost.status === 400 && continued.status === 302 && (continued.headers.get("location") ?? "") === `${env.site}/authorize/flow/${aId}` && claimedApple?.step === "signup" && claimedApple.signup?.email === aEmail && !!aJar.get("sa_signup") && ticketReused.status === 400,
+      `form_post ${ownParked.status}; again ${parkedTwice.status} ${errorCode(parkedTwice)}; ticket by POST ${ticketByPost.status} ${errorCode(ticketByPost)}; ticket GET ${continued.status} → ${continued.headers.get("location")}; flow ${claimedApple?.step} (${claimedApple?.signup?.email ?? "no sign-up"}); ticket reused ${ticketReused.status} ${errorCode(ticketReused)}`,
+    );
 
     // In the browser: another person opening the victim's flow page.
     const context = await newContext(browser);

@@ -5,7 +5,7 @@
  * with the details they share with the app. Search and filters run on the server; sorting runs on the rows loaded.
  * A row opens a drawer with the membership's details and its last 20 sign-ins.
  */
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useId, useMemo, useState, type MouseEvent } from "react";
 import { Users } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
 import { Avatar } from "@/components/arc/avatar/avatar";
@@ -115,6 +115,8 @@ function UserDrawerBody({ appId, appName, user: listed }: { appId: string; appNa
 
 export function UsersTab() {
   const ctx = useDeveloperApp();
+  // What a row's name button does, read after its name (aria-describedby).
+  const openHint = useId();
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
   const [filters, setFilters] = useState<FilterChip[]>([]);
@@ -158,10 +160,11 @@ export function UsersTab() {
       key: "name",
       label: "Name",
       render: (_, row) => (
-        <button type="button" className={styles.person} data-open-user={row.uuid} onClick={() => openUser(row.user)} aria-label={`Open ${row.name}${row.user.id ? ` (${row.user.id})` : ""}`}>
+        // Named by what it shows (WCAG 2.5.3: name, then id), with what it does as its description.
+        <button type="button" className={styles.person} data-open-user={row.uuid} onClick={() => openUser(row.user)} aria-label={`${row.name}, ${row.user.id ?? "deleted"}`} aria-describedby={openHint}>
           <Avatar name={row.name} src={row.user.pfp_url} size="sm" aria-hidden="true" />
           <span className={styles.personText}>
-            <span className={styles.personName}>{row.name}</span>
+            <span className={styles.personName}>{row.name}</span>{" "}
             <span className={styles.personId}>{row.user.id ?? "deleted"}</span>
           </span>
         </button>
@@ -230,6 +233,7 @@ export function UsersTab() {
     body = (
       <>
         <div className={styles.tableFrame} onClick={openRow} aria-busy={list.isPlaceholderData || undefined}>
+          <span id={openHint} hidden>Opens their details</span>
           <SortableDataTable
             rows={rows}
             columns={columns}

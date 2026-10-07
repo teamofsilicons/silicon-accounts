@@ -1,13 +1,14 @@
 //! App mode: `accounts app …`.
 
+use std::io::Read;
 use std::path::Path;
 use std::time::Duration;
 
 use serde_json::{Value, json};
 use silicon_accounts_client::{
     AppClient, AppDetails, DeliveriesQuery, ImportInput, ImportJob, ImportOptions, ImportRowsQuery,
-    IssueAta, IssueObo, PageRequest, ProofRef, ProofVerification, ProofsQuery, ReplayRequest,
-    UsersQuery, WaitEvent, WaitOptions,
+    IssueAta, IssueObo, MAX_IMPORT_BYTES, PageRequest, ProofRef, ProofVerification, ProofsQuery,
+    ReplayRequest, UsersQuery, WaitEvent, WaitOptions,
 };
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
@@ -17,7 +18,7 @@ use crate::cli::{
     ImportFormat, ProofCommand, TokenCommand,
 };
 use crate::ctx::{AppSelection, Ctx, StoredApp};
-use crate::error::{CliError, CliResult, EXIT_INVALID};
+use crate::error::{CliError, CliResult, EXIT_FAILURE, EXIT_INVALID};
 use crate::home;
 use crate::output::{Outcome, kv, stamp, table, to_json, when};
 use crate::util;
@@ -588,7 +589,7 @@ async fn run_import(ctx: &Ctx, app: &AppClient<'_>, args: ImportArgs) -> CliResu
                     }
                 },
             };
-            let bytes = util::read_file_or_stdin(&file, "the import file")?;
+            let bytes = read_import_file(&file, format)?;
             if bytes.is_empty() {
                 return Err(CliError::invalid(
                     format!("{} is empty.", display_path(&file)),
@@ -734,6 +735,72 @@ async fn wait_import(ctx: &Ctx, app: &AppClient<'_>, job_id: &str) -> CliResult<
             format!("Follow it again with `accounts app import status {job_id} --wait`."),
         )),
     }
+}
+
+/// Reads the file to import. A CSV is sent exactly as it is, so one over the import limit is
+/// refused before it is read: by its size on disk, or as soon as stdin has carried more than
+/// the limit. JSON is re-encoded before it is sent, so for JSON the client checks the encoded
+/// body instead (`AppClient::start_import`).
+fn read_import_file(file: &Path, format: ImportFormat) -> CliResult<Vec<u8>> {
+    if format == ImportFormat::Csv {
+        if file == Path::new("-") {
+            let mut bytes = Vec::new();
+            std::io::stdin()
+                .take(MAX_IMPORT_BYTES as u64 + 1)
+                .read_to_end(&mut bytes)
+                .map_err(|e| {
+                    CliError::new(
+                        EXIT_FAILURE,
+                        "io_error",
+                        format!("Could not read the import file from stdin: {e}."),
+                        "Retry.",
+                    )
+                })?;
+            if bytes.len() > MAX_IMPORT_BYTES {
+                return Err(csv_too_large(
+                    format!(
+                        "the CSV on stdin carries more than the {MAX_IMPORT_BYTES} bytes one import accepts"
+                    ),
+                    json!({ "limit_bytes": MAX_IMPORT_BYTES }),
+                ));
+            }
+            return Ok(bytes);
+        }
+        if let Ok(meta) = std::fs::metadata(file)
+            && meta.is_file()
+            && meta.len() > MAX_IMPORT_BYTES as u64
+        {
+            return Err(csv_too_large(
+                format!(
+                    "{} is {} bytes ({}), and one import accepts at most {MAX_IMPORT_BYTES} bytes",
+                    file.display(),
+                    meta.len(),
+                    megabytes(meta.len())
+                ),
+                json!({ "size_bytes": meta.len(), "limit_bytes": MAX_IMPORT_BYTES }),
+            ));
+        }
+    }
+    util::read_file_or_stdin(file, "the import file")
+}
+
+/// The refusal of a CSV over the import limit (`what` says how large it is), before it is
+/// uploaded. The service would answer 413 `payload_too_large`, often before the upload ends.
+fn csv_too_large(what: String, details: Value) -> CliError {
+    CliError::new(
+        EXIT_INVALID,
+        "payload_too_large",
+        format!("The import is over the 50 MB limit: {what}, so it was not uploaded."),
+        "Split it into files of at most 50 MB and 100,000 rows each, each starting with the header row, and import them one after another.",
+    )
+    .with_details(details)
+}
+
+/// `size` in MB (1 MB = 1,048,576 bytes, as the limit is counted) with one decimal, rounded
+/// up so that a file over the limit never reads as "50.0 MB".
+fn megabytes(size: u64) -> String {
+    let tenths = size.saturating_mul(10).div_ceil(1024 * 1024);
+    format!("{}.{} MB", tenths / 10, tenths % 10)
 }
 
 fn render_job(job: &ImportJob) -> String {

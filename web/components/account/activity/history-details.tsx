@@ -15,7 +15,7 @@
  *
  * Internal codes (`action`, `*_kind`, request and session ids) are not shown. Accounts are shown by their c:id or si:id,
  * never by uuid: summaries the service sent are used as they are, the custodian's own Silicons are known already, and
- * anyone else is looked up when the row opens. Enum values are said in words; `details` is flattened one level with a
+ * any other account is looked up when the row opens. Enum values are said in words; `details` is flattened one level with a
  * label per key.
  */
 import type { ReactNode } from "react";

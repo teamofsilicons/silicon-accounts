@@ -6,6 +6,11 @@
 //! and [`super::policy`] does the same for handlers that read the body themselves). Both
 //! errors made here are rendered by [`super::errors::render`] (RFC 6749 bodies on the OAuth
 //! token, revocation and introspection endpoints).
+//!
+//! A refused body is still read (and thrown away, up to 64 MB) by [`super::linger`], so a
+//! client or proxy that is still uploading reads the 413 instead of a reset connection. A
+//! request that runs past its time budget is not read any further
+//! ([`super::linger::LeaveUnread`]).
 
 use std::time::Duration;
 
@@ -18,6 +23,7 @@ use axum::response::Response;
 use http_body_util::Limited;
 
 use crate::middleware::errors;
+use crate::middleware::linger::LeaveUnread;
 use crate::paths::{self, RouteClass, Timeouts};
 
 /// The 413 error for `method path`.
@@ -86,7 +92,10 @@ pub async fn limits(State(timeouts): State<Timeouts>, req: Request, next: Next) 
         Ok(response) => response,
         Err(_) => {
             tracing::warn!(%method, %path, seconds = budget.as_secs(), "request ran past its time budget");
-            errors::render(&path, timed_out(&method, &path, budget))
+            let mut response = errors::render(&path, timed_out(&method, &path, budget));
+            // The budget bounds the whole request: whatever body is left stays unread.
+            response.extensions_mut().insert(LeaveUnread);
+            response
         }
     }
 }

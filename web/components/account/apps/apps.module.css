@@ -68,6 +68,7 @@ a.sub:hover, a.sub:focus-visible { color: var(--foreground); text-decoration: un
 .footnote a { --sq-r: 6px; --sq-fill: transparent; position: relative; display: inline-flex; align-items: center; gap: 2px; margin-inline: -3px; padding-inline: 3px; background: var(--sq-fill); text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); transition: background-color var(--duration-fast) var(--ease-standard); }
 .footnote a:hover { color: var(--accent-strong); text-decoration-color: currentColor; }
 .footnote a:focus-visible { --sq-fill: var(--accent-subtle); color: var(--accent-strong); text-decoration-color: currentColor; }
+.keep { white-space: nowrap; }
 .skeleton { display: grid; gap: var(--space-6); }
 
 @media (max-width: 480px) {

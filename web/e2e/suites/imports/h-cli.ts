@@ -11,6 +11,8 @@ import { cli, cliHome, tag, type CliRun } from "../../lib";
 import {
   FIXTURES,
   PRECONDITION_PHONE,
+  cliRaw,
+  countApiLog,
   countsText,
   ensurePhoneOwned,
   expectedFor,
@@ -150,18 +152,54 @@ async function walk(ctx: Parameters<Journey["run"]>[0], dir: string): Promise<vo
   const wrongSecret = `sa_app_legacy-crm_${"q".repeat(40)}`;
   const wrong = await run(["app", "import", small, "--json"], wrongSecret);
   results.check("a wrong secret: exit 3, invalid_app_credentials, the secret never printed", wrong.code === 3 && (wrong.json as CliJob | null)?.error?.code === "invalid_app_credentials" && !wrong.stdout.includes(wrongSecret) && !wrong.stderr.includes(wrongSecret), show(wrong));
-  // A file over the 50 MB limit, through the public origin as the CLI always goes: a precise refusal, not a crash.
+  // Files over the 50 MB limit (52,428,800 bytes): the CLI refuses them itself, precisely, before uploading anything
+  // (an upload the service would refuse anyway, often before it ends).
+  const importPosts = () => countApiLog(env, /method=POST route=\/v1\/apps\/\{app_id\}\/imports /);
+  const postsBefore = importPosts();
   const oversized = join(dir, `oversized-${t}.csv`);
   const huge = Buffer.alloc(51 * 1024 * 1024, 0x61);
   huge.write("email,display_name\n", 0);
   writeFileSync(oversized, huge);
   const tooBig: string[] = [];
+  let hint = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     const answer = await run(["app", "import", oversized, "--dry-run", "--json"]);
     const error = (answer.json as CliJob | null)?.error;
-    tooBig.push(`exit ${answer.code} ${error?.code ?? "?"}: ${(error?.message ?? answer.stderr).replace(/\s+/g, " ").slice(0, 160)}`);
+    hint = error?.hint ?? hint;
+    tooBig.push(`exit ${answer.code} ${error?.code ?? "?"} in ${answer.ms} ms: ${(error?.message ?? answer.stderr).replace(/\s+/g, " ").slice(0, 600)}`);
   }
   results.check("a 51 MB file: exit 2 with payload_too_large and the 50 MB limit (2 of 2 tries)", tooBig.every(answer => answer.startsWith("exit 2 payload_too_large") && /50 MB/.test(answer)), tooBig.join(" | "));
+  results.check(
+    "…saying exactly what and why: the file's size (53477376 bytes, 51.0 MB), the limit (52428800 bytes), that nothing was uploaded, and how to split it",
+    tooBig.every(answer => answer.includes(oversized) && answer.includes("53477376 bytes (51.0 MB)") && answer.includes("52428800") && /not uploaded/.test(answer)) && /Split it into files of at most 50 MB and 100,000 rows/.test(hint),
+    `${tooBig[0]} | hint: ${hint}`,
+  );
+  // The same file piped in (stdin carries no size): refused once more than the limit has come through.
+  const piped = await cliRaw(env, home, ["app", "import", "-", "--dry-run", "--json"], { stdin: huge, extraEnv: { ACCOUNTS_APP_ID: crm.app_id, ACCOUNTS_APP_SECRET: crm.secret } });
+  const pipedError = (piped.json as CliJob | null)?.error;
+  results.check("the same 51 MB piped to `accounts app import -`: exit 2 payload_too_large (\"the CSV on stdin carries more than the 52428800 bytes one import accepts\")", piped.code === 2 && pipedError?.code === "payload_too_large" && /stdin carries more than the 52428800 bytes/.test(pipedError.message ?? ""), show(piped));
+  // A JSON file is re-encoded before it is sent, so the CLI checks the request body it would send.
+  const bigJson = join(dir, `oversized-${t}.json`);
+  const jsonRows = Array.from({ length: 6_600 }, (_, i) => ({ email: `big${i}.${t}@legacy-crm.test`, display_name: "J".repeat(8_000) }));
+  writeFileSync(bigJson, JSON.stringify({ rows: jsonRows }));
+  const jsonTooBig = await run(["app", "import", bigJson, "--dry-run", "--json"]);
+  const jsonError = (jsonTooBig.json as CliJob | null)?.error;
+  results.check("a JSON file whose request body would pass 50 MB: exit 2 payload_too_large naming the body (\"its JSON body (6600 rows) is … bytes\")", jsonTooBig.code === 2 && jsonError?.code === "payload_too_large" && /its JSON body \(6600 rows\) is \d+ bytes/.test(jsonError.message ?? "") && (jsonError.details as { limit_bytes?: number } | undefined)?.limit_bytes === 52_428_800, show(jsonTooBig));
+  const postsAfter = importPosts();
+  results.check("none of these oversized imports reached the API (no import request in its log)", postsBefore !== null && postsAfter === postsBefore, `import requests in the API log: ${postsBefore} before, ${postsAfter} after`);
+  // The boundary: exactly 52,428,800 bytes is uploaded (the service then judges its content), one byte more is not.
+  const exact = join(dir, `exact-${t}.csv`);
+  const atLimit = Buffer.alloc(52_428_800, 0x78);
+  const head = `email,display_name\nexact.${t}@legacy-crm.test,`;
+  atLimit.write(head, 0);
+  writeFileSync(exact, atLimit);
+  const exactRun = await run(["app", "import", exact, "--dry-run", "--json"]);
+  const exactError = (exactRun.json as CliJob | null)?.error;
+  results.check("a CSV of exactly 52,428,800 bytes is uploaded: the service reads it and answers on its content (value_too_large: one 52 MB cell), not on its size", exactRun.code === 2 && exactError?.code === "value_too_large" && importPosts() === (postsAfter ?? 0) + 1, show(exactRun));
+  const overByOne = join(dir, `exact-plus-one-${t}.csv`);
+  writeFileSync(overByOne, Buffer.concat([atLimit, Buffer.from("x")]));
+  const overRun = await run(["app", "import", overByOne, "--dry-run", "--json"]);
+  results.check("…one byte more (52,428,801) is refused by the CLI itself: payload_too_large, nothing uploaded", overRun.code === 2 && (overRun.json as CliJob | null)?.error?.code === "payload_too_large" && importPosts() === (postsAfter ?? 0) + 1, show(overRun));
   const nothing = await run(["app", "import", "--json"]);
   results.check("no file and no subcommand: exit 2 with an example", nothing.code === 2 && /accounts app import users\.csv/.test(JSON.stringify(nothing.json ?? nothing.stderr)), show(nothing));
 

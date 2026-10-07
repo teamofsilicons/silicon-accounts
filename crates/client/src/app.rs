@@ -24,6 +24,12 @@ use crate::types::{
 };
 use crate::wait::{WaitEvent, WaitOptions};
 
+/// The largest import Silicon Accounts accepts: 50 MB (52,428,800 bytes) of request body,
+/// which is the CSV file itself, or the JSON (`{"rows": […], "options": {…}}`) the rows are
+/// sent as. One import also carries at most 100,000 rows. [`AppClient::start_import`]
+/// refuses a larger body before sending it ([`Error::PayloadTooLarge`]).
+pub const MAX_IMPORT_BYTES: usize = 50 * 1024 * 1024;
+
 enum AppAuth {
     /// The app's own credentials (HTTP Basic).
     Credentials(Secret),
@@ -340,6 +346,10 @@ impl<'a> AppClient<'a> {
     /// row is matched to the account that has its email or phone; otherwise an unclaimed
     /// Carbon is created (no email or SMS is sent). Pass an idempotency key so a retried
     /// upload never creates a second job.
+    ///
+    /// An import whose request body (the CSV itself, or the JSON the rows are sent as) is
+    /// over [`MAX_IMPORT_BYTES`] is refused here with [`Error::PayloadTooLarge`] and nothing
+    /// is sent: the service would refuse it anyway, often before the upload finishes.
     pub async fn start_import(
         &self,
         input: &ImportInput,
@@ -380,6 +390,10 @@ impl<'a> AppClient<'a> {
                     .timeout(Duration::from_secs(300))
             }
         };
+        let size = request.body_len();
+        if size > MAX_IMPORT_BYTES {
+            return Err(import_too_large(input, size));
+        }
         let response = self.client.execute(request).await?;
         response.json_from(unwrap_key(response.value()?, "job"))
     }
@@ -738,5 +752,79 @@ impl<'a> AppClient<'a> {
         } else {
             self.lookup(uuid_or_id).await
         }
+    }
+}
+
+/// The refusal of an import whose request body is `size` bytes, over [`MAX_IMPORT_BYTES`].
+fn import_too_large(input: &ImportInput, size: usize) -> Error {
+    let rows = |n: usize| format!("{n} row{}", if n == 1 { "" } else { "s" });
+    let body = match input {
+        ImportInput::Csv(_) => "its CSV".to_owned(),
+        ImportInput::Rows(list) => format!("its JSON body ({})", rows(list.len())),
+        ImportInput::Json(list) => format!("its JSON body ({})", rows(list.len())),
+    };
+    Error::PayloadTooLarge {
+        message: format!(
+            "The import is over the 50 MB limit: {body} is {size} bytes ({}), and one import accepts at most {MAX_IMPORT_BYTES} bytes, so it was not uploaded.",
+            megabytes(size)
+        ),
+        hint: "Split it into files of at most 50 MB and 100,000 rows each, and import them one after another.".to_owned(),
+        details: json!({ "size_bytes": size, "limit_bytes": MAX_IMPORT_BYTES }),
+    }
+}
+
+/// `size` in MB (counted like the limit, 1 MB = 1,048,576 bytes) with one decimal, rounded
+/// up so that a body over the limit never reads as "50.0 MB".
+fn megabytes(size: usize) -> String {
+    let tenths = (size as u64).saturating_mul(10).div_ceil(1024 * 1024);
+    format!("{}.{} MB", tenths / 10, tenths % 10)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sizes_read_in_megabytes_rounded_up() {
+        assert_eq!(megabytes(MAX_IMPORT_BYTES), "50.0 MB");
+        assert_eq!(megabytes(MAX_IMPORT_BYTES + 1), "50.1 MB");
+        assert_eq!(megabytes(51 * 1024 * 1024), "51.0 MB");
+        assert_eq!(megabytes(0), "0.0 MB");
+    }
+
+    #[test]
+    fn an_oversized_import_says_what_why_and_how_to_fix_it() {
+        let size = 51 * 1024 * 1024;
+        let error = import_too_large(&ImportInput::Csv(bytes::Bytes::new()), size);
+        assert_eq!(error.code(), "payload_too_large");
+        assert_eq!(
+            error.status(),
+            None,
+            "nothing was sent, so there is no HTTP status"
+        );
+        assert_eq!(
+            error.message(),
+            "The import is over the 50 MB limit: its CSV is 53477376 bytes (51.0 MB), and one import accepts at most 52428800 bytes, so it was not uploaded."
+        );
+        assert_eq!(
+            error.hint().as_deref(),
+            Some(
+                "Split it into files of at most 50 MB and 100,000 rows each, and import them one after another."
+            )
+        );
+        assert_eq!(
+            error.details(),
+            Some(&json!({ "size_bytes": 53_477_376, "limit_bytes": 52_428_800 }))
+        );
+        let one = import_too_large(&ImportInput::Json(vec![json!({})]), size);
+        assert!(one.message().contains("its JSON body (1 row) is"), "{one}");
+        let many = import_too_large(
+            &ImportInput::Rows(vec![crate::types::ImportRow::default(); 2]),
+            size,
+        );
+        assert!(
+            many.message().contains("its JSON body (2 rows) is"),
+            "{many}"
+        );
     }
 }

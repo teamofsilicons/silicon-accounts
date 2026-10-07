@@ -132,6 +132,9 @@ export function Apps() {
               ]}
             />
           </div>
+          {/* Names what the switch shows, so the headings below it (each app's name, or the empty state's) sit one level
+              under the page's: h1, h2, h3. */}
+          <h2 className="sr-only">{view === "access" ? "Apps with access" : "Apps whose access you removed"}</h2>
           {shown.length ? (
             <AnimatedRows items={shown} keyOf={item => item.membership_id} layout="grid" className={styles.grid} label={view === "access" ? "Apps with access" : "Apps whose access you removed"}>
               {item => <AppCard item={item} me={me.data} now={now} onRemove={() => removeAccess(item.app.app_id)} />}
@@ -148,10 +151,15 @@ export function Apps() {
           <ListCap page={apps.data} noun="apps" command="accounts apps list" />
           <p className={styles.footnote}>
             Making an app? Apps are created in{" "}
-            <a data-sq="surface" href={meta.data?.silicon_apps_url ?? "https://apps.teamofsilicons.com"} target="_blank" rel="noopener">
-              Silicon Apps<ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
-            </a>
-            , and the ones you own are under <Link data-sq="surface" href={paths.developer}>Developer</Link>.
+            {/* The link and its comma stay on one line: the link is an inline-flex box, so a phone could otherwise
+                start the next line with the comma. */}
+            <span className={styles.keep}>
+              <a data-sq="surface" href={meta.data?.silicon_apps_url ?? "https://apps.teamofsilicons.com"} target="_blank" rel="noopener">
+                Silicon Apps<ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
+              </a>
+              ,
+            </span>{" "}
+            and the ones you own are under <Link data-sq="surface" href={paths.developer}>Developer</Link>.
           </p>
         </>
       )}
@@ -172,7 +180,7 @@ function AppCard({ item, me, now, onRemove }: { item: MyApp; me: Me | undefined;
       <header className={styles.cardHead}>
         <AppMark app={app} size={44} />
         <div className={styles.cardTitle}>
-          <h2 className={styles.name}>{app.name}</h2>
+          <h3 className={styles.name}>{app.name}</h3>
           {domain ? (
             <a className={styles.sub} href={app.homepage_url ?? undefined} target="_blank" rel="noopener">
               {domain}

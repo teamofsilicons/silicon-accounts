@@ -66,7 +66,7 @@ export function IdChangeForm({ prefix, currentId, uuid, subject, submit, onChang
       <p className={styles.formNote}>
         {currentId
           ? <>When it changes, <span className="mono">{currentId}</span> stays reserved for {keeps} for 10 days: nobody else can take it, and {subject === "self" ? "you can take it back" : "you can take it back for it"}. </>
-          : <>Pick an id people can type. </>}
+          : <>Pick an id Carbons and Silicons can type. </>}
         {subject === "self"
           ? <>Every app you have signed into is told. Apps know you by your uuid <span className="mono">{uuid}</span>, which never changes.</>
           : <>Its webhook and every app it has signed into are told. Apps know it by its uuid <span className="mono">{uuid}</span>, which never changes.</>}

@@ -100,6 +100,43 @@ export const issueObo = (ctx: Ctx, appId: string, subjectToken: string, body: { 
 export const issueAta = (ctx: Ctx, appId: string, body: { audiences: string[]; scopes?: string[]; access_ttl_seconds?: number }, options: AppCallOptions = {}) =>
   asApp<IssuedProof>(ctx, appId, "POST", "/v1/proofs/ata", body, { key: randomUUID(), ...options });
 
+/**
+ * An ATA proof for exactly one app, the only kind UNDERSTANDING.md allows ("An ATA proof is always for exactly one app;
+ * a proof can't be made for several apps at once"). Sent as `audiences: [app]`, the body the API takes today; if the
+ * API has moved to OBO's `receiving_app` and refuses `audiences` (422 naming either), sent again that way.
+ * `path` is POST /v1/proofs/ata or the ATA page's POST /v1/apps/{app_id}/proofs/ata.
+ */
+export async function issueAtaFor(
+  ctx: Ctx,
+  issuer: string,
+  receiver: string,
+  extra: { scopes?: string[]; access_ttl_seconds?: number } = {},
+  options: AppCallOptions & { path?: string; as?: string } = {},
+): Promise<JsonAnswer<IssuedProof>> {
+  const { path = "/v1/proofs/ata", as = issuer, ...call } = options;
+  // One key for both tries: a refused request is never stored, so the second try is the key's first use.
+  const key = call.key ?? randomUUID();
+  const first = await asApp<IssuedProof>(ctx, as, "POST", path, { audiences: [receiver], ...extra }, { ...call, key });
+  if (first.status === 422 && /receiving_app|unknown field[^"]*audiences/.test(JSON.stringify(first.body))) {
+    return asApp<IssuedProof>(ctx, as, "POST", path, { receiving_app: receiver, ...extra }, { ...call, key });
+  }
+  return first;
+}
+
+/** The apps an issue answer (or a listing entry) names as its receivers: `receiving_apps`, `audiences` or `receiving_app`. */
+export function receiversOf(p: unknown): string[] {
+  if (!p || typeof p !== "object") return [];
+  const record = p as { receiving_apps?: unknown; audiences?: unknown; receiving_app?: unknown };
+  const list = record.receiving_apps ?? record.audiences;
+  if (Array.isArray(list)) return list.map(String);
+  if (typeof record.receiving_app === "string") return [record.receiving_app];
+  const named = record.receiving_app as { app_id?: unknown } | null | undefined;
+  return named && typeof named === "object" && typeof named.app_id === "string" ? [named.app_id] : [];
+}
+
+/** True when an issue answer or listing entry names exactly `app` and no other app. */
+export const namesOnly = (p: unknown, app: string) => JSON.stringify(receiversOf(p)) === JSON.stringify([app]);
+
 export const verifyAs = (ctx: Ctx, appId: string, proofToken: string, options: AppCallOptions = {}) => asApp<Verification>(ctx, appId, "POST", "/v1/proofs/verify", { proof_token: proofToken }, options);
 
 export const refreshAs = (ctx: Ctx, appId: string, refreshToken: string, extra: { access_ttl_seconds?: number } = {}, options: AppCallOptions = {}) =>

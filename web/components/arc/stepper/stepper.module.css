@@ -13,7 +13,11 @@
 .horizontal .head { width: fit-content; max-width: 100%; justify-items: start; row-gap: var(--space-3); }
 .vertical .head { width: 100%; grid-template-columns: var(--marker) minmax(0, 1fr); column-gap: var(--space-3); align-items: start; }
 .compact.vertical .head { grid-template-columns: var(--marker); column-gap: 0; }
-.head:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; }
+/* Silicon Accounts: keyboard position in fills and edges (Arc's ring is transparent here, and foundation.css removes
+   every outline): the label takes full ink and an underline, the disc a firm edge (a finished step's disc deepens). */
+.head:focus-visible .label { color: var(--foreground); text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.head:focus-visible .disc { box-shadow: inset 0 0 0 2px var(--foreground); }
+.item[data-status="complete"] .head:focus-visible .disc { background: var(--accent-strong); box-shadow: inset 0 0 0 2px var(--foreground); }
 .head:focus:not(:focus-visible) { outline: none; }
 
 /* The ring sits behind the disc and grows out of it; the disc carries the state color and the glyph. */

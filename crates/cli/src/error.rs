@@ -153,7 +153,9 @@ pub fn exit_code_for(error: &ClientError) -> i32 {
             "slow_down" => EXIT_RATE_LIMITED,
             _ => EXIT_FAILURE,
         },
-        ClientError::InvalidInput { .. } | ClientError::Token(_) => EXIT_INVALID,
+        ClientError::InvalidInput { .. }
+        | ClientError::PayloadTooLarge { .. }
+        | ClientError::Token(_) => EXIT_INVALID,
         _ => EXIT_FAILURE,
     }
 }

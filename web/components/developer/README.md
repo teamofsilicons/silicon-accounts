@@ -46,7 +46,9 @@ contract is `understanding/UNDERSTANDING.md`.
   fields, secret fields and the one-time secret reveal, copy fields, app icons. The tag field decides when typed text
   joins its list, not Arc's TagInput: Enter, leaving the field, and a comma only in lists whose values never hold one
   (domains, app ids); values are compared exactly after normalizing (a redirect URI's path and a scope are
-  case-sensitive), and a refused value keeps its text and says why.
+  case-sensitive), and a refused value keeps its text and says why. A secret field's Replace state lives in the
+  editor's draft (`SecretsDraft.googleReplace` / `appleReplace`), so a save or Discard closes it back to "A … is
+  stored", with focus on its Replace.
 - `tabs/hosted-preview.tsx`: the live preview of the hosted card for every step, light or dark, desktop or phone, built
   on the branding runtime. In the split layout it follows the hosted page: the copy beside the form comes from
   `heroCopy` (components/auth/flow/model.ts, for a first visit), a short "Sign in" heads the form, and "Powered by"
@@ -61,11 +63,13 @@ SCREENS_ERRORS=1 pnpm screens --only developer-signin-conflict --allow-errors
 LIVE_APP_ORIGIN=http://127.0.0.1:8593 pnpm exec tsx components/developer/checks.ts --live http://localhost:8590
 ```
 
-The live checks (15) sign in as the owner of `briefcase` through the site's own sign-in (codes from the dev outbox,
-which `scripts/dev.sh` turns on) and drive every tab against the real API: tab switches that never ask the server,
-saves, conflicts and rebases, typed list text and ⌘S, the leave guard (a link, a number key, the phone dock's sheet,
-the kept draft's notice and the reload question), focus after Save, Discard, a conflict's choice and a revoke,
-history, branding and the embed preview after a save, an import from dry run to "Import for real", the user base,
-webhook retries and replays (the testkit's fake app server answers the webhooks, fails on request and learns a
-rotated secret) and ATA proofs. They change that app's setup and data: run them against a scratch database.
+The live checks (20) sign in as the owner of `briefcase` through the site's own sign-in (codes from the dev outbox,
+which `scripts/dev.sh` turns on) and drive every tab against the real API: tab switches that never ask the server, the
+selected tab kept in view when the window narrows, saves, conflicts and rebases, a bring-your-own secret's field after
+Save, Discard and Keep, typed list text and ⌘S, the leave guard (a link, a number key, the phone dock's sheet, the kept
+draft's notice and the reload question), focus after Save, Discard, a conflict's choice and a revoke, history, branding
+and the embed preview after a save, an import from dry run to "Import for real", the user base, webhook retries and
+replays (the testkit's fake app server answers the webhooks, fails on request and learns a rotated secret; the drawer
+keeps naming its event after a replay takes it out of the filter shown) and ATA proofs. They change that app's setup
+and data: run them against a scratch database.
 `LIVE_APP_ORIGIN` is the fake apps' origin (dev.sh on other ports moves it, for example `http://127.0.0.1:8743`).

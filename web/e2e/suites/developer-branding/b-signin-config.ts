@@ -52,6 +52,14 @@ export const journey: Journey = {
     await page.getByText(`Stored version ${v0}`).waitFor({ timeout: 20_000 });
     const methods = page.getByRole("list", { name: "Sign-in methods, in the order they are shown" });
 
+    // Flows (UNDERSTANDING.md "Flows" and "developer.teamofsilicons.com", edited 2026-10-07): "An app can make its own
+    // flows. A flow decides which pages a Carbon goes through while signing in, in what order, and which details are
+    // asked on which page", and the developer platform lets the owner "build the app's flows".
+    const tabNames = (await page.getByRole("tab").allInnerTexts()).map(name => name.replace(/\s+/g, " ").trim());
+    const sections = (await page.getByRole("tabpanel").getByRole("heading").allInnerTexts()).map(name => name.replace(/\s+/g, " ").trim());
+    const configFields = Object.keys(before.signin_config);
+    results.check("the owner can build the app's flows: which pages a Carbon goes through, in what order, and which details are asked on which page (UNDERSTANDING.md \"Flows\")", tabNames.some(name => /\bflows?\b/i.test(name)) || sections.some(name => /\bflows?\b/i.test(name)) || configFields.some(field => /flow|pages|steps/i.test(field)), `tabs: ${tabNames.join(", ")}; Sign-in tab sections: ${sections.join(", ")}; stored sign-in setup fields: ${configFields.join(", ")}`);
+
     // Ten changes in one draft.
     const title = `Space Station ${t}`;
     const subtitle = `Telemetry for every Silicon, run ${t}.`;
@@ -223,8 +231,21 @@ export const journey: Journey = {
     const linkFields = badLinks.body.error?.details?.fields ?? {};
     results.check("javascript: and plain http links for terms and privacy are refused (422, per field)", badLinks.status === 422 && !!linkFields["copy.terms_url"] && !!linkFields["copy.privacy_url"], JSON.stringify(linkFields));
 
-    // The texts back to what they were (the next run starts from the seeded setup again).
-    await asSession(page, env, "PATCH", `/v1/apps/${APP}/signin-config`, { copy: { title: c0.copy.title, subtitle: c0.copy.subtitle } });
+    // Limits, at the boundary: 50 redirect URIs and 50 allowed origins pass, 51 are refused with the limit; an origin
+    // is only an origin (no path), and a refused list changes nothing.
+    const urisOf = (n: number) => Array.from({ length: n }, (_, i) => `https://dvb-${t}-${i}.example/auth/callback`);
+    const originsOf = (n: number) => Array.from({ length: n }, (_, i) => `https://dvb-${t}-${i}.example`);
+    type Refusal = { config_version?: number; error?: { details?: { fields?: Record<string, string> } } };
+    const versionBefore = (await asSession<AppDetail>(page, env, "GET", `/v1/apps/${APP}`)).body.config_version;
+    const tooManyUris = await asSession<Refusal>(page, env, "PATCH", `/v1/apps/${APP}/signin-config`, { redirect_uris: urisOf(51) });
+    const tooManyOrigins = await asSession<Refusal>(page, env, "PATCH", `/v1/apps/${APP}/signin-config`, { allowed_origins: originsOf(51) });
+    const withPath = await asSession<Refusal>(page, env, "PATCH", `/v1/apps/${APP}/signin-config`, { allowed_origins: [`https://dvb-${t}.example/app`] });
+    results.check("51 redirect URIs or 51 allowed origins are refused with the limit (422, \"at most 50 …\"), and an origin with a path is refused", tooManyUris.status === 422 && tooManyUris.body.error?.details?.fields?.redirect_uris === "at most 50 redirect URIs are allowed" && tooManyOrigins.status === 422 && tooManyOrigins.body.error?.details?.fields?.allowed_origins === "at most 50 origins are allowed" && withPath.status === 422 && !!withPath.body.error?.details?.fields?.["allowed_origins[0]"], `${tooManyUris.status} ${JSON.stringify(tooManyUris.body.error?.details?.fields)}; ${tooManyOrigins.status} ${JSON.stringify(tooManyOrigins.body.error?.details?.fields)}; ${withPath.status} ${JSON.stringify(withPath.body.error?.details?.fields)}`);
+    const fifty = await asSession<AppDetail>(page, env, "PATCH", `/v1/apps/${APP}/signin-config`, { redirect_uris: [...c0.redirect_uris, ...urisOf(50 - c0.redirect_uris.length)], allowed_origins: originsOf(50) });
+    results.check("exactly 50 redirect URIs and 50 allowed origins are accepted, as one new version", fifty.status === 200 && fifty.body.config_version === versionBefore + 1 && fifty.body.signin_config.redirect_uris.length === 50 && fifty.body.signin_config.allowed_origins.length === 50, `${fifty.status} v${fifty.body.config_version} (was v${versionBefore}), ${fifty.body.signin_config?.redirect_uris.length} URIs, ${fifty.body.signin_config?.allowed_origins.length} origins`);
+
+    // The setup back to what it was (the next run starts from the seeded setup again).
+    await asSession(page, env, "PATCH", `/v1/apps/${APP}/signin-config`, { copy: { title: c0.copy.title, subtitle: c0.copy.subtitle }, redirect_uris: c0.redirect_uris, allowed_origins: c0.allowed_origins });
     await owner.context.close();
   },
 };

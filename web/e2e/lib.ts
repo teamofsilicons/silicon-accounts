@@ -13,8 +13,8 @@
  *   E2E_ARTIFACTS [e2e/.artifacts/<base>] (report.json, report.md, shots/)   E2E_SHOTS [<artifacts>/shots]
  */
 import { execFile, spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { availableParallelism, loadavg, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, webkit, type Browser, type BrowserContext, type Cookie, type Page } from "@playwright/test";
@@ -253,6 +253,169 @@ export function sql(env: Env, query: string): Promise<string[][]> {
  */
 export async function forgetRateLimits(env: Env, ip?: string): Promise<void> {
   await sql(env, ip ? `delete from rate_limits where bucket like '%:ip:${ip.replace(/'/g, "")}'` : "delete from rate_limits where bucket like '%:ip:%'");
+}
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* Benchmarks on a shared machine                                                                                      */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+export interface BenchSlot {
+  /** False when the slot stayed taken for the whole wait and the benchmark ran without it. */
+  held: boolean;
+  waitedMs: number;
+  /** Who held the slot while this benchmark waited for it (pid, then what the holder said about itself). */
+  heldBy: string | null;
+}
+
+/** The machine's benchmark slot: .dev/locks/e2e-bench, beside the scripts' leases. */
+export const BENCH_SLOT_DIR = resolve(E2E_DIR, "../../.dev/locks/e2e-bench");
+
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/** The slot's holder ("<pid> <owner>"), or null when its directory is gone or has no owner file yet. */
+function benchSlotOwner(dir: string): string | null {
+  try {
+    return readFileSync(join(dir, "owner"), "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Takes the slot, or says why not: a live holder has it ("busy"), or a dead holder's slot was just freed. */
+function tryBenchSlot(dir: string, owner: string): "taken" | "busy" | "freed" {
+  try {
+    mkdirSync(dir);
+    writeFileSync(join(dir, "owner"), `${process.pid} ${owner}\n`);
+    return "taken";
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  }
+  const holder = benchSlotOwner(dir);
+  const pid = Number(holder?.split(" ")[0]);
+  let stale = holder ? Number.isInteger(pid) && pid > 0 && !processAlive(pid) : false;
+  if (!holder) {
+    // No owner file: a holder that died between mkdir and writing it, or a live one about to (given 30 s).
+    try {
+      stale = Date.now() - statSync(dir).mtimeMs > 30_000;
+    } catch {
+      return "freed";
+    }
+  }
+  if (!stale) return "busy";
+  // Rename first: of several runs taking over the same dead slot, only one rename succeeds.
+  const grave = `${dir}.stale.${process.pid}`;
+  try {
+    renameSync(dir, grave);
+    rmSync(grave, { recursive: true, force: true });
+  } catch {
+    // Another run took it over first.
+  }
+  return "freed";
+}
+
+/**
+ * Runs `body` holding the machine's one benchmark slot (BENCH_SLOT_DIR, made with mkdir, which is atomic; the slot of
+ * a holder that died is taken over), so two stacks never time their endpoints at the same moment. scripts/e2e-all.sh
+ * walks every suite in Chromium and WebKit side by side, so without it a suite's latency benchmark runs at the very
+ * moment its twin's does, and each loads the machine for the other. Waits up to `waitMs` (E2E_BENCH_SLOT_WAIT_MS,
+ * default 6 minutes) for the slot, then runs without it and says so in `slot.held`. `owner` names the holder for
+ * whoever waits (e.g. "9650 chromium proofs-perf-latency-verify"); `dir` is for tests.
+ */
+export async function withBenchSlot<T>(owner: string, body: (slot: BenchSlot) => Promise<T>, options: { waitMs?: number; dir?: string } = {}): Promise<T> {
+  const waitMs = options.waitMs ?? Number(process.env.E2E_BENCH_SLOT_WAIT_MS ?? 360_000);
+  const dir = options.dir ?? BENCH_SLOT_DIR;
+  mkdirSync(dirname(dir), { recursive: true });
+  const started = Date.now();
+  let heldBy: string | null = null;
+  let held = false;
+  for (;;) {
+    const outcome = tryBenchSlot(dir, owner.replace(/\s+/g, " "));
+    if (outcome === "taken") {
+      held = true;
+      break;
+    }
+    if (outcome === "busy") heldBy = benchSlotOwner(dir) ?? heldBy;
+    if (Date.now() - started >= waitMs) break;
+    if (outcome === "busy") await sleep(Math.min(1000, Math.max(0, waitMs - (Date.now() - started))));
+  }
+  const release = () => {
+    if (held && benchSlotOwner(dir)?.split(" ")[0] === String(process.pid)) rmSync(dir, { recursive: true, force: true });
+    held = false;
+  };
+  process.once("exit", release);
+  try {
+    return await body({ held, waitedMs: Date.now() - started, heldBy });
+  } finally {
+    release();
+    process.removeListener("exit", release);
+  }
+}
+
+export interface Calm {
+  /** The load average came down to the core count within the wait. */
+  calm: boolean;
+  waitedMs: number;
+  /** The 1-minute load average when the wait ended, and the machine's cores. */
+  load: number;
+  cores: number;
+}
+
+/**
+ * Waits up to `maxMs` until the machine's 1-minute load average is at most its number of cores (the other stacks'
+ * walks and builds are over or pausing), checking every 5 seconds; returns what it saw and never throws. For timings
+ * that are only worth taking on a machine with room to spare: other stacks' browsers, builds and benchmarks slow every
+ * request of this one, whatever its endpoints do.
+ */
+export async function waitForCalm(maxMs: number): Promise<Calm> {
+  const cores = availableParallelism();
+  const started = Date.now();
+  for (;;) {
+    const load = Math.round((loadavg()[0] ?? 0) * 100) / 100;
+    const waitedMs = Date.now() - started;
+    if (load <= cores) return { calm: true, waitedMs, load, cores };
+    if (waitedMs >= maxMs) return { calm: false, waitedMs, load, cores };
+    await sleep(Math.min(5000, maxMs - waitedMs));
+  }
+}
+
+/** A stall of this process this long is not load but a machine that was not running (asleep, or the process stopped). */
+export const FROZEN_STALL_MS = 5_000;
+
+/**
+ * Watches this process while a benchmark measures, with a timer due every `everyMs`: `stop()` returns the longest time
+ * the timer fired late (the stretch since its last tick included), in milliseconds, by the monotonic or the wall
+ * clock, whichever saw more. A loaded machine delays it by milliseconds; a stall of seconds (FROZEN_STALL_MS) means
+ * nothing ran: macOS puts the whole machine to sleep with every stack still up (on battery it sleeps for about 15
+ * minutes between short maintenance wakes), and a request in flight then "takes" 900 s, keep-alive connections are
+ * reset at wake, and a run's throughput reads 2 req/s. Such a run measured the sleep, not the endpoint.
+ */
+export function watchStalls(everyMs = 50): { stop: () => number } {
+  let lastMono = performance.now();
+  let lastWall = Date.now();
+  let longest = 0;
+  const tick = () => {
+    const mono = performance.now();
+    const wall = Date.now();
+    longest = Math.max(longest, mono - lastMono - everyMs, wall - lastWall - everyMs);
+    lastMono = mono;
+    lastWall = wall;
+  };
+  const timer = setInterval(tick, everyMs);
+  timer.unref();
+  return {
+    stop() {
+      clearInterval(timer);
+      tick();
+      return Math.max(0, longest);
+    },
+  };
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */

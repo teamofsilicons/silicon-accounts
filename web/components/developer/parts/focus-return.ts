@@ -28,6 +28,15 @@ export function useFocusMemory(): void {
   }, []);
 }
 
+/**
+ * A part the Carbon worked in has just left the page in favour of `to` (a secret's replace field closing back to its
+ * Replace button after a save or Discard): when the last place they worked in was inside it (`within`, asked of the
+ * detached element, whose own ancestors are still attached to it), focus comes back to `to` instead of the panel.
+ */
+export function moveFocusMemory(within: (element: HTMLElement) => boolean, to: HTMLElement | null): void {
+  if (last && to && !last.isConnected && within(last)) last = to;
+}
+
 /** The tab's panel: the place to land when nothing better is left. */
 export const activeTabPanel = () => document.querySelector<HTMLElement>("[role='tabpanel'][data-state='active']");
 

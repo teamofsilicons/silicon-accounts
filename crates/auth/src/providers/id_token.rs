@@ -250,12 +250,12 @@ pub fn parse_jwks(value: &serde_json::Value) -> Result<JwkSet, String> {
 }
 
 async fn fetch(http: &reqwest::Client, url: &str) -> Result<CachedKeys, IdTokenError> {
-    let response = http
-        .get(url)
-        .header(reqwest::header::ACCEPT, "application/json")
-        .send()
-        .await
-        .map_err(|e| IdTokenError::Jwks(format!("GET {url} failed ({})", without_url(&e))))?;
+    let response = super::send(http, &format!("JWKS fetch {url}"), |http| {
+        http.get(url)
+            .header(reqwest::header::ACCEPT, "application/json")
+    })
+    .await
+    .map_err(|e| IdTokenError::Jwks(format!("GET {url} failed ({e})")))?;
     let status = response.status();
     if !status.is_success() {
         return Err(IdTokenError::Jwks(format!(
@@ -266,7 +266,7 @@ async fn fetch(http: &reqwest::Client, url: &str) -> Result<CachedKeys, IdTokenE
     let value: serde_json::Value = response.json().await.map_err(|e| {
         IdTokenError::Jwks(format!(
             "GET {url} did not return JSON ({})",
-            without_url(&e)
+            super::describe_error(&e)
         ))
     })?;
     let keys = parse_jwks(&value).map_err(|m| IdTokenError::Jwks(format!("GET {url}: {m}")))?;
@@ -275,14 +275,6 @@ async fn fetch(http: &reqwest::Client, url: &str) -> Result<CachedKeys, IdTokenE
         fetched_at: Instant::now(),
         ttl,
     })
-}
-
-fn without_url(e: &reqwest::Error) -> String {
-    let mut e = e.to_string();
-    if let Some(i) = e.find(" for url (") {
-        e.truncate(i);
-    }
-    e
 }
 
 /// The key set at `url` (cached; `refresh` refetches unless it was fetched moments ago).

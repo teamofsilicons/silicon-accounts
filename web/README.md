@@ -195,6 +195,16 @@ follows it without knowing about branding, and nothing leaks out. `resolveBrandT
 painted theme (a forced light/dark, else the visitor's). Fonts load lazily (`loadBrandingFonts`, Fontsource files
 bundled with the site). `brandingContrastIssues()` checks text against the 4.5:1 minimum the server enforces.
 
+The server holds only two pairs to 4.5:1 (button text on the primary, text on the page), so the runtime keeps the
+colours it derives from the primary readable itself: `--accent-ink` (links, and the words of soft and outline buttons)
+reads at 4.5:1 on the page, the card and the tint a soft or hovered outline button lays under it, and `--accent-line`
+(an outline button's edge) at 3:1 on the page and the card. Each is the theme's usual colour (light: the primary;
+dark: the primary half-way to the text colour) whenever that already reads, so those palettes look exactly as chosen;
+otherwise it moves toward the text colour in 5 % steps just far enough (`legibleTint`, judged in OKLab as the styles
+mix). pixel-studio's #E5007E on its #FFF5FA page (4.25:1) becomes #C40F6D (5.42:1) on outline buttons, and a primary
+equal to the page colour no longer leaves the main action's words invisible. The hosted pages do the same for
+`danger` (`components/auth/flow/legible.ts`).
+
 `<PoweredBy>` ("Powered by Silicon Accounts", linking to account.teamofsilicons.com) renders outside the scope with
 its own fixed palette, so an app can neither restyle nor hide it.
 
@@ -206,10 +216,12 @@ its own fixed palette, so an app can neither restyle nor hide it.
 `handleCallback`; a script tag with `data-app-id` and `data-redirect-uri` renders the buttons by itself.
 `sdk/methods.ts` (labels, marks, ordering) is shared with the embed page.
 
-The SDK and the embed page both read `GET /v1/apps/{app_id}/public` and try a fetch the browser cut off twice more
-(after 0.5 s and 1.5 s) before they report that Silicon Accounts could not be reached: Safari cancels a page's and its
-frames' requests as soon as the page starts navigating away (before `pagehide`), which used to log a false
-`network_error` on the app's console whenever someone clicked sign-in while the buttons were still loading.
+The SDK and the embed page both read `GET /v1/apps/{app_id}/public` and try a read the browser cut off twice more
+(after 0.5 s and 1.5 s) before they report a problem: Safari cancels a page's and its frames' requests as soon as the
+page starts navigating away (before `pagehide`), which used to log a false error on the app's console whenever
+someone clicked sign-in while the buttons were still loading. The cut can come before the answer (the fetch rejects:
+`network_error`) or after its headers, while the body is still on its way (the status says 200, reading the body
+fails: it used to read "could not be loaded (HTTP 200)"); both are tried again.
 
 ## Arc UI
 
@@ -253,11 +265,18 @@ All edits are of four kinds, and keep Arc's look and motion:
 | avatar-group, lib/media, blocks/sign-in | wording only: the group's default label is "Members"; sample people and a comment use the site's vocabulary |
 | switch, segmented-control, timeline, inline-edit | keyboard focus (web-account fix round): an off switch's track takes the hover fill and an inner accent edge, an on track's fill deepens a step; the selected segment's highlight takes an accent edge (another segment, the hover ink and a soft fill); a timeline row's button and inline-edit's text take their hover fill on every device |
 | date-picker, user-menu | keyboard focus (integration round): the date picker's trigger edge takes the text colour, as inputs do; the user menu's trigger takes its hover fill and an inner edge |
-| combobox | behaviour: focus alone no longer opens the list (typing, ArrowDown/ArrowUp or a click do), the list closes when focus leaves the field, and the listbox is `tabIndex={-1}` (no Tab stop). The hosted pages' `ComboboxField` wrapper and the account editors' "focus the panel first" workaround are gone |
+| combobox | behaviour: focus alone no longer opens the list (typing, ArrowDown/ArrowUp or a click do), the list closes when focus leaves the field, and the listbox is `tabIndex={-1}` (no Tab stop). The hosted pages' `ComboboxField` wrapper and the account editors' "focus the panel first" workaround are gone. Keyboard focus (web-auth fix round): the clear button takes its hover fill and ink with an inner edge (its ring was `--focus-ring`, transparent site-wide, so Tab to it changed nothing) |
 | dialog, drawer, bottom-sheet, popover | behaviour: Escape inside the layer goes first to an open Combobox list, DatePicker calendar, InlineEdit being edited or ConfirmMorph question, and only the next Escape closes the layer (`components/arc/lib/escape.ts`: each layer passes its `onEscapeKeyDown` through `layerEscape` and marks its panel `data-escape-layer`). The account area's `parts/escape.ts` spread is gone |
 | phone-input | behaviour: a whole international number typed after "+" (which opens the country search) moves into the number field under its country once it has more digits than a calling code ("+1 202 5…" → United States, 202 5…) |
 | timeline | behaviour: only rows newer than every row shown are fresh (slide in, announced as "New update: …"); older rows added below by "Show older" join quietly |
 | otp-input | the field never grows past its container (`minmax(0, 1fr)`, `min-width: 0` on the row), so six cells shrink at 320 px instead of sticking out |
+| tabs, sortable-data-table, filter-toolbar, file-dropzone, pagination, dropdown-menu, stepper, command-palette, inline-edit, tag-input, checkbox, alert | keyboard focus (web-developer fix round): every focus style Arc drew as a ring in the transparent `--focus-ring` (or never drew) is a fill or an edge: the selected tab's highlight takes an accent edge and another tab a soft fill; a focused tab panel an accent edge along its top; a sort header deepens its fill over an accent edge (on phones the sort pill takes a fill and an edge); a row's select box its hit area's fill; Add filter's surface, the dropzone, pagination, the menu trigger, the palette's buttons, inline-edit's Save, Cancel and Retry, a checkbox's hit area and an alert's Dismiss their hover look; a stepper head underlines its label and edges its disc |
+| tabs | behaviour: a strip that starts to overflow (the window narrows, a tablet turns) scrolls the selected tab into view; before, only choosing a tab did, so a narrowed developer page showed its tab cut off or off the strip |
+| json-viewer | a row is named by what it shows, in order (WCAG 2.5.3): "key: value", "key, 16 keys, object" for an open branch, and a closed object's key preview after its key ("key: id, name, …, 5 keys, object"); the parts of a row are separated by spaces in the text too, so its words never run together |
+| avatar | the initials (no photo, or while it loads) are drawn by `::before` from `data-initials`, not written as text: they are part of a picture whose name is the whole name, and as text they counted as words of every link or button holding the avatar, so a tile of an app without a logo failed WCAG 2.5.3 on two letters its name lacked |
+| hold-to-confirm | the fill's copy of the label (aria-hidden, clipped away at rest) is drawn by `::before` from `data-text`: as text it doubled the button's words ("Hold to delete your accountHold to delete your account"), which failed WCAG 2.5.3 against its name |
+| command-palette | behaviour: results are not Tab stops (the search field drives them through aria-activedescendant, the arrow keys and Enter); a broken selector had left "No matching actions" unstyled |
+| sortable-data-table, file-dropzone, tabs | squircle: the sort button (no radius in its header cell, a pill on phones), the dropzone's paper sheets and the tab triggers (native only, `data-sq-native`: the sheets draw their lines with `::before`/`::after`, the triggers paint only the focus fill) |
 
 ## Style guide and screens
 
@@ -326,8 +345,11 @@ https Iris is covered by `https:` already). `sdk/build.mjs` writes `public/sdk/v
 - `.screens/`, `public/sdk/`, `.next/`, `.next-*/` (and their `.next-*.tsconfig.json`) are build output and
   git-ignored.
 - `agentRules: false` (next.config.ts): `next dev` never rewrites `AGENTS.md` / `CLAUDE.md`; both are kept by hand.
-- Checks: `pnpm checks:auth [--base URL | --live URL]` and `pnpm checks:developer --live URL` run the areas' Playwright
-  checks (components/auth/checks.ts, components/developer/checks.ts; the live ones need a scratch database).
+- Checks: `pnpm checks:auth [--base URL | --live URL]`, `pnpm checks:developer --live URL` and
+  `pnpm checks:account --live URL [--webkit]` run the areas' Playwright checks (components/auth/checks.ts,
+  components/developer/checks.ts, components/account/checks.ts; the live ones need a scratch database; the account
+  checks sign up Carbons of their own through /sign-in, so they need the API's dev outbox, as scripts/dev.sh and
+  scripts/e2e.sh stacks have it).
 
 ### Integration round: shared changes (2026-10-07)
 
@@ -361,3 +383,20 @@ Every shared-foundation request from the area builders, resolved in the shared c
 - **Split layout** (`<BrandAside>`, styles/branding.css): the app's side renders its content in a sticky
   `.sa-brand-aside-inner` at most one viewport tall, so on long steps (setting up, what is shared) the logo stays at the
   top and the hero copy at the foot of the screen instead of scrolling away below the fold.
+
+### Fix round: shared changes (web-developer, 2026-10-07)
+
+- **Branding runtime** (`lib/branding/apply.ts`, `contrast.ts`, `styles/branding.css`): `--accent-ink` and the new
+  `--accent-line` stay readable on any palette (see Branding runtime); an outline button's edge uses `--accent-line`.
+- **Shell**: while the shell is up, `html` has `scroll-padding-block` of 24 px at the top and the height of the dock
+  (plus room) at the bottom, so Tab never leaves a control under the floating dock or the phone bar (WCAG 2.4.11), nor
+  an edge drawn just above a focused part (a tab panel's accent line) above the window; the phone bar's section button
+  (`.menuButton`, "Identity" on the home page) shows keyboard focus with a deeper accent tint and an accent edge.
+- **Identity card** (`components/foundation/identity`): at rest on its front, the back face is `visibility: hidden`
+  (as the front already was at rest on its back). WebKit's software painting, which its screenshots use, ignores
+  `backface-visibility` and drew the back mirrored over the front, so the WebKit walk saw no keyboard focus on the
+  front's controls.
+- **Arc**: keyboard focus in fills and edges across the components that drew transparent rings, tabs that keep the
+  selected tab in view when the strip narrows, label-in-name fixes (json-viewer rows, avatar initials and the
+  hold-to-confirm fill drawn instead of written), squircles on the sort button, the dropzone sheets and tab triggers
+  (see Local edits).

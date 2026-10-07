@@ -30,6 +30,10 @@ async fn up_to_ten_emails_with_one_primary() {
         .expect_err("limit");
     assert_eq!(err.code, "email_limit_reached");
     assert_eq!(err.status.as_u16(), 422);
+    assert_eq!(
+        err.hint.as_deref(),
+        Some("Remove an email you no longer use, then add the new one.")
+    );
     let err =
         contacts::add_verified_email(&mut conn, &c.uuid, "e11@example.test", VerifiedVia::Code)
             .await
@@ -94,6 +98,13 @@ async fn an_email_belongs_to_one_account_only() {
         .expect_err("in use");
     assert_eq!(err.code, "email_in_use");
     assert_eq!(err.status.as_u16(), 409);
+    // "An email", never "A email" (the account site shows this hint as typed).
+    assert_eq!(
+        err.hint.as_deref(),
+        Some(
+            "An email can only belong to one account. Sign in with it to use that account, or add a different email."
+        )
+    );
     let err =
         contacts::add_verified_email(&mut conn, &b.uuid, "a@example.test", VerifiedVia::Google)
             .await
@@ -131,6 +142,12 @@ async fn phones_follow_the_same_rules() {
         .await
         .expect_err("in use");
     assert_eq!(err.code, "phone_in_use");
+    assert_eq!(
+        err.hint.as_deref(),
+        Some(
+            "A phone number can only belong to one account. Sign in with it to use that account, or add a different phone number."
+        )
+    );
     let p = contacts::primary_phone(&mut conn, &c.uuid)
         .await
         .expect("q")

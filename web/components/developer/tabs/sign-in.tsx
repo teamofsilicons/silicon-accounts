@@ -153,7 +153,7 @@ export function SignInTab() {
               value={draft.google.mode}
               onValueChange={value => {
                 editor.edit("google.mode", value);
-                if (value === "managed") editor.setSecrets({ googleSecret: "" });
+                if (value === "managed") editor.setSecrets({ googleSecret: "", googleReplace: false });
               }}
               options={providerModes.google}
               minColumnWidth={260}
@@ -176,8 +176,10 @@ export function SignInTab() {
                     stored={view.stored.google}
                     value={view.secrets.googleSecret}
                     onValueChange={value => editor.setSecrets({ googleSecret: value })}
+                    replacing={view.secrets.googleReplace}
+                    onReplacingChange={replacing => editor.setSecrets(replacing ? { googleReplace: true } : { googleReplace: false, googleSecret: "" })}
                     remove={view.secrets.googleRemove}
-                    onRemoveChange={remove => editor.setSecrets({ googleRemove: remove, googleSecret: "" })}
+                    onRemoveChange={remove => editor.setSecrets({ googleRemove: remove, googleSecret: "", googleReplace: false })}
                     placeholder="GOCSPX-…"
                     error={error("google.client_secret")}
                   />
@@ -198,7 +200,7 @@ export function SignInTab() {
               value={draft.apple.mode}
               onValueChange={value => {
                 editor.edit("apple.mode", value);
-                if (value === "managed") editor.setSecrets({ appleKey: "" });
+                if (value === "managed") editor.setSecrets({ appleKey: "", appleReplace: false });
               }}
               options={providerModes.apple}
               minColumnWidth={260}
@@ -227,8 +229,10 @@ export function SignInTab() {
                   stored={view.stored.apple}
                   value={view.secrets.appleKey}
                   onValueChange={value => editor.setSecrets({ appleKey: value })}
+                  replacing={view.secrets.appleReplace}
+                  onReplacingChange={replacing => editor.setSecrets(replacing ? { appleReplace: true } : { appleReplace: false, appleKey: "" })}
                   remove={view.secrets.appleRemove}
-                  onRemoveChange={remove => editor.setSecrets({ appleRemove: remove, appleKey: "" })}
+                  onRemoveChange={remove => editor.setSecrets({ appleRemove: remove, appleKey: "", appleReplace: false })}
                   placeholder={"-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----"}
                   multiline
                   error={error("apple.private_key")}

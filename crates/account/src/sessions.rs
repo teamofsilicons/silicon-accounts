@@ -59,11 +59,106 @@ pub(crate) struct SessionView {
     current: bool,
 }
 
-/// A short description of a browser from its user agent ("Safari on macOS").
+/// The product token of the accounts CLI's user agent (`accounts-cli/<v> silicon-accounts-client/<v>`).
+const CLI_PRODUCT: &str = "accounts-cli";
+/// The product token the Rust package adds to every user agent, after the program's own when it
+/// names one (`<program> silicon-accounts-client/<v>`).
+const PACKAGE_PRODUCT: &str = "silicon-accounts-client";
+
+/// One `name/version` product token of a user agent.
+struct Product<'a> {
+    name: &'a str,
+    version: Option<&'a str>,
+}
+
+impl Product<'_> {
+    /// "curl 8.4.0", clipped so a made-up user agent can't flood the page.
+    fn describe(&self) -> String {
+        match self.version {
+            Some(v) => format!("{} {}", clip(self.name, 40), clip(v, 24)),
+            None => clip(self.name, 40),
+        }
+    }
+}
+
+/// RFC 9110 `token` characters.
+fn is_token(s: &str) -> bool {
+    !s.is_empty()
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b))
+}
+
+/// The product tokens of a user agent, in order, skipping (comments) and anything that isn't a
+/// token.
+fn products(ua: &str) -> Vec<Product<'_>> {
+    let mut out = Vec::new();
+    let mut depth = 0usize;
+    for word in ua.split_whitespace() {
+        let opens = word.matches('(').count();
+        let closes = word.matches(')').count();
+        let inside = depth > 0 || opens > 0;
+        depth = (depth + opens).saturating_sub(closes);
+        if inside {
+            continue;
+        }
+        let (name, version) = match word.split_once('/') {
+            Some((name, version)) => (name, Some(version)),
+            None => (word, None),
+        };
+        if is_token(name) && version.is_none_or(is_token) {
+            out.push(Product { name, version });
+        }
+    }
+    out
+}
+
+/// A short description of the client behind a user agent, as sign-in history and the session
+/// list name it:
+///
+/// | user agent | described as |
+/// |---|---|
+/// | a browser's (`Mozilla/5.0 (Macintosh; …) … Version/17.0 Safari/605.1.15`) | `Safari on macOS` |
+/// | the accounts CLI's (`accounts-cli/0.1.0 silicon-accounts-client/0.1.0`) | `accounts CLI 0.1.0` |
+/// | the Rust package's (`silicon-accounts-client/0.1.0`) | `Silicon Accounts Rust package 0.1.0` |
+/// | a program using the package (`dm/2.0 silicon-accounts-client/0.1.0`) | `dm 2.0 (Silicon Accounts Rust package 0.1.0)` |
+/// | any other program's (`curl/8.4.0`, `python-requests/2.31.0`) | its product: `curl 8.4.0` |
+/// | nothing readable | `An unknown client` |
+///
+/// Only a user agent that presents itself as a browser (`Mozilla/…`, `Opera/…`) is called one;
+/// such a browser this doesn't know is `A browser` (with its system when that is known).
 pub(crate) fn describe_user_agent(ua: &str) -> Option<String> {
-    let u = ua.to_ascii_lowercase();
-    if u.is_empty() {
+    let ua = ua.trim();
+    if ua.is_empty() {
         return None;
+    }
+    let products = products(ua);
+    let find = |name: &str| {
+        products
+            .iter()
+            .position(|p| p.name.eq_ignore_ascii_case(name))
+    };
+    let named = |what: &str, p: &Product<'_>| match p.version {
+        Some(v) => format!("{what} {}", clip(v, 24)),
+        None => what.to_string(),
+    };
+    if let Some(i) = find(CLI_PRODUCT) {
+        return Some(named("accounts CLI", &products[i]));
+    }
+    if let Some(i) = find(PACKAGE_PRODUCT) {
+        let package = named("Silicon Accounts Rust package", &products[i]);
+        return Some(match products[..i].first() {
+            Some(program) => format!("{} ({package})", program.describe()),
+            None => package,
+        });
+    }
+    let u = ua.to_ascii_lowercase();
+    if !(u.starts_with("mozilla/") || u.starts_with("opera/")) {
+        return Some(
+            products
+                .first()
+                .map(Product::describe)
+                .unwrap_or_else(|| "An unknown client".to_string()),
+        );
     }
     let browser = if u.contains("edg/") {
         "Edge"
@@ -75,8 +170,6 @@ pub(crate) fn describe_user_agent(ua: &str) -> Option<String> {
         "Chrome"
     } else if u.contains("safari/") {
         "Safari"
-    } else if u.starts_with("curl/") {
-        "curl"
     } else {
         "A browser"
     };
@@ -286,7 +379,95 @@ mod tests {
             describe_user_agent("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0 Mobile/15E148 Safari/604.1").as_deref(),
             Some("Chrome on iOS")
         );
-        assert_eq!(describe_user_agent("curl/8.4.0").as_deref(), Some("curl"));
         assert_eq!(describe_user_agent(""), None);
+        assert_eq!(describe_user_agent("   "), None);
+    }
+
+    /// The accounts CLI and the Rust package sign in too, and they are not browsers: their
+    /// sign-ins once read "from 127.0.0.1 · A browser" in the account's history.
+    #[test]
+    fn the_cli_and_the_package_are_named_not_called_browsers() {
+        assert_eq!(
+            describe_user_agent("accounts-cli/0.1.0 silicon-accounts-client/0.1.0").as_deref(),
+            Some("accounts CLI 0.1.0")
+        );
+        assert_eq!(
+            describe_user_agent("accounts-cli/2.3.4").as_deref(),
+            Some("accounts CLI 2.3.4")
+        );
+        assert_eq!(
+            describe_user_agent("silicon-accounts-client/0.1.0").as_deref(),
+            Some("Silicon Accounts Rust package 0.1.0")
+        );
+        assert_eq!(
+            describe_user_agent("dm/2.0 silicon-accounts-client/0.1.0").as_deref(),
+            Some("dm 2.0 (Silicon Accounts Rust package 0.1.0)")
+        );
+        assert_eq!(
+            describe_user_agent("scout (+https://scout.example) silicon-accounts-client/0.1.0")
+                .as_deref(),
+            Some("scout (Silicon Accounts Rust package 0.1.0)")
+        );
+    }
+
+    #[test]
+    fn other_programs_are_named_by_their_product() {
+        assert_eq!(
+            describe_user_agent("curl/8.4.0").as_deref(),
+            Some("curl 8.4.0")
+        );
+        assert_eq!(
+            describe_user_agent("python-requests/2.31.0").as_deref(),
+            Some("python-requests 2.31.0")
+        );
+        assert_eq!(describe_user_agent("node").as_deref(), Some("node"));
+        assert_eq!(
+            describe_user_agent("Go-http-client/1.1").as_deref(),
+            Some("Go-http-client 1.1")
+        );
+        // Comments are skipped; something with no product at all is unknown, not a browser.
+        assert_eq!(
+            describe_user_agent("Dalvik/2.1.0 (Linux; U; Android 13; Pixel 7)").as_deref(),
+            Some("Dalvik 2.1.0")
+        );
+        assert_eq!(
+            describe_user_agent("(compatible; nothing)").as_deref(),
+            Some("An unknown client")
+        );
+        assert_eq!(
+            describe_user_agent("<script>/1").as_deref(),
+            Some("An unknown client")
+        );
+        // A made-up product can't flood the page.
+        let long = format!("{}/{}", "x".repeat(300), "9".repeat(300));
+        let said = describe_user_agent(&long).expect("described");
+        assert!(said.chars().count() <= 70, "{said}");
+        for ua in [
+            "accounts-cli/0.1.0 silicon-accounts-client/0.1.0",
+            "silicon-accounts-client/0.1.0",
+            "curl/8.4.0",
+            "node",
+            "(compatible; nothing)",
+        ] {
+            assert!(
+                !describe_user_agent(ua)
+                    .unwrap_or_default()
+                    .contains("browser"),
+                "{ua}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_browser_this_does_not_know_is_still_a_browser() {
+        assert_eq!(
+            describe_user_agent("Mozilla/5.0 (X11; Linux x86_64) SomeEngine/1.0").as_deref(),
+            Some("A browser on Linux")
+        );
+        assert_eq!(
+            describe_user_agent("Opera/9.80 (Windows NT 6.1) Presto/2.12.388 Version/12.16")
+                .as_deref(),
+            Some("Opera on Windows")
+        );
     }
 }

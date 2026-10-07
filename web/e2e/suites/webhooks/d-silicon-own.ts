@@ -3,8 +3,8 @@
  * within the 2 weeks, any change to its account (details, si:id, STK rotated), custodian changed (c-silicon-members),
  * set or moved by the Silicon or its custodian, removed, test pings. "Silicon webhooks are separate from app webhooks
  * but follow these same rules": signed, retried until they succeed (here: a fault, then the 72-hour window), and
- * failed deliveries can be replayed. Every Silicon gets its own sink on the fake app server (/hooks/<key>), told the
- * secret its creation or webhook change returned.
+ * failed deliveries can be replayed (here once; every replay rule is in m-silicon-replay.ts). Every Silicon gets its
+ * own sink on the fake app server (/hooks/<key>), told the secret its creation or webhook change returned.
  */
 import { randomUUID } from "node:crypto";
 import type { Ctx, Journey } from "../../context";
@@ -250,18 +250,16 @@ const delivery: Journey = {
     results.check("Silicon delivery: still failing 72 hours after it was created, it is failed for good", gaveUp?.status === "failed" && gaveUp.last_status === 503, short(gaveUp));
     await setFaults(env, sink, 0);
 
-    // UNDERSTANDING: "failed deliveries can be replayed" and Silicon webhooks "follow these same rules". The app API has
-    // GET …/webhook/deliveries and POST …/webhook/replay; a Silicon (or its custodian) needs the same for its webhook.
+    // UNDERSTANDING: "failed deliveries can be replayed" and Silicon webhooks "follow these same rules": the Silicon lists
+    // its failed deliveries and replays this one (m-silicon-replay.ts goes through every rule of it).
     const token = await siliconLogin(env, silicon.id, silicon.stk);
-    const probes = [
-      { who: "Silicon", list: await bearerCall(env, token, "GET", "/v1/me/webhook/deliveries?status=failed"), replay: await bearerCall(env, token, "POST", "/v1/me/webhook/replay", { json: { delivery_ids: [late.delivery_id] }, idempotencyKey: randomUUID() }) },
-      { who: "custodian", list: await custodian.visitor.call("GET", `/v1/me/silicons/${silicon.uuid}/webhook/deliveries?status=failed`), replay: await custodian.visitor.call("POST", `/v1/me/silicons/${silicon.uuid}/webhook/replay`, { json: { delivery_ids: [late.delivery_id] }, idempotencyKey: randomUUID() }) },
-    ];
-    const replayedEvent = await waitEvent(env, sink, { type: "silicon.updated", event_id: late.event_id }, 8_000);
+    const listed = await bearerCall<{ items?: Array<{ id: string; status: string }> }>(env, token, "GET", "/v1/me/webhook/deliveries?status=failed");
+    const replayed = await bearerCall<{ replayed?: string[] }>(env, token, "POST", "/v1/me/webhook/replay", { json: { delivery_ids: [late.delivery_id] }, idempotencyKey: randomUUID() });
+    const replayedEvent = await waitEvent(env, sink, { type: "silicon.updated", event_id: late.event_id }, 15_000);
     results.check(
-      "Silicon delivery: a failed delivery of the Silicon's webhook can be listed and replayed (by the Silicon or its custodian) and arrives with the same event_id",
-      probes.some(probe => probe.replay.status >= 200 && probe.replay.status < 300) && !!replayedEvent,
-      probes.map(probe => `${probe.who}: list ${probe.list.status}, replay ${probe.replay.status} ${short(probe.replay.body, 160)}`).join(" | ") + ` | arrived: ${!!replayedEvent}`,
+      "Silicon delivery: the Silicon lists the failed delivery (?status=failed) and replays it; it arrives with the same event_id and payload",
+      listed.status === 200 && !!listed.body.items?.some(item => item.id === late.delivery_id && item.status === "failed") && replayed.status === 200 && sameJson(replayed.body.replayed, [late.delivery_id]) && !!replayedEvent && sameJson(replayedEvent.payload, late.payload),
+      `list ${listed.status} (${listed.body.items?.length ?? "?"} failed), replay ${replayed.status} ${short(replayed.body, 200)}, arrived: ${!!replayedEvent}`,
     );
 
     // ---- test pings: a newer ping supersedes a failing one ------------------------------------------------------------

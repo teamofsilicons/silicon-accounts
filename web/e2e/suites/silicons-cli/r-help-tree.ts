@@ -26,7 +26,15 @@ export const journey: Journey = {
     const absent = commands.filter(entry => !new RegExp(`\\n {2,}${pathOf(entry.command).join(" ").replace(/[-]/g, "\\-")}( |\\n)`).test(root.stdout));
     results.check("…down to the nested commands, each with its full path (e.g. silicon request status, app webhook replay)", absent.length === 0 && root.stdout.includes("silicon request status <REQUEST_ID>") && root.stdout.includes("app webhook replay"), short(absent.map(entry => entry.command)));
     results.check("…the bundled docs topics", TOPICS.every(topic => root.stdout.includes(`  ${topic}`)), short(TOPICS.filter(topic => !root.stdout.includes(topic))));
-    results.check("…environment (ACCOUNTS_URL, ACCOUNTS_HOME, SILICON_HOME, ACCOUNTS_STK…), exit codes and links (docs, GitHub, the Rust package)", ["Environment:", "ACCOUNTS_URL", "ACCOUNTS_HOME", "SILICON_HOME", "ACCOUNTS_STK", "Exit codes:", "3 sign-in required or refused", "https://account.teamofsilicons.com/docs", "https://github.com/teamofsilicons/silicon-accounts", "silicon-accounts-client"].every(text => root.stdout.includes(text)), "");
+    results.check("…environment (ACCOUNTS_URL, ACCOUNTS_HOME, SILICON_HOME, ACCOUNTS_STK…), exit codes and links (docs, GitHub, the Rust package)", ["Environment:", "ACCOUNTS_URL", "ACCOUNTS_HOME", "SILICON_HOME", "ACCOUNTS_STK", "Exit codes:", "3 sign-in required or refused", "Docs ", "/docs", "https://github.com/teamofsilicons/silicon-accounts", "silicon-accounts-client"].every(text => root.stdout.includes(text)), "");
+    // UNDERSTANDING.md: "the service and the account site at `accounts.teamofsilicons.com`" (it was account.… before).
+    const defaultUrl = await local(["config", "get", "url", "--json"]);
+    const siteLinks = [...new Set(root.stdout.match(/https?:\/\/[a-z.]*teamofsilicons\.com[^\s\])]*/g) ?? [])];
+    results.check(
+      "the CLI talks to and links the account site where UNDERSTANDING.md puts it: https://accounts.teamofsilicons.com (default URL, docs link)",
+      defaultUrl.json?.value === "https://accounts.teamofsilicons.com" && defaultUrl.json?.source === "default" && root.stdout.includes("https://accounts.teamofsilicons.com/docs") && !/\baccount\.teamofsilicons\.com/.test(root.stdout),
+      `default url ${short(defaultUrl.json)}; links in --help: ${short(siteLinks)}`,
+    );
     results.check("…and that updates belong to Silicon Apps (the CLI never updates itself)", root.stdout.includes("Updates are managed by Silicon Apps; this CLI never updates itself."));
     const shortHelp = await local(["-h"]);
     results.check("`-h` is the short form and points at --help for the whole tree", shortHelp.code === 0 && shortHelp.stdout.length < root.stdout.length && shortHelp.stdout.includes("Run `accounts --help` for the whole command tree"), `${shortHelp.stdout.length} vs ${root.stdout.length} chars`);

@@ -124,6 +124,9 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+/* Keyboard position (WCAG 2.4.7) in a fill and an edge, never a ring: the accent tint deepens and the edge takes the
+   accent (it had no focus style, so Tab to it changed nothing on a phone). */
+.menuButton:focus-visible { --sq-fill: color-mix(in oklab, var(--accent) 28%, transparent); --sq-stroke: var(--accent); }
 .menuButton svg:first-child { flex: none; color: var(--accent-ink); }
 .menuLabel { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menuChevron { flex: none; color: var(--text-muted); }

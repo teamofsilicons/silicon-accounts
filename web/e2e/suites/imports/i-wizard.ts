@@ -2,7 +2,8 @@
  * The import wizard on the developer pages, as legacy-crm's owner: upload → check columns (the browser names the
  * columns and shows the first rows before anything is sent) → options → a dry run → "Import for real" → the report
  * (totals, filters, a row's detail) → Recent imports; columns Silicon Accounts doesn't keep must be acknowledged;
- * a pasted file without an email or phone column can't go on; the user base then lists the imported Carbons.
+ * a pasted file without an email or phone column can't go on; a file over 50 MB is refused before anything is
+ * uploaded; the user base then lists the imported Carbons.
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,7 +14,7 @@ import { FIXTURES, fakeApp, forgetImportBudgets, lastSeq, messagesAfter, psql, r
 
 export const journey: Journey = {
   name: "imports-wizard",
-  title: "the developer page's import wizard: upload, column check, options, dry run, Import for real, report filters and row detail, Recent imports, unknown columns acknowledged, a file without identifiers stopped, the user base",
+  title: "the developer page's import wizard: upload, column check, options, dry run, Import for real, report filters and row detail, Recent imports, unknown columns acknowledged, a file without identifiers stopped, a file over 50 MB refused before upload, the user base",
   async run(ctx) {
     const dir = mkdtempSync(join(tmpdir(), "sa-e2e-wizard-"));
     try {
@@ -159,6 +160,30 @@ async function walk(ctx: Parameters<Journey["run"]>[0], dir: string): Promise<vo
   const stoppedText = (await page.locator("main").innerText()).replace(/\s+/g, " ");
   results.check("a pasted CSV without an email or phone column is stopped, saying why", stopped && /No column holds an email or phone number/.test(stoppedText) && (await page.getByRole("button", { name: "Continue to options" }).isDisabled()), stoppedText.slice(0, 300));
   await shot(env, page, "imports-wizard-09-no-identifier");
+
+  // A file over 50 MB is refused in the browser, before anything is uploaded.
+  const bigPath = join(dir, `crm-too-big-${t}.csv`);
+  const big = Buffer.alloc(51 * 1024 * 1024, 0x61);
+  big.write("email,display_name\n", 0);
+  writeFileSync(bigPath, big);
+  const importPosts: string[] = [];
+  page.on("request", request => {
+    if (request.method() === "POST" && /\/v1\/apps\/legacy-crm\/imports/.test(request.url())) importPosts.push(request.url());
+  });
+  await page.goto(`${env.site}/developer/legacy-crm/import`);
+  const bigInput = page.locator('input[type="file"]').first();
+  await bigInput.waitFor({ state: "attached", timeout: 30_000 });
+  await bigInput.setInputFiles(bigPath);
+  const said = await page.getByText(`crm-too-big-${t}.csv is 51.0 MB; an import can be at most 50 MB. Split it into several files.`).first().waitFor({ timeout: 30_000 }).then(() => true, () => false);
+  const goOn = page.getByRole("button", { name: "Continue to options" });
+  const blockedBig = (await goOn.count()) === 0 || (await goOn.isDisabled());
+  await sleep(500);
+  await shot(env, page, "imports-wizard-11-too-big");
+  results.check(
+    "a 51 MB file is refused in the browser before anything is sent (\"… is 51.0 MB; an import can be at most 50 MB. Split it into several files.\"), and the wizard can't go on",
+    said && blockedBig && importPosts.length === 0,
+    `${said ? "the reason is shown" : (await page.locator("main").innerText()).replace(/\s+/g, " ").slice(0, 300)}; continue blocked ${blockedBig}; import requests sent ${importPosts.length}`,
+  );
 
   // The user base lists them as imported.
   await page.goto(`${env.site}/developer/legacy-crm/users`);

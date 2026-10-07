@@ -424,9 +424,9 @@ export function FileDropzone({ accept, multiple = true, maxFiles = 5, onFilesCha
         {/* Three sheets fan open on hover and spread wider under a file; a folded prompt opens them again to receive it. */}
         <AnimatePresence initial={false}>{(!compact || dragging) && <motion.span key="icon" className={styles.iconSlot} {...slot}>
           <span className={styles.sheets} aria-hidden="true">
-            <span className={styles.sheet} data-sheet="back" />
-            <span className={styles.sheet} data-sheet="side" />
-            <span className={styles.sheet} data-sheet="front"><ArrowUp size={14} strokeWidth={2} /></span>
+            <span className={styles.sheet} data-sq-native="" data-sheet="back" />
+            <span className={styles.sheet} data-sq-native="" data-sheet="side" />
+            <span className={styles.sheet} data-sq-native="" data-sheet="front"><ArrowUp size={14} strokeWidth={2} /></span>
           </span>
         </motion.span>}</AnimatePresence>
         <strong className={styles.label}><TextSwap text={dragging ? dropCopy : label} className={styles.labelText} reduce={reduce} /></strong>

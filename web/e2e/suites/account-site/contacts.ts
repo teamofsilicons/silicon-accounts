@@ -6,7 +6,7 @@
 import type { Locator, Page } from "@playwright/test";
 import type { Ctx, Journey } from "../../context";
 import { api, codeFor, lastSeq, newContext, shot, signInOnSite, sleep, sql, tag, type Env } from "../../lib";
-import { appUserinfo, call, codeOf, confirmMorph, getMe, inbox, messageOf, newCarbon, probePage, randomPhone, rowByKey, rowsOf, signIntoApp, until, waitEvent } from "./_helpers";
+import { addContact, appUserinfo, call, codeOf, confirmMorph, getMe, hintOf, inbox, messageOf, newCarbon, probePage, randomPhone, rowByKey, rowsOf, signIntoApp, until, waitEvent } from "./_helpers";
 
 type Channel = "email" | "phone";
 
@@ -172,7 +172,14 @@ function contactJourney(channel: Channel): Journey {
         await section.getByRole("button", { name: "Send code" }).click();
         const taken = await until(async () => (await section.innerText()).replace(/\s+/g, " "), text => /already belongs to another account/.test(text), 8_000);
         results.check("another account's address is refused by the server, in place", taken.includes("saketdev12@example.test already belongs to another account."), taken.match(/saketdev12[^.]*\./)?.[0] ?? "no message");
+        const takenApi = await call(probe, w.route, { method: "POST", json: { email: "saketdev12@example.test" } });
+        results.check("…the API's 409 email_in_use explains it in a correct sentence (\"An email can only belong to one account\", never \"A email\")", takenApi.status === 409 && codeOf(takenApi.body) === "email_in_use" && hintOf(takenApi.body) === "An email can only belong to one account. Sign in with it to use that account, or add a different email." && !/\bA email\b/.test(taken), `${takenApi.status} ${codeOf(takenApi.body)}: ${hintOf(takenApi.body)}`);
       } else {
+        // Another Carbon holds a number (added through the API with its code), for the refusal further down.
+        const holder = await newCarbon(ctx, "acct-phone-holder");
+        const held = randomPhone();
+        const holderAdded = await addContact(env, holder.probe, "phone", held);
+        await holder.context.close();
         await openAdder(page, channel, "+1202");
         await section.getByRole("button", { name: "Send code" }).click();
         await sleep(400);
@@ -187,6 +194,13 @@ function contactJourney(channel: Channel): Journey {
         results.check("a number the numbering plan rejects is refused by the server, in place", /is not a valid phone number/.test(invalid), invalid.match(/'[^']*' is not a valid phone number[^.]*\./)?.[0] ?? "no message");
         const own = await call(probe, w.route, { method: "POST", json: { phone: values[0] } });
         results.check("the account's own number is refused by the API (409 phone_already_added)", own.status === 409 && codeOf(own.body) === "phone_already_added", `${own.status} ${codeOf(own.body)}`);
+        // A number on another Carbon's account: refused in place, and the API says why.
+        await section.getByRole("textbox", { name: "Phone number" }).fill(held);
+        await section.getByRole("button", { name: "Send code" }).click();
+        const heldText = await until(async () => (await section.innerText()).replace(/\s+/g, " "), text => /already belongs to another account/.test(text), 8_000);
+        results.check("another account's number is refused by the server, in place", holderAdded.status === 200 && /already belongs to another account\./.test(heldText) && heldText.replace(/[^0-9+]/g, "").includes(held), `${holderAdded.status}: ${heldText.match(/[^.]*already belongs to another account\.[^.]*\.?/)?.[0] ?? heldText.slice(-200)}`);
+        const heldApi = await call(probe, w.route, { method: "POST", json: { phone: held } });
+        results.check("…the API's 409 phone_in_use explains it (\"A phone number can only belong to one account…\")", heldApi.status === 409 && codeOf(heldApi.body) === "phone_in_use" && messageOf(heldApi.body) === `${held} already belongs to another account.` && hintOf(heldApi.body) === "A phone number can only belong to one account. Sign in with it to use that account, or add a different phone number.", `${heldApi.status} ${codeOf(heldApi.body)}: ${messageOf(heldApi.body)} ${hintOf(heldApi.body)}`);
       }
       await section.getByRole("button", { name: "Cancel" }).first().click();
       await sleep(400);
@@ -256,6 +270,8 @@ function contactJourney(channel: Channel): Journey {
       results.check("10 of 10: the counter, the limit said, no way to add another", (await counter(page, channel)) === `10 of 10 ${w.plural}` && atTen.includes(`You have 10 ${w.plural}, the most an account can hold. Remove one to add another.`) && (await section.getByRole("button", { name: w.add }).count()) === 0, atTen.slice(-200));
       const eleventh = await call(probe, w.route, { method: "POST", json: isEmail ? { email: fresh() } : { phone: fresh() } });
       results.check(`the 11th is refused by the API: 422 ${w.field}_limit_reached, saying the limit`, eleventh.status === 422 && codeOf(eleventh.body) === `${w.field}_limit_reached` && messageOf(eleventh.body).includes(`already has 10 ${w.plural}`), `${eleventh.status} ${codeOf(eleventh.body)}: ${messageOf(eleventh.body)}`);
+      const remove = `Remove ${isEmail ? "an email" : "a phone number"} you no longer use, then add the new one.`;
+      results.check(`…both limit refusals say what to do in a correct sentence ("${remove}")`, hintOf(eleventh.body) === remove && hintOf(vy.body) === remove, `${hintOf(eleventh.body)} / ${hintOf(vy.body)}`);
       const stored = (await getMe(probe))[isEmail ? "emails" : "phones"].length;
       results.check("the account holds exactly 10", stored === 10, String(stored));
 

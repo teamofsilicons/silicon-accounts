@@ -9,7 +9,7 @@
 .tag { position: relative; display: inline-flex; align-items: center; gap: 3px; min-height: 28px; box-sizing: border-box; --sq-r: var(--radius-pill); --sq-fill: var(--surface-muted); --sq-stroke: var(--border); border: 1px solid var(--sq-stroke); padding: 0 4px 0 9px; background: var(--sq-fill); color: var(--foreground); font-size: var(--text-sm); white-space: nowrap; cursor: default; }
 .tag button { display: grid; width: 22px; height: 22px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--text-secondary); cursor: pointer; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-spring) var(--ease-spring); }
 @media (hover: hover) and (pointer: fine) { .tag button:hover { background: var(--surface); color: var(--foreground); } }
-.tag button:focus-visible { background: var(--surface); color: var(--foreground); outline: none; box-shadow: inset 0 0 0 1.5px var(--focus-ring); }
+.tag button:focus-visible { background: var(--surface); color: var(--foreground); outline: none; box-shadow: inset 0 0 0 1.5px var(--border-strong); }
 /* Quick press, spring release. */
 .tag button:active { transform: scale(.96); transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard); }
 .content input { flex: 1 1 100px; min-width: 80px; min-height: 28px; box-sizing: border-box; border: 0; padding: 0 5px; background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-sm); }

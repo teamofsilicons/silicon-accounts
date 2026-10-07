@@ -1,11 +1,13 @@
 import type { Journey } from "../../context";
-import { forgetRateLimits, sleep, sql, tag } from "../../lib";
+import { forgetRateLimits, sql, tag } from "../../lib";
 import {
+  COUNTING_STK_ATTEMPT,
   accounts,
   asCarbon,
   cliError,
   dataOf,
   freshDir,
+  holdRows,
   idAvailable,
   loginSilicon,
   obj,
@@ -20,6 +22,7 @@ import {
   sinkUrl,
   str,
   until,
+  waitForLockWaiters,
   waitSink,
   type Json,
 } from "./_helpers";
@@ -122,14 +125,28 @@ export const journey: Journey = {
     const hookE = await waitSink(env, keyE, "silicon.custodian.expired", event => dataOf(event).request_id === e.requestId);
     results.check("E's webhook got silicon.custodian.expired", dataOf(hookE).released === true, short(hookE?.payload, 200));
 
-    // D: a sign-in with the right STK is being checked (Argon2, about a second here) while a read releases the Silicon.
+    // D: a sign-in with the right STK has read the Silicon (pending, its STK hash) when a read of its overdue request
+    // releases it, before the sign-in re-reads the Silicon after checking the STK. Made deterministic with a lock on the
+    // Silicon's row: the read (which expires the request, then waits to release the Silicon) lines up first, the sign-in
+    // (which waits to count its attempt) second; when the lock goes, the release commits first.
     await overdue(env, d.requestId);
+    const failuresBefore = Number((await sql(env, `select count(*) from signin_history where account_uuid = '${d.uuid}' and method = 'silicon_stk' and outcome = 'failed'`))[0]?.[0] ?? 0);
+    const hold = await holdRows(env, "accounts", `uuid = '${d.uuid}'`);
+    const reading = requestStatus(ctx, d.requestId, d.requestToken);
+    const first = await waitForLockWaiters(env, 1);
     const racing = siliconLogin(ctx, `si:exp-d-${t}`, stkD);
-    await sleep(150);
-    const releasedD = await requestStatus(ctx, d.requestId, d.requestToken);
+    const lined = await waitForLockWaiters(env, 2, COUNTING_STK_ATTEMPT);
+    await hold.release();
+    const releasedD = await reading;
     const loginD = await racing;
-    results.check("D's request was released by a read while its sign-in was being checked", releasedD.body.status === "expired" && obj(releasedD.body.silicon).status === "deleted", short(releasedD.body));
-    results.check("…that sign-in (the right STK) still says exactly why: 403 custodian_expired, not 401 invalid_credentials", loginD.status === 403 && str(obj(loginD.body.error).code) === "custodian_expired", `${loginD.status} ${short(loginD.body)}`);
+    results.check("D: the read of its overdue request and its sign-in both wait behind a lock on the Silicon (read first)", !!first && !!lined, short({ first, lined }, 400));
+    results.check("D's request was released by that read while its sign-in was being checked", releasedD.body.status === "expired" && obj(releasedD.body.silicon).status === "deleted", short(releasedD.body));
+    results.check("…that sign-in (the right STK) still says exactly why: 403 custodian_expired, not 401 invalid_credentials", loginD.status === 403 && str(obj(loginD.body.error).code) === "custodian_expired" && /didn't accept within 14 days/.test(str(obj(loginD.body.error).message)), `${loginD.status} ${short(loginD.body)}`);
+    // The sign-in that was told why is recorded against the Silicon (an id that was gone already is recorded with none).
+    const failuresAfter = Number((await sql(env, `select count(*) from signin_history where account_uuid = '${d.uuid}' and method = 'silicon_stk' and outcome = 'failed'`))[0]?.[0] ?? 0);
+    results.check("…and it took the late path: its failed attempt is recorded against the Silicon it checked", failuresAfter === failuresBefore + 1, `${failuresBefore} → ${failuresAfter}`);
+    const againD = await siliconLogin(ctx, `si:exp-d-${t}`, stkD);
+    results.check("…the same as the STK hears afterwards, once the id is gone", againD.status === 403 && str(obj(againD.body.error).code) === "custodian_expired", `${againD.status} ${short(againD.body)}`);
 
     const history = await asCarbon<Json>(env, carbon, "GET", "/v1/me/history?kind=custodian");
     const expired = ((obj(history.body).items ?? []) as Json[]).filter(item => /^Custodian request of si:exp-[abcde]-/.test(str(item.title)) && str(item.title).endsWith("expired"));

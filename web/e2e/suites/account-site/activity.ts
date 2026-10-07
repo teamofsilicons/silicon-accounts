@@ -5,7 +5,7 @@
  */
 import type { Page } from "@playwright/test";
 import type { Journey } from "../../context";
-import { postJson, shot, sleep } from "../../lib";
+import { api, codeFor, lastSeq, postJson, shot, sleep } from "../../lib";
 import { call, newCarbon, signIntoApp, timelineRows, timezoneLabel, until } from "./_helpers";
 
 interface Item {
@@ -33,6 +33,14 @@ const activity: Journey = {
     const { page, probe, uuid } = carbon;
     await signIntoApp(env, page, "briefcase");
     await signIntoApp(env, page, "commit");
+    // Someone else types ten wrong codes for the Carbon's email (the accounts CLI's code sign-in, from another
+    // address): the lock that follows is a failed sign-in in the Carbon's activity.
+    const sentAfter = await lastSeq(env);
+    const attempt = await api<{ challenge_id?: string }>(ctx, "/v1/cli/login/start", { method: "POST", json: { email: carbon.email } });
+    const real = await codeFor(env, carbon.email, sentAfter);
+    const wrong = real === "000000" ? "111111" : "000000";
+    const refusals: number[] = [];
+    for (let i = 0; i < 10; i++) refusals.push((await api(ctx, "/v1/cli/login/verify", { method: "POST", json: { challenge_id: attempt.body.challenge_id, code: wrong } })).status);
     const newId = `${carbon.id}-v2`;
     const changed = await call(probe, "/v1/me/id", { method: "POST", json: { id: newId } });
     const issued = (await postJson<{ body?: { proof_id?: string } }>(`${env.apps}/briefcase/actions/issue-obo`, { uuid, receiving_app: "commit", scopes: ["files.read"] })).body.body?.proof_id ?? "";
@@ -54,6 +62,8 @@ const activity: Journey = {
     const kinds = new Set(all.map(item => item.kind));
     results.check("the API history has every kind this account did (signin, id_change, proof, app_access, security)", ["signin", "id_change", "proof", "app_access", "security"].every(kind => kinds.has(kind)) && all.length > 60, `${all.length} entries; ${[...kinds].join(", ")}`);
     results.check("…and its pages hold each entry once", new Set(all.map(item => item.id)).size === all.length);
+    const failed = all.filter(item => item.kind === "signin" && item.title.startsWith("Failed sign-in"));
+    results.check("ten wrong codes for the Carbon's email from another address are one failed sign-in in its history, saying from where", attempt.status === 200 && refusals.every(status => status >= 400) && failed.length === 1 && /with an email code/.test(failed[0]?.title ?? "") && (failed[0]?.detail ?? "").includes(`from ${ctx.ip}`), `${attempt.status} ${refusals.join(",")}: ${JSON.stringify(failed).slice(0, 300)}`);
 
     // The page: newest first, 50 at a time, in Auckland time.
     const started = Date.now();
@@ -87,6 +97,7 @@ const activity: Journey = {
     results.check("Id changes: the change and the creation, nothing else", ids.rows.length === 2 && ids.rows[0]?.startsWith(`Id changed from ${carbon.id} to ${newId}`) === true && ids.rows[1]?.startsWith(`Account created with the id ${carbon.id}`) === true, ids.rows.join(" | "));
     const signins = await filter(page, "Sign-ins");
     results.check("Sign-ins: only sign-ins and the sign-up", signins.rows.length >= 3 && signins.rows.every(row => /^(Signed (in|up)|Failed sign-in)/.test(row)) && signins.rows.some(row => row.startsWith("Signed in to Briefcase")) && signins.rows.some(row => row.startsWith("Signed in to Commit")), signins.rows.join(" | ").slice(0, 300));
+    results.check("…including the failed sign-in, as the history words it", signins.rows.some(row => row.startsWith(failed[0]?.title ?? "Failed sign-in")), signins.rows.filter(row => row.startsWith("Failed")).join(" | ") || "no failed sign-in row");
     const proofs = await filter(page, "Proofs");
     results.check("Proofs: issued and revoked", proofs.rows.length === 2 && proofs.rows.some(row => row.startsWith("Briefcase got a proof to act for you at Commit")) && proofs.rows.some(row => row.startsWith("Proof for Briefcase to act for you at Commit revoked")), proofs.rows.join(" | "));
     const access = await filter(page, "App access");

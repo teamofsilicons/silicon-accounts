@@ -77,26 +77,40 @@ stop takes at most 30 s.
 ## Middleware (outermost first)
 
 1. **Request id** (core): `X-Request-Id` taken when sane, generated otherwise, on every response.
-2. **Observe**: one log line per request inside a span carrying the request id; a Space Station
+2. **Linger**: reads and throws away whatever request body the layers below answered without
+   reading to its end (the 413 for a declared `Content-Length` over the limit, a 401 or 429 on an
+   upload, a streamed body past the limit), so a client or proxy that is still uploading reads the
+   answer instead of a reset connection. Without it, a 2 MB + 1 byte photo or a 51 MB import sent
+   through the account site's `/v1` rewrite got a bare `500` from the site (its proxy hit EPIPE
+   mid-upload), and direct clients got `ECONNRESET`. Without `Expect: 100-continue` the rest of
+   the body is read first and the answer follows (the connection stays usable when the whole
+   body came). With `Expect: 100-continue` and a body nobody asked for, the answer goes out at
+   once (no `100 Continue`, so a waiting client never sends the body) and ends once the client
+   stopped sending (2 s without a first byte; a proxy that streams anyway is read to the end).
+   Bounded: at most 64 MB read, whatever the declared length (the site's rewrite forwards at
+   most 52 MB of any body under the original `Content-Length`, and must still get the 413), the
+   route's time budget, 5 s without data; past those, and after a time-budget 503, the answer
+   carries `Connection: close`. HTTP/1 only (HTTP/2 resets an unread stream on its own).
+3. **Observe**: one log line per request inside a span carrying the request id; a Space Station
    `http.request` event (source `api`, step `"{METHOD} {route template}"`, progress 1.0; route
    template, method, status, duration — never raw paths or query strings). Health probes and
    static files are skipped. A request that opted out (`X-Accounts-Telemetry: off`, or the
    account site's cookie `sa_telemetry=off`) runs inside core's
    `telemetry::with_request_opt_out`: neither this event nor any event its handler records is
    sent.
-3. **Policy**: `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS when cookies are secure;
+4. **Policy**: `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS when cookies are secure;
    HTML gets the site CSP (`frame-ancestors 'none'`) + `X-Frame-Options: DENY`; JSON gets
    `default-src 'none'` and, under `/v1`, `Cache-Control: no-store` unless the handler set one.
    CORS `*` only for `/v1/apps/{app_id}/public`, `/sdk/*`, `/.well-known/*` (preflights answered
    here); every other response leaves without CORS headers. Plain-text 4xx/5xx (axum's 405,
    framework rejections) are rewritten into `{"error":{"code","message","hint"}}`.
-4. **Limits**: body limits by route — 64 KB default, 2 MB for the photo uploads
+5. **Limits**: body limits by route — 64 KB default, 2 MB for the photo uploads
    (`POST /v1/me/photo`, `/v1/me/silicons/{uuid}/photo`, `/v1/flows/{id}/signup/photo`), 50 MB
    (+64 KB envelope) `POST /v1/apps/{app_id}/imports`, 5 MB `POST /v1/internal/apps/sync`,
    512 KB `PATCH /v1/apps/{app_id}/signin-config` (two inline logos of up to 128 KB) —
    enforced on `Content-Length` and on the body stream (`413 payload_too_large`); time budgets
    30 s / 60 s (photo, sync) / 5 min (imports) → `503 request_timeout`.
-5. **Panic recovery**: a panicking handler becomes `500 internal` with `details.request_id`.
+6. **Panic recovery**: a panicking handler becomes `500 internal` with `details.request_id`.
 
 Errors these layers make (413, 503 time budget, 500 panic, rewritten 405 / plain-text errors)
 use the API error object everywhere except `/v1/oauth/token`, `/v1/oauth/revoke` and
@@ -128,3 +142,10 @@ endpoints, security headers, CORS, the SPA/static/embed/SDK serving, every body-
 declared and streamed), every time budget, RFC 6749 errors on the OAuth endpoints, panics,
 background start/stop, the telemetry opt-out covering handler events, and a custodian's Silicon
 photo plus the history entries that name the Silicon.
+
+`tests/early_answers.rs` serves the router on a real socket and talks raw HTTP/1.1 to it, the way
+a proxy does: a declared body over the limit (2 MB + 1 byte, 4 MB and 8 MB photos, a 51 MB
+import), `Expect: 100-continue` from a client that waits (the 413 comes without `100 Continue`)
+and from a proxy that streams the body anyway, a 401 on an upload, and a chunked photo past
+2 MB. Each upload must go out in full and its answer must be read; without the linger layer
+every one of them fails with ECONNRESET or EPIPE.

@@ -55,32 +55,54 @@ interface Problem {
 }
 
 /**
- * Waits between tries of a fetch the browser cut off. Safari (WebKit) cancels a frame's requests the moment the page
- * around it starts navigating away, while the frame is still alive (no pagehide yet), and networks blip: so the embed
- * tries twice more before it says Silicon Accounts could not be reached. A page that is really leaving is gone by
- * then, and a real outage still shows after about two seconds.
+ * Waits between tries of a read the browser cut off. Safari (WebKit) cancels a frame's requests the moment the page
+ * around it starts navigating away, while the frame is still alive (no pagehide yet), and networks blip. The cut can
+ * come before the answer (the fetch rejects) or after its headers, while the body is still on its way (the status
+ * says 200, but reading the body fails). Either way the embed tries twice more before it reports a problem: a page
+ * that is really leaving is gone by then, and a real outage still shows after about two seconds.
  */
 const NETWORK_RETRY_MS = [500, 1500];
 
+type ConfigBody = (AppPublic & { error?: Partial<Problem> }) | null;
+/** One GET of the app's public config: its status and JSON body, or `cut` (with the status, if one came). */
+type ConfigRead = { cut: false; ok: boolean; status: number; body: ConfigBody } | { cut: true; status: number | null };
+
+async function readConfig(url: string): Promise<ConfigRead> {
+  let response: Response;
+  try {
+    response = await fetch(url, { headers: { Accept: "application/json" }, credentials: "omit" });
+  } catch {
+    return { cut: true, status: null };
+  }
+  try {
+    return { cut: false, ok: response.ok, status: response.status, body: (await response.json()) as ConfigBody };
+  } catch {
+    // The headers came and the body did not: cut off on its way (or not JSON at all, which another try tells).
+    return { cut: true, status: response.status };
+  }
+}
+
 /** GET /v1/apps/{app_id}/public with a plain fetch; errors keep the server's own code, message and hint. */
 async function loadApp(id: string): Promise<AppPublic> {
-  let response: Response | null = null;
-  for (let attempt = 0; !response; attempt++) {
-    try {
-      response = await fetch(`/v1/apps/${encodeURIComponent(id)}/public`, { headers: { Accept: "application/json" }, credentials: "omit" });
-    } catch {
-      const wait = NETWORK_RETRY_MS[attempt];
-      if (wait === undefined) throw { code: "network_error", message: "Silicon Accounts could not be reached.", hint: "Check the connection, then reload the page." } satisfies Problem;
-      await new Promise(done => setTimeout(done, wait));
-    }
+  const url = `/v1/apps/${encodeURIComponent(id)}/public`;
+  let read = await readConfig(url);
+  for (const wait of NETWORK_RETRY_MS) {
+    if (!read.cut) break;
+    await new Promise(done => setTimeout(done, wait));
+    read = await readConfig(url);
   }
-  const body = (await response.json().catch(() => null)) as (AppPublic & { error?: Partial<Problem> }) | null;
-  if (response.ok && body && Array.isArray(body.methods)) return body;
+  const hint = "Reload the page. If it keeps happening, check the app's status in Developer.";
+  if (read.cut) {
+    if (read.status === null) throw { code: "network_error", message: "Silicon Accounts could not be reached.", hint: "Check the connection, then reload the page." } satisfies Problem;
+    throw { code: `http_${read.status}`, message: `The sign-in config of "${id}" could not be read (HTTP ${read.status}, the answer was cut off or was not JSON).`, hint } satisfies Problem;
+  }
+  const { ok, status, body } = read;
+  if (ok && body && Array.isArray(body.methods)) return body;
   const error = body?.error;
   throw {
-    code: error?.code ?? `http_${response.status}`,
-    message: error?.message ?? `The sign-in config of "${id}" could not be loaded (HTTP ${response.status}).`,
-    hint: error?.hint ?? "Reload the page. If it keeps happening, check the app's status in Developer.",
+    code: error?.code ?? `http_${status}`,
+    message: error?.message ?? `The sign-in config of "${id}" could not be loaded (HTTP ${status}).`,
+    hint: error?.hint ?? hint,
   } satisfies Problem;
 }
 

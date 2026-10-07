@@ -1,14 +1,16 @@
 /**
  * Helpers of the security suite (web/e2e/suites/security): raw HTTP with full control over Origin, cookies and the
- * forwarded address, a cookie jar that keeps every Set-Cookie line, the hosted sign-in flow driven over HTTP, the fake
- * apps' fixed credentials, and extra accounts-api processes (secure cookies, production mode) on the stack's spare
- * ports (base + 5 … base + 8, between this stack's ports and the next base's).
+ * forwarded address (and `raw` for byte-exact request targets and Host headers), a cookie jar that keeps every
+ * Set-Cookie line, the hosted sign-in flow driven over HTTP, the fake apps' fixed credentials, a recording HTTP server
+ * (`serve`), a dump of the stack's database (`dumpDatabase`), and extra accounts-api processes (secure cookies,
+ * production mode) on the stack's spare ports (base + 5 … base + 8, between this stack's ports and the next base's).
  *
  * Kept in the suite (README: "a suite never edits lib.ts"); nothing here is specific to one journey.
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { createServer, request as httpRequest, type IncomingHttpHeaders, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { Ctx } from "../../context";
@@ -152,6 +154,77 @@ export async function call<T = unknown>(url: string, options: CallOptions = {}):
   return { status: response.status, body: parsed as T, text, headers: response.headers, setCookies, ms };
 }
 
+export interface RawReply {
+  status: number;
+  headers: IncomingHttpHeaders;
+  text: string;
+}
+
+/**
+ * One HTTP/1.1 request with the request target sent exactly as given (fetch normalizes `//x`, `/\x` and `..`) and
+ * every header under the caller's control, Host included. Never follows redirects; status -1 when the connection failed.
+ */
+export function raw(base: string, target: string, options: { method?: string; headers?: Record<string, string>; body?: string } = {}): Promise<RawReply> {
+  const url = new URL(base);
+  return new Promise(done => {
+    const req = httpRequest(
+      { host: url.hostname, port: Number(url.port || 80), path: target, method: options.method ?? "GET", headers: { host: url.host, ...options.headers }, timeout: 30_000 },
+      (res: IncomingMessage) => {
+        let text = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk: string) => (text += chunk));
+        res.on("end", () => done({ status: res.statusCode ?? 0, headers: res.headers, text }));
+      },
+    );
+    req.on("timeout", () => req.destroy(new Error("timed out")));
+    req.on("error", error => done({ status: -1, headers: {}, text: String(error) }));
+    if (options.body !== undefined) req.write(options.body);
+    req.end();
+  });
+}
+
+export interface Hit {
+  method: string;
+  path: string;
+  headers: IncomingHttpHeaders;
+  body: string;
+}
+
+/** A small HTTP server on 127.0.0.1:`port` that records every request and answers with `handler` (default 200). */
+export async function serve(port: number, handler: (hit: Hit, res: ServerResponse) => void = (_hit, res) => res.end("ok")): Promise<{ url: string; hits: Hit[]; close: () => Promise<void> }> {
+  const hits: Hit[] = [];
+  const server = createServer((req, res) => {
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk: string) => (body += chunk));
+    req.on("end", () => {
+      const hit = { method: req.method ?? "", path: req.url ?? "", headers: req.headers, body };
+      hits.push(hit);
+      handler(hit, res);
+    });
+  });
+  await new Promise<void>((done, fail) => {
+    server.once("error", fail);
+    server.listen(port, "127.0.0.1", () => done());
+  });
+  const close = () =>
+    new Promise<void>(done => {
+      server.closeAllConnections();
+      server.close(() => done());
+    });
+  return { url: `http://127.0.0.1:${port}`, hits, close };
+}
+
+/** The stack database's data as SQL text (pg_dump --data-only), for scanning what is stored in clear. */
+export function dumpDatabase(env: Env, url = env.db): Promise<string> {
+  return new Promise((done, fail) => {
+    execFile(join(env.pgBin, "pg_dump"), ["--data-only", "--no-owner", "--no-privileges", url], { maxBuffer: 512 * 1024 * 1024, env: { ...process.env, PGOPTIONS: "--client-min-messages=warning" } }, (error, stdout, stderr) => {
+      if (error) fail(new Error(`pg_dump failed on ${url}: ${stderr.trim() || error.message}`));
+      else done(stdout);
+    });
+  });
+}
+
 /** The API error object of a reply (`{"error":{code,message,hint,details}}`), or an empty one. */
 export interface ApiErrorBody {
   code?: string;
@@ -293,7 +366,8 @@ export async function signInWithEmail(target: Target, options: { email?: string;
   const jar = options.jar ?? new Jar();
   const email = options.email ?? randomEmail(options.label ?? "carbon");
   const appId = options.appId ?? "accounts";
-  const redirect = appId === "accounts" ? `${env.site}/sign-in` : callbackOf(env, appId);
+  // The account site's own sign-in returns to the public origin the target serves (another server may have another).
+  const redirect = appId === "accounts" ? `${target.origin}/sign-in` : callbackOf(env, appId);
   const { verifier, challenge } = pkcePair();
   const state = `st-${tag()}`;
   const created = await startFlow(target, jar, { app_id: appId, redirect_uri: redirect, state, code_challenge: challenge, code_challenge_method: "S256", ...(options.scope ? { scope: options.scope } : {}), prompt: "login" });

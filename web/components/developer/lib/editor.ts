@@ -287,14 +287,21 @@ export class ConfigEditor {
     this.commit(this.afterEdit({ ...state, typed }, [sectionOf(path)]));
   }
 
-  /** Changes the typed BYO secrets (write-only; never read back from the server). */
+  /**
+   * Changes the typed BYO secrets (write-only; never read back from the server), or opens and closes a stored
+   * secret's replace field (`googleReplace`, `appleReplace`: not a change, and reset with the secrets on save and
+   * Discard, so the field shows the stored state again).
+   */
   setSecrets(patch: Partial<SecretsDraft>): void {
     const state = this.state;
     const touched = [
       ...("googleSecret" in patch || "googleRemove" in patch ? ["google.client_secret"] : []),
       ...("appleKey" in patch || "appleRemove" in patch ? ["apple.private_key"] : []),
     ];
-    this.commit(this.afterEdit({ ...state, secrets: { ...state.secrets, ...patch }, touched: union(state.touched, touched) }, ["signin"]));
+    const next = { ...state, secrets: { ...state.secrets, ...patch }, touched: union(state.touched, touched) };
+    // Only opening or closing a replace field edits nothing: the last server errors of the tab still stand.
+    const edits = Object.keys(patch).some(key => key !== "googleReplace" && key !== "appleReplace");
+    this.commit(edits ? this.afterEdit(next, ["signin"]) : next);
   }
 
   /** The new stored config, with the unsaved leaves of the sections not in `reset` re-applied on top. */

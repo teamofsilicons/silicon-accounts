@@ -9,7 +9,7 @@
 import type { BrowserContext, Frame, Page } from "@playwright/test";
 import type { Ctx, Journey } from "../../context";
 import { codeFor, json, lastSeq, newContext, shot, sleep, tag } from "../../lib";
-import { asSession, checkPoweredBy, fakeApp, freshEmail, hostPage, htmlPage, ownerSignIn } from "./_helpers";
+import { asSession, checkPoweredBy, checkPoweredByHost, fakeApp, freshEmail, hostPage, htmlPage, ownerSignIn } from "./_helpers";
 
 const APP = "browser";
 
@@ -95,7 +95,8 @@ export const journey: Journey = {
       const links = await allowed.frame.locator("a[data-method]").evaluateAll(anchors => anchors.map(a => ({ method: a.getAttribute("data-method"), text: (a.textContent ?? "").trim(), href: a.getAttribute("href") ?? "", target: a.getAttribute("target") })));
       results.check("the buttons follow the app's methods and order (email, then Google)", JSON.stringify(links.map(link => link.method)) === JSON.stringify(["email", "google"]), links.map(link => link.text).join(" | "));
       results.check("each button sends the whole window (target=_top) to /authorize with the snippet's parameters and its method", links.every(link => link.target === "_top" && link.href.startsWith("/authorize?") && link.href.includes(`app_id=${APP}`) && link.href.includes(`method=${link.method}`)), links.map(link => link.href).join(" "));
-      await checkPoweredBy(ctx, allowed.frame, "the embed iframe");
+      const powered = await checkPoweredBy(ctx, allowed.frame, "the embed iframe");
+      checkPoweredByHost(ctx, "the iframe embed", [powered.href]);
       await sleep(600);
       const height = await allowed.page.locator("iframe").first().evaluate(el => el.getBoundingClientRect().height);
       const content = await allowed.frame.locator("#silicon-accounts-embed").evaluate(el => Math.ceil(el.getBoundingClientRect().height));

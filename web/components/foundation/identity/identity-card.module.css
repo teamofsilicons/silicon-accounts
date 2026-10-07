@@ -24,6 +24,10 @@
 .scene[data-settled="back"] .card { transform: rotateX(var(--id-tilt-x)) rotateY(var(--id-tilt-y)); }
 .scene[data-settled="back"] .back { transform: none; }
 .scene[data-settled="back"] .face:not(.back) { visibility: hidden; }
+/* At rest on its front, the back is hidden outright, not only by backface visibility: WebKit's software painting (the
+   path its screenshots take) ignores backface-visibility and drew the back, mirrored, over the front, so the front's
+   controls and their keyboard focus never showed there. During a flip (no data-settled) both faces paint as before. */
+.scene[data-settled="front"] .back { visibility: hidden; }
 
 .face {
   --sq-r: var(--radius-surface);

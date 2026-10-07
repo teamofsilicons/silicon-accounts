@@ -2,7 +2,7 @@ import { statSync } from "node:fs";
 import { join } from "node:path";
 import type { Journey } from "../../context";
 import { forgetRateLimits, lastSeq, sql, tag } from "../../lib";
-import { accounts, cliError, codeEmail, freshDir, obj, said, short, signUpCarbon, str } from "./_helpers";
+import { accounts, asCarbon, cliError, codeEmail, freshDir, obj, said, short, signUpCarbon, str, type Json } from "./_helpers";
 
 export const journey: Journey = {
   name: "silicons-cli-email-login",
@@ -93,5 +93,15 @@ export const journey: Journey = {
     results.check("--silicon with --email: exit 2, the JSON error names the conflict", both.code === 2 && cliError(both).code === "invalid_arguments" && /cannot be used with/.test(str(cliError(both).message)), said(both));
     const carbonAsSilicon = await accounts(env, ["login", "--silicon", carbon.id, "--stk", "stk-0123456789ab", "--json"], { home: freshDir() });
     results.check("--silicon with a c:id: exit 2, a Carbon signs in with a code", carbonAsSilicon.code === 2 && /not a Silicon id/.test(str(cliError(carbonAsSilicon).message)), said(carbonAsSilicon));
+
+    // 6. The Carbon's history (as the account site shows it).
+    const entries = async (kind: string) => (obj((await asCarbon<Json>(env, carbon, "GET", `/v1/me/history?kind=${kind}&limit=100`)).body).items ?? []) as Json[];
+    const security = await entries("security");
+    const created = security.filter(item => item.title === "New CLI sign-in");
+    results.check("each headless sign-in that got through is a 'New CLI sign-in' (its label · with an email code): three of them", created.length === 3 && created.every(item => / · with an email code$/.test(str(item.detail))), short(created.map(item => item.detail)));
+    const lock = security.find(item => str(item.title).startsWith("Too many wrong codes"));
+    results.check("the ten wrong codes: 'Too many wrong codes for <masked address>', paused until when", !!lock && /^Too many wrong codes for s\*+@example\.test$/.test(str(lock.title)) && /^After 10 wrong codes in a row, tries were paused until \d{4}-\d\d-\d\dT/.test(str(lock.detail)), short(lock));
+    const failed = (await entries("signin")).filter(item => obj(item.meta).outcome === "failed");
+    results.check("…recorded as a failed sign-in from the accounts CLI", failed.length >= 1 && failed.every(item => item.title === "Failed sign-in to Silicon Accounts with an email code" && /· accounts CLI \d+\.\d+\.\d+$/.test(str(item.detail))), short(failed.map(item => [item.title, item.detail])));
   },
 };

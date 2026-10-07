@@ -7,7 +7,7 @@
 import { randomUUID } from "node:crypto";
 import type { Journey } from "../../context";
 import { json, sql } from "../../lib";
-import { appTokens, errorCode, issueAta, issueObo, row, short, signInToApp, verifyAs, type IssuedProof } from "./_helpers";
+import { appTokens, errorCode, issueAtaFor, issueObo, row, short, signInToApp, verifyAs, type IssuedProof } from "./_helpers";
 
 export const journey: Journey = {
   name: "proofs-perf-idempotency",
@@ -34,9 +34,9 @@ export const journey: Journey = {
     // The same key with another body, another app, another endpoint.
     const other = await issueObo(ctx, "dm", subject, { ...body, scopes: ["pp.other-body"] }, { key });
     results.check("the same key with a different body → 409 idempotency_key_reused", other.status === 409 && errorCode(other.body) === "idempotency_key_reused", `${other.status} ${short(other.body.error)}`);
-    const otherApp = await issueAta(ctx, "commit", { audiences: ["remind"] }, { key });
+    const otherApp = await issueAtaFor(ctx, "commit", "remind", {}, { key });
     results.check("the same key string from another app (Commit's ATA) → its own 201: keys belong to one app and endpoint", otherApp.status === 201 && otherApp.headers.get("idempotent-replayed") === null && otherApp.body.proof_id !== first.body.proof_id, `${otherApp.status} ${short(otherApp.body.error)}`);
-    const otherEndpoint = await issueAta(ctx, "dm", { audiences: ["briefcase"] }, { key });
+    const otherEndpoint = await issueAtaFor(ctx, "dm", "briefcase", {}, { key });
     results.check("the same key at another endpoint of the same app (dm's ATA) → its own 201", otherEndpoint.status === 201 && otherEndpoint.body.kind === "ata", `${otherEndpoint.status} ${short(otherEndpoint.body.error)}`);
 
     // A failure is not stored: the corrected retry with the same key runs.
@@ -70,10 +70,10 @@ export const journey: Journey = {
     const twice = await viaApp();
     results.check("dm's own retry through the fake app with one key gets the same proof", once.status === 201 && twice.status === 201 && once.body.proof_id === twice.body.proof_id && once.body.proof_token === twice.body.proof_token, `${once.status} ${twice.status}`);
 
-    // ATA too.
+    // ATA too (a proof for one app: UNDERSTANDING.md allows no other kind).
     const ataKey = randomUUID();
-    const ata1 = await issueAta(ctx, "commit", { audiences: ["remind", "waveform"], scopes: ["pp.ata-idem"] }, { key: ataKey });
-    const ata2 = await issueAta(ctx, "commit", { audiences: ["remind", "waveform"], scopes: ["pp.ata-idem"] }, { key: ataKey });
+    const ata1 = await issueAtaFor(ctx, "commit", "remind", { scopes: ["pp.ata-idem"] }, { key: ataKey });
+    const ata2 = await issueAtaFor(ctx, "commit", "remind", { scopes: ["pp.ata-idem"] }, { key: ataKey });
     results.check("ATA: the retry replays the same proof", ata1.status === 201 && ata2.status === 201 && ata2.headers.get("idempotent-replayed") === "true" && ata1.body.proof_id === ata2.body.proof_id && ata1.body.proof_token === ata2.body.proof_token, `${ata1.status} ${ata2.status} ${ata2.headers.get("idempotent-replayed")}`);
 
     // Past the 10-minute window (time travel on the stored key) the same key issues a new proof.

@@ -109,7 +109,7 @@ export function Landing() {
     const leave = () => { hovering = false; };
     card?.addEventListener("pointerenter", enter);
     card?.addEventListener("pointerleave", leave);
-    // A touch, a click or a key anywhere means someone is using the page: the card stays as it is from then on.
+    // A touch, a click or a key anywhere means the visitor is using the page: the card stays as it is from then on.
     document.addEventListener("keydown", stop, true);
     document.addEventListener("pointerdown", stop, true);
     timer = window.setTimeout(turn, FIRST_TURN_MS);

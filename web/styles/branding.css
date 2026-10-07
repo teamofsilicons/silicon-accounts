@@ -149,14 +149,16 @@
   --sq-stroke: color-mix(in oklab, var(--primary) 28%, var(--surface));
   box-shadow: none;
 }
+/* An outline button's words take the accent ink and its edge the accent line: the primary, or (when the primary
+   would vanish into the page) a shade the branding runtime keeps readable (lib/branding/apply.ts accentInk/accentLine). */
 .sa-brand.sa-brand[data-button-style="outline"] [data-variant="primary"] {
   --sq-fill: transparent;
-  --sq-stroke: var(--primary);
+  --sq-stroke: var(--accent-line, var(--primary));
   color: var(--accent-ink);
 }
 .sa-brand.sa-brand[data-button-style="outline"] [data-variant="primary"]:is(:hover, :focus-visible):not(:disabled) {
   --sq-fill: color-mix(in oklab, var(--primary) 8%, transparent);
-  --sq-stroke: var(--primary);
+  --sq-stroke: var(--accent-line, var(--primary));
   box-shadow: none;
 }
 .sa-brand.sa-brand[data-button-style="soft"] [data-variant="primary"]:active:not(:disabled),

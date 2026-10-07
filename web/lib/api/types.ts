@@ -853,6 +853,11 @@ export interface FlowSignup {
   provider_pfp_url: string | null;
   /** True when an imported account is finishing its setup. */
   finishing_import: boolean;
+  /**
+   * When finishing an import: the app whose import created the account (it may be another app than the one being
+   * signed into); null for a new account or when no import is on record. Optional for servers before it existed.
+   */
+  imported_by?: { app_id: string; name: string } | null;
   expires_at: Timestamp;
 }
 

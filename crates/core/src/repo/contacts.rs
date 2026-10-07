@@ -58,6 +58,14 @@ impl ContactKind {
         }
     }
 
+    /// `an email` / `a phone number`: the noun with its article (never "a email").
+    pub fn a_noun(&self) -> &'static str {
+        match self {
+            ContactKind::Email => "an email",
+            ContactKind::Phone => "a phone number",
+        }
+    }
+
     /// The account field a change of this kind shows up as (`account.updated`).
     pub fn field(&self) -> AccountField {
         match self {
@@ -788,10 +796,13 @@ pub async fn prove(
 }
 
 fn in_use(kind: ContactKind, value: &str) -> ApiError {
+    let one = match kind {
+        ContactKind::Email => "An email",
+        ContactKind::Phone => "A phone number",
+    };
     ApiError::conflict(format!("{}_in_use", kind.code()), format!("{value} already belongs to another account."))
         .hint(format!(
-            "A {} can only belong to one account. Sign in with it to use that account, or add a different {}.",
-            kind.noun(),
+            "{one} can only belong to one account. Sign in with it to use that account, or add a different {}.",
             kind.noun()
         ))
 }
@@ -816,8 +827,8 @@ fn limit_reached(kind: ContactKind) -> ApiError {
         ),
     )
     .hint(format!(
-        "Remove a {} you no longer use, then add the new one.",
-        kind.noun()
+        "Remove {} you no longer use, then add the new one.",
+        kind.a_noun()
     ))
 }
 

@@ -148,7 +148,7 @@ function Report({ appId, job, onImportForReal, onNew }: { appId: string; job: Im
   const counts = job.counts;
   const written = counts.created + counts.matched + counts.updated;
   const summary = failed
-    ? `The import stopped after ${formatCount(job.processed_rows)} of ${formatCount(job.total_rows)} rows.`
+    ? `The import stopped after ${formatCount(job.processed_rows)} of ${plural(job.total_rows, "row")}.`
     : dry
       ? `Nothing was written. ${plural(written, "row")} would go through, ${plural(counts.error, "row")} would fail and ${formatCount(counts.skipped)} would be skipped.`
       : `${plural(counts.created, "account")} created, ${formatCount(counts.matched)} matched to existing accounts, ${formatCount(counts.updated)} updated; ${plural(counts.error, "row")} failed and ${formatCount(counts.skipped)} ${counts.skipped === 1 ? "was" : "were"} skipped.`;
@@ -267,7 +267,7 @@ function RecentImports({ appId, onOpen }: { appId: string; onOpen: (job: ImportJ
             <li key={job.id}>
               <button type="button" data-sq="surface" className={styles.recentItem} onClick={() => onOpen(job)}>
                 <span className={styles.recentWhen}>{formatRelative(job.created_at)}<span className={styles.muted}> · {job.format.toUpperCase()} · {plural(job.total_rows, "row")}</span></span>
-                <span className={styles.recentCounts}>{formatCount(job.counts.created)} created · {formatCount(job.counts.matched)} matched · {formatCount(job.counts.error)} errors</span>
+                <span className={styles.recentCounts}>{formatCount(job.counts.created)} created · {formatCount(job.counts.matched)} matched · {plural(job.counts.error, "error")}</span>
                 <span className={styles.recentBadges}>
                   {dryRunOf(job) ? <Badge size="sm" tone="info">Dry run</Badge> : null}
                   <Badge size="sm" tone={job.status === "completed" ? "success" : job.status === "failed" ? "danger" : "neutral"}>{job.status === "completed" ? "Finished" : job.status === "failed" ? "Failed" : job.status === "running" ? "Running" : "Queued"}</Badge>
@@ -606,7 +606,7 @@ export function ImportTab() {
               <strong>{dryRunOf(job) ? "Dry run in progress" : `Importing ${plural(job.total_rows, "row")}`}</strong>
               <span className={styles.muted}>Started {job.started_at ? formatRelative(job.started_at) : "in a moment"} · {job.format.toUpperCase()}</span>
             </div>
-            <Progress label={job.status === "queued" ? "Queued: waiting for the import worker" : `${formatCount(job.processed_rows)} of ${formatCount(job.total_rows)} rows`} value={progress} showValue />
+            <Progress label={job.status === "queued" ? "Queued: waiting for the import worker" : `${formatCount(job.processed_rows)} of ${plural(job.total_rows, "row")}`} value={progress} showValue />
             <CountsStrip job={job} />
             <p className={styles.muted}>Rows are processed 500 at a time. You can leave this tab; the import keeps running and its report stays under Recent imports.</p>
           </>

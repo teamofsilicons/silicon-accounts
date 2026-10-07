@@ -148,7 +148,7 @@ export function CommandPalette({ items, placeholder = "Search commands", onSelec
             <AnimatePresence mode="popLayout" initial={false} custom={glide}>
               {groupedItems.map(([group, entries]) => <motion.div layout={glide ? "position" : false} className={styles.group} role="group" aria-label={group} key={group} variants={rowExit} initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit="exit" transition={reduced ? { duration: 0 } : { default: enter, layout: motionTokens.spring.smooth }}>
                 <span className={styles.groupHeading} aria-hidden="true">{group}</span>
-                <AnimatePresence mode="popLayout" initial={false} custom={glide}>{entries.map(({ item, index }) => <motion.button layout={glide ? "position" : false} key={item.id} id={`${inputId}-${item.id}`} className={`${styles.result} ${index === safeActiveIndex ? styles.activeResult : ""}`} type="button" role="option" aria-selected={index === safeActiveIndex} onClick={() => choose(item)} onPointerMove={event => {
+                <AnimatePresence mode="popLayout" initial={false} custom={glide}>{entries.map(({ item, index }) => <motion.button layout={glide ? "position" : false} key={item.id} id={`${inputId}-${item.id}`} className={`${styles.result} ${index === safeActiveIndex ? styles.activeResult : ""}`} type="button" role="option" tabIndex={-1} aria-selected={index === safeActiveIndex} onClick={() => choose(item)} onPointerMove={event => {
                   // Ignore the synthetic moves browsers send while the list scrolls under a still pointer.
                   if (event.clientX === lastPointer.current.x && event.clientY === lastPointer.current.y) return;
                   lastPointer.current = { x: event.clientX, y: event.clientY };

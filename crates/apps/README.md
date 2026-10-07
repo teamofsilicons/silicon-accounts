@@ -62,6 +62,15 @@ import; `access_removed` → none. `q` matches uuid (exact), id, display name, e
 app's imported emails/phones, and the primary email/phone only where the scope is granted — search
 can't probe contact details the app was never given.
 
+An account that removed the app's access stays listed as history, and the app sees none of the
+account's own data any more (the same rule as webhook deliveries: an app that lost access to an
+account no longer sees its data), whatever the account changes afterwards: `display_name: "Access
+removed"`, the default photo, no email, phone, dob or timezone. It keeps its uuid, membership id
+and current `id` (any uuid resolves to its id through `GET /v1/accounts/{uuid}`), and the app's
+own records (external_id, source, the scopes it had been granted, its sign-ins, dates). `q` finds it
+by uuid, id, external_id or the app's imported values, never by name. Signing in to the app again
+makes it `active` and shows everything it grants again.
+
 A deleted account stays listed as history: `status: "deleted"` (whatever the membership said),
 `display_name: "Deleted account"`, the default photo, `id: null` and no email, phone, dob or
 timezone (core keeps the membership row and the account's name; neither is shown). `status=deleted`

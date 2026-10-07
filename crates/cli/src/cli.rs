@@ -1029,7 +1029,7 @@ pub struct ImportArgs {
     #[command(subcommand)]
     pub command: Option<ImportCommand>,
 
-    /// CSV or JSON file to import (- for stdin).
+    /// CSV or JSON file to import (- for stdin): at most 50 MB and 100,000 rows.
     #[arg(value_name = "FILE")]
     pub file: Option<PathBuf>,
 

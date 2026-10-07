@@ -2,7 +2,7 @@
 
 /**
  * Small helpers shared by the account pages: error text in the server's words, readable times inside the service's
- * sentences, photo checks, durations, the names people take in API answers, the Carbon/Silicon views of Me, and a
+ * sentences, photo checks, durations, the names accounts take in API answers, the Carbon/Silicon views of Me, and a
  * ticking clock for relative times, countdowns and expiry rings.
  */
 import { useEffect, useState, useSyncExternalStore } from "react";

@@ -390,7 +390,10 @@ send them to your normal sign-in (hosted pages, the iframe or the snippet; see
    to Silicon Accounts. Check the details it gave us, then continue." Every field is filled
    from your row: display name, `c:id`, timezone, date of birth and photo (your values win
    over the name Google or Apple suggests). They can change any of them, then press
-   **Finish setup**.
+   **Finish setup**. If they first sign in to another app with that address, they finish the
+   same account there, and the page still names your app ("Legacy CRM added you to Silicon
+   Accounts. Check the details it gave us, then continue to Briefcase."; the flow's
+   `signup.imported_by`).
 3. They continue, and the account is theirs: status `active`, the proven address verified, the
    **same uuid** your import reported. Your app receives that uuid in the token response, and
    their membership turns from `imported` to `active`.
@@ -405,6 +408,7 @@ What the flow returned for row 1 in the walkthrough above (`signup` in the hoste
   "expires_at": "2026-10-09T02:45:33.952Z",
   "finishing_import": true,
   "id": "c:kofi",
+  "imported_by": { "app_id": "legacy-crm", "name": "Legacy CRM" },
   "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=p1y",
   "phone": null,
   "provider": null,

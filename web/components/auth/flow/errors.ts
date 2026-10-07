@@ -46,8 +46,26 @@ export const isApiSpeak = (text: string | null | undefined): boolean => !!text &
 /** "sign-in flow 'eVdo4FYOPFzXjl-M9BTMiQ'" → "this sign-in"; internal ids are no use to a Carbon. */
 const FLOW_ID = /\b(?:sign-in\s+)?flow\s+'[A-Za-z0-9_~-]{6,}'/gi;
 
-/** " (until 2026-10-06T10:41:00.000Z)", " at 2026-10-06T10:41:00.000Z": exact UTC instants read as noise here. */
-const INSTANT = /\s*(?:\((?:until|at)\s+)?\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\)?/g;
+/** An exact UTC instant as the server writes it into a sentence ("2026-10-06T10:41:00.000Z"). */
+const RFC3339 = String.raw`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z`;
+/** " (until 2026-10-06T10:41:00.000Z)", " (at …)": the whole aside goes. */
+const INSTANT_ASIDE = new RegExp(String.raw`\s*\((?:until|at)\s+${RFC3339}\)`, "g");
+/** "expired at 2026-…Z: a verified email…": the clause ends where its time was ("expired. A verified email…"). */
+const INSTANT_BEFORE_COLON = new RegExp(String.raw`\s+(?:until|at)\s+${RFC3339}:\s+(\p{Ll})`, "gu");
+/** " at 2026-10-06T10:41:00.000Z", " until …", or a bare instant: the time goes with the word that introduces it. */
+const INSTANT = new RegExp(String.raw`\s*(?:\b(?:until|at)\s+)?${RFC3339}`, "g");
+
+/**
+ * The server's sentence without its exact UTC instants, which read as noise on these pages, and without the words
+ * that introduced them: "The sign-up session expired at 2026-…Z: a verified email … stays ready for 48 hours." reads
+ * "The sign-up session expired. A verified email … stays ready for 48 hours.", never "expired at: …".
+ */
+export function withoutInstants(text: string): string {
+  return text
+    .replace(INSTANT_ASIDE, "")
+    .replace(INSTANT_BEFORE_COLON, (_, next: string) => `. ${next.toUpperCase()}`)
+    .replace(INSTANT, "");
+}
 
 const sentence = (text: string) => {
   const trimmed = text.trim();
@@ -55,9 +73,9 @@ const sentence = (text: string) => {
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 };
 
-/** The server's words with API instructions and internal ids taken out. */
+/** The server's words with API instructions, internal ids and exact instants taken out. */
 export function plainWords(error: ErrorLike): string {
-  const message = sentence(error.message.replace(FLOW_ID, "this sign-in").replace(INSTANT, ""));
+  const message = sentence(withoutInstants(error.message.replace(FLOW_ID, "this sign-in")));
   const hint = error.hint && !API_SPEAK.test(error.hint) ? sentence(error.hint.replace(FLOW_ID, "this sign-in")) : "";
   return [message, hint].filter(Boolean).join(" ");
 }
@@ -114,7 +132,7 @@ export function carbonError(error: ErrorLike, context: ErrorContext = {}): Carbo
     case "verification_locked":
       return make("Too many wrong codes", "Entry is paused after 10 wrong codes in a row. Wait for the countdown, then type the code again.");
     case "rate_limited":
-      return make("Too many tries", sentence(error.message.replace(INSTANT, "")));
+      return make("Too many tries", sentence(withoutInstants(error.message)));
     case "invalid_phone":
       return make("Check the phone number", `${sentence(error.message)} Check the number. For a number from another country, start it with + and its country code.`);
     case "invalid_country":

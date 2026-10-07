@@ -1,13 +1,16 @@
 /**
  * CSRF: every cookie-authenticated mutation must come from the site's own origin (403 `origin_not_allowed`), whatever
  * the foreign Origin looks like (another site, a look-alike host, another port of the same host, https instead of
- * http, "null", none at all), and nothing changes when it is refused. Bearer tokens are not affected (browsers never
- * attach them on their own). Then the real thing in a browser: a page on a same-site origin (cookies are sent) and on a
- * cross-site origin (SameSite=Lax keeps them home) submits forms and fetches against the signed-in victim's session.
+ * http, "null", none at all), and nothing changes when it is refused: no refusal sets or clears a cookie, and a
+ * sign-out that has no live session to end clears the browser's cookies only for the site's own pages (logout CSRF).
+ * Bearer tokens are not affected (browsers never attach them on their own). Then the real thing in a browser: a page
+ * on a same-site origin (cookies are sent) and on a cross-site origin (SameSite=Lax keeps them home) submits forms and
+ * fetches against the signed-in victim's session, and against a signed-out browser in the middle of a sign-up, which
+ * keeps its sign-up and finishes it afterwards.
  */
 import type { Journey } from "../../context";
-import { lastSeq, newContext, shot, sleep, tag } from "../../lib";
-import { brief, call, createSilicon, errorOf, flowOf, flowStep, remember, siliconLogin, signInWithEmail, sparePort, startFlow, viaSite, Jar } from "./_helpers";
+import { codeFor, lastSeq, newContext, shot, sleep, tag } from "../../lib";
+import { brief, call, callbackOf, createSilicon, errorOf, flowOf, flowStep, randomEmail, remember, siliconLogin, signInWithEmail, sparePort, startFlow, viaSite, Jar, type Reply } from "./_helpers";
 
 export const journey: Journey = {
   name: "security-csrf",
@@ -20,6 +23,13 @@ export const journey: Journey = {
     remember(ctx, "code", victim.code);
     const me = async () => (await call<{ display_name?: string; id?: string }>(`${env.site}/v1/me`, { jar: victim.jar, ip: ctx.ip })).body;
     const before = await me();
+    /** Refusals of foreign-origin requests that set or cleared a cookie anyway (a browser applies them). */
+    const refusalCookies: string[] = [];
+    let refusals = 0;
+    const noteCookies = (label: string, reply: Reply) => {
+      refusals++;
+      if (reply.setCookies.length) refusalCookies.push(`${label} (${reply.status}): ${reply.setCookies.map(cookie => `${cookie.name}${cookie.attributes.get("max-age") === "0" ? " cleared" : " set"}`).join(", ")}`);
+    };
 
     // 1. PATCH /v1/me from every kind of foreign Origin.
     const sitePort = new URL(env.site).port;
@@ -34,8 +44,9 @@ export const journey: Journey = {
     ];
     const refusedPatch: string[] = [];
     for (const [label, origin] of foreign) {
-      const reply = await call(`${env.site}/v1/me`, { method: "PATCH", json: { display_name: `Pwned ${tag()}` }, jar: victim.jar, origin, ip: ctx.ip });
+      const reply = await call(`${env.site}/v1/me`, { method: "PATCH", json: { display_name: `Pwned ${tag()}` }, jar: victim.jar.clone(), origin, ip: ctx.ip });
       if (reply.status !== 403 || errorOf(reply).code !== "origin_not_allowed") refusedPatch.push(`${label}: ${brief(reply)}`);
+      noteCookies(`PATCH /v1/me from ${label}`, reply);
     }
     const afterPatch = await me();
     results.check(`PATCH /v1/me with the session cookie is refused 403 origin_not_allowed from ${foreign.length} kinds of foreign Origin`, refusedPatch.length === 0, refusedPatch.join(" | ") || foreign.map(([label]) => label).join(", "));
@@ -65,8 +76,9 @@ export const journey: Journey = {
     ];
     const notRefused: string[] = [];
     for (const [label, method, path, json] of attempts) {
-      const reply = await call(`${env.site}${path}`, { method, ...(json !== undefined ? { json } : { body: "" }), jar: victim.jar, origin: evil, ip: ctx.ip, headers: { "idempotency-key": `csrf-${tag()}` } });
+      const reply = await call(`${env.site}${path}`, { method, ...(json !== undefined ? { json } : { body: "" }), jar: victim.jar.clone(), origin: evil, ip: ctx.ip, headers: { "idempotency-key": `csrf-${tag()}` } });
       if (reply.status !== 403 || errorOf(reply).code !== "origin_not_allowed") notRefused.push(`${label}: ${brief(reply)}`);
+      noteCookies(label, reply);
     }
     results.check(`${attempts.length} other cookie mutations from a foreign origin (sign-out, delete, Silicon, email, id, SLT, device approval, app access, sessions, Google) are refused 403 origin_not_allowed`, notRefused.length === 0, notRefused.join(" | ") || attempts.map(([label]) => label).join(", "));
     const session = await call<{ account?: { id: string } }>(`${env.site}/v1/session`, { jar: victim.jar, ip: ctx.ip });
@@ -88,11 +100,14 @@ export const journey: Journey = {
     const started = await startFlow(t, flowJar, { app_id: "briefcase", redirect_uri: `${env.apps}/briefcase/callback`, state: `s-${tag()}` });
     const flowId = flowOf(started)?.id ?? "";
     const target = `sec.csrf.flow.${tag()}@example.test`;
-    const emailFromEvil = await call(`${env.site}/v1/flows/${flowId}/email`, { json: { email: target }, jar: flowJar, origin: evil, ip: ctx.ip });
+    const emailFromEvil = await call(`${env.site}/v1/flows/${flowId}/email`, { json: { email: target }, jar: flowJar.clone(), origin: evil, ip: ctx.ip });
+    noteCookies("POST /v1/flows from another site", flowFromEvil);
+    noteCookies("a flow step from another site", emailFromEvil);
     const flowMails = await call<{ items?: unknown[] }>(`${env.messaging}/_messages?to=${encodeURIComponent(target)}`);
     results.check("the hosted flow refuses a foreign origin: POST /v1/flows and a step with the right flow cookie both get 403, and no code is sent", flowFromEvil.status === 403 && errorOf(flowFromEvil).code === "origin_not_allowed" && emailFromEvil.status === 403 && errorOf(emailFromEvil).code === "origin_not_allowed" && !(flowMails.body.items ?? []).length, `${brief(flowFromEvil)} / ${brief(emailFromEvil)} / ${(flowMails.body.items ?? []).length} codes`);
     const okStep = await flowStep(t, flowJar, flowId, "switch");
     results.check("control: the same flow step from the site's origin works", okStep.status === 200, brief(okStep));
+    results.check(`none of the ${refusals} refusals of a foreign-origin request sets or clears a cookie (the browser would apply it even to a refused request)`, refusalCookies.length === 0, refusalCookies.join(" | ") || `${refusals} refusals, no Set-Cookie`);
 
     // 4. Controls: the site's origin and the configured extra origin work; a Bearer token needs no Origin.
     const renamed = `Renamed ${tag()}`;
@@ -117,6 +132,30 @@ export const journey: Journey = {
     const cookieless = await call(`${env.site}/v1/session/signout`, { method: "POST", body: "", origin: "http://127.0.0.1:9", ip: ctx.ip });
     const cleared = cookieless.setCookies.filter(cookie => cookie.attributes.get("max-age") === "0").map(cookie => cookie.name);
     results.check("a cookieless sign-out from a foreign origin changes nothing: no Set-Cookie clears the browser's session or sign-up cookie", cleared.length === 0, `${brief(cookieless)}; Set-Cookie clears: ${cleared.join(", ") || "none"}`);
+
+    // The same for a browser that still holds cookies the server no longer knows (signed out elsewhere, made up): only
+    // the site's own pages may clean them up; from anywhere else (or with no Origin) the answer touches no cookie.
+    const stale = await signInWithEmail(t, { label: "csrf-stale" });
+    remember(ctx, "session cookie", stale.jar.get("sa_session"));
+    remember(ctx, "code", stale.code);
+    const staleSession = stale.jar.get("sa_session") ?? "";
+    const signedOutElsewhere = await call(`${env.site}/v1/session/signout`, { method: "POST", body: "", jar: stale.jar.clone(), origin: env.site, ip: ctx.ip });
+    const staleCookies = `sa_session=${staleSession}; sa_signup=sau_${"S".repeat(43)}`;
+    const staleCases: Array<[string, string, string | null]> = [
+      ["a signed-out session cookie from another site", staleCookies, "https://evil.example"],
+      ["a signed-out session cookie from a same-site page on another port", staleCookies, `http://localhost:${sparePort(env, 5)}`],
+      ["a signed-out session cookie with no Origin", staleCookies, null],
+      ["a made-up session cookie from another site", `sa_session=sas_${"G".repeat(43)}`, "https://evil.example"],
+    ];
+    const touched: string[] = [];
+    for (const [label, cookie, origin] of staleCases) {
+      const reply = await call(`${env.site}/v1/session/signout`, { method: "POST", body: "", headers: { cookie }, origin, ip: ctx.ip });
+      if (reply.status !== 401 || errorOf(reply).code !== "unauthenticated" || reply.setCookies.length) touched.push(`${label}: ${brief(reply)}; Set-Cookie ${reply.setCookies.map(c => c.name).join(", ") || "none"}`);
+    }
+    results.check(`sign-out with cookies the server no longer knows (${staleCases.length} cases: signed out elsewhere from another site, a same-site page or with no Origin; made up) gets 401 unauthenticated and no Set-Cookie`, signedOutElsewhere.status === 204 && touched.length === 0, touched.join(" | ") || `${staleCases.length} × 401, no Set-Cookie`);
+    const ownCleanup = await call(`${env.site}/v1/session/signout`, { method: "POST", body: "", headers: { cookie: staleCookies }, origin: env.site, ip: ctx.ip });
+    const ownCleared = ownCleanup.setCookies.filter(cookie => cookie.attributes.get("max-age") === "0").map(cookie => cookie.name);
+    results.check("control: the same stale cookies sent from the site's own pages get 401 and are cleaned up (sa_session and sa_signup with Max-Age=0)", ownCleanup.status === 401 && ownCleared.includes("sa_session") && ownCleared.includes("sa_signup"), `${brief(ownCleanup)}; clears ${ownCleared.join(", ") || "nothing"}`);
 
     // 5. In the browser: attacker pages against the signed-in victim.
     const victimContext = await newContext(browser, { forwardedFor: null });
@@ -200,6 +239,48 @@ async function shoot() {
     const poll = await call<{ error?: string; access_token?: string }>(`${env.site}/v1/oauth/token`, { form: { grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: device.body.device_code ?? "", client_id: "accounts" }, ip: ctx.ip });
     results.check("…and the attacker's device code was never approved: still pending, and the attacker's terminal polling it gets authorization_pending, no token", device.status === 200 && pendingDevice.body.status === "pending" && poll.status === 400 && poll.body.error === "authorization_pending" && !poll.body.access_token, `device ${device.status}; status ${pendingDevice.status} ${pendingDevice.body.status}; poll ${poll.status} ${poll.body.error}`);
     await victimContext.close();
+
+    // 6. A signed-out browser in the middle of a sign-up (its email verified, the details page next: sa_flow and the
+    //    48-hour sa_signup, no session). Same-site pages send its cookies, cross-site ones don't; neither may end it.
+    const pendingEmail = randomEmail("csrf-signup");
+    const signupJar = new Jar();
+    const pending = flowOf(await startFlow(t, signupJar, { app_id: "briefcase", redirect_uri: callbackOf(env, "briefcase"), state: `p-${tag()}`, prompt: "login" }));
+    const pendingId = pending?.id ?? "";
+    const sentAt = await lastSeq(env);
+    await flowStep(t, signupJar, pendingId, "email", { email: pendingEmail });
+    const pendingCode = await codeFor(env, pendingEmail, sentAt);
+    remember(ctx, "code", pendingCode);
+    const atSignup = flowOf(await flowStep(t, signupJar, pendingId, "verify", { code: pendingCode }));
+    remember(ctx, "sa_signup cookie", signupJar.get("sa_signup"));
+    remember(ctx, "sa_flow cookie", signupJar.get("sa_flow"));
+    const signupContext = await newContext(browser, { forwardedFor: null });
+    const signupCookies = ["sa_flow", "sa_signup"] as const;
+    await signupContext.addCookies(signupCookies.map(name => ({ name, value: signupJar.get(name) ?? "", domain: host, path: "/", httpOnly: true, sameSite: "Lax" as const, secure: false, expires: Math.floor(Date.now() / 1000) + 3600 })));
+    await signupContext.route(`${sameSite}/**`, route => route.fulfill({ contentType: "text/html", body: attackerPage("same-site") }));
+    await signupContext.route(`${crossSite}/**`, route => route.fulfill({ contentType: "text/html", body: attackerPage("cross-site") }));
+    const signupPage = await signupContext.newPage();
+    for (const [kind, origin] of [
+      ["same-site", sameSite],
+      ["cross-site", crossSite],
+    ] as const) {
+      const navigation = signupPage.waitForResponse(response => response.url() === `${env.site}/v1/session/signout` && response.request().method() === "POST", { timeout: 15_000 });
+      await signupPage.goto(`${origin}/csrf-signup.html`);
+      await signupPage.evaluate(() => (document.getElementById("signout") as HTMLFormElement).submit());
+      const answer = await navigation.then(async response => ({ status: response.status(), setCookie: (await response.allHeaders())["set-cookie"] ?? "", sentCookie: (await response.request().allHeaders())["cookie"] ?? "" })).catch(() => ({ status: 0, setCookie: "", sentCookie: "" }));
+      await sleep(400);
+      const kept = (await signupContext.cookies(env.site)).filter(cookie => (signupCookies as readonly string[]).includes(cookie.name) && cookie.value === signupJar.get(cookie.name)).map(cookie => cookie.name);
+      await shot(env, signupPage, `security-csrf-${kind}-signup-signout`);
+      results.check(`${kind} page: a forged sign-out form against a browser in the middle of a sign-up gets 401 without Set-Cookie, and the browser keeps its sa_signup and sa_flow cookies`, answer.status === 401 && !answer.setCookie && kept.length === 2, `form sign-out ${answer.status} (cookies sent: ${answer.sentCookie ? answer.sentCookie.split(";").map(part => part.split("=")[0]!.trim()).join(", ") : env.engine === "webkit" ? "not reported by WebKit" : "none"})${answer.setCookie ? `, Set-Cookie: ${answer.setCookie.replace(/\s+/g, " ").slice(0, 160)}` : ""}; browser keeps ${kept.join(", ") || "NOTHING"}`);
+      if (kept.length < 2) await signupContext.addCookies(signupCookies.map(name => ({ name, value: signupJar.get(name) ?? "", domain: host, path: "/", httpOnly: true, sameSite: "Lax" as const, secure: false, expires: Math.floor(Date.now() / 1000) + 3600 })));
+    }
+    // The sign-up survived: it is finished with the cookies the browser holds now.
+    const finishJar = new Jar();
+    for (const cookie of await signupContext.cookies(env.site)) if ((signupCookies as readonly string[]).includes(cookie.name)) finishJar.set(cookie.name, cookie.value);
+    let finished = flowOf(await flowStep(t, finishJar, pendingId, "signup", {}));
+    if (finished?.step === "consent") finished = flowOf(await flowStep(t, finishJar, pendingId, "consent", { approve: true, optional_scopes: [] }));
+    remember(ctx, "session cookie", finishJar.get("sa_session"));
+    results.check("…and that sign-up is finished afterwards with the cookies the browser kept: the account is created and the flow completes with briefcase's code", atSignup?.step === "signup" && finished?.step === "complete" && /[?&]code=/.test(finished.redirect_to ?? ""), `verified → ${atSignup?.step}; finished → ${finished?.step}${finished?.error ? ` (${finished.error.code})` : ""}`);
+    await signupContext.close();
   },
 };
 

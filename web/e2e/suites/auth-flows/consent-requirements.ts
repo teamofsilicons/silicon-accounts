@@ -1,6 +1,7 @@
 /**
- * What's shared with the app. Consent: required details locked on, optional ones toggled (the toggle decides what the
- * app gets, and a later consent replaces the grant), asked again when the app asks for more, Cancel sends
+ * What's shared with the app. Consent: required details locked on, optional ones toggled (unticked until the Carbon
+ * ticks them, even when the app asks for them in scope: UNDERSTANDING.md as edited on 2026-10-07; the toggle decides
+ * what the app gets, and a later consent replaces the grant), asked again when the app asks for more, Cancel sends
  * access_denied and grants nothing. Requirements: a detail the app requires and the account lacks is added with a code
  * before consent (dm: phone; ledgerly: phone + dob, where dob always exists), refusing addresses of other accounts.
  */
@@ -32,7 +33,7 @@ const tokenScope = async (page: import("@playwright/test").Page) => ((JSON.parse
 
 const consent: Journey = {
   name: "auth-flows-consent",
-  title: "briefcase's what's-shared screen: email required and locked, timezone optional and off; toggling it on shares it, prompt=consent toggling it off takes it back, Cancel sends access_denied; at the API: requested scopes pre-check, asking for more shows the screen again, bad optional scopes are refused",
+  title: "briefcase's what's-shared screen: email required and locked, timezone optional and off (also when briefcase asks for it in scope: unticked until the Carbon ticks it); toggling it on shares it, prompt=consent toggling it off takes it back, Cancel sends access_denied; at the API: a requested optional scope starts unticked, asking for more shows the screen again, bad optional scopes are refused",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const t = tag();
@@ -89,6 +90,36 @@ const consent: Journey = {
     results.check("Cancel → briefcase gets error=access_denied", (await page.locator("#error-code").innerText().catch(() => "")) === "access_denied", page.url());
     await context.close();
 
+    // UNDERSTANDING.md (edited 2026-10-07): an optional detail is unticked until the Carbon ticks it, also when the app
+    // asks for it in `scope`; sharing without touching it gives the app nothing optional.
+    const asker = new Browserish(env, ctx.ip);
+    await signUpVia(asker, "spacestation", `consent.asked.${t}@example.test`, { timezone: "Europe/Paris" });
+    const askedContext = await newContext(browser);
+    await adoptSession(askedContext, env.site, asker);
+    const asked = await askedContext.newPage();
+    results.watch(asked, "consent-asked");
+    await asked.goto(`${env.apps}/briefcase/?only=hosted&scope=${encodeURIComponent("email timezone")}`);
+    await asked.locator("#signin-hosted").click();
+    await asked.getByRole("button", { name: /^Continue as/ }).click({ timeout: 30_000 });
+    const askedTz = asked.getByRole("switch", { name: /Timezone/ });
+    await askedTz.waitFor({ timeout: 20_000 });
+    await sleep(300);
+    await shot(env, asked, "auth-flows-consent-asked");
+    results.check(
+      "briefcase asks for timezone in scope → the timezone switch still starts off (unticked until the Carbon ticks it)",
+      (await askedTz.getAttribute("aria-checked")) === "false",
+      `aria-checked=${await askedTz.getAttribute("aria-checked")}`,
+    );
+    await asked.getByRole("button", { name: "Share and continue" }).click();
+    await asked.waitForURL(appUrl(env.apps, "briefcase", "callback"), { timeout: 30_000 });
+    const askedShared = await appAccount(asked);
+    results.check(
+      "…and sharing without touching it gives briefcase no timezone (scope email profile)",
+      askedShared !== null && !("timezone" in askedShared) && (await tokenScope(asked)) === "email profile",
+      `${await tokenScope(asked)} ${JSON.stringify(askedShared).slice(0, 200)}`,
+    );
+    await askedContext.close();
+
     // At the API.
     const c = new Browserish(env, ctx.ip);
     const fresh = await startSignIn(c, "briefcase", { scope: "email timezone" });
@@ -96,7 +127,13 @@ const consent: Journey = {
     let flow = (await c.act(fresh.flow.id, "verify", { code: sent.code ?? "" })).body.flow;
     flow = (await c.act(flow.id, "signup", {})).body.flow;
     results.check("a new account lands on consent", flow.step === "consent", flow.step);
-    results.check("timezone asked for in scope → its optional row starts granted", flow.consent?.optional.find(row => row.scope === "timezone")?.granted === true, JSON.stringify(flow.consent?.optional));
+    // UNDERSTANDING.md (edited 2026-10-07): an optional detail "comes with a checkbox, and it's up to the Carbon to tick
+    // it … It's unticked until they do." The app asking for it in `scope` is not the Carbon ticking it.
+    results.check(
+      "timezone asked for in scope → its optional row still starts unticked (granted false: optional details are unticked until the Carbon ticks them)",
+      flow.consent?.optional.find(row => row.scope === "timezone")?.granted === false,
+      JSON.stringify(flow.consent?.optional),
+    );
     const badScope = await c.act(flow.id, "consent", { approve: true, optional_scopes: ["phone"] });
     results.check("optional_scopes with phone (not optional for briefcase) → 422 naming optional_scopes[0]", badScope.status === 422 && typeof ((errorDetails(badScope).fields ?? {}) as Record<string, string>)["optional_scopes[0]"] === "string", brief(badScope));
     const junk = await c.act(flow.id, "consent", { approve: true, optional_scopes: ["timezone", "superuser"] });

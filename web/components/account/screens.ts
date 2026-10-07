@@ -19,8 +19,8 @@ import type { MockReply, MockRoute, ScreenSpec } from "../../scripts/screens-typ
 const fromNow = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
 const error = (status: number, code: string, message: string, hint: string): MockReply => ({ status, json: { error: { code, message, hint } } });
 
-/** The people the samples mention, for GET /v1/accounts/{uuid}. */
-const people: AccountSummary[] = [
+/** The accounts the samples mention, for GET /v1/accounts/{uuid}. */
+const accounts: AccountSummary[] = [
   data.carbonSummary,
   { uuid: "Sh7", kind: "carbon", id: "c:shubham", display_name: "Shubham", pfp_url: data.portrait("Shubham", 300), status: "active" },
   ...data.silicons.map(({ uuid, kind, id, display_name, pfp_url, status }) => ({ uuid, kind, id, display_name, pfp_url, status })),
@@ -41,7 +41,7 @@ const accountRoutes: MockRoute[] = [
   ["GET /v1/me/proofs", () => ({ json: data.page(proofs()) })],
   ["GET /v1/me/custodian-requests", () => ({ json: data.page(requests()) })],
   ["GET /v1/accounts/:uuid", ({ params }) => {
-    const found = people.find(person => person.uuid === params.uuid);
+    const found = accounts.find(account => account.uuid === params.uuid);
     return found ? { json: found } : error(404, "account_not_found", `No account with uuid '${params.uuid}' exists.`, "Check the uuid.");
   }],
   ["POST /v1/me/emails", ({ body }) => {

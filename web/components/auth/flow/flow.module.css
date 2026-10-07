@@ -158,30 +158,35 @@
   --sq-r: var(--radius-control);
   --sq-fill: transparent;
   --sq-stroke: var(--border);
+  /* The photo or icon before the text (Arc's Avatar: md 36 px, lg 48 px; the destination's icon 16 px). */
+  --row-lead: 48px;
   position: relative;
   display: flex;
   min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   border: 1px solid var(--sq-stroke);
   background: var(--sq-fill);
 }
-.accountRow { --sq-r: var(--radius-panel); flex-wrap: wrap; padding: var(--space-3); }
-.destination { min-height: calc(var(--control-height-md) + 4px); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); }
-.accountText { display: grid; min-width: 0; flex: 1; gap: 2px; }
+.accountRow { --sq-r: var(--radius-panel); row-gap: var(--space-2); padding: var(--space-3); }
+.accountRow[data-size="sm"] { --row-lead: 36px; }
+.destination { --row-lead: 16px; min-height: calc(var(--control-height-md) + 4px); row-gap: 0; padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); }
+.accountRow > :first-child, .destinationIcon { flex: none; }
+.accountText { display: grid; min-width: 0; gap: 2px; }
 /*
- * The name and id keep room to be read: when the row cannot give them 5rem (an 11 character id) beside the action (a
- * 320 or 360 px phone with "Switch account"), the action moves under them, at the end, instead of cutting them to a few
- * letters.
+ * The account's name and id (or where the code went) are what the Carbon checks, so they are never cut short: they
+ * sit beside the action while they fit on their lines, and otherwise the action moves under them, at the end, and
+ * they get the row's whole width. Only a single word longer than that (an id, an address) breaks across lines.
  */
-.accountRow > .accountText { flex: 1 1 5rem; }
-.accountRow > .rowAction { margin-left: auto; }
-.accountName { overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.accountId { overflow: hidden; color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
-.destinationIcon { display: grid; flex: none; place-items: center; color: var(--text-secondary); }
+:is(.accountRow, .destination) > :is(.accountText, .destinationText) { flex: 1 1 auto; max-width: calc(100% - var(--row-lead) - var(--space-3)); }
+.destination > :is(.accountText, .destinationText) { padding-block: var(--space-2); }
+.accountName { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; overflow-wrap: anywhere; }
+.accountId { color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; overflow-wrap: anywhere; }
+.destinationIcon { display: grid; place-items: center; color: var(--text-secondary); }
 .provenNote { color: var(--text-secondary); font-size: var(--text-xs); }
-.destinationText { min-width: 0; flex: 1; overflow: hidden; color: var(--foreground); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
-.rowAction { display: flex; flex: none; align-items: center; }
+.destinationText { min-width: 0; color: var(--foreground); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.rowAction { display: flex; flex: none; align-items: center; margin-left: auto; }
 
 /* ------------------------------------------------------------------------------------------------ code entry */
 .codeEntry { display: grid; min-width: 0; gap: var(--space-3); }
@@ -214,7 +219,8 @@
   transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
 }
 .resend[aria-disabled="true"] { color: var(--text-muted); font-weight: 400; cursor: default; }
-.resend:not([aria-disabled="true"]):focus-visible { outline: none; background: var(--surface-muted); }
+/* Keyboard focus shows while it counts down too (it stays a Tab stop): the fill, with the waiting state's muted ink. */
+.resend:focus-visible { outline: none; background: var(--surface-muted); }
 .resendLabel { display: inline-flex; align-items: baseline; gap: .3em; white-space: nowrap; }
 .time { display: inline-flex; font-variant-numeric: tabular-nums; }
 .timeColumn { position: relative; display: inline-flex; justify-content: center; }

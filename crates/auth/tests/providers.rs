@@ -1131,3 +1131,101 @@ async fn google_never_reaches_an_import_someone_else_finished() {
         "the victim's Google was never linked to that account"
     );
 }
+
+#[tokio::test]
+async fn a_kept_alive_connection_the_provider_dropped_is_retried_on_a_new_one() {
+    // Providers close idle keep-alive connections long before reqwest's pool stops reusing
+    // them (Node closes after 5 s, the pool keeps them 90 s). A code exchange written to such a
+    // connection dies before any answer ("connection closed before message completed"). The
+    // provider never saw that request, so the code is still unused: it is sent once more on a
+    // new connection instead of failing the sign-in with provider_unavailable.
+    let mock = MockOidc::start().await;
+    let front = common::dropping_front::DroppingFront::start(&mock.base, 1).await;
+    let mut s = Settings::for_tests();
+    mock.configure(&mut s);
+    s.google.token_url = format!("{}/google/token", front.base);
+    s.apple.token_url = format!("{}/apple/token", front.base);
+    let ctx = TestContext::with_settings(s).await;
+    let (app, _) = app_with(
+        &ctx,
+        "waveform",
+        json!({"methods": {"apple": true, "google": true}}),
+    )
+    .await;
+    for (round, provider) in ["apple", "google", "apple", "google"]
+        .into_iter()
+        .enumerate()
+    {
+        let mut b = Browser::new(&ctx);
+        let id = id_of(&new_flow(&ctx, &mut b, &app.app_id, json!({})).await);
+        let r = oauth_start(&ctx, &mut b, &id, provider).await;
+        assert_eq!(r.status, 200, "{}", r.json);
+        let url = r.json["authorize_url"].as_str().expect("url").to_string();
+        let (code, state) = mock.authorize(&url, identity("keepalive-"));
+        let r = if provider == "apple" {
+            apple_callback(&ctx, &mut b, &mock, &[("code", &code), ("state", &state)]).await
+        } else {
+            google_callback(&ctx, &mut b, &code, &state).await
+        };
+        assert_redirect_to_flow(&ctx, &r, &id);
+        let r = b.get(&ctx, &format!("/v1/flows/{id}")).await;
+        assert_eq!(
+            r.json["flow"]["step"],
+            "signup",
+            "round {} ({provider}) signs in: {}",
+            round + 1,
+            r.json["flow"]["error"]
+        );
+        assert_eq!(r.json["flow"]["error"], Value::Null);
+    }
+    assert!(
+        front.dropped() >= 1,
+        "the reused connection was dropped at least once (dropped {}, answered {}, connections {})",
+        front.dropped(),
+        front.answered(),
+        front.connections()
+    );
+    assert_eq!(front.answered(), 4, "one answered exchange per sign-in");
+    assert_eq!(
+        mock.token_requests().len(),
+        4,
+        "the provider saw every code exactly once"
+    );
+}
+
+#[tokio::test]
+async fn an_unreachable_provider_is_reported_with_the_reason() {
+    let mock = MockOidc::start().await;
+    // A port nothing listens on: the connection is refused (twice: the retry fails the same way).
+    let closed = std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("bind")
+        .local_addr()
+        .expect("addr");
+    let mut s = Settings::for_tests();
+    mock.configure(&mut s);
+    s.google.token_url = format!("http://{closed}/google/token");
+    let ctx = TestContext::with_settings(s).await;
+    let (app, _) = app_with(&ctx, "commit", json!({"methods": {"google": true}})).await;
+    let (mut b, id, url) = google_leg(&ctx, &app.app_id).await;
+    let (code, state) = mock.authorize(&url, identity("down-"));
+    assert_redirect_to_flow(
+        &ctx,
+        &google_callback(&ctx, &mut b, &code, &state).await,
+        &id,
+    );
+    let e = flow_error(&ctx, &mut b, &id).await;
+    assert_eq!(e["code"], "provider_unavailable", "{e}");
+    let message = e["message"].as_str().expect("message").to_lowercase();
+    assert!(
+        message.contains("couldn't reach google") && message.contains("connect"),
+        "the message names the provider and the transport failure: {message}"
+    );
+    assert!(
+        message.contains("refused"),
+        "the root cause is kept, not cut at the first line: {message}"
+    );
+    assert!(
+        message.contains("tried twice"),
+        "says the request was retried: {message}"
+    );
+}

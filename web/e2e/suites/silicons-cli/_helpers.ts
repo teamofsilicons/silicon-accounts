@@ -8,9 +8,12 @@
  *   timer, strict JSON parsing of stdout and the JSON lines it writes on stderr in `--json` mode;
  * - webhook receivers: a Silicon's own webhook on the fake app server's generic sinks (`/hooks/<key>`), and the fake
  *   apps' own inboxes (both verify X-Accounts-Signature; refused deliveries are listed);
- * - app credentials (testkit/fake-apps.json), SLT exchanges and token calls as an app.
+ * - app credentials (testkit/fake-apps.json), SLT exchanges and token calls as an app;
+ * - row locks held from a psql session of the suite's own (holdRows, waitForLockWaiters), to line requests up behind a
+ *   lock and let them go at once: races between a sign-in and whatever ends its Silicon, made deterministic.
  */
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -43,6 +46,16 @@ export async function pool<T, R>(items: T[], width: number, work: (item: T) => P
     }),
   );
   return out;
+}
+
+/** The `items` of a page (`{"items": [...]}`), or []. */
+export const itemsOf = (body: unknown): Json[] => (Array.isArray(obj(body).items) ? (obj(body).items as Json[]) : []);
+
+/** JSON with object keys sorted at every level, to compare documents whatever their key order. */
+export function canonical(value: unknown): string {
+  const sorted = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(sorted) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v as Json).sort().map(key => [key, sorted((v as Json)[key])])) : v;
+  return JSON.stringify(sorted(value)) ?? "undefined";
 }
 
 /** Polls `probe` until it returns something truthy (or the time is up, then null). */
@@ -216,10 +229,11 @@ const sandbox = () => (sandboxHome ??= freshDir("sa-e2e-scli-user-"));
 
 /** Runs the real `accounts` CLI. */
 export function accounts(env: Env, args: string[], options: RunOptions = {}): Promise<Run> {
-  const base: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value === undefined || key.startsWith("ACCOUNTS_") || key === "SILICON_HOME") continue;
-    base[key] = value;
+  // A copy of this process's environment (typed as one: the site's Next types make NODE_ENV a required key of it),
+  // without the stack's own settings, so the CLI only knows what each run tells it.
+  const base: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of Object.keys(base)) {
+    if (base[key] === undefined || key.startsWith("ACCOUNTS_") || key === "SILICON_HOME") delete base[key];
   }
   base.NO_COLOR = "1";
   base.HOME = sandbox();
@@ -422,6 +436,80 @@ export const waitApp = (env: Env, app: string, type: string, match: (event: Inbo
 
 /** `data` of an event's body. */
 export const dataOf = (event: InboxEvent | null): Json => obj(event?.payload.data);
+
+/** Makes the sink refuse its next `failNext` deliveries with HTTP `status` (0 makes it accept again). */
+export async function sinkFault(env: Env, key: string, failNext: number, status = 500): Promise<Json> {
+  return obj((await json(`${env.apps}/hooks/${key}/_webhook-faults`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ fail_next: failNext, status }) })).body);
+}
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* Row locks (deterministic races)                                                                                     */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+export interface RowHold {
+  /** The database session holding the rows. */
+  pid: number;
+  /** Ends the hold (rollback) and waits until its session is gone. */
+  release(): Promise<void>;
+}
+
+/**
+ * Locks the rows of `table` matching `where` (`select … for update`) from a psql session of its own and keeps them
+ * locked until `release()` (at most `maxMs`), so requests that need those rows line up behind it in the order they
+ * arrive, and all go at once when it lets go. Only for this stack's own database and rows the journey made.
+ */
+export async function holdRows(env: Env, table: string, where: string, maxMs = 20_000): Promise<RowHold> {
+  const mark = `scli_hold_${randomUUID().replace(/-/g, "")}`;
+  const child = spawn(join(env.pgBin, "psql"), [env.db, "-v", "ON_ERROR_STOP=1", "-q", "-At"], {
+    env: { ...process.env, PGOPTIONS: "--client-min-messages=warning" },
+    stdio: ["pipe", "ignore", "pipe"],
+  });
+  let stderr = "";
+  child.stderr.on("data", chunk => (stderr += chunk));
+  child.stdin.on("error", () => undefined);
+  const closed = new Promise<void>(done => child.once("close", () => done()));
+  let ended = false;
+  const release = async () => {
+    if (!ended) {
+      ended = true;
+      child.stdin.end("rollback;\n");
+    }
+    await closed;
+    clearTimeout(timer);
+  };
+  // Declared after release(), which only runs once it exists (here, or when it fires).
+  const timer = setTimeout(() => void release(), maxMs);
+  child.stdin.write(`begin;\nselect '${mark}' from ${table} where ${where} for update;\n`);
+  const pid = await until(async () => {
+    const rows = await sql(env, `select pid from pg_stat_activity where state = 'idle in transaction' and query like '%${mark}%' and pid <> pg_backend_pid()`);
+    return rows[0]?.[0] ? Number(rows[0][0]) : null;
+  }, 15_000, 50);
+  if (!pid) {
+    await release();
+    throw new Error(`could not lock ${table} where ${where}: ${stderr.trim() || "the session never got there"}`);
+  }
+  return { pid, release };
+}
+
+/** What the sessions of this stack's database that wait for a lock are running (their statements, shortened). */
+export async function lockWaiters(env: Env): Promise<string[]> {
+  const rows = await sql(env, "select left(regexp_replace(query, '\\s+', ' ', 'g'), 100) from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and pid <> pg_backend_pid() order by query_start");
+  return rows.map(row => row[0] ?? "");
+}
+
+/**
+ * Waits until at least `n` sessions wait for a lock (one of them running a statement matching `including`, when
+ * given); their statements, or null when the time is up.
+ */
+export function waitForLockWaiters(env: Env, n: number, including?: RegExp, timeoutMs = 15_000): Promise<string[] | null> {
+  return until(async () => {
+    const waiting = await lockWaiters(env);
+    return waiting.length >= n && (!including || waiting.some(statement => including.test(statement))) ? waiting : null;
+  }, timeoutMs, 50);
+}
+
+/** The statement a Silicon sign-in waits in while it counts its attempt (core's `begin_stk_attempt`). */
+export const COUNTING_STK_ATTEMPT = /stk_failed_attempts = stk_failed_attempts \+ 1/;
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Apps                                                                                                                */

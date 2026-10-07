@@ -65,7 +65,9 @@ export const journey: Journey = {
     await shot(env, page, "dvb-a-01-owned-apps");
     const tiles = await list.getByRole("link").evaluateAll(links => links.map(link => ({ label: link.getAttribute("aria-label") ?? link.textContent ?? "", href: link.getAttribute("href") ?? "", target: link.getAttribute("target") })));
     const appTiles = tiles.filter(tile => tile.href.startsWith("/developer/"));
-    const expectedLabels = (owned.body.items ?? []).map(item => `${item.name} (${item.app_id}), ${item.users} ${item.users === 1 ? "user" : "users"}`);
+    // Each tile is named by what it shows, in order (WCAG 2.5.3): its name, app id, user count and source.
+    const sourceLabel: Record<string, string> = { first_party: "First-party", fake: "Stand-in app", silicon_apps: "Silicon Apps" };
+    const expectedLabels = (owned.body.items ?? []).map(item => `${item.name}, ${item.app_id}, ${item.users} ${item.users === 1 ? "user" : "users"}, ${sourceLabel[item.source] ?? item.source}`);
     results.check("the tiles are the owned apps, in the API's order, each with its name, app id and user count", JSON.stringify(appTiles.map(tile => tile.label)) === JSON.stringify(expectedLabels), appTiles.map(tile => tile.label).join(" | "));
     results.check("each tile opens that app's developer pages", appTiles.every((tile, index) => tile.href === `/developer/${apiIds[index]}`), appTiles.map(tile => tile.href).join(" "));
     const newApp = tiles.find(tile => /^New app/.test(tile.label));
@@ -84,7 +86,7 @@ export const journey: Journey = {
     await list.waitFor({ timeout: 20_000 });
 
     // A tile opens the app: its header and the overview's facts match what the API stores.
-    await list.getByRole("link", { name: /^Remind \(remind\)/ }).click();
+    await list.getByRole("link", { name: /^Remind, remind,/ }).click();
     await page.waitForURL(`${env.site}/developer/remind`, { timeout: 20_000 });
     await page.getByRole("heading", { level: 1, name: "Remind" }).waitFor({ timeout: 20_000 });
     const detail = await asSession<{ config_version: number; owner: { id: string } | null; status: string; source: string }>(page, env, "GET", "/v1/apps/remind");
@@ -96,10 +98,19 @@ export const journey: Journey = {
     results.check("the header shows the app id, Active and its source (a stand-in until Silicon Apps)", header.includes("remind") && /Active/.test(header) && /Stand-in app/.test(header) && detail.body.status === "active" && detail.body.source === "fake", header.slice(0, 120));
     await shot(env, page, "dvb-a-02-remind-overview");
 
-    // The owner's photo: a local stack must not send pages to the internet for it (the harness suite checks the same
-    // for Carbons who sign up on the site).
+    // The owner's photo. scripts/dev.sh seeds the fake apps' owners without ACCOUNTS_IRIS_BASE_URL, so their default
+    // photos point at production Iris; keepIrisLocal answers those requests from this stack's mock Iris, so no page
+    // reaches the internet. That is the harness's seeding, not the product (reported to the harness owner), so it is
+    // recorded here as a metric rather than judged.
     const [[ownerPhoto] = []] = await sql(env, "select pfp_url from accounts where handle = 'c:saket'");
-    results.check("the seeded owner's default photo is on this stack's mock Iris, so no page reaches the internet for it", !!ownerPhoto?.startsWith(env.iris) && askedProductionIris.length === 0, `c:saket pfp_url ${ownerPhoto}; the owner's pages asked production Iris ${askedProductionIris.length} times (answered from the mock Iris by this journey)`);
+    results.metric(`seeded owner's photo requests to production Iris answered by the mock Iris (pfp_url ${ownerPhoto?.startsWith(env.iris) ? "on the mock Iris" : ownerPhoto})`, askedProductionIris.length, "requests");
+
+    // Where the developer platform lives: UNDERSTANDING.md ("Where things live", edited 2026-10-07) puts everything about
+    // building apps on developer.teamofsilicons.com ("one unified frontend on top of" the services' backends) and says
+    // of accounts.teamofsilicons.com: "Anything about building apps lives on developer.teamofsilicons.com, not here."
+    const navDeveloper = await page.getByRole("link", { name: /^Developer\b/ }).count();
+    const servedHere = page.url().startsWith(`${env.site}/developer/`) && (await page.getByRole("tab", { name: /^Sign-in/ }).count()) > 0;
+    results.check("the account site does not carry the developer platform (UNDERSTANDING.md: anything about building apps lives on developer.teamofsilicons.com, not on accounts.teamofsilicons.com)", !servedHere, `the account site (${env.site}, accounts.teamofsilicons.com in production) serves ${new URL(page.url()).pathname} with every app tab (Overview, Sign-in, Branding, Users, Import, Webhooks, Proofs, Embed)${navDeveloper ? " and its navigation lists \"Developer\"" : ""}`);
 
     // CSRF: the owner's own cookie still needs the site's Origin to change anything.
     const noOrigin = await page.request.fetch(`${env.site}/v1/apps/remind/signin-config`, { method: "PATCH", headers: { "content-type": "application/json" }, data: JSON.stringify({ copy: { subtitle: `csrf ${t}` } }), failOnStatusCode: false });
@@ -153,6 +164,29 @@ export const journey: Journey = {
     const missing = fresh.page.getByText(`No app with the id no-such-app-${t}`);
     await missing.waitFor({ timeout: 20_000 }).catch(() => undefined);
     results.check("an app id that does not exist says so", (await missing.count()) > 0);
+
+    // An app without a logo (as Silicon Apps may deliver one): its tile shows the app's initials where the logo goes.
+    // They are drawn (the avatar's ::before), not text, so the tile is still named by exactly the words it shows, in
+    // order (WCAG 2.5.3); as text they were two letters its name lacked, and axe failed the tile on them.
+    const me = await asSession<{ uuid: string }>(fresh.page, env, "GET", "/v1/me");
+    const bare = `dvb-bare-${t}`;
+    await sql(env, `insert into apps (app_id, name, description, logo_url, logo_dark_url, homepage_url, owner_uuid, secret_hash, status, source)
+      select '${bare}', 'Bare Notes ${t}', 'An app without a logo', null, null, homepage_url, '${me.body.uuid}', secret_hash, 'active', 'fake' from apps where app_id = 'briefcase'`);
+    await sql(env, `insert into app_signin_configs (app_id, version, config, updated_by) select '${bare}', 1, config, 'system' from app_signin_configs where app_id = 'briefcase'`);
+    await fresh.page.goto(`${env.site}/developer`);
+    const bareTile = fresh.page.getByRole("list", { name: "Your apps" }).locator(`a[href="/developer/${bare}"]`);
+    await bareTile.waitFor({ timeout: 20_000 }).catch(() => undefined);
+    // Words as axe's label-in-name rule compares them: lower case, anything but letters and digits a separator. (No
+    // named helpers inside the callback: tsx wraps them in a __name() the page does not have.)
+    const bareLook = await bareTile.evaluate(link => {
+      const [shown, name] = [(link as HTMLElement).innerText, link.getAttribute("aria-label") ?? link.textContent ?? ""]
+        .map(text => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(/\s+/).filter(Boolean)) as [string[], string[]];
+      const contained = shown.length > 0 && name.some((_, start) => shown.every((word, index) => name[start + index] === word));
+      const mark = link.querySelector("[data-initials]");
+      return { shown: shown.join(" "), name: name.join(" "), contained, initials: mark ? getComputedStyle(mark, "::before").content : null };
+    }).catch(error => ({ shown: "", name: "", contained: false, initials: null, error: String(error).split("\n")[0] }));
+    results.check("a tile of an app without a logo shows its initials and is named by exactly the words it shows, in order (WCAG 2.5.3)", bareLook.contained && bareLook.initials === "\"BN\"", JSON.stringify(bareLook));
+    await shot(env, fresh.page, "dvb-a-05-app-without-logo");
     await fresh.context.close();
   },
 };

@@ -3,7 +3,8 @@
 /* The trigger anchors the menu, so press feedback stays in color. A scaled rect would be measured on pointerdown and shift the menu. */
 .trigger[data-state="open"] { --sq-stroke: var(--border-strong); --sq-fill: var(--surface-muted); box-shadow: none; }
 .trigger:active { --sq-stroke: var(--border-strong); --sq-fill: color-mix(in oklab, var(--surface-muted), var(--border) 55%); box-shadow: none; }
-.trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* Silicon Accounts: keyboard position in fills and edges (Arc's ring is transparent here): the hover look. */
+.trigger:focus-visible { --sq-stroke: var(--border-strong); --sq-fill: var(--surface-muted); }
 .item:focus-visible { outline: none; }
 .triggerIcon { display: inline-flex; flex: none; color: var(--text-secondary); }
 .label { position: relative; display: inline-flex; min-width: 0; flex: 0 1 auto; overflow-x: clip; }

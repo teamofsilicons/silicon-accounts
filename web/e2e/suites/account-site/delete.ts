@@ -97,8 +97,9 @@ const deletion: Journey = {
   async run(ctx) {
     const { env, results } = ctx;
     const t = tag();
-    // The sign-out after the deletion is checked on its own below (it answers 401: the deletion already ended the session).
-    const leaver = await newCarbon(ctx, "acct-leaver", { watch: [/status of 401 \(Unauthorized\) @ \S+\/v1\/session\/signout$/] });
+    // Nothing failing is expected on the walked page: the deletion ends the session itself, so the site leaves without a
+    // sign-out (round 1 found a POST /v1/session/signout answering 401 after every deletion; checked below as well).
+    const leaver = await newCarbon(ctx, "acct-leaver");
     const taker = await newCarbon(ctx, "acct-taker");
     const { uuid } = leaver;
     for (const app of ["briefcase", "commit", "browser"]) {
@@ -134,8 +135,12 @@ const deletion: Journey = {
     await sleep(600);
     results.check("letting go too early deletes nothing", (await getMe(leaver.probe)).status === "active");
     const failing: string[] = [];
+    const signouts: string[] = [];
     leaver.page.on("response", response => {
       if (response.url().startsWith(`${env.site}/v1/`) && response.status() >= 400) failing.push(`${response.request().method()} ${new URL(response.url()).pathname} ${response.status()}`);
+    });
+    leaver.page.on("request", request => {
+      if (request.url().startsWith(`${env.site}/v1/session/signout`)) signouts.push(request.method());
     });
     const deleteSent = requestSent(leaver.page, "DELETE", "/v1/me");
     await hold(leaver.page, button, 2600);
@@ -144,7 +149,7 @@ const deletion: Journey = {
     const sentAt = await deleteSent;
     results.metric("delete DELETE sent → signed-out landing page shown", Date.now() - sentAt);
     results.check("after the hold the browser lands signed out", landing);
-    results.check("deleting makes no failing request (the site does not sign out a session the deletion already ended)", failing.length === 0, failing.join(", ") || "none");
+    results.check("deleting makes no failing request, and no sign-out of a session the deletion already ended", failing.length === 0 && signouts.length === 0, `failing: ${failing.join(", ") || "none"}; sign-out requests: ${signouts.length}`);
     await shot(env, leaver.page, "acct-delete-03-gone");
 
     // Every way in is closed at once.
@@ -152,6 +157,8 @@ const deletion: Journey = {
     const other = await call(second.probe, "/v1/session");
     const cli = await api(ctx, "/v1/me", { headers: bearer });
     results.check("this browser, the other browser and the CLI are all signed out (401)", own.status === 401 && other.status === 401 && cli.status === 401, `${own.status} ${other.status} ${cli.status}`);
+    const leftCookies = (await leaver.context.cookies(env.site)).filter(entry => /sa_session$/.test(entry.name)).map(entry => entry.name);
+    results.check("…and this browser no longer holds a session cookie (the deletion cleared it)", leftCookies.length === 0, leftCookies.join(", ") || "none");
     await second.context.close();
 
     // Apps with access are told; their tokens and the proof are dead; the app whose access was removed hears nothing.

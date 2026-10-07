@@ -105,7 +105,13 @@ primary that gets verified (apps see `email_verified` / `phone_verified` change)
   app gets `membership.access_removed`. Repeating it does nothing (no second webhook). 404
   `membership_not_found`, 400 `first_party_app`.
 - `GET /v1/me/sessions?limit&cursor` → items `{"id","kind":"browser"|"cli","label","origin","ip","user_agent","created_at","last_seen_at","expires_at","current"}`
-  (browser sessions and live `aud=accounts` token families), newest first.
+  (browser sessions and live `aud=accounts` token families), newest first. A browser session's
+  `label` describes its user agent the way sign-in history does (`sessions::describe_user_agent`):
+  "Safari on macOS" for a browser (only a `Mozilla/…` or `Opera/…` agent is ever called one, "A
+  browser" when it isn't recognized), "accounts CLI 0.1.0" for the CLI
+  (`accounts-cli/<v> silicon-accounts-client/<v>`), "Silicon Accounts Rust package 0.1.0" for
+  the package (after the program's own product when it names one: "dm 2.0 (Silicon Accounts Rust
+  package 0.1.0)"), any other program by its product ("curl 8.4.0"), else "An unknown client".
 - `DELETE /v1/me/sessions/{id}` → 204; revoking the calling cookie session also clears the
   cookie. 404 `session_not_found` (unknown, another account's, or another app's sign-in).
 
@@ -129,6 +135,19 @@ names it in its title by its current si:id (or the id the row recorded once it w
 "Profile of si:scout updated", "New profile photo for si:scout", "Transfer of si:scout to c:x
 requested", "Custodian request of si:scout declined"…, and carries the Silicon's AccountSummary
 in `meta.silicon`. 400 `invalid_history_kind`, 400 `invalid_cursor`.
+
+Titles and details are sentences, never codes. A sign-in's detail is `from {ip} · {client}`
+(the client as for sessions above). A revoked proof's detail says why in the Proofs page's words:
+"Revoked by you", "Revoked by DM", "Revoked by DM's owner", "Revoked because its refresh token
+was used twice, which can mean it leaked", "Ended when your sign-in at DM ended", "Ended when
+you removed DM's access"; only an unknown reason falls back to "Revoked by … (reason)". Audit
+actions written by other crates have titles of their own (`history::other_entry`), for example
+`contact.added` (auth's requirement step) → "Phone number added while signing in to DM" (with
+the address when the entry records it as `details.email` / `details.phone`), `identity.linked`
+→ "Google account connected", `session.created` → "New CLI sign-in", `device.approved` →
+"Approved a terminal sign-in", `signin.locked` → "Too many wrong codes for s***@example.com",
+`oauth.refresh_reuse_detected` → "Sign-in at DM ended"; an action nobody mapped yet shows its
+code in words.
 
 ## Deleting the account
 

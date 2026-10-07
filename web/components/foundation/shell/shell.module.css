@@ -1,5 +1,11 @@
 /* The account site's frame: a quiet top row, the page, and the dock. */
 .shell { position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; }
+/* While the shell is up, what focus (Tab) or an in-page jump brings into view stops clear of the floating dock and the
+   phone bar (WCAG 2.4.11): the browser scrolls a control near the bottom up above them instead of leaving it under.
+   At the top it keeps 24 px of room, so an edge drawn just above a focused part (a tab panel's accent line, which sits
+   in the gap under its tab list) is never scrolled out of view: a panel taller than the room left by the dock is
+   brought in by its top edge, which used to land at the window's very top with its line above it. */
+:global(html):has(.shell) { scroll-padding-block: 24px calc(var(--dock-height) + 24px + env(safe-area-inset-bottom, 0px)); }
 
 .top {
   display: flex;

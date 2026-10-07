@@ -96,6 +96,67 @@ export function mixHex(a: string, b: string, amount: number): string {
   return `#${out.map(channel => channel.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
 }
 
+const toChannel = (value: number) => {
+  const encoded = value <= 0.0031308 ? 12.92 * value : 1.055 * value ** (1 / 2.4) - 0.055;
+  return Math.round(Math.min(1, Math.max(0, encoded)) * 255);
+};
+
+/** sRGB channels to OKLab (Björn Ottosson's matrices, as CSS Color 4 uses them). */
+function toOklab([r, g, b]: Rgb): [number, number, number] {
+  const [lr, lg, lb] = [linear(r), linear(g), linear(b)];
+  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+
+/** OKLab back to sRGB channels, clipped into the sRGB gamut. */
+function fromOklab([lightness, a, b]: [number, number, number]): Rgb {
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [
+    toChannel(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    toChannel(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    toChannel(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
+  ];
+}
+
+/**
+ * `a` moved `amount` (0 = a, 1 = b) of the way to `b` in OKLab: what CSS `color-mix(in oklab, a (1 - amount), b)`
+ * paints, so script can judge the colours the branding's styles mix.
+ */
+export function mixOklab(a: string, b: string, amount: number): string {
+  const x = parseHex(a);
+  const y = parseHex(b);
+  if (!x || !y) return a;
+  const [p, q] = [toOklab(x), toOklab(y)];
+  const out = fromOklab([0, 1, 2].map(index => p[index]! + (q[index]! - p[index]!) * amount) as [number, number, number]);
+  return `#${out.map(channel => channel.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+}
+
+/**
+ * A colour derived from the primary that must read on every ground it is painted on: the first of `start`, then
+ * `start` moved toward `toward` (the palette's text colour) in steps of 5 % of the way that is left, whose contrast
+ * on each of `grounds` is at least `minimum`:1. `start` is how far toward `toward` the theme's own ink already is
+ * (0 = the primary itself). Null when the start already reads, or when a colour is not #RRGGBB (nothing to judge).
+ * At worst it is `toward` itself, which the server holds to 4.5:1 on the page.
+ */
+export function legibleTint(primary: string, toward: string, grounds: string[], minimum: number, start = 0): string | null {
+  if (!parseHex(primary) || !parseHex(toward) || !grounds.every(ground => parseHex(ground))) return null;
+  const reads = (colour: string) => grounds.every(ground => (contrastRatio(colour, ground) ?? 0) >= minimum);
+  if (reads(mixOklab(primary, toward, start))) return null;
+  for (let step = 1; step <= 20; step++) {
+    const colour = mixOklab(primary, toward, start + ((1 - start) * step) / 20);
+    if (reads(colour)) return colour;
+  }
+  return toward.toUpperCase();
+}
+
 /** Black or paper text, whichever reads better on `background`. */
 export function readableOn(background: string, light = "#FFFDF9", dark = "#2A2927"): string {
   const onLight = contrastRatio(background, dark) ?? 0;

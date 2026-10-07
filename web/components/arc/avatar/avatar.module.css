@@ -29,6 +29,8 @@
   transition: none;
 }
 
+/* Silicon Accounts: the initials are generated content (avatar.tsx), so they are never text of the page. */
+.initials::before { content: attr(data-initials); }
 .fallback { animation: avatar-fallback-in var(--duration-standard) var(--ease-enter) both; }
 
 .sm { width: 28px; height: 28px; font-size: 10px; }

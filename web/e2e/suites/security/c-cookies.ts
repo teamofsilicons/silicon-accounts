@@ -97,7 +97,7 @@ export const journeys: Journey[] = [
   },
   {
     name: "security-cookies-secure",
-    title: "ACCOUNTS_COOKIE_SECURE=true (a second accounts-api on the stack's database): __Host-sa_flow / __Host-sa_signup / __Host-sa_session with Secure, HSTS on every answer, unprefixed (tossed) cookies ignored",
+    title: "ACCOUNTS_COOKIE_SECURE=true (a second accounts-api on the stack's database): __Host-sa_flow / __Host-sa_signup / __Host-sa_session with Secure, HSTS on every answer, unprefixed (tossed) cookies ignored, no cookie cleared by another site's sign-out",
     engines: ["chromium"],
     async run(ctx) {
       const { env, results } = ctx;
@@ -136,6 +136,10 @@ export const journeys: Journey[] = [
         const out = await call(`${secure.url}/v1/session/signout`, { method: "POST", body: "", headers: { cookie: `__Host-sa_session=${value}` }, origin: env.site });
         const cleared = out.setCookies.find(cookie => cookie.name === "__Host-sa_session");
         results.check("sign-out clears __Host-sa_session (Secure; Max-Age=0)", out.status === 204 && cleared?.attributes.get("max-age") === "0" && cleared.attributes.has("secure"), cleared?.line ?? brief(out));
+        const stranger = await call(`${secure.url}/v1/session/signout`, { method: "POST", body: "", origin: "https://evil.example" });
+        const staleOut = await call(`${secure.url}/v1/session/signout`, { method: "POST", body: "", headers: { cookie: `__Host-sa_session=${value}` }, origin: env.site });
+        const staleCleared = staleOut.setCookies.filter(cookie => cookie.attributes.get("max-age") === "0").map(cookie => cookie.name);
+        results.check("in secure mode too, a cookieless sign-out from another site gets 401 with no Set-Cookie, while the site's own pages clean up the dead session (401, __Host-sa_session and __Host-sa_signup cleared)", stranger.status === 401 && stranger.setCookies.length === 0 && staleOut.status === 401 && staleCleared.includes("__Host-sa_session") && staleCleared.includes("__Host-sa_signup"), `another site: ${brief(stranger)}, Set-Cookie ${stranger.setCookies.map(cookie => cookie.name).join(", ") || "none"}; site: ${brief(staleOut)}, clears ${staleCleared.join(", ") || "nothing"}`);
         results.check("the secure-mode server never printed a secret it handed out", ![value, carbon.code, flowJar.get("__Host-sa_flow") ?? ""].some(secret => secret && server.output().includes(secret)), `${server.output().length} bytes of output scanned`);
       } finally {
         await server.stop();

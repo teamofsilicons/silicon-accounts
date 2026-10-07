@@ -13,6 +13,11 @@
 }
 /* Color is the only press response: the target never scales. */
 .dropzone:has(.trigger:active) { --sq-fill: var(--surface-muted); }
+/* Silicon Accounts: keyboard position in fills and edges (Arc left the target without any): the hover fill, and the
+   dashed edge in full ink, as a focused field's edge. */
+.trigger:focus-visible { outline: none; }
+.dropzone:has(.trigger:focus-visible) { --sq-fill: var(--surface-muted); }
+.dropzone:has(.trigger:focus-visible) .edge path { stroke: var(--foreground); }
 /* A file over the target closes the dashes into a solid edge and the target breathes, slowly, while it waits. */
 .dropzone.dragging { --sq-fill: color-mix(in oklab, var(--accent) 2.5%, var(--surface)); animation: breathe 2.2s var(--ease-in-out) infinite; }
 @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.012); } }
@@ -23,12 +28,13 @@
 .dragging .edge path { stroke: color-mix(in oklab, var(--accent) 40%, var(--border)); stroke-dasharray: 7 0; stroke-dashoffset: 1.75; }
 /* No gaps between the prompt's parts: each slot carries its own space, so a folding slot takes its space with it. */
 .iconSlot, .noteSlot { display: flex; flex-direction: column; overflow: hidden; }
-/* Three sheets of paper, the target's one illustration. The slot's top margin is room for them to lift without clipping. */
+/* Three sheets of paper, the target's one illustration. The slot's top margin is room for them to lift without clipping.
+   Each sheet is a native-only squircle (data-sq-native): its ::before and ::after draw the lines of text. */
 .sheets { position: relative; display: block; width: 36px; height: 44px; align-self: center; margin: 10px 0 14px; }
 .sheet {
   --r: 0deg; --x: 0px; --y: 0px;
   position: absolute; inset: 0; display: grid; place-items: end center; padding: 0 0 5px;
-  border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--text-muted);
+  --sq-r: 7px; border: 1px solid var(--border); background: var(--surface-raised); color: var(--text-muted);
   box-shadow: 0 1px 2px oklch(0% 0 0 / .05), 0 3px 8px oklch(0% 0 0 / .04);
   transform: translate(var(--x), var(--y)) rotate(var(--r));
   transform-origin: 50% 100%;
@@ -101,6 +107,8 @@
   .retry:hover { border-color: var(--border-strong); background: var(--surface-muted); }
   .remove:hover { background: var(--surface-muted); color: var(--foreground); }
 }
+.retry:focus-visible { outline: none; border-color: var(--border-strong); background: var(--surface-muted); }
+.remove:focus-visible { outline: none; background: var(--surface-muted); color: var(--foreground); }
 /* Quick press, spring release. Neither button anchors a floating layer. */
 .retry:active, .remove:active { transform: scale(.97); transition-duration: var(--duration-instant); transition-timing-function: var(--ease-standard); }
 /* Words are measured against this box when they pop out to leave, so it must be the positioned parent. */

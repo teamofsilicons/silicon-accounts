@@ -104,6 +104,8 @@ function copyText(value: unknown, type: JsonValueType) {
 }
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 const countLabel = (row: { type: JsonValueType; count: number }) => row.type === "array" ? plural(row.count, "item", "items") : plural(row.count, "key", "keys");
+/** A closed object's first keys, as its row shows them: "id, name, …". */
+const objectPreview = (row: { value: unknown; count: number }) => `${entries(row.value).slice(0, 3).map(([key]) => key).join(", ")}${row.count > 3 ? ", …" : ""}`;
 
 /** Every container path, for expand all. */
 function allBranches(data: unknown, rootName: string) {
@@ -442,10 +444,14 @@ export const JsonViewer = forwardRef<HTMLDivElement, JsonViewerProps>(function J
   const bulk = rows.length > 400;
   const rowTransition: Transition = reduced || bulk ? { duration: 0 } : { height: motionTokens.spring.smooth, opacity: { duration: motionTokens.duration.fast, ease: [...motionTokens.ease.standard] } };
 
+  // Silicon Accounts: a row is named by the words it shows, in the order it shows them (WCAG 2.5.3): "key: value"; a
+  // branch "key, 16 items, array", a closed object with its key preview first ("key: id, name, …, 5 keys, object").
   const describe = (row: Row) => {
     const name = row.name === null ? rootName : String(row.name);
     if (row.kind === "more") return `Show ${Math.min(pageSize, row.hidden ?? 0)} more, ${row.hidden} hidden`;
-    return isBranch(row.type) ? `${name}, ${row.type}, ${countLabel(row)}` : `${name}: ${primitiveText(row.value, row.type)}`;
+    if (!isBranch(row.type)) return `${name}: ${primitiveText(row.value, row.type)}`;
+    const preview = !row.open && row.type === "object" ? `: ${objectPreview(row)}` : "";
+    return `${name}${preview}, ${countLabel(row)}, ${row.type}`;
   };
 
   return <div ref={ref} className={[styles.root, className].filter(Boolean).join(" ")} data-sq="clip" style={heightStyle}>
@@ -490,17 +496,17 @@ export const JsonViewer = forwardRef<HTMLDivElement, JsonViewerProps>(function J
               {isActive ? <motion.span layoutId="json-active" className={styles.highlight} transition={reduced || folded ? { duration: 0 } : scrollSpring} aria-hidden="true" /> : null}
               <span className={styles.line}>
                 {row.kind === "more" ? <span className={styles.more}>
-                  <span className={styles.moreLabel}>Show {Math.min(pageSize, row.hidden ?? 0)} more</span>
+                  <span className={styles.moreLabel}>Show {Math.min(pageSize, row.hidden ?? 0)} more</span>{" "}
                   <span className={styles.muted}>{row.hidden} hidden</span>
                 </span> : <>
                   <span className={styles.chevron} data-open={row.open || undefined} data-branch={branch || undefined} aria-hidden="true">{branch ? <ChevronRight size={14} strokeWidth={1.75} /> : null}</span>
                   <span className={typeof row.name === "number" ? styles.index : styles.key}>
                     {row.name === null ? rootName : typeof row.name === "number" ? row.name : <Highlight text={row.name} needle={mark} current={isCurrentMatch} />}
                   </span>
-                  <span className={styles.colon} aria-hidden="true">{row.name === null && branch ? "" : ":"}</span>
+                  {" "}<span className={styles.colon} aria-hidden="true">{row.name === null && branch ? "" : ":"}</span>{" "}
                   {branch
                     ? <span className={styles.summary}>
-                        {!row.open ? <span className={styles.preview}>{row.type === "array" ? "[…]" : `{ ${entries(row.value).slice(0, 3).map(([key]) => key).join(", ")}${row.count > 3 ? ", …" : ""} }`}</span> : null}
+                        {!row.open ? <span className={styles.preview}>{row.type === "array" ? "[…]" : `{ ${objectPreview(row)} }`}</span> : null}{" "}
                         <span className={styles.countLabel}>{countLabel(row)}</span>
                       </span>
                     : <span className={styles.value} data-type={row.type} title={row.type === "string" && (row.value as string).length > 40 ? row.value as string : undefined}>

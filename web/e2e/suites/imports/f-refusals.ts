@@ -1,18 +1,21 @@
 /**
  * What the import API refuses, and how precisely: malformed requests and options, files past the limits (columns,
- * cells, rows, 50 MB), and the app's budgets (60 requests an hour, 2,000,000 rows a day; time travel moves their
- * windows), with nothing imported by any refusal. And who may import and read jobs: the app's own credentials or its
+ * cells, rows, 50 MB: from the headers with or without Expect: 100-continue, chunked, through the site's rewrite, and
+ * the exact byte boundary), and the app's budgets (60 requests an hour, 2,000,000 rows a day; time travel moves their
+ * windows), with nothing imported by any refusal. Who may import and read jobs: the app's own credentials or its
  * owner's session (Origin-checked), never another app, a wrong secret or another Carbon; the rows endpoint's filters,
- * pagination and 404s.
+ * pagination and 404s. And capacity: two import bodies read at once per API node, 503 imports_busy after 30 s.
  */
 import { randomUUID } from "node:crypto";
 import type { Journey } from "../../context";
-import { newContext, signInOnSite, tag } from "../../lib";
+import { newContext, signInOnSite, sleep, tag } from "../../lib";
 import {
   allRows,
   appCall,
   basicAuth,
   countsText,
+  describeRaw,
+  errorOfText,
   fakeApp,
   forgetImportBudgets,
   listJobs,
@@ -20,10 +23,14 @@ import {
   postCsv,
   postExpectContinue,
   postJson,
+  postPlain,
+  postTrickle,
   psql,
+  rowsOf,
   waitJob,
   type ApiErrorBody,
   type ImportJob,
+  type RawAnswer,
   type RowResult,
 } from "./_helpers";
 
@@ -112,7 +119,62 @@ export const journeys: Journey[] = [
         viaSite.push(siteError?.code === "payload_too_large" && hugeSite.status === 413 ? "413 payload_too_large" : `${hugeSite.status} ${hugeSite.text.replace(/\s+/g, " ").slice(0, 80)}`);
       }
       results.check("a 51 MB body through the account site's /v1 gets the API's own 413 payload_too_large (3 of 3 tries)", viaSite.every(answer => answer === "413 payload_too_large"), viaSite.join(" | "));
-      results.check("none of these refusals created a job", (await listJobs(ctx, crm)).length === jobsBefore, `${(await listJobs(ctx, crm)).length - jobsBefore} new jobs`);
+
+      // Without Expect: 100-continue, the way fetch, browsers, proxies and the CLI upload: the whole body is on its way
+      // when the API refuses it from the headers, and the client must still read the 413 (not a reset connection).
+      const tooLarge = (answer: RawAnswer) => answer.status === 413 && errorOfText(answer.text)?.code === "payload_too_large";
+      const plainDirect: RawAnswer[] = [];
+      const plainSite: RawAnswer[] = [];
+      for (let attempt = 0; attempt < 3; attempt++) {
+        plainDirect.push(await postPlain(`${env.api}/v1/apps/legacy-crm/imports?dry_run=true`, hugeHeaders, huge));
+        plainSite.push(await postPlain(`${env.site}/v1/apps/legacy-crm/imports?dry_run=true`, hugeHeaders, huge));
+      }
+      results.check("a 51 MB body sent whole (no Expect) straight to the API: 413 payload_too_large every time (3 of 3), never a reset", plainDirect.every(tooLarge), plainDirect.map(describeRaw).join(" | "));
+      results.check("…and through the account site's /v1: the API's own 413 every time (3 of 3), never the proxy's 500", plainSite.every(tooLarge), plainSite.map(describeRaw).join(" | "));
+      for (const [i, answer] of plainSite.entries()) results.metric(`51 MB refused through the site, no Expect (try ${i + 1})`, answer.ms, "ms");
+      // Chunked: no Content-Length, so only the body stream itself can be found too large.
+      const chunkedHeaders = { authorization: basicAuth(crm), "content-type": "text/csv", "x-forwarded-for": ctx.ip };
+      const chunkedDirect = await postPlain(`${env.api}/v1/apps/legacy-crm/imports?dry_run=true`, chunkedHeaders, huge, { chunked: true });
+      const chunkedSite = await postPlain(`${env.site}/v1/apps/legacy-crm/imports?dry_run=true`, chunkedHeaders, huge, { chunked: true });
+      results.check("a chunked 51 MB body (no length declared) is refused while it streams: 413 payload_too_large, straight and through the site", tooLarge(chunkedDirect) && tooLarge(chunkedSite), `direct ${describeRaw(chunkedDirect)} | site ${describeRaw(chunkedSite)}`);
+      // 60 MB: more than the site's rewrite forwards (52 MB), declared far over the limit.
+      const sixty = Buffer.alloc(60 * 1024 * 1024, 0x61);
+      sixty.write("email,display_name\n", 0);
+      const sixtyDirect = await postPlain(`${env.api}/v1/apps/legacy-crm/imports?dry_run=true`, hugeHeaders, sixty, { timeoutMs: 90_000 });
+      const sixtySite = await postPlain(`${env.site}/v1/apps/legacy-crm/imports?dry_run=true`, hugeHeaders, sixty, { timeoutMs: 90_000 });
+      results.check("a 60 MB body (more than the site's rewrite forwards) still gets the API's 413, straight and through the site", tooLarge(sixtyDirect) && tooLarge(sixtySite), `direct ${describeRaw(sixtyDirect)} | site ${describeRaw(sixtySite)}`);
+      results.metric("60 MB refused through the site (no Expect)", sixtySite.ms, "ms");
+
+      // The exact limit: 50 MB = 52,428,800 bytes of body. A JSON body of exactly that size (one row, then spaces, which
+      // JSON allows) is accepted; one byte more is refused by the import itself.
+      const core = JSON.stringify({ rows: [{ email: `limit.${t}@legacy-crm.test`, display_name: "Exactly At The Limit" }], options: { dry_run: true } });
+      const atLimit = Buffer.alloc(52_428_800, 0x20);
+      atLimit.write(core, 0);
+      const jsonHeaders = { authorization: basicAuth(crm), "content-type": "application/json", "x-forwarded-for": ctx.ip };
+      const exact = await postPlain(`${env.api}/v1/apps/legacy-crm/imports`, jsonHeaders, atLimit);
+      const exactJob = (() => {
+        try {
+          return (JSON.parse(exact.text) as { job?: ImportJob }).job ?? null;
+        } catch {
+          return null;
+        }
+      })();
+      results.check("a body of exactly 52,428,800 bytes (50 MB) is accepted: 202, a one-row dry run", exact.status === 202 && exactJob?.total_rows === 1 && exactJob.dry_run === true, `${describeRaw(exact)} ${exact.text.slice(0, 200)}`);
+      if (exactJob) await waitJob(ctx, crm, exactJob.id);
+      const overByOne = Buffer.alloc(52_428_801, 0x20);
+      overByOne.write(core, 0);
+      const oneMore = await postPlain(`${env.api}/v1/apps/legacy-crm/imports`, jsonHeaders, overByOne);
+      const oneMoreError = errorOfText(oneMore.text);
+      results.check("one byte more (52,428,801) is refused: 413 payload_too_large, the import's own (\"larger than 50 MB\", max_bytes 52428800)", oneMore.status === 413 && oneMoreError?.code === "payload_too_large" && /50 MB/.test(oneMoreError.message ?? "") && (oneMoreError.details as { max_bytes?: number } | undefined)?.max_bytes === 52_428_800, `${describeRaw(oneMore)} ${oneMore.text.slice(0, 300)}`);
+      // Every 413 of the route should name that same limit: the one a client can split its files by.
+      const headerLimit = (directError?.details as { limit_bytes?: number; max_bytes?: number } | undefined) ?? {};
+      const stated = headerLimit.limit_bytes ?? headerLimit.max_bytes;
+      results.check(
+        "the 413 refused from the headers names the real limit too (52,428,800 bytes, the largest body accepted, as the import's own 413 and the CLI say)",
+        stated === 52_428_800 && (directError?.message ?? "").includes("52428800"),
+        `from the headers: ${directError?.message} details ${JSON.stringify(directError?.details)}; the import's own: ${oneMoreError?.message} details ${JSON.stringify(oneMoreError?.details)}`,
+      );
+      results.check("none of these refusals created a job (the one at the limit is the only new one)", (await listJobs(ctx, crm)).length === jobsBefore + (exactJob ? 1 : 0), `${(await listJobs(ctx, crm)).length - jobsBefore} new jobs`);
 
       // The hourly request budget (60 per app; every request that reaches the parser counts).
       await forgetImportBudgets(env, crm.app_id);
@@ -240,6 +302,54 @@ export const journeys: Journey[] = [
       await strangerContext.close();
       const leaked = await psql(env, `select count(*) from account_emails where email in ('acc.${t}@legacy-crm.test', 'owner.${t}@legacy-crm.test')`);
       results.check("none of the refused (or dry-run) requests wrote an account", leaked === "0", `${leaked} accounts`);
+    },
+  },
+  {
+    name: "imports-busy",
+    title: "capacity: an API node reads at most 2 import bodies at once; a third import waits 30 s, then 503 imports_busy (Retry-After 15, nothing imported); stalled uploads give their slots back when their clients go away; whether one app's stalled uploads can keep another app from importing",
+    timeoutMs: 5 * 60_000,
+    async run(ctx) {
+      const { env, results } = ctx;
+      const crm = fakeApp("legacy-crm");
+      const pixel = fakeApp("pixel-studio");
+      await forgetImportBudgets(env, crm.app_id);
+      await forgetImportBudgets(env, pixel.app_id);
+      const t = tag();
+      // pixel-studio starts two uploads that declare 1 MB and then send 16 bytes a second: a client on a dead slow link
+      // (or one that stalls on purpose). Each holds one of the node's two import slots while its body is read.
+      const pixelHeaders = { authorization: basicAuth(pixel), "content-type": "text/csv", "x-forwarded-for": ctx.ip };
+      const stalls = [0, 1].map(() => postTrickle(`${env.api}/v1/apps/pixel-studio/imports?dry_run=true`, pixelHeaders, 1024 * 1024));
+      await sleep(1500);
+      const key = randomUUID();
+      const csv = `email,display_name\nbusy.${t}@legacy-crm.test,Busy Row\n`;
+      let started = Date.now();
+      const blocked = await postCsv(ctx, crm, csv, { dry_run: true }, { key, direct: true });
+      const waited = Date.now() - started;
+      results.metric("an import with both slots taken was answered after", waited, "ms");
+      const [pixelBudget] = await rowsOf<{ count: number }>(env, `select count from rate_limits where bucket = 'import_submissions:app:pixel-studio'`);
+      results.check(
+        "with both slots held, the next import waits 30 s and is refused precisely: 503 imports_busy, Retry-After 15, nothing imported, retry with the same Idempotency-Key",
+        blocked.status === 503 && blocked.body.error?.code === "imports_busy" && blocked.headers.get("retry-after") === "15" && /nothing was imported/.test(blocked.body.error?.message ?? "") && /Idempotency-Key/.test(blocked.body.error?.hint ?? "") && waited >= 29_000 && waited < 60_000,
+        `${blocked.status} ${blocked.body.error?.code ?? ""} after ${waited} ms; Retry-After ${blocked.headers.get("retry-after")}; ${blocked.body.error?.message} | ${blocked.body.error?.hint}`,
+      );
+      results.check(
+        "one app's stalled uploads don't keep another app from importing: legacy-crm's import goes through while pixel-studio's two uploads stall",
+        blocked.status === 202,
+        `legacy-crm got ${blocked.status} ${blocked.body.error?.code ?? ""} after ${waited} ms while pixel-studio's two uploads (16 bytes/s, ${stalls.length} connections) held both of this node's import slots; pixel-studio's hourly import budget counted ${pixelBudget?.count ?? 0} of them`,
+      );
+      // The stalled clients go away: their slots come back at once.
+      for (const stall of stalls) stall.abort();
+      await sleep(300);
+      started = Date.now();
+      const retried = await postCsv(ctx, crm, csv, { dry_run: true }, { key, direct: true });
+      const retriedMs = Date.now() - started;
+      results.check("once the stalled clients are gone, the retry with the same Idempotency-Key gets a slot at once: 202 (a new job: the 503 stored nothing)", retried.status === 202 && !!retried.body.job && retried.headers.get("idempotent-replayed") === null && retriedMs < 10_000, `${retried.status} ${retried.body.job?.id ?? JSON.stringify(retried.body).slice(0, 200)} after ${retriedMs} ms; replayed=${retried.headers.get("idempotent-replayed")}`);
+      if (retried.body.job) await waitJob(ctx, crm, retried.body.job.id);
+      const parallel = await Promise.all([0, 1].map(i => postCsv(ctx, crm, `email\npar${i}.${t}@legacy-crm.test\n`, { dry_run: true }, { key: randomUUID(), direct: true })));
+      results.check("two imports side by side both go through (2 slots, nothing left held)", parallel.every(answer => answer.status === 202), parallel.map(answer => `${answer.status} ${answer.body.error?.code ?? ""}`).join(", "));
+      for (const answer of parallel) if (answer.body.job) await waitJob(ctx, crm, answer.body.job.id);
+      await forgetImportBudgets(env, crm.app_id);
+      await forgetImportBudgets(env, pixel.app_id);
     },
   },
 ];

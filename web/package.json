@@ -12,6 +12,7 @@
     "build:sdk": "node sdk/build.mjs",
     "build:docs": "tsx lib/docs/build.ts",
     "screens": "tsx scripts/screens.ts",
+    "checks:account": "tsx components/account/checks.ts",
     "checks:auth": "tsx components/auth/checks.ts",
     "checks:developer": "tsx components/developer/checks.ts",
     "e2e": "tsx e2e/run.ts"

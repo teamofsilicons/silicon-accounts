@@ -13,7 +13,7 @@ import {
   asApp,
   errorCode,
   isExactlyInvalid,
-  issueAta,
+  issueAtaFor,
   issueObo,
   refreshAs,
   revokeAs,
@@ -108,7 +108,7 @@ export const journeys: Journey[] = [
       const mark = randomUUID().slice(0, 8);
       const keep = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: [`pp.keep.${mark}`] })).body;
       const gone = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: [`pp.revoke.${mark}`] })).body;
-      const ata = (await issueAta(ctx, "commit", { audiences: ["remind"] })).body;
+      const ata = (await issueAtaFor(ctx, "commit", "remind")).body;
 
       const listed = (await carbon.session.call<{ items: MyProofItem[] }>("GET", "/v1/me/proofs?limit=200")).body.items ?? [];
       results.check("GET /v1/me/proofs lists both OBO proofs about the Carbon and no ATA proof", listed.some(item => item.proof_id === keep.proof_id) && listed.some(item => item.proof_id === gone.proof_id) && !listed.some(item => item.proof_id === ata.proof_id) && listed.length === 2, listed.map(item => `${item.proof_id}:${item.status}`).join(", "));

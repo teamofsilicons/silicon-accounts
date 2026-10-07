@@ -19,7 +19,14 @@ import { request as playwrightRequest, type APIRequestContext, type BrowserConte
 import type { Ctx } from "../../context";
 import { E2E_DIR, api, codeFor, json, lastSeq, newContext, randomIp, shot, signInOnSite, sleep, sql, tag, type ApiInit, type Env, type JsonAnswer } from "../../lib";
 
-export const POWERED_BY_HREF = "https://account.teamofsilicons.com";
+/**
+ * Where "Powered by Silicon Accounts" must link: UNDERSTANDING.md ("Making the pages your own", as the Carbons edited
+ * it on 2026-10-07) says `accounts.teamofsilicons.com`, the account site's host. Before that edit it said
+ * `account.teamofsilicons.com`, which is what the pages and the SDK still link to.
+ */
+export const POWERED_BY_HREF = "https://accounts.teamofsilicons.com";
+/** The account site's host before that edit: still a link to Silicon Accounts, but no longer the contract's. */
+export const OLD_POWERED_BY_HREF = "https://account.teamofsilicons.com";
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* The fake apps                                                                                                       */
@@ -405,19 +412,32 @@ export async function poweredByFacts(target: Page | Frame, shadowHost?: string):
   }, shadowHost ?? null);
 }
 
+export interface PoweredByCheck {
+  ok: boolean;
+  /** The link's href as the page has it (null when there was no link). */
+  href: string | null;
+}
+
+/** True when every href is exactly the contract's (a trailing slash aside). */
+export const contractHref = (href: string | null) => (href ?? "").replace(/\/$/, "") === POWERED_BY_HREF;
+
 /**
- * Checks "Powered by Silicon Accounts" on `target` and records one check: present exactly once, the text and link the
- * contract fixes (Silicon Accounts → https://account.teamofsilicons.com, in a new tab), visible by computed style, a
- * non-zero box in the viewport, nothing on top of it. `outsideBranding`: on the hosted pages it must live outside the
- * app's branded subtree (so no branding variable reaches it).
+ * Checks "Powered by Silicon Accounts" on `target` and records one check: present exactly once, the text the contract
+ * fixes, "Silicon Accounts" linking to the Silicon Accounts site in a new tab, visible by computed style, a non-zero
+ * box in the viewport, nothing on top of it. `outsideBranding`: on the hosted pages it must live outside the app's
+ * branded subtree (so no branding variable reaches it).
+ *
+ * The exact host is one constant per surface (the hosted pages and the iframe share one, the SDK has its own), so it
+ * is judged once per surface (`checkPoweredByHost`) rather than at every step: here the link may name either the
+ * contract's host or the one it had before the 2026-10-07 edit, and the href comes back for that check.
  */
-export async function checkPoweredBy(ctx: Ctx, target: Page | Frame, label: string, options: { shadowHost?: string; outsideBranding?: boolean } = {}): Promise<boolean> {
+export async function checkPoweredBy(ctx: Ctx, target: Page | Frame, label: string, options: { shadowHost?: string; outsideBranding?: boolean } = {}): Promise<PoweredByCheck> {
   const problemsOf = (facts: PoweredByFacts): string[] => {
     const problems: string[] = [];
     if (facts.count !== 1) problems.push(`${facts.count} elements`);
     if (facts.text !== "Powered by Silicon Accounts") problems.push(`text "${facts.text}"`);
     if (facts.linkText !== "Silicon Accounts") problems.push(`link text "${facts.linkText}"`);
-    if (!facts.href || facts.href.replace(/\/$/, "") !== POWERED_BY_HREF) problems.push(`href ${facts.href}`);
+    if (!facts.href || ![POWERED_BY_HREF, OLD_POWERED_BY_HREF].includes(facts.href.replace(/\/$/, ""))) problems.push(`href ${facts.href}`);
     if (facts.target !== "_blank") problems.push(`target ${facts.target}`);
     if (facts.hidden.length) problems.push(`hidden: ${facts.hidden.join(", ")}`);
     if (facts.opacity < 0.99) problems.push(`opacity ${facts.opacity}`);
@@ -440,10 +460,24 @@ export async function checkPoweredBy(ctx: Ctx, target: Page | Frame, label: stri
       problems = [`the page could not be inspected: ${String(error).slice(0, 200)}`];
     }
   }
-  return ctx.results.check(
-    `${label}: "Powered by Silicon Accounts" is there once, visible, uncovered, linking to account.teamofsilicons.com`,
+  const ok = ctx.results.check(
+    `${label}: "Powered by Silicon Accounts" is there once, visible, uncovered, its link opening Silicon Accounts in a new tab`,
     problems.length === 0,
-    problems.length || !facts ? problems.join("; ") : `${Math.round(facts.width)}×${Math.round(facts.height)} px, ${facts.fontSize}px text, link ${facts.linkColor} on ${facts.pillColor}`,
+    problems.length || !facts ? problems.join("; ") : `${Math.round(facts.width)}×${Math.round(facts.height)} px, ${facts.fontSize}px text, link ${facts.linkColor} on ${facts.pillColor}, ${facts.href}`,
+  );
+  return { ok, href: facts?.href ?? null };
+}
+
+/**
+ * One check per surface for the link's exact target: every "Powered by" `surface` showed links to
+ * https://accounts.teamofsilicons.com, the account site's host in UNDERSTANDING.md.
+ */
+export function checkPoweredByHost(ctx: Ctx, surface: string, hrefs: Array<string | null>): boolean {
+  const seen = [...new Set(hrefs.map(href => href ?? "no link"))];
+  return ctx.results.check(
+    `${surface}: "Silicon Accounts" in "Powered by" links to ${POWERED_BY_HREF} (UNDERSTANDING.md, "Making the pages your own")`,
+    hrefs.length > 0 && hrefs.every(contractHref),
+    `${hrefs.length} seen, linking to ${seen.join(", ")}${seen.includes(OLD_POWERED_BY_HREF) ? " (the host before the contract's 2026-10-07 edit)" : ""}`,
   );
 }
 
@@ -570,7 +604,18 @@ const PRIMARY_READABILITY = `(() => {
   const text = rgba(getComputedStyle(button).color);
   const ink = [0, 1, 2].map(k => text[k] * text[3] + base[k] * (1 - text[3]));
   const a = lum(ink), b = lum(base);
-  return { ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), text: getComputedStyle(button).color, background: "rgb(" + base.map(Math.round).join(", ") + ")", label: (button.textContent || "").trim() };
+  // The button's edge (its squircle ring: the registered --sq-stroke-c is the resolved colour), judged against the
+  // ground the button sits on when it has no fill of its own (an outline button), as WCAG 1.4.11 asks (3:1).
+  const ownFill = rgba(fill(button));
+  let edge = null;
+  if (ownFill[3] < 0.05) {
+    const strokeText = getComputedStyle(button).getPropertyValue("--sq-stroke-c").trim() || getComputedStyle(button).borderTopColor;
+    const s = rgba(strokeText);
+    const line = [0, 1, 2].map(k => s[k] * s[3] + base[k] * (1 - s[3]));
+    const l = lum(line);
+    edge = { color: strokeText, ratio: (Math.max(l, b) + 0.05) / (Math.min(l, b) + 0.05) };
+  }
+  return { ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), text: getComputedStyle(button).color, background: "rgb(" + base.map(Math.round).join(", ") + ")", label: (button.textContent || "").trim(), edge };
 })()`;
 
 export interface Readability {
@@ -578,6 +623,8 @@ export interface Readability {
   text: string;
   background: string;
   label: string;
+  /** An outline button's edge against the ground it sits on (null for a button with a fill of its own). */
+  edge: { color: string; ratio: number } | null;
 }
 
 /** The contrast of the step's main action (null when the step has none). */
@@ -685,6 +732,8 @@ export interface WalkResult {
   ms: number;
   /** The main action's contrast at each step that has one. */
   readability: Array<Readability & { step: string }>;
+  /** Where "Powered by" linked at each step (for checkPoweredByHost). */
+  hrefs: Array<string | null>;
 }
 
 /**
@@ -708,11 +757,12 @@ export async function walkHosted(ctx: Ctx, options: WalkOptions): Promise<WalkRe
   });
   const steps: string[] = [];
   const readability: WalkResult["readability"] = [];
+  const hrefs: Array<string | null> = [];
   const at = async (step: string) => {
     steps.push(step);
     await page.locator("main[data-fonts='ready']").first().waitFor({ timeout: 10_000 }).catch(() => undefined);
     await sleep(700);
-    await checkPoweredBy(ctx, page, `${options.label} ${step}`, { outsideBranding: true });
+    hrefs.push((await checkPoweredBy(ctx, page, `${options.label} ${step}`, { outsideBranding: true })).href);
     const action = await primaryReadability(page).catch(() => null);
     if (action) readability.push({ ...action, step });
     await options.atStep?.(step, page);
@@ -800,9 +850,81 @@ export async function walkHosted(ctx: Ctx, options: WalkOptions): Promise<WalkRe
     } catch {
       account = null;
     }
-    return { steps, account, ms: Date.now() - started, readability };
+    return { steps, account, ms: Date.now() - started, readability, hrefs };
   } finally {
     release();
     await context.close();
   }
+}
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* Holding a request                                                                                                   */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+export interface HeldRequests {
+  /** Resolves with the URL of the first request that `matches`, once the page has sent it. */
+  reached: Promise<string>;
+  /** Lets the held request (and every later one) go on. */
+  release: () => void;
+}
+
+/**
+ * Holds every request of `context` that `matches` until `release()`, then hands it on to the context's other routes
+ * (newContext's forwarded address). Hold a page's own fetch, never a navigation: while a top-level navigation is
+ * pending, Playwright answers no evaluate, locator or screenshot of the page until it commits (measured in Chromium).
+ */
+export async function holdRequests(context: BrowserContext, matches: (url: URL) => boolean): Promise<HeldRequests> {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>(done => (release = done));
+  let reach: (url: string) => void = () => undefined;
+  const reached = new Promise<string>(done => (reach = done));
+  await context.route(matches, async route => {
+    reach(route.request().url());
+    await gate;
+    await route.fallback().catch(() => undefined);
+  });
+  return { reached, release };
+}
+
+export interface LeavingSnapshot {
+  url: string;
+  text: string;
+  heading: string;
+  attrs: Record<string, string> | null;
+  powered: { count: number; text: string; href: string | null; width: number; height: number } | null;
+}
+
+/**
+ * What the account site's page shows at the moment the browser leaves it (its `beforeunload`), for every top-level page
+ * of `site` in `context`: its words, its branding scope and "Powered by". Read from the page itself through a binding,
+ * since Playwright cannot look at a page whose navigation has begun.
+ */
+export async function recordLeaving(context: BrowserContext, site: string): Promise<LeavingSnapshot[]> {
+  const seen: LeavingSnapshot[] = [];
+  await context.exposeBinding("__dvbLeaving", (_source, snapshot: LeavingSnapshot) => void seen.push(snapshot));
+  await context.addInitScript({
+    content: `(() => {
+      if (window.top !== window || location.origin !== ${JSON.stringify(new URL(site).origin)}) return;
+      addEventListener("beforeunload", () => {
+        try {
+          const scope = document.querySelector(".sa-brand[data-brand]");
+          const attrs = scope ? Object.fromEntries(scope.getAttributeNames().filter(n => n.startsWith("data-")).map(n => [n, scope.getAttribute(n) || ""])) : null;
+          const powered = document.querySelectorAll("[data-powered-by]");
+          const first = powered[0];
+          const link = first ? first.querySelector("a") : null;
+          const box = first ? (link || first).getBoundingClientRect() : null;
+          window.__dvbLeaving({
+            url: location.href,
+            text: (document.body.innerText || "").replace(/\\s+/g, " ").trim(),
+            heading: ((document.querySelector("main h1") || {}).textContent || "").trim(),
+            attrs,
+            powered: first ? { count: powered.length, text: (first.textContent || "").replace(/\\s+/g, " ").trim(), href: link ? link.getAttribute("href") : null, width: box.width, height: box.height } : null,
+          });
+        } catch (error) {
+          window.__dvbLeaving({ url: location.href, text: "snapshot failed: " + error, heading: "", attrs: null, powered: null });
+        }
+      });
+    })();`,
+  });
+  return seen;
 }

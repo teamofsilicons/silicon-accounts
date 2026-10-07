@@ -50,10 +50,14 @@ function DrawnCheck({ reduced }: { reduced: boolean }) {
   </svg>;
 }
 
-type FaceProps = { icon: ReactNode; text: string; done: boolean; width: MotionValue<number | "auto">; reduced: boolean; measure?: (node: HTMLSpanElement | null) => void };
+type FaceProps = { icon: ReactNode; text: string; done: boolean; width: MotionValue<number | "auto">; reduced: boolean; measure?: (node: HTMLSpanElement | null) => void; drawn?: boolean };
 
-/** Icon and label. The button renders it twice: once on the surface and once inside the fill, so the text changes colour exactly at the fill edge. */
-function Face({ icon, text, done, width, reduced, measure }: FaceProps) {
+/**
+ * Icon and label. The button renders it twice: once on the surface and once inside the fill, so the text changes colour exactly at the fill edge.
+ * Silicon Accounts: the fill's copy is `drawn` (its label is ::before content from data-text, not text): the fill is clipped away at rest but still
+ * counted as shown, so the button's words read twice ("Delete accountDelete account") and failed WCAG 2.5.3 against its name.
+ */
+function Face({ icon, text, done, width, reduced, measure, drawn }: FaceProps) {
   return <span className={styles.face}>
     <span className={styles.iconSlot}>
       <AnimatePresence initial={false}>
@@ -65,7 +69,7 @@ function Face({ icon, text, done, width, reduced, measure }: FaceProps) {
     <motion.span className={styles.labelFrame} style={{ width }}>
       {measure && <span ref={measure} className={styles.measure}>{text}</span>}
       <AnimatePresence mode="popLayout" initial={false}>
-        <motion.span key={text} className={styles.label} initial={reduced ? fadeIn : textIn} animate={rest} exit={reduced ? fadeOut : textOut} transition={{ duration: reduced ? motionTokens.duration.fast : motionTokens.duration.standard, ease: enter }}>{text}</motion.span>
+        <motion.span key={text} className={styles.label} data-text={drawn ? text : undefined} initial={reduced ? fadeIn : textIn} animate={rest} exit={reduced ? fadeOut : textOut} transition={{ duration: reduced ? motionTokens.duration.fast : motionTokens.duration.standard, ease: enter }}>{drawn ? null : text}</motion.span>
       </AnimatePresence>
     </motion.span>
   </span>;
@@ -198,7 +202,7 @@ export function HoldToConfirm({ label, confirmedLabel = "Done", onConfirm, durat
       onKeyDown={onKeyDown} onKeyUp={onKeyUp} onBlur={release} onContextMenu={event => event.preventDefault()}>
       <Face icon={icon} text={text} done={done} width={width} reduced={reduced} measure={measure} />
       <motion.span className={styles.fill} style={{ clipPath }} aria-hidden="true">
-        <Face icon={icon} text={text} done={done} width={width} reduced={reduced} />
+        <Face icon={icon} text={text} done={done} width={width} reduced={reduced} drawn />
       </motion.span>
     </motion.button>
     <span id={hintId} className={styles.srOnly}>{`Press and hold for ${seconds} seconds to confirm. With a keyboard, hold Space or Enter.`}</span>

@@ -516,6 +516,15 @@ impl<'a> Request<'a> {
         self.timeout = Some(timeout);
         self
     }
+
+    /// Bytes in the request body.
+    pub(crate) fn body_len(&self) -> usize {
+        match &self.body {
+            Body::Empty => 0,
+            Body::Json(bytes) | Body::Raw { bytes, .. } => bytes.len(),
+            Body::Form(text) => text.len(),
+        }
+    }
 }
 
 /// Idempotency keys are 1-200 printable ASCII characters.

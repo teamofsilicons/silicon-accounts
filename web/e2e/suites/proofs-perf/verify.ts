@@ -5,7 +5,7 @@
  */
 import type { Journey } from "../../context";
 import { json, sql } from "../../lib";
-import { appTokens, asApp, errorCode, isExactlyInvalid, issueAta, issueObo, short, signInToApp, verifyAs, type Verification } from "./_helpers";
+import { appTokens, asApp, errorCode, isExactlyInvalid, issueAtaFor, issueObo, short, signInToApp, verifyAs, type Verification } from "./_helpers";
 
 const VALID_KEYS = ["expires_at", "issuing_app", "kind", "proof_id", "receiving_app", "scopes", "user", "valid"];
 
@@ -17,17 +17,16 @@ export const journey: Journey = {
     const carbon = await signInToApp(ctx, "dm");
     const subject = (await appTokens(env, "dm", carbon.uuid)).access_token;
     const obo = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: ["files.write"] })).body;
-    const ata = (await issueAta(ctx, "commit", { audiences: ["remind", "waveform"], scopes: ["notifications.send"] })).body;
-    results.check("dm issued an OBO proof for Briefcase and Commit an ATA proof for Remind and Waveform", obo.proof_token?.startsWith("sap_") === true && ata.proof_token?.startsWith("sap_") === true, `${short(obo.error ?? obo.proof_id)} / ${short(ata.error ?? ata.proof_id)}`);
+    // An ATA proof is always for exactly one app (UNDERSTANDING.md): Commit's is for Remind.
+    const ata = (await issueAtaFor(ctx, "commit", "remind", { scopes: ["notifications.send"] })).body;
+    results.check("dm issued an OBO proof for Briefcase and Commit an ATA proof for Remind", obo.proof_token?.startsWith("sap_") === true && ata.proof_token?.startsWith("sap_") === true, `${short(obo.error ?? obo.proof_id)} / ${short(ata.error ?? ata.proof_id)}`);
 
     // The audiences: valid, with exactly the contract's keys and no token anywhere.
     const good = await verifyAs(ctx, "briefcase", obo.proof_token);
     results.check("Briefcase (the OBO audience) gets valid with exactly the contract keys", good.status === 200 && good.body.valid === true && JSON.stringify(Object.keys(good.body).sort()) === JSON.stringify(VALID_KEYS), `${good.status} ${JSON.stringify(Object.keys(good.body).sort())}`);
     results.check("…and the answer carries no token and is not cacheable (Cache-Control: no-store)", !JSON.stringify(good.body).includes("sap_") && good.headers.get("cache-control") === "no-store", String(good.headers.get("cache-control")));
-    for (const audience of ["remind", "waveform"]) {
-      const answer = await verifyAs(ctx, audience, ata.proof_token);
-      results.check(`${audience} (an ATA audience) gets valid, receiving_app ${audience}, user null`, answer.body.valid === true && answer.body.kind === "ata" && answer.body.receiving_app?.app_id === audience && answer.body.user === null && answer.body.issuing_app?.app_id === "commit", short(answer.body));
-    }
+    const remind = await verifyAs(ctx, "remind", ata.proof_token);
+    results.check("remind (the ATA proof's app) gets valid, receiving_app remind, user null, exactly the contract keys", remind.body.valid === true && remind.body.kind === "ata" && remind.body.receiving_app?.app_id === "remind" && remind.body.user === null && remind.body.issuing_app?.app_id === "commit" && JSON.stringify(Object.keys(remind.body).sort()) === JSON.stringify(VALID_KEYS), short(remind.body));
 
     // Every app that is not an audience, through the site and straight at accounts-api.
     const exactly = async (label: string, app: string, token: string, direct = false) => {
@@ -40,7 +39,7 @@ export const journey: Journey = {
     const issuer = await exactly("dm (the issuing app, not an audience) verifying its own OBO proof → exactly invalid", "dm", obo.proof_token);
     results.check("…with no x-accounts-hint: the input was a well-formed proof token, so nothing about the proof is hinted", issuer.headers.get("x-accounts-hint") === null, String(issuer.headers.get("x-accounts-hint")));
     await exactly("remind verifying dm's OBO proof straight at accounts-api → exactly invalid", "remind", obo.proof_token, true);
-    for (const app of ["briefcase", "dm", "commit", "spacestation"]) await exactly(`${app} verifying Commit's ATA proof for [remind, waveform] → exactly invalid`, app, ata.proof_token);
+    for (const app of ["waveform", "briefcase", "dm", "commit", "spacestation"]) await exactly(`${app} verifying Commit's ATA proof for remind → exactly invalid${app === "waveform" ? " (another app Commit talks to, but not this proof's)" : ""}`, app, ata.proof_token);
 
     // Unknown, malformed and wrapped inputs: the same body; a hint header describes the input only (never the proof).
     const random = `sap_${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url")}`;
@@ -91,7 +90,7 @@ export const journey: Journey = {
       await sql(env, "update apps set status = 'active' where app_id in ('dm', 'commit')");
     }
     const back = await verifyAs(ctx, "briefcase", obo.proof_token);
-    const backAta = await verifyAs(ctx, "waveform", ata.proof_token);
+    const backAta = await verifyAs(ctx, "remind", ata.proof_token);
     results.check("dm and Commit active again: both proofs verify again (disabling is not a revocation)", back.body.valid === true && backAta.body.valid === true, `${short(back.body)} / ${short(backAta.body)}`);
   },
 };

@@ -9,6 +9,16 @@
 //! `access_removed` membership none. Search (`q`) only looks at data the app may see, so it can't
 //! be used to probe contact details it was never given.
 //!
+//! An account that removed the app's access stays in the list as history, and the app sees none
+//! of the account's own data any more (the rule app webhook deliveries follow too: an app that
+//! lost access to an account no longer sees its data): `display_name: "Access removed"`, the
+//! default photo, no email, phone, dob or timezone, whatever the account changes afterwards. What
+//! stays is who it is about (uuid, membership id, and the current `id`, which any uuid resolves
+//! to through `GET /v1/accounts/{uuid}`), the app's own records (external_id, source, the scopes
+//! it had been granted, its sign-ins and dates) and the account's status. Search finds them by
+//! uuid, id, external_id or the app's own imported values, never by name. Signing in to the app
+//! again makes the membership `active`, and everything it grants is shown again.
+//!
 //! A deleted account stays in the list as history with `status: "deleted"` (whatever its
 //! membership said) and nothing about it but its uuid, membership id, external_id and dates: no
 //! name, photo, id, email, phone, dob or timezone. `?status=deleted` lists only those; the other
@@ -113,6 +123,9 @@ impl UserStatus {
 /// What a deleted account shows instead of its display name.
 pub const DELETED_DISPLAY_NAME: &str = "Deleted account";
 
+/// What an account that removed the app's access shows instead of its display name.
+pub const ACCESS_REMOVED_DISPLAY_NAME: &str = "Access removed";
+
 /// One item of the user base.
 #[derive(Debug, Clone, Serialize)]
 pub struct AppUserView {
@@ -156,20 +169,34 @@ fn first_string(v: Option<&Value>) -> Option<String> {
 impl UserRow {
     fn view(self, iris_base_url: &str) -> AppUserView {
         let scopes = scopes_from_strings(&self.granted_scopes);
-        if self.account_status == AccountStatus::Deleted {
+        let withheld = if self.account_status == AccountStatus::Deleted {
             // History only: nothing about a deleted account is shown any more.
+            Some((UserStatus::Deleted, DELETED_DISPLAY_NAME))
+        } else if self.status == MembershipStatus::AccessRemoved {
+            // The account took the app's access away: none of its data, then or after it
+            // changes it.
+            Some((UserStatus::AccessRemoved, ACCESS_REMOVED_DISPLAY_NAME))
+        } else {
+            None
+        };
+        if let Some((status, display_name)) = withheld {
             return AppUserView {
                 pfp_url: pfp::default_pfp_url(iris_base_url, self.kind, &self.account_uuid),
                 membership_id: self.membership_id,
                 uuid: self.account_uuid,
                 kind: self.kind,
-                id: None,
-                display_name: DELETED_DISPLAY_NAME.to_string(),
+                // A deleted account has no id any more. One that removed the app's access keeps
+                // its public id: any uuid resolves to its current id (GET /v1/accounts/{uuid}).
+                id: match status {
+                    UserStatus::Deleted => None,
+                    _ => self.handle,
+                },
+                display_name: display_name.to_string(),
                 email: None,
                 phone: None,
                 dob: None,
                 timezone: None,
-                status: UserStatus::Deleted,
+                status,
                 source: self.source,
                 external_id: self.external_id,
                 granted_scopes: scopes,
@@ -274,7 +301,8 @@ async fn list_users(
         None => (None, None),
     };
     let pattern = search.map(like_contains);
-    // Deleted accounts: their own filter, and found only by uuid or external_id.
+    // Deleted accounts: their own filter, and found only by uuid or external_id. Accounts that
+    // removed the app's access are never found by their name (the app no longer sees it).
     let sql = format!(
         "{USER_SELECT} where m.app_id = $1 \
            and ($2::text is null or (case when a.status = 'deleted' then 'deleted' else m.status end) = $2) \
@@ -283,7 +311,8 @@ async fn list_users(
            and ($5::text is null or ( \
                 a.uuid = $6 or m.external_id ilike $5 \
                 or (a.status <> 'deleted' and ( \
-                  a.handle ilike $5 or a.display_name ilike $5 \
+                  a.handle ilike $5 \
+                  or (m.status <> 'access_removed' and a.display_name ilike $5) \
                   or exists (select 1 from jsonb_array_elements_text(case when jsonb_typeof(m.imported_profile->'emails') = 'array' \
                              then m.imported_profile->'emails' else '[]'::jsonb end) x where x ilike $5) \
                   or exists (select 1 from jsonb_array_elements_text(case when jsonb_typeof(m.imported_profile->'phones') = 'array' \

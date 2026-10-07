@@ -4,7 +4,10 @@ mod common;
 
 use std::collections::HashSet;
 
-use accounts_core::models::{AccountStatus, Scope};
+use accounts_core::ids::AccountId;
+use accounts_core::models::{AccountKind, AccountStatus, Scope};
+use accounts_core::pfp;
+use accounts_core::repo::accounts::{self, ProfileUpdate};
 use accounts_core::repo::{audit, memberships};
 use accounts_core::test_support::{CarbonSpec, Req, TestContext};
 use common::{call, owned_app};
@@ -450,4 +453,217 @@ async fn deleted_accounts_are_history_without_data() {
     )
     .await;
     assert_eq!(r.json["items"][0]["users"], 1, "{}", r.json);
+}
+
+/// An account that removed an app's access stays in that app's user base as history, but the
+/// app sees nothing of the account's own data any more: not its name or photo (as they were, nor
+/// after it changes them), only who it was about (uuid, membership id, the public id any uuid
+/// resolves to) and the app's own records. Search can't find it by its name either. Signing in
+/// to the app again gives the app access again.
+#[tokio::test]
+async fn access_removed_members_show_nothing_about_the_account() {
+    let ctx = TestContext::new().await;
+    let a = owned_app(&ctx, "rm").await;
+    let mira = ctx
+        .carbon_with(CarbonSpec {
+            handle: Some("lin-rm".into()),
+            display_name: Some("Mira Before".into()),
+            email: Some("mira@rm.test".into()),
+            timezone: Some("Asia/Tokyo".into()),
+            ..Default::default()
+        })
+        .await;
+    let stays = ctx
+        .carbon_with(CarbonSpec {
+            display_name: Some("Mira Stays".into()),
+            ..Default::default()
+        })
+        .await;
+    ctx.membership(
+        &a.app_id,
+        &mira.uuid,
+        &[Scope::Profile, Scope::Email, Scope::Timezone],
+    )
+    .await;
+    ctx.membership(&a.app_id, &stays.uuid, &[Scope::Profile])
+        .await;
+    let photo = |n: u8| format!("https://photos.example.test/mira-{n}.png");
+    {
+        let mut conn = ctx.conn().await;
+        accounts::update_profile(
+            &mut conn,
+            &mira.uuid,
+            &ProfileUpdate {
+                pfp_url: Some(photo(1)),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("photo");
+        // The app's own reference for her, set while she is a member.
+        memberships::upsert_imported(
+            &mut conn,
+            &a.app_id,
+            &mira.uuid,
+            Some("crm-l1"),
+            None,
+            false,
+        )
+        .await
+        .expect("external id");
+    }
+    let detail = |uuid: String| {
+        let ctx = &ctx;
+        let (app_id, secret) = (a.app_id.clone(), a.secret.clone());
+        async move {
+            let r = call(
+                ctx,
+                Req::get(&format!("/v1/apps/{app_id}/users/{uuid}")).basic(&app_id, &secret),
+            )
+            .await;
+            assert_eq!(r.status, 200, "{}", r.json);
+            r.json
+        }
+    };
+    let search = |query: String| {
+        let ctx = &ctx;
+        let (app_id, secret) = (a.app_id.clone(), a.secret.clone());
+        async move { uuids(&list(ctx, &app_id, &secret, &query).await) }
+    };
+
+    // A member: the app sees her name, photo and what she shares.
+    let before = detail(mira.uuid.clone()).await;
+    assert_eq!(before["status"], "active");
+    assert_eq!(before["display_name"], "Mira Before");
+    assert_eq!(before["pfp_url"], photo(1));
+    assert_eq!(before["email"], "mira@rm.test");
+    assert_eq!(before["timezone"], "Asia/Tokyo");
+
+    // She removes the app's access: from then on the app sees nothing of hers.
+    {
+        let mut conn = ctx.conn().await;
+        memberships::remove_access(&mut conn, &a.app_id, &mira.uuid, &mira.uuid)
+            .await
+            .expect("removed");
+    }
+    let default_photo = pfp::default_pfp_url(
+        &ctx.state.settings.iris_base_url,
+        AccountKind::Carbon,
+        &mira.uuid,
+    );
+    let removed = detail(mira.uuid.clone()).await;
+    assert_eq!(removed["status"], "access_removed");
+    assert_eq!(removed["account_status"], "active");
+    assert_eq!(removed["uuid"], mira.uuid.as_str());
+    assert_eq!(
+        removed["membership_id"],
+        format!("{}:{}", a.app_id, mira.uuid)
+    );
+    assert_eq!(
+        removed["id"], "c:lin-rm",
+        "ids are public: any uuid resolves to its id"
+    );
+    assert_eq!(removed["display_name"], "Access removed");
+    assert_eq!(removed["pfp_url"], default_photo.as_str());
+    assert_eq!(
+        removed["external_id"], "crm-l1",
+        "the app's own reference stays"
+    );
+    for field in ["email", "phone", "dob", "timezone"] {
+        assert!(removed.get(field).is_none(), "{field}: {removed}");
+    }
+    for secret in ["Mira Before", "mira-1.png", "mira@rm.test", "Asia/Tokyo"] {
+        assert!(!removed.to_string().contains(secret), "{secret}: {removed}");
+    }
+    assert!(
+        removed["history"].is_array(),
+        "its own sign-ins stay: {removed}"
+    );
+
+    // …and then changes her name, photo and id: none of it reaches the app.
+    {
+        let mut conn = ctx.conn().await;
+        accounts::update_profile(
+            &mut conn,
+            &mira.uuid,
+            &ProfileUpdate {
+                display_name: Some("Mira Renamed".into()),
+                pfp_url: Some(photo(2)),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("rename");
+        let new_id = AccountId::parse("c:lin-two").expect("id");
+        accounts::change_id(&mut conn, &mira.uuid, &new_id, &mira.uuid)
+            .await
+            .expect("new id");
+    }
+    let renamed = detail(mira.uuid.clone()).await;
+    assert_eq!(renamed["display_name"], "Access removed");
+    assert_eq!(renamed["pfp_url"], default_photo.as_str());
+    assert_eq!(renamed["id"], "c:lin-two");
+    for secret in ["Mira Renamed", "Mira Before", "mira-2.png", "mira-1.png"] {
+        assert!(!renamed.to_string().contains(secret), "{secret}: {renamed}");
+    }
+    let listed = list(&ctx, &a.app_id, &a.secret, "status=access_removed").await;
+    assert_eq!(uuids(&listed), vec![mira.uuid.clone()]);
+    assert_eq!(listed["items"][0]["display_name"], "Access removed");
+    assert!(!listed.to_string().contains("Mira Renamed"), "{listed}");
+
+    // Search can't find her by a name, old or new; it still finds her by what the app may see.
+    for q in ["Mira%20Renamed", "Renamed", "Before"] {
+        assert!(search(format!("q={q}")).await.is_empty(), "q={q}");
+        assert!(
+            search(format!("status=access_removed&q={q}"))
+                .await
+                .is_empty(),
+            "status=access_removed&q={q}"
+        );
+    }
+    assert_eq!(search("q=Mira".into()).await, vec![stays.uuid.clone()]);
+    assert_eq!(
+        search("q=c%3Alin-two".into()).await,
+        vec![mira.uuid.clone()]
+    );
+    assert_eq!(
+        search(format!("q={}", mira.uuid)).await,
+        vec![mira.uuid.clone()]
+    );
+    assert_eq!(search("q=crm-l1".into()).await, vec![mira.uuid.clone()]);
+    assert!(search("q=mira%40rm.test".into()).await.is_empty());
+
+    // Signing in to the app again gives it access again: it sees her as she is now.
+    ctx.membership(&a.app_id, &mira.uuid, &[Scope::Profile])
+        .await;
+    let back = detail(mira.uuid.clone()).await;
+    assert_eq!(back["status"], "active");
+    assert_eq!(back["display_name"], "Mira Renamed");
+    assert_eq!(back["pfp_url"], photo(2));
+    assert_eq!(search("q=Renamed".into()).await, vec![mira.uuid.clone()]);
+
+    // An account that removed the access and was deleted later is deleted history (no id).
+    {
+        let mut conn = ctx.conn().await;
+        memberships::remove_access(&mut conn, &a.app_id, &stays.uuid, &stays.uuid)
+            .await
+            .expect("removed");
+        accounts::delete_account(
+            &mut conn,
+            &ctx.state.settings,
+            &stays.uuid,
+            &stays.uuid,
+            true,
+        )
+        .await
+        .expect("deleted");
+    }
+    let gone = detail(stays.uuid.clone()).await;
+    assert_eq!(gone["status"], "deleted");
+    assert_eq!(gone["display_name"], "Deleted account");
+    assert_eq!(gone["id"], Value::Null);
+    assert_eq!(
+        search("status=access_removed".into()).await,
+        Vec::<String>::new()
+    );
 }

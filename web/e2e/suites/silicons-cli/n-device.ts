@@ -121,6 +121,13 @@ export const journey: Journey = {
     await page.getByText("No sign-in uses").waitFor({ timeout: 15_000 }).catch(() => undefined);
     results.check("a code that doesn't exist: 'No sign-in uses ZZZZ-ZZZZ'", (await heading(page)).includes("No sign-in uses ZZZZ-ZZZZ"));
     await shot(env, page, "scli-device-04-unknown");
+
+    // 6. The Carbon's history: every decision, with the terminal's label, and the sign-ins it led to.
+    const security = ((obj((await asCarbon<Json>(env, carbon, "GET", "/v1/me/history?kind=security&limit=100")).body).items ?? []) as Json[]).map(item => `${str(item.title)} | ${str(item.detail)}`);
+    const expected = [`Approved a terminal sign-in | ${label}`, `Denied a terminal sign-in | ${label} (deny)`, `Approved a terminal sign-in | ${label} (typed)`, `Approved a terminal sign-in | ${label} (cli)`];
+    results.check("the history lists each approval and denial (site and `accounts device approve`) with the terminal's label", expected.every(entry => security.includes(entry)), short(security.filter(entry => entry.includes("terminal sign-in"))));
+    const signins = ((obj((await asCarbon<Json>(env, carbon, "GET", "/v1/me/history?kind=signin&limit=100")).body).items ?? []) as Json[]).filter(item => obj(item.meta).method === "device");
+    results.check("…and the three device sign-ins, from the accounts CLI", signins.length === 3 && signins.every(item => item.title === "Signed in to Silicon Accounts with the accounts CLI (device code)" && /· accounts CLI \d+\.\d+\.\d+$/.test(str(item.detail))), short(signins.map(item => [item.title, item.detail])));
     await context.close();
   },
 };

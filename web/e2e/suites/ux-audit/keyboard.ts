@@ -17,18 +17,21 @@
  */
 import type { Page } from "@playwright/test";
 import type { Ctx, Journey } from "../../context";
-import { appAccount, codeFor, lastSeq, signInOnSite, sleep } from "../../lib";
-import { activeFocus, auditContext, collectConsole, findingsFor, focusFromTop, focusVerdict, freshEmail, hostedLink, saveFindings, sendEmailCode, settle, stepReady, tabKey, tabTo, tabWalk, waitUntil, type Findings, type FocusStop } from "./_audit";
+import { appAccount, codeFor, lastSeq, sleep } from "../../lib";
+import { activeFocus, auditContext, collectConsole, findingsFor, focusFromTop, focusVerdict, freshEmail, hostedLink, saveFindings, sendEmailCode, settle, signInAsSeededOwner, stepReady, tabKey, tabTo, tabWalk, waitUntil, type Findings, type FocusStop } from "./_audit";
 
 const label = (stop: FocusStop) => `${stop.name || stop.el} <${stop.tag}${stop.role ? ` role=${stop.role}` : ""}>`;
 const evidence = (stop: FocusStop) => `pixels ${stop.pixels ?? "unmeasured"}${stop.moves ? `; from the previous stop ${stop.moves}` : ""}; computed look ${!stop.changed ? "not in the snapshot" : stop.changed.length ? `changed: ${stop.changed.slice(0, 4).join(", ")}` : "unchanged"}`;
 
-/** What an element (and its first children) paints that a focus style could change; `target` is a JS expression. */
+/**
+ * What an element (and its first children) paints that a focus style could change; `target` is a JS expression. The
+ * children's opacity and transform are left out: a countdown's rolling digits fade and slide on their own every second.
+ */
 const paintScript = (target: string) => `(() => {
   const el = ${target};
   if (!el) return null;
-  const pick = node => { const s = getComputedStyle(node); return [s.backgroundColor, s.color, s.borderTopColor, s.borderBottomColor, s.boxShadow, s.outlineStyle === "none" || /transparent|rgba\\(.*,\\s*0\\)$/.test(s.outlineColor) ? "no outline" : s.outlineColor + " " + s.outlineWidth, s.textDecorationLine, s.opacity].join("|"); };
-  return [el, ...el.querySelectorAll("*")].slice(0, 8).map(pick).join(" / ");
+  const pick = (node, own) => { const s = getComputedStyle(node); return [s.backgroundColor, own ? s.color : "", s.borderTopColor, s.borderBottomColor, s.boxShadow, s.outlineStyle === "none" || /transparent|rgba\\(.*,\\s*0\\)$/.test(s.outlineColor) ? "no outline" : s.outlineColor + " " + s.outlineWidth, s.textDecorationLine, own ? s.opacity : ""].join("|"); };
+  return [el, ...el.querySelectorAll("*")].slice(0, 8).map((node, index) => pick(node, index === 0)).join(" / ");
 })()`;
 
 /** Walks every Tab stop of the step (or page) on screen and checks each one; returns the stops. */
@@ -108,18 +111,21 @@ export const journeys: Journey[] = [
       await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 20_000 });
       const atCode = await focusAfterStep(ctx, page, "the code step");
       results.check("keyboard: the code step puts focus in its first cell", /digit 1 of 6/.test(atCode.name ?? ""), label(atCode));
-      await walkStep(ctx, page, findings, "keyboard-hosted code", [/digit 1 of 6/, /Verify/, /Change/, /Resend/]);
-      // The Resend button while it counts down: its words change every second, so its pixels cannot tell; what it
-      // paints (fill, ink, edges, a visible outline) must change with focus.
+      // The Resend button while it counts down (measured first, before the walk uses up its wait): its words change
+      // every second, so its pixels cannot tell; what it paints (fill, ink, edges, a visible outline) must change with focus.
       await focusFromTop(page);
       if (await tabTo(env, page, stop => /^Resend code/.test(stop.name ?? ""), 30)) {
         await sleep(250);
-        const focusedPaint = (await page.evaluate(paintScript("document.activeElement"))) as string | null;
+        // The very button that has focus, kept for after the blur (it is named by a visually hidden copy of its words,
+        // so no attribute finds it).
+        const waiting = (await page.evaluate("(() => { window.__uxaResend = document.activeElement; return document.activeElement.getAttribute('aria-disabled') === 'true'; })()")) === true;
+        const focusedPaint = (await page.evaluate(paintScript("window.__uxaResend"))) as string | null;
         await page.evaluate("document.activeElement && document.activeElement.blur()");
         await sleep(250);
-        const restPaint = (await page.evaluate(paintScript("document.querySelector('button[aria-label^=Resend]')"))) as string | null;
-        results.check("keyboard-hosted code: the Resend button shows keyboard focus while it counts down (WCAG 2.4.7)", !!focusedPaint && focusedPaint !== restPaint, `focused: ${focusedPaint} || unfocused: ${restPaint}`);
+        const restPaint = (await page.evaluate(paintScript("window.__uxaResend"))) as string | null;
+        results.check("keyboard-hosted code: the Resend button shows keyboard focus while it counts down (WCAG 2.4.7)", waiting && !!focusedPaint && !!restPaint && focusedPaint !== restPaint, `${waiting ? "counting down" : "not counting down when measured"}; focused: ${focusedPaint} || unfocused: ${restPaint}`);
       }
+      await walkStep(ctx, page, findings, "keyboard-hosted code", [/digit 1 of 6/, /Verify/, /Change/, /Resend/]);
       await tabAndPress(ctx, page, "the first code cell", stop => /digit 1 of 6/.test(stop.name ?? ""), "Home");
       await page.keyboard.type(code, { delay: 40 });
 
@@ -254,11 +260,11 @@ export const journeys: Journey[] = [
         await page.waitForURL(new RegExp(`${env.apps.replace(/[.:/]/g, "\\$&")}/briefcase/`), { timeout: 30_000 });
         await context.close();
       }
+      // The seeded owner's photo is test data on the production Iris (a harness defect): this stack's mock Iris draws it.
       const context = await auditContext(browser, { width: 1440, height: 900 });
       const page = await context.newPage();
-      // The seeded owner's photo points at the production Iris (reported by ux-audit-developer-briefcase).
-      results.watch(page, "keyboard-developer", [/iris\.teamofsilicons\.com/]);
-      await signInOnSite(env, page, "saketdev12@example.test");
+      results.watch(page, "keyboard-developer");
+      await signInAsSeededOwner(ctx, page, findings);
       for (const [tab, expected] of [["users", [/^Users$/, /Search users|Id, name/, /Sort by/, /Add filter/]], ["import", [/^Import$/, /Paste instead/]]] as const) {
         await page.goto(`${env.site}/developer/briefcase/${tab}`);
         await page.locator("main").first().waitFor({ timeout: 30_000 });

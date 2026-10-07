@@ -340,8 +340,20 @@ pub struct SignupView {
     pub provider: Option<Provider>,
     /// True when this finishes an account an app imported.
     pub finishing_import: bool,
+    /// When finishing an import: the app whose import created the account (its earliest
+    /// import), so the page can say who added the Carbon. It may be another app than the one
+    /// being signed into (an account legacy-crm imported can be finished by signing into
+    /// briefcase). `null` for a new account, or when no app's import is on record.
+    pub imported_by: Option<ImportedBy>,
     #[serde(with = "rfc3339_ms")]
     pub expires_at: OffsetDateTime,
+}
+
+/// The app an imported account came from (`SignupView.imported_by`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, sqlx::FromRow)]
+pub struct ImportedBy {
+    pub app_id: String,
+    pub name: String,
 }
 
 /// The imported account a sign-up session finishes, while it is still unclaimed. (Once
@@ -353,6 +365,19 @@ async fn claimable(conn: &mut PgConnection, session: &SignupSession) -> ApiResul
     Ok(accounts::get(conn, uuid)
         .await?
         .filter(|a| a.kind == AccountKind::Carbon && a.status == AccountStatus::Unclaimed))
+}
+
+/// The app whose import created `uuid`: the account's earliest membership that came from an
+/// import (later imports of the same person only matched the account).
+async fn importer(conn: &mut PgConnection, uuid: &str) -> ApiResult<Option<ImportedBy>> {
+    Ok(sqlx::query_as::<_, ImportedBy>(
+        "select m.app_id, a.name from memberships m join apps a on a.app_id = m.app_id \
+         where m.account_uuid = $1 and m.source = 'import' \
+         order by m.created_at, m.app_id limit 1",
+    )
+    .bind(uuid)
+    .fetch_optional(&mut *conn)
+    .await?)
 }
 
 /// Everything the sign-up page shows, already filled in.
@@ -369,6 +394,7 @@ pub async fn prefill(
         .map(|photo_id| accounts_core::pfp::photo_url(&state.settings, photo_id));
     if let Some(a) = claimable(conn, session).await? {
         // Finishing an imported account: the app's imported data is the prefill.
+        let imported_by = importer(conn, &a.uuid).await?;
         return Ok(SignupView {
             display_name: a.display_name.clone(),
             id: a.id().to_string(),
@@ -380,6 +406,7 @@ pub async fn prefill(
             phone: session.verified_phone.clone(),
             provider: session.provider,
             finishing_import: true,
+            imported_by,
             expires_at: session.expires_at,
         });
     }
@@ -410,6 +437,7 @@ pub async fn prefill(
         phone: session.verified_phone.clone(),
         provider: session.provider,
         finishing_import: false,
+        imported_by: None,
         expires_at: session.expires_at,
         display_name,
     })

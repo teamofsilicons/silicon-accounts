@@ -1,7 +1,7 @@
 //! Browser session endpoints: `GET /v1/session`, `POST /v1/session/signout`.
 
 use accounts_core::http::cookies::{SESSION_COOKIE, SIGNUP_COOKIE, append_cookie, clear_cookie};
-use accounts_core::http::{AccountAuth, AuthVia, ClientMeta};
+use accounts_core::http::{AccountAuth, AuthVia, ClientMeta, check_origin};
 use accounts_core::models::ActorKind;
 use accounts_core::repo::audit::{self, AuditEntry};
 use accounts_core::repo::{sessions, tokens};
@@ -9,7 +9,7 @@ use accounts_core::timefmt::format_rfc3339_ms;
 use accounts_core::views::AccountSummary;
 use accounts_core::{ApiError, ApiResult, AppState};
 use axum::extract::State;
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde_json::json;
 
@@ -76,6 +76,10 @@ pub async fn get_session(State(state): State<AppState>, auth: AccountAuth) -> Ap
 /// `POST /v1/session/signout` (session): revokes this browser session (or, with a Bearer
 /// token, its first-party sign-in) and clears the cookies. 204. Signing out of the account
 /// site doesn't sign the account out of apps.
+///
+/// Without a live session or token: 401 `unauthenticated`, and the session and sign-up
+/// cookies are cleared only when the request comes from the site's own pages (its `Origin`
+/// passes the CSRF guard), so no other website can sign a browser out.
 pub async fn signout(
     State(state): State<AppState>,
     meta: ClientMeta,
@@ -100,7 +104,17 @@ pub async fn signout(
             "Nothing to sign out: this request carries no live session cookie or access token.",
         )
         .hint("The browser is already signed out.");
-        return clear(e.into_response());
+        // Clearing a stale cookie is only for the site's own pages. A cross-site top-level form
+        // POST lands here too (SameSite=Lax keeps the cookie home), but the browser still
+        // applies this answer's Set-Cookie: clearing there would let any website sign its
+        // visitors out and drop a sign-up in progress (logout CSRF). A live cookie never gets
+        // here from elsewhere: the CSRF guard refuses it first (403 origin_not_allowed).
+        if check_origin(&state.settings, &headers, &Method::POST).is_ok() {
+            return clear(e.into_response());
+        }
+        let mut r = e.into_response();
+        no_store(r.headers_mut());
+        return r;
     };
     match do_signout(&state, &meta, &headers, &auth).await {
         Ok(()) => clear(StatusCode::NO_CONTENT.into_response()),

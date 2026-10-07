@@ -15,8 +15,9 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 Every call is async and returns `silicon_accounts_client::Result<T>`. Errors are typed
 (`Error::Api`, `Error::OAuth`, `Error::Http`, `Error::Decode`, `Error::InvalidInput`,
-`Error::Token`, `Error::TimedOut`); each one has a precise `message()` saying what went
-wrong and why, and a `hint()` saying what to do next. `Display` prints both.
+`Error::PayloadTooLarge`, `Error::Token`, `Error::TimedOut`); each one has a precise
+`message()` saying what went wrong and why, and a `hint()` saying what to do next.
+`Display` prints both.
 
 ```rust
 match client.silicon_login("si:scout", &stk, None).await {
@@ -171,6 +172,14 @@ let details = app.update_signin_config(&serde_json::json!({"methods": {"google":
 // retried test queues one ping.
 let hook = app.set_webhook("https://app.example.com/hooks/accounts", Some("wh-set-1")).await?;
 ```
+
+An import is at most 50 MB (`MAX_IMPORT_BYTES`: the CSV itself, or the JSON the rows are
+sent as) and 100,000 rows. `start_import` refuses a bigger body before sending anything, with
+`Error::PayloadTooLarge` (code `payload_too_large`, the service's own code for it, and
+`details()` `{"size_bytes", "limit_bytes"}`): the service would refuse it as soon as it sees
+the size, often before the upload ends, so the caller could otherwise see a reset
+connection instead of the reason. Split such a file into parts and import them one after
+another.
 
 `client.app_public("briefcase")` returns what a sign-in page needs (methods, branding, copy) and
 `allowed_origins`, the origins that may frame the embed and use the SDK.

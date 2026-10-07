@@ -27,7 +27,7 @@ let tasks = accounts_auth::spawn_background(state.clone());        // sweep of e
 | `POST /v1/flows/{id}/signup` | flow + `sa_signup` | create the Carbon (or finish the imported one) |
 | `POST /v1/flows/{id}/requirements/email` · `/phone` · `/verify` | flow + session | add a missing required detail with an inline code |
 | `POST /v1/flows/{id}/consent` | flow + session | `{"approve","optional_scopes"}` → code (or `error=access_denied`) |
-| `GET /v1/session`, `POST /v1/session/signout` | session | the browser session; sign-out clears `sa_session` + `sa_signup` (204) |
+| `GET /v1/session`, `POST /v1/session/signout` | session | the browser session; sign-out clears `sa_session` + `sa_signup` (204). Without a live session: 401, and stale cookies are cleared only for the site's own pages (Origin passes the CSRF guard): a cross-site form POST carries no SameSite=Lax cookie, but its browser would apply a clearing Set-Cookie (logout CSRF) |
 | `GET /v1/device/{user_code}`, `POST …/approve`, `POST …/deny` | session (Carbon) | CLI device approval (204) |
 | `POST /v1/cli/login/start`, `POST /v1/cli/login/verify` | public | headless code sign-in → token response (aud = `accounts`) |
 
@@ -79,7 +79,9 @@ prompt=none that can't sign in silently ─────────────�
   address takes it over (the row is removed from the other account, audit
   `contact.unverified_removed`). Core keeps unverified rows on unfinished imports only.
 - **Imported (unclaimed) accounts** go to sign-up with `finishing_import: true`, prefilled from the
-  account the import created; completing keeps the uuid and runs core's
+  account the import created, and `imported_by: {app_id, name}` naming the app whose import created
+  it (the earliest `import` membership; it may differ from the app being signed into, so the page
+  never credits the wrong app); completing keeps the uuid and runs core's
   `repo::accounts::finish_claim`: the proven email/phone becomes verified (primary if the old
   primary wasn't), **the import's other (unproven) emails and phones are removed** (the app keeps
   them in `memberships.imported_profile`), and the account is activated; this crate changes the
@@ -113,7 +115,9 @@ and echoed exactly as sent (never trimmed; control characters are refused).
 
 ### Errors (selection)
 
-`unknown_app` · `app_disabled` · `redirect_uri_not_registered` (400, never offers a redirect) ·
+`unknown_app` · `app_disabled` · `redirect_uri_not_registered` (400, never offers a redirect; also
+any `redirect_uri` with a `#fragment`, RFC 6749 §3.1.2, which the loopback any-port rule would
+otherwise let through) ·
 `invalid_scope` / `invalid_request` / `unsupported_response_type` / `method_not_enabled` (400, with
 `details.redirect_to` = the RFC 6749 error redirect) · `flow_not_found` 404 · `flow_not_bound` 403 ·
 `flow_expired` 410 · `invalid_step` / `flow_completed` / `flow_failed` 409 · `invalid_code` 422
@@ -124,7 +128,8 @@ and echoed exactly as sent (never trimmed; control characters are refused).
 `account_changed` 409 · `continue_not_allowed` / `reauthentication_required` 403 ·
 `provider_not_configured` 503 · `unknown_provider` 404. Callback pages: `invalid_state` 400,
 `flow_not_bound` 403 (an answer delivered by another browser); flow errors include
-`provider_answer_elsewhere`, `provider_cancelled`, `provider_error`, `provider_token_invalid`.
+`provider_answer_elsewhere`, `provider_cancelled`, `provider_error`, `provider_token_invalid`,
+`provider_unavailable`.
 
 ## Google and Apple
 
@@ -142,6 +147,14 @@ and echoed exactly as sent (never trimmed; control characters are refused).
   Resolution: known (provider, sub) → its account; else a verified email of an account → linked;
   else sign-up (Google name + picture, Apple `user` name on first login). Failures become the flow's
   `error`; the browser always lands on `/authorize/flow/{id}`.
+- **A provider request that gets no answer at all is sent once more on a new connection**
+  (`providers::send`: the code exchange and the JWKS fetch). The usual cause is a kept-alive
+  connection the provider already closed: servers drop idle connections after seconds (Node after
+  5 s), reqwest's pool reuses them for 90 s, and the request dies with "connection closed before
+  message completed". The provider never saw it, so the code is still unused (had it seen it, the
+  second exchange is refused with `invalid_grant`). Timeouts are not retried. `provider_unavailable`
+  and the logs carry the whole cause chain, e.g. `tcp connect error: Connection refused`, and say
+  when it was tried twice.
 - **Only the browser that started the sign-in can deliver the answer.** The callback request must
   carry the flow's binding cookie (`sa_flow`, SameSite=Lax). A Google redirect is a top-level GET,
   so it does. Apple's form_post is a cross-site POST, which doesn't: its answer is parked on the leg
@@ -178,7 +191,8 @@ CARGO_TARGET_DIR=target/auth cargo test -p silicon-accounts-auth
 ```
 
 `tests/common/mock_oidc.rs` is an in-process Google/Apple (token + JWKS, strict about client auth,
-redirect_uri, PKCE and the ES256 client secret). `tests/testkit_contract.rs` runs the same legs
-against the real testkit mock-oidc (`node --import tsx src/start.ts` on free ports); it is skipped
+redirect_uri, PKCE and the ES256 client secret); `tests/common/dropping_front.rs` puts an HTTP/1.1
+front before it that closes a kept-alive connection, unanswered, when a request is reused on it.
+`tests/testkit_contract.rs` runs the same legs against the real testkit mock-oidc (`node --import tsx src/start.ts` on free ports); it is skipped
 (with a note on stderr) when `testkit/node_modules` is missing. Test keys in `tests/fixtures/` are
 throwaway, test-only keys.

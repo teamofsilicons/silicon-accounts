@@ -215,6 +215,7 @@ export function heroCopy(flow: HostedFlow, journey: { firstVisit: boolean }): He
     firstVisit: journey.firstVisit,
     knowsApp: (flow.consent?.previously_granted ?? []).some(scope => scope !== "profile" && scope !== "openid" && scope !== "offline_access"),
     finishingImport: !!flow.signup?.finishing_import,
+    importedBy: flow.signup?.imported_by?.name ?? null,
   });
 }
 
@@ -227,24 +228,36 @@ export interface HeroInput {
   firstVisit: boolean;
   /** The Carbon granted the app something before (beyond its name, id and photo). */
   knowsApp?: boolean;
-  /** The sign-up finishes an account the app imported. */
+  /** The sign-up finishes an account an app imported. */
   finishingImport?: boolean;
+  /**
+   * The name of the app whose import created that account (FlowSignup.imported_by): it may be another app than the
+   * one being signed into. Null when the server does not say; the copy then names no app.
+   */
+  importedBy?: string | null;
+}
+
+/** The name of the app that imported the Carbon, for "Legacy CRM added you…"; null when no app can be named. */
+export function importerName(importedBy: string | null | undefined): string | null {
+  return importedBy?.trim() || null;
 }
 
 /**
  * heroCopy without a FlowView: the same rules for anything that knows the step and the app (the developer area's
  * Branding preview draws the split layout's copy with it).
  */
-export function heroCopyFor({ name: app, copy, step, firstVisit, knowsApp = false, finishingImport = false }: HeroInput): HeroCopy {
+export function heroCopyFor({ name: app, copy, step, firstVisit, knowsApp = false, finishingImport = false, importedBy = null }: HeroInput): HeroCopy {
   const signIn: HeroCopy = { title: copy.title?.trim() || `Sign in to ${app}`, subtitle: copy.subtitle?.trim() || null };
   switch (step) {
     case "choose_method":
     case "verify_code":
       return signIn;
-    case "signup":
-      return finishingImport
-        ? { title: `Welcome to ${app}`, subtitle: `${app} set up an account for you. Check what it filled in, and you are in.` }
-        : { title: `Welcome to ${app}`, subtitle: "Your account works here and in every other app that signs in with Silicon Accounts." };
+    case "signup": {
+      if (!finishingImport) return { title: `Welcome to ${app}`, subtitle: "Your account works here and in every other app that signs in with Silicon Accounts." };
+      // The app that imported the Carbon, which need not be this one (legacy-crm's import finished at briefcase).
+      const importer = importerName(importedBy);
+      return { title: `Welcome to ${app}`, subtitle: `${importer ?? "An app you use"} set up an account for you. Check what it filled in, and you are in.` };
+    }
     case "requirements":
       return firstVisit
         ? { title: `Welcome to ${app}`, subtitle: `${app} needs one more detail before you continue.` }

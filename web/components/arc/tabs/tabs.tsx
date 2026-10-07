@@ -47,7 +47,8 @@ export function TabsList({ className, ...props }: ComponentPropsWithoutRef<typeo
     const next = { overflow: scroll.scrollWidth > frame.clientWidth + 1, left: scroll.scrollLeft > 1, right: scroll.scrollLeft < max - 1 };
     setEdges(previous => previous.overflow === next.overflow && previous.left === next.left && previous.right === next.right ? previous : next);
   }, []);
-  const reveal = useCallback((tab: HTMLElement | null) => {
+  /** Scrolls the strip so `tab` is in full view, clear of the edge buttons (`instant` for a resize, which must not glide). */
+  const reveal = useCallback((tab: HTMLElement | null, instant = false) => {
     const scroll = viewport.current;
     if (!scroll || !tab) return;
     const frame = scroll.getBoundingClientRect();
@@ -56,22 +57,28 @@ export function TabsList({ className, ...props }: ComponentPropsWithoutRef<typeo
     const left = frame.left + (scroll.scrollLeft > 1 ? 34 : 0);
     const right = frame.right - (scroll.scrollLeft < max - 1 ? 34 : 0);
     const delta = item.left < left ? item.left - left : item.right > right ? item.right - right : 0;
-    if (delta) scroll.scrollBy({ left: delta, behavior: reduced ? "instant" : "smooth" });
+    if (delta) scroll.scrollBy({ left: delta, behavior: reduced || instant ? "instant" : "smooth" });
   }, [reduced]);
+  const activeTab = useCallback(() => list.current?.querySelector<HTMLElement>('[role="tab"][data-state="active"]') ?? null, []);
   useLayoutEffect(() => {
     const frame = shell.current;
     const scroll = viewport.current;
     const content = list.current;
     if (!frame || !scroll || !content) return;
-    const observer = new ResizeObserver(update);
+    // Silicon Accounts: a strip that starts to overflow (the window narrowed, a rotated tablet) keeps the selected tab
+    // in view; before, only a change of tab revealed it, so narrowing a page left it cut off or scrolled away.
+    const observer = new ResizeObserver(() => {
+      update();
+      if (scroll.scrollWidth > scroll.clientWidth + 1) reveal(activeTab(), true);
+    });
     observer.observe(frame);
     observer.observe(scroll);
     observer.observe(content);
     scroll.addEventListener("scroll", update, { passive: true });
     update();
     return () => { observer.disconnect(); scroll.removeEventListener("scroll", update); };
-  }, [update]);
-  useLayoutEffect(() => { reveal(list.current?.querySelector<HTMLElement>('[role="tab"][data-state="active"]') ?? null); }, [active, reveal]);
+  }, [update, reveal, activeTab]);
+  useLayoutEffect(() => { reveal(activeTab()); }, [active, reveal, activeTab]);
   const scrollTabs = (direction: number) => viewport.current?.scrollBy({ left: direction * (viewport.current?.clientWidth ?? 0) * .75, behavior: reduced ? "instant" : "smooth" });
   return <div ref={shell} className={styles.listShell} data-sq="surface" data-overflow={edges.overflow} data-left={edges.left} data-right={edges.right}>
     {edges.overflow && <button type="button" className={`${styles.scrollButton} ${styles.scrollLeft}`} aria-label="Scroll tabs left" disabled={!edges.left} onClick={() => scrollTabs(-1)}><NavArrowLeft width={17} height={17} aria-hidden="true"/></button>}
@@ -86,7 +93,8 @@ export function TabsTrigger({ className, children, value, ...props }: ComponentP
   const { active } = useContext(TabsContext);
   const reduced = useReducedMotion();
   // The LayoutGroup in Tabs scopes the highlight to this instance, so it glides between triggers but never flies in from another tab set.
-  return <TabsPrimitive.Trigger {...props} value={value} data-value={value} className={[styles.trigger, className].filter(Boolean).join(" ")}>
+  // data-sq-native: the trigger paints only a keyboard-focus fill (tabs.module.css), which follows the squircle curve.
+  return <TabsPrimitive.Trigger {...props} value={value} data-value={value} data-sq-native="" className={[styles.trigger, className].filter(Boolean).join(" ")}>
     {active === value && <motion.span className={styles.selection} data-sq="surface" layoutId="selection" layoutDependency={active} transition={reduced ? { duration: 0 } : motionTokens.spring.morph} aria-hidden="true"/>}
     <span className={styles.triggerLabel}>{children}</span>
   </TabsPrimitive.Trigger>;

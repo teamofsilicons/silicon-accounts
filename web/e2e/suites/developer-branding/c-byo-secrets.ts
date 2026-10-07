@@ -95,6 +95,23 @@ export const journey: Journey = {
     results.check("neither the page's HTML nor any field holds the stored secret", !html.includes(googleSecret) && !inputs.includes(googleSecret));
     await shot(env, page, "dvb-c-01-google-stored");
 
+    // Replace, type something, then think better of it: "Keep the stored secret" shows the stored state again, drops
+    // what was typed, leaves nothing to save, and hands focus to Replace (not to the page).
+    const typedThenKept = `GOCSPX-dvb${t}TypedThenKept`;
+    await google0.getByRole("button", { name: "Replace" }).click();
+    await google0.getByLabel("Client secret").fill(typedThenKept);
+    await sleep(200);
+    const dirtyWhileTyped = await saveBar.count();
+    await google0.getByRole("button", { name: "Keep the stored secret" }).click();
+    await sleep(400);
+    const keptValues = await page.locator("input, textarea").evaluateAll(fields => fields.map(field => (field as HTMLInputElement).value));
+    results.check("\"Keep the stored secret\" after typing a replacement shows \"A client secret is stored\" again, drops the typed value and leaves nothing to save", dirtyWhileTyped > 0 && (await google0.getByText("A client secret is stored").count()) === 1 && !keptValues.includes(typedThenKept) && (await saveBar.count()) === 0, `save bar while typing ${dirtyWhileTyped}, after ${await saveBar.count()}; stored line ${await google0.getByText("A client secret is stored").count()}`);
+    const focused = await page.evaluate(() => {
+      const active = document.activeElement as HTMLElement | null;
+      return active ? `${active.tagName.toLowerCase()} "${(active.textContent ?? "").trim().slice(0, 40)}"` : "nothing";
+    });
+    results.check("focus goes to the stored secret's Replace when its replace field closes", await google0.getByRole("button", { name: "Replace" }).evaluate(el => el === document.activeElement).catch(() => false), `focus on ${focused}`);
+
     // Re-entering the stored secret is no change at all: no version, no history entry.
     await google0.getByRole("button", { name: "Replace" }).click();
     await google0.getByLabel("Client secret").fill(googleSecret);

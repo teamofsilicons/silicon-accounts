@@ -5,7 +5,7 @@
  */
 import type { Journey } from "../../context";
 import { api, shot, sleep, sql } from "../../lib";
-import { appAuth, appName, appRefresh, appUserinfo, call, codeOf, confirmMorph, deliveredAfter, formatDate, getMe, inbox, newCarbon, queuedEvents, requestSent, signIntoApp, until, waitEvent } from "./_helpers";
+import { appAuth, appName, appRefresh, appUserinfo, call, codeOf, confirmMorph, deliveredAfter, formatDate, getMe, inbox, newCarbon, queuedEvents, requestSent, signIntoApp, timezoneLabel, until, waitEvent } from "./_helpers";
 
 interface MyApp {
   app: { app_id: string; name: string };
@@ -27,7 +27,8 @@ const apps: Journey = {
     const { page, probe, uuid } = carbon;
     const refusedAtStart = (await inbox(env, "briefcase")).rejected.length + (await inbox(env, "commit")).rejected.length;
     const briefcase = await signIntoApp(env, page, "briefcase");
-    const commit = await signIntoApp(env, page, "commit");
+    // Both ask for the email and offer the timezone as optional: switched on for Commit, left off for Briefcase.
+    const commit = await signIntoApp(env, page, "commit", { share: ["Timezone"] });
     results.check("setup: signed into Briefcase and Commit", briefcase?.uuid === uuid && commit?.uuid === uuid);
     const me = await getMe(probe);
 
@@ -45,6 +46,28 @@ const apps: Journey = {
     results.check("Briefcase's card: what it can see, with the values it gets", cardText.includes("It can see") && cardText.includes("Name, id and photo") && cardText.includes(`${me.display_name} · ${me.id}`) && cardText.includes("Email") && cardText.includes(carbon.email) && !cardText.includes("Timezone"), cardText.slice(0, 300));
     results.check("…signed in, one active session, its membership id", /Signed in/.test(cardText) && /1 active session/.test(cardText) && cardText.includes(`briefcase:${uuid}`), cardText.slice(-200));
     results.check("…first and last sign-in", cardText.includes(`First signed in ${formatDate(Date.now())}`) && /Last signed in (just now|\d+ (second|minute)s? ago)/.test(cardText), cardText.match(/Last signed in [^F]*/)?.[0] ?? "");
+
+    // An optional detail is shared only when the Carbon switches it on, and the app then sees it and hears its changes.
+    const scopesOf = (items: MyApp[], app: string) => items.find(item => item.app.app_id === app)?.granted_scopes ?? [];
+    const granted = await list();
+    results.check("the optional timezone was granted to Commit (switched on at the consent) and not to Briefcase (left off)", scopesOf(granted, "commit").includes("timezone") && !scopesOf(granted, "briefcase").includes("timezone"), `commit: ${scopesOf(granted, "commit").join(" ")}; briefcase: ${scopesOf(granted, "briefcase").join(" ")}`);
+    const commitCard = page.locator("#app-commit");
+    const commitText = (await commitCard.innerText()).replace(/\s+/g, " ");
+    results.check("Commit's card lists the timezone with its value; Briefcase's does not", commitText.includes("Timezone") && commitText.includes(timezoneLabel(me.timezone)) && !cardText.includes("Timezone"), commitText.slice(0, 300));
+    const beforeZone = { commit: (await inbox(env, "commit")).last_seq };
+    const zoned = await call(probe, "/v1/me", { method: "PATCH", json: { timezone: "America/Sao_Paulo" } });
+    const zoneEvent = await waitEvent(env, "commit", "account.updated", uuid, { after: beforeZone.commit });
+    const zoneData = zoneEvent?.payload.data as { changed?: string[]; account?: { timezone?: string } } | undefined;
+    results.check("a timezone change tells Commit (account.updated, changed [timezone], the new zone) and nothing goes to Briefcase", zoned.status === 200 && JSON.stringify(zoneData?.changed) === '["timezone"]' && zoneData?.account?.timezone === "America/Sao_Paulo" && (await queuedEvents(env, "briefcase", uuid, "account.updated", "and payload->'data'->'changed' ? 'timezone'")) === 0, `${zoned.status} ${JSON.stringify(zoneData ?? null).slice(0, 200)}`);
+    await page.reload();
+    await withAccess.waitFor({ timeout: 30_000 });
+    const shownZone = await until(async () => (await commitCard.innerText().catch(() => "")).replace(/\s+/g, " "), text => text.includes(timezoneLabel("America/Sao_Paulo")), 10_000);
+    results.check("…and Commit's card shows the new timezone", shownZone.includes(timezoneLabel("America/Sao_Paulo")), shownZone.slice(0, 300));
+    const zoneBack = await call(probe, "/v1/me", { method: "PATCH", json: { timezone: me.timezone } });
+    results.check("setup: the timezone is back", zoneBack.status === 200);
+    await page.reload();
+    await withAccess.waitFor({ timeout: 30_000 });
+    await sleep(600);
 
     // Remove Briefcase's access.
     const before = (await inbox(env, "briefcase")).last_seq;

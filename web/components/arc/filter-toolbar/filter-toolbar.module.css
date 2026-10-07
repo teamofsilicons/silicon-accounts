@@ -38,6 +38,13 @@
 @media (hover: hover) and (pointer: fine) {
   .menu[data-state="closed"] .trigger:hover + .surface { --sq-fill: var(--surface-muted); box-shadow: var(--shadow-resting); }
 }
+/* Silicon Accounts: keyboard position in fills and edges (Arc left these controls without any). Add filter's surface
+   takes the hover fill and a firm edge; the toolbar's small buttons take their hover fill and ink. */
+.menu[data-state="closed"] .trigger:focus-visible { outline: none; }
+.menu[data-state="closed"] .trigger:focus-visible + .surface { --sq-fill: var(--surface-muted); --sq-stroke: var(--border-strong); }
+.chip button:focus-visible { outline: none; background: var(--border); color: var(--foreground); }
+.clear:focus-visible { outline: none; background: var(--surface-muted); color: var(--foreground); }
+.back:focus-visible { outline: none; background: var(--surface-muted); color: var(--foreground); }
 .panel { position: absolute; top: 0; left: 0; width: min(var(--filter-menu-width, 16rem), calc(100vw - var(--space-8))); padding: 6px 6px 6px; outline: none; }
 .menu[data-y="up"] .panel { top: auto; bottom: 0; }
 .menu[data-state="closed"] .panel { visibility: hidden; }

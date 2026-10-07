@@ -96,6 +96,8 @@ export function Proofs() {
               ]}
             />
           </div>
+          {/* Names what the switch shows, so the empty state's heading sits one level under the page's: h1, h2, h3. */}
+          <h2 className="sr-only">{view === "active" ? "Active proofs" : "Ended proofs"}</h2>
           {shown.length ? (
             <AnimatedRows items={shown} keyOf={item => item.proof_id} className={styles.list} label={view === "active" ? "Active proofs" : "Ended proofs"}>
               {item => <ProofCard proof={item} now={now} onRevoke={revokeOne} />}

@@ -4,12 +4,14 @@
  * open Shadow DOM (nothing in the light DOM, nothing of the page's CSS inside), in the app's colours, with "Powered
  * by"; a click creates the state and PKCE and the sign-in completes at the app's callback. On the SDK's own
  * handleCallback: the code comes back with its verifier and nonce, the app exchanges it and the id_token carries that
- * nonce, and a callback works once. Misconfigured snippets say what is wrong inside the box, still with "Powered by".
+ * nonce, and a callback works once. Misconfigured snippets say what is wrong inside the box, still with "Powered by",
+ * whose link names the account site's host as UNDERSTANDING.md has it. An email the app hands the SDK (login_hint) is
+ * never filled in for the Carbon: UNDERSTANDING.md has the Carbon always type it on our pages.
  */
 import type { Page } from "@playwright/test";
 import type { Journey } from "../../context";
 import { codeFor, json, lastSeq, newContext, shot, sleep, tag } from "../../lib";
-import { appBasic, checkPoweredBy, freshEmail, hostPage, htmlPage, ownerSignIn, sameColour } from "./_helpers";
+import { appBasic, checkPoweredBy, checkPoweredByHost, freshEmail, hostPage, htmlPage, ownerSignIn, sameColour } from "./_helpers";
 
 const APP = "quill-docs";
 
@@ -91,7 +93,7 @@ export const journey: Journey = {
     results.check("the page's CSS cannot hide them (every button displayed, visible, with a box)", facts.visible.length > 0 && facts.visible.every(Boolean), JSON.stringify(facts.visible));
     results.check("the page's CSS cannot restyle them: the main button keeps the app's primary and text colours, not red Comic Sans", !!facts.primary && sameColour(facts.primary.background, publicConfig.branding.light.primary) && sameColour(facts.primary.color, publicConfig.branding.light.primary_foreground) && !/Comic Sans/.test(facts.primary.font), JSON.stringify(facts.primary));
     results.check("the SDK announced itself (silicon-accounts:ready)", (await visitor.evaluate(() => typeof (window as unknown as { __dvbReady?: number }).__dvbReady === "number")) && (await visitor.evaluate(() => typeof (window as unknown as { SiliconAccounts?: unknown }).SiliconAccounts === "object")));
-    await checkPoweredBy(ctx, visitor, "the SDK buttons", { shadowHost: "#silicon-accounts" });
+    const hrefs = [(await checkPoweredBy(ctx, visitor, "the SDK buttons", { shadowHost: "#silicon-accounts" })).href];
     await shot(env, visitor, "dvb-h-01-sdk-hostile-css");
 
     // renderButtons from JavaScript with theme "dark": the app's dark palette, in a shadow root of its own.
@@ -180,9 +182,51 @@ export const journey: Journey = {
       await broken.goto(url);
       const message = await broken.waitForFunction(() => document.querySelector("#box")?.shadowRoot?.querySelector("[role='alert']")?.textContent ?? "", undefined, { timeout: 15_000 }).then(handle => handle.jsonValue()).catch(() => "");
       results.check(`a snippet with ${label} shows "not set up correctly" and the reason inside the box`, /not set up correctly/.test(String(message)) && words.test(String(message)), String(message).slice(0, 200));
-      await checkPoweredBy(ctx, broken, `the SDK box with ${label}`, { shadowHost: "#box" });
+      hrefs.push((await checkPoweredBy(ctx, broken, `the SDK box with ${label}`, { shadowHost: "#box" })).href);
       await broken.close();
     }
     await context.close();
+    checkPoweredByHost(ctx, "the SDK's buttons and its error box", hrefs);
+
+    // UNDERSTANDING.md ("Adding sign-in to an app", edited 2026-10-07): "An app can never take in a Carbon's email or
+    // phone number itself and send it to us for verification. The Carbon always types it on our pages." The SDK takes a
+    // data-login-hint and passes it on to /authorize as login_hint; our page must not fill it in for the Carbon.
+    const hinted = freshEmail("hint");
+    const fresh = await newContext(ctx.browser);
+    const hintUrl = `${new URL(env.apps).origin}/__dvb/sdk-hint-${t}.html`;
+    await hostPage(fresh, hintUrl, htmlPage("An app that knows your email", `<div id="box"></div><script src="${env.site}/sdk/v1.js" data-app-id="${APP}" data-redirect-uri="${redirect}" data-target="#box" data-login-hint="${hinted}"></script>`));
+    const hintPage = await fresh.newPage();
+    results.watch(hintPage, "dvb-h-login-hint");
+    await hintPage.goto(hintUrl);
+    await hintPage.waitForFunction(() => (document.querySelector("#box")?.shadowRoot?.querySelectorAll("button[data-method]").length ?? 0) > 0, undefined, { timeout: 20_000 }).catch(() => undefined);
+    await hintPage.locator("#box button[data-method='email']").click();
+    await hintPage.waitForURL(url => url.href.startsWith(`${env.site}/authorize`), { timeout: 20_000 }).catch(() => undefined);
+    const handedOver = new URL(hintPage.url()).searchParams.get("login_hint");
+    const emailField = hintPage.getByRole("textbox", { name: "Email" });
+    await emailField.waitFor({ timeout: 30_000 }).catch(() => undefined);
+    await sleep(600);
+    const filledIn = await emailField.inputValue().catch(() => "(no Email field)");
+    results.check("an email the app hands the SDK (data-login-hint) is not filled in on our page: the Carbon types it there (UNDERSTANDING.md)", filledIn === "", `the SDK sent login_hint=${handedOver ?? "(none)"}; our Email field holds "${filledIn}"`);
+    await shot(env, hintPage, "dvb-h-03-login-hint");
+
+    // Where the snippet may be used: UNDERSTANDING.md ("developer.teamofsilicons.com", edited 2026-10-07) has the
+    // developer "set the redirect URLs and where the iframe and snippet may be used". The iframe keeps to the allowed
+    // origins (developer-branding-embed); the same snippet on a site quill-docs never allowed should not offer its
+    // sign-in either.
+    const allowedOrigins = (await json<{ allowed_origins?: string[] }>(`${env.site}/v1/apps/${APP}/public`)).body.allowed_origins ?? [];
+    const elsewhere = "http://elsewhere.example:8124";
+    const elsewhereUrl = `${elsewhere}/__dvb/sdk-${t}.html`;
+    await hostPage(fresh, elsewhereUrl, htmlPage("Someone else's site", `<h1>Not quill-docs</h1>${snippet}`));
+    const other = await fresh.newPage();
+    results.watch(other, "dvb-h-elsewhere", [/Silicon Accounts:/]);
+    await other.goto(elsewhereUrl);
+    const settled = await other.waitForFunction(() => {
+      const root = document.querySelector("#silicon-accounts")?.shadowRoot;
+      const buttons = root?.querySelectorAll("button[data-method]").length ?? 0;
+      return buttons > 0 || !!root?.querySelector("[role='alert']") ? { buttons, alert: root?.querySelector("[role='alert']")?.textContent ?? null } : null;
+    }, undefined, { timeout: 20_000 }).then(handle => handle.jsonValue()).catch(() => null);
+    results.check(`the SDK snippet on a site that is not among quill-docs' allowed origins (${elsewhere}) does not offer its sign-in (UNDERSTANDING.md: the developer sets where the snippet may be used)`, !allowedOrigins.includes(elsewhere) && !!settled && settled.buttons === 0, `allowed origins ${allowedOrigins.join(", ")}; on ${elsewhere} the SDK ${settled ? (settled.buttons ? `rendered ${settled.buttons} working sign-in buttons` : `showed "${String(settled.alert).slice(0, 120)}"`) : "rendered nothing within 20 s"}`);
+    await shot(env, other, "dvb-h-04-sdk-elsewhere");
+    await fresh.close();
   },
 };

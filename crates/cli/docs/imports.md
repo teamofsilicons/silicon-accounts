@@ -42,6 +42,14 @@ you pass `--ignore-unknown-columns`, which imports anyway and warns on affected 
 CSV needs a header row; JSON is a list of objects (or `{"rows":[…]}`). At most
 100,000 rows or 50 MB per import.
 
+A file over 50 MB is refused before it is uploaded: exit 2 with `payload_too_large`,
+its size and the limit. Split it into files of at most 50 MB and 100,000 rows each (every
+CSV part starting with the header row) and import them one after another. Why the CLI
+checks first: the service refuses an oversized body as soon as it sees its size, usually
+before the upload has finished, so a client that kept uploading could see a reset
+connection instead of the reason. For JSON the limit applies to the rows as they are sent
+(re-encoded without the file's indentation), so the CLI checks the encoded body.
+
 ## Row outcomes
 
 | outcome | meaning |

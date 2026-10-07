@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
+import { crc32, deflateSync } from "node:zlib";
 import type { Ctx } from "../../context";
 import { E2E_DIR, codeFor, lastSeq, randomIp, sleep, sql, tag, type Env, type JsonAnswer, type Results } from "../../lib";
 
@@ -102,6 +103,9 @@ export function fakeApp(appId: string): FakeApp {
 export interface CallInit {
   json?: unknown;
   form?: Record<string, string>;
+  /** A raw body (an image upload) with its Content-Type. */
+  bytes?: Buffer;
+  contentType?: string;
   headers?: Record<string, string>;
   idempotencyKey?: string;
   /** Straight at accounts-api instead of through the site's /v1 proxy. */
@@ -109,8 +113,11 @@ export interface CallInit {
 }
 
 async function send<T>(url: string, method: string, headers: Headers, init: CallInit): Promise<JsonAnswer<T> & { text: string; ms: number }> {
-  let body: string | undefined;
-  if (init.form) {
+  let body: BodyInit | undefined;
+  if (init.bytes) {
+    headers.set("content-type", init.contentType ?? "application/octet-stream");
+    body = new Uint8Array(init.bytes);
+  } else if (init.form) {
     headers.set("content-type", "application/x-www-form-urlencoded");
     body = new URLSearchParams(init.form).toString();
   } else if (init.json !== undefined) {
@@ -702,6 +709,26 @@ export class Receiver {
 
 /** Seconds between two RFC3339 timestamps. */
 export const secondsBetween = (a: string | null | undefined, b: string | null | undefined) => (a && b ? (Date.parse(b) - Date.parse(a)) / 1000 : Number.NaN);
+
+/** A width×height PNG of one colour (8-bit RGB), built here so the suite needs no image files. */
+export function solidPng(width: number, height: number, rgb: [number, number, number]): Buffer {
+  const chunk = (type: string, data: Buffer) => {
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const typed = Buffer.concat([Buffer.from(type, "latin1"), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(typed) >>> 0);
+    return Buffer.concat([length, typed, crc]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const row = Buffer.alloc(1 + width * 3);
+  for (let x = 0; x < width; x++) row.set(rgb, 1 + x * 3);
+  const pixels = Buffer.concat(Array.from({ length: height }, () => row));
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", header), chunk("IDAT", deflateSync(pixels)), chunk("IEND", Buffer.alloc(0))]);
+}
 
 /** Percentile of a list of numbers (nearest rank). */
 export function percentile(values: number[], p: number): number {

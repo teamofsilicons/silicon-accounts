@@ -663,5 +663,17 @@ export async function uuidOfEmail(env: Env, email: string): Promise<string | nul
   return rows[0]?.[0] ?? null;
 }
 
+/** How many emails or texts the mock email/SMS server received for `to` after message `after`. */
+export async function messagesTo(env: Env, to: string, after: number): Promise<number> {
+  const reply = await json<{ count?: number }>(`${env.messaging}/_messages?to=${encodeURIComponent(to)}&after=${after}&limit=1000`);
+  return reply.body.count ?? 0;
+}
+
+/** How many emails and texts the mock email/SMS server received (for anyone) after message `after`. */
+export async function messagesAfter(env: Env, after: number): Promise<number> {
+  const reply = await json<{ count?: number }>(`${env.messaging}/_messages?after=${after}&limit=1000`);
+  return reply.body.count ?? 0;
+}
+
 /** Puts a regex-special string into a RegExp literally. */
 export const literally = (text: string) => text.replace(/[.*+?^${}()|[\]\\/:]/g, "\\$&");

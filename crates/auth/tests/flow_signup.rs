@@ -362,6 +362,11 @@ async fn imported_accounts_finish_setup_with_their_imported_data() {
     assert_eq!(s["id"], "c:imported-user");
     assert_eq!(s["display_name"], "Imported User");
     assert_eq!(s["timezone"], "America/New_York");
+    assert_eq!(
+        s["imported_by"],
+        json!({"app_id": app.app_id, "name": app.name}),
+        "the page can say which app added the Carbon: {s}"
+    );
 
     let r = b
         .post(
@@ -448,10 +453,89 @@ async fn imported_accounts_can_finish_in_apps_that_take_no_new_accounts() {
     let mut b = Browser::new(&ctx);
     let (id, f) = to_signup(&ctx, &mut b, &app.app_id, &email).await;
     assert_eq!(f["signup"]["finishing_import"], true);
+    assert!(
+        f["signup"]["imported_by"].is_null(),
+        "no app's import is on record for this account: {}",
+        f["signup"]
+    );
     let r = b
         .post(&ctx, &format!("/v1/flows/{id}/signup"), json!({}))
         .await;
     assert_eq!(r.status, 200, "{}", r.json);
+}
+
+#[tokio::test]
+async fn finishing_an_import_in_another_app_names_the_app_that_imported_it() {
+    let ctx = TestContext::new().await;
+    let email = random_email("elsewhere");
+    let (crm, _) = ctx.app("legacy").await;
+    let (other, _) = ctx.app("briefcase").await;
+    let imported = ctx
+        .carbon_with(CarbonSpec {
+            email: Some(email.clone()),
+            status: Some(AccountStatus::Unclaimed),
+            ..Default::default()
+        })
+        .await;
+    {
+        let mut conn = ctx.conn().await;
+        accounts_core::repo::memberships::upsert_imported(
+            &mut conn,
+            &crm.app_id,
+            &imported.uuid,
+            Some("crm-9"),
+            None,
+            false,
+        )
+        .await
+        .expect("imported membership");
+    }
+    // The Carbon first signs into another app with the imported email: that finishes the account
+    // the CRM imported, and the view names the CRM, not the app being signed into.
+    let mut b = Browser::new(&ctx);
+    let (id, f) = to_signup(&ctx, &mut b, &other.app_id, &email).await;
+    assert_eq!(f["signup"]["finishing_import"], true);
+    assert_eq!(f["app"]["app_id"], other.app_id.as_str());
+    let crm_named = json!({"app_id": crm.app_id, "name": crm.name});
+    assert_eq!(f["signup"]["imported_by"], crm_named, "{}", f["signup"]);
+
+    // A later import of the same person by the other app only matched the account: the CRM's
+    // import (the earliest) is still the one that added them.
+    {
+        let mut conn = ctx.conn().await;
+        sqlx::query("update memberships set created_at = now() - interval '1 day' where app_id = $1 and account_uuid = $2")
+            .bind(&crm.app_id)
+            .bind(&imported.uuid)
+            .execute(&mut *conn)
+            .await
+            .expect("backdate the CRM's import");
+        accounts_core::repo::memberships::upsert_imported(
+            &mut conn,
+            &other.app_id,
+            &imported.uuid,
+            Some("bc-9"),
+            None,
+            false,
+        )
+        .await
+        .expect("second import");
+    }
+    let r = b.get(&ctx, &format!("/v1/flows/{id}")).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(
+        r.json["flow"]["signup"]["imported_by"], crm_named,
+        "{}",
+        r.json
+    );
+
+    let r = b
+        .post(&ctx, &format!("/v1/flows/{id}/signup"), json!({}))
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(
+        r.json["flow"]["signed_in_as"]["uuid"],
+        imported.uuid.as_str()
+    );
 }
 
 // ------------------------------------------------- imports can't plant addresses on accounts

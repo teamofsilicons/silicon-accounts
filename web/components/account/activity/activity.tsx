@@ -126,6 +126,8 @@ export function Activity() {
       <div className={styles.toolbar}>
         <SegmentedControl label="Show" value={filter} onValueChange={value => setFilter(value as Filter)} options={FILTERS} />
       </div>
+      {/* Names what the switch shows, so the day headings (or the empty state's) sit one level under the page's. */}
+      <h2 className="sr-only">{filter === "all" ? "All activity" : FILTERS.find(item => item.value === filter)?.label}</h2>
       {history.error && !history.data ? (
         <Alert tone="danger" title="Your activity did not load">
           {describeError(history.error)}
@@ -149,7 +151,7 @@ export function Activity() {
         <>
           <div ref={feed} className={styles.feed}>
             {/* Each filter starts its own timeline, so rows of the previous filter never slide in as new ones. */}
-            <Timeline key={filter} events={events} now={now} label="Account activity" timeZone={timeZone} headingLevel={2} />
+            <Timeline key={filter} events={events} now={now} label="Account activity" timeZone={timeZone} headingLevel={3} />
           </div>
           {history.hasNextPage ? (
             <div className={styles.more}>

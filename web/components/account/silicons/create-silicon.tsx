@@ -137,7 +137,7 @@ function CreateForm({ me, onCreated }: { me: CarbonMe; onCreated: (created: Sili
         check={check}
         error={failure?.message ?? errors.id ?? null}
         suggestions={failure?.suggestions}
-        description="What people and apps type to find it. 3 to 30 of a to z, 0 to 9, - and _."
+        description="What Carbons, Silicons and apps type to find it. 3 to 30 of a to z, 0 to 9, - and _."
       />
       <div className={styles.field}>
         <Combobox label="Timezone" options={options} value={timezone} onValueChange={setTimezone} description="Its local time. Yours to start with." />

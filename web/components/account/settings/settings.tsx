@@ -40,6 +40,16 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
   { value: "system", label: "Device" },
 ];
 
+/**
+ * The account is gone. DELETE /v1/me already ended every session of it and cleared this browser's session cookie, so
+ * there is nothing left to sign out: POST /v1/session/signout could only answer 401, which the browser logs as a failed
+ * request. Leave for the signed-out landing page with a full load, so nothing about the account stays in memory (the
+ * page renders signed out on the server, since the request carries no session cookie).
+ */
+function leaveDeletedAccount(): void {
+  window.location.replace(paths.home);
+}
+
 /** A readable name for a session: its label, or how it was made. */
 function sessionName(session: SessionInfo): string {
   if (session.label) return session.label;
@@ -147,7 +157,7 @@ export function Settings() {
             </p>
           </div>
         ) : carbon ? (
-          <DeleteAccount id={carbon.id ?? carbon.uuid} custodianOf={carbon.custodian_of} onDeleted={() => void signOutHere()} />
+          <DeleteAccount id={carbon.id ?? carbon.uuid} custodianOf={carbon.custodian_of} onDeleted={leaveDeletedAccount} />
         ) : (
           <SkeletonBlock width="100%" height="180px" radius="var(--radius-surface)" />
         )}
@@ -204,6 +214,7 @@ function SessionRow({ session, now, signingOut, onSignOutHere, onRevoke }: { ses
   );
 }
 
+/** `onDeleted` runs once "Deleted" has shown in place; the session is already gone by then (never sign it out). */
 function DeleteAccount({ id, custodianOf, onDeleted }: { id: string; custodianOf: number; onDeleted: () => void }) {
   const [phase, setPhase] = useState<"idle" | "pending" | "done">("idle");
   const [error, setError] = useState<string | null>(null);

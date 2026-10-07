@@ -13,7 +13,8 @@
 .open .chevron { transform: rotate(180deg); }
 .clear { display: grid; width: 22px; height: 22px; flex: 0 0 auto; place-items: center; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-muted); cursor: pointer; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
 @media (hover: hover) and (pointer: fine) { .clear:hover { background: var(--surface-muted); color: var(--foreground); } }
-.clear:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+/* Keyboard focus: the hover's fill and ink with an inner edge (the site's --focus-ring is transparent, so a ring showed nothing). */
+.clear:focus-visible { outline: none; background: var(--surface-muted); color: var(--foreground); box-shadow: inset 0 0 0 1px var(--border-strong); }
 .hint { color: var(--text-muted); font-size: var(--text-xs); }
 .popover { position: absolute; z-index: 80; top: calc(100% + 8px); right: 0; left: 0; overflow: hidden; transform-origin: top center; --sq-r: var(--radius-panel); --sq-fill: var(--surface-raised); --sq-stroke: var(--border); border: 1px solid var(--sq-stroke); padding: 5px; background: var(--sq-fill); color: var(--foreground); box-shadow: var(--shadow-floating); will-change: transform, opacity; }
 .autoHeight { overflow: hidden; }

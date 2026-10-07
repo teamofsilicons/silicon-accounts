@@ -54,6 +54,11 @@ export interface SiliconDrawerProps {
   onRevealDone: (id: string) => void;
   /** The Silicon was deleted and the drawer has closed: remove its tile. */
   onDeleted: (uuid: string) => void;
+  /**
+   * Where keyboard focus goes back to when the drawer closes: the Silicon's tile. Radix returns focus only to a
+   * Dialog.Trigger, and the tiles open the drawer without one, so focus would otherwise drop to the page body.
+   */
+  focusOnClose?: (uuid: string) => HTMLElement | null | undefined;
 }
 
 /** How long a "Removed" / "Cancelled" / "Deleted" result shows in place before the content behind it changes. */
@@ -62,11 +67,17 @@ const RESULT_MS = 700;
 const LONG_ID = 18;
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export function SiliconDrawer({ silicon, open, onOpenChange, ...rest }: SiliconDrawerProps) {
+export function SiliconDrawer({ silicon, open, onOpenChange, focusOnClose, ...rest }: SiliconDrawerProps) {
+  const returnFocus = (event: Event) => {
+    const target = silicon ? focusOnClose?.(silicon.uuid) : null;
+    if (!target?.isConnected) return;
+    event.preventDefault();
+    target.focus({ preventScroll: true });
+  };
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       {silicon ? (
-        <DrawerContent className={styles.panel} title={silicon.display_name} description={`${silicon.id ?? "No id"} · uuid ${silicon.uuid}`}>
+        <DrawerContent className={styles.panel} title={silicon.display_name} description={`${silicon.id ?? "No id"} · uuid ${silicon.uuid}`} onCloseAutoFocus={returnFocus}>
           <Body key={silicon.uuid} silicon={silicon} onClose={() => onOpenChange(false)} {...rest} />
         </DrawerContent>
       ) : null}
@@ -74,7 +85,7 @@ export function SiliconDrawer({ silicon, open, onOpenChange, ...rest }: SiliconD
   );
 }
 
-type BodyProps = Omit<SiliconDrawerProps, "silicon" | "open" | "onOpenChange"> & { silicon: ManagedSilicon; onClose: () => void };
+type BodyProps = Omit<SiliconDrawerProps, "silicon" | "open" | "onOpenChange" | "focusOnClose"> & { silicon: ManagedSilicon; onClose: () => void };
 type Origin = NonNullable<Reveal["origin"]>;
 
 function Body(props: BodyProps) {
@@ -548,7 +559,7 @@ function TransferBlock({ silicon, me, now }: BodyProps) {
     setError(null);
     try {
       const request = await start.mutateAsync({ uuid: silicon.uuid, to: target.to });
-      // The Silicon's card travels to the person it is going to, then the block shows the waiting transfer.
+      // The Silicon's card travels to the Carbon it is going to, then the block shows the waiting transfer.
       const from = mini.current?.getBoundingClientRect();
       const dest = field.current?.getBoundingClientRect();
       if (mini.current && from && dest && !reducedMotion()) {

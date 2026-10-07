@@ -19,7 +19,7 @@ const shape = (reply: Reply) => {
 
 export const journey: Journey = {
   name: "security-enumeration",
-  title: "enumeration: Silicon sign-in gives an unknown si:id and a wrong STK the identical 401 (message, hint, headers, timing), also for a pending Silicon; the hosted flow treats known and unknown emails alike until the code; lookups need credentials; the lock-only-for-real-ids and CLI account_not_found behaviours are recorded as notes",
+  title: "enumeration: Silicon sign-in gives an unknown si:id and a wrong STK the identical 401 (message, hint, headers, timing), also for a pending Silicon; the hosted flow treats known and unknown emails alike until the code; lookups need credentials; the CLI's documented address oracle is throttled at 60 per 10 minutes per network; the lock-only-for-real-ids and CLI account_not_found behaviours are recorded as notes",
   engines: ["chromium"],
   timeoutMs: 600_000,
   async run(ctx) {
@@ -122,5 +122,18 @@ export const journey: Journey = {
     const cliUnknown = await call(`${env.site}/v1/cli/login/start`, { json: { email: `sec.enum.cli.${tag()}@example.test` }, ip: ctx.ip });
     results.check("(note) the CLI's headless code sign-in tells a known address (a code is sent) from an unknown one (404 account_not_found), as 02-api.md specifies", true, `known ${cliKnown.status}, unknown ${brief(cliUnknown)}`);
     await forgetRateLimits(env, ctx.ip);
+
+    // 7. That oracle is throttled per network: 60 lookups per 10 minutes, unknown addresses included (no code is sent
+    //    for them, so only this limit stops a prober from testing a list of addresses).
+    const prober = randomIp();
+    const probes: Reply[] = [];
+    for (let start = 0; start < 60; start += 15) probes.push(...(await Promise.all(Array.from({ length: 15 }, (_, k) => call(`${env.site}/v1/cli/login/start`, { json: { email: `sec.enum.probe.${start + k}.${tag()}@example.test` }, ip: prober })))));
+    const probe61 = await call(`${env.site}/v1/cli/login/start`, { json: { email: `sec.enum.probe.61.${tag()}@example.test` }, ip: prober });
+    const probeKnown = await call(`${env.site}/v1/cli/login/start`, { json: { email: custodian.email }, ip: prober });
+    const elsewhere = await call(`${env.site}/v1/cli/login/start`, { json: { email: `sec.enum.probe.other.${tag()}@example.test` }, ip: randomIp() });
+    const retry = Number(probe61.headers.get("retry-after"));
+    const answered = probes.filter(reply => reply.status === 404 && errorOf(reply).code === "account_not_found").length;
+    results.check("the CLI's address lookup is throttled per network: 60 lookups of unknown addresses are answered (404), the 61st and a known address after it get 429 rate_limited with Retry-After (≤ 600 s), and another network is unaffected", answered === 60 && probe61.status === 429 && errorOf(probe61).code === "rate_limited" && retry >= 1 && retry <= 600 && Number(errorOf(probe61).details?.retry_after_seconds) === retry && probeKnown.status === 429 && elsewhere.status === 404, `${answered}/60 answered 404; 61st ${brief(probe61)} (Retry-After ${probe61.headers.get("retry-after")}); known address after it ${probeKnown.status}; another network ${elsewhere.status}`);
+    await forgetRateLimits(env, prober);
   },
 };

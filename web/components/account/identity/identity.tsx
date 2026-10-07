@@ -98,7 +98,7 @@ export function Identity() {
           <Dialog open={changingId} onOpenChange={setChangingId}>
             <DialogContent
               title="Change your id"
-              description={account.id ? `Your id is ${account.id} now.` : "Pick the id people will type to find you."}
+              description={account.id ? `Your id is ${account.id} now.` : "Pick the id Carbons and Silicons will type to find you."}
               onOpenAutoFocus={event => {
                 event.preventDefault();
                 requestAnimationFrame(() => idInput.current?.focus());

@@ -10,7 +10,7 @@ branding runtime); the product contract is `understanding/UNDERSTANDING.md`.
 | `/authorize/flow/[id]` | `flow-page.tsx` | One sign-in, driven by `FlowView.step`: `choose_method` (Continue as / Use another account, Google and Apple, email or phone), `verify_code`, `signup`, `requirements`, `consent`, `complete`, `failed`. Google and Apple come back here. |
 | `/sign-in` | `sign-in.tsx` | Both ends of the account site's own sign-in (first-party app `accounts`, redirect `{origin}/sign-in`): starts it with `return_to` remembered against the state, and finishes it (`?code&state`, or `?error&state` with a way to try again). A code or error counts only when this browser saved its state; the page never shows the address's `error` or `error_description` (fixed words per error code), so nobody can put their own text on it with a link. |
 | `/device` | `device.tsx` | Approving a CLI sign-in: enter (or arrive with) the code, review it (the whole client label, who approves, when it expires), approve or deny, and every status after; a code that runs out while the page is open turns into "This code expired" by the clock. Signed out, it signs in and comes back with the code. |
-| `/embed/v1/buttons` | `embed/embed-buttons.tsx` | The buttons apps frame; the page declares the frame's color scheme from `theme` on the first byte. A config fetch the browser cut off is tried twice more before `network_error` (Safari cancels a frame's requests when the page around it starts leaving). |
+| `/embed/v1/buttons` | `embed/embed-buttons.tsx` | The buttons apps frame; the page declares the frame's color scheme from `theme` on the first byte. A config read the browser cut off is tried twice more (after 0.5 s and 1.5 s) before a problem is reported: Safari cancels a frame's requests when the page around it starts leaving, before the answer (`network_error`) or after its 200 headers while the body is still on its way (`http_200`). |
 
 ## Inside
 
@@ -19,13 +19,17 @@ branding runtime); the product contract is `understanding/UNDERSTANDING.md`.
 - `flow/model.ts`: browser memory (the /authorize query for "Start again", "already redirected", the once-per-flow
   provider jump, the app's look), safe redirects, and the split layout's hero copy, which follows the step: the app's
   own title on the sign-in steps, "Welcome to {app}" for a first visit, never a "welcome back" to a new account.
-- `flow/errors.ts`: every error in the Carbon's words (API instructions and internal ids stay out), with the one-click
-  fix where there is one ("Sign in again").
+- `flow/errors.ts`: every error in the Carbon's words (API instructions, internal ids and exact UTC instants stay out,
+  with the words that introduced them: "expired at 2026-…Z: a verified…" reads "expired. A verified…"), with the
+  one-click fix where there is one ("Sign in again").
 - `flow/hosted-frame.tsx`: the page around a step: the app's branding on its own subtree, card, split or minimal, logo
   and name, and "Powered by Silicon Accounts" outside the branded subtree (in the split layout, in the form's column).
 - `flow/morph.tsx`: the card morph between steps (Arc's sign-in block motion); the leaving step is inert.
 - `flow/parts.tsx`: headings, field notes, alerts, rows, provider buttons, the code entry (submits on the sixth digit,
-  shakes, tries left, a live lockout, expiry, resend), and the email/phone form.
+  shakes, tries left, a live lockout, expiry, resend), and the email/phone form. The account and destination rows never
+  cut a name, c:id or address short: the action moves under the text when it needs the room, and an address breaks after
+  "@" or before a ".". "Resend code in 0:27" is named by exactly those words (a visually hidden copy; the rolling digits
+  are aria-hidden) and shows keyboard focus while it waits.
 - Phone numbers go through the foundation's `components/foundation/phone-field` (PhoneField + phone-data, moved there
   from this area so the account site's "Add a phone number" takes any country too): Arc's picker knows 49 countries; a
   number it would rewrite moves to a field for the number with its country code and is sent exactly as typed.
@@ -43,7 +47,9 @@ branding runtime); the product contract is `understanding/UNDERSTANDING.md`.
 - `steps/*`: one file per step. `mocks/flows.ts`: sample FlowViews for every step.
 
 The sign-up photo uploads to the sign-up itself as soon as it is picked (`POST /v1/flows/{id}/signup/photo`); the
-account takes it when it is created. "Not you?" calls `POST /v1/flows/{id}/switch`, which ends that sign-up in this
+account takes it when it is created. Finishing an imported account names the app that imported it
+(`signup.imported_by`), which may be another app than the one being signed into ("Legacy CRM added you to Silicon
+Accounts. Check the details it gave us, then continue to Briefcase."), and names no app when the server does not say. "Not you?" calls `POST /v1/flows/{id}/switch`, which ends that sign-up in this
 browser (the server clears its cookie).
 
 The hosted content renders after hydration: the flow is read in the browser (its cookies prove it is this browser's)
@@ -54,7 +60,7 @@ and the visitor's theme is known only there. Before that the server sends a quie
 ```
 pnpm screens --only auth-,device-                   every step for 4 brandings, interactions, device states
 SCREENS_ERRORS=1 pnpm screens --only auth-problem,auth-default-verify-wrong --allow-errors
-pnpm exec tsx components/auth/checks.ts --base http://localhost:8590            48 checks, mock API
+pnpm exec tsx components/auth/checks.ts --base http://localhost:8590            58 checks, mock API
 pnpm exec tsx components/auth/checks.ts --base http://localhost:8590 --engine webkit
 LIVE_OIDC_URL=http://127.0.0.1:8591 LIVE_APP_ORIGIN=http://127.0.0.1:8593 LIVE_PSQL="psql -h 127.0.0.1 -p 5444 -U postgres -d silicon_accounts" \
   pnpm exec tsx components/auth/checks.ts --live http://localhost:8590              25 checks end to end
@@ -64,7 +70,9 @@ Keyboard checks walk with Tab in Chromium and Option+Tab in WebKit (like Safari 
 buttons and links).
 
 The mock checks need any running site (`--base`); the browser's API calls are answered by `scripts/mock` with
-`mocks/flows.ts`. The live checks need the site, accounts-api with the dev outbox (`scripts/dev.sh` sets it) and the
+`mocks/flows.ts`. The embed checks cut the config's body off after its 200 (and, with a local server that holds the
+body back, let the page around the frame leave meanwhile: Safari's race, failing on the code before the fix in WebKit),
+and the Resend check runs axe-core's label-content-name-mismatch. The live checks need the site, accounts-api with the dev outbox (`scripts/dev.sh` sets it) and the
 testkit's mock Google/Apple; `LIVE_APP_ORIGIN` is the fake apps' registered origin (dev.sh on other ports rewrites it,
 for example `http://127.0.0.1:8703`). Apps' own pages (callbacks, pages that frame the buttons or load the SDK) are
 answered inside the browser on that origin. `CHECKS_SHOTS=<dir>` keeps screenshots of failed checks.

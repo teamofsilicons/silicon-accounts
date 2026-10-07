@@ -149,7 +149,7 @@ async fn one_timeline_over_every_source() {
     assert_eq!(issued["meta"]["event"], "issued");
     assert_eq!(issued["meta"]["scopes"], json!(["files.write"]));
     let revoked = find(&all, "proof", "revoked");
-    assert_eq!(revoked["detail"], "Revoked by you (revoked by account)");
+    assert_eq!(revoked["detail"], "Revoked by you");
     find(&all, "app_access", "Started using");
     let removal = find(&all, "app_access", "access");
     assert_eq!(removal["app"]["app_id"], leaving);
@@ -505,4 +505,412 @@ async fn entries_about_a_silicon_name_it() {
     assert_eq!(profile["title"], format!("Profile of {silicon_id} updated"));
     assert_eq!(profile["detail"], "Changed: display name, photo");
     assert_eq!(profile["meta"]["silicon"]["id"], silicon_id.as_str());
+}
+
+/// The CLI and the Rust package sign in too: their sign-ins name them, never "A browser" (the
+/// CLI's user agent is `accounts-cli/<v> silicon-accounts-client/<v>`).
+#[tokio::test]
+async fn sign_ins_name_the_cli_and_the_package_not_a_browser() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let mut conn = ctx.conn().await;
+    for (method, user_agent) in [
+        (
+            audit::method::EMAIL,
+            "accounts-cli/0.1.0 silicon-accounts-client/0.1.0",
+        ),
+        (audit::method::SLT, "silicon-accounts-client/0.1.0"),
+        (
+            audit::method::DEVICE,
+            "scout/1.4 silicon-accounts-client/0.1.0",
+        ),
+        (audit::method::PHONE, "curl/8.4.0"),
+    ] {
+        audit::signin(
+            &mut conn,
+            &SigninRecord {
+                account_uuid: Some(&carbon.uuid),
+                app_id: None,
+                method,
+                outcome: audit::outcome::SUCCESS,
+                ip: Some("127.0.0.1"),
+                user_agent: Some(user_agent),
+            },
+        )
+        .await
+        .expect("signin");
+    }
+    drop(conn);
+    let r = call(
+        &ctx,
+        Req::get("/v1/me/history?kind=signin").bearer(&token(&ctx, &carbon).await),
+    )
+    .await;
+    assert_status(&r, 200);
+    let signins = items(&r.json);
+    let detail_for = |user_agent: &str| {
+        signins
+            .iter()
+            .find(|i| i["meta"]["user_agent"] == user_agent)
+            .unwrap_or_else(|| panic!("no sign-in from {user_agent} in {signins:#?}"))["detail"]
+            .clone()
+    };
+    assert_eq!(
+        detail_for("accounts-cli/0.1.0 silicon-accounts-client/0.1.0"),
+        "from 127.0.0.1 · accounts CLI 0.1.0"
+    );
+    assert_eq!(
+        detail_for("silicon-accounts-client/0.1.0"),
+        "from 127.0.0.1 · Silicon Accounts Rust package 0.1.0"
+    );
+    assert_eq!(
+        detail_for("scout/1.4 silicon-accounts-client/0.1.0"),
+        "from 127.0.0.1 · scout 1.4 (Silicon Accounts Rust package 0.1.0)"
+    );
+    assert_eq!(detail_for("curl/8.4.0"), "from 127.0.0.1 · curl 8.4.0");
+    assert!(
+        signins
+            .iter()
+            .all(|i| !i["detail"].as_str().unwrap_or_default().contains("browser")),
+        "{signins:#?}"
+    );
+}
+
+/// A revoked proof says why in words (as the Proofs page does), never with the raw reason code
+/// ("Revoked by you (revoked by account)").
+#[tokio::test]
+async fn a_revoked_proof_says_why_in_words() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let owner = ctx.carbon().await;
+    let issuer = member_app(&ctx, "dm", &carbon, &[Scope::Profile]).await;
+    let receiver = member_app(&ctx, "briefcase", &carbon, &[Scope::Profile]).await;
+    let app_revoker = format!("app:{issuer}");
+    let cases: [(&str, &str); 7] = [
+        ("revoked_by_account", carbon.uuid.as_str()),
+        ("revoked_by_app", app_revoker.as_str()),
+        ("revoked_by_owner", owner.uuid.as_str()),
+        ("refresh_token_reuse", "system"),
+        ("sign_in_revoked", "system"),
+        ("access_removed", carbon.uuid.as_str()),
+        ("some_future_reason", app_revoker.as_str()),
+    ];
+    for (reason, revoked_by) in cases {
+        sqlx::query(
+            "insert into proof_families (id, kind, issuing_app, audiences, account_uuid, scopes, access_ttl_seconds, expires_at, \
+               revoked_at, revoked_by, revoke_reason) \
+             values ($1, 'obo', $2, $3, $4, '{files.write}', 600, now() + interval '900 days', now(), $5, $6)",
+        )
+        .bind(Uuid::now_v7())
+        .bind(&issuer)
+        .bind(vec![receiver.clone()])
+        .bind(&carbon.uuid)
+        .bind(revoked_by)
+        .bind(reason)
+        .execute(&ctx.state.db)
+        .await
+        .expect("proof");
+    }
+    let r = call(
+        &ctx,
+        Req::get("/v1/me/history?kind=proof").bearer(&token(&ctx, &carbon).await),
+    )
+    .await;
+    assert_status(&r, 200);
+    let all = items(&r.json);
+    let revoked: Vec<&Value> = all
+        .iter()
+        .filter(|i| i["meta"]["event"] == "revoked")
+        .collect();
+    assert_eq!(revoked.len(), cases.len(), "{all:#?}");
+    let issuer_name = revoked[0]["app"]["name"].as_str().expect("issuer name");
+    assert_eq!(issuer_name, "Test app dm");
+    let detail = |reason: &str| {
+        revoked
+            .iter()
+            .find(|i| i["meta"]["reason"] == reason)
+            .unwrap_or_else(|| panic!("no proof revoked for {reason}"))["detail"]
+            .as_str()
+            .unwrap_or_else(|| panic!("no detail for {reason}"))
+            .to_string()
+    };
+    assert_eq!(detail("revoked_by_account"), "Revoked by you");
+    assert_eq!(detail("revoked_by_app"), "Revoked by Test app dm");
+    assert_eq!(detail("revoked_by_owner"), "Revoked by Test app dm's owner");
+    assert_eq!(
+        detail("refresh_token_reuse"),
+        "Revoked because its refresh token was used twice, which can mean it leaked"
+    );
+    assert_eq!(
+        detail("sign_in_revoked"),
+        "Ended when your sign-in at Test app dm ended"
+    );
+    assert_eq!(
+        detail("access_removed"),
+        "Ended when you removed Test app dm's access"
+    );
+    // A reason this version doesn't know still names who revoked it (the app, not `app:…`).
+    assert_eq!(
+        detail("some_future_reason"),
+        "Revoked by Test app dm (some future reason)"
+    );
+    for item in &revoked {
+        let text = item["detail"].as_str().unwrap_or_default();
+        assert!(
+            !text.contains("revoked by account")
+                && !text.contains("app:")
+                && !text.contains(owner.uuid.as_str()),
+            "{text}"
+        );
+        assert_eq!(
+            item["title"],
+            "Proof for Test app dm to act for you at Test app briefcase revoked"
+        );
+    }
+}
+
+/// An audit entry as another crate writes it: (action, actor kind, actor id, app, target kind,
+/// details).
+type Written<'a> = (
+    &'a str,
+    ActorKind,
+    Option<&'a str>,
+    Option<&'a str>,
+    &'a str,
+    Value,
+);
+
+/// Audit actions written outside this crate (auth's sign-in flows, the CLI's sign-ins, OAuth,
+/// the service) read as sentences, never as their action code in words ("Contact added",
+/// "Oauth token revoked", "Signin locked").
+#[tokio::test]
+async fn entries_from_sign_in_flows_read_as_sentences() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let dm = member_app(&ctx, "dm", &carbon, &[Scope::Profile]).await;
+    let me = carbon.uuid.as_str();
+    let account = ActorKind::Account;
+    let system = ActorKind::System;
+    let entries: Vec<Written<'_>> = vec![
+        // crates/auth/src/flow/requirements.rs today: the kind, not the address …
+        (
+            "contact.added",
+            account,
+            Some(me),
+            Some(dm.as_str()),
+            "phone",
+            json!({"via": "requirement", "app_id": dm, "kind": "phone"}),
+        ),
+        // … and the address, when the entry carries it.
+        (
+            "contact.added",
+            account,
+            Some(me),
+            Some(dm.as_str()),
+            "email",
+            json!({"via": "requirement", "app_id": dm, "kind": "email", "email": "ada.second@example.test"}),
+        ),
+        (
+            "identity.linked",
+            account,
+            Some(me),
+            None,
+            "identity",
+            json!({"provider": "google", "linked_by": "account_site", "email_added": true}),
+        ),
+        (
+            "identity.linked",
+            account,
+            Some(me),
+            Some(dm.as_str()),
+            "identity",
+            json!({"provider": "apple", "linked_by": "verified_email"}),
+        ),
+        (
+            "session.created",
+            account,
+            Some(me),
+            Some("accounts"),
+            "session",
+            json!({"kind": "cli", "label": "accounts CLI on studio (macos)", "via": "email"}),
+        ),
+        (
+            "session.signed_out",
+            account,
+            Some(me),
+            None,
+            "session",
+            json!({"kind": "browser"}),
+        ),
+        (
+            "device.approved",
+            account,
+            Some(me),
+            Some("accounts"),
+            "device",
+            json!({"client_label": "accounts CLI on studio (macos)"}),
+        ),
+        (
+            "signin.locked",
+            system,
+            None,
+            Some(dm.as_str()),
+            "email",
+            json!({"destination": "a***@example.test", "purpose": "signin", "wrong_codes": 10, "locked_until": "2026-10-07T10:01:00.000Z"}),
+        ),
+        (
+            "signin.refused",
+            system,
+            None,
+            Some(dm.as_str()),
+            "identity",
+            json!({"provider": "google", "reason": "email_not_verified"}),
+        ),
+        (
+            "contact.unverified_removed",
+            system,
+            None,
+            None,
+            "phone",
+            json!({"kind": "phone", "was_primary": false, "reason": "an unverified address left by an import was proven by another sign-in"}),
+        ),
+        (
+            "oauth.token_revoked",
+            ActorKind::App,
+            Some(dm.as_str()),
+            Some(dm.as_str()),
+            "token_family",
+            json!({"reason": "app_revoked", "token_type": "refresh_token", "label": null}),
+        ),
+        (
+            "oauth.token_revoked",
+            account,
+            Some(me),
+            Some("accounts"),
+            "token_family",
+            json!({"reason": "user_signed_out", "token_type": "refresh_token", "label": "accounts CLI on studio (macos)"}),
+        ),
+        (
+            "oauth.refresh_reuse_detected",
+            ActorKind::App,
+            Some(dm.as_str()),
+            Some(dm.as_str()),
+            "token_family",
+            json!({"reason": "refresh_token_reuse"}),
+        ),
+        (
+            "account.claimed",
+            account,
+            Some(me),
+            Some(dm.as_str()),
+            "account",
+            json!({"method": "email", "app_id": dm}),
+        ),
+    ];
+    let mut conn = ctx.conn().await;
+    for (action, actor_kind, actor_id, app_id, target_kind, details) in &entries {
+        audit::record(
+            &mut conn,
+            &AuditEntry {
+                account_uuid: Some(me),
+                app_id: *app_id,
+                target_kind: Some(target_kind),
+                details: details.clone(),
+                ip: Some("198.51.100.4"),
+                ..AuditEntry::new(*actor_kind, *actor_id, action)
+            },
+        )
+        .await
+        .expect("audit");
+    }
+    drop(conn);
+    let r = call(
+        &ctx,
+        Req::get("/v1/me/history?kind=security&limit=50").bearer(&token(&ctx, &carbon).await),
+    )
+    .await;
+    assert_status(&r, 200);
+    let all = items(&r.json);
+    assert_eq!(all.len(), entries.len(), "{all:#?}");
+    let mut said: Vec<(String, Option<String>)> = all
+        .iter()
+        .map(|i| {
+            (
+                i["title"].as_str().expect("title").to_string(),
+                i["detail"].as_str().map(str::to_string),
+            )
+        })
+        .collect();
+    let want: Vec<(&str, Option<&str>)> = vec![
+        ("Phone number added while signing in to Test app dm", None),
+        (
+            "Email ada.second@example.test added while signing in to Test app dm",
+            None,
+        ),
+        (
+            "Google account connected",
+            Some("Its verified email was added to your emails"),
+        ),
+        (
+            "Apple account connected",
+            Some("Connected when you signed in with it: its verified email is on your account"),
+        ),
+        (
+            "New CLI sign-in",
+            Some("accounts CLI on studio (macos) · with an email code"),
+        ),
+        ("Signed out of a browser session", None),
+        (
+            "Approved a terminal sign-in",
+            Some("accounts CLI on studio (macos)"),
+        ),
+        (
+            "Too many wrong codes for a***@example.test",
+            Some("After 10 wrong codes in a row, tries were paused until 2026-10-07T10:01:00.000Z"),
+        ),
+        (
+            "Google sign-in to Test app dm refused",
+            Some("Reason: email not verified"),
+        ),
+        (
+            "Unverified phone number removed",
+            Some(
+                "An app's import had added it without a check, and someone else proved it is theirs",
+            ),
+        ),
+        ("Test app dm signed you out", None),
+        (
+            "Signed out of a CLI sign-in",
+            Some("accounts CLI on studio (macos)"),
+        ),
+        (
+            "Sign-in at Test app dm ended",
+            Some(
+                "Its refresh token was used twice, which can mean it leaked; sign in again to continue",
+            ),
+        ),
+        (
+            "Finished setting up your account",
+            Some("An app's import of its existing accounts had made it"),
+        ),
+    ];
+    let mut want: Vec<(String, Option<String>)> = want
+        .into_iter()
+        .map(|(t, d)| (t.to_string(), d.map(str::to_string)))
+        .collect();
+    // Rows written in the same microsecond have no meaningful order: compare as sets.
+    said.sort();
+    want.sort();
+    assert_eq!(said, want);
+    for (title, _) in &said {
+        for code_words in [
+            "Contact added",
+            "Oauth",
+            "Signin",
+            "Identity linked",
+            "Device approved",
+        ] {
+            assert!(!title.contains(code_words), "{title}");
+        }
+    }
 }

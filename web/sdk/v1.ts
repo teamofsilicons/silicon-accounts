@@ -305,36 +305,55 @@ window.addEventListener("message", event => {
 const configs = new Map<string, Promise<PublicApp>>();
 
 /**
- * Waits between tries of a fetch the browser cut off: Safari cancels a page's requests the moment it starts navigating
- * away (before pagehide), and networks blip. Two more tries before "could not reach", so a page that is leaving never
- * logs an error, and a real outage still does after about two seconds.
+ * Waits between tries of a read the browser cut off: Safari cancels a page's requests the moment it starts navigating
+ * away (before pagehide), either before the answer (the fetch rejects) or after its headers (the status says 200, but
+ * reading the body fails), and networks blip. Two more tries before reporting, so a page that is leaving never logs an
+ * error, and a real outage still does after about two seconds.
  */
 const NETWORK_RETRY_MS = [500, 1500];
 
-function fetchRetrying(url: string, attempt = 0): Promise<Response> {
-  return fetch(url, { credentials: "omit" }).catch(error => {
-    const wait = NETWORK_RETRY_MS[attempt];
-    if (wait === undefined) throw error;
-    return new Promise<Response>(done => setTimeout(() => done(fetchRetrying(url, attempt + 1)), wait));
-  });
+type ConfigBody = (PublicApp & { error?: { code?: string; message?: string; hint?: string } }) | null;
+/** One GET of the app's public config: its status and JSON body, or `cut` (with the status, if one came). */
+type ConfigRead = { cut: false; ok: boolean; status: number; body: ConfigBody } | { cut: true; status: number | null };
+
+async function readConfig(url: string): Promise<ConfigRead> {
+  let response: Response;
+  try {
+    response = await fetch(url, { credentials: "omit" });
+  } catch {
+    return { cut: true, status: null };
+  }
+  try {
+    return { cut: false, ok: response.ok, status: response.status, body: (await response.json()) as ConfigBody };
+  } catch {
+    return { cut: true, status: response.status };
+  }
 }
 
 /** GET /v1/apps/{app_id}/public (CORS *), once per app and page. */
 function loadApp(appId: string): Promise<PublicApp> {
   let pending = configs.get(appId);
   if (!pending) {
-    pending = fetchRetrying(`${base}/v1/apps/${encodeURIComponent(appId)}/public`)
-      .catch(() => {
-        throw new Error(`${TAG} could not reach ${base}. Check the connection and that the page may load from it.`);
-      })
-      .then(async response => {
-        const body = (await response.json().catch(() => null)) as (PublicApp & { error?: { code?: string; message?: string; hint?: string } }) | null;
-        if (!response.ok || !body || !Array.isArray(body.methods)) {
-          const error = body?.error;
-          throw new Error(`${TAG} ${error?.message ?? `the sign-in config of "${appId}" could not be loaded (HTTP ${response.status}).`}${error?.hint ? ` ${error.hint}` : ""}`);
-        }
-        return body;
-      });
+    pending = (async () => {
+      const url = `${base}/v1/apps/${encodeURIComponent(appId)}/public`;
+      let read = await readConfig(url);
+      for (const wait of NETWORK_RETRY_MS) {
+        if (!read.cut) break;
+        await new Promise(done => setTimeout(done, wait));
+        read = await readConfig(url);
+      }
+      if (read.cut) {
+        throw new Error(read.status === null
+          ? `${TAG} could not reach ${base}. Check the connection and that the page may load from it.`
+          : `${TAG} the sign-in config of "${appId}" could not be read (HTTP ${read.status}, the answer was cut off or was not JSON). Reload the page.`);
+      }
+      const { ok, status, body } = read;
+      if (!ok || !body || !Array.isArray(body.methods)) {
+        const error = body?.error;
+        throw new Error(`${TAG} ${error?.message ?? `the sign-in config of "${appId}" could not be loaded (HTTP ${status}).`}${error?.hint ? ` ${error.hint}` : ""}`);
+      }
+      return body;
+    })();
     pending.catch(() => configs.delete(appId));
     configs.set(appId, pending);
   }

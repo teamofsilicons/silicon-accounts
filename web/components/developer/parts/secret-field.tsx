@@ -4,12 +4,17 @@
  * A write-only secret in the sign-in setup (a Google client secret, an Apple .p8 key). Silicon Accounts stores it
  * encrypted and only ever says whether one is stored: the field shows that state, lets you replace it, or marks it
  * for removal on save.
+ *
+ * Whether the replace field is open (`replacing`) belongs to the editor's draft, not to this field: a save or Discard
+ * empties the draft's secrets, and the field then shows the stored state again (with its own state it stayed an empty
+ * replace field after a save, as if nothing were stored).
  */
-import { useRef, useState, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Check, FileKey, Undo2 } from "lucide-react";
 import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
 import { Textarea } from "@/components/arc/textarea/textarea";
+import { moveFocusMemory } from "./focus-return";
 import styles from "./parts.module.css";
 
 export interface SecretFieldProps {
@@ -19,6 +24,10 @@ export interface SecretFieldProps {
   stored: boolean;
   value: string;
   onValueChange: (value: string) => void;
+  /** The stored secret's replace field is open (Replace was pressed); false again after a save or Discard. */
+  replacing: boolean;
+  /** Replace (true), or "Keep the stored …" (false: the typed replacement is dropped too). */
+  onReplacingChange: (replacing: boolean) => void;
   remove: boolean;
   onRemoveChange: (remove: boolean) => void;
   description?: ReactNode;
@@ -30,11 +39,24 @@ export interface SecretFieldProps {
   accept?: string;
 }
 
-export function SecretField({ label, storedLabel, stored, value, onValueChange, remove, onRemoveChange, description, error, placeholder, multiline, accept = ".p8,.pem,.txt" }: SecretFieldProps) {
-  const [replacing, setReplacing] = useState(false);
+export function SecretField({ label, storedLabel, stored, value, onValueChange, replacing, onReplacingChange, remove, onRemoveChange, description, error, placeholder, multiline, accept = ".p8,.pem,.txt" }: SecretFieldProps) {
   const [fileError, setFileError] = useState<string | undefined>();
   const file = useRef<HTMLInputElement>(null);
   const editing = (!stored || replacing || !!value) && !remove;
+  // When the replace field closes (a save, Discard, "Keep the stored …"), focus that was in it, or would come back to
+  // it, goes to the stored state's Replace instead of falling to the page.
+  const fieldId = useId();
+  const replaceButton = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(editing);
+  useLayoutEffect(() => {
+    const closed = wasEditing.current && !editing;
+    wasEditing.current = editing;
+    const to = replaceButton.current;
+    if (!closed || !to) return;
+    moveFocusMemory(element => element.closest(`[data-secret-edit="${fieldId}"]`) !== null, to);
+    const active = document.activeElement;
+    if (!active || active === document.body || !active.isConnected) to.focus({ preventScroll: true });
+  }, [editing, fieldId]);
 
   const readFile = async (picked: File | undefined) => {
     setFileError(undefined);
@@ -47,8 +69,8 @@ export function SecretField({ label, storedLabel, stored, value, onValueChange, 
   };
 
   const keepStored = () => {
-    onValueChange("");
-    setReplacing(false);
+    setFileError(undefined);
+    onReplacingChange(false);
   };
 
   return (
@@ -64,7 +86,7 @@ export function SecretField({ label, storedLabel, stored, value, onValueChange, 
               <Button size="sm" variant="ghost" onClick={() => onRemoveChange(false)}><Undo2 size={14} strokeWidth={1.75} aria-hidden="true" />Keep it</Button>
             ) : (
               <span className={styles.secretStoredActions}>
-                <Button size="sm" variant="secondary" onClick={() => setReplacing(true)}>Replace</Button>
+                <Button ref={replaceButton} size="sm" variant="secondary" onClick={() => onReplacingChange(true)}>Replace</Button>
                 <Button size="sm" variant="ghost" onClick={() => onRemoveChange(true)}>Remove</Button>
               </span>
             )}
@@ -72,7 +94,7 @@ export function SecretField({ label, storedLabel, stored, value, onValueChange, 
           {error ? <p className={styles.fieldError} role="alert">{error}</p> : null}
         </div>
       ) : multiline ? (
-        <div className={styles.secretFieldBlock}>
+        <div className={styles.secretFieldBlock} data-secret-edit={fieldId}>
           <Textarea
             label={label}
             className={styles.mono}
@@ -103,7 +125,7 @@ export function SecretField({ label, storedLabel, stored, value, onValueChange, 
           </div>
         </div>
       ) : (
-        <div className={styles.secretFieldBlock}>
+        <div className={styles.secretFieldBlock} data-secret-edit={fieldId}>
           <Input
             label={label}
             type="password"
