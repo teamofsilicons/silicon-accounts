@@ -257,8 +257,8 @@ export function flowView(appId: string, step: FlowView["step"] = "choose_method"
         continue_label: null,
         layout: null,
         fields: [
-          { field: "email", mode: "required", label: "Email address", value: "s***@gmail.com", missing: false, shared: true, previously_granted: false },
-          { field: "timezone", mode: "optional", label: "Timezone", value: "Asia/Kolkata", missing: false, shared: false, previously_granted: false },
+          { field: "email", mode: "required", label: "Email address", value: "s***@gmail.com", missing: false, shared: true, previously_granted: false, new: true },
+          { field: "timezone", mode: "optional", label: "Timezone", value: "Asia/Kolkata", missing: false, shared: false, previously_granted: false, new: true },
         ],
         challenge: null,
       }

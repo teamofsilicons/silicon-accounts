@@ -66,7 +66,9 @@ export const journey: Journey = {
       results.check("\"Where they are asked\" follows: one page with phone, then email and date of birth (optional)", /Phone number, Email address \(optional\), Date of birth \(optional\)/.test(where), where);
       const preview = await previewText(page);
       await shot(env, page, "ds-h-01-details-draft");
-      results.check("the live preview shows the draft: phone required and missing (add it to continue), the optional ones as checkboxes", /Phone number Required: add it to continue/.test(preview) && /Date of birth/.test(preview) && !/Timezone/.test(preview), preview.slice(0, 300));
+      // In the hosted page's words (web/components/auth/steps/details.tsx): the missing required phone says "Adding it
+      // below." with its Required lock, and "Add your phone number" opens under the list.
+      results.check("the live preview shows the draft: phone required and missing (add it to continue), the optional ones as checkboxes", /Phone number Adding it below\. Required/.test(preview) && /Add your phone number/.test(preview) && /Email address Optional/.test(preview) && /Date of birth Optional/.test(preview) && !/Timezone/.test(preview), preview.slice(0, 600));
       const saved = await saveChanges(page);
       const stored = (await appDetail(ctx, APP)).signin_config;
       results.check("Save stores required [phone] and optional [email, dob], with no flow of its own", saved.saved && JSON.stringify(stored.required_fields) === JSON.stringify(["phone"]) && [...stored.optional_fields].sort().join(",") === "dob,email" && stored.flow === null, `${saved.text}; ${JSON.stringify({ required: stored.required_fields, optional: stored.optional_fields, flow: stored.flow })}`);

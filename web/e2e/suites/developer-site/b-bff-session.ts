@@ -23,7 +23,9 @@ export const journey: Journey = {
   async run(ctx) {
     const { env, results, browser } = ctx;
     const appId = "quill-docs";
-    const { context, page } = await ownerSignIn(ctx, appId, { label: "bff-session", expected: [/status of 400 \(Bad Request\) @ .*\/v1\/flows/] });
+    // This journey ends its own sign-in on purpose (sign-out, a refresh token used twice). The open app page learns it
+    // from whichever call it makes next: /api/accounts/me (DEVELOPER_SIGNED_OUT) or the app's own route, both 401.
+    const { context, page } = await ownerSignIn(ctx, appId, { label: "bff-session", expected: [/status of 400 \(Bad Request\) @ .*\/v1\/flows/, new RegExp(`status of 401 \\(Unauthorized\\) @ https?://[^ ]+/api/accounts/apps/${appId}\\b`)] });
     await page.getByRole("list", { name: "Your apps" }).waitFor({ timeout: 30_000 });
     const developerHost = new URL(env.developer).hostname;
 

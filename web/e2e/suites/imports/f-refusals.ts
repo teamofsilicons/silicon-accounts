@@ -4,7 +4,7 @@
  * the exact byte boundary), and the app's budgets (60 requests an hour, 2,000,000 rows a day; time travel moves their
  * windows), with nothing imported by any refusal. Who may import and read jobs: the app's own credentials or its
  * owner's session (Origin-checked; the developer site's BFF in p-developer.ts), never another app, a wrong secret or another Carbon; the rows endpoint's filters,
- * pagination and 404s. And capacity: two import bodies read at once per API node, 503 imports_busy after 30 s.
+ * pagination and 404s. And capacity: two import bodies read at once per API node (one per app), 503 imports_busy after 30 s.
  */
 import { randomUUID } from "node:crypto";
 import type { Journey } from "../../context";
@@ -308,7 +308,7 @@ export const journeys: Journey[] = [
   },
   {
     name: "imports-busy",
-    title: "capacity: an API node reads at most 2 import bodies at once; a third import waits 30 s, then 503 imports_busy (Retry-After 15, nothing imported); stalled uploads give their slots back when their clients go away; whether one app's stalled uploads can keep another app from importing",
+    title: "capacity: an API node reads at most 2 import bodies at once and one app at most 1 of them, so one app's stalled uploads never keep another app from importing; with both slots held by two other apps' uploads a third import waits 30 s, then 503 imports_busy (Retry-After 15, nothing imported); uploads give their slots back when their clients go away",
     // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
     engines: ["chromium"],
     timeoutMs: 5 * 60_000,
@@ -316,44 +316,55 @@ export const journeys: Journey[] = [
       const { env, results } = ctx;
       const crm = fakeApp("legacy-crm");
       const pixel = fakeApp("pixel-studio");
-      await forgetImportBudgets(env, crm.app_id);
-      await forgetImportBudgets(env, pixel.app_id);
+      const briefcase = fakeApp("briefcase");
+      for (const app of [crm, pixel, briefcase]) await forgetImportBudgets(env, app.app_id);
       const t = tag();
+      const headersOf = (app: typeof crm) => ({ authorization: basicAuth(app), "content-type": "text/csv", "x-forwarded-for": ctx.ip });
       // pixel-studio starts two uploads that declare 1 MB and then send 16 bytes a second: a client on a dead slow link
-      // (or one that stalls on purpose). Each holds one of the node's two import slots while its body is read.
-      const pixelHeaders = { authorization: basicAuth(pixel), "content-type": "text/csv", "x-forwarded-for": ctx.ip };
-      const stalls = [0, 1].map(() => postTrickle(`${env.api}/v1/apps/pixel-studio/imports?dry_run=true`, pixelHeaders, 1024 * 1024));
+      // (or one that stalls on purpose). One app holds at most one of the node's two import slots, so another app still
+      // gets the other one.
+      const stalls = [0, 1].map(() => postTrickle(`${env.api}/v1/apps/pixel-studio/imports?dry_run=true`, headersOf(pixel), 1024 * 1024));
       await sleep(1500);
-      const key = randomUUID();
       const csv = `email,display_name\nbusy.${t}@legacy-crm.test,Busy Row\n`;
       let started = Date.now();
+      const fair = await postCsv(ctx, crm, csv, { dry_run: true }, { key: randomUUID(), direct: true });
+      const fairMs = Date.now() - started;
+      results.metric("legacy-crm's import while pixel-studio's two uploads stall, answered after", fairMs, "ms");
+      const [pixelBudget] = await rowsOf<{ count: number }>(env, `select count from rate_limits where bucket = 'import_submissions:app:pixel-studio'`);
+      results.check(
+        "one app's stalled uploads don't keep another app from importing: legacy-crm's import goes through at once while pixel-studio's two uploads stall",
+        fair.status === 202 && fairMs < 10_000,
+        `legacy-crm got ${fair.status} ${fair.body.error?.code ?? ""} after ${fairMs} ms while pixel-studio's two uploads (16 bytes/s, ${stalls.length} connections) were open; pixel-studio's hourly import budget counted ${pixelBudget?.count ?? 0} of them`,
+      );
+      if (fair.body.job) await waitJob(ctx, crm, fair.body.job.id);
+      for (const stall of stalls) stall.abort();
+
+      // Both slots held by two other apps' uploads that keep a steady pace (64 KB/s, above the slowest pace a body may
+      // arrive at) towards a 40 MB body: the next import waits for a slot, then is refused.
+      const holders = [pixel, briefcase].map(app => postTrickle(`${env.api}/v1/apps/${app.app_id}/imports?dry_run=true`, headersOf(app), 40 * 1024 * 1024, { tickMs: 250, bytesPerTick: 16 * 1024 }));
+      await sleep(1500);
+      const key = randomUUID();
+      started = Date.now();
       const blocked = await postCsv(ctx, crm, csv, { dry_run: true }, { key, direct: true });
       const waited = Date.now() - started;
       results.metric("an import with both slots taken was answered after", waited, "ms");
-      const [pixelBudget] = await rowsOf<{ count: number }>(env, `select count from rate_limits where bucket = 'import_submissions:app:pixel-studio'`);
       results.check(
-        "with both slots held, the next import waits 30 s and is refused precisely: 503 imports_busy, Retry-After 15, nothing imported, retry with the same Idempotency-Key",
+        "with both slots held (pixel-studio's and briefcase's uploads), the next import waits 30 s and is refused precisely: 503 imports_busy, Retry-After 15, nothing imported, retry with the same Idempotency-Key",
         blocked.status === 503 && blocked.body.error?.code === "imports_busy" && blocked.headers.get("retry-after") === "15" && /nothing was imported/.test(blocked.body.error?.message ?? "") && /Idempotency-Key/.test(blocked.body.error?.hint ?? "") && waited >= 29_000 && waited < 60_000,
         `${blocked.status} ${blocked.body.error?.code ?? ""} after ${waited} ms; Retry-After ${blocked.headers.get("retry-after")}; ${blocked.body.error?.message} | ${blocked.body.error?.hint}`,
       );
-      results.check(
-        "one app's stalled uploads don't keep another app from importing: legacy-crm's import goes through while pixel-studio's two uploads stall",
-        blocked.status === 202,
-        `legacy-crm got ${blocked.status} ${blocked.body.error?.code ?? ""} after ${waited} ms while pixel-studio's two uploads (16 bytes/s, ${stalls.length} connections) held both of this node's import slots; pixel-studio's hourly import budget counted ${pixelBudget?.count ?? 0} of them`,
-      );
-      // The stalled clients go away: their slots come back at once.
-      for (const stall of stalls) stall.abort();
+      // The uploading clients go away: their slots come back at once.
+      for (const holder of holders) holder.abort();
       await sleep(300);
       started = Date.now();
       const retried = await postCsv(ctx, crm, csv, { dry_run: true }, { key, direct: true });
       const retriedMs = Date.now() - started;
-      results.check("once the stalled clients are gone, the retry with the same Idempotency-Key gets a slot at once: 202 (a new job: the 503 stored nothing)", retried.status === 202 && !!retried.body.job && retried.headers.get("idempotent-replayed") === null && retriedMs < 10_000, `${retried.status} ${retried.body.job?.id ?? JSON.stringify(retried.body).slice(0, 200)} after ${retriedMs} ms; replayed=${retried.headers.get("idempotent-replayed")}`);
+      results.check("once the uploading clients are gone, the retry with the same Idempotency-Key gets a slot at once: 202 (a new job: the 503 stored nothing)", retried.status === 202 && !!retried.body.job && retried.headers.get("idempotent-replayed") === null && retriedMs < 10_000, `${retried.status} ${retried.body.job?.id ?? JSON.stringify(retried.body).slice(0, 200)} after ${retriedMs} ms; replayed=${retried.headers.get("idempotent-replayed")}`);
       if (retried.body.job) await waitJob(ctx, crm, retried.body.job.id);
       const parallel = await Promise.all([0, 1].map(i => postCsv(ctx, crm, `email\npar${i}.${t}@legacy-crm.test\n`, { dry_run: true }, { key: randomUUID(), direct: true })));
-      results.check("two imports side by side both go through (2 slots, nothing left held)", parallel.every(answer => answer.status === 202), parallel.map(answer => `${answer.status} ${answer.body.error?.code ?? ""}`).join(", "));
+      results.check("two imports of one app side by side both go through (one after the other on its one slot, nothing left held)", parallel.every(answer => answer.status === 202), parallel.map(answer => `${answer.status} ${answer.body.error?.code ?? ""}`).join(", "));
       for (const answer of parallel) if (answer.body.job) await waitJob(ctx, crm, answer.body.job.id);
-      await forgetImportBudgets(env, crm.app_id);
-      await forgetImportBudgets(env, pixel.app_id);
+      for (const app of [crm, pixel, briefcase]) await forgetImportBudgets(env, app.app_id);
     },
   },
 ];

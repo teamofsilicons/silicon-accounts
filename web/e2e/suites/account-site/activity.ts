@@ -126,7 +126,11 @@ const activity: Journey = {
     const proofs = await filter(page, "Proofs");
     results.check("Proofs: issued and revoked", proofs.rows.length === 2 && proofs.rows.some(row => row.startsWith("Briefcase got a proof to act for you at Commit")) && proofs.rows.some(row => row.startsWith("Proof for Briefcase to act for you at Commit revoked")), proofs.rows.join(" | "));
     const access = await filter(page, "App access");
-    results.check("App access: started using each app, Commit's removal", access.rows.some(row => row.startsWith("Started using Briefcase")) && access.rows.some(row => row.startsWith("Started using Commit")) && access.rows.some(row => row.startsWith("Removed Commit's access")) && access.rows.every(row => /^(Started using|Removed)/.test(row)), access.rows.join(" | "));
+    // v2 keeps each answer on an app's what's-shared page (audit `consent.granted`), filed under App access: such a row
+    // belongs here when it reads as what was shared with the app, never as the raw action name ("Consent granted").
+    const appAccessRow = (row: string) => /^(Started using|Removed)/.test(row) || (/\bshared\b/i.test(row) && !/^Consent granted/i.test(row));
+    const notAppAccess = access.rows.filter(row => !appAccessRow(row));
+    results.check("App access: started using each app, Commit's removal", access.rows.some(row => row.startsWith("Started using Briefcase")) && access.rows.some(row => row.startsWith("Started using Commit")) && access.rows.some(row => row.startsWith("Removed Commit's access")) && notAppAccess.length === 0, notAppAccess.length ? `not app access (${notAppAccess.length}): ${notAppAccess.slice(0, 3).join(" | ")}` : access.rows.join(" | "));
     const custodian = await filter(page, "Custodian");
     results.check("Custodian: nothing yet, and it says what would show there", custodian.rows.length === 0 && custodian.empty.includes("Silicons you take on, hand over or are asked to look after show up here."), custodian.empty.slice(0, 200));
     const security = await filter(page, "Security");

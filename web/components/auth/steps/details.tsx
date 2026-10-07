@@ -138,8 +138,10 @@ function DetailsPage({ flow, ctl, notice, details }: DetailsProps & { details: F
   const addKind: ContactKind | null = challengeFor ?? (adding && fields.some(field => field.field === adding && field.missing) ? adding : missingRequired[0] ?? null);
   const codeMode = !!challenge && !changing && challengeFor === addKind && !!addKind;
   const addingRequired = !!addKind && missingRequired.includes(addKind);
-  const asksAgain = fields.some(field => field.previously_granted) && fields.some(field => !field.previously_granted);
-  const isNew = (field: FlowDetailField) => asksAgain && !field.previously_granted;
+  // "New" follows the server's rule (FlowDetailField.new): only details the Carbon hasn't answered before, so an
+  // optional detail they were offered and left unticked isn't badged again. A first sign-in (everything new) shows no badges.
+  const asksAgain = fields.some(field => field.new) && fields.some(field => !field.new);
+  const isNew = (field: FlowDetailField) => asksAgain && field.new;
   const first = details.index === 0;
   const last = details.index >= details.count - 1;
   const title = details.title?.trim() || defaultTitle(details, fields, app, asksAgain);

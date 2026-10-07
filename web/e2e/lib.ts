@@ -884,7 +884,7 @@ export interface FlowSeen {
     continue_label: string | null;
     layout: string | null;
     review_next?: boolean;
-    fields: Array<{ field: string; mode: "required" | "optional"; label: string; value: string | null; missing: boolean; shared: boolean; previously_granted: boolean }>;
+    fields: Array<{ field: string; mode: "required" | "optional"; label: string; value: string | null; missing: boolean; shared: boolean; previously_granted: boolean; new: boolean }>;
     challenge: unknown;
   } | null;
   review: { fields: Array<{ field: string; mode: string; label: string; value: string | null; shared: boolean }> } | null;

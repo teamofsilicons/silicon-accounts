@@ -271,18 +271,10 @@ export async function ownerSignIn(ctx: Ctx, appId: string, options: ContextOptio
   await freshCodeWindow(ctx.env, email);
   const context = await newContext(ctx.browser, options);
   const page = await context.newPage();
-  ctx.results.watch(page, options.label ?? `owner-${appId}`, [DEVELOPER_SIGNED_OUT, SEEDED_PHOTO, ...(options.expected ?? [])]);
+  ctx.results.watch(page, options.label ?? `owner-${appId}`, [DEVELOPER_SIGNED_OUT, ...(options.expected ?? [])]);
   await signInOnDeveloper(ctx.env, page, email, { returnTo: options.returnTo });
   return { context, page, email };
 }
-
-/**
- * The seeded owners' profile photos point at the production Iris (https://iris.teamofsilicons.com/pfp/…) instead of
- * the stack's mock Iris: scripts/dev.sh runs accounts-seed without ACCOUNTS_IRIS_BASE_URL. The developer site shows the
- * owner's photo in its account menu, so those loads leave the machine; developer-site-overview checks it once, and the
- * other journeys of owners take its failed loads as known noise instead of failing at random on it.
- */
-export const SEEDED_PHOTO = /requestfailed GET https:\/\/iris\.teamofsilicons\.com\/pfp\//;
 
 /** A fresh Carbon (signed up on the way) signed in to the developer site in a new browser context. */
 export async function freshSignIn(ctx: Ctx, label: string, options: ContextOptions & { returnTo?: string; expected?: RegExp[] } = {}): Promise<SignedInBrowser> {

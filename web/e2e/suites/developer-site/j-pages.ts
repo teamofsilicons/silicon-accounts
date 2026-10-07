@@ -12,7 +12,7 @@ import { join } from "node:path";
 import type { Locator, Page } from "@playwright/test";
 import type { Journey } from "../../context";
 import { POWERED_BY_HREF, hostedTitle, newContext, shot, sleep, startAtApp, tag, waitForOpening } from "../../lib";
-import { appDetail, hostedLook, ownerSignIn, pressSegment, restoreConfig, saveBarText, saveChanges, selectOption, setColour, setRange } from "./_helpers";
+import { appDetail, hostedLook, ownerSignIn, pressSegment, restoreConfig, saveBarText, saveChanges, selectOption, setColour, setRange, type SigninConfigView } from "./_helpers";
 
 const APP = "browser";
 
@@ -156,7 +156,11 @@ export const journey: Journey = {
       // The live preview, page by page, in both themes and sizes; "Powered by" on each.
       const chips = panel.getByRole("group", { name: "Pages", exact: true }).getByRole("button");
       const names = await chips.allInnerTexts();
-      results.check("the preview offers every page: sign-in and sign-up, Opening Google and Apple, both code pages, setting up, what's shared and the embed buttons", ["Sign in", "Sign up", "Opening Google", "Opening Apple", "Email code", "Phone code", "Set up account", "What's shared", "Embed buttons"].every(name => names.includes(name)), names.join(" | "));
+      // Only the pages a Carbon can meet with the draft's methods are offered (developer/…/lib/preview-pages.ts): the
+      // Opening and code pages follow the methods Browser has on.
+      const methodOf: Record<string, keyof SigninConfigView["methods"]> = { "Opening Google": "google", "Opening Apple": "apple", "Email code": "email", "Phone code": "phone" };
+      const offered = ["Sign in", "Sign up", "Opening Google", "Opening Apple", "Email code", "Phone code", "Set up account", "What's shared", "Embed buttons"].filter(name => !methodOf[name] || before.methods[methodOf[name]]);
+      results.check("the preview offers every page a Carbon can meet: sign-in and sign-up, the Opening and code pages of the methods that are on (and no others), setting up, what's shared and the embed buttons", offered.every(name => names.includes(name)) && Object.keys(methodOf).every(name => offered.includes(name) || !names.includes(name)), `${names.join(" | ")} (methods on: ${Object.entries(before.methods).filter(([, on]) => on).map(([method]) => method).join(", ")})`);
       const expectations: Record<string, RegExp> = {
         "Sign in": new RegExp(copy.title),
         "Sign up": new RegExp(copy.signup_title),
@@ -169,7 +173,7 @@ export const journey: Journey = {
         "Embed buttons": /Continue with email/,
       };
       const missing: string[] = [];
-      for (const [chip, pattern] of Object.entries(expectations)) {
+      for (const [chip, pattern] of Object.entries(expectations).filter(([name]) => offered.includes(name))) {
         await chips.filter({ hasText: new RegExp(`^${chip.replace(/'/g, ".")}$`) }).first().click();
         for (const theme of ["Light", "Dark"]) {
           await pressSegment(panel.getByRole("toolbar", { name: "Preview options" }), "Preview theme", theme);
@@ -182,7 +186,7 @@ export const journey: Journey = {
         }
         if (chip === "Opening Google" || chip === "Sign in") await shot(env, page, `ds-j-02-preview-${chip.replace(/\W+/g, "-").toLowerCase()}`);
       }
-      results.check("every page's preview shows its own content in light and dark, on a desktop and a phone, with \"Powered by Silicon Accounts\" linking to accounts.teamofsilicons.com (36 views)", missing.length === 0, missing.join(" | ") || "36 views");
+      results.check("every page's preview shows its own content in light and dark, on a desktop and a phone, with \"Powered by Silicon Accounts\" linking to accounts.teamofsilicons.com (4 views a page)", missing.length === 0, missing.join(" | ") || `${offered.length * 4} views`);
 
       // Saved exactly as set.
       const saved = await saveChanges(page);

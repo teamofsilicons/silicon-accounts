@@ -117,8 +117,9 @@ async function walk(ctx: Parameters<Journey["run"]>[0], dir: string): Promise<vo
   // Dry run in text mode: progress, the summary and the first errors, and nothing written.
   const dryRun = await run(["app", "import", dirty, "--default-country", "US", "--dry-run", "--wait"]);
   results.check("--dry-run --wait in text mode: the summary line, the counts and the first errors", dryRun.code === 0 && /Import [0-9a-f-]{36}: completed \(59\/59 rows\)/.test(dryRun.stdout) && /First errors:/.test(dryRun.stdout) && /row 6: .*missing_identifier/.test(dryRun.stdout), show(dryRun));
-  const dryCreated = /created\s+(\d+)/.exec(dryRun.stdout)?.[1];
-  const dryMatched = /matched\s+(\d+)/.exec(dryRun.stdout)?.[1];
+  // A dry run's counts read "would create" / "would match" (what a real import would do).
+  const dryCreated = /(?:would create|created)\s+(\d+)/.exec(dryRun.stdout)?.[1];
+  const dryMatched = /(?:would match|matched)\s+(\d+)/.exec(dryRun.stdout)?.[1];
   results.check("…a dry run of the file it just imported: every created row would now match its account (created 0, matched 47)", dryCreated === "0" && dryMatched === "47", `created ${dryCreated}, matched ${dryMatched}`);
 
   // JSON files.

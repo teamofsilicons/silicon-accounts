@@ -121,6 +121,7 @@ export function sampleFlow(app: AppPublic, scenario: Scenario, extra: Partial<Fl
     missing: value === null && (name === "email" || name === "phone"),
     shared: mode === "required",
     previously_granted: false,
+    new: !extra.previously_granted,
     ...extra,
   });
   const page = (fields: FlowDetailField[], extra: Partial<FlowDetails> = {}): FlowDetails => ({ index: 0, count: 1, id: "details", title: null, subtitle: null, continue_label: null, layout: null, fields, challenge: null, review_next: false, ...extra });

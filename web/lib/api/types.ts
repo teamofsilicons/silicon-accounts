@@ -937,6 +937,11 @@ export interface FlowDetailField {
   shared: boolean;
   /** The Carbon shared it with this app before. */
   previously_granted: boolean;
+  /**
+   * The server's rule for the "New" badge: the app asks for it and the Carbon hasn't answered it before (an optional
+   * detail they were offered and left unticked is not new).
+   */
+  new: boolean;
 }
 
 /** `FlowView.details` (step `details`): one page of the app's flow. */

@@ -511,6 +511,44 @@ fn field_names(details: Option<&Value>) -> Option<String> {
     (!names.is_empty()).then(|| names.join(", "))
 }
 
+/// A detail an app asks for, as a Carbon reads it ("dob" → "date of birth").
+fn detail_word(field: &str) -> String {
+    match field {
+        "phone" => "phone number".to_string(),
+        "dob" => "date of birth".to_string(),
+        other => other.replace('_', " "),
+    }
+}
+
+/// ["email", "timezone"] → "email and timezone"; three or more → "a, b and c".
+fn joined_words(words: &[String]) -> String {
+    match words {
+        [] => String::new(),
+        [one] => one.clone(),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    }
+}
+
+/// `consent.granted` (the Carbon answered an app's details pages): what they shared, and what
+/// they were offered but left unshared. Never the raw action name.
+fn consent_title(details: Option<&Value>, app: &str) -> (String, Option<String>) {
+    let shared = string_list(details, "shared");
+    let offered = string_list(details, "offered");
+    let shared_words: Vec<String> = shared.iter().map(|f| detail_word(f)).collect();
+    let unshared: Vec<String> = offered
+        .iter()
+        .filter(|f| !shared.contains(f))
+        .map(|f| detail_word(f))
+        .collect();
+    let title = if shared_words.is_empty() {
+        format!("Shared your profile with {app}")
+    } else {
+        format!("Shared your {} with {app}", joined_words(&shared_words))
+    };
+    let detail = (!unshared.is_empty()).then(|| format!("Not shared: {}", joined_words(&unshared)));
+    (title, detail)
+}
+
 /// "silicon.webhook.set" → "Silicon webhook set".
 fn action_title(action: &str) -> String {
     let words = action.replace(['.', '_'], " ");
@@ -1046,6 +1084,7 @@ fn describe(r: Row, me: &Account, l: &Lookups) -> HistoryItem {
                     format!("Removed {name}'s access"),
                     Some("Its sign-ins and the proofs it held for you were revoked".to_string()),
                 ),
+                "consent.granted" => consent_title(details, &name),
                 "account.profile.updated" => (
                     "Profile updated".to_string(),
                     field_names(details).map(|f| format!("Changed: {f}")),
@@ -1216,6 +1255,32 @@ mod tests {
             ))
             .as_deref(),
             Some("display name, photo, date of birth")
+        );
+    }
+
+    #[test]
+    fn consent_titles_say_what_was_shared() {
+        let both = json!({"shared": ["email", "timezone"], "offered": ["email", "timezone"]});
+        assert_eq!(
+            consent_title(Some(&both), "Commit"),
+            ("Shared your email and timezone with Commit".to_string(), None)
+        );
+        let partly = json!({"shared": ["email"], "offered": ["email", "phone", "dob"]});
+        assert_eq!(
+            consent_title(Some(&partly), "Ledgerly"),
+            (
+                "Shared your email with Ledgerly".to_string(),
+                Some("Not shared: phone number and date of birth".to_string())
+            )
+        );
+        let none = json!({"shared": [], "offered": []});
+        assert_eq!(
+            consent_title(Some(&none), "Briefcase").0,
+            "Shared your profile with Briefcase"
+        );
+        assert_eq!(
+            joined_words(&["a".into(), "b".into(), "c".into()]),
+            "a, b and c"
         );
     }
 }

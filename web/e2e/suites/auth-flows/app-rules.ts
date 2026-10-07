@@ -5,8 +5,8 @@
  * other domains, look-alikes and subdomains are refused before any code is sent, Google must be the university's
  * Workspace, "Continue as" needs a verified university email, and the email added on the way must be at the domain.
  * The documented rule (docs/start/sign-in-config.md "Allowed email domains") is that only Carbons with an email at one
- * of the domains get in; the journey also turns phone sign-in on for campus-connect for a moment (the known phone
- * bypass: a phone code is not checked against the domains) and puts it back.
+ * of the domains get in, whichever the method; the journey also turns phone sign-in on for campus-connect for a moment
+ * (a phone code must not let in an account without a university email) and puts it back.
  *
  * legacy-crm takes no new accounts (`allow_signup: false`): an unknown email or phone is refused after its code with
  * nothing created, existing Carbons sign in, and Carbons it imported finish setting up their account with the

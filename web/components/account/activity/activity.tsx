@@ -70,6 +70,9 @@ export function Activity() {
   const moreButton = useRef<HTMLButtonElement>(null);
   const [zone] = useState(browserTimezone);
   const timeZone = me.data?.timezone ?? zone;
+  // Rows wait for the account's timezone so their days and times never redraw after a first paint in the browser's
+  // zone; the browser's zone is only the fallback when the account can't be loaded.
+  const zoneKnown = !!me.data || me.isError;
 
   // The custodian's Silicons, so rows about one of them name it by its si:id without a lookup.
   const carbon = asCarbon(me.data);
@@ -133,7 +136,7 @@ export function Activity() {
           {describeError(history.error)}
           <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void history.refetch()}>Try again</Button></span>
         </Alert>
-      ) : !history.data ? (
+      ) : !history.data || !zoneKnown ? (
         <div className={styles.skeleton} aria-busy="true" aria-label="Loading your activity">
           <SkeletonBlock width="180px" height="18px" radius="6px" />
           {[0, 1, 2, 3, 4].map(index => (
