@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Who is signed in to the developer site, through the BFF: `GET /v1/me` (the BFF answers it with the sealed session's
- * token; 401 `signed_out` when this browser has no session). The service meta, signing out (`POST /auth/sign-out`, which
+ * Who is signed in to the developer site, through the BFF: `GET /auth/session` (is there a session cookie at all), then
+ * `GET /v1/me` (the BFF answers it with the sealed session's token; 401 `signed_out` when the session ended). The
+ * service meta, signing out (`POST /auth/sign-out`, which
  * revokes the sign-in and clears the cookie) and starting a sign-in (`/auth/sign-in`, a full navigation to the hosted
  * sign-in on the accounts site).
  */
@@ -25,7 +26,17 @@ export function useMeta() {
   return useQuery({ queryKey: queryKeys.meta, queryFn: ({ signal }) => api.meta.get(signal), staleTime: Infinity });
 }
 
+/** `GET /auth/session`: whether the sealed session cookie is there at all (no API call, never a 401). */
+async function hasSession(signal: AbortSignal): Promise<boolean> {
+  const response = await fetch("/auth/session", { credentials: "same-origin", cache: "no-store", signal });
+  if (!response.ok) return true; // Unknown: let /me answer.
+  const body = (await response.json().catch(() => null)) as { signed_in?: unknown } | null;
+  return body?.signed_in !== false;
+}
+
 async function readMe(signal: AbortSignal): Promise<Me | null> {
+  // A signed-out visit stops here, so the browser never logs the 401 /me would answer.
+  if (!(await hasSession(signal).catch(() => true))) return null;
   try {
     return await api.me.get(signal);
   } catch (error) {

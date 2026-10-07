@@ -128,10 +128,10 @@ export function SuccessMark({ name, photo }: { name: string; photo?: string | nu
   return (
     <div className={styles.success} aria-hidden="true">
       <svg className={styles.successRing} viewBox="0 0 96 96">
-        <motion.circle cx="48" cy="48" r="47" fill="none" stroke="currentColor" strokeWidth="1.5" initial={reduce ? false : { pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ pathLength: { duration: duration.considered * 1.25, ease: [...ease.inOut], delay: 0.18 }, opacity: { duration: duration.instant, delay: 0.18 } }} />
+        <motion.circle cx="48" cy="48" r="47" fill="none" stroke="currentColor" strokeWidth="1.5" initial={reduce ? false : { pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ pathLength: { duration: duration.considered, ease: [...ease.inOut], delay: 0.04 }, opacity: { duration: duration.instant, delay: 0.04 } }} />
       </svg>
       <span className={styles.successPhoto}><Avatar name={name} src={photo ?? undefined} size="xl" /></span>
-      <motion.span className={styles.successBadge} initial={reduce ? false : { opacity: 0, scale: 0.4 }} animate={{ opacity: 1, scale: 1 }} transition={{ ...spring.snappy, delay: 0.72 }}>
+      <motion.span className={styles.successBadge} initial={reduce ? false : { opacity: 0, scale: 0.4 }} animate={{ opacity: 1, scale: 1 }} transition={{ ...spring.snappy, delay: 0.36 }}>
         <Check size={14} strokeWidth={2.25} />
       </motion.span>
     </div>

@@ -424,6 +424,8 @@ Every shared-foundation request from the area builders, resolved in the shared c
 - **Split layout** (`<BrandAside>`, styles/branding.css): the app's side renders its content in a sticky
   `.sa-brand-aside-inner` at most one viewport tall, so on long steps (setting up, what is shared) the logo stays at the
   top and the hero copy at the foot of the screen instead of scrolling away below the fold.
+  The aside has no percentage height (the grid stretches it to its row): a `min-height: 100%` there made WebKit keep
+  the taller step's height after the card shrank, pushing Powered by below the fold.
 
 ### Fix round: shared changes (web-developer, 2026-10-07)
 

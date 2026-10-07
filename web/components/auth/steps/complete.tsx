@@ -34,12 +34,14 @@ export function Complete({ flow }: CompleteProps) {
   // prompt=none asked for no page at all, and a failed flow has nothing to show: go at once.
   const silent = flow.step === "failed" || /(^|\s)none(\s|$)/.test(flow.prompt ?? "");
 
+  // The success moment (SuccessMark: the ring draws, the check pops in at 0.36 s) is over by about 0.6 s, so the page
+  // leaves at 650 ms; the old page stays on screen while the app's own page loads. Reduced motion: a short beat to read.
   useEffect(() => {
     if (spent || !redirectTo) return;
     const timer = window.setTimeout(() => {
       markRedirected(flow.id);
       window.location.replace(redirectTo);
-    }, silent ? 0 : reduce ? 450 : 1200);
+    }, silent ? 0 : reduce ? 300 : 650);
     return () => window.clearTimeout(timer);
   }, [spent, redirectTo, silent, reduce, flow.id]);
 
