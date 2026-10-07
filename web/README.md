@@ -84,6 +84,7 @@ shared parts and a first version of each route; each area's builder owns its rou
 | web-account | `/` (landing when signed out, identity home when signed in), `/sign-in-methods`, `/apps`, `/silicons`, `/proofs`, `/activity`, `/settings` | `app/(shell)/(account)/`, `components/account/` |
 | web-auth | `/sign-in`, `/authorize`, `/authorize/flow/[id]`, `/device`, `/embed/v1/buttons` (polish) | `app/(auth)/`, `components/auth/` |
 | web-developer | `/developer`, `/developer/[appId]/[[...tab]]` | `app/(shell)/(developer)/`, `components/developer/` |
+| web-docs | `/docs`, `/docs/[...slug]` (and the static `/docs/<path>.md`, `/docs.md`), `/docs/search-index.json`, `/llms.txt`, `/llms-full.txt`: the repository's `docs/`, bundled by `pnpm build:docs` (run by dev, build and typecheck) into the git-ignored `lib/docs/generated/` and `public/docs/` | `app/(docs)/`, `components/docs/`, `lib/docs/` (guide: `lib/docs/README.md`) |
 | foundation | root layout, providers, shell, dock, command palette, theme, squircles, branding runtime, API client and hooks, SDK, `proxy.ts`, `/__kitchen`, screens | `app/layout.tsx`, `components/foundation/`, `components/kitchen/`, `lib/`, `styles/`, `sdk/`, `scripts/` |
 | Arc UI | the installed components (local edits below) | `components/arc/` |
 

@@ -1,0 +1,43 @@
+.nav { display: grid; gap: var(--space-6); padding-bottom: var(--space-8); font-size: var(--text-sm); }
+.top, .list, .children { margin: 0; padding: 0; list-style: none; }
+.list { display: grid; gap: 1px; }
+.group { display: grid; gap: var(--space-2); }
+
+.groupTitle {
+  display: block;
+  width: fit-content;
+  margin: 0;
+  padding: 0 10px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: .02em;
+  line-height: 1.6;
+  text-decoration: none;
+}
+a.groupTitle:hover, a.groupTitle[aria-current="page"] { color: var(--foreground); }
+a.groupTitle:focus-visible { outline: none; color: var(--foreground); text-decoration: underline; text-underline-offset: .25em; }
+
+.link {
+  --sq-r: 10px;
+  --sq-fill: transparent;
+  display: block;
+  padding: 6px 10px;
+  background: var(--sq-fill);
+  color: var(--text-secondary);
+  line-height: 1.4;
+  text-decoration: none;
+  text-wrap: pretty;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+@media (hover: hover) and (pointer: fine) { .link:hover { --sq-fill: var(--surface-muted); color: var(--foreground); } }
+.link:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
+.link[aria-current="page"] { --sq-fill: var(--surface-muted); color: var(--foreground); font-weight: 500; }
+.link[data-inside] { color: var(--foreground); }
+
+/* A page's own pages, under it on a hairline. (base.css resets ul[role=list] margins and padding: this outranks it.) */
+.nav ul.children { position: relative; display: grid; gap: 1px; margin: 2px 0 4px 14px; padding-left: 8px; }
+.children::before { position: absolute; top: 4px; bottom: 4px; left: 0; width: 1px; background: var(--border); content: ""; }
+.children .link { padding-block: 5px; font-size: .8125rem; }
+
+@media (prefers-reduced-motion: reduce) { .link { transition: none; } }

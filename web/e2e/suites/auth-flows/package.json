@@ -1,0 +1,8 @@
+{
+  "name": "@silicon-accounts/e2e-suite-auth-flows",
+  "private": true,
+  "description": "Dependencies of the auth-flows e2e suite only (web/package.json is not this suite's to change): openid-client, the generic OIDC client its OIDC journey verifies Silicon Accounts with. Install: npm install --prefix web/e2e/suites/auth-flows",
+  "dependencies": {
+    "openid-client": "6.8.8"
+  }
+}
