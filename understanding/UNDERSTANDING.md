@@ -4,7 +4,7 @@
 
 # UNDERSTANDING.md - Accounts
 
-This understanding contains the understanding for the entire Silicon Accounts, the service and the account site at `account.teamofsilicons.com`.
+This understanding contains the understanding for the entire Silicon Accounts, the service and the account site at `accounts.teamofsilicons.com`.
 
 Silicon Accounts is the account system for every Carbon and Silicon, and the authentication layer for any app that wants one. Every Carbon and Silicon has a single personal account that they carry into every app they sign into. For apps, we handle the entire auth for them: the sign-in methods, the sign up, the pages the user sees, and the app's own user base.
 
@@ -19,6 +19,16 @@ We should be as simple as Supabase and as deep as WorkOS or Okta. Turning on sig
 `App` - Any application that uses Silicon Accounts to sign its users in. Apps are created in Silicon Apps.
 `uuid` - The permanent identifier of an account. It never changes.
 `c:id` / `si:id` - The public, changeable ID of a Carbon / Silicon.
+
+
+# Where things live
+
+There are three sites:
+- `accounts.teamofsilicons.com` - this one. It's where every Carbon manages their own account. User facing.
+- `apps.teamofsilicons.com` - Silicon Apps. User facing, built later.
+- `developer.teamofsilicons.com` - the developer platform. A single place for developers to maintain everything they build with us. Each of our services keeps its own backend; this is just one unified frontend on top of them.
+
+Everything about creating and setting up an app's authentication happens on `developer.teamofsilicons.com`: its sign-in methods, Google and Apple, its flows and pages, the details it asks for, its redirect URLs, its user base and imports, its webhooks and its ATA proofs. The settings themselves are stored in Silicon Accounts.
 
 
 # Accounts
@@ -113,7 +123,13 @@ Once they continue they're redirected back to the app they were signing into.
 
 ## What's shared with the app
 
-During sign-in to an app we show another small screen with what information is going to be shared with that app. Each app declares the details it needs. If the app needs something the Carbon hasn't set up yet, say their phone number, they must add it before continuing. We show this screen the first time a Carbon signs into an app and again whenever the app asks for more.
+During sign-in to an app we show another small screen with what information is going to be shared with that app. We show it the first time a Carbon signs into an app and again whenever the app asks for more.
+
+Each app picks the details it wants, and each detail is either required or optional:
+- `required` - the Carbon has to give it to sign in. If they haven't set it up yet, say their phone number, they must add it before continuing.
+- `optional` - it comes with a checkbox, and it's up to the Carbon to tick it and share it with the app as well. It's unticked until they do.
+
+When an app picks a detail it's required by default; the app can switch it to optional.
 
 ## Silicons
 
@@ -137,9 +153,18 @@ Currently Google and Apple are the only providers we support.
 
 # Making the pages your own
 
-Every page a Carbon sees while signing into an app is ours, but it should look like the app's own. This covers the sign-in page, the email and phone code pages, the sign up details page and the what's-shared screen.
+Every page a Carbon sees while signing into an app is ours, but it should look like the app's own. This covers the sign-in and sign-up pages, the opening Google or Apple page, the email and phone code pages, the sign up details page, the what's-shared screen and every page of the app's flows.
 
-Each app gets a set of variables to configure how these pages render: colours, border radius, fonts, its own logo, and so on. At the bottom of every page it's always written `Powered by Silicon Accounts`, with Silicon Accounts linking to `account.teamofsilicons.com`. An app cannot remove this.
+Each page can be customised entirely in the app's style: colours, border radius, fonts, its own logo, layout, and so on. The only thing every page must keep is `Powered by Silicon Accounts` at the bottom, with Silicon Accounts linking to `accounts.teamofsilicons.com`. An app cannot remove this.
+
+
+# Flows
+
+An app can make its own flows. A flow decides which pages a Carbon goes through while signing in, in what order, and which details are asked on which page.
+
+Say an app needs 2 required details and 1 optional one: it can show all 3 on the same page, or one page for each, or any mix in between. The app controls the whole flow.
+
+Even when an app lets us handle its entire sign-in, it still controls the layout and the feel of every page.
 
 
 # Adding sign-in to an app
@@ -150,6 +175,12 @@ An app can add sign-in in three ways:
 3) Drop in a simple snippet of code that renders the sign-in buttons the app has configured.
 
 Whichever way, it should be well connected with us with as little code as possible.
+
+On its own website an app can put direct buttons: `Continue with Google`, `Continue with Apple`, `Continue with email`, `Continue with phone number`, and so on. Or it can just have a `Sign in` and a `Sign up` button, and we show everything else on our pages accordingly. The app can customise this entire flow.
+
+An app can never take in a Carbon's email or phone number itself and send it to us for verification. The Carbon always types it on our pages.
+
+When a Carbon presses `Continue with Google` or `Continue with Apple` on the app's own website, we don't jump straight to Google or Apple. We first open our page saying `Opening Google to sign you in to {app name}…`, in the app's configured style and with `Powered by Silicon Accounts` at the bottom, and only then move on to Google or Apple.
 
 
 # The app's user base
@@ -163,9 +194,9 @@ An app can import its existing users through an import users flow, so it can bri
 
 # Apps
 
-Apps are created in Silicon Apps. As soon as an app is created there it can be used to sign users in. On `account.teamofsilicons.com` a Carbon sees the list of apps they have, and making a new app takes them to Silicon Apps.
+Apps are created in Silicon Apps. As soon as an app is created there it can be used to sign users in. On `developer.teamofsilicons.com` a developer sees the list of apps they have and makes new ones.
 
-The app's sign-in setup (its sign-in methods, Google and Apple, page styling, required details and redirect URLs) is configured in Silicon Accounts.
+The app's sign-in setup (its sign-in methods, Google and Apple, flows, page styling, required and optional details and redirect URLs) is configured on `developer.teamofsilicons.com` and stored in Silicon Accounts.
 
 ### Until Silicon Apps exists
 
@@ -192,7 +223,7 @@ Silicon Accounts doesn't handle any app's endpoints anymore. Our job is just to 
 
 `OBO` (on behalf of) - when App A wants to perform an action at App B on behalf of a user, App A gets the user's consent itself and then gets a proof token from us. App B can then ask us to verify that proof token.
 
-`ATA` (app to app) - each app gets an ATA page in Silicon Apps where it can make new ATA proofs. If App A generates an app proof token for App B and App C, then App B and App C can verify with us that it's a valid app proof token.
+`ATA` (app to app) - each app gets an ATA page on `developer.teamofsilicons.com` where it can make new ATA proofs. An ATA proof is always for exactly one app; a proof can't be made for several apps at once. If App A wants to talk to App B and App C, it makes one proof for App B and another one for App C, and each of them verifies its own proof with us.
 
 Proofs work with the same access token and refresh token logic as sign-in. The issuing app holds the refresh token and uses it to get new proof tokens, and each proof token has a validity of its own.
 
@@ -200,10 +231,10 @@ When a proof is verified we send back whether it's valid and until when:
 - valid: `{valid: true, expires_at, issuing app, receiving app, user (for OBO)}`
 - not valid, expired, revoked, or for a user or app that isn't valid: `{valid: false, expires_at: null}`
 
-A user can see every OBO proof issued on their behalf on `account.teamofsilicons.com` and revoke it.
+A user can see every OBO proof issued on their behalf on `accounts.teamofsilicons.com` and revoke it.
 
 
-# account.teamofsilicons.com
+# accounts.teamofsilicons.com
 
 This is where a Carbon manages their account. They should be able to:
 - see and edit their details
@@ -211,7 +242,21 @@ This is where a Carbon manages their account. They should be able to:
 - see every app they've signed into, and remove an app's access
 - see and revoke their OBO proofs
 - see the Silicons they're custodian of, create a new Silicon, rotate its STK, and transfer it to another Carbon
-- see their apps and make a new one (in Silicon Apps)
+
+Anything about building apps lives on `developer.teamofsilicons.com`, not here.
+
+
+# developer.teamofsilicons.com
+
+This is where a developer sets up everything about their apps' authentication. For each app they should be able to:
+- see their apps and make a new one
+- pick the sign-in methods, and set up Google and Apple (one click or bring your own)
+- pick the details the app wants, each required or optional
+- build the app's flows and customise every page in the app's style
+- set the redirect URLs and where the iframe and snippet may be used
+- see the app's user base and import its existing users
+- set up the app's webhook, and see and replay its deliveries
+- make, see and revoke the app's ATA proofs, one app at a time
 
 
 # History
@@ -268,3 +313,10 @@ Silicon Apps manages updates for the installed Accounts CLI. Accounts must not r
 Carbon IDs use `c:{handle}` (for example `c:saket`), Silicon IDs use `si:{handle}` (for example `si:head_of_growth`), and app IDs are the bare `{app_id}` (for example `briefcase`). Each prefix appears exactly once.
 
 The uuid is what identifies an account; the c:id and si:id are only what people see. A membership with an app is `{app_id}:{uuid}`.
+
+
+
+
+
+
+
