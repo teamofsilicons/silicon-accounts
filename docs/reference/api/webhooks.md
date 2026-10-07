@@ -1,6 +1,6 @@
 ---
 title: Webhook deliveries and events
-description: Reference for the requests Silicon Accounts sends to app and Silicon webhooks — headers, the v1 signature, retries and every event type with its data.
+description: Reference for the requests Silicon Accounts sends to app and Silicon webhooks — headers, the v1 signature, retries, listing and replaying deliveries, and every event type with its data.
 kind: informative
 order: 67
 related:
@@ -96,8 +96,8 @@ the event. After `rotate-secret` every delivery, retry and replay is signed with
 
 - A 2xx answer within 10 seconds is success. Anything else — another status, a timeout, a refused
   connection — is retried after 10 s, 30 s, 1 min, 5 min, 15 min, 30 min, then every hour, until
-  72 hours after the event; then the delivery is `failed` and can be replayed
-  ([replay](apps.md#post-v1appsapp_idwebhookreplay)), which starts a fresh 72 hours.
+  72 hours after the event; then the delivery is `failed` and can be replayed (see
+  [Deliveries and replay](#deliveries-and-replay)), which starts a fresh 72 hours.
 - Each attempt goes to the target's **current** URL with its **current** secret.
 - Delivery is at least once: the same event can arrive twice (a retry after a slow 2xx, a
   replay). Dedupe on `event_id`.
@@ -106,9 +106,30 @@ the event. After `rotate-secret` every delivery, retry and replay is signed with
   `occurred_at`, and for account changes the `version` in `account`, to keep the newest state.
 - Redirects are not followed. In production a webhook URL must be https and resolve only to
   public addresses ([Security](../../learn/security.md#webhooks-never-reach-private-networks)).
-- An app's failed attempts show in
-  [`GET /v1/apps/{app_id}/webhook/deliveries`](apps.md#get-v1appsapp_idwebhookdeliveries) with
-  the status and a precise `last_error`.
+- Every attempt is recorded with its status and a precise `last_error`; the target lists them
+  ([Deliveries and replay](#deliveries-and-replay)).
+
+## Deliveries and replay
+
+Apps and Silicons list their deliveries and replay them the same way: a list newest first
+(`?status=pending|delivered|failed`, `limit`, `cursor`), one delivery with every attempt and the
+exact `payload`, and a replay by `{"delivery_ids": […]}` (1 to 100) or
+`{"status": "failed", "since"?}` (the oldest 100 failed per call). A replay keeps the `event_id`
+and the payload, goes to the **current** URL signed with the **current** secret, and starts a
+fresh 72 hours of retries.
+
+| Who | List | One delivery | Replay |
+|---|---|---|---|
+| an app (or its owner) | [`GET /v1/apps/{app_id}/webhook/deliveries`](apps.md#get-v1appsapp_idwebhookdeliveries) | `GET /v1/apps/{app_id}/webhook/deliveries/{delivery_id}` | [`POST /v1/apps/{app_id}/webhook/replay`](apps.md#post-v1appsapp_idwebhookreplay) |
+| a Silicon | [`GET /v1/me/webhook/deliveries`](silicons.md#get-v1mewebhookdeliveries) | `GET /v1/me/webhook/deliveries/{delivery_id}` | [`POST /v1/me/webhook/replay`](silicons.md#post-v1mewebhookreplay) |
+| its custodian | [`GET /v1/me/silicons/{uuid}/webhook/deliveries`](silicons.md#get-v1mesiliconsuuidwebhookdeliveries) | `GET /v1/me/silicons/{uuid}/webhook/deliveries/{delivery_id}` | [`POST /v1/me/silicons/{uuid}/webhook/replay`](silicons.md#post-v1mesiliconsuuidwebhookreplay) |
+
+Two differences. A replay never sends an app the data of an account that removed its access or
+was deleted (skipped `membership_inactive` / `account_deleted`, its detail
+`payload_redacted: true`), while a Silicon's events are all about the Silicon, so nothing is ever
+withheld from it or its custodian. And a Silicon's test pings are never replayed (skipped
+`test_ping`, counted in `not_replayable`): a replay would get around its limit of 10 test pings an
+hour; an app's `ping` replays like any event.
 
 ## App events
 

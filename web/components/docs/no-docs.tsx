@@ -46,7 +46,7 @@ export function NoDocs() {
           <h1 className={styles.title}>This build has no docs</h1>
           <p className={styles.lede}>
             The site bundles the Markdown under the repository&apos;s docs/ when it is built. This build found none: run{" "}
-            <code className={extra.code}>pnpm build:docs</code> in web/ (pnpm dev and pnpm build run it first), or set
+            <code className={extra.code} data-sq-native="">pnpm build:docs</code> in web/ (pnpm dev and pnpm build run it first), or set
             ACCOUNTS_DOCS_DIR to the docs directory, then build again.
           </p>
         </header>

@@ -128,7 +128,41 @@ async fn run(args: Args) -> Result<(), (u8, String)> {
         .await
         .map_err(|e| (1, format!("error: seeding failed: {e}")))?;
     print!("{report}");
+    let moved = move_default_photos_to_this_iris(&state)
+        .await
+        .map_err(|e| (1, format!("error: could not update default photos: {e}")))?;
+    if moved > 0 {
+        println!(
+            "accounts-seed: {moved} account(s) showed the production Iris's default photo; they now use {}",
+            state.settings.iris_base_url
+        );
+    }
     println!("accounts-seed: done; {} app(s) synced", report.apps.len());
     state.db.close().await;
     Ok(())
+}
+
+/// The production Iris (the `ACCOUNTS_IRIS_BASE_URL` default).
+const PRODUCTION_IRIS: &str = "https://iris.teamofsilicons.com";
+
+/// Outside production, with another Iris configured (a dev or e2e stack's mock Iris): accounts
+/// that still show the production Iris's default photo — seeded by an older accounts-seed that ran
+/// without `ACCOUNTS_IRIS_BASE_URL` — are moved to this stack's Iris, so a kept database stops
+/// loading photos from the internet. Only exact default photos change; uploads and other URLs
+/// stay. Returns how many accounts changed.
+async fn move_default_photos_to_this_iris(state: &AppState) -> Result<u64, sqlx::Error> {
+    let iris = state.settings.iris_base_url.trim_end_matches('/');
+    if state.settings.environment.is_production() || iris == PRODUCTION_IRIS {
+        return Ok(0);
+    }
+    let done = sqlx::query(
+        "update accounts set pfp_url = $1 || substr(pfp_url, length($2) + 1)
+          where starts_with(pfp_url, $2 || '/pfp/carbon?id=')
+             or starts_with(pfp_url, $2 || '/pfp/silicon?id=')",
+    )
+    .bind(iris)
+    .bind(PRODUCTION_IRIS)
+    .execute(&state.db)
+    .await?;
+    Ok(done.rows_affected())
 }

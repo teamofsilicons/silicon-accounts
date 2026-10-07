@@ -593,10 +593,16 @@ pub async fn submit_signup(
         },
         None => None,
     };
-    if claimed.is_none() && !fa.config.allow_signup && !fa.first_party() {
+    let refusal = if claimed.is_none() && !fa.config.allow_signup && !fa.first_party() {
         // Nothing here this app accepts (it closed sign-ups, or the import this sign-up was
-        // finishing was finished by someone else): back to the methods, with the reason.
-        let e = next::signup_not_allowed(&fa);
+        // finishing was finished by someone else).
+        Some(next::signup_not_allowed(&fa))
+    } else {
+        // The app's domains changed since the code (or this sign-up started in another app).
+        domain_refusal(&session, &fa)
+    };
+    if let Some(e) = refusal {
+        // Back to the methods, with the reason.
         flow.reset_to_choose_method();
         flow.extras.error = Some(model::FlowError::from_api(&e));
         model::save(&mut tx, &flow).await?;
@@ -931,8 +937,19 @@ pub fn may_resume(
         .config
         .available_methods(settings)
         .contains(&session.sign_in_method());
-    let domain_ok = session
-        .email()
-        .is_none_or(|e| fa.config.email_domain_allowed(e));
-    allowed && method_ok && domain_ok && session.is_live()
+    allowed && method_ok && domain_refusal(session, fa).is_none() && session.is_live()
+}
+
+/// Why the app's `allowed_email_domains` can't accept this sign-up, if it can't: its proven email
+/// is at another domain, or it proved no email (a phone) and the app doesn't require one, so
+/// nothing would ever ask for an email at the domains (see [`next::emailless_signup_allowed`]).
+fn domain_refusal(session: &SignupSession, fa: &FlowApp) -> Option<ApiError> {
+    match session.email() {
+        Some(e) if !fa.config.email_domain_allowed(e) => {
+            Some(next::domain_not_allowed(fa, Some(e)))
+        }
+        Some(_) => None,
+        None if next::emailless_signup_allowed(fa) => None,
+        None => Some(next::emailless_signup_not_allowed(fa, "a phone number")),
+    }
 }

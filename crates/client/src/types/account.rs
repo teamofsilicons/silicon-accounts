@@ -158,14 +158,14 @@ pub struct Me {
     /// When the account was created.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
     /// When the profile last changed.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub updated_at: Option<OffsetDateTime>,
@@ -205,7 +205,7 @@ pub struct Me {
     /// Silicon only: when the STK was last set.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub stk_rotated_at: Option<OffsetDateTime>,
@@ -244,7 +244,7 @@ pub struct EmailAddress {
     /// When it was verified.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub verified_at: Option<OffsetDateTime>,
@@ -254,7 +254,7 @@ pub struct EmailAddress {
     /// When it was added to the account.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
@@ -272,7 +272,7 @@ pub struct PhoneNumber {
     /// When it was verified.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub verified_at: Option<OffsetDateTime>,
@@ -282,7 +282,7 @@ pub struct PhoneNumber {
     /// When it was added to the account.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
@@ -307,14 +307,14 @@ pub struct Identity {
     /// When it was linked.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
     /// When it was last used to sign in.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub last_used_at: Option<OffsetDateTime>,
@@ -388,7 +388,7 @@ pub struct ContactChallenge {
     /// The code expires at this time (10 minutes after sending).
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,
@@ -477,7 +477,7 @@ pub struct MyApp {
     /// When the account removed the app's access (status `access_removed`).
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub access_removed_at: Option<OffsetDateTime>,
@@ -487,14 +487,14 @@ pub struct MyApp {
     /// First sign-in.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub first_signed_in_at: Option<OffsetDateTime>,
     /// Latest sign-in.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub last_signed_in_at: Option<OffsetDateTime>,
@@ -532,21 +532,21 @@ pub struct SessionInfo {
     /// Created at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
     /// Last used at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub last_seen_at: Option<OffsetDateTime>,
     /// When it ends unless used or revoked.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,
@@ -568,7 +568,7 @@ pub struct HistoryItem {
     /// When it happened.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub at: Option<OffsetDateTime>,
@@ -613,14 +613,14 @@ pub struct DeviceRequest {
     /// When the sign-in was started.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
     /// When the code expires.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,

@@ -16,7 +16,8 @@
  */
 import type { Page } from "@playwright/test";
 import type { Ctx, Journey } from "../../context";
-import { codeFor, lastSeq, sleep, sql } from "../../lib";
+import { codeFor, lastSeq, signInWithCode, sleep, sql } from "../../lib";
+import { freshPhone } from "./_hosted";
 import { VARIANTS, auditContext, auditVariants, collectConsole, findingsFor, freshEmail, hostedLink, pageFetch, saveFindings, stepReady, waitUntil, type Findings } from "./_audit";
 
 const FLOW_PATH = /\/authorize\/flow\/([^/?#]+)/;
@@ -33,6 +34,28 @@ async function openFlow(ctx: Ctx, page: Page): Promise<string> {
   await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
   await stepReady(page);
   return FLOW_PATH.exec(page.url())?.[1] ?? "";
+}
+
+/** Opens an app's hosted sign-in in `page` (its methods page on screen). */
+async function openApp(ctx: Ctx, page: Page, app: string): Promise<void> {
+  await page.goto(await hostedLink(ctx.env, page, app));
+  await page.waitForURL(url => url.pathname.startsWith("/authorize/flow/"), { timeout: 30_000 });
+  await page.locator("main h1").first().waitFor({ timeout: 30_000 });
+  await stepReady(page);
+}
+
+/** A phone number that is already another Carbon's: a new Carbon signs up with it on the account site. */
+async function takenPhone(ctx: Ctx): Promise<string> {
+  const context = await auditContext(ctx.browser);
+  const page = await context.newPage();
+  ctx.results.watch(page, "errors-taken-phone");
+  const phone = freshPhone();
+  await page.goto(`${ctx.env.site}/sign-in`);
+  await signInWithCode(ctx.env, page, { phone });
+  await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+  await page.waitForURL(`${ctx.env.site}/`, { timeout: 30_000 });
+  await context.close();
+  return phone;
 }
 
 /** Asks for a code for `email` on the email step and waits for the code step; returns the code. */
@@ -177,6 +200,24 @@ export const journeys: Journey[] = [
       const disabled = await cells.evaluateAll(nodes => nodes.filter(node => (node as HTMLInputElement).disabled).length);
       results.check("locked: the 10th wrong code pauses entry with a live countdown (\"Try again in m:ss\")", lockedShown, (await messages(page)).slice(0, 300));
       results.check("locked: the code cells are disabled while it counts down", disabled === 6, `${disabled} of 6 disabled`);
+      // The countdown ticks every second: it should change in place, not be made anew (with its entrance animation,
+      // and announced again as a new status) on every tick; and a ticking time does not belong in a live region
+      // (WAI-ARIA: a timer's role is "timer", which is not announced on each change).
+      const ticking = (await page.evaluate(`new Promise(done => {
+        const main = document.querySelector("main");
+        let made = 0;
+        const observer = new MutationObserver(list => { for (const m of list) for (const node of m.addedNodes) if (node.nodeType === 1 && /Try again in \\d+:\\d\\d/.test(node.textContent || "") && (node.matches("[role=status],[role=alert],[aria-live]") || node.querySelector("[role=status],[role=alert],[aria-live]"))) made++; });
+        observer.observe(main, { childList: true, subtree: true, characterData: true });
+        setTimeout(() => {
+          observer.disconnect();
+          const holders = Array.from(main.querySelectorAll("*")).filter(el => el.children.length === 0 && /Try again in \\d+:\\d\\d/.test(el.textContent || ""));
+          const live = holders.map(el => el.closest("[role=status],[role=alert],[aria-live]:not([aria-live=off])")).filter(Boolean).map(el => el.tagName.toLowerCase() + "[" + (el.getAttribute("role") || "aria-live=" + el.getAttribute("aria-live")) + "]");
+          done({ made, live });
+        }, 2600);
+      })`)) as { made: number; live: string[] };
+      findings.pages["errors-locked countdown"] = ticking;
+      results.check("locked: the countdown changes in place (no new status note, re-animated, every second)", ticking.made === 0, `${ticking.made} new status notes in 2.6 s`);
+      results.check("locked: the ticking countdown is not in a live region (it would be announced every second)", ticking.live.length === 0, ticking.live.join(", ") || "not in a live region");
       // The lock lasts a minute: two variants (light 1440, dark 390) fit in it.
       await judge(ctx, page, findings, "errors-locked", await messages(page), { what: /too many|wrong codes|paused|locked/i, next: /try again in \d+:\d\d|wait/i, nextLabel: "when entry opens again" }, [VARIANTS[0]!, VARIANTS[3]!]);
 
@@ -214,6 +255,45 @@ export const journeys: Journey[] = [
       await stepReady(page);
       const unknownWords = await mainText(page);
       await judge(ctx, page, findings, "errors-unknown-flow", unknownWords, { what: /not found|no sign-in|does not exist|doesn't exist|expired|ended|cannot|can't/i, next: /back to|start again|go to|sign in|try again/i, nextLabel: "where to go instead" });
+
+      // 8 and 9 (v2). On dm's own page, the phone it requires: a phone already on another account, then a code whose
+      // 10 minutes are over before it is typed (details/add and details/verify).
+      {
+        const dmEmail = freshEmail("uxa.errors.dm");
+        await openApp(ctx, page, "dm");
+        await page.getByRole("button", { name: "Email", exact: true }).click().catch(() => undefined);
+        await toCodeStep(ctx, page, dmEmail).then(code => typeCode(page, code));
+        await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+        const adder = page.locator('[data-adding="phone"]:not([data-step-leaving] *)').first();
+        await adder.waitFor({ timeout: 30_000 });
+        await stepReady(page);
+        // A phone that is already another Carbon's.
+        const taken = await takenPhone(ctx);
+        await adder.getByRole("textbox", { name: "Phone number" }).click();
+        await page.keyboard.type(taken, { delay: 20 });
+        await adder.getByRole("button", { name: "Send code" }).click();
+        await waitUntil(page, `/another account|already|in use|belongs/i.test((document.querySelector("main") || {}).innerText || "")`, 15_000);
+        await stepReady(page);
+        await judge(ctx, page, findings, "errors-details-phone-in-use", await messages(page), { what: /another account|already|in use|belongs/i, next: /another (number|phone)|use a different|sign in|switch/i, nextLabel: "what to do instead" }, [VARIANTS[0]!, VARIANTS[3]!]);
+        // A new number, its code expired before it is typed.
+        const fresh = freshPhone();
+        const field = adder.getByRole("textbox", { name: "Phone number" });
+        await field.click();
+        await page.keyboard.press("ControlOrMeta+a");
+        await page.keyboard.press("Backspace");
+        const after = await lastSeq(env);
+        await page.keyboard.type(fresh, { delay: 20 });
+        await adder.getByRole("button", { name: "Send code" }).click();
+        const sms = await codeFor(env, fresh, after);
+        await page.getByRole("group", { name: /^Code from the text message/ }).first().waitFor({ timeout: 20_000 });
+        await stepReady(page);
+        await sql(env, `update otp_challenges set expires_at = now() - interval '1 second' where destination = '${fresh}' and consumed_at is null`);
+        await page.getByRole("group", { name: /^Code from the text message/ }).first().getByRole("textbox").first().click();
+        await page.keyboard.type(sms, { delay: 30 });
+        await waitUntil(page, `/expired/i.test((document.querySelector("main") || {}).innerText || "")`, 15_000);
+        await stepReady(page);
+        await judge(ctx, page, findings, "errors-details-code-expired", await messages(page), { what: /expired/i, next: /new code|resend|send/i, nextLabel: "get a new code" }, [VARIANTS[0]!, VARIANTS[3]!]);
+      }
 
       results.check("hosted-errors: findings saved", true, saveFindings(ctx, findings));
       await context.close();

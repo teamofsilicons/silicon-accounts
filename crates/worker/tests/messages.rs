@@ -502,3 +502,163 @@ async fn a_result_after_the_claim_was_taken_over_is_not_recorded() {
     assert!(matches!(ok, delivery::DeliveryOutcome::Sent { .. }));
     assert_eq!(row(&ctx, id).await.status, "sent");
 }
+
+/// Keeps a copy of every message it is asked to send.
+#[derive(Default)]
+struct CapturingSender {
+    sent: Mutex<Vec<OutboundMessage>>,
+    fail: bool,
+}
+
+#[async_trait]
+impl Sender for CapturingSender {
+    async fn send(&self, msg: &OutboundMessage) -> Result<String, SendError> {
+        self.sent.lock().expect("lock").push(msg.clone());
+        if self.fail {
+            Err(SendError::permanent(
+                "Postmark answered 422: Invalid 'To' address",
+            ))
+        } else {
+            Ok(format!("provider-{}", msg.id))
+        }
+    }
+    fn name(&self) -> &'static str {
+        "capturing"
+    }
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct Stored {
+    status: String,
+    subject: Option<String>,
+    text_body: String,
+    html_body: Option<String>,
+    sealed_body: Option<Vec<u8>>,
+}
+
+async fn stored(ctx: &TestContext, id: Uuid) -> Stored {
+    sqlx::query_as::<_, Stored>(
+        "select status, subject, text_body, html_body, sealed_body from outbound_messages where id = $1",
+    )
+    .bind(id)
+    .fetch_one(&mut *ctx.conn().await)
+    .await
+    .expect("message row")
+}
+
+fn holds(s: &Stored, code: &str) -> bool {
+    s.subject.as_deref().unwrap_or("").contains(code)
+        || s.text_body.contains(code)
+        || s.html_body.as_deref().unwrap_or("").contains(code)
+}
+
+/// A verification code is never readable in outbound_messages (otp_challenges keeps only its
+/// HMAC): it is stored redacted with a sealed copy the sender opens, and the sealed copy is gone
+/// once the message is sent or has failed, unless the dev outbox (never in production) shows it.
+#[tokio::test]
+async fn verification_codes_are_never_stored_readable() {
+    use accounts_core::models::{OtpChannel, OtpPurpose};
+    use accounts_core::repo::otp::{self, NewChallenge};
+
+    for (dev_outbox, fail) in [(false, false), (true, false), (false, true)] {
+        let mut settings = Settings::for_tests();
+        settings.delivery = DeliveryMode::Providers;
+        settings.expose_dev_outbox = dev_outbox;
+        let ctx = TestContext::with_settings(settings).await;
+        let sender = Arc::new(CapturingSender {
+            fail,
+            ..CapturingSender::default()
+        });
+        let state = ctx.state.clone().with_sender(sender.clone());
+        let mut ids = Vec::new();
+        for (channel, to) in [
+            (OtpChannel::Email, "victim@example.test"),
+            (OtpChannel::Phone, "+14155550123"),
+        ] {
+            let mut conn = ctx.conn().await;
+            let created = otp::send(
+                &mut conn,
+                &ctx.state.keys.pepper,
+                &ctx.state.settings,
+                &NewChallenge {
+                    purpose: OtpPurpose::Signin,
+                    channel,
+                    destination: to,
+                    account_uuid: None,
+                    flow_id: Some("flow-1"),
+                    ip: None,
+                },
+            )
+            .await
+            .expect("challenge");
+            let id = delivery::enqueue_otp(
+                &mut conn,
+                &ctx.state.settings,
+                &created.challenge,
+                &created.code,
+                Some("Briefcase"),
+            )
+            .await
+            .expect("enqueue");
+            let row = stored(&ctx, id).await;
+            assert!(!holds(&row, &created.code), "pending: {row:?}");
+            assert!(row.text_body.contains(delivery::REDACTED_CODE), "{row:?}");
+            assert!(row.sealed_body.is_some());
+            ids.push((id, created.code));
+        }
+        // A code message stored readable before codes were sealed (left pending by an older build).
+        let legacy = Uuid::now_v7();
+        sqlx::query(
+            "insert into outbound_messages (id, channel, to_address, subject, text_body, html_body, purpose, status) \
+             values ($1, 'email', 'old@example.test', '314159 is your Silicon Accounts code', \
+                     'Your Silicon Accounts verification code is 314159.', '<p>314159</p>', 'otp_signin', 'pending')",
+        )
+        .bind(legacy)
+        .execute(&mut *ctx.conn().await)
+        .await
+        .expect("legacy row");
+        ids.push((legacy, "314159".to_string()));
+
+        let summary = messages::send_due(&state).await.expect("cycle");
+        assert_eq!(summary.claimed, 3, "dev_outbox={dev_outbox} fail={fail}");
+        let sent = sender.sent.lock().expect("lock").clone();
+        for (id, code) in &ids {
+            let carried = sent.iter().find(|m| m.id == *id).expect("sent");
+            assert!(
+                carried.text_body.contains(code.as_str()),
+                "the provider gets the real code: {carried:?}"
+            );
+            if carried.channel == accounts_core::models::MessageChannel::Email {
+                assert!(
+                    carried
+                        .subject
+                        .as_deref()
+                        .unwrap_or("")
+                        .contains(code.as_str())
+                );
+                assert!(
+                    carried
+                        .html_body
+                        .as_deref()
+                        .unwrap_or("")
+                        .contains(code.as_str())
+                );
+            }
+            assert!(carried.sealed_body.is_none());
+            let row = stored(&ctx, *id).await;
+            assert_eq!(row.status, if fail { "failed" } else { "sent" });
+            assert!(!holds(&row, code), "after the send: {row:?}");
+            let sealed_kept = *id != legacy && dev_outbox;
+            assert_eq!(
+                row.sealed_body.is_some(),
+                sealed_kept,
+                "dev_outbox={dev_outbox} fail={fail} legacy={}",
+                *id == legacy
+            );
+            if let Some(sealed) = &row.sealed_body {
+                let opened = delivery::open_sealed(&ctx.state.settings, sealed).expect("open");
+                assert!(opened.text.contains(code.as_str()));
+            }
+        }
+    }
+}

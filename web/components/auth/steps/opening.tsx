@@ -10,11 +10,14 @@
  * The move happens once per flow in this tab: coming back from Google with the browser's back button (or reloading
  * after the move) shows the page paused, with the button, instead of sending the Carbon straight back. Reduced motion
  * keeps the same behaviour without the animation.
+ *
+ * The pulsing dots and the filling bar are CSS animations (flow.module.css), not motion's: this page is usually the
+ * card's first view, and the card's AnimatePresence (initial={false}, so the first view does not slide in) holds every
+ * motion entrance inside it still. The CSS runs only when motion is allowed; otherwise the dots stay dim and the bar
+ * full.
  */
-import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useEffectEvent, useRef, useState, type CSSProperties } from "react";
 import { Button } from "@/components/arc/button/button";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
 import type { FlowController } from "../flow/controller";
 import { appSubtitle, autoStartClaimed, claimAutoStart, intentOf, openingTitle, providerName, type HostedFlow } from "../flow/model";
 import { AppleMark, FlowAlert, GoogleMark, StepHeading, useStepErrors } from "../flow/parts";
@@ -31,8 +34,10 @@ export interface OpeningProps {
   onOtherWays?: () => void;
 }
 
+/** The bar fills over exactly the wait before the move. */
+const BAR_STYLE = { "--opening-ms": `${OPENING_DELAY_MS}ms` } as CSSProperties;
+
 export function Opening({ flow, ctl, provider, onOtherWays }: OpeningProps) {
-  const reduce = !!useReducedMotion();
   const name = providerName(provider);
   const app = flow.app.name;
   // A flow this tab already moved on (a reload, or back from the provider) waits for a press. The move is claimed when
@@ -86,7 +91,6 @@ export function Opening({ flow, ctl, provider, onOtherWays }: OpeningProps) {
   const description = paused
     ? appSubtitle(flow) ?? `${name} checks it is you, then brings you back to ${app}.`
     : `${name} checks it is you, then brings you back to ${app}.`;
-  const filling = !paused && !reduce;
 
   return (
     <div className={styles.opening} data-opening={provider} data-paused={paused || undefined}>
@@ -96,26 +100,17 @@ export function Opening({ flow, ctl, provider, onOtherWays }: OpeningProps) {
         </span>
         {paused ? null : (
           <span className={styles.openingDots}>
-            {[0, 1, 2].map(index => (
-              <motion.span
-                key={index}
-                initial={false}
-                animate={reduce ? { opacity: 0.55 } : { opacity: [0.25, 1, 0.25] }}
-                transition={reduce ? { duration: 0 } : { duration: 1.1, repeat: Infinity, delay: index * 0.16, ease: [...motionTokens.ease.inOut] }}
-              />
-            ))}
+            <span />
+            <span />
+            <span />
           </span>
         )}
       </div>
       <StepHeading title={title} description={description} noFocus={!paused} />
       <FlowAlert error={errors.current} app={app} />
       {paused ? null : (
-        <div className={styles.openingBar} aria-hidden="true">
-          <motion.span
-            initial={filling ? { scaleX: 0 } : false}
-            animate={{ scaleX: 1 }}
-            transition={filling ? { duration: OPENING_DELAY_MS / 1000, ease: [...motionTokens.ease.inOut] } : { duration: 0 }}
-          />
+        <div className={styles.openingBar} style={BAR_STYLE} aria-hidden="true">
+          <span />
         </div>
       )}
       <p className="sr-only" role="status">{paused ? "" : `Opening ${name}.`}</p>

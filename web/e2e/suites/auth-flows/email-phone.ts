@@ -1,18 +1,18 @@
 /**
- * Email and phone sign-in through the hosted pages: a new Carbon with an email code (sign-up, consent, the app's code
- * exchange), the same Carbon back with the address typed in another case, a phone sign-up on dm (phone first, the
- * required phone already proven so no requirements step), and the API's answers to malformed input, other browsers
- * and other origins.
+ * Email and phone sign-in through the hosted pages: a new Carbon with an email code (sign-up, briefcase's details
+ * page, the app's code exchange), the same Carbon back with the address typed in another case, a phone sign-up on dm
+ * (phone first; the required phone already proven, so dm's page asks for nothing), and the API's answers to malformed
+ * input, other browsers and other origins.
  */
 import type { Journey } from "../../context";
-import { appAccount, codeFor, lastSeq, newContext, shot, sleep, sql, tag } from "../../lib";
-import { Browserish, brief, drive, errorCode, errorDetails, sendCode, startSignIn, timed } from "./_helpers";
+import { appAccount, codeFor, completeDetails, hostedTitle, lastSeq, newContext, shot, sleep, sql, startAtApp, tag } from "../../lib";
+import { Browserish, appPage, brief, drive, errorCode, errorDetails, providerLeg, randomPhone, sendCode, shownScope, startSignIn, timed } from "./_helpers";
 
 const titleCase = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 
 const email: Journey = {
   name: "auth-flows-email",
-  title: "email code on briefcase's hosted page: sign-up prefill, consent, the app's account; back again with the address in capitals, no sign-up and no consent",
+  title: "email code on briefcase's hosted page: masked code step, sign-up prefill, the details page (timezone unticked), the app's account; back again with the address in capitals: no sign-up and no page; timings",
   async run({ env, results, browser }) {
     const context = await newContext(browser);
     const page = await context.newPage();
@@ -21,11 +21,12 @@ const email: Journey = {
     const address = `ada.lovelace.${t}@example.test`;
 
     const started = Date.now();
-    await page.goto(`${env.apps}/briefcase/`);
-    await page.locator("#signin-hosted").click();
+    await startAtApp(env, page, "briefcase");
     const field = page.getByRole("textbox", { name: "Email" });
     await field.waitFor({ timeout: 30_000 });
     results.check("the hosted link lands on /authorize/flow/{id}", /\/authorize\/flow\/[A-Za-z0-9_-]+$/.test(new URL(page.url()).pathname), page.url());
+    const heading = await hostedTitle(page);
+    results.check("the methods page is the sign-in version: \"Sign in to Briefcase\"", heading === "Sign in to Briefcase", heading);
     let after = await lastSeq(env);
     await field.fill(`  Ada.Lovelace.${t.toUpperCase()}@Example.TEST `);
     await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -36,7 +37,7 @@ const email: Journey = {
     const codeGroup = page.getByRole("group", { name: /Code from the email/ });
     await codeGroup.waitFor({ timeout: 15_000 });
     const shown = (await page.locator("main").innerText()).replace(/\s+/g, " ");
-    results.check("the code step shows the masked address, never the whole one", shown.includes("a***@example.test") && !shown.includes(address), shown.slice(0, 200));
+    results.check("the code step says \"Check your email\" with the masked address, never the whole one", (await hostedTitle(page)) === "Check your email" && shown.includes("a***@example.test") && !shown.includes(address), shown.slice(0, 200));
     await page.keyboard.type(code, { delay: 25 });
 
     const idField = page.getByRole("textbox", { name: "Your id" });
@@ -49,30 +50,21 @@ const email: Journey = {
     results.check("sign-up: the display name comes from the email's local part, title-cased", name === `Ada Lovelace ${titleCase(t)}`, name);
     await page.getByRole("button", { name: "Create account" }).click();
 
-    const share = page.getByRole("button", { name: "Share and continue" });
-    await share.waitFor({ timeout: 20_000 });
-    const shareList = page.getByRole("list", { name: "Details shared with Briefcase" });
-    await shareList.waitFor({ timeout: 10_000 });
-    const consentText = (await shareList.innerText()).replace(/\s+/g, " ");
-    results.check("consent lists the required email (masked) and the optional timezone", consentText.includes("a***@example.test") && !consentText.includes(address) && /Timezone/.test(consentText), consentText.slice(0, 300));
-    const tz = page.getByRole("switch", { name: /Timezone/ });
-    results.check("the optional timezone starts off (the app did not ask for it in scope)", (await tz.getAttribute("aria-checked")) === "false" || (await tz.getAttribute("data-state")) === "unchecked");
-    await shot(env, page, "auth-flows-email-02-consent");
-    await share.click();
-    await page.waitForURL(new RegExp(`${env.apps.replace(/[.:/]/g, "\\$&")}/briefcase/callback`), { timeout: 30_000 });
+    const walk = await completeDetails(env, page, "briefcase", { shotName: "auth-flows-email-02" });
+    const rows = walk.pages[0]?.rows ?? [];
+    results.check("briefcase's page lists the required email (masked) and the optional timezone, unticked", rows.some(r => r.field === "email" && r.mode === "required" && r.text.includes("a***@example.test") && !r.text.includes(address)) && rows.some(r => r.field === "timezone" && r.mode === "optional" && r.ticked === false), JSON.stringify(rows));
     results.metric("email sign-up: app link → back at the app", Date.now() - started);
     const account = await appAccount(page);
     const uuid = String(account?.uuid ?? "");
     results.check("briefcase got the account with the verified, normalized email", account?.email === address && account?.email_verified === true, JSON.stringify(account).slice(0, 300));
-    results.check("briefcase got no timezone (declined by default)", account !== null && !("timezone" in account), JSON.stringify(account).slice(0, 300));
+    results.check("briefcase got no timezone (left unticked)", account !== null && !("timezone" in account), JSON.stringify(account).slice(0, 300));
     results.check("the membership id is briefcase:<uuid>", (await page.locator("#membership-id").innerText().catch(() => "")) === `briefcase:${uuid}`);
-    const token = JSON.parse((await page.locator("#token").innerText().catch(() => "{}")) || "{}") as { scope?: string };
-    results.check("granted scope: profile and email", (token.scope ?? "").split(" ").sort().join(" ") === "email profile", String(token.scope));
+    results.check("granted scope: profile and email", (await shownScope(page)) === "email profile", await shownScope(page));
 
     // Sign out of briefcase (it revokes its refresh token), then back in as the same address in capitals.
     let mark = Date.now();
-    const lap = (name: string) => {
-      results.metric(`second sign-in: ${name}`, Date.now() - mark);
+    const lap = (label: string) => {
+      results.metric(`second sign-in: ${label}`, Date.now() - mark);
       mark = Date.now();
     };
     await page.locator("#sign-out").click();
@@ -89,10 +81,10 @@ const email: Journey = {
     lap("code sent and received");
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await page.keyboard.type(again, { delay: 25 });
-    await page.waitForURL(new RegExp(`${env.apps.replace(/[.:/]/g, "\\$&")}/briefcase/callback`), { timeout: 30_000 });
+    await page.waitForURL(appPage(env, "briefcase", "callback"), { timeout: 30_000 });
     lap("code typed → back at briefcase");
     const second = await appAccount(page);
-    results.check("the same address in capitals is the same account (no sign-up, no consent)", second?.uuid === uuid, JSON.stringify(second).slice(0, 200));
+    results.check("the same address in capitals is the same account (no sign-up, no page)", second?.uuid === uuid, JSON.stringify(second).slice(0, 200));
     const history = await sql(env, `select method, outcome from signin_history where account_uuid = '${uuid}' and app_id = 'briefcase' order by at, id`);
     results.check("sign-in history: email/new_account, then email/success", JSON.stringify(history) === JSON.stringify([["email", "new_account"], ["email", "success"]]), JSON.stringify(history));
     const revoked = await sql(env, `select count(*) filter (where revoked_at is not null), count(*) from token_families where account_uuid = '${uuid}' and app_id = 'briefcase'`);
@@ -103,7 +95,7 @@ const email: Journey = {
 
 const emailApi: Journey = {
   name: "auth-flows-email-api",
-  title: "the email step's answers: malformed addresses, the masked challenge and its timings, another browser or origin, a method the app lacks, a code after the step moved on",
+  title: "the email step's answers: the binding cookie, malformed addresses, the masked challenge and its timings, another browser or origin, a method the app lacks, a code after the step moved on, login_hint never echoed nor forwarded to Google",
   async run(ctx) {
     const { env, results } = ctx;
     const b = new Browserish(env, ctx.ip);
@@ -111,7 +103,7 @@ const emailApi: Journey = {
     results.check("POST /v1/flows → 201 with the sa_flow binding cookie", s.reply.status === 201 && !!b.jar.get("sa_flow"), brief(s.reply));
     const setCookie = s.reply.headers.get("set-cookie") ?? "";
     results.check("sa_flow is HttpOnly, SameSite=Lax, Path=/", /HttpOnly/i.test(setCookie) && /SameSite=Lax/i.test(setCookie) && /Path=\//.test(setCookie), setCookie.replace(/saf_[A-Za-z0-9_-]+/, "saf_…"));
-    results.check("a new flow starts at choose_method with briefcase's methods in its order", s.flow.step === "choose_method" && s.flow.methods.join(",") === "google,apple,email,phone", `${s.flow.step} ${s.flow.methods.join(",")}`);
+    results.check("a new flow starts at choose_method with briefcase's methods in its order, intent signin, no method hint", s.flow.step === "choose_method" && s.flow.methods.join(",") === "google,apple,email,phone" && s.flow.intent === "signin" && s.flow.method_hint === null, `${s.flow.step} ${s.flow.methods.join(",")} ${s.flow.intent} ${s.flow.method_hint}`);
     const lifetime = Date.parse(s.flow.expires_at) - Date.now();
     results.check("a flow lives 60 minutes", lifetime > 59 * 60_000 && lifetime <= 60 * 60_000 + 5_000, `${Math.round(lifetime / 1000)} s`);
 
@@ -163,15 +155,17 @@ const emailApi: Journey = {
     const resend = await b.act(s.flow.id, "resend");
     results.check("resend at signup → 409 invalid_step", resend.status === 409 && errorCode(resend) === "invalid_step", brief(resend));
 
-    // login_hint is echoed for the page to prefill (cut to 320 characters) and passed on to Google.
-    const hinted = await startSignIn(new Browserish(env, ctx.ip), "briefcase", { loginHint: `  hint.${tag()}@example.test  ` });
-    results.check("login_hint comes back on the flow view, trimmed", /^hint\.[a-z0-9]+@example\.test$/.test(hinted.flow.login_hint ?? ""), String(hinted.flow.login_hint));
-    const longHint = await startSignIn(new Browserish(env, ctx.ip), "briefcase", { loginHint: "x".repeat(400) });
-    results.check("a 400-character login_hint is cut to 320", longHint.flow.login_hint?.length === 320, String(longHint.flow.login_hint?.length));
+    // login_hint is ignored entirely (UNDERSTANDING.md: "An app can never take in a Carbon's email or phone number
+    // itself and send it to us"): not on the flow, not forwarded to Google.
+    const hint = `hint.${tag()}@example.test`;
     const hb = new Browserish(env, ctx.ip);
-    const hs = await startSignIn(hb, "briefcase", { loginHint: "grace@gmail.test" });
+    const hs = await startSignIn(hb, "briefcase", { loginHint: hint });
+    results.check("a flow created with login_hint: 201, and the FlowView never carries it (no login_hint key, the address nowhere)", hs.reply.status === 201 && !("login_hint" in (hs.flow as unknown as Record<string, unknown>)) && !hs.reply.text.includes(hint), hs.reply.text.slice(0, 120));
+    const stored = await sql(env, `select count(*) from signin_flows where id = '${hs.flow.id}' and (provider_state::text like '%${hint}%' or coalesce(state, '') like '%${hint}%')`);
+    results.check("…nor is it stored with the flow", stored[0]?.[0] === "0", JSON.stringify(stored));
     const hgo = await hb.post<{ authorize_url?: string }>(`/v1/flows/${hs.flow.id}/oauth/google`);
-    results.check("…and Google's authorize request carries it", new URL(hgo.body?.authorize_url ?? "http://x/").searchParams.get("login_hint") === "grace@gmail.test", hgo.body?.authorize_url?.slice(0, 160));
+    const googleUrl = new URL(hgo.body?.authorize_url ?? "http://x/");
+    results.check("…and Google's authorize request carries no login_hint", hgo.status === 200 && !googleUrl.searchParams.has("login_hint") && !googleUrl.href.includes(encodeURIComponent(hint)), googleUrl.href.slice(0, 200));
 
     // A method the app does not offer.
     const c = new Browserish(env, ctx.ip);
@@ -182,12 +176,14 @@ const emailApi: Journey = {
     results.check("resend before any code → 409 invalid_step", early.status === 409 && errorCode(early) === "invalid_step", brief(early));
     const unknown = await c.flow("AAAAAAAAAAAAAAAAAAAAAA");
     results.check("an unknown flow id → 404 flow_not_found", unknown.status === 404 && errorCode(unknown) === "flow_not_found", brief(unknown));
+    const apple = await providerLeg(c, commit.flow.id, "apple", {});
+    results.check("Apple on commit (not enabled) → 403 method_not_enabled", apple.go.status === 403 && errorCode(apple.go) === "method_not_enabled", brief(apple.go));
   },
 };
 
 const phone: Journey = {
   name: "auth-flows-phone",
-  title: "dm's hosted page offers the phone first: an SMS code, the sign-up named \"Carbon 1234\", consent with the masked phone, dm gets the verified number; local numbers and bad numbers at the API",
+  title: "dm's hosted page offers the phone first: an SMS code, the sign-up named \"Carbon 1234\", dm's page with the phone present (masked), dm gets the verified number; local numbers and bad numbers at the API; the same number again signs straight in",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const context = await newContext(browser);
@@ -196,8 +192,7 @@ const phone: Journey = {
     const digits = String(Math.floor(1000 + Math.random() * 8999));
     const number = `+1415555${digits}`;
 
-    await page.goto(`${env.apps}/dm/`);
-    await page.locator("#signin-hosted").click();
+    await startAtApp(env, page, "dm");
     const field = page.getByRole("textbox", { name: "Phone number" });
     await field.waitFor({ timeout: 30_000 });
     results.check("dm's page opens on the phone field (phone comes first in its order)", await field.isVisible());
@@ -207,9 +202,9 @@ const phone: Journey = {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     const code = await codeFor(env, number, after);
     results.check("the SMS reached the E.164 number", /^\d{6}$/.test(code), number);
-    await page.getByRole("group", { name: /Code from the text message|Code/ }).first().waitFor({ timeout: 15_000 });
+    await page.getByRole("group", { name: /Code from the text message/ }).first().waitFor({ timeout: 15_000 });
     const masked = (await page.locator("main").innerText()).replace(/\s+/g, " ");
-    results.check("the code step shows the masked number", masked.includes(digits) && !masked.includes(number.slice(2, 8)), masked.slice(0, 200));
+    results.check("the code step says \"Check your phone\" and shows the masked number", (await hostedTitle(page)) === "Check your phone" && masked.includes(digits) && !masked.includes(number.slice(2, 8)), masked.slice(0, 200));
     await page.keyboard.type(code, { delay: 25 });
     const idField = page.getByRole("textbox", { name: "Your id" });
     await idField.waitFor({ timeout: 20_000 });
@@ -220,14 +215,9 @@ const phone: Journey = {
     results.check("sign-up by phone: id from the display name (carbon-<digits>, numbered if taken)", id === `carbon-${digits}` || id.startsWith(`carbon-${digits}-`), id);
     await shot(env, page, "auth-flows-phone-01-signup");
     await page.getByRole("button", { name: "Create account" }).click();
-    const share = page.getByRole("button", { name: "Share and continue" });
-    await share.waitFor({ timeout: 20_000 });
-    const shareList = page.getByRole("list", { name: "Details shared with DM" });
-    await shareList.waitFor({ timeout: 10_000 });
-    const consent = (await shareList.innerText()).replace(/\s+/g, " ");
-    results.check("dm's consent shows the required phone, masked (no requirements step: the sign-up proved it)", /Phone/.test(consent) && consent.includes(`+14*****${digits}`) && !consent.includes(number), consent.slice(0, 300));
-    await share.click();
-    await page.waitForURL(new RegExp(`${env.apps.replace(/[.:/]/g, "\\$&")}/dm/callback`), { timeout: 30_000 });
+    const walk = await completeDetails(env, page, "dm");
+    const rows = walk.pages[0]?.rows ?? [];
+    results.check("dm's page shows the required phone present and masked (the sign-up proved it), the email optional and missing", rows.some(r => r.field === "phone" && r.mode === "required" && !r.missing && r.text.includes(`+14*****${digits}`) && !r.text.includes(number)) && rows.some(r => r.field === "email" && r.missing), JSON.stringify(rows));
     const account = await appAccount(page);
     results.check("dm got the verified phone", account?.phone === number && account?.phone_verified === true, JSON.stringify(account).slice(0, 300));
     results.check("dm got no email (the Carbon has none)", account !== null && !("email" in account), JSON.stringify(account).slice(0, 300));
@@ -243,30 +233,29 @@ const phone: Journey = {
     const localCode = sent.status === 200 ? await codeFor(env, e164, localAfter).catch(() => null) : null;
     results.check("a local number with country \"us\" is normalized to E.164 and texted there", sent.status === 200 && sent.body.flow.challenge?.channel === "phone" && !!localCode, `${brief(sent)} ${e164}`);
     results.check("the phone challenge keeps only the first 3 and last 4 characters (+12*****NNNN)", sent.body.flow?.challenge?.destination === `+12*****${e164.slice(-4)}`, String(sent.body.flow?.challenge?.destination));
-    // The same number again in a fresh browser: the existing account signs in, dm's consent is not asked again.
+    // The same number again in a fresh browser: the existing account signs in, dm's page is not shown again.
     const firstVerify = sent.status === 200 ? await b.act(s.flow.id, "verify", { code: localCode ?? "" }) : null;
     const created = firstVerify?.status === 200 ? await drive(b, firstVerify.body.flow) : null;
     const again = new Browserish(env, ctx.ip);
     const as = await startSignIn(again, "dm");
     const agSent = await sendCode(again, as.flow.id, { phone: e164 });
     const agVerified = await again.act(as.flow.id, "verify", { code: agSent.code ?? "" });
-    results.check("the same number in a fresh browser signs the existing account straight in (complete, no sign-up, no consent)", created?.step === "complete" && agVerified.status === 200 && agVerified.body.flow.step === "complete" && agVerified.body.flow.signed_in_as?.uuid === (await b.session())?.account.uuid, brief(agVerified));
-    // A phone-only Carbon on an app that requires an email: the requirements step asks for one.
-    const needsEmail = await startSignIn(again, "briefcase");
-    const toRequirements = await again.act(needsEmail.flow.id, "continue");
-    results.check("that phone-only Carbon continuing to briefcase (email required) → requirements [email]", toRequirements.status === 200 && toRequirements.body.flow.step === "requirements" && JSON.stringify(toRequirements.body.flow.requirements?.missing) === '["email"]', brief(toRequirements));
+    results.check("the same number in a fresh browser signs the existing account straight in (complete, no sign-up, no page)", created?.step === "complete" && agVerified.status === 200 && agVerified.body.flow.step === "complete" && agVerified.body.flow.signed_in_as?.uuid === (await b.session())?.account.uuid, brief(agVerified));
 
     const b2 = new Browserish(env, ctx.ip);
     const s2 = await startSignIn(b2, "dm");
-    for (const [input, country, code, why] of [
+    for (const [input, country, errorName, why] of [
       ["2025550123", undefined, "invalid_phone", "a local number without a country"],
       ["+1 202 555", undefined, "invalid_phone", "too short to be a number"],
       ["+44 20 7946 09x8", undefined, "invalid_phone", "a letter in it"],
       ["2025550123", "XX", "invalid_country", "a country that does not exist"],
     ] as const) {
       const reply = await b2.act(s2.flow.id, "phone", { phone: input, ...(country ? { country } : {}) });
-      results.check(`${why} → 422 ${code} with a precise message`, reply.status === 422 && errorCode(reply) === code, brief(reply));
+      results.check(`${why} → 422 ${errorName} with a precise message`, reply.status === 422 && errorCode(reply) === errorName, brief(reply));
     }
+    const fresh = randomPhone();
+    const ok = await sendCode(b2, s2.flow.id, { phone: fresh });
+    results.check("after the refusals a good number still gets its code", ok.reply.status === 200 && !!ok.code, brief(ok.reply));
   },
 };
 

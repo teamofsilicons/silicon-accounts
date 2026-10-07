@@ -7,6 +7,11 @@
  * team), and a screenshot per variant. What is worth reading but not a failure (truncated text, moderate axe findings,
  * text spilling out of its box) goes to the journey's findings file: e2e/.artifacts/<base>/ux-audit/<journey>.json.
  *
+ * UNDERSTANDING.md v2: two sites. The account site (accounts.teamofsilicons.com, env.site) holds a Carbon's own account,
+ * the hosted sign-in pages, the device page and the docs; the developer site (developer.teamofsilicons.com, env.developer,
+ * base + 5) holds everything about building apps, signed in through its BFF (lib.ts signInOnDeveloper). Both are audited
+ * with the same checks; "Powered by Silicon Accounts" links to https://accounts.teamofsilicons.com (POWERED_HREF).
+ *
  * axe-core comes from the site's own node_modules (eslint-config-next's jsx-a11y depends on it), so the suite needs no
  * package of its own. It and the kit (_kit.ts) are installed with context.addInitScript, which no page CSP refuses.
  */
@@ -14,8 +19,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join, resolve } from "node:path";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import type { Ctx } from "../../context";
-import { E2E_DIR, codeFor, lastSeq, newContext, shot, signInOnSite, sleep, sql, tag, type ContextOptions, type Env } from "../../lib";
+import { DEVELOPER_SIGNED_OUT, E2E_DIR, codeFor, developerApi, lastSeq, newContext, shot, signInOnDeveloper, signInOnSite, sleep, sql, tag, type ContextOptions, type Env } from "../../lib";
 import { KIT_SOURCE } from "./_kit";
+
+/** Where every "Powered by Silicon Accounts" links (UNDERSTANDING.md "Making the pages your own"; v2: the plural host). */
+export const POWERED_HREF = /^https:\/\/accounts\.teamofsilicons\.com\/?$/;
 
 export type Theme = "light" | "dark";
 
@@ -428,6 +436,8 @@ export interface FocusStop {
   role?: string;
   name?: string;
   rect?: { x: number; y: number; w: number; h: number };
+  /** Its first line box (a wrapped link's own start; the same as rect otherwise). */
+  line?: { x: number; y: number; w: number; h: number };
   inView?: boolean;
   fully?: boolean;
   obscuredBy?: string | null;
@@ -656,9 +666,15 @@ export async function hostedLink(env: Env, page: Page, app: string): Promise<str
   return href;
 }
 
-/** On a hosted choose_method step: types the email and asks for the code; returns the code once it arrives. */
+/**
+ * On a hosted choose_method step: types the email and asks for the code; returns the code once it arrives. An app whose
+ * methods page opens on the phone (dm lists phone first) shows "Phone | Email": the Email segment is chosen first.
+ */
 export async function sendEmailCode(env: Env, page: Page, email: string): Promise<string> {
   const field = page.getByRole("textbox", { name: "Email" });
+  const segment = page.getByRole("button", { name: "Email", exact: true });
+  await field.or(segment).first().waitFor({ timeout: 30_000 });
+  if (!(await field.isVisible().catch(() => false))) await segment.click();
   await field.waitFor({ timeout: 30_000 });
   const after = await lastSeq(env);
   await field.fill(email);
@@ -717,17 +733,72 @@ export async function localSeedPhotos(ctx: Ctx, findings?: Findings): Promise<nu
 
 /** briefcase's seeded owner (c:saket), whose apps the developer pages need populated. */
 export const SEEDED_OWNER_EMAIL = "saketdev12@example.test";
+/** ledgerly's seeded owner (c:ledgerly-dev): the app with a two-page flow and a review page. */
+export const LEDGERLY_OWNER_EMAIL = "dev@ledgerly.test";
 
 /**
- * Signs `page` in as briefcase's seeded owner. Every sign-in sends a code to the same address, and the suite signs in
- * as this owner in several journeys (more on a stack walked again with --keep), so the per-address limit (10 codes in
- * 10 minutes) would refuse the suite's own later sign-ins: the window of the codes this suite already had sent there is
- * moved past (README "Time travel"), then the seeded photos are made local (localSeedPhotos).
+ * Every sign-in sends a code to the owner's address, and the suite signs in as a seeded owner in several journeys (more
+ * on a stack walked again with --keep), so the per-address limit (10 codes in 10 minutes) would refuse the suite's own
+ * later sign-ins: the window of the codes already sent there is moved past (README "Time travel"), and the seeded
+ * photos are made local (localSeedPhotos).
  */
-export async function signInAsSeededOwner(ctx: Ctx, page: Page, findings?: Findings): Promise<void> {
-  await sql(ctx.env, `update otp_challenges set created_at = created_at - interval '11 minutes' where destination = '${SEEDED_OWNER_EMAIL}' and created_at > now() - interval '11 minutes'`);
+async function prepareSeededOwner(ctx: Ctx, email: string, findings?: Findings): Promise<void> {
+  await sql(ctx.env, `update otp_challenges set created_at = created_at - interval '11 minutes' where destination = '${email.replace(/'/g, "")}' and created_at > now() - interval '11 minutes'`);
   await localSeedPhotos(ctx, findings);
-  await signInOnSite(ctx.env, page, SEEDED_OWNER_EMAIL);
+}
+
+/** Signs `page` in to the account site as a seeded owner (default briefcase's, c:saket). */
+export async function signInAsSeededOwner(ctx: Ctx, page: Page, findings?: Findings, email = SEEDED_OWNER_EMAIL): Promise<void> {
+  await prepareSeededOwner(ctx, email, findings);
+  await signInOnSite(ctx.env, page, email);
+}
+
+/** Signs `page` in to the developer site (through its BFF) as a seeded owner (default briefcase's, c:saket). */
+export async function signInAsSeededOwnerOnDeveloper(ctx: Ctx, page: Page, findings?: Findings, email = SEEDED_OWNER_EMAIL, returnTo = "/"): Promise<void> {
+  await prepareSeededOwner(ctx, email, findings);
+  await signInOnDeveloper(ctx.env, page, email, { returnTo });
+}
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* The developer site                                                                                                  */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+/** The tabs of an app on the developer site (developer/lib/app-tabs.ts), and the address of each. */
+export const TABS = ["overview", "sign-in", "details", "flows", "pages", "users", "import", "webhooks", "ata", "embed"] as const;
+export const tabPath = (appId: string, tab: (typeof TABS)[number]) => `/apps/${appId}${tab === "overview" ? "" : `/${tab}`}`;
+
+/** What the developer site's pages log on purpose: the session probe's 401 before signing in. */
+export const DEVELOPER_EXPECTED = [DEVELOPER_SIGNED_OUT];
+
+/** A new Carbon signed in to the developer site (signed up on the account site through the hosted pages on the way). */
+export async function developerCarbon(ctx: Ctx, who: string, options: ContextOptions = {}): Promise<{ context: BrowserContext; page: Page; email: string; id: string; uuid: string }> {
+  const context = await auditContext(ctx.browser, options);
+  const page = await context.newPage();
+  const email = freshEmail(who);
+  await signInOnDeveloper(ctx.env, page, email);
+  const me = await developerApi<{ id?: string; uuid?: string }>(ctx.env, page, "/me");
+  return { context, page, email, id: me.body?.id ?? "", uuid: me.body?.uuid ?? "" };
+}
+
+/**
+ * Makes an app owned by `ownerUuid` in the stack's database, as Silicon Apps would deliver one (UNDERSTANDING.md "Until
+ * Silicon Apps exists": apps are not created on our sites), with `from`'s sign-in setup, logo and secret.
+ */
+export async function ownedApp(ctx: Ctx, ownerUuid: string, appId: string, name: string, from = "briefcase"): Promise<void> {
+  const quote = (value: string) => value.replace(/'/g, "''");
+  await sql(ctx.env, `insert into apps (app_id, name, description, logo_url, logo_dark_url, homepage_url, owner_uuid, secret_hash, status, source)
+    select '${quote(appId)}', '${quote(name)}', 'An app the ux-audit suite made for its owner', logo_url, logo_dark_url, homepage_url, '${quote(ownerUuid)}', secret_hash, 'active', 'fake' from apps where app_id = '${quote(from)}'`);
+  await sql(ctx.env, `insert into app_signin_configs (app_id, version, config, updated_by) select '${quote(appId)}', 1, config, 'system' from app_signin_configs where app_id = '${quote(from)}' order by version desc limit 1`);
+}
+
+/** Opens a developer-site page and waits until its content (not the shell's or the tab's loading state) has settled. */
+export async function openDeveloperPage(ctx: Ctx, page: Page, path: string): Promise<string> {
+  await page.goto(`${ctx.env.developer}${path}`);
+  await page.locator("main").first().waitFor({ timeout: 30_000 });
+  await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 30_000 }).catch(() => undefined);
+  await waitUntil(page, "!document.querySelector('[aria-busy=\"true\"]')", 20_000);
+  await settle(page, 900);
+  return (await page.locator("main").first().innerText().catch(() => "")).replace(/\s+/g, " ");
 }
 
 /** A same-origin fetch from the page itself (the browser sends Origin, which cookie mutations need). */

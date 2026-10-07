@@ -5,8 +5,11 @@
 //!   `{"job": ImportJob}`. At most 100,000 rows / 50 MB. Whole-request problems (unknown
 //!   columns, empty file, structure past the limits of [`input`], …) are refused before a job
 //!   exists; rows are processed by the background worker ([`run_pending_jobs`]). Budgets
-//!   ([`limits`]): 60 requests per app per hour, 2,000,000 rows per app per 24 hours (dry runs
-//!   included), and at most 2 bodies read and parsed at once per process.
+//!   ([`limits`]): 60 requests per app per hour (counted when the request gets its import slot,
+//!   before its body is read), 2,000,000 rows per app per 24 hours (dry runs included), and at
+//!   most 2 bodies read and parsed at once per process, at most 1 of them per app; a body that
+//!   falls behind 32 KB/s (after its first 10 seconds) is dropped with 408
+//!   `import_upload_too_slow`, which frees its slot.
 //! - `GET /v1/apps/{app_id}/imports` (newest first), `GET …/imports/{job_id}` → `{"job": …}`.
 //! - `GET …/imports/{job_id}/rows?outcome&level&code&limit&cursor` → rows in file order:
 //!   `{"row_number","outcome","account_uuid","id","messages":[{level,code,message,field?}],"input"}`.
@@ -34,19 +37,25 @@ use accounts_core::http::{AppOrOwner, ClientMeta, IdempotencyKey, Path, Query};
 use accounts_core::repo::{audit, idempotency};
 use accounts_core::{ApiError, ApiResult, AppState};
 use axum::Router;
-use axum::body::{Body, Bytes};
+use axum::body::{Body, Bytes, HttpBody};
 use axum::extract::{RawQuery, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use http_body_util::BodyExt;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use sqlx::PgPool;
 use time::OffsetDateTime;
+use tokio::time::Instant;
 use uuid::Uuid;
 
 pub use engine::{Counts, Outcome};
 pub use input::{ALLOWED_COLUMNS, ImportOptions, MAX_BYTES, MAX_ROWS};
-pub use limits::{MAX_CONCURRENT_IMPORTS, ROWS_PER_DAY, SUBMISSIONS_PER_HOUR};
+pub use limits::{
+    MAX_CONCURRENT_IMPORTS, MAX_CONCURRENT_IMPORTS_PER_APP, MIN_UPLOAD_BYTES_PER_SECOND,
+    ROWS_PER_DAY, SUBMISSIONS_PER_HOUR, UPLOAD_GRACE,
+};
 pub use rules::{Level, RowMessage};
 pub use worker::{run_pending_jobs, spawn_worker};
 
@@ -136,15 +145,28 @@ async fn create_import(
     body: Body,
 ) -> ApiResult<Response> {
     let app_id = auth.app.app_id.clone();
-    // Refusals that cost nothing come before up to 50 MB are read. Not for a request with an
-    // Idempotency-Key: a retry of an import that went through must get its stored 202 back even
-    // when the app has used up its hour (the counted check below still applies to new work).
-    if key.is_none() {
+    let scope = idempotency::scope(
+        &caller_scope(&auth),
+        "POST",
+        &format!("/v1/apps/{app_id}/imports"),
+    );
+    // A retry under an Idempotency-Key of an import that went through gets its stored 202 back,
+    // even when the app has used up its hour: it is neither refused up front nor counted.
+    let retry = match key.as_deref() {
+        Some(k) => went_through(&state.db, &scope, k).await?,
+        None => false,
+    };
+    // Refusals that cost nothing come before up to 50 MB are read.
+    if !retry {
         limits::precheck_submissions(&state.db, &app_id).await?;
     }
-    // The slot bounds how many bodies this process holds and parses at once; it is kept until
-    // the job exists.
-    let _slot = limits::acquire_slot(limits::slots(), limits::SLOT_WAIT).await?;
+    // The slot bounds how many bodies this process (and this app) holds and parses at once; it
+    // is kept until the job exists. Taking one is what counts against the app's hour: an upload
+    // that stalls or breaks off held a slot too.
+    let _slot = limits::slots().acquire(&app_id, limits::SLOT_WAIT).await?;
+    if !retry {
+        limits::count_submission(&state.db, &app_id).await?;
+    }
     let body = read_body(body).await?;
     let content_type = headers
         .get(header::CONTENT_TYPE)
@@ -156,11 +178,6 @@ async fn create_import(
         "query": query,
         "sha256": hex::encode(accounts_core::crypto::sha256(&body)),
     });
-    let scope = idempotency::scope(
-        &caller_scope(&auth),
-        "POST",
-        &format!("/v1/apps/{app_id}/imports"),
-    );
     idempotency::run(
         &state,
         key.as_deref(),
@@ -168,7 +185,6 @@ async fn create_import(
         &fingerprint,
         false,
         || async {
-            limits::count_submission(&state.db, &app_id).await?;
             let parsed =
                 parse_off_runtime(content_type.clone(), query.clone(), body.clone()).await?;
             let job = create_job(&state, &auth, parsed, meta.ip.as_deref()).await?;
@@ -192,22 +208,56 @@ fn too_long(e: &(dyn std::error::Error + 'static)) -> bool {
     false
 }
 
+/// True when `key` holds the stored result of an import that went through (core's
+/// `idempotency::begin` replays it).
+async fn went_through(pool: &PgPool, scope: &str, key: &str) -> ApiResult<bool> {
+    Ok(sqlx::query_scalar(
+        "select exists (select 1 from idempotency_keys \
+           where scope = $1 and key = $2 and status_code <> 0 and expires_at > now())",
+    )
+    .bind(scope)
+    .bind(key)
+    .fetch_one(pool)
+    .await?)
+}
+
+/// Reads the body (holding an import slot), at most [`READ_LIMIT`] bytes, and only while it
+/// keeps the minimum pace ([`limits::UPLOAD_PACE`]): a stalled upload is dropped with 408
+/// `import_upload_too_slow` instead of keeping its slot for the request's whole budget.
 async fn read_body(body: Body) -> ApiResult<Bytes> {
-    let bytes = axum::body::to_bytes(body, READ_LIMIT).await.map_err(|e| {
-        if too_long(&e) {
-            input::payload_too_large()
-        } else {
-            ApiError::bad_request(
-                "invalid_body",
-                format!("The import body could not be read: {e}."),
-            )
-            .hint("Send the whole file in one request body (Content-Length or chunked).")
+    read_paced_body(body, limits::UPLOAD_PACE).await
+}
+
+async fn read_paced_body(mut body: Body, pace: limits::Pace) -> ApiResult<Bytes> {
+    let started = Instant::now();
+    let expected = usize::try_from(body.size_hint().lower()).unwrap_or(READ_LIMIT);
+    let mut buf: Vec<u8> = Vec::with_capacity(expected.min(READ_LIMIT));
+    loop {
+        let deadline = pace.deadline(started, buf.len());
+        let frame = match tokio::time::timeout_at(deadline, body.frame()).await {
+            Err(_) => return Err(pace.too_slow(buf.len(), started.elapsed())),
+            Ok(None) => break,
+            Ok(Some(Err(e))) if too_long(&e) => return Err(input::payload_too_large()),
+            Ok(Some(Err(e))) => {
+                return Err(ApiError::bad_request(
+                    "invalid_body",
+                    format!("The import body could not be read: {e}."),
+                )
+                .hint("Send the whole file in one request body (Content-Length or chunked)."));
+            }
+            Ok(Some(Ok(frame))) => frame,
+        };
+        if let Ok(data) = frame.into_data() {
+            if buf.len() + data.len() > READ_LIMIT {
+                return Err(input::payload_too_large());
+            }
+            buf.extend_from_slice(&data);
         }
-    })?;
-    if bytes.len() > MAX_BYTES {
+    }
+    if buf.len() > MAX_BYTES {
         return Err(input::payload_too_large());
     }
-    Ok(bytes)
+    Ok(Bytes::from(buf))
 }
 
 /// Parses on the blocking pool: a 50 MB body takes CPU time the async workers (which serve
@@ -463,4 +513,67 @@ async fn import_rows(
     let dry_run = job.options().dry_run;
     let items: Vec<Value> = page.items.iter().map(|r| r.view(dry_run)).collect();
     Ok(axum::Json(json!({"items": items, "next_cursor": page.next_cursor})).into_response())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    /// A body that sends `chunks` (each after its delay), then ends, or stalls when `stall`.
+    fn paced(chunks: Vec<(u64, &'static [u8])>, stall: bool) -> Body {
+        let stream = futures::stream::unfold(chunks.into_iter(), move |mut rest| async move {
+            match rest.next() {
+                Some((ms, bytes)) => {
+                    tokio::time::sleep(Duration::from_millis(ms)).await;
+                    Some((Ok::<_, std::io::Error>(Bytes::from_static(bytes)), rest))
+                }
+                None if stall => futures::future::pending().await,
+                None => None,
+            }
+        });
+        Body::from_stream(stream)
+    }
+
+    const PACE: limits::Pace = limits::Pace {
+        grace: Duration::from_millis(200),
+        min_bytes_per_second: 1024,
+    };
+
+    #[tokio::test]
+    async fn a_body_that_keeps_its_pace_is_read_whole() {
+        let body = paced(
+            vec![(0, b"email\n"), (50, b"a@x.test\n"), (50, b"b@x.test\n")],
+            false,
+        );
+        let bytes = read_paced_body(body, PACE).await.expect("read");
+        assert_eq!(&bytes[..], b"email\na@x.test\nb@x.test\n");
+    }
+
+    /// The imports-busy finding: an upload that trickles (or stops) gives its slot back after
+    /// the grace instead of holding it for the request's whole budget.
+    #[tokio::test]
+    async fn a_stalled_body_is_dropped_after_the_grace() {
+        let started = Instant::now();
+        let body = paced(vec![(0, b"email,display_name\n")], true);
+        let e = read_paced_body(body, PACE).await.expect_err("too slow");
+        let took = started.elapsed();
+        assert_eq!(e.status, StatusCode::REQUEST_TIMEOUT);
+        assert_eq!(e.code, "import_upload_too_slow");
+        assert_eq!(e.details["received_bytes"], 19);
+        assert!(e.message.contains("19 bytes"), "{}", e.message);
+        assert!(e.message.contains("nothing was imported"), "{}", e.message);
+        // 200 ms of grace plus the ~19 ms that 19 bytes earn at 1 KB/s.
+        assert!(
+            took >= Duration::from_millis(210) && took < Duration::from_secs(2),
+            "{took:?}"
+        );
+
+        // Trickling (a byte every 100 ms = 10 B/s) falls behind just the same.
+        let trickle: Vec<(u64, &'static [u8])> = (0..100).map(|_| (100, &b"x"[..])).collect();
+        let e = read_paced_body(paced(trickle, false), PACE)
+            .await
+            .expect_err("too slow");
+        assert_eq!(e.code, "import_upload_too_slow");
+    }
 }

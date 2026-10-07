@@ -6,7 +6,7 @@
 import type { Locator, Page } from "@playwright/test";
 import type { Ctx, Journey } from "../../context";
 import { api, codeFor, lastSeq, newContext, shot, signInOnSite, sleep, sql, tag, type Env } from "../../lib";
-import { addContact, appUserinfo, call, codeOf, confirmMorph, getMe, hintOf, inbox, messageOf, newCarbon, probePage, randomPhone, rowByKey, rowsOf, signIntoApp, until, waitEvent } from "./_helpers";
+import { addContact, appUserinfo, call, codeOf, confirmMorph, connectProvider, getMe, hintOf, inbox, messageOf, newCarbon, probePage, randomPhone, rowByKey, rowsOf, signIntoApp, until, waitEvent } from "./_helpers";
 
 type Channel = "email" | "phone";
 
@@ -274,6 +274,24 @@ function contactJourney(channel: Channel): Journey {
       results.check(`…both limit refusals say what to do in a correct sentence ("${remove}")`, hintOf(eleventh.body) === remove && hintOf(vy.body) === remove, `${hintOf(eleventh.body)} / ${hintOf(vy.body)}`);
       const stored = (await getMe(probe))[isEmail ? "emails" : "phones"].length;
       results.check("the account holds exactly 10", stored === 10, String(stored));
+
+      if (isEmail) {
+        // Google and Apple add their verified email when connected (UNDERSTANDING.md), so at 10 one with a new email
+        // would be the 11th: refused, with the reason, and nothing is linked. One whose email is already on the account
+        // connects and adds nothing.
+        const t = tag();
+        const refusedLink = await connectProvider(env, page, "Google", `acct.eleventh.${t}@gmail.test`, `Eleventh ${t}`);
+        const afterRefusal = await getMe(probe);
+        await shot(env, page, "acct-email-01b-google-at-ten");
+        results.check("at 10, connecting Google whose email is new is refused with the reason (10 emails), and nothing is linked or added", /Google was not connected/.test(refusedLink) && /10 emails/.test(refusedLink) && afterRefusal.identities.length === 0 && afterRefusal.emails.length === 10, `${refusedLink.slice(0, 240)} / identities ${afterRefusal.identities.length}, emails ${afterRefusal.emails.length}`);
+        const known = values[2]!;
+        const knownLink = await connectProvider(env, page, "Google", known, `Known ${t}`);
+        const afterKnown = await getMe(probe);
+        results.check("…while connecting Google whose email is already on the account works and adds nothing (\"Its email was already on your account\")", /Google is connected/.test(knownLink) && /already on your account/.test(knownLink) && afterKnown.identities.some(item => item.provider === "google" && item.email === known) && afterKnown.emails.length === 10, `${knownLink.slice(0, 200)} / ${JSON.stringify(afterKnown.identities.map(item => `${item.provider} ${item.email}`))}, emails ${afterKnown.emails.length}`);
+        await page.goto(`${env.site}/sign-in-methods`);
+        await section.waitFor({ timeout: 30_000 });
+        await sleep(600);
+      }
 
       // Make another one primary: the badge moves, the app that sees it is told and sees the new one.
       const target = values[3]!;

@@ -28,7 +28,7 @@ import { FONT_STACKS, loadBrandFont } from "@/lib/branding/fonts";
 import { hostOfUrl, useDeveloperApp } from "../lib/context";
 import { messageFor, useEditor } from "../lib/editor";
 import { clone } from "../lib/json";
-import { MAX_INLINE_LOGO_BYTES } from "../lib/validate";
+import { MAX_INLINE_LOGO_BYTES, backgroundStyleEdits } from "../lib/validate";
 import { EditorAlerts } from "../parts/editor-alerts";
 import { HistoryDrawer } from "../parts/history-drawer";
 import { RangeField } from "../parts/range-field";
@@ -219,7 +219,9 @@ export function PagesTab() {
   const pages = previewPages(view.draft);
   const shownPage = (pages.find(option => option.key === pageKey) ?? pages[0])?.page ?? ({ kind: "methods", intent: "signin" } as PreviewPage);
   const show = (page: PreviewPage | undefined) => {
-    const option = page && pages.find(entry => JSON.stringify(entry.page) === JSON.stringify(page));
+    if (!page) return;
+    // That page, else the first of its kind the app has (the Opening title of an app with Apple but no Google).
+    const option = pages.find(entry => JSON.stringify(entry.page) === JSON.stringify(page)) ?? pages.find(entry => entry.page.kind === page.kind);
     if (option) setPageKey(option.key);
   };
   const copyField = (key: "title" | "subtitle" | "signup_title" | "signup_subtitle" | "opening_title", label: string, placeholder: string, max: number, description?: string) => {
@@ -351,7 +353,7 @@ export function PagesTab() {
         </Group>
 
         <Group title="Background">
-          <SegmentedControl label="Background" value={branding.background_style} onValueChange={value => editor.edit("branding.background_style", value)} options={[{ value: "plain", label: "Plain" }, { value: "dots", label: "Dots" }, { value: "grain", label: "Grain" }, { value: "gradient", label: "Gradient" }, { value: "image", label: "Image" }]} />
+          <SegmentedControl label="Background" value={branding.background_style} onValueChange={value => editor.editMany(backgroundStyleEdits(branding, value as typeof branding.background_style))} options={[{ value: "plain", label: "Plain" }, { value: "dots", label: "Dots" }, { value: "grain", label: "Grain" }, { value: "gradient", label: "Gradient" }, { value: "image", label: "Image" }]} />
           {branding.background_style === "image" ? (
             <Input label="Background image" type="url" className={styles.mono} placeholder="https://example.com/background.jpg" value={branding.background_image_url ?? ""} onChange={event => editor.edit("branding.background_image_url", event.currentTarget.value || null)} error={error("branding.background_image_url")} description="https only; it is dimmed slightly so the card stays readable." />
           ) : null}

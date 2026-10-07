@@ -233,6 +233,11 @@ impl MemberTarget {
 }
 
 /// Apps with a live membership (`active` or `imported`) and a webhook URL, by app id.
+///
+/// A disabled app is still a target: its events are stored like any other app's and the worker
+/// holds their deliveries ("Not sent: … is disabled"), so an app re-enabled within the delivery
+/// window learns every change made meanwhile (an id change, a deletion) instead of keeping
+/// stale data.
 pub async fn webhook_targets(
     conn: &mut PgConnection,
     account_uuid: &str,
@@ -240,9 +245,7 @@ pub async fn webhook_targets(
     Ok(sqlx::query_as::<_, MemberTarget>(
         "select m.app_id, m.membership_id, m.granted_scopes, c.webhook_url from memberships m \
          join app_signin_configs c on c.app_id = m.app_id \
-         join apps a on a.app_id = m.app_id \
          where m.account_uuid = $1 and m.status in ('active', 'imported') and c.webhook_url is not null \
-           and a.status = 'active' \
          order by m.app_id",
     )
     .bind(account_uuid)

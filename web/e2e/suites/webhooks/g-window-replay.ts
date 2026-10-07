@@ -83,9 +83,10 @@ export const journey: Journey = {
       await ageDelivery(env, e2.delivery_id, 72);
       const gone2 = await waitAttempts(env, e2.delivery_id, 3);
       results.check("…and fails for good once it is 72 hours old too", gone2?.status === "failed", short(gone2));
-      await sleep(12_000);
+      // The worker looks for due deliveries every second: 3 s is three chances to (wrongly) try it again.
+      await sleep(3_000);
       const still = await getDelivery(env, APP, e1.delivery_id);
-      results.check("a failed delivery is left alone: no attempt in the 12 s after it failed", still.attempt_count === 2 && still.status === "failed", `${still.attempt_count} attempts`);
+      results.check("a failed delivery is left alone: no attempt in the 3 s after it failed", still.attempt_count === 2 && still.status === "failed", `${still.attempt_count} attempts`);
       const failedList = must("list failed deliveries", await appCall<{ items: Delivery[] }>(env, APP, "GET", `/v1/apps/${APP}/webhook/deliveries?status=failed&limit=200`), 200).body.items;
       results.check("both appear under ?status=failed, with no next_attempt_at", [e1.delivery_id, e2.delivery_id].every(id => failedList.some(item => item.id === id && item.status === "failed" && item.next_attempt_at === null)), `${failedList.length} failed`);
 

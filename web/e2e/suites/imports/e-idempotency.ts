@@ -31,6 +31,8 @@ export const journeys: Journey[] = [
   {
     name: "imports-idempotency",
     title: "the same Idempotency-Key returns the same job (also after it finished, and when retries race); the key with another body or options is 409; a new key re-imports and every row matches",
+    // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+    engines: ["chromium"],
     async run(ctx) {
       const { env, results } = ctx;
       const crm = fakeApp("legacy-crm");
@@ -87,6 +89,8 @@ export const journeys: Journey[] = [
   {
     name: "imports-reimport",
     title: "re-importing members: matched keeps the external id (warning external_id_differs), update_existing replaces the imported profile and external id (updated), the account's own data never changes; a phone match and two accounts in one row",
+    // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+    engines: ["chromium"],
     async run(ctx) {
       const { env, results } = ctx;
       const crm = fakeApp("legacy-crm");

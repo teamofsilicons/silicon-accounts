@@ -87,6 +87,9 @@ and the visitor's theme is known only there. Before that the server sends a quie
 
 ## Screens and checks
 
+`test/*.test.ts` are unit tests of the pure helpers (error lines, which page a flow is on), no stack needed:
+`pnpm exec tsx --test components/auth/test/*.test.ts`.
+
 `checks.ts` (the Playwright checks below) is paused: it was written for the v1 steps (requirements, consent) and is
 out of date with v2, so tsconfig.json and eslint skip it until it is rewritten. The screens are current.
 

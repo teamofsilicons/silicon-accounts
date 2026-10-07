@@ -12,6 +12,9 @@ use crate::util;
 
 const REPO: &str = "https://github.com/teamofsilicons/silicon-accounts";
 
+/// Most characters a report message may have (the service's limit).
+const REPORT_MAX_CHARS: usize = 10_000;
+
 pub async fn report(ctx: &Ctx, args: ReportArgs) -> CliResult<Outcome> {
     let message = util::arg_or_stdin(&args.message, "the report message")?;
     if message.trim().is_empty() {
@@ -21,13 +24,35 @@ pub async fn report(ctx: &Ctx, args: ReportArgs) -> CliResult<Outcome> {
         ));
     }
     let mut body = message.trim().to_owned();
+    // The limit is checked on what the reporter typed: the diagnostics the CLI appends must never
+    // be what makes a message "too long".
+    let typed = body.chars().count();
+    if typed > REPORT_MAX_CHARS {
+        return Err(CliError::invalid(
+            format!(
+                "A report message must be 1 to {REPORT_MAX_CHARS} characters; yours has {typed}."
+            ),
+            "Shorten it to what you ran, what you expected, what happened and the request id; put long logs in a PR or a gist and link it.",
+        )
+        .with_details(json!({ "characters": typed, "limit": REPORT_MAX_CHARS })));
+    }
+    let mut diagnostics_included = false;
     if !args.no_diagnostics {
-        body.push_str(&format!(
+        let diagnostics = format!(
             "\n\n--\naccounts CLI {} on {} {}",
             env!("CARGO_PKG_VERSION"),
             std::env::consts::OS,
             std::env::consts::ARCH
-        ));
+        );
+        let extra = diagnostics.chars().count();
+        if typed + extra <= REPORT_MAX_CHARS {
+            body.push_str(&diagnostics);
+            diagnostics_included = true;
+        } else {
+            ctx.out.notice(&format!(
+                "Sending the report without the CLI version and OS: your message has {typed} characters, and the {extra} characters of diagnostics would take it over the {REPORT_MAX_CHARS}-character limit."
+            ));
+        }
     }
     let key = args
         .idempotency_key
@@ -58,7 +83,7 @@ pub async fn report(ctx: &Ctx, args: ReportArgs) -> CliResult<Outcome> {
         text.push_str(&format!("\nYou can also open a PR at {REPO}"));
     }
     Ok(Outcome::new(
-        json!({ "report_id": receipt.report_id, "status": receipt.status, "recipients": receipt.recipients, "pr_url": args.pr }),
+        json!({ "report_id": receipt.report_id, "status": receipt.status, "recipients": receipt.recipients, "pr_url": args.pr, "diagnostics_included": diagnostics_included }),
         text,
     ))
 }

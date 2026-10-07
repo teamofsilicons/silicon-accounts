@@ -1,16 +1,19 @@
 /**
- * ux-audit: the signed-out surfaces of the account site in light and dark at 1440 and 390 px: the landing page, every
- * step of the site's own sign-in (email, code, a wrong code, setting up), the not-found page and a hosted link that
- * cannot start. Each page: theme, no sideways scroll, axe, squircles, console, broken images, vocabulary, screenshots.
+ * ux-audit: the signed-out surfaces of the account site in light and dark at 1440 and 390 px: the landing page (and
+ * its link to the developer site, GET /v1/meta developer_url), every step of the site's own sign-in (email, code, a
+ * wrong code, setting up), the not-found page, a hosted link that cannot start, and the old /developer addresses, which
+ * now lead to the developer site (UNDERSTANDING.md v2: "Anything about building apps lives on developer.teamofsilicons.com").
+ * Each page: theme, no sideways scroll, axe, squircles, console, broken images, vocabulary, screenshots.
  */
 import type { Journey } from "../../context";
-import { codeFor, lastSeq } from "../../lib";
-import { VARIANTS, auditContext, auditVariants, collectConsole, findingsFor, freshEmail, poweredBy, saveFindings, settle, stepReady } from "./_audit";
+import { codeFor, json, lastSeq } from "../../lib";
+import { POWERED_HREF, VARIANTS, auditContext, auditVariants, collectConsole, findingsFor, freshEmail, poweredBy, saveFindings, settle, stepReady } from "./_audit";
 
 export const journeys: Journey[] = [
   {
     name: "ux-audit-landing",
-    title: "the landing page, the site's own sign-in (email, code, wrong code, setting up), the not-found page and a broken hosted link: light/dark × 1440/390",
+    title: "the landing page (and its developer-site link), the site's own sign-in (email, code, wrong code, setting up), not-found, a broken hosted link and /developer leading to the developer site: light/dark × 1440/390",
+    timeoutMs: 900_000,
     async run(ctx) {
       const { env, results, browser } = ctx;
       const findings = findingsFor(ctx);
@@ -20,6 +23,8 @@ export const journeys: Journey[] = [
       const expected = [/status of 404 .*\/no-such-page/, /status of 422 .*\/v1\/flows\/[^/ ]+\/verify/, /status of 400 .*\/v1\/flows\b/];
       results.watch(page, "landing", expected);
       collectConsole(page, expected);
+      const meta = await json<{ developer_url?: string }>(`${env.site}/v1/meta`);
+      results.check("meta: GET /v1/meta names this stack's developer site (developer_url)", meta.body.developer_url?.replace(/\/+$/, "") === env.developer, String(meta.body.developer_url));
 
       // The landing page (signed out).
       await page.goto(`${env.site}/`);
@@ -27,6 +32,8 @@ export const journeys: Journey[] = [
       await auditVariants(ctx, page, findings, "landing", VARIANTS, { fullPage: true });
       const signIn = page.getByRole("link", { name: /sign in/i }).first();
       results.check("landing: offers a way to sign in", (await signIn.count()) > 0);
+      const developerLinks = await page.locator("a[href]").evaluateAll((links, developer) => links.filter(link => (link as HTMLAnchorElement).href.replace(/\/+$/, "") === developer).map(link => (link.textContent ?? "").replace(/\s+/g, " ").trim()), env.developer);
+      results.check("landing: links to the developer site at developer_url (building apps lives there)", developerLinks.length > 0, developerLinks.join(" | ") || "no link to the developer site");
 
       // The site's own sign-in: the email step.
       await page.goto(`${env.site}/sign-in`);
@@ -34,7 +41,8 @@ export const journeys: Journey[] = [
       await stepReady(page);
       await auditVariants(ctx, page, findings, "signin-email", VARIANTS);
       const powered = await poweredBy(page);
-      results.check("signin-email: \"Powered by Silicon Accounts\" is in view, uncovered, and links to account.teamofsilicons.com", powered.found && !!powered.inView && !powered.covered && !powered.overlaps?.length && /account\.teamofsilicons\.com/.test(powered.href ?? ""), JSON.stringify(powered));
+      findings.pages["signin-email powered by"] = powered;
+      results.check("signin-email: the account site's own sign-in (Silicon Accounts itself) shows no app, so \"Powered by\" is optional; when shown it links to accounts.teamofsilicons.com", !powered.found || POWERED_HREF.test(powered.href ?? ""), JSON.stringify(powered));
 
       // The code step, then a wrong code (the error state), then the right one.
       const email = freshEmail("uxa.landing");
@@ -64,6 +72,13 @@ export const journeys: Journey[] = [
       await auditVariants(ctx, page, findings, "signin-signup", VARIANTS, { fullPage: true });
       await page.getByRole("button", { name: "Create account" }).click();
       await page.waitForURL(`${env.site}/`, { timeout: 30_000 });
+
+      // The old developer addresses: a 307 to the developer site, the app and tab kept (renamed tabs land on theirs).
+      for (const [from, to] of [["/developer", "/"], ["/developer/briefcase", "/apps/briefcase"], ["/developer/briefcase/branding?x=1", "/apps/briefcase/branding?x=1"]] as const) {
+        const answer = await fetch(`${env.site}${from}`, { redirect: "manual" });
+        const location = answer.headers.get("location") ?? "";
+        results.check(`${from}: answers 307 to the developer site (${to})`, answer.status === 307 && location.replace(/\/+$/, "") === `${env.developer}${to}`.replace(/\/+$/, ""), `${answer.status} → ${location}`);
+      }
 
       // The not-found page and a hosted link that cannot start.
       const missing = await page.goto(`${env.site}/no-such-page`);

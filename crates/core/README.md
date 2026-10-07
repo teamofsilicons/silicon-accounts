@@ -422,7 +422,8 @@ use it for you.
 - `remove_access(&mut conn, app_id, uuid, actor)` → `AccessRemoved` (membership `access_removed`,
   the app's families revoked, OBO proofs that app issued about the account revoked with
   `proof.revoked` audit rows). Then `events::membership_access_removed`.
-- `webhook_targets(&mut conn, uuid)` — live members (active/imported) of active apps with a webhook.
+- `webhook_targets(&mut conn, uuid)` — live members (active/imported) of apps with a webhook, disabled apps
+  included (the worker holds their deliveries until the app is re-enabled).
 
 ## repo::tokens — grants
 

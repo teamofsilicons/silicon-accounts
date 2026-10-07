@@ -78,12 +78,16 @@ phone, so those are never shared.
 ```sh
 accounts webhook set https://scout.example/hooks/accounts   # prints the whsec_ secret once
 accounts webhook test
+accounts webhook deliveries --status failed                 # what did not arrive
+accounts webhook replay --failed                            # send it again
 ```
 
 Events: `silicon.created`, `silicon.custodian.accepted|declined|expired`,
 `silicon.updated`, `silicon.id_changed`, `silicon.stk_rotated`,
 `silicon.custodian.changed`, `ping`. Verify signatures as described in
-`accounts docs webhooks`.
+`accounts docs webhooks`. Deliveries are retried for 72 hours; when your endpoint was
+down longer, replay the failed ones (same event ids, so your dedupe still works). Your
+custodian can do the same with `accounts silicon webhook deliveries|replay <si:id>`.
 
 ## When your STK is rotated
 

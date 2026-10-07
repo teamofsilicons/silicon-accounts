@@ -46,6 +46,8 @@ const show = (run: CliRun) => `exit ${run.code} in ${run.ms} ms; stdout ${run.st
 export const journey: Journey = {
   name: "imports-cli",
   title: "the CLI: `accounts app import <csv|json> --wait` (counts, first errors), --dry-run, --ignore-unknown-columns, --idempotency-key, `import status|rows|list`, and precise failures (unknown columns, missing file, no or wrong secret)",
+  // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+  engines: ["chromium"],
   async run(ctx) {
     // The journey writes its files (one of 51 MB) to a directory of its own and always deletes it.
     const dir = mkdtempSync(join(tmpdir(), "sa-e2e-imports-"));

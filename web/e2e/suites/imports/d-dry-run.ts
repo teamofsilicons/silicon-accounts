@@ -34,6 +34,8 @@ import {
 export const journey: Journey = {
   name: "imports-dry-run",
   title: "dry run of dirty.csv: expected.json's outcomes, matched accounts not named, nothing written (accounts, addresses, memberships, ids), nothing sent; the real import afterwards creates exactly what the dry run announced",
+  // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     const crm = fakeApp("legacy-crm");

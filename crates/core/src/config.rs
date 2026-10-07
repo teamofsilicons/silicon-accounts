@@ -668,13 +668,20 @@ impl Settings {
             ),
             None => {}
         }
-        if let Err(e) = decode_key32(s.token_pepper.expose_secret()) {
-            r.problem("ACCOUNTS_TOKEN_PEPPER", e);
-        } else if prod && pepper_given && s.token_pepper.expose_secret() == DEV_TOKEN_PEPPER {
-            r.problem(
-                "ACCOUNTS_TOKEN_PEPPER",
-                "is the DEV ONLY value from .env.example; generate a new secret for production",
-            );
+        // Compared as decoded bytes: padded base64url and standard base64 spell the same key.
+        match decode_key32(s.token_pepper.expose_secret()) {
+            Err(e) => r.problem("ACCOUNTS_TOKEN_PEPPER", e),
+            Ok(pepper)
+                if prod
+                    && pepper_given
+                    && decode_key32(DEV_TOKEN_PEPPER).is_ok_and(|dev| dev == pepper) =>
+            {
+                r.problem(
+                    "ACCOUNTS_TOKEN_PEPPER",
+                    "is the DEV ONLY value from .env.example; generate a new secret for production",
+                )
+            }
+            Ok(_) => {}
         }
 
         let keyring_given = r.raw("ACCOUNTS_ENCRYPTION_KEYRING").is_some();
@@ -1151,6 +1158,35 @@ mod tests {
         assert!(vars.contains(&"ACCOUNTS_TOKEN_PEPPER"));
         assert!(vars.contains(&"ACCOUNTS_ENCRYPTION_KEYRING"));
         assert!(vars.contains(&"ACCOUNTS_JWT_PRIVATE_KEY"));
+    }
+
+    #[test]
+    fn production_refuses_every_spelling_of_the_dev_pepper() {
+        let padded = format!("{DEV_TOKEN_PEPPER}=");
+        let standard = padded.replace('-', "+").replace('_', "/");
+        assert_ne!(standard, padded, "the dev pepper has - or _ to respell");
+        for spelling in [
+            padded.as_str(),
+            standard.as_str(),
+            &format!(" {DEV_TOKEN_PEPPER} "),
+        ] {
+            assert_eq!(
+                decode_key32(spelling).ok(),
+                decode_key32(DEV_TOKEN_PEPPER).ok(),
+                "{spelling} is the same key"
+            );
+            let err = Settings::from_lookup(lookup(&[
+                ("ACCOUNTS_ENVIRONMENT", "production"),
+                ("ACCOUNTS_TOKEN_PEPPER", spelling),
+            ]))
+            .expect_err("must refuse");
+            assert!(
+                err.problems
+                    .iter()
+                    .any(|p| p.var == "ACCOUNTS_TOKEN_PEPPER" && p.message.contains("DEV ONLY")),
+                "{spelling}: {err}"
+            );
+        }
     }
 
     #[test]

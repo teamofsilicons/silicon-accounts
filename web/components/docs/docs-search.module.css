@@ -38,10 +38,12 @@
   font-size: var(--text-xs);
 }
 @media (min-width: 1024px) { .trigger { width: 240px; } .triggerLabel { flex: 1; text-align: left; } }
-/* Phones: the icon alone, as a square-ish button. */
+/* Phones: the icon alone, as a square-ish button. The label stays in the page, visually hidden, so the button keeps
+   its name ("Search the docs"); the key hint goes. */
 @media (max-width: 639px) {
   .trigger { --sq-r: 12px; width: 38px; justify-content: center; padding: 0; }
-  .triggerLabel, .triggerKey { display: none; }
+  .triggerLabel { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .triggerKey { display: none; }
 }
 
 .overlay { position: fixed; inset: 0; z-index: 70; background: var(--overlay); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
@@ -72,14 +74,18 @@
 .input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-base); -webkit-appearance: none; appearance: none; }
 .input::placeholder { color: var(--text-muted); }
 .input::-webkit-search-cancel-button { display: none; }
+/* Clear (×) and Esc: squircles like the trigger's key, painted through --sq-fill / --sq-stroke so the fallback follows
+   hover and focus. */
 .clear, .close {
+  --sq-r: 8px;
+  --sq-fill: transparent;
+  --sq-stroke: transparent;
   display: grid;
   height: 26px;
   flex: none;
   place-items: center;
   border: 0;
-  border-radius: 7px;
-  background: transparent;
+  background: var(--sq-fill);
   color: var(--text-muted);
   font: inherit;
   font-size: var(--text-xs);
@@ -87,30 +93,34 @@
   cursor: pointer;
 }
 .clear { width: 26px; }
-.close { min-width: 34px; padding: 0 7px; border: 1px solid var(--border-subtle); }
-.clear:focus-visible, .close:focus-visible { outline: none; background: var(--surface-muted); color: var(--foreground); }
-@media (hover: hover) and (pointer: fine) { .clear:hover, .close:hover { background: var(--surface-muted); color: var(--foreground); } }
+.close { --sq-stroke: var(--border-subtle); min-width: 34px; padding: 0 7px; border: 1px solid var(--sq-stroke); }
+.clear:focus-visible, .close:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
+@media (hover: hover) and (pointer: fine) { .clear:hover, .close:hover { --sq-fill: var(--surface-muted); color: var(--foreground); } }
 
 .status { flex: none; padding: 10px 18px 4px; color: var(--text-muted); font-size: var(--text-xs); font-weight: 500; }
 
 .results { min-height: 0; flex: 1 1 auto; margin: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 8px; list-style: none; }
+/* A row is a squircle (the same radius as the docs navigation's rows); only the highlighted one is filled. */
 .result {
+  --sq-r: 10px;
+  --sq-fill: transparent;
+  --sq-stroke: transparent;
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: start;
   gap: 2px 12px;
   padding: 9px 10px;
-  border-radius: 12px;
+  background: var(--sq-fill);
   color: var(--foreground);
   cursor: pointer;
 }
-.result[data-active] { background: var(--surface-muted); }
+.result[data-active] { --sq-fill: var(--surface-muted); }
 .resultIcon { display: grid; height: 20px; place-items: center; color: var(--text-muted); }
 .result[data-active] .resultIcon { color: var(--accent-ink); }
 .resultText { display: grid; min-width: 0; gap: 2px; }
 .resultTitle { overflow: hidden; font-size: var(--text-sm); font-weight: 500; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
 .resultSnippet { display: -webkit-box; overflow: hidden; color: var(--text-secondary); font-size: .8125rem; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
-.resultSnippet mark { border-radius: 3px; background: color-mix(in oklab, var(--accent) 20%, transparent); color: var(--foreground); }
+.resultSnippet mark { --sq-r: 3px; background: color-mix(in oklab, var(--accent) 20%, transparent); color: var(--foreground); }
 .resultPage { color: var(--text-muted); }
 .resultGroup { padding-top: 2px; color: var(--text-muted); font-size: var(--text-xs); line-height: 18px; white-space: nowrap; }
 
@@ -135,7 +145,7 @@
 
 .footer { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 10px 16px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: var(--text-xs); }
 .footer span { display: inline-flex; align-items: center; gap: 4px; }
-.footer kbd { display: inline-grid; min-width: 20px; height: 20px; place-items: center; padding: 0 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-muted); font-family: var(--font-body); font-size: 11px; }
+.footer kbd { --sq-r: 6px; --sq-fill: var(--surface-muted); --sq-stroke: var(--border); display: inline-grid; min-width: 20px; height: 20px; place-items: center; padding: 0 4px; border: 1px solid var(--sq-stroke); background: var(--sq-fill); font-family: var(--font-body); font-size: 11px; }
 .footerNote { margin-left: auto; }
 
 @keyframes fade-in { from { opacity: 0; } }

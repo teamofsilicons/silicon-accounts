@@ -95,7 +95,7 @@ fn unauthenticated() -> ApiError {
         "unauthenticated",
         "This endpoint needs a signed-in account: send the account site's session cookie, or an Authorization: Bearer access token issued to the accounts app.",
     )
-    .hint("Carbons: run `accounts login`. Silicons: run `accounts login --silicon si:<handle> --stk <stk>`.")
+    .hint("Carbons: run `accounts login`. Silicons: run `accounts login --silicon si:<handle> --stk-stdin` (or set ACCOUNTS_SILICON and ACCOUNTS_STK).")
 }
 
 /// Read-only identity routes a developer platform token may use (method GET or HEAD). The
@@ -130,7 +130,7 @@ fn wrong_audience(parts: &Parts, aud: &str, developer_allowed: bool) -> ApiError
                 parts.method
             ),
         )
-        .hint("Use a token issued to 'accounts' for this: sign in with `accounts login` (Carbons) or `accounts login --silicon si:… --stk …` (Silicons), or use the account site.")
+        .hint("Use a token issued to 'accounts' for this: sign in with `accounts login` (Carbons) or `accounts login --silicon si:<handle> --stk-stdin` (Silicons), or use the account site.")
         .detail("aud", aud.to_string());
     }
     let expected = if developer_allowed {
@@ -146,7 +146,7 @@ fn wrong_audience(parts: &Parts, aud: &str, developer_allowed: bool) -> ApiError
         "token_wrong_audience",
         format!("This access token was issued to the app '{aud}', but this endpoint needs a token issued to {expected}."),
     )
-    .hint("Use a first-party token: sign in with `accounts login` (Carbons) or `accounts login --silicon si:… --stk …` (Silicons).")
+    .hint("Use a first-party token: sign in with `accounts login` (Carbons) or `accounts login --silicon si:<handle> --stk-stdin` (Silicons).")
     .detail("aud", aud.to_string())
 }
 

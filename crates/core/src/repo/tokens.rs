@@ -597,7 +597,7 @@ pub async fn verify_access_token(
             format!("This access token was issued to the app '{got}', but this endpoint needs a token issued to '{expected}'."),
         )
         .hint(if expected == crate::FIRST_PARTY_APP_ID {
-            "Use a first-party token: sign in with `accounts login` (Carbons) or `accounts login --silicon si:… --stk …` (Silicons)."
+            "Use a first-party token: sign in with `accounts login` (Carbons) or `accounts login --silicon si:<handle> --stk-stdin` (Silicons)."
                 .to_string()
         } else {
             format!("Use a token that '{expected}' obtained for itself.")

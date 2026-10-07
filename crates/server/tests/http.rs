@@ -1427,3 +1427,74 @@ async fn time_budgets_follow_the_route_class() {
     assert_eq!(sync_ok, 200, "app sync gets the upload budget");
     assert_eq!(import_ok, 200, "imports get the import budget");
 }
+
+/// With ACCOUNTS_DELIVERY=providers a code message is stored with the code redacted; the dev
+/// outbox opens its sealed copy, so it still shows the code once the message is sent.
+#[tokio::test]
+async fn dev_outbox_shows_sealed_codes_after_sending() {
+    use accounts_core::config::DeliveryMode;
+    use accounts_core::models::{OtpChannel, OtpPurpose};
+    use accounts_core::repo::otp::{self, NewChallenge};
+
+    let mut settings = Settings::for_tests();
+    settings.delivery = DeliveryMode::Providers;
+    let ctx = TestContext::with_settings(settings).await;
+    assert!(ctx.state.settings.dev_outbox_enabled());
+    let (id, code) = {
+        let mut conn = ctx.conn().await;
+        let created = otp::send(
+            &mut conn,
+            &ctx.state.keys.pepper,
+            &ctx.state.settings,
+            &NewChallenge {
+                purpose: OtpPurpose::Signin,
+                channel: OtpChannel::Email,
+                destination: "sealed@example.test",
+                account_uuid: None,
+                flow_id: Some("flow-1"),
+                ip: None,
+            },
+        )
+        .await
+        .expect("challenge");
+        let id = delivery::enqueue_otp(
+            &mut conn,
+            &ctx.state.settings,
+            &created.challenge,
+            &created.code,
+            None,
+        )
+        .await
+        .expect("enqueue");
+        (id, created.code)
+    };
+    assert!(matches!(
+        delivery::deliver_now(&ctx.state, id)
+            .await
+            .expect("deliver"),
+        delivery::DeliveryOutcome::Sent { .. }
+    ));
+    let (text, subject): (String, Option<String>) =
+        sqlx::query_as("select text_body, subject from outbound_messages where id = $1")
+            .bind(id)
+            .fetch_one(&mut *ctx.conn().await)
+            .await
+            .expect("row");
+    assert!(!text.contains(&code) && !subject.unwrap_or_default().contains(&code));
+
+    let r = send(&ctx, Req::get("/v1/dev/outbox?to=sealed%40example.test")).await;
+    assert_eq!(r.status, 200, "{:?}", r.json);
+    let item = &r.json["items"][0];
+    assert_eq!(item["status"], "sent");
+    assert_eq!(item["code"], code.as_str());
+    assert!(
+        item["text_body"]
+            .as_str()
+            .is_some_and(|t| t.contains(&code))
+    );
+    assert!(
+        item["subject"]
+            .as_str()
+            .is_some_and(|t| t.starts_with(&code))
+    );
+}

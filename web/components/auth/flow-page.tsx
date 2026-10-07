@@ -21,9 +21,9 @@ import type { ApiError } from "@/lib/api/errors";
 import { paths } from "@/lib/navigation";
 import { useFlowController } from "./flow/controller";
 import { carbonError } from "./flow/errors";
-import { useHydrated } from "./flow/hooks";
+import { useHydrated, useTabTitle } from "./flow/hooks";
 import { HostedFrame } from "./flow/hosted-frame";
-import { appHome, appTitle, authorizeQueryOf, heroCopy, isProvider, lookOfFlow, type FrameApp, type HostedFlow } from "./flow/model";
+import { appHome, appTitle, authorizeQueryOf, heroCopy, lookOfFlow, openingProvider, type FrameApp, type HostedFlow } from "./flow/model";
 import { StepMorph } from "./flow/morph";
 import { ArrivalContext } from "./flow/parts";
 import { LoadingCard, Problem } from "./flow/problem";
@@ -38,16 +38,6 @@ import styles from "./flow/flow.module.css";
 
 /** Views in their usual order (sub-views sort just after their step) for the direction of the morph. */
 const VIEW_ORDER = ["loading", "opening", "choose_method", "verify_code", "signup", "details", "review", "complete", "failed"] as const;
-
-/**
- * The provider whose Opening page this flow starts on: the app's own "Continue with Google/Apple" (method=google|apple)
- * on a flow that has not moved yet. A flow that came back from the provider with an error shows the methods instead.
- */
-function openingProvider(flow: HostedFlow): "google" | "apple" | null {
-  const hint = flow.method_hint;
-  if (flow.step !== "choose_method" || !hint || !isProvider(hint) || !flow.methods.includes(hint) || flow.error) return null;
-  return hint;
-}
 
 export function Flow({ id }: { id: string }) {
   const hydrated = useHydrated();
@@ -98,11 +88,10 @@ function FlowPage({ id }: { id: string }) {
     return () => window.removeEventListener("pageshow", onShow);
   }, []);
 
-  // The tab says where the Carbon is signing in.
+  // The tab says where the Carbon is signing in (also over the route's own "Sign in", which Next applies after a
+  // client navigation from /authorize, once this page has already set the tab).
   const tabTitle = flow ? appTitle(flow) : ctl.failure ? "Sign-in problem" : "Signing in";
-  useEffect(() => {
-    document.title = `${tabTitle} · Silicon Accounts`;
-  }, [tabTitle]);
+  useTabTitle(`${tabTitle} · Silicon Accounts`);
 
   const restart = () => {
     const query = authorizeQueryOf(id);

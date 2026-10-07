@@ -1,14 +1,18 @@
 /**
- * The app owner's Webhooks tab on the account site (/developer/<app>/webhooks), in the browser: the endpoint and the
- * event list, "Send test ping" (the fake app receives it), a delivery that failed for good (the fake app fails, time
- * travel ends its 72 hours) opened in the drawer with its attempts and payload and replayed from there (same event_id),
- * "Replay all failed", and "Rotate secret" (the new secret is shown once; the fake app is given that value and verifies
- * the next ping with it). The app is ledgerly, whose owner is the seeded c:ledgerly-dev.
+ * The app owner's Webhooks tab on the developer site (developer.teamofsilicons.com: /apps/<app>/webhooks, UNDERSTANDING.md
+ * v2: "set up the app's webhook, and see and replay its deliveries"), in the browser: the owner signs in through the
+ * developer site's BFF (the account site's hosted sign-in as the first-party app `developer`); the account site's old
+ * address of the tab (/developer/<app>/webhooks) lands there; the endpoint and the event list, "Send test ping" (the fake
+ * app receives it), a delivery that failed for good (the fake app fails, time travel ends its 72 hours) opened in the
+ * drawer with its attempts and payload and replayed from there (same event_id), "Replay all failed", and "Rotate secret"
+ * (the new secret is shown once; the fake app is given that value and verifies the next ping with it). Every call the
+ * page makes goes through the BFF (/api/accounts/…), never to the API with a token in the browser. The app is ledgerly,
+ * whose owner is the seeded c:ledgerly-dev.
  */
 import type { Locator, Page } from "@playwright/test";
 import type { Journey } from "../../context";
-import { newContext, shot, signInOnSite, sleep } from "../../lib";
-import { ageDelivery, drainApp, fakeApp, getDelivery, inboxEvents, inboxUrl, setFaults, setInboxSecret, short, sqlRows, waitAttempts, waitDelivery, waitEvent } from "./_helpers";
+import { DEVELOPER_SIGNED_OUT, newContext, shot, signInOnDeveloper, sleep } from "../../lib";
+import { ageDelivery, drainApp, fakeApp, inboxEvents, inboxUrl, setFaults, setInboxSecret, short, sqlRows, waitAttempts, waitDelivery, waitEvent } from "./_helpers";
 
 const APP = "ledgerly";
 const EVENT_TYPES = ["account.id_changed", "account.updated", "account.deleted", "membership.signed_out", "membership.access_removed", "silicon.custodian_changed", "ping"];
@@ -40,7 +44,7 @@ async function settledText(locator: Locator, settled: (text: string) => boolean,
 
 export const journey: Journey = {
   name: "webhooks-developer-ui",
-  title: "the owner's Webhooks tab in the browser: endpoint and events, Send test ping, a failed delivery's attempts and payload in the drawer, Replay this delivery, Replay all failed, Rotate secret (shown once, then in use)",
+  title: "the owner's Webhooks tab on the developer site (signed in through its BFF; the account site's old address lands there): endpoint and events, Send test ping, a failed delivery's attempts and payload in the drawer, Replay this delivery, Replay all failed, Rotate secret (shown once, then in use)",
   timeoutMs: 6 * 60_000,
   async run(ctx) {
     const { env, results, browser } = ctx;
@@ -48,12 +52,47 @@ export const journey: Journey = {
     results.check(`setup: ${APP} has no pending delivery`, pending === 0, `${pending} pending`);
     const context = await newContext(browser);
     const page: Page = await context.newPage();
-    results.watch(page, "dev-webhooks");
+    results.watch(page, "dev-webhooks", [DEVELOPER_SIGNED_OUT]);
+    // Once signed in, the developer site's pages reach Silicon Accounts only through its BFF (/api/accounts/…): no request
+    // from the browser to any /v1/ address (the hosted sign-in before that is the account site's own page).
+    let recording = false;
+    const direct: string[] = [];
+    let viaBff = 0;
+    page.on("request", request => {
+      if (!recording) return;
+      const url = new URL(request.url());
+      if (url.origin === env.developer && url.pathname.startsWith("/api/accounts/")) viaBff += 1;
+      else if (url.pathname.startsWith("/v1/") || request.url().startsWith(env.api)) direct.push(`${request.method()} ${request.url()}`);
+    });
     try {
-      await signInOnSite(env, page, fakeApp(APP).owner_email);
-      await page.goto(`${env.site}/developer/${APP}/webhooks`);
+      const signInStarted = Date.now();
+      await signInOnDeveloper(env, page, fakeApp(APP).owner_email, { returnTo: `/apps/${APP}/webhooks` });
+      results.metric("owner signs in to the developer site (BFF)", Date.now() - signInStarted, "ms");
+      recording = true;
       const tab = page.getByRole("tabpanel", { name: "Webhooks" });
       await tab.getByRole("button", { name: "Send test ping" }).waitFor({ timeout: 30_000 });
+      results.check("signed in through the BFF, the owner lands on the developer site's Webhooks tab", page.url() === `${env.developer}/apps/${APP}/webhooks`, page.url());
+      // The account site's old address of this tab redirects to it (UNDERSTANDING.md v2: building apps lives on the developer site).
+      const old = await page.request.get(`${env.site}/developer/${APP}/webhooks`, { maxRedirects: 0 });
+      results.check("the account site's old /developer/<app>/webhooks answers a redirect to the developer site's Webhooks tab", [301, 302, 303, 307, 308].includes(old.status()) && old.headers().location === `${env.developer}/apps/${APP}/webhooks`, `${old.status()} → ${old.headers().location ?? "no Location"}`);
+      await page.goto(`${env.site}/developer/${APP}/webhooks`);
+      await tab.getByRole("button", { name: "Send test ping" }).waitFor({ timeout: 30_000 });
+      results.check("…and following it in the browser opens the tab, still signed in", page.url() === `${env.developer}/apps/${APP}/webhooks`, page.url());
+
+      // ---- the BFF's CSRF guard on the webhook's state-changing calls ----------------------------------------------------
+      // The browser's cookie rides along on a cross-site request; the developer site refuses it before it reaches the API.
+      const secretOf = async () => (await sqlRows<{ s: string }>(env, `select md5(coalesce(webhook_secret_enc::text, '')) as s from app_signin_configs where app_id = '${APP}'`))[0]?.s ?? "";
+      const pingsOf = async () => (await sqlRows<{ n: number }>(env, `select count(*)::int as n from webhook_events where target_id = '${APP}' and type = 'ping'`))[0]?.n ?? 0;
+      const [secretBefore, pingsBefore] = [await secretOf(), await pingsOf()];
+      const crossPing = await page.request.post(`${env.developer}/api/accounts/apps/${APP}/webhook/test`, { headers: { origin: "https://evil.example" } });
+      const crossRotate = await page.request.post(`${env.developer}/api/accounts/apps/${APP}/webhook/rotate-secret`, { headers: { origin: "https://evil.example" } });
+      const crossReplay = await page.request.post(`${env.developer}/api/accounts/apps/${APP}/webhook/replay`, { headers: { origin: "https://evil.example", "content-type": "application/json" }, data: JSON.stringify({ status: "failed" }) });
+      const codes = await Promise.all([crossPing, crossRotate, crossReplay].map(async answer => `${answer.status()} ${((await answer.json().catch(() => ({}))) as { error?: { code?: string } }).error?.code ?? ""}`));
+      results.check(
+        "the developer site's BFF refuses a cross-site test ping, secret rotation or replay carrying the owner's cookie (403 cross_site_request), and nothing reaches the API (no ping stored, the secret unchanged)",
+        codes.every(code => code === "403 cross_site_request") && (await pingsOf()) === pingsBefore && (await secretOf()) === secretBefore,
+        `${codes.join(" | ")}; pings ${pingsBefore} → ${await pingsOf()}`,
+      );
       results.check("the tab shows the app's webhook URL and that a whsec_ secret signs it (never the secret)", await tab.getByText(inboxUrl(env, APP), { exact: true }).isVisible() && await tab.getByText(/Signed with a whsec_ secret/).isVisible() && !/whsec_[A-Za-z0-9_-]{20}/.test(await tab.innerText()), inboxUrl(env, APP));
       await tab.getByRole("button", { name: "Events" }).click();
       await sleep(500);
@@ -162,7 +201,8 @@ export const journey: Journey = {
       const signedNew = await waitEvent(env, APP, { type: "ping", after: seq });
       results.check("after rotating, the next ping verifies with exactly the secret the page showed", !!signedNew && (await inboxEvents(env, APP, { after: seq })).rejected?.filter(entry => entry.seq > seq).length === 0, signedNew?.event_id ?? "refused or missing");
       const last = signedNew ? await sqlRows<{ id: string }>(env, `select id::text from webhook_deliveries where event_id = '${signedNew.event_id}'`) : [];
-      if (last[0]) results.check("…and the delivery is recorded delivered", (await getDelivery(env, APP, last[0].id)).status === "delivered");
+      if (last[0]) results.check("…and the delivery is recorded delivered", !!(await waitDelivery(env, APP, last[0].id, d => d.status === "delivered")));
+      results.check("signed in, the developer site's pages reached Silicon Accounts only through its BFF (/api/accounts/…), never /v1 from the browser", direct.length === 0 && viaBff > 0, `${viaBff} BFF calls; direct: ${short(direct.slice(0, 6))}`);
     } finally {
       await setFaults(env, APP, 0).catch(() => undefined);
       await context.close();

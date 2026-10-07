@@ -5,9 +5,11 @@
 //! Body: `{"event_id","type","occurred_at","app_id","silicon","data"}` — `app_id` is the target
 //! app for app webhooks, `silicon` the target Silicon's uuid for Silicon webhooks.
 //!
-//! App events go to every app with a *live* membership (`active` or `imported`), an active app
-//! status and a configured webhook URL. Call these helpers inside the same transaction as the
-//! change so events exist exactly when the change commits.
+//! App events go to every app with a *live* membership (`active` or `imported`) and a configured
+//! webhook URL. A disabled app gets its events too: the worker holds their deliveries until the
+//! app is re-enabled (or the delivery window ends, after which they can be replayed), so the app
+//! never misses a change made while it was disabled. Call these helpers inside the same
+//! transaction as the change so events exist exactly when the change commits.
 
 use serde_json::{Value, json};
 use sqlx::PgConnection;
@@ -269,7 +271,9 @@ pub async fn silicon_id_changed(
     .await
 }
 
-/// Both id-change notifications (apps, and the Silicon itself when it is one).
+/// Every id-change notification: `account.id_changed` to the account's member apps, plus
+/// `silicon.id_changed` to a Silicon's own webhook, or for a Carbon,
+/// [`custodian_id_changed`] for the Silicons it is custodian of.
 pub async fn notify_id_changed(
     conn: &mut PgConnection,
     account: &Account,
@@ -277,8 +281,35 @@ pub async fn notify_id_changed(
     new_id: &str,
 ) -> ApiResult<Vec<EmittedEvent>> {
     let mut out = account_id_changed(conn, account, old_id, new_id).await?;
-    if account.kind == AccountKind::Silicon {
-        out.extend(silicon_id_changed(conn, account, old_id, new_id).await?);
+    match account.kind {
+        AccountKind::Silicon => {
+            out.extend(silicon_id_changed(conn, account, old_id, new_id).await?);
+        }
+        AccountKind::Carbon => out.extend(custodian_id_changed(conn, &account.uuid).await?),
+    }
+    Ok(out)
+}
+
+/// A Carbon's c:id changed. Apps see a Silicon's custodian as `{uuid, id}` (token responses,
+/// lookups, `account.updated`), so each live Silicon this Carbon is custodian of gets its
+/// version bumped and `account.updated` with `changed: ["custodian"]` to its member apps (and
+/// `silicon.updated` to its own webhook), carrying the custodian's new c:id. Call it after the
+/// id change, in the same transaction.
+pub async fn custodian_id_changed(
+    conn: &mut PgConnection,
+    carbon_uuid: &str,
+) -> ApiResult<Vec<EmittedEvent>> {
+    let silicons: Vec<String> = sqlx::query_scalar(
+        "select uuid from accounts where kind = 'silicon' and custodian_uuid = $1 \
+         and status <> 'deleted' order by uuid",
+    )
+    .bind(carbon_uuid)
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut out = Vec::new();
+    for uuid in silicons {
+        let silicon = crate::repo::accounts::bump_version(conn, &uuid).await?;
+        out.extend(notify_profile_updated(conn, &silicon, &[AccountField::Custodian]).await?);
     }
     Ok(out)
 }

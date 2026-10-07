@@ -26,6 +26,13 @@ const identityCard: Journey = {
     const account = await signIntoApp(env, page, "briefcase");
     results.check("setup: the Carbon signed into Briefcase", account?.uuid === carbon.uuid, JSON.stringify(account).slice(0, 160));
     const me = await getMe(probe);
+    // What the sign-up page filled in (UNDERSTANDING.md "Sign up"): the c:id and the name from the email, the date of
+    // birth exactly 18 years before the day of sign-up (the Carbon's own today), the default photo from Iris.
+    const local = carbon.email.split("@")[0] ?? "";
+    const signupDay = new Intl.DateTimeFormat("en-CA", { timeZone: me.timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(me.created_at));
+    const eighteen = `${Number(signupDay.slice(0, 4)) - 18}${signupDay.slice(4)}`;
+    const tagPart = local.split(".").pop() ?? "";
+    results.check("the sign-up defaults: the c:id and display name from the email, the date of birth exactly 18 years before sign-up", me.id === `c:${local.replace(/\./g, "-")}` && me.display_name.toLowerCase().includes(tagPart.toLowerCase()) && (me.dob === eighteen || (eighteen.endsWith("-02-29") && me.dob === eighteen.replace("-02-29", "-02-28"))), `${carbon.email} → ${me.id}, "${me.display_name}", dob ${me.dob} (signed up ${signupDay}, want ${eighteen})`);
 
     const started = Date.now();
     await page.goto(`${env.site}/`);

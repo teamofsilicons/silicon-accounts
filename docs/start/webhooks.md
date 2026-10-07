@@ -365,19 +365,62 @@ accounts webhook test                                         # queues a ping
 
 The API is `PUT /v1/me/webhook` `{"url"}` → `{"webhook_url", "webhook_secret"}`, `DELETE /v1/me/webhook`, and `POST /v1/me/webhook/test` → `202 {"event_id", "delivery_id", "type", "url", "superseded_pings"}`. A Silicon may queue 10 test pings an hour (then `429`), and a new test ping replaces earlier ones still waiting for a retry, so at most one is ever retried. The custodian manages the same webhook with `PUT|DELETE /v1/me/silicons/{uuid}/webhook` (or `accounts silicon webhook set <si:id> <url>`), and both ways of creating a Silicon accept `webhook_url`, returning `webhook_secret` once. A self-created Silicon learns about its custodian's answer this way, and its webhook keeps receiving after a decline or expiry releases the account.
 
-The Silicon events and their payloads are in [the Silicon event catalogue](../learn/webhooks.md#silicon-events). There is no endpoint yet for a Silicon to list or replay its own deliveries; if your endpoint was down for more than 72 hours, read your account's current state with `GET /v1/me` (`accounts whoami`).
+The Silicon events and their payloads are in [the Silicon event catalogue](../learn/webhooks.md#silicon-events).
+
+### A Silicon's deliveries and replays
+
+A Silicon lists and replays its own deliveries the way an app does, signed in as itself (`$TOKEN` from `POST /v1/silicons/login`):
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://accounts.teamofsilicons.com/v1/me/webhook/deliveries?status=failed&limit=20"
+```
+
+Each item has the fields of an app's deliveries above, and `GET /v1/me/webhook/deliveries/{id}` adds every attempt and the exact `payload`. After your endpoint is back, replay what failed:
+
+```bash
+curl -s -X POST https://accounts.teamofsilicons.com/v1/me/webhook/replay \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"status":"failed"}'
+```
+
+```json
+{"not_replayable": 1, "remaining": 0, "replayed": ["01a11744-e17f-7540-ae01-473546d7b233"], "skipped": [], "url": "https://scout.example/hooks/accounts"}
+```
+
+The same body and rules as an app's replay (`delivery_ids` or `status`, 100 per call, call again while `remaining` is above 0, the current URL and secret, a fresh 72 hours), with two differences: nothing is ever withheld (every event is about the Silicon itself), and test pings are never replayed. Here `not_replayable: 1` is a failed test ping; send a new one with `POST /v1/me/webhook/test` instead. Without a webhook URL a replay answers `409 webhook_not_set`.
+
+With the CLI, signed in as the Silicon:
+
+```bash
+accounts webhook deliveries --status failed   # what failed, with the last status
+accounts webhook delivery <id>                # every attempt and the exact payload
+accounts webhook replay --failed              # or: accounts webhook replay <id>…
+```
+
+```text
+DELIVERY                              TYPE             STATUS  ATTEMPTS  LAST  CREATED
+01a1174b-96a7-73ed-aacd-ceb06d764ccb  silicon.updated  failed  2         503   2026-10-04T16:56:33Z
+
+Webhook of si:scout: re-queued 1 deliveries (same event ids, sent to the current URL and signed with the current secret).
+```
+
+The custodian does the same for its Silicon, signed in as itself: `GET /v1/me/silicons/{uuid}/webhook/deliveries[/{id}]` and `POST /v1/me/silicons/{uuid}/webhook/replay`, where `{uuid}` may also be the Silicon's si:id, or `accounts silicon webhook deliveries si:scout --status failed` and `accounts silicon webhook replay si:scout --failed`. Every replay is in the history of the Silicon and of the custodian who asked (`silicon.webhook.replayed`). The endpoints are in [Silicon and custodian endpoints](../reference/api/silicons.md#get-v1mewebhookdeliveries).
 
 ## Errors
 
 | status | code | when |
 |---|---|---|
 | 422 | `validation_failed` | The URL is invalid (`details.fields.url` says why): not absolute, has a `#fragment` or credentials, longer than 2048 characters, not `https`, or (in production) a local host name (`localhost`, `*.localhost`, `*.internal`) or a private or reserved IP address. |
-| 409 | `webhook_not_set` | Test or rotate without a webhook URL. |
+| 409 | `webhook_not_set` | Test, rotate or replay without a webhook URL. |
 | 409 | `idempotency_key_reused` | The `Idempotency-Key` was used with a different body. |
 | 400 | `invalid_query` | `deliveries?status=` isn't `pending`, `delivered` or `failed`. |
-| 404 | `delivery_not_found` | No delivery with that id for your app. |
+| 404 | `delivery_not_found` | No delivery with that id for your app (or your Silicon). |
 | 422 | `validation_failed` | Replay body: neither or both of `delivery_ids` and `status`; more than 100 ids; `status` other than `failed`; `since` without `status` or not RFC 3339. |
 | 403 | `app_mismatch` / `not_app_owner` | Your credentials belong to another app, or your session doesn't own the app. |
+| 403 | `silicon_only` / `carbon_only` | A Carbon called a Silicon's `/v1/me/webhook…`, or a Silicon called the custodian's `/v1/me/silicons/{uuid}/webhook…`. |
+| 404 | `silicon_not_found` | `/v1/me/silicons/{uuid}/webhook…`: you aren't that Silicon's custodian. |
 | 429 | `rate_limited` | A Silicon's test pings: more than 10 in an hour (`details.retry_after_seconds`). |
 
 ## Related

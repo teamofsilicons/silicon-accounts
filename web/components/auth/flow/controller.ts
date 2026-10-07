@@ -9,8 +9,8 @@
  * here instead:
  *   - fatal ones (the flow expired, ended, or belongs to another browser): the page shows a full problem page;
  *   - ones after which the server moved the flow on its own (a sign-up that ran out, a domain the app refuses, a
- *     detail that went missing or was added elsewhere): the flow is read again, and the error stays visible on the
- *     step it moved to.
+ *     detail that went missing or was added elsewhere, a page the app renamed): the flow is read again, and the error
+ *     stays visible on the page it moved to (`placeOf`: a step, or one page of the app's flow).
  *
  * Flow failures are never toasts: the Carbon reads them on the card.
  */
@@ -20,7 +20,7 @@ import { api } from "@/lib/api/endpoints";
 import { ApiError } from "@/lib/api/errors";
 import type { ContactField, FlowView, SignupPhoto, SignupSubmit } from "@/lib/api/types";
 import { queryKeys } from "@/lib/query/keys";
-import { rememberLook, type HostedFlow } from "./model";
+import { placeOf, rememberLook, type HostedFlow } from "./model";
 
 /** The flow itself is gone or not ours: nothing on the page can continue it. */
 const FATAL = new Set(["flow_expired", "flow_not_found", "flow_not_bound"]);
@@ -131,12 +131,13 @@ export function useFlowController(id: string): FlowController {
         return error;
       }
       if (RESYNC.has(error.code) && !keep?.has(error.code)) {
-        const before = current()?.step;
+        const before = placeOf(current());
         await reload();
-        // The step moved: keep the reason visible there, unless the flow carries its own. (When the step stayed, the
-        // step that asked shows the error itself.)
+        // The flow moved to another page (another step, or another page of the app's flow on the same step): the page
+        // that asked is gone, so the reason shows on the new one, unless the flow carries its own. (When the page
+        // stayed, the page that asked shows the error itself.)
         const after = current();
-        if (after && after.step !== before && !after.error) setNotice(error);
+        if (after && placeOf(after) !== before && !after.error) setNotice(error);
       }
       return error;
     };

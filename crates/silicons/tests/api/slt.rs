@@ -174,6 +174,21 @@ async fn app_and_auth_errors() {
     assert_eq!(r.status, 422);
     assert_eq!(r.error_code(), Some("first_party_app"));
 
+    // The developer platform is first-party too (a public client): a token for it could never
+    // be exchanged, so none is minted.
+    for developer in ["developer", " Developer "] {
+        let r = slt(&ctx, &t, developer).await;
+        assert_eq!(r.status, 422, "{developer}: {}", r.json);
+        assert_eq!(r.error_code(), Some("first_party_app"));
+        assert!(
+            r.json["error"]["message"]
+                .as_str()
+                .is_some_and(|m| m.contains("'developer'")),
+            "{}",
+            r.json
+        );
+    }
+
     let r = slt(&ctx, &t, "Not An App!").await;
     assert_eq!(r.status, 422);
     assert!(r.json["error"]["details"]["fields"]["app_id"].is_string());

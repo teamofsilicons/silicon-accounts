@@ -51,6 +51,8 @@ async function record(env: Ctx["env"], uuid: string): Promise<{ live: number; fa
 export const journey: Journey = {
   name: "silicons-cli-sign-in-races",
   title: "a sign-in with the right STK while its Silicon ends or its STK is replaced (lined up behind a lock on the Silicon's row, so the change commits while the STK is checked) answers as the Silicon is by then: declined → custodian_declined, its named Carbon gone → custodian_declined, deleted by its custodian → account_deleted, STK rotated → invalid_credentials with nothing issued",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   timeoutMs: 6 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;

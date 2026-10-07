@@ -6,9 +6,10 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 use silicon_accounts_client::{
-    AppClient, AppDetails, DeliveriesQuery, ImportInput, ImportJob, ImportOptions, ImportRowsQuery,
-    IssueAta, IssueObo, MAX_IMPORT_BYTES, PageRequest, ProofRef, ProofVerification, ProofsQuery,
-    ReplayRequest, UsersQuery, WaitEvent, WaitOptions,
+    AppClient, AppDetails, DeliveriesQuery, DeliveryDetail, ImportInput, ImportJob, ImportOptions,
+    ImportRowsQuery, IssueAta, IssueObo, MAX_IMPORT_BYTES, Page, PageRequest, ProofRef,
+    ProofVerification, ProofsQuery, ReplayRequest, ReplayResult, UsersQuery, WaitEvent,
+    WaitOptions, WebhookDelivery,
 };
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
@@ -122,21 +123,57 @@ async fn run_selected(
                         "Example: {\"required_fields\":[\"email\"],\"branding\":{\"radius\":12}}",
                     ));
                 }
+                // The version before the change: when nothing in the patch differs, the service
+                // makes no new version and no history entry, and answers with the app as it is.
+                let before = match expected_version {
+                    Some(version) => version,
+                    None => app.app().await?.config_version,
+                };
                 let key = idempotency_key.unwrap_or_else(util::idempotency_key);
                 let details = app
                     .update_signin_config(&patch, expected_version, Some(&key))
                     .await?;
-                let changed: Vec<String> = patch
-                    .as_object()
-                    .map(|m| m.keys().cloned().collect())
-                    .unwrap_or_default();
+                let mut json = to_json(&details);
+                if details.config_version == before {
+                    json["changed"] = json!(false);
+                    json["changes"] = json!([]);
+                    return Ok(Outcome::new(
+                        json,
+                        format!(
+                            "No change: {} already has these settings (the sign-in setup is still version {}).",
+                            details.app_id, details.config_version
+                        ),
+                    )
+                    .next("accounts app config get", "the full sign-in setup"));
+                }
+                // What changed: the history entry of this version (the paths that differ, not
+                // every key of the patch).
+                let entry = app
+                    .signin_config_history(&PageRequest {
+                        limit: Some(1),
+                        cursor: None,
+                    })
+                    .await
+                    .ok()
+                    .and_then(|page| page.items.into_iter().next())
+                    .filter(|entry| entry.version == details.config_version);
+                let changed = entry
+                    .as_ref()
+                    .map(|entry| summarize_changes(&entry.changes))
+                    .filter(|paths| !paths.is_empty())
+                    .unwrap_or_else(|| {
+                        patch
+                            .as_object()
+                            .map(|m| m.keys().cloned().collect::<Vec<_>>().join(", "))
+                            .unwrap_or_default()
+                    });
+                json["changed"] = json!(true);
+                json["changes"] = entry.map_or(Value::Null, |entry| entry.changes);
                 Ok(Outcome::new(
-                    to_json(&details),
+                    json,
                     format!(
-                        "Updated {} ({}); the sign-in setup is now version {}.",
-                        details.app_id,
-                        changed.join(", "),
-                        details.config_version
+                        "Updated {} ({changed}); the sign-in setup is now version {}.",
+                        details.app_id, details.config_version
                     ),
                 )
                 .next("accounts app config history", "see every change"))
@@ -151,7 +188,11 @@ async fn run_selected(
                     .map(|h| {
                         vec![
                             h.version.to_string(),
-                            h.actor.clone(),
+                            h.actor_account
+                                .as_ref()
+                                .map(|a| a.id.clone())
+                                .filter(|id| !id.is_empty())
+                                .unwrap_or_else(|| h.actor.clone()),
                             stamp(h.at),
                             summarize_changes(&h.changes),
                         ]
@@ -186,7 +227,7 @@ async fn run_selected(
                 .map(|u| {
                     vec![
                         u.uuid.clone(),
-                        u.id.clone(),
+                        u.id.clone().unwrap_or_default(),
                         u.display_name.clone(),
                         u.status.clone(),
                         u.source.clone(),
@@ -226,7 +267,7 @@ async fn run_selected(
             let user = app.user(&uuid).await?;
             let mut text = kv(&[
                 ("membership", user.membership_id.clone()),
-                ("id", user.id.clone()),
+                ("id", user.id.clone().unwrap_or_default()),
                 ("name", user.display_name.clone()),
                 (
                     "kind",
@@ -490,14 +531,25 @@ async fn run_import(ctx: &Ctx, app: &AppClient<'_>, args: ImportArgs) -> CliResu
             } else {
                 app.import_job(&job).await?
             };
-            Ok(Outcome::new(to_json(&job), render_job(&job)).next(
+            let mut outcome = Outcome::new(to_json(&job), render_job(&job)).next(
                 format!("accounts app import rows {} --outcome error", job.id),
                 "rows with errors",
-            ))
+            );
+            if job.dry_run && job.status == "completed" {
+                outcome = outcome.next(
+                    "accounts app import <file> --wait",
+                    "import the same file for real (without --dry-run)",
+                );
+            }
+            // A failed job is a failure, as for `accounts app import <file> --wait`, so a script
+            // following a job learns it from the exit code.
+            Ok(outcome.exit(import_exit(&job)))
         }
         Some(ImportCommand::Rows {
             job,
             outcome,
+            level,
+            code,
             limit,
             cursor,
         }) => {
@@ -506,6 +558,8 @@ async fn run_import(ctx: &Ctx, app: &AppClient<'_>, args: ImportArgs) -> CliResu
                     &job,
                     &ImportRowsQuery {
                         outcome,
+                        level,
+                        code,
                         limit,
                         cursor,
                     },
@@ -653,9 +707,14 @@ async fn run_import(ctx: &Ctx, app: &AppClient<'_>, args: ImportArgs) -> CliResu
                 json!({ "dry_run": args.dry_run, "format": job.format }),
             );
             if !args.wait {
+                let dry = if job.dry_run || args.dry_run {
+                    " as a dry run: nothing will be written"
+                } else {
+                    ""
+                };
                 return Ok(Outcome::new(
                     to_json(&job),
-                    format!("Started import job {} ({}).", job.id, job.status),
+                    format!("Started import job {} ({}){dry}.", job.id, job.status),
                 )
                 .next(
                     format!("accounts app import status {} --wait", job.id),
@@ -673,7 +732,7 @@ async fn run_import(ctx: &Ctx, app: &AppClient<'_>, args: ImportArgs) -> CliResu
                     &ImportRowsQuery {
                         outcome: Some("error".to_owned()),
                         limit: Some(10),
-                        cursor: None,
+                        ..ImportRowsQuery::default()
                     },
                 )
                 .await
@@ -694,13 +753,17 @@ async fn run_import(ctx: &Ctx, app: &AppClient<'_>, args: ImportArgs) -> CliResu
             }
             let mut json = to_json(&job);
             json["first_errors"] = to_json(&errors);
-            let exit = if job.status == "failed" { 1 } else { 0 };
-            Ok(Outcome::new(json, text)
-                .next(
-                    format!("accounts app import rows {} --outcome error", job.id),
-                    "every row with an error",
-                )
-                .exit(exit))
+            let mut outcome = Outcome::new(json, text).next(
+                format!("accounts app import rows {} --outcome error", job.id),
+                "every row with an error",
+            );
+            if job.dry_run && job.status == "completed" {
+                outcome = outcome.next(
+                    real_import_command(&file, &args),
+                    "import it for real (the same command without --dry-run)",
+                );
+            }
+            Ok(outcome.exit(import_exit(&job)))
         }
     }
 }
@@ -808,17 +871,55 @@ fn megabytes(size: u64) -> String {
     format!("{}.{} MB", tenths / 10, tenths % 10)
 }
 
+/// The exit code of a finished (or followed) import: 1 when the whole job failed.
+fn import_exit(job: &ImportJob) -> i32 {
+    if job.status == "failed" {
+        EXIT_FAILURE
+    } else {
+        0
+    }
+}
+
+/// `accounts app import <file> …` with the flags of a dry run, minus --dry-run.
+fn real_import_command(file: &Path, args: &ImportArgs) -> String {
+    let mut command = format!("accounts app import {}", file.display());
+    if let Some(format) = args.format {
+        command.push_str(match format {
+            ImportFormat::Csv => " --format csv",
+            ImportFormat::Json => " --format json",
+        });
+    }
+    if let Some(country) = &args.default_country {
+        command.push_str(&format!(" --default-country {country}"));
+    }
+    if args.ignore_unknown_columns {
+        command.push_str(" --ignore-unknown-columns");
+    }
+    if args.update_existing {
+        command.push_str(" --update-existing");
+    }
+    command.push_str(" --wait");
+    command
+}
+
 fn render_job(job: &ImportJob) -> String {
     let counts = &job.counts;
     let mut text = format!(
-        "Import {}: {} ({}/{} rows).\n",
+        "Import {}: {} ({}/{} rows)",
         job.id, job.status, job.processed_rows, job.total_rows
     );
+    // A dry run writes nothing: its counts are what a real import would do.
+    let would = |what: &'static str, real: &'static str| if job.dry_run { what } else { real };
+    if job.dry_run {
+        text.push_str(" as a dry run: nothing was written; a real import would do this.\n");
+    } else {
+        text.push_str(".\n");
+    }
     text.push_str(&kv(&[
-        ("created", counts.created.to_string()),
-        ("matched", counts.matched.to_string()),
-        ("updated", counts.updated.to_string()),
-        ("skipped", counts.skipped.to_string()),
+        (would("would create", "created"), counts.created.to_string()),
+        (would("would match", "matched"), counts.matched.to_string()),
+        (would("would update", "updated"), counts.updated.to_string()),
+        (would("would skip", "skipped"), counts.skipped.to_string()),
         ("errors", counts.error.to_string()),
         ("warnings", counts.warnings.to_string()),
         ("failure", job.error.clone().unwrap_or_default()),
@@ -1212,94 +1313,192 @@ async fn run_webhook(
                     cursor,
                 })
                 .await?;
-            let rows: Vec<Vec<String>> = page
-                .items
-                .iter()
-                .map(|d| {
-                    vec![
-                        d.id.clone(),
-                        d.event_type.clone(),
-                        d.status.clone(),
-                        d.attempts.to_string(),
-                        d.last_status
-                            .map(|s| s.to_string())
-                            .or_else(|| d.last_error.clone())
-                            .unwrap_or_default(),
-                        stamp(d.created_at),
-                    ]
-                })
-                .collect();
-            Ok(Outcome::new(
-                to_json(&page),
-                with_more(
-                    table(
-                        &["DELIVERY", "TYPE", "STATUS", "ATTEMPTS", "LAST", "CREATED"],
-                        &rows,
-                        "No deliveries.",
-                    ),
-                    page.next_cursor.as_deref(),
-                ),
-            )
-            .next(
+            Ok(deliveries_outcome(
+                &page,
                 "accounts app webhook replay --failed",
-                "re-send failed deliveries",
             ))
         }
-        AppWebhookCommand::Delivery { id } => {
-            let detail = app.delivery(&id).await?;
-            let mut text = kv(&[
-                ("delivery", detail.delivery.id.clone()),
-                (
-                    "event",
-                    format!(
-                        "{} ({})",
-                        detail.delivery.event_id, detail.delivery.event_type
-                    ),
-                ),
-                ("status", detail.delivery.status.clone()),
-                ("attempts", detail.delivery.attempts.to_string()),
-                ("next attempt", when(detail.delivery.next_attempt_at)),
-                ("delivered", stamp(detail.delivery.delivered_at)),
-            ]);
-            text.push_str(&format!(
-                "payload:\n{}\n",
-                serde_json::to_string_pretty(&detail.payload).unwrap_or_default()
-            ));
-            Ok(Outcome::new(to_json(&detail), text))
-        }
+        AppWebhookCommand::Delivery { id } => Ok(delivery_outcome(&app.delivery(&id).await?)),
         AppWebhookCommand::Replay {
             ids,
             failed,
             since,
             idempotency_key,
         } => {
-            let request = if failed {
-                let since = match since {
-                    Some(text) => {
-                        Some(OffsetDateTime::parse(text.trim(), &Rfc3339).map_err(|_| {
-                            CliError::invalid(
-                                format!("--since `{text}` is not an RFC 3339 time."),
-                                "Write it like 2026-10-01T00:00:00Z.",
-                            )
-                        })?)
-                    }
-                    None => None,
-                };
-                ReplayRequest::Failed { since }
-            } else {
-                ReplayRequest::Deliveries(ids)
-            };
+            let request = replay_request(ids, failed, since.as_deref())?;
             let key = idempotency_key.unwrap_or_else(util::idempotency_key);
             let result = app.replay(&request, Some(&key)).await?;
-            let text = format!(
-                "Re-queued {} deliveries (same event ids, current URL and secret); skipped {} whose accounts no longer use {app_id}.",
-                result.replayed_count(),
-                result.skipped_count()
-            );
-            Ok(Outcome::new(to_json(&result), text).next(
+            Ok(replay_outcome(
+                &result,
+                &format!("Webhook of {app_id}"),
+                "accounts app webhook replay --failed",
                 "accounts app webhook deliveries --status pending",
-                "watch them go out",
             ))
         }
     }
+}
+
+// ---- deliveries of any webhook (an app's, a Silicon's) ------------------------------------
+
+/// A page of deliveries as a table (app and Silicon webhooks have the same deliveries).
+pub(crate) fn deliveries_outcome(page: &Page<WebhookDelivery>, replay: &str) -> Outcome {
+    let rows: Vec<Vec<String>> = page
+        .items
+        .iter()
+        .map(|d| {
+            vec![
+                d.id.clone(),
+                d.event_type.clone(),
+                d.status.clone(),
+                d.attempts.to_string(),
+                d.last_status
+                    .map(|s| s.to_string())
+                    .or_else(|| d.last_error.clone())
+                    .unwrap_or_default(),
+                stamp(d.created_at),
+            ]
+        })
+        .collect();
+    Outcome::new(
+        to_json(page),
+        with_more(
+            table(
+                &["DELIVERY", "TYPE", "STATUS", "ATTEMPTS", "LAST", "CREATED"],
+                &rows,
+                "No deliveries.",
+            ),
+            page.next_cursor.as_deref(),
+        ),
+    )
+    .next(replay, "re-send failed deliveries")
+}
+
+/// One delivery with its attempts and payload.
+pub(crate) fn delivery_outcome(detail: &DeliveryDetail) -> Outcome {
+    let delivery = &detail.delivery;
+    let mut text = kv(&[
+        ("delivery", delivery.id.clone()),
+        (
+            "event",
+            format!("{} ({})", delivery.event_id, delivery.event_type),
+        ),
+        ("url", delivery.url.clone().unwrap_or_default()),
+        ("status", delivery.status.clone()),
+        ("attempts", delivery.attempts.to_string()),
+        (
+            "last attempt",
+            delivery
+                .last_status
+                .map(|s| format!("HTTP {s}"))
+                .or_else(|| delivery.last_error.clone())
+                .unwrap_or_default(),
+        ),
+        ("next attempt", when(delivery.next_attempt_at)),
+        ("delivered", stamp(delivery.delivered_at)),
+        (
+            "replayed",
+            if delivery.manual_replays > 0 {
+                format!("{} time(s) by hand", delivery.manual_replays)
+            } else {
+                String::new()
+            },
+        ),
+    ]);
+    if delivery.payload_redacted {
+        text.push_str(
+            "payload: withheld (the account deleted itself or removed the app's access)\n",
+        );
+    } else {
+        text.push_str(&format!(
+            "payload:\n{}\n",
+            serde_json::to_string_pretty(&detail.payload).unwrap_or_default()
+        ));
+    }
+    Outcome::new(to_json(detail), text)
+}
+
+/// The deliveries a replay names: ids, or every failed one (optionally since a time).
+pub(crate) fn replay_request(
+    ids: Vec<String>,
+    failed: bool,
+    since: Option<&str>,
+) -> CliResult<ReplayRequest> {
+    if !failed {
+        return Ok(ReplayRequest::Deliveries(ids));
+    }
+    let since = match since {
+        Some(text) => Some(OffsetDateTime::parse(text.trim(), &Rfc3339).map_err(|_| {
+            CliError::invalid(
+                format!("--since `{text}` is not an RFC 3339 time."),
+                "Write it like 2026-10-01T00:00:00Z.",
+            )
+        })?),
+        None => None,
+    };
+    Ok(ReplayRequest::Failed { since })
+}
+
+/// What a replay did, in words: what was re-queued, what was skipped and why, what is left.
+pub(crate) fn replay_outcome(
+    result: &ReplayResult,
+    webhook: &str,
+    again: &str,
+    watch: &str,
+) -> Outcome {
+    let mut text = format!(
+        "{webhook}: re-queued {} deliveries (same event ids, sent to the current URL and signed with the current secret).",
+        result.replayed_count()
+    );
+    let skipped = result.skipped.as_array().cloned().unwrap_or_default();
+    if !skipped.is_empty() {
+        // One line per reason: `2 already_pending: …`.
+        let mut reasons: Vec<(String, usize, String)> = Vec::new();
+        for item in &skipped {
+            let reason = item
+                .get("reason")
+                .and_then(Value::as_str)
+                .unwrap_or("skipped")
+                .to_owned();
+            let message = item
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            match reasons.iter_mut().find(|(r, _, _)| *r == reason) {
+                Some(entry) => entry.1 += 1,
+                None => reasons.push((reason, 1, message)),
+            }
+        }
+        text.push_str(&format!("\nSkipped {}:", skipped.len()));
+        for (reason, count, message) in reasons {
+            text.push_str(&format!("\n  {count} {reason}: {message}"));
+        }
+    } else if result.skipped_count() > 0 {
+        text.push_str(&format!("\nSkipped {}.", result.skipped_count()));
+    }
+    let remaining = result
+        .extra
+        .get("remaining")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    if remaining > 0 {
+        text.push_str(&format!(
+            "\n{remaining} failed deliveries are still waiting (a call re-queues at most 100): run `{again}` again."
+        ));
+    }
+    let not_replayable = result
+        .extra
+        .get("not_replayable")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    if not_replayable > 0 {
+        text.push_str(&format!(
+            "\n{not_replayable} failed test pings are never replayed: send a new ping instead."
+        ));
+    }
+    let mut outcome = Outcome::new(to_json(result), text);
+    if remaining > 0 {
+        outcome = outcome.next(again, "re-queue the failed deliveries still waiting");
+    }
+    outcome.next(watch, "watch them go out")
 }

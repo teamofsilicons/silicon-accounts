@@ -87,7 +87,7 @@ const oidc: Journey = {
 
     // Claims follow the granted scopes: ledgerly (phone + dob required, timezone optional) asking for openid.
     const l = new Browserish(env, ctx.ip);
-    const ledger = await signUpVia(l, "ledgerly", `oidc.ledger.${t}@example.test`, { scope: "openid", optionalScopes: ["timezone"], timezone: "Asia/Kolkata", signup: { dob: "1991-07-04" } });
+    const ledger = await signUpVia(l, "ledgerly", `oidc.ledger.${t}@example.test`, { scope: "openid", share: ["timezone"], timezone: "Asia/Kolkata", signup: { dob: "1991-07-04" } });
     const ledgerTokens = await exchangeCode(env, "ledgerly", ledger.code, ledger.started.redirectUri, ledger.started.verifier);
     const idToken = ledgerTokens.body.id_token ?? "";
     const lc = jwtClaims(idToken);
@@ -126,7 +126,7 @@ const oidc: Journey = {
     if (created.status !== 201) return;
     const sent = await sendCode(b, created.body.flow.id, { email });
     const verified = await b.act(created.body.flow.id, "verify", { code: sent.code ?? "" });
-    const done = await drive(b, verified.body.flow, { optionalScopes: ["email"] });
+    const done = await drive(b, verified.body.flow, { share: ["email"] });
     const callback = new URL(done.redirect_to ?? `${redirectUri}?error=no_redirect`);
 
     // A wrong state is refused by the library before it spends the code.
@@ -190,7 +190,7 @@ const oidc: Journey = {
     const f2 = await second.createFlow({ ...Object.fromEntries(url2.searchParams), timezone: "UTC" });
     const s2 = await sendCode(second, f2.body.flow.id, { email: `oidc.nonce.${t}@example.test` });
     const v2 = await second.act(f2.body.flow.id, "verify", { code: s2.code ?? "" });
-    const d2 = await drive(second, v2.body.flow, { optionalScopes: ["email"] });
+    const d2 = await drive(second, v2.body.flow, { share: ["email"] });
     try {
       await client.authorizationCodeGrant(config, new URL(d2.redirect_to ?? redirectUri), { pkceCodeVerifier: verifier2, expectedState: state2, expectedNonce: "another-nonce" });
       results.check("openid-client refuses an id_token whose nonce isn't the one it sent", false, "accepted");

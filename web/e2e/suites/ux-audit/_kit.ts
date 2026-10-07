@@ -58,6 +58,11 @@ export const KIT_SOURCE = String.raw`
     }
     return null;
   }
+  /** The element or an ancestor is position: fixed (placed against the viewport, not the page). */
+  function fixedLayer(el) {
+    for (var p = el; p && p !== document.body && p !== document.documentElement; p = p.parentElement) if (getComputedStyle(p).position === "fixed") return true;
+    return false;
+  }
   function rect(r) { return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }; }
   /** The part of an element its scrolling or clipping ancestors let show (null when nothing shows). */
   function shownRect(el) {
@@ -133,8 +138,10 @@ export const KIT_SOURCE = String.raw`
       if (!visible(el)) continue;
       var r = el.getBoundingClientRect();
       if (r.width < 6 || r.height < 6) continue;
-      // Parked off the page (a skip link above the top, a closed panel beside it): judged when it shows.
-      if (r.bottom + window.scrollY <= 0 || r.right + window.scrollX <= 0 || r.left >= document.documentElement.scrollWidth) continue;
+      // Parked off the page (a skip link above the top, a closed panel beside it): judged when it shows. A fixed layer
+      // is placed against the viewport, so it is parked when it is outside the viewport whatever the scroll.
+      if (fixedLayer(el) ? r.bottom <= 0 || r.right <= 0 || r.top >= window.innerHeight || r.left >= document.documentElement.clientWidth
+        : r.bottom + window.scrollY <= 0 || r.right + window.scrollX <= 0 || r.left >= document.documentElement.scrollWidth) continue;
       var cs = getComputedStyle(el);
       var radii = [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].map(function (v) { return parseFloat(v) || 0; });
       var maxR = Math.max.apply(null, radii);
@@ -190,6 +197,39 @@ export const KIT_SOURCE = String.raw`
       if (!kind) continue;
       var titled = !!(el.getAttribute("title") || el.closest("[title]") || el.getAttribute("aria-label") || el.closest("[aria-label]"));
       out.push({ el: describe(el), kind: kind, text: short(el.textContent, 140), titled: titled, box: el.clientWidth, content: el.scrollWidth, fixed: !!inFixed(el) });
+    }
+    return out;
+  }
+
+  /**
+   * Controls a container cuts off: a button, link, field or option partly hidden by an ancestor's overflow (hidden or
+   * clip) that a Carbon cannot scroll. Wholly hidden ones (a closed panel) are left out, and so are tab strips (they
+   * scroll their selected tab into view; ux-audit-developer checks that).
+   */
+  function clippedControls() {
+    var out = [];
+    var all = document.body ? document.body.querySelectorAll("button,a[href],input:not([type=hidden]),select,textarea,[role=tab],[role=radio],[role=option],[role=checkbox],[role=switch],[role=menuitem]") : [];
+    for (var i = 0; i < all.length && out.length < 12; i++) {
+      var el = all[i];
+      if (!visible(el) || el.closest("[inert],[aria-hidden=true],.sr-only,[role=tablist]")) continue;
+      var r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) continue;
+      for (var p = el.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+        var s = getComputedStyle(p);
+        if (s.position === "fixed") break;
+        var pr = p.getBoundingClientRect();
+        var cutX = 0, cutY = 0;
+        var userScrollsX = (s.overflowX === "auto" || s.overflowX === "scroll") && p.scrollWidth > p.clientWidth + 1;
+        var userScrollsY = (s.overflowY === "auto" || s.overflowY === "scroll") && p.scrollHeight > p.clientHeight + 1;
+        if ((s.overflowX === "hidden" || s.overflowX === "clip") && !userScrollsX) cutX = Math.max(0, pr.left - r.left) + Math.max(0, r.right - pr.right);
+        if ((s.overflowY === "hidden" || s.overflowY === "clip") && !userScrollsY) cutY = Math.max(0, pr.top - r.top) + Math.max(0, r.bottom - pr.bottom);
+        var shownW = r.width - cutX, shownH = r.height - cutY;
+        if ((cutX > 2 || cutY > 2) && shownW > 2 && shownH > 2) {
+          out.push({ el: describe(el), by: describe(p).slice(0, 90), cutX: Math.round(cutX), cutY: Math.round(cutY), w: Math.round(r.width), h: Math.round(r.height) });
+          break;
+        }
+        if ((cutX > 2 || cutY > 2) && (shownW <= 2 || shownH <= 2)) break; // wholly hidden: a closed panel
+      }
     }
     return out;
   }
@@ -292,6 +332,9 @@ export const KIT_SOURCE = String.raw`
       if (el.closest("[aria-hidden=true],[inert],.sr-only,[hidden]")) continue;
       // Icon-only controls that show on hover or focus (a row's copy buttons, a heading's "#" link) are hidden by design.
       if (el.matches("button,a[href]") && !/[A-Za-z0-9]/.test(short(el.textContent, 20))) continue;
+      // A native checkbox or radio kept transparent over the box a component draws for it (Arc's table row selects):
+      // still focusable and clickable, shown by its drawn box.
+      if (el.matches("input[type=checkbox],input[type=radio]") && parseFloat(getComputedStyle(el).opacity) === 0) continue;
       var r = el.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
       var cs = getComputedStyle(el);
@@ -423,10 +466,14 @@ export const KIT_SOURCE = String.raw`
     return out;
   }
   function nameOf(el) {
+    // aria-labelledby wins over aria-label (accname 1.2, step 2B before 2C).
+    var by = el.getAttribute("aria-labelledby");
+    if (by) {
+      var named = short(by.split(/\s+/).map(function (id) { var n = document.getElementById(id); return n ? spokenText(n) : ""; }).join(" "), 80);
+      if (named) return named;
+    }
     var label = el.getAttribute("aria-label");
     if (label) return short(label, 80);
-    var by = el.getAttribute("aria-labelledby");
-    if (by) return short(by.split(/\s+/).map(function (id) { var n = document.getElementById(id); return n ? spokenText(n) : ""; }).join(" "), 80);
     if (el.id) { var l = document.querySelector('label[for="' + el.id + '"]'); if (l) return short(spokenText(l), 80); }
     var wrap = el.closest("label");
     if (wrap) return short(spokenText(wrap), 80);
@@ -441,17 +488,27 @@ export const KIT_SOURCE = String.raw`
     var now = look(el);
     var changed = null;
     if (before) { changed = []; for (var key in now) if (now[key] !== before[key]) changed.push(key); }
-    var cx = r.left + r.width / 2, cy = r.top + Math.min(r.height / 2, 20);
+    // A link that wraps onto a second line: its box spans both lines (and whatever sits beside it), so the point that
+    // must be the link's own, and the position that orders it, are its first line's.
+    var lines = el.getClientRects();
+    var first = lines.length > 1 ? lines[0] : r;
+    // Started above the viewport (taller than it, a long table): the middle of the part on screen, not its hidden top.
+    var cx = first.left + first.width / 2, cy = first.top < 0 ? Math.min(first.bottom, window.innerHeight) / 2 : first.top + Math.min(first.height / 2, 20);
     var inView = r.bottom > 0 && r.right > 0 && r.top < window.innerHeight && r.left < document.documentElement.clientWidth;
     var fully = r.top >= -1 && r.left >= -1 && r.bottom <= window.innerHeight + 1 && r.right <= document.documentElement.clientWidth + 1;
-    var hit = inView ? document.elementFromPoint(Math.max(0, Math.min(cx, document.documentElement.clientWidth - 1)), Math.max(0, Math.min(cy, window.innerHeight - 1))) : null;
+    // Inside a shadow root (the SDK's buttons) the document answers with the host: ask the shadow root instead.
+    var scope = el.getRootNode && el.getRootNode() !== document && el.getRootNode().elementFromPoint ? el.getRootNode() : document;
+    var hit = inView ? scope.elementFromPoint(Math.max(0, Math.min(cx, document.documentElement.clientWidth - 1)), Math.max(0, Math.min(cy, window.innerHeight - 1))) : null;
     var obscuredBy = hit && !(hit === el || el.contains(hit) || hit.contains(el) || (el.labels && Array.prototype.some.call(el.labels, function (l) { return l.contains(hit); }))) ? describe(hit) : null;
     var uid = uids.get(el);
     if (!uid) { uid = nextUid++; uids.set(el, uid); }
+    // A native checkbox or radio kept transparent over the box a component draws for it is seen through that box.
+    var toggle = el.matches("input[type=checkbox],input[type=radio]") && parseFloat(getComputedStyle(el).opacity) === 0;
+    var seen = toggle ? (typeof el.checkVisibility !== "function" || el.checkVisibility({ checkVisibilityCSS: true })) && r.width > 0 && r.height > 0 : visible(el);
     return {
       uid: uid, none: false, el: describe(el), tag: el.tagName.toLowerCase(), type: el.getAttribute("type") || "", role: el.getAttribute("role") || "", name: nameOf(el),
-      rect: rect(r), inView: inView, fully: fully, obscuredBy: obscuredBy, changed: changed, inert: !!el.closest("[inert]"), ariaHidden: !!el.closest("[aria-hidden=true]"),
-      visible: visible(el), focusVisible: el.matches(":focus-visible"), scrollY: Math.round(window.scrollY),
+      rect: rect(r), line: rect(first), inView: inView, fully: fully, obscuredBy: obscuredBy, changed: changed, inert: !!el.closest("[inert]"), ariaHidden: !!el.closest("[aria-hidden=true]"),
+      visible: seen, focusVisible: el.matches(":focus-visible"), scrollY: Math.round(window.scrollY),
     };
   }
 
@@ -577,7 +634,7 @@ export const KIT_SOURCE = String.raw`
   }
 
   window.__uxa = {
-    describe: describe, visible: visible, calm: calm, overflow: overflow, squircles: squircles, truncation: truncation, textOverlaps: textOverlaps,
+    describe: describe, visible: visible, calm: calm, overflow: overflow, squircles: squircles, truncation: truncation, textOverlaps: textOverlaps, clippedControls: clippedControls,
     brokenImages: brokenImages, words: words, hiddenContent: hiddenContent, poweredBy: poweredBy, dockClearance: dockClearance,
     snapshotLooks: snapshotLooks, activeFocus: activeFocus, blurActive: blurActive, refocus: refocus, motionStart: motionStart, motionStop: motionStop, axe: axeRun,
   };

@@ -54,17 +54,15 @@ impl Output {
         std::io::stderr().is_terminal() && std::env::var_os("NO_COLOR").is_none()
     }
 
-    /// Prints a command's result.
-    pub fn outcome(&self, outcome: &Outcome) {
+    /// Prints a command's result. False when stdout could not take it (see [`print_stdout`]).
+    pub fn outcome(&self, outcome: &Outcome) -> bool {
         if self.json {
             let text =
                 serde_json::to_string_pretty(&outcome.json).unwrap_or_else(|_| "null".to_owned());
-            println!("{text}");
-            return;
+            return print_stdout(&text);
         }
-        if !outcome.text.is_empty() {
-            let text = outcome.text.trim_end_matches('\n');
-            println!("{text}");
+        if !outcome.text.is_empty() && !print_stdout(outcome.text.trim_end_matches('\n')) {
+            return false;
         }
         if !self.quiet && !outcome.next.is_empty() {
             let width = outcome
@@ -79,13 +77,14 @@ impl Output {
             }
             self.stderr(&self.dim(&text));
         }
+        true
     }
 
     /// Prints an error: JSON on stdout with `--json`, else `error:`/`hint:` on stderr.
     pub fn error(&self, error: &CliError) {
         if self.json {
             let text = serde_json::to_string_pretty(&error.to_json()).unwrap_or_default();
-            println!("{text}");
+            print_stdout(&text);
             return;
         }
         let label = if self.color() {
@@ -177,6 +176,31 @@ impl Output {
     }
 }
 
+/// Writes `text` and a newline to stdout, never panicking (`println!` panics when the write
+/// fails). A reader that went away (a closed pipe: `accounts help --json | head -1`, or a
+/// consumer that exits early) is not the command's failure: the rest of the output is dropped
+/// quietly and the command keeps its own exit code. Any other write error (a full disk, a closed
+/// descriptor) is reported on stderr and returns false so the command can exit non-zero.
+pub fn print_stdout(text: &str) -> bool {
+    let mut out = std::io::stdout().lock();
+    let written = out
+        .write_all(text.as_bytes())
+        .and_then(|()| out.write_all(b"\n"))
+        .and_then(|()| out.flush());
+    match written {
+        Ok(()) => true,
+        Err(err) if err.kind() == std::io::ErrorKind::BrokenPipe => true,
+        Err(err) => {
+            let mut stderr = std::io::stderr().lock();
+            let _ = writeln!(
+                stderr,
+                "error: could not write the result to stdout: {err}.\nhint: Check where stdout goes (a full disk or a closed file), then run the command again."
+            );
+            false
+        }
+    }
+}
+
 /// `key  value` lines with aligned values; rows with empty values are skipped.
 pub fn kv(rows: &[(&str, String)]) -> String {
     let rows: Vec<&(&str, String)> = rows.iter().filter(|(_, v)| !v.is_empty()).collect();
@@ -260,20 +284,31 @@ pub fn stamp(t: Option<OffsetDateTime>) -> String {
     .unwrap_or_default()
 }
 
-/// `3m`, `2h 5m`, `14d`.
+/// `42s`, `3m`, `2h 5m`, `14d`, `13d 5h`: rounded to the nearest unit shown, so a token valid for
+/// 120 s that is a moment old reads `2m` (not `1m`), and a 14-day request reads `14d` (not `13d`).
 pub fn relative(seconds: u64) -> String {
     match seconds {
         s if s < 60 => format!("{s}s"),
-        s if s < 3600 => format!("{}m", s / 60),
-        s if s < 86_400 => {
-            let m = (s % 3600) / 60;
+        // 59.5 minutes and more read as an hour.
+        s if s < 3570 => format!("{}m", ((s + 30) / 60).max(1)),
+        s if s < 86_370 => {
+            let minutes = (s + 30) / 60;
+            let (h, m) = (minutes / 60, minutes % 60);
             if m == 0 {
-                format!("{}h", s / 3600)
+                format!("{h}h")
             } else {
-                format!("{}h {m}m", s / 3600)
+                format!("{h}h {m}m")
             }
         }
-        s => format!("{}d", s / 86_400),
+        s => {
+            let hours = (s + 1800) / 3600;
+            let (d, h) = (hours / 24, hours % 24);
+            if h == 0 {
+                format!("{d}d")
+            } else {
+                format!("{d}d {h}h")
+            }
+        }
     }
 }
 
@@ -353,5 +388,16 @@ mod tests {
         assert_eq!(relative(7200), "2h");
         assert_eq!(relative(7500), "2h 5m");
         assert_eq!(relative(14 * 86_400), "14d");
+        // A moment after it was issued, the time left still reads as what was issued.
+        assert_eq!(relative(119), "2m");
+        assert_eq!(relative(90), "2m");
+        assert_eq!(relative(89), "1m");
+        assert_eq!(relative(3599), "1h");
+        assert_eq!(relative(2 * 3600 - 1), "2h");
+        assert_eq!(relative(14 * 86_400 - 1), "14d");
+        assert_eq!(relative(14 * 86_400 - 5 * 60), "14d");
+        assert_eq!(relative(13 * 86_400 + 5 * 3600), "13d 5h");
+        assert_eq!(relative(86_399), "1d");
+        assert_eq!(relative(86_400 + 3600), "1d 1h");
     }
 }

@@ -15,6 +15,8 @@ const modeOf = (path: string) => {
 export const journey: Journey = {
   name: "silicons-cli-config-home",
   title: "`accounts config home <dir>`: refuses a file or a missing path with 'not a directory', points the CLI's state at a directory (pointer in SILICON_HOME or ~), which then holds the session; --home and ACCOUNTS_HOME win; a home that disappears or SILICON_HOME/--home/ACCOUNTS_HOME that are not directories say so precisely",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     await forgetRateLimits(env, "127.0.0.1");

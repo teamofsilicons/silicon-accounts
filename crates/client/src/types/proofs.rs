@@ -74,7 +74,7 @@ pub struct IssuedProof {
     /// When `proof_token` expires.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,
@@ -84,7 +84,7 @@ pub struct IssuedProof {
     /// When the refresh token stops working.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub refresh_expires_at: Option<OffsetDateTime>,
@@ -184,7 +184,7 @@ pub struct ValidProof {
     /// `obo` or `ata`.
     pub kind: ProofKind,
     /// Valid until.
-    #[serde(with = "time::serde::rfc3339")]
+    #[serde(with = "crate::serde_util::rfc3339_ms")]
     pub expires_at: OffsetDateTime,
     /// Who issued it.
     pub issuing_app: ProofApp,
@@ -241,28 +241,28 @@ pub struct AppProof {
     /// Created at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
     /// When the proof family expires.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,
     /// Last refresh.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub last_refreshed_at: Option<OffsetDateTime>,
     /// When it was revoked.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub revoked_at: Option<OffsetDateTime>,
@@ -280,7 +280,7 @@ pub struct AppProof {
     /// When the current proof token expires.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub token_expires_at: Option<OffsetDateTime>,
@@ -306,21 +306,21 @@ pub struct MyProof {
     /// Created at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
     /// Expires at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,
     /// Last refresh.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub last_refreshed_at: Option<OffsetDateTime>,
@@ -330,7 +330,7 @@ pub struct MyProof {
     /// When it was revoked.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub revoked_at: Option<OffsetDateTime>,
@@ -344,7 +344,7 @@ pub struct MyProof {
     /// When the current proof token expires.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub token_expires_at: Option<OffsetDateTime>,

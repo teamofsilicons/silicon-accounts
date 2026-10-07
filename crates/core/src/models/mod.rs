@@ -74,7 +74,7 @@ macro_rules! text_enum {
             fn deserialize<D: ::serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
                 let s = <String as ::serde::Deserialize>::deserialize(d)?;
                 Self::parse(&s).ok_or_else(|| {
-                    ::serde::de::Error::custom(format!("unknown value `{}`, expected one of {}", s, Self::expected()))
+                    ::serde::de::Error::custom(format!("'{}' is not one of {}", s, Self::expected()))
                 })
             }
         }
@@ -675,6 +675,8 @@ text_enum! {
         Timezone = "timezone",
         Email = "email",
         Phone = "phone",
+        /// A Silicon's custodian as apps see it (`{uuid, id}`): its custodian changed its c:id.
+        Custodian = "custodian",
     }
 }
 
@@ -682,7 +684,7 @@ impl AccountField {
     /// The scope an app needs to see this field (`None` = always visible with `profile`).
     pub fn required_scope(&self) -> Option<Scope> {
         match self {
-            AccountField::DisplayName | AccountField::PfpUrl => None,
+            AccountField::DisplayName | AccountField::PfpUrl | AccountField::Custodian => None,
             AccountField::Dob => Some(Scope::Dob),
             AccountField::Timezone => Some(Scope::Timezone),
             AccountField::Email => Some(Scope::Email),
@@ -714,7 +716,8 @@ mod tests {
         let err = serde_json::from_str::<Method>("\"github\"").expect_err("unknown");
         assert!(
             err.to_string()
-                .contains("expected one of google, apple, email, phone")
+                .starts_with("'github' is not one of google, apple, email, phone"),
+            "{err}"
         );
         assert_eq!("phone".parse::<ContactField>(), Ok(ContactField::Phone));
     }

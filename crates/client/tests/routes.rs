@@ -483,6 +483,66 @@ async fn account_session_calls() {
         Reply::json(200, json!({"event_id": "e1"})),
         s.test_my_webhook()
     );
+    // A Silicon's own webhook deliveries: list, inspect, replay (as for an app's webhook).
+    let r = check!(
+        mock,
+        "GET",
+        "/v1/me/webhook/deliveries",
+        Reply::json(
+            200,
+            json!({"items": [{"id": "d1", "status": "failed"}], "next_cursor": null})
+        ),
+        s.my_webhook_deliveries(&DeliveriesQuery {
+            status: Some("failed".into()),
+            limit: Some(5),
+            ..Default::default()
+        })
+    );
+    assert_eq!(r.query.as_deref(), Some("status=failed&limit=5"));
+    check!(
+        mock,
+        "GET",
+        "/v1/me/webhook/deliveries/d1",
+        Reply::json(
+            200,
+            json!({"id": "d1", "attempts": [{"status_code": 503}], "payload": {"type": "silicon.updated"}, "payload_redacted": false})
+        ),
+        s.my_webhook_delivery(" d1 ")
+    );
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/me/webhook/replay",
+        Reply::json(
+            200,
+            json!({"replayed": ["d1"], "skipped": [], "remaining": 0, "not_replayable": 0, "url": "https://x"})
+        ),
+        s.replay_my_webhook(
+            &ReplayRequest::Deliveries(vec!["d1".into()]),
+            Some("rp-own-1")
+        )
+    );
+    assert_eq!(r.json(), json!({"delivery_ids": ["d1"]}));
+    assert_eq!(r.header("idempotency-key"), Some("rp-own-1"));
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/me/webhook/replay",
+        Reply::json(200, json!({"replayed": [], "skipped": [], "remaining": 0})),
+        s.replay_my_webhook(&ReplayRequest::Failed { since: None }, None)
+    );
+    assert_eq!(r.json(), json!({"status": "failed"}));
+    // Refused before sending: no ids, or more than 100.
+    let before = mock.requests_to("POST", "/v1/me/webhook/replay").len();
+    let err = s
+        .replay_my_webhook(&ReplayRequest::Deliveries(vec![]), None)
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "invalid_input");
+    assert_eq!(
+        mock.requests_to("POST", "/v1/me/webhook/replay").len(),
+        before
+    );
     check!(
         mock,
         "GET",
@@ -641,6 +701,50 @@ async fn custodian_calls() {
         Reply::empty(204),
         s.remove_silicon_webhook("b9Z")
     );
+    // The custodian sees and replays the Silicon's webhook deliveries.
+    let r = check!(
+        mock,
+        "GET",
+        "/v1/me/silicons/b9Z/webhook/deliveries",
+        Reply::json(200, json!({"items": [], "next_cursor": null})),
+        s.silicon_webhook_deliveries(
+            "b9Z",
+            &DeliveriesQuery {
+                status: Some("failed".into()),
+                cursor: Some("c2".into()),
+                ..Default::default()
+            }
+        )
+    );
+    assert_eq!(r.query.as_deref(), Some("status=failed&cursor=c2"));
+    check!(
+        mock,
+        "GET",
+        "/v1/me/silicons/b9Z/webhook/deliveries/d2",
+        Reply::json(200, json!({"id": "d2", "attempts": [], "payload": {}})),
+        s.silicon_webhook_delivery("b9Z", "d2")
+    );
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/me/silicons/b9Z/webhook/replay",
+        Reply::json(
+            200,
+            json!({"replayed": ["d2"], "skipped": [], "remaining": 0})
+        ),
+        s.replay_silicon_webhook(
+            "b9Z",
+            &ReplayRequest::Failed {
+                since: Some(time::macros::datetime!(2026-10-01 00:00 UTC))
+            },
+            Some("rp-si-1")
+        )
+    );
+    assert_eq!(
+        r.json(),
+        json!({"status": "failed", "since": "2026-10-01T00:00:00Z"})
+    );
+    assert_eq!(r.header("idempotency-key"), Some("rp-si-1"));
     let r = check!(
         mock,
         "POST",
@@ -844,6 +948,26 @@ async fn app_calls() {
         )
     );
     assert_eq!(r.query.as_deref(), Some("outcome=error"));
+    // Rows can be filtered by message level and code too.
+    let r = check!(
+        mock,
+        "GET",
+        "/v1/apps/briefcase/imports/job-1/rows",
+        Reply::json(200, json!({"items": []})),
+        a.import_rows(
+            "job-1",
+            &ImportRowsQuery {
+                level: Some("warning".into()),
+                code: Some("id_conflict".into()),
+                limit: Some(50),
+                ..Default::default()
+            }
+        )
+    );
+    assert_eq!(
+        r.query.as_deref(),
+        Some("level=warning&code=id_conflict&limit=50")
+    );
     check!(
         mock,
         "PUT",

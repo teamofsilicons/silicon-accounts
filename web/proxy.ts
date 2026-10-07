@@ -18,8 +18,12 @@
  * /developer and everything under it moved to the developer site (developer.teamofsilicons.com): a 307 to the address
  * GET /v1/meta names as `developer_url` (cached briefly; ACCOUNTS_DEVELOPER_URL, then the production address, when the
  * API cannot say). /developer → its home, /developer/{app_id}[/{tab}] → /apps/{app_id}[/{tab}] there, query kept.
+ *
+ * /docs/<path> that is no page of the docs and no group's page: the page load is rewritten to /docs/404 with status
+ * 404, so the docs' "No page here" renders on the server (see docsAddressMissing).
  */
 import { NextResponse, type NextRequest } from "next/server";
+import { findPage, isGroup } from "@/lib/docs/content";
 
 /** Where the Rust API listens (server side). Read at request time, so it can differ from the build's. */
 const apiUrl = () => (process.env.ACCOUNTS_API_URL ?? "http://127.0.0.1:8589").replace(/\/+$/, "");
@@ -131,6 +135,32 @@ function localIrisImageSource(): string {
   }
 }
 
+/** Where an address under /docs with no page renders (app/(docs)/docs/404): the docs' "No page here". */
+const DOCS_MISSING_PATH = "/docs/404";
+
+/**
+ * True for a page load of /docs/<path> that is neither a page of the docs nor a group's page (the same lookups as the
+ * /docs/[...slug] route: lib/docs/content findPage and isGroup). A notFound() below the root layout renders only in
+ * the browser in this Next: the HTML is an empty `<html id="__next_error__">` and the words come with the script. So
+ * the proxy answers those page loads itself, rewritten to DOCS_MISSING_PATH with status 404. The Markdown files
+ * (/docs/<path>.md), the search index and client-side navigations (RSC requests, where the route's notFound() renders
+ * as it always did) pass through.
+ */
+function docsAddressMissing(pathname: string, rsc: boolean): boolean {
+  if (rsc || !pathname.startsWith("/docs/")) return false;
+  const rest = pathname.slice("/docs/".length).replace(/\/+$/, "");
+  if (!rest || rest.endsWith(".md") || rest === "search-index.json") return false;
+  const path = rest.split("/").map(part => {
+    try {
+      return decodeURIComponent(part);
+    } catch {
+      return part;
+    }
+  }).join("/");
+  // docs/index.md is the landing page itself (the route redirects /docs/index to /docs).
+  return path !== "index" && !findPage(path) && !isGroup(path);
+}
+
 function contentSecurityPolicy(nonce: string, frameAncestorsValue: string): string {
   return [
     "default-src 'self'",
@@ -160,7 +190,10 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-sa-surface", embed ? "embed" : "site");
   requestHeaders.set("x-sa-embed-framing", embed && ancestors.length ? "allowed" : "none");
 
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const read = request.method === "GET" || request.method === "HEAD";
+  const response = read && docsAddressMissing(pathname, request.headers.has("rsc"))
+    ? NextResponse.rewrite(new URL(DOCS_MISSING_PATH, request.url), { status: 404, request: { headers: requestHeaders } })
+    : NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
   if (!ancestors.length) response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");

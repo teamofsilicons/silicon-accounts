@@ -27,6 +27,8 @@ pub const APP_SECRET: &str = "sa_app_briefcase_test_secret";
 pub struct MockState {
     /// (method, path, authorization, body)
     pub requests: Vec<(String, String, Option<String>, String)>,
+    /// (method, path, query)
+    pub queries: Vec<(String, String, String)>,
     pub telemetry_batches: Vec<Value>,
     /// The Silicon's currently valid access and refresh tokens (rotated on refresh).
     pub access_token: String,
@@ -37,6 +39,13 @@ pub struct MockState {
     /// Custodian request polls; the request is accepted from this poll number on.
     pub request_polls: u32,
     pub accept_on_poll: u32,
+    /// The Silicon's current STK (a test rotates it by changing this).
+    pub stk: String,
+    /// The Carbon's currently valid access token (a test revokes the session by changing it).
+    pub carbon_token: String,
+    /// The app's sign-in setup version and redirect URIs (PATCH signin-config changes them).
+    pub config_version: i64,
+    pub redirect_uris: Value,
 }
 
 pub struct Mock {
@@ -56,6 +65,10 @@ impl Mock {
             refresh_token: "sar_1".into(),
             generation: 1,
             accept_on_poll,
+            stk: STK.into(),
+            carbon_token: CARBON_TOKEN.into(),
+            config_version: 4,
+            redirect_uris: json!(["http://127.0.0.1:8593/briefcase/callback"]),
             ..MockState::default()
         }));
         let shared = state.clone();
@@ -98,6 +111,34 @@ impl Mock {
     pub fn telemetry(&self) -> Vec<Value> {
         self.state.lock().unwrap().telemetry_batches.clone()
     }
+
+    /// Revokes every session of the Silicon and makes `stk` its STK, as a custodian's
+    /// `rotate-stk` does: the stored access and refresh tokens stop working.
+    pub fn rotate_stk(&self, stk: &str) {
+        let mut st = self.state.lock().unwrap();
+        st.stk = stk.to_owned();
+        st.generation += 10;
+        st.access_token = format!("at-{}", st.generation);
+        st.refresh_token = format!("sar_{}", st.generation);
+    }
+
+    /// Revokes the Carbon's session (as `accounts sessions revoke` from another terminal).
+    pub fn revoke_carbon_session(&self) {
+        let mut st = self.state.lock().unwrap();
+        st.carbon_token = format!("{CARBON_TOKEN}-{}", st.requests.len());
+    }
+
+    /// The query string of every request to `method path`.
+    pub fn queries(&self, method: &str, path: &str) -> Vec<String> {
+        self.state
+            .lock()
+            .unwrap()
+            .queries
+            .iter()
+            .filter(|r| r.0 == method && r.1 == path)
+            .map(|r| r.2.clone())
+            .collect()
+    }
 }
 
 fn error(status: u16, code: &str, message: &str, hint: &str) -> (u16, Value) {
@@ -124,9 +165,9 @@ fn silicon_tokens(state: &MockState) -> Value {
     })
 }
 
-fn carbon_tokens() -> Value {
+fn carbon_tokens(state: &MockState) -> Value {
     json!({
-        "access_token": CARBON_TOKEN,
+        "access_token": state.carbon_token,
         "token_type": "Bearer",
         "expires_in": 1800,
         "refresh_token": "sar_carbon",
@@ -179,6 +220,52 @@ fn import_job(status: &str, processed: u64) -> Value {
     })
 }
 
+fn app_details(state: &MockState) -> Value {
+    json!({ "app_id": APP_ID, "name": "Briefcase", "description": "", "status": "active", "source": "fake",
+            "owner": { "uuid": CARBON_UUID, "kind": "carbon", "id": CARBON_ID, "display_name": "Saket", "pfp_url": "", "status": "active" },
+            "signin_config": { "methods": { "email": true, "google": true, "apple": false, "phone": false },
+                "method_order": ["google", "apple", "email", "phone"], "redirect_uris": state.redirect_uris,
+                "required_fields": ["email"], "optional_fields": [], "allow_signup": true },
+            "config_version": state.config_version, "webhook": { "url": null, "secret_set": false },
+            "stats": { "users": 2, "active_last_30d": 1, "imported_unclaimed": 0 } })
+}
+
+fn delivery(id: &str, status: &str) -> Value {
+    json!({ "id": id, "event_id": "e-1", "type": "silicon.updated", "account_uuid": SILICON_UUID,
+            "url": "https://scout.example/hooks", "status": status, "attempts": 12, "last_status": 503,
+            "last_error": null, "next_attempt_at": null, "last_attempt_at": "2026-10-06T12:00:00.000Z",
+            "delivered_at": null, "created_at": "2026-10-03T12:00:00.000Z", "manual_replays": 0 })
+}
+
+fn delivery_detail() -> Value {
+    let mut detail = delivery("d-1", "failed");
+    detail["attempt_count"] = json!(12);
+    detail["attempts"] = json!([{ "attempted_at": "2026-10-06T12:00:00.000Z", "status_code": 503, "error": null, "duration_ms": 41 }]);
+    detail["payload"] = json!({ "event_id": "e-1", "type": "silicon.updated", "silicon": SILICON_UUID, "data": { "uuid": SILICON_UUID } });
+    detail["payload_redacted"] = json!(false);
+    detail
+}
+
+fn replay_result(body: &Value) -> Value {
+    let replayed = match body.get("delivery_ids") {
+        Some(Value::Array(ids)) => ids
+            .iter()
+            .filter(|id| *id != "d-pending")
+            .cloned()
+            .collect(),
+        _ => vec![json!("d-1")],
+    };
+    let skipped: Vec<Value> = match body.get("delivery_ids") {
+        Some(Value::Array(ids)) if ids.iter().any(|id| id == "d-pending") => vec![json!({
+            "delivery_id": "d-pending", "reason": "already_pending",
+            "message": "Delivery d-pending is still being retried; it is not replayed."
+        })],
+        _ => Vec::new(),
+    };
+    json!({ "replayed": replayed, "skipped": skipped, "remaining": if body.get("status").is_some() { 3 } else { 0 },
+            "not_replayable": 1, "url": "https://scout.example/hooks" })
+}
+
 fn form(body: &str) -> HashMap<String, String> {
     url::form_urlencoded::parse(body.as_bytes())
         .into_owned()
@@ -200,15 +287,17 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
     let mut st = state.lock().unwrap();
     st.requests
         .push((method.clone(), path.clone(), auth.clone(), body.clone()));
+    st.queries
+        .push((method.clone(), path.clone(), query.clone()));
     let silicon_bearer = auth.as_deref() == Some(&format!("Bearer {}", st.access_token));
-    let carbon_bearer = auth.as_deref() == Some(&format!("Bearer {CARBON_TOKEN}"));
+    let carbon_bearer = auth.as_deref() == Some(&format!("Bearer {}", st.carbon_token));
     let basic = format!("Basic {}", base64_encode(&format!("{APP_ID}:{APP_SECRET}")));
     let app_auth = auth.as_deref() == Some(basic.as_str());
     let json_body: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
 
     let (status, value): (u16, Value) = match (method.as_str(), path.as_str()) {
         ("POST", "/v1/silicons/login") => {
-            if json_body["id"] == SILICON_ID && json_body["stk"] == STK {
+            if json_body["id"] == SILICON_ID && json_body["stk"] == st.stk.as_str() {
                 (200, silicon_tokens(&st))
             } else {
                 error(
@@ -254,7 +343,7 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
         }
         ("POST", "/v1/cli/login/verify") => {
             if json_body["challenge_id"] == "ch-1" && json_body["code"] == "123456" {
-                (200, carbon_tokens())
+                (200, carbon_tokens(&st))
             } else {
                 let (status, mut value) = error(
                     422,
@@ -282,14 +371,14 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
                 Some("authorization_code")
                     if f.get("code").map(String::as_str) == Some("sac_good") =>
                 {
-                    (200, carbon_tokens())
+                    (200, carbon_tokens(&st))
                 }
                 Some("urn:ietf:params:oauth:grant-type:device_code") => {
                     st.device_polls += 1;
                     if st.device_polls < 2 {
                         (400, json!({ "error": "authorization_pending" }))
                     } else {
-                        (200, carbon_tokens())
+                        (200, carbon_tokens(&st))
                     }
                 }
                 _ => (400, json!({ "error": "unsupported_grant_type" })),
@@ -365,16 +454,7 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
             201,
             json!({ "silicon": new_silicon("active"), "stk": STK, "webhook_secret": null }),
         ),
-        ("GET", "/v1/apps/briefcase") if app_auth => (
-            200,
-            json!({ "app_id": APP_ID, "name": "Briefcase", "description": "", "status": "active", "source": "fake",
-                    "owner": { "uuid": CARBON_UUID, "kind": "carbon", "id": CARBON_ID, "display_name": "Saket", "pfp_url": "", "status": "active" },
-                    "signin_config": { "methods": { "email": true, "google": true, "apple": false, "phone": false },
-                        "method_order": ["google", "apple", "email", "phone"], "redirect_uris": ["http://127.0.0.1:8593/briefcase/callback"],
-                        "required_fields": ["email"], "optional_fields": [], "allow_signup": true },
-                    "config_version": 4, "webhook": { "url": null, "secret_set": false },
-                    "stats": { "users": 2, "active_last_30d": 1, "imported_unclaimed": 0 } }),
-        ),
+        ("GET", "/v1/apps/briefcase") if app_auth => (200, app_details(&st)),
         ("GET", "/v1/apps/briefcase") => error(
             401,
             "invalid_client",
@@ -429,14 +509,97 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
             "The app credentials were rejected.",
             "Check the app id and secret.",
         ),
-        ("POST", "/v1/reports") => (
-            201,
-            json!({ "report_id": "rep-1", "status": "queued", "recipients": 3 }),
+        ("POST", "/v1/reports") => {
+            if json_body["message"]
+                .as_str()
+                .unwrap_or_default()
+                .chars()
+                .count()
+                > 10_000
+            {
+                error(
+                    422,
+                    "validation_failed",
+                    "The report message is longer than 10000 characters.",
+                    "Shorten it.",
+                )
+            } else {
+                (
+                    201,
+                    json!({ "report_id": "rep-1", "status": "queued", "recipients": 3 }),
+                )
+            }
+        }
+        // A Silicon's own webhook deliveries, and its custodian's view of them.
+        ("GET", "/v1/me/webhook/deliveries") if silicon_bearer => (
+            200,
+            json!({ "items": [delivery("d-1", "failed")], "next_cursor": null }),
+        ),
+        ("GET", "/v1/me/silicons/b9Z/webhook/deliveries") if carbon_bearer => (
+            200,
+            json!({ "items": [delivery("d-1", "failed")], "next_cursor": "c-2" }),
+        ),
+        ("GET", "/v1/me/webhook/deliveries/d-1") if silicon_bearer => (200, delivery_detail()),
+        ("GET", "/v1/me/silicons/b9Z/webhook/deliveries/d-1") if carbon_bearer => {
+            (200, delivery_detail())
+        }
+        ("POST", "/v1/me/webhook/replay") if silicon_bearer => (200, replay_result(&json_body)),
+        ("POST", "/v1/me/silicons/b9Z/webhook/replay") if carbon_bearer => {
+            (200, replay_result(&json_body))
+        }
+        ("GET", "/v1/me/silicons") if carbon_bearer => (
+            200,
+            json!({ "items": [{ "silicon": new_silicon("active"), "pending_transfer": null }], "next_cursor": null }),
+        ),
+        ("GET", "/v1/apps/briefcase/imports/job-failed") if app_auth => {
+            let mut job = import_job("failed", 1);
+            job["id"] = json!("job-failed");
+            job["error"] = json!(
+                "The worker processing this import stopped (the server restarted or crashed) more than twice."
+            );
+            (200, json!({ "job": job }))
+        }
+        ("GET", "/v1/apps/briefcase/imports/job-dry") if app_auth => {
+            let mut job = import_job("completed", 3);
+            job["id"] = json!("job-dry");
+            job["dry_run"] = json!(true);
+            (200, json!({ "job": job }))
+        }
+        ("PATCH", "/v1/apps/briefcase/signin-config") if app_auth => {
+            // Like the service: a patch that changes nothing makes no new version.
+            if let Some(uris) = json_body.get("redirect_uris")
+                && *uris != st.redirect_uris
+            {
+                st.redirect_uris = uris.clone();
+                st.config_version += 1;
+            }
+            (200, app_details(&st))
+        }
+        ("GET", "/v1/apps/briefcase/signin-config/history") if app_auth => (
+            200,
+            json!({ "items": [{ "version": st.config_version, "actor": CARBON_UUID,
+                "actor_account": { "uuid": CARBON_UUID, "kind": "carbon", "id": CARBON_ID, "display_name": "Saket", "pfp_url": "", "status": "active" },
+                "changes": [{ "path": "redirect_uris", "before": [], "after": st.redirect_uris }],
+                "at": "2026-10-06T12:00:00.000Z" }], "next_cursor": null }),
         ),
         ("POST", "/v1/telemetry/events") => {
             st.telemetry_batches
                 .push(serde_json::from_str(&body).unwrap_or(Value::Null));
             (202, json!({}))
+        }
+        // Like the service: a revoked or unknown access token is refused on every account route.
+        (_, p)
+            if p.starts_with("/v1/me")
+                && auth.as_deref().is_some_and(|a| a.starts_with("Bearer "))
+                && !silicon_bearer
+                && !carbon_bearer =>
+        {
+            error(
+                401,
+                "unauthenticated",
+                "The access token is missing, expired or revoked.",
+                "Sign in again.",
+            )
         }
         _ => error(
             404,
@@ -496,6 +659,32 @@ impl Env {
 
     pub fn state_file(&self, name: &str) -> PathBuf {
         self.home.path().join(".accounts").join(name)
+    }
+
+    /// The same isolated command as [`Env::cmd`], as a `std::process::Command` (for a test that
+    /// chooses where stdout goes).
+    pub fn std_cmd(&self) -> std::process::Command {
+        let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_accounts"));
+        for var in [
+            "SILICON_HOME",
+            "ACCOUNTS_HOME",
+            "ACCOUNTS_URL",
+            "ACCOUNTS_SILICON",
+            "ACCOUNTS_STK",
+            "ACCOUNTS_APP_ID",
+            "ACCOUNTS_APP_SECRET",
+            "ACCOUNTS_TIMEOUT_SECONDS",
+            "ACCOUNTS_ALLOW_INSECURE_HTTP",
+            "TZ",
+        ] {
+            cmd.env_remove(var);
+        }
+        cmd.env("HOME", self.home.path())
+            .env("ACCOUNTS_TELEMETRY", "0")
+            .env("ACCOUNTS_NO_BROWSER", "1")
+            .env("NO_COLOR", "1")
+            .env("HOSTNAME", "test-host");
+        cmd
     }
 
     pub fn cmd(&self) -> assert_cmd::Command {

@@ -6,8 +6,8 @@
  * the same email later signs up a brand-new account (a uuid is never reused).
  */
 import type { Journey } from "../../context";
-import { api, codeFor, json, lastSeq, newContext, postJson, shot, signInOnSite, sleep, sql, tag } from "../../lib";
-import { appAuth, appRefresh, appUserinfo, call, codeOf, deliveredAfter, getMe, hold, inbox, messageOf, newCarbon, probePage, queuedEvents, requestSent, signInAgain, signIntoApp, until, waitEvent } from "./_helpers";
+import { api, codeFor, developerApi, json, lastSeq, newContext, postJson, shot, signInOnDeveloper, signInOnSite, sleep, sql, tag } from "../../lib";
+import { DEVELOPER_SESSION_ENDED, appAuth, appRefresh, appUserinfo, call, codeOf, deliveredAfter, getMe, hold, inbox, messageOf, newCarbon, probePage, queuedEvents, requestSent, signInAgain, signIntoApp, timelineRows, until, waitEvent } from "./_helpers";
 
 interface Created {
   silicon?: { uuid: string; id: string };
@@ -76,6 +76,18 @@ const blocked: Journey = {
     const request = requests.find(item => item.silicon.uuid === sb?.uuid);
     const accepted = await call(heir.probe, `/v1/me/custodian-requests/${request?.id}/accept`, { method: "POST" });
     results.check("the other Carbon accepts the transfer", accepted.status === 204 && (await getMe(keeper.probe)).custodian_of === 0 && (await getMe(heir.probe)).custodian_of === 1, `${accepted.status}`);
+    // Every custodian change is kept (UNDERSTANDING.md "Custodian", "History"): each Carbon's activity has its side.
+    const custody = async (probe: typeof keeper.probe) => (await call<{ items: Array<{ title: string }> }>(probe, "/v1/me/history?kind=custodian&limit=20")).body.items.map(item => item.title);
+    const keeperCustody = await custody(keeper.probe);
+    const heirCustody = await custody(heir.probe);
+    results.check("the keeper's activity: both Silicons created, the second transferred to the heir", keeperCustody.filter(title => title.startsWith("Created the Silicon ")).length === 2 && keeperCustody.includes(`Created the Silicon ${sb?.id}`) && keeperCustody.includes(`Transferred ${sb?.id} to ${heir.id}`), keeperCustody.join(" | "));
+    results.check("the heir's activity: it became the custodian, transferred from the keeper", heirCustody.includes(`Became the custodian of ${sb?.id} (transferred from ${keeper.id})`), heirCustody.join(" | "));
+    await keeper.page.goto(`${env.site}/activity`);
+    await keeper.page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Custodian", exact: true }).click({ timeout: 30_000 });
+    const custodianRows = await until(() => timelineRows(keeper.page), rows => rows.length >= keeperCustody.length, 10_000);
+    await shot(env, keeper.page, "acct-delete-01b-custodian-activity");
+    results.check("…and /activity's Custodian filter shows exactly those entries, newest first (the request, then the transfer)", custodianRows.length === keeperCustody.length && keeperCustody.every((title, index) => (custodianRows[index] ?? "").startsWith(title)) && keeperCustody.includes(`Transfer of ${sb?.id} to ${heir.id} requested`), custodianRows.join(" | "));
+    await keeper.page.goto(`${env.site}/settings`);
     await keeper.page.reload();
     await section.getByText(/Your account ends for good/).waitFor({ timeout: 30_000 }).catch(() => undefined);
     await sleep(600);
@@ -109,6 +121,12 @@ const deletion: Journey = {
     const removed = await call(leaver.probe, "/v1/me/apps/browser", { method: "DELETE" });
     const proof = (await postJson<{ body?: { proof_token?: string } }>(`${env.apps}/briefcase/actions/issue-obo`, { uuid, receiving_app: "commit", scopes: ["files.read"] })).body.body?.proof_token ?? "";
     const second = await signInAgain(ctx, leaver.email, "acct-leaver-2");
+    // The developer site too (developer.teamofsilicons.com, the first-party app `developer`): its server holds tokens
+    // for this Carbon, which the deletion must end like every other sign-in.
+    const developer = await leaver.context.newPage();
+    results.watch(developer, "acct-leaver-developer", [DEVELOPER_SESSION_ENDED]);
+    await signInOnDeveloper(env, developer, null);
+    const devBefore = await developerApi<{ uuid?: string }>(env, developer, "/me");
     const after = await lastSeq(env);
     const start = await api<{ challenge_id?: string }>(ctx, "/v1/cli/login/start", { method: "POST", json: { email: leaver.email } });
     const code = await codeFor(env, leaver.email, after);
@@ -119,7 +137,11 @@ const deletion: Journey = {
     const orphanId = `si:orphan-${t}`;
     const orphan = await api<{ request?: { id: string }; request_token?: string; webhook_secret?: string; silicon?: { uuid: string } }>(ctx, "/v1/silicons", { method: "POST", json: { id: orphanId, display_name: `Orphan ${t}`, custodian: leaver.id, webhook_url: `${env.apps}/hooks/${hook}` } });
     await postJson(`${env.apps}/hooks/${hook}/_webhook-secret`, { secret: orphan.body.webhook_secret });
-    results.check("setup: Browser's access removed, a proof for Commit, a second browser, the CLI, a Silicon waiting for this Carbon", removed.status === 204 && !!proof && cliTokens.status === 200 && orphan.status === 201, `${removed.status} ${!!proof} ${cliTokens.status} ${orphan.status}`);
+    // Another Carbon is handing a Silicon over to this one, still waiting for the answer.
+    const handed = await call<Created>(taker.probe, "/v1/me/silicons", { method: "POST", json: { id: `si:handover-${t}`, display_name: `Handover ${t}` } });
+    const handedUuid = handed.body.silicon?.uuid ?? "";
+    const handover = await call(taker.probe, `/v1/me/silicons/${handedUuid}/transfer`, { method: "POST", json: { to: leaver.id } });
+    results.check("setup: Browser's access removed, a proof for Commit, a second browser, the CLI, the developer site, a Silicon waiting for this Carbon, another Carbon's Silicon being handed to it", removed.status === 204 && !!proof && cliTokens.status === 200 && devBefore.status === 200 && devBefore.body.uuid === uuid && orphan.status === 201 && handed.status === 201 && handover.status === 201, `${removed.status} ${!!proof} ${cliTokens.status} ${devBefore.status} ${orphan.status} ${handed.status} ${handover.status}`);
     const verifyProof = async () => (await postJson<{ verification?: { valid?: boolean; expires_at?: string | null } }>(`${env.apps}/commit/api/verify-proof`, { proof_token: proof })).body.verification ?? {};
     results.check("setup: the proof verifies before the deletion", (await verifyProof()).valid === true);
     const seq = { briefcase: (await inbox(env, "briefcase")).last_seq, commit: (await inbox(env, "commit")).last_seq };
@@ -157,6 +179,8 @@ const deletion: Journey = {
     const other = await call(second.probe, "/v1/session");
     const cli = await api(ctx, "/v1/me", { headers: bearer });
     results.check("this browser, the other browser and the CLI are all signed out (401)", own.status === 401 && other.status === 401 && cli.status === 401, `${own.status} ${other.status} ${cli.status}`);
+    const devAfter = await developerApi<{ error?: { code?: string } }>(env, developer, "/me");
+    results.check("…and so is the developer site (its next call answers 401)", devAfter.status === 401, `${devAfter.status} ${codeOf(devAfter.body)}`);
     const leftCookies = (await leaver.context.cookies(env.site)).filter(entry => /sa_session$/.test(entry.name)).map(entry => entry.name);
     results.check("…and this browser no longer holds a session cookie (the deletion cleared it)", leftCookies.length === 0, leftCookies.join(", ") || "none");
     await second.context.close();
@@ -196,6 +220,12 @@ const deletion: Journey = {
     results.check("its request is closed and the Silicon released", status2.status === 200 && status2.body.status !== "pending" && status2.body.silicon?.status === "deleted", JSON.stringify(status2.body).slice(0, 200));
     const orphanFree = await api<{ available: boolean }>(ctx, `/v1/ids/available?id=${encodeURIComponent(orphanId)}`);
     results.check("…its si:id is free again at once (it never became active)", orphanFree.body.available === true, JSON.stringify(orphanFree.body));
+
+    // The Silicon being handed to it stays with the Carbon handing it over, and that hand-over is closed.
+    const [[handoverStatus] = []] = await sql(env, `select status from custodian_requests where silicon_uuid = '${handedUuid}' order by created_at desc limit 1`);
+    const kept = await call<{ custodian?: { uuid?: string } | null; pending_transfer?: unknown }>(taker.probe, `/v1/me/silicons/${handedUuid}`);
+    const keptBy = kept.body.custodian?.uuid;
+    results.check("a Silicon another Carbon was handing to it stays with that Carbon, and the hand-over is closed (no longer pending)", handoverStatus !== undefined && handoverStatus !== "pending" && kept.status === 200 && keptBy === taker.uuid && kept.body.pending_transfer === null && (await getMe(taker.probe)).custodian_of === 1, `request ${handoverStatus}; ${kept.status} custodian ${keptBy} (want ${taker.uuid}), pending_transfer ${JSON.stringify(kept.body.pending_transfer)}`);
 
     // The email is free: signing in with it is a sign-up, for a new account with a new uuid.
     const context = await newContext(ctx.browser);

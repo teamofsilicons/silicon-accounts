@@ -16,7 +16,7 @@ Timestamps are RFC 3339 UTC with milliseconds. Lists are `{"items":[…],"next_c
 | route | auth | response |
 |---|---|---|
 | `GET /v1/ids/available?id=c:saket` | public, 120/min per IP (429 `rate_limited`) | `{"id","available","reason":"taken"\|"reserved"\|"reserved_word"\|"invalid"\|null,"message","reclaimable","suggestions":[…]}`; `suggestions` holds up to 3 free ids close to the one asked for (empty when it is available or has no prefix); with a session, an id reserved for the caller is `available:true, reclaimable:true`; a custodian adds `&for=<uuid or si:id>` of one of its Silicons to ask for that Silicon (an id reserved for it is `available:true, reclaimable:true`, and the message names the Silicon; another Carbon's Silicon → 404 `silicon_not_found`; no session → 401 `unauthenticated`; a blank `for` is ignored); invalid ids are a 200 answer; missing `id` → 400 `invalid_query` |
-| `GET /v1/accounts/{uuid}` | app or session; 600 per minute per app or per account, both lookup routes together (429 `rate_limited`) | AccountSummary `{"uuid","kind","id","display_name","pfp_url","status"}`; Silicons add `"custodian": AccountSummary\|null`. 400 `invalid_uuid` (the hint points to by-id when given an id), 404 `account_not_found`, 404 `account_deleted` |
+| `GET /v1/accounts/{uuid}` | app or session; 600 per minute per app or per account, both lookup routes together (429 `rate_limited`) | session: AccountSummary `{"uuid","kind","id","display_name","pfp_url","status"}`; Silicons add `"custodian": AccountSummary\|null`. app: the public identity only, `{"uuid","kind","id","status"}`; Silicons add `"custodian": {"uuid","id"}\|null` (never a display name or photo: an account shares those with an app by signing in to it and takes them back by removing its access, so apps read them from their user base, `GET /v1/apps/{app_id}/users/{uuid}`). 400 `invalid_uuid` (the hint points to by-id when given an id), 404 `account_not_found`, 404 `account_deleted` |
 | `GET /v1/accounts/by-id/{id}` | app or session; same limit | same view; current ids only. 400 `invalid_id`, 404 `account_not_found` (hint says when the id was released recently) |
 
 ## Profile and id (`session`, Carbons and Silicons)
@@ -99,13 +99,16 @@ primary that gets verified (apps see `email_verified` / `phone_verified` change)
   `identity_not_found`, 409 `last_sign_in_method` (no email or phone left to sign in with).
 - `GET /v1/me/apps?status=active|access_removed|imported&limit&cursor` → items
   `{"app":{"app_id","name","logo_url","logo_dark_url","homepage_url"},"membership_id","status","source","granted_scopes","first_signed_in_at","last_signed_in_at","access_removed_at","active_sessions"}`,
-  most recently used first; the first-party app is not listed.
+  most recently used first; the first-party apps (`accounts`: the account site and CLI;
+  `developer`: the developer platform) are not listed.
 - `DELETE /v1/me/apps/{app_id}` → 204: the app's token families for the account and the OBO
   proofs it issued about the account are revoked, the membership becomes `access_removed`, the
   app gets `membership.access_removed`. Repeating it does nothing (no second webhook). 404
-  `membership_not_found`, 400 `first_party_app`.
-- `GET /v1/me/sessions?limit&cursor` → items `{"id","kind":"browser"|"cli","label","origin","ip","user_agent","created_at","last_seen_at","expires_at","current"}`
-  (browser sessions and live `aud=accounts` token families), newest first. A browser session's
+  `membership_not_found`, 400 `first_party_app` for `accounts` and `developer` (Silicon
+  Accounts' own apps hold sessions, not access: the hint points to `DELETE /v1/me/sessions/{id}`).
+- `GET /v1/me/sessions?limit&cursor` → items `{"id","kind":"browser"|"cli"|"developer","label","origin","ip","user_agent","created_at","last_seen_at","expires_at","current"}`
+  (browser sessions, live `aud=accounts` token families as `cli` and live `aud=developer` ones
+  as `developer`, labelled "Silicon Developer (developer.teamofsilicons.com)"), newest first. A browser session's
   `label` describes its user agent the way sign-in history does (`sessions::describe_user_agent`):
   "Safari on macOS" for a browser (only a `Mozilla/…` or `Opera/…` agent is ever called one, "A
   browser" when it isn't recognized), "accounts CLI 0.1.0" for the CLI
@@ -147,7 +150,11 @@ the address when the entry records it as `details.email` / `details.phone`), `id
 → "Google account connected", `session.created` → "New CLI sign-in", `device.approved` →
 "Approved a terminal sign-in", `signin.locked` → "Too many wrong codes for s***@example.com",
 `oauth.refresh_reuse_detected` → "Sign-in at DM ended"; an action nobody mapped yet shows its
-code in words.
+code in words. Sign-outs are named as what was signed out: `account.session.revoked` (Settings)
+→ "A browser session was signed out", "A CLI sign-in was signed out" or "A developer site
+sign-in was signed out" (detail "Silicon Developer (developer.teamofsilicons.com)"), and
+`oauth.token_revoked` of a first-party sign-in → "Signed out of a CLI sign-in" (the family's
+label as detail, never the internal `code:…` marker) or "Signed out of the developer site".
 
 ## Deleting the account
 

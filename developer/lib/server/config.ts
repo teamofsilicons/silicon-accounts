@@ -72,20 +72,24 @@ export function allowedOrigins(): Set<string> {
   return out;
 }
 
-const DEV_SECRET = "silicon-accounts-developer-site-dev-only-session-secret-0001";
+/** The development secret. It is written here, so anyone can read it: production refuses it. */
+export const DEV_SECRET = "silicon-accounts-developer-site-dev-only-session-secret-0001";
 let warned = false;
 
-/** The secret the session cookies are sealed with. Development has a fixed, public one; production must set its own. */
+/**
+ * The secret the session cookies are sealed with. Development has a fixed, public one; production must set its own, and
+ * refuses a missing one, a short one, or the public development secret (cookies sealed with it could be opened, and
+ * forged, by anyone who read this file).
+ */
 export function sessionSecret(): string {
   const value = process.env.DEVELOPER_SESSION_SECRET?.trim();
-  if (value && value.length >= 32) return value;
   if (isProduction()) {
-    throw new Error(
-      value
-        ? `DEVELOPER_SESSION_SECRET is ${value.length} characters; it must be at least 32 (generate one with: openssl rand -base64 48).`
-        : "DEVELOPER_SESSION_SECRET is not set. The developer site seals its session cookies with it; set at least 32 random characters (openssl rand -base64 48).",
-    );
+    if (!value) throw new Error("DEVELOPER_SESSION_SECRET is not set. The developer site seals its session cookies with it; set at least 32 random characters (openssl rand -base64 48).");
+    if (value.length < 32) throw new Error(`DEVELOPER_SESSION_SECRET is ${value.length} characters; it must be at least 32 (generate one with: openssl rand -base64 48).`);
+    if (value === DEV_SECRET) throw new Error("DEVELOPER_SESSION_SECRET is the public development secret from the developer site's source; anyone could open or forge its cookies. Generate one with: openssl rand -base64 48.");
+    return value;
   }
+  if (value && value.length >= 32) return value;
   if (!warned) {
     warned = true;
     console.warn("developer site: DEVELOPER_SESSION_SECRET is not set, so session cookies are sealed with the public development secret. Never run like this in production.");

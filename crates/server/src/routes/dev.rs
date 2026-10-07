@@ -1,6 +1,8 @@
 //! `GET /v1/dev/outbox`: the messages this service recorded (local delivery mode stores them
 //! instead of sending), newest first, with the 6-digit code parsed out of verification-code
-//! messages so tests and local development can sign in without a mailbox.
+//! messages so tests and local development can sign in without a mailbox. With
+//! ACCOUNTS_DELIVERY=providers a code message's stored subject and bodies show the code as
+//! `••••••`; the outbox opens its sealed copy (kept while the outbox is on) to show the real ones.
 //!
 //! Served only when ACCOUNTS_EXPOSE_DEV_OUTBOX=true and the environment is not production. In
 //! production the route answers exactly like a route that does not exist.
@@ -40,6 +42,7 @@ struct OutboxRow {
     last_error: Option<String>,
     created_at: OffsetDateTime,
     sent_at: Option<OffsetDateTime>,
+    sealed_body: Option<Vec<u8>>,
 }
 
 /// One message in the outbox.
@@ -86,7 +89,7 @@ pub async fn outbox(
         .map(str::trim)
         .filter(|s| !s.is_empty());
     let rows = sqlx::query_as::<_, OutboxRow>(
-        "select id, channel, to_address, subject, text_body, purpose, status, attempts, last_error, created_at, sent_at \
+        "select id, channel, to_address, subject, text_body, purpose, status, attempts, last_error, created_at, sent_at, sealed_body \
          from outbound_messages \
          where ($1::text is null or lower(to_address) = lower($1)) and ($2::text is null or purpose = $2) \
          order by created_at desc, id desc limit $3",
@@ -98,23 +101,35 @@ pub async fn outbox(
     .await?;
     let items: Vec<OutboxItem> = rows
         .into_iter()
-        .map(|r| OutboxItem {
-            code: if r.purpose.starts_with("otp_") {
-                delivery::extract_code(&r.text_body)
-            } else {
-                None
-            },
-            id: r.id,
-            channel: r.channel,
-            to: r.to_address,
-            subject: r.subject,
-            text_body: r.text_body,
-            purpose: r.purpose,
-            status: r.status,
-            attempts: r.attempts,
-            last_error: r.last_error,
-            created_at: r.created_at,
-            sent_at: r.sent_at,
+        .map(|r| {
+            // A code message keeps its code only sealed (ACCOUNTS_DELIVERY=providers): show the
+            // message as it was sent. One that can't be opened shows as stored (code redacted).
+            let opened = r
+                .sealed_body
+                .as_deref()
+                .and_then(|sealed| delivery::open_sealed(&state.settings, sealed).ok());
+            let (subject, text_body) = match opened {
+                Some(body) => (body.subject, body.text),
+                None => (r.subject, r.text_body),
+            };
+            OutboxItem {
+                code: if r.purpose.starts_with("otp_") {
+                    delivery::extract_code(&text_body)
+                } else {
+                    None
+                },
+                id: r.id,
+                channel: r.channel,
+                to: r.to_address,
+                subject,
+                text_body,
+                purpose: r.purpose,
+                status: r.status,
+                attempts: r.attempts,
+                last_error: r.last_error,
+                created_at: r.created_at,
+                sent_at: r.sent_at,
+            }
         })
         .collect();
     Ok(Json(json!({ "items": items, "next_cursor": null })))

@@ -55,6 +55,20 @@ function accentLine(p: Palette): string | null {
   return legibleTint(p.primary, p.foreground, [p.background, p.surface], 3);
 }
 
+/**
+ * Accent-coloured text on the accent tint (an info badge's words on --accent-subtle, the active tab, a hovered link):
+ * --accent-strong, at 4.5:1 on the tint over the card and over the page, on the tint a hovered badge lays (10 %), and
+ * on the page and the card themselves. The theme's own ink is the primary 22 % of the way to the text colour; it reads
+ * in light, but in dark it stays close to the primary (the default dark #1F5FB8 gives #5383C9, 2.9:1 on its tint
+ * #313C4A; the site's own dark ink is #93B8F1), so it moves on toward the text colour until it reads, as --accent-ink
+ * does (#85A7D9 there, 4.55:1). Null keeps that ink.
+ */
+export function accentStrong(p: Palette, dark: boolean): string | null {
+  const tint = dark ? 0.18 : 0.11;
+  const grounds = [p.background, p.surface, mixHex(p.surface, p.primary, tint), mixHex(p.background, p.primary, tint), mixOklab(p.surface, p.primary, 0.1)];
+  return legibleTint(p.primary, p.foreground, grounds, LIMITS.minContrast, 0.22);
+}
+
 /** The custom properties a branding paints in one theme. */
 export function brandingVariables(input: Branding | Partial<Branding> | null | undefined, theme: PaintTheme): Record<string, string> {
   const branding = normalizeBranding(input as Partial<Branding>);
@@ -74,7 +88,8 @@ export function brandingVariables(input: Branding | Partial<Branding> | null | u
     "--border-subtle": mix(p.border, 55, p.surface),
     "--border-strong": mix(p.border, 74, p.foreground),
     "--accent": p.primary,
-    "--accent-strong": mix(p.primary, 78, p.foreground),
+    // Text on the tint (info badges, the active tab): it must read there in both themes (accentStrong).
+    "--accent-strong": accentStrong(p, dark) ?? mix(p.primary, 78, p.foreground),
     "--accent-subtle": mix(p.primary, dark ? 18 : 11, "transparent"),
     "--accent-foreground": p.primary_foreground,
     // Accent-coloured text on dark surfaces needs a lighter ink than a fill does; on any palette it must read (accentInk).

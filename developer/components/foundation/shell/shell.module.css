@@ -66,9 +66,12 @@
 @media (hover: hover) and (pointer: fine) { .search:hover { --sq-fill: var(--surface); --sq-stroke: var(--border-strong); color: var(--foreground); } }
 .search:focus-visible { --sq-fill: var(--surface); --sq-stroke: var(--border-strong); color: var(--foreground); }
 .search kbd { --sq-r: 8px; --sq-fill: var(--surface-muted); --sq-stroke: var(--border); display: inline-flex; height: 24px; min-width: 38px; align-items: center; justify-content: center; padding: 0 6px; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--text-muted); font-family: var(--font-body); font-size: var(--text-xs); }
+/* On phones the button is its icon alone: the words stay for screen readers (they are the button's only name; hidden
+   with display: none the button had none), clipped out of sight instead of removed. */
 @media (max-width: 639px) {
-  .search { width: 36px; justify-content: center; padding: 0; }
-  .searchLabel, .search kbd { display: none; }
+  .search { position: relative; width: 36px; justify-content: center; padding: 0; }
+  .searchLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .search kbd { display: none; }
 }
 
 .main { position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; outline: none; }

@@ -7,8 +7,8 @@
  * window passing (time travel: the buckets' rows) lets the network in again.
  */
 import type { Journey } from "../../context";
-import { forgetRateLimits, randomIp, sleep, tag } from "../../lib";
-import { brief, call, errorOf, remember, signInWithEmail, viaSite, type Reply } from "./_helpers";
+import { codeFor, forgetRateLimits, lastSeq, randomIp, sleep, sql, tag } from "../../lib";
+import { brief, call, callbackOf, errorOf, flowOf, flowStep, forgetCodesTo, randomEmail, remember, signInWithEmail, startFlow, viaSite, Jar, type Reply } from "./_helpers";
 
 /** What is wrong with a 429 (empty: nothing). */
 function limitProblems(reply: Reply, perWindow: string, maxRetry: number): string[] {
@@ -31,7 +31,7 @@ async function burst<T>(count: number, width: number, one: (i: number) => Promis
 
 export const journey: Journey = {
   name: "security-rate-limits",
-  title: "rate limits: ids/available 120/min, reports 5/hour (idempotent replay free, new key no help, only accepted reports mailed), Silicon sign-in 60/min before Argon2, self-creation 10/hour; 429 + Retry-After + details; a forged left-most X-Forwarded-For doesn't escape; other networks unaffected; the window passing lets the network in",
+  title: "rate limits: ids/available 120/min, reports 5/hour (idempotent replay free, new key no help, only accepted reports mailed), Silicon sign-in 60/min before Argon2, self-creation 10/hour, codes 10 per address and 30 per network per 10 minutes, 10 wrong codes → a 1-minute cooldown (right code and other flows included); 429 + Retry-After + details; a forged left-most X-Forwarded-For doesn't escape; other networks unaffected; the window passing lets the network in",
   engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
@@ -112,7 +112,63 @@ export const journey: Journey = {
     results.check("Silicon self-creation: 10 in an hour from one network are created, the 11th is 429 with Retry-After", created.every(reply => reply.status === 201) && createProblems.length === 0, `${created.map(reply => reply.status).join(",")}; 11th: ${createProblems.join("; ") || brief(eleventh)}`);
     await forgetRateLimits(env, createIp);
 
-    // 5. Request size limits: a public endpoint refuses an oversized body before reading it (64 KB by default), with a
+    // 5. Verification codes (UNDERSTANDING.md "Email and phone verification"): 10 codes per address, then wait 10
+    //    minutes, whichever flow or network asks (and 30 per network over all addresses); after 10 wrong codes in a row a
+    //    1-minute cooldown, even for the right code and for codes another flow sent to the same address.
+    const sendFrom = async (email: string, ip: string) => {
+      const target = { ...t, ip };
+      const jar = new Jar();
+      const created = flowOf(await startFlow(target, jar, { app_id: "briefcase", redirect_uri: callbackOf(env, "briefcase"), state: `otp-${tag()}` }));
+      const reply = await flowStep(target, jar, created?.id ?? "", "email", { email });
+      return { reply, jar, id: created?.id ?? "" };
+    };
+    const destination = randomEmail("otp-limit");
+    const sends = [];
+    for (let i = 0; i < 10; i++) sends.push((await sendFrom(destination, randomIp())).reply);
+    const eleventhCode = (await sendFrom(destination, randomIp())).reply;
+    const eleventhProblems = limitProblems(eleventhCode, "10 per 10 minutes", 600);
+    const masked = !(errorOf(eleventhCode).message ?? "").includes(destination);
+    results.check("codes to one address: 10 in 10 minutes are sent (each from a new flow and network), the 11th is 429 rate_limited with Retry-After (≤ 600 s), says the limit and names the address only masked", sends.every(reply => reply.status === 200) && eleventhProblems.length === 0 && masked, `${sends.map(reply => reply.status).join(",")}; 11th: ${eleventhProblems.join("; ") || brief(eleventhCode)}${masked ? "" : " (the address in clear)"}`);
+    const otherAddress = (await sendFrom(randomEmail("otp-other"), randomIp())).reply;
+    await forgetCodesTo(env, destination);
+    const afterWindow2 = (await sendFrom(destination, randomIp())).reply;
+    results.check("…another address is unaffected, and once the 10 minutes have passed (time travel: the codes' rows) the address gets codes again", otherAddress.status === 200 && afterWindow2.status === 200, `other address ${brief(otherAddress)}; after the window ${brief(afterWindow2)}`);
+    const network = randomIp();
+    const perNetwork = [];
+    for (let i = 0; i < 30; i++) perNetwork.push((await sendFrom(randomEmail(`otp-net${i}`), network)).reply);
+    const thirtyFirst = (await sendFrom(randomEmail("otp-net31"), network)).reply;
+    const elsewhere2 = (await sendFrom(randomEmail("otp-net-other"), randomIp())).reply;
+    const networkProblems = limitProblems(thirtyFirst, "per", 600);
+    results.check("codes from one network: 30 to 30 addresses in 10 minutes are sent, the 31st is 429 rate_limited with Retry-After, another network is unaffected", perNetwork.every(reply => reply.status === 200) && networkProblems.length === 0 && elsewhere2.status === 200, `${perNetwork.filter(reply => reply.status === 200).length}/30 sent; 31st: ${networkProblems.join("; ") || brief(thirtyFirst)}; another network ${elsewhere2.status}`);
+    await forgetRateLimits(env, network);
+
+    const lockEmail = randomEmail("otp-lock");
+    const at = await lastSeq(env);
+    const locking = await sendFrom(lockEmail, randomIp());
+    const rightCode = await codeFor(env, lockEmail, at);
+    remember(ctx, "code", rightCode);
+    const lockTarget = { ...t, ip: randomIp() };
+    const wrongs: Reply[] = [];
+    for (let i = 0; i < 10; i++) {
+      const wrong = String((Number(rightCode) + 1 + i) % 1_000_000).padStart(6, "0");
+      wrongs.push(await flowStep(lockTarget, locking.jar, locking.id, "verify", { code: wrong }));
+    }
+    const remaining = wrongs.map(reply => Number(errorOf(reply).details?.remaining_attempts));
+    const tenth = wrongs[9]!;
+    const tenthRetry = Number(tenth.headers.get("retry-after"));
+    const rightDuringLock = await flowStep(lockTarget, locking.jar, locking.id, "verify", { code: rightCode });
+    // A code another flow sends to the same address during the cooldown doesn't get around it.
+    const at2 = await lastSeq(env);
+    const second = await sendFrom(lockEmail, randomIp());
+    const secondCode = await codeFor(env, lockEmail, at2).catch(() => "");
+    remember(ctx, "code", secondCode);
+    const otherFlowDuringLock = secondCode ? await flowStep(lockTarget, second.jar, second.id, "verify", { code: secondCode }) : null;
+    results.check("10 wrong codes in a row: 422 invalid_code counting down 9…1, the 10th says 0 with locked_until and Retry-After (≤ 60 s); then even the right code gets 423 verification_locked, and so does the right code of another flow sent to the same address", wrongs.slice(0, 9).every(reply => reply.status === 422 && errorOf(reply).code === "invalid_code") && remaining.slice(0, 9).join(",") === "9,8,7,6,5,4,3,2,1" && tenth.status === 422 && remaining[9] === 0 && !!errorOf(tenth).details?.locked_until && tenthRetry >= 1 && tenthRetry <= 60 && rightDuringLock.status === 423 && errorOf(rightDuringLock).code === "verification_locked" && otherFlowDuringLock?.status === 423, `remaining ${remaining.join(",")}; 10th ${brief(tenth)} (Retry-After ${tenth.headers.get("retry-after")}); right code ${brief(rightDuringLock)}; another flow's code ${otherFlowDuringLock ? brief(otherFlowDuringLock) : "no code arrived"}`);
+    await sql(env, `update otp_challenges set locked_until = now() - interval '1 second' where destination = '${lockEmail}' and locked_until is not null`);
+    const afterCooldown = await flowStep(lockTarget, second.jar, second.id, "verify", { code: secondCode });
+    results.check("…once the minute has passed (time travel: the codes' locked_until) the right code verifies", afterCooldown.status === 200 && (flowOf(afterCooldown)?.step ?? "") === "signup", brief(afterCooldown));
+
+    // 6. Request size limits: a public endpoint refuses an oversized body before reading it (64 KB by default), with a
     //    declared length and when streamed without one, through the site and straight at accounts-api.
     const big = JSON.stringify({ id: "si:x", stk: "stk-0123456789ab", client_label: "x".repeat(70 * 1024) });
     const declared = await call(`${env.site}/v1/silicons/login`, { body: big, contentType: "application/json", ip: randomIp() });

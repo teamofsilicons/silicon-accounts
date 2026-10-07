@@ -329,7 +329,7 @@ async fn apply(
                 row.version
             ),
         )
-        .hint("GET /v1/apps/{app_id} for the current config and config_version, re-apply your change, and send it again.")
+        .hint(format!("GET /v1/apps/{app_id} for the current config and config_version, re-apply your change, and send it again."))
         .detail("expected_version", expected)
         .detail("current_version", row.version));
     }

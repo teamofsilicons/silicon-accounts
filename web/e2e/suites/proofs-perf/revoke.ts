@@ -22,6 +22,7 @@ import {
   signInToApp,
   SiteSession,
   verifyAs,
+  watchOutside,
   type ApiErrorBody,
   type IssuedProof,
   type MyProofItem,
@@ -117,6 +118,7 @@ export const journeys: Journey[] = [
       await carbon.session.into(context);
       const page = await context.newPage();
       results.watch(page, "revoke-on-site");
+      const outside = watchOutside(page);
       await page.goto(`${env.site}/proofs`);
       const cardOf = (scope: string) => page.getByRole("article", { name: "DM acts at Briefcase for you" }).filter({ hasText: scope });
       const target = cardOf(`pp.revoke.${mark}`);
@@ -169,6 +171,7 @@ export const journeys: Journey[] = [
       results.check("the Carbon revokes the other one through the API (DELETE /v1/me/proofs/{id}) → 204, exactly invalid", viaApi.status === 204 && isExactlyInvalid((await verifyAs(ctx, "briefcase", keep.proof_token)).body), `${viaApi.status} ${short(viaApi.body)}`);
       const [[revokedCount] = []] = await sql(env, `select count(*) from proof_families where account_uuid = '${carbon.uuid}' and revoke_reason = 'revoked_by_account'`);
       results.check("exactly the two proofs the Carbon revoked are stored as revoked_by_account", revokedCount === "2", String(revokedCount));
+      results.check("nothing /proofs loaded left the machine", outside().length === 0, outside().join(", ") || "none");
       await context.close();
     },
   },

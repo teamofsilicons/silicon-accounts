@@ -101,7 +101,8 @@ export function carbonError(error: ErrorLike, context: ErrorContext = {}): Carbo
       return make("Another account signed in", "This browser signed in to a different account in another tab, so this sign-in stopped. Choose the account to continue with.", { kind: "switch", label: "Choose the account" });
     case "flow_changed":
     case "invalid_step":
-      return make("This sign-in moved on", "It changed in another tab while you were here, so this page now shows where it is.");
+      // The app may have changed its sign-in, or another tab moved it on: the server cannot tell which, so neither do we.
+      return make("This sign-in moved on", "It changed while you were here, so this page now shows where it is.");
     case "flow_completed":
       return make("This sign-in already finished", "It finished in another tab.");
     case "flow_failed":
@@ -202,5 +203,15 @@ export function titleFor(code: string): string {
   }
 }
 
-/** An error as one line in the Carbon's words (field errors, step alerts). */
-export const describe = (error: ErrorLike | null | undefined, context?: ErrorContext): string | null => (error ? carbonError(error, context).text : null);
+/**
+ * Codes whose text goes on from their title ("Send a new code." after "This code expired"). Where only one line shows
+ * (a message under a field), that line starts with the title, so it still says what happened.
+ */
+const TEXT_FOLLOWS_TITLE = new Set(["code_expired", "code_already_used", "no_code_sent", "challenge_not_found", "flow_changed", "invalid_step", "flow_completed", "flow_failed", "method_not_enabled"]);
+
+/** An error as one line in the Carbon's words (field errors, step alerts): what happened and what to do next. */
+export function describe(error: ErrorLike | null | undefined, context?: ErrorContext): string | null {
+  if (!error) return null;
+  const copy = carbonError(error, context);
+  return TEXT_FOLLOWS_TITLE.has(copy.code) ? `${copy.title}. ${copy.text}` : copy.text;
+}

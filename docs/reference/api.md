@@ -267,6 +267,7 @@ The endpoints that accept a key, with how long their result is kept:
 | `POST /v1/silicons` (self-create) | 10 min |
 | `POST /v1/me/silicons`, `POST /v1/me/silicons/{uuid}/stk` | 10 min |
 | `POST /v1/me/silicons/{uuid}/photo` | 24 h |
+| `POST /v1/me/webhook/replay`, `POST /v1/me/silicons/{uuid}/webhook/replay` | 24 h |
 | `PATCH /v1/apps/{app_id}/signin-config`, `POST /v1/apps/{app_id}/imports` | 24 h |
 | `PUT /v1/apps/{app_id}/webhook`, `POST /v1/apps/{app_id}/webhook/rotate-secret` | 10 min |
 | `POST /v1/apps/{app_id}/webhook/test`, `POST /v1/apps/{app_id}/webhook/replay` | 24 h |
@@ -405,6 +406,9 @@ pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)
 | `PUT /v1/me/webhook` | account (Silicon) | | 200 webhook + secret |
 | `DELETE /v1/me/webhook` | account (Silicon) | | 204 |
 | `POST /v1/me/webhook/test` | account (Silicon) | | 202 queued ping |
+| `GET /v1/me/webhook/deliveries` | account (Silicon) | | 200 list |
+| `GET /v1/me/webhook/deliveries/{delivery_id}` | account (Silicon) | | 200 delivery |
+| `POST /v1/me/webhook/replay` | account (Silicon) | yes | 200 result |
 | `GET /v1/me/silicons` | account (Carbon) | | 200 list |
 | `POST /v1/me/silicons` | account (Carbon) | yes | 201 Silicon + STK |
 | `GET /v1/me/silicons/{uuid}` | account (Carbon, custodian) | | 200 Silicon |
@@ -414,6 +418,9 @@ pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)
 | `POST /v1/me/silicons/{uuid}/photo` | account (Carbon, custodian) | yes | 201 photo |
 | `PUT /v1/me/silicons/{uuid}/webhook` | account (Carbon, custodian) | | 200 webhook + secret |
 | `DELETE /v1/me/silicons/{uuid}/webhook` | account (Carbon, custodian) | | 204 |
+| `GET /v1/me/silicons/{uuid}/webhook/deliveries` | account (Carbon, custodian) | | 200 list |
+| `GET /v1/me/silicons/{uuid}/webhook/deliveries/{delivery_id}` | account (Carbon, custodian) | | 200 delivery |
+| `POST /v1/me/silicons/{uuid}/webhook/replay` | account (Carbon, custodian) | yes | 200 result |
 | `POST /v1/me/silicons/{uuid}/stk` | account (Carbon, custodian) | yes | 200 new STK |
 | `POST /v1/me/silicons/{uuid}/transfer` | account (Carbon, custodian) | | 201 request |
 | `DELETE /v1/me/silicons/{uuid}/transfer` | account (Carbon, custodian) | | 204 |
@@ -463,7 +470,9 @@ pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)
 ### Webhooks — [webhooks.md](api/webhooks.md)
 
 Webhooks are requests Silicon Accounts sends to you: the delivery format, the signature and every
-event type are on that page.
+event type are on that page. The endpoints that set a webhook and list or replay its deliveries
+are under [Apps](#apps--appsmd) (an app's) and
+[Silicons and custodians](#silicons-and-custodians--siliconsmd) (a Silicon's).
 
 ### Service — [service.md](api/service.md)
 

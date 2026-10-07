@@ -177,6 +177,8 @@ where the method returns a `Vec`.
 | `short_lived_token(app_id)` | `POST /v1/me/short-lived-tokens` | `ShortLivedToken` (`slt`, `app_id`, `expires_at`) |
 | `proofs()`, `revoke_proof(proof_id)` | `/v1/me/proofs…` | `Vec<MyProof>` / `()` |
 | `set_my_webhook(url)`, `remove_my_webhook()`, `test_my_webhook()` | `/v1/me/webhook…` (Silicons) | `SiliconWebhook` / `()` / `WebhookTestResult` |
+| `my_webhook_deliveries(&DeliveriesQuery)`, `my_webhook_delivery(id)` | `GET /v1/me/webhook/deliveries…` (Silicons) | `Page<WebhookDelivery>` / `DeliveryDetail` |
+| `replay_my_webhook(&ReplayRequest, idempotency_key)` | `POST /v1/me/webhook/replay` (Silicons) | `ReplayResult` |
 | `silicons()`, `get_silicon(uuid)` | `/v1/me/silicons…` | `Vec<ManagedSilicon>` / `ManagedSilicon` |
 | `create_silicon(&CreateSilicon, idempotency_key)` | `POST /v1/me/silicons` | `SiliconCreated` (`silicon`, `stk`, `webhook_secret`) |
 | `update_silicon(uuid, &UpdateSilicon)` | `PATCH /v1/me/silicons/{uuid}` | `SiliconView` |
@@ -184,6 +186,8 @@ where the method returns a `Vec`.
 | `change_silicon_id(uuid, new_id)` | `POST /v1/me/silicons/{uuid}/id` | `SiliconView` |
 | `rotate_stk(uuid, stk)` | `POST /v1/me/silicons/{uuid}/stk` | `StkRotated` (`stk` when generated, `rotated_at`) |
 | `set_silicon_webhook(uuid, url)`, `remove_silicon_webhook(uuid)` | `/v1/me/silicons/{uuid}/webhook` | `SiliconWebhook` / `()` |
+| `silicon_webhook_deliveries(uuid, &DeliveriesQuery)`, `silicon_webhook_delivery(uuid, id)` | `GET /v1/me/silicons/{uuid}/webhook/deliveries…` | `Page<WebhookDelivery>` / `DeliveryDetail` |
+| `replay_silicon_webhook(uuid, &ReplayRequest, idempotency_key)` | `POST /v1/me/silicons/{uuid}/webhook/replay` | `ReplayResult` |
 | `transfer_silicon(uuid, to)`, `cancel_transfer(uuid)` | `/v1/me/silicons/{uuid}/transfer` | `CustodianRequest` / `()` |
 | `delete_silicon(uuid, confirm)` | `DELETE /v1/me/silicons/{uuid}` | `()` |
 | `custodian_requests()`, `accept_custodian_request(id)`, `decline_custodian_request(id)` | `/v1/me/custodian-requests…` | `Vec<CustodianRequest>` / `()` |

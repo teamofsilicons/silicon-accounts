@@ -9,11 +9,18 @@
  *   silicons    "Create a Silicon" (drawer); a Silicon's own drawer ("Manage si:…")
  *   palette     "Search and jump" (⌘K), from the shell's search button
  *   sign-up     the date of birth picker and the timezone list (popovers of the hosted sign-up)
- *   developer   a user's drawer on briefcase's Users tab (its seeded owner)
+ *   developer   the developer site (briefcase's seeded owner): its command palette (⌘K), the apps home's "New app"
+ *               dialog, a user's drawer on the Users tab, and the sign-in setup's History drawer
+ *
+ * Also the state a Carbon reaches through the "Create a Silicon" drawer: the generated STK, shown once on the page.
  */
 import type { Journey } from "../../context";
-import { applyVariant, auditContext, collectConsole, findingsFor, freshEmail, hostedLink, openAccountPage, pageFetch, saveFindings, sendEmailCode, signInAsSeededOwner, signedInCarbon, stepReady, type Variant } from "./_audit";
+import { sleep } from "../../lib";
+import { DEVELOPER_EXPECTED, VARIANTS, applyVariant, auditContext, auditPage, collectConsole, findingsFor, freshEmail, hostedLink, openAccountPage, openDeveloperPage, pageFetch, saveFindings, sendEmailCode, signInAsSeededOwnerOnDeveloper, signedInCarbon, stepReady, type Variant } from "./_audit";
 import { auditOverlay } from "./_overlay";
+
+/** The History drawer at 1440 light and 390 dark (its content is the same list in every theme). */
+const VARIANTS_FOR_HISTORY = [VARIANTS[0]!, VARIANTS[3]!];
 
 export const journeys: Journey[] = [
   {
@@ -55,6 +62,21 @@ export const journeys: Journey[] = [
         panel: p => p.getByRole("dialog", { name: "Create a Silicon" }),
         kind: "modal",
       });
+      // Created from the drawer: the generated STK is shown exactly once, on the page (UNDERSTANDING.md "Silicon account").
+      {
+        await applyVariant(page, VARIANTS[0]!);
+        await page.getByRole("button", { name: "Create a Silicon" }).first().click();
+        const drawer = page.getByRole("dialog", { name: "Create a Silicon" });
+        await drawer.waitFor({ timeout: 15_000 });
+        await drawer.getByRole("textbox", { name: "Display name" }).fill(`Reveal Scout ${Date.now().toString(36).slice(-4)}`);
+        await sleep(900);
+        await drawer.getByRole("button", { name: "Create Silicon", exact: true }).click();
+        await drawer.waitFor({ state: "hidden", timeout: 20_000 }).catch(() => undefined);
+        const stk = page.locator("main").getByText(/stk-[0-9a-f]{12}/).first();
+        const shown = await stk.waitFor({ timeout: 20_000 }).then(() => true, () => false);
+        results.check("silicons-stk-reveal: the generated STK is shown on the page once the Silicon exists", shown, (await page.locator("main").first().innerText().catch(() => "")).replace(/\s+/g, " ").slice(0, 300));
+        for (const variant of [VARIANTS[0]!, VARIANTS[3]!]) await auditPage(ctx, page, findings, { name: "silicons-stk-reveal", variant, keepScroll: true });
+      }
       await auditOverlay(ctx, page, findings, {
         name: "overlay-silicon-drawer",
         trigger: p => p.getByRole("button", { name: /^Manage si:uxa-overlay-/ }).first(),
@@ -92,14 +114,44 @@ export const journeys: Journey[] = [
         await context.close();
       }
 
-      // A user's drawer on briefcase's Users tab, as its seeded owner.
+      // The developer site, as briefcase's seeded owner: its palette, a user's drawer on the Users tab, the History drawer.
+      // First a new Carbon in briefcase's user base, so the Users table has a row to open whatever ran before.
+      {
+        const context = await auditContext(browser);
+        const user = await context.newPage();
+        results.watch(user, "overlays-briefcase-user");
+        await user.goto(await hostedLink(env, user, "briefcase"));
+        const code = await sendEmailCode(env, user, freshEmail("uxa.overlays.user"));
+        await user.getByRole("textbox", { name: /digit 1 of 6/ }).first().click();
+        await user.keyboard.type(code, { delay: 25 });
+        await user.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+        await user.getByRole("button", { name: "Share and continue" }).click({ timeout: 30_000 });
+        await user.waitForURL(url => url.href.startsWith(`${env.apps}/briefcase/`), { timeout: 30_000 });
+        await context.close();
+      }
       {
         const context = await auditContext(browser);
         const owner = await context.newPage();
-        results.watch(owner, "overlays-developer");
-        collectConsole(owner);
-        await signInAsSeededOwner(ctx, owner, findings);
-        await openAccountPage(ctx, owner, "/developer/briefcase/users", /Users|users/);
+        results.watch(owner, "overlays-developer", DEVELOPER_EXPECTED);
+        collectConsole(owner, DEVELOPER_EXPECTED);
+        await signInAsSeededOwnerOnDeveloper(ctx, owner, findings);
+        await openDeveloperPage(ctx, owner, "/apps/briefcase");
+        await auditOverlay(ctx, owner, findings, {
+          name: "overlay-developer-palette",
+          trigger: p => p.locator('button[aria-keyshortcuts], button[aria-label="Search and jump"]').filter({ visible: true }).first(),
+          panel: p => p.getByRole("dialog", { name: "Search and jump" }),
+          kind: "modal",
+          expectedConsole: DEVELOPER_EXPECTED,
+        });
+        await openDeveloperPage(ctx, owner, "/");
+        await auditOverlay(ctx, owner, findings, {
+          name: "overlay-developer-new-app",
+          trigger: p => p.getByRole("button", { name: "New app", exact: true }).first(),
+          panel: p => p.getByRole("dialog", { name: "Apps come from Silicon Apps" }),
+          kind: "modal",
+          expectedConsole: DEVELOPER_EXPECTED,
+        });
+        await openDeveloperPage(ctx, owner, "/apps/briefcase/users");
         const prepare = async (variant: Variant) => {
           await applyVariant(owner, variant);
           await owner.locator("button[data-open-user]").first().waitFor({ timeout: 20_000 }).catch(() => undefined);
@@ -109,7 +161,16 @@ export const journeys: Journey[] = [
           trigger: p => p.locator("button[data-open-user]").first(),
           panel: p => p.getByRole("dialog").last(),
           kind: "modal",
+          expectedConsole: DEVELOPER_EXPECTED,
         }, prepare);
+        await openDeveloperPage(ctx, owner, "/apps/briefcase/sign-in");
+        await auditOverlay(ctx, owner, findings, {
+          name: "overlay-developer-history",
+          trigger: p => p.getByRole("button", { name: /^History/ }).filter({ visible: true }).first(),
+          panel: p => p.getByRole("dialog").last(),
+          kind: "modal",
+          expectedConsole: DEVELOPER_EXPECTED,
+        }, undefined, [VARIANTS_FOR_HISTORY[0]!, VARIANTS_FOR_HISTORY[1]!]);
         await context.close();
       }
       results.check("overlays: findings saved", true, saveFindings(ctx, findings));

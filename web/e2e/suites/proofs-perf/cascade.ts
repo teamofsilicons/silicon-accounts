@@ -20,6 +20,7 @@ import {
   short,
   signInToApp,
   verifyAs,
+  watchOutside,
   type ApiErrorBody,
   type MyProofItem,
   type Verification,
@@ -47,6 +48,7 @@ export const journeys: Journey[] = [
       await carbon.session.into(context);
       const page = await context.newPage();
       results.watch(page, "cascade-remove-access");
+      const outside = watchOutside(page);
       await page.goto(`${env.site}/apps`);
       const card = page.getByRole("list", { name: "Apps with access" }).getByRole("listitem").filter({ has: page.getByRole("heading", { name: "DM", exact: true }) });
       await card.waitFor({ timeout: 30_000 });
@@ -97,6 +99,7 @@ export const journeys: Journey[] = [
       const fresh = await issueObo(ctx, "dm", newSubject, { receiving_app: "briefcase" });
       results.check("after signing into dm again dm gets a new proof that verifies", again.uuid === carbon.uuid && fresh.status === 201 && (await verifyAs(ctx, "briefcase", fresh.body.proof_token)).body.valid === true, `${fresh.status} ${short(fresh.body.error)}`);
       results.check("…and the old proofs stay exactly invalid (no resurrection)", isExactlyInvalid((await verifyAs(ctx, "briefcase", toBriefcase.proof_token)).body) && (await refreshAs(ctx, "dm", toBriefcase.proof_refresh_token)).status === 410);
+      results.check("nothing /apps and /proofs loaded left the machine", outside().length === 0, outside().join(", ") || "none");
       await context.close();
     },
   },

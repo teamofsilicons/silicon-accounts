@@ -2,11 +2,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Journey } from "../../context";
 import { forgetRateLimits, sql, tag } from "../../lib";
-import { accounts, asCarbon, cliError, freshDir, loginCarbon, loginSilicon, obj, said, short, signUpCarbon, str, type Json } from "./_helpers";
+import { accounts, asCarbon, cliError, freshDir, loginCarbon, loginSilicon, obj, said, short, signUpCarbon, str, until, type Json } from "./_helpers";
 
 export const journey: Journey = {
   name: "silicons-cli-login-status",
   title: "`accounts login status`: signed out it is {\"authenticated\":false} with exit 1 (JSON and text, online and --offline); signed in it says as whom; it follows a session to its end (logout, a revoked session, an expired one) and refreshes an access token about to expire",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     await forgetRateLimits(env, "127.0.0.1");
@@ -79,6 +81,30 @@ export const journey: Journey = {
     const statusB = await accounts(env, ["login", "status", "--json"], { home: homeB });
     results.check("…while this one stays signed in", statusB.code === 0 && statusB.json?.authenticated === true, said(statusB));
 
+    // 5b. `accounts login` again in a terminal whose session was revoked meanwhile (nothing ran there since): it must
+    //     notice the session ended and start a new sign-in, not answer "Already signed in" from the dead session.
+    const homeD = freshDir();
+    await loginCarbon(env, homeD, carbon);
+    const dSession = (((await accounts(env, ["sessions", "list", "--json"], { home: homeD })).json?.items ?? []) as Json[]).find(item => item.current === true);
+    const revokedD = await accounts(env, ["sessions", "revoke", str(dSession?.id), "--json"], { home: homeB });
+    let deviceEvent: Json | null = null;
+    const relogin = accounts(env, ["login", "--no-browser", "--json"], {
+      home: homeD,
+      timeoutMs: 60_000,
+      onEvent: event => {
+        if (event.event === "device_code") deviceEvent = event;
+      },
+    });
+    const shown = await until(async () => deviceEvent, 15_000, 100);
+    if (shown) await asCarbon(env, carbon, "POST", `/v1/device/${str(shown.user_code)}/approve`, {});
+    const reloggedIn = await relogin;
+    const statusD = await accounts(env, ["login", "status", "--json"], { home: homeD });
+    results.check(
+      "`accounts login` where the session was revoked meanwhile starts a new sign-in (a device code, approved here) instead of answering \"Already signed in\" from the dead session; `login status` then says authenticated",
+      revokedD.code === 0 && !!shown && reloggedIn.code === 0 && reloggedIn.json?.authenticated === true && statusD.code === 0 && statusD.json?.authenticated === true,
+      `${shown ? "device code shown" : "no device code"} | ${said(reloggedIn)} | then ${said(statusD)}`,
+    );
+
     // 6. A session past its 900 days (time travel) has ended.
     await sql(env, `update token_families set expires_at = now() - interval '1 second' where account_uuid = '${carbon.uuid}' and revoked_at is null`);
     const sessionB = join(homeB, ".accounts", "session.json");
@@ -102,7 +128,7 @@ export const journey: Journey = {
     );
     const security = await asCarbon<Json>(env, carbon, "GET", "/v1/me/history?kind=security");
     const created = ((obj(security.body).items ?? []) as Json[]).filter(item => item.title === "New CLI sign-in");
-    results.check("…and each new CLI sign-in is listed with its label and how it signed in ('… · with an email code')", created.length >= 2 && created.every(item => / · with an email code$/.test(str(item.detail))), short(created.map(item => item.detail)));
+    results.check("…and each new CLI sign-in is listed with its label and how it signed in ('… · with an email code')", created.filter(item => / · with an email code$/.test(str(item.detail))).length >= 3 && created.every(item => / · with /.test(str(item.detail))), short(created.map(item => item.detail)));
     results.check("the Silicon's own history names its STK sign-in from the CLI the same way", siliconSignin?.title === "Signed in to Silicon Accounts with the STK" && /^from \S+ · accounts CLI \d+\.\d+\.\d+$/.test(str(siliconSignin?.detail)), short(siliconSignin));
   },
 };

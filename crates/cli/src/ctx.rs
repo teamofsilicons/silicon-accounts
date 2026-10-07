@@ -199,6 +199,7 @@ pub struct Ctx {
     pub telemetry: Telemetry,
     home: OnceCell<Home>,
     config: OnceCell<FileConfig>,
+    url: OnceCell<(String, UrlSource)>,
     client: OnceCell<AccountsClient>,
     network_used: Cell<bool>,
 }
@@ -214,6 +215,7 @@ impl Ctx {
             telemetry: Telemetry::new(),
             home: OnceCell::new(),
             config: OnceCell::new(),
+            url: OnceCell::new(),
             client: OnceCell::new(),
             network_used: Cell::new(false),
         }
@@ -245,8 +247,18 @@ impl Ctx {
     }
 
     /// The URL and where it came from: --url > ACCOUNTS_URL > config.json > the stored
-    /// session's URL > a pending code sign-in's URL > the default.
+    /// session's URL > a pending code sign-in's URL > the default. Resolved once per command: a
+    /// session that ends while the command runs (and is deleted) must not move the command, or
+    /// the sign-in that replaces it, to another URL.
     pub fn url(&self) -> CliResult<(String, UrlSource)> {
+        if let Some(resolved) = self.url.get() {
+            return Ok(resolved.clone());
+        }
+        let resolved = self.resolve_url()?;
+        Ok(self.url.get_or_init(|| resolved).clone())
+    }
+
+    fn resolve_url(&self) -> CliResult<(String, UrlSource)> {
         if let Some(url) = self.global.url.as_deref().filter(|u| !u.trim().is_empty()) {
             return Ok((normalize_url(url), UrlSource::Flag));
         }

@@ -10,7 +10,7 @@ function eighteenYearsAgo(timeZone: string): string {
 
 export const journey: Journey = {
   name: "a-signup",
-  title: "first-party sign-up on the account site with an email code: the sign-up page is prefilled, the identity home renders",
+  title: "first-party sign-up on the account site with an email code: the sign-up page is prefilled, the identity home renders and leads to the developer site",
   provides: ["ada"],
   async run({ env, results, browser, shared }) {
     const context = await newContext(browser);
@@ -59,6 +59,11 @@ export const journey: Journey = {
     results.check("the session cookie works through the site's proxy", session.status() === 200, String(session.status()));
     const me = (await (await page.request.get(`${env.site}/v1/me`)).json()) as { id?: string; uuid?: string; dob?: string };
     results.check("GET /v1/me answers for the new Carbon", me.id === `c:${id}`, JSON.stringify(me).slice(0, 200));
+    // Building apps lives on the developer site now: the account site says where it is and links there.
+    const meta = (await (await page.request.get(`${env.site}/v1/meta`)).json()) as { developer_url?: string };
+    results.check("GET /v1/meta names the developer site (developer_url)", meta.developer_url === env.developer, String(meta.developer_url));
+    const developerLinks = await page.locator(`a[href^="${env.developer}"]`).evaluateAll(links => links.map(link => (link as HTMLAnchorElement).href));
+    results.check("the account site's navigation links to the developer site", developerLinks.length > 0, developerLinks.slice(0, 3).join(" "));
     shared.ada = { email, id: me.id ?? "", uuid: me.uuid ?? "", cookies: await context.cookies() };
     await context.close();
   },

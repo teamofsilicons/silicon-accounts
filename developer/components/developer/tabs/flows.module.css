@@ -11,13 +11,18 @@
 .journey { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .journey li { display: inline-flex; align-items: center; gap: var(--space-2); }
 .journey li + li::before { content: ""; width: 14px; height: 1px; background: var(--border-strong); }
-.node { --sq-r: var(--radius-pill); display: inline-flex; min-height: 32px; align-items: center; gap: 6px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-secondary); font: inherit; font-size: var(--text-xs); font-weight: 500; white-space: nowrap; }
+/* Nodes are squircles (data-sq): their fill and edge are --sq-fill / --sq-stroke, so the fallback path follows them. */
+.node { --sq-r: var(--radius-pill); --sq-fill: var(--surface); --sq-stroke: var(--border); position: relative; display: inline-flex; min-height: 32px; align-items: center; gap: 6px; padding: 4px 12px; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--text-secondary); font: inherit; font-size: var(--text-xs); font-weight: 500; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard); }
 .node em { color: var(--text-muted); font-style: normal; font-weight: 400; }
 .node[data-optional] { border-style: dashed; }
-.node[data-own] { border-color: color-mix(in oklab, var(--accent) 35%, var(--border)); background: var(--accent-subtle); color: var(--foreground); }
+.node[data-own] { --sq-stroke: color-mix(in oklab, var(--accent) 35%, var(--border)); --sq-fill: var(--accent-subtle); color: var(--foreground); }
 button.node { cursor: pointer; }
-button.node:hover, button.node:focus-visible { outline: none; border-color: var(--accent); }
-button.node[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+button.node:hover { outline: none; --sq-stroke: var(--accent); }
+/* The page shown in the preview: an accent edge, doubled inside. */
+button.node[aria-pressed="true"] { --sq-stroke: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* Keyboard focus deepens the fill (on the pressed node too, which already has the accent edge), so it never reads
+   the same as the pressed look. */
+button.node:focus-visible { outline: none; --sq-stroke: var(--accent); --sq-fill: color-mix(in oklab, var(--accent) 22%, var(--surface)); }
 
 .empty { display: grid; justify-items: start; gap: var(--space-4); }
 .empty p { margin: 0; max-width: 64ch; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
@@ -49,12 +54,12 @@ button.node[aria-pressed="true"] { border-color: var(--accent); box-shadow: inse
 .remove { flex: none; }
 
 /* The details on a page: chips in a drop zone. */
-.drop { display: flex; min-width: 0; min-height: 56px; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px dashed var(--border); border-radius: 14px; background: var(--surface-muted); transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
-.drop[data-over] { border-color: var(--accent); background: var(--accent-subtle); }
+.drop { --sq-r: 14px; --sq-fill: var(--surface-muted); --sq-stroke: var(--border); position: relative; display: flex; min-width: 0; min-height: 56px; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px dashed var(--sq-stroke); background: var(--sq-fill); transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+.drop[data-over] { --sq-stroke: var(--accent); --sq-fill: var(--accent-subtle); }
 .drop[data-empty] { justify-content: center; }
 .dropHint { color: var(--text-secondary); font-size: var(--text-sm); text-align: center; }
-.chip { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; padding: 2px 3px 2px 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); cursor: grab; user-select: none; }
-.chip:hover { border-color: var(--border-strong); }
+.chip { --sq-r: var(--radius-pill); --sq-fill: var(--surface); --sq-stroke: var(--border); position: relative; display: inline-flex; min-height: 36px; align-items: center; gap: 6px; padding: 2px 3px 2px 8px; border: 1px solid var(--sq-stroke); background: var(--sq-fill); cursor: grab; user-select: none; }
+.chip:hover { --sq-stroke: var(--border-strong); }
 .chipLabel { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; white-space: nowrap; }
 .chipMenu { --sq-r: 999px; --sq-fill: transparent; display: grid; width: 28px; height: 28px; place-items: center; border: 0; background: var(--sq-fill); color: var(--text-secondary); cursor: pointer; }
 .chipMenu:hover, .chipMenu:focus-visible, .chipMenu[data-state="open"] { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }

@@ -53,6 +53,8 @@ const seconds = (from: string | null, to: string | null) => (from && to ? (Date.
 export const journey: Journey = {
   name: "imports-big-100k",
   title: "100,000 rows through the API: a dry run straight to accounts-api, then the real import through the public origin; rows/s from the job's timestamps, progress in 500-row chunks, 100,000 accounts and memberships checked in the database",
+  // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+  engines: ["chromium"],
   timeoutMs: 20 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;

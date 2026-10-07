@@ -164,6 +164,14 @@ export async function signUpCarbon(env: Env, label: string, options: { email?: s
   return { email, id: str(body.id), uuid: str(body.uuid), ip, session };
 }
 
+/** A phone number (+1 415 555 xxxx) no account of this stack has yet. */
+export async function freshPhone(env: Env): Promise<string> {
+  for (;;) {
+    const phone = `+1415555${String(1000 + Math.floor(Math.random() * 9000))}`;
+    if (!(await sql(env, `select 1 from account_phones where phone = '${phone}'`)).length) return phone;
+  }
+}
+
 /** An account-site call as this Carbon (session cookie + Origin, as the site's own pages make it). */
 export function asCarbon<T = unknown>(env: Env, carbon: Carbon, method: string, path: string, body?: unknown): Promise<JsonAnswer<T>> {
   const jar = new Jar();
@@ -175,6 +183,66 @@ export function asCarbon<T = unknown>(env: Env, carbon: Carbon, method: string, 
 export async function carbonContext(browser: Browser, carbon: Carbon): Promise<BrowserContext> {
   const cookie: Cookie = { name: "sa_session", value: carbon.session, domain: "localhost", path: "/", expires: -1, httpOnly: true, secure: false, sameSite: "Lax" };
   return newContext(browser, { cookies: [cookie] });
+}
+
+export interface HostedSignIn {
+  /** Every details page the sign-in showed, as the API described it (FlowView.details), in order. */
+  pages: Json[];
+  /** The review page (FlowView.review), when the app's flow has one. */
+  review: Json | null;
+  /** Where the flow sent the browser: the app's redirect URI with a code. */
+  redirect: string;
+  /** The fake app's answer when it took the code at its callback. */
+  callbackStatus: number;
+}
+
+/**
+ * Signs a Carbon into an app the way the app's hosted pages do, through their own API calls with the Carbon's
+ * account-site session (no browser): the app's own sign-in link (its registered redirect URI, state and PKCE
+ * challenge), POST /v1/flows, "Continue as", every details page answered with `share` (the optional details the
+ * Carbon ticks; the others stay unticked; required ones are always shared), the review approved; then the fake app
+ * takes the code at its callback. `prompt: "consent"` shows a returning Carbon the details pages again.
+ */
+export async function signInToApp(env: Env, carbon: Carbon, app: string, options: { share?: string[]; prompt?: string } = {}): Promise<HostedSignIn> {
+  // The fake app ties the state of its link to its own session cookie, which its callback checks.
+  const appJar = new Jar();
+  const appPage = await fetch(`${env.apps}/${app}/`);
+  appJar.take(appPage);
+  const home = await appPage.text();
+  const link = /id="signin-hosted"[^>]*href="([^"]+)"/.exec(home)?.[1];
+  if (!link) throw new Error(`${app}'s own page (${env.apps}/${app}/) has no #signin-hosted link`);
+  const authorize = new URL(link.replace(/&amp;/g, "&"));
+  const body: Json = Object.fromEntries(authorize.searchParams.entries());
+  if (options.prompt) body.prompt = options.prompt;
+  const jar = new Jar();
+  jar.cookies.set("sa_session", carbon.session);
+  const step = async (what: string, method: string, path: string, payload?: unknown): Promise<Json> => {
+    const answer = await siteCall(env, jar, carbon.ip, method, path, payload);
+    if (answer.status >= 300) throw new Error(`signing ${carbon.id} into ${app}: ${what} answered ${answer.status} ${short(answer.body)}`);
+    return obj(obj(answer.body).flow);
+  };
+  let flow = await step("POST /v1/flows", "POST", "/v1/flows", body);
+  const id = str(flow.id);
+  if (flow.step === "choose_method") flow = await step("continue as", "POST", `/v1/flows/${id}/continue`, {});
+  const pages: Json[] = [];
+  let review: Json | null = null;
+  for (let i = 0; i < 12 && flow.step === "details"; i++) {
+    const details = obj(flow.details);
+    pages.push(details);
+    const fields = (Array.isArray(details.fields) ? details.fields : []) as Json[];
+    const share = fields.filter(field => field.mode === "optional" && (options.share ?? []).includes(str(field.field))).map(field => str(field.field));
+    flow = await step(`details page ${i + 1}`, "POST", `/v1/flows/${id}/details/continue`, { share });
+  }
+  if (flow.step === "review") {
+    review = obj(flow.review);
+    flow = await step("the review", "POST", `/v1/flows/${id}/review`, { approve: true });
+  }
+  if (flow.step !== "complete" || !str(flow.redirect_to)) throw new Error(`signing ${carbon.id} into ${app}: the flow ended at ${str(flow.step)} (${short(flow.error ?? flow)})`);
+  const redirect = str(flow.redirect_to);
+  const cookie = appJar.header();
+  const callback = await fetch(redirect, { redirect: "manual", headers: cookie ? { cookie } : {} });
+  await callback.text().catch(() => "");
+  return { pages, review, redirect, callbackStatus: callback.status };
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
@@ -227,10 +295,12 @@ export const freshDir = (prefix = "sa-e2e-scli-") => {
 let sandboxHome: string | null = null;
 const sandbox = () => (sandboxHome ??= freshDir("sa-e2e-scli-user-"));
 
-/** Runs the real `accounts` CLI. */
-export function accounts(env: Env, args: string[], options: RunOptions = {}): Promise<Run> {
-  // A copy of this process's environment (typed as one: the site's Next types make NODE_ENV a required key of it),
-  // without the stack's own settings, so the CLI only knows what each run tells it.
+/**
+ * The environment of a CLI run: a copy of this process's (typed as one: the site's Next types make NODE_ENV a required
+ * key of it) without the stack's own settings, so the CLI only knows what each run tells it, plus `extra` (undefined
+ * removes a variable).
+ */
+function cliEnv(extra: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
   const base: NodeJS.ProcessEnv = { ...process.env };
   for (const key of Object.keys(base)) {
     if (base[key] === undefined || key.startsWith("ACCOUNTS_") || key === "SILICON_HOME") delete base[key];
@@ -238,11 +308,20 @@ export function accounts(env: Env, args: string[], options: RunOptions = {}): Pr
   base.NO_COLOR = "1";
   base.HOME = sandbox();
   base.ACCOUNTS_NO_BROWSER = "1";
-  for (const [key, value] of Object.entries(options.env ?? {})) {
+  for (const [key, value] of Object.entries(extra)) {
     if (value === undefined) delete base[key];
     else base[key] = value;
   }
-  const full = [...(options.url === null ? [] : ["--url", options.url ?? env.site]), ...(options.home ? ["--home", options.home] : []), ...args];
+  return base;
+}
+
+/** The CLI's arguments with the stack's --url and the run's --home in front. */
+const cliArgs = (env: Env, args: string[], options: RunOptions) => [...(options.url === null ? [] : ["--url", options.url ?? env.site]), ...(options.home ? ["--home", options.home] : []), ...args];
+
+/** Runs the real `accounts` CLI. */
+export function accounts(env: Env, args: string[], options: RunOptions = {}): Promise<Run> {
+  const base = cliEnv(options.env);
+  const full = cliArgs(env, args, options);
   return new Promise(done => {
     const started = Date.now();
     const child = spawn(env.cli, full, { env: base });
@@ -310,6 +389,58 @@ export async function loginCarbon(env: Env, home: string, carbon: Carbon): Promi
   const finish = await accounts(env, ["login", "--email", carbon.email, "--code", code, "--json"], { home });
   return { start, finish };
 }
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* The CLI writing into a pipe nobody reads (EPIPE)                                                                    */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+export interface PipedRun {
+  args: string[];
+  /** The CLI's own exit code (bash's PIPESTATUS[0]): 128 + n when signal n ended it (141: SIGPIPE). */
+  code: number | null;
+  /** What the CLI wrote on stderr (empty with `stderr: "gone"`). */
+  stderr: string;
+  ms: number;
+  timedOut: boolean;
+}
+
+/**
+ * Runs the CLI the way `accounts … | head -c 1` does once head has what it wants, through bash so the pipe is a real
+ * one and the exit code is the CLI's own (PIPESTATUS):
+ * - `reader: "gone"` (default): `{ sleep 0.3; accounts …; } | true`: the reading end is closed (true has exited) well
+ *   before the CLI starts, so its first write to stdout fails with EPIPE (Rust ignores SIGPIPE, so it is an error the
+ *   CLI must handle, not a signal that ends it);
+ * - `reader: "head"`: `accounts … | head -c 1`: a reader that takes one byte and goes;
+ * - `stderr: "gone"`: stderr goes into the closed pipe too, stdout to /dev/null.
+ */
+export function accountsIntoClosedPipe(env: Env, args: string[], options: RunOptions & { reader?: "gone" | "head"; stderr?: "kept" | "gone" } = {}): Promise<PipedRun> {
+  const full = cliArgs(env, args, options);
+  const redirect = options.stderr === "gone" ? " 2>&1 >/dev/null" : "";
+  const script =
+    options.reader === "head"
+      ? `"$0" "$@"${redirect} | head -c 1 >/dev/null; exit "\${PIPESTATUS[0]}"`
+      : `{ sleep 0.3; "$0" "$@"${redirect}; } | true; exit "\${PIPESTATUS[0]}"`;
+  return new Promise(done => {
+    const started = Date.now();
+    const child = spawn("/bin/bash", ["-c", script, env.cli, ...full], { env: cliEnv(options.env), stdio: ["pipe", "ignore", "pipe"] });
+    let stderr = "";
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, options.timeoutMs ?? 60_000);
+    child.stderr.on("data", chunk => (stderr += chunk));
+    child.stdin.on("error", () => undefined);
+    child.stdin.end(options.stdin ?? "");
+    child.on("close", code => {
+      clearTimeout(timer);
+      done({ args: full, code, stderr, ms: Date.now() - started, timedOut });
+    });
+  });
+}
+
+/** What a Rust panic leaves on stderr ("thread 'main' panicked at …", the RUST_BACKTRACE note). */
+export const PANIC = /panicked at|RUST_BACKTRACE|stack backtrace/;
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Silicons through the API                                                                                            */

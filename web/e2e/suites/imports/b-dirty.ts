@@ -47,6 +47,8 @@ export const journeys: Journey[] = [
   {
     name: "imports-dirty-csv",
     title: "dirty.csv (BOM, CRLF, quoted newlines, invalid and local phones, bad dates, ambiguous matches, colliding ids, duplicate external ids…): every row's outcome and messages as expected.json, and what each case wrote",
+    // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+    engines: ["chromium"],
     async run(ctx) {
       const { env, results } = ctx;
       const crm = fakeApp("legacy-crm");
@@ -179,6 +181,8 @@ export const journeys: Journey[] = [
   {
     name: "imports-dirty-json",
     title: "dirty.json as a JSON body: the name alias, emails/phones as arrays and ;-strings, nulls, padding, email_verified, an empty object, a seeded account matched, an id collision",
+    // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+    engines: ["chromium"],
     async run(ctx) {
       const { env, results } = ctx;
       const crm = fakeApp("legacy-crm");

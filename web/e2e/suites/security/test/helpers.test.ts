@@ -1,13 +1,14 @@
 /**
- * The security suite's helpers that need no stack: Set-Cookie parsing and the cookie jar, and raw requests (byte-exact
- * request targets and Host headers) against the recording server.
+ * The security suite's helpers that need no stack: Set-Cookie parsing and the cookie jar, raw requests (byte-exact
+ * request targets and Host headers) against the recording server, the developer site's cookie sealing as the suite
+ * reproduces it (AES-256-GCM under an HKDF key, the cookie's purpose bound in), JWT claims and test phone numbers.
  *
  *   web/node_modules/.bin/tsx --test web/e2e/suites/security/test/*.test.ts
  */
 import assert from "node:assert/strict";
 import { createServer, type AddressInfo } from "node:net";
 import { describe, it } from "node:test";
-import { Jar, parseSetCookie, raw, serve } from "../_helpers";
+import { Jar, jwtClaims, parseSetCookie, randomPhone, raw, sealDeveloper, serve, unsealDeveloper } from "../_helpers";
 
 /** A port nothing listens on right now. */
 async function freePort(): Promise<number> {
@@ -89,5 +90,41 @@ describe("raw and serve", () => {
     const reply = await raw(`http://127.0.0.1:${await freePort()}`, "/");
     assert.equal(reply.status, -1);
     assert.match(reply.text, /ECONNREFUSED/);
+  });
+});
+
+describe("sealDeveloper and unsealDeveloper", () => {
+  const secret = "a-test-secret-that-is-long-enough-0123456789";
+  it("open what they sealed, only for the same purpose and secret, and never show the value in clear", () => {
+    const value = { v: 1, at: "eyJhbGciOiJFZERTQSJ9.eyJhdWQiOiJkZXZlbG9wZXIifQ.c2ln", rt: "sar_refresh", ae: 1, re: 2, sub: "abc" };
+    const sealed = sealDeveloper(value, "sa_dev_session", secret);
+    assert.match(sealed, /^v1\.[A-Za-z0-9_-]+$/);
+    assert.ok(!sealed.includes("sar_refresh") && !sealed.includes("eyJ"));
+    assert.deepEqual(unsealDeveloper(sealed, "sa_dev_session", secret), value);
+    assert.equal(unsealDeveloper(sealed, "sa_dev_signin", secret), null);
+    assert.equal(unsealDeveloper(sealed, "sa_dev_session", `${secret}x`), null);
+    assert.notEqual(sealDeveloper(value, "sa_dev_session", secret), sealed);
+  });
+
+  it("refuse tampered, truncated and foreign values", () => {
+    const sealed = sealDeveloper({ a: 1 }, "p", secret);
+    const flipped = `${sealed.slice(0, -2)}${sealed.slice(-2, -1) === "A" ? "B" : "A"}${sealed.slice(-1)}`;
+    assert.equal(unsealDeveloper(flipped, "p", secret), null);
+    assert.equal(unsealDeveloper(sealed.slice(0, 20), "p", secret), null);
+    assert.equal(unsealDeveloper("v2.abc", "p", secret), null);
+    assert.equal(unsealDeveloper(undefined, "p", secret), null);
+  });
+});
+
+describe("jwtClaims and randomPhone", () => {
+  it("read a JWT's payload without verifying it, and {} for anything else", () => {
+    const payload = Buffer.from(JSON.stringify({ aud: "developer", sub: "a8K" })).toString("base64url");
+    assert.deepEqual(jwtClaims(`eyJ.${payload}.sig`), { aud: "developer", sub: "a8K" });
+    assert.deepEqual(jwtClaims("not a jwt"), {});
+    assert.deepEqual(jwtClaims(undefined), {});
+  });
+
+  it("make US numbers in the fictional 555 range", () => {
+    for (let i = 0; i < 20; i++) assert.match(randomPhone(), /^\+1202555\d{4}$/);
   });
 });

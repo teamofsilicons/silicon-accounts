@@ -1,13 +1,12 @@
 /**
  * Verification answers exactly `{"valid": false, "expires_at": null}` for anything that is not a valid proof for the
  * app asking: every non-audience app (the issuing app included), unknown and malformed tokens, a proof whose issuing
- * app is disabled. A valid answer has exactly the contract's keys and never a token. Only apps may verify.
+ * app is disabled. A valid answer has exactly the contract's keys and never a token. Only apps may verify (not a
+ * Carbon's own token, not the developer platform, which has no secret).
  */
 import type { Journey } from "../../context";
 import { json, sql } from "../../lib";
-import { appTokens, asApp, errorCode, isExactlyInvalid, issueAtaFor, issueObo, short, signInToApp, verifyAs, type Verification } from "./_helpers";
-
-const VALID_KEYS = ["expires_at", "issuing_app", "kind", "proof_id", "receiving_app", "scopes", "user", "valid"];
+import { VALID_KEYS, appTokens, asApp, errorCode, isExactlyInvalid, issueAtaFor, issueObo, short, signInToApp, verifyAs, type Verification } from "./_helpers";
 
 export const journey: Journey = {
   name: "proofs-perf-verify-exact-invalid",
@@ -21,14 +20,15 @@ export const journey: Journey = {
     const ata = (await issueAtaFor(ctx, "commit", "remind", { scopes: ["notifications.send"] })).body;
     results.check("dm issued an OBO proof for Briefcase and Commit an ATA proof for Remind", obo.proof_token?.startsWith("sap_") === true && ata.proof_token?.startsWith("sap_") === true, `${short(obo.error ?? obo.proof_id)} / ${short(ata.error ?? ata.proof_id)}`);
 
-    // The audiences: valid, with exactly the contract's keys and no token anywhere.
+    // The receiving apps: valid, with exactly the contract's keys and no token anywhere.
     const good = await verifyAs(ctx, "briefcase", obo.proof_token);
-    results.check("Briefcase (the OBO audience) gets valid with exactly the contract keys", good.status === 200 && good.body.valid === true && JSON.stringify(Object.keys(good.body).sort()) === JSON.stringify(VALID_KEYS), `${good.status} ${JSON.stringify(Object.keys(good.body).sort())}`);
+    results.check("Briefcase (the OBO proof's receiving app) gets valid with exactly the contract keys", good.status === 200 && good.body.valid === true && JSON.stringify(Object.keys(good.body).sort()) === JSON.stringify(VALID_KEYS), `${good.status} ${JSON.stringify(Object.keys(good.body).sort())}`);
+    results.check("…the OBO verdict names the issuing app, the receiving app, the user (uuid, id, kind, membership with dm), the scopes and the token's expiry", good.body.issuing_app?.app_id === "dm" && good.body.receiving_app?.app_id === "briefcase" && good.body.user?.uuid === carbon.uuid && good.body.user.membership_id === `dm:${carbon.uuid}` && JSON.stringify(good.body.scopes) === '["files.write"]' && good.body.expires_at === obo.expires_at, short(good.body));
     results.check("…and the answer carries no token and is not cacheable (Cache-Control: no-store)", !JSON.stringify(good.body).includes("sap_") && good.headers.get("cache-control") === "no-store", String(good.headers.get("cache-control")));
     const remind = await verifyAs(ctx, "remind", ata.proof_token);
     results.check("remind (the ATA proof's app) gets valid, receiving_app remind, user null, exactly the contract keys", remind.body.valid === true && remind.body.kind === "ata" && remind.body.receiving_app?.app_id === "remind" && remind.body.user === null && remind.body.issuing_app?.app_id === "commit" && JSON.stringify(Object.keys(remind.body).sort()) === JSON.stringify(VALID_KEYS), short(remind.body));
 
-    // Every app that is not an audience, through the site and straight at accounts-api.
+    // Every app that is not the receiving app, through the site and straight at accounts-api.
     const exactly = async (label: string, app: string, token: string, direct = false) => {
       const answer = await verifyAs(ctx, app, token, { direct });
       const ok = answer.status === 200 && isExactlyInvalid(answer.body) && answer.headers.get("cache-control") === "no-store";
@@ -36,7 +36,7 @@ export const journey: Journey = {
       return answer;
     };
     for (const app of ["remind", "waveform", "commit", "spacestation", "acme-notes"]) await exactly(`${app} verifying dm's OBO proof for Briefcase → exactly {valid:false, expires_at:null}`, app, obo.proof_token);
-    const issuer = await exactly("dm (the issuing app, not an audience) verifying its own OBO proof → exactly invalid", "dm", obo.proof_token);
+    const issuer = await exactly("dm (the issuing app, not the receiving app) verifying its own OBO proof → exactly invalid", "dm", obo.proof_token);
     results.check("…with no x-accounts-hint: the input was a well-formed proof token, so nothing about the proof is hinted", issuer.headers.get("x-accounts-hint") === null, String(issuer.headers.get("x-accounts-hint")));
     await exactly("remind verifying dm's OBO proof straight at accounts-api → exactly invalid", "remind", obo.proof_token, true);
     for (const app of ["waveform", "briefcase", "dm", "commit", "spacestation"]) await exactly(`${app} verifying Commit's ATA proof for remind → exactly invalid${app === "waveform" ? " (another app Commit talks to, but not this proof's)" : ""}`, app, ata.proof_token);
@@ -73,6 +73,8 @@ export const journey: Journey = {
     results.check("a wrong secret → 401 invalid_app_credentials", wrong.status === 401 && errorCode(wrong.body) === "invalid_app_credentials", `${wrong.status} ${short(wrong.body)}`);
     const nobody = await json<Record<string, unknown>>(`${env.api}/v1/proofs/verify`, { method: "POST", headers: { "content-type": "application/json", authorization: `Basic ${Buffer.from("no-such-app:sa_app_x").toString("base64")}` }, body: JSON.stringify({ proof_token: obo.proof_token }) });
     results.check("an unknown app id → 401", nobody.status === 401, `${nobody.status} ${short(nobody.body)}`);
+    const developer = await json<Record<string, unknown>>(`${env.api}/v1/proofs/verify`, { method: "POST", headers: { "content-type": "application/json", authorization: `Basic ${Buffer.from("developer:anything").toString("base64")}` }, body: JSON.stringify({ proof_token: obo.proof_token }) });
+    results.check("the developer platform's app id (a public client with no secret) → 401: it can't verify proofs", developer.status === 401 && !("valid" in (developer.body as object)), `${developer.status} ${short(developer.body)}`);
     const bearer = await json<Record<string, unknown>>(`${env.site}/v1/proofs/verify`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${subject}`, "x-forwarded-for": ctx.ip }, body: JSON.stringify({ proof_token: obo.proof_token }) });
     results.check("the Carbon's own bearer token → 401: accounts can't verify proofs, apps do", bearer.status === 401, `${bearer.status} ${short(bearer.body)}`);
 

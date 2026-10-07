@@ -24,7 +24,9 @@ const PR = "https://github.com/teamofsilicons/silicon-accounts/pull/42";
 
 export const journey: Journey = {
   name: "silicons-cli-report",
-  title: "`accounts report`: each report is emailed through Postmark (the mock) to exactly saketdev12@gmail.com, shubhastro2@gmail.com and bugs@teamofsilicons.com, with the PR link when given; signed-in reports name the account; retries don't send twice; invalid input and the 5-per-hour limit are explained",
+  title: "`accounts report`: each report is emailed through Postmark (the mock) to exactly saketdev12@gmail.com, shubhastro2@gmail.com and bugs@teamofsilicons.com, with the PR link when given; signed-in reports name the account; retries don't send twice; invalid input, a message at the edge of the 10,000-character limit (with the CLI's own diagnostics appended) and the 5-per-hour limit are explained",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     await forgetRateLimits(env, "127.0.0.1");
@@ -111,12 +113,33 @@ export const journey: Journey = {
     await sleep(1000);
     results.check("…neither sent an email", (await mailsWith(env, `scli-invalid-${t}`, after)).length === 0);
 
-    // 6. Five reports an hour per network: the sixth is refused and says when to retry.
-    const sent = [anon, signed, piped, once].length;
+    // 6. A message just under the limit (the API takes 10,000 characters): 9,990 characters typed by the reporter. The
+    //    CLI appends its own diagnostics (version and platform) unless --no-diagnostics; that must not turn a message
+    //    under the limit into a refusal that counts characters the reporter never wrote, without saying so.
+    // (The window of the per-network limit starts afresh here, as if an hour had passed, so sections 6 and 7 count alone.)
+    await forgetRateLimits(env, "127.0.0.1");
+    const marker5 = `scli-edge-${t}`;
+    const edgeText = `${marker5} ${"e".repeat(9990 - marker5.length - 1)}`;
+    after = await lastSeq(env);
+    const edge = await accounts(env, ["report", "-", "--json"], { home: freshDir(), stdin: edgeText });
+    const edgeError = cliError(edge);
+    results.check(
+      "a 9,990-character report (under the 10,000 limit) is sent with the CLI's diagnostics, or refused saying that its own appended diagnostics pushed it over (not that the message has more characters than were typed)",
+      edgeText.length === 9990 && (edge.code === 0 || (/\b9,?990\b/.test(`${str(edgeError.message)} ${str(edgeError.hint)}`) && /diagnostic/i.test(`${str(edgeError.message)} ${str(edgeError.hint)}`))),
+      said(edge),
+    );
+    const bare = await accounts(env, ["report", "-", "--no-diagnostics", "--json"], { home: freshDir(), stdin: edgeText });
+    results.check("…with --no-diagnostics the same 9,990 characters are sent", bare.code === 0 && bare.json?.status === "queued", said(bare));
+    const over = await accounts(env, ["report", "-", "--no-diagnostics", "--json"], { home: freshDir(), stdin: `${edgeText}${"o".repeat(11)}` });
+    results.check("10,001 characters: exit 2, refused before sending, naming the limit and the length", over.code === 2 && /10,?000/.test(str(cliError(over).message)) && /10,?001/.test(str(cliError(over).message)), said(over));
+
+    // 7. Five reports an hour per network (a fresh window): the sixth is refused and says when to retry. Refused
+    //    input (above) never counts.
+    await forgetRateLimits(env, "127.0.0.1");
     const extra = [];
-    for (let i = sent; i < 5; i++) extra.push(await accounts(env, ["report", `scli-limit-${t}-${i}`, "--json"], { home: freshDir() }));
+    for (let i = 1; i <= 5; i++) extra.push(await accounts(env, ["report", `scli-limit-${t}-${i}`, "--json"], { home: freshDir() }));
     const sixth = await accounts(env, ["report", `scli-limit-${t}-6`, "--json"], { home: freshDir() });
-    results.check("five reports an hour from one network; the sixth: exit 6, rate_limited, retry_after_seconds", extra.every(run => run.code === 0) && sixth.code === 6 && cliError(sixth).code === "rate_limited" && Number(obj(cliError(sixth).details).retry_after_seconds) > 0, `${extra.length} more ok, then ${said(sixth)}`);
+    results.check("five reports an hour from one network; the sixth: exit 6, rate_limited, retry_after_seconds", extra.every(run => run.code === 0) && sixth.code === 6 && cliError(sixth).code === "rate_limited" && Number(obj(cliError(sixth).details).retry_after_seconds) > 0, `${extra.filter(run => run.code === 0).length} of 5 ok, then ${said(sixth)}`);
     await forgetRateLimits(env, "127.0.0.1");
   },
 };

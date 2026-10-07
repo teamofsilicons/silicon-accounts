@@ -1,5 +1,5 @@
 /**
- * The hourly proof sweep, part 1 of 2 (part 2: z-sweep.ts). This file sorts first in the suite so that it runs before
+ * The hourly proof sweep, part 1 of 2 (part 2: z-sweep.ts); both run only with E2E_PROOFS_SWEEP=1 (_sweep.ts). This file sorts first in the suite so that it runs before
  * the stack's first sweep, 120 s after accounts-api started (_sweep.ts). It makes the proofs that sweep must store,
  * delete or keep, moving time only on its own rows:
  *
@@ -13,11 +13,11 @@
 import type { Journey } from "../../context";
 import { api, sql } from "../../lib";
 import { appListing, appTokens, basicAuth, familyOf, isExactlyInvalid, issueAtaFor, issueObo, refreshAs, revokeAs, row, short, signInToApp, verifyAs, type IssuedProof } from "./_helpers";
-import { FIRST_SWEEP_AFTER_MS, SETUP_MARGIN_MS, SWEEP_KEY, apiListeningAt, apiLogFile, type SweepSetup } from "./_sweep";
+import { FIRST_SWEEP_AFTER_MS, SETUP_MARGIN_MS, SWEEP_KEY, apiListeningAt, apiLogFile, sweepOptIn, type SweepSetup } from "./_sweep";
 
 export const journey: Journey = {
   name: "proofs-perf-sweep-setup",
-  title: "before the stack's first hourly proof sweep (120 s after accounts-api starts): an OBO proof whose dm sign-in dm ended (its end not stored yet), proof tokens expired 25 h and 23 h ago, proofs revoked 31 and 29 days ago, an ATA proof that ended 31 days ago, and a live proof with a used refresh token",
+  ...sweepOptIn("before the stack's first hourly proof sweep (120 s after accounts-api starts): an OBO proof whose dm sign-in dm ended (its end not stored yet), proof tokens expired 25 h and 23 h ago, proofs revoked 31 and 29 days ago, an ATA proof that ended 31 days ago, and a live proof with a used refresh token"),
   provides: [SWEEP_KEY],
   async run(ctx) {
     const { env, results, shared } = ctx;

@@ -113,7 +113,7 @@ service's logs (`accounts report` and `POST /v1/reports` take it in the message)
 | `account_deleted` | 401 / 403 / 404 / 409 | the account was deleted: 401 for its own tokens, 403 at Silicon sign-in, 404 at lookups, 409 when it happened during the request |
 | `origin_not_allowed` | 403 | a cookie-authenticated POST/PUT/PATCH/DELETE came without the account site's `Origin`; use a Bearer token instead of the cookie |
 | `carbon_only` | 403 | a Silicon called an endpoint for Carbons (emails, phones, custodian side…) |
-| `silicon_only` | 403 | a Carbon called an endpoint for Silicons (`/v1/me/webhook`) |
+| `silicon_only` | 403 | a Carbon called an endpoint for Silicons (`/v1/me/webhook…`: its own webhook, deliveries and replay) |
 | `account_not_active` | 403 | the account isn't active (pending custodian, unfinished import) |
 | `app_credentials_required` | 401 | an app endpoint got no credentials |
 | `invalid_app_credentials` | 401 | unknown app_id, wrong secret, or malformed Basic header |
@@ -270,7 +270,7 @@ outside the app's `google.hosted_domain`), `signup_expired`, `session_changed` (
 | `transfer_not_found` | 404 | no pending transfer to cancel |
 | `transfer_to_self` | 422 | a transfer must go to another Carbon |
 | `transfer_stale` | 409 | the custodian changed after the transfer was requested |
-| `webhook_not_set` | 409 | a test ping or secret rotation without a webhook URL |
+| `webhook_not_set` | 409 | a test ping, secret rotation or replay without a webhook URL: set one first |
 
 ## Apps
 
@@ -279,7 +279,7 @@ outside the app's `google.hosted_domain`), `signup_expired`, `session_changed` (
 | `config_version_conflict` | 409 | the sign-in setup changed since the version you sent (`details.current_version`): re-read, re-apply, resend |
 | `user_not_found` | 404 | the uuid isn't in this app's user base (uuids are case-sensitive) |
 | `import_not_found` | 404 | no such import job for this app |
-| `delivery_not_found` | 404 | no such webhook delivery for this app |
+| `delivery_not_found` | 404 | no such webhook delivery for this app, or for this Silicon (`/v1/me/webhook/deliveries…`) |
 | `unknown_columns` | 422 | the import has columns Silicon Accounts doesn't keep (`details.unknown_columns`, `allowed_columns`); remove them or set `ignore_unknown_columns` |
 | `duplicate_columns` | 422 | the same column twice |
 | `no_identifier_columns` | 422 | no `email`, `emails`, `phone` or `phones` column |

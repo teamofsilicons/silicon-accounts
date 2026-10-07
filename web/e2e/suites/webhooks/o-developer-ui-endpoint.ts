@@ -1,6 +1,6 @@
 /**
- * The owner's Webhooks tab, the endpoint side (/developer/campus-connect/webhooks, owner it@university.test), in the
- * browser: Change URL refuses a bad URL in place (the page's own check, and a 422 only the server can give, shown under
+ * The owner's Webhooks tab on the developer site, the endpoint side (developer.teamofsilicons.com
+ * /apps/campus-connect/webhooks, owner it@university.test signed in through the developer site's BFF), in the browser: Change URL refuses a bad URL in place (the page's own check, and a 422 only the server can give, shown under
  * the field), Cancel keeps the URL, saving a new URL shows its new signing secret once and the next ping is signed with
  * it; Remove webhook fails what is pending at once and disables "Replay all failed"; setting a URL again, the failed
  * delivery is selected in the table and replayed ("Replay 1 selected") to the new URL with the same event_id; a failed
@@ -10,7 +10,7 @@
  */
 import type { Locator, Page } from "@playwright/test";
 import type { Journey } from "../../context";
-import { newContext, shot, signInOnSite, sleep } from "../../lib";
+import { DEVELOPER_SIGNED_OUT, newContext, shot, signInOnDeveloper, sleep } from "../../lib";
 import {
   ageDelivery,
   drainApp,
@@ -96,7 +96,7 @@ async function readSecret(page: Page, title: string): Promise<{ masked: boolean;
 
 export const journey: Journey = {
   name: "webhooks-developer-ui-endpoint",
-  title: "the owner's Webhooks tab: Change URL (refused in place by the page and by the server, Cancel, new secret shown once and used), Remove webhook (pending fails, Replay all failed disabled), set it again and Replay 1 selected, a skipped replay's reason shown",
+  title: "the owner's Webhooks tab on the developer site: Change URL (refused in place by the page and by the server, Cancel, new secret shown once and used), Remove webhook (pending fails, Replay all failed disabled), set it again and Replay 1 selected, a skipped replay's reason shown",
   timeoutMs: 6 * 60_000,
   async run(ctx) {
     const { env, results, browser } = ctx;
@@ -111,11 +111,12 @@ export const journey: Journey = {
     const sinkUrl = `${env.apps}/${sink}`;
     const context = await newContext(browser);
     const page: Page = await context.newPage();
-    // The 422 the journey asks the server for is logged by the browser as a failed resource load.
-    results.watch(page, "dev-webhook-endpoint", [/status of 422/]);
+    // The 422 the journey asks the server for is logged by the browser as a failed resource load, and so is the developer
+    // site's signed-out session probe before signing in.
+    results.watch(page, "dev-webhook-endpoint", [/status of 422/, DEVELOPER_SIGNED_OUT]);
     try {
-      await signInOnSite(env, page, fakeApp(APP).owner_email);
-      await page.goto(`${env.site}/developer/${APP}/webhooks`);
+      await signInOnDeveloper(env, page, fakeApp(APP).owner_email, { returnTo: `/apps/${APP}/webhooks` });
+      if (!page.url().startsWith(`${env.developer}/apps/${APP}/webhooks`)) await page.goto(`${env.developer}/apps/${APP}/webhooks`);
       const tab = page.getByRole("tabpanel", { name: "Webhooks" });
       await tab.getByRole("button", { name: "Send test ping" }).waitFor({ timeout: 30_000 });
       results.check("the tab shows the app's webhook URL", await tab.getByText(original, { exact: true }).isVisible(), original);
@@ -135,7 +136,8 @@ export const journey: Journey = {
       // Short enough for the page's check (2048 characters), too long for the server's once the é are encoded (%C3%A9).
       const overlong = `${env.apps}/hooks/${"é".repeat(400)}`;
       await field.fill(overlong);
-      const answered = page.waitForResponse(response => response.url().endsWith(`/v1/apps/${APP}/webhook`) && response.request().method() === "PUT", { timeout: 15_000 }).catch(() => null);
+      // The page saves through the developer site's BFF: PUT /api/accounts/apps/<app>/webhook → the API's PUT /v1/apps/<app>/webhook.
+      const answered = page.waitForResponse(response => response.url() === `${env.developer}/api/accounts/apps/${APP}/webhook` && response.request().method() === "PUT", { timeout: 15_000 }).catch(() => null);
       await tab.getByRole("button", { name: "Save the new URL" }).click();
       const response = await answered;
       const serverError = await fieldError(field);

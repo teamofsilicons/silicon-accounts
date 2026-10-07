@@ -330,3 +330,83 @@ async fn core_proof_revocations_are_audited() {
     assert_eq!(audited[1].3["reason"], "account_deleted");
     assert_eq!(audited[1].3["kind"], "obo");
 }
+
+/// A custodian's new c:id reaches the apps of its Silicons, which show it as the Silicon's
+/// `custodian` (the custodian itself is no member of them), and the Silicon's own webhook.
+#[tokio::test]
+async fn a_custodians_new_id_reaches_its_silicons_apps() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let (silicon, _) = ctx.silicon(&carbon.uuid).await;
+    let (other_silicon, _) = ctx.silicon(&carbon.uuid).await;
+    let stranger = ctx.carbon().await;
+    let (not_mine, _) = ctx.silicon(&stranger.uuid).await;
+    let (briefcase, _) = ctx.app("briefcase").await;
+    ctx.set_app_webhook(
+        &briefcase.app_id,
+        "http://127.0.0.1:8593/briefcase/webhooks",
+    )
+    .await;
+    ctx.membership(&briefcase.app_id, &silicon.uuid, &[Scope::Profile])
+        .await;
+    ctx.membership(&briefcase.app_id, &not_mine.uuid, &[Scope::Profile])
+        .await;
+    ctx.exec(&format!(
+        "update accounts set webhook_url = 'http://127.0.0.1:8593/si/hooks' where uuid = '{}'",
+        other_silicon.uuid
+    ))
+    .await;
+
+    let mut conn = ctx.conn().await;
+    let new_id =
+        accounts_core::ids::AccountId::parse(&format!("c:renamed-{}", carbon.uuid.to_lowercase()))
+            .expect("id");
+    let change =
+        accounts_core::repo::accounts::change_id(&mut conn, &carbon.uuid, &new_id, &carbon.uuid)
+            .await
+            .expect("change id");
+    let emitted =
+        events::notify_id_changed(&mut conn, &change.account, &change.old_id, &change.new_id)
+            .await
+            .expect("emit");
+    let mut kinds: Vec<(String, String)> = emitted
+        .iter()
+        .map(|e| (e.target_id.clone(), e.event_type.clone()))
+        .collect();
+    kinds.sort();
+    let mut expected = vec![
+        (briefcase.app_id.clone(), types::ACCOUNT_UPDATED.to_string()),
+        (
+            other_silicon.uuid.clone(),
+            types::SILICON_UPDATED.to_string(),
+        ),
+    ];
+    expected.sort();
+    assert_eq!(
+        kinds, expected,
+        "the custodian is no member of briefcase: no id_changed for it"
+    );
+
+    let evs = events_for(&ctx, &briefcase.app_id).await;
+    assert_eq!(evs.len(), 1, "nothing about the stranger's Silicon");
+    let data = &evs[0].1["data"];
+    assert_eq!(data["uuid"], silicon.uuid.as_str());
+    assert_eq!(data["changed"], serde_json::json!(["custodian"]));
+    assert_eq!(data["account"]["custodian"]["uuid"], carbon.uuid.as_str());
+    assert_eq!(data["account"]["custodian"]["id"], change.new_id.as_str());
+    assert_eq!(
+        data["account"]["version"],
+        silicon.version + 1,
+        "apps that order by version see a newer account"
+    );
+    let own = events_for(&ctx, &other_silicon.uuid).await;
+    assert_eq!(own.len(), 1);
+    assert_eq!(
+        own[0].1["data"]["changed"],
+        serde_json::json!(["custodian"])
+    );
+    assert_eq!(
+        own[0].1["data"]["silicon"]["custodian"]["id"],
+        change.new_id.as_str()
+    );
+}

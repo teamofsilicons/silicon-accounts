@@ -77,7 +77,10 @@ async fn the_default_flow_is_one_page_with_required_and_unticked_optional_detail
     assert_eq!(d["title"], Value::Null);
     assert_eq!(d["layout"], Value::Null);
     assert_eq!(d["challenge"], Value::Null);
-    assert_eq!(d["review_next"], false, "the default flow has no review page");
+    assert_eq!(
+        d["review_next"], false,
+        "the default flow has no review page"
+    );
     assert_eq!(
         page_fields(&f),
         vec![
@@ -191,7 +194,10 @@ async fn a_flow_walks_its_pages_in_order_and_reviews_before_finishing() {
         ),
         (json!("For your tax year"), json!("Finish"), json!("split"))
     );
-    assert_eq!(d["review_next"], true, "the last page of a flow with review opens it");
+    assert_eq!(
+        d["review_next"], true,
+        "the last page of a flow with review opens it"
+    );
     assert_eq!(
         page_fields(f),
         vec![
@@ -512,12 +518,80 @@ async fn a_missing_required_phone_is_added_on_its_page_with_a_code() {
     assert_eq!(phones.len(), 1);
     assert!(phones[0].is_primary && phones[0].verified_at.is_some());
     drop(conn);
+    // The activity names the number and the app ("Phone number +1… added while signing in to …"),
+    // as the account site's own adds do.
+    let added: Value = sqlx::query_scalar(
+        "select details from audit_log where account_uuid = $1 and action = 'contact.added'",
+    )
+    .bind(&carbon.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("contact.added");
+    assert_eq!(
+        added,
+        json!({"via": "requirement", "app_id": app.app_id, "kind": "phone", "phone": "+14155550101"})
+    );
     let r = continue_page(&ctx, &mut b, &id, &[]).await;
     assert_eq!(r.json["flow"]["step"], "complete", "{}", r.json);
     assert_eq!(
         granted(&ctx, &app.app_id, &carbon.uuid).await,
         vec!["profile", "phone"]
     );
+}
+
+/// Adding a missing email or phone on a details page answers 409 when another account has it,
+/// so every attempt counts toward the account site's add limits (one shared budget): 20 per
+/// account per 10 minutes, then 429, also when every answer was 409.
+#[tokio::test]
+async fn adding_a_detail_counts_toward_the_account_sites_add_limits() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let taken = "+14155550177";
+    ctx.carbon_with(CarbonSpec {
+        phone: Some(taken.into()),
+        ..Default::default()
+    })
+    .await;
+    let (app, _) = app_with(
+        &ctx,
+        "legacy",
+        json!({"required_fields": ["email"], "optional_fields": ["phone"]}),
+    )
+    .await;
+    let mut b = Browser::new(&ctx);
+    let (id, f) = code_sign_in(&ctx, &mut b, &app.app_id, &email_of(&carbon), json!({})).await;
+    assert_eq!(f["step"], "details");
+    for i in 0..20 {
+        let r = b
+            .post(
+                &ctx,
+                &format!("/v1/flows/{id}/details/add"),
+                json!({"phone": taken}),
+            )
+            .await;
+        assert_eq!(
+            r.error_code(),
+            Some("phone_in_use"),
+            "attempt {i}: {}",
+            r.json
+        );
+    }
+    let r = b
+        .post(
+            &ctx,
+            &format!("/v1/flows/{id}/details/add"),
+            json!({"phone": taken}),
+        )
+        .await;
+    assert_eq!(r.status, 429, "{}", r.json);
+    assert_eq!(r.error_code(), Some("rate_limited"));
+    assert!(r.headers.get("retry-after").is_some());
+    let counted: i32 = sqlx::query_scalar("select count from rate_limits where bucket = $1")
+        .bind(format!("contact_add:account:{}", carbon.uuid))
+        .fetch_one(&ctx.state.db)
+        .await
+        .expect("the account site's bucket");
+    assert!(counted > 20, "{counted}");
 }
 
 #[tokio::test]
@@ -817,6 +891,32 @@ async fn prompt_none_signs_in_silently_or_explains_why_not() {
 
     let f = new_flow(&ctx, &mut b, &needs_phone.app_id, json!({"prompt": "none"})).await;
     assert_eq!(f["error"]["code"], "interaction_required");
+
+    // An app that asks every Carbon to sign in again: login_required, and the description says
+    // why (a Carbon IS signed in to this browser).
+    let (forgetful, _) = app_with(&ctx, "spacestation", json!({"remember_browser": false})).await;
+    let f = new_flow(&ctx, &mut b, &forgetful.app_id, json!({"prompt": "none"})).await;
+    assert_eq!(f["step"], "failed");
+    assert_eq!(f["error"]["code"], "login_required");
+    let to = f["redirect_to"].as_str().expect("to");
+    let description = query_param(to, "error_description").expect("description");
+    assert!(
+        description.contains("remember_browser is off") && !description.contains("No Carbon"),
+        "{description}"
+    );
+    assert_eq!(query_param(to, "error").as_deref(), Some("login_required"));
+
+    // Nobody signed in at all: that's what it says.
+    let mut nobody = Browser::new(&ctx);
+    let f = new_flow(&ctx, &mut nobody, &app.app_id, json!({"prompt": "none"})).await;
+    assert_eq!(f["error"]["code"], "login_required");
+    assert!(
+        f["error"]["message"]
+            .as_str()
+            .expect("message")
+            .starts_with("No Carbon is signed in"),
+        "{f}"
+    );
 }
 
 #[tokio::test]
@@ -844,6 +944,217 @@ async fn a_silicons_session_is_never_offered_or_continued() {
             .as_str()
             .expect("hint")
             .contains("accounts login --app")
+    );
+    // prompt=none says it's a Silicon, not that nobody is signed in.
+    let f = new_flow(&ctx, &mut b, &app.app_id, json!({"prompt": "none"})).await;
+    assert_eq!(f["error"]["code"], "login_required");
+    assert!(
+        f["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("a Silicon"),
+        "{f}"
+    );
+}
+
+/// The `(field, new)` pairs of a details page.
+fn new_marks(flow: &Value) -> Vec<(String, bool)> {
+    flow["details"]["fields"]
+        .as_array()
+        .expect("fields")
+        .iter()
+        .map(|f| {
+            (
+                f["field"].as_str().expect("field").to_string(),
+                f["new"].as_bool().expect("new"),
+            )
+        })
+        .collect()
+}
+
+/// "Continue as" in a browser signed in as the Carbon; returns the flow after it.
+async fn continue_as(ctx: &TestContext, b: &mut Browser, app_id: &str) -> (String, Value) {
+    let id = id_of(&new_flow(ctx, b, app_id, json!({})).await);
+    let r = b
+        .post(ctx, &format!("/v1/flows/{id}/continue"), json!({}))
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    (id, r.json["flow"].clone())
+}
+
+/// UNDERSTANDING.md: the what's-shared screen shows "again whenever the app asks for more". An
+/// optional detail the app adds later is offered to returning Carbons (unticked, marked new);
+/// one they left unticked before stays quiet and isn't new; a newly required one is the only
+/// new detail on its page.
+#[tokio::test]
+async fn returning_carbons_are_offered_what_the_app_asks_for_since() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let (app, _) = app_with(
+        &ctx,
+        "briefcase",
+        json!({"required_fields": ["email"], "optional_fields": ["timezone"]}),
+    )
+    .await;
+    let mut b = Browser::new(&ctx);
+    let (id, f) = code_sign_in(&ctx, &mut b, &app.app_id, &email_of(&carbon), json!({})).await;
+    assert_eq!(f["step"], "details");
+    assert_eq!(
+        new_marks(&f),
+        vec![("email".into(), false), ("timezone".into(), false)],
+        "nothing is 'new' on a Carbon's first page"
+    );
+    // The timezone is left unticked.
+    let r = continue_page(&ctx, &mut b, &id, &[]).await;
+    assert_eq!(r.json["flow"]["step"], "complete", "{}", r.json);
+    let (_, f) = continue_as(&ctx, &mut b, &app.app_id).await;
+    assert_eq!(f["step"], "complete", "nothing new: straight back");
+
+    // The app adds an optional phone: offered, unticked and new; the timezone isn't new.
+    set_config(
+        &ctx,
+        &app.app_id,
+        json!({"optional_fields": ["timezone", "phone"]}),
+    )
+    .await;
+    let (id, f) = continue_as(&ctx, &mut b, &app.app_id).await;
+    assert_eq!(f["step"], "details", "the app asks for more: {f}");
+    assert_eq!(
+        page_fields(&f),
+        vec![
+            row("email", "required", true, false),
+            row("timezone", "optional", false, false),
+            row("phone", "optional", false, true),
+        ]
+    );
+    assert_eq!(
+        new_marks(&f),
+        vec![
+            ("email".into(), false),
+            ("timezone".into(), false),
+            ("phone".into(), true)
+        ]
+    );
+    let r = continue_page(&ctx, &mut b, &id, &[]).await;
+    assert_eq!(r.json["flow"]["step"], "complete", "{}", r.json);
+    // Declined before: quiet. prompt=none works again too.
+    let (_, f) = continue_as(&ctx, &mut b, &app.app_id).await;
+    assert_eq!(f["step"], "complete", "{f}");
+    let f = new_flow(&ctx, &mut b, &app.app_id, json!({"prompt": "none"})).await;
+    assert_eq!(f["step"], "complete", "{f}");
+
+    // A newly required date of birth: the only new detail on the page.
+    set_config(
+        &ctx,
+        &app.app_id,
+        json!({"required_fields": ["email", "dob"]}),
+    )
+    .await;
+    let f = new_flow(&ctx, &mut b, &app.app_id, json!({"prompt": "none"})).await;
+    assert_eq!(f["error"]["code"], "consent_required");
+    let (_, f) = continue_as(&ctx, &mut b, &app.app_id).await;
+    assert_eq!(f["step"], "details");
+    let marks = new_marks(&f);
+    assert!(
+        marks.contains(&("dob".into(), true))
+            && marks
+                .iter()
+                .filter(|(field, _)| field != "dob")
+                .all(|(_, new)| !new),
+        "{marks:?}"
+    );
+}
+
+/// An active membership made by exchanging a short-lived token (`accounts login --app …`): the
+/// Carbon never saw the app's pages.
+async fn slt_membership(ctx: &TestContext, app_id: &str, uuid: &str) {
+    use accounts_core::models::{MembershipSource, Scope};
+    use accounts_core::repo::memberships::{self, GrantMode};
+    let mut conn = ctx.conn().await;
+    memberships::upsert_signin(
+        &mut conn,
+        app_id,
+        uuid,
+        MembershipSource::Slt,
+        &[Scope::Profile, Scope::Email],
+        GrantMode::Union,
+    )
+    .await
+    .expect("slt membership");
+}
+
+/// A membership made without the pages (a short-lived token from the CLI or a Silicon) never
+/// showed the Carbon what the app gets: their first sign-in on the hosted pages shows every page,
+/// and so does the first one after the app's access was removed.
+#[tokio::test]
+async fn the_first_hosted_sign_in_after_a_short_lived_token_shows_the_pages() {
+    use accounts_core::models::ActorKind;
+    use accounts_core::repo::audit::{self, AuditEntry};
+    use accounts_core::repo::memberships;
+
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let email = email_of(&carbon);
+    let (app, _) = app_with(
+        &ctx,
+        "briefcase",
+        json!({"required_fields": ["email"], "optional_fields": ["timezone"]}),
+    )
+    .await;
+    slt_membership(&ctx, &app.app_id, &carbon.uuid).await;
+
+    let mut b = Browser::new(&ctx);
+    let (id, f) = code_sign_in(&ctx, &mut b, &app.app_id, &email, json!({})).await;
+    assert_eq!(f["step"], "details", "what's shared is shown once: {f}");
+    assert_eq!(
+        page_fields(&f),
+        vec![
+            row("email", "required", true, false),
+            row("timezone", "optional", false, false),
+        ]
+    );
+    assert!(new_marks(&f).iter().all(|(_, new)| !new));
+    let r = continue_page(&ctx, &mut b, &id, &["timezone"]).await;
+    assert_eq!(r.json["flow"]["step"], "complete", "{}", r.json);
+    let answer: Value = sqlx::query_scalar(
+        "select details from audit_log where account_uuid = $1 and action = 'consent.granted'",
+    )
+    .bind(&carbon.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("the answer is recorded");
+    assert_eq!(answer["offered"], json!(["email", "timezone"]));
+    assert_eq!(answer["shared"], json!(["email", "timezone"]));
+    let (_, f) = continue_as(&ctx, &mut b, &app.app_id).await;
+    assert_eq!(f["step"], "complete", "then the normal rule: {f}");
+
+    // The Carbon removes the app's access (the account site), then a token brings it back.
+    {
+        let mut conn = ctx.conn().await;
+        memberships::remove_access(&mut conn, &app.app_id, &carbon.uuid, &carbon.uuid)
+            .await
+            .expect("remove access");
+        audit::record(
+            &mut conn,
+            &AuditEntry {
+                account_uuid: Some(&carbon.uuid),
+                app_id: Some(&app.app_id),
+                details: json!({}),
+                ..AuditEntry::new(
+                    ActorKind::Account,
+                    Some(&carbon.uuid),
+                    "membership.access_removed",
+                )
+            },
+        )
+        .await
+        .expect("audit");
+    }
+    slt_membership(&ctx, &app.app_id, &carbon.uuid).await;
+    let (_, f) = continue_as(&ctx, &mut b, &app.app_id).await;
+    assert_eq!(
+        f["step"], "details",
+        "answers before the removal don't count: {f}"
     );
 }
 

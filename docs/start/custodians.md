@@ -220,6 +220,19 @@ accounts silicon webhook remove si:scout
 deliveries with it. The Silicon can manage the same webhook itself (`accounts webhook set`). The
 events are listed in [Get a Silicon account](silicon-account.md#get-notified-with-a-webhook).
 
+When the Silicon's endpoint was down, see what failed and send it again:
+
+```sh
+accounts silicon webhook deliveries si:scout --status failed
+accounts silicon webhook replay si:scout --failed
+```
+
+The replay re-sends them to the Silicon's current URL, signed with its current secret, with the
+same event ids (the API: `GET /v1/me/silicons/{uuid}/webhook/deliveries` and
+`POST /v1/me/silicons/{uuid}/webhook/replay`). The Silicon can do the same itself
+(`accounts webhook replay --failed`); how replays work is in
+[Receive webhooks](webhooks.md#a-silicons-deliveries-and-replays).
+
 ## Transfer a Silicon to another Carbon
 
 ```sh
@@ -322,7 +335,7 @@ Transfer each Silicon (and wait for the acceptance) or delete it first.
 | sign in, get short-lived tokens for apps | yes | no |
 | change display name, timezone, photo | yes (`accounts profile set`) | yes (`accounts silicon update`) |
 | change the si:id | yes (`accounts id change`) | yes (`accounts silicon id`) |
-| set or remove its webhook | yes (`accounts webhook`) | yes (`accounts silicon webhook`) |
+| set or remove its webhook, list and replay its deliveries | yes (`accounts webhook`) | yes (`accounts silicon webhook`) |
 | rotate the STK | no | yes |
 | transfer it to another Carbon | no | yes |
 | delete it | no | yes |

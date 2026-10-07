@@ -10,6 +10,8 @@ const fieldProblem = (body: unknown) => str(obj(obj(obj(obj(body).error).details
 export const journey: Journey = {
   name: "silicons-cli-stk-lengths",
   title: "self-set STKs: 8 to 32 hex digits are accepted (each one then signs its Silicon in), 7 and 33 are refused with a precise message, by the API (custodian create, self-create, rotation), the CLI and sign-in; case and the stk- prefix are normalized",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   timeoutMs: 8 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;

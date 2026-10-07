@@ -65,6 +65,9 @@ async fn start_testkit() -> Option<Testkit> {
             "0",
             "--fake-apps-port",
             "0",
+            // Every port free-picked: a dev stack on the default ports (8591–8594) holds them.
+            "--iris-port",
+            "0",
             "--quiet",
         ])
         .current_dir(&dir)

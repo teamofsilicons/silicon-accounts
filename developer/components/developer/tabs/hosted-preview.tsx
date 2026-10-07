@@ -8,13 +8,16 @@
  * Pages (06-v2 §6): the method choice in its sign-in and sign-up versions (intent), the Opening page before Google or
  * Apple, the email and phone code pages, the sign-up details page, each page of the app's flow (a details step, with
  * its own title, subtitle, continue label and layout), the review page, and the embed buttons on the app's own site.
+ * Only pages a Carbon can meet with the draft's methods are offered (no Opening Apple without Apple). Each page says
+ * what the hosted page says (web/components/auth: steps/*.tsx, flow-page.tsx's footer), word for word, with the sample
+ * Carbon below; when those words change there, change them here.
  *
  * A desktop page is laid out at 1024 px and scaled to fit (so the split layout shows as it would); a phone page is
  * 390 px wide. Nothing in it is interactive (inert). Sample values are never a real person.
  */
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "motion/react";
-import { Lock, Mail, Phone } from "lucide-react";
+import { Lock, Mail, Phone, Smartphone } from "lucide-react";
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { Button } from "@/components/arc/button/button";
 import { Checkbox } from "@/components/arc/checkbox/checkbox";
@@ -22,83 +25,41 @@ import { Input } from "@/components/arc/input/input";
 import { OtpInput } from "@/components/arc/otp-input/otp-input";
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
 import { BrandAside, BrandPanel, BrandStage, BrandingScope, PoweredBy } from "@/components/foundation/branding/branding";
-import type { Branding, ContactField, SigninFlowStep } from "@/lib/api/types";
+import type { Branding, ContactField } from "@/lib/api/types";
 import { brandLogo, type PaintTheme } from "@/lib/branding/apply";
-import { FIELD_LABELS } from "@/lib/format";
-import { defaultFlowOf, requestedFields, type EditableConfig } from "../lib/config";
+import { FIELD_LABELS, formatDate } from "@/lib/format";
+import { timezoneLabel, utcOffset } from "@/lib/timezones";
+import type { EditableConfig } from "../lib/config";
+import { effectiveSteps, enabledMethods, pageKey, previewPages, type PreviewPage } from "../lib/preview-pages";
 import { AppleMark, GoogleMark } from "../parts/provider-marks";
 import styles from "./preview.module.css";
 
 export type PreviewDevice = "desktop" | "phone";
 
-export type PreviewPage =
-  | { kind: "methods"; intent: "signin" | "signup" }
-  | { kind: "opening"; provider: "google" | "apple" }
-  | { kind: "code"; channel: "email" | "phone" }
-  | { kind: "signup" }
-  | { kind: "details"; index: number }
-  | { kind: "review" }
-  | { kind: "buttons" };
-
-export interface PreviewPageOption {
-  key: string;
-  label: string;
-  group: string;
-  page: PreviewPage;
-}
-
-export function pageKey(page: PreviewPage): string {
-  switch (page.kind) {
-    case "methods": return `methods-${page.intent}`;
-    case "opening": return `opening-${page.provider}`;
-    case "code": return `code-${page.channel}`;
-    case "details": return `details-${page.index}`;
-    default: return page.kind;
-  }
-}
-
-/**
- * The pages a Carbon walks through, as a flow step list: the app's own flow, else the default (one page with every
- * requested detail), else the what's-shared page with only the profile (an app that asks for no details).
- */
-export function effectiveSteps(config: EditableConfig): SigninFlowStep[] {
-  if (config.flow?.steps.length) return config.flow.steps;
-  if (requestedFields(config).length) return defaultFlowOf(config).steps;
-  return [{ id: "profile", fields: [], title: null, subtitle: null, continue_label: null, layout: null }];
-}
-
-/** Every page of the sign-in, in the order a Carbon meets them. */
-export function previewPages(config: EditableConfig): PreviewPageOption[] {
-  const out: PreviewPageOption[] = [
-    { key: "methods-signin", label: "Sign in", group: "Start", page: { kind: "methods", intent: "signin" } },
-    { key: "methods-signup", label: "Sign up", group: "Start", page: { kind: "methods", intent: "signup" } },
-    { key: "opening-google", label: "Opening Google", group: "Start", page: { kind: "opening", provider: "google" } },
-    { key: "opening-apple", label: "Opening Apple", group: "Start", page: { kind: "opening", provider: "apple" } },
-    { key: "code-email", label: "Email code", group: "Verify", page: { kind: "code", channel: "email" } },
-    { key: "code-phone", label: "Phone code", group: "Verify", page: { kind: "code", channel: "phone" } },
-    { key: "signup", label: "Set up account", group: "Verify", page: { kind: "signup" } },
-  ];
-  const steps = effectiveSteps(config);
-  steps.forEach((step, index) => {
-    out.push({
-      key: `details-${index}`,
-      label: steps.length > 1 ? `Details ${index + 1}${step.title ? `: ${step.title}` : ""}` : step.fields.length ? "What's shared" : "What's shared (profile)",
-      group: "Flow",
-      page: { kind: "details", index },
-    });
-  });
-  if (config.flow?.review) out.push({ key: "review", label: "Review", group: "Flow", page: { kind: "review" } });
-  out.push({ key: "buttons", label: "Embed buttons", group: "Your site", page: { kind: "buttons" } });
-  return out;
-}
+export type { PreviewPage, PreviewPageOption } from "../lib/preview-pages";
+export { effectiveSteps, pageKey, previewPages } from "../lib/preview-pages";
 
 const SIZES: Record<PreviewDevice, { width: number; height: number }> = {
   desktop: { width: 1024, height: 700 },
   phone: { width: 390, height: 780 },
 };
 
-/** Sample values for the details pages (never a real person). The sample Carbon has an email but no phone yet. */
-const SAMPLE: Record<ContactField, string | null> = { email: "a***@example.com", phone: null, dob: "14 Mar 1998", timezone: "Europe/London" };
+/**
+ * Sample values for the details pages (never a real person), as the hosted pages show them (contact details masked, the
+ * date and the timezone in words, with today's offset). The sample Carbon has an email but no phone yet.
+ */
+function sample(field: ContactField): string | null {
+  switch (field) {
+    case "email": return "a***@example.com";
+    case "phone": return null;
+    case "dob": return formatDate("1998-03-14");
+    case "timezone": return `${timezoneLabel("Europe/London")} (UTC${utcOffset("Europe/London")})`;
+  }
+}
+/** A phone number the sample Carbon added on an earlier page (a required phone is there by the review). */
+const ADDED_PHONE = "+44 7700 ••• 123";
+/** The profile row's value, as the hosted pages write it: "Name (id)". */
+const PROFILE_VALUE = "Ada Okafor (c:ada)";
 const PROVIDER_NAME = { google: "Google", apple: "Apple" } as const;
 
 const fill = (text: string, app: string, provider?: string) => text.replaceAll("{app}", app).replaceAll("{provider}", provider ?? "Google");
@@ -137,7 +98,7 @@ function heroFor(app: string, config: EditableConfig, page: PreviewPage): { titl
     case "details":
       return { title: `Welcome to ${app}`, subtitle: `You choose what ${app} sees, and you can change it any time in your account.` };
     case "review":
-      return { title: `Welcome to ${app}`, subtitle: `Check what ${app} sees, then continue.` };
+      return { title: `Almost in to ${app}`, subtitle: `Check what ${app} sees. Nothing is shared until you continue.` };
     default:
       return signIn;
   }
@@ -176,15 +137,27 @@ function StepHeading({ title, description }: { title: string; description?: stri
   );
 }
 
+/** Who is signing in, with an action (details.tsx's AccountRow: the photo, the name, the id, "Switch account"). */
 function AccountRow({ name, detail, action }: { name: string; detail: string; action: string }) {
   return (
     <div data-sq="surface" className={styles.account}>
-      <Avatar name={name} size="sm" />
+      <Avatar name={name} size="md" />
       <span className={styles.accountText}>
         <span className={styles.accountName}>{name}</span>
         <span className={styles.accountDetail}>{detail}</span>
       </span>
-      <span className={styles.textLink}>{action}</span>
+      <span className={styles.rowAction}><Button variant="ghost" size="sm" tabIndex={-1}>{action}</Button></span>
+    </div>
+  );
+}
+
+/** Where a code went, with "Change" (parts.tsx's DestinationRow). */
+function DestinationRow({ channel, destination }: { channel: "email" | "phone"; destination: string }) {
+  return (
+    <div data-sq="surface" className={styles.destination}>
+      <span className={styles.destinationIcon} aria-hidden="true">{channel === "email" ? <Mail size={16} strokeWidth={1.75} /> : <Smartphone size={16} strokeWidth={1.75} />}</span>
+      <span className={styles.destinationText}>{destination}</span>
+      <span className={styles.rowAction}><Button variant="ghost" size="sm" tabIndex={-1}>Change</Button></span>
     </div>
   );
 }
@@ -249,31 +222,41 @@ function MethodsStep({ config, intent }: { config: EditableConfig; intent: "sign
   );
 }
 
+/** The Opening page before Google or Apple (steps/opening.tsx, while it moves on by itself). */
 function OpeningStep({ appName, config, provider }: { appName: string; config: EditableConfig; provider: "google" | "apple" }) {
   const name = PROVIDER_NAME[provider];
   const title = fill(config.copy.opening_title?.trim() || "Opening {provider} to sign you in to {app}…", appName, name);
+  // "Other ways to sign in" leaves for the app's other methods, when it has any.
+  const otherWays = enabledMethods(config).length > 1;
   return (
     <div className={styles.opening}>
-      <span className={styles.openingMark} aria-hidden="true">{provider === "google" ? <GoogleMark size={28} /> : <AppleMark size={28} />}</span>
-      <StepHeading title={title} description={`${name} asks you to choose an account, then you come straight back.`} />
+      <div className={styles.openingMark} aria-hidden="true">
+        <span data-sq="surface" className={styles.openingTile}>{provider === "google" ? <GoogleMark size={28} /> : <AppleMark size={28} />}</span>
+        <span className={styles.openingDots}><i /><i /><i /></span>
+      </div>
+      <StepHeading title={title} description={`${name} checks it is you, then brings you back to ${appName}.`} />
       <span className={styles.openingBar} aria-hidden="true"><i /></span>
-      <Button variant="secondary" className={styles.wide} tabIndex={-1}>{provider === "google" ? <GoogleMark size={16} /> : <AppleMark size={16} />}{`Continue to ${name}`}</Button>
+      <div className={styles.actions}>
+        <Button variant="secondary" className={styles.wide} tabIndex={-1}>{provider === "google" ? <GoogleMark size={16} /> : <AppleMark size={16} />}{`Continue to ${name}`}</Button>
+        {otherWays ? <button type="button" className={styles.textButton} tabIndex={-1}>Other ways to sign in</button> : null}
+      </div>
     </div>
   );
 }
 
+/** The 6 digit code page (steps/verify-code.tsx), a code half typed. */
 function CodeStep({ channel }: { channel: "email" | "phone" }) {
   const email = channel === "email";
   return (
     <>
       <StepHeading
-        title={email ? "Check your email" : "Check your messages"}
-        description={email ? "We sent a 6 digit code to a***@example.com. It expires in 10 minutes." : "We sent a 6 digit code by SMS to +44 7700 ••• 123. It expires in 10 minutes."}
+        title={email ? "Check your email" : "Check your phone"}
+        description={`Enter the 6 digit code we ${email ? "emailed" : "texted"} you. It works for 10 minutes.`}
       />
-      <AccountRow name={email ? "ada@example.com" : "+44 7700 900123"} detail="Sign-in code sent" action="Change" />
-      <OtpInput label="Verification code" value="481" />
+      <DestinationRow channel={channel} destination={email ? "ada@example.com" : "+44 7700 900123"} />
+      <OtpInput label={email ? "Code from the email" : "Code from the text message"} value="481" />
       <Button className={styles.wide} tabIndex={-1}>Verify</Button>
-      <span className={styles.resend}>Send a new code in 0:27</span>
+      <span className={styles.resend}>Resend code in 0:27</span>
     </>
   );
 }
@@ -297,90 +280,175 @@ function SignupStep() {
   );
 }
 
-/** One requested detail on a details page: required ones are shared (or added first when missing), optional ones unticked. */
-function DetailRow({ field, required }: { field: ContactField; required: boolean }) {
-  const value = SAMPLE[field];
-  if (required && !value) {
-    return (
-      <li className={styles.missing}>
-        <span className={styles.sharedText}><span>{FIELD_LABELS[field]}</span><span className={styles.sharedValue}>Required: add it to continue</span></span>
-        <div className={styles.addRow}>
-          <Input label={field === "phone" ? "Phone number" : "Email"} type={field === "phone" ? "tel" : "email"} placeholder={field === "phone" ? "+44 7700 900123" : "name@example.com"} readOnly tabIndex={-1} />
-          <Button variant="secondary" size="sm" tabIndex={-1}>Send code</Button>
-        </div>
-      </li>
-    );
-  }
+/** "Step 1 of 3" with a dot per page (details.tsx's PageProgress). */
+function PageProgress({ index, count }: { index: number; count: number }) {
   return (
-    <li>
-      <span className={styles.sharedText}><span>{FIELD_LABELS[field]}</span><span className={styles.sharedValue}>{value ?? "Not on your account yet"}</span></span>
-      {required ? <Lock size={14} strokeWidth={1.75} aria-hidden="true" className={styles.lock} /> : <Checkbox aria-label={`Share ${FIELD_LABELS[field]}`} checked={false} tabIndex={-1} />}
+    <div className={styles.pageProgress}>
+      <span className={styles.pageDots} aria-hidden="true">
+        {Array.from({ length: count }, (_, position) => <span key={position} data-state={position < index ? "done" : position === index ? "current" : "next"} />)}
+      </span>
+      <span>{`Step ${Math.min(index + 1, count)} of ${count}`}</span>
+    </div>
+  );
+}
+
+/** Lower-case names for sentences ("Add your phone number"). */
+const DETAIL_NAME: Record<ContactField, string> = { email: "email address", phone: "phone number", dob: "date of birth", timezone: "timezone" };
+const isContactField = (field: ContactField) => field === "email" || field === "phone";
+
+/** The profile every app sees, first on the first page and on the review. */
+function ProfileRow() {
+  return (
+    <li className={styles.shareRow} data-field="profile">
+      <span className={styles.sharedText}>
+        <span className={styles.sharedLabel}>Name, id and profile photo</span>
+        <span className={styles.sharedValue}>{PROFILE_VALUE}</span>
+      </span>
+      <span className={styles.shareLock}><Lock size={14} strokeWidth={1.75} aria-hidden="true" /><span>Always</span></span>
     </li>
   );
 }
 
+/**
+ * One requested detail on a details page (details.tsx's DetailRow): a required one is locked ("Required"), and added
+ * below the list first when the account lacks it; an optional one has a checkbox, unticked, and "Add" when it is missing.
+ */
+function DetailRow({ field, required, adding }: { field: ContactField; required: boolean; adding: boolean }) {
+  const value = sample(field);
+  const missingText = required ? "Not added yet. Add it below to continue." : "You have not added one, so nothing is shared.";
+  const shown = value ?? (adding ? "Adding it below." : missingText);
+  if (required) {
+    return (
+      <li className={styles.shareRow} data-field={field} data-missing={value ? undefined : ""}>
+        <span className={styles.sharedText}>
+          <span className={styles.sharedLabel}>{FIELD_LABELS[field]}</span>
+          <span className={styles.sharedValue}>{shown}</span>
+        </span>
+        <span className={styles.shareLock}><Lock size={14} strokeWidth={1.75} aria-hidden="true" /><span>Required</span></span>
+      </li>
+    );
+  }
+  return (
+    <li className={styles.shareRow} data-field={field} data-missing={value ? undefined : ""}>
+      <span className={styles.shareCheck}><Checkbox aria-label={`Share ${FIELD_LABELS[field]}`} checked={false} disabled={!value} tabIndex={-1} /></span>
+      <span className={styles.sharedText}>
+        <span className={styles.sharedLabel}>{FIELD_LABELS[field]}<span className={styles.shareOptional}>Optional</span></span>
+        <span className={styles.sharedValue}>{shown}</span>
+      </span>
+      {!value && isContactField(field) ? <Button variant="ghost" size="sm" tabIndex={-1}>Add</Button> : null}
+    </li>
+  );
+}
+
+/** Adding a missing required email or phone under the list (details.tsx's adder), before the page can continue. */
+function Adder({ appName, field }: { appName: string; field: "email" | "phone" }) {
+  const phone = field === "phone";
+  return (
+    <div className={styles.adder}>
+      <div className={styles.adderHead}>
+        <p className={styles.adderTitle}>{`Add your ${DETAIL_NAME[field]}`}</p>
+        <p className={styles.adderText}>{`${appName} needs ${phone ? "a phone number" : "an email address"} on your account. We ${phone ? "text" : "email"} a 6 digit code to make sure it is yours.`}</p>
+      </div>
+      <div className={styles.form}>
+        <Input label={phone ? "Phone number" : "Email"} type={phone ? "tel" : "email"} placeholder={phone ? "+44 7700 900123" : "name@example.com"} description={phone ? "We text a 6 digit code to this number." : "We email a 6 digit code to this address."} readOnly tabIndex={-1} />
+        <Button className={styles.wide} tabIndex={-1}>Send code</Button>
+      </div>
+    </div>
+  );
+}
+
+/** One page of the app's flow, or the what's-shared page (steps/details.tsx), for the sample Carbon's first visit. */
 function DetailsStep({ appName, config, index }: { appName: string; config: EditableConfig; index: number }) {
   const steps = effectiveSteps(config);
   const step = steps[index] ?? steps[0];
   if (!step) return null;
+  const first = index === 0;
   const title = step.title?.trim() || defaultStepTitle(appName, step.fields, steps.length);
   const subtitle = step.subtitle?.trim() || defaultStepSubtitle(appName);
+  // A required email or phone the sample Carbon lacks opens the adder by itself; the page's main action waits for it.
+  const adding = step.fields.find((field): field is "email" | "phone" => isContactField(field) && config.required_fields.includes(field) && !sample(field)) ?? null;
   return (
     <>
+      {steps.length > 1 ? <PageProgress index={index} count={steps.length} /> : null}
       <StepHeading title={title} description={subtitle} />
-      {index === 0 ? <AccountRow name="Ada Okafor" detail="c:ada" action="Switch" /> : null}
-      <ul className={styles.shared} role="list">
-        {index === 0 ? (
-          <li>
-            <span className={styles.sharedText}><span>Name, id and profile photo</span><span className={styles.sharedValue}>Ada Okafor · c:ada</span></span>
-            <Lock size={14} strokeWidth={1.75} aria-hidden="true" className={styles.lock} />
-          </li>
-        ) : null}
-        {step.fields.map(field => <DetailRow key={field} field={field} required={config.required_fields.includes(field)} />)}
+      {first ? <AccountRow name="Ada Okafor" detail="c:ada" action="Switch account" /> : null}
+      <ul data-sq="surface" className={styles.shareList} role="list" aria-label={`Details shared with ${appName}`}>
+        {first ? <ProfileRow /> : null}
+        {step.fields.map(field => <DetailRow key={field} field={field} required={config.required_fields.includes(field)} adding={field === adding} />)}
       </ul>
+      {adding ? <Adder appName={appName} field={adding} /> : null}
       <div className={styles.actions}>
-        <Button className={styles.wide} tabIndex={-1}>{step.continue_label?.trim() || defaultContinueLabel(index, steps.length, !!config.flow?.review)}</Button>
-        <Button variant="ghost" className={styles.wide} tabIndex={-1}>{index > 0 ? "Back" : "Cancel"}</Button>
+        <Button variant={adding ? "secondary" : "primary"} className={styles.wide} tabIndex={-1}>{step.continue_label?.trim() || defaultContinueLabel(index, steps.length, !!config.flow?.review)}</Button>
+        {first ? (
+          <Button variant="secondary" className={styles.wide} tabIndex={-1}>Cancel</Button>
+        ) : (
+          <>
+            <Button variant="secondary" className={styles.wide} tabIndex={-1}>Back</Button>
+            <button type="button" className={styles.textButton} tabIndex={-1}>Cancel signing in</button>
+          </>
+        )}
       </div>
     </>
   );
 }
 
+/**
+ * The review page (steps/review.tsx): what the app will see, the profile first, then apart what the Carbon keeps. The
+ * sample Carbon shares the required details and leaves every optional one unticked, as the pages start them.
+ */
 function ReviewStep({ appName, config }: { appName: string; config: EditableConfig }) {
-  const fields = requestedFields(config);
+  const fields = effectiveSteps(config).flatMap(step => step.fields);
+  const shared = fields.filter(field => config.required_fields.includes(field));
+  const kept = fields.filter(field => !config.required_fields.includes(field));
   return (
     <>
       <StepHeading title={`Check what ${appName} sees`} description={defaultStepSubtitle(appName)} />
-      <ul className={styles.shared} role="list">
-        <li>
-          <span className={styles.sharedText}><span>Name, id and profile photo</span><span className={styles.sharedValue}>Ada Okafor · c:ada</span></span>
-          <Lock size={14} strokeWidth={1.75} aria-hidden="true" className={styles.lock} />
-        </li>
-        {fields.map(field => {
-          const required = config.required_fields.includes(field);
-          return (
-            <li key={field}>
-              <span className={styles.sharedText}><span>{FIELD_LABELS[field]}</span><span className={styles.sharedValue}>{required ? SAMPLE[field] ?? "+44 7700 900123 (just added)" : "Not shared (you left it unticked)"}</span></span>
-              {required ? <Lock size={14} strokeWidth={1.75} aria-hidden="true" className={styles.lock} /> : null}
-            </li>
-          );
-        })}
+      <ul data-sq="surface" className={styles.shareList} role="list" aria-label={`Shared with ${appName}`}>
+        <ProfileRow />
+        {shared.map(field => (
+          <li key={field} className={styles.shareRow} data-field={field}>
+            <span className={styles.sharedText}>
+              <span className={styles.sharedLabel}>{FIELD_LABELS[field]}</span>
+              <span className={styles.sharedValue}>{sample(field) ?? ADDED_PHONE}</span>
+            </span>
+            <span className={styles.shareLock}><Lock size={14} strokeWidth={1.75} aria-hidden="true" /><span>Required</span></span>
+          </li>
+        ))}
       </ul>
+      {kept.length ? (
+        <div className={styles.keptBack}>
+          <p className={styles.keptTitle}>{`Not shared with ${appName}`}</p>
+          <ul data-sq="surface" className={`${styles.shareList} ${styles.quietList}`} role="list" aria-label={`Not shared with ${appName}`}>
+            {kept.map(field => (
+              <li key={field} className={styles.shareRow} data-field={field}>
+                <span className={styles.sharedText}>
+                  <span className={styles.sharedLabel}>{FIELD_LABELS[field]}</span>
+                  <span className={styles.sharedValue}>{sample(field) === null ? "You have not added one" : "You left it unticked. Go back to share it."}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className={styles.actions}>
         <Button className={styles.wide} tabIndex={-1}>Share and continue</Button>
-        <Button variant="ghost" className={styles.wide} tabIndex={-1}>Back</Button>
+        <Button variant="secondary" className={styles.wide} tabIndex={-1}>Back</Button>
+        <button type="button" className={styles.textButton} tabIndex={-1}>Cancel signing in</button>
       </div>
     </>
   );
 }
 
-function Legal({ appName, config }: { appName: string; config: EditableConfig }) {
+/** The pages' footer (flow-page.tsx's FlowFooter): terms and privacy where the Carbon commits, and the support address. */
+function Legal({ appName, config, legal }: { appName: string; config: EditableConfig; legal: boolean }) {
   const copy = config.copy;
+  const terms = legal && !!(copy.terms_url || copy.privacy_url);
+  if (!terms && !copy.support_email) return null;
   return (
-    <>
-      {copy.terms_url || copy.privacy_url ? (
+    <div className={styles.footer}>
+      {terms ? (
         <p className="sa-brand-legal">
-          By continuing you accept the{" "}
+          By continuing, you agree to the{" "}
           {copy.terms_url ? <a href={copy.terms_url} tabIndex={-1}>terms</a> : null}
           {copy.terms_url && copy.privacy_url ? " and " : null}
           {copy.privacy_url ? <a href={copy.privacy_url} tabIndex={-1}>privacy policy</a> : null}
@@ -388,9 +456,9 @@ function Legal({ appName, config }: { appName: string; config: EditableConfig })
         </p>
       ) : null}
       {copy.support_email ? (
-        <p className="sa-brand-legal"><Mail size={12} strokeWidth={1.75} aria-hidden="true" className={styles.inlineIcon} />Need help? {copy.support_email}</p>
+        <p className="sa-brand-legal">Need help? Write to <a href={`mailto:${copy.support_email}`} tabIndex={-1}>{copy.support_email}</a>.</p>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -404,7 +472,7 @@ function ButtonsPage({ appName, config, theme }: { appName: string; config: Edit
       <div className={styles.siteBody}>
         <BrandingScope branding={config.branding} theme={theme} className={styles.siteScope}>
           <div className={styles.siteColumns}>
-            <section className={styles.siteCard}>
+            <section data-sq="surface" className={styles.siteCard}>
               <p className={styles.siteEyebrow}>Direct buttons</p>
               <h2 className={styles.siteTitle}>{`Welcome to ${appName}`}</h2>
               <div className={styles.siteButtons}>
@@ -416,7 +484,7 @@ function ButtonsPage({ appName, config, theme }: { appName: string; config: Edit
                 )) : <p className={styles.empty}>No sign-in method is on.</p>}
               </div>
             </section>
-            <section className={styles.siteCard}>
+            <section data-sq="surface" className={styles.siteCard}>
               <p className={styles.siteEyebrow}>Sign in and Sign up</p>
               <h2 className={styles.siteTitle}>Two buttons, the rest on our pages</h2>
               <div className={styles.siteButtons}>
@@ -555,7 +623,7 @@ export function HostedPreview({ app, config, theme, page, device, host, maxHeigh
                       </AnimatePresence>
                     </div>
                   </div>
-                  {page.kind === "opening" ? null : <Legal appName={app.name} config={config} />}
+                  <Legal appName={app.name} config={config} legal={page.kind !== "code"} />
                 </BrandPanel>
               </BrandStage>
             </BrandingScope>

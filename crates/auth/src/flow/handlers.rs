@@ -183,6 +183,15 @@ pub async fn claim_pending(
                 ));
                 return Ok(Vec::new());
             };
+            // The provider's email passed the app's domains, but the account it signs in to must
+            // still have a verified email there (the same rule as every other method).
+            if !next::account_domain_allowed(conn, &fa.config, &account).await? {
+                let e = next::domain_not_allowed(fa, None);
+                next::record_refusal(conn, meta, fa, &account, provider.as_str(), &e.code).await?;
+                flow.reset_to_choose_method();
+                flow.extras.error = Some(FlowError::from_api(&e));
+                return Ok(Vec::new());
+            }
             let signed = browser::sign_in(conn, state, headers, meta, &account.uuid).await?;
             flow.extras.browser_session_id = Some(signed.session_id);
             flow.extras.auth_method = Some(provider.as_str().to_string());
@@ -643,8 +652,22 @@ pub async fn verify_code(
     let holder = contacts::after_proof(&mut tx, kind, &destination, meta.ip.as_deref()).await?;
     let browser_before = browser::current(&mut tx, &state, &headers).await?;
     let mut cookies = Vec::new();
+    // An app with `allowed_email_domains` takes only accounts with a verified email at one of
+    // them, whichever method proves who the Carbon is. An email code already did (the address is
+    // at the domains); a phone code did not. A sign-up that proved no email can only be accepted
+    // when the app's details page will ask for one (a required email).
+    let emailless_signup_refused =
+        kind == ContactKind::Phone && !next::emailless_signup_allowed(&fa);
     match holder {
         Holder::Active(a) => {
+            if !next::account_domain_allowed(&mut tx, &fa.config, &a).await? {
+                let e = match kind {
+                    ContactKind::Phone => next::phone_account_not_allowed(&fa),
+                    ContactKind::Email => next::domain_not_allowed(&fa, None),
+                };
+                next::record_refusal(&mut tx, &meta, &fa, &a, method, &e.code).await?;
+                return persist_failure(tx, &mut flow, e).await;
+            }
             let signed = browser::sign_in(&mut tx, &state, &headers, &meta, &a.uuid).await?;
             flow.extras.browser_session_id = Some(signed.session_id);
             flow.extras.auth_method = Some(method.to_string());
@@ -653,6 +676,12 @@ pub async fn verify_code(
             cookies.extend(signed.cookie);
         }
         Holder::Unclaimed(a) => {
+            // Finishing an import keeps only what this Carbon proved: the import's unproven
+            // emails are removed, so a phone leaves the account without an email.
+            if emailless_signup_refused {
+                let e = next::emailless_signup_not_allowed(&fa, "a phone number");
+                return persist_failure(tx, &mut flow, e).await;
+            }
             let (session, cookie) = signup::create_session(
                 &mut tx,
                 &state,
@@ -681,6 +710,10 @@ pub async fn verify_code(
         Holder::Free | Holder::Unproven(_) => {
             if !fa.config.allow_signup && !fa.first_party() {
                 let e = next::signup_not_allowed(&fa);
+                return persist_failure(tx, &mut flow, e).await;
+            }
+            if emailless_signup_refused {
+                let e = next::emailless_signup_not_allowed(&fa, "a phone number");
                 return persist_failure(tx, &mut flow, e).await;
             }
             let (session, cookie) = signup::create_session(

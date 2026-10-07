@@ -297,6 +297,9 @@ base_env() {
   export ACCOUNTS_PUBLIC_URL="$PUBLIC_URL"
   export ACCOUNTS_EXTRA_ALLOWED_ORIGINS="$EXTRA_ORIGINS"
   export ACCOUNTS_DEVELOPER_URL="$DEVELOPER_URL"
+  # accounts-seed creates the fake apps' owner Carbons, whose default photo is an Iris URL: without this they would
+  # point at the production Iris while every account made at runtime points at this stack's mock Iris.
+  export ACCOUNTS_IRIS_BASE_URL="$IRIS_URL"
 }
 
 say "applying migrations to $DB_URL"

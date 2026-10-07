@@ -9,8 +9,25 @@
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import type { Ctx, Journey } from "../../context";
-import { codeFor, lastSeq, sleep } from "../../lib";
-import { auditContext, collectConsole, describeMotion, findingsFor, freshEmail, hostedLink, kit, probeMotion, saveFindings, settle, signedInCarbon, stepReady, type Findings, type MotionSummary } from "./_audit";
+import { codeFor, lastSeq, live, signInWithCode, sleep, startAtApp, tag, type Env } from "../../lib";
+import { DEVELOPER_EXPECTED, auditContext, collectConsole, describeMotion, developerCarbon, findingsFor, freshEmail, hostedLink, kit, openDeveloperPage, ownedApp, probeMotion, saveFindings, settle, signedInCarbon, stepReady, type Findings, type MotionSummary } from "./_audit";
+import { freshPhone } from "./_hosted";
+
+/** ledgerly's first page: the phone it requires, added with a code (the page can then continue). */
+async function completeStepOne(env: Env, page: Page): Promise<void> {
+  const adder = live(page, '[data-adding="phone"]').first();
+  await adder.waitFor({ timeout: 15_000 });
+  const phone = freshPhone();
+  const input = adder.getByRole("textbox", { name: "Phone number" });
+  await input.click();
+  const after = await lastSeq(env);
+  await page.keyboard.type(phone, { delay: 20 });
+  await adder.getByRole("button", { name: "Send code" }).click();
+  const code = await codeFor(env, phone, after);
+  await page.getByRole("group", { name: /^Code from the text message/ }).first().getByRole("textbox").first().click({ timeout: 15_000 });
+  await page.keyboard.type(code, { delay: 25 });
+  await live(page, 'ul[aria-label^="Details shared with"] > li[data-field="phone"]:not([data-missing])').first().waitFor({ timeout: 15_000 });
+}
 
 type Mode = "reduce" | "no-preference";
 
@@ -51,7 +68,7 @@ export const journeys: Journey[] = [
   {
     name: "ux-audit-reduced-motion",
     title: "prefers-reduced-motion: no ambient motion, no step morph, no page transition, no theme eclipse, no sliding drawer or palette, no endless animation, nothing left invisible — each measured against a control without the preference",
-    timeoutMs: 900_000,
+    timeoutMs: 1_200_000,
     async run(ctx) {
       const { env, results } = ctx;
       const findings = findingsFor(ctx);
@@ -145,7 +162,7 @@ export const journeys: Journey[] = [
       await signed.reduce.keyboard.press("Escape");
 
       // Every account page at rest under reduced motion: no endless animation, nothing left invisible.
-      for (const path of ["/", "/sign-in-methods", "/apps", "/silicons", "/proofs", "/activity", "/settings", "/developer"]) {
+      for (const path of ["/", "/sign-in-methods", "/apps", "/silicons", "/proofs", "/activity", "/settings"]) {
         const page = signed.reduce;
         await page.goto(`${env.site}${path}`);
         await page.locator("main").first().waitFor({ timeout: 30_000 });
@@ -157,9 +174,74 @@ export const journeys: Journey[] = [
       await signed.reduce.goto(`${env.site}/`);
       await settle(signed.reduce, 600);
       await signed.reduce.screenshot({ path: `${env.shots}/uxa-motion-home-reduce.png` });
-      results.check("reduced motion: findings saved", true, saveFindings(ctx, findings));
       await a.context.close();
       await b.context.close();
+
+      // ledgerly's flow: its first details page moving to the second (a page of the flow sliding to the next).
+      {
+        // A context per mode: each signs up a new Carbon, and a shared cookie jar would make the second page a
+        // returning browser ("Continue as") instead of a sign-up.
+        const flowContexts: Record<Mode, BrowserContext> = { "no-preference": await auditContext(ctx.browser), reduce: await auditContext(ctx.browser) };
+        const flows: Record<Mode, Page> = { "no-preference": await modePage(flowContexts["no-preference"], "no-preference"), reduce: await modePage(flowContexts.reduce, "reduce") };
+        for (const [mode, page] of Object.entries(flows)) {
+          results.watch(page, `motion-flow-${mode}`);
+          collectConsole(page);
+        }
+        await compare(ctx, findings, flows, "a flow's details page moving to the next (ledgerly Step 1 → Step 2)", async page => {
+          await startAtApp(env, page, "ledgerly", { intent: "signup" });
+          await signInWithCode(env, page, { email: freshEmail("uxa.motion.flow") });
+          await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+          await page.getByText("Step 1 of 2", { exact: true }).first().waitFor({ timeout: 30_000 });
+          await completeStepOne(env, page);
+          await settle(page, 600);
+        }, async page => {
+          await page.getByRole("button", { name: "Continue", exact: true }).click();
+          await page.getByText("Step 2 of 2", { exact: true }).first().waitFor({ timeout: 15_000 });
+        }, 1_600);
+        const hiddenFlow = await kit<Array<{ el: string; opacity: number }>>(flows.reduce, "hiddenContent()");
+        results.check("reduced motion: the second page of the flow shows everything (no entrance left at opacity 0)", hiddenFlow.length === 0, JSON.stringify(hiddenFlow));
+        await flows.reduce.screenshot({ path: `${env.shots}/uxa-motion-flow-step2-reduce.png`, fullPage: true });
+        for (const context of Object.values(flowContexts)) await context.close();
+      }
+
+      // The developer site: a tab change and the page transition from the apps home to an app.
+      {
+        const devA = await developerCarbon(ctx, "uxa.motion.dev.a");
+        const devB = await developerCarbon(ctx, "uxa.motion.dev.b");
+        const appA = `uxa-m-${tag()}`;
+        const appB = `uxa-m-${tag()}`;
+        await ownedApp(ctx, devA.uuid, appA, `Motion A ${appA.slice(-6)}`);
+        await ownedApp(ctx, devB.uuid, appB, `Motion B ${appB.slice(-6)}`);
+        const dev: Record<Mode, Page> = { "no-preference": devA.page, reduce: devB.page };
+        const appOf: Record<Mode, string> = { "no-preference": appA, reduce: appB };
+        for (const [mode, page] of Object.entries(dev)) {
+          await page.emulateMedia({ reducedMotion: mode as Mode });
+          results.watch(page, `motion-dev-${mode}`, DEVELOPER_EXPECTED);
+          collectConsole(page, DEVELOPER_EXPECTED);
+        }
+        await compare(ctx, findings, dev, "the developer site: the apps home to an app", async page => {
+          await openDeveloperPage(ctx, page, "/");
+        }, async (page, mode) => {
+          await page.locator(`a[href="/apps/${appOf[mode]}"]`).first().click();
+          await page.waitForURL(url => url.pathname === `/apps/${appOf[mode]}`, { timeout: 15_000 });
+        }, 1_400);
+        await compare(ctx, findings, dev, "the developer site: a tab change (Overview → Details)", async (page, mode) => {
+          await openDeveloperPage(ctx, page, `/apps/${appOf[mode]}`);
+        }, async page => {
+          await page.getByRole("tab", { name: "Details" }).click();
+          await page.waitForURL(url => url.pathname.endsWith("/details"), { timeout: 15_000 });
+        }, 1_400);
+        for (const path of ["/", `/apps/${appB}`, `/apps/${appB}/flows`, `/apps/${appB}/pages`]) {
+          const page = dev.reduce;
+          await openDeveloperPage(ctx, page, path);
+          const rest = await probeMotion(page, async () => undefined, 1_200);
+          const hidden = await kit<Array<{ el: string; opacity: number }>>(page, "hiddenContent()");
+          results.check(`reduced motion: the developer site's ${path.replace(appB, "<app>")} at rest: no endless or travelling animation, nothing left invisible`, rest.infinite.length === 0 && moves(rest) === 0 && hidden.length === 0, `${describeMotion(rest)}${hidden.length ? `; invisible: ${JSON.stringify(hidden)}` : ""}`);
+        }
+        await devA.context.close();
+        await devB.context.close();
+      }
+      results.check("reduced motion: findings saved", true, saveFindings(ctx, findings));
     },
   },
 ];

@@ -36,6 +36,8 @@ const hex12 = (t: string, lead: string) => `${lead}${t.replace(/[^0-9a-f]/g, "0"
 export const journey: Journey = {
   name: "silicons-cli-expiry",
   title: "a custodian request nobody answers expires after 14 days (time travel): the minute sweep expires it and sends silicon.custodian.expired, reads expire it at once (--wait, request status, sign-in), the Silicon is released and its id freed; a sign-in racing the release still says why",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   timeoutMs: 8 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;

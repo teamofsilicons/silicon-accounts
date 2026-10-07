@@ -193,6 +193,7 @@ function StepCard(props: StepCardProps) {
       </div>
 
       <div
+        data-sq="surface"
         className={styles.drop}
         data-over={over || undefined}
         data-empty={!step.fields.length || undefined}
@@ -218,6 +219,7 @@ function StepCard(props: StepCardProps) {
           return (
             <div
               key={field}
+              data-sq="surface"
               className={styles.chip}
               data-dragging={dragField === field || undefined}
               draggable
@@ -328,18 +330,18 @@ export function FlowsTab() {
           actions={<Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}><History size={14} strokeWidth={1.75} aria-hidden="true" />{`Version ${view.version}`}</Button>}
         >
           <ol className={styles.journey} aria-label="The sign-in, in order">
-            <li><span className={styles.node}>Choose a method</span></li>
-            <li><span className={styles.node}>Code, Google or Apple</span></li>
-            <li><span className={styles.node} data-optional="">Set up account <em>first time</em></span></li>
+            <li><span data-sq="surface" className={styles.node}>Choose a method</span></li>
+            <li><span data-sq="surface" className={styles.node}>Code, Google or Apple</span></li>
+            <li><span data-sq="surface" className={styles.node} data-optional="">Set up account <em>first time</em></span></li>
             {steps.length ? steps.map((step, index) => (
               <li key={`${step.id}-${index}`}>
-                <button type="button" className={styles.node} data-own="" aria-pressed={index === shown} onClick={() => setSelected(index)}>
+                <button type="button" data-sq="surface" className={styles.node} data-own="" aria-pressed={index === shown} onClick={() => setSelected(index)}>
                   {step.title?.trim() || (steps.length > 1 ? `Page ${index + 1}` : "What's shared")}
                 </button>
               </li>
-            )) : <li><span className={styles.node} data-own="">What&apos;s shared <em>profile</em></span></li>}
-            {flow?.review ? <li><span className={styles.node} data-own="">Review</span></li> : null}
-            <li><span className={styles.node}>Back to {ctx.app.name}</span></li>
+            )) : <li><span data-sq="surface" className={styles.node} data-own="">What&apos;s shared <em>profile</em></span></li>}
+            {flow?.review ? <li><span data-sq="surface" className={styles.node} data-own="">Review</span></li> : null}
+            <li><span data-sq="surface" className={styles.node}>Back to {ctx.app.name}</span></li>
           </ol>
         </Section>
 

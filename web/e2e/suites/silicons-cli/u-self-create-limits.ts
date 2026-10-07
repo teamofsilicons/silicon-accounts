@@ -4,7 +4,9 @@ import { accounts, asCarbon, cliError, freshDir, obj, pool, said, selfCreate, sh
 
 export const journey: Journey = {
   name: "silicons-cli-self-create-limits",
-  title: "self-creation can't be used to spam: 10 Silicons an hour per network (failed attempts don't count), 20 waiting for the same custodian name; a retried `silicon create` with its idempotency key creates once; `--wait --timeout` gives up without losing the STK",
+  title: "self-creation can't be used to spam: 10 Silicons an hour per network (failed attempts don't count), 20 waiting for the same custodian name; naming the custodian (an si:id, a malformed email, a phone number, a bare handle) is answered precisely; a retried `silicon create` with its idempotency key creates once; `--wait --timeout` gives up without losing the STK",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   timeoutMs: 8 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;
@@ -25,6 +27,27 @@ export const journey: Journey = {
     results.check("ten self-creations from one network succeed (the failed ones didn't count); the 11th: 429 rate_limited with retry_after_seconds", made.every(status => status === 201) && eleventh.status === 429 && error.code === "rate_limited" && Number(obj(error.details).retry_after_seconds) > 0, `${made.join(",")} then ${eleventh.status} ${short(error.message)}`);
     const other = await selfCreate(ctx, { id: `si:net11-${t}`, display_name: "Net 11", custodian: `scli.net.${t}.11@example.test` }, randomIp());
     results.check("…another network is not affected", other.status === 201, String(other.status));
+
+    // 1b. Naming the custodian (UNDERSTANDING.md: "using their c:id or email"): what can't name one is refused, saying
+    //     exactly why and how to name a Carbon instead. Each from a network of its own (refusals never count anyway).
+    const naming = async (custodian: string) => {
+      const answer = await selfCreate(ctx, { id: `si:named-${Math.random().toString(36).slice(2, 7)}-${t}`, display_name: "Named", custodian });
+      return { custodian, status: answer.status, problem: str(obj(obj(obj(answer.body.error).details).fields).custodian) || str(obj(answer.body.error).message) };
+    };
+    const silicon = await naming(`si:dup-${t}`);
+    results.check("an si:id as custodian: 422, says it is a Silicon id and a custodian is a Carbon (c:…)", silicon.status === 422 && /Silicon id/.test(silicon.problem) && /c:/.test(silicon.problem), `${silicon.status} ${silicon.problem}`);
+    const broken = await Promise.all(["saket@", "saket@example", "@example.test"].map(naming));
+    results.check("a malformed email as custodian: 422, says what is wrong with the address", broken.every(entry => entry.status === 422 && /is not a valid email address/.test(entry.problem)), short(broken.map(entry => `${entry.custodian} → ${entry.status} ${entry.problem}`), 600));
+    const blank = await naming("   ");
+    results.check("an empty custodian: 422, says to name the Carbon by its c:id or an email address", blank.status === 422 && /c:id/.test(blank.problem) && /email/.test(blank.problem), `${blank.status} ${blank.problem}`);
+    const phones = await Promise.all(["+15005550006", "+1 500 555 0006"].map(naming));
+    results.check(
+      "a phone number as custodian: 422, saying a custodian is named by c:id or email (not that a 'handle' can't contain '+')",
+      phones.every(entry => entry.status === 422 && /email/i.test(entry.problem) && /c:/.test(entry.problem) && !/^The handle '\+/.test(entry.problem)),
+      short(phones.map(entry => `${entry.custodian} → ${entry.status} ${entry.problem}`), 700),
+    );
+    const bare = await selfCreate(ctx, { id: `si:bare-${t}`, display_name: "Bare", custodian: `  ${carbon.id.slice(2).toUpperCase()} ` });
+    results.check("a bare handle in any case names that Carbon (c: added, lower-cased)", bare.status === 201 && obj(bare.body.request).custodian === carbon.id, `${bare.status} ${short(bare.body.request ?? bare.body.error)}`);
 
     // 2. At most 20 self-created Silicons wait for the same custodian name.
     const busy = await signUpCarbon(env, "busy");

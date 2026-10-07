@@ -14,10 +14,11 @@ use crate::secret::Secret;
 use crate::serde_util::unwrap_key;
 use crate::types::{
     AccountKind, AccountSummary, Contact, ContactChallenge, CreateSilicon, CustodianRequest,
-    DeviceRequest, EmailAddress, HistoryItem, HistoryQuery, IdAvailability, Identity,
-    ManagedSilicon, Me, MyApp, MyProof, OwnedApp, Page, PhoneNumber, PhotoUploaded, ProfileUpdate,
-    SessionInfo, ShortLivedToken, SiliconCreated, SiliconPhotoUploaded, SiliconView,
-    SiliconWebhook, StkRotated, UpdateSilicon, WebhookTestResult,
+    DeliveriesQuery, DeliveryDetail, DeviceRequest, EmailAddress, HistoryItem, HistoryQuery,
+    IdAvailability, Identity, ManagedSilicon, Me, MyApp, MyProof, OwnedApp, Page, PhoneNumber,
+    PhotoUploaded, ProfileUpdate, ReplayRequest, ReplayResult, SessionInfo, ShortLivedToken,
+    SiliconCreated, SiliconPhotoUploaded, SiliconView, SiliconWebhook, StkRotated, UpdateSilicon,
+    WebhookDelivery, WebhookTestResult,
 };
 
 /// A signed-in Carbon or Silicon, authenticated with a first-party access token
@@ -428,6 +429,55 @@ impl<'a> AccountSession<'a> {
         Ok(serde_json::from_value(response.value()?).unwrap_or_default())
     }
 
+    /// `GET /v1/me/webhook/deliveries` (Silicon): deliveries of your own webhook, newest
+    /// first, filtered by `status` (`pending`, `delivered` or `failed`).
+    pub async fn my_webhook_deliveries(
+        &self,
+        query: &DeliveriesQuery,
+    ) -> Result<Page<WebhookDelivery>> {
+        self.page(deliveries_url(
+            self.client,
+            &["v1", "me", "webhook", "deliveries"],
+            query,
+        ))
+        .await
+    }
+
+    /// `GET /v1/me/webhook/deliveries/{id}` (Silicon): one delivery with its attempts and the
+    /// exact payload that was signed.
+    pub async fn my_webhook_delivery(&self, delivery_id: &str) -> Result<DeliveryDetail> {
+        self.get(&["v1", "me", "webhook", "deliveries", delivery_id.trim()])
+            .await
+    }
+
+    /// `POST /v1/me/webhook/replay` (Silicon): re-queues deliveries of your own webhook (at
+    /// most 100 per call) with the same event ids, sent to your current URL and signed with
+    /// your current secret. With [`ReplayRequest::Failed`], call again until `remaining` is 0.
+    /// Pass an idempotency key so a retried call doesn't replay twice.
+    pub async fn replay_my_webhook(
+        &self,
+        request: &ReplayRequest,
+        idempotency_key: Option<&str>,
+    ) -> Result<ReplayResult> {
+        self.replay(&["v1", "me", "webhook", "replay"], request, idempotency_key)
+            .await
+    }
+
+    async fn replay(
+        &self,
+        segments: &[&str],
+        request: &ReplayRequest,
+        idempotency_key: Option<&str>,
+    ) -> Result<ReplayResult> {
+        request.check()?;
+        let body = request.to_json();
+        let request = Request::new(Method::POST, self.url(segments), self.auth())
+            .json(&body)?
+            .idempotency_key(idempotency_key)?;
+        let response = self.client.execute(request).await?;
+        Ok(serde_json::from_value(response.value()?).unwrap_or_default())
+    }
+
     // ---- custodian side (Carbons) -------------------------------------------------------
 
     /// `GET /v1/me/silicons`: Silicons you are custodian of.
@@ -556,6 +606,56 @@ impl<'a> AccountSession<'a> {
         )
         .await
         .map(|_| ())
+    }
+
+    /// `GET /v1/me/silicons/{uuid}/webhook/deliveries` (custodian): deliveries of a Silicon's
+    /// own webhook, newest first, filtered by `status`.
+    pub async fn silicon_webhook_deliveries(
+        &self,
+        uuid: &str,
+        query: &DeliveriesQuery,
+    ) -> Result<Page<WebhookDelivery>> {
+        self.page(deliveries_url(
+            self.client,
+            &["v1", "me", "silicons", uuid, "webhook", "deliveries"],
+            query,
+        ))
+        .await
+    }
+
+    /// `GET /v1/me/silicons/{uuid}/webhook/deliveries/{id}` (custodian): one delivery of a
+    /// Silicon's webhook with its attempts and payload.
+    pub async fn silicon_webhook_delivery(
+        &self,
+        uuid: &str,
+        delivery_id: &str,
+    ) -> Result<DeliveryDetail> {
+        self.get(&[
+            "v1",
+            "me",
+            "silicons",
+            uuid,
+            "webhook",
+            "deliveries",
+            delivery_id.trim(),
+        ])
+        .await
+    }
+
+    /// `POST /v1/me/silicons/{uuid}/webhook/replay` (custodian): re-queues deliveries of a
+    /// Silicon's webhook, exactly like [`AccountSession::replay_my_webhook`].
+    pub async fn replay_silicon_webhook(
+        &self,
+        uuid: &str,
+        request: &ReplayRequest,
+        idempotency_key: Option<&str>,
+    ) -> Result<ReplayResult> {
+        self.replay(
+            &["v1", "me", "silicons", uuid, "webhook", "replay"],
+            request,
+            idempotency_key,
+        )
+        .await
     }
 
     /// `POST /v1/me/silicons/{uuid}/transfer`: ask another Carbon (`c:` id or email) to
@@ -745,6 +845,17 @@ fn check_photo(bytes: Bytes, content_type: &str) -> Result<Bytes> {
     Ok(bytes)
 }
 
+/// A delivery list URL with its `status`, `limit` and `cursor`.
+fn deliveries_url(client: &AccountsClient, segments: &[&str], query: &DeliveriesQuery) -> url::Url {
+    client.endpoint_with_query(
+        segments,
+        &[
+            ("status", query.status.clone()),
+            ("limit", query.limit.map(|l| l.to_string())),
+            ("cursor", query.cursor.clone()),
+        ],
+    )
+}
 #[cfg(test)]
 mod tests {
     use super::normalize_user_code;

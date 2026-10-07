@@ -18,7 +18,7 @@
 //! `invalid_pfp_url`, `invalid_username`, `reserved_username`, `extra_fields`, `missing_fields`,
 //! `invalid_external_id`, `invalid_value`, `too_many_emails`, `too_many_phones`,
 //! `display_name_truncated`, `access_removed`, `import_conflict`, `identifiers_not_attached`,
-//! `external_id_differs`.
+//! `external_id_differs`, `external_id_released`.
 
 use std::collections::HashMap;
 
@@ -71,6 +71,9 @@ pub mod codes {
     pub const IDENTIFIERS_NOT_ATTACHED: &str = "identifiers_not_attached";
     /// A matched member keeps its external_id; the row had another one (warning).
     pub const EXTERNAL_ID_DIFFERS: &str = "external_id_differs";
+    /// The row's external_id belonged to a deleted account's membership and is now this row's
+    /// account's (info).
+    pub const EXTERNAL_ID_RELEASED: &str = "external_id_released";
 }
 
 /// Severity of a row message.

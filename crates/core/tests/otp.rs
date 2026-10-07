@@ -145,6 +145,15 @@ async fn ten_wrong_codes_lock_for_a_minute_then_the_code_works() {
             10 - attempt,
             "attempt {attempt}"
         );
+        match attempt {
+            8 => assert!(
+                err.message.contains("; 2 more tries for "),
+                "{}",
+                err.message
+            ),
+            9 => assert!(err.message.contains("; 1 more try for "), "{}", err.message),
+            _ => {}
+        }
     }
     let err = otp::verify(
         &ctx.state.db,

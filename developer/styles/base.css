@@ -76,15 +76,17 @@ hr { height: 1px; margin: 0; border: 0; background: var(--border); }
 .muted { color: var(--text-muted); }
 .secondary { color: var(--text-secondary); }
 
-/* Skip link: invisible until keyboard focus reaches it. */
+/* Skip link: invisible until keyboard focus reaches it. A squircle like every rounded surface: the element carries
+   data-sq="surface", so its corners come from --sq-r and its paint from --sq-fill. */
 .skip-link {
+  --sq-r: var(--radius-control);
+  --sq-fill: var(--foreground);
   position: fixed;
   top: 12px;
   left: 12px;
   z-index: 200;
   padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-control);
-  background: var(--foreground);
+  background: var(--sq-fill);
   color: var(--background);
   font-size: var(--text-sm);
   text-decoration: none;

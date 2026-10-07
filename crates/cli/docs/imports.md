@@ -15,10 +15,12 @@ accounts app import users.csv --default-country US --wait
 
 `--wait` shows progress, the outcome counts and the first errors. Without it the job
 id is printed; follow it with `accounts app import status <job> --wait` and inspect
-rows with `accounts app import rows <job> --outcome error`.
+rows with `accounts app import rows <job> --outcome error` (or by message:
+`--level warning`, `--code id_conflict`). Both `--wait` forms exit 1 when the whole job
+failed, so a script can tell.
 
-Use `--dry-run` first: it validates every row and reports exactly what would happen,
-without writing anything. Re-running the same upload with the same
+Use `--dry-run` first: it validates every row and reports exactly what would happen
+("would create", "would match"…), without writing anything. Re-running the same upload with the same
 `--idempotency-key` never creates a second job.
 
 ## Columns

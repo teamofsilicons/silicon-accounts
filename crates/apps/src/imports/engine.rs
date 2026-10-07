@@ -9,7 +9,9 @@
 //! 4. memberships of matched accounts and owners of the chunk's external ids
 //!    (`error external_id_conflict`); an account that removed this app's access is not added
 //!    back (`skipped access_removed`); a member's external_id only changes with
-//!    `update_existing` (else `warning external_id_differs`);
+//!    `update_existing` (else `warning external_id_differs`). An external id that only a
+//!    deleted account's membership holds is free again (`info external_id_released`, see
+//!    below);
 //! 5. ids for new accounts, checked in batches (`id_conflict` / `invalid_username` /
 //!    `reserved_username` warnings say what was wanted and what was assigned);
 //! 6. writes (not in dry runs) in bulk inside a savepoint: accounts (`unclaimed`, carrying only
@@ -26,11 +28,21 @@
 //! only one who can claim it; the other addresses stay in the app's imported data
 //! (`info identifiers_not_attached`) until their owner adds and verifies them.
 //!
+//! External ids of deleted accounts: a deleted account's membership stays in the app's user base
+//! as history and keeps the external_id the app gave it, but nobody can ever sign in to that
+//! account again (its uuid is never reused). When the app imports that external id again (a
+//! nightly re-import of its users), the row is decided as if nobody held it: a new account is
+//! created (or the matched one gets it) and the deleted membership gives it up, inside the same
+//! savepoint. External ids are unique per app (`memberships_external_idx`), so the history row
+//! keeps it as `imported_profile = {"released_external_id": …}` (a deleted account's
+//! imported_profile is otherwise empty), which the user base shows as that row's `external_id`
+//! (`users.rs`).
+//!
 //! If a bulk write hits a uniqueness race (someone signed up with the same email, or took the
 //! same id, between the checks and the insert), the savepoint is rolled back and the chunk is
 //! redone one row at a time with fresh checks. Nothing here ever sends an email or SMS.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use accounts_core::ids::{AccountId, handle_base, uuid_for_number, validate_handle, with_suffix};
 use accounts_core::models::AccountKind;
@@ -290,6 +302,9 @@ struct Match {
     uuid: String,
     handle: Option<String>,
     membership_existed: bool,
+    /// The row's external_id is written to the membership (a new membership, one without an
+    /// external_id, or `update_existing`).
+    takes_external_id: bool,
 }
 
 /// A matched account's membership with the app, when it has one.
@@ -450,7 +465,7 @@ pub async fn process_rows(
                 messages[i].push(RowMessage::error(
                     codes::AMBIGUOUS_MATCH,
                     format!(
-                        "Row {n} can't be imported as one account: its identifiers belong to {count} different accounts ({}). Split it into one row per person, or remove the identifier that belongs to someone else.",
+                        "Row {n} can't be imported as one account: its identifiers belong to {count} different accounts ({}). Split it into one row per Carbon, or remove the identifier that belongs to someone else.",
                         groups.join("; ")
                     ),
                     None,
@@ -488,17 +503,28 @@ pub async fn process_rows(
         .iter()
         .filter_map(|(i, _)| rows[*i].1.external_id.clone())
         .collect();
+    // Live holders conflict; one only a deleted account's membership holds is free again (see
+    // the module docs).
     let mut ext_owners: HashMap<String, String> = HashMap::new();
+    let mut ext_released: HashSet<String> = HashSet::new();
     if !external_ids.is_empty() {
-        let found: Vec<(String, String)> = sqlx::query_as(
-            "select external_id, account_uuid from memberships where app_id = $1 and external_id = any($2)",
+        let found: Vec<(String, String, bool)> = sqlx::query_as(
+            "select m.external_id, m.account_uuid, a.status = 'deleted' \
+             from memberships m join accounts a on a.uuid = m.account_uuid \
+             where m.app_id = $1 and m.external_id = any($2)",
         )
         .bind(&ctx.app_id)
         .bind(&external_ids)
         .fetch_all(&mut *conn)
         .await
         .map_err(ApiError::from)?;
-        ext_owners.extend(found);
+        for (ext, uuid, deleted) in found {
+            if deleted {
+                ext_released.insert(ext);
+            } else {
+                ext_owners.insert(ext, uuid);
+            }
+        }
     }
 
     let mut creates: Vec<Create> = Vec::new();
@@ -593,9 +619,13 @@ pub async fn process_rows(
         match plan {
             Plan::Match(o) => {
                 scope.local.accounts.insert(o.uuid.clone(), *n);
+                let current = memberships.get(&o.uuid);
                 matches.push(Match {
                     idx: i,
-                    membership_existed: memberships.contains_key(&o.uuid),
+                    membership_existed: current.is_some(),
+                    takes_external_id: p.external_id.is_some()
+                        && (ctx.options.update_existing
+                            || current.is_none_or(|m| m.external_id.is_none())),
                     uuid: o.uuid,
                     handle: o.handle,
                 });
@@ -630,10 +660,37 @@ pub async fn process_rows(
     }
     creates.retain(|c| c.handle.is_some());
 
+    // External ids these rows take over from deleted accounts' memberships.
+    let mut released: Vec<String> = Vec::new();
+    let takers = creates.iter().map(|c| c.idx).chain(
+        matches
+            .iter()
+            .filter(|m| m.takes_external_id)
+            .map(|m| m.idx),
+    );
+    for i in takers {
+        if let Some(ext) = rows[i]
+            .1
+            .external_id
+            .as_ref()
+            .filter(|e| ext_released.contains(*e))
+        {
+            messages[i].push(RowMessage::info(
+                codes::EXTERNAL_ID_RELEASED,
+                format!(
+                    "external_id {} belonged to a member of this app whose account was deleted, so it is free again and this row's account gets it. The deleted account stays in the app's user base as history, still showing that external_id.",
+                    rules::quote(ext)
+                ),
+                Some("external_id"),
+            ));
+            released.push(ext.clone());
+        }
+    }
+
     // 6: writes.
     if !ctx.options.dry_run && (!creates.is_empty() || !matches.is_empty()) {
         let mut sp = conn.begin().await.map_err(ApiError::from)?;
-        match write(&mut sp, ctx, rows, &mut creates, &matches).await {
+        match write(&mut sp, ctx, rows, &mut creates, &matches, &released).await {
             Ok(()) => sp.commit().await.map_err(ApiError::from)?,
             Err(e) => {
                 sp.rollback().await.map_err(ApiError::from)?;
@@ -931,14 +988,31 @@ async fn allocate_handles(
     Ok(())
 }
 
-/// Bulk writes for decided rows (inside the caller's savepoint).
+/// Bulk writes for decided rows (inside the caller's savepoint). `released`: external ids the
+/// rows take over from deleted accounts' memberships (see the module docs).
 async fn write(
     conn: &mut PgConnection,
     ctx: &JobCtx,
     rows: &[(i32, Prepared)],
     creates: &mut [Create],
     matches: &[Match],
+    released: &[String],
 ) -> Result<(), ProcessError> {
+    if !released.is_empty() {
+        // Only memberships of deleted accounts give an external id up (a deleted account never
+        // comes back); a live member that took one meanwhile makes the insert below clash, and
+        // the rows are redone with fresh checks.
+        sqlx::query(
+            "update memberships m set external_id = null, \
+               imported_profile = jsonb_build_object('released_external_id', m.external_id), updated_at = now() \
+             from accounts a \
+             where a.uuid = m.account_uuid and a.status = 'deleted' and m.app_id = $1 and m.external_id = any($2)",
+        )
+        .bind(&ctx.app_id)
+        .bind(released)
+        .execute(&mut *conn)
+        .await?;
+    }
     if !creates.is_empty() {
         let mut handles: Vec<String> = creates
             .iter()

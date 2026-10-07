@@ -438,10 +438,7 @@ pub async fn id_availability_for(
             id: full.clone(),
             available: false,
             reason: Some("reserved"),
-            message: format!(
-                "{full} was released recently and is reserved for its previous owner until {}.",
-                crate::timefmt::format_rfc3339_ms(until)
-            ),
+            message: reserved_id_message(conn, &full, &holder, until).await?,
             reclaimable: false,
         });
     }
@@ -1408,6 +1405,33 @@ pub async fn active_reservation(
     .await?)
 }
 
+/// Why someone else can't take `full_id` while `holder` keeps a reservation on it until `until`.
+/// The old id of a live account is reserved so that account can take it back; the id of a
+/// deleted account can never be reclaimed, only taken by anyone once the hold ends.
+pub async fn reserved_id_message(
+    conn: &mut PgConnection,
+    full_id: &str,
+    holder: &str,
+    until: OffsetDateTime,
+) -> ApiResult<String> {
+    let until = crate::timefmt::format_rfc3339_ms(until);
+    let deleted: bool = sqlx::query_scalar(
+        "select coalesce((select status = 'deleted' from accounts where uuid = $1), false)",
+    )
+    .bind(holder)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(if deleted {
+        format!(
+            "{full_id} belonged to an account that was deleted; it is held until {until} and can be taken after that."
+        )
+    } else {
+        format!(
+            "{full_id} was released recently and is reserved for its previous owner until {until}."
+        )
+    })
+}
+
 /// Live reservations held by an account (its recent old ids), newest first.
 pub async fn reservations_of(
     conn: &mut PgConnection,
@@ -1457,12 +1481,9 @@ async fn ensure_claimable(
     }
     match active_reservation(conn, &full).await? {
         Some((holder, _)) if requester_uuid == Some(holder.as_str()) => Ok(Claim::ReclaimOwn),
-        Some((_, until)) => Err(ApiError::conflict(
+        Some((holder, until)) => Err(ApiError::conflict(
             "id_reserved",
-            format!(
-                "{full} was released recently and is reserved for its previous owner until {}.",
-                crate::timefmt::format_rfc3339_ms(until)
-            ),
+            reserved_id_message(conn, &full, &holder, until).await?,
         )
         .hint("Pick another id, or wait until the reservation ends.")
         .detail("reserved_until", crate::timefmt::format_rfc3339_ms(until))),

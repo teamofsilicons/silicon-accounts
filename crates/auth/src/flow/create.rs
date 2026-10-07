@@ -8,7 +8,7 @@
 use accounts_core::crypto::{pkce, prefix, random_token};
 use accounts_core::http::cookies::flow_cookie;
 use accounts_core::http::{ClientMeta, Json, check_origin};
-use accounts_core::models::{Method, Scope};
+use accounts_core::models::{AccountKind, Method, Scope};
 use accounts_core::normalize::normalize_timezone;
 use accounts_core::repo::rate_limit::{self, Limit};
 use accounts_core::{ApiError, ApiResult, AppState};
@@ -195,7 +195,9 @@ pub async fn create_flow(
         };
         return Err(ApiError::bad_request(
             "redirect_uri_not_registered",
-            format!("redirect_uri '{redirect_uri}' is not registered for the app '{app_id}': {rule}."),
+            format!(
+                "redirect_uri '{redirect_uri}' is not registered for the app '{app_id}': {rule}."
+            ),
         )
         .hint(hint)
         .detail("app_id", app_id.as_str()));
@@ -412,7 +414,8 @@ pub async fn create_flow(
         .as_ref()
         .filter(|b| b.is_active_carbon() && fa.config.remember_browser && !prompt.login);
     if prompt.none {
-        silent_sign_in(&mut tx, &state, &meta, &mut flow, &fa, usable_browser).await?;
+        // Given the browser's account as it is: when it can't be used, the error says why.
+        silent_sign_in(&mut tx, &state, &meta, &mut flow, &fa, current.as_ref()).await?;
     } else if usable_browser.is_none()
         && let Some(session) = signup::from_cookie(&mut tx, &state, &headers).await?
         && signup::may_resume(&session, &fa, &state.settings)
@@ -458,6 +461,9 @@ pub async fn create_flow(
 
 /// `prompt=none`: complete with the browser's account when nothing needs the Carbon, else end
 /// the flow with the OIDC error (`login_required`, `interaction_required`, `consent_required`).
+/// `browser` is the browser's account whatever it is: `login_required` says why it can't be used
+/// (nobody signed in, a Silicon, an account that can't sign in, or an app that asks every Carbon
+/// to sign in again).
 async fn silent_sign_in(
     conn: &mut sqlx::PgConnection,
     state: &AppState,
@@ -466,6 +472,8 @@ async fn silent_sign_in(
     fa: &FlowApp,
     browser: Option<&browser::BrowserAccount>,
 ) -> ApiResult<()> {
+    let sign_in_hint =
+        "Send the browser to /authorize without prompt=none so the Carbon can sign in.";
     let Some(b) = browser else {
         return next::fail(
             state,
@@ -473,10 +481,53 @@ async fn silent_sign_in(
             FlowError::new(
                 "login_required",
                 "No Carbon is signed in to Silicon Accounts in this browser, and prompt=none forbids showing the sign-in page.",
-                "Send the browser to /authorize without prompt=none so the Carbon can sign in.",
+                sign_in_hint,
             ),
         );
     };
+    if b.account.kind != AccountKind::Carbon {
+        return next::fail(
+            state,
+            flow,
+            FlowError::new(
+                "login_required",
+                format!(
+                    "This browser is signed in to Silicon Accounts as {}, a Silicon; Silicons never use the sign-in pages, so prompt=none can't sign a Carbon in silently.",
+                    b.account.display_id()
+                ),
+                "Send the browser to /authorize without prompt=none so a Carbon can sign in. A Silicon signs in to apps with `accounts login --app <app_id>`.",
+            ),
+        );
+    }
+    if !b.is_active_carbon() {
+        return next::fail(
+            state,
+            flow,
+            FlowError::new(
+                "login_required",
+                format!(
+                    "The account signed in to this browser ({}) is {} and can't sign in, and prompt=none forbids showing the sign-in page.",
+                    b.account.display_id(),
+                    b.account.status
+                ),
+                sign_in_hint,
+            ),
+        );
+    }
+    if !fa.config.remember_browser {
+        return next::fail(
+            state,
+            flow,
+            FlowError::new(
+                "login_required",
+                format!(
+                    "{} asks every Carbon to sign in again (remember_browser is off), so prompt=none can't sign in silently with the account signed in to this browser.",
+                    fa.app.name
+                ),
+                "Send the browser to /authorize without prompt=none so the Carbon signs in again, or turn remember_browser on in the app's sign-in setup.",
+            ),
+        );
+    }
     if !next::account_domain_allowed(conn, &fa.config, &b.account).await? {
         return next::fail(
             state,

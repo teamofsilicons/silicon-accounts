@@ -87,6 +87,8 @@ async function startOn(ctx: Ctx, node: Instance, others: number[], app: FakeApp,
 export const journey: Journey = {
   name: "imports-worker-nodes",
   title: "import jobs across API nodes: a node killed mid-job is taken over by another and every row lands once; a job whose workers stopped too often fails with what to do, and re-importing the file imports the rest; two apps importing the same new people on two nodes at once make one account per person",
+  // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+  engines: ["chromium"],
   timeoutMs: 20 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;

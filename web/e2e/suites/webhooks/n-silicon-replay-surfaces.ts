@@ -1,14 +1,16 @@
 /**
  * Where a Silicon finds the replay of its own webhook deliveries outside the HTTP API. UNDERSTANDING "Rust Package &
  * CLI": the package is the primary interface, "Everything should work through the CLI first", and the CLI "is built
- * for both Carbons and Silicons, but it'll mostly be used by Silicons"; "Docs": instructive docs written for Silicons.
- * The API has GET /v1/me/webhook/deliveries and POST /v1/me/webhook/replay (and the custodian's
- * /v1/me/silicons/{uuid}/webhook/…), so:
+ * for both Carbons and Silicons, but it'll mostly be used by Silicons"; "Docs": instructive docs written for Silicons;
+ * "Webhooks": failed deliveries can be replayed, and Silicon webhooks "follow these same rules". The API has
+ * GET /v1/me/webhook/deliveries and POST /v1/me/webhook/replay (and the custodian's /v1/me/silicons/{uuid}/webhook/…),
+ * so two journeys, one per surface:
  *
- * - the CLI, signed in as the Silicon, lists its failed deliveries and replays one (the event arrives again with the
- *   same event_id); its custodian's `accounts silicon webhook` has the same;
- * - the bundled CLI docs (`accounts docs webhooks`) and the docs site (/docs/…md) tell a Silicon how to do it, and no
- *   longer say there is no listing or replay endpoint.
+ * - webhooks-silicon-replay-cli: the CLI, signed in as the Silicon, lists its failed deliveries and replays one (the
+ *   event arrives again with the same event_id); its custodian's `accounts silicon webhook` has the same; the bundled
+ *   CLI docs (`accounts docs webhooks`) say how;
+ * - webhooks-silicon-replay-docs: the docs site (/docs/…md) tells a Silicon how to do it, and no longer says there is
+ *   no listing or replay endpoint.
  */
 import type { Journey } from "../../context";
 import { cli, cliHome, forgetRateLimits } from "../../lib";
@@ -22,9 +24,9 @@ function commandsOf(help: string): string[] {
   return block.split("\n").map(line => line.trim().split(/\s+/)[0] ?? "").filter(Boolean);
 }
 
-export const journey: Journey = {
-  name: "webhooks-silicon-replay-surfaces",
-  title: "a Silicon (and its custodian) can list and replay the Silicon's webhook deliveries through the CLI, and the CLI docs and the docs site say how",
+const cliJourney: Journey = {
+  name: "webhooks-silicon-replay-cli",
+  title: "a Silicon (and its custodian) can list and replay the Silicon's webhook deliveries through the CLI, and the CLI's bundled docs say how",
   timeoutMs: 4 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;
@@ -68,13 +70,22 @@ export const journey: Journey = {
     const custodian = commandsOf(custodianHelp.stdout);
     results.check("CLI (as the custodian): `accounts silicon webhook` can list and replay a Silicon's deliveries too", custodian.includes("deliveries") && custodian.includes("replay"), `accounts silicon webhook commands: [${custodian.join(", ")}]`);
 
-    // ---- the docs ----------------------------------------------------------------------------------------------------------------
+    // ---- the CLI's bundled docs ---------------------------------------------------------------------------------------------
     const bundled = await cli(env, home, ["docs", "webhooks"]);
     results.check(
       "CLI docs (`accounts docs webhooks`): say how a Silicon replays its own failed deliveries",
       bundled.code === 0 && /accounts webhook replay|\/v1\/me\/webhook\/replay/.test(bundled.stdout),
       `exit ${bundled.code}; replay lines: ${short(bundled.stdout.split("\n").filter(line => /replay/i.test(line)).join(" / "), 500)}`,
     );
+  },
+};
+
+const docsJourney: Journey = {
+  name: "webhooks-silicon-replay-docs",
+  title: "the docs site tells a Silicon how to list and replay its own webhook deliveries (learn/webhooks, reference/api) and no longer says it can't",
+  timeoutMs: 60_000,
+  async run(ctx) {
+    const { env, results } = ctx;
     const page = async (path: string) => {
       const response = await fetch(`${env.site}/docs/${path}.md`, { signal: AbortSignal.timeout(15_000) });
       return { status: response.status, text: await response.text() };
@@ -86,9 +97,18 @@ export const journey: Journey = {
       learn.status === 200 && !stale,
       `${learn.status}; ${stale ? `still says: ${short(stale.trim(), 300)}` : "no such line"}`,
     );
-    const reference = await page("reference/api");
-    const routes = ["GET /v1/me/webhook/deliveries", "POST /v1/me/webhook/replay", "GET /v1/me/silicons/{uuid}/webhook/deliveries", "POST /v1/me/silicons/{uuid}/webhook/replay"];
-    const missing = routes.filter(route => !reference.text.includes(route));
-    results.check("docs site, reference/api: lists the Silicon's and the custodian's delivery and replay routes", reference.status === 200 && missing.length === 0, `${reference.status}; missing: ${missing.join(", ") || "none"}`);
+    // The API reference: its index (reference/api) and its pages for Silicons and webhooks.
+    const pages = await Promise.all(["reference/api", "reference/api/silicons", "reference/api/webhooks"].map(async path => ({ path, ...(await page(path)) })));
+    const reference = pages.map(entry => entry.text).join("\n");
+    const routes: Array<[string, RegExp]> = [
+      ["GET /v1/me/webhook/deliveries", /GET \/v1\/me\/webhook\/deliveries\b/],
+      ["POST /v1/me/webhook/replay", /POST \/v1\/me\/webhook\/replay\b/],
+      ["GET /v1/me/silicons/{uuid}/webhook/deliveries", /GET \/v1\/me\/silicons\/\{[^}]+\}\/webhook\/deliveries\b/],
+      ["POST /v1/me/silicons/{uuid}/webhook/replay", /POST \/v1\/me\/silicons\/\{[^}]+\}\/webhook\/replay\b/],
+    ];
+    const missing = routes.filter(([, pattern]) => !pattern.test(reference)).map(([route]) => route);
+    results.check("docs site, API reference (reference/api, its Silicons and webhooks pages): documents the Silicon's and the custodian's delivery and replay routes", pages.every(entry => entry.status === 200) && missing.length === 0, `${pages.map(entry => `${entry.path} ${entry.status}`).join(", ")}; missing: ${missing.join(", ") || "none"}`);
   },
 };
+
+export const journeys: Journey[] = [cliJourney, docsJourney];

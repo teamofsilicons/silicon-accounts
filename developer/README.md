@@ -131,10 +131,14 @@ tokens, Carbons/Silicons vocabulary, errors in the server's words). `lib/api/htt
 - **Flows** (`tabs/flows.tsx`): the journey from the button to the app, one card per page (details as chips: drag one
   onto another page or before another chip, or use its menu; reorder pages by their handle or the arrow keys; title,
   subtitle, continue label, layout, id), a review page on or off, inline validation and a live preview.
-- **Pages** (`tabs/pages.tsx`, `tabs/hosted-preview.tsx`): a live preview of every page (sign-in and sign-up versions
-  of the method choice, Opening Google and Apple, email and phone codes, setting up an account, each flow page, review,
-  the embed buttons on the app's own site), light or dark, desktop or phone, painted with the draft through the same
-  branding runtime as the hosted pages, "Powered by Silicon Accounts" on every page.
+- **Pages** (`tabs/pages.tsx`, `tabs/hosted-preview.tsx`, `lib/preview-pages.ts`): a live preview of every page a
+  Carbon can meet with the draft's methods (sign-in and sign-up versions of the method choice, Opening Google and/or
+  Apple, the email and/or phone code page, setting up an account, each flow page, review, the embed buttons on the app's
+  own site), light or dark, desktop or phone, painted with the draft through the same branding runtime as the hosted
+  pages, "Powered by Silicon Accounts" on every page. Each page says what the hosted page says, word for word
+  (`web/components/auth/steps/*.tsx` and `flow-page.tsx`'s footer): change the preview when those words change. Leaving
+  the Image background drops an image URL the server would refuse (`backgroundStyleEdits`), so a hidden field never
+  blocks saving.
 - **ATA** (`tabs/ata.tsx`): one receiving app per proof (`{receiving_app}`); the proof and refresh tokens are shown
   once; the list (ATA by default, OBO one filter away) revokes any active proof.
 - **Embed** (`tabs/embed.tsx`): the hosted link (with `intent` and `method`), the iframe, the SDK (one button per method
@@ -149,4 +153,9 @@ tokens, Carbons/Silicons vocabulary, errors in the server's words). `lib/api/htt
 - Refreshing is single-flight per process. Several instances behind a load balancer can refresh the same session at
   once, which Silicon Accounts treats as refresh token reuse (it ends the sign-in): run one instance, or route a browser
   to the same instance, until the API tolerates a short reuse window.
-- No end-to-end suite yet; `pnpm typecheck && pnpm lint && pnpm test && pnpm build` are the gates.
+- `pnpm typecheck && pnpm lint && pnpm test && pnpm build` are the gates; the browser walks are `web/e2e`'s
+  developer-site, developer-branding and ux-audit suites (`scripts/e2e.sh --suite developer-site`).
+- Arc's local edits here (beyond `web/README.md`'s list): layers opened from plain state (no Radix Trigger: the dialogs,
+  drawers and the ⌘K palette) return focus to what opened them (`components/arc/lib/return-focus.ts`); radio cards,
+  the colour picker, accordions, chip groups, code blocks and copy fields show keyboard focus in fills and edges; the
+  palette's Esc button is named "Esc: close the command palette"; badge tints are opaque (every tone 4.5:1 at 11 px).

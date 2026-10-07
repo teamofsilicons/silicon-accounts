@@ -196,12 +196,25 @@ export function must<A extends JsonAnswer<unknown>>(what: string, answer: A, ok:
 /* Carbons, apps and Silicons                                                                                          */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-interface FlowView {
+/** One detail of a details page (FlowView.details.fields). */
+export interface FlowDetailField {
+  field: string;
+  mode: "required" | "optional";
+  label: string;
+  value: string | null;
+  missing: boolean;
+  shared: boolean;
+  previously_granted: boolean;
+}
+
+/** The hosted flow as the API describes it (v2: details pages and a review page replace requirements and consent). */
+export interface FlowView {
   id: string;
   step: string;
   redirect_to?: string | null;
   signup?: { display_name: string; id: string; timezone: string; dob: string } | null;
-  requirements?: { missing: string[] } | null;
+  details?: { index: number; count: number; id: string; title: string | null; continue_label: string | null; review_next?: boolean; fields: FlowDetailField[] } | null;
+  review?: { fields: Array<{ field: string; mode: string; label: string; value: string | null; shared: boolean }> } | null;
   error?: { code: string; message: string } | null;
 }
 
@@ -258,19 +271,69 @@ export interface AppSession {
   code: string;
   redirectUri: string;
   codeVerifier: string;
+  /** The details pages the hosted flow showed (none for a returning Carbon with nothing new). */
+  pages: DetailsPage[];
+  /** The review page's rows (profile first), or null when the app's flow has none. */
+  review: string[] | null;
+}
+
+/** A details page as the API showed it, and what the walk answered on it. */
+export interface DetailsPage {
+  id: string;
+  index: number;
+  count: number;
+  title: string | null;
+  fields: Array<{ field: string; mode: "required" | "optional"; missing: boolean; shared: boolean; previouslyGranted: boolean }>;
+  /** Details added on the page with a code. */
+  added: string[];
+  /** The `share` list sent with Continue: the optional details ticked. */
+  ticked: string[];
+}
+
+export interface SignInOptions {
+  /**
+   * Optional details to tick, wherever the app's flow shows them (every other optional detail on a page shown is left
+   * unticked, which ends a grant made before). An optional email or phone the account lacks is added with a code first.
+   */
+  optionalScopes?: string[];
+  /** The phone (or email) to add on a details page when the account lacks one the app asks for (default: a new one). */
+  phone?: string;
+  email?: string;
+  /** `prompt` of the authorize request (e.g. "consent": every page again, so optional details can be changed). */
+  prompt?: string;
+  /** `scope` of the authorize request (e.g. "timezone": an optional detail the app asks for this time). */
+  scope?: string;
+  /** Cancel on the details page with this index (0-based) or on the review page, instead of sharing. */
+  cancelAt?: number | "review";
+}
+
+export interface FlowWalk {
+  flow: FlowView;
+  pages: DetailsPage[];
+  review: string[] | null;
+  redirectUri: string;
+  codeVerifier: string;
+  /** The redirect the flow ended with (`?code=…` or `?error=access_denied`). */
+  redirect: URL;
 }
 
 /**
- * Signs a Carbon into a fake app through the hosted flow (continue as the signed-in account, add a missing phone or
- * email when the app requires it, consent with `optionalScopes`), then exchanges the code as the app would.
+ * Walks a fake app's hosted flow over HTTP the way the hosted pages do (UNDERSTANDING.md v2 "What's shared with the
+ * app", "Flows"): continue as the browser's Carbon (or an email code when the app doesn't remember browsers), then every
+ * details page (a missing required email/phone added with a code; optional details ticked only when listed in
+ * `optionalScopes`), the review page when the app's flow has one, until the flow completes. Returns where it ended.
  */
-export async function signIntoApp(ctx: Ctx, carbon: Carbon, appId: string, options: { optionalScopes?: string[]; phone?: string } = {}): Promise<AppSession> {
+export async function walkFlow(ctx: Ctx, carbon: Carbon, appId: string, options: SignInOptions = {}): Promise<FlowWalk> {
   const visitor = carbon.visitor;
+  const wanted = new Set(options.optionalScopes ?? []);
   const redirectUri = `${ctx.env.apps}/${appId}/callback`;
   const codeVerifier = b64url(randomBytes(32));
   const state = b64url(randomBytes(12));
-  let flow = must(`create ${appId}'s flow`, await visitor.call<{ flow: FlowView }>("POST", "/v1/flows", { json: { app_id: appId, redirect_uri: redirectUri, state, code_challenge: b64url(sha256(codeVerifier)), code_challenge_method: "S256", timezone: "Asia/Kolkata" } })).body.flow;
-  for (let guard = 0; guard < 8 && flow.step !== "complete"; guard++) {
+  const request = { app_id: appId, redirect_uri: redirectUri, state, code_challenge: b64url(sha256(codeVerifier)), code_challenge_method: "S256", timezone: "Asia/Kolkata", ...(options.prompt ? { prompt: options.prompt } : {}), ...(options.scope ? { scope: options.scope } : {}) };
+  let flow = must(`create ${appId}'s flow`, await visitor.call<{ flow: FlowView }>("POST", "/v1/flows", { json: request })).body.flow;
+  const pages: DetailsPage[] = [];
+  let review: string[] | null = null;
+  for (let guard = 0; guard < 16 && flow.step !== "complete"; guard++) {
     if (flow.step === "choose_method") {
       const continued = await visitor.call<{ flow: FlowView; error?: { code?: string } }>("POST", `/v1/flows/${flow.id}/continue`, {});
       if (continued.status === 200 || continued.status === 201) {
@@ -282,26 +345,80 @@ export async function signIntoApp(ctx: Ctx, carbon: Carbon, appId: string, optio
       const after = await lastSeq(ctx.env);
       await flowStep(visitor, "send the sign-in code", `/v1/flows/${flow.id}/email`, { email: carbon.email });
       flow = await flowStep(visitor, "verify the sign-in code", `/v1/flows/${flow.id}/verify`, { code: await codeFor(ctx.env, carbon.email, after) });
-    } else if (flow.step === "requirements") {
-      const missing = flow.requirements?.missing ?? [];
-      const kind = missing.includes("phone") ? "phone" : missing.includes("email") ? "email" : null;
-      if (!kind) throw new Error(`${appId} requires ${missing.join(", ")}, which this helper can't add`);
-      const value = kind === "phone" ? (options.phone ?? randomPhone()) : `wh.req+${uid()}@example.test`;
-      const after = await lastSeq(ctx.env);
-      await flowStep(visitor, `add the required ${kind}`, `/v1/flows/${flow.id}/requirements/${kind}`, { [kind]: value });
-      flow = await flowStep(visitor, `verify the required ${kind}`, `/v1/flows/${flow.id}/requirements/verify`, { code: await codeFor(ctx.env, value, after) });
-    } else if (flow.step === "consent") flow = await flowStep(visitor, "consent", `/v1/flows/${flow.id}/consent`, { approve: true, optional_scopes: options.optionalScopes ?? [] });
-    else throw new Error(`${appId}'s flow stopped at ${flow.step} ${short(flow.error)}`);
+    } else if (flow.step === "details" && flow.details) {
+      const details = flow.details;
+      const page: DetailsPage = {
+        id: details.id,
+        index: details.index,
+        count: details.count,
+        title: details.title,
+        fields: details.fields.map(f => ({ field: f.field, mode: f.mode, missing: f.missing, shared: f.shared, previouslyGranted: f.previously_granted })),
+        added: [],
+        ticked: [],
+      };
+      pages.push(page);
+      // Cancel the page as it is shown (nothing added on it).
+      if (options.cancelAt === details.index) {
+        flow = await flowStep(visitor, `cancel on ${appId}'s page ${details.id}`, `/v1/flows/${flow.id}/review`, { approve: false });
+        break;
+      }
+      for (const field of details.fields) {
+        if (!field.missing || (field.field !== "email" && field.field !== "phone")) continue;
+        if (field.mode === "optional" && !wanted.has(field.field)) continue;
+        const value = field.field === "phone" ? (options.phone ?? randomPhone()) : (options.email ?? `wh.add+${uid()}@example.test`);
+        const after = await lastSeq(ctx.env);
+        await flowStep(visitor, `add the ${field.mode} ${field.field} on ${appId}'s page ${details.id}`, `/v1/flows/${flow.id}/details/add`, { [field.field]: value });
+        flow = await flowStep(visitor, `verify the ${field.field} added on ${appId}'s page`, `/v1/flows/${flow.id}/details/verify`, { code: await codeFor(ctx.env, field.field === "email" ? value.toLowerCase() : value, after) });
+        page.added.push(field.field);
+      }
+      const shown = flow.details?.fields ?? details.fields;
+      page.ticked = shown.filter(f => f.mode === "optional" && !f.missing && wanted.has(f.field)).map(f => f.field);
+      flow = await flowStep(visitor, `continue on ${appId}'s page ${details.id}`, `/v1/flows/${flow.id}/details/continue`, { share: page.ticked });
+    } else if (flow.step === "review" && flow.review) {
+      review = flow.review.fields.map(f => f.field);
+      flow = await flowStep(visitor, `${options.cancelAt === "review" ? "cancel" : "approve"} on ${appId}'s review page`, `/v1/flows/${flow.id}/review`, { approve: options.cancelAt !== "review" });
+    } else throw new Error(`${appId}'s flow stopped at ${flow.step} ${short(flow.error)}`);
   }
-  if (flow.step !== "complete" || !flow.redirect_to) throw new Error(`${appId}'s flow did not complete (${flow.step})`);
-  const code = new URL(flow.redirect_to).searchParams.get("code");
-  if (!code) throw new Error(`${appId}'s flow ended without a code: ${flow.redirect_to}`);
+  if (flow.step !== "complete" || !flow.redirect_to) throw new Error(`${appId}'s flow did not complete (${flow.step}) ${short(flow.error)}`);
+  return { flow, pages, review, redirectUri, codeVerifier, redirect: new URL(flow.redirect_to) };
+}
+
+/**
+ * Signs a Carbon into a fake app through the hosted flow (walkFlow: continue as the signed-in account, the app's
+ * details pages with `optionalScopes` ticked, a missing required email or phone added with a code, the review page),
+ * then exchanges the code as the app would.
+ */
+export async function signIntoApp(ctx: Ctx, carbon: Carbon, appId: string, options: SignInOptions = {}): Promise<AppSession> {
+  const walk = await walkFlow(ctx, carbon, appId, options);
+  const code = walk.redirect.searchParams.get("code");
+  if (!code) throw new Error(`${appId}'s flow ended without a code: ${walk.redirect.href}`);
   const tokens = must(
     `${appId} exchanges the code`,
-    await appCall<{ access_token: string; refresh_token: string; membership_id: string; scope: string; account: Json }>(ctx.env, appId, "POST", "/v1/oauth/token", { form: { grant_type: "authorization_code", code, redirect_uri: redirectUri, code_verifier: codeVerifier } }),
+    await appCall<{ access_token: string; refresh_token: string; membership_id: string; scope: string; account: Json }>(ctx.env, appId, "POST", "/v1/oauth/token", { form: { grant_type: "authorization_code", code, redirect_uri: walk.redirectUri, code_verifier: walk.codeVerifier } }),
     200,
   ).body;
-  return { appId, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, membershipId: tokens.membership_id, scope: tokens.scope, account: tokens.account, code, redirectUri, codeVerifier };
+  return { appId, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, membershipId: tokens.membership_id, scope: tokens.scope, account: tokens.account, code, redirectUri: walk.redirectUri, codeVerifier: walk.codeVerifier, pages: walk.pages, review: walk.review };
+}
+
+/**
+ * A token of the developer platform (aud=developer) for a Carbon signed in on the account site, the way the developer
+ * site's BFF gets one: the hosted flow as the first-party public client `developer` (PKCE S256, its redirect URI
+ * `{developer}/auth/callback`), then the code exchanged with client_id=developer and no secret.
+ */
+export async function developerToken(ctx: Ctx, visitor: Visitor): Promise<{ accessToken: string; refreshToken: string; scope: string }> {
+  const redirectUri = `${ctx.env.developer}/auth/callback`;
+  const codeVerifier = b64url(randomBytes(32));
+  let flow = must("create the developer platform's flow", await visitor.call<{ flow: FlowView }>("POST", "/v1/flows", { json: { app_id: "developer", redirect_uri: redirectUri, state: b64url(randomBytes(12)), code_challenge: b64url(sha256(codeVerifier)), code_challenge_method: "S256" } })).body.flow;
+  if (flow.step === "choose_method") flow = await flowStep(visitor, "continue as the signed-in Carbon (developer)", `/v1/flows/${flow.id}/continue`, {});
+  if (flow.step !== "complete" || !flow.redirect_to) throw new Error(`the developer platform's flow did not complete (${flow.step}) ${short(flow.error)}`);
+  const code = new URL(flow.redirect_to).searchParams.get("code");
+  if (!code) throw new Error(`the developer platform's flow ended without a code: ${flow.redirect_to}`);
+  const tokens = must(
+    "the developer platform exchanges its code (public client, PKCE)",
+    await publicCall<{ access_token: string; refresh_token: string; scope: string }>(ctx.env, "POST", "/v1/oauth/token", { form: { grant_type: "authorization_code", client_id: "developer", code, redirect_uri: redirectUri, code_verifier: codeVerifier } }),
+    200,
+  ).body;
+  return { accessToken: tokens.access_token, refreshToken: tokens.refresh_token, scope: tokens.scope };
 }
 
 // US numbers every phone library accepts (testkit/lib/mocks.ts randomPhone): +1 <area> 555 XXXX.

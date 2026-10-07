@@ -6,11 +6,11 @@
  */
 import type { Journey } from "../../context";
 import { codeFor, forgetRateLimits, lastSeq, newContext, randomIp, shot, sleep, sql, tag } from "../../lib";
-import { Browserish, brief, drive, errorCode, errorDetails, errorMessage, nextCode, sendCode, signUpVia, startSignIn, stats, timed } from "./_helpers";
+import { Browserish, brief, drive, errorCode, errorDetails, errorMessage, newCarbon, nextCode, randomPhone, sendCode, signUpVia, startSignIn, stats, timed } from "./_helpers";
 
 const sendLimit: Journey = {
   name: "auth-flows-otp-send-limit",
-  title: "10 codes per address per 10 minutes: the 11th send is 429 with Retry-After (any flow, any network), the last code still works, the window passing (time travel) allows more; 30 codes per network; the hosted page shows the wait",
+  title: "10 codes per address per 10 minutes: the 11th send is 429 with Retry-After (any flow, any network, and a code to add the address on a details page too), the window passing (time travel) allows more; 30 codes per network; the hosted page shows the wait",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const t = tag();
@@ -43,6 +43,17 @@ const sendLimit: Journey = {
     results.check("another flow, browser and network → still 429 for that address", elsewhere.status === 429 && errorCode(elsewhere) === "rate_limited", brief(elsewhere));
     const free = await b.act(s.flow.id, "email", { email: `other.${t}@example.test` });
     results.check("a different address from the same browser is fine", free.status === 200, brief(free));
+
+    // A code to add that address on a details page counts against the same 10 (the limit is the address's).
+    const phoneLimit = randomPhone();
+    const ps = await startSignIn(other, "dm");
+    let phoneSend = await other.act(ps.flow.id, "phone", { phone: phoneLimit });
+    for (let i = 2; i <= 10 && phoneSend.status === 200; i++) phoneSend = await other.act(ps.flow.id, "resend");
+    const adder = (await newCarbon(env, randomIp(), `limit.adder.${t}@example.test`)).b;
+    const as = await startSignIn(adder, "dm");
+    await adder.act(as.flow.id, "continue");
+    const addBlocked = await adder.detailsAdd(as.flow.id, { phone: phoneLimit });
+    results.check("after 10 sign-in codes to a number, adding it on dm's details page → 429 rate_limited too (one budget per address)", phoneSend.status === 200 && addBlocked.status === 429 && errorCode(addBlocked) === "rate_limited" && Number(addBlocked.headers.get("retry-after")) > 0, `${brief(phoneSend)} / ${brief(addBlocked)}`);
 
     // The last code sent before the limit still works (here: re-send it to the first address's flow).
     const c = new Browserish(env, randomIp());
@@ -103,7 +114,7 @@ const sendLimit: Journey = {
 
 const lockout: Journey = {
   name: "auth-flows-verify-lockout",
-  title: "10 wrong codes in a row → the 10th says 0 tries left with locked_until, then 423 for 1 minute (even the right code, any flow, a resend); the cooldown over (time travel) the right code works and the streak restarts; an account's history records the lock; the hosted page shows it",
+  title: "10 wrong codes in a row → the 10th says 0 tries left with locked_until, then 423 for 1 minute (even the right code, any flow, a resend, a details page adding the address); the cooldown over (time travel) the right code works and the streak restarts; an account's history records the lock; the hosted page shows it",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const t = tag();
@@ -145,6 +156,23 @@ const lockout: Journey = {
     results.check("after the cooldown (time travel) a wrong code counts from scratch: 9 tries left", fresh.status === 422 && errorDetails(fresh).remaining_attempts === 9, brief(fresh));
     const unlocked = await b.act(s.flow.id, "verify", { code: resentCode ?? "" });
     results.check("…and the right code works", unlocked.status === 200 && unlocked.body.flow.step === "signup", brief(unlocked));
+
+    // The streak is the address's whatever the purpose: a number locked by wrong sign-in codes can't be added on a
+    // details page with its right code during the cooldown.
+    const lockedPhone = randomPhone();
+    const lp = new Browserish(env, randomIp());
+    const lps = await startSignIn(lp, "dm");
+    const lpSent = await sendCode(lp, lps.flow.id, { phone: lockedPhone });
+    const lpWrong = lpSent.code === "000000" ? "111111" : "000000";
+    for (let i = 1; i <= 10; i++) await lp.act(lps.flow.id, "verify", { code: lpWrong });
+    const owner2 = (await newCarbon(env, randomIp(), `lock.adder.${t}@example.test`)).b;
+    const o2s = await startSignIn(owner2, "dm");
+    await owner2.act(o2s.flow.id, "continue");
+    const mark2 = await lastSeq(env);
+    const addSent = await owner2.detailsAdd(o2s.flow.id, { phone: lockedPhone });
+    const addCode = await nextCode(env, lockedPhone, mark2);
+    const addTry = await owner2.detailsVerify(o2s.flow.id, addCode ?? "");
+    results.check("a number locked by 10 wrong sign-in codes: adding it on a details page, even with its right code → 423 verification_locked", addSent.status === 200 && addTry.status === 423 && errorCode(addTry) === "verification_locked", `${brief(addSent)} / ${brief(addTry)}`);
 
     // An existing Carbon's address locked by someone guessing: its history says so.
     const owner = new Browserish(env, randomIp());

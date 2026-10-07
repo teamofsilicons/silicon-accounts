@@ -373,6 +373,32 @@ async fn deletion_reserves_id_frees_contacts_and_revokes_everything() {
             .expect("q")
             .is_some()
     );
+    // The hold is not "for its previous owner": a deleted account can never take it back.
+    let seen = accounts::id_availability_for(&mut conn, "c:leaving", None, None)
+        .await
+        .expect("availability");
+    assert_eq!(
+        (seen.available, seen.reason, seen.reclaimable),
+        (false, Some("reserved"), false)
+    );
+    assert!(
+        seen.message
+            .starts_with("c:leaving belonged to an account that was deleted; it is held until ")
+            && seen.message.ends_with(" and can be taken after that."),
+        "{}",
+        seen.message
+    );
+    let other = ctx.carbon().await;
+    let err = accounts::change_id(&mut conn, &other.uuid, &carbon_id("leaving"), &other.uuid)
+        .await
+        .expect_err("held");
+    assert_eq!(err.code, "id_reserved");
+    assert!(
+        err.message
+            .contains("belonged to an account that was deleted"),
+        "{}",
+        err.message
+    );
     let live_sessions: i64 = sqlx::query_scalar(
         "select count(*) from browser_sessions where account_uuid = $1 and revoked_at is null",
     )

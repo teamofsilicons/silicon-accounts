@@ -45,8 +45,12 @@
 
 .neutral { --badge-color: var(--text-secondary); --badge-foreground: var(--text-secondary); --badge-background: var(--surface-muted); --badge-border: var(--border); }
 .success { --badge-color: var(--success); --badge-foreground: var(--success); --badge-background: color-mix(in oklab, var(--success) 10%, var(--surface)); --badge-border: color-mix(in oklab, var(--success) 25%, var(--border)); }
-.info { --badge-color: var(--accent); --badge-foreground: var(--accent-strong); --badge-background: var(--accent-subtle); --badge-border: color-mix(in oklab, var(--accent) 24%, var(--border)); }
-.warning { --badge-color: var(--warning); --badge-foreground: var(--warning); --badge-background: color-mix(in oklab, var(--warning) 11%, var(--surface)); --badge-border: color-mix(in oklab, var(--warning) 27%, var(--border)); }
+/* Silicon Accounts: every tone's text clears 4.5:1 on its own tint at 11 px. The tints are opaque mixes with --surface, so
+   a badge reads the same on a raised drawer or a muted row (the info tint was the translucent --accent-subtle: 4.34:1 on
+   a dark drawer); the warning tint is lighter (11 % gave 4.47:1 in light). Measured: info 6.6:1 light, 5.2:1 dark;
+   warning 4.7:1 light, 5.6:1 dark. */
+.info { --badge-color: var(--accent); --badge-foreground: var(--accent-strong); --badge-background: color-mix(in oklab, var(--accent) 14%, var(--surface)); --badge-border: color-mix(in oklab, var(--accent) 24%, var(--border)); }
+.warning { --badge-color: var(--warning); --badge-foreground: var(--warning); --badge-background: color-mix(in oklab, var(--warning) 8%, var(--surface)); --badge-border: color-mix(in oklab, var(--warning) 27%, var(--border)); }
 .danger { --badge-color: var(--danger); --badge-foreground: var(--danger); --badge-background: color-mix(in oklab, var(--danger) 10%, var(--surface)); --badge-border: color-mix(in oklab, var(--danger) 26%, var(--border)); }
 
 @media (prefers-reduced-motion: reduce) {

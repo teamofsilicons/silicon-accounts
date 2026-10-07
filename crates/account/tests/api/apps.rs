@@ -63,17 +63,23 @@ async fn lists_the_apps_signed_into() {
     memberships::remove_access(&mut conn, &removed, &carbon.uuid, &carbon.uuid)
         .await
         .expect("remove");
-    // Signing in to the account site itself is not "an app you signed into".
-    memberships::upsert_signin(
-        &mut conn,
+    // Signing in to the account site or the developer platform is not "an app you signed into"
+    // (neither records a membership; one left behind is still not listed).
+    for first_party in [
         accounts_core::FIRST_PARTY_APP_ID,
-        &carbon.uuid,
-        MembershipSource::Signin,
-        &[Scope::Profile],
-        GrantMode::Replace,
-    )
-    .await
-    .expect("first-party membership");
+        accounts_core::DEVELOPER_APP_ID,
+    ] {
+        memberships::upsert_signin(
+            &mut conn,
+            first_party,
+            &carbon.uuid,
+            MembershipSource::Signin,
+            &[Scope::Profile],
+            GrantMode::Replace,
+        )
+        .await
+        .expect("first-party membership");
+    }
     drop(conn);
     ctx.exec(&format!(
         "update memberships set last_signed_in_at = now() - interval '1 day' where app_id = '{removed}'"
@@ -86,6 +92,7 @@ async fn lists_the_apps_signed_into() {
     let ids = app_ids(&r.json);
     assert_eq!(ids.len(), 3, "{}", r.json);
     assert!(!ids.contains(&accounts_core::FIRST_PARTY_APP_ID.to_string()));
+    assert!(!ids.contains(&accounts_core::DEVELOPER_APP_ID.to_string()));
     let item = |app: &str| {
         r.json["items"]
             .as_array()
@@ -275,4 +282,87 @@ async fn removing_access_errors() {
     assert_error(&r, 400, "first_party_app");
     let r = call(&ctx, Req::delete("/v1/me/apps/never-used")).await;
     assert_error(&r, 401, "unauthenticated");
+}
+
+/// The developer platform (developer.teamofsilicons.com) is first-party like Silicon Accounts
+/// itself: while the Carbon is signed in to it, removing it as an app is refused and points at
+/// the session to sign out. It once answered 404 "has never signed into an app with the app_id
+/// 'developer'", which was false.
+#[tokio::test]
+async fn removing_the_developer_platform_is_refused_like_silicon_accounts() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let cookie = ctx.browser_session(&carbon).await;
+    let developer = ctx
+        .tokens_for(&carbon, accounts_core::DEVELOPER_APP_ID, &[Scope::Profile])
+        .await;
+
+    let r = call(
+        &ctx,
+        Req::delete("/v1/me/apps/developer").session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_error(&r, 400, "first_party_app");
+    let message = r.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        message.contains("developer.teamofsilicons.com") && message.contains("Silicon Accounts"),
+        "{}",
+        r.json
+    );
+    assert!(
+        !message.contains("never signed into"),
+        "the Carbon is signed in to it: {}",
+        r.json
+    );
+    assert!(
+        r.json["error"]["hint"].as_str().is_some_and(
+            |h| h.contains("DELETE /v1/me/sessions/{id}") && h.contains("GET /v1/me/sessions")
+        ),
+        "{}",
+        r.json
+    );
+    assert_eq!(r.json["error"]["details"]["app_id"], "developer");
+    // Silicon Accounts itself names itself, not the developer platform.
+    let r = call(
+        &ctx,
+        Req::delete("/v1/me/apps/accounts").session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_error(&r, 400, "first_party_app");
+    assert!(
+        !r.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("developer"),
+        "{}",
+        r.json
+    );
+
+    // Nothing was touched: the developer site's sign-in is live, and still listed as a session.
+    let live: bool = sqlx::query_scalar(
+        "select revoked_at is null from token_families where account_uuid = $1 and app_id = 'developer'",
+    )
+    .bind(&carbon.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("developer family");
+    assert!(live && !developer.refresh_token.is_empty());
+    let sessions = call(
+        &ctx,
+        Req::get("/v1/me/sessions").session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert!(
+        sessions.json["items"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|s| s["kind"] == "developer")),
+        "{}",
+        sessions.json
+    );
+    assert!(
+        event_types(&ctx, accounts_core::DEVELOPER_APP_ID)
+            .await
+            .is_empty(),
+        "no webhook event for a first-party app"
+    );
 }

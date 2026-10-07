@@ -4,12 +4,12 @@
  * (time travel), and the ones that end with an app's access. ATA proofs are about apps, never listed here.
  */
 import type { Journey } from "../../context";
-import { postJson, shot, sleep, sql } from "../../lib";
-import { call, codeOf, confirmMorph, newCarbon, requestSent, signIntoApp, until } from "./_helpers";
+import { api, postJson, shot, sleep, sql } from "../../lib";
+import { appAuth, call, codeOf, confirmMorph, newCarbon, requestSent, signIntoApp, until } from "./_helpers";
 
 interface Issued {
   status?: number;
-  body?: { proof_id?: string; proof_token?: string; expires_at?: string; user?: { uuid?: string; membership_id?: string } };
+  body?: { proof_id?: string; proof_token?: string; proof_refresh_token?: string; expires_at?: string; user?: { uuid?: string; membership_id?: string } };
 }
 
 interface Verification {
@@ -48,8 +48,9 @@ const proofs: Journey = {
     const ids = { read: read.body?.proof_id ?? "", write: write.body?.proof_id ?? "", message: message.body?.proof_id ?? "" };
     const tokens = { read: read.body?.proof_token ?? "", write: write.body?.proof_token ?? "", message: message.body?.proof_token ?? "" };
     results.check("Briefcase got three OBO proofs for this Carbon (two for Commit, one for DM)", read.status === 201 && write.status === 201 && message.status === 201 && read.body?.user?.uuid === uuid, JSON.stringify(read).slice(0, 200));
-    const ata = (await postJson<Issued>(`${env.apps}/commit/actions/issue-ata`, { audiences: ["remind"] })).body;
-    results.check("setup: Commit also holds an ATA proof (app to app, no Carbon in it)", ata.status === 201, JSON.stringify(ata).slice(0, 160));
+    // An ATA proof is for exactly one app (06-v2 §7): Commit's for Remind.
+    const ata = (await postJson<Issued>(`${env.apps}/commit/actions/issue-ata`, { receiving_app: "remind" })).body;
+    results.check("setup: Commit also holds an ATA proof for Remind (app to app, no Carbon in it)", ata.status === 201 && !!ata.body?.proof_token, JSON.stringify(ata).slice(0, 160));
 
     const v1 = await verify("commit", tokens.read);
     results.check("Commit verifies the read proof: valid, Briefcase → Commit, for this Carbon, its scopes", v1.valid === true && v1.issuing_app?.app_id === "briefcase" && v1.receiving_app?.app_id === "commit" && v1.user?.uuid === uuid && JSON.stringify(v1.scopes) === '["files.read"]', JSON.stringify(v1).slice(0, 240));
@@ -84,6 +85,13 @@ const proofs: Journey = {
     results.check("the write proof is still valid", (await verify("commit", tokens.write)).valid === true);
     const revoked = (await mine()).find(item => item.proof_id === ids.read);
     results.check("the proof is revoked by the account", revoked?.status === "revoked" && revoked.revoke_reason === "revoked_by_account", JSON.stringify(revoked && { status: revoked.status, reason: revoked.revoke_reason }));
+    // Proofs follow the sign-in token logic: Briefcase holds each proof's refresh token. The revoked one's no longer
+    // gets a new proof token; the write proof's still does, and the new token verifies.
+    const refreshProof = (token: string) => api<{ proof_token?: string; error?: { code?: string } }>(ctx, "/v1/proofs/refresh", { method: "POST", json: { proof_refresh_token: token }, headers: { authorization: appAuth("briefcase") } });
+    const deadRefresh = await refreshProof(read.body?.proof_refresh_token ?? "");
+    const liveRefresh = await refreshProof(write.body?.proof_refresh_token ?? "");
+    const fresh = liveRefresh.body.proof_token ? await verify("commit", liveRefresh.body.proof_token) : {};
+    results.check("Briefcase can no longer refresh the revoked proof; the write proof refreshes, and its new token verifies", deadRefresh.status >= 400 && deadRefresh.status < 500 && !!codeOf(deadRefresh.body) && liveRefresh.status === 200 && fresh.valid === true, `revoked: ${deadRefresh.status} ${codeOf(deadRefresh.body)}; write: ${liveRefresh.status} → valid ${String(fresh.valid)}`);
     await until(async () => page.getByRole("button", { name: "Ended (1)" }).count(), n => n === 1, 8_000);
     await page.getByRole("button", { name: "Ended (1)" }).click();
     const ended = page.getByRole("list", { name: "Ended proofs" });

@@ -10,7 +10,7 @@ import { Browserish, brief, drive, errorCode, errorDetails, exchangeCode, redire
 
 const redirects: Journey = {
   name: "auth-flows-redirect-uri",
-  title: "an unregistered redirect_uri or unknown app → an error page that never redirects (nor links) there; exact matching (loopback ports aside); later mistakes go back to the app; the code is bound to its redirect_uri",
+  title: "an unregistered redirect_uri or unknown app → an error page that never redirects (nor links) there; exact matching (loopback ports aside); the first-party apps' own rules (accounts: the site; developer: exactly its /auth/callback); later mistakes go back to the app; the code is bound to its redirect_uri",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const t = tag();
@@ -109,6 +109,23 @@ const redirects: Journey = {
       const reply = await attempt(uri, {}, "accounts");
       results.check(`accounts (first-party): ${why} → ${allowed ? "201" : "400"}`, allowed ? reply.status === 201 : reply.status === 400 && errorCode(reply) === "redirect_uri_not_registered", brief(reply));
     }
+
+    // The first-party app developer (developer.teamofsilicons.com): exactly {ACCOUNTS_DEVELOPER_URL}/auth/callback.
+    const devCallback = `${env.developer}/auth/callback`;
+    for (const [uri, allowed, why] of [
+      [devCallback, true, "the developer site's /auth/callback"],
+      [`  ${devCallback} `, true, "the same padded with spaces"],
+      [`${devCallback}?next=/apps`, false, "its callback with a query"],
+      [`${env.developer}/auth/callback/`, false, "a trailing slash"],
+      [`${env.developer}/`, false, "another path on the developer site"],
+      [`${env.site}/sign-in`, false, "the account site's /sign-in (the accounts app's, not developer's)"],
+      [devCallback.replace("localhost", "127.0.0.1"), false, "127.0.0.1 instead of localhost"],
+    ] as const) {
+      const reply = await attempt(uri, {}, "developer");
+      results.check(`developer (first-party): ${why} → ${allowed ? "201" : "400 redirect_uri_not_registered"}`, allowed ? reply.status === 201 : reply.status === 400 && errorCode(reply) === "redirect_uri_not_registered", brief(reply));
+    }
+    const devFlow = await attempt(devCallback, {}, "developer");
+    results.check("developer's flow is first-party, with the email and phone methods", devFlow.body.flow?.app.first_party === true && ["email", "phone"].every(m => devFlow.body.flow?.methods.includes(m)), JSON.stringify({ fp: devFlow.body.flow?.app.first_party, methods: devFlow.body.flow?.methods }));
 
     // The code is bound to the redirect_uri of its flow: another registered (loopback-port) variant is refused, and burns it.
     const c = new Browserish(env, ctx.ip);

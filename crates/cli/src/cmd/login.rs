@@ -108,7 +108,10 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
         );
     }
 
-    // Already signed in as the requested account: reuse the session.
+    // Already signed in as the requested account: reuse the session, but only once the service
+    // confirmed it is still alive. A session revoked elsewhere (`accounts sessions revoke`, an STK
+    // rotation, a sign-out on another machine) is not "signed in": it falls through to a real
+    // sign-in with the credentials given (or the browser or code flow).
     let explicit = silicon.is_some() || code_mode;
     if !args.force
         && let Some(current) = ctx.current_session()?
@@ -118,21 +121,8 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
             None => !explicit,
         };
         if same {
-            match ctx.session().await {
-                Ok(session) => {
-                    if let Some(app_id) = &args.app {
-                        return short_lived_token(ctx, &session, app_id).await;
-                    }
-                    let text = format!(
-                        "Already signed in as {} ({}). Use `accounts login --force` to sign in again, or `accounts logout` first.",
-                        session.who(),
-                        session.kind.title()
-                    );
-                    return Ok(Outcome::new(status_json(&session, false), text).next(
-                        "accounts login status",
-                        "check the session against the service",
-                    ));
-                }
+            match reuse_session(ctx, args.app.as_deref()).await {
+                Ok(outcome) => return Ok(outcome),
                 Err(err) if err.code == "session_ended" => {
                     ctx.out
                         .notice(&format!("{} Signing in again.", err.message));
@@ -183,6 +173,50 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
     }
     let outcome = Outcome::new(status_json(&session, true), signed_in_text(&session));
     Ok(next_after_login(outcome, session.kind))
+}
+
+/// The stored session, checked with the service: with `app`, the short-lived token minted with it
+/// (that call is the check); otherwise `GET /v1/me`. Both refresh an expired access token once.
+/// Fails with `session_ended` when the session was revoked or its refresh was refused (the stored
+/// session is then deleted), so the caller signs in again instead of reporting a dead session.
+async fn reuse_session(ctx: &Ctx, app: Option<&str>) -> CliResult<Outcome> {
+    if let Some(app_id) = app {
+        let session = ctx.session().await?;
+        return short_lived_token(ctx, &session, app_id).await;
+    }
+    let me = match crate::with_session!(ctx, |s| s.me()) {
+        Ok(me) => me,
+        // A 401 the refresh did not get past (e.g. a refresh that raced another process) is
+        // still a session that does not work.
+        Err(err) if err.status == Some(401) => {
+            let stored = ctx.load_session()?;
+            return Err(CliError::new(
+                crate::error::EXIT_AUTH,
+                "session_ended",
+                format!(
+                    "Your session as {} was refused: {}",
+                    stored.as_ref().map_or("this account", StoredSession::who),
+                    err.message
+                ),
+                "Sign in again with `accounts login`.",
+            ));
+        }
+        Err(err) => return Err(err),
+    };
+    let mut session = ctx.session().await?;
+    if session.account.id != me.id || session.account.display_name != me.display_name {
+        session.account.id.clone_from(&me.id);
+        session.account.display_name.clone_from(&me.display_name);
+        ctx.save_session(&session)?;
+    }
+    let text = format!(
+        "Already signed in as {} ({}); the session is active. Use `accounts login --force` to sign in again, or `accounts logout` first.",
+        session.who(),
+        session.kind.title()
+    );
+    let mut json = status_json(&session, true);
+    json["reused"] = json!(true);
+    Ok(next_after_login(Outcome::new(json, text), session.kind))
 }
 
 /// Best-effort revocation of the session being replaced.

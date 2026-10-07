@@ -200,9 +200,12 @@ pub(crate) fn describe_user_agent(ua: &str) -> Option<String> {
     })
 }
 
+/// How a sign-in to the developer platform is named, in the session list and in history.
+pub(crate) const DEVELOPER_SITE: &str = "Silicon Developer (developer.teamofsilicons.com)";
+
 fn family_label(kind: &str, origin: Option<&str>) -> &'static str {
     if kind == "developer" {
-        return "Silicon Developer (developer.teamofsilicons.com)";
+        return DEVELOPER_SITE;
     }
     match origin {
         Some("device") => "accounts CLI (approved in the browser)",

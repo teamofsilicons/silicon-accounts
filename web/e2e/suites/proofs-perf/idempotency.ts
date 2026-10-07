@@ -1,8 +1,9 @@
 /**
- * Idempotent issuance: an Idempotency-Key makes a retried POST /v1/proofs/obo|ata replay the first proof (same id,
- * same tokens) instead of issuing another, even when the retries race; the stored answer is sealed (no token in the
- * database); a different body is refused; failures are not stored; keys belong to one app and endpoint; the replay
- * window of an answer that carries tokens is 10 minutes.
+ * Idempotent issuance (UNDERSTANDING.md: "For externally initiated changes include idempotency keys, so retrying
+ * something never does it twice"): an Idempotency-Key makes a retried POST /v1/proofs/obo|ata replay the first proof
+ * (same id, same tokens) instead of issuing another, even when the retries race; the stored answer is sealed (no token
+ * in the database); a different body is refused; failures are not stored; keys belong to one app and endpoint; the
+ * replay window of an answer that carries tokens is 10 minutes.
  */
 import { randomUUID } from "node:crypto";
 import type { Journey } from "../../context";
@@ -11,7 +12,7 @@ import { appTokens, errorCode, issueAtaFor, issueObo, row, short, signInToApp, v
 
 export const journey: Journey = {
   name: "proofs-perf-idempotency",
-  title: "OBO and ATA issuance with an Idempotency-Key: a retry replays the same proof (Idempotent-Replayed: true), ten racing retries issue one proof, the stored answer is sealed, another body → 409, failures are not stored, keys are per app and endpoint, the replay window is 10 minutes",
+  title: "OBO and ATA issuance with an Idempotency-Key: a retry replays the same proof (Idempotent-Replayed: true), ten racing retries issue one proof, the stored answer is sealed, another body → 409, failures are not stored, keys are per app and endpoint (the ATA page's too), the replay window is 10 minutes",
   async run(ctx) {
     const { env, results } = ctx;
     const carbon = await signInToApp(ctx, "dm");
@@ -70,11 +71,22 @@ export const journey: Journey = {
     const twice = await viaApp();
     results.check("dm's own retry through the fake app with one key gets the same proof", once.status === 201 && twice.status === 201 && once.body.proof_id === twice.body.proof_id && once.body.proof_token === twice.body.proof_token, `${once.status} ${twice.status}`);
 
-    // ATA too (a proof for one app: UNDERSTANDING.md allows no other kind).
+    // ATA too (a proof for one app: UNDERSTANDING.md allows no other kind), on POST /v1/proofs/ata and the ATA page.
     const ataKey = randomUUID();
     const ata1 = await issueAtaFor(ctx, "commit", "remind", { scopes: ["pp.ata-idem"] }, { key: ataKey });
     const ata2 = await issueAtaFor(ctx, "commit", "remind", { scopes: ["pp.ata-idem"] }, { key: ataKey });
     results.check("ATA: the retry replays the same proof", ata1.status === 201 && ata2.status === 201 && ata2.headers.get("idempotent-replayed") === "true" && ata1.body.proof_id === ata2.body.proof_id && ata1.body.proof_token === ata2.body.proof_token, `${ata1.status} ${ata2.status} ${ata2.headers.get("idempotent-replayed")}`);
+    const ataOtherApp = await issueAtaFor(ctx, "commit", "waveform", { scopes: ["pp.ata-idem"] }, { key: ataKey });
+    results.check("ATA: the same key for another receiving app → 409 idempotency_key_reused (a second app is a second proof, with a key of its own)", ataOtherApp.status === 409 && errorCode(ataOtherApp.body) === "idempotency_key_reused", `${ataOtherApp.status} ${short(ataOtherApp.body.error)}`);
+    const pageKey = randomUUID();
+    const page1 = await issueAtaFor(ctx, "commit", "waveform", {}, { key: pageKey, path: "/v1/apps/commit/proofs/ata" });
+    const page2 = await issueAtaFor(ctx, "commit", "waveform", {}, { key: pageKey, path: "/v1/apps/commit/proofs/ata" });
+    const pageElsewhere = await issueAtaFor(ctx, "commit", "waveform", {}, { key: pageKey });
+    results.check(
+      "the ATA page's endpoint replays a retry too, and the same key on POST /v1/proofs/ata is another endpoint's (its own new proof)",
+      page1.status === 201 && page2.status === 201 && page2.headers.get("idempotent-replayed") === "true" && page2.body.proof_id === page1.body.proof_id && pageElsewhere.status === 201 && pageElsewhere.headers.get("idempotent-replayed") === null && pageElsewhere.body.proof_id !== page1.body.proof_id,
+      `${page1.status} ${page2.status}/${page2.headers.get("idempotent-replayed")} ${pageElsewhere.status}/${pageElsewhere.headers.get("idempotent-replayed")}`,
+    );
 
     // Past the 10-minute window (time travel on the stored key) the same key issues a new proof.
     await sql(env, `update idempotency_keys set expires_at = now() - interval '1 second' where key = '${key}' and scope = 'app:dm POST /v1/proofs/obo'`);

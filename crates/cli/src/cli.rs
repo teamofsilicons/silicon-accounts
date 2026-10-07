@@ -158,9 +158,11 @@ pub enum Commands {
     #[command(after_long_help = SILICON_EXAMPLES)]
     Silicon(SiliconArgs),
 
-    /// A Silicon's own webhook: get notified about your account (custodian decisions, STK rotations, changes).
+    /// A Silicon's own webhook: get notified about your account (custodian decisions, STK rotations, changes), and see or replay its deliveries.
+    ///
+    /// Every event has an event_id (dedupe on it) and is signed with your webhook's secret. Deliveries are retried for 72 hours; failed ones can be replayed with the same event id, sent to your current URL and signed with your current secret. Your custodian can do the same with `accounts silicon webhook`.
     #[command(
-        after_long_help = "Examples:\n  accounts webhook set https://scout.example/hooks/accounts\n  accounts webhook test\n  accounts webhook remove"
+        after_long_help = "Examples:\n  accounts webhook set https://scout.example/hooks/accounts\n  accounts webhook test\n  accounts webhook deliveries --status failed\n  accounts webhook delivery 0192f0c2-…\n  accounts webhook replay --failed\n  accounts webhook replay 0192f0c2-… 0192f0c3-…\n  accounts webhook remove"
     )]
     Webhook(OwnWebhookArgs),
 
@@ -210,7 +212,9 @@ pub enum Commands {
     )]
     Docs(DocsArgs),
 
-    /// Help for a command (`accounts help silicon create`) or a docs topic (`accounts help proofs`).
+    /// Help for a command (`accounts help silicon create`) or a docs topic (`accounts help imports`).
+    ///
+    /// A command's help wins when a docs topic has the same name (`accounts help proofs` is the `accounts proofs` command); read that guide with `accounts docs proofs`.
     Help(HelpArgs),
 
     /// Delete your account permanently (requires --confirm <your id>).
@@ -245,6 +249,7 @@ const SILICON_EXAMPLES: &str = "Examples:
   Custodian tasks:
     accounts silicon list
     accounts silicon rotate-stk si:scout
+    accounts silicon webhook deliveries si:scout --status failed
     accounts silicon transfer si:scout --to c:shubham
     accounts silicon delete si:scout --confirm si:scout";
 
@@ -706,7 +711,12 @@ pub enum SiliconCommand {
         stk_stdin: bool,
     },
 
-    /// Set or remove one of your Silicons' webhook endpoint.
+    /// One of your Silicons' webhook: set or remove the endpoint, see and replay its deliveries.
+    ///
+    /// The same webhook the Silicon manages itself with `accounts webhook`. Failed deliveries can be replayed with the same event id, sent to the current URL and signed with the current secret.
+    #[command(
+        after_long_help = "Examples:\n  accounts silicon webhook set si:scout https://scout.example/hooks/accounts\n  accounts silicon webhook deliveries si:scout --status failed\n  accounts silicon webhook replay si:scout --failed\n  accounts silicon webhook remove si:scout"
+    )]
     Webhook(SiliconWebhookArgs),
 
     /// Transfer a Silicon to another Carbon (they must accept within 14 days).
@@ -803,6 +813,66 @@ pub enum SiliconWebhookCommand {
         /// si:id or uuid.
         silicon: String,
     },
+    /// List the deliveries of the Silicon's webhook, newest first.
+    #[command(
+        after_long_help = "Examples:\n  accounts silicon webhook deliveries si:scout\n  accounts silicon webhook deliveries si:scout --status failed --json"
+    )]
+    Deliveries {
+        /// si:id or uuid.
+        silicon: String,
+        #[command(flatten)]
+        filter: DeliveriesFilter,
+    },
+    /// Show one delivery of the Silicon's webhook with its attempts and the exact payload.
+    Delivery {
+        /// si:id or uuid.
+        silicon: String,
+        /// The delivery id.
+        id: String,
+    },
+    /// Re-queue deliveries of the Silicon's webhook (same event id, its current URL and secret).
+    ///
+    /// Name the deliveries by id, or replay every failed one with --failed (at most 100 per call; run it again while `remaining` is above 0). Test pings are never replayed: send a new one.
+    #[command(
+        after_long_help = "Examples:\n  accounts silicon webhook replay si:scout --failed\n  accounts silicon webhook replay si:scout --failed --since 2026-10-01T00:00:00Z\n  accounts silicon webhook replay si:scout 0192f0c2-… 0192f0c3-…"
+    )]
+    Replay {
+        /// si:id or uuid.
+        silicon: String,
+        #[command(flatten)]
+        selection: ReplaySelection,
+    },
+}
+
+/// `--status`, `--limit` and `--cursor` of a delivery list.
+#[derive(Debug, Args)]
+pub struct DeliveriesFilter {
+    /// Only deliveries with this status: pending, delivered or failed.
+    #[arg(long, value_name = "STATUS")]
+    pub status: Option<String>,
+    /// Rows per page (max 200).
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..=200))]
+    pub limit: Option<u32>,
+    /// Continue from next_cursor.
+    #[arg(long)]
+    pub cursor: Option<String>,
+}
+
+/// Which deliveries a replay re-queues: ids, or every failed one.
+#[derive(Debug, Args)]
+pub struct ReplaySelection {
+    /// Delivery ids (max 100).
+    #[arg(required_unless_present = "failed")]
+    pub ids: Vec<String>,
+    /// Replay every failed delivery instead (the oldest first, at most 100 per call).
+    #[arg(long, conflicts_with = "ids")]
+    pub failed: bool,
+    /// With --failed: only deliveries created since this RFC 3339 time.
+    #[arg(long, value_name = "TIME", requires = "failed")]
+    pub since: Option<String>,
+    /// Idempotency key; reuse it when retrying so the deliveries are re-queued once [default: random].
+    #[arg(long, value_name = "KEY")]
+    pub idempotency_key: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -853,6 +923,29 @@ pub enum OwnWebhookCommand {
     Remove,
     /// Send a test `ping` delivery.
     Test,
+    /// List your webhook's deliveries, newest first (failed ones can be replayed).
+    #[command(
+        after_long_help = "Examples:\n  accounts webhook deliveries\n  accounts webhook deliveries --status failed --json"
+    )]
+    Deliveries {
+        #[command(flatten)]
+        filter: DeliveriesFilter,
+    },
+    /// Show one delivery with its attempts and the exact payload that was signed.
+    Delivery {
+        /// The delivery id.
+        id: String,
+    },
+    /// Re-queue deliveries (same event id, sent to your current URL and signed with your current secret).
+    ///
+    /// Name the deliveries by id, or replay every failed one with --failed (at most 100 per call; run it again while `remaining` is above 0). Test pings are never replayed: send a new one with `accounts webhook test`.
+    #[command(
+        after_long_help = "Examples:\n  accounts webhook replay --failed\n  accounts webhook replay --failed --since 2026-10-01T00:00:00Z\n  accounts webhook replay 0192f0c2-… 0192f0c3-…"
+    )]
+    Replay {
+        #[command(flatten)]
+        selection: ReplaySelection,
+    },
 }
 
 #[derive(Debug, Args)]
@@ -1006,7 +1099,7 @@ pub struct UsersArgs {
     /// Search id, display name, email, phone and external id.
     #[arg(long, value_name = "TEXT")]
     pub q: Option<String>,
-    /// active, access_removed or imported.
+    /// active, access_removed, imported or deleted.
     #[arg(long, value_name = "STATUS")]
     pub status: Option<String>,
     /// carbon or silicon.
@@ -1082,9 +1175,15 @@ pub enum ImportCommand {
     Rows {
         /// The job id.
         job: String,
-        /// Only rows with this outcome: created, matched, updated, skipped, error.
+        /// Only rows with this outcome: created, matched, updated, skipped, error or pending.
         #[arg(long, value_name = "OUTCOME")]
         outcome: Option<String>,
+        /// Only rows with a message of this level: error, warning or info.
+        #[arg(long, value_name = "LEVEL")]
+        level: Option<String>,
+        /// Only rows with a message of this code, e.g. id_conflict or missing_identifier.
+        #[arg(long, value_name = "CODE")]
+        code: Option<String>,
         /// Rows per page (max 200).
         #[arg(long, value_name = "N")]
         limit: Option<u32>,
@@ -1388,6 +1487,6 @@ pub struct DocsArgs {
 
 #[derive(Debug, Args)]
 pub struct HelpArgs {
-    /// A command path (silicon create) or a docs topic (proofs).
+    /// A command path (silicon create) or a docs topic (imports); a command wins over a topic of the same name.
     pub topic: Vec<String>,
 }

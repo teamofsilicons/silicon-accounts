@@ -105,6 +105,16 @@
   .format:hover { background: color-mix(in oklab, var(--foreground) 5%, transparent); }
   .add:hover { border-color: var(--foreground); color: var(--foreground); }
 }
+/* Silicon Accounts: keyboard focus in fills and edges (Arc drew none; rings are off site-wide). The trigger's edge takes
+   the text colour, as fields do; the small buttons take their hover look; the thumbs grow as when dragged; a saved colour
+   takes an accent edge. */
+.trigger:focus-visible { --sq-stroke: var(--foreground); --sq-fill: color-mix(in oklab, var(--foreground) 4%, var(--picker-fill)); }
+.iconButton:focus-visible { background: var(--surface-muted); color: var(--foreground); }
+.format:focus-visible { background: color-mix(in oklab, var(--foreground) 8%, transparent); }
+.add:focus-visible { border-color: var(--foreground); color: var(--foreground); }
+.areaThumb:focus-visible, .sliderThumb:focus-visible { scale: 1.2; }
+.swatch:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.swatch[data-current]:focus-visible { box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 0 4px var(--picker-fill); }
 @media (max-width: 360px) { .against { display: none; } }
 @media (prefers-contrast: more) { .trigger, .panel, .field { --sq-stroke: var(--border-strong); } }
 @media (prefers-reduced-motion: reduce) { .areaThumb, .sliderThumb, .swatchChip, .iconButton, .add { transition: none; } }

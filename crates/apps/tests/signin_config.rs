@@ -299,10 +299,15 @@ async fn expected_version_guards_against_lost_updates() {
     assert_eq!(r.error_code(), Some("config_version_conflict"));
     assert_eq!(r.json["error"]["details"]["current_version"], 2);
     assert_eq!(r.json["error"]["details"]["expected_version"], 1);
-    assert!(
-        r.json["error"]["hint"]
-            .as_str()
-            .is_some_and(|h| h.contains("config_version"))
+    // The hint names the app's own endpoint, never a `{app_id}` placeholder.
+    assert_eq!(
+        r.json["error"]["hint"],
+        format!(
+            "GET /v1/apps/{} for the current config and config_version, re-apply your change, and send it again.",
+            a.app_id
+        ),
+        "{}",
+        r.json
     );
 }
 

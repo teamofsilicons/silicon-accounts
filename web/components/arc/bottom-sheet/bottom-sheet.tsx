@@ -7,6 +7,7 @@ import { AnimatePresence, animate, motion, useMotionValue, usePresence, useReduc
 import { X } from "lucide-react";
 import { ESCAPE_LAYER_ATTRIBUTE, layerEscape } from "../lib/escape";
 import { motionTokens } from "../lib/motion-tokens";
+import { useReturnFocus } from "../lib/return-focus";
 import styles from "./bottom-sheet.module.css";
 
 /**
@@ -104,6 +105,8 @@ function Sheet({ title, description, detents = [.45, .92], initialDetent = 0, on
   /** When the sheet last started entering or leaving, so a press that began while it was leaving never dismisses it once it is reopened. */
   const presenceChange = useRef({ present: isPresent, at: 0 });
   useLayoutEffect(() => { presenceChange.current = { present: isPresent, at: performance.now() }; }, [isPresent]);
+  // Focus starts on the sheet itself, and goes back to what opened it when it closes, trigger or not (lib/return-focus.ts).
+  const returnFocus = useReturnFocus(isPresent, event => { event.preventDefault(); sheetRef.current?.focus({ preventScroll: true }); });
 
   const offset = useCallback((stop: Stop) => {
     const full = height.get();
@@ -360,7 +363,7 @@ function Sheet({ title, description, detents = [.45, .92], initialDetent = 0, on
       // Escape inside belongs to an open list, calendar or question first (lib/escape.ts); the next one closes the sheet.
       {...{ [ESCAPE_LAYER_ATTRIBUTE]: "" }}
       onEscapeKeyDown={layerEscape()}
-      onOpenAutoFocus={event => { event.preventDefault(); sheetRef.current?.focus({ preventScroll: true }); }}
+      {...returnFocus}
       // Radix waits for the click before treating a press as outside. A press on the trigger while the sheet leaves reopens it first, so that press must not close it again.
       onPointerDownOutside={event => { const { present, at } = presenceChange.current; if (!present || event.detail.originalEvent.timeStamp < at) event.preventDefault(); }}
     >

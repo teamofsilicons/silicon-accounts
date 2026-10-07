@@ -2,9 +2,9 @@
 
 /**
  * Small hooks the hosted pages share: a ticking clock (one timer per interval, shared by every component that asks
- * for it), "has this page hydrated", and a timer-safe "later".
+ * for it), "has this page hydrated", the browser tab's title, and a timer-safe "later".
  */
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 interface Clock {
   value: number;
@@ -80,4 +80,21 @@ const readPointer = () => !!window.matchMedia?.("(pointer: fine)").matches;
 /** True on devices with a precise pointer, where focusing a field does not throw up a keyboard. */
 export function useFinePointer(): boolean {
   return useSyncExternalStore(subscribePointer, readPointer, serverSnapshot);
+}
+
+/**
+ * Keeps the browser tab's title at `title` while the component is mounted. A route's metadata title arrives after a
+ * client navigation (Next streams it in, after this page's effects ran): it would put the route's fixed title back, so
+ * whenever the head's title changes, this one is set again.
+ */
+export function useTabTitle(title: string): void {
+  useEffect(() => {
+    const apply = () => {
+      if (document.title !== title) document.title = title;
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [title]);
 }

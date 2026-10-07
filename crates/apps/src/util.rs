@@ -40,7 +40,10 @@ pub fn like_contains(q: &str) -> String {
     out
 }
 
-/// Parses an optional enum-like query value, naming the parameter and the accepted values.
+/// Parses an optional enum-like query value, naming the parameter and the accepted values
+/// (`expected`: the values joined with `", "`). The hint lists every accepted value, and names
+/// the one the caller most likely meant when the value is one of them in other case or
+/// spelling (`Pending`, `access-removed`) or the start of exactly one of them (`creat`).
 pub fn parse_choice<T>(
     param: &str,
     value: Option<&str>,
@@ -50,15 +53,37 @@ pub fn parse_choice<T>(
     match value.map(str::trim).filter(|v| !v.is_empty()) {
         None => Ok(None),
         Some(v) => parse(v).map(Some).ok_or_else(|| {
+            let all = format!("Set {param} to one of {expected}, or leave it out.");
             ApiError::bad_request(
                 "invalid_query",
                 format!("The query parameter '{param}' is '{v}', which is not one of {expected}."),
             )
-            .hint(format!(
-                "Use {param}={} (or leave it out).",
-                expected.split(", ").next().unwrap_or("")
-            ))
+            .hint(match closest_choice(v, expected) {
+                Some(meant) => format!("Did you mean {param}={meant}? {all}"),
+                None => all,
+            })
         }),
+    }
+}
+
+/// The accepted value `value` most likely means: the same in other case or with `-`/space for
+/// `_`, else the only one that starts with it.
+fn closest_choice<'a>(value: &str, expected: &'a str) -> Option<&'a str> {
+    let wanted: String = value
+        .chars()
+        .map(|c| match c {
+            '-' | ' ' => '_',
+            c => c.to_ascii_lowercase(),
+        })
+        .collect();
+    let choices = || expected.split(", ").filter(|c| !c.is_empty());
+    if let Some(same) = choices().find(|c| *c == wanted) {
+        return Some(same);
+    }
+    let mut starting = choices().filter(|c| c.starts_with(&wanted));
+    match (starting.next(), starting.next()) {
+        (Some(only), None) => Some(only),
+        _ => None,
     }
 }
 
@@ -111,6 +136,59 @@ mod tests {
     fn like_patterns_escape_wildcards() {
         assert_eq!(like_contains("ada"), "%ada%");
         assert_eq!(like_contains("50%_off\\"), "%50\\%\\_off\\\\%");
+    }
+
+    #[test]
+    fn choice_hints_list_every_value_and_name_the_likely_one() {
+        let parse = |s: &str| {
+            ["pending", "delivered", "failed", "access_removed"]
+                .contains(&s)
+                .then(|| s.to_string())
+        };
+        let expected = "pending, delivered, failed, access_removed";
+        assert_eq!(
+            parse_choice("status", Some(" failed "), parse, expected).expect("valid"),
+            Some("failed".to_string())
+        );
+        assert_eq!(
+            parse_choice("status", Some(""), parse, expected).expect("empty"),
+            None
+        );
+        let hint = |v: &str| {
+            parse_choice("status", Some(v), parse, expected)
+                .expect_err("invalid")
+                .hint
+                .unwrap_or_default()
+        };
+        // Nothing close: every value, never just the first one.
+        assert_eq!(
+            hint("done"),
+            "Set status to one of pending, delivered, failed, access_removed, or leave it out."
+        );
+        assert_eq!(
+            hint("Failed"),
+            "Did you mean status=failed? Set status to one of pending, delivered, failed, access_removed, or leave it out."
+        );
+        assert!(hint("access-removed").starts_with("Did you mean status=access_removed? "));
+        assert!(hint("deliv").starts_with("Did you mean status=delivered? "));
+        // A prefix of no value, or of several, names none.
+        assert!(hint("x").starts_with("Set status to one of "));
+        let e = parse_choice(
+            "outcome",
+            Some("e"),
+            |_| None::<()>,
+            "created, error, empty",
+        )
+        .expect_err("invalid");
+        assert_eq!(
+            e.hint.as_deref(),
+            Some("Set outcome to one of created, error, empty, or leave it out.")
+        );
+        assert_eq!(e.code, "invalid_query");
+        assert_eq!(
+            e.message,
+            "The query parameter 'outcome' is 'e', which is not one of created, error, empty."
+        );
     }
 
     #[test]

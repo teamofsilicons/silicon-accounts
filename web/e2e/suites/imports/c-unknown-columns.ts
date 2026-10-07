@@ -32,6 +32,8 @@ const VALUES = ["teal", "amber", "violet", "enterprise", "business", "2026-09-30
 export const journey: Journey = {
   name: "imports-unknown-columns",
   title: "unknown columns: 422 unknown_columns (CSV and JSON) listing them and the allowed columns, nothing imported; ignore_unknown_columns imports every row with a warning and never stores the ignored values",
+  // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     const crm = fakeApp("legacy-crm");

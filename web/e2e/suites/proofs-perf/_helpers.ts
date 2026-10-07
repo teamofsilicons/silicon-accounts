@@ -2,43 +2,27 @@
  * Helpers of the proofs-perf suite (OBO and ATA proofs end to end, their failure modes, and their latency).
  *
  * Kept in the suite (README: "keep it in the suite (_helpers.ts) and say so"): a Carbon signed into a fake app without
- * a browser (the hosted flow driven through the site's /v1, the fake app exchanging the code itself, so the fake app
- * server holds the account's tokens exactly as after a browser sign-in), calls made with an app's own credentials,
- * the exact "not valid" body, percentiles, and the server-side duration of a request from the stack's API log.
+ * a browser (the v2 hosted flow driven through the site's /v1: email code, sign-up, the app's details pages — a missing
+ * required email or phone added there with a code, optional details shared only when asked — and the review page; the
+ * fake app exchanging the code itself, so the fake app server holds the account's tokens exactly as after a browser
+ * sign-in), a sign-in to the first-party `developer` app with PKCE (a developer-platform token, aud=developer), calls
+ * made with an app's own credentials, the exact "not valid" body, percentiles, and the server-side duration of a request
+ * from the stack's API log.
  *
  * testkit/lib has similar helpers, but it imports with `.ts` extensions that the site's tsconfig refuses, so the walk
  * keeps its own small versions here.
  */
-import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { availableParallelism, loadavg } from "node:os";
-import { join, resolve } from "node:path";
-import type { BrowserContext } from "@playwright/test";
+import { join } from "node:path";
+import type { BrowserContext, Page } from "@playwright/test";
 import type { Ctx } from "../../context";
-import { E2E_DIR, api, codeFor, json, lastSeq, randomIp, sql, tag, type Env, type JsonAnswer } from "../../lib";
-
-const ROOT = resolve(E2E_DIR, "../..");
+import { REPO_ROOT, api, codeFor, fakeApp, json, lastSeq, randomIp, sleep, sql, tag, type Env, type JsonAnswer } from "../../lib";
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Apps                                                                                                                */
 /* ------------------------------------------------------------------------------------------------------------------ */
-
-interface FakeAppRecord {
-  app_id: string;
-  name: string;
-  secret: string;
-  owner_id?: string;
-}
-
-let fakeApps: FakeAppRecord[] | null = null;
-
-/** The fake apps the stack seeded (testkit/fake-apps.json): fixed app ids and secrets, as Silicon Apps delivers them. */
-export function fakeApp(appId: string): FakeAppRecord {
-  fakeApps ??= (JSON.parse(readFileSync(join(ROOT, "testkit/fake-apps.json"), "utf8")) as { apps: FakeAppRecord[] }).apps;
-  const app = fakeApps.find(candidate => candidate.app_id === appId);
-  if (!app) throw new Error(`testkit/fake-apps.json has no app "${appId}"`);
-  return app;
-}
 
 /** `Authorization: Basic base64(app_id:secret)` (client_secret_basic form-encodes both first, a no-op for these ids). */
 export function basicAuth(appId: string, secret = fakeApp(appId).secret): string {
@@ -63,7 +47,11 @@ export function asApp<T = Record<string, unknown>>(ctx: Ctx, appId: string, meth
   return api<T>(ctx, path, { method, headers, direct: options.direct, ...(body === undefined ? {} : { json: body }) });
 }
 
-/** What POST /v1/proofs/obo|ata|refresh answers. */
+export interface ApiErrorBody {
+  error: { code: string; message: string; hint?: string; details?: Record<string, unknown> };
+}
+
+/** What POST /v1/proofs/obo|ata|refresh answers (v2: `receiving_app` names the one app, OBO and ATA alike). */
 export interface IssuedProof {
   proof_id: string;
   kind: "obo" | "ata";
@@ -72,15 +60,10 @@ export interface IssuedProof {
   proof_refresh_token: string;
   refresh_expires_at: string;
   issuing_app: string;
-  receiving_app?: string;
-  receiving_apps?: string[];
+  receiving_app: string;
   user: { uuid: string; id: string | null; kind: string; membership_id: string } | null;
   scopes: string[];
   error?: ApiErrorBody["error"];
-}
-
-export interface ApiErrorBody {
-  error: { code: string; message: string; hint?: string; details?: Record<string, unknown> };
 }
 
 export interface Verification {
@@ -94,19 +77,25 @@ export interface Verification {
   scopes?: string[];
 }
 
+/** The keys of a valid verification (UNDERSTANDING.md: valid, expires_at, issuing app, receiving app, user for OBO). */
+export const VALID_KEYS = ["expires_at", "issuing_app", "kind", "proof_id", "receiving_app", "scopes", "user", "valid"];
+
+/** The keys of an issue or refresh answer. */
+export const ISSUED_KEYS = ["expires_at", "issuing_app", "kind", "proof_id", "proof_refresh_token", "proof_token", "receiving_app", "refresh_expires_at", "scopes", "user"];
+
 export const issueObo = (ctx: Ctx, appId: string, subjectToken: string, body: { receiving_app: string; scopes?: string[]; access_ttl_seconds?: number }, options: AppCallOptions = {}) =>
   asApp<IssuedProof>(ctx, appId, "POST", "/v1/proofs/obo", { subject_token: subjectToken, ...body }, { key: randomUUID(), ...options });
 
-export const issueAta = (ctx: Ctx, appId: string, body: { audiences: string[]; scopes?: string[]; access_ttl_seconds?: number }, options: AppCallOptions = {}) =>
-  asApp<IssuedProof>(ctx, appId, "POST", "/v1/proofs/ata", body, { key: randomUUID(), ...options });
+/** POST /v1/proofs/ata (or `path`, the ATA page's POST /v1/apps/{app_id}/proofs/ata) with any body: for refusals. */
+export const issueAtaRaw = (ctx: Ctx, appId: string, body: Record<string, unknown>, options: AppCallOptions & { path?: string } = {}) =>
+  asApp<IssuedProof>(ctx, appId, "POST", options.path ?? "/v1/proofs/ata", body, { key: randomUUID(), ...options });
 
 /**
- * An ATA proof for exactly one app, the only kind UNDERSTANDING.md allows ("An ATA proof is always for exactly one app;
- * a proof can't be made for several apps at once"). Sent as `audiences: [app]`, the body the API takes today; if the
- * API has moved to OBO's `receiving_app` and refuses `audiences` (422 naming either), sent again that way.
- * `path` is POST /v1/proofs/ata or the ATA page's POST /v1/apps/{app_id}/proofs/ata.
+ * An ATA proof for exactly one app (UNDERSTANDING.md: "An ATA proof is always for exactly one app; a proof can't be made
+ * for several apps at once"): `{"receiving_app": app}`. `path` is POST /v1/proofs/ata (default) or the ATA page's
+ * POST /v1/apps/{app_id}/proofs/ata; `as` calls with another app's credentials.
  */
-export async function issueAtaFor(
+export function issueAtaFor(
   ctx: Ctx,
   issuer: string,
   receiver: string,
@@ -114,16 +103,10 @@ export async function issueAtaFor(
   options: AppCallOptions & { path?: string; as?: string } = {},
 ): Promise<JsonAnswer<IssuedProof>> {
   const { path = "/v1/proofs/ata", as = issuer, ...call } = options;
-  // One key for both tries: a refused request is never stored, so the second try is the key's first use.
-  const key = call.key ?? randomUUID();
-  const first = await asApp<IssuedProof>(ctx, as, "POST", path, { audiences: [receiver], ...extra }, { ...call, key });
-  if (first.status === 422 && /receiving_app|unknown field[^"]*audiences/.test(JSON.stringify(first.body))) {
-    return asApp<IssuedProof>(ctx, as, "POST", path, { receiving_app: receiver, ...extra }, { ...call, key });
-  }
-  return first;
+  return asApp<IssuedProof>(ctx, as, "POST", path, { receiving_app: receiver, ...extra }, { key: randomUUID(), ...call });
 }
 
-/** The apps an issue answer (or a listing entry) names as its receivers: `receiving_apps`, `audiences` or `receiving_app`. */
+/** The apps an issue answer, a listing entry or a verification names as its receiver: `receiving_app` (a string, or {app_id}). */
 export function receiversOf(p: unknown): string[] {
   if (!p || typeof p !== "object") return [];
   const record = p as { receiving_apps?: unknown; audiences?: unknown; receiving_app?: unknown };
@@ -134,8 +117,11 @@ export function receiversOf(p: unknown): string[] {
   return named && typeof named === "object" && typeof named.app_id === "string" ? [named.app_id] : [];
 }
 
-/** True when an issue answer or listing entry names exactly `app` and no other app. */
-export const namesOnly = (p: unknown, app: string) => JSON.stringify(receiversOf(p)) === JSON.stringify([app]);
+/** True when an answer or listing entry names exactly `app` as `receiving_app` (a string) and carries no app list. */
+export const namesOnly = (p: unknown, app: string) => {
+  const record = (p ?? {}) as Record<string, unknown>;
+  return record.receiving_app === app && !("audiences" in record) && !("receiving_apps" in record);
+};
 
 export const verifyAs = (ctx: Ctx, appId: string, proofToken: string, options: AppCallOptions = {}) => asApp<Verification>(ctx, appId, "POST", "/v1/proofs/verify", { proof_token: proofToken }, options);
 
@@ -144,11 +130,11 @@ export const refreshAs = (ctx: Ctx, appId: string, refreshToken: string, extra: 
 
 export const revokeAs = (ctx: Ctx, appId: string, body: Record<string, unknown>, options: AppCallOptions = {}) => asApp<ApiErrorBody | null>(ctx, appId, "POST", "/v1/proofs/revoke", body, options);
 
-/** One item of GET /v1/apps/{app_id}/proofs. */
+/** One item of GET /v1/apps/{app_id}/proofs (v2: `receiving_app`, one app). */
 export interface AppProofItem {
   proof_id: string;
   kind: string;
-  audiences: string[];
+  receiving_app: string;
   user: { uuid: string; id: string | null; kind: string } | null;
   scopes: string[];
   status: string;
@@ -205,7 +191,7 @@ export const errorCode = (body: unknown): string | undefined => {
 
 export const short = (value: unknown, max = 300) => {
   const text = typeof value === "string" ? value : JSON.stringify(value);
-  return (text ?? String(value)).replace(/sapr?_[A-Za-z0-9_-]{20,}/g, token => `${token.slice(0, 9)}…`).slice(0, max);
+  return (text ?? String(value)).replace(/sapr?_[A-Za-z0-9_-]{20,}/g, token => `${token.slice(0, 9)}…`).replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_.-]+/g, jwt => `${jwt.slice(0, 12)}…`).slice(0, max);
 };
 
 /* ------------------------------------------------------------------------------------------------------------------ */
@@ -254,12 +240,36 @@ export class SiteSession {
   }
 }
 
-interface FlowView {
+/**
+ * Every request a page makes to a host other than this machine's (README: "Nothing a page loads should leave the
+ * machine"): call it before the page navigates; the getter lists them (resource type and address), each once.
+ */
+export function watchOutside(page: Page): () => string[] {
+  const seen = new Set<string>();
+  page.on("request", request => {
+    const url = request.url();
+    if (!/^https?:/i.test(url)) return;
+    const host = new URL(url).hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return;
+    seen.add(`${request.resourceType()} ${url}`);
+  });
+  return () => [...seen];
+}
+
+/** The parts of the v2 FlowView this suite reads. */
+export interface FlowView {
   id: string;
-  step: string;
+  step: "choose_method" | "verify_code" | "signup" | "details" | "review" | "complete" | "failed";
   signed_in_as: { uuid: string; id: string } | null;
   signup: { display_name: string; id: string; timezone: string; dob: string } | null;
-  requirements: { missing: string[] } | null;
+  details: {
+    index: number;
+    count: number;
+    id: string;
+    title: string | null;
+    fields: Array<{ field: string; mode: "required" | "optional"; missing: boolean; shared: boolean; previously_granted: boolean }>;
+  } | null;
+  review: { fields: Array<{ field: string; shared: boolean }> } | null;
   redirect_to: string | null;
   error: { code: string; message: string } | null;
 }
@@ -275,6 +285,9 @@ export interface AppSignIn {
   session: SiteSession;
   /** What the fake app received (AccountForApp) and its callback answer. */
   callback: Record<string, unknown>;
+  /** The details pages the flow showed (their ids and fields), and whether it showed a review page. */
+  pages: Array<{ id: string; fields: string[]; added: string[] }>;
+  review: boolean;
   ms: number;
 }
 
@@ -288,13 +301,14 @@ async function flowStep(session: SiteSession, path: string, body: unknown, what:
 }
 
 /**
- * Signs a Carbon into a fake app through the hosted flow without a browser: the fake app starts the sign-in (its state,
- * PKCE pair and session cookie), the flow runs through the site's /v1 (email code, sign-up with the prefill, the
- * requirements the app has — a phone for dm — and consent), and the fake app's callback exchanges the code, so the
- * fake app server holds the account's tokens (its /_state, /actions/*), just as after a sign-in in a browser.
- * A session already signed in to the site continues as that account.
+ * Signs a Carbon into a fake app through the v2 hosted flow without a browser: the fake app starts the sign-in (its
+ * state, PKCE pair and session cookie), the flow runs through the site's /v1 — an email code (or "Continue as" for a
+ * session already signed in), sign-up with the prefill, then the app's details pages: a required email or phone the
+ * account lacks is added there with a code (dm requires a phone), the optional details in `share` are ticked (none by
+ * default: optional details stay unticked), and a review page is approved — and the fake app's callback exchanges the
+ * code, so the fake app server holds the account's tokens (its /_state, /actions/*), just as after a browser sign-in.
  */
-export async function signInToApp(ctx: Ctx, appId: string, options: { email?: string; phone?: string; session?: SiteSession } = {}): Promise<AppSignIn> {
+export async function signInToApp(ctx: Ctx, appId: string, options: { email?: string; phone?: string; session?: SiteSession; share?: string[] } = {}): Promise<AppSignIn> {
   const started = Date.now();
   const { env } = ctx;
   const session = options.session ?? new SiteSession(env);
@@ -315,28 +329,42 @@ export async function signInToApp(ctx: Ctx, appId: string, options: { email?: st
     const code = await codeFor(env, email, after);
     flow = await flowStep(session, `/v1/flows/${flow.id}/verify`, { code }, "verifying the email code");
   }
-  for (let guard = 0; guard < 10 && flow.step !== "complete"; guard++) {
+  const pages: AppSignIn["pages"] = [];
+  let review = false;
+  for (let guard = 0; guard < 16 && flow.step !== "complete"; guard++) {
     if (flow.step === "signup") {
       const prefill = flow.signup;
       if (!prefill) throw new Error(`flow ${flow.id} is at signup without a prefill`);
       flow = await flowStep(session, `/v1/flows/${flow.id}/signup`, { display_name: prefill.display_name, id: prefill.id, timezone: prefill.timezone, dob: prefill.dob }, "signing up");
-    } else if (flow.step === "requirements") {
-      const missing = flow.requirements?.missing ?? [];
-      const kind = missing.includes("phone") ? "phone" : missing.includes("email") ? "email" : null;
-      if (!kind) throw new Error(`flow ${flow.id} requires ${missing.join(", ")}, which this helper cannot give`);
-      const to = kind === "phone" ? phone : email;
-      const after = await lastSeq(env);
-      flow = await flowStep(session, `/v1/flows/${flow.id}/requirements/${kind}`, { [kind]: to }, `adding the required ${kind}`);
-      const code = await codeFor(env, to, after);
-      flow = await flowStep(session, `/v1/flows/${flow.id}/requirements/verify`, { code }, `verifying the required ${kind}`);
-    } else if (flow.step === "consent") {
-      flow = await flowStep(session, `/v1/flows/${flow.id}/consent`, { approve: true, optional_scopes: [] }, "consenting");
+    } else if (flow.step === "details") {
+      const details = flow.details;
+      if (!details) throw new Error(`flow ${flow.id} is at details without a details page`);
+      const page = { id: details.id, fields: details.fields.map(field => `${field.field}:${field.mode}${field.missing ? ":missing" : ""}`), added: [] as string[] };
+      // Every missing required email or phone of the page, added with a code (one at a time).
+      for (let i = 0; i < 3; i++) {
+        const missing = (flow.details?.fields ?? []).find(field => field.mode === "required" && field.missing);
+        if (!missing) break;
+        if (missing.field !== "email" && missing.field !== "phone") throw new Error(`flow ${flow.id} requires ${missing.field}, which this helper cannot give`);
+        const to = missing.field === "phone" ? phone : email;
+        const after = await lastSeq(env);
+        flow = await flowStep(session, `/v1/flows/${flow.id}/details/add`, { [missing.field]: to }, `adding the required ${missing.field}`);
+        const code = await codeFor(env, to, after);
+        flow = await flowStep(session, `/v1/flows/${flow.id}/details/verify`, { code }, `verifying the required ${missing.field}`);
+        page.added.push(missing.field);
+      }
+      const share = (flow.details?.fields ?? []).filter(field => field.mode === "optional" && !field.missing && (options.share ?? []).includes(field.field)).map(field => field.field);
+      pages.push(page);
+      flow = await flowStep(session, `/v1/flows/${flow.id}/details/continue`, { share }, `continuing from the details page ${details.id}`);
+    } else if (flow.step === "review") {
+      review = true;
+      flow = await flowStep(session, `/v1/flows/${flow.id}/review`, { approve: true }, "approving the review page");
     } else {
       throw new Error(`flow ${flow.id} stopped at ${flow.step}: ${short(flow.error)}`);
     }
   }
   if (flow.step !== "complete" || !flow.redirect_to) throw new Error(`flow ${flow.id} did not complete (${flow.step})`);
   const back = new URL(flow.redirect_to);
+  if (back.searchParams.get("error")) throw new Error(`flow ${flow.id} came back to ${appId} with error=${back.searchParams.get("error")}`);
   const callback = await json<Record<string, unknown>>(`${env.apps}/${appId}/callback?${back.searchParams.toString()}&format=json`, { headers: { cookie: start.body.session_cookie, accept: "application/json" } });
   if (callback.status !== 200 || callback.body.ok !== true) throw new Error(`${appId}'s callback answered ${callback.status} ${short(callback.body, 500)}`);
   return {
@@ -348,6 +376,8 @@ export async function signInToApp(ctx: Ctx, appId: string, options: { email?: st
     phone,
     session,
     callback: callback.body,
+    pages,
+    review,
     ms: Date.now() - started,
   };
 }
@@ -364,6 +394,71 @@ export async function appTokens(env: Env, appId: string, uuid: string): Promise<
 export function familyOf(accessToken: string): string {
   const [, payload = ""] = accessToken.split(".");
   return String((JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { fid?: string }).fid ?? "");
+}
+
+/** The audience (`aud`) of an access token. */
+export function audienceOf(accessToken: string): string {
+  const [, payload = ""] = accessToken.split(".");
+  return String((JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { aud?: string }).aud ?? "");
+}
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* The developer platform's own sign-in (first-party app `developer`, PKCE)                                             */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+export interface DeveloperTokens {
+  access_token: string;
+  refresh_token: string | null;
+  /** The account site's session of the same sign-in (the hosted flow signs the browser in). */
+  session: SiteSession;
+}
+
+/**
+ * Signs in to the first-party app `developer` the way developer.teamofsilicons.com's server does (06-v2 §2): an
+ * authorization-code flow with PKCE S256 and no client secret, redirect URI `{developer}/auth/callback`, the code
+ * exchanged at POST /v1/oauth/token with `client_id=developer`. A session already signed in continues as its Carbon;
+ * otherwise `email` gets a code. Returns the developer-audience tokens (what the developer site keeps sealed).
+ */
+export async function developerSignIn(ctx: Ctx, options: { email?: string; session?: SiteSession } = {}): Promise<DeveloperTokens> {
+  const { env } = ctx;
+  const session = options.session ?? new SiteSession(env);
+  const verifier = randomBytes(32).toString("base64url");
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  const redirectUri = `${env.developer}/auth/callback`;
+  let flow = await flowStep(session, "/v1/flows", { app_id: "developer", redirect_uri: redirectUri, state: `pp-${tag()}`, code_challenge: challenge, code_challenge_method: "S256", timezone: "Asia/Kolkata" }, "starting the developer platform's sign-in");
+  if (flow.step === "choose_method" && flow.signed_in_as) {
+    flow = await flowStep(session, `/v1/flows/${flow.id}/continue`, {}, "continue as (developer)");
+  } else {
+    if (!options.email) throw new Error("developerSignIn: the hosted sign-in asks for an email and none was given");
+    const after = await lastSeq(env);
+    flow = await flowStep(session, `/v1/flows/${flow.id}/email`, { email: options.email }, "sending the email code (developer)");
+    const code = await codeFor(env, options.email.toLowerCase(), after);
+    flow = await flowStep(session, `/v1/flows/${flow.id}/verify`, { code }, "verifying the email code (developer)");
+  }
+  for (let guard = 0; guard < 6 && flow.step !== "complete"; guard++) {
+    if (flow.step === "signup" && flow.signup) {
+      flow = await flowStep(session, `/v1/flows/${flow.id}/signup`, { display_name: flow.signup.display_name, id: flow.signup.id, timezone: flow.signup.timezone, dob: flow.signup.dob }, "signing up (developer)");
+    } else {
+      throw new Error(`the developer platform's sign-in stopped at ${flow.step}: ${short(flow.error ?? flow.details)}`);
+    }
+  }
+  const back = new URL(flow.redirect_to ?? "");
+  const code = back.searchParams.get("code");
+  if (!code) throw new Error(`the developer platform's sign-in came back without a code: ${flow.redirect_to}`);
+  const exchange = await api<{ access_token?: string; refresh_token?: string | null; error?: unknown }>(ctx, "/v1/oauth/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
+    body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: "developer", code_verifier: verifier }).toString(),
+  });
+  if (exchange.status !== 200 || !exchange.body.access_token) throw new Error(`exchanging the developer platform's code answered ${exchange.status} ${short(exchange.body)}`);
+  return { access_token: exchange.body.access_token, refresh_token: exchange.body.refresh_token ?? null, session };
+}
+
+/** A call with `Authorization: Bearer <token>` (no cookies), from the journey's own address. */
+export function asBearer<T = Record<string, unknown>>(ctx: Ctx, token: string, method: string, path: string, body?: unknown, options: { direct?: boolean; key?: string } = {}): Promise<JsonAnswer<T>> {
+  const headers: Record<string, string> = { accept: "application/json", authorization: `Bearer ${token}` };
+  if (options.key) headers["idempotency-key"] = options.key;
+  return api<T>(ctx, path, { method, headers, direct: options.direct, ...(body === undefined ? {} : { json: body }) });
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
@@ -393,23 +488,45 @@ export function machineLoad(): { load1: number; cores: number } {
   return { load1: Math.round((loadavg()[0] ?? 0) * 100) / 100, cores: availableParallelism() };
 }
 
+/** The stack's accounts-api log (scripts/dev.sh writes .dev/logs/<base>/accounts-api.log; the default stack .dev/logs/). */
+export const apiLog = (env: Env) => join(REPO_ROOT, ".dev", "logs", ...(env.base === 8590 ? [] : [String(env.base)]), "accounts-api.log");
+
 /**
- * accounts-api's own duration (whole milliseconds, from its `request … duration_ms=… request_id=…` log lines) of the
- * requests whose X-Request-Id is in `ids`. The stack's log is .dev/logs/<base>/accounts-api.log.
+ * accounts-api's own duration (whole milliseconds, from its `request … duration_ms=… request_id=…` log lines, health
+ * probes included: they are logged at debug level) of the requests whose X-Request-Id is in `ids`. Reads only the part
+ * of the log written since `fromByte` (a size taken before the requests), and waits up to `waitMs` for lines still being
+ * written to arrive.
  */
-export function serverDurations(env: Env, ids: Iterable<string>): Map<string, number> {
+export async function serverDurations(env: Env, ids: Iterable<string>, options: { fromByte?: number; waitMs?: number } = {}): Promise<Map<string, number>> {
   const wanted = new Set(ids);
   const found = new Map<string, number>();
-  const file = join(ROOT, ".dev", "logs", String(env.base), "accounts-api.log");
-  if (!existsSync(file)) return found;
-  for (const line of readFileSync(file, "utf8").split("\n")) {
-    const id = /request_id=([0-9a-f-]{36})/.exec(line)?.[1];
-    if (!id || !wanted.has(id)) continue;
-    const duration = /duration_ms=(\d+)/.exec(line)?.[1];
-    if (duration !== undefined) found.set(id, Number(duration));
+  const file = apiLog(env);
+  const deadline = Date.now() + (options.waitMs ?? 0);
+  for (;;) {
+    if (existsSync(file)) {
+      const all = readFileSync(file);
+      const text = all.subarray(Math.min(options.fromByte ?? 0, all.length)).toString("utf8");
+      for (const line of text.split("\n")) {
+        if (!line.includes("duration_ms=")) continue;
+        const id = /request_id=([0-9a-f-]{36})/.exec(line)?.[1];
+        if (!id || !wanted.has(id) || found.has(id)) continue;
+        const duration = /duration_ms=(\d+)/.exec(line)?.[1];
+        if (duration !== undefined) found.set(id, Number(duration));
+      }
+    }
+    if (found.size >= wanted.size || Date.now() >= deadline) return found;
+    await sleep(250);
   }
-  return found;
 }
+
+/** The accounts-api log's size now (where serverDurations should start reading for requests made after this). */
+export const apiLogSize = (env: Env) => {
+  try {
+    return statSync(apiLog(env)).size;
+  } catch {
+    return 0;
+  }
+};
 
 /** One row of the stack's database as a record (sql() returns strings). */
 export async function row(env: Env, query: string): Promise<string[] | null> {

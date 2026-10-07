@@ -5,7 +5,7 @@
  * browser, only where the app would accept it, and ends after 48 hours (time travel) or "Not you?".
  */
 import type { Journey } from "../../context";
-import { codeFor, lastSeq, newContext, shot, sleep, sql, tag } from "../../lib";
+import { codeFor, completeDetails, lastSeq, newContext, shot, sleep, sql, startAtApp, tag } from "../../lib";
 import { Browserish, brief, eighteenYearsAgo, errorCode, errorDetails, sendCode, signUpVia, startSignIn, type FlowView, type Reply } from "./_helpers";
 
 const titleCase = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
@@ -91,7 +91,7 @@ const prefill: Journey = {
     const still = await v.flow(id);
     results.check("refused submissions leave the flow at signup with the session live", still.body.flow?.step === "signup" && !!still.body.flow.signup, brief(still));
     const custom = await v.act(id, "signup", { display_name: "  Custom Carbon  ", id: `C:Custom-${t.toUpperCase()}`, timezone: "america/new_york", dob: "1990-05-17", pfp_url: null });
-    results.check("a custom sign-up is accepted (trimmed name, id lowercased, timezone canonical)", custom.status === 200 && ["consent", "complete"].includes(custom.body.flow.step), brief(custom));
+    results.check("a custom sign-up is accepted (trimmed name, id lowercased, timezone canonical) → briefcase's details page", custom.status === 200 && custom.body.flow.step === "details", brief(custom));
     const me = await v.get<Record<string, unknown>>("/v1/me");
     results.check("the account is exactly what was submitted", me.body.display_name === "Custom Carbon" && me.body.id === `c:custom-${t}` && me.body.timezone === "America/New_York" && me.body.dob === "1990-05-17", JSON.stringify(me.body).slice(0, 300));
     results.check("pfp_url null → our Iris default for the new uuid", me.body.pfp_url === `${env.iris}/pfp/carbon?id=${String(me.body.uuid)}`, String(me.body.pfp_url));
@@ -110,8 +110,7 @@ const prefillBrowser: Journey = {
     const context = await newContext(browser);
     const page = await context.newPage();
     results.watch(page, "ids");
-    await page.goto(`${env.apps}/spacestation/`);
-    await page.locator("#signin-hosted").click();
+    await startAtApp(env, page, "spacestation");
     const field = page.getByRole("textbox", { name: "Email" });
     await field.waitFor({ timeout: 30_000 });
     const after = await lastSeq(env);
@@ -144,10 +143,8 @@ const prefillBrowser: Journey = {
     await sleep(600);
     results.check("picking a free id fills the field and it is available", (await idField.inputValue()) === picked && /is available/.test(await page.locator("main").innerText()), `${picked} → ${await idField.inputValue()}`);
     await page.getByRole("button", { name: "Create account" }).click();
-    const share = page.getByRole("button", { name: "Share and continue" });
-    await share.waitFor({ timeout: 20_000 });
-    await share.click();
-    await page.waitForURL(new RegExp(`${env.apps.replace(/[.:/]/g, "\\$&")}/spacestation/callback`), { timeout: 30_000 });
+    const walk = await completeDetails(env, page, "spacestation");
+    results.check("then spacestation's one page (what's shared: the profile, the optional timezone) and back at the app", walk.pages.length === 1 && walk.pages[0]?.rows.some(r => r.field === "timezone" && r.mode === "optional") === true && /\/spacestation\/callback/.test(page.url()), JSON.stringify(walk.pages.map(p => p.rows)));
     const rows = await sql(env, `select a.handle from accounts a join account_emails e on e.account_uuid = a.uuid where e.email = '${address}'`);
     results.check("the account has the picked id", rows[0]?.[0] === `c:${picked}`, JSON.stringify(rows));
     await context.close();

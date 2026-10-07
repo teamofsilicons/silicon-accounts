@@ -7,12 +7,15 @@
  * signed into: when pixel-studio imports someone legacy-crm already imported, the second import only matches, and
  * finishing at pixel-studio says Legacy CRM added them. And the 48-hour sign-up session of a finishing import expires
  * (time travel): finishing is refused with a reason that reads, the account stays unclaimed, and a new code finishes it.
+ * And finishing an email-only import at an app that requires a phone (dm): its own details page asks for the missing
+ * phone, which is added there with an SMS code (UNDERSTANDING.md: a required detail the Carbon hasn't set up yet must be
+ * added before continuing).
  */
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import type { Journey } from "../../context";
-import { afterConsent, appAccount, codeFor, lastSeq, newContext, shot, sleep, tag } from "../../lib";
-import { accountsByUuid, allRows, appCall, describeRow, fakeApp, flowView, forgetImportBudgets, importRows, lit, postJson, psql, rowsOf, waitJob, type FakeApp, type RowResult } from "./_helpers";
+import { afterConsent, appAccount, codeFor, completeDetails, lastSeq, newContext, shot, sleep, startAtApp, tag } from "../../lib";
+import { accountsByUuid, allRows, appCall, describeRow, fakeApp, flowView, forgetImportBudgets, freshExchange, importRows, lit, messagesAfter, postJson, psql, rowsOf, signInWithEmailCode, waitJob, type FakeApp, type RowResult } from "./_helpers";
 
 type Ctx = Parameters<Journey["run"]>[0];
 
@@ -213,6 +216,115 @@ export const journeys: Journey[] = [
       results.check("pixel-studio receives that account (same uuid); it is active with the email verified; pixel-studio's membership is active, legacy-crm's still imported", atPixel?.uuid === uuid && finished?.status === "active" && finished.email_verified === true && finished.pixel === "active" && finished.crm === "imported", `${JSON.stringify(atPixel).slice(0, 160)} ${JSON.stringify(finished)}`);
       const crmView = await appCall<{ status?: string; email?: string | null; external_id?: string }>(ctx, crm, `/v1/apps/legacy-crm/users/${uuid}`);
       results.check("legacy-crm's user base still shows them as imported, with the email it supplied", crmView.body.status === "imported" && crmView.body.email === email && crmView.body.external_id === `xena-${t}`, JSON.stringify(crmView.body).slice(0, 300));
+      await context.close();
+    },
+  },
+  {
+    name: "imports-claim-dm-phone",
+    title: "an email-only Carbon legacy-crm imported first signs into dm, which requires a phone: \"Finish setting up\" names Legacy CRM and continues to DM, then dm's own page \"Set up DM\" asks for the missing phone (added with an SMS code) and offers the email and timezone unticked; dm gets the phone only, legacy-crm's membership stays imported",
+    async run(ctx) {
+      const { env, results, browser } = ctx;
+      const crm = fakeApp("legacy-crm");
+      await forgetImportBudgets(env, crm.app_id);
+      const t = tag();
+      const exchange = await freshExchange(env, ["415"]);
+      const email = `dana.${t}@legacy-crm.test`;
+      const phone = `+1415${exchange}0166`;
+      const imported = await importOne(ctx, crm, { external_id: `dana-${t}`, email, display_name: "Dana Imported", username: `dana_${t}`, timezone: "Europe/Madrid" });
+      const uuid = imported.account_uuid ?? "";
+      results.check("legacy-crm imports c:dana_<tag> with an email only (unclaimed)", imported.outcome === "created" && imported.id === `c:dana_${t}` && !!uuid, describeRow(imported));
+
+      const context = await newContext(browser);
+      const page = await context.newPage();
+      results.watch(page, "imports-claim-dm");
+      await startAtApp(env, page, "dm");
+      await signInWithEmailCode(env, page, email);
+      const idField = page.getByRole("textbox", { name: "Your id" });
+      await idField.waitFor({ timeout: 30_000 });
+      await sleep(700);
+      const text = await pageText(page);
+      await shot(env, page, "imports-claim-06-dm-finish");
+      results.check(
+        "at dm, the email code leads to \"Finish setting up your account\": \"Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to DM.\", prefilled with legacy-crm's id and name",
+        text.includes("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to DM.") && (await idField.inputValue()) === `dana_${t}` && (await page.getByRole("textbox", { name: "Display name" }).inputValue()) === "Dana Imported",
+        text.slice(0, 300),
+      );
+      await page.getByRole("button", { name: "Finish setup" }).click();
+      const sms = await lastSeq(env);
+      const walk = await completeDetails(env, page, "dm", { add: { phone }, shotName: "imports-claim-07-dm" });
+      const details = walk.pages[0];
+      const rowOf = (field: string) => details?.rows.find(item => item.field === field);
+      results.check(
+        "dm's own page \"Set up DM\" (\"Start messaging\") asks for the phone it requires (missing on the imported account: added there with an SMS code) and offers the email and timezone, unticked",
+        walk.pages.length === 1 && details?.title === "Set up DM" && details.continueLabel === "Start messaging" && rowOf("phone")?.mode === "required" && rowOf("phone")?.missing === true && details.added.includes("phone") && rowOf("email")?.mode === "optional" && rowOf("email")?.missing === false && rowOf("email")?.ticked === false && rowOf("timezone")?.ticked === false,
+        JSON.stringify({ title: details?.title, continueLabel: details?.continueLabel, rows: details?.rows.map(row => `${row.field}:${row.mode}${row.missing ? ":missing" : ""}:${row.ticked}`), added: details?.added }),
+      );
+      const texted = (await messagesAfter(env, sms)).filter(item => item.to === phone);
+      results.check("one SMS code went to the phone the Carbon typed", texted.length === 1 && texted[0]?.channel === "sms", texted.map(item => `${item.channel} to ${item.to}`).join(", ") || "none");
+      const atDm = await appAccount(page);
+      results.check("dm receives the account legacy-crm imported, with the phone it required and not the unticked email", atDm?.uuid === uuid && atDm.phone === phone && atDm.email === undefined, JSON.stringify(atDm).slice(0, 300));
+      const [after] = [...(await accountsByUuid(env, [uuid])).values()];
+      const [dmMember] = await rowsOf<{ status: string; granted_scopes: string[] }>(env, `select status, granted_scopes from memberships where app_id = 'dm' and account_uuid = ${lit(uuid)}`);
+      results.check(
+        "the account is active with the email (proven by its code) and the phone (proven by SMS), both verified; legacy-crm's membership stays imported, dm's is active with profile + phone",
+        after?.status === "active" && after.emails[0]?.email === email && after.emails[0]?.verified === true && after.phones[0]?.phone === phone && after.phones[0]?.verified === true && after.membership?.status === "imported" && dmMember?.status === "active" && JSON.stringify([...(dmMember.granted_scopes ?? [])].sort()) === JSON.stringify(["phone", "profile"]),
+        `${JSON.stringify({ status: after?.status, emails: after?.emails, phones: after?.phones, crm: after?.membership?.status })} dm ${JSON.stringify(dmMember)}`,
+      );
+      await context.close();
+    },
+  },
+  {
+    name: "imports-claim-flow-review",
+    title: "an email-only Carbon ledgerly imported finishes at ledgerly, whose own flow has two pages and a review: page 1 adds the phone it requires (SMS code), page 2 shows the imported date of birth (required) and the timezone (optional, ticked here), the review lists what is shared; ledgerly gets exactly that",
+    async run(ctx) {
+      const { env, results, browser } = ctx;
+      const ledgerly = fakeApp("ledgerly");
+      await forgetImportBudgets(env, ledgerly.app_id);
+      const t = tag();
+      const exchange = await freshExchange(env, ["415"]);
+      const email = `lena.${t}@ledgerly.test`;
+      const phone = `+1415${exchange}0155`;
+      const imported = await importOne(ctx, ledgerly, { external_id: `lena-${t}`, email, display_name: "Lena Ledger", username: `lena_${t}`, dob: "1979-05-17", timezone: "Europe/Oslo" });
+      const uuid = imported.account_uuid ?? "";
+      results.check("ledgerly imports c:lena_<tag> (unclaimed, email only)", imported.outcome === "created" && imported.id === `c:lena_${t}` && !!uuid, describeRow(imported));
+
+      const context = await newContext(browser);
+      const page = await context.newPage();
+      results.watch(page, "imports-claim-ledgerly");
+      await startAtApp(env, page, "ledgerly");
+      await signInWithEmailCode(env, page, email);
+      const idField = page.getByRole("textbox", { name: "Your id" });
+      await idField.waitFor({ timeout: 30_000 });
+      await sleep(700);
+      const text = await pageText(page);
+      results.check(
+        "\"Finish setting up your account\": \"Ledgerly added you to Silicon Accounts. Check the details it gave us, then continue.\" (the app being signed into imported them), prefilled with its id and name",
+        text.includes("Ledgerly added you to Silicon Accounts. Check the details it gave us, then continue.") && (await idField.inputValue()) === `lena_${t}` && (await page.getByRole("textbox", { name: "Display name" }).inputValue()) === "Lena Ledger",
+        text.slice(0, 300),
+      );
+      await page.getByRole("button", { name: "Finish setup" }).click();
+      const walk = await completeDetails(env, page, "ledgerly", { add: { phone }, tick: ["timezone"], shotName: "imports-claim-08-ledgerly" });
+      const [first, second] = walk.pages;
+      const field = (seen: typeof first, name: string) => seen?.rows.find(row => row.field === name);
+      results.check(
+        "page 1 of 2 \"How can we reach you?\": the phone ledgerly requires, missing on the imported account, added there with an SMS code",
+        walk.pages.length === 2 && first?.title === "How can we reach you?" && first.progress === "Step 1 of 2" && field(first, "phone")?.mode === "required" && field(first, "phone")?.missing === true && first.added.includes("phone"),
+        JSON.stringify({ title: first?.title, progress: first?.progress, rows: first?.rows.map(row => `${row.field}:${row.mode}${row.missing ? ":missing" : ""}`), added: first?.added }),
+      );
+      results.check(
+        "page 2 of 2 \"About you\" in ledgerly's split layout: the date of birth (required, there: the import gave it) and the timezone (optional, unticked until ticked); its button says \"Review\"",
+        second?.title === "About you" && second.progress === "Step 2 of 2" && second.shownLayout === "split" && field(second, "dob")?.mode === "required" && field(second, "dob")?.missing === false && field(second, "timezone")?.mode === "optional" && field(second, "timezone")?.ticked === false && second.continueLabel === "Review",
+        JSON.stringify({ title: second?.title, progress: second?.progress, layout: second?.shownLayout, rows: second?.rows.map(row => `${row.field}:${row.mode}:${row.ticked}`), continueLabel: second?.continueLabel }),
+      );
+      results.check(
+        "the review lists everything that will be shared (profile, phone, dob, the ticked timezone) and nothing kept back",
+        !!walk.review && ["profile", "phone", "dob", "timezone"].every(name => walk.review!.shared.includes(name)) && !walk.review.shared.includes("email") && walk.review.kept.length === 0,
+        JSON.stringify(walk.review),
+      );
+      const atLedgerly = await appAccount(page);
+      results.check("ledgerly receives the account it imported, with the phone, the imported date of birth and the timezone, and not the email it didn't ask for", atLedgerly?.uuid === uuid && atLedgerly.phone === phone && atLedgerly.dob === "1979-05-17" && atLedgerly.timezone === "Europe/Oslo" && atLedgerly.email === undefined, JSON.stringify(atLedgerly).slice(0, 300));
+      const [member] = await rowsOf<{ status: string; granted_scopes: string[]; source: string }>(env, `select status, granted_scopes, source from memberships where app_id = 'ledgerly' and account_uuid = ${lit(uuid)}`);
+      results.check("ledgerly's membership is active (source import) with profile, phone, dob and timezone granted", member?.status === "active" && member.source === "import" && JSON.stringify([...(member.granted_scopes ?? [])].sort()) === JSON.stringify(["dob", "phone", "profile", "timezone"]), JSON.stringify(member));
       await context.close();
     },
   },

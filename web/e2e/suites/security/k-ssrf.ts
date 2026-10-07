@@ -50,7 +50,7 @@ export const journeys: Journey[] = [
       const { env, results } = ctx;
       const port = sparePort(env, 7);
       const url = `http://127.0.0.1:${port}`;
-      const publicUrl = "https://account.security-e2e.test";
+      const publicUrl = "https://accounts.security-e2e.test";
       const credentials = JSON.parse(readFileSync(join(ROOT, "testkit/dev-credentials.json"), "utf8")) as { messaging: { postmark: { server_token: string }; twilio: { account_sid: string; auth_token: string; messaging_service_sid: string } } };
       const secrets = {
         ACCOUNTS_TOKEN_PEPPER: key32(),

@@ -28,6 +28,8 @@ import {
 export const journey: Journey = {
   name: "imports-clean",
   title: "clean.csv into legacy-crm with the app's credentials: 25 rows created with their own ids, unclaimed accounts with one unverified address, imported memberships in the user base, no email or SMS",
+  // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     const crm = fakeApp("legacy-crm");

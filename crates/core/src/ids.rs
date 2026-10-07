@@ -176,6 +176,11 @@ pub enum IdError {
     MissingPrefix {
         input: String,
     },
+    /// `x:scout`: a prefix, but not `c:` or `si:`. `prefix` includes the colon.
+    UnknownPrefix {
+        input: String,
+        prefix: String,
+    },
     WrongKind {
         input: String,
         expected: AccountKind,
@@ -208,7 +213,7 @@ impl IdError {
     /// What to do instead.
     pub fn hint(&self) -> String {
         match self {
-            IdError::Empty | IdError::MissingPrefix { .. } => {
+            IdError::Empty | IdError::MissingPrefix { .. } | IdError::UnknownPrefix { .. } => {
                 "Write the id as c:<handle> for a Carbon or si:<handle> for a Silicon, e.g. c:saket or si:scout.".into()
             }
             IdError::WrongKind { expected, .. } => {
@@ -227,6 +232,10 @@ impl fmt::Display for IdError {
             IdError::MissingPrefix { input } => write!(
                 f,
                 "'{input}' has no prefix: ids start with c: (Carbons) or si: (Silicons)."
+            ),
+            IdError::UnknownPrefix { prefix, .. } => write!(
+                f,
+                "'{prefix}' is not an id prefix: ids start with c: (Carbons) or si: (Silicons)."
             ),
             IdError::WrongKind { input, expected } => {
                 let other = match expected {
@@ -346,8 +355,22 @@ impl AccountId {
         } else if let Some(rest) = strip_prefix_ascii(s, "si:") {
             (AccountKind::Silicon, rest)
         } else {
-            return Err(IdError::MissingPrefix {
-                input: s.to_string(),
+            return Err(match s.split_once(':') {
+                Some((prefix, _))
+                    if !prefix.is_empty()
+                        && prefix.len() <= 16
+                        && prefix
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') =>
+                {
+                    IdError::UnknownPrefix {
+                        input: s.to_string(),
+                        prefix: format!("{prefix}:"),
+                    }
+                }
+                _ => IdError::MissingPrefix {
+                    input: s.to_string(),
+                },
             });
         };
         let handle = validate_handle(rest)?;
@@ -634,7 +657,10 @@ mod tests {
             ("c:si:x", "':' at position 3"),
             ("c:josé", "non-ASCII"),
             ("c:admin", "reserved word"),
-            ("x:abc", "no prefix"),
+            (
+                "x:abc",
+                "'x:' is not an id prefix: ids start with c: (Carbons) or si: (Silicons).",
+            ),
             // Non-ASCII letters whose lowercase is ASCII are refused as written.
             ("c:\u{212A}elvin", "non-ASCII, U+212A) at position 1"),
             ("c:ma\u{0130}l", "non-ASCII, U+0130) at position 3"),
@@ -643,6 +669,24 @@ mod tests {
         for (input, fragment) in bad {
             let err = AccountId::parse(input).expect_err(input);
             assert!(err.to_string().contains(fragment), "{input}: {err}");
+        }
+        assert_eq!(
+            AccountId::parse("x:scout"),
+            Err(IdError::UnknownPrefix {
+                input: "x:scout".into(),
+                prefix: "x:".into()
+            })
+        );
+        assert_eq!(
+            AccountId::parse("x:scout").expect_err("prefix").hint(),
+            AccountId::parse("scout").expect_err("none").hint()
+        );
+        // Without a colon, or with something that is no prefix before it, there is none.
+        for input in ["scout", ":scout", "an id: scout"] {
+            assert!(
+                matches!(AccountId::parse(input), Err(IdError::MissingPrefix { .. })),
+                "{input}"
+            );
         }
         assert_eq!(
             AccountId::parse("c:admin").expect_err("reserved").reason(),

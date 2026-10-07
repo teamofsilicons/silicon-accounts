@@ -6,14 +6,16 @@
  */
 import type { Page } from "@playwright/test";
 import type { Ctx, Journey } from "../../context";
-import { appAccount, finishSignup, json, newContext, shot, sleep, sql, tag } from "../../lib";
+import { appAccount, finishSignup, json, newContext, shot, sleep, sql, startAtApp, tag, waitForOpening } from "../../lib";
 import {
   Browserish,
   CLIENT_IDS,
+  appPage,
   brief,
   deliverAnswer,
   drive,
   errorCode,
+  exchangeCode,
   providerAuthorize,
   providerLog,
   redirectParams,
@@ -104,16 +106,19 @@ const google: Journey = {
     results.check("history: google/new_account then google/success", JSON.stringify(history) === JSON.stringify([["google", "new_account"], ["google", "success"]]), JSON.stringify(history));
     await fresh.close();
 
-    // method=google: the hosted page opens Google at once, without a click.
+    // The app's own "Continue with Google" (method=google): our Opening page first, then Google without a click.
     const hinted = await newContext(browser);
     const hp = await hinted.newPage();
     results.watch(hp, "google-method");
-    await hp.goto(`${env.apps}/interface/?method=google`);
     const hintedAt = Date.now();
-    await hp.locator("#signin-hosted").click();
-    await hp.waitForURL(new RegExp(env.oidc.replace(/[.:/]/g, "\\$&")), { timeout: 30_000 }).catch(() => undefined);
-    results.check("method=google: the hosted page goes straight to Google's page (no click on the methods)", hp.url().startsWith(env.oidc), hp.url());
+    await startAtApp(env, hp, "interface", { method: "google" });
+    const opening = await waitForOpening(env, hp, "google", { shotName: "auth-flows-google-opening" });
+    results.check("method=google: the Opening page says \"Opening Google to sign you in to Silicon Interface…\" and then moves on to Google by itself", opening.title === "Opening Google to sign you in to Silicon Interface…" && opening.movedAfterMs !== null && hp.url().startsWith(env.oidc), `${opening.title} | moved after ${opening.movedAfterMs} ms | ${hp.url().slice(0, 80)}`);
     results.metric("method=google: app link → Google's page", Date.now() - hintedAt);
+    if (opening.movedAfterMs !== null) results.metric("method=google: Opening page shown → Google's page", opening.movedAfterMs);
+    await hp.locator(`button.identity[data-email="${email}"]`).click({ timeout: 15_000 });
+    await hp.waitForURL(appPage(env, "interface", "callback"), { timeout: 30_000 });
+    results.check("…and the known identity comes back signed in to interface", (await appAccount(hp))?.uuid === uuid, hp.url());
     await hinted.close();
     const api = new Browserish(env, ctx.ip);
     const wrongMethod = await startSignIn(api, "dm", { method: "google" });
@@ -184,7 +189,7 @@ const googleApi: Journey = {
     const s = await startSignIn(g, "interface");
     await registerIdentity(env, { provider: "google", email: ownerEmail, name: `Someone Else ${t}`, picture: `https://pictures.example.test/${t}.png` });
     const leg = await providerLeg(g, s.flow.id, "google", { email: ownerEmail });
-    results.check("Google with the verified email of an account → that account signs in (consent for interface), no sign-up", leg.flow?.step === "consent" && leg.flow.signed_in_as?.uuid === uuid && made.code.length > 0, `${leg.flow?.step} ${leg.flow?.signed_in_as?.uuid} vs ${uuid}`);
+    results.check("Google with the verified email of an account → that account signs in (interface's page), no sign-up", leg.flow?.step === "details" && leg.flow.signed_in_as?.uuid === uuid && made.code.length > 0, `${leg.flow?.step} ${leg.flow?.signed_in_as?.uuid} vs ${uuid}`);
     results.check("…the browser got a session for it", (await g.session())?.account.uuid === uuid);
     const identities = await sql(env, `select provider from identities where account_uuid = '${uuid}'`);
     results.check("…and the Google identity is now linked to it", JSON.stringify(identities) === JSON.stringify([["google"]]), JSON.stringify(identities));
@@ -242,7 +247,7 @@ const googleApi: Journey = {
 
 const apple: Journey = {
   name: "auth-flows-apple",
-  title: "managed Apple on waveform in the browser: form_post back through the site, the first-time name on the sign-up page, Apple's ES256 client secret; at the API the form_post is parked for a same-site GET, the name comes only once, orbit-games uses its own key",
+  title: "managed Apple on waveform in the browser: form_post back through the site, the first-time name on the sign-up page, Apple's ES256 client secret; at the API the form_post is parked for a same-site GET, the name comes only once, an email already on an account signs that account in (then one click), orbit-games uses its own key",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const t = tag();
@@ -301,6 +306,36 @@ const apple: Journey = {
       const verified = await sql(env, `select verified_via from account_emails where email = 'ada.apple.${t}@icloud.test'`);
       results.check("…the email is verified via apple", verified[0]?.[0] === "apple", JSON.stringify(verified));
     }
+
+    // UNDERSTANDING.md: "When Google or Apple gives us an email that's already on an account, it's that account
+    // signing in, not a new one." An account made with an email code on another app; Apple later proves that email.
+    const owner = new Browserish(env, ctx.ip);
+    const ownerEmail = `apple.linked.${t}@example.test`;
+    await signUpVia(owner, "spacestation", ownerEmail);
+    const ownerUuid = (await owner.session())?.account.uuid ?? "";
+    await registerIdentity(env, { provider: "apple", email: ownerEmail, given_name: "Someone", family_name: `Else ${t}` });
+    const a = new Browserish(env, ctx.ip);
+    const as = await startSignIn(a, "waveform");
+    const linked = await providerLeg(a, as.flow.id, "apple", { email: ownerEmail });
+    results.check(
+      "Apple with the verified email of an account → that account signs in (waveform's page), no sign-up",
+      linked.flow?.step === "details" && linked.flow.signed_in_as?.uuid === ownerUuid && !a.jar.get("sa_signup"),
+      `${linked.flow?.step} ${linked.flow?.signed_in_as?.uuid} vs ${ownerUuid} ${JSON.stringify(linked.flow?.error)}`,
+    );
+    const linkedDone = linked.flow?.step === "details" ? await drive(a, linked.flow) : null;
+    const linkedTokens = linkedDone ? await exchangeCode(env, "waveform", redirectParams(linkedDone).get("code") ?? "", as.redirectUri, as.verifier) : null;
+    const linkedRows = await sql(env, `select (select count(*) from account_emails where email = '${ownerEmail}'), (select string_agg(provider, ',') from identities where account_uuid = '${ownerUuid}'), (select details->>'linked_by' from audit_log where account_uuid = '${ownerUuid}' and action = 'identity.linked' limit 1)`);
+    results.check(
+      "…waveform gets that same account (uuid), one account holds the email, the Apple identity is linked to it (linked_by verified_email)",
+      linkedTokens?.status === 200 && linkedTokens.body.account.uuid === ownerUuid && JSON.stringify(linkedRows) === JSON.stringify([["1", "apple", "verified_email"]]),
+      `${linkedTokens ? (linkedTokens.status === 200 ? `uuid ${linkedTokens.body.account.uuid}` : brief(linkedTokens)) : "no code"} ${JSON.stringify(linkedRows)}`,
+    );
+    // The same Apple identity again, in a fresh browser: straight back to waveform (nothing new to share).
+    const again2 = new Browserish(env, ctx.ip);
+    const ags = await startSignIn(again2, "waveform");
+    const known = await providerLeg(again2, ags.flow.id, "apple", { email: ownerEmail });
+    const knownTokens = known.flow?.step === "complete" ? await exchangeCode(env, "waveform", redirectParams(known.flow).get("code") ?? "", ags.redirectUri, ags.verifier) : null;
+    results.check("the linked Apple identity in a fresh browser signs the same account straight in (complete, no page)", known.flow?.step === "complete" && knownTokens?.status === 200 && knownTokens.body.account.uuid === ownerUuid, `${known.flow?.step} ${knownTokens ? (knownTokens.status === 200 ? `uuid ${knownTokens.body.account.uuid}` : brief(knownTokens)) : ""}`);
 
     // orbit-games brings its own Apple key.
     const o = new Browserish(env, ctx.ip);

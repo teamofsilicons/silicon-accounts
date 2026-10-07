@@ -172,7 +172,7 @@ fn photo_not_found(id: &str) -> ApiError {
             crate::util::clip(id, 60)
         ),
     )
-    .hint("Fetch the account again (GET /v1/accounts/{uuid} or the account.updated webhook) for its current pfp_url.")
+    .hint("Read the current pfp_url again: GET /v1/me for your own account; an app reads its user's from GET /v1/apps/{app_id}/users/{uuid} or the account.updated webhook.")
 }
 
 /// `GET /v1/photos/{id}` — public. Serves the stored bytes with their type, immutable caching,

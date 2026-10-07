@@ -1,14 +1,17 @@
 import type { Journey } from "../context";
-import { newContext, postJson, shot, sleep } from "../lib";
+import { api, cli, cliHome, fakeApp, issueAta, newContext, postJson, shot, sleep, verifyProof } from "../lib";
 
 interface SaveAnswer {
   ok?: boolean;
   timings?: { issue_ms?: number; verify_ms?: number | null; call_ms?: number; total_ms?: number };
 }
 
+/** commit's notify demo: one ATA proof per receiving app (UNDERSTANDING.md), each pinged with its own proof. */
 interface NotifyAnswer {
   ok?: boolean;
-  timings?: { issue_ms?: number; total_ms?: number; verify_ms?: Record<string, number | null> };
+  proofs?: Record<string, { proof_id?: string; receiving_app?: unknown }>;
+  results?: Record<string, { ok?: boolean; verification?: { valid?: boolean; receiving_app?: { app_id?: string } } }>;
+  timings?: { issue_ms?: Record<string, number | null>; verify_ms?: Record<string, number | null>; total_ms?: number };
 }
 
 const spread = (values: number[]) => {
@@ -17,16 +20,21 @@ const spread = (values: number[]) => {
   return `${sorted[0]!.toFixed(1)}–${sorted[sorted.length - 1]!.toFixed(1)} ms (median ${sorted[Math.floor(sorted.length / 2)]!.toFixed(1)})`;
 };
 
+const appIdOf = (value: unknown) => (typeof value === "string" ? value : value && typeof value === "object" ? (value as { app_id?: string }).app_id : undefined);
+
 export const journey: Journey = {
   name: "e-proofs",
-  title: "OBO dm → briefcase and ATA commit → remind + waveform through the fake apps (timings); the Carbon sees and revokes an OBO proof on /proofs",
+  title: "OBO dm → briefcase and ATA commit → remind and waveform (one proof per app) through the fake apps, with timings; an ATA proof is for exactly one app; the Carbon sees and revokes an OBO proof on /proofs",
   needs: ["brook"],
-  async run({ env, results, browser, shared }) {
+  async run(ctx) {
+    const { env, results, browser, shared } = ctx;
     const brook = shared.brook!;
     const timings: Record<string, number[]> = {};
     const add = (name: string, value: number | null | undefined) => {
       if (typeof value === "number") (timings[name] ??= []).push(value);
     };
+
+    // OBO: dm acts at briefcase on brook's behalf; briefcase verifies the proof with Silicon Accounts.
     for (let i = 0; i < 5; i++) {
       const answer = await postJson<SaveAnswer>(`${env.apps}/dm/actions/save-to-briefcase`, { uuid: brook.uuid, filename: `walk-${i}.txt` });
       if (i === 0) results.check("OBO: dm saves a file to briefcase on the Carbon's behalf (briefcase verified the proof)", answer.status === 200 && answer.body.ok === true, JSON.stringify(answer.body).slice(0, 200));
@@ -35,14 +43,49 @@ export const journey: Journey = {
       add("obo call", answer.body.timings?.call_ms);
       add("obo total", answer.body.timings?.total_ms);
     }
+
+    // ATA: commit talks to remind and waveform, so it gets two proofs, one for each, and each app verifies its own.
     for (let i = 0; i < 5; i++) {
       const answer = await postJson<NotifyAnswer>(`${env.apps}/commit/actions/notify`, { audiences: ["remind", "waveform"], message: `walk ${i}` });
-      if (i === 0) results.check("ATA: commit's one proof is verified by remind and waveform", answer.status === 200 && answer.body.ok === true, JSON.stringify(answer.body).slice(0, 200));
-      add("ata issue", answer.body.timings?.issue_ms);
-      add("ata total", answer.body.timings?.total_ms);
-      for (const [audience, value] of Object.entries(answer.body.timings?.verify_ms ?? {})) add(`ata verify ${audience}`, value);
+      if (i === 0) {
+        const proofs = answer.body.proofs ?? {};
+        const ids = Object.values(proofs).map(proof => proof.proof_id);
+        results.check("ATA: commit's notify gets one proof for remind and another for waveform", answer.status === 200 && answer.body.ok === true && ids.length === 2 && new Set(ids).size === 2 && appIdOf(proofs.remind?.receiving_app) === "remind" && appIdOf(proofs.waveform?.receiving_app) === "waveform", JSON.stringify(proofs).slice(0, 300));
+        results.check("…and remind and waveform each verified the proof made for it", answer.body.results?.remind?.verification?.valid === true && answer.body.results?.waveform?.verification?.valid === true, JSON.stringify(answer.body.results).slice(0, 300));
+      }
+      for (const [audience, value] of Object.entries(answer.body.timings?.issue_ms ?? {})) add(`ata issue for ${audience}`, value);
+      for (const [audience, value] of Object.entries(answer.body.timings?.verify_ms ?? {})) add(`ata verify by ${audience}`, value);
+      add("ata total (two proofs in parallel)", answer.body.timings?.total_ms);
     }
-    results.check("timings (5 runs each)", true, Object.entries(timings).map(([name, values]) => `${name} ${spread(values)}`).join("; "));
+
+    // The single-app rule, with commit's own credentials against the API.
+    const issued = await issueAta(ctx, "commit", "remind", { scopes: ["notifications.send"] });
+    results.check("POST /v1/proofs/ata {receiving_app: remind} issues a proof for remind alone", (issued.status === 201 || issued.status === 200) && issued.body.kind === "ata" && appIdOf(issued.body.receiving_app) === "remind" && typeof issued.body.proof_token === "string", `${issued.status} ${JSON.stringify(issued.body).slice(0, 200)}`);
+    add("ata issue (commit, through the site)", issued.ms);
+    const byRemind = await verifyProof(ctx, "remind", issued.body.proof_token ?? "");
+    results.check("remind verifies it: valid, issued by commit, for remind, with an expiry", byRemind.body.valid === true && appIdOf(byRemind.body.issuing_app) === "commit" && appIdOf(byRemind.body.receiving_app) === "remind" && typeof byRemind.body.expires_at === "string", JSON.stringify(byRemind.body).slice(0, 240));
+    add("ata verify (remind, through the site)", byRemind.ms);
+    const byWaveform = await verifyProof(ctx, "waveform", issued.body.proof_token ?? "");
+    results.check("waveform (not its receiving app) is told exactly {valid:false, expires_at:null}", byWaveform.status === 200 && byWaveform.body.valid === false && byWaveform.body.expires_at === null && Object.keys(byWaveform.body).length === 2, JSON.stringify(byWaveform.body));
+    const several = await api<{ error?: { code?: string; message?: string; hint?: string } }>(ctx, "/v1/proofs/ata", {
+      method: "POST",
+      headers: { authorization: `Basic ${Buffer.from(`commit:${fakeApp("commit").secret}`).toString("base64")}`, "idempotency-key": `e2e-several-${Date.now()}` },
+      json: { audiences: ["remind", "waveform"] },
+    });
+    results.check("a proof for two apps at once is refused: 422 ata_single_app, naming the one-proof-per-app way", several.status === 422 && several.body.error?.code === "ata_single_app" && /receiving_app/.test(several.body.error?.hint ?? ""), `${several.status} ${JSON.stringify(several.body).slice(0, 300)}`);
+
+    // The CLI the same way: `accounts app proof ata --to <app>` names exactly one app.
+    const home = cliHome();
+    const secret = `${fakeApp("commit").secret}\n`;
+    const viaCli = await cli(env, home, ["app", "proof", "ata", "--to", "waveform", "--scope", "notifications.send", "--app-id", "commit", "--app-secret-stdin", "--json"], { stdin: secret });
+    const cliToken = typeof viaCli.json?.proof_token === "string" ? viaCli.json.proof_token : "";
+    results.check("`accounts app proof ata --to waveform` issues commit's proof for waveform", viaCli.code === 0 && viaCli.json?.receiving_app === "waveform" && viaCli.json.kind === "ata" && cliToken.startsWith("sap_"), `exit ${viaCli.code} in ${viaCli.ms} ms: ${JSON.stringify(viaCli.json).slice(0, 160)}`);
+    results.check("…which waveform verifies", (await verifyProof(ctx, "waveform", cliToken)).body.valid === true);
+    const twice = await cli(env, home, ["app", "proof", "ata", "--to", "remind", "--to", "waveform", "--app-id", "commit", "--app-secret-stdin", "--json"], { stdin: secret });
+    const twiceError = (twice.json?.error ?? {}) as { message?: string };
+    results.check("…and `--to` twice is refused, saying it takes one app", twice.code === 2 && /--to/.test(twiceError.message ?? ""), `exit ${twice.code}: ${JSON.stringify(twice.json).slice(0, 200)}`);
+
+    results.check("timings (5 runs each, plus the single-app calls)", true, Object.entries(timings).map(([name, values]) => `${name} ${spread(values)}`).join("; "));
     for (const [name, values] of Object.entries(timings)) {
       const sorted = [...values].sort((a, b) => a - b);
       results.metric(`${name} median`, sorted[Math.floor(sorted.length / 2)]!);
@@ -50,9 +93,9 @@ export const journey: Journey = {
     }
 
     // The Carbon's /proofs page lists the proofs; revoking one there makes briefcase's verify answer "not valid".
-    const issued = await postJson<{ body?: { proof_token?: string; proof_id?: string } }>(`${env.apps}/dm/actions/issue-obo`, { uuid: brook.uuid, receiving_app: "briefcase", scopes: ["files.write"] });
-    const token = issued.body.body?.proof_token ?? "";
-    const proofId = issued.body.body?.proof_id ?? "";
+    const obo = await postJson<{ body?: { proof_token?: string; proof_id?: string } }>(`${env.apps}/dm/actions/issue-obo`, { uuid: brook.uuid, receiving_app: "briefcase", scopes: ["files.write"] });
+    const token = obo.body.body?.proof_token ?? "";
+    const proofId = obo.body.body?.proof_id ?? "";
     const before = await postJson<{ verification?: { valid?: boolean } }>(`${env.apps}/briefcase/api/verify-proof`, { proof_token: token });
     results.check("briefcase verifies a fresh OBO proof as valid", before.body.verification?.valid === true);
     const context = await newContext(browser, { cookies: brook.cookies });

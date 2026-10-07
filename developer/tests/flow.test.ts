@@ -47,3 +47,30 @@ test("the details save group sends the flow with the details", () => {
   assert.equal(sectionOf("branding.light.primary"), "pages");
   assert.equal(sectionOf("redirect_uris[2]"), "signin");
 });
+
+test("leaving the Image background drops an image URL the server would refuse, so a hidden field never blocks saving", async () => {
+  const { backgroundStyleEdits, brandingProblems } = await import("../components/developer/lib/validate");
+  const { DEFAULT_BRANDING } = await import("../lib/branding/defaults");
+  const typed = { ...DEFAULT_BRANDING, background_style: "image" as const, background_image_url: "http://browser.example/bg.jpg" };
+  assert.match(brandingProblems(typed)["branding.background_image_url"] ?? "", /must use https/, "stopped while Image is chosen");
+  const edits = backgroundStyleEdits(typed, "gradient");
+  assert.deepEqual(edits, { "branding.background_style": "gradient", "branding.background_image_url": null });
+  const after = { ...typed, background_style: "gradient" as const, background_image_url: null };
+  assert.equal(brandingProblems(after)["branding.background_image_url"], undefined, "nothing left to block saving");
+  const usable = { ...typed, background_image_url: "https://browser.example/bg.jpg" };
+  assert.deepEqual(backgroundStyleEdits(usable, "dots"), { "branding.background_style": "dots" }, "a usable URL stays for coming back to Image");
+  assert.deepEqual(backgroundStyleEdits(typed, "image"), { "branding.background_style": "image" }, "choosing Image keeps what was typed");
+});
+
+test("the Pages tab previews only the pages a Carbon can meet with the draft's methods", async () => {
+  const { previewPages } = await import("../components/developer/lib/preview-pages");
+  const labels = (methods: Partial<Record<"email" | "phone" | "google" | "apple", boolean>>, order: Array<"email" | "phone" | "google" | "apple">, extra: Record<string, unknown> = {}) =>
+    previewPages(normalizeConfig({ methods: { email: false, phone: false, google: false, apple: false, ...methods }, method_order: order, ...extra })).map(option => option.label);
+  // ledgerly: email, phone and Google; no Apple, so no Carbon ever sees an Opening Apple page.
+  const ledgerly = labels({ email: true, phone: true, google: true }, ["email", "phone", "google"], { required_fields: ["email"], optional_fields: ["timezone"], flow: { steps: [step("contact", ["email"]), step("about", ["timezone"])], review: true } });
+  assert.deepEqual(ledgerly, ["Sign in", "Sign up", "Opening Google", "Email code", "Phone code", "Set up account", "Details 1", "Details 2", "Review", "Embed buttons"]);
+  // An app with only Apple: its Opening page and no code pages.
+  assert.deepEqual(labels({ apple: true }, ["apple"]), ["Sign in", "Sign up", "Opening Apple", "Set up account", "What's shared (profile)", "Embed buttons"]);
+  // Every method on: every page.
+  assert.deepEqual(labels({ email: true, phone: true, google: true, apple: true }, ["google", "apple", "email", "phone"], { required_fields: ["email"] }), ["Sign in", "Sign up", "Opening Google", "Opening Apple", "Email code", "Phone code", "Set up account", "What's shared", "Embed buttons"]);
+});

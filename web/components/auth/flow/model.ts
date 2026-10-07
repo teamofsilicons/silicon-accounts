@@ -55,6 +55,31 @@ export const destinationName = (app: Pick<HostedFlow["app"], "app_id" | "name">)
 /** Google and Apple are providers; email and phone are contact methods with a code. */
 export const isProvider = (method: SigninMethod): method is "google" | "apple" => method === "google" || method === "apple";
 
+/**
+ * The provider whose Opening page this flow starts on: the app's own "Continue with Google/Apple" (method=google|apple)
+ * on a flow that has not moved yet. A flow that came back from the provider with an error shows the methods instead.
+ */
+export function openingProvider(flow: Pick<HostedFlow, "step" | "method_hint" | "methods" | "error">): "google" | "apple" | null {
+  const hint = flow.method_hint;
+  if (flow.step !== "choose_method" || !hint || !isProvider(hint) || !flow.methods.includes(hint) || flow.error) return null;
+  return hint;
+}
+
+/**
+ * Which page the flow is on, as the card draws it: the step, the page of the app's flow on a details step (a page the
+ * app renamed is another page), and on the methods step the Opening page or "Continue as". When a failed action makes
+ * the flow move to another page, the page that asked is gone, and the reason has to show on the new one.
+ */
+export function placeOf(flow: Pick<HostedFlow, "step" | "details" | "signed_in_as" | "method_hint" | "methods" | "error"> | null | undefined): string | null {
+  if (!flow) return null;
+  if (flow.step === "details") return `details:${flow.details?.id ?? ""}:${flow.details?.index ?? 0}`;
+  if (flow.step === "choose_method") {
+    const opening = openingProvider(flow);
+    return opening ? `opening:${opening}` : flow.signed_in_as ? "choose_method:account" : "choose_method";
+  }
+  return flow.step;
+}
+
 /** What the frame needs to know about the app (a FlowView's `app`, or a remembered look while it loads). */
 export interface FrameApp {
   app_id: string;

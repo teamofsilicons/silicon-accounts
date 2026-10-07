@@ -9,6 +9,9 @@ import { newContext, sql, tag } from "../../lib";
 import {
   Browserish,
   appEvents,
+  redirectParams,
+  sendCode,
+  startSignIn,
   appForm,
   brief,
   exchangeCode,
@@ -166,7 +169,7 @@ const refreshRotation: Journey = {
     const { env, results } = ctx;
     const t = tag();
     const b = new Browserish(env, ctx.ip);
-    const s = await signUpVia(b, "briefcase", `rotate.${t}@example.test`, { optionalScopes: ["timezone"] });
+    const s = await signUpVia(b, "briefcase", `rotate.${t}@example.test`, { share: ["timezone"] });
     const t0 = await exchangeCode(env, "briefcase", s.code, s.started.redirectUri, s.started.verifier);
     const uuid = t0.body.account.uuid;
     const created = await sql(env, `select extract(epoch from expires_at - created_at)::bigint from token_families where account_uuid = '${uuid}' and app_id = 'briefcase'`);
@@ -242,7 +245,7 @@ const endpoints: Journey = {
     const t = tag();
     const b = new Browserish(env, ctx.ip);
     const email = `endpoints.${t}@example.test`;
-    const s = await signUpVia(b, "briefcase", email, { optionalScopes: ["timezone"], timezone: "Asia/Tokyo" });
+    const s = await signUpVia(b, "briefcase", email, { share: ["timezone"], timezone: "Asia/Tokyo" });
     const tokens = await exchangeCode(env, "briefcase", s.code, s.started.redirectUri, s.started.verifier);
     results.check("token responses are never cached (Cache-Control: no-store)", /no-store/.test(tokens.headers.get("cache-control") ?? ""), String(tokens.headers.get("cache-control")));
     const uuid = tokens.body.account.uuid;
@@ -323,5 +326,58 @@ const endpoints: Journey = {
   },
 };
 
-export const journeys: Journey[] = [pkce, codeReuse, refreshRotation, endpoints];
+const developerClient: Journey = {
+  name: "auth-flows-developer-client",
+  title: "the developer site's first-party public client: no details pages and no membership, its code redeemed without a secret only with PKCE S256 (plain or none refused), refreshed and revoked as a public client; its token works on /v1/me but not elsewhere (token_wrong_audience); apps never pass as public clients",
+  async run(ctx) {
+    const { env, results } = ctx;
+    const t = tag();
+    const callback = `${env.developer}/auth/callback`;
+    const signUpDeveloper = async (pkceMethod: "S256" | "plain" | "none", email: string) => {
+      const b = new Browserish(env, ctx.ip);
+      const s = await startSignIn(b, "developer", { redirectUri: callback, pkce: pkceMethod, nonce: null });
+      const sent = await sendCode(b, s.flow.id, { email });
+      const verified = await b.act(s.flow.id, "verify", { code: sent.code ?? "" });
+      const done = verified.body.flow?.step === "signup" ? (await b.act(s.flow.id, "signup", {})).body.flow : verified.body.flow;
+      return { b, s, done, code: redirectParams(done).get("code") ?? "" };
+    };
+    const first = await signUpDeveloper("S256", `developer.${t}@example.test`);
+    results.check("a new Carbon signing in to the developer site: sign-up, then complete at once (first-party: no details page), back to its /auth/callback", first.done?.step === "complete" && (first.done.redirect_to ?? "").startsWith(`${callback}?`) && !!first.code, first.done?.redirect_to ?? "");
+    const pub = await exchangeCode(env, "developer", first.code, callback, first.s.verifier, { publicClient: true });
+    const claims = jwtClaims(pub.body.access_token);
+    results.check("its code is redeemed with client_id=developer, no secret, the PKCE verifier → 200, aud developer", pub.status === 200 && claims.aud === "developer" && typeof pub.body.refresh_token === "string", brief(pub));
+    const uuid = String(claims.sub ?? "");
+    const membership = await sql(env, `select count(*) from memberships where app_id = 'developer' and account_uuid = '${uuid}'`);
+    results.check("…and no membership is made for the developer site", membership[0]?.[0] === "0", JSON.stringify(membership));
+    const me = await fetch(`${env.site}/v1/me`, { headers: { authorization: `Bearer ${pub.body.access_token}` } });
+    results.check("the developer token reads GET /v1/me (allowed for aud developer)", me.status === 200, String(me.status));
+    const apps = await fetch(`${env.site}/v1/me/apps`, { headers: { authorization: `Bearer ${pub.body.access_token}` } });
+    const appsBody = (await apps.json().catch(() => ({}))) as { error?: { code?: string } };
+    results.check("…but not GET /v1/me/apps (the account site's): 401 token_wrong_audience", apps.status === 401 && appsBody.error?.code === "token_wrong_audience", `${apps.status} ${JSON.stringify(appsBody).slice(0, 200)}`);
+    const rotated = await refresh(env, "developer", pub.body.refresh_token, {}, { publicClient: true });
+    results.check("the public client refreshes its own token (rotation)", rotated.status === 200 && rotated.body.refresh_token !== pub.body.refresh_token, brief(rotated));
+    const revoked = rotated.status === 200 ? await revoke(env, "developer", rotated.body.refresh_token, { publicClient: true }) : null;
+    results.check("…and revokes it as a public client (200 revoked:true), after which it is dead", revoked?.status === 200 && revoked.body.revoked === true && (await refresh(env, "developer", rotated.body.refresh_token, {}, { publicClient: true })).status === 400, revoked ? JSON.stringify(revoked.body) : "no refresh");
+
+    const plain = await signUpDeveloper("plain", `developer.plain.${t}@example.test`);
+    const plainTry = await exchangeCode(env, "developer", plain.code, callback, plain.s.verifier, { publicClient: true });
+    results.check("a developer sign-in with plain PKCE: its code without a secret → invalid_grant (S256 required)", plainTry.status === 400 && plainTry.body.error === "invalid_grant" && /S256/.test(plainTry.body.error_description ?? ""), brief(plainTry));
+    const none = await signUpDeveloper("none", `developer.none.${t}@example.test`);
+    const noneTry = await exchangeCode(env, "developer", none.code, callback, null, { publicClient: true });
+    results.check("a developer sign-in without PKCE: its code without a secret → invalid_grant", noneTry.status === 400 && noneTry.body.error === "invalid_grant", brief(noneTry));
+
+    const app = new Browserish(env, ctx.ip);
+    const brief1 = await signUpVia(app, "briefcase", `developer.other.${t}@example.test`);
+    const stolen = await exchangeCode(env, "developer", brief1.code, brief1.started.redirectUri, brief1.started.verifier, { publicClient: true });
+    results.check("briefcase's code redeemed by the public developer client → invalid_grant (issued to a different app)", stolen.status === 400 && stolen.body.error === "invalid_grant", brief(stolen));
+    const noSecret = await exchangeCode(env, "briefcase", brief1.code, brief1.started.redirectUri, brief1.started.verifier, { publicClient: true });
+    results.check("an app without its secret (client_id=briefcase only) → 401 invalid_client: apps are never public clients", noSecret.status === 401 && noSecret.body.error === "invalid_client", brief(noSecret));
+    const credentials = await appForm<Record<string, string>>(env, "developer", "/v1/oauth/token", { grant_type: "client_credentials" }, { publicClient: true });
+    results.check("the developer client asking for client_credentials → 400 (unsupported_grant_type or unauthorized_client)", credentials.status === 400 && ["unsupported_grant_type", "unauthorized_client"].includes(String(credentials.body.error)), brief(credentials));
+    const introspected = await appForm<Record<string, unknown>>(env, "developer", "/v1/oauth/introspect", { token: pub.body.access_token }, { publicClient: true });
+    results.check("the public developer client can't introspect → 401 invalid_client", introspected.status === 401, brief(introspected));
+  },
+};
+
+export const journeys: Journey[] = [pkce, codeReuse, refreshRotation, endpoints, developerClient];
 

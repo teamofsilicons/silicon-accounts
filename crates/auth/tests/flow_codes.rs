@@ -409,6 +409,199 @@ async fn allowed_email_domains_are_enforced() {
     assert_eq!(r.json["flow"]["step"], "signup");
 }
 
+/// Sends a phone code in a flow and verifies it; returns the verify response.
+async fn phone_and_verify(
+    ctx: &TestContext,
+    b: &mut Browser,
+    flow_id: &str,
+    phone: &str,
+) -> accounts_core::test_support::Resp {
+    let r = b
+        .post(
+            ctx,
+            &format!("/v1/flows/{flow_id}/phone"),
+            json!({"phone": phone}),
+        )
+        .await;
+    assert_eq!(r.status, 200, "send phone code: {}", r.json);
+    let code = last_code(ctx, phone).await;
+    b.post(
+        ctx,
+        &format!("/v1/flows/{flow_id}/verify"),
+        json!({"code": code}),
+    )
+    .await
+}
+
+/// The domain rule holds for phone codes too: only an account with a verified email at one of
+/// the app's domains gets in, and a new phone-only Carbon can only sign up when the app's
+/// details page will ask for an email at the domains (a required email).
+#[tokio::test]
+async fn phone_codes_meet_the_apps_email_domains() {
+    let ctx = TestContext::new().await;
+    let (app, _) = app_with(
+        &ctx,
+        "campus",
+        json!({
+            "allowed_email_domains": ["university.test"],
+            "methods": {"email": true, "phone": true},
+            "required_fields": ["email"],
+            "optional_fields": [],
+        }),
+    )
+    .await;
+    // An existing Carbon whose only email is elsewhere.
+    let outsider = ctx
+        .carbon_with(CarbonSpec {
+            email: Some(random_email("outsider").replace("example.test", "gmail.test")),
+            phone: Some("+14155550161".into()),
+            ..Default::default()
+        })
+        .await;
+    let mut b = Browser::new(&ctx);
+    let id = id_of(&new_flow(&ctx, &mut b, &app.app_id, json!({})).await);
+    let r = phone_and_verify(&ctx, &mut b, &id, "+14155550161").await;
+    assert_eq!(r.status, 403, "{}", r.json);
+    assert_eq!(r.error_code(), Some("email_domain_not_allowed"));
+    assert_eq!(
+        r.json["error"]["details"]["allowed_domains"],
+        json!(["university.test"])
+    );
+    let r = b.get(&ctx, &format!("/v1/flows/{id}")).await;
+    assert_eq!(r.json["flow"]["step"], "choose_method");
+    assert_eq!(r.json["flow"]["error"]["code"], "email_domain_not_allowed");
+    assert!(b.cookie("sa_session").is_none(), "nobody was signed in");
+    let members = scalar_i64(
+        &ctx,
+        "select count(*) from memberships where account_uuid = $1",
+        &outsider.uuid,
+    )
+    .await;
+    assert_eq!(members, 0, "the app got nothing");
+    let refused: (String, String) = sqlx::query_as(
+        "select method, outcome from signin_history where account_uuid = $1 and app_id = $2",
+    )
+    .bind(&outsider.uuid)
+    .bind(&app.app_id)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("refused sign-in recorded");
+    assert_eq!(refused, ("phone".into(), "failed".into()));
+
+    // Once the account has a verified university email (not even its primary), the phone works.
+    {
+        let mut conn = ctx.conn().await;
+        accounts_core::repo::contacts::add_verified_email(
+            &mut conn,
+            &outsider.uuid,
+            "outsider@university.test",
+            accounts_core::models::VerifiedVia::Code,
+        )
+        .await
+        .expect("university email");
+    }
+    let id = id_of(&new_flow(&ctx, &mut b, &app.app_id, json!({})).await);
+    let r = phone_and_verify(&ctx, &mut b, &id, "+14155550161").await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["flow"]["step"], "details");
+    let r = continue_page(&ctx, &mut b, &id, &[]).await;
+    assert_eq!(r.json["flow"]["step"], "complete", "{}", r.json);
+
+    // A new phone, email required: the sign-up goes on, and its details page asks for an email
+    // at the domains before anything completes.
+    let mut n = Browser::new(&ctx);
+    let id = id_of(&new_flow(&ctx, &mut n, &app.app_id, json!({})).await);
+    let r = phone_and_verify(&ctx, &mut n, &id, "+14155550162").await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["flow"]["step"], "signup");
+    let r = n
+        .post(&ctx, &format!("/v1/flows/{id}/signup"), json!({}))
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["flow"]["step"], "details");
+    assert!(page_fields(&r.json["flow"])[0].3, "the email is missing");
+    let r = continue_page(&ctx, &mut n, &id, &[]).await;
+    assert_eq!(r.error_code(), Some("requirements_missing"));
+    let r = n
+        .post(
+            &ctx,
+            &format!("/v1/flows/{id}/details/add"),
+            json!({"email": "newcomer@gmail.test"}),
+        )
+        .await;
+    assert_eq!(r.error_code(), Some("email_domain_not_allowed"));
+    let r = n
+        .post(
+            &ctx,
+            &format!("/v1/flows/{id}/details/add"),
+            json!({"email": "newcomer@university.test"}),
+        )
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let code = last_code(&ctx, "newcomer@university.test").await;
+    let r = n
+        .post(
+            &ctx,
+            &format!("/v1/flows/{id}/details/verify"),
+            json!({"code": code}),
+        )
+        .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let r = continue_page(&ctx, &mut n, &id, &[]).await;
+    assert_eq!(r.json["flow"]["step"], "complete", "{}", r.json);
+
+    // Without a required email nothing would ask for one: a new phone is refused before any
+    // sign-up starts, and so is a phone-only sign-up already open in this browser.
+    let mut q = Browser::new(&ctx);
+    let open = id_of(&new_flow(&ctx, &mut q, &app.app_id, json!({})).await);
+    let r = phone_and_verify(&ctx, &mut q, &open, "+14155550163").await;
+    assert_eq!(r.json["flow"]["step"], "signup", "{}", r.json);
+    set_config(
+        &ctx,
+        &app.app_id,
+        json!({"required_fields": [], "optional_fields": ["email"]}),
+    )
+    .await;
+    let r = q
+        .post(&ctx, &format!("/v1/flows/{open}/signup"), json!({}))
+        .await;
+    assert_eq!(r.status, 403, "{}", r.json);
+    assert_eq!(r.error_code(), Some("email_domain_not_allowed"));
+    assert_eq!(
+        scalar_i64(
+            &ctx,
+            "select count(*) from account_phones where phone = $1",
+            "+14155550163"
+        )
+        .await,
+        0,
+        "no account was made"
+    );
+    let f = new_flow(&ctx, &mut q, &app.app_id, json!({})).await;
+    assert_eq!(
+        f["step"], "choose_method",
+        "the phone-only sign-up doesn't resume"
+    );
+    let id = id_of(&f);
+    let r = phone_and_verify(&ctx, &mut q, &id, "+14155550164").await;
+    assert_eq!(r.status, 403, "{}", r.json);
+    assert_eq!(r.error_code(), Some("email_domain_not_allowed"));
+    assert!(
+        r.json["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("has no email yet"),
+        "{}",
+        r.json
+    );
+    let r = q.get(&ctx, &format!("/v1/flows/{id}")).await;
+    assert_eq!(r.json["flow"]["step"], "choose_method");
+    // An email at the domains still signs up.
+    let r = email_and_verify(&ctx, &mut q, &id, "fresh@university.test").await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["flow"]["step"], "signup");
+}
+
 #[tokio::test]
 async fn closed_apps_refuse_new_accounts_but_not_existing_ones() {
     let ctx = TestContext::new().await;

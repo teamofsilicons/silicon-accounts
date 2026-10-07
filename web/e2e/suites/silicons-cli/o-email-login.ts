@@ -1,12 +1,14 @@
 import { statSync } from "node:fs";
 import { join } from "node:path";
 import type { Journey } from "../../context";
-import { forgetRateLimits, lastSeq, sql, tag } from "../../lib";
-import { accounts, asCarbon, cliError, codeEmail, freshDir, obj, said, short, signUpCarbon, str, type Json } from "./_helpers";
+import { codeFor, forgetRateLimits, lastSeq, sql, tag } from "../../lib";
+import { accounts, asCarbon, cliError, codeEmail, freshDir, freshPhone, loginCarbon, obj, said, short, signUpCarbon, str, type Json } from "./_helpers";
 
 export const journey: Journey = {
   name: "silicons-cli-email-login",
-  title: "headless `accounts login --email`: the code is sent and the command returns (code_sent), `--code` finishes it (or `--challenge`); wrong, expired and reused codes, an unknown address, ten wrong codes lock it for a minute, and the flags that don't fit together",
+  title: "headless `accounts login --email` and `--phone`: the code is sent and the command returns (code_sent), `--code` finishes it (or `--challenge`); wrong, expired and reused codes, an unknown address or number, ten wrong codes lock it for a minute, a local number with --country, and the flags that don't fit together",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     await forgetRateLimits(env, "127.0.0.1");
@@ -103,5 +105,34 @@ export const journey: Journey = {
     results.check("the ten wrong codes: 'Too many wrong codes for <masked address>', paused until when", !!lock && /^Too many wrong codes for s\*+@example\.test$/.test(str(lock.title)) && /^After 10 wrong codes in a row, tries were paused until \d{4}-\d\d-\d\dT/.test(str(lock.detail)), short(lock));
     const failed = (await entries("signin")).filter(item => obj(item.meta).outcome === "failed");
     results.check("…recorded as a failed sign-in from the accounts CLI", failed.length >= 1 && failed.every(item => item.title === "Failed sign-in to Silicon Accounts with an email code" && /· accounts CLI \d+\.\d+\.\d+$/.test(str(item.detail))), short(failed.map(item => [item.title, item.detail])));
+
+    // 7. The same by phone (`accounts login --phone`): another Carbon, whose phone was added and verified with the CLI.
+    const phoned = await signUpCarbon(env, "headless-phone");
+    const homeP = freshDir();
+    await loginCarbon(env, homeP, phoned);
+    const phone = await freshPhone(env);
+    let seq = await lastSeq(env);
+    const add = await accounts(env, ["phone", "add", phone, "--json"], { home: homeP });
+    const addCode = await codeFor(env, phone, seq).catch(() => "");
+    const verified = await accounts(env, ["phone", "verify", str(add.json?.challenge_id), addCode, "--json"], { home: homeP });
+    results.check("setup: another Carbon adds and verifies a phone with the CLI (`accounts phone add` + `accounts phone verify`)", add.code === 0 && verified.code === 0, `${said(add)} | ${said(verified)}`);
+    const homeQ = freshDir();
+    seq = await lastSeq(env);
+    const startP = await accounts(env, ["login", "--phone", phone, "--json"], { home: homeQ });
+    results.check("`accounts login --phone <+E.164> --json`: exit 0, code_sent, the number masked, how to finish", startP.code === 0 && startP.json?.status === "code_sent" && startP.json?.authenticated === false && !str(startP.json?.destination).includes(phone) && str(startP.json?.next).includes("--code"), said(startP));
+    const sms = await codeFor(env, phone, seq).catch(() => "");
+    const finishP = await accounts(env, ["login", "--phone", phone, "--code", sms, "--json"], { home: homeQ });
+    results.check("…the code from the text message (`--code`) signs the Carbon in", !!sms && finishP.code === 0 && finishP.json?.authenticated === true && finishP.json?.id === phoned.id && finishP.json?.kind === "carbon", said(finishP));
+    const local = `(${phone.slice(2, 5)}) ${phone.slice(5, 8)}-${phone.slice(8)}`;
+    const homeR = freshDir();
+    seq = await lastSeq(env);
+    const startL = await accounts(env, ["login", "--phone", local, "--country", "US", "--json"], { home: homeR });
+    const localCode = await codeFor(env, phone, seq).catch(() => "");
+    const finishL = await accounts(env, ["login", "--phone", local, "--country", "US", "--code", localCode, "--json"], { home: homeR });
+    results.check(`the same number written locally ("${local}" with --country US) reaches the same account`, startL.code === 0 && !!localCode && finishL.code === 0 && finishL.json?.id === phoned.id, `${said(startL)} | ${said(finishL)}`);
+    const nobodyPhone = await accounts(env, ["login", "--phone", await freshPhone(env), "--json"], { home: freshDir() });
+    results.check("a number no Carbon has: exit 4, account_not_found", nobodyPhone.code === 4 && cliError(nobodyPhone).code === "account_not_found", said(nobodyPhone));
+    const emailAndPhone = await accounts(env, ["login", "--email", phoned.email, "--phone", phone, "--json"], { home: freshDir() });
+    results.check("--email with --phone: exit 2, the JSON error names the conflict", emailAndPhone.code === 2 && /cannot be used with/.test(str(cliError(emailAndPhone).message)), said(emailAndPhone));
   },
 };

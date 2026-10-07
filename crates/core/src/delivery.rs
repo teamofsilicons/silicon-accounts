@@ -12,17 +12,26 @@
 //! the claim still holds (`attempts` and `next_attempt_at` unchanged since the claim): a sender
 //! that outlived its claim, after another node claimed the message again, records nothing
 //! ([`DeliveryOutcome::ClaimLost`]).
+//!
+//! Verification codes are never readable in `outbound_messages` with
+//! `ACCOUNTS_DELIVERY=providers` (`otp_challenges` keeps only an HMAC of each code): a code
+//! message is stored with the code replaced by [`REDACTED_CODE`], and its real subject and bodies
+//! are sealed with the keyring in `sealed_body` ([`enqueue_otp`]). The sender opens them to send;
+//! once the message is sent or has failed, `sealed_body` is cleared, except where the dev outbox
+//! is on (never in production), which opens it to show the code.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use secrecy::ExposeSecret;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::{PgConnection, PgPool};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::config::{DeliveryMode, Settings};
+use crate::crypto::Keyring;
 use crate::error::ApiResult;
 use crate::models::{MessageChannel, OtpChannel, OtpPurpose};
 use crate::repo::otp::OtpChallenge;
@@ -68,13 +77,57 @@ pub struct OutboundMessage {
     pub last_error: Option<String>,
     pub created_at: OffsetDateTime,
     pub sent_at: Option<OffsetDateTime>,
+    /// A code message's real subject and bodies, sealed with the keyring ([`SealedBody`]); the
+    /// columns above then show the code as [`REDACTED_CODE`].
+    pub sealed_body: Option<Vec<u8>>,
 }
 
 macro_rules! message_columns {
     () => {
         "id, channel, to_address, subject, text_body, html_body, purpose, status, attempts, next_attempt_at, \
-         provider_message_id, last_error, created_at, sent_at"
+         provider_message_id, last_error, created_at, sent_at, sealed_body"
     };
+}
+
+/// How a verification code reads in a stored message (its subject and bodies).
+pub const REDACTED_CODE: &str = "••••••";
+
+/// SQL `set` items that blank any 6-digit code left in a code message's subject and bodies (a
+/// message enqueued before codes were sealed); a no-op on redacted ones.
+macro_rules! redact_codes_sql {
+    () => {
+        "subject = case when purpose like 'otp\\_%' then regexp_replace(subject, '(?<![0-9])[0-9]{6}(?![0-9])', '••••••', 'g') else subject end, \
+         text_body = case when purpose like 'otp\\_%' then regexp_replace(text_body, '(?<![0-9])[0-9]{6}(?![0-9])', '••••••', 'g') else text_body end, \
+         html_body = case when purpose like 'otp\\_%' then regexp_replace(html_body, '(?<![0-9])[0-9]{6}(?![0-9])', '••••••', 'g') else html_body end"
+    };
+}
+
+/// The real subject and bodies of a code message, sealed in `outbound_messages.sealed_body`
+/// (keyring-encrypted JSON).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SealedBody {
+    pub subject: Option<String>,
+    pub text: String,
+    pub html: Option<String>,
+}
+
+fn message_keyring(settings: &Settings) -> ApiResult<Keyring> {
+    Ok(Keyring::from_json(
+        settings.encryption_keyring.expose_secret(),
+        settings.encryption_current_version,
+    )?)
+}
+
+/// Opens a message's `sealed_body` with the configured keyring.
+pub fn open_sealed(settings: &Settings, sealed: &[u8]) -> ApiResult<SealedBody> {
+    let json = message_keyring(settings)?.decrypt(sealed)?;
+    Ok(serde_json::from_slice(&json)?)
+}
+
+/// True when a sent or failed message keeps its `sealed_body`: only where the dev outbox shows
+/// codes (never in production).
+fn keeps_sealed_body(settings: &Settings) -> bool {
+    settings.dev_outbox_enabled()
 }
 
 /// Stores a message (`pending`, or `local` in local delivery mode). Returns its id.
@@ -83,14 +136,23 @@ pub async fn enqueue(
     settings: &Settings,
     msg: &NewMessage,
 ) -> ApiResult<Uuid> {
+    insert(conn, settings, msg, None).await
+}
+
+async fn insert(
+    conn: &mut PgConnection,
+    settings: &Settings,
+    msg: &NewMessage,
+    sealed_body: Option<Vec<u8>>,
+) -> ApiResult<Uuid> {
     let id = Uuid::now_v7();
     let status = match settings.delivery {
         DeliveryMode::Local => "local",
         DeliveryMode::Providers => "pending",
     };
     sqlx::query(
-        "insert into outbound_messages (id, channel, to_address, subject, text_body, html_body, purpose, status) \
-         values ($1, $2, $3, $4, $5, $6, $7, $8)",
+        "insert into outbound_messages (id, channel, to_address, subject, text_body, html_body, purpose, status, sealed_body) \
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     )
     .bind(id)
     .bind(msg.channel)
@@ -100,6 +162,7 @@ pub async fn enqueue(
     .bind(&msg.html_body)
     .bind(&msg.purpose)
     .bind(status)
+    .bind(sealed_body)
     .execute(&mut *conn)
     .await?;
     Ok(id)
@@ -135,7 +198,24 @@ pub async fn enqueue_otp(
             purpose: format!("otp_{}", challenge.purpose),
         },
     };
-    enqueue(conn, settings, &msg).await
+    if settings.delivery == DeliveryMode::Local {
+        // Never sent; the dev outbox shows it as written.
+        return enqueue(conn, settings, &msg).await;
+    }
+    // The code is stored only sealed: the readable columns show it as REDACTED_CODE.
+    let sealed = message_keyring(settings)?.encrypt(&serde_json::to_vec(&SealedBody {
+        subject: msg.subject.clone(),
+        text: msg.text_body.clone(),
+        html: msg.html_body.clone(),
+    })?)?;
+    let redact = |s: &str| s.replace(code, REDACTED_CODE);
+    let stored = NewMessage {
+        subject: msg.subject.as_deref().map(redact),
+        text_body: redact(&msg.text_body),
+        html_body: msg.html_body.as_deref().map(redact),
+        ..msg
+    };
+    insert(conn, settings, &stored, Some(sealed)).await
 }
 
 /// Why a send failed.
@@ -462,16 +542,42 @@ pub async fn deliver_claimed(
     settings: &Settings,
     msg: &OutboundMessage,
 ) -> ApiResult<DeliveryOutcome> {
-    match sender.send(msg).await {
+    // A code message is sent with its sealed subject and bodies (the stored ones are redacted).
+    let sent = match &msg.sealed_body {
+        None => sender.send(msg).await,
+        Some(sealed) => match open_sealed(settings, sealed) {
+            Ok(body) => {
+                let real = OutboundMessage {
+                    subject: body.subject,
+                    text_body: body.text,
+                    html_body: body.html,
+                    sealed_body: None,
+                    ..msg.clone()
+                };
+                sender.send(&real).await
+            }
+            Err(e) => {
+                tracing::error!(message_id = %msg.id, error = %e, "a sealed message could not be opened");
+                Err(SendError::permanent(
+                    "the message's sealed subject and bodies can't be opened with the configured ACCOUNTS_ENCRYPTION_KEYRING (was the key that sealed them removed?)",
+                ))
+            }
+        },
+    };
+    let keep_sealed = keeps_sealed_body(settings);
+    match sent {
         Ok(provider_id) => {
-            let recorded = sqlx::query(
-                "update outbound_messages set status = 'sent', sent_at = now(), provider_message_id = $2, last_error = null \
-                 where id = $1 and status = 'pending' and attempts = $3 and next_attempt_at = $4",
-            )
+            let recorded = sqlx::query(concat!(
+                "update outbound_messages set status = 'sent', sent_at = now(), provider_message_id = $2, last_error = null, \
+                 sealed_body = case when $5 then sealed_body end, ",
+                redact_codes_sql!(),
+                " where id = $1 and status = 'pending' and attempts = $3 and next_attempt_at = $4"
+            ))
             .bind(msg.id)
             .bind(&provider_id)
             .bind(msg.attempts)
             .bind(msg.next_attempt_at)
+            .bind(keep_sealed)
             .execute(pool)
             .await?
             .rows_affected();
@@ -511,14 +617,17 @@ pub async fn deliver_claimed(
                     error: e.message,
                 })
             } else {
-                let recorded = sqlx::query(
-                    "update outbound_messages set status = 'failed', last_error = $2 \
-                     where id = $1 and status = 'pending' and attempts = $3 and next_attempt_at = $4",
-                )
+                let recorded = sqlx::query(concat!(
+                    "update outbound_messages set status = 'failed', last_error = $2, \
+                     sealed_body = case when $5 then sealed_body end, ",
+                    redact_codes_sql!(),
+                    " where id = $1 and status = 'pending' and attempts = $3 and next_attempt_at = $4"
+                ))
                 .bind(msg.id)
                 .bind(&e.message)
                 .bind(msg.attempts)
                 .bind(msg.next_attempt_at)
+                .bind(keep_sealed)
                 .execute(pool)
                 .await?
                 .rows_affected();

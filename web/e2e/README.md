@@ -1,14 +1,22 @@
 # The browser end-to-end walk
 
 `web/e2e` walks Silicon Accounts in a real browser (Playwright's Chromium or WebKit) against a whole local stack:
-the account site (a production build of this Next.js app), accounts-api behind it, Postgres, and the testkit's mock
-Google/Apple, mock email/SMS, mock Iris and fake apps. Every stack is isolated (its own ports, database and site
-build), so any number of them can run at the same time: one per suite, one per agent.
+the account site (a production build of this Next.js app), the developer site (`developer/`, its own production build),
+accounts-api behind them, Postgres, and the testkit's mock Google/Apple, mock email/SMS, mock Iris and fake apps. Every
+stack is isolated (its own ports, database and builds), so any number of them can run at the same time: one per suite,
+one per agent.
+
+It follows UNDERSTANDING.md v2 (build spec 06-v2): the hosted sign-in goes `choose_method` (or the Opening page for an
+app's own Google/Apple button) → `verify_code` → `signup` → the app's `details` pages (required details locked, a
+missing email or phone added there with a code, optional details unticked until ticked) → `review` (when the app's flow
+has one) → the app; apps start it as a sign-in or a sign-up (`intent`), with a direct method button or not, and never
+hand over an email or phone; everything about building apps is on the developer site; an ATA proof is for exactly one
+app.
 
 ```
 scripts/e2e.sh                         # every suite in Chromium on a fresh stack of its own, then teardown
-scripts/e2e.sh --suite silicons        # one suite (repeat --suite or comma-separate); "core" is e2e/journeys
-scripts/e2e.sh b-apps silicons/        # journeys by name prefix, or <suite>/<prefix>
+scripts/e2e.sh --suite silicons-cli    # one suite (repeat --suite or comma-separate); "core" is e2e/journeys
+scripts/e2e.sh b-apps silicons-cli/    # journeys by name prefix, or <suite>/<prefix>
 scripts/e2e.sh --webkit --keep         # WebKit, and leave the stack running afterwards
 scripts/e2e.sh --list                  # every suite and journey
 scripts/e2e-all.sh                     # every suite in parallel, one stack each, merged summary
@@ -18,9 +26,10 @@ pnpm -C web e2e [options] [prefix…]    # against a stack that is already runni
 
 `scripts/e2e.sh` builds the Rust binaries (skip with `--no-build`), leases a port base, starts the stack with
 `scripts/dev.sh` (a new database `accounts_e2e_<base>`, migrations, the seeded fake apps, the testkit, accounts-api,
-the site built into `web/.next-<base>`), runs `e2e/run.ts`, copies the stack's logs into the artifacts, stops
-everything, drops the database and deletes the site build. Its exit code is 0 only when every selected journey
-passed. `--dev` serves the site with `next dev` instead of a production build.
+the site built into `web/.next-<base>`, the developer site built into `developer/.next-<base>`), runs `e2e/run.ts`,
+copies the stack's logs into the artifacts, stops everything, drops the database and deletes both builds. Its exit code
+is 0 only when every selected journey passed. `--dev` serves both sites with `next dev` instead of production builds.
+Rust builds go to `CARGO_TARGET_DIR` (the CLI the journeys run is `$CARGO_TARGET_DIR/debug/accounts`).
 
 ## Suites and journeys
 
@@ -29,7 +38,7 @@ web/e2e/
   run.ts             finds journeys, runs them in one browser, writes the report (never edited to add a suite)
   lib.ts             helpers for journeys (below)          context.ts   the Journey, Ctx and Shared types
   summary.ts         merges the reports of scripts/e2e-all.sh
-  journeys/*.ts      the "core" suite: the product's main journeys
+  journeys/*.ts      the "core" suite: the product's main journeys (below)
   suites/<suite>/    one folder per suite; every *.ts file in it holds journeys
   suites/harness/    the harness checks itself (isolation, forwarded addresses, mock Iris)
   test/, suites/<suite>/test/   unit tests (node:test, no stack needed) of the harness and of a suite's helpers
@@ -84,12 +93,57 @@ A journey:
 A journey passes when it threw nothing, every check passed and its watched pages reported no problem. Checks are
 data: `results.check(name, ok, detail)` never throws, so a journey keeps going and reports everything it saw.
 
-`lib.ts` has: `newContext` (1440×900, Asia/Kolkata, its own forwarded address), `shot`, `tag`, `sleep`, `json`,
-`postJson`, `api` (a call with the journey's own address, through the site or `direct` to accounts-api), `lastSeq` and
-`codeFor` (codes from the mock email/SMS server), `cli` and `cliHome` (the real `accounts` CLI), `signInOnSite`,
-`finishSignup`, `afterConsent`, `appAccount` (what a fake app received), `sql` and `forgetRateLimits` (the stack's
-database), `randomIp`, `forwardAs`, `withBenchSlot`, `waitForCalm` and `watchStalls` (benchmarks, below). The
-testkit's own helpers (`testkit/lib`) work too, pointed at `ctx.env`.
+`lib.ts` has:
+
+- the basics: `newContext` (1440×900, Asia/Kolkata, its own forwarded address), `shot`, `tag`, `sleep`, `json`,
+  `postJson`, `api` (a call with the journey's own address, through the site or `direct` to accounts-api), `lastSeq` and
+  `codeFor` (codes from the mock email/SMS server), `cli` and `cliHome` (the real `accounts` CLI), `sql` and
+  `forgetRateLimits` (the stack's database), `randomIp`, `forwardAs`, `withBenchSlot`, `waitForCalm` and `watchStalls`
+  (benchmarks, below);
+- the fake apps: `fakeApp(id)` (testkit/fake-apps.json: owner, secret, seeded sign-in setup), `appUrl`, `appAccount`
+  (what a fake app received), `startAtApp(env, page, app, { intent?, method?, extra? })` (the app's own "Sign in with
+  Silicon Accounts" link, its "Create an account" link for `intent: "signup"`, or its direct "Continue with …" button
+  for `method`; `extra` adds or removes query parameters of that link, such as a `login_hint` the hosted pages must
+  ignore, keeping the app's state and PKCE; returns the /authorize address);
+- the hosted pages: `live(page, css)` (the step on screen, not the one morphing out), `hostedTitle`, `methodButton`
+  (Continue with Google/Apple), `signInWithCode(env, page, { email } | { phone })` (the field, Continue, the code),
+  `chooseMockIdentity` (the mock Google/Apple chooser), `waitForOpening` (the Opening page: its title, font and
+  background, the "Continue to Google" fallback, "Powered by", how long until it moved on), `poweredBy` (where it links,
+  in view or at the page's foot), `POWERED_BY_HREF`, `readFlow` (the FlowView, with the browser's own cookies);
+- the details pages: `completeDetails(env, page, app, answers)` walks every details page and the review until the
+  browser is back at the app: `add: { email?, phone? }` adds a missing email or phone with a code (a required one must
+  be given), `tick` / `untick` optional details, `cancelOnPage`, `approve: false`, `stopAtReview`; it returns every
+  page as shown (index and count, title, "Step n of m", continue label, its own and its drawn layout, each row's mode,
+  missing and ticked state, what it shared) and the review (shared and kept). `finishSignup` (Create account or Finish
+  setup, then the defaults) and `afterConsent` (the defaults: required shared, optional left unticked, review approved)
+  are built on it;
+- sign-ins: `signInOnSite` (the account site's own /sign-in), `signInOnDeveloper(env, page, email | null, { returnTo })`
+  (the developer site through its BFF: its sign-in card, the account site's hosted pages as the app `developer` with
+  PKCE, `/auth/callback`; `null` continues as the account site's signed-in Carbon), `developerApi` (a call through the
+  developer site's BFF with the context's sealed session and its Origin), `DEVELOPER_SIGNED_OUT` (the 401 of the
+  developer site's session probe while signed out, for `results.watch`);
+- proofs: `issueAta(ctx, app, receivingApp)` (one ATA proof for exactly one app, with the fake app's credentials),
+  `verifyProof(ctx, app, token)`.
+
+The testkit's own helpers (`testkit/lib`) work too, pointed at `ctx.env`.
+
+### The core suite
+
+| journey | what it walks |
+| --- | --- |
+| `a-signup` | the account site's own sign-up (prefilled), the identity home, `developer_url` and the link to the developer site; provides `ada` |
+| `b-apps` | briefcase: a sign-up and its what's-shared page (email required, timezone optional and unticked); dm: Continue as, its one custom page adds the missing phone with a code and shares the ticked email; provides `brook` |
+| `c-providers` | Google and Apple, managed and the apps' own; the apps' direct buttons: the Opening page (default and custom title, the app's style, Powered by, moving on by itself) and email/phone opening on their empty field; a `login_hint` ignored |
+| `d-cli` | the CLI: device sign-in approved in the browser, silicon create, a self-created Silicon accepted on the site, login --silicon, an SLT |
+| `e-proofs` | OBO dm → briefcase and ATA commit → remind and waveform (one proof per app) with timings; a proof for two apps refused (`ata_single_app`), `accounts app proof ata --to` once only; revoking an OBO proof on /proofs |
+| `f-import` | dirty.csv into legacy-crm on the developer site (dry run, for real), the CLI's re-import, an imported Carbon finishing setup (a kept stack walked again: the rows match instead, and the Carbon signs straight in) |
+| `g-webhooks` | account changes reaching the fake apps' webhooks, signatures verified |
+| `h-branding` | acme-notes and pixel-studio in their own style on every page at 1440 and 390 px, Sign in / Sign up buttons, the SDK, the embed's framing |
+| `i-flows` | ledgerly's two-page flow with a review: intent=signup, a page per step, its own split layout, Back keeps choices, Cancel → access_denied |
+| `j-developer` | the developer site as an owner: its apps, a saved title shown by the hosted page, an ATA proof made, verified and revoked on its ATA tab, signing out of it only |
+| `x-shared` | the developer site's unsaved-work guard from every way out and its 404; Escape, the Combobox and focus states; any-country phones; dark tokens; /developer on the account site → the developer site |
+| `y-silicons` | a Silicon on the account site: STK and webhook secret shown once, STK rotated by holding |
+| `z-connect` | connecting Google and Apple on Sign-in methods |
 
 ## Port bases
 
@@ -103,13 +157,15 @@ A stack is named by its port base, the site's port:
 | base + 2 | mock email/SMS (`/_messages`) |
 | base + 3 | the fake apps (`/<app_id>/…`) |
 | base + 4 | mock Iris (`/pfp/carbon?id=…`, `/_requests`) |
+| base + 5 | the developer site (`http://localhost:<base+5>`, its own public origin: `/sign-in`, `/auth/*`, `/api/accounts/*`, `/apps/<app_id>/<tab>`) |
 
 `scripts/e2e.sh` takes `E2E_PORT_BASE` (or `--base`) when given; otherwise it leases the first free base of 9600,
 9610, … 9990 (from `E2E_BASE_START` when set, wrapping around): a lease is the directory `.dev/locks/e2e-<base>` (made
-atomically, holding the run's pid; a dead run's lease is taken over), and a base is only used when all six ports are
-free. Bases are 10 apart so neighbours never overlap. `scripts/e2e-all.sh` asks run n for base 9600 + 10·n and each
-run takes the next free one when that is busy, so it coexists with stacks other runs (or agents) hold. The default
-`scripts/dev.sh` stack is 8589–8594, `scripts/journeys.sh` uses 9690.
+atomically, holding the run's pid; a dead run's lease is taken over), and a base is only used when all seven ports
+(base − 1 … base + 5) are free. Bases are 10 apart so neighbours never overlap. `scripts/e2e-all.sh` asks run n for
+base 9600 + 10·n and each run takes the next free one when that is busy, so it coexists with stacks other runs (or
+agents) hold. The default `scripts/dev.sh` stack is 8589–8594 with the developer site on 8600 (keep e2e runs off it: a
+person may be using it), `scripts/journeys.sh` uses 9690.
 
 ## Site builds
 
@@ -132,8 +188,16 @@ same file:
   wait (`dev: waiting for a build slot`).
 
 The standalone server runs from `web/.next-<port>/standalone/server.js` with `static/` and `public/` copied beside it,
-as production runs it. `scripts/e2e.sh` deletes the build at teardown unless `--keep`; for a kept stack,
-`ACCOUNTS_PORT=<base> scripts/stop.sh --clean` stops it and deletes its build (`--all --clean` for every stack).
+as production runs it.
+
+The developer site builds the same way into `developer/.next-<port>` (its own per-directory tsconfig, no type pass, a
+build slot of its own) and runs its standalone server on base + 5 with `ACCOUNTS_API_URL` (accounts-api, server to
+server), `ACCOUNTS_PUBLIC_URL` (the account site, where its sign-in goes), `ACCOUNTS_DEVELOPER_URL` =
+`DEVELOPER_PUBLIC_URL` = `http://localhost:<base+5>` (its redirect URI `{it}/auth/callback`, which accounts-api gets as
+`ACCOUNTS_DEVELOPER_URL` too, and its CSRF origin) and a per-stack `DEVELOPER_SESSION_SECRET` (it seals the session
+cookie; a production build refuses to start without one). Nothing of it is baked into the build: it reads its
+environment at request time. `scripts/e2e.sh` deletes both builds at teardown unless `--keep`; for a kept stack,
+`ACCOUNTS_PORT=<base> scripts/stop.sh --clean` stops it and deletes its builds (`--all --clean` for every stack).
 
 ## Reports
 
@@ -250,8 +314,9 @@ proofs-perf-latency-verify` with no other stack running). The gate's and the mea
 
 `pnpm -C web e2e` (run.ts) finds the stack from the environment. `E2E_PORT_BASE=<base>` names a stack started by
 `scripts/e2e.sh --keep` (or by dev.sh with those ports); without it the defaults are `scripts/dev.sh`'s (site 8590,
-database `silicon_accounts`). One by one: `E2E_SITE`, `E2E_API`, `E2E_OIDC`, `E2E_MESSAGING`, `E2E_APPS`, `E2E_IRIS`,
-`E2E_DB`, `E2E_PG_BIN`, `E2E_CLI` (default `target/debug/accounts`, or `$CARGO_TARGET_DIR/debug/accounts`),
+database `silicon_accounts`, the developer site on 8600). One by one: `E2E_SITE`, `E2E_DEVELOPER` (default
+`http://localhost:<base+5>`), `E2E_API`, `E2E_OIDC`, `E2E_MESSAGING`, `E2E_APPS`, `E2E_IRIS`, `E2E_DB`, `E2E_PG_BIN`,
+`E2E_CLI` (default `target/debug/accounts`, or `$CARGO_TARGET_DIR/debug/accounts`),
 `E2E_ENGINE`, `E2E_ARTIFACTS` (default `e2e/.artifacts/<base>`), `E2E_SHOTS`. Benchmarks: `E2E_BENCH_SLOT_WAIT_MS`,
 `E2E_BENCH_CALM_WAIT_MS`, `E2E_LATENCY_GATE=strict` (see above). Options: `--suite`, `--engine`, `--webkit`, `--list`,
 `--list-suites`, and journey prefixes.
@@ -260,12 +325,18 @@ database `silicon_accounts`). One by one: `E2E_SITE`, `E2E_API`, `E2E_OIDC`, `E2
 
 `results.watch(page, label, expected)` turns console errors, uncaught page errors, CSP refusals and failed requests
 into problems that fail the journey, except those matching `expected` (a 404 the journey asks for, an imported
-fixture's unreachable photo host) or the short list of browser noise in `lib.ts` (`BENIGN`). HTTP 4xx/5xx answers are
-only notes. Nothing a page loads should leave the machine; the harness suite checks it.
+fixture's unreachable photo host, the developer site's signed-out probe `DEVELOPER_SIGNED_OUT`, a fake app's error page
+after a cancelled sign-in) or the short list of browser noise in `lib.ts` (`BENIGN`). HTTP 4xx/5xx answers are only
+notes, but the browser itself logs a failed fetch or document (any 4xx/5xx) as a console error, so a page that is
+expected to see one says so in `expected`. Nothing a page loads should leave the machine; the harness suite checks it.
 
 ## Troubleshooting
 
 - Leftover stacks: `scripts/stop.sh --all --clean`; leftover databases: `dropdb -h 127.0.0.1 -p 5444 -U postgres
   accounts_e2e_<base>`; a lease of a run that was killed is taken over by the next run that wants the base.
 - "a port of base N is in use": something else holds one of base − 1 … base + 4; leave `E2E_PORT_BASE` out.
-- A failed journey: `report.md` (checks, problems, error), `shots/FAILED-*.png`, and `logs/accounts-api.log`.
+- A failed journey: `report.md` (checks, problems, error), `shots/FAILED-*.png`, and `logs/accounts-api.log`
+  (`logs/developer.log` for the developer site's server, `logs/developer-build.log` for its build).
+- `completeDetails` stopped with "needs a phone the account does not have": the app requires a detail the Carbon lacks;
+  give it with `add`. "did not reach a details page, the review page or <app>": the error names the page it was on and
+  its text (an alert there says why).

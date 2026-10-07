@@ -7,6 +7,7 @@
  *   <Surface>         a bordered squircle region (never nest them)
  *   <SettingsGroup>/<SettingsRow>   one bordered group of divided rows (label + description, control on the right)
  *   <DescriptionList>/<DescriptionItem>   label and value pairs
+ *   <SkipLink>        "Skip to content", the first Tab stop of a frame (the account shell, the docs)
  *
  * Server-safe (no hooks except useId): usable from server and client components.
  */
@@ -158,4 +159,12 @@ export function DescriptionItem({ label, children }: { label: ReactNode; childre
       <dd>{children}</dd>
     </div>
   );
+}
+
+/**
+ * "Skip to content": a frame's first Tab stop, out of sight until keyboard focus reaches it (styles/base.css
+ * `.skip-link`). A squircle like every rounded surface, so it carries `data-sq`; its colours are --sq-fill/--sq-stroke.
+ */
+export function SkipLink({ href, children = "Skip to content" }: { href: `#${string}`; children?: ReactNode }) {
+  return <a className="skip-link" data-sq="surface" href={href}>{children}</a>;
 }

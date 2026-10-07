@@ -14,8 +14,8 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:f
 import { request as httpRequest, type IncomingHttpHeaders } from "node:http";
 import { connect } from "node:net";
 import { dirname, join, resolve } from "node:path";
-import type { Browser } from "@playwright/test";
-import { E2E_DIR, api, codeFor, json, lastSeq, newContext, sleep, type ApiInit, type CliRun, type Env, type JsonAnswer, type Results } from "../../lib";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
+import { DEVELOPER_SIGNED_OUT, E2E_DIR, api, codeFor, json, lastSeq, newContext, signInOnDeveloper, signInWithCode, sleep, type ApiInit, type CliRun, type Env, type JsonAnswer, type Results } from "../../lib";
 
 export const ROOT = resolve(E2E_DIR, "../..");
 export const FIXTURES = join(ROOT, "testkit/fixtures/imports");
@@ -332,15 +332,7 @@ export async function ensurePhoneOwned(ctx: { env: Env; browser: Browser; result
   const page = await context.newPage();
   results.watch(page, "imports-precondition");
   await page.goto(`${env.site}/sign-in`);
-  await page.getByRole("button", { name: "Phone", exact: true }).click({ timeout: 30_000 });
-  const field = page.getByRole("textbox", { name: "Phone number" });
-  await field.click();
-  const after = await lastSeq(env);
-  await page.keyboard.type(phone, { delay: 20 });
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  const code = await codeFor(env, phone, after);
-  await page.getByRole("group", { name: /Code/ }).first().waitFor({ timeout: 15_000 });
-  await page.keyboard.type(code, { delay: 25 });
+  await signInWithCode(env, page, { phone });
   const create = page.getByRole("button", { name: "Create account" });
   const home = page.waitForURL(`${env.site}/`, { timeout: 30_000 }).then(() => "home" as const);
   if ((await Promise.race([home, create.waitFor({ timeout: 30_000 }).then(() => "signup" as const)])) === "signup") await create.click();
@@ -1002,3 +994,86 @@ export async function importRows(ctx: Caller, app: FakeApp, rows: Array<Record<s
   const job = await waitJob(ctx, app, answer.body.job.id);
   return { job, rows: await allRows(ctx, app, job.id) };
 }
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* The hosted pages: an email code on an app that may open on its phone field                                         */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+/**
+ * lib's signInWithCode for an email, on an app whose methods page may open on its phone field first (dm's order is
+ * phone, email): picks "Email" in the "Email | Phone" choice when the email field isn't the one shown.
+ */
+export async function signInWithEmailCode(env: Env, page: Page, email: string): Promise<string> {
+  await page.getByRole("textbox", { name: /^(Email|Phone number)$/ }).first().waitFor({ timeout: 30_000 });
+  const field = page.getByRole("textbox", { name: "Email" });
+  if (!(await field.isVisible().catch(() => false))) await page.getByRole("button", { name: "Email", exact: true }).click({ timeout: 10_000 });
+  return signInWithCode(env, page, { email });
+}
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* The developer site (developer.teamofsilicons.com: a BFF in front of the API)                                        */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+/**
+ * A browser context signed in to the developer site as `email` (lib's signInOnDeveloper: the account site's hosted
+ * sign-in as the app `developer`, the code exchanged by the developer site's server), its page on `returnTo`, watched
+ * with the developer site's signed-out probe allowed (and `expected`).
+ */
+export async function developerSession(ctx: { env: Env; browser: Browser; results: Results }, email: string, label: string, options: { returnTo?: string; expected?: RegExp[] } = {}): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await newContext(ctx.browser);
+  const page = await context.newPage();
+  ctx.results.watch(page, label, [DEVELOPER_SIGNED_OUT, ...(options.expected ?? [])]);
+  await signInOnDeveloper(ctx.env, page, email, { returnTo: options.returnTo ?? "/" });
+  return { context, page };
+}
+
+export interface DeveloperAnswer<T = unknown> {
+  status: number;
+  body: T;
+  headers: Record<string, string>;
+  ms: number;
+}
+
+/**
+ * A raw call to the developer site's BFF (`{developer}/api/accounts<path>` → accounts-api `/v1<path>`) with the
+ * context's sealed session cookie: any body (CSV text, a 51 MB buffer…), any content type, and the Origin the caller
+ * chooses (default: the developer site's own; null: none). lib's developerApi only sends JSON.
+ */
+export async function developerFetch<T = unknown>(env: Env, page: Page, path: string, init: { method?: string; body?: string | Buffer; contentType?: string | null; origin?: string | null; headers?: Record<string, string>; timeoutMs?: number } = {}): Promise<DeveloperAnswer<T>> {
+  const headers: Record<string, string> = { ...init.headers };
+  const origin = init.origin === undefined ? env.developer : init.origin;
+  if (origin) headers.origin = origin;
+  if (init.body !== undefined && init.contentType !== null) headers["content-type"] = init.contentType ?? "text/csv";
+  const started = Date.now();
+  const response = await page.request.fetch(`${env.developer}/api/accounts${path}`, {
+    method: init.method ?? (init.body === undefined ? "GET" : "POST"),
+    headers,
+    ...(init.body === undefined ? {} : { data: init.body }),
+    timeout: init.timeoutMs ?? 120_000,
+    maxRedirects: 0,
+  });
+  const text = await response.text();
+  let body: unknown = text;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    // Not JSON: keep the text.
+  }
+  return { status: response.status(), body: body as T, headers: response.headers(), ms: Date.now() - started };
+}
+
+/** Polls a job through the developer site's BFF until it is completed or failed. */
+export async function waitJobViaDeveloper(env: Env, page: Page, appId: string, jobId: string, timeoutMs = 120_000): Promise<ImportJob> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const answer = await developerFetch<{ job?: ImportJob }>(env, page, `/apps/${appId}/imports/${jobId}`);
+    const job = answer.body?.job;
+    if (answer.status !== 200 || !job) throw new Error(`GET import ${jobId} through the developer site: ${answer.status} ${JSON.stringify(answer.body).slice(0, 300)}`);
+    if (job.status === "completed" || job.status === "failed") return job;
+    if (Date.now() > deadline) throw new Error(`import ${jobId} is still ${job.status} after ${timeoutMs} ms`);
+    await sleep(200);
+  }
+}
+
+/** The text of a page region, whitespace collapsed. */
+export const textOf = async (page: Page, selector = "main") => (await page.locator(selector).first().innerText().catch(() => "")).replace(/\s+/g, " ").trim();

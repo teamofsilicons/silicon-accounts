@@ -58,7 +58,10 @@
 /* Links and inline code. */
 .prose a:not(.anchor) { color: var(--accent-ink); text-decoration-line: underline; text-decoration-color: color-mix(in oklab, currentColor 38%, transparent); text-decoration-thickness: 1px; text-underline-offset: .22em; transition: text-decoration-color var(--duration-fast) var(--ease-standard); }
 .prose a:not(.anchor):hover { text-decoration-color: currentColor; }
-.prose a:not(.anchor) .inlineCode { color: inherit; }
+/* Code inside a link sits on the code chip (--surface-muted), where the link ink is too faint in dark mode (#82ACEE on
+   #464441 is 4.2:1). The chip's text keeps the link's hue, moved towards the foreground: 5.0:1 dark, 6.4:1 light. The
+   link's underline still runs under it. */
+.prose a:not(.anchor) .inlineCode { color: color-mix(in oklab, var(--accent-ink) 80%, var(--foreground)); }
 .external { white-space: normal; }
 .externalIcon { display: inline-block; margin-left: 1px; vertical-align: .05em; opacity: .7; }
 .missing { text-decoration: underline dashed color-mix(in oklab, var(--text-muted) 60%, transparent); text-underline-offset: .22em; cursor: help; }
@@ -120,7 +123,9 @@
   line-height: 1.65;
 }
 .callout[data-kind="tip"] { --callout: var(--success); --callout-ink: var(--success); }
-.callout[data-kind="important"] { --callout: var(--series-2); --callout-ink: var(--series-2); }
+/* --series-2 is a chart colour: as text on the callout's tint it is 4.1:1 in dark mode. The title mixes in the
+   foreground, darker in light mode and lighter in dark: 5.8:1 and 5.2:1. */
+.callout[data-kind="important"] { --callout: var(--series-2); --callout-ink: color-mix(in oklab, var(--series-2) 80%, var(--foreground)); }
 .callout[data-kind="warning"] { --callout: var(--warning); --callout-ink: var(--warning); }
 .callout[data-kind="caution"] { --callout: var(--danger); --callout-ink: var(--danger); }
 .calloutTitle { display: flex; align-items: center; gap: .45rem; margin: 0 0 .35rem; color: var(--callout-ink); font-size: var(--text-sm); font-weight: 600; letter-spacing: -.005em; }

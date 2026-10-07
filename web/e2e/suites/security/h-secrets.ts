@@ -1,5 +1,6 @@
 /**
- * Error bodies never echo a secret: wrong or unknown codes (hosted flow, CLI, adding an email), STKs, authorization
+ * Error bodies never echo a secret: wrong or unknown codes (hosted flow, CLI, adding an email, a v2 details page), STKs,
+ * the developer platform's code, verifier and refresh token, the developer site's session cookie and callback, authorization
  * codes, refresh tokens (also on reuse), SLTs, device codes, PKCE verifiers, app secrets (Basic and body), request
  * polling tokens, proof tokens and Bearer tokens all come back without the value that was sent, and never with the
  * right one. Reads never return stored secrets either: app details show `secret_set` flags, not the webhook secret or a
@@ -8,13 +9,13 @@
 import { randomBytes } from "node:crypto";
 import type { Journey } from "../../context";
 import { codeFor, lastSeq, tag } from "../../lib";
-import { appCredentials, appTokens, base64url, brief, call, createSilicon, flowOf, flowStep, remember, siliconLogin, signInWithEmail, startFlow, token, viaSite, callbackOf, Jar, type Reply } from "./_helpers";
+import { appCredentials, appTokens, base64url, brief, call, continueInto, createSilicon, flowOf, flowStep, publicToken, randomPhone, remember, siliconLogin, signInWithEmail, startFlow, token, viaSite, callbackOf, Jar, type Reply } from "./_helpers";
 
 const rand = (prefix: string) => `${prefix}${base64url(randomBytes(32))}`;
 
 export const journey: Journey = {
   name: "security-secrets",
-  title: "no secret in any answer: wrong/unknown codes, STKs (also self-chosen ones, refused or accepted), auth codes, refresh tokens (also reused), SLTs, device codes, verifiers, app secrets, polling and proof tokens and Bearer tokens are never echoed (nor the right values); app and account reads show secret_set flags, never secrets, STKs or hashes",
+  title: "no secret in any answer: wrong/unknown codes (also a details page's), STKs (also self-chosen ones, refused or accepted), auth codes (also the developer platform's), refresh tokens (also reused), SLTs, device codes, verifiers, app secrets, polling and proof tokens, Bearer tokens and the developer site's cookies are never echoed (nor the right values); app, proof and account reads show secret_set flags, never secrets, proof tokens, STKs or hashes",
   engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
@@ -129,7 +130,29 @@ export const journey: Journey = {
     probe("Bearer: briefcase's refresh token on /v1/me", await call(`${env.site}/v1/me`, { bearer: rotated.body.refresh_token ?? unknownRefresh, ip: ctx.ip }), rotated.body.refresh_token);
     const madeUpSession = rand("sas_");
     probe("a made-up session cookie", await call(`${env.site}/v1/me`, { headers: { cookie: `sa_session=${madeUpSession}` }, ip: ctx.ip }), madeUpSession);
-    results.check(`${probes} refusals echo neither the secret that was sent nor the right one (codes ×3, STKs ×2, chosen STKs ×4, polling token, auth code, refresh ×2, SLT, device code, app secret ×3, verifier, proof refresh, Bearer ×2, session cookie)`, echoed.length === 0, echoed.join(" | ") || `${probes} probes`);
+    // v2: a wrong code on an app's details page (adding a missing phone), the developer platform's code exchange, and
+    //     the developer site's BFF.
+    const crmJar = carbon.jar.clone();
+    let crm = flowOf(await startFlow(t, crmJar, { app_id: "legacy-crm", redirect_uri: callbackOf(env, "legacy-crm"), state: `crm-${tag()}` }));
+    crm = flowOf(await flowStep(t, crmJar, crm?.id ?? "", "continue")) ?? crm;
+    const detailPhone = randomPhone();
+    after = await lastSeq(env);
+    const detailAdded = await flowStep(t, crmJar, crm?.id ?? "", "details/add", { phone: detailPhone });
+    const realDetailCode = await codeFor(env, detailPhone, after);
+    remember(ctx, "code", realDetailCode);
+    results.check("the details page's view after a code was sent to a missing phone never contains the code", detailAdded.status === 200 && !!flowOf(detailAdded)?.details?.challenge && !detailAdded.text.includes(realDetailCode), `${detailAdded.status}, challenge ${JSON.stringify(flowOf(detailAdded)?.details?.challenge ?? null).slice(0, 120)}`);
+    const wrongDetailCode = realDetailCode === "135790" ? "246802" : "135790";
+    probe("details page: a wrong code for a missing phone", await flowStep(t, crmJar, crm?.id ?? "", "details/verify", { code: wrongDetailCode }), wrongDetailCode, realDetailCode);
+    const devFlow = await continueInto(t, carbon.jar, "developer");
+    remember(ctx, "code", devFlow.code);
+    const wrongDevVerifier = base64url(randomBytes(32));
+    probe("developer platform: its code with a wrong PKCE verifier", await publicToken(t, "developer", { grant_type: "authorization_code", code: devFlow.code, redirect_uri: devFlow.redirect, code_verifier: wrongDevVerifier }), devFlow.code, wrongDevVerifier, devFlow.verifier);
+    const devGarbage = rand("sar_");
+    probe("developer platform: an unknown refresh token", await publicToken(t, "developer", { grant_type: "refresh_token", refresh_token: devGarbage }), devGarbage);
+    const forgedSeal = `v1.${base64url(randomBytes(90))}`;
+    probe("developer site: a forged session cookie", await call(`${env.developer}/api/accounts/apps/briefcase`, { headers: { cookie: `sa_dev_session=${forgedSeal}` }, ip: ctx.ip }), forgedSeal);
+    probe("developer site: a callback with a made-up code and state", await call(`${env.developer}/auth/callback?code=${devGarbage.replace("sar_", "sac_")}&state=${tag()}${tag()}`, { ip: ctx.ip }).then(reply => ({ ...reply, status: reply.status === 303 ? 400 : reply.status, text: `${reply.text} ${reply.headers.get("location") ?? ""}` })), devGarbage.replace("sar_", "sac_"));
+    results.check(`${probes} refusals echo neither the secret that was sent nor the right one (codes ×3, STKs ×2, chosen STKs ×4, polling token, auth code, refresh ×2, SLT, device code, app secret ×3, verifier, proof refresh, Bearer ×2, session cookie; v2: a details page's code, the developer platform's code, verifier and refresh token, the developer site's session cookie and callback)`, echoed.length === 0, echoed.join(" | ") || `${probes} probes`);
 
     // 5. An idempotent replay is only ever for the same caller: another account (or network) re-sending the same
     //    Idempotency-Key and body never gets the first caller's answer, which carries a freshly made STK.
@@ -161,6 +184,11 @@ export const journey: Journey = {
     const acme = await call(`${env.site}/v1/apps/acme-notes`, { basic: appCredentials("acme-notes"), ip: ctx.ip });
     const config = await call(`${env.site}/v1/apps/acme-notes/signin-config/history`, { basic: appCredentials("acme-notes"), ip: ctx.ip });
     results.check("a bring-your-own Google secret never comes back (acme-notes' details and config history show client_secret_set, not GOCSPX-…)", acme.status === 200 && !/GOCSPX-|-----BEGIN/.test(acme.text) && /client_secret_set/.test(acme.text) && !/GOCSPX-|-----BEGIN/.test(config.text), `details ${acme.status}, history ${config.status}`);
+    // Proofs: the token and the refresh token are shown once, when issued; listings never carry them.
+    const issued = await call<{ proof_id?: string; proof_token?: string; proof_refresh_token?: string }>(`${env.site}/v1/proofs/ata`, { json: { receiving_app: "remind" }, basic: appCredentials("commit"), ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}` } });
+    remember(ctx, "proof token", issued.body.proof_token, issued.body.proof_refresh_token);
+    const listed = await call(`${env.site}/v1/apps/commit/proofs?limit=100`, { basic: appCredentials("commit"), ip: ctx.ip });
+    results.check("an ATA proof's token and refresh token come back once, when it is made, and the app's proof listing never carries any proof token (sap_/sapr_)", issued.status === 201 && (issued.body.proof_token ?? "").startsWith("sap_") && listed.status === 200 && listed.text.includes(issued.body.proof_id ?? "~") && !/\bsapr?_[A-Za-z0-9_-]{20,}/.test(listed.text), `issued ${issued.status}; listing ${listed.status}, ${listed.text.length} bytes`);
     const meCarbon = await call(`${env.site}/v1/me/silicons`, { jar: carbon.jar, ip: ctx.ip });
     const login = await siliconLogin(t, silicon.id, silicon.stk);
     remember(ctx, "access token", login.body.access_token);

@@ -67,6 +67,8 @@ export const journey: Journey = {
     const everything = await collect("");
     const ids = everything.map(item => item.proof_id);
     results.check("dm's listing, 9 at a time across every page: no proof twice, newest first, ours in order", new Set(ids).size === ids.length && JSON.stringify(ids.filter(id => mine.has(id))) === JSON.stringify(newestFirst) && everything.every((item, i) => i === 0 || Date.parse(everything[i - 1]!.created_at) >= Date.parse(item.created_at)), `${ids.length} proofs listed`);
+    const shapes = everything.filter(item => typeof item.receiving_app !== "string" || "audiences" in item || "receiving_apps" in item);
+    results.check("every entry names its one receiving app as receiving_app (a string), never a list of apps", everything.length > 0 && shapes.length === 0 && everything.filter(item => mine.has(item.proof_id)).every(item => item.receiving_app === "briefcase"), shapes.length ? short(shapes[0]) : `${everything.length} entries`);
     const revokedObo = (await collect("&kind=obo&status=revoked")).filter(item => mine.has(item.proof_id));
     results.check("?kind=obo&status=revoked has exactly our two revoked proofs, with who revoked them", JSON.stringify(revokedObo.map(item => `${item.proof_id}:${item.revoke_reason}`)) === JSON.stringify([`${p4.proof_id}:revoked_by_account`, `${p2.proof_id}:revoked_by_app`]), short(revokedObo.map(item => item.revoke_reason)));
     const ataOnly = await collect("&kind=ata");

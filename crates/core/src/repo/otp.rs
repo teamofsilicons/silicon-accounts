@@ -419,7 +419,8 @@ pub async fn verify(
             ApiError::unprocessable(
                 "invalid_code",
                 format!(
-                    "That code is wrong; {remaining} more tries for {} before a {lock_seconds} second cooldown.",
+                    "That code is wrong; {remaining} more {} for {} before a {lock_seconds} second cooldown.",
+                    if remaining == 1 { "try" } else { "tries" },
                     c.masked_destination()
                 ),
             )

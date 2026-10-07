@@ -248,6 +248,163 @@ async fn a_member_keeps_its_external_id_unless_update_existing() {
     assert_eq!(stored.as_deref(), Some("crm-P"));
 }
 
+/// A Carbon the app imported deletes their account; the app's nightly re-import of the same row
+/// (same email, same external_id) creates a new account that gets the external_id, while the
+/// deleted membership stays history and still shows it. A live member's external_id still
+/// conflicts.
+#[tokio::test]
+async fn a_deleted_accounts_external_id_is_free_again() {
+    let ctx = TestContext::new().await;
+    let a = owned_app(&ctx, "delx").await;
+    let email = "gone@delx.test";
+    let carbon = ctx
+        .carbon_with(CarbonSpec {
+            email: Some(email.into()),
+            ..Default::default()
+        })
+        .await;
+    let row = json!({"rows": [{"email": email, "external_id": "crm-9", "display_name": "Gone From The CRM"}]});
+    let (_, out) = run(
+        &ctx,
+        &a.app_id,
+        &a.secret,
+        import_json(&a.app_id, &a.secret, row.clone()),
+    )
+    .await;
+    assert_eq!(out[0]["outcome"], "matched", "{}", out[0]);
+    assert_eq!(out[0]["account_uuid"], carbon.uuid.as_str());
+    {
+        let mut conn = ctx.conn().await;
+        accounts_core::repo::accounts::delete_account(
+            &mut conn,
+            &ctx.state.settings,
+            &carbon.uuid,
+            &carbon.uuid,
+            true,
+        )
+        .await
+        .expect("delete");
+    }
+
+    // A dry run already says so, and writes nothing.
+    let mut dry = row.clone();
+    dry["options"] = json!({"dry_run": true});
+    let (_, out) = run(
+        &ctx,
+        &a.app_id,
+        &a.secret,
+        import_json(&a.app_id, &a.secret, dry),
+    )
+    .await;
+    assert_eq!(out[0]["outcome"], "created", "{}", out[0]);
+    assert!(
+        codes(&out[0]).contains(&"external_id_released".to_string()),
+        "{}",
+        out[0]
+    );
+    let held: Option<String> = sqlx::query_scalar(
+        "select external_id from memberships where app_id = $1 and account_uuid = $2",
+    )
+    .bind(&a.app_id)
+    .bind(&carbon.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("history");
+    assert_eq!(held.as_deref(), Some("crm-9"), "a dry run writes nothing");
+
+    let (job, out) = run(
+        &ctx,
+        &a.app_id,
+        &a.secret,
+        import_json(&a.app_id, &a.secret, row.clone()),
+    )
+    .await;
+    assert_eq!(job["counts"]["error"], 0, "{job}");
+    assert_eq!(out[0]["outcome"], "created", "{}", out[0]);
+    let fresh = out[0]["account_uuid"]
+        .as_str()
+        .expect("new account")
+        .to_string();
+    assert_ne!(fresh, carbon.uuid, "the deleted account is never revived");
+    let released = out[0]["messages"]
+        .as_array()
+        .and_then(|m| m.iter().find(|x| x["code"] == "external_id_released"))
+        .cloned()
+        .expect("external_id_released");
+    assert_eq!(released["level"], "info");
+    assert_eq!(released["field"], "external_id");
+    let text = released["message"].as_str().unwrap_or_default();
+    assert!(
+        text.contains("'crm-9'") && text.contains("deleted") && !text.contains("another member"),
+        "{text}"
+    );
+    let owners: Vec<(String, Option<String>)> = sqlx::query_as(
+        "select account_uuid, external_id from memberships where app_id = $1 order by created_at",
+    )
+    .bind(&a.app_id)
+    .fetch_all(&ctx.state.db)
+    .await
+    .expect("memberships");
+    assert_eq!(
+        owners,
+        vec![
+            (carbon.uuid.clone(), None),
+            (fresh.clone(), Some("crm-9".to_string()))
+        ]
+    );
+
+    // The user base: the deleted membership is history and still shows its external_id; search
+    // by it finds both rows.
+    let get = |uuid: &str| {
+        Req::get(&format!("/v1/apps/{}/users/{uuid}", a.app_id)).basic(&a.app_id, &a.secret)
+    };
+    let history = call(&ctx, get(&carbon.uuid)).await;
+    assert_eq!(history.status, 200, "{}", history.json);
+    assert_eq!(history.json["status"], "deleted", "{}", history.json);
+    assert_eq!(history.json["external_id"], "crm-9", "{}", history.json);
+    let new = call(&ctx, get(&fresh)).await;
+    assert_eq!(new.json["status"], "imported", "{}", new.json);
+    assert_eq!(new.json["external_id"], "crm-9", "{}", new.json);
+    let found = call(
+        &ctx,
+        Req::get(&format!("/v1/apps/{}/users?q=crm-9", a.app_id)).basic(&a.app_id, &a.secret),
+    )
+    .await;
+    let mut statuses: Vec<String> = found.json["items"]
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .map(|i| i["status"].as_str().unwrap_or_default().to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+    statuses.sort();
+    assert_eq!(statuses, vec!["deleted", "imported"], "{}", found.json);
+
+    // The new account holds it now: another row with it is a conflict with a live member.
+    let (_, out) = run(
+        &ctx,
+        &a.app_id,
+        &a.secret,
+        import_json(
+            &a.app_id,
+            &a.secret,
+            json!({"rows": [{"email": "other@delx.test", "external_id": "crm-9"}]}),
+        ),
+    )
+    .await;
+    assert_eq!(out[0]["outcome"], "error", "{}", out[0]);
+    assert_eq!(codes(&out[0]), vec!["external_id_conflict"]);
+    assert!(
+        out[0]["messages"][0]["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("another member of this app already has it")),
+        "{}",
+        out[0]
+    );
+}
+
 /// The review's lookup case: a dry run of someone else's email names no account.
 #[tokio::test]
 async fn a_dry_run_is_not_an_account_lookup() {

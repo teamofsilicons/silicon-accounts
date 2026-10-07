@@ -183,19 +183,191 @@ impl From<ClientError> for CliError {
 }
 
 impl From<&clap::Error> for CliError {
+    /// clap renders an argument error over several lines: the error, the missing or wrong
+    /// arguments indented below it, tips, and the usage. All of it goes into the message, hint and
+    /// details, so `--json` says exactly which argument is missing or wrong, not just "the
+    /// following required arguments were not provided:".
     fn from(error: &clap::Error) -> Self {
+        use clap::error::{ContextKind, ContextValue};
+
         let rendered = error.to_string();
-        let first = rendered
-            .lines()
-            .find(|l| !l.trim().is_empty())
-            .unwrap_or("invalid arguments")
-            .trim_start_matches("error: ")
-            .to_owned();
-        Self::new(
-            EXIT_INVALID,
-            "invalid_arguments",
-            first,
-            "Run the command with --help to see its arguments and examples.",
-        )
+        let mut paragraphs: Vec<Vec<&str>> = Vec::new();
+        let mut current: Vec<&str> = Vec::new();
+        for line in rendered.lines() {
+            if line.trim().is_empty() {
+                if !current.is_empty() {
+                    paragraphs.push(std::mem::take(&mut current));
+                }
+            } else {
+                current.push(line);
+            }
+        }
+        if !current.is_empty() {
+            paragraphs.push(current);
+        }
+        let mut message = String::new();
+        let mut tips: Vec<String> = Vec::new();
+        let mut usage: Option<String> = None;
+        for (i, paragraph) in paragraphs.iter().enumerate() {
+            if i == 0 {
+                let lead = paragraph[0].trim().trim_start_matches("error: ");
+                let rest: Vec<&str> = paragraph[1..].iter().map(|l| l.trim()).collect();
+                message = if rest.is_empty() {
+                    lead.to_owned()
+                } else if lead.ends_with(':') {
+                    format!("{lead} {}", rest.join(", "))
+                } else {
+                    format!("{lead} {}", rest.join(" "))
+                };
+                continue;
+            }
+            let mut in_usage = false;
+            for line in paragraph {
+                let line = line.trim();
+                if let Some(tip) = line.strip_prefix("tip:") {
+                    tips.push(tip.trim().to_owned());
+                    in_usage = false;
+                } else if line.starts_with("Usage:") {
+                    usage = Some(line.to_owned());
+                    in_usage = true;
+                } else if in_usage && let Some(more) = usage.as_mut() {
+                    // A long usage wraps onto indented lines of its paragraph.
+                    more.push(' ');
+                    more.push_str(line);
+                }
+            }
+        }
+        if message.is_empty() {
+            message = "invalid arguments".to_owned();
+        }
+        let mut hint: Vec<String> = tips.iter().map(|tip| sentence(tip)).collect();
+        if let Some(usage) = &usage {
+            hint.push(sentence(usage));
+        }
+        hint.push("Run the command with --help to see its arguments and examples.".to_owned());
+
+        let mut details = serde_json::Map::new();
+        details.insert(
+            "kind".into(),
+            json!(snake_case(&format!("{:?}", error.kind()))),
+        );
+        match error.get(ContextKind::InvalidArg) {
+            Some(ContextValue::Strings(args)) => {
+                details.insert("arguments".into(), json!(args));
+            }
+            Some(ContextValue::String(arg)) => {
+                details.insert("arguments".into(), json!([arg]));
+            }
+            _ => {}
+        }
+        if let Some(ContextValue::String(value)) = error.get(ContextKind::InvalidValue) {
+            details.insert("value".into(), json!(value));
+        }
+        if let Some(ContextValue::String(sub)) = error.get(ContextKind::InvalidSubcommand) {
+            details.insert("subcommand".into(), json!(sub));
+        }
+        if let Some(usage) = usage {
+            details.insert(
+                "usage".into(),
+                json!(usage.trim_start_matches("Usage:").trim()),
+            );
+        }
+        Self::new(EXIT_INVALID, "invalid_arguments", message, hint.join(" "))
+            .with_details(Value::Object(details))
+    }
+}
+
+/// `a similar subcommand exists: 'delivery'` → `A similar subcommand exists: 'delivery'.`
+fn sentence(text: &str) -> String {
+    let mut chars = text.trim().chars();
+    let mut out: String = match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    };
+    if !out.ends_with('.') {
+        out.push('.');
+    }
+    out
+}
+
+/// `MissingRequiredArgument` → `missing_required_argument`.
+fn snake_case(name: &str) -> String {
+    let mut out = String::new();
+    for c in name.chars() {
+        if c.is_uppercase() && !out.is_empty() {
+            out.push('_');
+        }
+        out.push(c.to_ascii_lowercase());
+    }
+    out
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use clap::{Arg, Command};
+
+    use super::*;
+
+    fn command() -> Command {
+        Command::new("accounts")
+            .subcommand(
+                Command::new("ata")
+                    .arg(
+                        Arg::new("to")
+                            .long("to")
+                            .value_name("APP_ID")
+                            .required(true),
+                    )
+                    .arg(
+                        Arg::new("scope")
+                            .long("scope")
+                            .value_name("SCOPE")
+                            .required(true),
+                    ),
+            )
+            .subcommand(Command::new("webhook").subcommand(Command::new("delivery")))
+    }
+
+    #[test]
+    fn json_argument_errors_name_the_missing_argument() {
+        let err = command()
+            .try_get_matches_from(["accounts", "ata", "--scope", "x"])
+            .unwrap_err();
+        let cli = CliError::from(&err);
+        assert_eq!(cli.code, "invalid_arguments");
+        assert_eq!(cli.exit, EXIT_INVALID);
+        assert_eq!(
+            cli.message,
+            "the following required arguments were not provided: --to <APP_ID>"
+        );
+        let hint = cli.hint.clone().unwrap_or_default();
+        assert!(hint.contains("Usage: accounts ata --to <APP_ID>"), "{hint}");
+        let details = cli.details.clone().unwrap_or_default();
+        assert_eq!(details["arguments"], json!(["--to <APP_ID>"]));
+        assert_eq!(details["kind"], "missing_required_argument");
+
+        // Several missing arguments are all named.
+        let err = command()
+            .try_get_matches_from(["accounts", "ata"])
+            .unwrap_err();
+        let cli = CliError::from(&err);
+        assert_eq!(
+            cli.message,
+            "the following required arguments were not provided: --to <APP_ID>, --scope <SCOPE>"
+        );
+
+        // An unknown subcommand keeps its tip.
+        let err = command()
+            .try_get_matches_from(["accounts", "webhook", "deliveries"])
+            .unwrap_err();
+        let cli = CliError::from(&err);
+        assert_eq!(cli.message, "unrecognized subcommand 'deliveries'");
+        let hint = cli.hint.clone().unwrap_or_default();
+        assert!(hint.contains("'delivery'"), "{hint}");
+        assert_eq!(
+            cli.details.clone().unwrap_or_default()["subcommand"],
+            "deliveries"
+        );
     }
 }

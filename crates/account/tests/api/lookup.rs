@@ -4,7 +4,7 @@ use accounts_core::ids::AccountId;
 use accounts_core::models::AccountKind;
 use accounts_core::repo::accounts;
 use accounts_core::test_support::{CarbonSpec, Req, TestContext, rand_suffix};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::common::*;
 
@@ -215,20 +215,19 @@ async fn lookup_by_uuid_with_app_or_session() {
     let (app, secret) = ctx.app("lookup").await;
     let path = format!("/v1/accounts/{}", carbon.uuid);
 
+    // An app gets the public identity only: never a display name or photo (see
+    // `app_lookups_never_hand_back_what_the_account_took_back`).
     let r = call(&ctx, Req::get(&path).basic(&app.app_id, &secret)).await;
     assert_status(&r, 200);
-    assert_eq!(r.json["uuid"], carbon.uuid);
-    assert_eq!(r.json["kind"], "carbon");
-    assert_eq!(r.json["id"], carbon.handle.clone().expect("id"));
-    assert_eq!(r.json["status"], "active");
-    assert!(r.json["pfp_url"].as_str().is_some());
-    assert!(
-        r.json.get("custodian").is_none(),
-        "Carbons have no custodian"
-    );
-    assert!(
-        r.json.get("email").is_none(),
-        "lookups never expose contacts"
+    assert_eq!(
+        r.json,
+        json!({
+            "uuid": carbon.uuid,
+            "kind": "carbon",
+            "id": carbon.handle.clone().expect("id"),
+            "status": "active",
+        }),
+        "Carbons have no custodian, and lookups never expose contacts"
     );
 
     let r = call(
@@ -237,11 +236,16 @@ async fn lookup_by_uuid_with_app_or_session() {
     )
     .await;
     assert_status(&r, 200);
-    assert_eq!(r.json["kind"], "silicon");
-    assert_eq!(r.json["custodian"]["uuid"], carbon.uuid);
     assert_eq!(
-        r.json["custodian"]["id"],
-        carbon.handle.clone().expect("id")
+        r.json,
+        json!({
+            "uuid": silicon.uuid,
+            "kind": "silicon",
+            "id": silicon.handle.clone().expect("si:id"),
+            "status": "active",
+            // As apps see a custodian everywhere: uuid and c:id.
+            "custodian": { "uuid": carbon.uuid, "id": carbon.handle.clone().expect("id") },
+        })
     );
 
     let pending = pending_silicon(&ctx).await;
@@ -259,12 +263,36 @@ async fn lookup_by_uuid_with_app_or_session() {
     );
     assert_eq!(r.json["custodian"], Value::Null);
 
+    // A signed-in Carbon or Silicon gets the AccountSummary, and a Silicon's custodian's.
     let tok = token(&ctx, &silicon).await;
     let r = call(&ctx, Req::get(&path).bearer(&tok)).await;
     assert_status(&r, 200);
+    assert_eq!(r.json["display_name"], carbon.display_name);
+    assert_eq!(r.json["pfp_url"], carbon.pfp_url);
+    assert!(
+        r.json.get("email").is_none(),
+        "lookups never expose contacts"
+    );
     let cookie = ctx.browser_session(&carbon).await;
     let r = call(&ctx, Req::get(&path).session(&ctx.state.settings, &cookie)).await;
     assert_status(&r, 200);
+    assert_eq!(r.json["display_name"], carbon.display_name);
+    let r = call(
+        &ctx,
+        Req::get(&format!("/v1/accounts/{}", silicon.uuid)).session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_eq!(r.json["display_name"], silicon.display_name);
+    assert_eq!(r.json["custodian"]["uuid"], carbon.uuid);
+    assert_eq!(r.json["custodian"]["display_name"], carbon.display_name);
+    assert_eq!(r.json["custodian"]["pfp_url"], carbon.pfp_url);
+    let r = call(
+        &ctx,
+        Req::get(&format!("/v1/accounts/{}", pending.uuid)).session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_eq!(r.json["custodian"], Value::Null);
+    assert_eq!(r.json["display_name"], "Waiting Silicon");
 
     let r = call(&ctx, Req::get(&path)).await;
     assert_error(&r, 401, "unauthenticated");
@@ -382,6 +410,90 @@ async fn lookup_by_current_id_only() {
     )
     .await;
     assert_eq!(r.json["uuid"], carbon.uuid);
+}
+
+/// An app whose access the Carbon removed was told on /apps it "can no longer see anything about
+/// you", and its user base shows "Access removed" and the default photo whatever the Carbon
+/// changes afterwards. The lookups once answered any app the account's current display name and
+/// photo, so one call undid that. Apps get the public identity only (uuid, kind, id, status),
+/// whatever their membership: the display name and photo are read from the app's user base,
+/// which follows what the account shares with it.
+#[tokio::test]
+async fn app_lookups_never_hand_back_what_the_account_took_back() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let (pixel, pixel_secret) = ctx.app("pixel").await;
+    let (stranger, stranger_secret) = ctx.app("stranger").await;
+    ctx.membership(
+        &pixel.app_id,
+        &carbon.uuid,
+        &[accounts_core::models::Scope::Profile],
+    )
+    .await;
+    let cookie = ctx.browser_session(&carbon).await;
+    let by_uuid = format!("/v1/accounts/{}", carbon.uuid);
+    let by_id = |id: &str| format!("/v1/accounts/by-id/{id}");
+    let fields = |v: &Value| {
+        let mut keys: Vec<String> = v.as_object().expect("object").keys().cloned().collect();
+        keys.sort();
+        keys
+    };
+    let public = vec!["id", "kind", "status", "uuid"];
+
+    // While it is a member, and for an app the Carbon never signed into: the public identity.
+    for (app_id, secret) in [
+        (&pixel.app_id, &pixel_secret),
+        (&stranger.app_id, &stranger_secret),
+    ] {
+        let r = call(&ctx, Req::get(&by_uuid).basic(app_id, secret)).await;
+        assert_status(&r, 200);
+        assert_eq!(fields(&r.json), public, "{app_id}: {}", r.json);
+    }
+
+    let r = call(
+        &ctx,
+        Req::delete(&format!("/v1/me/apps/{}", pixel.app_id)).session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_status(&r, 204);
+    let renamed = format!("Mira Renamed {}", rand_suffix());
+    let r = call(
+        &ctx,
+        Req::patch("/v1/me")
+            .session(&ctx.state.settings, &cookie)
+            .json(json!({ "display_name": renamed })),
+    )
+    .await;
+    assert_status(&r, 200);
+    let new_handle = format!("mira-{}", rand_suffix());
+    let r = call(
+        &ctx,
+        Req::post("/v1/me/id")
+            .session(&ctx.state.settings, &cookie)
+            .json(json!({ "id": new_handle })),
+    )
+    .await;
+    assert_status(&r, 200);
+    let new_id = format!("c:{new_handle}");
+
+    // The uuid still resolves to the current id (UNDERSTANDING.md), and nothing else comes back.
+    for path in [by_uuid.clone(), by_id(&new_id)] {
+        let r = call(&ctx, Req::get(&path).basic(&pixel.app_id, &pixel_secret)).await;
+        assert_status(&r, 200);
+        assert_eq!(fields(&r.json), public, "{path}: {}", r.json);
+        assert_eq!(r.json["id"], new_id.as_str());
+        assert_eq!(r.json["uuid"], carbon.uuid);
+        let body = r.json.to_string();
+        assert!(!body.contains(&renamed), "{path}: {body}");
+    }
+    // The Carbon themself (and any signed-in account) still sees the full summary.
+    let r = call(
+        &ctx,
+        Req::get(&by_uuid).session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_eq!(r.json["display_name"], renamed.as_str());
+    assert!(r.json["pfp_url"].as_str().is_some());
 }
 
 #[tokio::test]

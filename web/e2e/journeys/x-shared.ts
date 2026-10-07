@@ -1,6 +1,6 @@
 import type { Locator } from "@playwright/test";
 import type { Journey } from "../context";
-import { codeFor, lastSeq, newContext, shot, signInOnSite, sleep, tag } from "../lib";
+import { DEVELOPER_SIGNED_OUT, codeFor, developerApi, lastSeq, newContext, shot, signInOnDeveloper, signInOnSite, sleep, tag } from "../lib";
 
 const styleOf = (locator: Locator, names: string[]) =>
   locator.evaluate((element, props) => {
@@ -10,39 +10,35 @@ const styleOf = (locator: Locator, names: string[]) =>
 
 export const journey: Journey = {
   name: "x-shared",
-  title: "the shared behaviours: leaving unsaved work asks from every way out, Escape and the Combobox inside layers, focus states, any-country phones, dark tokens, the 404 of an unknown tab",
+  title: "the shared behaviours: the developer site asks before unsaved work is lost from every way out (and its unknown tab is a 404), Escape and the Combobox inside layers, focus states, any-country phones, dark tokens, the account site's old /developer addresses lead to the developer site",
   async run({ env, results, browser }) {
     const context = await newContext(browser);
     const page = await context.newPage();
-    results.watch(page, "x", [/no-such-tab/]);
+    results.watch(page, "x", [/no-such-tab/, DEVELOPER_SIGNED_OUT]);
     await signInOnSite(env, page, "saketdev12@example.test");
     const tab = env.engine === "webkit" ? "Alt+Tab" : "Tab";
     const back = env.engine === "webkit" ? "Alt+Shift+Tab" : "Shift+Tab";
 
-    // 1. The navigation guard: the developer editor's unsaved draft is asked about from every way out.
-    await page.goto(`${env.site}/developer/briefcase/sign-in`);
-    const title = page.getByRole("textbox", { name: "Title", exact: true });
+    // 1. The navigation guard, on the developer site (where apps are edited now): briefcase's unsaved page words are
+    // asked about from every way out. Signed in to the account site, the developer site's sign-in is "Continue as".
+    const pages = `${env.developer}/apps/briefcase/pages`;
+    await signInOnDeveloper(env, page, null, { returnTo: "/apps/briefcase/pages" });
+    results.check("signed in to the account site, the developer site signs in with \"Continue as\" and returns to the page", page.url() === pages, page.url());
+    const title = page.getByRole("textbox", { name: "Sign-in title", exact: true });
     await title.waitFor({ timeout: 30_000 });
     await title.fill(`Guarded ${tag()}`);
     const leave = page.getByRole("dialog", { name: "Leave with unsaved changes?" });
     await page.keyboard.press("ControlOrMeta+k");
     await sleep(300);
-    await page.keyboard.type("Apps", { delay: 20 });
+    await page.keyboard.type("Your apps", { delay: 20 });
     await sleep(300);
     await page.keyboard.press("Enter");
     await leave.waitFor({ timeout: 5_000 }).catch(() => undefined);
     results.check("the command palette asks before leaving unsaved changes", await leave.isVisible());
     await leave.getByRole("button", { name: "Keep editing" }).click();
     await sleep(300);
-    results.check("Keep editing stays, with the draft", page.url().endsWith("/developer/briefcase/sign-in") && (await title.inputValue()).startsWith("Guarded"));
-    const menu = page.locator("nav[aria-label='Account sections']").getByRole("button").last();
-    await menu.click();
-    await page.getByRole("menuitem", { name: "Settings" }).click();
-    await leave.waitFor({ timeout: 5_000 }).catch(() => undefined);
-    results.check("the user menu's Settings asks", await leave.isVisible());
-    await leave.getByRole("button", { name: "Keep editing" }).click();
-    await sleep(300);
-    await menu.click();
+    results.check("Keep editing stays, with the draft", page.url() === pages && (await title.inputValue()).startsWith("Guarded"));
+    await page.getByRole("button", { name: /^Account menu/ }).click();
     await page.getByRole("menuitem", { name: /Sign out/ }).click();
     const signOut = page.getByRole("dialog", { name: "Sign out with unsaved changes?" });
     await signOut.waitFor({ timeout: 5_000 }).catch(() => undefined);
@@ -51,30 +47,25 @@ export const journey: Journey = {
     results.check("signing out asks, and offers discard or keep editing (no draft survives signing out)", (await signOut.isVisible()) && (await signOut.getByRole("button", { name: "Leave, keep the draft" }).count()) === 0);
     await signOut.getByRole("button", { name: "Keep editing" }).click();
     await sleep(400);
-    results.check("staying keeps the session", (await page.request.get(`${env.site}/v1/session`)).status() === 200);
-    await page.getByRole("switch", { name: /^Phone/ }).focus();
-    await page.keyboard.press("3");
-    await leave.waitFor({ timeout: 5_000 }).catch(() => undefined);
-    results.check("a section number key asks", await leave.isVisible());
-    await page.keyboard.press("4");
-    await sleep(300);
-    results.check("a number key under the open question does nothing", page.url().endsWith("/developer/briefcase/sign-in"));
-    await page.keyboard.press("Escape");
-    await sleep(300);
-    await page.getByRole("link", { name: "Your apps" }).click();
+    results.check("staying keeps the developer site's session", (await developerApi(env, page, "/me")).status === 200);
+    await page.getByRole("navigation", { name: "Developer site" }).getByRole("link", { name: "Apps", exact: true }).click();
     await leave.getByRole("button", { name: "Leave, keep the draft" }).click({ timeout: 5_000 });
-    await page.waitForURL(`${env.site}/developer`, { timeout: 10_000 });
+    await page.waitForURL(`${env.developer}/`, { timeout: 10_000 });
     await page.getByRole("button", { name: "Return" }).click({ timeout: 5_000 });
-    await page.waitForURL(/\/developer\/briefcase\/sign-in$/, { timeout: 10_000 });
-    results.check("a link on the page asks; the kept draft comes back with Return", (await title.inputValue()).startsWith("Guarded"));
+    await page.waitForURL(pages, { timeout: 10_000 });
+    await title.waitFor({ timeout: 10_000 });
+    results.check("the top bar's Apps asks; the kept draft comes back with Return", (await title.inputValue()).startsWith("Guarded"));
     await page.keyboard.press("ControlOrMeta+k");
     await sleep(300);
-    await page.keyboard.type("Silicons", { delay: 20 });
+    await page.keyboard.type("Your apps", { delay: 20 });
     await sleep(300);
     await page.keyboard.press("Enter");
     await leave.getByRole("button", { name: "Discard and leave" }).click({ timeout: 5_000 });
-    await page.waitForURL(`${env.site}/silicons`, { timeout: 10_000 });
-    results.check("Discard and leave goes on", page.url() === `${env.site}/silicons`);
+    await page.waitForURL(`${env.developer}/`, { timeout: 10_000 });
+    results.check("Discard and leave goes on", page.url() === `${env.developer}/`);
+    const missing = await page.goto(`${env.developer}/apps/briefcase/no-such-tab`);
+    results.check("an unknown tab of an app answers 404 with the developer site's not-found page", missing?.status() === 404 && (await page.getByText("Nothing lives at this address").isVisible()), String(missing?.status()));
+    await page.goto(`${env.site}/silicons`);
 
     // 2. A drawer: number keys stay put, Escape belongs to the open list first, the Combobox keyboard pattern.
     await page.getByRole("button", { name: "Create a Silicon" }).first().click();
@@ -155,15 +146,19 @@ export const journey: Journey = {
       results.check("…and it is on the account, verified", phones.items.some(item => item.phone === romanian && !!item.verified_at));
     }
 
-    // 6. Dark-theme tokens and 7. the 404 of an unknown developer tab.
+    // 6. Dark-theme tokens.
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
     const tokens = await page.evaluate(() => {
       const style = getComputedStyle(document.documentElement);
       return [style.getPropertyValue("--text-muted"), style.getPropertyValue("--text-secondary"), style.getPropertyValue("--accent-strong")].map(value => value.trim().toUpperCase());
     });
     results.check("dark tokens: muted #B8B3AB, secondary #C2BDB5, accent-strong #93B8F1 (4.5:1 on their tracks)", JSON.stringify(tokens) === JSON.stringify(["#B8B3AB", "#C2BDB5", "#93B8F1"]), tokens.join(" "));
-    const missing = await page.goto(`${env.site}/developer/briefcase/no-such-tab`);
-    results.check("an unknown developer tab answers 404 with the not-found page", missing?.status() === 404 && (await page.getByText("Nothing lives at this address").isVisible()), String(missing?.status()));
+    // 7. The account site's old /developer addresses lead to the developer site (a 307, the tab renamed where it moved).
+    const moved = await fetch(`${env.site}/developer/briefcase/branding?from=e2e`, { redirect: "manual" });
+    results.check("/developer/briefcase/branding on the account site answers 307 to the developer site", moved.status === 307 && (moved.headers.get("location") ?? "").startsWith(`${env.developer}/apps/briefcase/branding`), `${moved.status} ${moved.headers.get("location")}`);
+    await page.goto(`${env.site}/developer/briefcase/branding`);
+    await page.waitForURL(url => url.href.startsWith(`${env.developer}/apps/briefcase/pages`), { timeout: 30_000 });
+    results.check("…and the developer site shows its renamed tab (Branding is Pages now)", page.url().startsWith(`${env.developer}/apps/briefcase/pages`), page.url());
     await context.close();
   },
 };

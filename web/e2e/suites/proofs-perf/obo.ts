@@ -1,12 +1,15 @@
 /**
- * OBO end to end: a new Carbon signs into dm in a real browser, dm (the fake app server) trades the Carbon's access
- * token for an OBO proof and calls Briefcase with it, Briefcase verifies it with Silicon Accounts, and the Carbon sees
- * the proof on /proofs. Then every rule of issuing one: the subject token, the receiving app, scopes, lifetimes and
- * the app's credentials.
+ * OBO end to end: a new Carbon signs into dm in a real browser (the v2 hosted flow: dm's own "Continue with email"
+ * button, the email code, the sign-up, then dm's one details page "Set up DM", where the phone dm requires is added with
+ * a code and the optional email and timezone stay unticked), dm (the fake app server) trades the Carbon's access token
+ * for an OBO proof and calls Briefcase with it, Briefcase verifies it with Silicon Accounts, and the Carbon sees the
+ * proof on /proofs. Then every rule of issuing one: the subject token, the receiving app, scopes, lifetimes and the
+ * app's credentials.
  */
 import type { Journey } from "../../context";
-import { appAccount, codeFor, json, lastSeq, newContext, shot, sleep, sql } from "../../lib";
+import { appAccount, completeDetails, json, newContext, shot, signInWithCode, sleep, sql, startAtApp } from "../../lib";
 import {
+  ISSUED_KEYS,
   appListing,
   appTokens,
   asApp,
@@ -20,6 +23,7 @@ import {
   short,
   signInToApp,
   verifyAs,
+  watchOutside,
   type IssuedProof,
   type MyProofItem,
   type Verification,
@@ -39,52 +43,39 @@ const PROOF_REFRESH_TOKEN = /^sapr_[A-Za-z0-9_-]{43}$/;
 export const journeys: Journey[] = [
   {
     name: "proofs-perf-obo-browser",
-    title: "a new Carbon signs into dm in the browser (email, sign-up, the phone dm requires, consent); dm saves a file to Briefcase for it through the fake apps (dm issues the OBO proof, Briefcase verifies it), and the Carbon sees the proof on /proofs",
+    title: "a new Carbon signs into dm in the browser (dm's own Continue with email, the code, sign-up, dm's details page adds the phone it requires with a code); dm saves a file to Briefcase for it through the fake apps (dm issues the OBO proof, Briefcase verifies it), and the Carbon sees the proof on /proofs",
     async run(ctx) {
       const { env, results, browser } = ctx;
       const context = await newContext(browser);
       const page = await context.newPage();
       results.watch(page, "obo-browser");
+      const outside = watchOutside(page);
       const email = newEmail("obo-browser");
       const phone = newPhone();
 
-      // dm's hosted link: dm offers phone and email; the Carbon picks email.
-      await page.goto(`${env.apps}/dm/`);
-      await page.locator("#signin-hosted").click();
-      await page.getByRole("button", { name: "Continue", exact: true }).waitFor({ timeout: 30_000 });
-      const emailField = page.getByRole("textbox", { name: "Email" });
-      if (!(await emailField.isVisible())) await page.getByRole("button", { name: "Email", exact: true }).click();
-      await emailField.waitFor({ timeout: 10_000 });
-      let after = await lastSeq(env);
-      await emailField.fill(email);
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
-      const code = await codeFor(env, email, after);
-      await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
-      await page.keyboard.type(code, { delay: 25 });
+      // dm's own "Continue with email" button: the hosted page opens on the email field.
+      const started = Date.now();
+      await startAtApp(env, page, "dm", { method: "email" });
+      await signInWithCode(env, page, { email });
       const create = page.getByRole("button", { name: "Create account" });
       await create.waitFor({ timeout: 30_000 });
       await sleep(300);
       await create.click();
-      // dm requires a phone number: the requirement step asks for it before consent.
-      const phoneField = page.getByRole("textbox", { name: "Phone number" });
-      await phoneField.waitFor({ timeout: 30_000 });
-      after = await lastSeq(env);
-      await phoneField.click();
-      await page.keyboard.type(phone, { delay: 25 });
-      await sleep(250);
-      await page.getByRole("button", { name: "Send code" }).click();
-      const sms = await codeFor(env, phone, after);
-      await page.getByRole("group", { name: /Code/ }).first().waitFor({ timeout: 15_000 });
-      await page.keyboard.type(sms, { delay: 25 });
-      const share = page.getByRole("button", { name: "Share and continue" });
-      await share.waitFor({ timeout: 30_000 });
-      await share.click();
-      await page.waitForURL(new RegExp(`${env.apps.replace(/[.:/]/g, "\\$&")}/dm/`), { timeout: 30_000 });
+      // dm's one details page: the phone it requires is missing, so it is added there with a code before continuing.
+      const walk = await completeDetails(env, page, "dm", { add: { phone }, shotName: "proofs-perf-obo-01-dm" });
+      const setup = walk.pages[0];
+      const rowOf = (field: string) => setup?.rows.find(entry => entry.field === field);
+      results.check(
+        "dm shows one details page, \"Set up DM\" (\"Start messaging\"): the phone it requires missing, then added there with a code; email and timezone optional and unticked",
+        walk.pages.length === 1 && setup?.title === "Set up DM" && setup.continueLabel === "Start messaging" && rowOf("phone")?.mode === "required" && rowOf("phone")?.missing === true && setup.added.includes("phone") && rowOf("email")?.mode === "optional" && rowOf("email")?.ticked === false && rowOf("timezone")?.ticked === false && !walk.review,
+        `${walk.pages.length} page(s): ${setup?.title} / ${setup?.continueLabel}; ${setup?.rows.map(entry => `${entry.field}:${entry.mode}${entry.missing ? ":missing" : ""}${entry.ticked === null ? "" : entry.ticked ? ":ticked" : ":unticked"}`).join(" ")}; added ${JSON.stringify(setup?.added)}`,
+      );
       await page.waitForLoadState("networkidle").catch(() => undefined);
       const account = await appAccount(page);
       const uuid = String(account?.uuid ?? "");
-      results.check("dm holds the new Carbon's sign-in (AccountForApp with the phone it required)", !!uuid && account?.phone === phone, short(account));
-      await shot(env, page, "proofs-perf-obo-01-dm-signed-in");
+      results.metric("dm sign-up in the browser (button → back at dm, with the phone added)", Date.now() - started);
+      results.check("dm holds the new Carbon's sign-in: the phone it required (verified), not the email or timezone left unticked", !!uuid && account?.phone === phone && account.phone_verified === true && account.email === undefined && account.timezone === undefined, short(account));
+      await shot(env, page, "proofs-perf-obo-02-dm-signed-in");
 
       // OBO through the fake apps: dm issues a proof for Briefcase and calls Briefcase's API with it; Briefcase verifies.
       const filename = `report-${uuid}.txt`;
@@ -97,7 +88,11 @@ export const journeys: Journey[] = [
       const lifetime = save.body.proof ? secondsBetween(save.body.proof.expires_at, new Date().toISOString()) : Number.NaN;
       results.check("the proof token lives about 600 s from now (the access_ttl_seconds dm sent)", lifetime > 540 && lifetime <= 601, `${lifetime.toFixed(1)} s left`);
       const proofId = save.body.proof?.proof_id ?? "";
-      results.check("the issue answer has the contract shape without tokens leaking into dm's own answer", !!proofId && save.body.proof?.kind === "obo" && save.body.proof.issuing_app === "dm" && save.body.proof.receiving_app === "briefcase" && save.body.proof.user?.membership_id === `dm:${uuid}` && !JSON.stringify(save.body).includes("sap_"), short(save.body.proof));
+      results.check(
+        "the issue answer has the contract shape (receiving_app the one app briefcase), without tokens leaking into dm's own answer",
+        !!proofId && save.body.proof?.kind === "obo" && save.body.proof.issuing_app === "dm" && save.body.proof.receiving_app === "briefcase" && save.body.proof.user?.membership_id === `dm:${uuid}` && !JSON.stringify(save.body).includes("sap_"),
+        short(save.body.proof),
+      );
       const t = save.body.timings;
       for (const [name, value] of Object.entries(t ?? {})) if (typeof value === "number") results.metric(`OBO round trip via the fake apps: ${name}`, value);
 
@@ -111,7 +106,7 @@ export const journeys: Journey[] = [
 
       // dm's listing of what it issued.
       const listed = await appListing(ctx, "dm", proofId);
-      results.check("dm's proof listing has it: obo, audiences [briefcase], the Carbon, active, 600 s tokens", listed?.kind === "obo" && JSON.stringify(listed.audiences) === '["briefcase"]' && listed.user?.uuid === uuid && listed.status === "active" && listed.access_ttl_seconds === 600 && listed.revoked_at === null, short(listed));
+      results.check("dm's proof listing has it: obo, receiving_app briefcase (one app, no list), the Carbon, active, 600 s tokens", listed?.kind === "obo" && listed.receiving_app === "briefcase" && !("audiences" in listed) && listed.user?.uuid === uuid && listed.status === "active" && listed.access_ttl_seconds === 600 && listed.revoked_at === null, short(listed));
       const foreign = await asApp(ctx, "briefcase", "GET", "/v1/apps/dm/proofs");
       results.check("Briefcase cannot list dm's proofs (it is neither dm nor dm's owner)", foreign.status === 401 || foreign.status === 403 || foreign.status === 404, `${foreign.status} ${errorCode(foreign.body)}`);
 
@@ -125,24 +120,25 @@ export const journeys: Journey[] = [
       await sleep(800);
       const cardText = (await card.first().innerText()).replace(/\s+/g, " ");
       results.check("/proofs shows the card \"DM acts at Briefcase for you\" with its scope and the Active badge", /files\.write/.test(cardText) && /Active/.test(cardText) && /Revoke/.test(cardText), cardText.slice(0, 300));
-      await shot(env, page, "proofs-perf-obo-02-proofs-page", true);
+      await shot(env, page, "proofs-perf-obo-03-proofs-page", true);
 
       // History: the issue is in the audit log under the account, and in the account's history.
       const [audited] = await sql(env, `select count(*) from audit_log where action = 'proof.issued' and target_id = '${proofId}' and account_uuid = '${uuid}' and app_id = 'dm'`);
       results.check("the issue is in the audit log (proof.issued, app dm, the Carbon's uuid)", audited?.[0] === "1", String(audited));
       const history = (await (await page.request.get(`${env.site}/v1/me/history?kind=proof&limit=50`)).json()) as { items?: unknown[] };
       results.check("the Carbon's history (kind=proof) shows the proof", JSON.stringify(history.items ?? []).includes(proofId), short(history.items?.[0]));
+      results.check("nothing the pages of this journey loaded (dm, the hosted pages, /proofs) left the machine", outside().length === 0, outside().join(", ") || "none");
       await context.close();
     },
   },
   {
     name: "proofs-perf-obo-rules",
-    title: "issuing an OBO proof: the contract shape and token formats, an OBO proof never outlives the sign-in, and precise refusals for wrong subject tokens, receiving apps, scopes, lifetimes, bodies and app credentials",
+    title: "issuing an OBO proof: the contract shape and token formats, an OBO proof never outlives the sign-in, and precise refusals for wrong subject tokens, receiving apps (itself, Silicon Accounts, the developer platform, unknown, disabled), scopes, lifetimes, bodies and app credentials",
     async run(ctx) {
       const { env, results } = ctx;
       const dm = await signInToApp(ctx, "dm");
       const briefcase = await signInToApp(ctx, "briefcase", { session: dm.session });
-      results.check("one Carbon signed into dm and (continue as) Briefcase", briefcase.uuid === dm.uuid, `${dm.uuid} / ${briefcase.uuid}`);
+      results.check("one Carbon signed into dm (its details page added the phone dm requires) and, continuing as it, Briefcase", briefcase.uuid === dm.uuid && dm.pages[0]?.added.includes("phone") === true, `${dm.uuid} / ${briefcase.uuid}; dm pages ${JSON.stringify(dm.pages)}`);
       const subject = (await appTokens(env, "dm", dm.uuid)).access_token;
       const briefcaseToken = (await appTokens(env, "briefcase", dm.uuid)).access_token;
 
@@ -150,8 +146,9 @@ export const journeys: Journey[] = [
       const issued = await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: ["files.write", "files.read", "files.write"], access_ttl_seconds: 900 });
       const p = issued.body;
       results.check("201 with Cache-Control: no-store", issued.status === 201 && issued.headers.get("cache-control") === "no-store", `${issued.status} ${issued.headers.get("cache-control")}`);
+      results.check("exactly the contract's keys (receiving_app, never a list of apps)", JSON.stringify(Object.keys(p).sort()) === JSON.stringify(ISSUED_KEYS), JSON.stringify(Object.keys(p).sort()));
       results.check("proof_token is sap_ + 43 base64url characters, proof_refresh_token sapr_ + 43", PROOF_TOKEN.test(p.proof_token ?? "") && PROOF_REFRESH_TOKEN.test(p.proof_refresh_token ?? ""), `${(p.proof_token ?? "").length} / ${(p.proof_refresh_token ?? "").length} characters`);
-      results.check("kind obo, issuing dm, receiving briefcase, the Carbon with membership dm:<uuid>, duplicate scopes dropped in order", p.kind === "obo" && p.issuing_app === "dm" && p.receiving_app === "briefcase" && p.receiving_apps === undefined && p.user?.uuid === dm.uuid && p.user.id === dm.id && p.user.kind === "carbon" && p.user.membership_id === `dm:${dm.uuid}` && JSON.stringify(p.scopes) === '["files.write","files.read"]', short(p, 500));
+      results.check("kind obo, issuing dm, receiving briefcase, the Carbon with membership dm:<uuid>, duplicate scopes dropped in order", p.kind === "obo" && p.issuing_app === "dm" && p.receiving_app === "briefcase" && p.user?.uuid === dm.uuid && p.user.id === dm.id && p.user.kind === "carbon" && p.user.membership_id === `dm:${dm.uuid}` && JSON.stringify(p.scopes) === '["files.write","files.read"]', short(p, 500));
       const family = familyOf(subject);
       const signInEnd = (await row(env, `select to_char(expires_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') from token_families where id = '${family}'`))?.[0];
       results.check("refresh_expires_at is the end of dm's sign-in (an OBO proof never outlives the sign-in it stands on)", !!signInEnd && Math.abs(Date.parse(p.refresh_expires_at) - Date.parse(signInEnd)) <= 1, `${p.refresh_expires_at} vs sign-in ${signInEnd}`);
@@ -159,8 +156,8 @@ export const journeys: Journey[] = [
       results.check("…which is about 900 days away", days > 899 && days <= 900.01, `${days.toFixed(3)} days`);
       const ttl = secondsBetween(p.expires_at, new Date().toISOString());
       results.check("expires_at follows access_ttl_seconds 900", ttl > 840 && ttl <= 901, `${ttl.toFixed(1)} s`);
-      const stored = await row(env, `select f.access_ttl_seconds, f.subject_family_id, (select count(*) from proof_tokens t where t.family_id = f.id) from proof_families f where f.id = '${p.proof_id}'`);
-      results.check("stored: 900 s tokens, the subject's sign-in, one proof token + one refresh token (hashes only)", stored?.[0] === "900" && stored[1] === family && stored[2] === "2", short(stored));
+      const stored = await row(env, `select f.access_ttl_seconds, f.subject_family_id, (select count(*) from proof_tokens t where t.family_id = f.id), array_to_string(f.audiences, ',') from proof_families f where f.id = '${p.proof_id}'`);
+      results.check("stored: 900 s tokens, the subject's sign-in, one proof token + one refresh token (hashes only), the one receiving app", stored?.[0] === "900" && stored[1] === family && stored[2] === "2" && stored[3] === "briefcase", short(stored));
       const plaintext = await row(env, `select count(*) from proof_tokens where family_id = '${p.proof_id}' and (position('sap' in encode(token_hash, 'escape')) > 0 or length(token_hash) <> 32)`);
       results.check("proof_tokens keeps 32-byte HMACs, never the tokens", plaintext?.[0] === "0", short(plaintext));
       const valid = await verifyAs(ctx, "briefcase", p.proof_token);
@@ -169,7 +166,7 @@ export const journeys: Journey[] = [
       // Default lifetime and the bounds.
       const byDefault = await issueObo(ctx, "dm", subject, { receiving_app: "briefcase" });
       const defaultTtl = secondsBetween(byDefault.body.expires_at, new Date().toISOString());
-      results.check("without access_ttl_seconds a proof token lives 1800 s, and scopes default to []", byDefault.status === 201 && defaultTtl > 1740 && defaultTtl <= 1801 && JSON.stringify(byDefault.body.scopes) === "[]", `${byDefault.status} ${defaultTtl.toFixed(1)} s ${short(byDefault.body.scopes)}`);
+      results.check("without access_ttl_seconds a proof token lives 1800 s (a sign-in access token's 30 minutes), and scopes default to []", byDefault.status === 201 && defaultTtl > 1740 && defaultTtl <= 1801 && JSON.stringify(byDefault.body.scopes) === "[]", `${byDefault.status} ${defaultTtl.toFixed(1)} s ${short(byDefault.body.scopes)}`);
       for (const [value, ok] of [[60, true], [1800, true], [59, false], [1801, false], [0, false], [-5, false]] as const) {
         const answer = await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", access_ttl_seconds: value });
         const fields = (answer.body.error?.details?.fields ?? {}) as Record<string, string>;
@@ -191,19 +188,23 @@ export const journeys: Journey[] = [
       results.check("bad scopes → 422 naming each one: scopes[1] (space), scopes[2] (empty), scopes[3] (101 characters), scopes[4] (non-ASCII); scopes[0] is fine", badScopes.status === 422 && !!badFields["scopes[1]"] && !!badFields["scopes[2]"] && !!badFields["scopes[3]"] && !!badFields["scopes[4]"] && !badFields["scopes[0]"], short(badFields, 600));
 
       // The receiving app.
-      const cases: Array<[string, number, string]> = [
-        ["dm", 400, "invalid_receiving_app"],
-        ["accounts", 400, "invalid_receiving_app"],
-        [`nope-${dm.uuid.toLowerCase()}`, 400, "unknown_receiving_app"],
+      const cases: Array<[string, string, number, string]> = [
+        ["dm itself (the issuing app)", "dm", 400, "invalid_receiving_app"],
+        ["Silicon Accounts itself", "accounts", 400, "invalid_receiving_app"],
+        ["the developer platform (first-party app developer)", "developer", 400, "invalid_receiving_app"],
+        ["an unknown app", `nope-${dm.uuid.toLowerCase()}`, 400, "unknown_receiving_app"],
+        ["a malformed app id", "Not An App!", 422, "validation_failed"],
       ];
-      for (const [receiver, status, codeName] of cases) {
+      for (const [what, receiver, status, codeName] of cases) {
         const answer = await issueObo(ctx, "dm", subject, { receiving_app: receiver });
-        results.check(`receiving_app "${receiver}" → ${status} ${codeName}`, answer.status === status && errorCode(answer.body) === codeName, `${answer.status} ${short(answer.body.error)}`);
+        results.check(`receiving_app ${what} → ${status} ${codeName}`, answer.status === status && errorCode(answer.body) === codeName, `${answer.status} ${short(answer.body.error)}`);
       }
       const upper = await issueObo(ctx, "dm", subject, { receiving_app: "  BriefCase " });
       results.check("receiving_app is trimmed and lower-cased (\"  BriefCase \" → briefcase)", upper.status === 201 && upper.body.receiving_app === "briefcase", `${upper.status} ${short(upper.body.receiving_app ?? upper.body.error)}`);
       const empty = await issueObo(ctx, "dm", subject, { receiving_app: "" });
       results.check("an empty receiving_app → 422 on receiving_app", empty.status === 422 && !!(empty.body.error?.details?.fields as Record<string, string> | undefined)?.receiving_app, `${empty.status} ${short(empty.body.error)}`);
+      const list = await asApp<IssuedProof>(ctx, "dm", "POST", "/v1/proofs/obo", { subject_token: subject, receiving_app: ["briefcase", "waveform"] });
+      results.check("receiving_app as a list of apps → 422 (an OBO proof is for one app)", list.status === 422, `${list.status} ${short(list.body.error)}`);
       // A disabled receiving app (as Silicon Apps would set it): refused, then accepted again once it is back.
       await sql(env, "update apps set status = 'disabled' where app_id = 'waveform'");
       try {
@@ -236,7 +237,7 @@ export const journeys: Journey[] = [
 
       // The body and the caller.
       const unknownField = await asApp<IssuedProof>(ctx, "dm", "POST", "/v1/proofs/obo", { subject_token: subject, receiving_app: "briefcase", user: "c:someone-else" });
-      results.check("an unknown body field → 422 (bodies are strict)", unknownField.status === 422, `${unknownField.status} ${short(unknownField.body.error)}`);
+      results.check("an unknown body field (a user to act for) → 422: the subject token alone names the account", unknownField.status === 422, `${unknownField.status} ${short(unknownField.body.error)}`);
       const noAuth = await asApp<IssuedProof>(ctx, "dm", "POST", "/v1/proofs/obo", { subject_token: subject, receiving_app: "briefcase" }, { secret: null });
       results.check("no app credentials → 401 app_credentials_required", noAuth.status === 401 && errorCode(noAuth.body) === "app_credentials_required", `${noAuth.status} ${short(noAuth.body.error)}`);
       const wrongSecret = await asApp<IssuedProof>(ctx, "dm", "POST", "/v1/proofs/obo", { subject_token: subject, receiving_app: "briefcase" }, { secret: "sa_app_dm_wrong" });
@@ -245,6 +246,8 @@ export const journeys: Journey[] = [
       results.check("the Carbon's own access token as the caller (Bearer) → 401: only apps issue proofs", bearer.status === 401, `${bearer.status} ${short((bearer.body as { error?: unknown }).error)}`);
       const issuedByBriefcase = await issueObo(ctx, "briefcase", briefcaseToken, { receiving_app: "dm" });
       results.check("any app the Carbon signed into may issue for it: Briefcase → dm works with Briefcase's own token", issuedByBriefcase.status === 201 && issuedByBriefcase.body.user?.membership_id === `briefcase:${dm.uuid}`, `${issuedByBriefcase.status} ${short(issuedByBriefcase.body.user ?? issuedByBriefcase.body.error)}`);
+      const remindVerifies = await verifyAs(ctx, "dm", issuedByBriefcase.body.proof_token);
+      results.check("…and dm verifies it, naming the Carbon's membership with Briefcase (the grant the proof stands on)", remindVerifies.body.valid === true && remindVerifies.body.user?.membership_id === `briefcase:${dm.uuid}` && remindVerifies.body.issuing_app?.app_id === "briefcase", short(remindVerifies.body));
     },
   },
 ];

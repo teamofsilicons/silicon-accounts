@@ -3,7 +3,7 @@
  * cells, rows, 50 MB: from the headers with or without Expect: 100-continue, chunked, through the site's rewrite, and
  * the exact byte boundary), and the app's budgets (60 requests an hour, 2,000,000 rows a day; time travel moves their
  * windows), with nothing imported by any refusal. Who may import and read jobs: the app's own credentials or its
- * owner's session (Origin-checked), never another app, a wrong secret or another Carbon; the rows endpoint's filters,
+ * owner's session (Origin-checked; the developer site's BFF in p-developer.ts), never another app, a wrong secret or another Carbon; the rows endpoint's filters,
  * pagination and 404s. And capacity: two import bodies read at once per API node, 503 imports_busy after 30 s.
  */
 import { randomUUID } from "node:crypto";
@@ -50,6 +50,8 @@ export const journeys: Journey[] = [
   {
     name: "imports-refusals",
     title: "refusals with precise errors and nothing imported: content types, options, empty files, missing identifier columns, duplicate columns, invalid UTF-8, cells over 8 KB, 201 columns, 100,001 rows, bodies over 50 MB; the hourly request and daily row budgets (time travel)",
+    // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+    engines: ["chromium"],
     timeoutMs: 8 * 60_000,
     async run(ctx) {
       const { env, results } = ctx;
@@ -211,7 +213,7 @@ export const journeys: Journey[] = [
   },
   {
     name: "imports-access",
-    title: "who may import: the app's credentials or its owner's session (Origin-checked, the job says who), never no credentials, a wrong secret, another app or another Carbon; the rows endpoint's filters, pagination, bad queries and 404s",
+    title: "who may import: the app's credentials or its owner's account-site session (Origin-checked, the job says who; the developer site's BFF is imports-developer-bff), never no credentials, a wrong secret, another app or another Carbon; the rows endpoint's filters, pagination, bad queries and 404s",
     async run(ctx) {
       const { env, results, browser } = ctx;
       const crm = fakeApp("legacy-crm");
@@ -307,6 +309,8 @@ export const journeys: Journey[] = [
   {
     name: "imports-busy",
     title: "capacity: an API node reads at most 2 import bodies at once; a third import waits 30 s, then 503 imports_busy (Retry-After 15, nothing imported); stalled uploads give their slots back when their clients go away; whether one app's stalled uploads can keep another app from importing",
+    // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
+    engines: ["chromium"],
     timeoutMs: 5 * 60_000,
     async run(ctx) {
       const { env, results } = ctx;

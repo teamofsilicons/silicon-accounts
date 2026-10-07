@@ -29,6 +29,8 @@ import {
 export const journey: Journey = {
   name: "silicons-cli-rotate-stk",
   title: "the custodian rotates a Silicon's STK with the CLI: the old STK is dead, every sign-in (CLI sessions, app tokens, unused SLTs) is revoked, apps get membership.signed_out, the Silicon gets silicon.stk_rotated; a chosen STK; retries rotate once",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     await forgetRateLimits(env, "127.0.0.1");
@@ -47,8 +49,16 @@ export const journey: Journey = {
     // Every kind of sign-in the Silicon can have.
     const home1 = freshDir();
     const home2 = freshDir();
+    // Two more CLI sessions nothing touches between the rotation and the Silicon signing in again (a status check or
+    // a command would notice the session ended and clear it first).
+    const home3 = freshDir();
+    const home4 = freshDir();
+    const home5 = freshDir();
     const slt1 = await loginSilicon(env, home1, sid, first, ["--app", "remind"]);
     const login2 = await loginSilicon(env, home2, sid, first);
+    const login3 = await loginSilicon(env, home3, sid, first);
+    const login4 = await loginSilicon(env, home4, sid, first);
+    const login5 = await loginSilicon(env, home5, sid, first);
     const slt2 = await accounts(env, ["login", "--app", "briefcase", "--json"], { home: home2 });
     const unused = await accounts(env, ["login", "--app", "browser", "--json"], { home: home1 });
     const remind = await appSltLogin(env, "remind", str(slt1.json?.slt));
@@ -77,6 +87,27 @@ export const journey: Journey = {
     results.check("a CLI session from before: `login status` says not authenticated (exit 1, session_ended)", status1.code === 1 && status1.json?.authenticated === false && status1.json?.reason === "session_ended", said(status1));
     const whoami2 = await accounts(env, ["whoami", "--json"], { home: home2 });
     results.check("another CLI session: `whoami` fails with session_ended (exit 3) and says why", whoami2.code === 3 && cliError(whoami2).code === "session_ended" && /STK was rotated/.test(str(cliError(whoami2).hint)), said(whoami2));
+    // The Silicon signs in again as the hint says, in a terminal whose session the rotation ended: the new STK must
+    // sign it in for real; the old STK must not "sign in" at all.
+    const again = await loginSilicon(env, home3, sid, second);
+    const againStatus = await accounts(env, ["login", "status", "--json"], { home: home3 });
+    results.check(
+      "`accounts login --silicon … --stk-stdin` with the new STK, where a session from before the rotation is still stored: a real sign-in (verified), and `login status` then says authenticated",
+      login3.code === 0 && again.code === 0 && again.json?.authenticated === true && again.json?.verified === true && againStatus.code === 0 && againStatus.json?.authenticated === true,
+      `${said(again)} | then ${said(againStatus)}`,
+    );
+    const withApp = await loginSilicon(env, home5, sid, second, ["--app", "remind"]);
+    results.check(
+      "…and `accounts login --silicon … --stk-stdin --app remind` with the new STK there: signs in and prints the token (exit 0), not session_ended",
+      login5.code === 0 && withApp.code === 0 && str(withApp.json?.slt).startsWith("slt_"),
+      said(withApp).replace(str(withApp.json?.slt), "slt_…"),
+    );
+    const stale = await loginSilicon(env, home4, sid, first);
+    results.check(
+      "…and with the old STK there: refused (exit 3, invalid_credentials), never \"authenticated\" on the strength of the dead stored session",
+      login4.code === 0 && stale.code === 3 && cliError(stale).code === "invalid_credentials",
+      said(stale),
+    );
     const apiMe = await withToken(ctx, directToken, "GET", "/v1/me");
     results.check("an access token from before is refused at once (401)", apiMe.status === 401, `${apiMe.status} ${short(apiMe.body)}`);
     for (const app of ["remind", "briefcase"]) {

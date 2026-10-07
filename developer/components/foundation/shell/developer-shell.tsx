@@ -136,7 +136,7 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
 
   const chrome = (content: ReactNode) => (
     <div className={styles.shell}>
-      <a className="skip-link" href="#main">Skip to content</a>
+      <a className="skip-link" data-sq="surface" href="#main">Skip to content</a>
       <header className={styles.top}>
         <div className={styles.topStart}>
           <Link href={paths.home} data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {

@@ -9,7 +9,7 @@
 import { randomBytes } from "node:crypto";
 import type { Journey } from "../../context";
 import { forgetRateLimits, randomIp, tag } from "../../lib";
-import { brief, call, callbackOf, createSilicon, errorOf, flowOf, flowStep, median, remember, siliconLogin, signInWithEmail, startFlow, viaSite, Jar, type Reply } from "./_helpers";
+import { brief, call, callbackOf, createSilicon, errorOf, flowOf, flowStep, median, randomPhone, remember, siliconLogin, signInWithEmail, signInWithPhone, startFlow, viaSite, Jar, type Reply } from "./_helpers";
 
 /** The parts of a refusal a prober could compare. */
 const shape = (reply: Reply) => {
@@ -19,7 +19,7 @@ const shape = (reply: Reply) => {
 
 export const journey: Journey = {
   name: "security-enumeration",
-  title: "enumeration: Silicon sign-in gives an unknown si:id and a wrong STK the identical 401 (message, hint, headers, timing), also for a pending Silicon; the hosted flow treats known and unknown emails alike until the code; lookups need credentials; the CLI's documented address oracle is throttled at 60 per 10 minutes per network; the lock-only-for-real-ids and CLI account_not_found behaviours are recorded as notes",
+  title: "enumeration: Silicon sign-in gives an unknown si:id and a wrong STK the identical 401 (message, hint, headers, timing), also for a pending Silicon; the hosted flow treats known and unknown emails alike until the code; lookups need credentials; the CLI's documented address oracle is throttled at 60 per 10 minutes per network; the lock-only-for-real-ids and CLI account_not_found behaviours are recorded as notes; adding an address on an app's details page is counted like the account site's add (no unlimited in-use oracle)",
   engines: ["chromium"],
   timeoutMs: 600_000,
   async run(ctx) {
@@ -135,5 +135,36 @@ export const journey: Journey = {
     const answered = probes.filter(reply => reply.status === 404 && errorOf(reply).code === "account_not_found").length;
     results.check("the CLI's address lookup is throttled per network: 60 lookups of unknown addresses are answered (404), the 61st and a known address after it get 429 rate_limited with Retry-After (≤ 600 s), and another network is unaffected", answered === 60 && probe61.status === 429 && errorOf(probe61).code === "rate_limited" && retry >= 1 && retry <= 600 && Number(errorOf(probe61).details?.retry_after_seconds) === retry && probeKnown.status === 429 && elsewhere.status === 404, `${answered}/60 answered 404; 61st ${brief(probe61)} (Retry-After ${probe61.headers.get("retry-after")}); known address after it ${probeKnown.status}; another network ${elsewhere.status}`);
     await forgetRateLimits(env, prober);
+
+    // 8. Adding a missing email or phone on an app's details page (v2: POST /v1/flows/{id}/details/add) answers 409
+    //    phone_in_use / email_in_use when another account has the address, before any code is sent. The account site's
+    //    own "add a phone" answers the same 409 and therefore counts every attempt first (20 per account, 30 per network
+    //    every 10 minutes: "otherwise anyone signed in could check, without limit, whether an address has an account");
+    //    the details page is the same question and must not be an unlimited way around that.
+    const known = await signInWithPhone(t, { phone: randomPhone() });
+    remember(ctx, "session cookie", known.jar.get("sa_session"));
+    remember(ctx, "code", known.code);
+    const phoneProber = await signInWithEmail(t, { label: "phoneprober" });
+    remember(ctx, "session cookie", phoneProber.jar.get("sa_session"));
+    remember(ctx, "code", phoneProber.code);
+    const probeJar = phoneProber.jar.clone();
+    const crm = flowOf(await startFlow(t, probeJar, { app_id: "legacy-crm", redirect_uri: callbackOf(env, "legacy-crm"), state: `crm-${tag()}` }));
+    const onPage = flowOf(await flowStep(t, probeJar, crm?.id ?? "", "continue"));
+    const phoneRow = onPage?.details?.fields.find(field => field.field === "phone");
+    const detailsIp = randomIp();
+    const detailsAnswers: Reply[] = [];
+    for (let i = 0; i < 35; i++) detailsAnswers.push(await call(`${env.site}/v1/flows/${onPage?.id}/details/add`, { json: { phone: known.phone }, jar: probeJar, origin: env.site, ip: detailsIp }));
+    const inUse = detailsAnswers.filter(reply => reply.status === 409 && errorOf(reply).code === "phone_in_use").length;
+    const limited = detailsAnswers.filter(reply => reply.status === 429).length;
+    // Control: the account site's own add-a-phone, same Carbon, same number.
+    const controlIp = randomIp();
+    const controlAnswers: Reply[] = [];
+    for (let i = 0; i < 22; i++) controlAnswers.push(await call(`${env.site}/v1/me/phones`, { json: { phone: known.phone }, jar: phoneProber.jar, origin: env.site, ip: controlIp, headers: { "idempotency-key": `sec-${tag()}${tag()}` } }));
+    const controlInUse = controlAnswers.filter(reply => reply.status === 409).length;
+    const controlLimited = controlAnswers.filter(reply => reply.status === 429).length;
+    results.check("control: on the account site a signed-in Carbon asking to add a phone another account has gets 409 phone_in_use at most 20 times, then 429 (every attempt is counted before the answer)", controlInUse <= 20 && controlLimited > 0, `${controlInUse} × 409, ${controlLimited} × 429 of ${controlAnswers.length}${controlAnswers[controlAnswers.length - 1] ? `; last ${brief(controlAnswers[controlAnswers.length - 1]!)}` : ""}`);
+    results.check("adding a missing phone on an app's details page is counted the same way: 35 tries with a phone another account has (legacy-crm's optional phone) get at most 20 answers of 409 phone_in_use before 429, so the page is no unlimited way to learn whether a phone number has an account", phoneRow?.missing === true && limited > 0 && inUse <= 20, `page ${onPage?.step} (phone ${phoneRow ? `${phoneRow.mode}, missing ${phoneRow.missing}` : "not on the page"}); ${inUse} × 409 phone_in_use, ${limited} × 429 of ${detailsAnswers.length}; last ${detailsAnswers[detailsAnswers.length - 1] ? brief(detailsAnswers[detailsAnswers.length - 1]!) : "none"}`);
+    await forgetRateLimits(env, detailsIp);
+    await forgetRateLimits(env, controlIp);
   },
 };

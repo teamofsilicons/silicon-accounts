@@ -9,12 +9,21 @@
 //! any details step or the review ── POST …/review {"approve": false} ──▶ complete, error=access_denied
 //! ```
 //!
-//! **Which steps a Carbon sees.** Every step the first time they sign in to the app (no active
-//! membership: never signed in, imported, or access removed) and with `prompt=consent`. After
-//! that only a step with something new on it: a required detail the app wasn't granted yet, a
-//! required email or phone the account doesn't have (verified) any more, or a detail the
-//! `scope` parameter asks for that wasn't granted. A Carbon with nothing new goes straight to
-//! complete. The first-party apps (`accounts`, `developer`) never show these pages.
+//! **Which steps a Carbon sees.** Every step the first time they sign in to the app on these
+//! pages (no active membership: never signed in, imported, or access removed; or an active one
+//! whose Carbon never answered the pages, e.g. made by a Silicon or CLI short-lived token) and
+//! with `prompt=consent`. After that only a step with something new on it: a required detail the
+//! app wasn't granted yet, a required email or phone the account doesn't have (verified) any
+//! more, an optional detail the app asks for now that the Carbon was never offered, or a detail
+//! the `scope` parameter asks for that wasn't granted. Optional details the Carbon left unticked
+//! before stay quiet. A Carbon with nothing new goes straight to complete. The first-party apps
+//! (`accounts`, `developer`) never show these pages.
+//!
+//! **The answer record.** Every time a Carbon finishes the pages, the audit log gets a
+//! `consent.granted` entry for the app (actor: the Carbon) with the details offered to them so
+//! far and the details they shared. The latest one since the app's access was last removed
+//! (`membership.access_removed`) tells whether the Carbon answered the pages and what they were
+//! offered ([`Standing::load`]); a detail is `new` on a page when it wasn't.
 //!
 //! **Details.** Required details are always shared; a missing email or phone must be added on
 //! the page (`…/details/add` + `…/details/verify`, a 6-digit code) before continuing. Optional
@@ -39,6 +48,7 @@ use accounts_core::models::{
 use accounts_core::normalize::{mask_email, mask_phone, normalize_email, normalize_phone};
 use accounts_core::repo::audit::{self, AuditEntry};
 use accounts_core::repo::contacts::{self, ContactKind};
+use accounts_core::repo::rate_limit::{self, Limit};
 use accounts_core::repo::{accounts, memberships, otp};
 use accounts_core::timefmt::format_date;
 use accounts_core::views::PrimaryContact;
@@ -55,6 +65,106 @@ use super::next::{self, Grant};
 use super::view::{self, ChallengeView, ViewContext};
 use super::{FlowApp, FlowResponse, browser, load_bound};
 use crate::util::telemetry;
+
+// ----------------------------------------------------------------------------- limits
+
+/// Attempts to add a missing email or phone on a details page, per account: 20 per 10 minutes.
+/// The same bucket (`contact_add:account`) and limit as the account site's adds
+/// (`CONTACT_ADDS_PER_ACCOUNT` in the account crate), so both share one budget. Every attempt
+/// counts, including those answered 409 `email_in_use` / `phone_in_use`: otherwise anyone signed
+/// in could check, without limit, whether an address has an account.
+pub const DETAIL_ADDS_PER_ACCOUNT: Limit = Limit::new(20, 600);
+
+/// The same per network (`contact_add:ip`, 30 per 10 minutes, shared with the account site).
+pub const DETAIL_ADDS_PER_IP: Limit = Limit::new(30, 600);
+
+// ----------------------------------------------------------------------------- answers
+
+/// The audit action recording a Carbon's answer on an app's details pages (see the module docs).
+pub const CONSENT_ACTION: &str = "consent.granted";
+
+/// The audit action the account site writes when a Carbon removes an app's access: answers
+/// before it don't count any more.
+const ACCESS_REMOVED_ACTION: &str = "membership.access_removed";
+
+/// What the Carbon answered on the app's pages last (since the app's access was last removed):
+/// the details they had been offered by then. `None` when they never answered them.
+async fn last_answer(
+    conn: &mut PgConnection,
+    app_id: &str,
+    account_uuid: &str,
+) -> ApiResult<Option<Vec<ContactField>>> {
+    let row: Option<(String, serde_json::Value)> = sqlx::query_as(
+        "select action, details from audit_log \
+         where account_uuid = $1 and app_id = $2 and action in ($3, $4) \
+         order by at desc, id desc limit 1",
+    )
+    .bind(account_uuid)
+    .bind(app_id)
+    .bind(CONSENT_ACTION)
+    .bind(ACCESS_REMOVED_ACTION)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(match row {
+        Some((action, details)) if action == CONSENT_ACTION => Some(
+            details["offered"]
+                .as_array()
+                .map(|fields| {
+                    fields
+                        .iter()
+                        .filter_map(|f| f.as_str().and_then(ContactField::parse))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        ),
+        _ => None,
+    })
+}
+
+/// Records the Carbon's answer on the app's pages (a sign-in that completed through them):
+/// every detail offered to them so far, and the details they share now.
+async fn record_answer(
+    conn: &mut PgConnection,
+    meta: &ClientMeta,
+    fa: &FlowApp,
+    plan: &Plan,
+    standing: &Standing,
+    shared: &[Scope],
+) -> ApiResult<()> {
+    let mut offered: Vec<ContactField> = standing.offered.clone();
+    for step in &plan.steps {
+        for (f, _) in &step.fields {
+            if !offered.contains(f) {
+                offered.push(*f);
+            }
+        }
+    }
+    offered.sort_unstable();
+    let shared: Vec<&str> = shared
+        .iter()
+        .filter_map(Scope::contact_field)
+        .map(|f| f.as_str())
+        .collect();
+    let uuid = standing.account.uuid.as_str();
+    let membership_id = format!("{}:{uuid}", fa.app.app_id);
+    audit::record(
+        conn,
+        &AuditEntry {
+            account_uuid: Some(uuid),
+            app_id: Some(&fa.app.app_id),
+            target_kind: Some("membership"),
+            target_id: Some(&membership_id),
+            details: json!({
+                "app_id": fa.app.app_id,
+                "offered": offered.iter().map(ContactField::as_str).collect::<Vec<_>>(),
+                "shared": shared,
+            }),
+            ip: meta.ip.as_deref(),
+            ..AuditEntry::new(ActorKind::Account, Some(uuid), CONSENT_ACTION)
+        },
+    )
+    .await
+}
 
 // ----------------------------------------------------------------------------- the plan
 
@@ -149,6 +259,13 @@ pub struct Standing {
     pub granted: Vec<Scope>,
     /// The account signed in to the app before and still has it (membership `active`).
     pub active_member: bool,
+    /// An active member who answered the app's pages before (since its access was last
+    /// removed). False for a membership made without the pages (a short-lived token from the
+    /// CLI or a Silicon): its first sign-in here shows every page.
+    pub answered: bool,
+    /// The details the app offered the Carbon on its pages by their last answer (empty unless
+    /// `answered`).
+    pub offered: Vec<ContactField>,
 }
 
 impl Standing {
@@ -167,13 +284,34 @@ impl Standing {
         let active_member = membership
             .as_ref()
             .is_some_and(|m| m.status == MembershipStatus::Active);
+        let answer = if active_member {
+            last_answer(conn, app_id, &account.uuid).await?
+        } else {
+            None
+        };
         Ok(Standing {
             account: account.clone(),
             email,
             phone,
             granted,
             active_member,
+            answered: answer.is_some(),
+            offered: answer.unwrap_or_default(),
         })
+    }
+
+    /// True when the app offered the Carbon this detail on its pages before.
+    pub fn offered(&self, field: ContactField) -> bool {
+        self.offered.contains(&field)
+    }
+
+    /// True when the detail is new to the Carbon on a page of a returning sign-in: the app asks
+    /// for it since their last answer (an optional detail never offered, or a required one not
+    /// granted). Never on a Carbon's first pages (nothing is "new" there).
+    pub fn is_new(&self, field: ContactField, mode: FieldMode) -> bool {
+        self.answered
+            && !self.granted(field)
+            && (mode == FieldMode::Required || !self.offered(field))
     }
 
     /// True when the account has the detail: a verified primary email or phone (every account
@@ -217,13 +355,16 @@ impl Standing {
 
 /// True when a step has something for the Carbon (see the module docs).
 pub fn needs_carbon(step: &PlanStep, standing: &Standing, flow: &Flow) -> bool {
-    if flow.prompt.consent || !standing.active_member {
+    if flow.prompt.consent || !standing.answered {
         return true;
     }
     let asked = asked_in_scope(flow);
     step.fields.iter().any(|(f, mode)| match mode {
         FieldMode::Required => !standing.has(*f) || !standing.granted(*f),
-        FieldMode::Optional => asked.contains(f) && !standing.granted(*f),
+        // A new optional detail, or one the `scope` parameter asks for again.
+        FieldMode::Optional => {
+            !standing.granted(*f) && (!standing.offered(*f) || asked.contains(f))
+        }
     })
 }
 
@@ -430,9 +571,10 @@ async fn finish(
         flow,
         fa,
         &standing.account,
-        Grant::Chosen(scopes),
+        Grant::Chosen(scopes.clone()),
     )
-    .await
+    .await?;
+    record_answer(conn, meta, fa, plan, standing, &scopes).await
 }
 
 /// The details step on screen; `None` when the app's flow changed and the page is gone.
@@ -474,6 +616,12 @@ pub async fn repair(
         Ok(()) => Ok(true),
         // The flow is back on the page of the missing detail: a GET shows it.
         Err(e) if e.code == "requirements_missing" => Ok(true),
+        // The account can't sign in to the app (no verified email at its domains any more):
+        // the page says so instead of failing the GET.
+        Err(e) if e.code == "email_domain_not_allowed" => {
+            flow.extras.error = Some(super::model::FlowError::from_api(&e));
+            Ok(true)
+        }
         Err(e) => Err(e),
     }
 }
@@ -496,6 +644,11 @@ pub struct DetailField {
     pub shared: bool,
     /// The account granted this app the detail before.
     pub previously_granted: bool,
+    /// The app asks for this detail since the Carbon last answered its pages (an optional detail
+    /// they were never offered, or a required one they didn't share): the page marks it New.
+    /// Always false on a Carbon's first pages for the app; an optional detail they left unticked
+    /// before is not new.
+    pub new: bool,
 }
 
 /// `FlowView.details` (step `details`).
@@ -563,6 +716,7 @@ fn detail_field(
         missing,
         shared,
         previously_granted,
+        new: standing.is_new(field, mode),
     }
 }
 
@@ -772,7 +926,9 @@ fn tick_if_optional(flow: &mut Flow, step: Option<&PlanStep>, field: ContactFiel
 /// Errors: 422 `validation_failed` (neither or both of email/phone, or an invalid value), 409
 /// `detail_not_on_page`, 403 `email_domain_not_allowed`, 409 `email_in_use` / `phone_in_use`,
 /// 422 `email_limit_reached` / `phone_limit_reached`, 429 `rate_limited` (10 codes per address per
-/// 10 minutes), and the flow errors (`invalid_step`, `session_required`, `account_changed`, …).
+/// 10 minutes; 20 add attempts per account and 30 per network per 10 minutes, shared with the
+/// account site's adds and counted also when the answer is 409), and the flow errors
+/// (`invalid_step`, `session_required`, `account_changed`, …).
 pub async fn add_detail(
     State(state): State<AppState>,
     meta: ClientMeta,
@@ -839,6 +995,24 @@ pub async fn add_detail(
     };
     if kind == ContactKind::Email && !fa.config.email_domain_allowed(&value) {
         return Err(next::domain_not_allowed(&fa, Some(&value)));
+    }
+    // Counted on their own connections, before any answer about who has the address (a 409
+    // rolls this transaction back, but these hits stay counted), in the account site's buckets.
+    rate_limit::enforce_pool(
+        &state.db,
+        &rate_limit::bucket("contact_add:account", &account.uuid),
+        DETAIL_ADDS_PER_ACCOUNT,
+        "attempts to add an email or phone number to this account",
+    )
+    .await?;
+    if let Some(ip) = meta.ip.as_deref() {
+        rate_limit::enforce_pool(
+            &state.db,
+            &rate_limit::bucket("contact_add:ip", ip),
+            DETAIL_ADDS_PER_IP,
+            "attempts to add an email or phone number from this network",
+        )
+        .await?;
     }
     match contacts::check_can_add(&mut tx, kind, &account.uuid, &value).await {
         Ok(()) => {}
@@ -979,13 +1153,17 @@ pub async fn verify_detail(
         let updated = accounts::bump_version(&mut tx, &account_uuid).await?;
         events::account_updated(&mut tx, &updated, &[account_field(kind)]).await?;
     }
+    // The added address under its kind (`"email"` / `"phone"`), as the account site's own adds
+    // record it: the activity names it ("Phone number +1… added while signing in to DM").
+    let mut added = json!({"via": "requirement", "app_id": fa.app.app_id, "kind": kind.code()});
+    added[kind.code()] = json!(challenge.destination);
     audit::record(
         &mut tx,
         &AuditEntry {
             account_uuid: Some(&account_uuid),
             app_id: Some(&fa.app.app_id),
             target_kind: Some(kind.code()),
-            details: json!({"via": "requirement", "app_id": fa.app.app_id, "kind": kind.code()}),
+            details: added,
             ip: meta.ip.as_deref(),
             ..AuditEntry::new(ActorKind::Account, Some(&account_uuid), "contact.added")
         },

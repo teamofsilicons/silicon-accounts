@@ -1,15 +1,16 @@
 /**
  * ux-audit: the narrowest phones. The web spec's quality bar is "works at 320/390 px (16 px gutters, no horizontal
  * scroll)", and WCAG 1.4.10 (Reflow) asks for 320 CSS px without scrolling in two directions. The rest of the suite
- * walks 390; this walks 320 × 640 (light): every signed-out and signed-in page, the hosted steps in three layouts, the
- * device page, the developer tabs and two docs pages. Each page: no sideways scroll, every word and control at least
+ * walks 390; this walks 320 × 640 (light): every signed-out and signed-in page, the hosted pages in three layouts (with
+ * a flow page adding a phone and the Opening page), the device page, two docs pages, and the developer site's home and
+ * every tab of an app. Each page: no sideways scroll, every word and control at least
  * 16 px from the screen's edges (fixed bars and full-bleed backgrounds aside), nothing cut short without a way to read
  * it (listed in the findings), and a screenshot.
  */
-import type { Page } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
 import type { Ctx, Journey } from "../../context";
-import { codeFor, lastSeq, sql, tag } from "../../lib";
-import { auditContext, collectConsole, drainProblems, findingsFor, freshEmail, hostedLink, kit, openAccountPage, saveFindings, settle, signedInCarbon, stepReady, type Findings } from "./_audit";
+import { codeFor, lastSeq, signInOnDeveloper, signInWithCode, sleep, startAtApp, tag } from "../../lib";
+import { DEVELOPER_EXPECTED, TABS, auditContext, collectConsole, drainProblems, findingsFor, freshEmail, hostedLink, kit, openAccountPage, openDeveloperPage, ownedApp, saveFindings, settle, signedInCarbon, stepReady, tabPath, type Findings } from "./_audit";
 
 const WIDTH = 320;
 const HEIGHT = 640;
@@ -96,8 +97,8 @@ async function reflow(ctx: Ctx, page: Page, findings: Findings, name: string): P
 export const journeys: Journey[] = [
   {
     name: "ux-audit-reflow-320",
-    title: "320 × 640 (the spec's narrowest phone, WCAG 1.4.10): signed-out pages, hosted steps in card/split/minimal, every account page, the device page, the developer tabs and docs — no sideways scroll, 16 px gutters",
-    timeoutMs: 900_000,
+    title: "320 × 640 (the spec's narrowest phone, WCAG 1.4.10): signed-out pages, hosted pages in card/split/minimal (methods, code, setting up, what's shared, a flow page adding a phone, the Opening page), every account page, the device page, the developer site's home and ten tabs, docs — no sideways scroll, 16 px gutters",
+    timeoutMs: 1_200_000,
     async run(ctx) {
       const { env, results, browser } = ctx;
       const findings = findingsFor(ctx);
@@ -139,15 +140,42 @@ export const journeys: Journey[] = [
         await page.getByRole("button", { name: "Create account" }).click();
         await page.getByRole("button", { name: "Share and continue" }).waitFor({ timeout: 30_000 });
         await stepReady(page);
-        await reflow(ctx, page, findings, "hosted-briefcase-consent");
+        await reflow(ctx, page, findings, "hosted-briefcase-details");
         await context.close();
       }
 
-      // Signed in: every account page, the device page, the developer area of an app of their own, two docs pages.
+      // ledgerly's first flow page with the phone being added (the country picker and the number side by side), and
+      // the Opening page (held while it opens Google, so it can be measured).
+      {
+        const context = await auditContext(browser, { width: WIDTH, height: HEIGHT });
+        const page = await context.newPage();
+        results.watch(page, "reflow-flow");
+        collectConsole(page);
+        await startAtApp(env, page, "ledgerly", { intent: "signup" });
+        await signInWithCode(env, page, { email: freshEmail("uxa.reflow.flow") });
+        await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+        await page.getByText("Step 1 of 2", { exact: true }).first().waitFor({ timeout: 30_000 });
+        await stepReady(page);
+        await reflow(ctx, page, findings, "hosted-ledgerly-step1-adding-phone");
+        const held: Route[] = [];
+        const site = new URL(env.site).origin;
+        const isStart = (url: URL) => url.origin === site && /^\/v1\/flows\/[^/]+\/oauth\/(google|apple)$/.test(url.pathname);
+        await context.route(isStart, route => (route.request().method() === "POST" ? void held.push(route) : void route.continue()));
+        await startAtApp(env, page, "acme-notes", { method: "google" });
+        for (let i = 0; i < 100 && !held.length; i++) await sleep(100);
+        await stepReady(page);
+        await reflow(ctx, page, findings, "hosted-acme-opening-google");
+        for (const route of held.splice(0)) await route.continue().catch(() => undefined);
+        await page.waitForURL(url => url.href.startsWith(env.oidc), { timeout: 15_000 }).catch(() => undefined);
+        await context.unroute(isStart).catch(() => undefined);
+        await context.close();
+      }
+
+      // Signed in: every account page, the device page, two docs pages; then the developer site (an app of their own).
       const carbon = await signedInCarbon(ctx, "uxa.reflow.in", { width: WIDTH, height: HEIGHT });
       const { page } = carbon;
-      results.watch(page, "reflow-signed-in");
-      collectConsole(page);
+      results.watch(page, "reflow-signed-in", DEVELOPER_EXPECTED);
+      collectConsole(page, DEVELOPER_EXPECTED);
       for (const [path, name] of [["/", "identity"], ["/sign-in-methods", "sign-in-methods"], ["/apps", "apps"], ["/silicons", "silicons"], ["/proofs", "proofs"], ["/activity", "activity"], ["/settings", "settings"]] as const) {
         await openAccountPage(ctx, page, path, /./);
         await reflow(ctx, page, findings, `account-${name}`);
@@ -156,24 +184,23 @@ export const journeys: Journey[] = [
       await page.getByRole("textbox", { name: "Code from your terminal" }).waitFor({ timeout: 30_000 });
       await stepReady(page);
       await reflow(ctx, page, findings, "device");
-      const appId = `uxa-r-${tag()}`;
-      await sql(env, `insert into apps (app_id, name, description, logo_url, logo_dark_url, homepage_url, owner_uuid, secret_hash, status, source)
-        select '${appId}', 'Reflow Notes ${appId.slice(-6)}', 'An app the ux-audit suite made for its owner', logo_url, logo_dark_url, homepage_url, '${carbon.uuid}', secret_hash, 'active', 'fake' from apps where app_id = 'briefcase'`);
-      await sql(env, `insert into app_signin_configs (app_id, version, config, updated_by) select '${appId}', 1, config, 'system' from app_signin_configs where app_id = 'briefcase'`);
-      await openAccountPage(ctx, page, "/developer", /./);
-      await reflow(ctx, page, findings, "developer-home");
-      for (const tab of ["overview", "sign-in", "branding", "users", "import", "webhooks", "proofs", "embed"]) {
-        await openAccountPage(ctx, page, `/developer/${appId}${tab === "overview" ? "" : `/${tab}`}`, /./);
-        await reflow(ctx, page, findings, `developer-${tab}`);
-      }
       for (const [path, name] of [["/docs/start/add-sign-in", "docs-add-sign-in"], ["/docs/reference/errors", "docs-errors"]] as const) {
         await page.goto(`${env.site}${path}`);
         await page.locator("main h1").first().waitFor({ timeout: 30_000 });
         await reflow(ctx, page, findings, name);
+      }
+      const appId = `uxa-r-${tag()}`;
+      await ownedApp(ctx, carbon.uuid, appId, `Reflow Notes ${appId.slice(-6)}`);
+      // The developer site: "Continue as" the Carbon already signed in on the account site.
+      await signInOnDeveloper(env, page, null);
+      await openDeveloperPage(ctx, page, "/");
+      await reflow(ctx, page, findings, "developer-home");
+      for (const tab of TABS) {
+        await openDeveloperPage(ctx, page, tabPath(appId, tab));
+        await reflow(ctx, page, findings, `developer-${tab}`);
       }
       results.check("reflow: findings saved", true, saveFindings(ctx, findings));
       await carbon.context.close();
     },
   },
 ];
-

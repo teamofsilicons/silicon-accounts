@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use time::OffsetDateTime;
 
-use crate::sessions::describe_user_agent;
+use crate::sessions::{DEVELOPER_SITE, describe_user_agent};
 use crate::util::{END_OF_TIME, clip, from_micros, to_micros, ts};
 
 /// The history kinds, in the order the docs list them.
@@ -829,17 +829,24 @@ fn other_entry(
                 detail_str(details, "reason").map(|x| format!("Reason: {}", x.replace('_', " "))),
             )
         }
-        "oauth.token_revoked" => {
-            if r.app_id.as_deref() == Some(accounts_core::FIRST_PARTY_APP_ID) {
-                (
-                    "Signed out of a CLI sign-in".to_string(),
-                    detail_str(details, "label"),
-                )
-            } else {
+        // crates/oauth/src/revoke.rs: a first-party sign-in revoked through /v1/oauth/revoke is
+        // the account signing itself out there; any other app ended its own sign-in.
+        "oauth.token_revoked" => match r.app_id.as_deref() {
+            Some(accounts_core::FIRST_PARTY_APP_ID) => (
+                "Signed out of a CLI sign-in".to_string(),
+                // A family made by the authorization_code grant stores an internal
+                // `code:<hash>` marker as its label (code-reuse revocation), not a name.
+                detail_str(details, "label").filter(|l| !l.starts_with("code:")),
+            ),
+            Some(accounts_core::DEVELOPER_APP_ID) => (
+                "Signed out of the developer site".to_string(),
+                Some(DEVELOPER_SITE.to_string()),
+            ),
+            _ => {
                 let name = app.unwrap_or("An app");
                 (format!("{name} signed you out"), None)
             }
-        }
+        },
         "oauth.refresh_reuse_detected" => (
             match app {
                 Some(a) => format!("Sign-in at {a} ended"),
@@ -1094,13 +1101,17 @@ fn describe(r: Row, me: &Account, l: &Lookups) -> HistoryItem {
                     ),
                     None,
                 ),
-                "account.session.revoked" => (
-                    match detail_str(details, "kind").as_deref() {
-                        Some("browser") => "A browser session was signed out".to_string(),
-                        _ => "A CLI sign-in was signed out".to_string(),
-                    },
-                    None,
-                ),
+                // crates/account/src/sessions.rs: `browser` (a cookie session), `cli` (a
+                // first-party sign-in: the CLI, the package, a Silicon login) or `developer` (a
+                // sign-in to the developer platform), each named as what it was.
+                "account.session.revoked" => match detail_str(details, "kind").as_deref() {
+                    Some("browser") => ("A browser session was signed out".to_string(), None),
+                    Some("developer") => (
+                        "A developer site sign-in was signed out".to_string(),
+                        Some(DEVELOPER_SITE.to_string()),
+                    ),
+                    _ => ("A CLI sign-in was signed out".to_string(), None),
+                },
                 other => match silicon_target(&r) {
                     // Every entry about a Silicon names it (custodians see many Silicons).
                     Some(uuid) => silicon_entry(other, uuid, &r, me, l),

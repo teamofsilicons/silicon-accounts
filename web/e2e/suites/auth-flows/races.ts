@@ -5,11 +5,11 @@
  */
 import type { Journey } from "../../context";
 import { lastSeq, randomIp, sql, tag } from "../../lib";
-import { Browserish, brief, errorCode, errorDetails, nextCode, sendCode, startSignIn } from "./_helpers";
+import { Browserish, addDetail, brief, errorCode, errorDetails, nextCode, randomPhone, redirectParams, sendCode, startSignIn } from "./_helpers";
 
 const races: Journey = {
   name: "auth-flows-double-submit",
-  title: "double submits and bursts: two verifies, two sign-ups, two consents at once each happen once; 12 parallel sends to one address → exactly 10; 15 parallel wrong codes → exactly 10 counted; two browsers signing up one address → one account, a clean 409",
+  title: "double submits and bursts: two verifies, two sign-ups, two \"Share and continue\" at once each happen once, an approve racing a cancel on the review page; 12 parallel sends to one address → exactly 10; 15 parallel wrong codes → exactly 10 counted; two browsers signing up one address → one account, a clean 409",
   async run(ctx) {
     const { env, results } = ctx;
     const t = tag();
@@ -31,11 +31,27 @@ const races: Journey = {
     const accounts = await sql(env, `select count(*) from account_emails where email = '${email}'`);
     results.check("…exactly one account has the address", accounts[0]?.[0] === "1", JSON.stringify(accounts));
 
-    // "Share and continue" twice at once.
-    const consents = await Promise.all([0, 1].map(() => b.act(s.flow.id, "consent", { approve: true, optional_scopes: [] })));
-    results.check("two consents at once → one 200 (complete), one 409 flow_completed", consents.filter(reply => reply.status === 200).length === 1 && consents.some(reply => errorCode(reply) === "flow_completed"), consents.map(reply => `${reply.status} ${errorCode(reply) ?? ""}`).join(", "));
+    // "Share and continue" twice at once on the details page.
+    const consents = await Promise.all([0, 1].map(() => b.detailsContinue(s.flow.id, [])));
+    results.check("two \"Share and continue\" at once → one 200 (complete), one 409 flow_completed", consents.filter(reply => reply.status === 200 && reply.body.flow.step === "complete").length === 1 && consents.some(reply => errorCode(reply) === "flow_completed"), consents.map(reply => `${reply.status} ${errorCode(reply) ?? reply.body.flow?.step ?? ""}`).join(", "));
     const issued = await sql(env, `select count(*) from authorization_codes where flow_id = '${s.flow.id}'`);
     results.check("…and exactly one authorization code was issued for the flow", issued[0]?.[0] === "1", JSON.stringify(issued));
+
+    // A review page approved and cancelled at the same moment: one wins, never both.
+    const r = new Browserish(env, randomIp());
+    const rs = await startSignIn(r, "ledgerly");
+    const rsent = await sendCode(r, rs.flow.id, { email: `review.race.${t}@example.test` });
+    await r.act(rs.flow.id, "verify", { code: rsent.code ?? "" });
+    await r.act(rs.flow.id, "signup", {});
+    const rp = randomPhone();
+    const radd = await addDetail(r, rs.flow.id, { phone: rp });
+    await r.detailsContinue(rs.flow.id, []);
+    const atReview = await r.detailsContinue(rs.flow.id, []);
+    const [yes, no] = await Promise.all([r.review(rs.flow.id, true), r.review(rs.flow.id, false)]);
+    const outcomes = [yes, no].map(reply => (reply.status === 200 ? (redirectParams(reply.body.flow).get("code") ? "code" : redirectParams(reply.body.flow).get("error") ?? "?") : `${reply.status} ${errorCode(reply)}`));
+    results.check("approve and cancel of ledgerly's review at once → exactly one answer wins (a code or access_denied), the other 409 flow_completed", radd.verified?.status === 200 && atReview.body.flow?.step === "review" && [yes, no].filter(reply => reply.status === 200).length === 1 && [yes, no].some(reply => errorCode(reply) === "flow_completed"), outcomes.join(", "));
+    const reviewCodes = await sql(env, `select count(*) from authorization_codes where flow_id = '${rs.flow.id}'`);
+    results.check("…and at most one authorization code exists for that flow", Number(reviewCodes[0]?.[0]) <= 1, JSON.stringify(reviewCodes));
 
     // 12 sends to one address at the same moment (from 12 networks): the limit holds exactly.
     const burstAddress = `burst.${t}@example.test`;
@@ -86,7 +102,7 @@ const races: Journey = {
     const resend = await second.act(f2.flow.id, "email", { email: shared });
     const again = await nextCode(env, shared, mark);
     const signedIn = await second.act(f2.flow.id, "verify", { code: again ?? "" });
-    results.check("…the second browser then signs in to that account with a new code (consent for commit)", switched.status === 200 && resend.status === 200 && signedIn.status === 200 && signedIn.body.flow.step === "consent" && signedIn.body.flow.signed_in_as?.uuid === (await first.session())?.account.uuid, brief(signedIn));
+    results.check("…the second browser then signs in to that account with a new code (commit's page)", switched.status === 200 && resend.status === 200 && signedIn.status === 200 && signedIn.body.flow.step === "details" && signedIn.body.flow.signed_in_as?.uuid === (await first.session())?.account.uuid, brief(signedIn));
   },
 };
 

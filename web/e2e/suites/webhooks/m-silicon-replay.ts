@@ -30,6 +30,7 @@ import {
   bearerCall,
   checkEq,
   createSilicon,
+  developerToken,
   inboxEvents,
   must,
   newCarbon,
@@ -214,7 +215,12 @@ export const journey: Journey = {
       results.check("the custodian reads one delivery with its attempts and payload", keeperOne.event_id === e2.event_id && keeperOne.attempts.length === 3 && sameJson(keeperOne.payload, e2.payload), short({ attempts: keeperOne.attempts.length }));
       const siblingThroughKeeper = await byKeeper<ErrorBody>("GET", `/deliveries/${siblingDelivery}`);
       results.check("the custodian's route for one Silicon does not show another Silicon's delivery (404 delivery_not_found)", siblingThroughKeeper.status === 404 && codeOf(siblingThroughKeeper.body) === "delivery_not_found", `${siblingThroughKeeper.status} ${codeOf(siblingThroughKeeper.body)}`);
+      // A developer-platform token (aud=developer) acts only on GET /v1/me, /v1/session, /v1/me/owned-apps and the owner
+      // routes of apps (build spec 06-v2 §2): never on a Silicon's webhook, even for its custodian.
+      const keeperDev = await developerToken(ctx, keeper.visitor);
       const refusals = [
+        ["the custodian's developer-platform token lists", await bearerCall<ErrorBody>(env, keeperDev.accessToken, "GET", `/v1/me/silicons/${silicon.uuid}/webhook/deliveries`), 401, "token_wrong_audience"],
+        ["the custodian's developer-platform token replays", await bearerCall<ErrorBody>(env, keeperDev.accessToken, "POST", `/v1/me/silicons/${silicon.uuid}/webhook/replay`, { json: { status: "failed" }, idempotencyKey: randomUUID() }), 401, "token_wrong_audience"],
         ["a stranger lists", await stranger.visitor.call<ErrorBody>("GET", `/v1/me/silicons/${silicon.uuid}/webhook/deliveries`), 404, "silicon_not_found"],
         ["a stranger reads one", await stranger.visitor.call<ErrorBody>("GET", `/v1/me/silicons/${silicon.uuid}/webhook/deliveries/${e1.delivery_id}`), 404, "silicon_not_found"],
         ["a stranger replays", await stranger.visitor.call<ErrorBody>("POST", `/v1/me/silicons/${silicon.uuid}/webhook/replay`, { json: { status: "failed" }, idempotencyKey: randomUUID() }), 404, "silicon_not_found"],
@@ -225,7 +231,7 @@ export const journey: Journey = {
         ["nobody replays", await publicCall<ErrorBody>(env, "POST", "/v1/me/webhook/replay", { json: { status: "failed" } }), 401, null],
       ] as const;
       const refusalLines = refusals.map(([label, answer, status, code]) => `${label}: ${answer.status} ${codeOf(answer.body)}${answer.status === status && (code === null || codeOf(answer.body) === code) ? "" : ` (expected ${status} ${code ?? ""})`}`);
-      results.check("refused: a stranger (404 silicon_not_found), the Silicon on the custodian's routes (403 carbon_only), a Carbon on the Silicon's (403 silicon_only), no Origin (403), nobody (401)", refusalLines.every(line => !line.includes("expected")), refusalLines.join(" | "));
+      results.check("refused: the custodian's developer-platform token (401 token_wrong_audience), a stranger (404 silicon_not_found), the Silicon on the custodian's routes (403 carbon_only), a Carbon on the Silicon's (403 silicon_only), no Origin (403), nobody (401)", refusalLines.every(line => !line.includes("expected")), refusalLines.join(" | "));
       results.check("…and none of the refused replays re-queued anything (manual_replays of e1 still 1)", (await ownDelivery(e1.delivery_id)).manual_replays === 1);
 
       // ---- what can't be replayed: pending, unknown, foreign ------------------------------------------------------------------

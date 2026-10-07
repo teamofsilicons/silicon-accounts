@@ -324,13 +324,14 @@ impl FieldErrors {
         }
     }
 
-    /// One-line summary used as the error message.
+    /// One-line summary used as the error message. Field messages that end with a full stop
+    /// lose it here (`details.fields` keeps them whole), so the summary never reads `..` or `.;`.
     pub fn summary(&self) -> String {
         let mut parts: Vec<String> = self
             .0
             .iter()
             .take(3)
-            .map(|(k, v)| format!("{k}: {v}"))
+            .map(|(k, v)| format!("{k}: {}", v.trim_end().trim_end_matches('.').trim_end()))
             .collect();
         if self.0.len() > 3 {
             parts.push(format!("and {} more", self.0.len() - 3));
@@ -507,6 +508,32 @@ impl From<ApiError> for OAuthError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn field_summary_never_doubles_full_stops() {
+        let mut f = FieldErrors::new();
+        f.add(
+            "display_name",
+            "The display name is empty; it must be 1 to 100 characters.",
+        );
+        assert_eq!(
+            f.summary(),
+            "Invalid fields — display_name: The display name is empty; it must be 1 to 100 characters."
+        );
+        f.add("dob", "Use a date like 1990-04-21. ");
+        assert_eq!(
+            f.summary(),
+            "Invalid fields — display_name: The display name is empty; it must be 1 to 100 characters; dob: Use a date like 1990-04-21."
+        );
+        f.add("custodian", "Name a Carbon, e.g. c:scout.");
+        f.add("timezone", "unknown");
+        assert_eq!(
+            f.summary(),
+            "Invalid fields — custodian: Name a Carbon, e.g. c:scout; display_name: The display name is empty; it must be 1 to 100 characters; dob: Use a date like 1990-04-21; and 1 more."
+        );
+        // details.fields keep each message whole.
+        assert_eq!(f.to_json()["custodian"], "Name a Carbon, e.g. c:scout.");
+    }
 
     #[test]
     fn api_error_body_shape() {

@@ -1,8 +1,8 @@
 /**
  * ux-audit: the orchestrator's UX notes (scratchpad ux-notes.md), items 4 to 7, re-checked against the running stack.
  * Items 1 to 3 are checked where the pages are walked: the split layout's hero copy per step in ux-audit-hosted-acme,
- * the dock's clearance on every account and developer page (ux-audit-account-*, ux-audit-developer-*), and "Powered by"
- * on card, split and minimal layouts at 390 and 1440 (ux-audit-hosted-*).
+ * the dock's clearance on every account page (ux-audit-account-*), and "Powered by" on card, split and minimal layouts
+ * at 390 and 1440 (ux-audit-hosted-*, ux-audit-opening). v2 adds: a 12 MB import through the developer site's BFF.
  *
  *   4  the site's rewrites (/v1, /.well-known), bodies over 10 MB through the proxy, proxyTimeout, agentRules
  *   5  /v1 and /.well-known outside the page proxy (no page CSP), Set-Cookie, absolute Location, Origin and
@@ -15,8 +15,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import type { Journey } from "../../context";
-import { E2E_DIR, api, json, sql, sleep, tag } from "../../lib";
-import { auditContext, collectConsole, freshEmail, hostedLink, pageFetch, sendEmailCode, signedInCarbon, stepReady } from "./_audit";
+import { E2E_DIR, api, json, signInOnDeveloper, sql, sleep, tag } from "../../lib";
+import { DEVELOPER_EXPECTED, auditContext, collectConsole, freshEmail, hostedLink, ownedApp, pageFetch, sendEmailCode, signedInCarbon, stepReady } from "./_audit";
 
 /** Uploads a small PNG (drawn on a canvas) from the page itself: same origin, cookies and Origin included. */
 async function uploadPng(page: Page, path: string): Promise<{ status: number; body: Record<string, unknown> | string | null }> {
@@ -59,12 +59,11 @@ export const journeys: Journey[] = [
 
       // A 12 MB import through the site's proxy (Next cuts proxied bodies at 10 MB by default: a 500 after 30 s).
       const owner = await signedInCarbon(ctx, "uxa.notes.big");
-      results.watch(owner.page, "notes-proxy");
+      results.watch(owner.page, "notes-proxy", DEVELOPER_EXPECTED);
       const cookies = await owner.context.cookies(env.site);
       results.check("note 5: Set-Cookie passes through the site (the session cookie lands on the site's origin)", cookies.some(cookie => /(^|__Host-)sa_session$/.test(cookie.name)), cookies.map(cookie => cookie.name).join(", "));
       const appId = `uxa-big-${tag()}`;
-      await sql(env, `insert into apps (app_id, name, description, owner_uuid, secret_hash, status, source) select '${appId}', 'Big Import ${appId.slice(-6)}', '', '${owner.uuid}', secret_hash, 'active', 'fake' from apps where app_id = 'briefcase'`);
-      await sql(env, `insert into app_signin_configs (app_id, version, config, updated_by) select '${appId}', 1, config, 'system' from app_signin_configs where app_id = 'briefcase'`);
+      await ownedApp(ctx, owner.uuid, appId, `Big Import ${appId.slice(-6)}`);
       const rows = Array.from({ length: 90_000 }, (_, i) => ({ email: `uxa.big.${i}.${appId}@example.test`, display_name: `Imported Carbon number ${i} with a longer name`, external_id: `ext-${appId}-${i}` }));
       const body = JSON.stringify({ rows, options: { dry_run: true } });
       const started = Date.now();
@@ -75,6 +74,19 @@ export const journeys: Journey[] = [
         const text = await big.text();
         results.check(`note 4: a ${(body.length / 1_048_576).toFixed(1)} MB import body reaches accounts-api through the site (not Next's 500)`, big.status() < 500 && /"job"|"error"/.test(text), `${big.status()} in ${ms} ms: ${text.slice(0, 220)}`);
         results.metric("12 MB import through the proxy", ms);
+      }
+      // v2: imports are made on the developer site, whose BFF forwards them (/api/accounts/apps/{id}/imports).
+      {
+        await signInOnDeveloper(env, owner.page, null);
+        const startedBff = Date.now();
+        const viaBff = await owner.page.request.post(`${env.developer}/api/accounts/apps/${appId}/imports`, { headers: { "content-type": "application/json", origin: env.developer, "idempotency-key": `uxa-big-bff-${appId}` }, data: body, timeout: 120_000 }).catch(error => error as Error);
+        const msBff = Date.now() - startedBff;
+        if (viaBff instanceof Error) results.check("v2: a 12 MB import body reaches accounts-api through the developer site's BFF", false, viaBff.message.slice(0, 300));
+        else {
+          const text = await viaBff.text();
+          results.check(`v2: a ${(body.length / 1_048_576).toFixed(1)} MB import body reaches accounts-api through the developer site's BFF`, viaBff.status() < 500 && viaBff.status() !== 413 && /"job"|"error"/.test(text), `${viaBff.status()} in ${msBff} ms: ${text.slice(0, 220)}`);
+          results.metric("12 MB import through the developer site's BFF", msBff);
+        }
       }
 
       // Location, Origin and X-Forwarded-For through the rewrite. A provider's callback lands on the site's
@@ -125,8 +137,7 @@ export const journeys: Journey[] = [
       const owner = await signedInCarbon(ctx, "uxa.notes.brand");
       results.watch(owner.page, "notes-branding-owner", [/status of 422 .*signin-config/]);
       const appId = `uxa-brand-${tag()}`;
-      await sql(env, `insert into apps (app_id, name, description, owner_uuid, secret_hash, status, source) select '${appId}', 'Brand Check ${appId.slice(-6)}', '', '${owner.uuid}', secret_hash, 'active', 'fake' from apps where app_id = 'briefcase'`);
-      await sql(env, `insert into app_signin_configs (app_id, version, config, updated_by) select '${appId}', 1, config, 'system' from app_signin_configs where app_id = 'briefcase'`);
+      await ownedApp(ctx, owner.uuid, appId, `Brand Check ${appId.slice(-6)}`);
       const button = await pageFetch<{ error?: { code?: string; details?: unknown; message?: string } }>(owner.page, `/v1/apps/${appId}/signin-config`, { method: "PATCH", body: { branding: { light: { primary: "#3B82F6", primary_foreground: "#FFFDF9" } } } });
       results.check("note 6: the server refuses button text at 3.62:1 (#FFFDF9 on #3B82F6) with a field error", button.status === 422 && /primary/.test(JSON.stringify(button.body)), `${button.status} ${JSON.stringify(button.body).slice(0, 300)}`);
       const text = await pageFetch(owner.page, `/v1/apps/${appId}/signin-config`, { method: "PATCH", body: { branding: { light: { foreground: "#8A8580", background: "#FFFFFF" } } } });

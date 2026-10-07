@@ -423,7 +423,8 @@ impl<'a> AppClient<'a> {
         response.json_from(unwrap_key(response.value()?, "job"))
     }
 
-    /// `GET /v1/apps/{app_id}/imports/{job_id}/rows`.
+    /// `GET /v1/apps/{app_id}/imports/{job_id}/rows`: per-row outcomes, filtered by outcome,
+    /// by message level (`error`, `warning`, `info`) or by message code (`id_conflict`…).
     pub async fn import_rows(
         &self,
         job_id: &str,
@@ -433,6 +434,8 @@ impl<'a> AppClient<'a> {
             &["imports", job_id.trim(), "rows"],
             &[
                 ("outcome", query.outcome.clone()),
+                ("level", query.level.clone()),
+                ("code", query.code.clone()),
                 ("limit", query.limit.map(|l| l.to_string())),
                 ("cursor", query.cursor.clone()),
             ],
@@ -575,17 +578,7 @@ impl<'a> AppClient<'a> {
         request: &ReplayRequest,
         idempotency_key: Option<&str>,
     ) -> Result<ReplayResult> {
-        if let ReplayRequest::Deliveries(ids) = request
-            && (ids.is_empty() || ids.len() > 100)
-        {
-            return Err(Error::invalid_input(
-                format!(
-                    "A replay takes 1 to 100 delivery ids; {} were given.",
-                    ids.len()
-                ),
-                "Pass the ids from `deliveries`, or replay every failed delivery instead.",
-            ));
-        }
+        request.check()?;
         let body = request.to_json();
         let response = self
             .send(

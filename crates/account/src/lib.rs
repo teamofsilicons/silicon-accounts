@@ -5,8 +5,8 @@
 //! | route | auth | what |
 //! |---|---|---|
 //! | `GET /v1/ids/available?id=` | public (120/min per IP) | can this `c:`/`si:` id be taken (or reclaimed by me)? |
-//! | `GET /v1/accounts/{uuid}` | app or session (600/min per caller) | AccountSummary (+ `custodian` for Silicons) |
-//! | `GET /v1/accounts/by-id/{id}` | app or session (600/min per caller) | AccountSummary of the current owner of an id |
+//! | `GET /v1/accounts/{uuid}` | app or session (600/min per caller) | session: AccountSummary (+ `custodian` for Silicons); app: the public identity only (uuid, kind, id, status, custodian ref) |
+//! | `GET /v1/accounts/by-id/{id}` | app or session (600/min per caller) | the same, for the current owner of an id |
 //! | `GET` / `PATCH` / `DELETE /v1/me` | session | the Me view; profile changes; account deletion (Carbons) |
 //! | `POST /v1/me/id` | session | change my id (old id reserved 10 days, reclaimable; 5 changes per 24 h) |
 //! | `POST` / `DELETE /v1/me/photo`, `GET /v1/photos/{id}` | session / public | profile photos |

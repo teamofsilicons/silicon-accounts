@@ -69,9 +69,14 @@ fn run() -> i32 {
         };
         match result {
             Ok(outcome) => {
-                ctx.out.outcome(&outcome);
-                ctx.flush_telemetry(outcome.exit, None).await;
-                outcome.exit
+                // A result stdout could not take is a failure, unless the command already failed.
+                let exit = if ctx.out.outcome(&outcome) || outcome.exit != 0 {
+                    outcome.exit
+                } else {
+                    EXIT_FAILURE
+                };
+                ctx.flush_telemetry(exit, None).await;
+                exit
             }
             Err(err) => {
                 ctx.out.error(&err);
@@ -95,7 +100,7 @@ fn clap_error(err: &clap::Error, json: bool) -> i32 {
         _ if json => {
             let error = CliError::from(err);
             let text = serde_json::to_string_pretty(&error.to_json()).unwrap_or_default();
-            println!("{text}");
+            output::print_stdout(&text);
             EXIT_INVALID
         }
         _ => {

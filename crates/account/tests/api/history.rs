@@ -576,6 +576,94 @@ async fn sign_ins_name_the_cli_and_the_package_not_a_browser() {
     );
 }
 
+/// Signing a browser, a CLI sign-in and the developer site out from Settings (`DELETE
+/// /v1/me/sessions/{id}`) names each as what it was: the developer site's sign-out once read as
+/// a second "A CLI sign-in was signed out".
+#[tokio::test]
+async fn sign_outs_from_settings_name_what_was_signed_out() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let cookie = ctx.browser_session(&carbon).await;
+    let other_browser = ctx.browser_session(&carbon).await;
+    let tok = token(&ctx, &carbon).await;
+    ctx.first_party_tokens(&carbon).await;
+    ctx.tokens_for(&carbon, accounts_core::DEVELOPER_APP_ID, &[Scope::Profile])
+        .await;
+    let listed = call(
+        &ctx,
+        Req::get("/v1/me/sessions").session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_status(&listed, 200);
+    let sessions = items(&listed.json);
+    assert_eq!(sessions.len(), 5, "{}", listed.json);
+    let current_family: Vec<String> = {
+        let mine = call(&ctx, Req::get("/v1/me/sessions").bearer(&tok)).await;
+        items(&mine.json)
+            .into_iter()
+            .filter(|s| s["current"] == true)
+            .filter_map(|s| s["id"].as_str().map(str::to_string))
+            .collect()
+    };
+    // The other browser, the CLI sign-in that isn't the token used below, and the developer site.
+    let pick = |kind: &str| {
+        sessions
+            .iter()
+            .find(|s| {
+                s["kind"] == kind
+                    && s["current"] == false
+                    && !current_family.iter().any(|c| s["id"] == c.as_str())
+            })
+            .and_then(|s| s["id"].as_str().map(str::to_string))
+            .unwrap_or_else(|| panic!("no {kind} session to sign out in {sessions:#?}"))
+    };
+    for id in [pick("browser"), pick("cli"), pick("developer")] {
+        let r = call(
+            &ctx,
+            Req::delete(&format!("/v1/me/sessions/{id}")).session(&ctx.state.settings, &cookie),
+        )
+        .await;
+        assert_status(&r, 204);
+    }
+    let r = call(
+        &ctx,
+        Req::get("/v1/me").session(&ctx.state.settings, &other_browser),
+    )
+    .await;
+    assert_error(&r, 401, "session_expired");
+
+    let r = call(
+        &ctx,
+        Req::get("/v1/me/history?kind=security&limit=50").bearer(&tok),
+    )
+    .await;
+    assert_status(&r, 200);
+    let mut said: Vec<(String, Option<String>)> = items(&r.json)
+        .iter()
+        .filter(|i| i["meta"]["action"] == "account.session.revoked")
+        .map(|i| {
+            (
+                i["title"].as_str().expect("title").to_string(),
+                i["detail"].as_str().map(str::to_string),
+            )
+        })
+        .collect();
+    said.sort();
+    assert_eq!(
+        said,
+        vec![
+            ("A CLI sign-in was signed out".to_string(), None),
+            ("A browser session was signed out".to_string(), None),
+            (
+                "A developer site sign-in was signed out".to_string(),
+                Some("Silicon Developer (developer.teamofsilicons.com)".to_string()),
+            ),
+        ],
+        "{}",
+        r.json
+    );
+}
+
 /// A revoked proof says why in words (as the Proofs page does), never with the raw reason code
 /// ("Revoked by you (revoked by account)").
 #[tokio::test]
@@ -790,6 +878,26 @@ async fn entries_from_sign_in_flows_read_as_sentences() {
             "token_family",
             json!({"reason": "user_signed_out", "token_type": "refresh_token", "label": "accounts CLI on studio (macos)"}),
         ),
+        // A first-party family made by the authorization_code grant: its label is an internal
+        // marker (`code:<hash>`), never shown.
+        (
+            "oauth.token_revoked",
+            account,
+            Some(me),
+            Some("accounts"),
+            "token_family",
+            json!({"reason": "user_signed_out", "token_type": "refresh_token", "label": "code:0123456789abcdef"}),
+        ),
+        // The developer site signing itself out (its BFF calls /v1/oauth/revoke): the Carbon
+        // signed out there; the developer platform didn't sign them out.
+        (
+            "oauth.token_revoked",
+            account,
+            Some(me),
+            Some("developer"),
+            "token_family",
+            json!({"reason": "user_signed_out", "token_type": "refresh_token", "label": "code:fedcba9876543210"}),
+        ),
         (
             "oauth.refresh_reuse_detected",
             ActorKind::App,
@@ -882,6 +990,11 @@ async fn entries_from_sign_in_flows_read_as_sentences() {
         (
             "Signed out of a CLI sign-in",
             Some("accounts CLI on studio (macos)"),
+        ),
+        ("Signed out of a CLI sign-in", None),
+        (
+            "Signed out of the developer site",
+            Some("Silicon Developer (developer.teamofsilicons.com)"),
         ),
         (
             "Sign-in at Test app dm ended",

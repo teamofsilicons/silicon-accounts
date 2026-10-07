@@ -220,11 +220,22 @@ async fn transfer_rules() {
     )
     .await;
     assert_eq!(r.status, 422);
+    let problem = r.json["error"]["details"]["fields"]["to"]
+        .as_str()
+        .expect("m");
     assert!(
-        r.json["error"]["details"]["fields"]["to"]
-            .as_str()
-            .expect("m")
-            .contains("Carbon")
+        problem.contains("is a Silicon id") && problem.contains("must be a Carbon"),
+        "{problem}"
+    );
+    // A phone number can't name the receiving Carbon either.
+    let r = transfer(&ctx, &t, &silicon.uuid, "+1 500 555 0006").await;
+    assert_eq!(r.status, 422, "{}", r.json);
+    let problem = r.json["error"]["details"]["fields"]["to"]
+        .as_str()
+        .expect("m");
+    assert!(
+        problem.contains("phone number") && problem.contains("c:id"),
+        "{problem}"
     );
 
     let first = transfer(

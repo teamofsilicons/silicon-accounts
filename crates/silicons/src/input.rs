@@ -4,7 +4,7 @@
 
 use accounts_core::crypto::stk;
 use accounts_core::error::FieldErrors;
-use accounts_core::ids::AccountId;
+use accounts_core::ids::{AccountId, IdError};
 use accounts_core::models::AccountKind;
 use accounts_core::normalize;
 use accounts_core::repo::accounts;
@@ -84,7 +84,8 @@ pub enum CarbonTarget {
 }
 
 impl CarbonTarget {
-    /// Parses `c:saket`, `saket` or `saket@example.com`.
+    /// Parses `c:saket`, `saket` or `saket@example.com`. A Silicon's si:id and a phone number
+    /// can't name a Carbon, and each is told so (not that it is a malformed handle).
     pub fn parse(input: &str) -> Result<CarbonTarget, String> {
         let s = input.trim();
         if s.is_empty() {
@@ -98,10 +99,51 @@ impl CarbonTarget {
                 .map(CarbonTarget::Email)
                 .map_err(|e| e.message);
         }
+        if looks_like_phone(s) {
+            return Err(phone_named(s));
+        }
         AccountId::parse_for_kind(s, AccountKind::Carbon)
             .map(CarbonTarget::Id)
-            .map_err(|e| format!("{e} {}", e.hint()))
+            .map_err(|e| match e {
+                IdError::WrongKind { .. } => silicon_named(s),
+                e => format!("{e} {}", e.hint()),
+            })
     }
+}
+
+/// A phone number named where a Carbon must be. Handles may be all digits, so when the input is
+/// also a valid handle it says how to name that Carbon instead (with c: it is always an id).
+fn phone_named(s: &str) -> String {
+    let mut problem = format!(
+        "'{s}' looks like a phone number, and a phone number can't name a custodian: name the Carbon by its c:id (like c:saket) or an email address"
+    );
+    if let Ok(id) = AccountId::parse_for_kind(s, AccountKind::Carbon) {
+        problem.push_str(&format!(" (if '{s}' is a handle, write it as {id})"));
+    }
+    problem
+}
+
+/// An si:id named where a Carbon must be. It says the account is a Silicon, instead of the
+/// generic id hint, which would point at `c:<same handle>` (an unrelated account).
+fn silicon_named(s: &str) -> String {
+    let shown = AccountId::parse(s).map_or_else(|_| s.to_string(), |id| id.to_string());
+    format!(
+        "'{shown}' is a Silicon id, and a custodian must be a Carbon: name them by their c:id (like c:saket) or their email address"
+    )
+}
+
+/// True when `s` is written like a phone number (`+15005550006`, `+1 500 555 0006`,
+/// `(500) 555-0006`): an optional leading `+`, then only digits, spaces, `-`, `.`, `(` and `)`,
+/// with at least 7 digits (or any digit after the `+`, which never appears in an id).
+fn looks_like_phone(s: &str) -> bool {
+    let (plus, rest) = match s.strip_prefix('+') {
+        Some(rest) => (true, rest),
+        None => (false, s),
+    };
+    let digits = rest.bytes().filter(u8::is_ascii_digit).count();
+    rest.bytes()
+        .all(|b| b.is_ascii_digit() || matches!(b, b' ' | b'-' | b'.' | b'(' | b')'))
+        && (digits >= 7 || (plus && digits > 0))
 }
 
 /// Deserializes a field that may be absent (`None`), `null` (`Some(None)`) or a value.
@@ -149,10 +191,58 @@ mod tests {
             CarbonTarget::parse("Saket@Example.COM"),
             Ok(CarbonTarget::Email("saket@example.com".into()))
         );
-        let e = CarbonTarget::parse("si:scout").expect_err("a Silicon can't be a custodian");
-        assert!(e.contains("Carbon"), "{e}");
+        // An si:id says it is a Silicon, without pointing at an unrelated c:<same handle>.
+        let e = CarbonTarget::parse(" SI:Scout ").expect_err("a Silicon can't be a custodian");
+        assert!(
+            e.starts_with("'si:scout' is a Silicon id") && e.contains("must be a Carbon"),
+            "{e}"
+        );
+        assert!(e.contains("c:id") && e.contains("email"), "{e}");
+        assert!(!e.contains("c:scout") && !e.ends_with('.'), "{e}");
         assert!(CarbonTarget::parse("").is_err());
         assert!(CarbonTarget::parse("not an@email").is_err());
+        // Malformed ids still say what is wrong with the handle.
+        let e = CarbonTarget::parse("c:no way").expect_err("space");
+        assert!(e.contains("handle"), "{e}");
+    }
+
+    #[test]
+    fn phone_numbers_cant_name_a_custodian() {
+        for phone in [
+            "+15005550006",
+            "+1 500 555 0006",
+            " +44 (20) 7946-0958 ",
+            "(500) 555-0006",
+            "500.555.0006",
+            "+1",
+        ] {
+            let e = CarbonTarget::parse(phone).expect_err(phone);
+            assert!(
+                e.contains("phone number") && e.contains("c:id") && e.contains("email"),
+                "{phone}: {e}"
+            );
+            assert!(!e.contains("handle"), "{phone}: {e}");
+        }
+        // A number that is also a valid handle says how to name it as an id.
+        let e = CarbonTarget::parse("500-555-0006").expect_err("phone-shaped");
+        assert!(
+            e.contains("phone number") && e.ends_with("write it as c:500-555-0006)"),
+            "{e}"
+        );
+        // ...and with c: in front it is an id.
+        assert_eq!(
+            CarbonTarget::parse("c:5005550006"),
+            Ok(CarbonTarget::Id(
+                AccountId::parse("c:5005550006").expect("valid id")
+            ))
+        );
+        // Short numeric and mixed handles stay handles.
+        for handle in ["12345", "agent-007", "r2-d2"] {
+            assert!(
+                matches!(CarbonTarget::parse(handle), Ok(CarbonTarget::Id(_))),
+                "{handle}"
+            );
+        }
     }
 
     #[test]

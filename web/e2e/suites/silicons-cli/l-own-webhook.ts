@@ -2,6 +2,8 @@ import type { Journey } from "../../context";
 import { forgetRateLimits, json, sleep, sql, tag } from "../../lib";
 import {
   accounts,
+  appSltLogin,
+  asCarbon,
   cliError,
   dataOf,
   freshDir,
@@ -16,12 +18,17 @@ import {
   sinkUrl,
   str,
   until,
+  waitApp,
   waitSink,
+  type InboxEvent,
+  type Json,
 } from "./_helpers";
 
 export const journey: Journey = {
   name: "silicons-cli-own-webhook",
-  title: "a Silicon's own webhook: the Silicon sets, tests and removes it with the CLI, its custodian can point it elsewhere (a new secret each time); detail changes arrive as silicon.updated, signed, retried after a failure; nothing is sent once it is removed; test pings are limited",
+  title: "a Silicon's own webhook: the Silicon sets, tests and removes it with the CLI, its custodian can point it elsewhere (a new secret each time); detail changes (name, timezone, photo, by the custodian or the Silicon itself) arrive as silicon.updated, signed, retried after a failure; its date of birth never changes; nothing is sent once it is removed; test pings are limited",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     await forgetRateLimits(env, "127.0.0.1");
@@ -33,7 +40,8 @@ export const journey: Journey = {
     const created = await accounts(env, ["silicon", "create", "--id", sid, "--json"], { home: homeC });
     const uuid = str(obj(created.json?.silicon).uuid);
     const homeS = freshDir();
-    await loginSilicon(env, homeS, sid, str(created.json?.stk));
+    // Signed in to the CLI and, with a short-lived token, to remind (which gets its profile and timezone).
+    const remindIn = await appSltLogin(env, "remind", str((await loginSilicon(env, homeS, sid, str(created.json?.stk), ["--app", "remind"])).json?.slt));
     const keyA = `scli-own-a-${t}`;
     const keyB = `scli-own-b-${t}`;
 
@@ -56,6 +64,32 @@ export const journey: Journey = {
     await accounts(env, ["silicon", "update", sid, "--timezone", "America/New_York", "--json"], { home: homeC });
     const tz = await waitSink(env, keyA, "silicon.updated", event => obj(dataOf(event).silicon).timezone === "America/New_York");
     results.check("…a timezone change too: changed [timezone]", JSON.stringify(dataOf(tz).changed) === '["timezone"]', short(dataOf(tz).changed));
+    // UNDERSTANDING.md "Webhooks": the apps it signed into hear of every detail they have access to that changes.
+    const changedAt = (field: string) => (event: InboxEvent) => dataOf(event).uuid === uuid && JSON.stringify(dataOf(event).changed) === JSON.stringify([field]);
+    const remindName = await waitApp(env, "remind", "account.updated", changedAt("display_name"));
+    const remindTz = await waitApp(env, "remind", "account.updated", changedAt("timezone"));
+    results.check(
+      "remind, which the Silicon signed into, got account.updated for each (changed [display_name], then [timezone]), signature verified",
+      remindIn.body.ok === true && !!remindName && !!remindTz && remindName.payload.app_id === "remind" && dataOf(remindTz).membership_id === `remind:${uuid}`,
+      `${short(remindIn.body.error ?? "signed in")} | ${short(remindName?.payload, 160)} | ${short(remindTz?.payload, 160)}`,
+    );
+    const photo = `https://example.com/scli-photo-${t}.png`;
+    const photoSet = await accounts(env, ["silicon", "update", sid, "--pfp-url", photo, "--json"], { home: homeC });
+    const photoHook = await waitSink(env, keyA, "silicon.updated", event => obj(dataOf(event).silicon).pfp_url === photo);
+    results.check("…a new photo (`--pfp-url`): changed [pfp_url]", photoSet.code === 0 && JSON.stringify(dataOf(photoHook).changed) === '["pfp_url"]', `${said(photoSet).slice(0, 120)} | ${short(dataOf(photoHook).changed)}`);
+    const selfRenamed = await accounts(env, ["profile", "set", "--display-name", `Hooked by itself ${t}`, "--json"], { home: homeS });
+    const selfHook = await waitSink(env, keyA, "silicon.updated", event => obj(dataOf(event).silicon).display_name === `Hooked by itself ${t}`);
+    results.check("the Silicon renaming itself (`accounts profile set`) is a change to its account too: silicon.updated", selfRenamed.code === 0 && JSON.stringify(dataOf(selfHook).changed) === '["display_name"]', `${said(selfRenamed).slice(0, 120)} | ${short(dataOf(selfHook).changed)}`);
+    // A Silicon's date of birth is the day its account was created (UNDERSTANDING.md "Silicon account").
+    const quietBeforeDob = (await sinkInbox(env, keyA)).deliveries;
+    const dobByCustodian = await asCarbon<Json>(env, carbon, "PATCH", `/v1/me/silicons/${uuid}`, { dob: "2000-01-01" });
+    const dobBySilicon = await accounts(env, ["profile", "set", "--dob", "2000-01-01", "--json"], { home: homeS });
+    await sleep(1500);
+    results.check(
+      "its date of birth can't change: the custodian (422) and the Silicon itself (`accounts profile set --dob`: exit 2) get dob_immutable naming its creation day, and nothing is sent",
+      dobByCustodian.status === 422 && str(obj(obj(dobByCustodian.body).error).code) === "dob_immutable" && dobBySilicon.code === 2 && cliError(dobBySilicon).code === "dob_immutable" && /day its account was created \(\d{4}-\d\d-\d\d\)/.test(str(cliError(dobBySilicon).message)) && (await sinkInbox(env, keyA)).deliveries === quietBeforeDob,
+      `${dobByCustodian.status} ${short(dobByCustodian.body, 160)} | ${said(dobBySilicon)}`,
+    );
 
     // 3. The custodian points it elsewhere: a new secret; events follow the new URL.
     const moved = await accounts(env, ["silicon", "webhook", "set", sid, sinkUrl(env, keyB), "--json"], { home: homeC });
@@ -68,22 +102,31 @@ export const journey: Journey = {
     await sleep(1500);
     results.check("…the next event goes to the new URL only, signed with the new secret", !!atB && (await sinkInbox(env, keyA)).deliveries === beforeA, `B ${atB ? "got it" : "nothing"}, A deliveries ${beforeA} → ${(await sinkInbox(env, keyA)).deliveries}`);
 
-    // 4. A failed delivery is retried with the same event id.
+    // 4. A failed delivery is retried with the same event id. The first retry is due 10 s after the refusal; time travel
+    //    makes it due at once (the worker looks for due deliveries every second).
     await json(`${env.apps}/hooks/${keyB}/_webhook-faults`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ fail_next: 1, status: 503 }) });
     const failedAt = Date.now();
     await accounts(env, ["silicon", "update", sid, "--display-name", `Hooked retried ${t}`, "--json"], { home: homeC });
-    const retried = await waitSink(env, keyB, "silicon.updated", event => obj(dataOf(event).silicon).display_name === `Hooked retried ${t}`, 60_000);
+    const refusedOnce = await until(async () => {
+      const rows = await sql(env, `select id, attempts, coalesce(last_status, 0), round(extract(epoch from (next_attempt_at - last_attempt_at))::numeric, 1) from webhook_deliveries where target_kind = 'silicon' and target_id = '${uuid}' and status = 'pending' and attempts >= 1 and last_status = 503 and created_at > now() - interval '1 minute'`);
+      return rows[0] ?? null;
+    }, 20_000, 200);
+    results.check("the refused delivery (503) stays pending, its first retry due 10 s later", !!refusedOnce && Math.abs(Number(refusedOnce[3]) - 10) < 1.5, short(refusedOnce));
+    if (refusedOnce) await sql(env, `update webhook_deliveries set next_attempt_at = now() where id = '${refusedOnce[0]}' and status = 'pending'`);
+    const retried = await waitSink(env, keyB, "silicon.updated", event => obj(dataOf(event).silicon).display_name === `Hooked retried ${t}`, 30_000);
     const attempts = retried ? await sql(env, `select d.attempts, d.status, coalesce(d.last_status, 0) from webhook_deliveries d where d.event_id = '${retried.event_id}'`) : [];
     results.check("a delivery the Silicon's endpoint refused (503) is retried and arrives with the same event id", !!retried && Number(attempts[0]?.[0]) >= 2 && attempts[0]?.[1] === "delivered", short(attempts));
-    results.metric("Silicon webhook retry delivered after", Date.now() - failedAt, "ms");
+    results.metric("Silicon webhook retry delivered after (retry made due at once)", Date.now() - failedAt, "ms");
 
     // 5. The Silicon removes it: nothing more is sent; a test says there is none.
     const removed = await accounts(env, ["webhook", "remove", "--json"], { home: homeS });
     results.check("`accounts webhook remove` (as the Silicon)", removed.code === 0 && removed.json?.removed === true, said(removed));
     const quietBefore = (await sinkInbox(env, keyB)).deliveries;
+    const queuedBefore = Number((await sql(env, `select count(*) from webhook_deliveries where target_kind = 'silicon' and target_id = '${uuid}'`))[0]?.[0] ?? -1);
     await accounts(env, ["silicon", "update", sid, "--display-name", `Hooked silent ${t}`, "--json"], { home: homeC });
-    await sleep(4000);
-    results.check("…after which a change sends nothing", (await sinkInbox(env, keyB)).deliveries === quietBefore, `${quietBefore} → ${(await sinkInbox(env, keyB)).deliveries}`);
+    await sleep(1500);
+    const queuedAfter = Number((await sql(env, `select count(*) from webhook_deliveries where target_kind = 'silicon' and target_id = '${uuid}'`))[0]?.[0] ?? -1);
+    results.check("…after which a change sends nothing (no delivery queued for the Silicon, nothing arrives)", (await sinkInbox(env, keyB)).deliveries === quietBefore && queuedAfter === queuedBefore, `arrived ${quietBefore} → ${(await sinkInbox(env, keyB)).deliveries}; queued ${queuedBefore} → ${queuedAfter}`);
     const noHook = await accounts(env, ["webhook", "test", "--json"], { home: homeS });
     results.check("`accounts webhook test` without a webhook: exit 5, webhook_not_set", noHook.code === 5 && cliError(noHook).code === "webhook_not_set", said(noHook));
     const shown = await accounts(env, ["silicon", "show", sid, "--json"], { home: homeC });

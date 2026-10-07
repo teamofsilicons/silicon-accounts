@@ -118,6 +118,15 @@ export const journeys: Journey[] = [
         results.check("POST /v1/flows sets __Host-sa_flow: Secure; HttpOnly; SameSite=Lax; Path=/; no Domain", created.status === 201 && flowProblems.length === 0, flowProblems.join("; ") || flowJar.last("__Host-sa_flow")!.line.replace(/=[^;]{12}[^;]*/, "=…"));
         const unprefixedFlow = await call(`${secure.url}/v1/flows/${flowOf(created)?.id ?? "x"}`, { headers: { cookie: `sa_flow=${flowJar.get("__Host-sa_flow")}` } });
         results.check("…and the flow ignores the same value under the unprefixed name sa_flow (403 flow_not_bound)", unprefixedFlow.status === 403, brief(unprefixedFlow));
+        // Flow fixation: a binding value an attacker planted under the unprefixed name (a sibling host can toss that one)
+        // is never adopted for the browser's next sign-in, so the attacker can't read that flow (and the code it ends with).
+        const planted = `saf_${"P".repeat(43)}`;
+        const fixJar = new Jar();
+        fixJar.set("sa_flow", planted);
+        const fixed = await startFlow(secure, fixJar, { app_id: "briefcase", redirect_uri: `${env.apps}/briefcase/callback`, state: `fx-${tag()}` });
+        const adopted = fixJar.get("__Host-sa_flow");
+        const readWithPlanted = await call(`${secure.url}/v1/flows/${flowOf(fixed)?.id ?? "x"}`, { headers: { cookie: `sa_flow=${planted}; __Host-sa_flow=${planted}` } });
+        results.check("a binding value planted under the unprefixed sa_flow is never adopted: the new flow gets a fresh __Host-sa_flow, and the planted value can't read the flow (403)", fixed.status === 201 && !!adopted && adopted !== planted && readWithPlanted.status === 403, `flow ${fixed.status}; new binding ${adopted ? (adopted === planted ? "IS THE PLANTED VALUE" : "fresh") : "none"}; planted read ${brief(readWithPlanted)}`);
 
         const carbon = await signInWithEmail(secure, { label: "secure" });
         remember(ctx, "session cookie", carbon.jar.get("__Host-sa_session"));

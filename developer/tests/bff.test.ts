@@ -63,3 +63,30 @@ test("the account site's old developer tabs land on their new names", async () =
   assert.equal(isUnknownAppTab("/apps/briefcase/bogus"), true);
   assert.equal(isUnknownAppTab("/apps/briefcase"), false);
 });
+
+test("production seals with nothing anyone can know: no secret, a short one or the public development secret are refused", async () => {
+  const { DEV_SECRET, sessionSecret } = await import("../lib/server/config");
+  const env = process.env as Record<string, string | undefined>;
+  const saved = { node: env.NODE_ENV, secret: env.DEVELOPER_SESSION_SECRET };
+  try {
+    env.NODE_ENV = "production";
+    delete env.DEVELOPER_SESSION_SECRET;
+    assert.throws(() => sessionSecret(), /DEVELOPER_SESSION_SECRET is not set/);
+    env.DEVELOPER_SESSION_SECRET = "short-secret-0123456";
+    assert.throws(() => sessionSecret(), /20 characters; it must be at least 32/);
+    env.DEVELOPER_SESSION_SECRET = DEV_SECRET;
+    assert.throws(() => sessionSecret(), /public development secret/);
+    env.DEVELOPER_SESSION_SECRET = `  ${DEV_SECRET}  `;
+    assert.throws(() => sessionSecret(), /public development secret/, "surrounding spaces do not disguise it");
+    env.DEVELOPER_SESSION_SECRET = SECRET;
+    assert.equal(sessionSecret(), SECRET);
+    env.NODE_ENV = "development";
+    env.DEVELOPER_SESSION_SECRET = DEV_SECRET;
+    assert.equal(sessionSecret(), DEV_SECRET, "development may use it");
+  } finally {
+    if (saved.node === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = saved.node;
+    if (saved.secret === undefined) delete env.DEVELOPER_SESSION_SECRET;
+    else env.DEVELOPER_SESSION_SECRET = saved.secret;
+  }
+});

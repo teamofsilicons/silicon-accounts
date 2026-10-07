@@ -29,12 +29,13 @@ use crate::paths::{self, RouteClass, Timeouts};
 /// The 413 error for `method path`.
 pub fn payload_too_large(method: &Method, path: &str, declared: Option<u64>) -> ApiError {
     let class = RouteClass::of(method, path);
-    let limit = class.body_limit();
+    // The limit a client can split its bodies by (for imports, not the read allowance above it).
+    let limit = class.stated_limit();
     let size = match declared {
         Some(n) => format!("The request body is {n} bytes, but"),
         None => "The request body is too large:".to_string(),
     };
-    ApiError::new(
+    let error = ApiError::new(
         StatusCode::PAYLOAD_TOO_LARGE,
         "payload_too_large",
         format!(
@@ -52,7 +53,13 @@ pub fn payload_too_large(method: &Method, path: &str, declared: Option<u64>) -> 
         RouteClass::InternalSync => "Sync the apps in smaller batches (at most 5 MB per request).",
         RouteClass::SigninConfig => "Inline logos may be at most 128 KB each; host larger logos and use https URLs.",
     })
-    .detail("limit_bytes", limit)
+    .detail("limit_bytes", limit);
+    match class {
+        // The import's own 413 (a body read past the limit) says max_bytes: both 413s of the
+        // route carry the same keys.
+        RouteClass::Import => error.detail("max_bytes", limit),
+        _ => error,
+    }
 }
 
 /// The error when a request runs past its time budget.
@@ -97,5 +104,39 @@ pub async fn limits(State(timeouts): State<Timeouts>, req: Request, next: Next) 
             response.extensions_mut().insert(LeaveUnread);
             response
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn import_413s_state_the_real_limit_not_the_read_allowance() {
+        let e = payload_too_large(
+            &Method::POST,
+            "/v1/apps/legacy-crm/imports",
+            Some(53_477_376),
+        );
+        assert_eq!(
+            e.message,
+            "The request body is 53477376 bytes, but POST /v1/apps/legacy-crm/imports accepts at most 50 MB (52428800 bytes)."
+        );
+        assert_eq!(e.details["limit_bytes"], 52_428_800);
+        assert_eq!(
+            e.details["max_bytes"], 52_428_800,
+            "the import's own 413 key"
+        );
+        let streamed = payload_too_large(&Method::POST, "/v1/apps/legacy-crm/imports", None);
+        assert_eq!(streamed.details["limit_bytes"], 52_428_800);
+
+        let other = payload_too_large(&Method::POST, "/v1/reports", Some(70_000));
+        assert_eq!(other.details["limit_bytes"], 65_536);
+        assert!(other.details.get("max_bytes").is_none());
+        assert!(
+            other
+                .message
+                .ends_with("accepts at most 64 KB (65536 bytes).")
+        );
     }
 }

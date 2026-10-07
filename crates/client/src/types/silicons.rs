@@ -71,7 +71,7 @@ pub struct CustodianRequestInfo {
     /// The custodian has 14 days to accept.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,
@@ -99,21 +99,21 @@ pub struct CustodianRequestStatus {
     /// When the request was made.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
     /// When the request expires (14 days after creation).
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,
     /// When it was decided.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub decided_at: Option<OffsetDateTime>,
@@ -139,9 +139,9 @@ impl CustodianRequestStatus {
 pub struct RequestSilicon {
     /// Account uuid.
     pub uuid: String,
-    /// Its id (empty once released after a decline or expiry).
-    #[serde(default, deserialize_with = "lenient_string")]
-    pub id: String,
+    /// Its si:id; `None` (`null`) once the account was released after a decline or expiry.
+    #[serde(default, deserialize_with = "lenient_opt_string")]
+    pub id: Option<String>,
     /// Account status.
     #[serde(default, deserialize_with = "lenient_string")]
     pub status: String,
@@ -214,7 +214,7 @@ pub struct StkRotated {
     /// When the rotation happened.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub rotated_at: Option<OffsetDateTime>,
@@ -314,14 +314,14 @@ pub struct PendingTransfer {
     /// Created at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
     /// Expires at (14 days).
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,
@@ -355,14 +355,14 @@ pub struct CustodianRequest {
     /// Created at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
     /// Expires at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,

@@ -86,3 +86,31 @@ A replay keeps the event id (so your dedupe works), goes to the current URL, is
 signed with the current secret and gets a fresh 72 hours of retries from the replay. Deliveries about accounts that no longer have a
 membership with your app are skipped: data is never replayed to an app that lost
 access.
+
+`--failed` re-queues at most 100 deliveries per call, the oldest first; the answer's
+`remaining` says how many failed ones are still waiting, so call it again until it is 0.
+A retried call with the same `--idempotency-key` re-queues nothing twice.
+
+### A Silicon's own webhook
+
+A Silicon's webhook follows the same rules: the Silicon (signed in with its STK) sees and
+replays its own deliveries, and its custodian can do the same for it.
+
+```sh
+# as the Silicon
+accounts webhook deliveries --status failed
+accounts webhook delivery <delivery-id>              # attempts and the exact payload
+accounts webhook replay --failed                     # or: accounts webhook replay <delivery-id>…
+# as its custodian
+accounts silicon webhook deliveries si:scout --status failed
+accounts silicon webhook replay si:scout --failed --since 2026-10-01T00:00:00Z
+```
+
+Every event of a Silicon's webhook is about the Silicon itself, so nothing is withheld
+from it or its custodian. Test pings are never replayed (a replay would get around the
+limit of 10 pings an hour): send a new one with `accounts webhook test`. A replay with no
+webhook set fails with `webhook_not_set`: set one first with `accounts webhook set`.
+
+In Rust: `AccountSession::my_webhook_deliveries`, `my_webhook_delivery` and
+`replay_my_webhook` for the Silicon; `silicon_webhook_deliveries`,
+`silicon_webhook_delivery` and `replay_silicon_webhook` for its custodian.

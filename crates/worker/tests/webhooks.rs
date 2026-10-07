@@ -620,20 +620,19 @@ async fn ssrf_guard_refuses_private_targets_when_private_is_not_allowed() {
                 .expect("set url");
         }
     };
-    let expect_refusal =
-        |outcomes: Vec<DeliveryOutcome>, needle: &'static str| match outcomes.as_slice() {
-            [
-                DeliveryOutcome::Retrying {
-                    status: None,
-                    error,
-                    ..
-                },
-            ] => {
-                assert!(error.contains("SSRF guard"), "{error}");
-                assert!(error.contains(needle), "expected '{needle}' in: {error}");
-            }
-            other => panic!("expected a refusal, got {other:?}"),
-        };
+    let expect_refusal = |outcomes: Vec<DeliveryOutcome>, needle: &str| match outcomes.as_slice() {
+        [
+            DeliveryOutcome::Retrying {
+                status: None,
+                error,
+                ..
+            },
+        ] => {
+            assert!(error.contains("SSRF guard"), "{error}");
+            assert!(error.contains(needle), "expected '{needle}' in: {error}");
+        }
+        other => panic!("expected a refusal, got {other:?}"),
+    };
 
     // http is refused outright.
     expect_refusal(
@@ -667,22 +666,45 @@ async fn ssrf_guard_refuses_private_targets_when_private_is_not_allowed() {
         );
     }
 
-    // A name that slips past the name check is still refused once it resolves to loopback
-    // (`localhost.` with the trailing dot is a different spelling of localhost), and the stored
+    // Another spelling of a local name (`localhost.`, with the trailing dot of a fully
+    // qualified name) is refused by name too.
+    set_url(format!("https://localhost.:{}/hook", rx.port())).await;
+    make_due(&ctx, ev.delivery_id).await;
+    expect_refusal(
+        deliverer.deliver_due(10).await.expect("cycle"),
+        "local host",
+    );
+
+    // A name that passes the name check is still refused once it resolves to a private or
+    // reserved address (whichever of these names the machine's hosts file has), and the stored
     // error never says what it resolved to: app owners read it.
-    if tokio::net::lookup_host(("localhost.", 0)).await.is_ok() {
-        set_url(format!("https://localhost.:{}/hook", rx.port())).await;
+    let mut private_name = None;
+    for name in [
+        "localhost.localdomain",
+        "ip6-localhost",
+        "ip6-loopback",
+        "broadcasthost",
+    ] {
+        if tokio::net::lookup_host((name, 0)).await.is_ok() {
+            private_name = Some(name);
+            break;
+        }
+    }
+    if let Some(name) = private_name {
+        set_url(format!("https://{name}:{}/hook", rx.port())).await;
         make_due(&ctx, ev.delivery_id).await;
         expect_refusal(
             deliverer.deliver_due(10).await.expect("cycle"),
-            "'localhost.' has no public address",
+            &format!("'{name}' has no public address"),
         );
         let stored = delivery(&ctx, ev.delivery_id)
             .await
             .last_error
             .unwrap_or_default();
         assert!(
-            !stored.contains("127.0.0.1") && !stored.contains("::1"),
+            !stored.contains("127.0.0.1")
+                && !stored.contains("::1")
+                && !stored.contains("255.255.255.255"),
             "{stored}"
         );
     }
@@ -1035,4 +1057,106 @@ async fn a_replay_gets_seventy_two_hours_from_the_replay_itself() {
         deliverer.deliver_due(10).await.expect("cycle").as_slice(),
         [DeliveryOutcome::Failed { .. }]
     ));
+}
+
+/// Account events are stored for a disabled app too, held while it is disabled, and delivered
+/// once it is enabled again: an app re-enabled within the delivery window never misses a change.
+#[tokio::test]
+async fn a_disabled_app_hears_every_account_change_once_re_enabled() {
+    use accounts_core::events::types;
+    use accounts_core::models::{AccountField, Scope};
+
+    let ctx = TestContext::new().await;
+    let rx = start_receiver().await;
+    let (app, _) = ctx.app("paused").await;
+    ctx.set_app_webhook(&app.app_id, &rx.url("hook")).await;
+    let carbon = ctx.carbon().await;
+    ctx.membership(&app.app_id, &carbon.uuid, &[Scope::Profile])
+        .await;
+    let set_status = |status: &'static str| {
+        let ctx = &ctx;
+        let app_id = app.app_id.clone();
+        async move {
+            sqlx::query("update apps set status = $2 where app_id = $1")
+                .bind(&app_id)
+                .bind(status)
+                .execute(&mut *ctx.conn().await)
+                .await
+                .expect("app status");
+        }
+    };
+    set_status("disabled").await;
+
+    let emitted = {
+        let mut conn = ctx.conn().await;
+        let mut out = events::account_updated(&mut conn, &carbon, &[AccountField::DisplayName])
+            .await
+            .expect("updated");
+        out.extend(
+            events::notify_id_changed(&mut conn, &carbon, "c:before", "c:after")
+                .await
+                .expect("id changed"),
+        );
+        out.extend(
+            events::account_deleted(&mut conn, &carbon.uuid)
+                .await
+                .expect("deleted"),
+        );
+        out
+    };
+    let kinds: Vec<&str> = emitted.iter().map(|e| e.event_type.as_str()).collect();
+    assert_eq!(
+        kinds,
+        [
+            types::ACCOUNT_UPDATED,
+            types::ACCOUNT_ID_CHANGED,
+            types::ACCOUNT_DELETED
+        ],
+        "stored although the app is disabled"
+    );
+
+    let deliverer = WebhookDeliverer::new(&ctx.state).expect("client");
+    let held = deliverer.deliver_due(10).await.expect("cycle");
+    assert_eq!(held.len(), 3, "{held:?}");
+    for outcome in &held {
+        match outcome {
+            DeliveryOutcome::Retrying { error, .. } => {
+                assert!(error.contains("is disabled"), "{error}")
+            }
+            other => panic!("expected a held retry, got {other:?}"),
+        }
+    }
+    assert!(rx.received().is_empty());
+
+    set_status("active").await;
+    for _ in 0..10 {
+        sqlx::query(
+            "update webhook_deliveries set next_attempt_at = now() where target_id = $1 and status = 'pending'",
+        )
+        .bind(&app.app_id)
+        .execute(&mut *ctx.conn().await)
+        .await
+        .expect("time travel");
+        deliverer.deliver_due(10).await.expect("cycle");
+        if rx.received().len() >= 3 {
+            break;
+        }
+    }
+    let mut got: Vec<String> = rx
+        .received()
+        .iter()
+        .map(|r| {
+            r.json()["event_id"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect();
+    got.sort();
+    let mut sent: Vec<String> = emitted.iter().map(|e| e.event_id.to_string()).collect();
+    sent.sort();
+    assert_eq!(
+        got, sent,
+        "each held event arrives once, with its own event_id"
+    );
 }

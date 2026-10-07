@@ -1,12 +1,14 @@
 import type { Journey } from "../../context";
-import { forgetRateLimits, randomIp, sleep, sql, tag } from "../../lib";
+import { forgetRateLimits, randomIp, sql, tag } from "../../lib";
 import { asCarbon, cliError, freshDir, loginSilicon, obj, said, short, signUpCarbon, siliconLogin, str, type Json } from "./_helpers";
 
 const wrongStk = (n: number) => `stk-${n.toString(16).padStart(12, "0")}`;
 
 export const journey: Journey = {
   name: "silicons-cli-lockout",
-  title: "10 wrong STKs in a row lock a Silicon's sign-in for a minute (423 login_locked, exit 6), even for the right STK; the lock ends on its own, a success resets the count, it is per Silicon, and parallel guesses get no more than 10 checks",
+  title: "10 wrong STKs in a row lock a Silicon's sign-in for a minute (423 login_locked, exit 6), even for the right STK; the lock ends on its own (time travel), a success resets the count, it is per Silicon, and parallel guesses get no more than 10 checks",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   timeoutMs: 8 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;
@@ -41,12 +43,15 @@ export const journey: Journey = {
     const unknown = await loginSilicon(env, freshDir(), `si:nobody-${t}`, stk);
     results.check("an si:id that doesn't exist gets the same answer as a wrong STK (exit 3, invalid_credentials)", unknown.code === 3 && cliError(unknown).code === "invalid_credentials", said(unknown));
 
-    // 2. The lock ends on its own after the minute.
-    const waitMs = Math.max(0, retryAfter * 1000 - (Date.now() - lockedAt)) + 1500;
-    await sleep(waitMs);
+    // 2. The lock ends on its own after the minute: time travel moves its end into the past (no minute of waiting;
+    //    the lock is a time, so nothing but the clock has to happen for it to end).
+    const stillLocked = await siliconLogin(ctx, sid, stk);
+    results.check("…still locked a moment later (423 login_locked with retry_after_seconds)", stillLocked.status === 423 && str(obj(stillLocked.body.error).code) === "login_locked" && Number(obj(obj(stillLocked.body.error).details).retry_after_seconds) > 0, `${stillLocked.status} ${short(stillLocked.body)}`);
+    await sql(env, `update accounts set stk_locked_until = now() - interval '1 second' where uuid = '${uuid}' and stk_locked_until is not null`);
     const afterLock = await loginSilicon(env, freshDir(), sid, stk);
-    results.check("after the minute the right STK signs in again", afterLock.code === 0 && afterLock.json?.id === sid, said(afterLock));
-    results.metric("lock lasted (until sign-in worked again)", Date.now() - lockedAt, "ms");
+    results.check("after the minute (time travel) the right STK signs in again", afterLock.code === 0 && afterLock.json?.id === sid, said(afterLock));
+    results.metric("lock length (stk_locked_until − now at the 10th wrong STK)", Number(row[0]?.[1]), "s");
+    results.metric("locked → signed in again (time travel instead of the minute)", Date.now() - lockedAt, "ms");
 
     // 3. A success resets the count: nine more wrong ones and the right one still works.
     const again: number[] = [];

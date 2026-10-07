@@ -596,7 +596,8 @@ impl SigninConfig {
             Err(e) => {
                 let path = e.path().to_string();
                 let path = if path == "." { String::new() } else { path };
-                errors.add(path, clean_serde_message(&e.inner().to_string()));
+                let message = plain_serde_message(&path, &e.inner().to_string());
+                errors.add(path, message);
                 Err(errors)
             }
         }
@@ -1261,6 +1262,64 @@ fn clean_serde_message(m: &str) -> String {
     }
 }
 
+/// serde's message about a value of the wrong type in plain words: `invalid type: floating
+/// point `12.5`, expected u32` becomes `must be a whole number from 0 to 40 (pixels), not 12.5`.
+/// Other messages (an enum's "'x' is not one of …") are kept as they are.
+fn plain_serde_message(path: &str, raw: &str) -> String {
+    let m = clean_serde_message(raw);
+    let Some((got, expected)) = m
+        .strip_prefix("invalid type: ")
+        .or_else(|| m.strip_prefix("invalid value: "))
+        .and_then(|rest| rest.rsplit_once(", expected "))
+    else {
+        return m;
+    };
+    let wanted = match expected.trim() {
+        "u8" | "u16" | "u32" | "u64" | "u128" | "usize" | "i8" | "i16" | "i32" | "i64" | "i128"
+        | "isize" => match whole_number_range(path) {
+            Some(range) => format!("a whole number {range}"),
+            None => "a whole number".to_string(),
+        },
+        "f32" | "f64" => "a number".to_string(),
+        "a string" | "a borrowed string" | "string" => "text (a JSON string)".to_string(),
+        "a boolean" | "bool" => "true or false".to_string(),
+        "a sequence" => "a list (a JSON array)".to_string(),
+        "a map" => "an object".to_string(),
+        e if e.starts_with("struct ") || e.starts_with("a map") => "an object".to_string(),
+        e => e.to_string(),
+    };
+    format!("must be {wanted}, not {}", describe_unexpected(got))
+}
+
+/// serde's description of the value it got (`floating point `12.5``, `string "big"`, `map`),
+/// as the JSON a person wrote.
+fn describe_unexpected(got: &str) -> String {
+    let got = got.trim();
+    for prefix in ["floating point ", "integer ", "boolean ", "char "] {
+        if let Some(value) = got.strip_prefix(prefix) {
+            return value.trim_matches('`').to_string();
+        }
+    }
+    if let Some(quoted) = got.strip_prefix("string ") {
+        return quoted.to_string();
+    }
+    match got {
+        "map" => "an object".to_string(),
+        "sequence" => "a list".to_string(),
+        "unit value" | "null" => "null".to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// The range [`SigninConfig`]'s validation allows for a numeric field, as people say it.
+fn whole_number_range(path: &str) -> Option<&'static str> {
+    match path {
+        "branding.radius" => Some("from 0 to 40 (pixels)"),
+        "branding.logo_height" => Some("from 16 to 96 (pixels)"),
+        _ => None,
+    }
+}
+
 /// Deep-merges `patch` into `target`: objects merge recursively, arrays and scalars replace, and
 /// `null` removes the key (the field returns to its default).
 pub fn merge_patch(target: &mut Value, patch: &Value) {
@@ -1505,6 +1564,19 @@ pub fn validate_origin(origin: &str) -> Result<(), String> {
     if u.path() != "/" || u.query().is_some() || u.fragment().is_some() {
         return Err(format!(
             "'{origin}' must be just scheme://host[:port], without a path"
+        ));
+    }
+    // One real host. The url crate parses CSP wildcard syntax (`https://*`, `https://*.x.com`)
+    // as a host named `*`, and an origin is copied into the embed's `frame-ancestors`, where `*`
+    // would let any site frame the sign-in buttons.
+    let one_host = match u.host() {
+        Some(url::Host::Ipv4(_) | url::Host::Ipv6(_)) => true,
+        Some(url::Host::Domain(d)) => d == "localhost" || is_valid_domain(d),
+        None => false,
+    };
+    if !one_host {
+        return Err(format!(
+            "'{origin}' must name one host, like https://app.example.com or http://127.0.0.1:3000: wildcards (*) are not allowed, and each part of the host name may use only a-z, 0-9 and -"
         ));
     }
     match u.scheme() {
@@ -2184,5 +2256,88 @@ mod tests {
             crate::DEVELOPER_APP_ID,
             &format!("{}/", settings.public_url)
         ));
+    }
+
+    #[test]
+    fn origins_need_one_real_host() {
+        for ok in [
+            "https://app.example.com",
+            "https://App.Example.com",
+            "https://app.example.com:8443",
+            "https://xn--bcher-kva.example",
+            "http://localhost:3000",
+            "http://127.0.0.1:8593",
+            "http://[::1]:3000",
+            "https://203.0.113.7",
+        ] {
+            assert_eq!(validate_origin(ok), Ok(()), "{ok}");
+        }
+        for wild in [
+            "https://*",
+            "https://*:443",
+            "https://*.quill.example",
+            "https://app.*.example",
+            "https://a_b.example.com",
+            "https://-app.example.com",
+        ] {
+            let msg = validate_origin(wild).expect_err(wild);
+            assert!(msg.contains("must name one host"), "{wild}: {msg}");
+        }
+        // The other refusals keep their own messages.
+        assert!(validate_origin("https://app.example.com/x").is_err());
+        assert!(validate_origin("http://app.example.com").is_err());
+        assert!(validate_origin("javascript:alert(1)").is_err());
+    }
+
+    #[test]
+    fn type_mistakes_read_as_plain_words() {
+        let mistake = |patch: Value, path: &str| -> String {
+            let err = SigninConfig::default()
+                .apply_patch(&patch, no_secrets())
+                .expect_err("invalid");
+            err.get(path)
+                .unwrap_or_else(|| panic!("no error at {path}: {err:?}"))
+                .to_string()
+        };
+        assert_eq!(
+            mistake(json!({"branding": {"radius": 12.5}}), "branding.radius"),
+            "must be a whole number from 0 to 40 (pixels), not 12.5"
+        );
+        assert_eq!(
+            mistake(json!({"branding": {"radius": "big"}}), "branding.radius"),
+            "must be a whole number from 0 to 40 (pixels), not \"big\""
+        );
+        assert_eq!(
+            mistake(
+                json!({"branding": {"logo_height": -4}}),
+                "branding.logo_height"
+            ),
+            "must be a whole number from 16 to 96 (pixels), not -4"
+        );
+        assert_eq!(
+            mistake(
+                json!({"branding": {"show_app_name": "yes"}}),
+                "branding.show_app_name"
+            ),
+            "must be true or false, not \"yes\""
+        );
+        let font = mistake(
+            json!({"branding": {"font_family": "Comic Sans"}}),
+            "branding.font_family",
+        );
+        assert!(font.starts_with("'Comic Sans' is not one of "), "{font}");
+        assert!(!font.contains('`') && !font.contains("expected"), "{font}");
+        assert_eq!(
+            plain_serde_message("x", "invalid type: map, expected a string"),
+            "must be text (a JSON string), not an object"
+        );
+        assert_eq!(
+            plain_serde_message("x", "invalid type: sequence, expected a boolean"),
+            "must be true or false, not a list"
+        );
+        assert_eq!(
+            plain_serde_message("x", "missing field `y`"),
+            "missing field `y`"
+        );
     }
 }

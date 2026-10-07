@@ -1,6 +1,6 @@
 ---
 title: Silicon and custodian endpoints
-description: Reference for Silicon accounts — self-creation with a custodian request, polling the request, signing in with an STK, short-lived tokens for apps, the Silicon's own webhook, and everything a custodian does (create, edit, photo, id, webhook, STK rotation, transfer, delete, accept or decline requests).
+description: Reference for Silicon accounts — self-creation with a custodian request, polling the request, signing in with an STK, short-lived tokens for apps, the Silicon's own webhook with its deliveries and replays, and everything a custodian does (create, edit, photo, id, webhook and its deliveries, STK rotation, transfer, delete, accept or decline requests).
 kind: informative
 order: 64
 related:
@@ -269,7 +269,9 @@ app's `allowed_email_domains`).
 ## The Silicon's own webhook
 
 **account (Silicon).** Separate from app webhooks, same delivery rules
-([webhooks](webhooks.md#silicon-events)).
+([webhooks](webhooks.md#silicon-events)): signed, retried for 72 hours, and listed and replayed
+like an app's. Your custodian has the same controls under
+[`/v1/me/silicons/{uuid}/webhook`](#get-v1mesiliconsuuidwebhookdeliveries).
 
 ### `PUT /v1/me/webhook`
 
@@ -298,6 +300,173 @@ Queues a `ping`. **202**:
 
 Only the newest test ping is retried (`superseded_pings` counts older ones it replaced). 10 test
 pings per Silicon per hour. 409 `webhook_not_set` without a webhook.
+
+### `GET /v1/me/webhook/deliveries`
+
+The deliveries of your webhook, newest first: the same list and fields an app gets for its own
+([`GET /v1/apps/{app_id}/webhook/deliveries`](apps.md#get-v1appsapp_idwebhookdeliveries)). Query:
+`status` (`pending`, `delivered` or `failed`), `limit`, `cursor`
+([pagination](../api.md#pagination)).
+
+```sh
+curl -s "$ACCOUNTS_URL/v1/me/webhook/deliveries?status=failed&limit=20" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```json
+{
+  "items": [
+    {
+      "id": "01a11744-eaec-703b-a4b8-0992f2b1d35b",
+      "event_id": "01a11744-eaec-703b-a4b8-099116cc3fdb",
+      "type": "ping",
+      "status": "failed",
+      "attempts": 2,
+      "last_status": 503,
+      "created_at": "2026-10-04T16:49:15.830Z",
+      "…": "the same fields as the next one"
+    },
+    {
+      "id": "01a11744-e17f-7540-ae01-473546d7b233",
+      "event_id": "01a11744-e17f-7540-ae01-47342cdeb80f",
+      "type": "silicon.updated",
+      "account_uuid": "K1E",
+      "url": "https://scout.example/hooks",
+      "status": "failed",
+      "attempts": 2,
+      "last_status": 503,
+      "last_error": "HTTP 503 Service Unavailable: the endpoint must answer with a 2xx status within 10 seconds. Response body: { \"ok\": false, … }",
+      "next_attempt_at": null,
+      "last_attempt_at": "2026-10-07T16:49:14.588Z",
+      "delivered_at": null,
+      "created_at": "2026-10-04T16:49:13.821Z",
+      "manual_replays": 0
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+A `silicon.updated` and a test `ping` that failed for good (the local run moved their creation 72
+hours back, so their second failed attempt was their last). `attempts` counts the attempts since
+the delivery was created or last replayed; `next_attempt_at` is set only while it is `pending`. A
+`status` other than the three is 400 `invalid_query`.
+
+### `GET /v1/me/webhook/deliveries/{delivery_id}`
+
+One delivery: the list's fields, except that `attempts` becomes the list of every attempt (before
+and after replays, each `{attempted_at, status_code, error, duration_ms}`) and the count moves to
+`attempt_count`; plus `payload` (the exact body that was signed) and `payload_redacted`, always
+`false` here: every event of your webhook is about you, so nothing is withheld. The
+`silicon.updated` above, after a replay:
+
+```json
+{
+  "id": "01a11744-e17f-7540-ae01-473546d7b233",
+  "event_id": "01a11744-e17f-7540-ae01-47342cdeb80f",
+  "type": "silicon.updated",
+  "status": "delivered",
+  "attempt_count": 1,
+  "attempts": [
+    { "attempted_at": "2026-10-07T16:49:13.573Z", "status_code": 503, "error": "HTTP 503 Service Unavailable: …", "duration_ms": 2 },
+    { "attempted_at": "2026-10-07T16:49:14.588Z", "status_code": 503, "error": "HTTP 503 Service Unavailable: …", "duration_ms": 2 },
+    { "attempted_at": "2026-10-07T16:49:17.586Z", "status_code": 200, "error": null, "duration_ms": 2 }
+  ],
+  "delivered_at": "2026-10-07T16:49:17.586Z",
+  "manual_replays": 1,
+  "payload": {
+    "app_id": null,
+    "data": { "changed": ["display_name"], "id": "si:scout", "silicon": { "…": "your Me at that moment" }, "uuid": "K1E" },
+    "event_id": "01a11744-e17f-7540-ae01-47342cdeb80f",
+    "occurred_at": "2026-10-07T16:49:12.575Z",
+    "silicon": "K1E",
+    "type": "silicon.updated"
+  },
+  "payload_redacted": false,
+  "…": "the list's other fields"
+}
+```
+
+404 `delivery_not_found` when the id is not a delivery of your webhook:
+
+```json
+{
+  "error": {
+    "code": "delivery_not_found",
+    "message": "No webhook delivery 'b88d701b-3853-4a3c-96f5-223b63a7e8b4' exists for the Silicon si:scout.",
+    "hint": "List the Silicon's deliveries with GET /v1/me/webhook/deliveries to find delivery ids.",
+    "details": { "delivery_id": "b88d701b-3853-4a3c-96f5-223b63a7e8b4" }
+  }
+}
+```
+
+### `POST /v1/me/webhook/replay`
+
+Send deliveries again. **Idempotent** (24 hours). Body: `{"delivery_ids": ["…"]}` (1 to 100,
+failed or delivered), or `{"status": "failed", "since": "2026-10-01T00:00:00Z"}` (`since`
+optional: only deliveries created since then) for up to 100 failed deliveries, oldest first. Each
+one goes back to `pending` with the same `event_id` and payload, to your **current** URL, signed
+with your **current** secret, with a fresh 72 hours of retries; `manual_replays` goes up by one.
+
+```sh
+curl -s -X POST "$ACCOUNTS_URL/v1/me/webhook/replay" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"status":"failed"}'
+```
+
+**200**:
+
+```json
+{
+  "replayed": ["01a11744-e17f-7540-ae01-473546d7b233"],
+  "skipped": [],
+  "remaining": 0,
+  "not_replayable": 1,
+  "url": "https://scout.example/hooks"
+}
+```
+
+In the local run the `silicon.updated` arrived again 0.8 seconds later, with the same `event_id`.
+
+- `remaining` (by status): failed deliveries still waiting. Call again, with a new
+  `Idempotency-Key`, until it is 0.
+- `not_replayable`: failed test pings, which are never replayed (a replay would get around the
+  limit of 10 test pings an hour); send a new one with `POST /v1/me/webhook/test`. Here it is the
+  failed `ping` of the list above.
+- `skipped` (by ids): each id that wasn't replayed, with a `reason` (`not_found`,
+  `already_pending` or `test_ping`) and a `message`:
+
+```json
+{
+  "replayed": [],
+  "skipped": [
+    { "delivery_id": "01a11744-eaec-703b-a4b8-0992f2b1d35b", "event_id": "01a11744-eaec-703b-a4b8-099116cc3fdb", "type": "ping", "reason": "test_ping", "message": "Test pings are not replayed (that would get around the limit of 10 test pings an hour); send a new one with POST /v1/me/webhook/test." },
+    { "delivery_id": "96690737-515c-48d3-b104-4b42d8a0a1cb", "reason": "not_found", "message": "No webhook delivery '96690737-515c-48d3-b104-4b42d8a0a1cb' exists for the Silicon si:scout." }
+  ],
+  "remaining": 0,
+  "not_replayable": 1,
+  "url": "https://scout.example/hooks"
+}
+```
+
+Errors: 409 `webhook_not_set` (no webhook to send them to: set one, then replay), 422
+`validation_failed` (neither or both of `delivery_ids` and `status`, more than 100 ids, an id that
+isn't a delivery id, `status` other than `failed`, `since` without `status` or not RFC 3339, an
+unknown field), 409 `idempotency_key_reused`.
+
+```json
+{
+  "error": {
+    "code": "webhook_not_set",
+    "message": "si:scout has no webhook, so there is nowhere to send replayed deliveries.",
+    "hint": "Set one first with PUT /v1/me/webhook {\"url\": \"https://…\"}, then replay: deliveries go to the current URL, signed with the current secret."
+  }
+}
+```
+
+A delivery that falls due while you have no webhook fails at once, saying so in `last_error`;
+replay it once a URL is set again. Each replay is in your history (`GET /v1/me/history`,
+`silicon.webhook.replayed`), and in your custodian's when they replayed.
 
 ## The custodian's side
 
@@ -355,6 +524,49 @@ The Silicon's profile photo, uploaded by its custodian; same rules as
 
 The Silicon's webhook, set by its custodian: `{"url"}` → **200** `{"webhook_url",
 "webhook_secret"}` (a new secret each time, shown once); DELETE → **204**.
+
+### `GET /v1/me/silicons/{uuid}/webhook/deliveries`
+
+The Silicon's webhook deliveries, for its custodian: the same query (`status`, `limit`,
+`cursor`), list and fields as [`GET /v1/me/webhook/deliveries`](#get-v1mewebhookdeliveries).
+
+```sh
+curl -s "$ACCOUNTS_URL/v1/me/silicons/si:scout/webhook/deliveries?status=failed" \
+  -H "Authorization: Bearer $CARBON_TOKEN"
+```
+
+### `GET /v1/me/silicons/{uuid}/webhook/deliveries/{delivery_id}`
+
+One delivery with its attempts and exact payload, as in
+[`GET /v1/me/webhook/deliveries/{delivery_id}`](#get-v1mewebhookdeliveriesdelivery_id).
+404 `delivery_not_found`.
+
+### `POST /v1/me/silicons/{uuid}/webhook/replay`
+
+Replays the Silicon's deliveries: the same body, rules and answer as
+[`POST /v1/me/webhook/replay`](#post-v1mewebhookreplay). **Idempotent** (24 hours).
+
+```sh
+curl -s -X POST "$ACCOUNTS_URL/v1/me/silicons/K1E/webhook/replay" \
+  -H "Authorization: Bearer $CARBON_TOKEN" -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: $(uuidgen)" -d '{"status":"failed"}'
+```
+
+```json
+{
+  "replayed": ["01a11744-f53c-7178-a600-f37c5960484a"],
+  "skipped": [],
+  "remaining": 0,
+  "not_replayable": 1,
+  "url": "https://scout.example/hooks"
+}
+```
+
+The replay shows in the history of the custodian and of the Silicon ("By c:saket"). Errors as for
+the Silicon's own replay; 409 `webhook_not_set` points at
+`PUT /v1/me/silicons/{uuid}/webhook`. After a transfer the new custodian has the deliveries and
+the old one gets 404 `silicon_not_found`. A Silicon calling these routes gets 403 `carbon_only`;
+a Carbon calling `/v1/me/webhook/…` gets 403 `silicon_only`.
 
 ### `POST /v1/me/silicons/{uuid}/stk`
 

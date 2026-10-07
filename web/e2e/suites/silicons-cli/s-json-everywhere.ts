@@ -25,6 +25,8 @@ function judge(run: Run, okExits: number[] = [0]): string | null {
 export const journey: Journey = {
   name: "silicons-cli-json",
   title: "--json on every command: signed out, as a Carbon, as a Silicon and as an app, every command prints exactly one JSON document on stdout (results or {\"error\":{code,message,exit_code}}), only JSON lines on stderr, and an exit code that matches",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   timeoutMs: 8 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;

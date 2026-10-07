@@ -9,14 +9,14 @@
 import type { Page, Route } from "@playwright/test";
 import type { Journey } from "../../context";
 import { codeFor, lastSeq, newContext, shot, sleep, tag } from "../../lib";
-import { appCredentials, brief, call, callbackOf, errorOf, raw, remember, signInWithEmail, viaSite, Jar } from "./_helpers";
+import { appCredentials, brief, call, callbackOf, developerCallback, errorOf, raw, remember, signInWithEmail, viaSite, Jar } from "./_helpers";
 
 /** Requests to the attacker's host (by host: the site's own URLs carry "evil.example" in their query strings). */
 const EVIL = (url: URL) => url.hostname === "evil.example" || url.hostname.endsWith(".evil.example");
 
 export const journey: Journey = {
   name: "security-redirects",
-  title: "open redirects: /authorize refuses unregistered, look-alike, scheme-changed, path-changed and query-added redirect URIs (and never error-redirects to them), the first-party app only its own origin; the site's own redirects stay on the site for //, /\\ and encoded paths; forged Host / X-Forwarded-Host / Forwarded headers change no published URL; in the browser /authorize, /sign-in?return_to and Connect Google never leave the site, and hostile parameters are never executed",
+  title: "open redirects: /authorize refuses unregistered, look-alike, scheme-changed, path-changed and query-added redirect URIs (and never error-redirects to them), the first-party app only its own origin, the developer site's app only its exact callback; the site's own redirects stay on the site for //, /\\ and encoded paths; forged Host / X-Forwarded-Host / Forwarded headers change no published URL; in the browser /authorize, /sign-in?return_to and Connect Google never leave the site, and hostile parameters are never executed",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const t = viaSite(ctx);
@@ -116,6 +116,40 @@ export const journey: Journey = {
     const own = await call(`${env.site}/v1/flows`, { json: { app_id: "accounts", redirect_uri: `${env.site}/sign-in`, state: "s" }, jar: new Jar(), origin: env.site, ip: ctx.ip });
     results.check(`the account site's own sign-in redirects only to its origin: ${firstParty.length} others refused (look-alike host, userinfo, other site/port, fragment, //, javascript:), its /sign-in accepted`, fpAccepted.length === 0 && own.status === 201, fpAccepted.join(" | ") || `own ${own.status}`);
 
+    // The developer site's app (`developer`, a public client): only {ACCOUNTS_DEVELOPER_URL}/auth/callback, exactly. Its
+    // code is the developer platform's whole sign-in, so a look-alike redirect would hand it to someone else.
+    const devCb = developerCallback(env);
+    const dev = new URL(env.developer);
+    const devVariants: Array<[string, string]> = [
+      ["a trailing slash", `${devCb}/`],
+      ["a query added", `${devCb}?next=https://evil.example/`],
+      ["another path", `${env.developer}/auth/callbackx`],
+      ["the path's case", `${env.developer}/auth/CALLBACK`],
+      ["a dot segment", `${env.developer}/auth/x/../callback`],
+      ["an encoded slash", `${env.developer}/auth%2Fcallback`],
+      ["127.0.0.1 for localhost", devCb.replace("localhost", "127.0.0.1")],
+      ["https instead of http", devCb.replace("http:", "https:")],
+      ["another port", `http://${dev.hostname}:${Number(dev.port) + 1}/auth/callback`],
+      ["the account site's origin", `${env.site}/auth/callback`],
+      ["a look-alike host", `${env.developer}.evil.example/auth/callback`],
+      ["userinfo", `http://${dev.host}@evil.example/auth/callback`],
+      ["another site", "https://evil.example/auth/callback"],
+      ["a fragment", `${devCb}#frag`],
+      ["the production developer site", "https://developer.teamofsilicons.com/auth/callback"],
+      ["a fake app's callback", callbackOf(env, "briefcase")],
+    ];
+    const devAccepted: string[] = [];
+    for (const [label, uri] of devVariants) {
+      const jar = new Jar();
+      const reply = await call(`${env.site}/v1/flows`, { json: { app_id: "developer", redirect_uri: uri, state: "s", code_challenge: "x".repeat(43), code_challenge_method: "S256" }, jar, origin: env.site, ip: ctx.ip });
+      if (reply.status !== 400 || errorOf(reply).code !== "redirect_uri_not_registered" || errorOf(reply).details?.redirect_to !== undefined || jar.get("sa_flow")) devAccepted.push(`${label} (${uri}): ${brief(reply)}`);
+    }
+    const devOwn = await call(`${env.site}/v1/flows`, { json: { app_id: "developer", redirect_uri: devCb, state: "s", code_challenge: "x".repeat(43), code_challenge_method: "S256" }, jar: new Jar(), origin: env.site, ip: ctx.ip });
+    results.check(`the developer site's app redirects only to ${devCb}: ${devVariants.length} others refused before any flow exists (trailing slash, query, other paths, dot segment, encoded slash, 127.0.0.1, https, another port, the account site, look-alike, userinfo, another site, fragment, the production address, an app's callback), its own accepted`, devAccepted.length === 0 && devOwn.status === 201, devAccepted.join(" | ") || `own ${devOwn.status}`);
+    const devApp = await call(`${env.site}/v1/apps/developer/public`);
+    const devPatch = await call(`${env.site}/v1/apps/developer/signin-config`, { method: "PATCH", json: { redirect_uris: ["https://evil.example/cb"] }, basic: ["developer", "anything"], ip: ctx.ip });
+    results.check("nobody can give the developer app another redirect URI: it has no secret to change its setup with (401)", devPatch.status === 401, `public ${devApp.status}; PATCH ${brief(devPatch)}`);
+
     // Connect Google's return_to (POST /v1/me/identities/google, a signed-in Carbon's browser).
     const carbon = await signInWithEmail(t, { label: "redirects" });
     remember(ctx, "session cookie", carbon.jar.get("sa_session"));
@@ -199,22 +233,30 @@ export const journey: Journey = {
       void dialog.dismiss();
     });
     results.watch(page, "redirects", [/400 \(Bad Request\)/, /Failed to load resource/]);
-    const settle = async (p: Page, ms = 2500) => {
+    // After the network is idle, a short wait catches anything a page would still do by itself; a direct Google
+    // button's Opening page moves on after about 900 ms, so that case waits past it.
+    const settle = async (p: Page, ms = 600) => {
       await p.waitForLoadState("networkidle").catch(() => undefined);
       await sleep(ms);
     };
 
+    const providerHits = async () => ((await call<{ items?: unknown[] }>(`${env.oidc}/_requests?endpoint=authorize`)).body.items ?? []).length;
+    const providerBefore = await providerHits();
     for (const [label, query] of [
       ["an unregistered redirect_uri", `app_id=briefcase&redirect_uri=${encodeURIComponent("https://evil.example/cb")}&state=x`],
       ["an unregistered redirect_uri with prompt=none", `app_id=briefcase&redirect_uri=${encodeURIComponent("https://evil.example/cb")}&state=x&prompt=none`],
       ["a javascript: redirect_uri", `app_id=briefcase&redirect_uri=${encodeURIComponent("javascript:window.__pwned=1")}&state=x`],
+      ["an unregistered redirect_uri behind the app's Continue with Google button (intent=signup)", `app_id=briefcase&redirect_uri=${encodeURIComponent("https://evil.example/cb")}&state=x&method=google&intent=signup`],
+      ["the developer app with a foreign redirect_uri", `app_id=developer&redirect_uri=${encodeURIComponent("https://evil.example/auth/callback")}&state=x&code_challenge=${"x".repeat(43)}&code_challenge_method=S256`],
     ] as const) {
       await page.goto(`${env.site}/authorize?${query}`);
-      await settle(page);
+      await settle(page, query.includes("method=google") ? 1_500 : 600);
       const text = (await page.locator("body").innerText()).replace(/\s+/g, " ");
       const stayed = new URL(page.url()).origin === env.site && new URL(page.url()).pathname.startsWith("/authorize");
       results.check(`/authorize with ${label} stays on the site and says the redirect isn't registered`, stayed && hits.length === 0 && /not registered|isn.t registered|redirect/i.test(text), `at ${page.url().slice(0, 90)}; evil hits ${hits.length}; "${text.slice(0, 140)}"`);
     }
+    const providerAfter = await providerHits();
+    results.check("…and none of them ever opened Google or Apple (no authorize request reached the mock providers; the Opening page never showed for a link that can't start)", providerAfter === providerBefore, `${providerAfter - providerBefore} authorize requests`);
     await shot(env, page, "security-redirects-01-unregistered");
 
     // Signed in: /sign-in?return_to=… goes straight to return_to, so only a path on this site may come through.
@@ -224,7 +266,7 @@ export const journey: Journey = {
     for (const payload of payloads) {
       await page.goto(`${env.site}/sign-in?return_to=${encodeURIComponent(payload)}`);
       await page.waitForURL(url => url.origin !== env.site || url.pathname !== "/sign-in", { timeout: 20_000 }).catch(() => undefined);
-      await settle(page, 600);
+      await settle(page, 300);
       const at = new URL(page.url());
       if (at.origin !== env.site || hits.length) escaped.push(`${JSON.stringify(payload)} → ${page.url()}`);
     }
@@ -284,7 +326,7 @@ export const journey: Journey = {
     });
     for (const path of hostile) {
       await probe.goto(`${env.site}${path}`);
-      await settle(probe, 1500);
+      await settle(probe, 500);
       const state = await probe.evaluate(() => ({ pwned: (window as unknown as { __pwned?: number }).__pwned ?? null, injected: document.querySelectorAll('img[src="x"], svg[onload]').length }));
       if (state.pwned !== null || state.injected) executed.push(`${path.slice(0, 60)}: pwned=${state.pwned} injected elements=${state.injected}`);
     }

@@ -7,13 +7,31 @@
  * tasks start just before it logs "Silicon Accounts is listening"), then every hour. So the setup has to be done before
  * that first sweep. A setup that comes too late (a stack walked again with --keep, or a site build that waited minutes
  * for a build slot) is handed over as such, and the check reports "not measured" as a failure rather than a pass.
+ *
+ * Both journeys run only when asked for, with E2E_PROOFS_SWEEP=1 (`E2E_PROOFS_SWEEP=1 scripts/e2e.sh proofs-perf-sweep`):
+ * the check has to wait for that first sweep, 120 s after accounts-api started, which is a minute or more of doing
+ * nothing at the end of an otherwise ~40 s suite. Otherwise they are reported as skipped. The sweep's own logic
+ * (store::sweep: what it stores, deletes and keeps) is covered without waiting by crates/proofs/tests (api/listings.rs,
+ * api/sign_in.rs), which call it directly; these journeys add its schedule on a real stack.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import type { Journey } from "../../context";
 import type { AppSignIn, IssuedProof } from "./_helpers";
 import { E2E_DIR, type Env } from "../../lib";
 
 const ROOT = resolve(E2E_DIR, "../..");
+
+/** E2E_PROOFS_SWEEP=1 runs the sweep journeys (they wait for the stack's first sweep); otherwise they are skipped. */
+export const SWEEP_ENABLED = process.env.E2E_PROOFS_SWEEP === "1";
+
+/**
+ * What the sweep journeys spread into themselves: nothing when enabled; otherwise no engine (run.ts reports a journey
+ * whose `engines` leave out the run's engine as skipped) and a title that says how to run them.
+ */
+export function sweepOptIn(title: string): Pick<Journey, "title" | "engines"> {
+  return SWEEP_ENABLED ? { title } : { title: `[skipped unless E2E_PROOFS_SWEEP=1: it waits for the stack's first sweep, 120 s after accounts-api starts] ${title}`, engines: [] };
+}
 
 /** crates/proofs/src/lib.rs SWEEP_FIRST_DELAY. */
 export const FIRST_SWEEP_AFTER_MS = 120_000;

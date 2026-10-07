@@ -65,20 +65,45 @@ const activity: Journey = {
     const failed = all.filter(item => item.kind === "signin" && item.title.startsWith("Failed sign-in"));
     results.check("ten wrong codes for the Carbon's email from another address are one failed sign-in in its history, saying from where", attempt.status === 200 && refusals.every(status => status >= 400) && failed.length === 1 && /with an email code/.test(failed[0]?.title ?? "") && (failed[0]?.detail ?? "").includes(`from ${ctx.ip}`), `${attempt.status} ${refusals.join(",")}: ${JSON.stringify(failed).slice(0, 300)}`);
 
-    // The page: newest first, 50 at a time, in Auckland time.
-    const started = Date.now();
-    await page.goto(`${env.site}/activity`);
-    const firstPage = await until(() => timelineRows(page), rows => rows.length >= 50, 20_000);
-    results.metric("/activity first page visible after navigation", Date.now() - started);
-    await sleep(600);
-    await shot(env, page, "acct-activity-01-all");
-    const header = (await page.locator("main").innerText()).replace(/\s+/g, " ");
-    results.check("the page says days and times are in the account's timezone (Auckland)", header.includes(`Days and times are in ${timezoneLabel("Pacific/Auckland")}, your timezone.`), header.slice(0, 200));
-    results.check("the first page is the newest 50, in the API's order", firstPage.length === 50 && all.slice(0, 50).every((item, index) => (firstPage[index] ?? "").startsWith(item.title.slice(0, 24))), `${firstPage.length} rows; first: ${firstPage[0]} / ${all[0]?.title}`);
-    results.check("the newest entry is the timezone change", /^Profile updated/.test(firstPage[0] ?? "") && /timezone/.test(firstPage[0] ?? ""), firstPage[0] ?? "");
+    // The page: newest first, 50 at a time, in Auckland time. What it draws first is read at once (the Carbon sees it):
+    // its days and times must already be the account's, never the browser's (Kolkata) first.
     const when = new Date(all[0]?.at ?? Date.now());
     const aucklandTime = new Intl.DateTimeFormat("en-US", { timeZone: "Pacific/Auckland", hour: "numeric", minute: "2-digit" }).format(when);
     const aucklandDay = new Intl.DateTimeFormat("en-US", { timeZone: "Pacific/Auckland", weekday: "long", month: "long", day: "numeric" }).format(when);
+    const browserDay = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", weekday: "long", month: "long", day: "numeric" }).format(when);
+    const zoneWords = `Days and times are in ${timezoneLabel("Pacific/Auckland")}, your timezone.`;
+    const mainNow = async () => (await page.locator("main").innerText().catch(() => "")).replace(/\s+/g, " ");
+    const started = Date.now();
+    await page.goto(`${env.site}/activity`);
+    const region = page.getByRole("region", { name: "Account activity" });
+    await region.locator("li").first().waitFor({ timeout: 20_000 });
+    const drawnFirst = { header: await mainNow(), row: ((await region.locator("li").first().innerText().catch(() => "")) || "").replace(/\s+/g, " ") };
+    results.metric("/activity first rows visible after navigation", Date.now() - started);
+    results.check(
+      "the first rows drawn already read in the account's timezone (no flash of the browser's day and time first)",
+      drawnFirst.header.includes(zoneWords) && drawnFirst.row.includes(aucklandDay) && drawnFirst.row.includes(aucklandTime),
+      `first drawn: header ${drawnFirst.header.includes(zoneWords) ? "Auckland" : `"${drawnFirst.header.match(/Days and times are in [^.]*\./)?.[0] ?? "?"}"`}; row "${drawnFirst.row.slice(0, 140)}" (Auckland "${aucklandDay}" "${aucklandTime}", browser day "${browserDay}")`,
+    );
+    // Then settled: the account's timezone, one row per entry (a day that changed under the rows leaves no copies).
+    let settled: string[] = [];
+    let previous = "";
+    await until(async () => {
+      const rows = await timelineRows(page);
+      const header = await mainNow();
+      const key = rows.join("\n");
+      const steady = key === previous && rows.length === 50 && header.includes(zoneWords) && (rows[0] ?? "").includes(aucklandDay);
+      previous = key;
+      settled = rows;
+      return steady;
+    }, ok => ok, 20_000, 300);
+    const firstPage = settled;
+    results.metric("/activity first page settled after navigation", Date.now() - started);
+    await sleep(300);
+    await shot(env, page, "acct-activity-01-all");
+    const header = await mainNow();
+    results.check("the page says days and times are in the account's timezone (Auckland)", header.includes(zoneWords), header.slice(0, 200));
+    results.check("the first page is the newest 50, in the API's order", firstPage.length === 50 && all.slice(0, 50).every((item, index) => (firstPage[index] ?? "").startsWith(item.title.slice(0, 24))), `${firstPage.length} rows; first: ${firstPage[0]} / ${all[0]?.title}`);
+    results.check("the newest entry is the timezone change", /^Profile updated/.test(firstPage[0] ?? "") && /timezone/.test(firstPage[0] ?? ""), firstPage[0] ?? "");
     results.check("its time reads in Auckland time (the account's timezone, not the browser's)", (firstPage[0] ?? "").includes(aucklandTime) && (firstPage[0] ?? "").includes(aucklandDay), `want "${aucklandDay}" "${aucklandTime}" in: ${firstPage[0]}`);
     const more = page.getByRole("button", { name: "Show older activity" });
     results.check("\"Show older activity\" is offered", (await more.count()) === 1);

@@ -17,6 +17,7 @@ import { LogOut, Monitor, Moon, Search, Settings as SettingsIcon, Sun, SwatchBoo
 import { Alert } from "@/components/arc/alert/alert";
 import { Button } from "@/components/arc/button/button";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
+import { SkipLink } from "@/components/foundation/layout/layout";
 import { changeTheme } from "@/lib/theme";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
 import { SECTIONS, navigationType, paths, sectionFor, sectionHref } from "@/lib/navigation";
@@ -185,7 +186,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
 
   const chrome = (content: ReactNode) => (
     <div className={styles.shell}>
-      <a className="skip-link" href="#main">Skip to content</a>
+      <SkipLink href="#main" />
       <header className={styles.top}>
         <Link href={paths.home} data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
           if (event.button !== 0 || event.metaKey || event.ctrlKey) return;

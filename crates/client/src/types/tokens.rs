@@ -26,7 +26,7 @@ pub struct TokenResponse {
     /// When the refresh token family ends.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub refresh_token_expires_at: Option<OffsetDateTime>,
@@ -123,7 +123,7 @@ pub struct AccountForApp {
     /// When the account last changed.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub updated_at: Option<OffsetDateTime>,
@@ -286,7 +286,7 @@ pub struct CliLoginChallenge {
     /// When the code expires (10 minutes).
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,
@@ -302,7 +302,7 @@ pub struct ShortLivedToken {
     /// The app it is bound to.
     pub app_id: String,
     /// When it expires.
-    #[serde(with = "time::serde::rfc3339")]
+    #[serde(with = "crate::serde_util::rfc3339_ms")]
     pub expires_at: OffsetDateTime,
 }
 

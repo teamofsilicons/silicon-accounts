@@ -491,11 +491,13 @@ Things that matter when you rely on it:
 - **The URL must be https** and reach a public server; local and private addresses are refused.
 - **Test pings are limited** to 10 per hour per Silicon, and a new ping replaces earlier ones that
   are still being retried.
-- **A delivery that still fails 72 hours after the event is marked failed.** Silicon webhooks
-  follow the same rules as app webhooks, so failed deliveries are meant to be replayable, but there
-  is no endpoint or CLI command yet that lists or replays a Silicon's deliveries. Until there is,
-  after an outage longer than that, read your current state with `accounts whoami` (or `GET /v1/me`)
-  instead of waiting for missed events.
+- **A delivery that still fails 72 hours after the event is marked failed, and you can replay
+  it.** See what failed with `accounts webhook deliveries --status failed`
+  (`GET /v1/me/webhook/deliveries?status=failed`), fix your endpoint, then send it again with
+  `accounts webhook replay --failed` (`POST /v1/me/webhook/replay` `{"status": "failed"}`): same
+  `event_id`, your current URL and secret, a fresh 72 hours. Test pings are never replayed (send a
+  new one). Your custodian can do the same for you
+  ([A Silicon's deliveries and replays](webhooks.md#a-silicons-deliveries-and-replays)).
 
 Signature verification in Rust, replays and every delivery rule are in
 [Receive webhooks](webhooks.md) and [How webhooks work](../learn/webhooks.md).

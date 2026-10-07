@@ -5,11 +5,11 @@
  * control character or past 255 characters (error), a javascript: photo, two rows wanting the same new id, a 30-character
  * username, the 1900-01-01 and today date boundaries, a lower-case timezone, a list where text belongs, a blank name
  * (named from the email), an unusable email_verified. And an imported name made of HTML is only ever text: on the
- * developer pages' user base and in the import report.
+ * developer site's user base and in its import report.
  */
 import type { Journey } from "../../context";
-import { newContext, shot, signInOnSite, sleep, tag } from "../../lib";
-import { VALID_ID, accountsByUuid, defaultDob, describeRow, fakeApp, forgetImportBudgets, freshExchange, importRows, lastSeq, messagesAfter, type RowMessage, type RowResult } from "./_helpers";
+import { shot, sleep, tag } from "../../lib";
+import { VALID_ID, accountsByUuid, defaultDob, describeRow, developerSession, fakeApp, forgetImportBudgets, freshExchange, importRows, lastSeq, messagesAfter, type RowMessage, type RowResult } from "./_helpers";
 
 const titled = (local: string) =>
   local
@@ -20,9 +20,9 @@ const titled = (local: string) =>
 
 export const journey: Journey = {
   name: "imports-edge-rows",
-  title: "rows at the edges of the rules: names past 100 characters, 12 emails and phones, more than 5 invalid emails, long values quoted to 80 characters, bad external ids, javascript: photos, two rows wanting one id, 30-character usernames, date and timezone boundaries, lists where text belongs, blank names; HTML in a name stays text on the developer pages",
+  title: "rows at the edges of the rules: names past 100 characters, 12 emails and phones, more than 5 invalid emails, long values quoted to 80 characters, bad external ids, javascript: photos, two rows wanting one id, 30-character usernames, date and timezone boundaries, lists where text belongs, blank names; HTML in a name stays text on the developer site",
   async run(ctx) {
-    const { env, results, browser } = ctx;
+    const { env, results } = ctx;
     const crm = fakeApp("legacy-crm");
     await forgetImportBudgets(env, crm.app_id);
     const t = tag();
@@ -86,12 +86,9 @@ export const journey: Journey = {
     const sent = await messagesAfter(env, seq);
     results.check("no email or SMS went out", sent.length === 0, sent.map(item => `${item.channel} to ${item.to}`).join(", ") || "nothing captured");
 
-    // The HTML name on the developer pages, as legacy-crm's owner: text, never markup.
-    const context = await newContext(browser);
-    const page = await context.newPage();
-    results.watch(page, "imports-edge-rows");
-    await signInOnSite(env, page, crm.owner_email);
-    await page.goto(`${env.site}/developer/legacy-crm/users`);
+    // The HTML name on the developer site, as legacy-crm's owner: text, never markup.
+    const { context, page } = await developerSession(ctx, crm.owner_email, "imports-edge-rows", { returnTo: "/apps/legacy-crm/users" });
+    if (!page.url().startsWith(`${env.developer}/apps/legacy-crm/users`)) await page.goto(`${env.developer}/apps/legacy-crm/users`);
     const search = page.getByRole("searchbox", { name: "Search users" }).or(page.getByRole("textbox", { name: "Search users" }));
     await search.first().fill(`eve_${t}`);
     const person = page.locator(`[data-open-user="${at(2)?.account_uuid}"]`);
@@ -101,7 +98,7 @@ export const journey: Journey = {
     const injected = await page.evaluate(() => ({ flag: (window as unknown as { __importXss?: number }).__importXss ?? null, images: [...document.querySelectorAll("main img")].filter(img => img.getAttribute("src") === "x").length }));
     await shot(env, page, "imports-edge-01-users");
     results.check("the user base shows the HTML name as text (no <img> made from it, nothing run)", listed && shown.includes(xssName) && injected.flag === null && injected.images === 0, `${listed ? shown.replace(/\s+/g, " ").slice(0, 200) : "not listed"}; ${JSON.stringify(injected)}`);
-    await page.goto(`${env.site}/developer/legacy-crm/import`);
+    await page.goto(`${env.developer}/apps/legacy-crm/import`);
     const recent = page.getByRole("region", { name: "Recent imports" }).getByRole("listitem");
     await recent.first().waitFor({ timeout: 20_000 });
     await recent.first().getByRole("button").first().click();

@@ -2,8 +2,10 @@
  * App webhooks about a Carbon: every change reaches exactly the apps it should, signed (the fake apps only list events
  * whose v1 signature they verified), with the payload the contract describes and nothing the app may not see.
  *
- * The Carbon signs into briefcase (granted profile + email: optional timezone refused), remind (profile + timezone),
- * dm (profile + phone + email: optional email accepted, timezone refused) and spacestation (no webhook). Which apps an
+ * The Carbon signs into each app through its details pages (v2: required details always shared, optional ones only when
+ * ticked): briefcase (profile + email: the optional timezone left unticked), remind (profile + its required timezone:
+ * the optional email left unticked), dm (profile + phone + email: its required phone added on its page with a code, the
+ * optional email ticked, the timezone left unticked) and spacestation (no webhook). Which apps an
  * event goes to is read from the database right after the change (events are stored in the change's transaction), so
  * "this app gets nothing" is exact instead of a timeout.
  */
@@ -123,7 +125,7 @@ const profileJourney: Journey = {
     after = await seqs(ctx, apps);
     since = Date.now();
     must("change the timezone", await carbon.visitor.call("PATCH", "/v1/me", { json: { timezone: "Europe/Berlin" } }), 200);
-    checkEq(results, "timezone: only remind (the one app granted timezone) gets account.updated; briefcase refused the optional scope, dm never had it", await targetsSince(ctx, carbon.uuid, "account.updated", since), ["remind"]);
+    checkEq(results, "timezone: only remind (the one app granted timezone) gets account.updated; briefcase and dm were not given it (left unticked)", await targetsSince(ctx, carbon.uuid, "account.updated", since), ["remind"]);
     const tz = (await receivedBy(ctx, ["remind"], carbon.uuid, "account.updated", after)).remind;
     const tzData = tz?.payload.data as { changed?: string[]; account?: Record<string, unknown> } | undefined;
     results.check("timezone: remind received changed [timezone] with the new timezone", sameJson(tzData?.changed, ["timezone"]) && tzData?.account?.timezone === "Europe/Berlin", short(tzData, 300));

@@ -1,29 +1,47 @@
 /**
- * Expiry: a proof token issued with access_ttl_seconds 60 verifies until its expiry and not after it, on the real clock;
- * and by time travel in the stack's database: an expired proof token (the proof lives on: the issuing app refreshes
- * it), a proof past its own lifetime, and an OBO proof whose sign-in expired. Every expiry answer is exactly
- * {valid:false, expires_at:null}.
+ * Expiry, by time travel in the stack's database (never by waiting): a proof token issued with access_ttl_seconds 60
+ * is stored to expire 60 s after the proof was issued, verifies while its expires_at is ahead and is exactly invalid
+ * once it is behind (through the site and straight at accounts-api), and the issuing app refreshes it into a new 60 s
+ * token; an expired proof token of a longer-lived proof (the proof lives on: the issuing app refreshes it), a proof past
+ * its own lifetime, and an OBO proof whose sign-in expired. Every expiry answer is exactly {valid:false, expires_at:null}.
  */
 import type { Journey } from "../../context";
-import { sleep, sql } from "../../lib";
-import { appListing, appTokens, errorCode, familyOf, isExactlyInvalid, issueObo, row, short, signInToApp, refreshAs, verifyAs, type MyProofItem } from "./_helpers";
+import { sql } from "../../lib";
+import { appListing, appTokens, errorCode, familyOf, isExactlyInvalid, issueObo, row, secondsBetween, short, signInToApp, refreshAs, verifyAs, type MyProofItem } from "./_helpers";
 
 export const journey: Journey = {
   name: "proofs-perf-expiry",
-  title: "a 60 s proof token verifies until its expires_at and is exactly invalid right after it on the real clock; time travel: an expired token (refreshable), a proof past its lifetime (410 proof_expired) and an OBO proof whose sign-in expired",
-  timeoutMs: 6 * 60_000,
+  title: "a 60 s proof token (stored to expire 60 s after issue) verifies while its expires_at is ahead and is exactly invalid once it is behind, then refreshes into a new 60 s token; an expired token of a longer proof (refreshable), a proof past its lifetime (410 proof_expired) and an OBO proof whose sign-in expired — all by SQL time travel, no waiting",
   async run(ctx) {
     const { env, results } = ctx;
     const carbon = await signInToApp(ctx, "dm");
     const subject = (await appTokens(env, "dm", carbon.uuid)).access_token;
 
-    // A 60-second proof token, on the real clock (checked at the end, while the time-travel cases run).
+    // A 60-second proof token: its stored lifetime, then its expiry moved instead of waited for.
     const short60 = await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", access_ttl_seconds: 60, scopes: ["files.read"] });
     const p60 = short60.body;
     const life = await row(env, `select extract(epoch from (t.expires_at - f.created_at)) from proof_tokens t join proof_families f on f.id = t.family_id where f.id = '${p60.proof_id}' and t.kind = 'access'`);
     results.check("access_ttl_seconds 60: the proof token expires 60 s after the proof was issued (database clock)", short60.status === 201 && Math.abs(Number(life?.[0]) - 60) < 0.05, `${short60.status} ${life?.[0]} s`);
+    const left60 = secondsBetween(p60.expires_at, new Date().toISOString());
+    results.check("…the issue answer's expires_at is 60 s away", left60 > 55 && left60 <= 61, `${left60.toFixed(1)} s`);
     const now60 = await verifyAs(ctx, "briefcase", p60.proof_token);
-    results.check("…and verifies right away with that expires_at", now60.body.valid === true && now60.body.expires_at === p60.expires_at, short(now60.body));
+    results.check("…and it verifies right away with that expires_at", now60.body.valid === true && now60.body.expires_at === p60.expires_at, short(now60.body));
+    const moveToken = (proofId: string, interval: string) => sql(env, `update proof_tokens set expires_at = now() + interval '${interval}' where family_id = '${proofId}' and kind = 'access'`);
+    // 57 s later: 3 s left. Verify reads the expiry live and still says valid, naming the (moved) expires_at.
+    await moveToken(p60.proof_id, "3 seconds");
+    const justBefore = await verifyAs(ctx, "briefcase", p60.proof_token);
+    const leftBefore = (Date.parse(justBefore.body.expires_at ?? "") - Date.now()) / 1000;
+    results.check("moved to 3 s before its expires_at, it still verifies, with the moved expires_at (read live, not cached)", justBefore.body.valid === true && leftBefore > 0 && leftBefore <= 3.5, `${leftBefore.toFixed(2)} s left: ${short(justBefore.body)}`);
+    // 61 s later: 1 s past it.
+    await moveToken(p60.proof_id, "-1 second");
+    const justAfter = await verifyAs(ctx, "briefcase", p60.proof_token);
+    results.check("moved to 1 s past its expires_at, it is exactly {valid:false, expires_at:null}", isExactlyInvalid(justAfter.body), JSON.stringify(justAfter.body));
+    const direct = await verifyAs(ctx, "briefcase", p60.proof_token, { direct: true });
+    results.check("…straight at accounts-api too", isExactlyInvalid(direct.body), JSON.stringify(direct.body));
+    const fresh = await refreshAs(ctx, "dm", p60.proof_refresh_token);
+    const freshLife = fresh.status === 200 ? (Date.parse(fresh.body.expires_at) - Date.now()) / 1000 : Number.NaN;
+    results.check("dm refreshes the expired 60 s proof: the same proof, a new token with the proof's own 60 s lifetime that verifies", fresh.status === 200 && fresh.body.proof_id === p60.proof_id && freshLife > 55 && freshLife <= 61 && (await verifyAs(ctx, "briefcase", fresh.body.proof_token)).body.valid === true, `${fresh.status} ${freshLife.toFixed(1)} s ${short(fresh.body.error)}`);
+    results.check("…while the expired token stays exactly invalid", isExactlyInvalid((await verifyAs(ctx, "briefcase", p60.proof_token)).body));
 
     // Time travel 1: the proof token expired, the proof did not: verify says invalid, the issuing app refreshes it.
     const a = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", access_ttl_seconds: 600 })).body;
@@ -72,22 +90,5 @@ export const journey: Journey = {
     results.check("dm's listing reports it expired", listedC?.status === "expired", short(listedC));
     const reissue = await issueObo(ctx, "dm", otherSubject, { receiving_app: "briefcase" });
     results.check("a new proof from the expired sign-in's access token → 400 invalid_subject_token (reason expired)", reissue.status === 400 && errorCode(reissue.body) === "invalid_subject_token" && reissue.body.error?.details?.reason === "expired", `${reissue.status} ${short(reissue.body.error)}`);
-
-    // Back to the real clock: still valid a few seconds before expires_at, exactly invalid right after it.
-    const expiresAt = Date.parse(p60.expires_at);
-    const beforeWait = expiresAt - 4_000 - Date.now();
-    if (beforeWait > 0) await sleep(beforeWait);
-    const justBefore = await verifyAs(ctx, "briefcase", p60.proof_token);
-    const leftAtCheck = (expiresAt - Date.now()) / 1000;
-    results.check("the 60 s token still verifies a few seconds before its expires_at", justBefore.body.valid === true && leftAtCheck > 0, `${leftAtCheck.toFixed(1)} s left: ${short(justBefore.body)}`);
-    const afterWait = expiresAt + 1_500 - Date.now();
-    if (afterWait > 0) await sleep(afterWait);
-    const justAfter = await verifyAs(ctx, "briefcase", p60.proof_token);
-    results.check("1.5 s after its expires_at it is exactly {valid:false, expires_at:null} (real clock, no time travel)", isExactlyInvalid(justAfter.body), `${((Date.now() - expiresAt) / 1000).toFixed(1)} s after: ${JSON.stringify(justAfter.body)}`);
-    const viaSite = await verifyAs(ctx, "briefcase", p60.proof_token, { direct: true });
-    results.check("…straight at accounts-api too", isExactlyInvalid(viaSite.body), JSON.stringify(viaSite.body));
-    const fresh = await refreshAs(ctx, "dm", p60.proof_refresh_token);
-    const freshLife = fresh.status === 200 ? (Date.parse(fresh.body.expires_at) - Date.now()) / 1000 : Number.NaN;
-    results.check("dm refreshes the expired 60 s proof: a new token with the proof's own 60 s lifetime that verifies", fresh.status === 200 && freshLife > 50 && freshLife <= 61 && (await verifyAs(ctx, "briefcase", fresh.body.proof_token)).body.valid === true, `${fresh.status} ${freshLife.toFixed(1)} s`);
   },
 };

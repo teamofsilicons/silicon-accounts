@@ -505,7 +505,7 @@ fn too_many_items(row: RowRef, column: &str) -> ApiError {
             shown(column)
         ),
     )
-    .hint("Fix that row: list one person's own emails and phones, one row per person.")
+    .hint("Fix that row: list one Carbon's own emails and phones, one row per Carbon.")
     .detail("row", row.number())
     .detail("column", storable(column))
     .detail("max_items", MAX_LIST_ITEMS)

@@ -1,6 +1,7 @@
 /**
- * The test ping and who may touch an app's webhook (orbit-games): the app itself or its owner signed in on the account
- * site (with the site's Origin: the CSRF guard), never another app, another Carbon or nobody. An Idempotency-Key makes
+ * The test ping and who may touch an app's webhook (orbit-games): the app itself, its owner signed in on the account
+ * site (with the site's Origin: the CSRF guard), or its owner through the developer platform (a token with
+ * aud=developer, what developer.teamofsilicons.com's BFF sends), never another app, another Carbon or nobody. An Idempotency-Key makes
  * a retried ping a no-op. Deliveries list newest first with cursors and a status filter, and only the app's own. A
  * burst of pings measures delivery latency through the worker (16 at a time).
  */
@@ -9,7 +10,9 @@ import type { Journey } from "../../context";
 import {
   type Delivery,
   appCall,
+  bearerCall,
   checkEq,
+  developerToken,
   envelopeProblems,
   fakeApp,
   inboxEvents,
@@ -32,7 +35,7 @@ const LIST_KEYS = ["account_uuid", "attempts", "created_at", "delivered_at", "ev
 
 export const journey: Journey = {
   name: "webhooks-ping",
-  title: "test pings by the app or its owner (Origin-checked), refused for other apps, other Carbons and anonymous callers; idempotent; 409 without a webhook; deliveries paginate newest first and stay the app's own; a 40-ping burst's latency",
+  title: "test pings by the app or its owner (on the account site, Origin-checked, or through the developer platform's token), refused for other apps, other Carbons and anonymous callers; idempotent; 409 without a webhook; deliveries paginate newest first and stay the app's own; a 40-ping burst's latency",
   timeoutMs: 5 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;
@@ -60,6 +63,15 @@ export const journey: Journey = {
     const foreign = await owner.call<{ error?: { code?: string } }>("POST", path, { origin: "https://evil.example" });
     checkEq(results, "the owner's cookie without the site's Origin (no Origin, a foreign one): 403 origin_not_allowed (CSRF guard)", [noOrigin.status, noOrigin.body.error?.code, foreign.status, foreign.body.error?.code], [403, "origin_not_allowed", 403, "origin_not_allowed"]);
 
+    // ---- the owner through the developer platform (UNDERSTANDING.md v2: webhooks are set up on the developer site) ----
+    const dev = await developerToken(ctx, owner);
+    const byDeveloper = await bearerCall<{ event_id?: string }>(env, dev.accessToken, "POST", path);
+    const devArrived = byDeveloper.body.event_id ? await waitEvent(env, APP, { type: "ping", event_id: byDeveloper.body.event_id }) : null;
+    results.check("the owner's developer-platform token (aud=developer, as the developer site's BFF sends it): 202, and the fake app gets that ping", byDeveloper.status === 202 && !!devArrived, `${byDeveloper.status} ${short(byDeveloper.body, 200)}`);
+    const devList = await bearerCall<{ items?: Delivery[] }>(env, dev.accessToken, "GET", `/v1/apps/${APP}/webhook/deliveries?limit=5`);
+    const devForeign = await bearerCall<{ error?: { code?: string } }>(env, dev.accessToken, "POST", "/v1/apps/pixel-studio/webhook/test");
+    checkEq(results, "…it lists the app's deliveries (200), and is refused on an app the Carbon doesn't own (403 not_app_owner)", [devList.status, (devList.body.items?.length ?? 0) > 0, devForeign.status, devForeign.body.error?.code], [200, true, 403, "not_app_owner"]);
+
     // ---- everyone else is refused ---------------------------------------------------------------------------------------
     const stranger = await newCarbon(ctx, "stranger");
     const notOwner = await stranger.visitor.call<{ error?: { code?: string } }>("POST", path);
@@ -68,7 +80,7 @@ export const journey: Journey = {
     const anonymous = await publicCall<{ error?: { code?: string } }>(env, "POST", path);
     checkEq(results, "refused: another Carbon 403 not_app_owner, another app 403 app_mismatch, a wrong secret 401, nobody 401", { notOwner: [notOwner.status, notOwner.body.error?.code], otherApp: [otherApp.status, otherApp.body.error?.code], wrongSecret: wrongSecret.status, anonymous: anonymous.status }, { notOwner: [403, "not_app_owner"], otherApp: [403, "app_mismatch"], wrongSecret: 401, anonymous: 401 });
     const pingsBefore = await pingsSinceStart();
-    results.check("…and a refused ping queues nothing (2 pings stored: the app's and the owner's)", pingsBefore === 2, `${pingsBefore} pings stored for ${APP} during the journey`);
+    results.check("…and a refused ping queues nothing (3 pings stored: the app's, the owner's on the account site and through the developer platform)", pingsBefore === 3, `${pingsBefore} pings stored for ${APP} during the journey`);
 
     // ---- idempotency ------------------------------------------------------------------------------------------------------
     const key = randomUUID();

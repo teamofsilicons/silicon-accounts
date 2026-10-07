@@ -82,6 +82,9 @@
 }
 .card:not([data-checked]):not([aria-disabled="true"]):active { --sq-fill: var(--surface-muted); }
 .card:focus-visible:not([data-checked]) { --sq-stroke: var(--border-strong); --sq-fill: var(--surface-muted); }
+/* Silicon Accounts: the checked card is the group's Tab stop (a radio group's one stop), so it needs a focus look of its
+   own: its tint deepens under the ring (the ring alone is what "checked" looks like). */
+.card[data-checked]:focus-visible { --sq-fill: color-mix(in oklab, var(--control-on) 13%, var(--surface)); }
 
 @media (prefers-reduced-motion: reduce) {
   .card, .indicator { transition: none; }

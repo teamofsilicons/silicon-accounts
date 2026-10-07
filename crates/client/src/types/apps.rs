@@ -197,7 +197,7 @@ pub struct OwnedApp {
     /// Created at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
@@ -236,14 +236,15 @@ pub struct AppDetails {
     /// Created at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
-    /// Last change to the app (identity or sign-in setup).
+    /// Last change to the app's own record (name, logo, homepage, owner, status). Sign-in
+    /// setup changes don't move it: they show as `config_version` and in the config history.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub updated_at: Option<OffsetDateTime>,
@@ -489,13 +490,17 @@ pub struct ConfigHistoryEntry {
     /// `app`, an account uuid, `system` or `silicon_apps`.
     #[serde(default, deserialize_with = "lenient_string")]
     pub actor: String,
+    /// The account behind `actor` when it is an account uuid (an owner's change): show its
+    /// id instead of the uuid. `null` for `app`, `system` and `silicon_apps`.
+    #[serde(default)]
+    pub actor_account: Option<AccountSummary>,
     /// List of `{path, before, after}` (secrets redacted).
     #[serde(default)]
     pub changes: Value,
     /// When.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub at: Option<OffsetDateTime>,
@@ -513,9 +518,9 @@ pub struct AppUser {
     /// Carbon or Silicon.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<AccountKind>,
-    /// Current public id.
-    #[serde(default, deserialize_with = "lenient_string")]
-    pub id: String,
+    /// Current public id; `None` (`null`) once the account was deleted.
+    #[serde(default, deserialize_with = "lenient_opt_string")]
+    pub id: Option<String>,
     /// Display name.
     #[serde(default, deserialize_with = "lenient_string")]
     pub display_name: String,
@@ -552,34 +557,22 @@ pub struct AppUser {
     /// `signin`, `slt` or `import`.
     #[serde(default, deserialize_with = "lenient_string")]
     pub source: String,
-    /// Your own id for this user (from an import).
-    #[serde(
-        default,
-        deserialize_with = "lenient_opt_string",
-        skip_serializing_if = "Option::is_none"
-    )]
+    /// Your own id for this user (from an import); `null` when none was imported.
+    #[serde(default, deserialize_with = "lenient_opt_string")]
     pub external_id: Option<String>,
     /// Scopes the account granted.
     #[serde(default, deserialize_with = "lenient_vec")]
     pub granted_scopes: Vec<String>,
-    /// First sign-in.
-    #[serde(
-        default,
-        with = "time::serde::rfc3339::option",
-        skip_serializing_if = "Option::is_none"
-    )]
+    /// First sign-in (`null` for an imported account that never signed in).
+    #[serde(default, with = "crate::serde_util::rfc3339_ms::option")]
     pub first_signed_in_at: Option<OffsetDateTime>,
     /// Latest sign-in.
-    #[serde(
-        default,
-        with = "time::serde::rfc3339::option",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, with = "crate::serde_util::rfc3339_ms::option")]
     pub last_signed_in_at: Option<OffsetDateTime>,
     /// When the membership was created.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
@@ -595,7 +588,7 @@ pub struct SigninEvent {
     /// When.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub at: Option<OffsetDateTime>,
@@ -623,7 +616,7 @@ pub struct SigninEvent {
 pub struct UsersQuery {
     /// Matches id, display name, email, phone and external_id.
     pub q: Option<String>,
-    /// `active`, `access_removed` or `imported`.
+    /// `active`, `access_removed`, `imported` or `deleted`.
     pub status: Option<String>,
     /// `carbon` or `silicon`.
     pub kind: Option<String>,
@@ -728,30 +721,18 @@ pub struct ImportJob {
     /// Created at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
-    /// Started at.
-    #[serde(
-        default,
-        with = "time::serde::rfc3339::option",
-        skip_serializing_if = "Option::is_none"
-    )]
+    /// Started at (`null` while queued).
+    #[serde(default, with = "crate::serde_util::rfc3339_ms::option")]
     pub started_at: Option<OffsetDateTime>,
-    /// Finished at.
-    #[serde(
-        default,
-        with = "time::serde::rfc3339::option",
-        skip_serializing_if = "Option::is_none"
-    )]
+    /// Finished at (`null` until it is completed or failed).
+    #[serde(default, with = "crate::serde_util::rfc3339_ms::option")]
     pub finished_at: Option<OffsetDateTime>,
-    /// Why the whole job failed.
-    #[serde(
-        default,
-        deserialize_with = "lenient_opt_string",
-        skip_serializing_if = "Option::is_none"
-    )]
+    /// Why the whole job failed (`null` unless it failed).
+    #[serde(default, deserialize_with = "lenient_opt_string")]
     pub error: Option<String>,
     /// The app it imports into.
     #[serde(
@@ -767,11 +748,7 @@ pub struct ImportJob {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<ImportOptions>,
     /// Who started it: `app` or the owner's uuid.
-    #[serde(
-        default,
-        deserialize_with = "lenient_opt_string",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, deserialize_with = "lenient_opt_string")]
     pub created_by: Option<String>,
 }
 
@@ -830,19 +807,12 @@ pub struct ImportRowResult {
     /// `created`, `matched`, `updated`, `skipped`, `error` or `pending`.
     #[serde(default, deserialize_with = "lenient_string")]
     pub outcome: String,
-    /// The account the row maps to.
-    #[serde(
-        default,
-        deserialize_with = "lenient_opt_string",
-        skip_serializing_if = "Option::is_none"
-    )]
+    /// The account the row maps to (`null` for a row that maps to none, and for matched rows
+    /// of a dry run).
+    #[serde(default, deserialize_with = "lenient_opt_string")]
     pub account_uuid: Option<String>,
-    /// The account's id.
-    #[serde(
-        default,
-        deserialize_with = "lenient_opt_string",
-        skip_serializing_if = "Option::is_none"
-    )]
+    /// The account's id (`null` when there is none to show).
+    #[serde(default, deserialize_with = "lenient_opt_string")]
     pub id: Option<String>,
     /// Errors, warnings and notes.
     #[serde(default, deserialize_with = "lenient_vec")]
@@ -877,8 +847,13 @@ pub struct RowMessage {
 /// Filters for import rows.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ImportRowsQuery {
-    /// Only rows with this outcome (`error`, `created`…).
+    /// Only rows with this outcome: `created`, `matched`, `updated`, `skipped`, `error` or
+    /// `pending`.
     pub outcome: Option<String>,
+    /// Only rows with a message of this level: `error`, `warning` or `info`.
+    pub level: Option<String>,
+    /// Only rows with a message of this code, e.g. `id_conflict` or `missing_identifier`.
+    pub code: Option<String>,
     /// Items per page (max 200).
     pub limit: Option<u32>,
     /// Cursor from the previous page.
@@ -925,59 +900,35 @@ pub struct WebhookDelivery {
     #[serde(default, deserialize_with = "count_or_len")]
     pub attempts: u64,
     /// HTTP status of the last attempt.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub last_status: Option<u16>,
     /// Error of the last attempt.
-    #[serde(
-        default,
-        deserialize_with = "lenient_opt_string",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, deserialize_with = "lenient_opt_string")]
     pub last_error: Option<String>,
-    /// Next retry.
-    #[serde(
-        default,
-        with = "time::serde::rfc3339::option",
-        skip_serializing_if = "Option::is_none"
-    )]
+    /// Next retry (only a pending delivery has one).
+    #[serde(default, with = "crate::serde_util::rfc3339_ms::option")]
     pub next_attempt_at: Option<OffsetDateTime>,
     /// When it was delivered.
-    #[serde(
-        default,
-        with = "time::serde::rfc3339::option",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, with = "crate::serde_util::rfc3339_ms::option")]
     pub delivered_at: Option<OffsetDateTime>,
     /// Created at.
     #[serde(
         default,
-        with = "time::serde::rfc3339::option",
+        with = "crate::serde_util::rfc3339_ms::option",
         skip_serializing_if = "Option::is_none"
     )]
     pub created_at: Option<OffsetDateTime>,
     /// How many times it was replayed by hand.
     #[serde(default, deserialize_with = "lenient_u64")]
     pub manual_replays: u64,
-    /// The endpoint it goes to (the app's current webhook URL).
-    #[serde(
-        default,
-        deserialize_with = "lenient_opt_string",
-        skip_serializing_if = "Option::is_none"
-    )]
+    /// The endpoint it goes to (the current webhook URL).
+    #[serde(default, deserialize_with = "lenient_opt_string")]
     pub url: Option<String>,
     /// The account the event is about, if any.
-    #[serde(
-        default,
-        deserialize_with = "lenient_opt_string",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, deserialize_with = "lenient_opt_string")]
     pub account_uuid: Option<String>,
     /// When the last attempt was made.
-    #[serde(
-        default,
-        with = "time::serde::rfc3339::option",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, with = "crate::serde_util::rfc3339_ms::option")]
     pub last_attempt_at: Option<OffsetDateTime>,
     /// Detail view: true when the payload is withheld because the account deleted itself or
     /// removed the app's access.
@@ -1050,8 +1001,9 @@ pub struct DeliveriesQuery {
 }
 
 /// Which deliveries to replay (at most 100). Replays go to the current URL, signed with
-/// the current secret, keeping the original event id; accounts that no longer have a
-/// membership with the app are skipped.
+/// the current secret, keeping the original event id. For an app's webhook, accounts that no
+/// longer have a membership with the app are skipped; for a Silicon's webhook, test pings are
+/// never replayed (send a new one).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ReplayRequest {
@@ -1065,6 +1017,22 @@ pub enum ReplayRequest {
 }
 
 impl ReplayRequest {
+    /// Refuses an id list the service would refuse (1 to 100 ids), before sending it.
+    pub(crate) fn check(&self) -> crate::error::Result<()> {
+        if let Self::Deliveries(ids) = self
+            && (ids.is_empty() || ids.len() > 100)
+        {
+            return Err(crate::error::Error::invalid_input(
+                format!(
+                    "A replay takes 1 to 100 delivery ids; {} were given.",
+                    ids.len()
+                ),
+                "Pass the ids from `deliveries`, or replay every failed delivery instead.",
+            ));
+        }
+        Ok(())
+    }
+
     pub(crate) fn to_json(&self) -> Value {
         match self {
             Self::Deliveries(ids) => serde_json::json!({ "delivery_ids": ids }),
@@ -1119,6 +1087,79 @@ fn value_count(value: &Value) -> u64 {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn config_history_keeps_the_owner_behind_a_change() {
+        let entry: ConfigHistoryEntry = serde_json::from_value(json!({
+            "version": 4, "actor": "a8K",
+            "actor_account": {"uuid": "a8K", "kind": "carbon", "id": "c:saket", "display_name": "Saket", "pfp_url": "", "status": "active"},
+            "changes": [{"path": "redirect_uris", "before": [], "after": ["https://x"]}],
+            "at": "2026-10-07T05:17:55.590Z"
+        }))
+        .unwrap();
+        assert_eq!(entry.actor_account.as_ref().unwrap().id, "c:saket");
+        let out = serde_json::to_value(&entry).unwrap();
+        assert_eq!(out["actor_account"]["id"], "c:saket");
+        assert_eq!(out["at"], "2026-10-07T05:17:55.590Z");
+        // A change by the app itself has no account: null, as the API sends it.
+        let entry: ConfigHistoryEntry = serde_json::from_value(
+            json!({"version": 2, "actor": "app", "actor_account": null, "changes": [], "at": "2026-10-07T05:17:55.000Z"}),
+        )
+        .unwrap();
+        assert!(entry.actor_account.is_none());
+        let out = serde_json::to_value(&entry).unwrap();
+        assert_eq!(out["actor_account"], Value::Null);
+        assert_eq!(out["at"], "2026-10-07T05:17:55.000Z");
+    }
+
+    #[test]
+    fn nulls_the_api_sends_stay_null() {
+        // A deleted account in the user base: no id and no external id any more.
+        let api = json!({
+            "membership_id": "briefcase:a8K", "uuid": "a8K", "kind": "carbon", "id": null,
+            "display_name": "Deleted account", "pfp_url": "https://iris.example/pfp", "status": "deleted",
+            "source": "signin", "external_id": null, "granted_scopes": [],
+            "first_signed_in_at": "2026-10-07T05:17:55.590Z", "last_signed_in_at": null,
+            "created_at": "2026-10-07T05:17:55.000Z", "account_status": "deleted"
+        });
+        let user: AppUser = serde_json::from_value(api.clone()).unwrap();
+        assert_eq!(user.id, None);
+        assert_eq!(serde_json::to_value(&user).unwrap(), api);
+
+        // A released Silicon of a custodian request has no si:id.
+        let status: crate::types::CustodianRequestStatus = serde_json::from_value(json!({
+            "id": "req-1", "status": "declined", "kind": "initial", "custodian": "c:saket",
+            "silicon": {"uuid": "b9Z", "id": null, "status": "deleted"}
+        }))
+        .unwrap();
+        assert_eq!(status.silicon.id, None);
+        assert_eq!(
+            serde_json::to_value(&status).unwrap()["silicon"]["id"],
+            Value::Null
+        );
+
+        // A delivery that was never attempted.
+        let api = json!({
+            "id": "d1", "event_id": "e1", "type": "ping", "account_uuid": null, "url": "https://x",
+            "status": "pending", "attempts": 0, "last_status": null, "last_error": null,
+            "next_attempt_at": "2026-10-07T05:17:55.590Z", "last_attempt_at": null, "delivered_at": null,
+            "created_at": "2026-10-07T05:17:55.000Z", "manual_replays": 0
+        });
+        let delivery: WebhookDelivery = serde_json::from_value(api.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&delivery).unwrap(), api);
+
+        // A running import job.
+        let job: ImportJob = serde_json::from_value(json!({
+            "id": "job-1", "status": "running", "format": "csv", "total_rows": 3, "processed_rows": 1,
+            "counts": {}, "created_at": "2026-10-07T05:17:55.000Z", "started_at": "2026-10-07T05:17:56.100Z",
+            "finished_at": null, "error": null, "created_by": "app", "app_id": "briefcase", "dry_run": false
+        }))
+        .unwrap();
+        let out = serde_json::to_value(&job).unwrap();
+        assert_eq!(out["finished_at"], Value::Null);
+        assert_eq!(out["error"], Value::Null);
+        assert_eq!(out["started_at"], "2026-10-07T05:17:56.100Z");
+    }
 
     #[test]
     fn sign_in_setups_keep_their_flow_and_page_copy() {

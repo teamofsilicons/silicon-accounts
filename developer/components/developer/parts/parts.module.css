@@ -28,6 +28,9 @@
 }
 .copyValue { min-width: 0; flex: 1; overflow-x: auto; color: var(--foreground); font-family: var(--font-mono); font-size: var(--text-sm); letter-spacing: 0; white-space: nowrap; scrollbar-width: none; }
 .copyValue::-webkit-scrollbar { display: none; }
+/* The value is a Tab stop (a long one scrolls by keys): focused, the field takes the text colour on its edge, as inputs
+   do, over a plain fill. */
+.copyShell:has(.copyValue:focus-visible) { --sq-stroke: var(--foreground); --sq-fill: var(--surface); }
 .copyDescription { color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
 
 /* Tag fields (Arc TagInput plus validation). */

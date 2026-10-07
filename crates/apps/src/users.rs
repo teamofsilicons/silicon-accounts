@@ -22,7 +22,10 @@
 //! A deleted account stays in the list as history with `status: "deleted"` (whatever its
 //! membership said) and nothing about it but its uuid, membership id, external_id and dates: no
 //! name, photo, id, email, phone, dob or timezone. `?status=deleted` lists only those; the other
-//! status filters leave them out. Search finds them only by uuid or external_id.
+//! status filters leave them out. Search finds them only by uuid or external_id. When the app
+//! later imported its external id for another account, the membership gave the external id up
+//! (it is unique per app) and keeps it as `imported_profile.released_external_id`
+//! (`imports::engine`); the history row still shows it as its `external_id`.
 
 use accounts_core::http::pagination::paginate;
 use accounts_core::http::{AppOrOwner, Path, Query};
@@ -82,7 +85,9 @@ struct UserRow {
 }
 
 const USER_SELECT: &str = "select m.account_uuid, m.membership_id, m.status, m.source, m.granted_scopes, \
-     m.external_id, m.imported_profile, m.first_signed_in_at, m.last_signed_in_at, m.created_at, \
+     (case when a.status = 'deleted' then coalesce(m.external_id, m.imported_profile->>'released_external_id') \
+           else m.external_id end) as external_id, \
+     m.imported_profile, m.first_signed_in_at, m.last_signed_in_at, m.created_at, \
      a.kind, a.handle, a.display_name, a.pfp_url, a.dob, a.timezone, a.status as account_status, \
      (select e.email from account_emails e where e.account_uuid = a.uuid and e.is_primary) as primary_email, \
      (select p.phone from account_phones p where p.account_uuid = a.uuid and p.is_primary) as primary_phone \
@@ -309,7 +314,9 @@ async fn list_users(
            and ($3::text is null or a.kind = $3) \
            and ($4::text is null or m.source = $4) \
            and ($5::text is null or ( \
-                a.uuid = $6 or m.external_id ilike $5 \
+                a.uuid = $6 \
+                or (case when a.status = 'deleted' then coalesce(m.external_id, m.imported_profile->>'released_external_id') \
+                         else m.external_id end) ilike $5 \
                 or (a.status <> 'deleted' and ( \
                   a.handle ilike $5 \
                   or (m.status <> 'access_removed' and a.display_name ilike $5) \

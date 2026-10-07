@@ -39,5 +39,11 @@
 :global(:root[data-theme="dark"]) .property { color: oklch(79% .12 85); }
 :global(:root[data-theme="dark"]) .tag { color: oklch(79% .13 230); }
 @media (hover: hover) and (pointer: fine) { .expand:hover { background: var(--surface-muted); color: var(--foreground); } .expand:hover .chevron { color: var(--foreground); } }
+/* Silicon Accounts: keyboard focus (rings are off site-wide). The source is a Tab stop, so it can be scrolled by keys:
+   focused, it takes a soft fill and the block a stronger edge. Expand takes its hover look. */
+.pre:focus-visible { background: var(--surface-muted); }
+.block:has(.pre:focus-visible) { --sq-stroke: var(--border-strong); }
+.expand:focus-visible { background: var(--surface-muted); color: var(--foreground); }
+.expand:focus-visible .chevron { color: var(--foreground); }
 @media (max-width: 420px) { .header { padding-left: var(--space-3); } .header :global(button) { width: var(--control-height-sm); padding-inline: 0; } .header :global(button) > span:last-of-type { display: none; } .viewport { --code-collapsed: calc(var(--code-lines, 0) * var(--text-xs) * 1.7 + var(--space-4) * 2); } .pre { padding: var(--space-4); font-size: var(--text-xs); } }
 @media (prefers-reduced-motion: reduce) { .expand { transition: none; } }

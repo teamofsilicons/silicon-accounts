@@ -6,6 +6,10 @@
 /* Rotation is driven by a spring in accordion.tsx; CSS only handles color. */
 .icon { display: inline-flex; flex: 0 0 auto; color: var(--text-muted); transition: color var(--duration-fast) var(--ease-standard); }
 .trigger[data-state="open"] .icon { color: var(--foreground); }
+/* Silicon Accounts: keyboard focus (Arc drew none; rings are off site-wide): the title takes an accent underline and the
+   chevron the text colour. */
+.trigger:focus-visible > span:first-child { text-decoration-line: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: .3em; }
+.trigger:focus-visible .icon { color: var(--foreground); }
 .panel { overflow: hidden; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
 .panelInner { overflow-wrap: anywhere; padding: 0 var(--space-8) var(--space-5) 0; }
 .lg .trigger { min-height: 76px; gap: var(--space-8); padding-block: var(--space-5); font-size: var(--text-lg); letter-spacing: var(--tracking-body); }

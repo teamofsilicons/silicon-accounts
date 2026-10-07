@@ -52,12 +52,8 @@ pub async fn create(
         fields.add("app_id", problem);
         return Err(ApiError::validation(fields));
     }
-    if app_id == accounts_core::FIRST_PARTY_APP_ID {
-        return Err(ApiError::unprocessable(
-            "first_party_app",
-            "Short-lived tokens are for signing into other apps; 'accounts' is Silicon Accounts itself, which you are already signed into.",
-        )
-        .hint("Pass the app_id of the app you want to sign into, e.g. briefcase."));
+    if accounts_core::is_first_party_app_id(&app_id) {
+        return Err(first_party_app(&app_id, &state.settings.developer_url));
     }
     if !auth.account.is_active() {
         return Err(ApiError::forbidden(
@@ -105,6 +101,21 @@ pub async fn create(
             "scope": scopes_to_string(&scopes),
         })),
     ))
+}
+
+/// 422 `first_party_app` for Silicon Accounts' own apps (`accounts`, `developer`). Both are
+/// public clients, and only an app with its own client secret can exchange a short-lived token,
+/// so a token minted for either could never be used.
+fn first_party_app(app_id: &str, developer_url: &str) -> ApiError {
+    let message = if app_id == accounts_core::DEVELOPER_APP_ID {
+        format!(
+            "Short-lived tokens are for signing into other apps; 'developer' is the Silicon Accounts developer platform, which signs Carbons in on its own site ({developer_url}) and takes no short-lived tokens."
+        )
+    } else {
+        "Short-lived tokens are for signing into other apps; 'accounts' is Silicon Accounts itself, which you are already signed into.".to_string()
+    };
+    ApiError::unprocessable("first_party_app", message)
+        .hint("Pass the app_id of the app you want to sign into, e.g. briefcase.")
 }
 
 /// `profile` + the dob/timezone the app requires or optionally asks for.
@@ -199,6 +210,26 @@ async fn carbon_scopes(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn first_party_apps_are_named() {
+        let developer = first_party_app("developer", "https://developer.example");
+        assert_eq!(developer.code, "first_party_app");
+        assert!(
+            developer.message.contains("'developer'")
+                && developer.message.contains("https://developer.example"),
+            "{}",
+            developer.message
+        );
+        let accounts = first_party_app("accounts", "https://developer.example");
+        assert!(
+            accounts
+                .message
+                .contains("'accounts' is Silicon Accounts itself"),
+            "{}",
+            accounts.message
+        );
+    }
 
     #[test]
     fn silicons_get_only_dob_and_timezone() {

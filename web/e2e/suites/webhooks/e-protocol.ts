@@ -2,11 +2,12 @@
  * The delivery protocol, checked byte for byte with the suite's own receiver instead of the testkit's: the headers
  * (event id, type, delivery id, timestamp, v1 signature, User-Agent, JSON), the HMAC over "{timestamp}.{raw body}" keyed
  * by the whole whsec_ string, the body being exactly the stored event; a retry keeping the event and delivery ids with a
- * fresh timestamp and signature; at-least-once delivery when the endpoint answers too late (the same event_id twice,
+ * fresh timestamp and signature (the backoff skipped by time travel); at-least-once delivery when the endpoint answers too late (the same event_id twice,
  * which receivers must dedupe); a replay of a delivered event; redirects never followed. The app is browser, whose
  * webhook points at the receiver for the journey and goes back to the fake app server at the end.
  */
 import type { Journey } from "../../context";
+import { sleep } from "../../lib";
 import {
   type Received,
   Receiver,
@@ -19,6 +20,7 @@ import {
   reconnectAppWebhook,
   retryNow,
   sameJson,
+  secondsBetween,
   short,
   signIntoApp,
   signatureFor,
@@ -86,14 +88,23 @@ export const journey: Journey = {
       results.check("non-ASCII body: the signature verifies over the raw UTF-8 bytes and the name arrives exactly as set", !!fancy && verifySignature(secret, fancy.headers["x-accounts-timestamp"], fancy.raw, fancy.headers["x-accounts-signature"]) && fancyName === unicode && fancy.raw.includes(Buffer.from("漢字", "utf8")), `${fancyName} (${fancy?.raw.length ?? 0} bytes)`);
 
       // ---- a retry: same ids and body, fresh timestamp and signature -------------------------------------------------
+      // The 10 s wait is read off the delivery and skipped by time travel (f-retries.ts checks that nothing comes early).
       const isPing = (id: string) => (request: Received) => request.headers["x-accounts-event-id"] === id;
       receiver.answer({ status: 500, body: '{"error":"try later"}' }, 1, request => request.body?.type === "ping");
       const retried = must("test ping", await appCall<{ event_id: string; delivery_id: string }>(env, APP, "POST", `/v1/apps/${APP}/webhook/test`), 202).body;
-      const firstTwo = await receiver.waitCount(isPing(retried.event_id), 2, 25_000);
-      results.check("retry: the 500 was retried on its own about 10 s later", firstTwo.length === 2 && firstTwo[0]!.status === 500 && firstTwo[1]!.status === 200 && firstTwo[1]!.at - firstTwo[0]!.at > 8_500 && firstTwo[1]!.at - firstTwo[0]!.at < 17_000, firstTwo.map(r => `${r.status}@${r.at}`).join(" → "));
+      const refusedOnce = await receiver.waitCount(isPing(retried.event_id), 1, 15_000);
+      await waitAttempts(env, retried.delivery_id, 1);
+      const scheduled = await getDelivery(env, APP, retried.delivery_id);
+      const gap = secondsBetween(scheduled.attempts[0]?.attempted_at, scheduled.next_attempt_at);
+      results.check("retry: the 500 leaves the delivery pending, its next attempt scheduled 10 s later", refusedOnce[0]?.status === 500 && scheduled.status === "pending" && Math.abs(gap - 10) < 1.5, `${scheduled.status}, next in ${gap} s`);
+      // Each attempt is signed when it is sent: let the clock pass the first attempt's second before the retry is due.
+      const firstTs = Number(refusedOnce[0]?.headers["x-accounts-timestamp"] ?? 0);
+      await sleep(Math.max(0, (firstTs + 1) * 1000 - Date.now() + 50));
+      await retryNow(env, retried.delivery_id);
+      const firstTwo = await receiver.waitCount(isPing(retried.event_id), 2, 15_000);
+      results.check("retry: once due, the refused ping is sent again and accepted", firstTwo.length === 2 && firstTwo[0]!.status === 500 && firstTwo[1]!.status === 200, firstTwo.map(r => `${r.status}@${r.at}`).join(" → "));
       if (firstTwo.length === 2) {
         const [a, b] = firstTwo as [Received, Received];
-        results.metric("retry after a 500 (receiver-measured)", b.at - a.at, "ms");
         checkEq(results, "retry: the same event id, delivery id and body bytes", [b.headers["x-accounts-event-id"], b.headers["x-accounts-delivery-id"], b.raw.equals(a.raw)], [a.headers["x-accounts-event-id"], a.headers["x-accounts-delivery-id"], true]);
         results.check("retry: a fresh timestamp and signature, each valid for its own timestamp only", Number(b.headers["x-accounts-timestamp"]) > Number(a.headers["x-accounts-timestamp"]) && a.headers["x-accounts-signature"] !== b.headers["x-accounts-signature"] && verifySignature(secret, a.headers["x-accounts-timestamp"], a.raw, a.headers["x-accounts-signature"]) && verifySignature(secret, b.headers["x-accounts-timestamp"], b.raw, b.headers["x-accounts-signature"]) && b.headers["x-accounts-signature"] !== signatureFor(secret, a.headers["x-accounts-timestamp"]!, b.raw), `${a.headers["x-accounts-timestamp"]} → ${b.headers["x-accounts-timestamp"]}`);
         const failedAttempt = (await getDelivery(env, APP, retried.delivery_id)).attempts[0];

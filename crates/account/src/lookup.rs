@@ -5,7 +5,7 @@ use accounts_core::ids::{self, AccountId};
 use accounts_core::models::{Account, AccountKind, AccountStatus};
 use accounts_core::repo::accounts::{self, IdAvailability};
 use accounts_core::repo::rate_limit::{self, Limit};
-use accounts_core::views::AccountSummary;
+use accounts_core::views::{AccountSummary, CustodianRef};
 use accounts_core::{ApiError, ApiResult, AppState};
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
@@ -200,35 +200,77 @@ pub(crate) async fn id_available(
     }))
 }
 
-/// AccountSummary plus, for Silicons, the custodian (`null` while a self-created Silicon waits
-/// for its custodian to accept).
+/// The answer of both lookups, by who asks.
 #[derive(Debug, Serialize)]
-pub(crate) struct LookupView {
+#[serde(untagged)]
+pub(crate) enum LookupView {
+    /// A signed-in Carbon or Silicon.
+    Account(AccountLookup),
+    /// An app.
+    App(AppLookup),
+}
+
+/// What a signed-in Carbon or Silicon sees: AccountSummary plus, for Silicons, the custodian's
+/// (`null` while a self-created Silicon waits for its custodian to accept).
+#[derive(Debug, Serialize)]
+pub(crate) struct AccountLookup {
     #[serde(flatten)]
     summary: AccountSummary,
     #[serde(skip_serializing_if = "Option::is_none")]
     custodian: Option<Option<AccountSummary>>,
 }
 
-async fn lookup_view(conn: &mut PgConnection, account: &Account) -> ApiResult<LookupView> {
-    let custodian = match account.kind {
-        AccountKind::Carbon => None,
-        AccountKind::Silicon => Some(match &account.custodian_uuid {
-            Some(c) => accounts::get(conn, c)
-                .await?
-                .as_ref()
-                .map(AccountSummary::from_account),
-            None => None,
-        }),
+/// What an app sees: the account's public identity, `{"uuid","kind","id","status"}`, plus for
+/// Silicons the custodian as `{"uuid","id"}` (`null` while a self-created Silicon waits for its
+/// custodian to accept), the way apps see a custodian everywhere.
+///
+/// Never the display name or photo. Those are details an account shares with an app by signing
+/// in to it, and it can take them back by removing the app's access, so an app reads them from
+/// its user base (`GET /v1/apps/{app_id}/users/{uuid}`), which follows that: an account that
+/// removed the app's access shows none of its data there, whatever it changes afterwards. A
+/// lookup that answered them to any app would undo that with one call.
+#[derive(Debug, Serialize)]
+pub(crate) struct AppLookup {
+    uuid: String,
+    kind: AccountKind,
+    id: Option<String>,
+    status: AccountStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    custodian: Option<Option<CustodianRef>>,
+}
+
+async fn lookup_view(
+    conn: &mut PgConnection,
+    caller: &Caller,
+    account: &Account,
+) -> ApiResult<LookupView> {
+    let custodian = match (account.kind, &account.custodian_uuid) {
+        (AccountKind::Carbon, _) => None,
+        (AccountKind::Silicon, Some(c)) => Some(accounts::get(conn, c).await?),
+        (AccountKind::Silicon, None) => Some(None),
     };
-    Ok(LookupView {
-        summary: AccountSummary::from_account(account),
-        custodian,
+    Ok(match caller {
+        Caller::Account(_) => LookupView::Account(AccountLookup {
+            summary: AccountSummary::from_account(account),
+            custodian: custodian.map(|c| c.as_ref().map(AccountSummary::from_account)),
+        }),
+        Caller::App(_) => LookupView::App(AppLookup {
+            uuid: account.uuid.clone(),
+            kind: account.kind,
+            id: account.handle.clone(),
+            status: account.status,
+            custodian: custodian.map(|c| {
+                c.map(|c| CustodianRef {
+                    uuid: c.uuid,
+                    id: c.handle,
+                })
+            }),
+        }),
     })
 }
 
-/// `GET /v1/accounts/{uuid}` — app or session (see [`LOOKUPS_PER_MINUTE`]). 404 for unknown and
-/// deleted accounts.
+/// `GET /v1/accounts/{uuid}` — app or session (see [`LOOKUPS_PER_MINUTE`]); see [`LookupView`]
+/// for what each sees. 404 for unknown and deleted accounts.
 pub(crate) async fn by_uuid(
     State(state): State<AppState>,
     caller: Caller,
@@ -276,11 +318,11 @@ pub(crate) async fn by_uuid(
         .hint("Deleted accounts can't be looked up; remove it from your records (apps also got an account.deleted webhook)."));
     }
     tracing::debug!(caller = %caller.describe(), uuid, "account lookup");
-    Ok(Json(lookup_view(&mut conn, &account).await?))
+    Ok(Json(lookup_view(&mut conn, &caller, &account).await?))
 }
 
-/// `GET /v1/accounts/by-id/{id}` — app or session (see [`LOOKUPS_PER_MINUTE`]). Only current ids
-/// resolve.
+/// `GET /v1/accounts/by-id/{id}` — app or session (see [`LOOKUPS_PER_MINUTE`]); the same answer
+/// as by uuid. Only current ids resolve.
 pub(crate) async fn by_id(
     State(state): State<AppState>,
     caller: Caller,
@@ -318,5 +360,5 @@ pub(crate) async fn by_id(
         .hint(hint));
     };
     tracing::debug!(caller = %caller.describe(), id = %full, "account lookup by id");
-    Ok(Json(lookup_view(&mut conn, &account).await?))
+    Ok(Json(lookup_view(&mut conn, &caller, &account).await?))
 }

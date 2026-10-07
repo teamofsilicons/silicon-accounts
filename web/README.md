@@ -9,10 +9,10 @@ developer.teamofsilicons.com (`developer/` in this repository, its own Next.js a
 dock's Developer item, the landing page's footer and the apps page lead to `developer_url` from `GET /v1/meta`, and
 `/developer[/*]` redirects there (see Topology).
 
-> **e2e suites paused, out of date with v2.** `e2e/` and the areas' Playwright checks
-> (`components/*/checks.ts`) were written for the v1 hosted steps (requirements, consent), login hints and the developer
-> pages that moved to the developer site. tsconfig.json and eslint skip them (one line each) until they are rewritten;
-> `pnpm screens` is current.
+> **The areas' Playwright checks are paused, out of date with v2.** `components/*/checks.ts` were written for the v1
+> hosted steps (requirements, consent), login hints and the developer pages that moved to the developer site;
+> tsconfig.json and eslint skip them (one line each) until they are rewritten. The end-to-end walk (`e2e/`) is current
+> with v2 and type-checked and linted with the rest of the site; `pnpm screens` is current.
 
 Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Arc UI installed with the shadcn
 CLI, TanStack Query for data. The product contract is `understanding/UNDERSTANDING.md`; nothing here overrides it.
@@ -208,7 +208,10 @@ bundled with the site). `brandingContrastIssues()` checks text against the 4.5:1
 The server holds only two pairs to 4.5:1 (button text on the primary, text on the page), so the runtime keeps the
 colours it derives from the primary readable itself: `--accent-ink` (links, and the words of soft and outline buttons)
 reads at 4.5:1 on the page, the card and the tint a soft or hovered outline button lays under it, and `--accent-line`
-(an outline button's edge) at 3:1 on the page and the card. Each is the theme's usual colour (light: the primary;
+(an outline button's edge) at 3:1 on the page and the card, and `--accent-strong` (an info badge's words on the
+accent tint, the active tab, a hovered link) at 4.5:1 on that tint over the card and the page, on a hovered badge's
+tint and on the page and the card (`accentStrong`: the default dark palette's #5383C9 was 2.9:1 on its tint #313C4A;
+it is #85A7D9 now, 4.55:1; `lib/branding/apply.test.ts`). Each is the theme's usual colour (light: the primary;
 dark: the primary half-way to the text colour) whenever that already reads, so those palettes look exactly as chosen;
 otherwise it moves toward the text colour in 5 % steps just far enough (`legibleTint`, judged in OKLab as the styles
 mix). pixel-studio's #E5007E on its #FFF5FA page (4.25:1) becomes #C40F6D (5.42:1) on outline buttons, and a primary
@@ -302,6 +305,10 @@ All edits are of four kinds, and keep Arc's look and motion:
 | hold-to-confirm | the fill's copy of the label (aria-hidden, clipped away at rest) is drawn by `::before` from `data-text`: as text it doubled the button's words ("Hold to delete your accountHold to delete your account"), which failed WCAG 2.5.3 against its name |
 | command-palette | behaviour: results are not Tab stops (the search field drives them through aria-activedescendant, the arrow keys and Enter); a broken selector had left "No matching actions" unstyled |
 | sortable-data-table, file-dropzone, tabs | squircle: the sort button (no radius in its header cell, a pill on phones), the dropzone's paper sheets and the tab triggers (native only, `data-sq-native`: the sheets draw their lines with `::before`/`::after`, the triggers paint only the focus fill) |
+| dialog, drawer, bottom-sheet | behaviour (web-foundation fix round): closing puts focus back on what opened the layer, Trigger or not (WCAG 2.4.3). Radix returns it only to its own `<Dialog.Trigger>`, and the account site opens its layers from controlled state, so focus fell to `<body>` (Change id, Create a Silicon). `components/arc/lib/return-focus.ts` (`useReturnFocus`) remembers the focused element in an insertion effect when `open` turns true (before an `autoFocus` field or Radix moves focus) and restores it in `onCloseAutoFocus`; a caller's own `onCloseAutoFocus` that calls `preventDefault()` still wins, and focus that already moved on outside the layer stays where it is. The shell's ⌘K palette (`command-menu.tsx`) uses the same hook |
+| command-palette | the "Esc" button is named "Esc, close the command palette" (its visible word was missing from its name, WCAG 2.5.3) with `aria-keyshortcuts`; it, the clear button, the ⌘K and shortcut keys and the result highlight are squircles (`--sq-r` 7 px / 5 px / 8 px) |
+| calendar | keyboard focus (web-foundation fix round): a day takes the hover fill under an inner accent edge, the selected day's disc deepens and takes an inner paper edge, the month arrows and Today their hover fill and an inner accent edge (an arrow that cannot move brightens a little); days of the next and previous month are no longer dimmed below 4.5:1 (they stay choosable, so they keep `--text-muted`) |
+| checkbox | a caller's `aria-describedby` is kept beside the description's id instead of being replaced by it (the hosted details page describes each optional detail's box by the value it would share); "Checkbox" is the fallback name only when neither a label nor `aria-labelledby` names the box |
 
 ## Style guide and screens
 
@@ -333,18 +340,19 @@ export const screens: ScreenSpec[] = [
 
 ## End-to-end walk
 
-**Paused: e2e suites out of date with v2** (the v1 requirements/consent steps, login hints, the developer pages that
-moved to the developer site). `tsconfig.json` (`exclude`) and `eslint.config.mjs` (`globalIgnores`) skip `e2e/` and
-`components/*/checks.ts` until they are rewritten for v2. What follows describes them as they were.
-
-`e2e/` walks every journey of the product in a real browser against a running stack, through this site: a first-party
-sign-up, briefcase's hosted sign-in and dm's "Continue as" with the phone it requires, Google and Apple (managed and
-bring-your-own) through the mock providers, the CLI (device sign-in approved in the browser, `silicon create`, a
-self-created Silicon accepted on /silicons, `login --silicon`, an SLT for remind), OBO and ATA through the fake apps
-(with timings), dirty.csv imported on the developer page and with the CLI and an imported Carbon finishing setup,
-webhooks with valid signatures, branded hosted pages with "Powered by", the embed and the SDK, the shared behaviours
-(leaving unsaved work, Escape in layers, the Combobox, focus states, any-country phones, dark tokens, the 404 of an
-unknown tab), a Silicon's secrets on the account site and connecting Google and Apple.
+`e2e/` walks every journey of the product (UNDERSTANDING.md v2) in a real browser against a running stack: this site,
+the developer site (`developer/`) and accounts-api behind them. The core suite (`e2e/journeys`): a first-party sign-up;
+briefcase's hosted sign-in with its what's-shared page and dm's "Continue as" with its own page adding the phone it
+requires (optional details unticked until ticked); Google and Apple (managed and the apps' own) and the apps' direct
+buttons (the Opening page, email and phone opening on their field); the CLI (device sign-in approved in the browser,
+`silicon create`, a self-created Silicon accepted on /silicons, `login --silicon`, an SLT for remind); OBO and ATA
+through the fake apps (one ATA proof per app, with timings); dirty.csv imported on the developer site (signed in
+through its BFF) and with the CLI, and an imported Carbon finishing setup; webhooks with valid signatures; every page in
+an app's own style with "Powered by", Sign in / Sign up buttons, the embed and the SDK; ledgerly's two-page flow with
+its review (Back, Cancel); the developer site as an owner (a saved title on the hosted page, an ATA proof made and
+revoked on its ATA tab); the shared behaviours (the developer site's unsaved-work guard, Escape in layers, the Combobox,
+focus states, any-country phones, dark tokens, /developer leading to the developer site); a Silicon's secrets on the
+account site; connecting Google and Apple. Other suites live in `e2e/suites/<suite>/`.
 
 ```
 scripts/e2e.sh                 # from the repo root: a fresh isolated stack (production build), every journey, teardown
@@ -356,9 +364,12 @@ pnpm e2e --list
 ```
 
 **`e2e/README.md` is the guide**: suites (`e2e/journeys/*.ts` is the core suite, `e2e/suites/<suite>/*.ts` the
-others, found without editing run.ts), port bases, per-stack site builds, reports (`e2e/.artifacts/<base>/report.json`
-and `report.md`, `e2e/.artifacts/summary.md`), the mock Iris, forwarded addresses and time travel. Each journey
-records checks and fails on console errors, uncaught page errors, CSP refusals and failed requests (`e2e/lib.ts`).
+others, found without editing run.ts), the v2 helpers in `e2e/lib.ts` (the details pages, intents and method buttons,
+the Opening page, the developer site's sign-in through its BFF, single-app ATA proofs), port bases (the developer site
+is base + 5), per-stack builds of both sites, reports (`e2e/.artifacts/<base>/report.json` and `report.md`,
+`e2e/.artifacts/summary.md`), the mock Iris, forwarded addresses and time travel. Each journey records checks and fails
+on console errors, uncaught page errors, CSP refusals and failed requests (`e2e/lib.ts`). `e2e/` is part of
+`pnpm typecheck` and `pnpm lint` (tsconfig.json and eslint skip only `e2e/.artifacts`, the reports).
 
 Two shared files serve the walk: `next.config.ts` builds into `NEXT_DIST_DIR` (default `.next`; a local stack on
 another port builds into `.next-<port>` with a per-directory tsconfig that extends `tsconfig.json`, no type-check
@@ -374,7 +385,7 @@ https Iris is covered by `https:` already). `sdk/build.mjs` writes `public/sdk/v
 - `.screens/`, `public/sdk/`, `.next/`, `.next-*/` (and their `.next-*.tsconfig.json`) are build output and
   git-ignored.
 - `agentRules: false` (next.config.ts): `next dev` never rewrites `AGENTS.md` / `CLAUDE.md`; both are kept by hand.
-- Checks (paused with the e2e suites, see above): `pnpm checks:auth [--base URL | --live URL]` and
+- Checks (paused, see the top of this file): `pnpm checks:auth [--base URL | --live URL]` and
   `pnpm checks:account --live URL [--webkit]` run the areas' Playwright checks (components/auth/checks.ts,
   components/account/checks.ts; the live ones need a scratch database; the account checks sign up Carbons of their
   own through /sign-in, so they need the API's dev outbox, as scripts/dev.sh and scripts/e2e.sh stacks have it). The
@@ -460,3 +471,16 @@ What changed on this site for UNDERSTANDING.md v2 (build spec 06-v2.md):
 - `StepMorph` orders numbered sub-views ("details:0" → "details:1" slides forward, Back slides back);
   `HostedFrame` takes a page's own `layout`.
 
+### Fix round: shared changes (web-foundation, round 1, 2026-10-07)
+
+- **Skip link** (`<SkipLink>` in `components/foundation/layout`, `styles/base.css`): a squircle (`data-sq`, `--sq-r`,
+  `--sq-fill`) instead of `border-radius`; the account shell uses it. A skip link without `data-sq` now has square
+  corners, so every frame should render `<SkipLink href="#…" />`.
+- **Layers return focus** to what opened them (Arc dialog, drawer, bottom sheet and the ⌘K palette; see Local edits).
+- **Branding runtime**: `--accent-strong` reads on the accent tint in any palette (see Branding runtime).
+- **Docs 404 on the server** (`proxy.ts`, `app/(docs)/docs/404`): a `notFound()` below the root layout renders only in
+  the browser in this Next (the HTML is an empty `<html id="__next_error__">`, with or without the shared providers:
+  checked on production builds), so a page load of `/docs/<path>` that is no page and no group's page (lib/docs
+  `findPage` / `isGroup`) is rewritten to `/docs/404` with status 404, which renders the docs' "No page here" inside
+  the docs frame with the theme boot script. The Markdown files, the search index and client-side navigations (RSC
+  requests, where the catch-all's `notFound()` renders as before) pass through.

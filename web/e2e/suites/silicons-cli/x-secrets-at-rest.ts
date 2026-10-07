@@ -33,6 +33,8 @@ const withKey = (env: Env, carbon: Carbon, method: string, path: string, key: st
 export const journey: Journey = {
   name: "silicons-cli-secrets-at-rest",
   title: "only hashes are kept: a Silicon's STKs (generated and chosen, at creation and at rotation, answers kept for retries included), its request token, webhook secrets, SLTs and the tokens it and an app got are in no row of the database and no line of the API's or the site's logs",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     await forgetRateLimits(env, "127.0.0.1");

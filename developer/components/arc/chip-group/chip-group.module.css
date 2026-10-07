@@ -24,6 +24,12 @@
   .chip[aria-pressed="true"]:hover .surface { --sq-stroke: color-mix(in oklab, var(--accent) 60%, var(--border)); --sq-fill: color-mix(in oklab, var(--accent) 16%, var(--surface)); }
 }
 
+/* Silicon Accounts: keyboard focus in fills and edges (Arc's ring is transparent here): an unselected chip takes the
+   hover edge over a muted fill, a selected one deepens its tint, and the words take the text colour. */
+.chip:focus-visible { color: var(--foreground); }
+.chip:focus-visible .surface { --sq-stroke: var(--border-strong); --sq-fill: var(--surface-muted); }
+.chip[aria-pressed="true"]:focus-visible .surface { --sq-stroke: color-mix(in oklab, var(--accent) 70%, var(--border)); --sq-fill: color-mix(in oklab, var(--accent) 20%, var(--surface)); }
+
 /* The overflow chip travels under the chips it reveals, so they seem to come out of it. */
 .chip:not(.more) { z-index: 1; }
 .more { color: var(--text-muted); }

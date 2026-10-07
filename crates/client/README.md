@@ -188,6 +188,24 @@ match event.payload {
 // Dedupe on event.event_id: retries and replays reuse it.
 ```
 
+Failed deliveries can be listed and replayed (same event id, the current URL and secret):
+`app.deliveries(…)`, `app.delivery(id)` and `app.replay(…)` for an app's webhook. A Silicon's own
+webhook has the same calls on its session (`my_webhook_deliveries`, `my_webhook_delivery`,
+`replay_my_webhook`), and so does its custodian's (`silicon_webhook_deliveries`,
+`silicon_webhook_delivery`, `replay_silicon_webhook`, by the Silicon's uuid):
+
+```rust
+use silicon_accounts_client::{DeliveriesQuery, ReplayRequest};
+
+let session = client.with_token(silicon_access_token);
+let failed = session
+    .my_webhook_deliveries(&DeliveriesQuery { status: Some("failed".into()), ..Default::default() })
+    .await?;
+let result = session
+    .replay_my_webhook(&ReplayRequest::Failed { since: None }, Some("replay-1"))
+    .await?; // at most 100 per call: call again while result.extra["remaining"] > 0
+```
+
 ### User base, imports, sign-in setup
 
 ```rust

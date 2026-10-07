@@ -47,6 +47,18 @@ export const DETAIL_LABEL: Record<ContactField | "profile", string> = {
 /** Lower-case names for sentences ("Add your phone number"). */
 const DETAIL_NAME: Record<ContactField, string> = { email: "email address", phone: "phone number", dob: "date of birth", timezone: "timezone" };
 
+/** The same with its article ("Add an email address", "needs a phone number"). */
+const A_DETAIL: Record<ContactField, string> = { email: "an email address", phone: "a phone number", dob: "a date of birth", timezone: "a timezone" };
+
+/**
+ * The first field in `root` the Carbon can type in. PhoneField's country search comes first in the DOM but sits in an
+ * inert row while its list is closed, where focus() does nothing; a leaving morph step is inert too.
+ */
+function firstField(root: HTMLElement | null): HTMLInputElement | null {
+  const inputs = root ? Array.from(root.querySelectorAll<HTMLInputElement>("input:not(:disabled)")) : [];
+  return inputs.find(input => !input.closest("[inert], [aria-hidden='true']")) ?? null;
+}
+
 /** Values as people read them: "Mar 14, 1998", "Kolkata, Asia (UTC+05:30)"; contact values come masked. */
 export function detailValue(field: string, value: string | null): string | null {
   if (value === null) return null;
@@ -195,7 +207,7 @@ function DetailsPage({ flow, ctl, notice, details }: DetailsProps & { details: F
     if (missingRequired.length) {
       // Nothing to ask the server yet: say what is missing and take the Carbon to it.
       setBlocked(`${app} needs ${listOf(missingRequired)} on your account to continue. Add it above.`);
-      adder.current?.querySelector<HTMLInputElement>("input:not(:disabled)")?.focus();
+      firstField(adder.current)?.focus();
       return;
     }
     const share = fields.filter(field => field.mode === "optional" && !field.missing && ticked.has(field.field)).map(field => field.field);
@@ -245,10 +257,10 @@ function DetailsPage({ flow, ctl, notice, details }: DetailsProps & { details: F
       {addKind ? (
         <div ref={adder} className={styles.adder} data-adding={addKind}>
           <div className={styles.adderHead}>
-            <p className={styles.adderTitle}>{addingRequired ? `Add your ${DETAIL_NAME[addKind]}` : `Add a ${DETAIL_NAME[addKind]}`}</p>
+            <p className={styles.adderTitle}>{addingRequired ? `Add your ${DETAIL_NAME[addKind]}` : `Add ${A_DETAIL[addKind]}`}</p>
             <p className={styles.adderText}>
               {addingRequired
-                ? `${app} needs ${addKind === "phone" ? "a phone number" : "an email address"} on your account. We ${addKind === "phone" ? "text" : "email"} a 6 digit code to make sure it is yours.`
+                ? `${app} needs ${A_DETAIL[addKind]} on your account. We ${addKind === "phone" ? "text" : "email"} a 6 digit code to make sure it is yours.`
                 : `It joins your account, ticked to share with ${app} (untick it to keep it to yourself). We ${addKind === "phone" ? "text" : "email"} a 6 digit code to make sure it is yours.`}
             </p>
           </div>
@@ -350,7 +362,7 @@ function DetailRow({ field, isNew, ticked, onToggle, disabled, adding, onAdd }: 
   const value = detailValue(field.field, field.value);
   const required = field.mode === "required";
   const missingText = required ? "Not added yet. Add it below to continue." : "You have not added one, so nothing is shared.";
-  const addButton = onAdd && !adding ? <Button variant="ghost" size="sm" onClick={onAdd} disabled={disabled} aria-label={`Add ${required ? "your" : "a"} ${DETAIL_NAME[field.field]}`}>Add</Button> : null;
+  const addButton = onAdd && !adding ? <Button variant="ghost" size="sm" onClick={onAdd} disabled={disabled} aria-label={required ? `Add your ${DETAIL_NAME[field.field]}` : `Add ${A_DETAIL[field.field]}`}>Add</Button> : null;
   const newBadge = isNew ? <Badge tone="info" size="sm">New</Badge> : null;
   if (required) {
     return (

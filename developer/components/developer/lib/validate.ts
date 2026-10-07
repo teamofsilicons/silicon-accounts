@@ -309,6 +309,17 @@ export function brandingProblems(branding: Branding): Record<string, string> {
   return out;
 }
 
+/**
+ * The edits that choose a background style. The server checks background_image_url whatever the style, and the Pages
+ * tab shows that field only while Image is chosen, so leaving Image drops a URL the server would refuse: a problem in a
+ * field nobody can see must never block saving. A usable URL stays, for coming back to Image.
+ */
+export function backgroundStyleEdits(branding: Pick<Branding, "background_image_url">, style: Branding["background_style"]): Record<string, unknown> {
+  const url = branding.background_image_url?.trim();
+  const unusable = !!url && !!httpsUrlProblem(url, "https://example.com/background.jpg");
+  return style !== "image" && unusable ? { "branding.background_style": style, "branding.background_image_url": null } : { "branding.background_style": style };
+}
+
 /** An app id as Silicon Apps assigns them: `[a-z][a-z0-9-]{1,39}`. */
 export function appIdProblem(raw: string): string | null {
   const value = raw.trim().toLowerCase();

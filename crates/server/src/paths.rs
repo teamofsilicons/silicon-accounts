@@ -81,7 +81,13 @@ pub enum RouteClass {
 /// Body limits (02-api.md: 64 KB default, 2 MB photo, 50 MB imports).
 pub const DEFAULT_BODY_LIMIT: usize = 64 * 1024;
 pub const PHOTO_BODY_LIMIT: usize = 2 * 1024 * 1024;
-pub const IMPORT_BODY_LIMIT: usize = 50 * 1024 * 1024 + 64 * 1024;
+/// The largest import body accepted: the import's own limit (`accounts_apps::imports::MAX_BYTES`,
+/// 50 MB = 52,428,800 bytes). Every 413 of the import route states this number.
+pub const IMPORT_MAX_BYTES: usize = accounts_apps::imports::MAX_BYTES;
+/// How much of an import body is read: [`IMPORT_MAX_BYTES`] plus 64 KB, so a body just over the
+/// limit reaches the import handler, which answers with its own precise 413. Only a read
+/// allowance: never stated to clients.
+pub const IMPORT_BODY_LIMIT: usize = IMPORT_MAX_BYTES + 64 * 1024;
 pub const SYNC_BODY_LIMIT: usize = 5 * 1024 * 1024;
 pub const SIGNIN_CONFIG_BODY_LIMIT: usize = 512 * 1024;
 
@@ -151,6 +157,15 @@ impl RouteClass {
             RouteClass::Import => IMPORT_BODY_LIMIT,
             RouteClass::InternalSync => SYNC_BODY_LIMIT,
             RouteClass::SigninConfig => SIGNIN_CONFIG_BODY_LIMIT,
+        }
+    }
+
+    /// The largest body accepted, as every 413 states it. The same as [`Self::body_limit`] except
+    /// for imports, whose read allowance has 64 KB of slack above the real limit.
+    pub fn stated_limit(self) -> usize {
+        match self {
+            RouteClass::Import => IMPORT_MAX_BYTES,
+            other => other.body_limit(),
         }
     }
 
@@ -299,7 +314,16 @@ mod tests {
         assert_eq!(RouteClass::Default.body_limit(), 65_536);
         assert_eq!(RouteClass::PhotoUpload.body_limit(), 2_097_152);
         assert_eq!(RouteClass::Import.body_limit(), 52_428_800 + 65_536);
+        assert_eq!(RouteClass::Import.stated_limit(), 52_428_800);
         assert_eq!(RouteClass::Import.limit_label(), "50 MB");
+        for class in [
+            RouteClass::Default,
+            RouteClass::PhotoUpload,
+            RouteClass::InternalSync,
+            RouteClass::SigninConfig,
+        ] {
+            assert_eq!(class.stated_limit(), class.body_limit(), "{class:?}");
+        }
         assert_eq!(
             RouteClass::of(&Method::PATCH, "/v1/apps/briefcase/signin-config"),
             RouteClass::SigninConfig

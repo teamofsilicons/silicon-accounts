@@ -8,6 +8,7 @@ import type { Transition } from "motion/react";
 import { X } from "lucide-react";
 import { ESCAPE_LAYER_ATTRIBUTE, layerEscape } from "../lib/escape";
 import { motionTokens } from "../lib/motion-tokens";
+import { useReturnFocus } from "../lib/return-focus";
 import styles from "./dialog.module.css";
 
 /** Mirrors the open state so the content can stay mounted while it animates out, and retarget mid-flight if it is reopened or closed early. */
@@ -40,9 +41,11 @@ function SwapText({ text }: { text: string }) {
   </AnimatePresence>;
 }
 
-export function DialogContent({ title, description, children, className, onPointerDownOutside, onEscapeKeyDown, ...props }: DialogContentProps) {
+export function DialogContent({ title, description, children, className, onPointerDownOutside, onEscapeKeyDown, onOpenAutoFocus, onCloseAutoFocus, ...props }: DialogContentProps) {
   const open = useContext(OpenContext);
   const reduced = useReducedMotion();
+  // Closing puts focus back on what opened the dialog, Trigger or not (lib/return-focus.ts).
+  const returnFocus = useReturnFocus(open, onOpenAutoFocus, onCloseAutoFocus);
   // When the open state last changed. Radix waits for the click before treating a press as outside, and a press on the trigger
   // while the dialog leaves reopens it first, so that press must not close it again.
   const change = useRef({ open, at: 0 });
@@ -53,7 +56,7 @@ export function DialogContent({ title, description, children, className, onPoint
   };
   const classes = [styles.content, className].filter(Boolean).join(" ");
   // Escape inside belongs to an open list, calendar or question first (lib/escape.ts); the next one closes the dialog.
-  const escape = { [ESCAPE_LAYER_ATTRIBUTE]: "", onEscapeKeyDown: layerEscape(onEscapeKeyDown) };
+  const escape = { [ESCAPE_LAYER_ATTRIBUTE]: "", onEscapeKeyDown: layerEscape(onEscapeKeyDown), ...returnFocus };
   const inner = <>
     <div className={styles.header}><div><DialogPrimitive.Title className={styles.title}><SwapText text={title}/></DialogPrimitive.Title>{description ? <DialogPrimitive.Description className={styles.description}><SwapText text={description}/></DialogPrimitive.Description> : null}</div><DialogPrimitive.Close className={styles.close} data-sq="surface" aria-label="Close dialog"><X size={16} strokeWidth={1.75} aria-hidden="true"/></DialogPrimitive.Close></div>
     <div className={styles.body}>{children}</div>

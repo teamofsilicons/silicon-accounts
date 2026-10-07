@@ -19,6 +19,7 @@ use std::path::{Path, PathBuf};
 
 use accounts_core::http::Query;
 use accounts_core::ids::validate_app_id;
+use accounts_core::models::signin_config::validate_origin;
 use accounts_core::{ApiError, ApiResult, AppState, config, repo};
 use axum::Router;
 use axum::body::Body;
@@ -208,12 +209,14 @@ pub async fn frame_ancestors(state: &AppState, app_id: Option<&str>) -> ApiResul
 }
 
 /// Parses each entry as an origin; anything that isn't one is dropped, so nothing but
-/// `scheme://host[:port]` can reach the CSP header.
+/// `scheme://host[:port]` can reach the CSP header. An entry the sign-in setup would refuse
+/// today (a wildcard host like `https://*`, stored before that rule) is dropped too.
 pub fn clean_origins(list: &[String]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for entry in list {
         if let Some(origin) = config::origin_of(entry)
-            && !origin.contains([' ', ';', ',', '\'', '"'])
+            && !origin.contains([' ', ';', ',', '\'', '"', '*'])
+            && validate_origin(&origin).is_ok()
             && !out.contains(&origin)
         {
             out.push(origin);
@@ -298,6 +301,10 @@ mod tests {
             "https://evil.example; script-src *".to_string(),
             "javascript:alert(1)".to_string(),
             "not a url".to_string(),
+            "https://*".to_string(),
+            "https://*:443".to_string(),
+            "https://*.example.com".to_string(),
+            "http://lan.example.com".to_string(),
         ];
         assert_eq!(
             clean_origins(&list),

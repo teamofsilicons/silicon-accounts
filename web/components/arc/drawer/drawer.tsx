@@ -8,6 +8,7 @@ import type { PanInfo, Transition } from "motion/react";
 import { X } from "lucide-react";
 import { ESCAPE_LAYER_ATTRIBUTE, layerEscape } from "../lib/escape";
 import { motionTokens } from "../lib/motion-tokens";
+import { useReturnFocus } from "../lib/return-focus";
 import styles from "./drawer.module.css";
 
 /** Mirrors the open state so the panel can stay mounted while it slides out, retarget mid-flight, and close itself after a drag. */
@@ -78,10 +79,14 @@ export function DrawerContent({
   className,
   onInteractOutside,
   onEscapeKeyDown,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: DrawerContentProps) {
   const drawer = useContext(DrawerContext);
   const reduced = useReducedMotion();
+  // Closing puts focus back on what opened the drawer, Trigger or not (lib/return-focus.ts).
+  const returnFocus = useReturnFocus(drawer?.open, onOpenAutoFocus, onCloseAutoFocus);
   const panelRef = useRef<HTMLDivElement>(null);
   const offset = useMotionValue<number | string>(0);
   const pan = useRef<number | null>(null);
@@ -91,7 +96,7 @@ export function DrawerContent({
   const classes = [styles.content, className].filter(Boolean).join(" ");
   const draggable = drawer !== null && !reduced;
   // Escape inside belongs to an open list, calendar or question first (lib/escape.ts); the next one closes the drawer.
-  const escape = { [ESCAPE_LAYER_ATTRIBUTE]: "", onEscapeKeyDown: layerEscape(onEscapeKeyDown) };
+  const escape = { [ESCAPE_LAYER_ATTRIBUTE]: "", onEscapeKeyDown: layerEscape(onEscapeKeyDown), ...returnFocus };
 
   const panelSize = () => (axis === "x" ? panelRef.current?.offsetWidth : panelRef.current?.offsetHeight) ?? 480;
 

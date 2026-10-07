@@ -263,7 +263,7 @@ function Profile({ silicon }: BodyProps) {
             <button ref={uploadTrigger} data-sq="surface" type="button" className={partStyles.textAction} onClick={() => fileInput.current?.click()} disabled={uploading} aria-label={`Upload a photo for ${id}`}>
               <ImageUp size={14} strokeWidth={1.75} aria-hidden="true" />&nbsp;Upload a photo
             </button>
-            <button ref={photoTrigger} data-sq="surface" type="button" className={partStyles.textAction} aria-label={`Set ${id}'s photo from a link`} aria-expanded={editing === "photo"} aria-controls={editorId} onClick={() => openEditor("photo")}>Use a link</button>
+            <button ref={photoTrigger} data-sq="surface" type="button" className={partStyles.textAction} aria-label={`Use a link for ${id}'s photo`} aria-expanded={editing === "photo"} aria-controls={editorId} onClick={() => openEditor("photo")}>Use a link</button>
             {ownPhoto ? (
               <ConfirmMorph
                 label="Use the default photo"

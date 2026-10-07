@@ -8,10 +8,11 @@ import type { PanInfo, Transition } from "motion/react";
 import { X } from "lucide-react";
 import { ESCAPE_LAYER_ATTRIBUTE, layerEscape } from "../lib/escape";
 import { motionTokens } from "../lib/motion-tokens";
+import { returnFocusTo, useLayerOpener } from "../lib/return-focus";
 import styles from "./drawer.module.css";
 
 /** Mirrors the open state so the panel can stay mounted while it slides out, retarget mid-flight, and close itself after a drag. */
-const DrawerContext = createContext<{ open: boolean; flung: boolean; setOpen: (open: boolean) => void; fling: () => void; openedAt: RefObject<number> } | null>(null);
+const DrawerContext = createContext<{ open: boolean; flung: boolean; setOpen: (open: boolean) => void; fling: () => void; openedAt: RefObject<number>; opener: HTMLElement | null } | null>(null);
 
 export function Drawer({ open: openProp, defaultOpen = false, onOpenChange, ...props }: ComponentPropsWithoutRef<typeof DialogPrimitive.Root>) {
   const [uncontrolled, setUncontrolled] = useState(defaultOpen);
@@ -20,6 +21,8 @@ export function Drawer({ open: openProp, defaultOpen = false, onOpenChange, ...p
   // When the drawer last opened, so a click that reopens it mid-close is not also read as a click outside the leaving panel.
   const openedAt = useRef(0);
   const open = openProp ?? uncontrolled;
+  // What had focus when the drawer opened: focus returns there when it closes (lib/return-focus.ts).
+  const opener = useLayerOpener(open);
   const setOpen = useCallback((next: boolean) => {
     setFlung(false);
     if (next) openedAt.current = performance.now();
@@ -27,7 +30,7 @@ export function Drawer({ open: openProp, defaultOpen = false, onOpenChange, ...p
     onOpenChange?.(next);
   }, [openProp, onOpenChange]);
   const fling = useCallback(() => { setOpen(false); setFlung(true); }, [setOpen]);
-  const value = useMemo(() => ({ open, flung, setOpen, fling, openedAt }), [open, flung, setOpen, fling]);
+  const value = useMemo(() => ({ open, flung, setOpen, fling, openedAt, opener }), [open, flung, setOpen, fling, opener]);
   return <DrawerContext.Provider value={value}><DialogPrimitive.Root {...props} open={open} onOpenChange={setOpen} /></DrawerContext.Provider>;
 }
 
@@ -78,6 +81,7 @@ export function DrawerContent({
   className,
   onInteractOutside,
   onEscapeKeyDown,
+  onCloseAutoFocus,
   ...props
 }: DrawerContentProps) {
   const drawer = useContext(DrawerContext);
@@ -92,6 +96,8 @@ export function DrawerContent({
   const draggable = drawer !== null && !reduced;
   // Escape inside belongs to an open list, calendar or question first (lib/escape.ts); the next one closes the drawer.
   const escape = { [ESCAPE_LAYER_ATTRIBUTE]: "", onEscapeKeyDown: layerEscape(onEscapeKeyDown) };
+  // Opened from plain state (no Trigger), Radix would leave focus on <body>: it goes back to what opened the drawer.
+  const closeFocus = returnFocusTo(drawer?.opener ?? null, onCloseAutoFocus);
 
   const panelSize = () => (axis === "x" ? panelRef.current?.offsetWidth : panelRef.current?.offsetHeight) ?? 480;
 
@@ -140,7 +146,7 @@ export function DrawerContent({
     return (
       <DialogPrimitive.Portal container={container}>
         <DialogPrimitive.Overlay className={`${styles.overlay} ${styles.keyframes}`} data-contained={container ? "" : undefined} />
-        <DialogPrimitive.Content {...props} {...escape} onInteractOutside={onInteractOutside} data-side={side} data-contained={container ? "" : undefined} className={`${classes} ${styles.keyframes}`}>{inner}</DialogPrimitive.Content>
+        <DialogPrimitive.Content {...props} {...escape} onInteractOutside={onInteractOutside} onCloseAutoFocus={closeFocus} data-side={side} data-contained={container ? "" : undefined} className={`${classes} ${styles.keyframes}`}>{inner}</DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     );
   }
@@ -163,6 +169,7 @@ export function DrawerContent({
           <DialogPrimitive.Content
             {...props}
             {...escape}
+            onCloseAutoFocus={closeFocus}
             asChild
             forceMount
             // Radix reads a click outside on click, so the press that reopens a closing drawer would dismiss it again.

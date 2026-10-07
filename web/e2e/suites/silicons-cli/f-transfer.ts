@@ -27,7 +27,7 @@ import {
 
 export const journey: Journey = {
   name: "silicons-cli-transfer",
-  title: "a custodian transfers a Silicon with the CLI: refusals (self, a Silicon, unknown, not yours, one at a time), cancel, decline, then accept on the site: custody moves, apps and the Silicon are told, every step is in the histories; transfers expire after 14 days",
+  title: "a custodian transfers a Silicon with the CLI: refusals (self, a Silicon, unknown, not yours, one at a time), cancel, decline, then accept on the site: custody moves, apps and the Silicon are told, every step is in the histories; transfers expire after 14 days; a transfer accepted with `accounts custodian accept` moves it back",
   async run(ctx) {
     const { env, results, browser } = ctx;
     await forgetRateLimits(env, "127.0.0.1");
@@ -164,14 +164,32 @@ export const journey: Journey = {
     const unchanged = await accounts(env, ["whoami", "--json"], { home: homeS });
     results.check("…and the Silicon stays with its custodian", obj(unchanged.json?.custodian).id === to.id, said(unchanged));
     const anew = await accounts(env, ["silicon", "transfer", sid, "--to", from.id, "--json"], { home: homeTo });
+    const anewId = str(anew.json?.id);
     results.check("a new transfer can be sent after the expired one", anew.code === 0 && anew.json?.status === "pending", said(anew));
-    await accounts(env, ["silicon", "cancel-transfer", sid, "--json"], { home: homeTo });
 
-    // A custodian can't delete their account while a Silicon is in their care.
+    // A custodian can't delete their account while a Silicon is in their care (a transfer pending changes nothing).
     const deletion = await accounts(env, ["delete-account", "--confirm", to.id, "--json"], { home: homeTo });
     results.check("the custodian can't delete their account while custodian (exit 5, custodian_of_silicons)", deletion.code === 5 && cliError(deletion).code === "custodian_of_silicons", said(deletion));
     const alive = await asCarbon<Json>(env, to, "GET", "/v1/me");
     results.check("…the account is still there", alive.status === 200 && obj(alive.body).status === "active");
+
+    // 5. This time the receiving Carbon accepts with the CLI (`accounts custodian accept`): custody moves back.
+    const backAt = Date.now();
+    const acceptedCli = await accounts(env, ["custodian", "accept", anewId, "--json"], { home: homeFrom });
+    const backTo = await accounts(env, ["whoami", "--json"], { home: homeS });
+    results.check("`accounts custodian accept <transfer id>`: accepted, and the Silicon's custodian is the first Carbon again", acceptedCli.code === 0 && obj(backTo.json?.custodian).id === from.id, `${said(acceptedCli)} | custodian ${short(backTo.json?.custodian)}`);
+    const backHook = await waitSink(env, key, "silicon.custodian.changed", event => dataOf(event).uuid === uuid && obj(dataOf(event).to).id === from.id);
+    results.check("…the Silicon's webhook got silicon.custodian.changed (to → from)", obj(dataOf(backHook).from).id === to.id, short(backHook?.payload, 240));
+    for (const app of ["remind", "briefcase"]) {
+      const event = await waitApp(env, app, "silicon.custodian_changed", candidate => dataOf(candidate).uuid === uuid && obj(dataOf(candidate).to).id === from.id);
+      results.check(`…${app} got silicon.custodian_changed again (to → from)`, obj(dataOf(event).from).id === to.id, short(event?.payload, 200));
+    }
+    results.metric("CLI accept → apps notified", Date.now() - backAt, "ms");
+    const custodyRows = await sql(env, `select kind, coalesce(from_uuid, ''), to_uuid from custodian_history where silicon_uuid = '${uuid}' order by id`);
+    results.check("custodian_history now has the second transfer too: from the second Carbon back to the first", custodyRows.length === 3 && custodyRows[2]?.[0] === "transfer" && custodyRows[2]?.[1] === to.uuid && custodyRows[2]?.[2] === from.uuid, short(custodyRows));
+    // (Its browser closes first: a page of a deleted account's session would only see 401s.)
     await context.close();
+    const freed = await accounts(env, ["delete-account", "--confirm", to.id, "--json"], { home: homeTo });
+    results.check("…and the second Carbon, custodian of nothing now, can delete its account", freed.code === 0, said(freed));
   },
 };

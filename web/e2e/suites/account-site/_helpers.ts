@@ -1,9 +1,14 @@
 /**
  * Helpers of the account-site suite (web/e2e/suites/account-site): a fresh Carbon in a browser context of its own, an
- * unwatched "probe" page for API calls with that browser's cookies, signing into a fake app through its hosted link,
- * the fake apps' webhook inboxes, a decodable PNG, and the site's own timezone and date words.
+ * unwatched "probe" page for API calls with that browser's cookies, signing into a fake app through its hosted link
+ * (v2: "Continue as", then the app's details pages and review through lib.ts's completeDetails, ticking optional
+ * details or adding a missing email or phone), an app's own view of its user base, connecting Google or Apple on
+ * Sign-in methods, the fake apps' webhook inboxes, a decodable PNG, and the site's own timezone and date words.
  *
- * Every journey of the suite makes its own Carbons (random emails), so journeys never depend on each other.
+ * Every journey of the suite makes its own Carbons (random emails), so journeys never depend on each other. The suite's
+ * journeys: identity card, profile, change-id, emails, phones, identities (Google/Apple), apps, details-added (contacts
+ * added on an app's details pages), proofs, sessions (with the developer site's), activity, delete-blocked, delete,
+ * pages (landmarks, headings, phone widths) and scope (the developer site's links and /developer redirects).
  */
 import { readFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
@@ -11,7 +16,7 @@ import { resolve } from "node:path";
 import { deflateSync } from "node:zlib";
 import type { BrowserContext, Locator, Page } from "@playwright/test";
 import type { Ctx } from "../../context";
-import { E2E_DIR, codeFor, json, lastSeq, newContext, randomIp, signInOnSite, sleep, sql, tag, type Env } from "../../lib";
+import { E2E_DIR, api, appAccount, chooseMockIdentity, codeFor, completeDetails, json, lastSeq, newContext, randomIp, signInOnSite, sleep, sql, startAtApp, tag, type DetailField, type Env, type HostedWalk } from "../../lib";
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Carbons                                                                                                              */
@@ -222,6 +227,12 @@ export function randomPhone(): string {
   return `+1202${exchange}${rest}`;
 }
 
+/**
+ * What a developer-site page logs once its session ended (signed out from the account site, or the account deleted):
+ * any of its BFF calls answers 401 (lib.ts's DEVELOPER_SIGNED_OUT covers only its session probe, /api/accounts/me).
+ */
+export const DEVELOPER_SESSION_ENDED = /status of 401 \(Unauthorized\) @ https?:\/\/[^ ]+\/api\/accounts\//;
+
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Fake apps                                                                                                           */
 /* ------------------------------------------------------------------------------------------------------------------ */
@@ -250,52 +261,88 @@ export function appAuth(appId: string): string {
 
 export const appName = (appId: string): string => FAKE_APPS.find(entry => entry.app_id === appId)?.name ?? appId;
 
-const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\:/]/g, "\\$&");
+export interface AppSignInOptions {
+  /** Optional details to tick on the app's details pages (they start unticked); everything else keeps the page's state. */
+  tick?: DetailField[];
+  untick?: DetailField[];
+  /** A missing email or phone to add on the details pages with a code (a required one must be given). */
+  add?: { email?: string; phone?: string };
+  /** Screenshot prefix for the details pages and the review. */
+  shotName?: string;
+}
+
+export interface AppSignIn {
+  /** What the fake app received (its `<pre id="account">`), or null. */
+  account: Record<string, unknown> | null;
+  /** The details pages and the review as shown (none when the app already had everything it asks for). */
+  walk: HostedWalk;
+}
 
 /**
- * Signs the browser's Carbon into a fake app through the app's hosted link: "Continue as" (the browser is signed in to
- * the account site), the consent ("Share and continue") when the app asks, back at the app. Returns the account the app
- * received (its `<pre id="account">`). `share` names optional details (their labels, e.g. "Timezone") to switch on at
- * the consent; the others stay off, as they start.
+ * Signs the browser's Carbon into a fake app through the app's own "Sign in with Silicon Accounts" link (v2 hosted
+ * pages): "Continue as" (the browser is signed in to the account site), then the app's details pages (UNDERSTANDING.md
+ * "What's shared with the app": required details locked, optional ones unticked until ticked, a missing email or phone
+ * added with a code) and its review when its flow has one, then back at the app. Returns what the app received and
+ * every page shown.
  */
-export async function signIntoApp(env: Env, page: Page, app: string, options: { share?: string[] } = {}): Promise<Record<string, unknown> | null> {
-  await page.goto(`${env.apps}/${app}/`);
-  // Clicked as soon as the page has loaded, as a Carbon would. The app's page also holds the embed iframe and the SDK,
-  // which may still be reading the app's config: leaving cuts those reads off (WebKit cuts them before or after the
-  // answer's headers). The embed and the SDK retry a cut-off read before they report anything, so a click this early
-  // must not leave a browser problem behind (round 1 waited for the page to settle, to step around that defect).
-  await page.locator("#signin-hosted").click();
-  const back = new RegExp(`^${escapeRe(env.apps)}/${app}/(callback|signed-in)`);
-  const continueAs = page.getByRole("button", { name: /^Continue as/ });
-  const share = page.getByRole("button", { name: "Share and continue" });
-  for (let step = 0; step < 6; step++) {
-    if (back.test(page.url())) break;
-    const next = await Promise.race([
-      page.waitForURL(back, { timeout: 30_000 }).then(() => "back" as const),
-      continueAs.waitFor({ timeout: 30_000 }).then(() => "continue" as const),
-      share.waitFor({ timeout: 30_000 }).then(() => "share" as const),
-    ]).catch(() => "timeout" as const);
-    if (next === "back") break;
-    if (next === "timeout") throw new Error(`signing into ${app}: no Continue as, consent or return within 30 s (at ${page.url()})`);
-    await sleep(250);
-    if (next === "continue") {
-      await continueAs.click();
-    } else {
-      for (const label of options.share ?? []) {
-        const toggle = page.getByRole("switch", { name: new RegExp(`^${escapeRe(label)}`) });
-        if ((await toggle.getAttribute("aria-checked", { timeout: 5_000 })) !== "true") await toggle.click();
-      }
-      await share.click();
-    }
-    await sleep(400);
-  }
+export async function signIntoAppSeen(env: Env, page: Page, app: string, options: AppSignInOptions = {}): Promise<AppSignIn> {
+  // Clicked as soon as the app's page has loaded, as a Carbon would (the embed and the SDK on it retry a read the
+  // navigation cut off before they report anything).
+  await startAtApp(env, page, app);
+  // Wait to have left the app's page: completeDetails treats any page of the app as "back at the app".
+  await page.waitForURL(url => url.href.startsWith(env.site), { timeout: 30_000 });
+  const continueAs = page.getByRole("button", { name: /^Continue as / });
+  await continueAs.waitFor({ timeout: 30_000 });
+  await sleep(250);
+  await continueAs.click();
+  const walk = await completeDetails(env, page, app, { tick: options.tick, untick: options.untick, add: options.add, shotName: options.shotName });
   await page.locator("#account").waitFor({ timeout: 30_000 });
-  const raw = await page.locator("#account").innerText().catch(() => "");
-  try {
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+  return { account: await appAccount(page), walk };
+}
+
+/** signIntoAppSeen(), returning only what the app received. */
+export async function signIntoApp(env: Env, page: Page, app: string, options: AppSignInOptions = {}): Promise<Record<string, unknown> | null> {
+  return (await signIntoAppSeen(env, page, app, options)).account;
+}
+
+/** "email:required ticked" … per row of a details page, for check details. */
+export const rowsSeen = (rows: Array<{ field: string; mode: string; missing: boolean; ticked: boolean | null }>): string =>
+  rows.map(row => `${row.field}:${row.mode}${row.missing ? ":missing" : ""}${row.ticked === null ? "" : row.ticked ? ":ticked" : ":unticked"}`).join(" ");
+
+/** A row of an app's user base (GET /v1/apps/{app_id}/users/{uuid}, as the app itself reads it). */
+export interface UserBaseRow {
+  uuid: string;
+  membership_id: string;
+  status: string;
+  display_name: string | null;
+  id?: string | null;
+  email: string | null;
+  phone: string | null;
+  dob?: string | null;
+  timezone?: string | null;
+  granted_scopes?: string[];
+  [key: string]: unknown;
+}
+
+/** The app's own view of one member of its user base (with the app's credentials). */
+export async function userBaseRow(ctx: Ctx, app: string, uuid: string): Promise<{ status: number; row: UserBaseRow | null; body: unknown }> {
+  const answer = await api<{ user?: UserBaseRow } & Partial<UserBaseRow>>(ctx, `/v1/apps/${app}/users/${uuid}`, { headers: { authorization: appAuth(app) } });
+  const row = (answer.body?.user ?? (answer.body?.uuid ? answer.body : null)) as UserBaseRow | null;
+  return { status: answer.status, row, body: answer.body };
+}
+
+/**
+ * "Connect Google/Apple" on /sign-in-methods through the mock provider ("Use another account" with this email and
+ * name), back on the page with its outcome: the success status or the refusal alert, as the page words it.
+ */
+export async function connectProvider(env: Env, page: Page, provider: "Google" | "Apple", email: string, name: string): Promise<string> {
+  await page.goto(`${env.site}/sign-in-methods`);
+  await page.getByRole("button", { name: `Connect ${provider}` }).click({ timeout: 30_000 });
+  await chooseMockIdentity(env, page, email, name);
+  await page.waitForURL(url => url.pathname === "/sign-in-methods", { timeout: 30_000 });
+  await page.waitForLoadState("networkidle").catch(() => undefined);
+  // A success is a status (role=status), a refusal an alert (role=alert).
+  return until(async () => (await page.locator('[role="alert"], [role="status"]').allInnerTexts()).join(" | ").replace(/\s+/g, " "), text => text.includes(`${provider} is connected`) || text.includes(`${provider} was not connected`), 10_000);
 }
 
 export interface InboxEvent {

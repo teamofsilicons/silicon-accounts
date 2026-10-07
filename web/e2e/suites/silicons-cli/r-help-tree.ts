@@ -1,5 +1,6 @@
 import type { Journey } from "../../context";
-import { accounts, cliError, freshDir, pool, said, short, str, type Json } from "./_helpers";
+import { json } from "../../lib";
+import { accounts, cliError, freshDir, obj, pool, said, short, str, type Json } from "./_helpers";
 
 /** `accounts silicon webhook set <SILICON> <URL>` → ["silicon", "webhook", "set"]. */
 const pathOf = (command: string) => command.replace(/^accounts /, "").split(" ").filter(word => word && !/^[<[]/.test(word));
@@ -8,7 +9,9 @@ const TOPICS = ["getting-started", "silicons", "custodians", "apps", "proofs", "
 
 export const journey: Journey = {
   name: "silicons-cli-help-tree",
-  title: "the CLI is a tree you can walk with --help: the root shows every command, the bundled docs, environment, exit codes and links; every command's --help works and says what it is for; `help`, `docs`, missing and unknown commands behave",
+  title: "the CLI is a tree you can walk with --help: the root shows every command, the bundled docs, environment, exit codes and links (the account site and the developer platform); every command's --help works and says what it is for; `help`, `docs`, missing and unknown commands behave; `app new` points at the developer platform",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     const home = freshDir();
@@ -36,6 +39,21 @@ export const journey: Journey = {
       `default url ${short(defaultUrl.json)}; links in --help: ${short(siteLinks)}`,
     );
     results.check("…and that updates belong to Silicon Apps (the CLI never updates itself)", root.stdout.includes("Updates are managed by Silicon Apps; this CLI never updates itself."));
+    // UNDERSTANDING.md "Where things live": a Carbon's own account at accounts.…, building apps at developer.….
+    const links = root.stdout.slice(root.stdout.indexOf("Links:"));
+    results.check(
+      "its links name both sites: the account (https://accounts.teamofsilicons.com) and the developer platform (https://developer.teamofsilicons.com, the apps' sign-in setup)",
+      /Account\s+https:\/\/accounts\.teamofsilicons\.com\b/.test(links) && /Developer\s+https:\/\/developer\.teamofsilicons\.com\b/.test(links),
+      short(links.split("\n").slice(0, 7).join(" | "), 400),
+    );
+    // `accounts app new` points at where apps are made and set up, the developer site's address coming from the service.
+    const meta = await accounts(env, ["app", "new", "--no-browser", "--json"], { home });
+    const served = obj((await json<Json>(`${env.site}/v1/meta`)).body);
+    results.check(
+      "`accounts app new --no-browser --json`: Silicon Apps' URL, and the developer platform's from GET /v1/meta (this stack's developer site), nothing opened",
+      meta.code === 0 && meta.json?.developer_url === env.developer && served.developer_url === env.developer && str(meta.json?.silicon_apps_url).startsWith("https://") && meta.json?.opened === false,
+      `${said(meta)} | meta developer_url ${short(served.developer_url)}`,
+    );
     const shortHelp = await local(["-h"]);
     results.check("`-h` is the short form and points at --help for the whole tree", shortHelp.code === 0 && shortHelp.stdout.length < root.stdout.length && shortHelp.stdout.includes("Run `accounts --help` for the whole command tree"), `${shortHelp.stdout.length} vs ${root.stdout.length} chars`);
     const helpJson = await local(["help", "--json"]);
@@ -43,7 +61,8 @@ export const journey: Journey = {
     const version = await local(["--version"]);
     results.check("`accounts --version`", version.code === 0 && /^accounts \d+\.\d+\.\d+/.test(version.stdout.trim()), version.stdout.trim());
 
-    // 2. Every command's --help.
+    // 2. Every command's --help. It says what the command is for: its one-line summary (the tree's "about"), or a longer
+    //    description in its place (clap shows a command's long description with --help and the summary with -h).
     const bad: string[] = [];
     const noExamples: string[] = [];
     const helps = await pool(commands, 8, async entry => ({ entry, run: await local([...pathOf(entry.command), "--help"]) }));
@@ -51,7 +70,17 @@ export const journey: Journey = {
       const path = pathOf(entry.command);
       const usage = `Usage: accounts ${path.join(" ")}`;
       const first = entry.about.split(/[.:(]/)[0]!.trim().slice(0, 40);
-      if (run.code !== 0 || !run.stdout.includes(usage) || !run.stdout.replace(/\s+/g, " ").includes(first)) bad.push(`${path.join(" ")} (exit ${run.code})`);
+      const flat = run.stdout.replace(/\s+/g, " ");
+      let says = flat.includes(first);
+      let why = `exit ${run.code}`;
+      if (!says && run.code === 0 && run.stdout.includes(usage)) {
+        // A long description instead of the summary: -h must show the summary, and --help a description of its own.
+        const brief = await local([...path, "-h"]);
+        const described = run.stdout.slice(0, run.stdout.indexOf("Usage:")).replace(/\s+/g, " ").trim();
+        says = brief.code === 0 && brief.stdout.replace(/\s+/g, " ").includes(first) && described.length >= 40;
+        why = `--help starts "${described.slice(0, 60)}", -h ${brief.code === 0 ? "lacks" : "fails on"} "${first}"`;
+      }
+      if (run.code !== 0 || !run.stdout.includes(usage) || !says) bad.push(`${path.join(" ")} (${why})`);
       if (path.length === 1 && path[0] !== "help" && !run.stdout.includes("Examples:")) noExamples.push(path.join(" "));
     }
     results.check(`every one of the ${commands.length} commands answers --help (exit 0) with its usage and what it is for`, bad.length === 0, short(bad));

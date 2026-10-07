@@ -47,9 +47,10 @@ The receiver checked the signature with `dm`'s secret and answered `200`; from t
 | set by | the app (its credentials) or its owner, `PUT /v1/apps/{app_id}/webhook` | the Silicon (`PUT /v1/me/webhook`) or its custodian (`PUT /v1/me/silicons/{uuid}/webhook`), or at creation (`webhook_url`) |
 | about | every account with a live membership with the app | the Silicon's own account |
 | body | `"app_id": "<the app>"`, `"silicon": null` | `"app_id": null`, `"silicon": "<the Silicon's uuid>"` |
-| deliveries and replay | `GET …/webhook/deliveries`, `POST …/webhook/replay` | retried the same way; no listing or replay endpoint yet |
+| deliveries and replay | the app or its owner: `GET /v1/apps/{app_id}/webhook/deliveries`, `POST /v1/apps/{app_id}/webhook/replay` | the Silicon: `GET /v1/me/webhook/deliveries`, `POST /v1/me/webhook/replay`; its custodian: `GET /v1/me/silicons/{uuid}/webhook/deliveries`, `POST /v1/me/silicons/{uuid}/webhook/replay` |
 
-Both are signed the same way and follow the same retry rules.
+Both are signed the same way, follow the same retry rules and are listed and replayed the same way
+(see [Replay](#replay) for the two differences).
 
 ## Who receives an app event
 
@@ -147,13 +148,17 @@ Some deliveries fail at once, because no retry could succeed: the app removed it
 
 ## Replay
 
-A failed delivery isn't lost: the app (or its owner) replays it with `POST /v1/apps/{app_id}/webhook/replay`, by delivery ids (up to 100, failed or already delivered) or by status (`{"status": "failed", "since": …}`: the oldest 100 per call, queued oldest first; they are still sent in parallel, so keep applying them by version or `occurred_at`). A replay:
+A failed delivery isn't lost: the app (or its owner) replays it with `POST /v1/apps/{app_id}/webhook/replay`, and a Silicon with `POST /v1/me/webhook/replay` (its custodian with `POST /v1/me/silicons/{uuid}/webhook/replay`). Either names delivery ids (up to 100, failed or already delivered) or a status (`{"status": "failed", "since": …}`: the oldest 100 per call, queued oldest first; they are still sent in parallel, so keep applying them by version or `occurred_at`). The deliveries to choose from are listed by `GET …/webhook/deliveries` on the same paths. A replay:
 
 - keeps the `event_id` and the exact payload, so the receiver's duplicate check works;
-- goes to the app's **current** URL, signed with its **current** secret (a moved endpoint or rotated secret is no obstacle);
+- goes to the receiver's **current** URL, signed with its **current** secret (a moved endpoint or rotated secret is no obstacle);
 - gets a fresh 72 hours of retries from the moment of the replay, and adds one to `manual_replays`.
 
-One rule overrides the request: **account data is never replayed to an app that lost access to the account.** If the account removed the app's access, no longer has a membership with it, or was deleted, deliveries that carry account data (`account.updated`, `account.id_changed`, `silicon.custodian_changed`) are skipped with `reason: "membership_inactive"` or `"account_deleted"`, and their detail shows only who they were about (`payload_redacted: true`). The app lost the right to that data when the account left; a replay must not hand it back. Notices that the relationship ended (`membership.signed_out`, `membership.access_removed`, `account.deleted`) and `ping` carry no account data and always replay. In the local run, replaying every failed delivery of `briefcase` after a Carbon removed its access answered `"replayed": ["…access_removed delivery…"], "not_replayable": 1`: the earlier `account.updated` about that Carbon stayed withheld.
+For an app, one rule overrides the request: **account data is never replayed to an app that lost access to the account.** If the account removed the app's access, no longer has a membership with it, or was deleted, deliveries that carry account data (`account.updated`, `account.id_changed`, `silicon.custodian_changed`) are skipped with `reason: "membership_inactive"` or `"account_deleted"`, and their detail shows only who they were about (`payload_redacted: true`). The app lost the right to that data when the account left; a replay must not hand it back. Notices that the relationship ended (`membership.signed_out`, `membership.access_removed`, `account.deleted`) and `ping` carry no account data and always replay. In the local run, replaying every failed delivery of `briefcase` after a Carbon removed its access answered `"replayed": ["…access_removed delivery…"], "not_replayable": 1`: the earlier `account.updated` about that Carbon stayed withheld.
+
+A Silicon's webhook has no such rule: every event on it is about the Silicon itself, so nothing is withheld from the Silicon or its custodian, and a delivery's detail always shows its whole `payload`. It has another one instead: **test pings are never replayed**. A Silicon may queue 10 test pings an hour, and only its newest one is retried, so that the test can't be used to aim signed traffic at someone else's server; replaying old pings would get around both limits. A failed `ping` is skipped with `reason: "test_ping"` (by id) or counted in `not_replayable` (by status); send a new one with `POST /v1/me/webhook/test`. In the local run, after a `silicon.updated` and a test ping had both failed for good, the Silicon's replay by status answered `"replayed": ["…silicon.updated delivery…"], "not_replayable": 1`, and the `silicon.updated` arrived again 0.8 seconds later with its original `event_id`.
+
+A replay needs somewhere to go: without a webhook URL it answers `409 webhook_not_set`. Deliveries that fall due while there is no URL fail at once, saying why in `last_error`, so they are ready to replay once a URL is set again.
 
 ## Ordering
 

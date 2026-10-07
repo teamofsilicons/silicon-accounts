@@ -101,6 +101,25 @@ export function FieldNote({ id, text, tone = "hint", alert }: { id?: string; tex
 }
 
 /**
+ * "Locked. Try again in 0:59." while code entry is paused. The row opens once, as FieldNote's do, and the time then
+ * changes in place: no new note, entrance or announcement every second. It is a timer, which screen readers read when
+ * asked and never announce on each tick; the code field's error (an alert) says once that entry is paused.
+ */
+export function LockNote({ seconds }: { seconds: number | null }) {
+  const reduce = !!useReducedMotion();
+  const open: Transition = reduce ? { duration: 0 } : { height: spring.smooth, opacity: { duration: duration.fast } };
+  return (
+    <AnimatePresence initial={false}>
+      {seconds !== null ? (
+        <motion.span key="lock" className={styles.noteSlot} initial={reduce ? false : { height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0, transition: reduce ? { duration: 0 } : { height: spring.smooth, opacity: { duration: duration.instant } } }} transition={open}>
+          <span className={styles.note} data-tone="status" role="timer">{`Locked. Try again in ${formatCountdown(seconds)}.`}</span>
+        </motion.span>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+/**
  * The signed-in moment: a ring draws around the photo, then a check pops in (the Arc sign-in block's success, with
  * the step's own h1 so the page keeps one heading).
  */
@@ -386,8 +405,8 @@ export interface CodeEntryProps {
 
 /**
  * The 6 digit code: digits pop into their slots and the code is checked as soon as the last one lands. A wrong code
- * shakes the row and says how many tries are left; the tenth locks entry with a live countdown; an expired code asks
- * for a new one. "Resend code" waits for the server's resend time.
+ * shakes the row and says how many tries are left; the tenth locks entry with a countdown (LockNote); an expired code
+ * asks for a new one, and says that it expired. "Resend code" waits for the server's resend time.
  */
 export function CodeEntry({ challenge, verify, resend, label, submitLabel }: CodeEntryProps) {
   const [code, setCode] = useState("");
@@ -466,7 +485,8 @@ export function CodeEntry({ challenge, verify, resend, label, submitLabel }: Cod
     setExpired(false);
   };
 
-  const status = locked ? `Locked. Try again in ${formatCountdown(lockLeft)}.` : timeUp && !error ? "This code expired. Send a new one." : null;
+  /** The code ran out by the clock before the server said anything (a lock says more, and comes first). */
+  const status = !locked && timeUp && !error ? "This code expired. Send a new one." : null;
 
   return (
     <div className={styles.codeEntry}>
@@ -484,6 +504,7 @@ export function CodeEntry({ challenge, verify, resend, label, submitLabel }: Cod
           disabled={locked || pending}
           autoFocus={fine}
         />
+        <LockNote seconds={locked ? lockLeft : null} />
         <FieldNote text={status} tone="status" />
         <Button type="submit" className={styles.wide} loading={pending} disabled={locked}>{submitLabel ?? "Verify"}</Button>
       </form>

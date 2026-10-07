@@ -27,6 +27,8 @@ import {
 export const journey: Journey = {
   name: "silicons-cli-custodian-gone",
   title: "custodians leaving: a Carbon who deletes their account before answering releases the Silicon that named it (silicon.custodian.declined, reason custodian_account_deleted); a custodian deletes its Silicon with the CLI (apps get account.deleted, it can't sign in, its id is held), and only then can delete its own account",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     await forgetRateLimits(env, "127.0.0.1");

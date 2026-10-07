@@ -6,7 +6,9 @@ use accounts_core::http::{AccountAuth, ClientMeta, Json, Path, Query};
 use accounts_core::models::MembershipStatus;
 use accounts_core::repo::memberships;
 use accounts_core::views::{AppSummary, Page};
-use accounts_core::{ApiError, ApiResult, AppState, FIRST_PARTY_APP_ID};
+use accounts_core::{
+    ApiError, ApiResult, AppState, DEVELOPER_APP_ID, FIRST_PARTY_APP_ID, is_first_party_app_id,
+};
 use axum::extract::State;
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -61,8 +63,13 @@ pub(crate) struct MyApp {
     active_sessions: i64,
 }
 
+/// Silicon Accounts' own apps: the account site and CLI (`accounts`) and the developer platform
+/// (`developer`). They are never apps the account signed into.
+const FIRST_PARTY_APPS: [&str; 2] = [FIRST_PARTY_APP_ID, DEVELOPER_APP_ID];
+
 /// `GET /v1/me/apps?limit&cursor&status` → `{"items":[MyApp…],"next_cursor"}`, most recently
-/// used first. The first-party app (the account site and CLI) is not listed.
+/// used first. The first-party apps (the account site and CLI, the developer platform) are not
+/// listed.
 pub(crate) async fn list(
     State(state): State<AppState>,
     me: AccountAuth,
@@ -103,13 +110,13 @@ pub(crate) async fn list(
                 (select count(*) from token_families f where f.account_uuid = m.account_uuid and f.app_id = m.app_id \
                    and f.revoked_at is null and f.expires_at > now()) as active_sessions \
            from memberships m join apps a on a.app_id = m.app_id \
-          where m.account_uuid = $1 and m.app_id <> $2 and ($3::text is null or m.status = $3) \
+          where m.account_uuid = $1 and m.app_id <> all($2) and ($3::text is null or m.status = $3) \
             and (coalesce(m.last_signed_in_at, m.created_at), m.app_id) < ($4, $5) \
           order by coalesce(m.last_signed_in_at, m.created_at) desc, m.app_id desc \
           limit $6",
     )
     .bind(me.uuid())
-    .bind(FIRST_PARTY_APP_ID)
+    .bind(&FIRST_PARTY_APPS[..])
     .bind(status.map(|s| s.as_str()))
     .bind(cursor_at)
     // Without a cursor the bound time is later than any row, so the app id never decides.
@@ -157,10 +164,31 @@ pub(crate) async fn list(
     )))
 }
 
+/// 400 `first_party_app` for Silicon Accounts' own apps (`accounts`, `developer`): they are not
+/// apps the account signed into, so there is no access to remove. What they hold are sessions of
+/// Silicon Accounts itself, which `DELETE /v1/me/sessions/{id}` signs out.
+fn first_party_refusal(app_id: &str) -> ApiError {
+    let refusal = if app_id == DEVELOPER_APP_ID {
+        ApiError::bad_request(
+            "first_party_app",
+            "The developer platform (developer.teamofsilicons.com, app_id 'developer') is part of Silicon Accounts, not an app you signed into, so it has no access to your account to remove.",
+        )
+        .hint("To sign the developer site out, revoke its sign-in with DELETE /v1/me/sessions/{id} (GET /v1/me/sessions lists it with kind developer).")
+    } else {
+        ApiError::bad_request(
+            "first_party_app",
+            "Silicon Accounts itself (the account site and the accounts CLI) can't lose access to your account.",
+        )
+        .hint("To sign out a browser or CLI, revoke it with DELETE /v1/me/sessions/{id} (list them with GET /v1/me/sessions).")
+    };
+    refusal.detail("app_id", app_id)
+}
+
 /// `DELETE /v1/me/apps/{app_id}` → 204. Removes the app's access: its sign-ins (token families)
 /// for this account are revoked, the OBO proofs it issued about this account are revoked, the
 /// membership becomes `access_removed`, and the app gets `membership.access_removed`. Removing
-/// access that is already removed changes nothing (no second webhook).
+/// access that is already removed changes nothing (no second webhook). Silicon Accounts' own apps
+/// are refused (see [`first_party_refusal`]).
 pub(crate) async fn remove_access(
     State(state): State<AppState>,
     me: AccountAuth,
@@ -168,12 +196,8 @@ pub(crate) async fn remove_access(
     Path(app_id): Path<String>,
 ) -> ApiResult<StatusCode> {
     let app_id = app_id.trim().to_string();
-    if app_id == FIRST_PARTY_APP_ID {
-        return Err(ApiError::bad_request(
-            "first_party_app",
-            "Silicon Accounts itself (the account site and the accounts CLI) can't lose access to your account.",
-        )
-        .hint("To sign out a browser or CLI, revoke it with DELETE /v1/me/sessions/{id} (list them with GET /v1/me/sessions)."));
+    if is_first_party_app_id(&app_id) {
+        return Err(first_party_refusal(&app_id));
     }
     let mut tx = state.db.begin().await?;
     let status: Option<MembershipStatus> = sqlx::query_scalar(

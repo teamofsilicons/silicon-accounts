@@ -3,31 +3,9 @@
  * without a code), refused when they belong to someone else, signing in with them, and unlinking them (the email
  * stays, so a later Google sign-in with it is still this account's).
  */
-import type { Page } from "@playwright/test";
 import type { Journey } from "../../context";
-import { newContext, shot, sleep, tag, type Env } from "../../lib";
-import { call, codeOf, confirmMorph, getMe, newCarbon, probePage, until } from "./_helpers";
-
-const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\:/]/g, "\\$&");
-
-/** On the mock provider's chooser: "Use another account" with this email (the mock finds or makes that identity). */
-async function choose(env: Env, page: Page, email: string, name: string): Promise<void> {
-  await page.waitForURL(new RegExp(escapeRe(env.oidc)), { timeout: 30_000 });
-  await page.locator('#new-identity input[name="_auto"]').fill(email);
-  await page.locator('#new-identity input[name="_name"]').fill(name);
-  await page.locator('#new-identity button[data-action="use-another"]').click();
-}
-
-/** "Connect Google/Apple" on /sign-in-methods through the mock provider, back on the page with its outcome alert. */
-async function connect(env: Env, page: Page, provider: "Google" | "Apple", email: string, name: string): Promise<string> {
-  await page.goto(`${env.site}/sign-in-methods`);
-  await page.getByRole("button", { name: `Connect ${provider}` }).click({ timeout: 30_000 });
-  await choose(env, page, email, name);
-  await page.waitForURL(url => url.pathname === "/sign-in-methods", { timeout: 30_000 });
-  await page.waitForLoadState("networkidle").catch(() => undefined);
-  // A success is a status (role=status), a refusal an alert (role=alert).
-  return until(async () => (await page.locator('[role="alert"], [role="status"]').allInnerTexts()).join(" | ").replace(/\s+/g, " "), text => text.includes(`${provider} is connected`) || text.includes(`${provider} was not connected`), 10_000);
-}
+import { chooseMockIdentity, newContext, shot, sleep, tag } from "../../lib";
+import { call, codeOf, confirmMorph, connectProvider as connect, getMe, newCarbon, probePage, until } from "./_helpers";
 
 const identities: Journey = {
   name: "account-site-identities",
@@ -81,7 +59,7 @@ const identities: Journey = {
       results.watch(page, label);
       await page.goto(`${env.site}/sign-in`);
       await page.getByRole("button", { name: "Continue with Google" }).click({ timeout: 30_000 });
-      await choose(env, page, gmail, `Ada Google ${t}`);
+      await chooseMockIdentity(env, page, gmail, `Ada Google ${t}`);
       await page.waitForURL(`${env.site}/`, { timeout: 30_000 });
       const probe = await probePage(env, context);
       const signedIn = await getMe(probe);

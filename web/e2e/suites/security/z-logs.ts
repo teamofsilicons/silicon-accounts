@@ -118,7 +118,7 @@ const atRest: Journey = {
 
 const logs: Journey = {
   name: "security-logs",
-  title: "no secret in the logs: after making every kind of secret (and the ones the suite's other journeys handled), the stack's accounts-api and site logs contain none of them and nothing shaped like one (prefixed tokens, STKs, JWTs, Authorization headers, provider credentials)",
+  title: "no secret in the logs: after making every kind of secret (and the ones the suite's other journeys handled), the stack's accounts-api, account site and developer site logs contain none of them and nothing shaped like one (prefixed tokens, STKs, JWTs, Authorization headers, provider credentials)",
   engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
@@ -177,6 +177,9 @@ const logs: Journey = {
     const apiLog = readFileSync(logPath, "utf8");
     const webLogPath = stackLog(env, "web");
     const webLog = webLogPath ? readFileSync(webLogPath, "utf8") : "";
+    const developerLogPath = stackLog(env, "developer");
+    const developerLog = developerLogPath ? readFileSync(developerLogPath, "utf8") : "";
+    const logFiles: Array<[string, string]> = [["accounts-api.log", apiLog], ["web.log", webLog], ["developer.log", developerLog]];
     const grew = apiLog.length - sizeBefore;
     const requestLines = apiLog.split("\n").filter(line => /route=\/v1\//.test(line)).length;
     results.check("the stack's accounts-api log is being written (this journey's requests are in it)", grew > 0 && requestLines > 20, `${logPath.replace(`${ROOT}/`, "")}: ${apiLog.split("\n").length} lines, ${requestLines} request lines, grew ${grew} bytes during this journey`);
@@ -188,24 +191,24 @@ const logs: Journey = {
     const found: string[] = [];
     for (const { kind, value } of secrets) {
       const pattern = /^\d{6}$/.test(value) ? new RegExp(`(?<![0-9])${value}(?![0-9])`) : new RegExp(escapeRegExp(value));
-      for (const [name, text] of [["accounts-api.log", apiLog], ["web.log", webLog]] as const) {
+      for (const [name, text] of logFiles) {
         const line = text.split("\n").find(entry => pattern.test(entry));
         if (line) found.push(`${kind} in ${name}: ${line.replace(pattern, "<SECRET>").slice(0, 220)}`);
       }
     }
-    results.check(`none of the ${secrets.length} secrets the suite handled appears in the accounts-api or site log (${[...kinds].map(([kind, n]) => `${n} ${kind}`).join(", ")})`, found.length === 0, found.slice(0, 5).join(" | ") || `${secrets.length} secrets, 0 found`);
+    results.check(`none of the ${secrets.length} secrets the suite handled appears in the accounts-api, account site or developer site log (${[...kinds].map(([kind, n]) => `${n} ${kind}`).join(", ")})`, found.length === 0, found.slice(0, 5).join(" | ") || `${secrets.length} secrets, 0 found`);
 
     // 2. Anything shaped like a secret.
     const shapes = secretShapes(JSON.parse(readFileSync(join(ROOT, "testkit/dev-credentials.json"), "utf8")) as Parameters<typeof secretShapes>[0]);
     const shaped: string[] = [];
     for (const [label, pattern] of shapes) {
-      for (const [name, text] of [["accounts-api.log", apiLog], ["web.log", webLog]] as const) {
+      for (const [name, text] of logFiles) {
         const line = text.split("\n").find(entry => pattern.test(entry));
         if (line) shaped.push(`${label} in ${name}: ${line.replace(pattern, "<MATCH>").slice(0, 220)}`);
       }
     }
-    results.check(`nothing shaped like a secret is in the logs (${shapes.length} shapes: prefixed tokens, webhook/app secrets, STKs, JWTs, Authorization headers, Google/Postmark/Twilio credentials, private keys)`, shaped.length === 0, shaped.slice(0, 5).join(" | ") || `${apiLog.length + webLog.length} bytes scanned`);
-    results.metric("log bytes scanned", apiLog.length + webLog.length, "bytes");
+    results.check(`nothing shaped like a secret is in the logs (${shapes.length} shapes: prefixed tokens, webhook/app secrets, STKs, JWTs, Authorization headers, Google/Postmark/Twilio credentials, private keys)`, shaped.length === 0, shaped.slice(0, 5).join(" | ") || `${apiLog.length + webLog.length + developerLog.length} bytes scanned (${developerLogPath ? "with" : "WITHOUT"} the developer site's log)`);
+    results.metric("log bytes scanned", apiLog.length + webLog.length + developerLog.length, "bytes");
     results.metric("secrets checked", secrets.length, "count");
   },
 };

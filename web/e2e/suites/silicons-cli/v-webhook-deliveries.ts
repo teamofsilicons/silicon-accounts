@@ -33,6 +33,8 @@ const skippedOf = (answer: JsonAnswer<Json>) => (Array.isArray(answer.body.skipp
 export const journey: Journey = {
   name: "silicons-cli-webhook-deliveries",
   title: "a Silicon's webhook deliveries follow the app rules: the Silicon and its custodian list and inspect them (attempts, the exact signed body); a delivery its endpoint keeps refusing fails after its 72 hours of retries (time travel) and is replayed, by status or by id, with the same event id, to the webhook's current URL and secret; test pings are never replayed; precise refusals; the CLI can do it too",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   timeoutMs: 8 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;

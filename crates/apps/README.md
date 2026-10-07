@@ -92,6 +92,8 @@ A deleted account stays listed as history: `status: "deleted"` (whatever the mem
 `display_name: "Deleted account"`, the default photo, `id: null` and no email, phone, dob or
 timezone (core keeps the membership row and the account's name; neither is shown). `status=deleted`
 lists them; the other status filters leave them out; `q` finds them only by uuid or external_id.
+Its `external_id` stays shown even after the app imported that external id again for a new
+account (the membership then keeps it in `imported_profile.released_external_id`; see Imports).
 
 ## Imports
 
@@ -117,13 +119,18 @@ its text — or a column name over 200 bytes), `too_many_items` (a JSON array wi
 items, nested ones included). Values of ignored columns aren't limited because they are never
 stored. NUL characters (which `jsonb` refuses) become U+FFFD.
 
-Budgets (`limits.rs`, on core's `rate_limit::peek` / `hit` / weighted `take`): 60 import requests per app per hour (dry runs and refused files count; an
-app at the limit is refused before its body is read, except an Idempotency-Key retry, which still
-gets its stored 202), 2,000,000 rows per app per 24 hours taken in the job's own transaction (dry
-runs count; a refused import costs nothing) → 429 `rate_limited` with `Retry-After` and
-`details.limit` / `details.limit_rows`, `remaining_rows`, `import_rows`; at most 2 bodies read and
-parsed at once per process (a request waits up to 30 s for a slot before reading its body, then
-503 `imports_busy` with `Retry-After: 15`).
+Budgets (`limits.rs`, on core's `rate_limit::peek` / `hit` / weighted `take`): 60 import requests per app per hour, counted when the request gets its import
+slot, before its body is read (dry runs, refused files and uploads that stall or break off count;
+an app at the limit is refused before it waits for a slot; a retry under an Idempotency-Key whose
+import went through is not counted and still gets its stored 202), 2,000,000 rows per app per 24
+hours taken in the job's own transaction (dry runs count; a refused import costs nothing) → 429
+`rate_limited` with `Retry-After` and `details.limit` / `details.limit_rows`, `remaining_rows`,
+`import_rows`; at most 2 bodies read and parsed at once per process and at most 1 per app, so one
+app's uploads (however many, however slow) never keep the other apps from importing (a request
+waits up to 30 s for a slot before reading its body, then 503 `imports_busy` with
+`Retry-After: 15`); a body must average 32 KB/s after its first 10 seconds, or the read stops with
+408 `import_upload_too_slow` (`details.received_bytes`, `min_bytes_per_second`) and the slot is
+free at once.
 
 Per row (`rules.rs`, `engine.rs`), in file order, chunks of 500 rows per transaction:
 trim everything; emails lowercased/validated/de-duplicated (max 10), phones to E.164 with
@@ -139,7 +146,11 @@ an existing member's external_id is only replaced with `update_existing` — oth
 and the row gets `warning external_id_differs`; an empty one is filled in; the account's own data
 is never touched); an account that removed the app's access → `skipped access_removed` (an import
 never adds it back); a second row for the same account → `skipped duplicate_in_file`; an
-external_id used by another member / earlier row → `error external_id_conflict`; otherwise a new
+external_id used by another member / earlier row → `error external_id_conflict` (an external_id
+only a deleted account's membership holds is free again: the row takes it, `info
+external_id_released`, and the deleted membership keeps it as history in
+`imported_profile.released_external_id`, which the user base still shows as its `external_id`,
+because `memberships_external_idx` keeps external ids unique per app); otherwise a new
 `unclaimed` Carbon, handle history `import`, membership `imported` (source `import`, external_id,
 imported_profile = the cleaned row with every email and phone).
 
@@ -160,6 +171,7 @@ unambiguous; ambiguous → warning + default dob), `invalid_timezone` (→ UTC),
 (https only, and never a photo an account uploaded to Silicon Accounts, which would keep someone
 else's removed photo alive → default photo), `unknown_columns`, `extra_fields`, `missing_fields`,
 `display_name_truncated`, `too_many_emails/phones`, `invalid_value`, `external_id_differs`.
+Info: `identifiers_not_attached`, `duplicate_in_file`, `external_id_released`.
 Messages are bounded: at most 5 per kind of invalid list item and row (then one "…and N more"
 summary), quoted values cut to 80 characters, no message over 2,000 characters. Display names
 collapse control characters (quoted newlines) into spaces. Nothing is ever emailed or texted.

@@ -465,7 +465,12 @@ pub fn validate_webhook_url(settings: &Settings, input: &str) -> Result<Url, Str
     if u.scheme() != "https" {
         return Err(format!("'{s}' must use https"));
     }
-    let bare = host.trim_start_matches('[').trim_end_matches(']');
+    // A fully qualified name keeps its trailing dot (`localhost.`, `metadata.google.internal.`)
+    // and resolves to the same host, so it is compared without it.
+    let bare = host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .trim_end_matches('.');
     if bare.eq_ignore_ascii_case("localhost")
         || bare.ends_with(".localhost")
         || bare.ends_with(".internal")
@@ -839,6 +844,16 @@ mod tests {
         assert!(validate_webhook_url(&prod, "https://[2002:a00:1::1]/x").is_err());
         assert!(validate_webhook_url(&prod, "https://[::a00:1]/x").is_err());
         assert!(validate_webhook_url(&prod, "https://localhost/x").is_err());
+        for fqdn in [
+            "https://localhost./hook",
+            "https://app.localhost./hook",
+            "https://metadata.google.internal./computeMetadata/v1/",
+            "https://LOCALHOST../hook",
+        ] {
+            let e = validate_webhook_url(&prod, fqdn).expect_err(fqdn);
+            assert!(e.contains("points at a local host"), "{fqdn}: {e}");
+        }
+        assert!(validate_webhook_url(&prod, "https://hooks.example.com./x").is_ok());
         assert!(validate_webhook_url(&prod, "https://hooks.example.com/x").is_ok());
         assert!(validate_webhook_url(&prod, "https://[2606:4700:4700::1111]/x").is_ok());
     }

@@ -8,7 +8,7 @@
  */
 import type { Journey } from "../../context";
 import { codeFor, lastSeq, newContext, shot, sleep, tag } from "../../lib";
-import { appCredentials, brief, call, callbackOf, errorOf, flowOf, flowStep, pkcePair, randomEmail, remember, signInWithEmail, startFlow, viaSite, Jar, type FlowView, type Reply } from "./_helpers";
+import { advance, appCredentials, brief, call, callbackOf, errorOf, flowOf, flowStep, pkcePair, randomEmail, randomPhone, remember, signInWithEmail, startFlow, viaSite, Jar, type FlowView, type Reply } from "./_helpers";
 
 const notBound = (reply: Reply) => reply.status === 403 && errorOf(reply).code === "flow_not_bound" && !(reply.body as { flow?: unknown } | null)?.flow;
 
@@ -25,7 +25,7 @@ const unescapeHtml = (text: string) =>
 
 export const journey: Journey = {
   name: "security-flow-binding",
-  title: "flow binding: a stolen flow id without the browser's sa_flow cookie (none, another flow's, made up) can't read, drive, verify, continue or collect the code (403 flow_not_bound); sign-up needs the sa_signup cookie; a Google answer and a parked Apple form_post delivered by another browser are discarded and used up; another browser opening the flow page is never sent to the app",
+  title: "flow binding: a stolen flow id without the browser's sa_flow cookie (none, another flow's, made up) can't read, drive, verify, continue, answer the v2 details/review pages or collect the code (403 flow_not_bound); those pages also need the flow account's own session; sign-up needs the sa_signup cookie; a Google answer and a parked Apple form_post delivered by another browser are discarded and used up; another browser opening the flow page is never sent to the app",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const t = viaSite(ctx);
@@ -74,10 +74,41 @@ export const journey: Journey = {
     withoutSignup.delete("sa_signup");
     const noSignupCookie = await flowStep(t, withoutSignup, flowId, "signup", {});
     results.check("the sign-up step without the browser's sa_signup cookie is refused (403 signup_not_bound) even with the flow cookie", noSignupCookie.status === 403 && /signup/.test(errorOf(noSignupCookie).code ?? ""), brief(noSignupCookie));
-    for (let guard = 0; guard < 4 && flow && flow.step !== "complete"; guard++) {
-      const next = flow.step === "signup" ? await flowStep(t, victimJar, flowId, "signup", {}) : await flowStep(t, victimJar, flowId, "consent", { approve: true, optional_scopes: [] });
-      flow = flowOf(next);
+    const signedUp = await flowStep(t, victimJar, flowId, "signup", {});
+    flow = flowOf(signedUp);
+    remember(ctx, "session cookie", victimJar.get("sa_session"));
+
+    // The v2 details page (briefcase: email required, timezone optional): a stolen id can't answer it either, and even
+    // the right flow cookie needs the browser session of the flow's account.
+    const atDetails = flow?.step === "details";
+    const detailsActions: Array<[string, string, unknown]> = [
+      ["continue (sharing the timezone)", "details/continue", { share: ["timezone"] }],
+      ["go back", "details/back", {}],
+      ["approve", "review", { approve: true }],
+      ["cancel", "review", { approve: false }],
+      ["add a phone", "details/add", { phone: randomPhone() }],
+      ["verify a code", "details/verify", { code: "123456" }],
+    ];
+    const answered: string[] = [];
+    for (const [label, jar] of attackers) {
+      for (const [action, step, body] of detailsActions) {
+        const reply = await flowStep(t, jar, flowId, step, body);
+        if (!notBound(reply)) answered.push(`${label}, ${action}: ${brief(reply)}`);
+      }
     }
+    const attackerSession = await signInWithEmail(t, { label: "flowsession" });
+    remember(ctx, "session cookie", attackerSession.jar.get("sa_session"));
+    const otherSession = victimJar.clone();
+    otherSession.set("sa_session", attackerSession.jar.get("sa_session") ?? "");
+    const noSession = victimJar.clone();
+    noSession.delete("sa_session");
+    const asOther = await flowStep(t, otherSession, flowId, "details/continue", { share: [] });
+    const withoutSession = await flowStep(t, noSession, flowId, "details/continue", { share: [] });
+    const cancelAsOther = await flowStep(t, otherSession, flowId, "review", { approve: false });
+    const stillThere = flowOf(await call(`${env.site}/v1/flows/${flowId}`, { jar: victimJar, ip: ctx.ip }));
+    results.check(`on the details page a stolen flow id is refused for all ${detailsActions.length} v2 actions (continue, back, approve, cancel, add a phone, verify) with no cookie, another flow's cookie or a made-up one (${detailsActions.length * attackers.length} × 403 flow_not_bound)`, atDetails && answered.length === 0, `flow at ${flow?.step}; ${answered.join(" | ") || "all refused"}`);
+    results.check("…and with the right flow cookie but another Carbon's session (409 account_changed) or no session (401 session_required) the page can't be continued or cancelled; the flow stays on its details page", asOther.status === 409 && errorOf(asOther).code === "account_changed" && withoutSession.status === 401 && errorOf(withoutSession).code === "session_required" && cancelAsOther.status === 409 && stillThere?.step === "details", `another session ${brief(asOther)}; cancel ${brief(cancelAsOther)}; no session ${brief(withoutSession)}; flow ${stillThere?.step}`);
+    if (flow && flow.step !== "complete") flow = await advance(t, victimJar, flow);
     const authCode = flow?.redirect_to ? new URL(flow.redirect_to).searchParams.get("code") : null;
     remember(ctx, "code", authCode);
     remember(ctx, "session cookie", victimJar.get("sa_session"));

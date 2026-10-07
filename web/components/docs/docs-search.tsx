@@ -61,7 +61,7 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 function Snippet({ hit }: { hit: SearchHit }) {
-  return <>{hit.snippet.map((part, index) => (part.mark ? <mark key={index}>{part.text}</mark> : <span key={index}>{part.text}</span>))}</>;
+  return <>{hit.snippet.map((part, index) => (part.mark ? <mark key={index} data-sq-native="">{part.text}</mark> : <span key={index}>{part.text}</span>))}</>;
 }
 
 export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] }) {
@@ -168,6 +168,7 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
           onFocus={loadIndex}
         >
           <Search size={16} strokeWidth={1.75} aria-hidden="true" />
+          {/* The button's name at every width: below 640 px it is visually hidden and only the icon shows. */}
           <span className={styles.triggerLabel}>Search the docs</span>
           <kbd className={styles.triggerKey} data-sq="surface">{apple ? "⌘ K" : "Ctrl K"}</kbd>
         </button>
@@ -218,11 +219,11 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
                 onKeyDown={onKeyDown}
               />
               {query ? (
-                <button type="button" className={styles.clear} aria-label="Clear the search" onClick={() => { setQuery(""); setActive(0); inputRef.current?.focus(); }}>
+                <button type="button" className={styles.clear} data-sq="surface" aria-label="Clear the search" onClick={() => { setQuery(""); setActive(0); inputRef.current?.focus(); }}>
                   <X size={15} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               ) : null}
-              <DialogPrimitive.Close className={styles.close}>Esc</DialogPrimitive.Close>
+              <DialogPrimitive.Close className={styles.close} data-sq="surface">Esc</DialogPrimitive.Close>
             </div>
 
             <div className={styles.status} role="status" aria-live="polite">{status}</div>
@@ -242,7 +243,7 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
               <ul ref={listRef} id={`docs-search-${id}-list`} className={styles.results} role="listbox" aria-label={showingSuggestions ? "Suggested pages" : "Search results"}>
                 {showingSuggestions
                   ? suggestions.map((entry, position) => (
-                      <li key={entry.href} id={optionId(position)} role="option" aria-selected={position === activeIndex} data-index={position} className={styles.result} data-active={position === activeIndex ? "" : undefined} onPointerMove={pointerMove(position)} onClick={event => go(entry.href, event)}>
+                      <li key={entry.href} id={optionId(position)} role="option" aria-selected={position === activeIndex} data-index={position} className={styles.result} data-sq="surface" data-active={position === activeIndex ? "" : undefined} onPointerMove={pointerMove(position)} onClick={event => go(entry.href, event)}>
                         <span className={styles.resultIcon} aria-hidden="true"><FileText size={16} strokeWidth={1.75} /></span>
                         <span className={styles.resultText}>
                           <span className={styles.resultTitle}>{entry.title}</span>
@@ -251,7 +252,7 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
                       </li>
                     ))
                   : hits.map((hit, position) => (
-                      <li key={hit.record.u} id={optionId(position)} role="option" aria-selected={position === activeIndex} data-index={position} className={styles.result} data-active={position === activeIndex ? "" : undefined} onPointerMove={pointerMove(position)} onClick={event => go(hit.record.u, event)}>
+                      <li key={hit.record.u} id={optionId(position)} role="option" aria-selected={position === activeIndex} data-index={position} className={styles.result} data-sq="surface" data-active={position === activeIndex ? "" : undefined} onPointerMove={pointerMove(position)} onClick={event => go(hit.record.u, event)}>
                         <span className={styles.resultIcon} aria-hidden="true">{hit.record.h ? <Hash size={16} strokeWidth={1.75} /> : <FileText size={16} strokeWidth={1.75} />}</span>
                         <span className={styles.resultText}>
                           <span className={styles.resultTitle}>{hit.record.h ?? hit.record.t}</span>
@@ -267,9 +268,9 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
             )}
 
             <div className={styles.footer} aria-hidden="true">
-              <span><kbd>↑</kbd><kbd>↓</kbd> to choose</span>
-              <span><kbd><CornerDownLeft size={11} strokeWidth={2} /></kbd> to open</span>
-              <span><kbd>esc</kbd> to close</span>
+              <span><kbd data-sq="surface">↑</kbd><kbd data-sq="surface">↓</kbd> to choose</span>
+              <span><kbd data-sq="surface"><CornerDownLeft size={11} strokeWidth={2} /></kbd> to open</span>
+              <span><kbd data-sq="surface">esc</kbd> to close</span>
               <span className={styles.footerNote}>Searches in your browser</span>
             </div>
           </DialogPrimitive.Content>

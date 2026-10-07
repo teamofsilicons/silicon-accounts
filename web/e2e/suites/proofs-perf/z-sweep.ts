@@ -1,5 +1,5 @@
 /**
- * The hourly proof sweep, part 2 of 2 (part 1: 0-sweep-setup.ts). This file sorts last in the suite: it waits for the
+ * The hourly proof sweep, part 2 of 2 (part 1: 0-sweep-setup.ts); both run only with E2E_PROOFS_SWEEP=1 (_sweep.ts). This file sorts last in the suite: it waits for the
  * stack's first sweep (120 s after accounts-api started, logged as "proof sweep" with what it did), then checks it
  * against the documented maintenance (crates/proofs store::sweep):
  *
@@ -15,11 +15,11 @@
 import type { Journey } from "../../context";
 import { sleep, sql } from "../../lib";
 import { appListing, errorCode, isExactlyInvalid, refreshAs, revokeAs, row, short, verifyAs, type MyProofItem } from "./_helpers";
-import { FIRST_SWEEP_AFTER_MS, SWEEP_KEY, SWEEP_WAIT_MS, sweepLines, type SweepLine, type SweepSetup } from "./_sweep";
+import { FIRST_SWEEP_AFTER_MS, SWEEP_KEY, SWEEP_WAIT_MS, sweepLines, sweepOptIn, type SweepLine, type SweepSetup } from "./_sweep";
 
 export const journey: Journey = {
   name: "proofs-perf-sweep",
-  title: "the stack's first hourly proof sweep: stores the end of the OBO proof whose sign-in ended (sign_in_revoked by system, one audit entry, now in the Carbon's history), deletes proof tokens expired over a day and every token of proofs ended over 30 days, keeps the proofs themselves, younger tokens, the refresh token of a still-live proof and a live proof's used refresh token (reuse still caught)",
+  ...sweepOptIn("the stack's first hourly proof sweep: stores the end of the OBO proof whose sign-in ended (sign_in_revoked by system, one audit entry, now in the Carbon's history), deletes proof tokens expired over a day and every token of proofs ended over 30 days, keeps the proofs themselves, younger tokens, the refresh token of a still-live proof and a live proof's used refresh token (reuse still caught)"),
   needs: [SWEEP_KEY],
   timeoutMs: 8 * 60_000,
   async run(ctx) {

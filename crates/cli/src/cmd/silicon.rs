@@ -5,15 +5,16 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 use silicon_accounts_client::{
-    AccountKind, AccountsClient, CreateSilicon, CustodianRequestStatus, ManagedSilicon,
-    SiliconSelfCreate, UpdateSilicon, WaitEvent, WaitOptions,
+    AccountKind, AccountsClient, CreateSilicon, CustodianRequestStatus, DeliveriesQuery,
+    ManagedSilicon, SiliconSelfCreate, UpdateSilicon, WaitEvent, WaitOptions,
 };
 use time::OffsetDateTime;
 
 use crate::cli::{
-    CustodianArgs, CustodianCommand, OwnWebhookArgs, OwnWebhookCommand, RequestCommand,
-    SiliconArgs, SiliconCommand, SiliconCreateArgs, SiliconWebhookCommand,
+    CustodianArgs, CustodianCommand, DeliveriesFilter, OwnWebhookArgs, OwnWebhookCommand,
+    RequestCommand, SiliconArgs, SiliconCommand, SiliconCreateArgs, SiliconWebhookCommand,
 };
+use crate::cmd::app::{deliveries_outcome, delivery_outcome, replay_outcome, replay_request};
 use crate::ctx::{Ctx, StoredRequest, UrlSource};
 use crate::error::{CliError, CliResult, EXIT_FAILURE, EXIT_INTERRUPTED, EXIT_NOT_FOUND};
 use crate::home;
@@ -135,6 +136,46 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
                 Ok(Outcome::new(
                     json!({ "removed": true, "silicon": managed.silicon.id }),
                     format!("Removed the webhook of {}.", managed.silicon.id),
+                ))
+            }
+            SiliconWebhookCommand::Deliveries { silicon, filter } => {
+                let managed = resolve(ctx, &silicon).await?;
+                let uuid = managed.silicon.uuid.clone();
+                let query = deliveries_query(filter);
+                let page = with_session!(ctx, |s| s.silicon_webhook_deliveries(&uuid, &query))?;
+                Ok(deliveries_outcome(
+                    &page,
+                    &format!(
+                        "accounts silicon webhook replay {} --failed",
+                        managed.silicon.id
+                    ),
+                ))
+            }
+            SiliconWebhookCommand::Delivery { silicon, id } => {
+                let managed = resolve(ctx, &silicon).await?;
+                let uuid = managed.silicon.uuid.clone();
+                let detail = with_session!(ctx, |s| s.silicon_webhook_delivery(&uuid, &id))?;
+                Ok(delivery_outcome(&detail))
+            }
+            SiliconWebhookCommand::Replay { silicon, selection } => {
+                let managed = resolve(ctx, &silicon).await?;
+                let uuid = managed.silicon.uuid.clone();
+                let request =
+                    replay_request(selection.ids, selection.failed, selection.since.as_deref())?;
+                let key = selection
+                    .idempotency_key
+                    .unwrap_or_else(util::idempotency_key);
+                let result = with_session!(ctx, |s| s.replay_silicon_webhook(
+                    &uuid,
+                    &request,
+                    Some(&key)
+                ))?;
+                let id = &managed.silicon.id;
+                Ok(replay_outcome(
+                    &result,
+                    &format!("Webhook of {id}"),
+                    &format!("accounts silicon webhook replay {id} --failed"),
+                    &format!("accounts silicon webhook deliveries {id} --status pending"),
                 ))
             }
         },
@@ -506,7 +547,7 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
         event["event"] = json!("silicon_created");
         ctx.out.essential("", &event);
     } else {
-        println!("{}", summary.trim_end());
+        crate::output::print_stdout(summary.trim_end());
     }
     let interrupted_details = created_json.clone();
     let final_status =
@@ -737,8 +778,10 @@ async fn request_status(
         )
         .await?;
         if !status.is_accepted() {
-            if known.silicon_id.is_empty() {
-                known.silicon_id.clone_from(&status.silicon.id);
+            if known.silicon_id.is_empty()
+                && let Some(id) = &status.silicon.id
+            {
+                known.silicon_id.clone_from(id);
             }
             return Err(decision_error(&status, &known));
         }
@@ -748,11 +791,12 @@ async fn request_status(
             .silicon_request_status(request_id, &known.request_token)
             .await?
     };
-    let silicon_id = if status.silicon.id.is_empty() {
-        known.silicon_id.clone()
-    } else {
-        status.silicon.id.clone()
-    };
+    let silicon_id = status
+        .silicon
+        .id
+        .clone()
+        .filter(|id| !id.is_empty())
+        .unwrap_or_else(|| known.silicon_id.clone());
     let text = kv(&[
         ("request", status.id.clone()),
         ("silicon", format!("{silicon_id} ({})", status.silicon.uuid)),
@@ -810,8 +854,43 @@ pub async fn own_webhook(ctx: &Ctx, args: OwnWebhookArgs) -> CliResult<Outcome> 
                         .map(|id| format!(" (event {id})"))
                         .unwrap_or_default()
                 ),
+            )
+            .next("accounts webhook deliveries", "see whether it arrived"))
+        }
+        OwnWebhookCommand::Deliveries { filter } => {
+            let query = deliveries_query(filter);
+            let page = with_session!(ctx, |s| s.my_webhook_deliveries(&query))?;
+            Ok(deliveries_outcome(
+                &page,
+                "accounts webhook replay --failed",
             ))
         }
+        OwnWebhookCommand::Delivery { id } => {
+            let detail = with_session!(ctx, |s| s.my_webhook_delivery(&id))?;
+            Ok(delivery_outcome(&detail))
+        }
+        OwnWebhookCommand::Replay { selection } => {
+            let request =
+                replay_request(selection.ids, selection.failed, selection.since.as_deref())?;
+            let key = selection
+                .idempotency_key
+                .unwrap_or_else(util::idempotency_key);
+            let result = with_session!(ctx, |s| s.replay_my_webhook(&request, Some(&key)))?;
+            Ok(replay_outcome(
+                &result,
+                &format!("Webhook of {}", session.who()),
+                "accounts webhook replay --failed",
+                "accounts webhook deliveries --status pending",
+            ))
+        }
+    }
+}
+
+fn deliveries_query(filter: DeliveriesFilter) -> DeliveriesQuery {
+    DeliveriesQuery {
+        status: filter.status,
+        limit: filter.limit,
+        cursor: filter.cursor,
     }
 }
 

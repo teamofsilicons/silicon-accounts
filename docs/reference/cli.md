@@ -368,9 +368,18 @@ As `accounts --help` prints it:
                                             into are notified)
     silicon rotate-stk <SILICON>            Rotate a Silicon's STK: the old one stops working and
                                             its sessions are revoked
-    silicon webhook                         Set or remove one of your Silicons' webhook endpoint
+    silicon webhook                         One of your Silicons' webhook: set or remove the
+                                            endpoint, see and replay its deliveries
       silicon webhook set <SILICON> <URL>   Set the endpoint (prints the signing secret once)
       silicon webhook remove <SILICON>      Remove the endpoint
+      silicon webhook deliveries <SILICON>  List the deliveries of the Silicon's webhook, newest
+                                            first
+      silicon webhook delivery <SILICON> <ID>
+                                            Show one delivery of the Silicon's webhook with its
+                                            attempts and the exact payload
+      silicon webhook replay <SILICON> [IDS]
+                                            Re-queue deliveries of the Silicon's webhook (same
+                                            event id, its current URL and secret)
     silicon transfer <SILICON>              Transfer a Silicon to another Carbon (they must accept
                                             within 14 days)
     silicon cancel-transfer <SILICON>       Cancel a pending transfer
@@ -379,11 +388,18 @@ As `accounts --help` prints it:
       silicon request status <REQUEST_ID>   Check (or wait for) the custodian's decision on a
                                             self-created Silicon
   webhook                                   A Silicon's own webhook: get notified about your
-                                            account (custodian decisions, STK rotations, changes)
+                                            account (custodian decisions, STK rotations, changes),
+                                            and see or replay its deliveries
     webhook set <URL>                       Set your webhook endpoint (prints the signing secret
                                             once)
     webhook remove                          Remove your webhook endpoint
     webhook test                            Send a test `ping` delivery
+    webhook deliveries                      List your webhook's deliveries, newest first (failed
+                                            ones can be replayed)
+    webhook delivery <ID>                   Show one delivery with its attempts and the exact
+                                            payload that was signed
+    webhook replay [IDS]                    Re-queue deliveries (same event id, sent to your
+                                            current URL and signed with your current secret)
   custodian                                 Custodian requests addressed to you (Carbons): list,
                                             accept, decline
     custodian requests                      List custodian requests waiting for you
@@ -431,7 +447,8 @@ As `accounts --help` prints it:
                                             list
       app proof obo                         Issue an OBO proof: act at another app on behalf of an
                                             account that consented in your app
-      app proof ata                         Issue an ATA proof that one other app can verify (one proof per app)
+      app proof ata                         Issue an ATA proof that one other app can verify (one
+                                            proof per app)
       app proof verify <TOKEN>              Verify a proof token as this app: exit 0 when valid, 2
                                             when not
       app proof refresh <REFRESH_TOKEN>     Get a new proof token with the proof refresh token (it
@@ -468,7 +485,7 @@ As `accounts --help` prints it:
   docs [TOPIC]                              Read the bundled docs (guides for Silicons, Carbons
                                             and apps)
   help [TOPIC]                              Help for a command (`accounts help silicon create`) or
-                                            a docs topic (`accounts help proofs`)
+                                            a docs topic (`accounts help imports`)
   delete-account                            Delete your account permanently (requires --confirm
                                             <your id>)
 ```
@@ -476,9 +493,9 @@ As `accounts --help` prints it:
 ## Commands
 
 Each section is generated from `accounts <command> --help`. Options marked `[env: …]` also read that
-environment variable; `[default: …]` is the value used when the option is left out. Where `--help`
-is incomplete or wrong today, a note written by hand follows the section and says so
-([`accounts app users`](#accounts-app-users), [`accounts help`](#accounts-help)).
+environment variable; `[default: …]` is the value used when the option is left out. A few sections
+add a note written by hand after the generated part, such as what a deleted account looks like in
+[`accounts app users`](#accounts-app-users).
 
 ### `accounts login`
 
@@ -1102,7 +1119,7 @@ accounts silicon [OPTIONS] <COMMAND>
 | [`update`](#accounts-silicon-update) | Change one of your Silicons' display name, timezone or photo (a URL, or upload a file) |
 | [`id`](#accounts-silicon-id) | Change one of your Silicons' si:id (apps it signed into are notified) |
 | [`rotate-stk`](#accounts-silicon-rotate-stk) | Rotate a Silicon's STK: the old one stops working and its sessions are revoked |
-| [`webhook`](#accounts-silicon-webhook) | Set or remove one of your Silicons' webhook endpoint |
+| [`webhook`](#accounts-silicon-webhook) | One of your Silicons' webhook: set or remove the endpoint, see and replay its deliveries |
 | [`transfer`](#accounts-silicon-transfer) | Transfer a Silicon to another Carbon (they must accept within 14 days) |
 | [`cancel-transfer`](#accounts-silicon-cancel-transfer) | Cancel a pending transfer |
 | [`delete`](#accounts-silicon-delete) | Delete one of your Silicons permanently |
@@ -1121,6 +1138,7 @@ As a Silicon (your custodian must accept):
 Custodian tasks:
   accounts silicon list
   accounts silicon rotate-stk si:scout
+  accounts silicon webhook deliveries si:scout --status failed
   accounts silicon transfer si:scout --to c:shubham
   accounts silicon delete si:scout --confirm si:scout
 ```
@@ -1248,7 +1266,9 @@ printf 'stk-%s' "$(openssl rand -hex 16)" | accounts silicon rotate-stk si:scout
 
 #### `accounts silicon webhook`
 
-Set or remove one of your Silicons' webhook endpoint
+One of your Silicons' webhook: set or remove the endpoint, see and replay its deliveries.
+
+The same webhook the Silicon manages itself with `accounts webhook`. Failed deliveries can be replayed with the same event id, sent to the current URL and signed with the current secret.
 
 ```text
 accounts silicon webhook [OPTIONS] <COMMAND>
@@ -1258,6 +1278,18 @@ accounts silicon webhook [OPTIONS] <COMMAND>
 |---|---|
 | [`set`](#accounts-silicon-webhook-set) | Set the endpoint (prints the signing secret once) |
 | [`remove`](#accounts-silicon-webhook-remove) | Remove the endpoint |
+| [`deliveries`](#accounts-silicon-webhook-deliveries) | List the deliveries of the Silicon's webhook, newest first |
+| [`delivery`](#accounts-silicon-webhook-delivery) | Show one delivery of the Silicon's webhook with its attempts and the exact payload |
+| [`replay`](#accounts-silicon-webhook-replay) | Re-queue deliveries of the Silicon's webhook (same event id, its current URL and secret) |
+
+Examples, as `--help` prints them:
+
+```text
+accounts silicon webhook set si:scout https://scout.example/hooks/accounts
+accounts silicon webhook deliveries si:scout --status failed
+accounts silicon webhook replay si:scout --failed
+accounts silicon webhook remove si:scout
+```
 
 ##### `accounts silicon webhook set`
 
@@ -1283,6 +1315,67 @@ accounts silicon webhook remove [OPTIONS] <SILICON>
 | argument or option | meaning |
 |---|---|
 | `<SILICON>` | si:id or uuid |
+
+##### `accounts silicon webhook deliveries`
+
+List the deliveries of the Silicon's webhook, newest first
+
+```text
+accounts silicon webhook deliveries [OPTIONS] <SILICON>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+| `--status <STATUS>` | Only deliveries with this status: pending, delivered or failed |
+| `--limit <N>` | Rows per page (max 200) |
+| `--cursor <CURSOR>` | Continue from next_cursor |
+
+Examples, as `--help` prints them:
+
+```text
+accounts silicon webhook deliveries si:scout
+accounts silicon webhook deliveries si:scout --status failed --json
+```
+
+##### `accounts silicon webhook delivery`
+
+Show one delivery of the Silicon's webhook with its attempts and the exact payload
+
+```text
+accounts silicon webhook delivery [OPTIONS] <SILICON> <ID>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+| `<ID>` | The delivery id |
+
+##### `accounts silicon webhook replay`
+
+Re-queue deliveries of the Silicon's webhook (same event id, its current URL and secret).
+
+Name the deliveries by id, or replay every failed one with --failed (at most 100 per call; run it again while `remaining` is above 0). Test pings are never replayed: send a new one.
+
+```text
+accounts silicon webhook replay [OPTIONS] <SILICON> [IDS]...
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+| `[IDS]...` | Delivery ids (max 100) |
+| `--failed` | Replay every failed delivery instead (the oldest first, at most 100 per call) |
+| `--since <TIME>` | With --failed: only deliveries created since this RFC 3339 time |
+| `--idempotency-key <KEY>` | Idempotency key; reuse it when retrying so the deliveries are re-queued once [default: random] |
+
+Examples, as `--help` prints them:
+
+```text
+accounts silicon webhook replay si:scout --failed
+accounts silicon webhook replay si:scout --failed --since 2026-10-01T00:00:00Z
+accounts silicon webhook replay si:scout 0192f0c2-… 0192f0c3-…
+```
 
 #### `accounts silicon transfer`
 
@@ -1360,7 +1453,9 @@ accounts silicon request status 0192f0c2-… --wait --timeout 2h
 
 ### `accounts webhook`
 
-A Silicon's own webhook: get notified about your account (custodian decisions, STK rotations, changes)
+A Silicon's own webhook: get notified about your account (custodian decisions, STK rotations, changes), and see or replay its deliveries.
+
+Every event has an event_id (dedupe on it) and is signed with your webhook's secret. Deliveries are retried for 72 hours; failed ones can be replayed with the same event id, sent to your current URL and signed with your current secret. Your custodian can do the same with `accounts silicon webhook`.
 
 ```text
 accounts webhook [OPTIONS] <COMMAND>
@@ -1371,12 +1466,19 @@ accounts webhook [OPTIONS] <COMMAND>
 | [`set`](#accounts-webhook-set) | Set your webhook endpoint (prints the signing secret once) |
 | [`remove`](#accounts-webhook-remove) | Remove your webhook endpoint |
 | [`test`](#accounts-webhook-test) | Send a test `ping` delivery |
+| [`deliveries`](#accounts-webhook-deliveries) | List your webhook's deliveries, newest first (failed ones can be replayed) |
+| [`delivery`](#accounts-webhook-delivery) | Show one delivery with its attempts and the exact payload that was signed |
+| [`replay`](#accounts-webhook-replay) | Re-queue deliveries (same event id, sent to your current URL and signed with your current secret) |
 
 Examples, as `--help` prints them:
 
 ```text
 accounts webhook set https://scout.example/hooks/accounts
 accounts webhook test
+accounts webhook deliveries --status failed
+accounts webhook delivery 0192f0c2-…
+accounts webhook replay --failed
+accounts webhook replay 0192f0c2-… 0192f0c3-…
 accounts webhook remove
 ```
 
@@ -1406,6 +1508,64 @@ Send a test `ping` delivery
 
 ```text
 accounts webhook test [OPTIONS]
+```
+
+#### `accounts webhook deliveries`
+
+List your webhook's deliveries, newest first (failed ones can be replayed)
+
+```text
+accounts webhook deliveries [OPTIONS]
+```
+
+| argument or option | meaning |
+|---|---|
+| `--status <STATUS>` | Only deliveries with this status: pending, delivered or failed |
+| `--limit <N>` | Rows per page (max 200) |
+| `--cursor <CURSOR>` | Continue from next_cursor |
+
+Examples, as `--help` prints them:
+
+```text
+accounts webhook deliveries
+accounts webhook deliveries --status failed --json
+```
+
+#### `accounts webhook delivery`
+
+Show one delivery with its attempts and the exact payload that was signed
+
+```text
+accounts webhook delivery [OPTIONS] <ID>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<ID>` | The delivery id |
+
+#### `accounts webhook replay`
+
+Re-queue deliveries (same event id, sent to your current URL and signed with your current secret).
+
+Name the deliveries by id, or replay every failed one with --failed (at most 100 per call; run it again while `remaining` is above 0). Test pings are never replayed: send a new one with `accounts webhook test`.
+
+```text
+accounts webhook replay [OPTIONS] [IDS]...
+```
+
+| argument or option | meaning |
+|---|---|
+| `[IDS]...` | Delivery ids (max 100) |
+| `--failed` | Replay every failed delivery instead (the oldest first, at most 100 per call) |
+| `--since <TIME>` | With --failed: only deliveries created since this RFC 3339 time |
+| `--idempotency-key <KEY>` | Idempotency key; reuse it when retrying so the deliveries are re-queued once [default: random] |
+
+Examples, as `--help` prints them:
+
+```text
+accounts webhook replay --failed
+accounts webhook replay --failed --since 2026-10-01T00:00:00Z
+accounts webhook replay 0192f0c2-… 0192f0c3-…
 ```
 
 ### `accounts custodian`
@@ -1710,7 +1870,7 @@ accounts app users [OPTIONS]
 | argument or option | meaning |
 |---|---|
 | `--q <TEXT>` | Search id, display name, email, phone and external id |
-| `--status <STATUS>` | active, access_removed or imported |
+| `--status <STATUS>` | active, access_removed, imported or deleted |
 | `--kind <KIND>` | carbon or silicon |
 | `--source <SOURCE>` | signin, slt or import |
 | `--limit <N>` | Rows per page (max 200) |
@@ -1718,10 +1878,9 @@ accounts app users [OPTIONS]
 
 Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
 
-`--status deleted` works too, although `--help` leaves it out. Deleted accounts stay in the user
-base as history, with their uuid, membership id, external id and dates but none of their details
-(the name reads "Deleted account"); `--status deleted` lists only them, and the other statuses
-leave them out ([What apps see](../learn/what-apps-see.md)).
+Deleted accounts stay in the user base as history, with their uuid, membership id, external id and
+dates but none of their details (the name reads "Deleted account"); `--status deleted` lists only
+them, and the other statuses leave them out ([What apps see](../learn/what-apps-see.md)).
 
 ```text
 $ accounts app users --status deleted
@@ -1760,7 +1919,7 @@ accounts app import <COMMAND>
 
 | argument or option | meaning |
 |---|---|
-| `[FILE]` | CSV or JSON file to import (- for stdin) |
+| `[FILE]` | CSV or JSON file to import (- for stdin): at most 50 MB and 100,000 rows |
 | `--format <FORMAT>` | File format [default: from the extension; csv for stdin] [possible values: csv, json] |
 | `--default-country <CC>` | Country for local phone numbers (ISO code, e.g. US) |
 | `--dry-run` | Validate and report without writing anything |
@@ -1797,7 +1956,9 @@ accounts app import rows [OPTIONS] <JOB>
 | argument or option | meaning |
 |---|---|
 | `<JOB>` | The job id |
-| `--outcome <OUTCOME>` | Only rows with this outcome: created, matched, updated, skipped, error |
+| `--outcome <OUTCOME>` | Only rows with this outcome: created, matched, updated, skipped, error or pending |
+| `--level <LEVEL>` | Only rows with a message of this level: error, warning or info |
+| `--code <CODE>` | Only rows with a message of this code, e.g. id_conflict or missing_identifier |
 | `--limit <N>` | Rows per page (max 200) |
 | `--cursor <CURSOR>` | Continue from next_cursor |
 
@@ -1978,15 +2139,14 @@ accounts app proof obo --subject-token "$ACCESS_TOKEN" --to briefcase \
 
 ##### `accounts app proof ata`
 
-Issue an ATA proof that one other app can verify (one proof per app)
+Issue an ATA (app to app) proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An ATA proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Owners can also make, see and revoke ATA proofs on the app's ATA page at developer.teamofsilicons.com.
 
 ```text
 accounts app proof ata [OPTIONS] --to <APP_ID>
 ```
 
-An ATA proof is always for exactly one app: to talk to several apps, issue one proof per app, and
-each app verifies its own. A list in `--to` (`remind,waveform`) exits 2 before anything is sent,
-with one command per app in the hint.
+A list in `--to` (`remind,waveform`) exits 2 before anything is sent, with one command per app in
+the hint.
 
 | argument or option | meaning |
 |---|---|
@@ -2369,7 +2529,9 @@ accounts docs proofs
 
 ### `accounts help`
 
-Help for a command (`accounts help silicon create`) or a docs topic (`accounts help proofs`)
+Help for a command (`accounts help silicon create`) or a docs topic (`accounts help imports`).
+
+A command's help wins when a docs topic has the same name (`accounts help proofs` is the `accounts proofs` command); read that guide with `accounts docs proofs`.
 
 ```text
 accounts help [OPTIONS] [TOPIC]...
@@ -2377,13 +2539,9 @@ accounts help [OPTIONS] [TOPIC]...
 
 | argument or option | meaning |
 |---|---|
-| `[TOPIC]...` | A command path (silicon create) or a docs topic (proofs) |
+| `[TOPIC]...` | A command path (silicon create) or a docs topic (imports); a command wins over a topic of the same name |
 
-> [!NOTE]
-> A command name wins over a docs topic of the same name, so `accounts help proofs` prints the
-> help of `accounts proofs`, not the proofs guide (the description above is wrong about that
-> example). `accounts docs proofs` prints the guide; [Bundled guides](#bundled-guides) lists which
-> topic names are also commands.
+[Bundled guides](#bundled-guides) lists which topic names are also commands.
 
 ### `accounts delete-account`
 

@@ -236,7 +236,10 @@ async fn developer_platform_sign_ins_are_listed_and_can_be_signed_out() {
             .fetch_one(&ctx.state.db)
             .await
             .expect("family");
-    assert!(revoked.is_some(), "the developer platform's refresh token stops working");
+    assert!(
+        revoked.is_some(),
+        "the developer platform's refresh token stops working"
+    );
     assert!(!developer.refresh_token.is_empty());
 
     let r = call(
@@ -245,7 +248,9 @@ async fn developer_platform_sign_ins_are_listed_and_can_be_signed_out() {
     )
     .await;
     assert!(
-        sessions_of(&r.json).iter().all(|s| s["kind"] != "developer"),
+        sessions_of(&r.json)
+            .iter()
+            .all(|s| s["kind"] != "developer"),
         "{}",
         r.json
     );

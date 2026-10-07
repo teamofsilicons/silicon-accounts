@@ -6,12 +6,16 @@
  */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { CommandPalette, type CommandItem } from "@/components/arc/command-palette/command-palette";
+import { useReturnFocus } from "@/components/arc/lib/return-focus";
 import { closeCommandPalette, setCommandPaletteOpen, useCommandPaletteOpen, useCommands } from "@/lib/commands";
 import styles from "./shell.module.css";
 
 export function CommandMenu() {
   const open = useCommandPaletteOpen();
   const commands = useCommands();
+  // The palette opens from the top bar's button, the phone bar's or a key, never a Radix Trigger: closing puts focus
+  // back on what had it (the search field's autoFocus takes focus before Radix would have noted it).
+  const returnFocus = useReturnFocus(open);
   const items: CommandItem[] = commands.map(({ id, label, description, group, keywords, icon, shortcut }) => ({ id, label, description, group, keywords, icon, shortcut }));
   const run = (item: CommandItem) => {
     closeCommandPalette();
@@ -24,7 +28,7 @@ export function CommandMenu() {
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className={styles.paletteOverlay} />
         <div className={styles.palettePositioner}>
-          <DialogPrimitive.Content className={styles.palettePanel} aria-describedby={undefined}>
+          <DialogPrimitive.Content className={styles.palettePanel} aria-describedby={undefined} {...returnFocus}>
             <DialogPrimitive.Title className="sr-only">Search and jump</DialogPrimitive.Title>
             {open ? (
               <CommandPalette items={items} placeholder="Search pages and actions" label="Search pages and actions" autoFocus onClose={closeCommandPalette} onSelect={run} />

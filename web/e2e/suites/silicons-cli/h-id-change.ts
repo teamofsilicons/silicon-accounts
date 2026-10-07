@@ -2,6 +2,7 @@ import type { Journey } from "../../context";
 import { forgetRateLimits, sql, tag } from "../../lib";
 import {
   accounts,
+  appInbox,
   appSltLogin,
   asApp,
   asCarbon,
@@ -12,6 +13,7 @@ import {
   loginCarbon,
   loginSilicon,
   obj,
+  requestStatus,
   said,
   selfCreate,
   setSinkSecret,
@@ -26,7 +28,9 @@ import {
 
 export const journey: Journey = {
   name: "silicons-cli-id-change",
-  title: "the custodian changes a Silicon's si:id with the CLI: apps it signed into get account.id_changed, the Silicon gets silicon.id_changed, the old id is reserved for 10 days (only it can take it back), sign-in follows the new id",
+  title: "the custodian changes a Silicon's si:id with the CLI: apps it signed into get account.id_changed, the Silicon gets silicon.id_changed, the old id is reserved for 10 days (only it can take it back), sign-in follows the new id; the custodian's own c:id change shows everywhere (its Silicon, its list, a request sent to the old c:id)",
+  // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
+  engines: ["chromium"],
   async run(ctx) {
     const { env, results } = ctx;
     await forgetRateLimits(env, "127.0.0.1");
@@ -111,5 +115,32 @@ export const journey: Journey = {
     const history = await accounts(env, ["history", "--kind", "id_change", "--json"], { home: homeS });
     const changes = ((history.json?.items ?? []) as Json[]).map(item => `${str(obj(item.meta).old_id)}→${str(obj(item.meta).new_id)}`);
     results.check("the Silicon's id history: created, changed, changed back", changes.includes(`${oldId}→${newId}`) && changes.includes(`${newId}→${oldId}`) && changes.includes(`→${oldId}`), short(changes));
+
+    // 6. The custodian changes its own c:id. UNDERSTANDING.md: "The custodian is stored by their uuid but shown as their
+    //    c:id everywhere": its Silicon, its list, and a request a Silicon sent to its old c:id all show the new one.
+    const waiting = await selfCreate(ctx, { id: `si:waits-${t}`, display_name: "Waits", custodian: carbon.id });
+    const carbonNew = `c:renamed-${t}`;
+    const renamedCarbon = await accounts(env, ["id", "change", carbonNew, "--json"], { home: homeC });
+    results.check("the custodian changes its own c:id with the CLI (`accounts id change`)", waiting.status === 201 && renamedCarbon.code === 0 && renamedCarbon.json?.id === carbonNew && renamedCarbon.json?.uuid === carbon.uuid, said(renamedCarbon));
+    const silicon = await accounts(env, ["whoami", "--json"], { home: homeS });
+    const listed = ((await accounts(env, ["silicon", "list", "--json"], { home: homeC })).json?.items ?? []) as Json[];
+    const mine = listed.find(item => item.uuid === uuid);
+    results.check(
+      "the Silicon shows its custodian by the new c:id (`accounts whoami` as the Silicon), and so does the custodian's own list",
+      obj(silicon.json?.custodian).id === carbonNew && obj(silicon.json?.custodian).uuid === carbon.uuid && obj(mine?.custodian).id === carbonNew,
+      `whoami ${short(silicon.json?.custodian)}; list ${short(mine?.custodian)}`,
+    );
+    const request = await requestStatus(ctx, waiting.requestId, waiting.requestToken);
+    const offered = ((await accounts(env, ["custodian", "requests", "--json"], { home: homeC })).json?.items ?? []) as Json[];
+    results.check(
+      "a request a Silicon sent to the old c:id (kept by uuid) now names the new c:id, and is still waiting for the same Carbon",
+      request.body.custodian === carbonNew && offered.some(item => item.id === waiting.requestId),
+      `request custodian ${short(request.body.custodian)}; offered ${offered.some(item => item.id === waiting.requestId)}`,
+    );
+    const acceptedNew = await accounts(env, ["custodian", "accept", waiting.requestId, "--json"], { home: homeC });
+    const waitingWhoami = await loginSilicon(env, freshDir(), `si:waits-${t}`, waiting.stk);
+    results.check("…the Carbon accepts it with the CLI, and that Silicon signs in", acceptedNew.code === 0 && waitingWhoami.code === 0, `${said(acceptedNew)} | ${said(waitingWhoami)}`);
+    const appsQuiet = [...(await appInbox(env, "remind")).items, ...(await appInbox(env, "briefcase")).items].filter(event => event.type === "account.id_changed" && dataOf(event).uuid === carbon.uuid);
+    results.check("…the apps the Silicon signed into hear nothing of its custodian's own id (the Carbon never signed into them)", appsQuiet.length === 0, `${appsQuiet.length} events`);
   },
 };

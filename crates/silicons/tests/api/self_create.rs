@@ -314,12 +314,34 @@ async fn self_create_validation_errors_are_precise() {
     ] {
         assert!(fields[f].is_string(), "missing problem for {f}: {fields}");
     }
+    let problem = fields["custodian"].as_str().expect("msg");
+    // It says the si:id is a Silicon, not "use c:someone" (an unrelated account).
     assert!(
-        fields["custodian"]
-            .as_str()
-            .expect("msg")
-            .contains("Carbon")
+        problem.contains("'si:someone' is a Silicon id")
+            && problem.contains("must be a Carbon")
+            && !problem.contains("c:someone"),
+        "{problem}"
     );
+
+    // A phone number can't name a custodian, and is told so (not that a handle can't hold '+').
+    for phone in ["+15005550006", "+1 500 555 0006"] {
+        let r = self_create(
+            &ctx,
+            json!({"id": silicon_id("v"), "display_name": "X", "custodian": phone}),
+        )
+        .await;
+        assert_eq!(r.status, 422, "{phone}: {}", r.json);
+        let problem = r.json["error"]["details"]["fields"]["custodian"]
+            .as_str()
+            .expect("problem");
+        assert!(
+            problem.contains("phone number")
+                && problem.contains("c:id")
+                && problem.contains("email")
+                && !problem.contains("handle"),
+            "{phone}: {problem}"
+        );
+    }
 
     let r = self_create(
         &ctx,

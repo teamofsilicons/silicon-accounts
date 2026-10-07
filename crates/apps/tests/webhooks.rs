@@ -388,6 +388,12 @@ async fn deliveries_detail_and_replay_respect_membership() {
     )
     .await;
     assert_eq!(r.error_code(), Some("invalid_query"));
+    assert_eq!(
+        r.json["error"]["hint"],
+        "Set status to one of pending, delivered, failed, or leave it out.",
+        "{}",
+        r.json
+    );
 
     // Detail: attempts + the exact payload.
     let r = call(
