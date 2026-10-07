@@ -18,7 +18,6 @@ import { ApiError } from "@/lib/api/errors";
 import type { CarbonMe, SiliconCreated } from "@/lib/api/types";
 import { timezoneOptions } from "@/lib/timezones";
 import { describeError } from "../parts/common";
-import { escapeLayer } from "../parts/escape";
 import { IdField, useIdCheck } from "../parts/id-field";
 import { useCreateSiliconOnce } from "../parts/queries";
 import { normalizeStk, stkProblem } from "../parts/stk";
@@ -40,7 +39,7 @@ export function handleFromName(name: string): string {
 export function CreateSilicon({ open, onOpenChange, me, onCreated }: CreateSiliconProps) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent {...escapeLayer} className={styles.panel} title="Create a Silicon" description="You become its custodian. It signs in with its si:id and an STK that is shown to you once.">
+      <DrawerContent className={styles.panel} title="Create a Silicon" description="You become its custodian. It signs in with its si:id and an STK that is shown to you once.">
         {/* Mounted while the drawer is open, so every opening starts with an empty form. */}
         <CreateForm me={me} onCreated={created => { onCreated(created); onOpenChange(false); }} />
       </DrawerContent>

@@ -279,6 +279,11 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
                     400,
                     json!({ "error": "invalid_grant", "error_description": "The refresh token was already used; the whole session was revoked." }),
                 ),
+                Some("authorization_code")
+                    if f.get("code").map(String::as_str) == Some("sac_good") =>
+                {
+                    (200, carbon_tokens())
+                }
                 Some("urn:ietf:params:oauth:grant-type:device_code") => {
                     st.device_polls += 1;
                     if st.device_polls < 2 {

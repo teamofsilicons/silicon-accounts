@@ -230,6 +230,12 @@ export interface PhotoUploaded {
   me: Me;
 }
 
+/** `POST /v1/flows/{id}/signup/photo` (201): the photo picked at sign-up, kept with the sign-up until it finishes. */
+export interface SignupPhoto {
+  pfp_url: string;
+  photo: PhotoInfo;
+}
+
 /** `POST /v1/me/silicons/{uuid}/photo` (201): a custodian's upload for one of its Silicons. */
 export interface SiliconPhotoUploaded {
   pfp_url: string;
@@ -318,7 +324,11 @@ export interface Meta {
   /** Whether managed ("one click") Google and Apple credentials are configured. */
   providers: { google: boolean; apple: boolean };
   delivery: "local" | "providers";
-  /** Where the docs live, once published. Absent today: hide docs links until it is set. */
+  /**
+   * Where the docs live. The server always sends it (ACCOUNTS_DOCS_URL, by default this site's /docs at
+   * https://account.teamofsilicons.com/docs), even before docs are published there: link it only where docs are served
+   * (the landing page lists this site's docs paths in SITE_DOCS_PATHS, empty while there is no app/docs).
+   */
   docs_url?: string | null;
 }
 

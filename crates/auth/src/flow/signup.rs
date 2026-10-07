@@ -390,13 +390,17 @@ pub async fn prefill(
     );
     let seeds = suggest::id_seeds(session.email(), &display_name);
     let id = accounts::suggest_id(conn, AccountKind::Carbon, &seeds).await?;
+    let timezone = suggest::timezone(
+        meta.ip_timezone.as_deref(),
+        flow.extras.browser_timezone.as_deref(),
+    );
+    // "Exactly 18 years ago" is counted from the Carbon's own today: just after midnight in
+    // Kolkata it is still yesterday in UTC.
+    let dob = suggest::dob(accounts_core::timefmt::today_in(&timezone));
     Ok(SignupView {
         id: id.to_string(),
-        timezone: suggest::timezone(
-            meta.ip_timezone.as_deref(),
-            flow.extras.browser_timezone.as_deref(),
-        ),
-        dob: suggest::dob(view::today()),
+        timezone,
+        dob,
         // UNDERSTANDING.md: "`pfp` - our default Carbon profile photo from Iris". The
         // provider's picture is only offered (and stored only when the Carbon picks it); a photo
         // uploaded on this page replaces the default.

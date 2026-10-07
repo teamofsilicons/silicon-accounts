@@ -4,7 +4,8 @@
  *
  *   .sa-brand[data-layout][data-bg][data-corner][data-button-style][data-density]   (BrandingScope)
  *     .sa-brand-stage                     centres the content for the layout
- *       .sa-brand-aside                   split layout: the app's side (logo, name, title, subtitle)
+ *       .sa-brand-aside                   split layout: the app's side (logo, name, title, subtitle), its content in
+ *         .sa-brand-aside-inner           a sticky block at most one viewport tall
  *       .sa-brand-panel                   the sign-in card
  *         .sa-brand-header                logo + app name
  *         .sa-brand-title / .sa-brand-subtitle
@@ -104,14 +105,25 @@
   .sa-brand[data-layout="split"] .sa-brand-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); place-items: stretch; padding: 0; }
   .sa-brand[data-layout="split"] .sa-brand-aside {
     position: relative;
-    display: flex;
+    display: block;
     min-height: 100%;
+    border-right: 1px solid var(--border);
+    background: color-mix(in oklab, var(--accent) 7%, var(--surface));
+  }
+  /* The app's side stays in view while a long step (setting up, what is shared) scrolls the page: its content sticks to
+     the top and is at most one viewport tall, so the logo stays at the top and the hero copy at the foot of the screen
+     instead of falling below the fold. */
+  .sa-brand[data-layout="split"] .sa-brand-aside-inner {
+    position: sticky;
+    top: 0;
+    display: flex;
+    box-sizing: border-box;
+    height: min(100%, 100vh);
+    height: min(100%, 100dvh);
     flex-direction: column;
     justify-content: space-between;
     gap: var(--space-8);
     padding: clamp(32px, 5cqi, 64px);
-    border-right: 1px solid var(--border);
-    background: color-mix(in oklab, var(--accent) 7%, var(--surface));
   }
   .sa-brand[data-layout="split"] .sa-brand-aside .sa-brand-title { font-size: clamp(var(--text-3xl), 3.6cqi, var(--text-4xl)); }
   .sa-brand[data-layout="split"] .sa-brand-panel { align-self: center; justify-self: center; margin: clamp(32px, 5cqi, 64px) var(--space-6); border-color: transparent; background: transparent; box-shadow: none; }

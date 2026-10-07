@@ -54,6 +54,32 @@ pub fn today_utc() -> Date {
     now().date()
 }
 
+/// The calendar date at `at` in the IANA timezone `timezone` (`Asia/Kolkata`, `UTC`…). A name that
+/// is not a timezone gives the UTC date.
+pub fn date_in(at: OffsetDateTime, timezone: &str) -> Date {
+    use chrono::{Offset, TimeZone};
+    let utc_date = at.to_offset(UtcOffset::UTC).date();
+    let Ok(tz) = timezone.trim().parse::<chrono_tz::Tz>() else {
+        return utc_date;
+    };
+    let Some(instant) = chrono::DateTime::from_timestamp(at.unix_timestamp(), 0) else {
+        return utc_date;
+    };
+    let seconds = tz
+        .offset_from_utc_datetime(&instant.naive_utc())
+        .fix()
+        .local_minus_utc();
+    match UtcOffset::from_whole_seconds(seconds) {
+        Ok(offset) => at.to_offset(offset).date(),
+        Err(_) => utc_date,
+    }
+}
+
+/// Today's date for someone in the IANA timezone `timezone` (UTC for a name that is not one).
+pub fn today_in(timezone: &str) -> Date {
+    date_in(now(), timezone)
+}
+
 /// Serde: `OffsetDateTime` as RFC 3339 UTC with milliseconds.
 pub mod rfc3339_ms {
     use serde::{Deserialize, Deserializer, Serializer};
@@ -145,6 +171,22 @@ mod tests {
             format_rfc3339_ms(datetime!(2026-10-06 12:00 UTC)),
             "2026-10-06T12:00:00.000Z"
         );
+    }
+
+    #[test]
+    fn dates_follow_the_timezone() {
+        // 20:34 UTC on 6 October is already 7 October in Kolkata and still 6 October in Los Angeles.
+        let at = datetime!(2026-10-06 20:34 UTC);
+        assert_eq!(date_in(at, "Asia/Kolkata"), date!(2026 - 10 - 07));
+        assert_eq!(date_in(at, "America/Los_Angeles"), date!(2026 - 10 - 06));
+        assert_eq!(date_in(at, "UTC"), date!(2026 - 10 - 06));
+        // Just after midnight UTC it is still the previous day west of Greenwich.
+        let early = datetime!(2026-10-07 00:30 UTC);
+        assert_eq!(date_in(early, "America/New_York"), date!(2026 - 10 - 06));
+        assert_eq!(date_in(early, "Pacific/Kiritimati"), date!(2026 - 10 - 07));
+        // Not a timezone: the UTC date.
+        assert_eq!(date_in(at, "Mars/Olympus_Mons"), date!(2026 - 10 - 06));
+        assert_eq!(date_in(at, ""), date!(2026 - 10 - 06));
     }
 
     #[test]

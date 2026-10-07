@@ -70,8 +70,8 @@
 /* A missing or refused date: the trigger's edge says so, like Arc's invalid inputs. */
 .field button[data-invalid] { --sq-stroke: var(--danger); }
 /*
- * Keyboard focus on the trigger: its edge takes the text colour, as Arc's inputs and the id field do (Arc's date picker
- * trigger shows none). A refused date keeps its danger edge and gains the hover fill.
+ * Keyboard focus on the trigger: its edge takes the text colour, as Arc's inputs, the id field and Arc's own date picker
+ * trigger do. A refused date keeps its danger edge and gains the hover fill.
  */
 .field button[aria-haspopup="dialog"]:focus-visible { --sq-stroke: var(--foreground); }
 .field button[aria-haspopup="dialog"][data-invalid]:focus-visible { --sq-stroke: var(--danger); --sq-fill: var(--surface-muted); }

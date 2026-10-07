@@ -20,15 +20,12 @@ import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { Section, Surface } from "@/components/foundation/layout/layout";
-import { api } from "@/lib/api/endpoints";
+import { ApiError } from "@/lib/api/errors";
 import { proofRevokeReason } from "@/lib/api/labels";
-import type { AppProof, AtaRequest, IssuedProof } from "@/lib/api/types";
+import type { AppProof, IssuedProof } from "@/lib/api/types";
 import { formatDateTime, formatExpiry, formatRelative, plural } from "@/lib/format";
 import { useMyApps } from "@/lib/query/account";
-import { useOwnedApps, useRevokeAppProof } from "@/lib/query/developer";
-import { useIdempotentMutation } from "@/lib/query/idempotency";
-import { useQueryClient } from "@tanstack/react-query";
-import { queryKeys } from "@/lib/query/keys";
+import { useCreateAta, useOwnedApps, useRevokeAppProof } from "@/lib/query/developer";
 import { useAppLookups, type AppLookup, type KnownApp } from "../lib/apps";
 import { useDeveloperApp } from "../lib/context";
 import { PROOF_STATUS, ttlLabel } from "../lib/labels";
@@ -105,7 +102,6 @@ function ProofRow({ proof, appName, logo, lookups, onRevoke }: { proof: AppProof
 export function ProofsTab() {
   const ctx = useDeveloperApp();
   const { appId } = ctx;
-  const client = useQueryClient();
   const [audiences, setAudiences] = useState<string[]>([]);
   const [scopes, setScopes] = useState<string[]>([]);
   const [ttl, setTtl] = useState("1800");
@@ -146,10 +142,10 @@ export function ProofsTab() {
     (status ?? heading)?.focus({ preventScroll: true });
   }, [proofs]);
 
-  const issue = useIdempotentMutation((body: AtaRequest, idempotencyKey) => api.apps.proofs.createAta(appId, body, { idempotencyKey }), {
-    onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.app.root(appId).concat("proofs") }),
-    meta: { toast: false },
-  });
+  // A secret mutation (lib/query useSecretMutation): the proof and refresh tokens are kept only by the reveal below,
+  // never in TanStack's cache. A refusal is shown in place (its own state, since the mutation forgets it).
+  const issue = useCreateAta(appId, { toast: false });
+  const [issueError, setIssueError] = useState<ApiError | null>(null);
   const revoke = useRevokeAppProof(appId);
 
   const audienceProblems = audiences.flatMap(id => {
@@ -159,11 +155,12 @@ export function ProofsTab() {
   const resolving = audiences.some(id => lookups[id]?.state === "loading");
 
   const submit = async () => {
+    setIssueError(null);
     try {
-      const proof = await issue.mutateAsync({ audiences, scopes: scopes.length ? scopes : undefined, access_ttl_seconds: Number(ttl) });
+      const proof = await issue.run({ audiences, scopes: scopes.length ? scopes : undefined, access_ttl_seconds: Number(ttl) });
       setIssued(proof);
-    } catch {
-      // Shown inline from issue.error.
+    } catch (raw) {
+      setIssueError(ApiError.from(raw));
     }
   };
 
@@ -174,7 +171,6 @@ export function ProofsTab() {
   };
   const refreshCurl = `# Run by ${appId} when the token expires; the refresh token rotates every time\ncurl -u ${appId}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -d "{\\"proof_refresh_token\\":\\"$PROOF_REFRESH_TOKEN\\"}" \\\n  ${ctx.publicUrl}/v1/proofs/refresh`;
   const oboCurl = `# Your server, after the account agreed in your app\ncurl -u ${appId}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: 4f1c…' \\\n  -d '{"subject_token":"<their access token for ${appId}>","receiving_app":"briefcase","scopes":["files.write"],"access_ttl_seconds":600}' \\\n  ${ctx.publicUrl}/v1/proofs/obo\n\n# → { "proof_id": "…", "proof_token": "sap_…", "proof_refresh_token": "sapr_…", "expires_at": "…", … }\n# The receiving app verifies it with POST /v1/proofs/verify and its own credentials.`;
-  const issueError = issue.error;
   const filtered = kind !== "all" || status !== "all";
 
   return (
@@ -187,7 +183,7 @@ export function ProofsTab() {
               mono
               placeholder="An app id, like remind"
               value={audiences}
-              onValueChange={value => { setAudiences(value); issue.reset(); }}
+              onValueChange={value => { setAudiences(value); setIssueError(null); }}
               normalize={value => value.trim().toLowerCase()}
               commaAdds
               validate={tag => (tag === appId ? `${appId} is the app issuing the proof; name the apps that receive it.` : appIdProblem(tag))}

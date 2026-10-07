@@ -44,6 +44,10 @@ The rewrite proxy accepts bodies up to 52 MB and waits up to 5 minutes (`experim
 `X-Content-Type-Options: nosniff`, a strict referrer policy. The root layout puts the nonce on the inline theme boot
 script; Next adds it to its own scripts. It skips `/v1`, `/.well-known`, `/_next` and static files.
 
+`proxy.ts` also answers an address under an app's developer pages that names no tab (`/developer/briefcase/bogus`)
+with the site's not-found page and a real `404` (the page itself could only stream a soft 404 under a 200). The tab list
+lives in `lib/developer-tabs.ts` (no icons, so the proxy can import it; `lib/navigation.ts` re-exports it).
+
 The embed page `/embed/v1/buttons` is the one page other sites may frame: `proxy.ts` reads the app's
 `GET /v1/apps/{app_id}/public` and answers `frame-ancestors 'self' <allowed_origins>` (none listed, unknown app or API
 unreachable: `'none'` plus `X-Frame-Options: DENY`). The page renders on a transparent document, reports its height to
@@ -59,11 +63,16 @@ From the repository root, `scripts/dev.sh` runs everything: Postgres on 127.0.0.
 PORT=8590 ACCOUNTS_API_URL=http://127.0.0.1:8589 pnpm -C web dev
 ```
 
+`scripts/dev.sh --prod` builds the site (`pnpm -C web build`, with `ACCOUNTS_API_URL` baked into the rewrites) and runs
+what production runs: the standalone server, `node .next/standalone/server.js`, with `.next/static` and `public/`
+copied beside it (`next start` only remains as a fallback for a build without `output: "standalone"`).
+
 Rust binaries share one target directory: `CARGO_TARGET_DIR=target/integration scripts/dev.sh --no-build` reuses
-binaries that are already built there. Running a second stack on other ports: the API needs `ACCOUNTS_BIND_ADDR`,
-`ACCOUNTS_PUBLIC_URL` (this site's origin, for example `http://localhost:8690`) and `ACCOUNTS_EXTRA_ALLOWED_ORIGINS`;
-start this site with `PORT=8690 ACCOUNTS_API_URL=http://127.0.0.1:8689 pnpm dev`. Next allows one `next dev` per
-project directory at a time.
+binaries that are already built there. A second stack on other ports (`ACCOUNTS_PORT=8690 ACCOUNTS_API_PORT=8689
+MOCK_OIDC_PORT=8691 MOCK_MESSAGING_PORT=8692 FAKE_APPS_PORT=8693 MOCK_IRIS_PORT=8694 ACCOUNTS_DB_NAME=… scripts/dev.sh`)
+builds this site into `.next-8690` (`NEXT_DIST_DIR`), so it never touches the default stack's `.next`; by hand:
+`NEXT_DIST_DIR=.next-8690 PORT=8690 ACCOUNTS_API_URL=http://127.0.0.1:8689 pnpm build` (or `pnpm dev`). Next allows
+one `next dev` per build directory at a time. `scripts/e2e.sh` stacks work the same way (`e2e/README.md`).
 
 ## Who owns what
 
@@ -97,13 +106,33 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
 - **Data.** Never `fetch` the API from components: use the hooks in `lib/query/` (or `api` from `lib/api` inside
   them). Errors are `ApiError` (`status`, `code`, `message`, `hint`, `requestId`, `retryAfter`, `lockedUntil`,
   `redirectTo`). Failed mutations toast message + hint unless `meta: { toast: false }` (show those inline); failed
-  queries render inline. Any 401 marks the session gone and the shell sends the visitor to sign in.
+  queries render inline. Any 401 marks the session gone and the shell sends the visitor to sign in. The account's own
+  lists (apps, proofs, sessions, Silicons, custodian requests, owned apps) are read whole: every page of 200, up to 25
+  pages (`lib/query/pages.ts`: `readEveryPage`, `useWholeList`, `MAX_LIST_PAGES`), so counts and filters never stop
+  at the first page. Toasts read the service's RFC 3339 times and "N seconds from now" as clock times and spans
+  (`readableTimes` and `durationText` in `lib/format.ts`).
 - **Idempotency.** Every create/act endpoint takes an `Idempotency-Key`: `useIdempotentMutation(fn)` or
   `useIdempotencyKey()` keep one key per logical action and input, so retrying never does it twice.
+- **Secrets shown once** (a generated or chosen STK, a webhook signing secret, a proof token): the action is a
+  `useSecretMutation(fn)` (`lib/query/idempotency.ts`): `run(input)` resolves with the answer and resets the mutation,
+  and nothing is cached (gcTime 0), so the page that shows the secret holds the only copy. `useCreateSilicon`,
+  `useRotateStk`, `useSetSiliconWebhook`, `useSetOwnWebhook`, `useSetWebhook`, `useRotateWebhookSecret` and
+  `useCreateAta` are secret mutations.
 - **Telemetry.** Opted in by default; turning it off (settings) sends `X-Accounts-Telemetry: off` on every API call
   from the first request on, and sets the `sa_telemetry=off` cookie for requests without headers.
 - **Navigation.** `lib/navigation.ts` has every path and the dock's sections. Page changes use View Transitions
   (`router.push(href, { transitionTypes: ["page-forward"] })`); the dock morphs its highlight.
+- **Unsaved work** asks before it is lost through the navigation guard (`lib/navigation-guard.ts`): a page registers
+  `useNavigationGuard(dirty ? { protects, confirm } : null)` (or `question` for the shell's own "Leave this page?"
+  dialog, `<LeaveQuestionHost>`), and the shell asks it before every navigation it starts (the dock and its phone
+  sheet, the brand, the command palette, the section number keys, the user menu's Settings, signing out) and before a
+  plain click on any other same-origin link (`useGuardedLinks`, a window capture listener). Links that ask through
+  `confirmNavigation` themselves carry `data-guarded-navigation`. Back/Forward, typed addresses, reloads and closing
+  the tab cannot be asked through it: keep the work for the tab and set `beforeunload`. The section number keys never
+  fire while any dialog, drawer, sheet, menu or listbox is open.
+- **Phone numbers** go through `components/foundation/phone-field` (`PhoneField`): Arc's picker formats the 49
+  countries it lists, and every other number is typed with its country code and sent exactly as typed (the hosted
+  pages and the account site's "Add a phone number" both use it; `guessCountry()` starts it in the visitor's country).
 - **Signing out** waits for the server, then leaves with a full load (`useSignOut()`): no account page stays mounted
   without a session.
 - **Arc rules.** One primary action per surface; destructive actions ask in place (ConfirmMorph) or need a hold;
@@ -113,15 +142,16 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
 
 | File | Hooks |
 | --- | --- |
-| `session.ts` | `useSession`, `useMe`, `useMeta`, `useSignOut`, `useRefreshSession`, `useTelemetryEnabled`, `firstPartySignInUrl`, `beginSignIn`, `consumeSignInReturn`, `safeReturnPath` |
+| `session.ts` | `useSession`, `useMe`, `useMeta`, `useSignOut`, `useRefreshSession`, `useTelemetryEnabled`, the first-party sign-in round trip (`beginSignIn` → /sign-in → `firstPartySignInUrl` → back to /sign-in, which reads `savedSignInReturn` / `forgetSignInReturn`; the home page never reads a code or error from its address), `sameSitePath`, `safeReturnPath` |
 | `account.ts` | profile (`useUpdateProfile`, `useUploadPhoto`, `useRemovePhoto`, `useChangeId`, `useIdAvailability`, `useDeleteAccount`), emails, phones, identities, apps (`useMyApps`, `useRemoveAppAccess`), sessions, history, proofs, the Carbon's own webhook |
 | `silicons.ts` | `useSilicons`, `useSilicon`, create, update, change id, photo, `useRotateStk`, webhook, transfer, delete, custodian requests |
 | `developer.ts` | owned apps, app detail and public config, sign-in config and its history, users, imports and rows, webhook deliveries and replays, proofs (ATA, revoke) |
 | `auth.ts` | `useCreateFlow`, `useFlow`, `useFlowAction`, `useRefreshFlow`, `useDeviceRequest`, `useDecideDevice` |
-| `keys.ts`, `client.ts`, `idempotency.ts` | query keys, the shared client, idempotency helpers |
+| `keys.ts`, `client.ts`, `idempotency.ts`, `pages.ts` | query keys, the shared client, idempotency helpers and `useSecretMutation`, whole lists |
 
 `lib/notify.ts` raises toasts from anywhere (`notify.success`, `notify.error(apiError, title)`, `notify.loading` then
-`notify.update`). `lib/format.ts` formats dates, relative times, phones and scopes; `lib/timezones.ts` lists zones.
+`notify.update`). `lib/format.ts` formats dates, relative times, phones and scopes, and reads the service's times in
+its sentences (`readableTimes`, `durationText`); `lib/timezones.ts` lists zones.
 
 ## Squircles
 
@@ -175,6 +205,11 @@ its own fixed palette, so an app can neither restyle nor hide it.
 `handleCallback`; a script tag with `data-app-id` and `data-redirect-uri` renders the buttons by itself.
 `sdk/methods.ts` (labels, marks, ordering) is shared with the embed page.
 
+The SDK and the embed page both read `GET /v1/apps/{app_id}/public` and try a fetch the browser cut off twice more
+(after 0.5 s and 1.5 s) before they report that Silicon Accounts could not be reached: Safari cancels a page's and its
+frames' requests as soon as the page starts navigating away (before `pagehide`), which used to log a false
+`network_error` on the app's console whenever someone clicked sign-in while the buttons were still loading.
+
 ## Arc UI
 
 Installed with the shadcn CLI from the `@uiarc` registry (`components.json`), every free item: React components with
@@ -184,7 +219,7 @@ animation is `lib/theme.ts`).
 
 ### Local edits
 
-All edits are of three kinds, and keep Arc's behaviour and motion:
+All edits are of four kinds, and keep Arc's look and motion:
 
 - **Squircle:** the element gets `data-sq="surface"` (or `"clip"` for photos and containers whose children paint into
   the corners, or `data-sq-native` where Arc draws a border with `::after`), its `border-radius` becomes `--sq-r`, and
@@ -194,6 +229,9 @@ All edits are of three kinds, and keep Arc's behaviour and motion:
   `--primary-foreground` (Arc fills them with the foreground colour or the accent).
 - **Keyboard focus:** controls Arc left without any visible keyboard position get one, in fills and edges (never
   rings), so every control passes WCAG 2.4.7.
+- **Behaviour** (integration round): keyboard and layer rules Arc got wrong, fixed where they live so no area needs a
+  wrapper: the Combobox follows the WAI-ARIA combobox pattern, Escape inside a layer goes to the open control first,
+  PhoneInput takes a whole number typed after "+", the Timeline announces only news, OTP cells fit narrow containers.
 
 | Component | What changed |
 | --- | --- |
@@ -213,6 +251,12 @@ All edits are of three kinds, and keep Arc's behaviour and motion:
 | theme-switch | the icon-only size sets `--sq-r` |
 | avatar-group, lib/media, blocks/sign-in | wording only: the group's default label is "Members"; sample people and a comment use the site's vocabulary |
 | switch, segmented-control, timeline, inline-edit | keyboard focus (web-account fix round): an off switch's track takes the hover fill and an inner accent edge, an on track's fill deepens a step; the selected segment's highlight takes an accent edge (another segment, the hover ink and a soft fill); a timeline row's button and inline-edit's text take their hover fill on every device |
+| date-picker, user-menu | keyboard focus (integration round): the date picker's trigger edge takes the text colour, as inputs do; the user menu's trigger takes its hover fill and an inner edge |
+| combobox | behaviour: focus alone no longer opens the list (typing, ArrowDown/ArrowUp or a click do), the list closes when focus leaves the field, and the listbox is `tabIndex={-1}` (no Tab stop). The hosted pages' `ComboboxField` wrapper and the account editors' "focus the panel first" workaround are gone |
+| dialog, drawer, bottom-sheet, popover | behaviour: Escape inside the layer goes first to an open Combobox list, DatePicker calendar, InlineEdit being edited or ConfirmMorph question, and only the next Escape closes the layer (`components/arc/lib/escape.ts`: each layer passes its `onEscapeKeyDown` through `layerEscape` and marks its panel `data-escape-layer`). The account area's `parts/escape.ts` spread is gone |
+| phone-input | behaviour: a whole international number typed after "+" (which opens the country search) moves into the number field under its country once it has more digits than a calling code ("+1 202 5…" → United States, 202 5…) |
+| timeline | behaviour: only rows newer than every row shown are fresh (slide in, announced as "New update: …"); older rows added below by "Show older" join quietly |
+| otp-input | the field never grows past its container (`minmax(0, 1fr)`, `min-width: 0` on the row), so six cells shrink at 320 px instead of sticking out |
 
 ## Style guide and screens
 
@@ -242,9 +286,77 @@ export const screens: ScreenSpec[] = [
 ];
 ```
 
+## End-to-end walk
+
+`e2e/` walks every journey of the product in a real browser against a running stack, through this site: a first-party
+sign-up, briefcase's hosted sign-in and dm's "Continue as" with the phone it requires, Google and Apple (managed and
+bring-your-own) through the mock providers, the CLI (device sign-in approved in the browser, `silicon create`, a
+self-created Silicon accepted on /silicons, `login --silicon`, an SLT for remind), OBO and ATA through the fake apps
+(with timings), dirty.csv imported on the developer page and with the CLI and an imported Carbon finishing setup,
+webhooks with valid signatures, branded hosted pages with "Powered by", the embed and the SDK, the shared behaviours
+(leaving unsaved work, Escape in layers, the Combobox, focus states, any-country phones, dark tokens, the 404 of an
+unknown tab), a Silicon's secrets on the account site and connecting Google and Apple.
+
+```
+scripts/e2e.sh                 # from the repo root: a fresh isolated stack (production build), every journey, teardown
+scripts/e2e.sh --suite core    # one suite; journeys by prefix: scripts/e2e.sh b-apps silicons/
+scripts/e2e.sh --dev --webkit  # the site on next dev, walked in WebKit
+scripts/e2e-all.sh --engines chromium,webkit   # every suite in parallel, a stack each, merged summary
+pnpm e2e [journey…]            # against an already running stack (scripts/dev.sh's ports, or E2E_PORT_BASE / E2E_*)
+pnpm e2e --list
+```
+
+**`e2e/README.md` is the guide**: suites (`e2e/journeys/*.ts` is the core suite, `e2e/suites/<suite>/*.ts` the
+others, found without editing run.ts), port bases, per-stack site builds, reports (`e2e/.artifacts/<base>/report.json`
+and `report.md`, `e2e/.artifacts/summary.md`), the mock Iris, forwarded addresses and time travel. Each journey
+records checks and fails on console errors, uncaught page errors, CSP refusals and failed requests (`e2e/lib.ts`).
+
+Two shared files serve the walk: `next.config.ts` builds into `NEXT_DIST_DIR` (default `.next`; a local stack on
+another port builds into `.next-<port>` with a per-directory tsconfig that extends `tsconfig.json`, no type-check
+pass and no Turbopack build cache, so concurrent builds share nothing; see the comment there), and `proxy.ts` adds a
+loopback `http://` `ACCOUNTS_IRIS_BASE_URL` origin to the CSP's `img-src` (the testkit's mock Iris; production's
+https Iris is covered by `https:` already). `sdk/build.mjs` writes `public/sdk/v1.js` through a rename.
+
 ## Notes
 
-- `output: "standalone"`: deploy `.next/standalone` with `.next/static` and `public/` copied beside it. `next start`
-  still works locally (it prints a warning).
+- `output: "standalone"`: deploy `.next/standalone` with `.next/static` and `public/` copied beside it (what
+  `scripts/dev.sh --prod` runs). `next start` still works locally (it prints a warning).
 - Every route renders per request (the nonce CSP needs it).
-- `.screens/`, `public/sdk/` and `.next/` are build output and git-ignored.
+- `.screens/`, `public/sdk/`, `.next/`, `.next-*/` (and their `.next-*.tsconfig.json`) are build output and
+  git-ignored.
+- `agentRules: false` (next.config.ts): `next dev` never rewrites `AGENTS.md` / `CLAUDE.md`; both are kept by hand.
+- Checks: `pnpm checks:auth [--base URL | --live URL]` and `pnpm checks:developer --live URL` run the areas' Playwright
+  checks (components/auth/checks.ts, components/developer/checks.ts; the live ones need a scratch database).
+
+### Integration round: shared changes (2026-10-07)
+
+Every shared-foundation request from the area builders, resolved in the shared code:
+
+- **Navigation guard** (`lib/navigation-guard.ts`, `components/foundation/shell/leave-question.tsx`): see Conventions.
+  The shell routes the dock, phone sheet, brand, palette, number keys, Settings and sign-out through it; the developer
+  area's own window-capture click/keydown interception, synthetic Escape and copy of the typing rule are gone.
+- **Number keys** no longer jump from under an open layer: the shell checks `[role=dialog]`, `[role=alertdialog]`,
+  `[role=menu]` and `[role=listbox]` (Radix layers carry no `aria-modal`).
+- **Whole lists** (`lib/query/pages.ts`): `useMyApps`, `useMyProofs`, `useSessions`, `useSilicons`,
+  `useCustodianRequests` and `useOwnedApps` read every page; the account area's `useEvery*` are re-exports.
+- **Secret mutations** (`useSecretMutation`): every action whose answer carries a secret; the account area's `*Once`
+  hooks are re-exports, and the developer area's webhook and ATA forms use the shared hooks.
+- **First-party sign-in** ends on /sign-in only: the shell no longer reads `/?state&code|error` (a link could put its
+  own words in a toast there); `consumeSignInReturn` / `isSignInReturn` are gone, `/device` is a valid return path.
+- **Arc**: Combobox, Escape in layers, PhoneInput, Timeline, OTP input, focus states (see Local edits).
+- **Focus states** in the foundation: the shell's brand link (a soft fill), every plain link site-wide
+  (`styles/base.css`, zero specificity so a component's own rule wins) and the "Powered by" pill (underline and edge).
+- **Dark theme contrast** (`styles/tokens.css`): `--text-muted` #B8B3AB (4.66:1 on `--surface-muted`),
+  `--text-secondary` #C2BDB5 (stays the stronger of the two), `--accent-strong` #93B8F1 (info badges 4.85:1).
+- **Branding defaults**: the default dark `danger` is #FF8A80 (5.45:1 on #353432) here, in crates/core
+  `default_dark` and in stored configs (migration 0004); the SDK's dark fallback primary is #1F5FB8 like the server's
+  (its #5B8FE0 override is gone) and its dark ink follows the hosted pages' `--accent-ink` (50 % mix, 5.5:1).
+- **Toasts** read the service's times (`readableTimes` moved to `lib/format.ts`).
+- **heroCopyFor** (components/auth/flow/model.ts): the split layout's hero rules without a FlowView; the developer
+  Branding preview uses it.
+- **API client**: `api.flows.uploadSignupPhoto` and the `SignupPhoto` type.
+- **Unknown developer tabs** answer 404 from proxy.ts (`lib/developer-tabs.ts`).
+- **Phone field** moved to `components/foundation/phone-field`; the account site's add-phone form uses it.
+- **Split layout** (`<BrandAside>`, styles/branding.css): the app's side renders its content in a sticky
+  `.sa-brand-aside-inner` at most one viewport tall, so on long steps (setting up, what is shared) the logo stays at the
+  top and the hero copy at the foot of the screen instead of scrolling away below the fold.

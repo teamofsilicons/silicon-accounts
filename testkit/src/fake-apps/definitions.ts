@@ -191,7 +191,7 @@ function drafts(credentials: DevCredentials): Draft[] {
         remember_browser: true,
         branding: {
           light: { primary: '#17775C', primary_foreground: '#FFFDF9', background: '#FFFDF9', surface: '#FFFFFF', foreground: '#353432', muted: '#6F6B66', border: '#E8E3DA', danger: '#B42318' },
-          dark: { primary: '#34B38A', primary_foreground: '#06231A', background: '#2A2927', surface: '#353432', foreground: '#FFFDF9', muted: '#B5B0A8', border: '#4A4845', danger: '#F97066' },
+          dark: { primary: '#34B38A', primary_foreground: '#06231A', background: '#2A2927', surface: '#353432', foreground: '#FFFDF9', muted: '#B5B0A8', border: '#4A4845', danger: '#FF8A80' },
         },
         copy: { title: 'Sign in to DM', subtitle: 'Messages between Carbons and Silicons.', terms_url: FIRST_PARTY_TERMS, privacy_url: FIRST_PARTY_PRIVACY, support_email: 'support@teamofsilicons.com' },
       },

@@ -62,7 +62,7 @@ export const Combobox = forwardRef<HTMLInputElement, ComboboxProps>(function Com
     id,
     className,
     disabled,
-    onFocus,
+    onBlur,
     ...inputProps
   },
   forwardedRef,
@@ -213,9 +213,17 @@ export const Combobox = forwardRef<HTMLInputElement, ComboboxProps>(function Com
           aria-controls={open ? listboxId : undefined}
           aria-autocomplete="list"
           aria-activedescendant={open && activeOption ? `${controlId}-option-${activeOption.value}` : undefined}
-          onFocus={(event) => {
-            onFocus?.(event);
-            openMenu();
+          // WAI-ARIA combobox: focus alone never opens the list (a Tab walk through a form would drop it over the next
+          // fields); typing, ArrowDown/ArrowUp or a click do. Leaving the field closes it, so it never stays open
+          // behind focus.
+          onBlur={(event) => {
+            onBlur?.(event);
+            // Focus moving anywhere but into the list (the next field, or the field's own Clear button) closes it.
+            const next = event.relatedTarget as Node | null;
+            if (open && next && !document.getElementById(listboxId)?.contains(next)) {
+              setOpen(false);
+              setQuery("");
+            }
           }}
           onClick={openMenu}
           onChange={(event) => {
@@ -256,7 +264,8 @@ export const Combobox = forwardRef<HTMLInputElement, ComboboxProps>(function Com
             role="presentation"
           >
             <AutoHeight reduceMotion={reduceMotion}>
-            <div id={listboxId} className={styles.listbox} role="listbox" aria-label={`${label} options`}>
+            {/* Not a Tab stop (it scrolls, so browsers would make it one): the arrow keys move through its options. */}
+            <div id={listboxId} className={styles.listbox} role="listbox" aria-label={`${label} options`} tabIndex={-1}>
               {filteredOptions.length ? filteredOptions.map((option, index) => (
                 <div
                   key={option.value}

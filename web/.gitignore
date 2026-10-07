@@ -1,8 +1,11 @@
 # Dependencies
 /node_modules
 
-# Next.js
+# Next.js (`.next-<port>/` and its `.next-<port>.tsconfig.json`: the build of one local stack, see next.config.ts)
 /.next/
+/.next-*/
+/.next-*.tsconfig.json
+/.next-*.tsconfig.json.*.tmp
 /out/
 next-env.d.ts
 *.tsbuildinfo
@@ -16,6 +19,7 @@ next-env.d.ts
 # Playwright and test output
 /test-results/
 /playwright-report/
+/e2e/.artifacts/
 
 # Local environment
 .env*

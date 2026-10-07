@@ -4,8 +4,9 @@
  *
  * The app's layout (../layout.tsx, components/developer/app/app-scope.tsx) renders the tab the address names, and a
  * switch between tabs only changes the address in the browser (history.pushState), so it never waits for the server.
- * This page renders nothing: on a load it names the tab in the document title, and it sends an unknown tab to the
- * overview without adding a history entry.
+ * This page renders nothing: on a load it names the tab in the document title. An address that names no tab never
+ * reaches it on a load: proxy.ts answers it with the not-found page and a real 404. (A client-side navigation to one
+ * still ends at the overview, without adding a history entry.)
  */
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";

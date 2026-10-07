@@ -3,7 +3,10 @@
  *
  * Brand: primary #1F5FB8, warm paper #FFFDF9, warm charcoal #353432.
  * Contrast (WCAG 2.2, measured): every text token clears 4.5:1 on --background, --surface and --surface-raised in its
- * theme, and on --surface-muted in light. Two additions to Arc's set exist because of that:
+ * theme; --text-secondary and --text-muted also clear it on --surface-muted in both themes (the track of tabs and
+ * segmented controls: dark muted #B8B3AB is 4.66:1 there, secondary #C2BDB5 5.2:1, so secondary stays the stronger of
+ * the two), and --accent-strong on --accent-subtle (info badges, the active tab: dark #93B8F1, 4.85:1 on the tint over
+ * --surface). Two additions to Arc's set exist because of that:
  *   --accent-ink   accent-coloured text. In dark mode the brand accent #5B8FE0 is 3.8:1 on --surface, so text that
  *                  wants the accent uses a lighter ink (4.75:1 on --surface-raised). Fills and indicators keep --accent.
  *   --primary*     filled primary buttons stay brand blue with paper text in both themes (6.1:1). Arc's own primary
@@ -91,14 +94,14 @@
   --surface-raised: #3E3C3A;
   --surface-muted: #464441;
   --foreground: #FFFDF9;
-  --text-secondary: #B5B0A8;
-  --text-muted: #ADA8A0;
+  --text-secondary: #C2BDB5;
+  --text-muted: #B8B3AB;
   --border: #4A4845;
   --border-subtle: #403E3B;
   --border-strong: #5E5B57;
 
   --accent: #5B8FE0;
-  --accent-strong: #86AFEF;
+  --accent-strong: #93B8F1;
   --accent-subtle: rgb(91 143 224 / .18);
   --accent-foreground: #FFFDF9;
   --accent-ink: #82ACEE;

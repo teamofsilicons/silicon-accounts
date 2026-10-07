@@ -485,6 +485,50 @@ fn proof_verify_exit_codes() {
 }
 
 #[test]
+fn a_pkce_verifier_may_start_with_a_hyphen() {
+    // PKCE verifiers are random base64url: one in 64 starts with "-", and it is still the value.
+    let mock = Mock::start();
+    let env = Env::new();
+    let verifier = "-nVb8kQ2xZ_example-verifier-with-a-leading-hyphen-0123456789";
+    let output = env
+        .cmd()
+        .args([
+            "--url",
+            mock.url.as_str(),
+            "app",
+            "--app-id",
+            APP_ID,
+            "--app-secret-stdin",
+            "token",
+            "exchange",
+            "--code",
+            "sac_good",
+            "--redirect-uri",
+            "http://127.0.0.1:8593/briefcase/callback",
+            "--code-verifier",
+            verifier,
+            "--json",
+        ])
+        .write_stdin(APP_SECRET)
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout_json(&output)["refresh_token"].is_string());
+    let sent = mock.requests("POST", "/v1/oauth/token");
+    assert!(
+        sent.iter()
+            .any(|(_, body)| body.contains(&format!("code_verifier={verifier}"))),
+        "{sent:?}"
+    );
+}
+
+#[test]
 fn id_availability_and_report() {
     let mock = Mock::start();
     let env = Env::new();

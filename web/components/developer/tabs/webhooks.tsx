@@ -32,7 +32,7 @@ import { ApiError } from "@/lib/api/errors";
 import { APP_EVENT_TYPES, type DeliveryStatus, type ReplayRequest, type ReplayResult, type WebhookDelivery } from "@/lib/api/types";
 import { formatDateTime, formatRelative, plural } from "@/lib/format";
 import { useIdempotentMutation } from "@/lib/query/idempotency";
-import { useRemoveWebhook, useRotateWebhookSecret, useTestWebhook, useWebhookDelivery } from "@/lib/query/developer";
+import { useRemoveWebhook, useRotateWebhookSecret, useSetWebhook, useTestWebhook, useWebhookDelivery } from "@/lib/query/developer";
 import { queryKeys } from "@/lib/query/keys";
 import { useDeveloperApp } from "../lib/context";
 import { EVENT_DESCRIPTION, deliveryStatus, shortId } from "../lib/labels";
@@ -186,7 +186,9 @@ export function WebhooksTab() {
   const deliveries = useMemo(() => list.data?.pages.flatMap(page => page.items) ?? [], [list.data]);
   const refreshDeliveries = () => void client.invalidateQueries({ queryKey: queryKeys.app.root(appId).concat("deliveries") });
 
-  const setWebhook = useIdempotentMutation((value: string, idempotencyKey) => api.apps.webhook.set(appId, value, { idempotencyKey }), { meta: { toast: false } });
+  // Secret mutations (lib/query useSecretMutation): the signing secret is kept only by the reveal below, never in
+  // TanStack's cache.
+  const setWebhook = useSetWebhook(appId, { toast: false });
   const rotateSecret = useRotateWebhookSecret(appId);
   const removeWebhook = useRemoveWebhook(appId);
   const testWebhook = useTestWebhook(appId);
@@ -201,7 +203,7 @@ export function WebhooksTab() {
     setUrlError(problem ?? undefined);
     if (problem) return;
     try {
-      const result = await setWebhook.mutateAsync(value);
+      const result = await setWebhook.run(value);
       setSecret({ value: result.secret, reason: "set" });
       setEditing(false);
       setFocusUrl(false);
@@ -216,7 +218,7 @@ export function WebhooksTab() {
   };
 
   const rotate = async () => {
-    const result = await rotateSecret.mutateAsync();
+    const result = await rotateSecret.run();
     setSecret({ value: result.secret, reason: "rotated" });
     ctx.setApp(current => ({ ...current, webhook: { ...current.webhook, secret_set: true } }));
   };

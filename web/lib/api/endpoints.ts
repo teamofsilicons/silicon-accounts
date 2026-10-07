@@ -17,7 +17,7 @@ import type {
   OboRequest, OidcDiscovery, OutboxMessage, OwnedApp, Page, PageQuery, PhoneView, PhotoUploaded, ProfileUpdate,
   ProofRevokeRequest, ProofVerification, ReplayRequest, ReplayResult, ReportReceipt, SessionInfo, ShortLivedToken,
   SigninConfigPatch, SiliconAppsApp, SiliconCreated, SiliconPhotoUploaded, SiliconSelfCreate, SiliconSelfCreated,
-  SiliconWebhook, SiliconWebhookTestQueued, SignupSubmit, StkRotated, TelemetryEvent, TokenRequest, TokenResponse,
+  SiliconWebhook, SiliconWebhookTestQueued, SignupPhoto, SignupSubmit, StkRotated, TelemetryEvent, TokenRequest, TokenResponse,
   TransferRequest, UpdateSilicon, UserInfo, WebhookDelivery, WebhookDeliveryDetail, WebhookTestQueued,
 } from "./types";
 
@@ -93,6 +93,13 @@ export const flows = {
   verify: (id: string, code: string) => flowCall(`/v1/flows/${seg(id)}/verify`, { code }),
   /** Start Google or Apple: navigate the top-level window to the returned `authorize_url`. */
   oauthStart: (id: string, provider: "google" | "apple") => request<{ authorize_url: string }>(`/v1/flows/${seg(id)}/oauth/${provider}`, { method: "POST", body: {} }),
+  /**
+   * `POST /v1/flows/{id}/signup/photo` (201, flow and sign-up cookies): the photo picked on the sign-up page (PNG, JPEG,
+   * WebP or GIF, ≤ 2 MB). It replaces an earlier one and becomes the prefilled `signup.pfp_url`; the account takes it
+   * when it is created (`pfp_url: null` in the sign-up discards it). 403 signup_not_bound, 409 invalid_step, 413/415/422.
+   */
+  uploadSignupPhoto: (id: string, file: Blob) =>
+    request<SignupPhoto>(`/v1/flows/${seg(id)}/signup/photo`, { method: "POST", raw: file, contentType: file.type || "application/octet-stream" }),
   /** Create the account (or finish an imported one). 409 id_taken with details.suggestions. */
   signup: (id: string, body: SignupSubmit) => flowCall(`/v1/flows/${seg(id)}/signup`, body),
   /** Send a code to add a missing required email. 409 email_in_use. */

@@ -17,6 +17,7 @@ import { UserMenu, type UserMenuUser } from "@/components/arc/user-menu/user-men
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
 import { useTheme, type ThemePreference } from "@/components/foundation/theme/use-theme";
 import { SECTIONS, type SectionKey } from "@/lib/navigation";
+import { GUARDED_NAVIGATION } from "@/lib/navigation-guard";
 import styles from "./dock.module.css";
 
 export interface DockAccount extends UserMenuUser {
@@ -25,10 +26,18 @@ export interface DockAccount extends UserMenuUser {
 
 export interface DockProps {
   activeKey: SectionKey | undefined;
-  /** Navigates (inside a page transition). Called for unmodified primary clicks only. */
-  onNavigate: (href: string) => void;
+  /**
+   * Navigates (inside a page transition, after asking the page's navigation guards). Called for unmodified primary
+   * clicks only, with the element focus should go back to when the Carbon stays.
+   */
+  onNavigate: (href: string, returnFocus: HTMLElement | null) => void;
   account: DockAccount | null;
-  onSignOut: () => Promise<unknown>;
+  /**
+   * Signs out. A promise keeps the user menu open with the item's progress until it settles; nothing returned closes
+   * the menu at once (the shell does that when a page will ask about unsaved work first, so the question is never
+   * asked over the menu).
+   */
+  onSignOut: () => void | Promise<unknown>;
   onOpenSettings: () => void;
   onOpenPalette: () => void;
   isApple: boolean;
@@ -156,10 +165,11 @@ function FullDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, o
               aria-current={current ? "page" : undefined}
               aria-label={section.label}
               aria-keyshortcuts={section.shortcut}
+              {...{ [GUARDED_NAVIGATION]: "" }}
               onClick={event => {
                 if (!plainClick(event)) return;
                 event.preventDefault();
-                onNavigate(section.href);
+                onNavigate(section.href, event.currentTarget);
               }}
             >
               <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
@@ -209,6 +219,7 @@ const themeOptions: { value: ThemePreference; label: string }[] = [
 function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, onOpenPalette }: DockProps) {
   const { preference, change } = useTheme();
   const [open, setOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const active = SECTIONS.find(section => section.key === activeKey);
   const ActiveIcon = active?.icon ?? Search;
   return (
@@ -219,7 +230,7 @@ function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings
         title="Go to"
         detents={[0.62, 0.92]}
         trigger={
-          <button data-sq="surface" type="button" className={styles.menuButton} aria-haspopup="dialog" aria-expanded={open}>
+          <button ref={menuButton} data-sq="surface" type="button" className={styles.menuButton} aria-haspopup="dialog" aria-expanded={open}>
             <ActiveIcon size={18} strokeWidth={1.75} aria-hidden="true" />
             <span className={styles.menuLabel}>{active?.label ?? "Menu"}</span>
             <ChevronUp className={styles.menuChevron} size={16} strokeWidth={1.75} aria-hidden="true" />
@@ -236,11 +247,14 @@ function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings
                   data-sq="surface"
                   className={styles.sheetItem}
                   aria-current={section.key === activeKey ? "page" : undefined}
+                  {...{ [GUARDED_NAVIGATION]: "" }}
                   onClick={event => {
                     if (!plainClick(event)) return;
                     event.preventDefault();
+                    // The sheet closes first, so a question about unsaved work is never asked over it; staying puts
+                    // focus back on the button that opened it.
                     setOpen(false);
-                    onNavigate(section.href);
+                    onNavigate(section.href, menuButton.current);
                   }}
                 >
                   <span className={styles.sheetIcon} aria-hidden="true"><Icon size={20} strokeWidth={1.75} /></span>

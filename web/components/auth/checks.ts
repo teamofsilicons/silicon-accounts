@@ -696,7 +696,7 @@ const hostedChecks: MockCheck[] = [
         await expect(error).toBeVisible();
         return { text: await error.evaluate(el => getComputedStyle(el).color), card: await page.locator(".sa-brand-panel").evaluate(el => getComputedStyle(el).backgroundColor) };
       };
-      // The default dark danger #F97066 is 4.46:1 on the default dark card; the hosted pages use #FF8A80 there.
+      // The default dark danger is #FF8A80 (5.45:1 on the default dark card; the old #F97066 read at 4.46:1 there).
       const own = await wrongCode();
       expect(own.card).toBe("rgb(53, 52, 50)");
       expect(contrast(own.text, own.card)).toBeGreaterThanOrEqual(4.5);

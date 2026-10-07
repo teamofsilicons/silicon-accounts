@@ -13,20 +13,62 @@
  *
  * Security headers for pages (nonce CSP, frame-ancestors, X-Frame-Options…) come from proxy.ts; this file adds the
  * SDK's CORS and cache headers.
+ *
+ * NEXT_DIST_DIR gives a build its own directory (default `.next`): because the API address is baked into each build,
+ * every local stack on other ports (scripts/dev.sh, scripts/e2e.sh) builds into `.next-<port>`, so stacks that run at
+ * the same time never share or overwrite a build. See isolatedBuild() for what such a build does differently.
  */
-import { dirname } from "node:path";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const apiUrl = (process.env.ACCOUNTS_API_URL ?? "http://127.0.0.1:8589").replace(/\/+$/, "");
 
+/** The build directory: `.next`, or NEXT_DIST_DIR (`.next-<name>`, inside web/, which .gitignore and tsconfig skip). */
+function distDirFromEnv(): string {
+  const wanted = process.env.NEXT_DIST_DIR?.trim() || ".next";
+  if (!/^\.next(-[A-Za-z0-9_.-]+)?$/.test(wanted)) {
+    throw new Error(`NEXT_DIST_DIR must look like .next-<name> (a directory in web/, e.g. .next-9600), got "${wanted}"`);
+  }
+  return wanted;
+}
+
+const distDir = distDirFromEnv();
+
+/**
+ * A build in its own directory (NEXT_DIST_DIR) runs beside other builds in this same web/ directory, so it must not
+ * write the files they share. Next's TypeScript setup would add `<distDir>/types/**` to tsconfig.json; pointing it at
+ * a per-directory config that only extends tsconfig.json makes it leave tsconfig.json alone. It also skips the
+ * type-check pass: `pnpm typecheck` is the type gate, and that pass would read next-env.d.ts, which every build
+ * rewrites for its own directory (scripts/dev.sh puts it back to `.next` afterwards). The compiled output is the same.
+ */
+function isolatedBuild(dir: string): NextConfig["typescript"] {
+  const tsconfig = `${dir}.tsconfig.json`;
+  const content = `${JSON.stringify({ extends: "./tsconfig.json" }, null, 2)}\n`;
+  const path = join(root, tsconfig);
+  // Every process that loads this config (the build and its workers) may get here at once: write a temporary file and
+  // rename it, so nobody ever reads a half-written config.
+  if (!existsSync(path) || readFileSync(path, "utf8") !== content) {
+    const temporary = `${path}.${process.pid}.tmp`;
+    writeFileSync(temporary, content);
+    renameSync(temporary, path);
+  }
+  return { tsconfigPath: tsconfig, ignoreBuildErrors: true };
+}
+
 const nextConfig: NextConfig = {
   output: "standalone",
+  distDir,
+  ...(distDir === ".next" ? {} : { typescript: isolatedBuild(distDir) }),
   reactStrictMode: true,
   poweredByHeader: false,
   // The floating dev badge would sit on top of the embed's iframes and the dock; build and runtime errors still show.
   devIndicators: false,
+  // `next dev` would (re)write its managed block into AGENTS.md / CLAUDE.md when a coding assistant runs it. Both files
+  // are kept in the repo by hand (the project's rules sit under that block), so the dev server never edits them.
+  agentRules: false,
   // The repo has other lockfiles (testkit/); this app is its own root for Turbopack and the standalone trace.
   turbopack: { root },
   outputFileTracingRoot: root,
@@ -38,6 +80,9 @@ const nextConfig: NextConfig = {
     // 10 MB by default (the request then fails with a 500 after 30 s), and a big import can take minutes.
     proxyClientMaxBodySize: "52mb",
     proxyTimeout: 300_000,
+    // A stack's own build directory is thrown away with the stack (scripts/e2e.sh), so its ~100 MB Turbopack cache would
+    // never be read again; a cold build takes seconds.
+    ...(distDir === ".next" ? {} : { turbopackFileSystemCacheForBuild: false }),
   },
   env: {
     // The rewrite destination this build was made with (instrumentation.ts compares it with the runtime value).

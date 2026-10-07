@@ -13,8 +13,10 @@
   margin-inline: auto;
   padding: 0 var(--gutter);
 }
-.brand { display: inline-flex; min-width: 0; align-items: center; gap: 10px; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; letter-spacing: -.01em; text-decoration: none; }
+/* The padding (taken back by the negative margin, so nothing moves) gives keyboard focus a soft fill to show in. */
+.brand { --sq-r: 12px; --sq-fill: transparent; display: inline-flex; min-width: 0; align-items: center; gap: 10px; margin: -6px -10px; padding: 6px 10px; background: var(--sq-fill); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; letter-spacing: -.01em; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
 .brand:hover { color: var(--foreground); }
+.brand:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
 .brandMark { --sq-r: 9px; display: grid; width: 28px; height: 28px; flex: none; place-items: center; background: var(--primary); color: var(--primary-foreground); }
 .brandMark svg { width: 18px; height: 18px; }
 .brandText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -67,4 +69,12 @@
 @media (prefers-reduced-motion: reduce) {
   .search { transition: none; }
   .paletteOverlay[data-state="open"] { animation-duration: var(--duration-instant); }
+}
+
+/* The shell's "Leave this page?" question (leave-question.tsx). */
+.leaveDialog.leaveDialog { width: min(calc(100vw - var(--space-8)), 460px); }
+.leaveActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+@media (max-width: 520px) {
+  .leaveActions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .leaveActions > * { width: 100%; }
 }

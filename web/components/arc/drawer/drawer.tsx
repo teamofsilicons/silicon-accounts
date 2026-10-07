@@ -6,6 +6,7 @@ import type { ComponentPropsWithoutRef, ReactNode, RefObject } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "motion/react";
 import type { PanInfo, Transition } from "motion/react";
 import { X } from "lucide-react";
+import { ESCAPE_LAYER_ATTRIBUTE, layerEscape } from "../lib/escape";
 import { motionTokens } from "../lib/motion-tokens";
 import styles from "./drawer.module.css";
 
@@ -76,6 +77,7 @@ export function DrawerContent({
   container,
   className,
   onInteractOutside,
+  onEscapeKeyDown,
   ...props
 }: DrawerContentProps) {
   const drawer = useContext(DrawerContext);
@@ -88,6 +90,8 @@ export function DrawerContent({
   const offscreen = { [axis]: `${sign * 100}%` };
   const classes = [styles.content, className].filter(Boolean).join(" ");
   const draggable = drawer !== null && !reduced;
+  // Escape inside belongs to an open list, calendar or question first (lib/escape.ts); the next one closes the drawer.
+  const escape = { [ESCAPE_LAYER_ATTRIBUTE]: "", onEscapeKeyDown: layerEscape(onEscapeKeyDown) };
 
   const panelSize = () => (axis === "x" ? panelRef.current?.offsetWidth : panelRef.current?.offsetHeight) ?? 480;
 
@@ -136,7 +140,7 @@ export function DrawerContent({
     return (
       <DialogPrimitive.Portal container={container}>
         <DialogPrimitive.Overlay className={`${styles.overlay} ${styles.keyframes}`} data-contained={container ? "" : undefined} />
-        <DialogPrimitive.Content {...props} onInteractOutside={onInteractOutside} data-side={side} data-contained={container ? "" : undefined} className={`${classes} ${styles.keyframes}`}>{inner}</DialogPrimitive.Content>
+        <DialogPrimitive.Content {...props} {...escape} onInteractOutside={onInteractOutside} data-side={side} data-contained={container ? "" : undefined} className={`${classes} ${styles.keyframes}`}>{inner}</DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     );
   }
@@ -158,6 +162,7 @@ export function DrawerContent({
           </DialogPrimitive.Overlay>
           <DialogPrimitive.Content
             {...props}
+            {...escape}
             asChild
             forceMount
             // Radix reads a click outside on click, so the press that reopens a closing drawer would dismiss it again.

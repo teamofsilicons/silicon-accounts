@@ -1,13 +1,14 @@
 # Silicon Accounts testkit
 
 Local stand-ins for everything Silicon Accounts talks to, so the whole service can be developed and
-tested end to end on one machine, without real Google, Apple, Postmark, Twilio or Silicon Apps:
+tested end to end on one machine, without real Google, Apple, Postmark, Twilio, Iris or Silicon Apps:
 
 | piece | port | what it is |
 |---|---|---|
 | **mock-oidc** | 8591 | "Sign in with Google" under `/google` and "Sign in with Apple" under `/apple` — authorize pages, token endpoints, JWKS — strict where the real providers are strict |
 | **mock-messaging** | 8592 | the Postmark Email API under `/postmark` and the Twilio Messages API under `/twilio`; captures every message and extracts the 6-digit code |
 | **fake app server** | 8593 | the server side of the 15 fake apps (`/briefcase/…`, `/dm/…`, …): sign-in pages, OAuth callbacks, webhook receivers, OBO/ATA proof demos |
+| **mock-iris** | 8594 | Iris, which draws every account's default profile photo: `/pfp/carbon?id=<uuid>` and `/pfp/silicon?id=<uuid>` answer a small SVG that depends only on the id (`ACCOUNTS_IRIS_BASE_URL`), so no page loads a photo from the internet |
 | **fake-apps.json** | — | the 15 fake apps "as Silicon Apps would deliver them": fixed app ids and secrets, owners, logos, sign-in setups |
 | **fixtures/imports/** | — | CSV/JSON files for the user import flow, with the expected outcome of every row |
 | **lib/** | — | a TypeScript helper library for the e2e suites (sign-in flows over HTTP, OTP codes, webhooks, PKCE, signatures) |
@@ -24,7 +25,7 @@ pieces yourself:
 
 ```sh
 pnpm -C testkit install
-pnpm -C testkit start            # mock-oidc :8591, mock-messaging :8592, fake apps :8593 (Ctrl-C stops all three)
+pnpm -C testkit start            # mock-oidc :8591, mock-messaging :8592, fake apps :8593, mock-iris :8594 (Ctrl-C stops all four)
 ```
 
 In another terminal, point Silicon Accounts at the mocks and seed the fake apps:
@@ -37,14 +38,14 @@ PORT=8590 ACCOUNTS_API_URL=http://127.0.0.1:8589 pnpm -C web dev   # the site (o
 open http://127.0.0.1:8593/                  # the fake apps; sign in to any of them
 ```
 
-Run the testkit's own tests: `pnpm -C testkit test` (96 node:test tests, ~1 s) and `pnpm -C testkit typecheck`.
+Run the testkit's own tests: `pnpm -C testkit test` (98 node:test tests, ~1 s) and `pnpm -C testkit typecheck`.
 
 ## Commands
 
 | command | does |
 |---|---|
-| `pnpm -C testkit start` (alias `mocks`) | starts all three servers on their default ports until SIGINT/SIGTERM, then stops them gracefully. Flags: `--host` (`TESTKIT_HOST`), `--oidc-port` (`MOCK_OIDC_PORT`), `--messaging-port` (`MOCK_MESSAGING_PORT`), `--fake-apps-port` (`FAKE_APPS_PORT`), `--accounts-url` (`ACCOUNTS_URL`, default accounts-api at `http://127.0.0.1:8589`; the public site works too), `--ready-file <path>` (writes the URLs as JSON once listening), `--log` (`TESTKIT_LOG=1`, one line per request on stderr), `--quiet`. Port `0` picks a free port. Always prints one line `testkit ready {"oidc":…,"messaging":…,"fake_apps":…}` when listening. |
-| `pnpm -s -C testkit accounts-env [--format dotenv\|shell\|json] [--oidc-url URL] [--messaging-url URL] [--api-port N] [--public-url URL] [--no-topology]` | prints the `ACCOUNTS_*` variables that point Silicon Accounts at the mocks (below) and the local topology: `ACCOUNTS_BIND_ADDR=127.0.0.1:8589` (`--api-port`, `ACCOUNTS_API_PORT`), `ACCOUNTS_PUBLIC_URL=http://localhost:8590` (the site; `--public-url`, `ACCOUNTS_PUBLIC_URL`), `ACCOUNTS_TRUST_FORWARDED_FOR=true`; `--no-topology` leaves those three out |
+| `pnpm -C testkit start` (alias `mocks`) | starts all four servers on their default ports until SIGINT/SIGTERM, then stops them gracefully. Flags: `--host` (`TESTKIT_HOST`), `--oidc-port` (`MOCK_OIDC_PORT`), `--messaging-port` (`MOCK_MESSAGING_PORT`), `--fake-apps-port` (`FAKE_APPS_PORT`), `--iris-port` (`MOCK_IRIS_PORT`), `--accounts-url` (`ACCOUNTS_URL`, default accounts-api at `http://127.0.0.1:8589`; the public site works too), `--ready-file <path>` (writes the URLs as JSON once listening), `--log` (`TESTKIT_LOG=1`, one line per request on stderr), `--quiet`. Port `0` picks a free port. Always prints one line `testkit ready {"oidc":…,"messaging":…,"fake_apps":…,"iris":…}` when listening. |
+| `pnpm -s -C testkit accounts-env [--format dotenv\|shell\|json] [--oidc-url URL] [--messaging-url URL] [--iris-url URL] [--api-port N] [--public-url URL] [--no-topology]` | prints the `ACCOUNTS_*` variables that point Silicon Accounts at the mocks (below) and the local topology: `ACCOUNTS_BIND_ADDR=127.0.0.1:8589` (`--api-port`, `ACCOUNTS_API_PORT`), `ACCOUNTS_PUBLIC_URL=http://localhost:8590` (the site; `--public-url`, `ACCOUNTS_PUBLIC_URL`), `ACCOUNTS_TRUST_FORWARDED_FOR=true`; `--no-topology` leaves those three out |
 | `pnpm -C testkit test` | all unit/integration tests |
 | `pnpm -C testkit journeys [name…]` | the journeys against a running stack (default ports = `scripts/dev.sh`); `scripts/journeys.sh` starts a fresh isolated stack, runs them and tears it down |
 | `pnpm -C testkit typecheck` | `tsc --noEmit` (strict) |
@@ -57,7 +58,7 @@ Run the testkit's own tests: `pnpm -C testkit test` (96 node:test tests, ~1 s) a
 ## Pointing Silicon Accounts at the mocks
 
 `pnpm -s -C testkit accounts-env` prints exactly these values (from `dev-credentials.json`; ports follow
-`MOCK_OIDC_PORT` / `MOCK_MESSAGING_PORT` or `--oidc-url` / `--messaging-url`):
+`MOCK_OIDC_PORT` / `MOCK_MESSAGING_PORT` / `MOCK_IRIS_PORT` or `--oidc-url` / `--messaging-url` / `--iris-url`):
 
 | variable | value |
 |---|---|
@@ -79,6 +80,7 @@ Run the testkit's own tests: `pnpm -C testkit test` (96 node:test tests, ~1 s) a
 | `ACCOUNTS_APPLE_TOKEN_URL` | `http://127.0.0.1:8591/apple/token` |
 | `ACCOUNTS_APPLE_JWKS_URL` | `http://127.0.0.1:8591/apple/jwks` |
 | `ACCOUNTS_APPLE_ISSUER` | `http://127.0.0.1:8591/apple` (both the id_token `iss` and the `aud` Accounts must put in its client_secret JWT) |
+| `ACCOUNTS_IRIS_BASE_URL` | `http://127.0.0.1:8594` (mock-iris; production keeps `https://iris.teamofsilicons.com`. The account site needs the same value: its CSP allows a loopback http Iris origin, see `web/proxy.ts`) |
 | `ACCOUNTS_WEBHOOK_ALLOW_PRIVATE` | `true` (webhooks go to the fake app server on 127.0.0.1) |
 
 Programmatically: `accountsEnvForMocks({ oidcUrl, messagingUrl })` and
@@ -207,6 +209,18 @@ Owner emails: c:saket `saketdev12@example.test`, c:shubham `shubhastro2@example.
 c:campus-it `it@university.test`, c:crm-dev `dev@legacy-crm.test`, c:orbit-dev `dev@orbit-games.test`,
 c:quill-dev `dev@quill-docs.test`. Every palette passes WCAG AA (≥ 4.5:1) for primary/foreground pairs,
 well above the server's 3:1 floor.
+
+## mock-iris (port 8594)
+
+| endpoint | does |
+|---|---|
+| `GET /pfp/carbon?id=<uuid>` | a Carbon's default photo: a 96×96 SVG of woven straps, colours from a hash of the id (the sign-up page asks for `id=new`) |
+| `GET /pfp/silicon?id=<uuid>` | a Silicon's default photo: a chip grid |
+| `GET /_requests[?kind=carbon\|silicon]` | what was drawn, newest first: `{count, items:[{seq, at, kind, id, referer}]}` (the last 200) |
+| `DELETE /_requests` | forget them |
+
+Answers carry `Access-Control-Allow-Origin: *` and `Cross-Origin-Resource-Policy: cross-origin`, and a day of
+caching. `irisSvg(kind, id)` (`src/mock-iris.ts`) gives the same SVG in code.
 
 ## fake app server (port 8593)
 
@@ -370,7 +384,7 @@ only method, path and status (no query strings, bodies or credentials).
 
 ```
 testkit/
-  src/            mock-oidc.ts, mock-messaging.ts, fake-app-server.ts, testkit.ts (startTestkit),
+  src/            mock-oidc.ts, mock-messaging.ts, fake-app-server.ts, mock-iris.ts, testkit.ts (startTestkit),
                   start.ts (CLI), print-env.ts, credentials.ts, fake-apps/ (definitions, logos, pages,
                   types, load), shared/ (http router/server, page shell, utils)
   lib/            the e2e helper library (index.ts)

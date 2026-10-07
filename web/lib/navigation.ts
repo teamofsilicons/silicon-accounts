@@ -4,6 +4,7 @@
  */
 import type { LucideIcon } from "lucide-react";
 import { Braces, Cpu, History, IdCard, KeyRound, LayoutGrid, ShieldCheck } from "lucide-react";
+import { DEVELOPER_TABS, developerTabFrom, type DeveloperTab } from "./developer-tabs";
 
 /** Every route of the web app. */
 export const paths = {
@@ -24,9 +25,8 @@ export const paths = {
   kitchen: "/__kitchen",
 } as const;
 
-/** Tabs of an app in the developer area (`/developer/[appId]/[[...tab]]`; no tab = overview). */
-export const DEVELOPER_TABS = ["overview", "sign-in", "branding", "users", "import", "webhooks", "proofs", "embed"] as const;
-export type DeveloperTab = (typeof DEVELOPER_TABS)[number];
+/** Tabs of an app in the developer area (`/developer/[appId]/[[...tab]]`; no tab = overview): lib/developer-tabs.ts. */
+export { DEVELOPER_TABS, developerTabFrom, type DeveloperTab };
 export const DEVELOPER_TAB_LABELS: Record<DeveloperTab, string> = {
   overview: "Overview",
   "sign-in": "Sign-in",
@@ -37,14 +37,6 @@ export const DEVELOPER_TAB_LABELS: Record<DeveloperTab, string> = {
   proofs: "Proofs",
   embed: "Embed",
 };
-
-/** The tab a `[[...tab]]` segment names, or null when it names none (the page should then call notFound()). */
-export function developerTabFrom(segments: string[] | undefined): DeveloperTab | null {
-  if (!segments || segments.length === 0) return "overview";
-  if (segments.length > 1) return null;
-  const tab = segments[0] as DeveloperTab;
-  return (DEVELOPER_TABS as readonly string[]).includes(tab) ? tab : null;
-}
 
 export type SectionKey = "identity" | "sign-in" | "apps" | "silicons" | "proofs" | "activity" | "developer";
 

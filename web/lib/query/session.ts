@@ -3,7 +3,8 @@
 /**
  * The browser session of the account site: who is signed in (GET /v1/session), the full Me view shared by every
  * account page, the service meta, signing out, and the first-party sign-in round trip
- * (/sign-in → /authorize?app_id=accounts → back to /?code&state, where the saved return path is restored).
+ * (/sign-in?return_to=… → /authorize?app_id=accounts → back to /sign-in?code&state, which restores the saved path;
+ * components/auth/sign-in.tsx). A code or error counts as a return only when this browser saved its state.
  */
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
@@ -11,6 +12,8 @@ import { api, authorizeUrl } from "../api/endpoints";
 import { ApiError } from "../api/errors";
 import type { BrowserSession, FlowPrompt, Me, SigninMethod } from "../api/types";
 import { browserTimezone } from "../format";
+import { paths } from "../navigation";
+import { modernTimezone } from "../timezones";
 import { setTelemetryEnabled, subscribeTelemetry, telemetryEnabled } from "../telemetry";
 import { queryKeys } from "./keys";
 
@@ -109,23 +112,33 @@ export function useTelemetryEnabled(): [boolean, (enabled: boolean) => void] {
 /* First-party sign-in round trip                                                                                      */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-const BLOCKED_RETURNS = ["/authorize", "/sign-in", "/embed", "/device"];
+/** Pages a sign-in never returns to: the sign-in pages themselves and the embed. (/device does get its code back.) */
+const NO_RETURN = ["/sign-in", "/authorize", "/embed"];
 
 /**
- * A same-origin path to come back to after signing in, or "/". Parsed with URL against this origin, so tricks such as
- * "/\t/evil.example" (which a string check lets through and the browser turns into //evil.example) end at "/".
+ * A `return_to` this site can go back to: a path on this origin, as the browser itself reads it, or null. Text that only
+ * looks like a path can be another origin once parsed ("/\t/evil.example/x" loses its tab and becomes
+ * "//evil.example/x"), so anything else is dropped.
  */
-export function safeReturnPath(value: string | null | undefined): string {
-  if (!value || typeof window === "undefined") return "/";
+export function sameSitePath(value: string | null | undefined): string | null {
+  if (!value || typeof window === "undefined") return null;
   let url: URL;
   try {
     url = new URL(value, window.location.origin);
   } catch {
-    return "/";
+    return null;
   }
-  if (url.origin !== window.location.origin) return "/";
-  if (BLOCKED_RETURNS.some(prefix => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) return "/";
-  return `${url.pathname}${url.search}${url.hash}`;
+  if (url.origin !== window.location.origin) return null;
+  const path = `${url.pathname}${url.search}${url.hash}`;
+  // "//host" and "/\host" read as other origins wherever a path is resolved again.
+  if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return null;
+  if (NO_RETURN.some(prefix => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) return null;
+  return path;
+}
+
+/** A same-origin path to come back to after signing in, or "/" (see sameSitePath). */
+export function safeReturnPath(value: string | null | undefined): string {
+  return sameSitePath(value) ?? "/";
 }
 
 function randomState(): string {
@@ -135,54 +148,40 @@ function randomState(): string {
 }
 
 /**
- * The /authorize URL that signs a Carbon into the account site itself (app `accounts`, redirect `{origin}/`).
- * `returnTo` (a same-site path) is remembered against the state and restored when the flow comes back.
+ * The /authorize URL that signs a Carbon into the account site itself (app `accounts`, redirect `{origin}/sign-in`).
+ * `returnTo` (a same-site path) is remembered against the state in this tab, and /sign-in restores it when the flow
+ * comes back.
  */
-export function firstPartySignInUrl(returnTo?: string | null, extra: { prompt?: Extract<FlowPrompt, "login" | "select_account">; login_hint?: string; method?: SigninMethod } = {}): string {
+export function firstPartySignInUrl(returnTo?: string | null, extra: { prompt?: FlowPrompt; login_hint?: string; method?: SigninMethod } = {}): string {
   const state = randomState();
   try {
-    sessionStorage.setItem(RETURN_PREFIX + state, safeReturnPath(returnTo));
+    sessionStorage.setItem(RETURN_PREFIX + state, sameSitePath(returnTo) ?? paths.home);
   } catch {
-    // Without storage the visitor lands on / after signing in.
+    // Without storage the visitor lands on the home page after signing in.
   }
-  return authorizeUrl({ app_id: FIRST_PARTY_APP_ID, redirect_uri: `${window.location.origin}/`, state, timezone: browserTimezone(), ...extra });
+  return authorizeUrl({ app_id: FIRST_PARTY_APP_ID, redirect_uri: `${window.location.origin}${paths.signIn}`, state, timezone: modernTimezone(browserTimezone()), ...extra });
+}
+
+/** What firstPartySignInUrl saved for `state` in this browser, exactly; null when it saved nothing. */
+export function savedSignInReturn(state: string): string | null {
+  try {
+    return sessionStorage.getItem(RETURN_PREFIX + state);
+  } catch {
+    return null;
+  }
+}
+
+/** Forgets a saved return once it has been used (or the sign-in ended). */
+export function forgetSignInReturn(state: string): void {
+  try {
+    sessionStorage.removeItem(RETURN_PREFIX + state);
+  } catch {
+    // Nothing to clean up without storage.
+  }
 }
 
 /** Sends the browser to sign in (a full navigation; the hosted flow takes over), then back to `returnTo`. */
 export function beginSignIn(returnTo: string = window.location.pathname + window.location.search): void {
   // A full navigation on purpose: the hosted flow takes over the page, and coming back loads the site afresh.
-  window.location.assign(new URL(`/sign-in?return_to=${encodeURIComponent(safeReturnPath(returnTo))}`, window.location.origin).href);
-}
-
-export interface SignInReturn {
-  /** Where to continue (the path saved when sign-in started). */
-  path: string;
-  /** Set when the flow ended without signing in (`access_denied`, `login_required`…). */
-  error: string | null;
-}
-
-/** True when the current URL is the end of a first-party sign-in (`/?state=…&code=…` or `&error=…`). */
-export function isSignInReturn(): boolean {
-  if (typeof window === "undefined" || window.location.pathname !== "/") return false;
-  const params = new URLSearchParams(window.location.search);
-  return !!params.get("state") && (!!params.get("code") || !!params.get("error"));
-}
-
-/**
- * Handles the end of a first-party sign-in. The session cookie was already set by the flow, so the code is not
- * exchanged: the saved return path is handed back (the caller navigates there with router.replace) and the storage
- * entry is removed. Returns null when the current URL is not a sign-in return.
- */
-export function consumeSignInReturn(): SignInReturn | null {
-  if (!isSignInReturn()) return null;
-  const params = new URLSearchParams(window.location.search);
-  const state = params.get("state") ?? "";
-  let path = "/";
-  try {
-    path = safeReturnPath(sessionStorage.getItem(RETURN_PREFIX + state));
-    sessionStorage.removeItem(RETURN_PREFIX + state);
-  } catch {
-    path = "/";
-  }
-  return { path, error: params.get("error") };
+  window.location.assign(new URL(`${paths.signIn}?return_to=${encodeURIComponent(safeReturnPath(returnTo))}`, window.location.origin).href);
 }

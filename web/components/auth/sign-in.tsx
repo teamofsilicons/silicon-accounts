@@ -16,72 +16,18 @@
  * `prompt`, `login_hint` and `method` pass through, so the account site (and the CLI's device page) can ask for a fresh
  * sign-in or a method. A browser that is already signed in (and asks for no prompt) goes straight to return_to.
  *
- * The round trip ends here rather than on the home page because the home page's return path rules leave out pages
- * such as /device, which must get its code back after signing in.
+ * The round trip's helpers (firstPartySignInUrl, sameSitePath, the saved return per state) are the foundation's, in
+ * lib/query/session.ts: every first-party sign-in ends here, and /device gets its code back after signing in.
  */
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { authorizeUrl } from "@/lib/api/endpoints";
 import type { FlowPrompt, SigninMethod } from "@/lib/api/types";
-import { browserTimezone } from "@/lib/format";
-import { modernTimezone } from "@/lib/timezones";
 import { paths } from "@/lib/navigation";
-import { FIRST_PARTY_APP_ID, useRefreshSession, useSession } from "@/lib/query/session";
+import { firstPartySignInUrl, forgetSignInReturn, sameSitePath, savedSignInReturn, useRefreshSession, useSession } from "@/lib/query/session";
 import { useHydrated } from "./flow/hooks";
 import { HostedFrame } from "./flow/hosted-frame";
 import { SILICON_ACCOUNTS } from "./flow/model";
 import { ArrivalScope, LoadingCard, Problem } from "./flow/problem";
-
-const RETURN_PREFIX = "silicon-accounts:return:";
-/** Pages a sign-in never returns to: the sign-in pages themselves and the embed. */
-const NO_RETURN = ["/sign-in", "/authorize", "/embed"];
-
-/**
- * A `return_to` this site can go back to: a path on this origin, as the browser itself reads it. Text that only looks
- * like a path can be another origin once parsed ("/\t/evil.example/x" loses its tab and becomes "//evil.example/x"),
- * so anything else is dropped (the sign-in returns to the account site's home instead).
- */
-export function sameSitePath(value: string | null | undefined): string | null {
-  if (!value || typeof window === "undefined") return null;
-  let url: URL;
-  try {
-    url = new URL(value, window.location.origin);
-  } catch {
-    return null;
-  }
-  if (url.origin !== window.location.origin) return null;
-  const path = `${url.pathname}${url.search}${url.hash}`;
-  // "//host" and "/\host" read as other origins wherever a path is resolved again.
-  if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return null;
-  if (NO_RETURN.some(prefix => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) return null;
-  return path;
-}
-
-function randomState(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
-}
-
-/** The /authorize URL of a first-party sign-in that comes back to /sign-in and then to `returnTo`. */
-export function firstPartyAuthorizeUrl(returnTo: string | null, extra: { prompt?: FlowPrompt; login_hint?: string; method?: SigninMethod } = {}): string {
-  const state = randomState();
-  try {
-    sessionStorage.setItem(RETURN_PREFIX + state, returnTo ?? paths.home);
-  } catch {
-    // Without storage the visitor lands on the home page after signing in.
-  }
-  return authorizeUrl({ app_id: FIRST_PARTY_APP_ID, redirect_uri: `${window.location.origin}${paths.signIn}`, state, timezone: modernTimezone(browserTimezone()), ...extra });
-}
-
-/** What firstPartyAuthorizeUrl saved for `state` in this browser, exactly; null when it saved nothing. */
-function savedReturnOf(state: string): string | null {
-  try {
-    return sessionStorage.getItem(RETURN_PREFIX + state);
-  } catch {
-    return null;
-  }
-}
 
 /** A sign-in this browser started that came back here. */
 interface Arrival {
@@ -97,7 +43,7 @@ function arrivalOf(search: Pick<URLSearchParams, "get">): Arrival | null {
   const state = search.get("state");
   const error = search.get("error");
   if (!state || (!search.get("code") && !error)) return null;
-  const saved = savedReturnOf(state);
+  const saved = savedSignInReturn(state);
   if (saved === null) return null;
   return { state, error: error || null, path: sameSitePath(saved) ?? paths.home };
 }
@@ -119,14 +65,6 @@ function endedCopy(error: string): { title: string; message: string; hint: strin
       return { title: "Sign-in did not finish", message: "Silicon Accounts could not finish the sign-in just now, so you are not signed in.", hint: "Sign in again in a moment." };
     default:
       return { title: "Sign-in did not finish", message: "The sign-in stopped before you were signed in, so nothing changed.", hint: "Sign in again whenever you are ready." };
-  }
-}
-
-function forgetReturn(state: string): void {
-  try {
-    sessionStorage.removeItem(RETURN_PREFIX + state);
-  } catch {
-    // Nothing to clean up without storage.
   }
 }
 
@@ -163,13 +101,13 @@ function SignInRoundTrip() {
   const startFlow = (returnTo: string | null, prompt?: FlowPrompt) => {
     const loginHint = search.get("login_hint")?.trim();
     const method = METHODS.find(value => value === search.get("method"));
-    router.replace(firstPartyAuthorizeUrl(returnTo, { prompt, login_hint: loginHint ? loginHint.slice(0, 320) : undefined, method }));
+    router.replace(firstPartySignInUrl(returnTo, { prompt, login_hint: loginHint ? loginHint.slice(0, 320) : undefined, method }));
   };
 
   const onReady = useEffectEvent(() => {
     if (left.current) return;
     if (arrival) {
-      forgetReturn(arrival.state);
+      forgetSignInReturn(arrival.state);
       // A sign-in that ended without signing in stays here to say so.
       if (arrival.error) return;
       left.current = true;

@@ -17,8 +17,9 @@
 #   scripts/journeys.sh --keep          leave the stack running and keep the database afterwards
 #
 # Ports: JOURNEYS_PORT_BASE [9690] is the public site (proxy or Next.js), accounts-api is base-1,
-# mock-oidc base+1, mock-messaging base+2, the fake apps base+3. JOURNEYS_DB_NAME
-# [accounts_journeys_<base>], CARGO_TARGET_DIR [target]. The stack runs with
+# mock-oidc base+1, mock-messaging base+2, the fake apps base+3, mock Iris base+4. JOURNEYS_DB_NAME
+# [accounts_journeys_<base>], CARGO_TARGET_DIR [target]. With --next the site builds into
+# web/.next-<base> (deleted afterwards unless --keep). The stack runs with
 # ACCOUNTS_TRUST_FORWARDED_FOR=true so each journey's random X-Forwarded-For gets its own
 # per-network limits. Logs: .dev/logs/<base>/. Exit 0 when every journey passed.
 set -euo pipefail
@@ -51,9 +52,11 @@ export ACCOUNTS_API_PORT="$((BASE - 1))"
 export MOCK_OIDC_PORT="$((BASE + 1))"
 export MOCK_MESSAGING_PORT="$((BASE + 2))"
 export FAKE_APPS_PORT="$((BASE + 3))"
+export MOCK_IRIS_PORT="$((BASE + 4))"
+export NEXT_DIST_DIR=".next-$BASE"
 export ACCOUNTS_DB_NAME="${JOURNEYS_DB_NAME:-accounts_journeys_$BASE}"
 export ACCOUNTS_TRUST_FORWARDED_FOR=true
-unset ACCOUNTS_PUBLIC_URL ACCOUNTS_EXTRA_ALLOWED_ORIGINS ACCOUNTS_WEB_DIST
+unset ACCOUNTS_PUBLIC_URL ACCOUNTS_EXTRA_ALLOWED_ORIGINS ACCOUNTS_WEB_DIST ACCOUNTS_IRIS_BASE_URL
 PG_BIN="${PG_BIN:-/opt/homebrew/opt/postgresql@16/bin}"
 PGPORT="${ACCOUNTS_PGPORT:-5444}"
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
@@ -75,8 +78,8 @@ teardown() {
     echo "journeys: the stack keeps running (ACCOUNTS_PORT=$BASE scripts/stop.sh) on database $ACCOUNTS_DB_NAME"
     return
   fi
-  ACCOUNTS_PORT="$BASE" "$ROOT/scripts/stop.sh" --quiet || true
-  rm -rf "$ROOT/.dev/run/$BASE"
+  ACCOUNTS_PORT="$BASE" "$ROOT/scripts/stop.sh" --quiet --clean || true
+  rm -rf "$ROOT/.dev/run/$BASE" "$ROOT/web/$NEXT_DIST_DIR" "$ROOT/web/$NEXT_DIST_DIR.tsconfig.json"
   PGOPTIONS='--client-min-messages=warning' "$PG_BIN/dropdb" -h 127.0.0.1 -p "$PGPORT" -U postgres --if-exists --force "$ACCOUNTS_DB_NAME" 2>/dev/null || true
   rm -f "$ROOT/.dev/seed/$ACCOUNTS_DB_NAME-$PGPORT.sha256"
 }

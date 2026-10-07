@@ -22,7 +22,7 @@ describe('lib: sign-in helpers against mocks + stub Accounts', () => {
   let oidc: MockOidcClient;
 
   before(async () => {
-    kit = await startTestkit({ oidcPort: 0, messagingPort: 0, fakeApps: false });
+    kit = await startTestkit({ oidcPort: 0, messagingPort: 0, irisPort: 0, fakeApps: false });
     const creds = kit.credentials;
     stub = await startStubAccounts({
       apps: loadFakeApps(),
@@ -55,6 +55,7 @@ describe('lib: sign-in helpers against mocks + stub Accounts', () => {
     assert.equal(kit.accountsEnv.ACCOUNTS_GOOGLE_ISSUERS, kit.oidc?.issuer.google);
     assert.equal(kit.accountsEnv.ACCOUNTS_APPLE_ISSUER, kit.oidc?.issuer.apple);
     assert.match(kit.accountsEnv.ACCOUNTS_APPLE_PRIVATE_KEY ?? '', /^-----BEGIN PRIVATE KEY-----\n/);
+    assert.equal(kit.accountsEnv.ACCOUNTS_IRIS_BASE_URL, kit.iris?.url);
   });
 
   test('signInWithCode (email): new Carbon signs up, consents, and the app exchanges the code', async () => {

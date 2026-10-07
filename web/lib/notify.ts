@@ -11,6 +11,7 @@
  */
 import type { ToastOptions, ToastStackApi } from "@/components/arc/toast-stack/toast-stack";
 import { ApiError } from "./api/errors";
+import { durationText, readableTimes } from "./format";
 
 let api: ToastStackApi | null = null;
 const queue: ToastOptions[] = [];
@@ -51,11 +52,14 @@ function titleFor(error: ApiError): string {
   return "That did not work";
 }
 
-/** Shows an API failure: the server's message says what and why, the hint says what to do next. Returns the toast id. */
+/**
+ * Shows an API failure: the server's message says what and why, the hint says what to do next. Times the service
+ * writes into its sentences (RFC 3339, "N seconds from now") read as clock times and spans. Returns the toast id.
+ */
 export function notifyError(error: unknown, title?: string): string {
   const failure = ApiError.from(error);
-  const retry = failure.retryAfter && !failure.hint ? ` Try again in ${failure.retryAfter} s.` : "";
-  const description = [failure.message, failure.hint].filter(Boolean).join(" ") + retry;
+  const retry = failure.retryAfter && !failure.hint ? ` Try again in ${durationText(failure.retryAfter)}.` : "";
+  const description = readableTimes([failure.message, failure.hint].filter(Boolean).join(" ") + retry);
   // One network toast at a time: every failing request would otherwise stack its own.
   return show({ type: "error", title: title ?? titleFor(failure), description, id: failure.isNetwork ? "network_error" : undefined });
 }

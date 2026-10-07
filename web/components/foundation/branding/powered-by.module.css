@@ -43,7 +43,10 @@
   visibility: visible !important;
   opacity: 1 !important;
 }
-.pill a:hover { text-decoration: underline !important; text-underline-offset: .2em; }
+.pill a:hover, .pill a:focus-visible { text-decoration: underline !important; text-underline-offset: .2em; }
+/* Keyboard focus also shows as the pill's edge taking the text colour (focus is never a ring on these pages). */
+.pill:has(a:focus-visible) { border-color: currentColor !important; }
+.pill a:focus-visible { outline: none; }
 .mark { display: block !important; width: 14px !important; height: 14px !important; flex: none !important; }
 .dark .pill { border-color: rgb(255 253 249 / .14) !important; background: rgb(42 41 39 / .86) !important; color: #C9C4BC !important; }
 .dark .pill a { color: #FFFDF9 !important; }

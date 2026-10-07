@@ -218,7 +218,8 @@ impl Palette {
 
     /// The Silicon Accounts dark palette. Filled buttons keep the brand blue `#1F5FB8` under
     /// `#FFFDF9` text (6.1:1, WCAG AA for text); the lighter `#5B8FE0` is only an ink for links
-    /// and accents on dark surfaces and would put button text at 3.2:1.
+    /// and accents on dark surfaces and would put button text at 3.2:1. Error text is `#FF8A80`
+    /// (5.45:1 on the `#353432` card); the old `#F97066` read at 4.46:1 there (migration 0004).
     pub fn default_dark() -> Palette {
         Palette {
             primary: "#1F5FB8".into(),
@@ -228,7 +229,7 @@ impl Palette {
             foreground: "#FFFDF9".into(),
             muted: "#B5B0A8".into(),
             border: "#4A4845".into(),
-            danger: "#F97066".into(),
+            danger: "#FF8A80".into(),
         }
     }
 
@@ -1347,6 +1348,9 @@ mod tests {
                 (&p.primary_foreground, &p.primary),
                 (&p.foreground, &p.background),
                 (&p.foreground, &p.surface),
+                // Error text sits on the card and on the page.
+                (&p.danger, &p.surface),
+                (&p.danger, &p.background),
             ] {
                 let ratio = contrast_ratio(fg, bg).expect("hex colours");
                 assert!(

@@ -49,11 +49,13 @@ async fn new_carbons_sign_up_with_everything_prefilled() {
         s["timezone"], "Europe/Paris",
         "browser timezone when no IP header"
     );
-    let today = accounts_core::timefmt::today_utc();
-    assert_eq!(
-        s["dob"],
-        accounts_core::timefmt::format_date(accounts_core::normalize::default_dob(today))
-    );
+    // Exactly 18 years before the Carbon's own today (in the prefilled timezone, not UTC).
+    let dob_in = |timezone: &str| {
+        accounts_core::timefmt::format_date(accounts_core::normalize::default_dob(
+            accounts_core::timefmt::today_in(timezone),
+        ))
+    };
+    assert_eq!(s["dob"], dob_in("Europe/Paris").as_str(), "{s}");
     assert!(
         s["pfp_url"]
             .as_str()
@@ -80,6 +82,11 @@ async fn new_carbons_sign_up_with_everything_prefilled() {
         )
         .await;
     assert_eq!(r.json["flow"]["signup"]["timezone"], "Asia/Kolkata");
+    assert_eq!(
+        r.json["flow"]["signup"]["dob"],
+        dob_in("Asia/Kolkata").as_str(),
+        "the dob follows the timezone the page prefills"
+    );
 
     // Accept the prefill as-is.
     let r = b

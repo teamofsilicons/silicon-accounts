@@ -61,7 +61,7 @@ prompt=none that can't sign in silently ─────────────�
   `interaction_required` and `redirect_to = redirect_uri?error=…&state=…`.
 - **Sign-up prefill**: display name (provider name → email local part → `Carbon 1234`), id
   (`repo::accounts::suggest_id` from the email local part then the name), timezone (IP header →
-  browser `timezone` sent to `POST /v1/flows` → UTC), dob (18 years ago), photo (our default Carbon
+  browser `timezone` sent to `POST /v1/flows` → UTC), dob (exactly 18 years before the Carbon's own today, counted in the prefilled timezone: just after midnight in Kolkata it is still yesterday in UTC), photo (our default Carbon
   photo from Iris, as UNDERSTANDING.md says; a Google picture is offered separately as
   `signup.provider_pfp_url` and stored only when sent back as `pfp_url`; a photo uploaded with
   `POST …/signup/photo` replaces the default as the prefill). The only photo of this service a

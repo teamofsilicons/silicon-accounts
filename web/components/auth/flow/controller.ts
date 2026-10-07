@@ -17,8 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/endpoints";
 import { ApiError } from "@/lib/api/errors";
-import { request, seg } from "@/lib/api/http";
-import type { ConsentSubmit, FlowView, PhotoInfo, SignupSubmit } from "@/lib/api/types";
+import type { ConsentSubmit, FlowView, SignupPhoto, SignupSubmit } from "@/lib/api/types";
 import { queryKeys } from "@/lib/query/keys";
 import { rememberLook, type HostedFlow } from "./model";
 
@@ -45,11 +44,7 @@ const SEND_REFUSALS = new Set(["email_domain_not_allowed"]);
 
 export type ActionResult = ApiError | null;
 
-/** `POST /v1/flows/{id}/signup/photo` (201): the photo picked at sign-up, stored with the sign-up until it finishes. */
-export interface SignupPhoto {
-  pfp_url: string;
-  photo: PhotoInfo;
-}
+export type { SignupPhoto };
 
 export interface FlowActions {
   /** Reads the flow again (Retry, a resync). */
@@ -171,8 +166,7 @@ export function useFlowController(id: string): FlowController {
       },
       uploadSignupPhoto: async file => {
         try {
-          // Not in lib/api yet (a request to the foundation): the flow-scoped upload of the sign-up step.
-          return await request<SignupPhoto>(`/v1/flows/${seg(id)}/signup/photo`, { method: "POST", raw: file, contentType: file.type || "application/octet-stream" });
+          return await api.flows.uploadSignupPhoto(id, file);
         } catch (raw) {
           const error = ApiError.from(raw);
           await handle(error);

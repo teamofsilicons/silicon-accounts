@@ -8,7 +8,7 @@
  * On a page they open in a popover from a small "Change" button (TimezoneEditor, DobEditor). Inside a modal drawer they
  * are shown inline instead (InlineEditor with TimezoneForm or PhotoUrlForm): a phone-wide drawer has no room beside the
  * row, and a layer opened from a modal layer is easy to lose. Escape in an open timezone list or calendar closes just
- * that list or calendar; the next Escape closes the popover (parts/escape.ts).
+ * that list or calendar; the next Escape closes the popover (components/arc/lib/escape.ts).
  */
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Avatar } from "@/components/arc/avatar/avatar";
@@ -20,7 +20,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popove
 import { Select } from "@/components/arc/select/select";
 import { timezoneOptions } from "@/lib/timezones";
 import { describeError } from "./common";
-import { escapeLayer } from "./escape";
 import partStyles from "./parts.module.css";
 import styles from "./editors.module.css";
 
@@ -46,18 +45,11 @@ function EditorShell({ title, description, trigger, triggerLabel, open, onOpenCh
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger data-sq="surface" className={partStyles.textAction} aria-label={triggerLabel}>{trigger}</PopoverTrigger>
       <PopoverContent
-        {...escapeLayer}
         className={styles.popover}
         side="bottom"
         align="start"
         sideOffset={8}
         aria-labelledby={titleId}
-        // Focus lands on the panel itself: the timezone search opens its list as soon as it is focused, which would
-        // cover the panel's own actions before anything was asked for. Tab moves into the fields.
-        onOpenAutoFocus={event => {
-          event.preventDefault();
-          (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true });
-        }}
       >
         <p id={titleId} className={styles.title}>{title}</p>
         <p className={styles.description}>{description}</p>

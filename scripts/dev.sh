@@ -2,15 +2,18 @@
 # The whole local Silicon Accounts stack, one command:
 #
 #   Postgres (scripts/dev-db.sh) → accounts-migrate → accounts-seed (testkit/fake-apps.json)
-#   → testkit (mock Google/Apple, mock Postmark/Twilio, the fake app server)
-#   → accounts-api on 127.0.0.1:8589, wired to the mocks (ACCOUNTS_DELIVERY=providers, dev outbox on)
+#   → testkit (mock Google/Apple, mock Postmark/Twilio, the fake app server, mock Iris)
+#   → accounts-api on 127.0.0.1:8589, wired to the mocks (ACCOUNTS_DELIVERY=providers, dev outbox on, the default
+#     profile photos from mock Iris, so no page loads anything from the internet)
 #   → the account site (Next.js, web/) on http://localhost:8590: the public origin. It serves the
 #     pages and proxies /v1/* and /.well-known/* to accounts-api (ACCOUNTS_API_URL).
 #
 #   scripts/dev.sh               run in the foreground; Ctrl-C stops everything it started
 #   scripts/dev.sh --detach      start in the background, print the URLs and return
 #                                (stop it with scripts/stop.sh)
-#   scripts/dev.sh --prod        run the site as a production build (pnpm -C web build, then start)
+#   scripts/dev.sh --prod        run the site as a production build: pnpm -C web build, then the standalone server
+#                                production runs (node <build dir>/standalone/server.js, with <build dir>/static and
+#                                public/ copied beside it)
 #   scripts/dev.sh --web=MODE    what serves the public origin:
 #       auto      (default) next when web/package.json depends on "next", else none (with a warning)
 #       next      the Next.js site: `pnpm -C web dev` (or build + start with --prod)
@@ -31,17 +34,22 @@
 #
 # Environment (defaults in brackets) — set them to run a second stack on other ports:
 #   ACCOUNTS_PORT [8590] (the public site)   ACCOUNTS_API_PORT [8589] (accounts-api)
-#   MOCK_OIDC_PORT [8591]   MOCK_MESSAGING_PORT [8592]   FAKE_APPS_PORT [8593]
+#   MOCK_OIDC_PORT [8591]   MOCK_MESSAGING_PORT [8592]   FAKE_APPS_PORT [8593]   MOCK_IRIS_PORT [8594]
 #   ACCOUNTS_PGPORT [5444]  ACCOUNTS_DB_NAME [silicon_accounts]
 #   ACCOUNTS_PUBLIC_URL [http://localhost:$ACCOUNTS_PORT; with --web=none http://localhost:$ACCOUNTS_API_PORT]
 #   ACCOUNTS_EXTRA_ALLOWED_ORIGINS [the public URL's port on 127.0.0.1]
 #   ACCOUNTS_TRUST_FORWARDED_FOR [true: accounts-api runs behind the site]
 #   TESTKIT_ACCOUNTS_URL [the API]   how the fake apps reach Silicon Accounts server to server
+#   ACCOUNTS_IRIS_BASE_URL [mock Iris: http://127.0.0.1:$MOCK_IRIS_PORT]   the default profile photos
 #   ACCOUNTS_WEB_DIR [web]   the Next.js site to run (another checkout or a probe app)
+#   NEXT_DIST_DIR [.next on port 8590, else .next-$ACCOUNTS_PORT]   the site's build directory inside the site's
+#                directory: Next bakes ACCOUNTS_API_URL into each build, so every stack builds into its own and
+#                stacks running at the same time never share or overwrite a build
+#   ACCOUNTS_WEB_BUILD_SLOTS [2]   production builds of the site that may run at once across stacks (others wait)
 #   CARGO_TARGET_DIR [target]   PG_BIN [/opt/homebrew/opt/postgresql@16/bin]
 #
 # Logs: .dev/logs/ (or .dev/logs/<ACCOUNTS_PORT>/ for a non-default port).
-# State (pid files, the generated env): .dev/run/<ACCOUNTS_PORT>/.
+# State (pid files, the generated env, web.dist naming the site's build directory): .dev/run/<ACCOUNTS_PORT>/.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -128,11 +136,12 @@ API_PORT="${ACCOUNTS_API_PORT:-8589}"
 MOCK_OIDC_PORT="${MOCK_OIDC_PORT:-8591}"
 MOCK_MESSAGING_PORT="${MOCK_MESSAGING_PORT:-8592}"
 FAKE_APPS_PORT="${FAKE_APPS_PORT:-8593}"
+MOCK_IRIS_PORT="${MOCK_IRIS_PORT:-8594}"
 PGPORT="${ACCOUNTS_PGPORT:-5444}"
 DB="${ACCOUNTS_DB_NAME:-silicon_accounts}"
 PG_BIN="${PG_BIN:-/opt/homebrew/opt/postgresql@16/bin}"
 
-for p in "$ACCOUNTS_PORT" "$API_PORT" "$MOCK_OIDC_PORT" "$MOCK_MESSAGING_PORT" "$FAKE_APPS_PORT" "$PGPORT"; do
+for p in "$ACCOUNTS_PORT" "$API_PORT" "$MOCK_OIDC_PORT" "$MOCK_MESSAGING_PORT" "$FAKE_APPS_PORT" "$MOCK_IRIS_PORT" "$PGPORT"; do
   case "$p" in
     ''|*[!0-9]*) echo "error: ports must be numbers, got '$p'" >&2; exit 2 ;;
   esac
@@ -155,6 +164,18 @@ API_URL="http://127.0.0.1:$API_PORT"
 FRONT_URL="http://127.0.0.1:$ACCOUNTS_PORT"
 TESTKIT_ACCOUNTS_URL="${TESTKIT_ACCOUNTS_URL:-$API_URL}"
 DB_URL="postgres://postgres@127.0.0.1:$PGPORT/$DB"
+IRIS_URL="${ACCOUNTS_IRIS_BASE_URL:-http://127.0.0.1:$MOCK_IRIS_PORT}"
+IRIS_URL="${IRIS_URL%/}"
+
+# The site's build directory (inside the site's directory). The default stack keeps Next's own .next; any other port
+# gets .next-<port>, because ACCOUNTS_API_URL is baked into each build (web/next.config.ts reads NEXT_DIST_DIR).
+if [ "$ACCOUNTS_PORT" = 8590 ]; then DEFAULT_DIST_DIR=.next; else DEFAULT_DIST_DIR=".next-$ACCOUNTS_PORT"; fi
+DIST_DIR="${NEXT_DIST_DIR:-$DEFAULT_DIST_DIR}"
+case "$DIST_DIR" in
+  .next|.next-*) ;;
+  *) fail "NEXT_DIST_DIR must be .next or .next-<name> (a directory inside the site's directory), got '$DIST_DIR'" ;;
+esac
+case "$DIST_DIR" in */*|*' '*) fail "NEXT_DIST_DIR must be a plain directory name like .next-9600, got '$DIST_DIR'" ;; esac
 
 RUN_DIR="$ROOT/.dev/run/$ACCOUNTS_PORT"
 if [ "$ACCOUNTS_PORT" = 8590 ]; then LOG_DIR="$ROOT/.dev/logs"; else LOG_DIR="$ROOT/.dev/logs/$ACCOUNTS_PORT"; fi
@@ -179,12 +200,12 @@ if [ -d "$RUN_DIR" ] && ls "$RUN_DIR"/*.pid >/dev/null 2>&1; then
   ACCOUNTS_PORT="$ACCOUNTS_PORT" "$ROOT/scripts/stop.sh" --quiet
 fi
 
-ports_to_check=("$API_PORT" "$MOCK_OIDC_PORT" "$MOCK_MESSAGING_PORT" "$FAKE_APPS_PORT")
+ports_to_check=("$API_PORT" "$MOCK_OIDC_PORT" "$MOCK_MESSAGING_PORT" "$FAKE_APPS_PORT" "$MOCK_IRIS_PORT")
 case "$WEB_MODE" in next|proxy) ports_to_check+=("$ACCOUNTS_PORT") ;; esac
 for p in "${ports_to_check[@]}"; do
   if port_busy "$p"; then
     fail "port $p is already in use by $(who_listens "$p" || echo 'another process')" \
-      "stop it, or pick other ports: ACCOUNTS_PORT=9590 ACCOUNTS_API_PORT=9589 MOCK_OIDC_PORT=9591 MOCK_MESSAGING_PORT=9592 FAKE_APPS_PORT=9593 scripts/dev.sh"
+      "stop it, or pick other ports: ACCOUNTS_PORT=9590 ACCOUNTS_API_PORT=9589 MOCK_OIDC_PORT=9591 MOCK_MESSAGING_PORT=9592 FAKE_APPS_PORT=9593 MOCK_IRIS_PORT=9594 scripts/dev.sh"
   fi
 done
 
@@ -252,6 +273,40 @@ if [ ! -x "$ROOT/testkit/node_modules/.bin/tsx" ]; then
     || { tail -n 20 "$LOG_DIR/testkit-install.log" >&2; fail "pnpm install in testkit/ failed"; }
 fi
 
+# A site build uses every core, so more than a couple at once only slow each other and the walks of stacks that are
+# already up. A production build takes one of ACCOUNTS_WEB_BUILD_SLOTS [2] slots, .dev/locks/web-build-<n> (mkdir is
+# atomic; a slot whose holder died is taken over), and waits while all are taken. Builds never share files (see
+# NEXT_DIST_DIR), so this is only about the machine's cores.
+BUILD_SLOT=""
+take_build_slot() {
+  local slots="${ACCOUNTS_WEB_BUILD_SLOTS:-2}" n dir owner said=0
+  case "$slots" in ''|*[!0-9]*|0) fail "ACCOUNTS_WEB_BUILD_SLOTS must be a positive number, got '$slots'" ;; esac
+  mkdir -p "$ROOT/.dev/locks"
+  while :; do
+    for n in $(seq 1 "$slots"); do
+      dir="$ROOT/.dev/locks/web-build-$n"
+      if mkdir "$dir" 2>/dev/null; then
+        printf '%s\n' "$$" >"$dir/pid"
+        BUILD_SLOT="$dir"
+        return 0
+      fi
+      owner="$(cat "$dir/pid" 2>/dev/null || true)"
+      if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null && mv "$dir" "$dir.stale.$$" 2>/dev/null; then
+        rm -rf "$dir.stale.$$"
+      fi
+    done
+    if [ "$said" = 0 ]; then
+      say "waiting for a build slot (other stacks are building; ACCOUNTS_WEB_BUILD_SLOTS=$slots at a time)"
+      said=1
+    fi
+    sleep 1
+  done
+}
+release_build_slot() {
+  if [ -n "$BUILD_SLOT" ]; then rm -rf "$BUILD_SLOT"; fi
+  BUILD_SLOT=""
+}
+
 PIDS=()
 started=0
 cleanup_done=0
@@ -264,9 +319,9 @@ stop_all() {
   say "stopped (Postgres keeps running; scripts/stop.sh --db stops it)"
 }
 # Foreground: Ctrl-C (or any failure) stops everything. Detached: only a failure during start-up does.
-trap 'stop_all; exit 130' INT
-trap 'stop_all; exit 143' TERM
-trap 'if [ "$DETACH" = 0 ] || [ "$started" = 0 ]; then stop_all; fi' EXIT
+trap 'release_build_slot; stop_all; exit 130' INT
+trap 'release_build_slot; stop_all; exit 143' TERM
+trap 'release_build_slot; if [ "$DETACH" = 0 ] || [ "$started" = 0 ]; then stop_all; fi' EXIT
 
 # Each background service gets its own process group (job control on just for the launch), so
 # stopping it stops its children too (tsx and pnpm run node as children), and Ctrl-C reaches
@@ -301,11 +356,24 @@ wait_ready() {
   done
 }
 
+# Next rewrites web/next-env.d.ts on every build and dev start to import the route types of the build directory it
+# uses (<dir>/types, or <dir>/dev/types for next dev). A stack's own directory (.next-<port>) is deleted with the
+# stack, so point the file back at .next/types, what `next build` and `pnpm typecheck` (next typegen) write and editors
+# expect. A temporary file and a rename: other stacks may be building right now.
+restore_next_env() {
+  local file="$WEB_DIR/next-env.d.ts" pattern
+  [ "$DIST_DIR" != .next ] && [ -f "$file" ] || return 0
+  pattern="\./${DIST_DIR//./\\.}/"
+  grep -q "$pattern" "$file" 2>/dev/null || return 0
+  sed -e "s#${pattern}dev/types/#./.next/types/#g" -e "s#$pattern#./.next/#g" "$file" >"$file.$$.tmp" && mv -f "$file.$$.tmp" "$file"
+}
+
 rm -f "$RUN_DIR/testkit.json"
-say "starting the testkit (mock-oidc :$MOCK_OIDC_PORT, mock-messaging :$MOCK_MESSAGING_PORT, fake apps :$FAKE_APPS_PORT)"
+say "starting the testkit (mock-oidc :$MOCK_OIDC_PORT, mock-messaging :$MOCK_MESSAGING_PORT, fake apps :$FAKE_APPS_PORT, mock Iris :$MOCK_IRIS_PORT)"
 launch testkit env \
   ACCOUNTS_URL="$TESTKIT_ACCOUNTS_URL" ACCOUNTS_PUBLIC_URL="$PUBLIC_URL" \
   MOCK_OIDC_PORT="$MOCK_OIDC_PORT" MOCK_MESSAGING_PORT="$MOCK_MESSAGING_PORT" FAKE_APPS_PORT="$FAKE_APPS_PORT" \
+  MOCK_IRIS_PORT="$MOCK_IRIS_PORT" \
   TESTKIT_LOG=1 \
   "$ROOT/testkit/node_modules/.bin/tsx" "$ROOT/testkit/src/start.ts" --ready-file "$RUN_DIR/testkit.json"
 TESTKIT_PID="$LAST_PID"
@@ -326,7 +394,7 @@ done
 ENV_FILE="$RUN_DIR/accounts-api.env"
 (
   cd "$ROOT/testkit"
-  MOCK_OIDC_PORT="$MOCK_OIDC_PORT" MOCK_MESSAGING_PORT="$MOCK_MESSAGING_PORT" \
+  MOCK_OIDC_PORT="$MOCK_OIDC_PORT" MOCK_MESSAGING_PORT="$MOCK_MESSAGING_PORT" MOCK_IRIS_PORT="$MOCK_IRIS_PORT" \
     ./node_modules/.bin/tsx src/print-env.ts --format shell --api-port "$API_PORT" --public-url "$PUBLIC_URL"
 ) >"$ENV_FILE.tmp" || fail "could not compute the testkit environment (testkit/src/print-env.ts)"
 {
@@ -338,6 +406,7 @@ ENV_FILE="$RUN_DIR/accounts-api.env"
     "ACCOUNTS_PUBLIC_URL=$PUBLIC_URL" \
     "ACCOUNTS_EXTRA_ALLOWED_ORIGINS=$EXTRA_ORIGINS" \
     "ACCOUNTS_TRUST_FORWARDED_FOR=$TRUST_FORWARDED_FOR" \
+    "ACCOUNTS_IRIS_BASE_URL=$IRIS_URL" \
     "ACCOUNTS_DELIVERY=providers" \
     "ACCOUNTS_EXPOSE_DEV_OUTBOX=true" \
     "ACCOUNTS_WORKER_ENABLED=true" \
@@ -365,23 +434,46 @@ case "$WEB_MODE" in
       pnpm -C "$WEB_DIR" install ${install_flags[@]+"${install_flags[@]}"} >"$LOG_DIR/web-install.log" 2>&1 \
         || { tail -n 20 "$LOG_DIR/web-install.log" >&2; fail "pnpm install in web/ failed (log: $LOG_DIR/web-install.log)"; }
     fi
-    web_env=(PORT="$ACCOUNTS_PORT" ACCOUNTS_API_URL="$API_URL" ACCOUNTS_PUBLIC_URL="$PUBLIC_URL" NEXT_TELEMETRY_DISABLED=1)
+    # ACCOUNTS_IRIS_BASE_URL: the site's CSP lets pages show the mock Iris's photos (web/proxy.ts).
+    web_env=(PORT="$ACCOUNTS_PORT" ACCOUNTS_API_URL="$API_URL" ACCOUNTS_PUBLIC_URL="$PUBLIC_URL" ACCOUNTS_IRIS_BASE_URL="$IRIS_URL" NEXT_DIST_DIR="$DIST_DIR" NEXT_TELEMETRY_DISABLED=1)
     printf '%s\n' "$WEB_DIR" >"$RUN_DIR/web.match"
+    printf '%s\n' "$WEB_DIR/$DIST_DIR" >"$RUN_DIR/web.dist"
     if [ "$PROD" = 1 ]; then
-      say "building the site for production (pnpm -C $(rel "$WEB_DIR") build; log: $(rel "$LOG_DIR")/web-build.log)"
-      env "${web_env[@]}" NODE_ENV=production pnpm -C "$WEB_DIR" build >"$LOG_DIR/web-build.log" 2>&1 \
-        || { tail -n 40 "$LOG_DIR/web-build.log" >&2; fail "pnpm -C web build failed (log: $LOG_DIR/web-build.log)"; }
-      say "starting the site (next start) on $FRONT_URL"
-      launch web env "${web_env[@]}" NODE_ENV=production pnpm -C "$WEB_DIR" start
+      say "building the site for production into $(rel "$WEB_DIR")/$DIST_DIR (pnpm -C $(rel "$WEB_DIR") build; log: $(rel "$LOG_DIR")/web-build.log)"
+      build_status=0
+      take_build_slot
+      env "${web_env[@]}" NODE_ENV=production pnpm -C "$WEB_DIR" build >"$LOG_DIR/web-build.log" 2>&1 || build_status=$?
+      release_build_slot
+      restore_next_env
+      [ "$build_status" = 0 ] || { tail -n 40 "$LOG_DIR/web-build.log" >&2; fail "pnpm -C web build failed (log: $LOG_DIR/web-build.log)"; }
+      # output: "standalone" (web/next.config.ts): production runs <build dir>/standalone/server.js with the static
+      # assets and public/ copied beside it, so that is what runs here too (`next start` only warns that it is not meant
+      # for it). A site without a standalone build falls back to `next start`.
+      standalone="$WEB_DIR/$DIST_DIR/standalone"
+      if [ -f "$standalone/server.js" ]; then
+        rm -rf "$standalone/$DIST_DIR/static" "$standalone/public"
+        mkdir -p "$standalone/$DIST_DIR"
+        cp -R "$WEB_DIR/$DIST_DIR/static" "$standalone/$DIST_DIR/static"
+        [ -d "$WEB_DIR/public" ] && cp -R "$WEB_DIR/public" "$standalone/public"
+        say "starting the site (the standalone production server, $(rel "$standalone")/server.js) on $FRONT_URL"
+        # The server renames its process to "next-server (vX)", so that is what stop.sh must find at this pid.
+        printf '%s\n' "next-server" >"$RUN_DIR/web.match"
+        # HOSTNAME is the address it binds (an inherited machine name would bind only that interface).
+        launch web env "${web_env[@]}" NODE_ENV=production HOSTNAME=0.0.0.0 node "$standalone/server.js"
+      else
+        say "starting the site (next start) on $FRONT_URL"
+        launch web env "${web_env[@]}" NODE_ENV=production pnpm -C "$WEB_DIR" start
+      fi
       FRONT_PID="$LAST_PID"
       FRONT_NAME=web
       wait_ready web "$FRONT_URL/v1/meta" "$FRONT_PID" 120
     else
-      say "starting the site (next dev) on $FRONT_URL"
+      say "starting the site (next dev, build directory $(rel "$WEB_DIR")/$DIST_DIR) on $FRONT_URL"
       launch web env "${web_env[@]}" pnpm -C "$WEB_DIR" dev
       FRONT_PID="$LAST_PID"
       FRONT_NAME=web
       wait_ready web "$FRONT_URL/v1/meta" "$FRONT_PID" 180
+      restore_next_env
     fi
     ;;
   proxy)
@@ -409,8 +501,9 @@ Silicon Accounts dev stack is up
   fake apps            http://127.0.0.1:$FAKE_APPS_PORT/
   mock Google/Apple    http://127.0.0.1:$MOCK_OIDC_PORT   (/_requests, /_identities)
   mock email/SMS       http://127.0.0.1:$MOCK_MESSAGING_PORT/_messages
+  profile photos       $IRIS_URL   ($( [ "$IRIS_URL" = "http://127.0.0.1:$MOCK_IRIS_PORT" ] && echo 'mock Iris' || echo 'ACCOUNTS_IRIS_BASE_URL'))
   database             $DB_URL
-  logs                 $(rel "$LOG_DIR")/ (accounts-api.log, testkit.log$( [ -n "$FRONT_NAME" ] && echo ", $FRONT_NAME.log"), migrate.log, seed.log)
+  logs                 $(rel "$LOG_DIR")/ (accounts-api.log, testkit.log$( [ -n "$FRONT_NAME" ] && echo ", $FRONT_NAME.log"), migrate.log, seed.log)$( [ "$WEB_MODE" = next ] && printf '\n  site build           %s/%s' "$(rel "$WEB_DIR")" "$DIST_DIR")
   CLI                  $(rel "$BIN")/accounts --url $PUBLIC_URL --help
 EOF
 

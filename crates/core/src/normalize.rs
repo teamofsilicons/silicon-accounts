@@ -247,6 +247,17 @@ pub fn normalize_phone(input: &str, default_country: Option<&str>) -> Result<Str
     Ok(out)
 }
 
+/// Loads the phone-number metadata [`normalize_phone`] reads. The `phonenumber` crate loads its
+/// whole metadata database on the first number a process parses: about a second in an unoptimized
+/// build and tens of milliseconds in a release one, and far longer on a busy machine. accounts-api
+/// calls this once before it listens, so no request (the first phone sign-in, requirement or new
+/// number) waits for it.
+pub fn warm_up_phone_metadata() {
+    // A number that parses: the metadata loads whether or not it is valid, but parsing it fully
+    // also builds what a valid number needs.
+    let _ = normalize_phone("+12025550142", None);
+}
+
 /// `+919876543210` → `+91******3210`.
 pub fn mask_phone(phone: &str) -> String {
     let digits: Vec<char> = phone.chars().collect();
@@ -701,6 +712,20 @@ mod tests {
         }
         assert_eq!(mask_email("saket@gmail.com"), "s***@gmail.com");
         assert_eq!(email_domain("a@b.test"), "b.test");
+    }
+
+    #[test]
+    fn warming_up_the_phone_metadata_changes_no_answer() {
+        warm_up_phone_metadata();
+        warm_up_phone_metadata();
+        assert_eq!(
+            normalize_phone("+1 202 555 0142", None).as_deref(),
+            Ok("+12025550142")
+        );
+        assert_eq!(
+            normalize_phone("+40 755 123 456", None).as_deref(),
+            Ok("+40755123456")
+        );
     }
 
     #[test]

@@ -8,7 +8,7 @@
  * The drawer is modal, so focus never falls out of it: whenever a control replaces itself (a form becoming a waiting
  * card, a "Removed" button folding away, a stored secret closing), focus moves to what took its place. Escape closes
  * the drawer, except while a control inside has something of its own to close first (the timezone list, a name being
- * edited, a confirm question): parts/escape.ts.
+ * edited, a confirm question): Arc's layers handle that themselves (components/arc/lib/escape.ts).
  */
 import { useRef, useState, type FormEvent, type ReactNode, type Ref } from "react";
 import { animate } from "motion/react";
@@ -31,7 +31,6 @@ import { useUpdateSilicon, useUploadSiliconPhoto } from "@/lib/query/silicons";
 import { timezoneLabel, utcOffset } from "@/lib/timezones";
 import { describeError, isDefaultPhoto, msUntil, PHOTO_ACCEPT, photoProblem, personLabel, reasonError, spanText, stkRotatedAt } from "../parts/common";
 import { InlineEditor, PhotoUrlForm, photoUrlDescription, timezoneDescription, TimezoneForm } from "../parts/detail-editors";
-import { escapeLayer } from "../parts/escape";
 import { FitPrompt } from "../parts/fit-prompt";
 import { handFocus } from "../parts/focus";
 import { HeightFrame } from "../parts/height-frame";
@@ -67,7 +66,7 @@ export function SiliconDrawer({ silicon, open, onOpenChange, ...rest }: SiliconD
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       {silicon ? (
-        <DrawerContent {...escapeLayer} className={styles.panel} title={silicon.display_name} description={`${silicon.id ?? "No id"} · uuid ${silicon.uuid}`}>
+        <DrawerContent className={styles.panel} title={silicon.display_name} description={`${silicon.id ?? "No id"} · uuid ${silicon.uuid}`}>
           <Body key={silicon.uuid} silicon={silicon} onClose={() => onOpenChange(false)} {...rest} />
         </DrawerContent>
       ) : null}

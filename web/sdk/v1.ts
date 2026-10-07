@@ -79,9 +79,11 @@ interface PublicApp {
 const TAG = "Silicon Accounts:";
 const STORAGE_PREFIX = "silicon-accounts:auth:";
 const LIGHT: Palette = { primary: "#1F5FB8", primary_foreground: "#FFFDF9", background: "#FFFDF9", surface: "#FFFFFF", foreground: "#353432", muted: "#6F6B66", border: "#E8E3DA", danger: "#B42318" };
-const DARK: Palette = { primary: "#5B8FE0", primary_foreground: "#FFFDF9", background: "#2A2927", surface: "#353432", foreground: "#FFFDF9", muted: "#B5B0A8", border: "#4A4845", danger: "#F97066" };
-/** Solid primary buttons on dark keep the brand blue (6.1:1 under paper white) while the app kept the default ink (3.2:1). */
-const BRAND_FILL = { fill: "#1F5FB8", hover: "#2766C2" };
+/**
+ * The default dark palette (crates/core `default_dark`, lib/branding/defaults.ts DEFAULT_DARK): filled buttons are the
+ * brand blue #1F5FB8 under paper white (6.1:1); accent-coloured text uses the lighter ink below (`--ink`).
+ */
+const DARK: Palette = { primary: "#1F5FB8", primary_foreground: "#FFFDF9", background: "#2A2927", surface: "#353432", foreground: "#FFFDF9", muted: "#B5B0A8", border: "#4A4845", danger: "#FF8A80" };
 const SANS = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
 const FONTS: Record<string, string> = {
   Geist: `"Geist Variable", "Geist", ${SANS}`,
@@ -302,11 +304,26 @@ window.addEventListener("message", event => {
 
 const configs = new Map<string, Promise<PublicApp>>();
 
+/**
+ * Waits between tries of a fetch the browser cut off: Safari cancels a page's requests the moment it starts navigating
+ * away (before pagehide), and networks blip. Two more tries before "could not reach", so a page that is leaving never
+ * logs an error, and a real outage still does after about two seconds.
+ */
+const NETWORK_RETRY_MS = [500, 1500];
+
+function fetchRetrying(url: string, attempt = 0): Promise<Response> {
+  return fetch(url, { credentials: "omit" }).catch(error => {
+    const wait = NETWORK_RETRY_MS[attempt];
+    if (wait === undefined) throw error;
+    return new Promise<Response>(done => setTimeout(() => done(fetchRetrying(url, attempt + 1)), wait));
+  });
+}
+
 /** GET /v1/apps/{app_id}/public (CORS *), once per app and page. */
 function loadApp(appId: string): Promise<PublicApp> {
   let pending = configs.get(appId);
   if (!pending) {
-    pending = fetch(`${base}/v1/apps/${encodeURIComponent(appId)}/public`, { credentials: "omit" })
+    pending = fetchRetrying(`${base}/v1/apps/${encodeURIComponent(appId)}/public`)
       .catch(() => {
         throw new Error(`${TAG} could not reach ${base}. Check the connection and that the page may load from it.`);
       })
@@ -425,12 +442,13 @@ function paint(root: HTMLElement, host: Element, app: PublicApp | null, requeste
   const theme = forced ?? backdrop(host, media);
   const p = paletteFor(app, theme);
   const mix = (a: string, percent: number, b: string) => `color-mix(in oklab,${a} ${percent}%,${b})`;
-  const brandFill = theme === "dark" && (branding.button_style ?? "solid") === "solid" && p.primary.toUpperCase() === DARK.primary && p.primary_foreground.toUpperCase() === DARK.primary_foreground;
   const vars: Record<string, string> = {
-    "--pr": brandFill ? BRAND_FILL.fill : p.primary,
-    "--prh": brandFill ? BRAND_FILL.hover : mix(p.primary, 90, p.foreground),
+    "--pr": p.primary,
+    "--prh": mix(p.primary, 90, p.foreground),
     "--pf": p.primary_foreground,
-    "--ink": theme === "dark" ? mix(p.primary, 80, p.foreground) : p.primary,
+    // Accent-coloured text on dark needs a lighter ink than a fill (the hosted pages' --accent-ink: 5.5:1 for the
+    // default blue on the dark card).
+    "--ink": theme === "dark" ? mix(p.primary, 50, p.foreground) : p.primary,
     "--sfc": p.surface,
     "--sf": p.surface,
     "--sfh": mix(p.foreground, theme === "dark" ? 9 : 5, p.surface),

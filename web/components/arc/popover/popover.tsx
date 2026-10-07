@@ -3,6 +3,7 @@
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { forwardRef } from "react";
 import type { ComponentPropsWithoutRef } from "react";
+import { ESCAPE_LAYER_ATTRIBUTE, layerEscape } from "../lib/escape";
 import styles from "./popover.module.css";
 
 export const Popover = PopoverPrimitive.Root;
@@ -21,10 +22,13 @@ PopoverTrigger.displayName = "PopoverTrigger";
 export const PopoverContent = forwardRef<
   HTMLDivElement,
   ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(function PopoverContent({ className, align = "start", sideOffset = 6, collisionPadding = 10, ...props }, ref) {
+>(function PopoverContent({ className, align = "start", sideOffset = 6, collisionPadding = 10, onEscapeKeyDown, ...props }, ref) {
   return <PopoverPrimitive.Portal>
     <PopoverPrimitive.Content
       {...props}
+      {...{ [ESCAPE_LAYER_ATTRIBUTE]: "" }}
+      // Escape inside belongs to an open list, calendar or question first (lib/escape.ts).
+      onEscapeKeyDown={layerEscape(onEscapeKeyDown)}
       ref={ref}
       align={align}
       sideOffset={sideOffset}

@@ -171,18 +171,32 @@ function TimelineRow({ row, last, expanded, onToggle, timeLabel, timeFull }: { r
   </motion.li>;
 }
 
+/** An event's time in epoch milliseconds (an unreadable time sorts as the oldest). */
+function timeOf(at: string | number): number {
+  const value = typeof at === "number" ? at : Date.parse(at);
+  return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
+}
+
 export function Timeline({ events, now, label, timeZone = "UTC", locale = "en-US", maxHeight, scrollToNew = true, defaultExpanded = [], headingLevel = 3, className }: TimelineProps) {
   const reduced = useReducedMotionSafe();
   const id = useId();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(() => new Set(defaultExpanded));
 
-  // Rows added after the first render are fresh: they slide in and the rest glide down. Their titles are announced.
+  // Rows newer than every row already shown are fresh: they slide in, the rest glide down, and their titles are
+  // announced. Older rows added below (a "Show older" page) join quietly: they are history being read, not news.
   const ids = events.map(event => event.id).join("|");
-  const [known, setKnown] = useState(() => ({ ids, set: new Set(events.map(event => event.id)), fresh: new Set<string>(), announcement: "" }));
+  const newestOf = (list: TimelineEvent[]) => list.reduce((newest, event) => Math.max(newest, timeOf(event.at)), Number.NEGATIVE_INFINITY);
+  const [known, setKnown] = useState(() => ({ ids, set: new Set(events.map(event => event.id)), newest: newestOf(events), fresh: new Set<string>(), announcement: "" }));
   if (known.ids !== ids) {
-    const added = events.filter(event => !known.set.has(event.id));
-    setKnown({ ids, set: new Set(events.map(event => event.id)), fresh: new Set([...known.fresh, ...added.map(event => event.id)]), announcement: added.length ? `New update: ${added.map(event => [event.actor, event.title].filter(Boolean).join(" ")).join(". ")}` : known.announcement });
+    const added = events.filter(event => !known.set.has(event.id) && timeOf(event.at) > known.newest);
+    setKnown({
+      ids,
+      set: new Set(events.map(event => event.id)),
+      newest: Math.max(known.newest, newestOf(events)),
+      fresh: new Set([...known.fresh, ...added.map(event => event.id)]),
+      announcement: added.length ? `New update: ${added.map(event => [event.actor, event.title].filter(Boolean).join(" ")).join(". ")}` : known.announcement,
+    });
   }
   // The bottom edge feathers while more updates wait below, and clears once the end is in view.
   const trackRef = useRef<HTMLDivElement>(null);

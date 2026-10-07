@@ -7,17 +7,21 @@ export interface MockUrls {
   oidcUrl?: string;
   /** mock-messaging base URL (default http://127.0.0.1:8592). */
   messagingUrl?: string;
+  /** mock-iris base URL, the default profile photos (default http://127.0.0.1:8594). */
+  irisUrl?: string;
 }
 
 /**
  * Environment variables for accounts-api so that:
  * - email/SMS go to mock-messaging (ACCOUNTS_DELIVERY=providers + Postmark/Twilio URLs and tokens),
- * - managed Google/Apple sign-in goes to mock-oidc with the dev managed credentials.
+ * - managed Google/Apple sign-in goes to mock-oidc with the dev managed credentials,
+ * - default profile photos come from mock-iris (ACCOUNTS_IRIS_BASE_URL), so pages never load them from the internet.
  * The Apple private key value contains real newlines (PEM).
  */
 export function accountsEnvForMocks(urls: MockUrls = {}, credentials: DevCredentials = loadDevCredentials()): Record<string, string> {
   const oidc = (urls.oidcUrl ?? 'http://127.0.0.1:8591').replace(/\/+$/, '');
   const messaging = (urls.messagingUrl ?? 'http://127.0.0.1:8592').replace(/\/+$/, '');
+  const iris = (urls.irisUrl ?? 'http://127.0.0.1:8594').replace(/\/+$/, '');
   const { google, apple } = credentials.managed;
   const { postmark, twilio } = credentials.messaging;
   return {
@@ -44,6 +48,7 @@ export function accountsEnvForMocks(urls: MockUrls = {}, credentials: DevCredent
     ACCOUNTS_APPLE_TOKEN_URL: `${oidc}/apple/token`,
     ACCOUNTS_APPLE_JWKS_URL: `${oidc}/apple/jwks`,
     ACCOUNTS_APPLE_ISSUER: `${oidc}/apple`,
+    ACCOUNTS_IRIS_BASE_URL: iris,
     ACCOUNTS_WEBHOOK_ALLOW_PRIVATE: 'true',
   };
 }

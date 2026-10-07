@@ -5,7 +5,7 @@
  *   node sdk/build.mjs            build once (minified)
  *   node sdk/build.mjs --watch    rebuild on change while working on the SDK
  */
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -48,6 +48,14 @@ if (watch) {
   await context.watch();
   console.log("sdk: watching sdk/ for changes");
 } else {
-  await esbuild.build(options);
+  // Several local stacks may build at once (scripts/dev.sh, scripts/e2e-all.sh): write a temporary file and rename it
+  // over public/sdk/v1.js, so a stack copying public/ never reads a half-written SDK.
+  const result = await esbuild.build({ ...options, write: false });
+  await mkdir(dirname(options.outfile), { recursive: true });
+  for (const file of result.outputFiles) {
+    const temporary = `${file.path}.${process.pid}.tmp`;
+    await writeFile(temporary, file.contents);
+    await rename(temporary, file.path);
+  }
   await report();
 }

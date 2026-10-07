@@ -236,6 +236,19 @@ function matchesQuery(entry: PhoneCountry, needle: string) {
   return entry.name.toLowerCase().includes(needle) || entry.iso.toLowerCase() === needle;
 }
 
+/**
+ * A search that is really a whole international number: "+" and more digits than any calling code and area code take
+ * ("+1 202 555 0142" typed key by key after "+" opened the list). It belongs in the number field, under its country.
+ */
+function numberInSearch(query: string, pool: PhoneCountry[]): { country: PhoneCountry; national: string } | null {
+  const text = query.trim();
+  if (!/^\+[\d\s().-]+$/.test(text)) return null;
+  const digits = onlyDigits(text);
+  if (digits.length < 5) return null;
+  const parsed = parsePhoneNumber(`+${digits}`, pool);
+  return parsed && parsed.national ? parsed : null;
+}
+
 /** Position in the formatted text just after the nth digit. */
 function caretAfterDigits(text: string, count: number) {
   if (count <= 0) { const first = text.search(/\d/); return first < 0 ? text.length : Math.min(first, text.length); }
@@ -564,6 +577,16 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(function
   }
 
   function onQuery(next: string) {
+    // Typing a whole number after "+" (the habit of writing "+1 202 555 0142") moves it into the number field as soon
+    // as it is more than a calling code, under its country; the rest of it goes on in the number field.
+    const typed = numberInSearch(next, pool);
+    if (typed) {
+      if (typed.country.iso !== current.iso) setAnnouncement(`Country set to ${typed.country.name}`);
+      setNumber(typed.national, typed.national.length, typed.country);
+      setQuery("");
+      close("number");
+      return;
+    }
     setQuery(next);
     setActive(null);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;

@@ -5,6 +5,8 @@
 .trigger { --sq-r: var(--radius-control); --sq-fill: var(--surface); --sq-stroke: var(--border); position: relative; display: flex; width: 100%; min-height: var(--control-height-md); align-items: center; gap: 9px; border: 1px solid var(--sq-stroke); padding: 0 12px; background: var(--sq-fill); color: var(--foreground); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
 @media (hover: hover) and (pointer: fine) { .trigger:hover:not(:disabled) { --sq-stroke: var(--border-strong); --sq-fill: var(--surface-muted); } }
 .trigger:active:not(:disabled), .trigger[aria-expanded="true"] { --sq-stroke: var(--border-strong); --sq-fill: var(--surface-muted); }
+/* Keyboard focus: the edge takes the text colour, as Arc's inputs do (focus shows in borders and fills, never rings). */
+.trigger:focus-visible { outline: none; --sq-stroke: var(--foreground); }
 .trigger:disabled { cursor: not-allowed; opacity: .5; }
 .trigger > svg:first-child { flex: 0 0 auto; color: var(--text-muted); }
 /* Old and new values cross in place; each part of a date is its own box so a wider day or month moves the rest along on a spring. */

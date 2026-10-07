@@ -1,12 +1,13 @@
 //! `accounts-api`: the Silicon Accounts HTTP service.
 //!
 //! Reads the ACCOUNTS_* settings (and `.env` outside production; every problem is reported at
-//! once), connects to Postgres, refuses a database with pending migrations, starts the
-//! background tasks when ACCOUNTS_WORKER_ENABLED, and serves on ACCOUNTS_BIND_ADDR until
-//! Ctrl-C / SIGTERM. On shutdown, at the same moment, it stops accepting connections and lets
-//! in-flight requests finish (at most 30 s), and the worker stops claiming work and finishes
-//! the sends it has in flight (normally within one 10 s send timeout; cut off after 20 s, when
-//! another node retries them once their 60 s claim ends). The whole stop takes at most 30 s.
+//! once), connects to Postgres, refuses a database with pending migrations, loads the
+//! phone-number metadata, starts the background tasks when ACCOUNTS_WORKER_ENABLED, and serves
+//! on ACCOUNTS_BIND_ADDR until Ctrl-C / SIGTERM. On shutdown, at the same moment, it stops
+//! accepting connections and lets in-flight requests finish (at most 30 s), and the worker stops
+//! claiming work and finishes the sends it has in flight (normally within one 10 s send timeout;
+//! cut off after 20 s, when another node retries them once their 60 s claim ends). The whole
+//! stop takes at most 30 s.
 //!
 //! Exit codes: 0 clean shutdown, 1 runtime failure (database, port), 2 invalid configuration.
 
@@ -86,6 +87,13 @@ async fn run() -> Result<(), (u8, String)> {
                 list.join(", ")
             ),
         ));
+    }
+    // The phone-number metadata loads on the first number parsed (about 1 s unoptimized, far longer
+    // on a busy machine): load it before listening, so readiness means no request waits for it.
+    if let Err(e) =
+        tokio::task::spawn_blocking(accounts_core::normalize::warm_up_phone_metadata).await
+    {
+        tracing::warn!(error = %e, "loading the phone-number metadata at start-up failed; the first phone number will load it");
     }
     let bind_addr = settings.bind_addr;
     let worker_enabled = settings.worker_enabled;

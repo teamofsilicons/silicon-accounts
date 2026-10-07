@@ -43,7 +43,7 @@ pub fn timezone(ip_timezone: Option<&str>, browser_timezone: Option<&str>) -> St
         .unwrap_or_else(|| "UTC".to_string())
 }
 
-/// The suggested date of birth: today minus 18 years.
+/// The suggested date of birth: the Carbon's today (in their timezone) minus 18 years.
 pub fn dob(today: Date) -> Date {
     default_dob(today)
 }

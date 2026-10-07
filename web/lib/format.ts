@@ -143,3 +143,51 @@ export function browserTimezone(): string {
     return "UTC";
   }
 }
+
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* Times inside the service's sentences                                                                               */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+const TIMESTAMP = /\b(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\b/g;
+/** "(85009 seconds from now)" in the service's rate-limit sentences. */
+const SECONDS_FROM_NOW = /\((\d+) seconds? from now\)/g;
+/** "locked for 600 more seconds". */
+const MORE_SECONDS = /\b(\d+) more seconds?\b/g;
+const HOUR_MS = 3_600_000;
+
+/**
+ * The service writes times into some sentences as RFC 3339 ("reserved … until 2026-10-16T11:01:06.201Z", "try again at
+ * …") and waits in seconds ("85009 seconds from now"); people read clock times and spans. A time within the hour reads
+ * as a time of day with seconds ("14:05:42"), one within two days as a date and time ("Oct 7, 2026, 13:46"), anything
+ * further as a date. Times are in `timeZone` (the visitor's own clock unless a page that states its zone passes one:
+ * a wait is read against the clock on the visitor's wall).
+ */
+export function readableTimes(message: string, options: { timeZone?: string; now?: number } = {}): string {
+  const now = options.now ?? Date.now();
+  return message
+    .replace(TIMESTAMP, value => {
+      const away = Math.abs(Date.parse(value) - now);
+      if (!Number.isFinite(away)) return value;
+      if (away < HOUR_MS) return formatTime(value, options.timeZone, true);
+      if (away < 48 * HOUR_MS) return formatDateTime(value, options.timeZone);
+      return formatDate(value, options.timeZone);
+    })
+    .replace(SECONDS_FROM_NOW, (_, seconds: string) => `(in ${durationText(Number(seconds))})`)
+    .replace(MORE_SECONDS, (whole: string, seconds: string) => (Number(seconds) >= 90 ? `${durationText(Number(seconds))} more` : whole));
+}
+
+/**
+ * A wait in seconds as people say it, to the minute once it is long: "40 seconds", "5 minutes", "23 hours 37 minutes",
+ * "3 days 4 hours".
+ */
+export function durationText(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const unit = (value: number, name: string) => `${value} ${name}${value === 1 ? "" : "s"}`;
+  if (seconds < 90) return unit(seconds, "second");
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return unit(minutes, "minute");
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return minutes % 60 ? `${unit(hours, "hour")} ${unit(minutes % 60, "minute")}` : unit(hours, "hour");
+  const days = Math.floor(hours / 24);
+  return hours % 24 ? `${unit(days, "day")} ${unit(hours % 24, "hour")}` : unit(days, "day");
+}

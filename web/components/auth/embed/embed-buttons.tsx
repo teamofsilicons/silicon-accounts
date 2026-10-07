@@ -54,13 +54,25 @@ interface Problem {
   hint?: string | null;
 }
 
+/**
+ * Waits between tries of a fetch the browser cut off. Safari (WebKit) cancels a frame's requests the moment the page
+ * around it starts navigating away, while the frame is still alive (no pagehide yet), and networks blip: so the embed
+ * tries twice more before it says Silicon Accounts could not be reached. A page that is really leaving is gone by
+ * then, and a real outage still shows after about two seconds.
+ */
+const NETWORK_RETRY_MS = [500, 1500];
+
 /** GET /v1/apps/{app_id}/public with a plain fetch; errors keep the server's own code, message and hint. */
 async function loadApp(id: string): Promise<AppPublic> {
-  let response: Response;
-  try {
-    response = await fetch(`/v1/apps/${encodeURIComponent(id)}/public`, { headers: { Accept: "application/json" }, credentials: "omit" });
-  } catch {
-    throw { code: "network_error", message: "Silicon Accounts could not be reached.", hint: "Check the connection, then reload the page." } satisfies Problem;
+  let response: Response | null = null;
+  for (let attempt = 0; !response; attempt++) {
+    try {
+      response = await fetch(`/v1/apps/${encodeURIComponent(id)}/public`, { headers: { Accept: "application/json" }, credentials: "omit" });
+    } catch {
+      const wait = NETWORK_RETRY_MS[attempt];
+      if (wait === undefined) throw { code: "network_error", message: "Silicon Accounts could not be reached.", hint: "Check the connection, then reload the page." } satisfies Problem;
+      await new Promise(done => setTimeout(done, wait));
+    }
   }
   const body = (await response.json().catch(() => null)) as (AppPublic & { error?: Partial<Problem> }) | null;
   if (response.ok && body && Array.isArray(body.methods)) return body;

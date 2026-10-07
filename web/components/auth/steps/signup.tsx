@@ -11,12 +11,12 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ImageUp, LoaderCircle, Mail, Smartphone } from "lucide-react";
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { Button } from "@/components/arc/button/button";
+import { Combobox } from "@/components/arc/combobox/combobox";
 import { Input } from "@/components/arc/input/input";
 import type { ApiError } from "@/lib/api/errors";
 import type { FlowSignup, SignupSubmit } from "@/lib/api/types";
 import { formatTime } from "@/lib/format";
 import { isValidTimezone, modernTimezone, timezoneOptions } from "@/lib/timezones";
-import { ComboboxField } from "../flow/combobox-field";
 import type { FlowController } from "../flow/controller";
 import { DobField } from "../flow/dob-field";
 import { describe } from "../flow/errors";
@@ -346,7 +346,7 @@ function SignupForm({ flow, ctl, notice, prefill }: SignupProps & { prefill: Flo
         />
 
         <div className={styles.stack}>
-          <ComboboxField
+          <Combobox
             label="Timezone"
             options={zones}
             value={timezone}

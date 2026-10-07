@@ -26,12 +26,13 @@ contract is `understanding/UNDERSTANDING.md`.
   and not added yet (`typed`) is part of the draft: it counts as unsaved, survives tab switches, and a save first adds it
   (or waits, naming it, when the field refuses it). Drafts with changes are kept per app in this browser tab when the
   page unmounts, and while any draft has unsaved changes a reload or close of the browser tab asks first.
-- The leave guard (`app/app-scope.tsx`): the App Router has no way to block a navigation, so links that leave the app
-  are caught on the window in the capture phase and ask first (keep editing, leave with the draft, discard). A link in
-  an open layer (the phone dock's "Go to" sheet) closes that layer before asking; a section's number key asks too
-  (and does nothing while a dialog, drawer or menu is open). "Keep editing" puts focus back on the link, the key's
-  control or the sheet's button. Navigations that cannot be caught (the command palette, Back) keep the draft, and the
-  next page shows a notice with Return (`lib/kept-drafts.ts`) until the Carbon goes back.
+- The leave guard (`app/app-scope.tsx`): while a draft has unsaved changes the layout registers a navigation guard
+  (`useNavigationGuard`, the foundation's `lib/navigation-guard.ts`), and the shell asks it before every way out of the
+  app: a link on the page, the dock and its phone sheet (which closes itself first), the brand, the command palette, a
+  section's number key, the user menu's Settings and signing out. The question offers keep editing, leave with the
+  draft, or discard (signing out offers discard only: drafts do not survive it). "Keep editing" puts focus back on the
+  link, the key's control or the sheet's button. Navigations nothing can ask about (Back, a typed address) keep the
+  draft, and the next page shows a notice with Return (`lib/kept-drafts.ts`) until the Carbon goes back.
 - Focus that would fall to the start of the page (`parts/focus-return.ts`): Save and Discard leave the save bar, a
   conflict's choices leave with the conflict, a revoke takes its row's Revoke away. Focus then goes back to the last
   place the Carbon worked in (or to the revoked proof's status), not to `<body>`.

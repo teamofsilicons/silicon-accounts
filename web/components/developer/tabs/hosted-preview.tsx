@@ -6,7 +6,7 @@
  * subtree, as the hosted pages render them. A desktop page is laid out at 1024 px and scaled to fit (so the split
  * layout shows as it would); a phone page is 390 px wide. Nothing in it is interactive (inert).
  *
- * The split layout follows the hosted page's rules: the big copy beside the form is the hosted page's own (heroCopy in
+ * The split layout follows the hosted page's rules: the big copy beside the form is the hosted page's own (heroCopyFor in
  * components/auth/flow/model.ts, for a Carbon's first visit: the app's title and subtitle on the sign-in steps,
  * "Welcome to …" from setting up on), a short "Sign in" heads the form on the first step, and "Powered by" sits in the
  * form's half.
@@ -20,9 +20,9 @@ import { Input } from "@/components/arc/input/input";
 import { OtpInput } from "@/components/arc/otp-input/otp-input";
 import { Switch } from "@/components/arc/switch/switch";
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
-import { heroCopy, type HeroCopy } from "@/components/auth/flow/model";
+import { heroCopyFor, type HeroCopy } from "@/components/auth/flow/model";
 import { BrandAside, BrandPanel, BrandStage, BrandingScope, PoweredBy } from "@/components/foundation/branding/branding";
-import type { ContactField, FlowStep, FlowView } from "@/lib/api/types";
+import type { ContactField, FlowStep } from "@/lib/api/types";
 import { brandLogo, type PaintTheme } from "@/lib/branding/apply";
 import { FIELD_LABELS } from "@/lib/format";
 import type { EditableConfig } from "../lib/config";
@@ -49,24 +49,7 @@ const FLOW_STEPS: Record<PreviewStep, FlowStep> = { methods: "choose_method", co
 
 /** The split layout's copy beside the form at a step, by the hosted page's rules, for a Carbon's first visit. */
 function heroAt(app: HostedPreviewProps["app"], config: EditableConfig, step: PreviewStep): HeroCopy {
-  const flow: FlowView = {
-    id: "preview",
-    step: FLOW_STEPS[step],
-    expires_at: "",
-    app: { app_id: "preview", name: app.name, logo_url: app.logo_url, logo_dark_url: app.logo_dark_url ?? null, homepage_url: null, branding: config.branding, copy: config.copy, first_party: false },
-    methods: [],
-    signed_in_as: null,
-    challenge: null,
-    signup: null,
-    requirements: null,
-    consent: null,
-    redirect_to: null,
-    error: null,
-    prompt: null,
-    login_hint: null,
-    method_hint: null,
-  };
-  return heroCopy(flow, { firstVisit: true });
+  return heroCopyFor({ name: app.name, copy: config.copy, step: FLOW_STEPS[step], firstVisit: true });
 }
 
 /** Sample values for the what's-shared rows (never a real person). */

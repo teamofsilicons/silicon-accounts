@@ -5,16 +5,22 @@
  *
  * - Content-Security-Policy with the nonce: script-src 'self' 'nonce-…' 'strict-dynamic' (Next adds the nonce to its
  *   own scripts; the root layout adds it to the theme boot script), style-src 'self' 'unsafe-inline', img-src 'self'
- *   https: data: blob:, font-src 'self' data:, connect-src 'self', frame-ancestors 'none', form-action 'self' https:,
- *   base-uri 'none'. Development adds 'unsafe-eval' (React's dev tooling needs it; production never does).
+ *   https: data: blob: (plus a local stack's mock Iris, see localIrisImageSource), font-src 'self' data:,
+ *   connect-src 'self', frame-ancestors 'none', form-action 'self' https:, base-uri 'none'. Development adds
+ *   'unsafe-eval' (React's dev tooling needs it; production never does).
  * - X-Frame-Options DENY, nosniff, Referrer-Policy, and HSTS in production over https.
  * - /embed/v1/buttons: frame-ancestors 'self' <the app's allowed_origins> from GET /v1/apps/{app_id}/public (cached
  *   briefly), and no X-Frame-Options; none configured (or the field missing, or the app unknown) → frame-ancestors
  *   'none' and the page explains why when opened on its own.
  *
  * Request headers handed to the render: x-nonce, x-sa-surface (site | embed), x-sa-embed-framing (allowed | none).
+ *
+ * An address under an app's developer pages that names no tab (/developer/briefcase/bogus) is answered here with the
+ * site's not-found page and a real 404: the page itself could only stream a "soft" 404 under a 200 once the shell's
+ * layout has started.
  */
 import { NextResponse, type NextRequest } from "next/server";
+import { isUnknownDeveloperTab } from "./lib/developer-tabs";
 
 /** Where the Rust API listens (server side). Read at request time, so it can differ from the build's. */
 const apiUrl = () => (process.env.ACCOUNTS_API_URL ?? "http://127.0.0.1:8589").replace(/\/+$/, "");
@@ -69,12 +75,29 @@ async function frameAncestors(appId: string | null): Promise<string[]> {
   return origins;
 }
 
+/**
+ * Default profile photos come from Iris (ACCOUNTS_IRIS_BASE_URL, read at request time like ACCOUNTS_API_URL).
+ * Production's Iris is https and already allowed by `https:`. A local stack points it at the testkit's mock Iris
+ * (http://127.0.0.1:<port>), whose exact origin is added; only a loopback http origin is ever added.
+ */
+function localIrisImageSource(): string {
+  const raw = process.env.ACCOUNTS_IRIS_BASE_URL?.trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]";
+    return url.protocol === "http:" && loopback ? ` ${url.origin}` : "";
+  } catch {
+    return "";
+  }
+}
+
 function contentSecurityPolicy(nonce: string, frameAncestorsValue: string): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' https: data: blob:",
+    `img-src 'self' https: data: blob:${localIrisImageSource()}`,
     "font-src 'self' data:",
     "connect-src 'self'",
     "object-src 'none'",
@@ -97,7 +120,10 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-sa-surface", embed ? "embed" : "site");
   requestHeaders.set("x-sa-embed-framing", embed && ancestors.length ? "allowed" : "none");
 
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  // No page lives here: render the not-found page (an address no route matches) with a 404 status.
+  const response = isUnknownDeveloperTab(pathname)
+    ? NextResponse.rewrite(new URL("/_sa/not-found", request.url), { status: 404, request: { headers: requestHeaders } })
+    : NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
   if (!ancestors.length) response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");

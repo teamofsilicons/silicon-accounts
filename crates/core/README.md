@@ -267,7 +267,9 @@ Default palettes (`Palette::default_light`, `default_dark`): filled buttons are 
 `#1F5FB8` under `#FFFDF9` text in both themes (6.1:1). The dark default was `#5B8FE0` (3.2:1 under
 `#FFFDF9`, below AA); migration 0003 moved every stored config still carrying that old default pair
 to `#1F5FB8` (a new config version and a `system` history entry). `#5B8FE0` remains the site's ink
-for links and accents on dark surfaces, not a fill.
+for links and accents on dark surfaces, not a fill. Error text (`danger`) meets 4.5:1 on the card
+and the page in both themes: the dark default is `#FF8A80` (5.45:1 on `#353432`); migration 0004
+moved stored configs that still paired the old `#F97066` (4.46:1) with the default dark card.
 
 ## views
 

@@ -5,9 +5,13 @@
  * palette, number-key section shortcuts and page transitions. It also guards the account routes: visitors without a
  * session are sent to sign in and come back to the page they asked for. At "/" a signed-out visitor sees the landing
  * page, rendered bare (without the shell).
+ *
+ * Every navigation the shell starts (dock, phone sheet, brand, palette, number keys, Settings, signing out) asks the
+ * page's navigation guards first (lib/navigation-guard.ts), and so does a plain click on any other link while a guard
+ * protects its destination: a page with unsaved work registers one guard and every way out asks.
  */
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ViewTransition, useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { LogOut, Monitor, Moon, Search, Settings as SettingsIcon, Sun, SwatchBook } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
@@ -16,11 +20,13 @@ import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { changeTheme } from "@/lib/theme";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
 import { SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
-import { notify, notifyError } from "@/lib/notify";
-import { beginSignIn, consumeSignInReturn, useMe, useRefreshSession, useSession, useSignOut } from "@/lib/query/session";
+import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
+import { notifyError } from "@/lib/notify";
+import { beginSignIn, useMe, useSession, useSignOut } from "@/lib/query/session";
 import { BrandMark } from "./brand-mark";
 import { CommandMenu } from "./command-menu";
 import { Dock, type DockAccount } from "./dock";
+import { LeaveQuestionHost } from "./leave-question";
 import styles from "./shell.module.css";
 
 const subscribeNothing = () => () => undefined;
@@ -60,45 +66,57 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { status, session, error, refetch } = useSession();
   const me = useMe();
-  const refreshSession = useRefreshSession();
   const { signOut } = useSignOut();
   const paletteOpen = useCommandPaletteOpen();
   const isApple = useSyncExternalStore(subscribeNothing, detectApple, () => false);
   const isHome = pathname === "/";
   const active = sectionFor(pathname);
 
-  // The end of a first-party sign-in (/?code&state): put the saved path back, then show it. Until the router has
-  // left this URL the page shows its skeleton (read from the address, so nothing flashes on the way).
-  const search = useSearchParams();
-  const returning = isHome && !!search.get("state") && (!!search.get("code") || !!search.get("error"));
+  // Account routes need a session; "/" shows the landing page instead. (Sign-ins come back to /sign-in, which restores
+  // the page: this home page never reads a code, state or error from its address.)
   useEffect(() => {
-    if (!returning) return;
-    const result = consumeSignInReturn();
-    if (!result) return;
-    if (result.error) {
-      notify.info("Sign-in did not finish", result.error === "access_denied" ? "You cancelled it. Sign in again whenever you are ready." : `The sign-in ended with "${result.error}". Try again.`);
-    }
-    void refreshSession().finally(() => router.replace(result.path));
-  }, [returning, refreshSession, router]);
+    if (status === "signed_out" && !isHome) beginSignIn(window.location.pathname + window.location.search);
+  }, [status, isHome]);
 
-  // Account routes need a session; "/" shows the landing page instead.
-  useEffect(() => {
-    if (status === "signed_out" && !isHome && !returning) beginSignIn(window.location.pathname + window.location.search);
-  }, [status, isHome, returning]);
+  /** Navigates inside a page transition whose direction follows the dock (no guard asked: the caller did). */
+  const push = useCallback((href: string) => {
+    router.push(href, { transitionTypes: [navigationType(window.location.pathname, href)] });
+  }, [router]);
 
-  /** Navigates inside a page transition whose direction follows the dock. */
-  const go = useCallback((href: string) => {
+  /**
+   * Every navigation the shell starts: the page's guards are asked first (focus goes back to `returnFocus` when the
+   * Carbon stays), then it moves inside a page transition.
+   */
+  const go = useCallback(async (href: string, returnFocus: HTMLElement | null = null) => {
     if (href === pathname) return;
-    router.push(href, { transitionTypes: [navigationType(pathname, href)] });
-  }, [pathname, router]);
+    if (!(await confirmNavigation(href, { returnFocus }))) return;
+    push(href);
+  }, [pathname, push]);
+
+  // Links in the pages ask too while a guard protects where they go.
+  useGuardedLinks(push);
 
   const doSignOut = useCallback(async () => {
+    // Nothing in this browser tab survives signing out, so unsaved work is asked about first.
+    if (!(await confirmNavigation(paths.home, { reason: "sign-out" }))) return;
     try {
       await signOut();
     } catch (failure) {
       notifyError(failure, "Could not sign out");
     }
   }, [signOut]);
+
+  /**
+   * The user menu's "Sign out": with nothing to ask about, the menu shows the sign-out's progress (a promise); when a
+   * page will ask about unsaved work first, the menu closes at once and the question takes over.
+   */
+  const menuSignOut = useCallback((): void | Promise<void> => {
+    if (navigationIsGuarded(paths.home, "sign-out")) {
+      void doSignOut();
+      return;
+    }
+    return doSignOut();
+  }, [doSignOut]);
 
   // Commands every account page has.
   useRegisterCommands(() => [
@@ -112,18 +130,18 @@ export function AccountShell({ children }: { children: ReactNode }) {
         shortcut: section.shortcut,
         icon: <Icon size={16} strokeWidth={1.75} />,
         keywords: [section.key, "go", "open"],
-        run: () => go(section.href),
+        run: () => void go(section.href),
       };
     }),
-    { id: "go.settings", label: "Settings", description: "Theme, telemetry, sessions and your account", group: "Go to", icon: <SettingsIcon size={16} strokeWidth={1.75} />, keywords: ["preferences", "delete", "sessions"], run: () => go(paths.settings) },
+    { id: "go.settings", label: "Settings", description: "Theme, telemetry, sessions and your account", group: "Go to", icon: <SettingsIcon size={16} strokeWidth={1.75} />, keywords: ["preferences", "delete", "sessions"], run: () => void go(paths.settings) },
     { id: "theme.light", label: "Use the light theme", group: "Appearance", icon: <Sun size={16} strokeWidth={1.75} />, keywords: ["theme", "light", "appearance"], run: () => changeTheme("light", null) },
     { id: "theme.dark", label: "Use the dark theme", group: "Appearance", icon: <Moon size={16} strokeWidth={1.75} />, keywords: ["theme", "dark", "appearance", "night"], run: () => changeTheme("dark", null) },
     { id: "theme.system", label: "Match the device theme", group: "Appearance", icon: <Monitor size={16} strokeWidth={1.75} />, keywords: ["theme", "system", "auto", "appearance"], run: () => changeTheme("system", null) },
     ...(process.env.NODE_ENV !== "production"
-      ? [{ id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={1.75} />, keywords: ["kitchen", "components", "arc"], run: () => router.push(paths.kitchen) }]
+      ? [{ id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={1.75} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) }]
       : []),
     { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={1.75} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
-  ], [go, doSignOut, router]);
+  ], [go, doSignOut]);
 
   // ⌘K toggles the palette; 1 to 7 jump to sections (never while typing or with a layer open).
   useEffect(() => {
@@ -134,11 +152,14 @@ export function AccountShell({ children }: { children: ReactNode }) {
         return;
       }
       if (event.metaKey || event.ctrlKey || event.altKey || event.repeat || paletteOpen || isTypingTarget(event.target)) return;
-      if (document.querySelector("[role='dialog'][aria-modal='true'], [role='menu']")) return;
+      // Any open layer (Radix dialogs, drawers and sheets carry no aria-modal), menu or popup list keeps the keys.
+      const layers = document.querySelectorAll("[role='dialog'], [role='alertdialog'], [role='menu'], [role='listbox']");
+      if ([...layers].some(layer => layer.getClientRects().length > 0)) return;
       const section = SECTIONS.find(entry => entry.shortcut === event.key);
       if (!section || status !== "signed_in") return;
       event.preventDefault();
-      go(section.href);
+      const from = event.target instanceof HTMLElement && event.target !== document.body ? event.target : null;
+      void go(section.href, from);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -160,10 +181,10 @@ export function AccountShell({ children }: { children: ReactNode }) {
     <div className={styles.shell}>
       <a className="skip-link" href="#main">Skip to content</a>
       <header className={styles.top}>
-        <Link href={paths.home} className={styles.brand} onClick={event => {
+        <Link href={paths.home} data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
           if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
           event.preventDefault();
-          go(paths.home);
+          void go(paths.home, event.currentTarget);
         }}>
           <BrandMark />
           <span className={styles.brandText}>Silicon <span className={styles.brandMuted}>Accounts</span></span>
@@ -179,16 +200,16 @@ export function AccountShell({ children }: { children: ReactNode }) {
         activeKey={active?.key}
         onNavigate={go}
         account={account}
-        onSignOut={doSignOut}
-        onOpenSettings={() => go(paths.settings)}
+        onSignOut={menuSignOut}
+        onOpenSettings={() => void go(paths.settings)}
         onOpenPalette={openCommandPalette}
         isApple={isApple}
       />
       <CommandMenu />
+      <LeaveQuestionHost />
     </div>
   );
 
-  if (returning) return chrome(<PageSkeleton />);
   if (status === "signed_in") {
     return chrome(
       <ViewTransition key={active?.key ?? pathname} enter={PAGE_CLASSES} exit={PAGE_CLASSES} default="none">

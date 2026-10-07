@@ -1,8 +1,9 @@
 /**
  * Every country calling code (ITU-T E.164), and a timezone → country table for guessing where a visitor is.
  *
- * The phone picker (components/arc/phone-input) formats the 49 countries it lists and knows no others. The hosted pages must take a
- * phone number from anywhere, so this table backs the "type it with its country code" mode of PhoneField: it tells
+ * The phone picker (components/arc/phone-input) formats the 49 countries it lists and knows no others. The hosted pages and the
+ * account site must take a phone number from anywhere, so this table backs the "type it with its country code" mode of
+ * PhoneField (./phone-field.tsx): it tells
  * whether the digits after "+" start with a real calling code, and names the country. Only the server validates a
  * number for real (crates/core normalize_phone, full libphonenumber metadata).
  *
@@ -165,3 +166,30 @@ export const ZONE_COUNTRY: ReadonlyMap<string, string> = new Map(
     return [entry.slice(0, index), entry.slice(index + 1)] as const;
   }),
 );
+
+/**
+ * A best guess at the visitor's country (ISO 3166-1 alpha-2) for phone numbers: the timezone's country, else the
+ * region of the browser's language, else the United States. It can be any country, not only the ones the phone
+ * picker formats (PhoneField offers the others with their calling code).
+ */
+export function guessCountry(): string {
+  let zone = "";
+  try {
+    zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+  } catch {
+    zone = "";
+  }
+  const byZone = ZONE_COUNTRY.get(zone);
+  if (byZone) return byZone;
+  try {
+    if (typeof navigator !== "undefined") {
+      for (const tag of navigator.languages ?? [navigator.language]) {
+        const region = /^[a-z]{2,3}(?:[-_][A-Za-z]{4})?[-_]([A-Za-z]{2})\b/.exec(tag ?? "")?.[1];
+        if (region) return region.toUpperCase();
+      }
+    }
+  } catch {
+    // No navigator: fall through.
+  }
+  return "US";
+}

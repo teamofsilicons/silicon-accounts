@@ -1,7 +1,7 @@
 // `pnpm -s -C testkit accounts-env [--format dotenv|shell|json] [--oidc-url URL] [--messaging-url URL]
-//                                  [--api-port N] [--public-url URL] [--no-topology]`
+//                                  [--iris-url URL] [--api-port N] [--public-url URL] [--no-topology]`
 // prints the ACCOUNTS_* variables for a local Silicon Accounts: the testkit mocks (email/SMS to
-// mock-messaging, managed Google/Apple to mock-oidc) and the topology (accounts-api on
+// mock-messaging, managed Google/Apple to mock-oidc, default profile photos from mock-iris) and the topology (accounts-api on
 // 127.0.0.1:8589 behind the account site on http://localhost:8590, client addresses taken from
 // X-Forwarded-For). --no-topology prints the mock settings only.
 //   pnpm -s -C testkit accounts-env > .env.mocks                 # dotenv (default)
@@ -9,7 +9,7 @@
 
 import { accountsEnvForMocks, accountsTopologyEnv, toDotenv, toShellExports } from '../lib/env.ts';
 
-const USAGE = 'pnpm -s -C testkit accounts-env [--format dotenv|shell|json] [--oidc-url URL] [--messaging-url URL] [--api-port N] [--public-url URL] [--no-topology]';
+const USAGE = 'pnpm -s -C testkit accounts-env [--format dotenv|shell|json] [--oidc-url URL] [--messaging-url URL] [--iris-url URL] [--api-port N] [--public-url URL] [--no-topology]';
 const args = process.argv.slice(2);
 const options: Record<string, string> = {};
 let topology = true;
@@ -22,7 +22,7 @@ for (let i = 0; i < args.length; i++) {
   const eq = arg.indexOf('=');
   const name = (eq < 0 ? arg : arg.slice(0, eq)).replace(/^--/, '');
   const inline = eq < 0 ? undefined : arg.slice(eq + 1);
-  if (!arg.startsWith('--') || !['format', 'oidc-url', 'messaging-url', 'api-port', 'public-url'].includes(name)) {
+  if (!arg.startsWith('--') || !['format', 'oidc-url', 'messaging-url', 'iris-url', 'api-port', 'public-url'].includes(name)) {
     process.stderr.write(`error: unexpected argument "${arg}"\nhint: ${USAGE}\n`);
     process.exit(2);
   }
@@ -51,6 +51,7 @@ const env = {
   ...accountsEnvForMocks({
     oidcUrl: options['oidc-url'] ?? `http://127.0.0.1:${process.env.MOCK_OIDC_PORT ?? 8591}`,
     messagingUrl: options['messaging-url'] ?? `http://127.0.0.1:${process.env.MOCK_MESSAGING_PORT ?? 8592}`,
+    irisUrl: options['iris-url'] ?? `http://127.0.0.1:${process.env.MOCK_IRIS_PORT ?? 8594}`,
   }),
   ...(topology ? accountsTopologyEnv({ apiPort, publicUrl }) : {}),
 };

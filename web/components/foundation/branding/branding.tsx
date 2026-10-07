@@ -88,7 +88,8 @@ export function BrandStage({ className, children }: { className?: string; childr
 
 /** The app's side of the split layout (hidden in the card and minimal layouts, and on narrow branded areas). */
 export function BrandAside({ className, children }: { className?: string; children: ReactNode }) {
-  return <aside className={cx("sa-brand-aside", className)}>{children}</aside>;
+  // The inner block is what stays in view while a long step scrolls the page (styles/branding.css, split layout).
+  return <aside className={cx("sa-brand-aside", className)}><div className="sa-brand-aside-inner">{children}</div></aside>;
 }
 
 export interface BrandPanelProps extends HTMLAttributes<HTMLElement> {

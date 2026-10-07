@@ -11,7 +11,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
 import { OtpInput } from "@/components/arc/otp-input/otp-input";
-import { PhoneInput } from "@/components/arc/phone-input/phone-input";
+import { PhoneField, type PhoneFieldValue } from "@/components/foundation/phone-field/phone-field";
 import { ApiError } from "@/lib/api/errors";
 import type { ContactChallenge } from "@/lib/api/types";
 import { formatCountdown, formatPhone } from "@/lib/format";
@@ -38,7 +38,9 @@ export function ContactAdder({ channel, existing, defaultCountry = "US" }: Conta
   const now = useNow(1000);
   const [step, setStep] = useState<Step>({ kind: "closed" });
   const [value, setValue] = useState("");
-  const [phoneValid, setPhoneValid] = useState(false);
+  /** Why the typed phone number cannot be sent yet (PhoneField's own words), or null. */
+  const [phoneProblem, setPhoneProblem] = useState<string | null>("Enter the phone number to add.");
+  const phoneBox = useRef<HTMLDivElement>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [lockedUntil, setLockedUntil] = useState(0);
@@ -54,12 +56,14 @@ export function ContactAdder({ channel, existing, defaultCountry = "US" }: Conta
   const noun = channel === "email" ? "email" : "phone number";
   const shown = (raw: string) => (channel === "phone" ? formatPhone(raw) : raw);
   const normalized = channel === "email" ? value.trim().toLowerCase() : value;
-  const focusField = () => requestAnimationFrame(() => requestAnimationFrame(() => field.current?.focus()));
+  /** The field to type in: the email input, or the phone field's number input (whichever mode it is in). */
+  const fieldElement = (): HTMLInputElement | null => (channel === "phone" ? phoneBox.current?.querySelector<HTMLInputElement>('input[type="tel"]') ?? null : field.current);
+  const focusField = () => requestAnimationFrame(() => requestAnimationFrame(() => fieldElement()?.focus()));
 
   const localProblem = (): string | null => {
     if (!normalized) return channel === "email" ? "Enter the email address to add." : "Enter the phone number to add.";
     if (channel === "email" && !EMAIL_SHAPE.test(normalized)) return `Enter an email like name@example.com; “${normalized}” is missing ${normalized.includes("@") ? "a domain such as example.com" : "an @"}.`;
-    if (channel === "phone" && !phoneValid) return "That number is not complete for the country picked. Check the digits or pick the right country.";
+    if (channel === "phone" && phoneProblem) return phoneProblem;
     if (existing.some(item => item.toLowerCase() === normalized)) return `${shown(normalized)} is already on your account.`;
     return null;
   };
@@ -83,7 +87,7 @@ export function ContactAdder({ channel, existing, defaultCountry = "US" }: Conta
     const problem = localProblem();
     if (problem) {
       setError(problem);
-      field.current?.focus();
+      fieldElement()?.focus();
       return;
     }
     setError(null);
@@ -97,7 +101,7 @@ export function ContactAdder({ channel, existing, defaultCountry = "US" }: Conta
       setStep({ kind: "code", challenge, value: target });
     } catch (raw) {
       setError(describeError(raw));
-      if (step.kind === "enter") field.current?.focus();
+      if (step.kind === "enter") fieldElement()?.focus();
     }
   };
 
@@ -141,15 +145,18 @@ export function ContactAdder({ channel, existing, defaultCountry = "US" }: Conta
       ) : step.kind === "enter" ? (
         <form className={styles.adder} onSubmit={(event: FormEvent) => { event.preventDefault(); void send(); }} noValidate>
           {channel === "phone" ? (
-            <PhoneInput
-              ref={field}
-              label="Phone number"
-              value={value}
-              defaultCountry={defaultCountry}
-              onValueChange={(next, details) => { setValue(next); setPhoneValid(details.valid); setError(null); }}
-              error={error ?? undefined}
-              description="We text a 6-digit code to it. It signs you in once it is verified."
-            />
+            // Any country: Arc's picker formats the 49 it lists, and every other number is typed with its country code
+            // (the foundation's PhoneField never sends a number the Carbon did not type).
+            <div ref={phoneBox}>
+              <PhoneField
+                label="Phone number"
+                initial={value || undefined}
+                defaultCountry={defaultCountry}
+                onChange={(next: PhoneFieldValue) => { setValue(next.phone); setPhoneProblem(next.problem); setError(null); }}
+                error={error}
+                description="We text a 6-digit code to it. It signs you in once it is verified."
+              />
+            </div>
           ) : (
             <Input
               ref={field}

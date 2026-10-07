@@ -22,7 +22,7 @@ import { formatCountdown } from "@/lib/format";
 import type { ActionResult } from "./controller";
 import { carbonError, describe, type ErrorContext, type ErrorLike } from "./errors";
 import { useFinePointer, useNow } from "./hooks";
-import { PhoneField, type PhoneFieldValue } from "./phone-field";
+import { PhoneField, type PhoneFieldValue } from "@/components/foundation/phone-field/phone-field";
 import styles from "./flow.module.css";
 
 const { blur, duration, ease, spring } = motionTokens;

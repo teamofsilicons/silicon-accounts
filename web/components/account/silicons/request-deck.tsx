@@ -15,7 +15,7 @@ import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
 import type { CustodianRequest } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
-import { msUntil, reportFailure, spanText } from "../parts/common";
+import { durationText, msUntil, reportFailure } from "../parts/common";
 import { FitPrompt } from "../parts/fit-prompt";
 import { useDecideRequest, type Decision } from "../parts/queries";
 import styles from "./request-deck.module.css";
@@ -156,7 +156,7 @@ function DeckCard({ request, index, total, now, decide, onDecided }: DeckCardPro
       ) : null}
       <p className={styles.sentence}>{sentence}</p>
       <p className={styles.expiry}>
-        {left > 0 ? `Answer within ${spanText(left)} (by ${formatDate(request.expires_at)}). After that the request expires.` : "This request has expired."}
+        {left > 0 ? `Answer within ${durationText(left / 1000)} (by ${formatDate(request.expires_at)}). After that the request expires.` : "This request has expired."}
       </p>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.actions}>

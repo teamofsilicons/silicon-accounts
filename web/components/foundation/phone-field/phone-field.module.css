@@ -1,0 +1,32 @@
+/* The phone field (phone-field.tsx) and its "Country not in the list?" switch. */
+.phoneField { display: grid; min-width: 0; gap: var(--space-2); }
+.fieldLink {
+  justify-self: start;
+  min-height: 28px;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), text-decoration-color var(--duration-fast) var(--ease-standard);
+}
+.fieldLink:is(:hover, :focus-visible) { outline: none; color: var(--foreground); text-decoration-color: currentColor; }
+
+/* A field whose label is visually hidden (a control above already says what it is). */
+.quietLabel { display: grid; min-width: 0; }
+.quietLabel > div > label:first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) { .fieldLink { transition: none; } }

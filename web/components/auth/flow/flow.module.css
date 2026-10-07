@@ -26,8 +26,6 @@
 @container hosted (min-width: 860px) {
   .hosted[data-layout="split"] .powered { left: 50% !important; width: 50% !important; }
 }
-/* Its link shows keyboard focus as the embed's pill does (the foundation pill underlines only on hover). */
-.powered a:focus-visible { text-decoration: underline !important; text-underline-offset: .2em; }
 /*
  * An open list or calendar (the timezone, the date of birth, the phone number's countries) can reach the bottom of the
  * page, where it would run under the pill: while one is open the card stacks above it, and the pill is back as soon
@@ -97,8 +95,6 @@
 .stack { display: grid; min-width: 0; gap: var(--brand-gap, var(--space-4)); }
 /* A chosen timezone longer than a narrow field ("Kolkata, Asia · UTC+05:30" at 320 px) ends in an ellipsis. */
 .stack input[role="combobox"]:not(:focus) { text-overflow: ellipsis; }
-/* ComboboxField's wrapper around Arc's Combobox: no box of its own in the layout. */
-.comboboxField { display: grid; min-width: 0; }
 
 /* An Arc field whose label is visually hidden (the segmented control above already says what it is). */
 .quietLabel { display: grid; min-width: 0; }
@@ -131,36 +127,11 @@
 .segments { width: 100%; }
 .segments > div { flex: 1 1 auto; }
 .segments button { flex: 1 1 0; }
-/*
- * Keyboard focus (Arc's segmented control shows none): the focused option's pill takes the text colour on its edge, as
- * a focused field does. Only the chosen option is a Tab stop, so focus is on the pill.
- */
-.segments button:focus-visible [data-sq] { --sq-stroke: var(--foreground); }
-.segments button:focus-visible:not([aria-pressed="true"]) { color: var(--foreground); }
 .continueAs { display: grid; gap: var(--space-3); }
 
 .divider { display: flex; align-items: center; gap: var(--space-3); color: var(--text-muted); font-size: var(--text-xs); line-height: 1; }
 .divider::before, .divider::after { flex: 1; height: 1px; background: var(--border); content: ""; }
 
-/* The phone field and its "Country not in the list?" switch. */
-.phoneField { display: grid; min-width: 0; gap: var(--space-2); }
-.fieldLink {
-  justify-self: start;
-  min-height: 28px;
-  border: 0;
-  padding: 0;
-  background: none;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: var(--text-xs);
-  font-weight: 500;
-  text-decoration: underline;
-  text-decoration-color: var(--border-strong);
-  text-underline-offset: 3px;
-  cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-standard), text-decoration-color var(--duration-fast) var(--ease-standard);
-}
-.fieldLink:is(:hover, :focus-visible) { outline: none; color: var(--foreground); text-decoration-color: currentColor; }
 
 /* A quiet text action ("Other ways to sign in", "Back to the code"). */
 .textButton {
@@ -414,6 +385,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .panel > * { transition: none; }
-  .textButton, .suggestion, .fieldLink, .resend, .idControl, .shareRow, .footer a { transition: none; }
+  .textButton, .suggestion, .resend, .idControl, .shareRow, .footer a { transition: none; }
   .spin { animation: none; }
 }

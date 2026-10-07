@@ -8,7 +8,6 @@
  * from code that also renders on the server.
  */
 import type { AccountSummary, Branding, FlowChallenge, FlowView, SigninCopy, SigninMethod } from "@/lib/api/types";
-import { ZONE_COUNTRY } from "./phone-data";
 
 export type HostedFlow = FlowView;
 export type HostedStep = FlowView["step"];
@@ -188,32 +187,8 @@ export function firstName(displayName: string): string {
   return first.length > 18 ? `${first.slice(0, 17)}…` : first || displayName;
 }
 
-/**
- * A best guess at the visitor's country (ISO 3166-1 alpha-2) for phone numbers: the timezone's country, else the
- * region of the browser's language, else the United States. It can be any country, not only the ones the phone
- * picker formats (PhoneField offers the others with their calling code).
- */
-export function guessCountry(): string {
-  let zone = "";
-  try {
-    zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
-  } catch {
-    zone = "";
-  }
-  const byZone = ZONE_COUNTRY.get(zone);
-  if (byZone) return byZone;
-  try {
-    if (typeof navigator !== "undefined") {
-      for (const tag of navigator.languages ?? [navigator.language]) {
-        const region = /^[a-z]{2,3}(?:[-_][A-Za-z]{4})?[-_]([A-Za-z]{2})\b/.exec(tag ?? "")?.[1];
-        if (region) return region.toUpperCase();
-      }
-    }
-  } catch {
-    // No navigator: fall through.
-  }
-  return "US";
-}
+// The visitor's likely country for phone numbers lives with the phone field (components/foundation/phone-field).
+export { guessCountry } from "@/components/foundation/phone-field/phone-data";
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* The split layout's hero                                                                                             */
@@ -233,29 +208,54 @@ export interface HeroCopy {
  * `firstVisit`: this page showed the sign-up step of this flow (a new account, or one an app imported).
  */
 export function heroCopy(flow: HostedFlow, journey: { firstVisit: boolean }): HeroCopy {
-  const app = flow.app.name;
-  const copy = flow.app.copy;
-  const signIn: HeroCopy = { title: appTitle(flow), subtitle: copy.subtitle?.trim() || null };
-  const knowsApp = (flow.consent?.previously_granted ?? []).some(scope => scope !== "profile" && scope !== "openid" && scope !== "offline_access");
-  switch (flow.step) {
+  return heroCopyFor({
+    name: flow.app.name,
+    copy: flow.app.copy,
+    step: flow.step,
+    firstVisit: journey.firstVisit,
+    knowsApp: (flow.consent?.previously_granted ?? []).some(scope => scope !== "profile" && scope !== "openid" && scope !== "offline_access"),
+    finishingImport: !!flow.signup?.finishing_import,
+  });
+}
+
+/** What heroCopyFor needs: the app's name and copy, the step, and what the page knows about the Carbon. */
+export interface HeroInput {
+  name: string;
+  copy: Pick<HostedFlow["app"]["copy"], "title" | "subtitle">;
+  step: HostedFlow["step"];
+  /** This page showed the sign-up step of this flow (a new account, or one an app imported). */
+  firstVisit: boolean;
+  /** The Carbon granted the app something before (beyond its name, id and photo). */
+  knowsApp?: boolean;
+  /** The sign-up finishes an account the app imported. */
+  finishingImport?: boolean;
+}
+
+/**
+ * heroCopy without a FlowView: the same rules for anything that knows the step and the app (the developer area's
+ * Branding preview draws the split layout's copy with it).
+ */
+export function heroCopyFor({ name: app, copy, step, firstVisit, knowsApp = false, finishingImport = false }: HeroInput): HeroCopy {
+  const signIn: HeroCopy = { title: copy.title?.trim() || `Sign in to ${app}`, subtitle: copy.subtitle?.trim() || null };
+  switch (step) {
     case "choose_method":
     case "verify_code":
       return signIn;
     case "signup":
-      return flow.signup?.finishing_import
+      return finishingImport
         ? { title: `Welcome to ${app}`, subtitle: `${app} set up an account for you. Check what it filled in, and you are in.` }
         : { title: `Welcome to ${app}`, subtitle: "Your account works here and in every other app that signs in with Silicon Accounts." };
     case "requirements":
-      return journey.firstVisit
+      return firstVisit
         ? { title: `Welcome to ${app}`, subtitle: `${app} needs one more detail before you continue.` }
         : { title: `One more detail for ${app}`, subtitle: "Add it once and it stays on your account, for the apps you choose to share it with." };
     case "consent":
-      return knowsApp && !journey.firstVisit
+      return knowsApp && !firstVisit
         ? { title: `Welcome back to ${app}`, subtitle: `${app} is asking for a little more than before. You choose what it sees.` }
         : { title: `Welcome to ${app}`, subtitle: `You choose what ${app} sees, and you can change it any time in your account.` };
     case "complete":
     case "failed":
-      return journey.firstVisit ? { title: `Welcome to ${app}`, subtitle: "Taking you there now." } : { title: `Signed in to ${app}`, subtitle: "Taking you there now." };
+      return firstVisit ? { title: `Welcome to ${app}`, subtitle: "Taking you there now." } : { title: `Signed in to ${app}`, subtitle: "Taking you there now." };
     default:
       return signIn;
   }

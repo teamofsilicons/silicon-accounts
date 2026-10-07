@@ -12,10 +12,11 @@
  *   await api.apps.webhook.set(appId, url, { idempotencyKey: keys.for({ appId, url }) });
  *   keys.reset();
  */
-import { useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useMutation, type UseMutationOptions, type UseMutationResult } from "@tanstack/react-query";
 import { newIdempotencyKey } from "../api/http";
 import type { ApiError } from "../api/errors";
+import type { QueryMeta } from "./client";
 
 /** A stable text for any input: object keys sorted, files described by name, size, type and date. */
 export function stableSignature(value: unknown): string {
@@ -74,4 +75,34 @@ export function useIdempotentMutation<TData, TVariables>(
       return onSuccess?.(...args);
     },
   });
+}
+
+export interface SecretMutation<TData, TVariables> {
+  /** Runs the action and resolves with its answer (the secret is the caller's to hand over); rejects on failure. */
+  run: (variables: TVariables) => Promise<TData>;
+  isPending: boolean;
+}
+
+/**
+ * An action whose answer carries a secret shown once: a generated or chosen STK, a webhook signing secret, a proof
+ * token. The answer must live only where it is shown, so the mutation is never kept: `run(input)` resolves with the
+ * answer and then resets the mutation, and nothing is cached after that (gcTime 0) — not the answer, not the input (a
+ * chosen STK is input). A failure keeps its Idempotency-Key, so a retry of the same input reuses it (the server
+ * replays a lost answer for 10 minutes instead of acting twice); `fn` may ignore the key when the endpoint takes none.
+ * Failures toast through the shared client unless `meta.toast` is false; `run` rejects either way.
+ */
+export function useSecretMutation<TData, TVariables = void>(
+  fn: (variables: TVariables, idempotencyKey: string) => Promise<TData>,
+  options: { onSuccess?: (data: TData, variables: TVariables) => void; meta?: QueryMeta } = {},
+): SecretMutation<TData, TVariables> {
+  const mutation = useIdempotentMutation<TData, TVariables>(fn, { gcTime: 0, onSuccess: options.onSuccess, meta: options.meta });
+  const { mutateAsync, reset } = mutation;
+  const run = useCallback(async (variables: TVariables): Promise<TData> => {
+    try {
+      return await mutateAsync(variables);
+    } finally {
+      reset();
+    }
+  }, [mutateAsync, reset]);
+  return { run, isPending: mutation.isPending };
 }

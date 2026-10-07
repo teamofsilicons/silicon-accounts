@@ -10,8 +10,9 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { api } from "../api/endpoints";
 import type { ApiError } from "../api/errors";
 import type { EmailView, HistoryKind, Me, PhoneView, ProfileUpdate } from "../api/types";
-import { useIdempotentMutation } from "./idempotency";
+import { useIdempotentMutation, useSecretMutation } from "./idempotency";
 import { queryKeys } from "./keys";
+import { useWholeList } from "./pages";
 import { setMe, useSession } from "./session";
 
 /* ------------------------------------------------------------------------------------------------------------------ */
@@ -183,10 +184,10 @@ export function useUnlinkIdentity() {
 /* Apps, sessions, history and proofs                                                                                  */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-/** Apps this account signed into (one page of 200 covers every realistic account). */
+/** Every app this account signed into (the whole list, every page of 200; see lib/query/pages.ts). */
 export function useMyApps() {
   const { status } = useSession();
-  return useQuery({ queryKey: queryKeys.me.apps, queryFn: () => api.me.apps.list({ limit: 200 }), enabled: status === "signed_in" });
+  return useWholeList(queryKeys.me.apps, query => api.me.apps.list(query), status === "signed_in");
 }
 
 export function useRemoveAppAccess() {
@@ -201,9 +202,10 @@ export function useRemoveAppAccess() {
   });
 }
 
+/** Every browser and terminal signed in to this account (the whole list). */
 export function useSessions() {
   const { status } = useSession();
-  return useQuery({ queryKey: queryKeys.me.sessions, queryFn: () => api.me.sessions.list({ limit: 200 }), enabled: status === "signed_in" });
+  return useWholeList(queryKeys.me.sessions, query => api.me.sessions.list(query), status === "signed_in");
 }
 
 export function useRevokeSession() {
@@ -227,9 +229,10 @@ export function useHistory(kind?: HistoryKind | null) {
   });
 }
 
+/** Every OBO proof about this account, active and ended (the whole list). */
 export function useMyProofs() {
   const { status } = useSession();
-  return useQuery({ queryKey: queryKeys.me.proofs, queryFn: () => api.me.proofs.list({ limit: 200 }), enabled: status === "signed_in" });
+  return useWholeList(queryKeys.me.proofs, query => api.me.proofs.list(query), status === "signed_in");
 }
 
 export function useRevokeMyProof() {
@@ -245,9 +248,13 @@ export function useRevokeMyProof() {
 /* A Silicon's own webhook (a Silicon signed in to the site)                                                            */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
+/** Sets a Silicon's own webhook; its signing secret comes back once (`run(url)`; see useSecretMutation). */
 export function useSetOwnWebhook() {
   const client = useQueryClient();
-  return useMutation({ mutationFn: (url: string) => api.me.webhook.set(url), onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.me.view }), meta: { errorTitle: "Could not set the webhook" } });
+  return useSecretMutation((url: string) => api.me.webhook.set(url), {
+    onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.me.view }),
+    meta: { errorTitle: "Could not set the webhook" },
+  });
 }
 
 export function useRemoveOwnWebhook() {

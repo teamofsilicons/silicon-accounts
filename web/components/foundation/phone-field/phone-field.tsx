@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * The phone number field of the hosted pages (sign-in, "Change", the requirements step).
+ * The phone number field of the hosted pages (sign-in, "Change", the requirements step) and the account site (adding
+ * a phone number on Sign-in methods).
  *
  * Arc's PhoneInput formats the countries it lists and nothing else: a number with any other calling code would be
  * folded into the selected country's digits (a pasted "+40 755 345 678" became the US number +1 407 553 4567), so the
@@ -19,9 +20,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/arc/input/input";
 import { PHONE_COUNTRIES, PhoneInput, parsePhoneNumber, type PhoneCountry } from "@/components/arc/phone-input/phone-input";
-import { guessCountry } from "./model";
-import { E164_MAX_DIGITS, E164_MIN_DIGITS, callingCodeOf, callingCountry, countriesOf, isCallingCodePrefix } from "./phone-data";
-import styles from "./flow.module.css";
+import { E164_MAX_DIGITS, E164_MIN_DIGITS, callingCodeOf, callingCountry, countriesOf, guessCountry, isCallingCodePrefix } from "./phone-data";
+import styles from "./phone-field.module.css";
 
 export type PhoneMode = "picker" | "international";
 
@@ -43,6 +43,8 @@ export interface PhoneFieldProps {
   error?: string | null;
   /** Under the field (for example "We text a 6 digit code to this number."). */
   description?: string;
+  /** The country to start in (ISO 3166-1 alpha-2); default: the visitor's likely country (guessCountry). */
+  defaultCountry?: string;
   onChange: (value: PhoneFieldValue) => void;
 }
 
@@ -109,8 +111,8 @@ interface Start {
 }
 
 /** Where the field starts: the given number in whichever mode can hold it, else the visitor's likely country. */
-function startFrom(initial: string | undefined): Start {
-  const guess = guessCountry();
+function startFrom(initial: string | undefined, preferred?: string): Start {
+  const guess = preferred?.toUpperCase() || guessCountry();
   const pickerCountry = BY_ISO.has(guess) ? guess : "US";
   const text = (initial ?? "").trim();
   if (text) {
@@ -132,8 +134,8 @@ function valueOf(mode: PhoneMode, picker: string, country: string, raw: string):
   return { mode, phone: digits ? `+${digits}` : "", problem: internationalProblem(raw) };
 }
 
-export function PhoneField({ label, hideLabel, initial, error, description, onChange }: PhoneFieldProps) {
-  const [start] = useState(() => startFrom(initial));
+export function PhoneField({ label, hideLabel, initial, error, description, defaultCountry, onChange }: PhoneFieldProps) {
+  const [start] = useState(() => startFrom(initial, defaultCountry));
   const [mode, setMode] = useState<PhoneMode>(start.mode);
   const [picker, setPicker] = useState(start.picker);
   const [country, setCountry] = useState(start.country);
@@ -167,7 +169,7 @@ export function PhoneField({ label, hideLabel, initial, error, description, onCh
     }
   }, [focusTarget, mode]);
 
-  const example = callingCountry(guessCountry()) ?? callingCountry("RO");
+  const example = callingCountry(defaultCountry?.toUpperCase() || guessCountry()) ?? callingCountry("RO");
   const dial = callingCodeOf(onlyDigits(raw));
   const names = dial ? countriesOf(dial) : null;
   const detected = names && raw.trim().startsWith("+") ? `${names[0]?.toUpperCase()}${names.slice(1)} (+${dial})` : null;

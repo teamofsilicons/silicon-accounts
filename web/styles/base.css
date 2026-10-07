@@ -38,6 +38,17 @@ input, button, textarea, select { font: inherit; letter-spacing: inherit; color:
 button { -webkit-tap-highlight-color: transparent; }
 a { color: var(--accent-ink); text-decoration-thickness: from-font; text-underline-offset: .2em; }
 a:not([data-variant]):hover { color: var(--accent-strong); }
+/* Keyboard focus on a plain link: the hover ink, a full underline and a soft fill (focus never shows as a ring). :where
+   keeps it at one pseudo-class of specificity, so a component's own focus rule for its links still wins. */
+:where(a:not([data-variant], [data-sq])):focus-visible {
+  outline: none;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 12%, transparent);
+  color: var(--accent-strong);
+  text-decoration-line: underline;
+  text-decoration-color: currentColor;
+}
 code, kbd, samp, pre { font-family: var(--font-mono); font-size: .92em; letter-spacing: 0; }
 strong, b { font-weight: 500; }
 hr { height: 1px; margin: 0; border: 0; background: var(--border); }

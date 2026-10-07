@@ -2,14 +2,16 @@
 
 /**
  * Queries and mutations for Silicons and custodian requests (/silicons, the identity card's counts).
- * Secrets in answers (a generated STK, a webhook secret) are shown exactly once: keep them in component state only
- * (never in the query cache, never in browser storage).
+ * Secrets in answers (a generated STK, a webhook secret) are shown exactly once: the actions that return them are
+ * secret mutations (`run(input)`, never cached; lib/query/idempotency.ts useSecretMutation), and the page keeps the
+ * secret only where it shows it (never in the query cache, never in browser storage).
  */
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "../api/endpoints";
 import type { CreateSilicon, ManagedSilicon, Page, UpdateSilicon } from "../api/types";
-import { useIdempotentMutation } from "./idempotency";
+import { useIdempotentMutation, useSecretMutation } from "./idempotency";
 import { queryKeys } from "./keys";
+import { useWholeList } from "./pages";
 import { useSession } from "./session";
 
 /** Puts a Silicon the server just returned into the list and its own cache entry. */
@@ -26,14 +28,10 @@ function refreshSilicons(client: QueryClient): void {
   void client.invalidateQueries({ queryKey: queryKeys.me.historyRoot });
 }
 
-/** Silicons this Carbon is custodian of, in the service's order (account number). */
+/** Every Silicon this Carbon is custodian of, in the service's order (account number): the whole list. */
 export function useSilicons() {
   const { status, session } = useSession();
-  return useQuery({
-    queryKey: queryKeys.me.silicons,
-    queryFn: () => api.me.silicons.list({ limit: 200 }),
-    enabled: status === "signed_in" && session?.account.kind === "carbon",
-  });
+  return useWholeList(queryKeys.me.silicons, query => api.me.silicons.list(query), status === "signed_in" && session?.account.kind === "carbon");
 }
 
 /** One Silicon (by uuid or si:id). */
@@ -41,10 +39,13 @@ export function useSilicon(uuid: string | null) {
   return useQuery({ queryKey: queryKeys.me.silicon(uuid ?? ""), queryFn: () => api.me.silicons.get(uuid ?? ""), enabled: !!uuid });
 }
 
-/** Creates a Silicon with me as custodian. The answer's `stk` / `webhook_secret` are shown once. Same input, same key. */
+/**
+ * Creates a Silicon with me as custodian: `run(body)`. The answer's `stk` / `webhook_secret` are shown once, so the
+ * action is a secret mutation (never cached; a chosen STK in the input is not kept either). Same input, same key.
+ */
 export function useCreateSilicon() {
   const client = useQueryClient();
-  return useIdempotentMutation((body: CreateSilicon, idempotencyKey) => api.me.silicons.create(body, { idempotencyKey }), {
+  return useSecretMutation((body: CreateSilicon, idempotencyKey) => api.me.silicons.create(body, { idempotencyKey }), {
     onSuccess: created => {
       storeSilicon(client, created.silicon);
       refreshSilicons(client);
@@ -84,10 +85,13 @@ export function useUploadSiliconPhoto() {
   });
 }
 
-/** Rotates the STK: the old one dies at once and the Silicon is signed out everywhere. A generated STK is shown once. */
+/**
+ * Rotates the STK: `run({uuid, stk?})`. The old one dies at once and the Silicon is signed out everywhere. A generated
+ * STK is shown once (a secret mutation: never cached, and neither is a chosen STK).
+ */
 export function useRotateStk() {
   const client = useQueryClient();
-  return useIdempotentMutation(({ uuid, stk }: { uuid: string; stk?: string }, idempotencyKey) => api.me.silicons.rotateStk(uuid, stk, { idempotencyKey }), {
+  return useSecretMutation(({ uuid, stk }: { uuid: string; stk?: string }, idempotencyKey) => api.me.silicons.rotateStk(uuid, stk, { idempotencyKey }), {
     onSuccess: (_result, { uuid }) => {
       void client.invalidateQueries({ queryKey: queryKeys.me.silicon(uuid) });
       refreshSilicons(client);
@@ -96,11 +100,18 @@ export function useRotateStk() {
   });
 }
 
+/**
+ * Sets a Silicon's webhook: `run({uuid, url})`; its new signing secret comes back once (a secret mutation). The PUT
+ * takes no Idempotency-Key: a retry after a lost answer sets the same URL again with a fresh secret, and the unseen one
+ * simply stops working.
+ */
 export function useSetSiliconWebhook() {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: ({ uuid, url }: { uuid: string; url: string }) => api.me.silicons.setWebhook(uuid, url),
-    onSuccess: (_result, { uuid }) => {
+  return useSecretMutation(({ uuid, url }: { uuid: string; url: string }) => api.me.silicons.setWebhook(uuid, url), {
+    onSuccess: (answer, { uuid }) => {
+      const change = (silicon: ManagedSilicon) => ({ ...silicon, webhook_url: answer.webhook_url });
+      client.setQueryData<ManagedSilicon>(queryKeys.me.silicon(uuid), silicon => (silicon ? change(silicon) : silicon));
+      client.setQueryData<Page<ManagedSilicon>>(queryKeys.me.silicons, page => (page ? { ...page, items: page.items.map(item => (item.uuid === uuid ? change(item) : item)) } : page));
       void client.invalidateQueries({ queryKey: queryKeys.me.silicon(uuid) });
       void client.invalidateQueries({ queryKey: queryKeys.me.silicons });
     },
@@ -148,14 +159,10 @@ export function useDeleteSilicon() {
   });
 }
 
-/** Custodian requests addressed to me (a Silicon's own request, or a transfer to me). */
+/** Every custodian request addressed to me (a Silicon's own request, or a transfer to me): the whole list. */
 export function useCustodianRequests() {
   const { status, session } = useSession();
-  return useQuery({
-    queryKey: queryKeys.me.custodianRequests,
-    queryFn: () => api.me.custodianRequests.list({ limit: 200 }),
-    enabled: status === "signed_in" && session?.account.kind === "carbon",
-  });
+  return useWholeList(queryKeys.me.custodianRequests, query => api.me.custodianRequests.list(query), status === "signed_in" && session?.account.kind === "carbon");
 }
 
 export function useAcceptCustodianRequest() {

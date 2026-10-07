@@ -1113,7 +1113,8 @@ pub enum TokenCommand {
         #[arg(long, value_name = "URI")]
         redirect_uri: String,
         /// The PKCE verifier, if you sent a challenge.
-        #[arg(long, value_name = "VERIFIER")]
+        // A verifier is random base64url, so one in 64 starts with "-": it is still the value, never a flag.
+        #[arg(long, value_name = "VERIFIER", allow_hyphen_values = true)]
         code_verifier: Option<String>,
     },
     /// Exchange a Silicon's short-lived token (slt_…).

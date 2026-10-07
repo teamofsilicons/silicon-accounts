@@ -1,4 +1,4 @@
-// The CLI entry (`pnpm -C testkit start`): starts all three servers, prints a ready line,
+// The CLI entry (`pnpm -C testkit start`): starts all four servers, prints a ready line,
 // and stops cleanly on SIGTERM/SIGINT.
 
 import assert from 'node:assert/strict';
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const testkitRoot = fileURLToPath(new URL('..', import.meta.url));
 
 async function startCli(): Promise<{ child: ReturnType<typeof spawn>; urls: Record<string, string> }> {
-  const child = spawn(process.execPath, ['--import', 'tsx', 'src/start.ts', '--oidc-port', '0', '--messaging-port', '0', '--fake-apps-port', '0', '--accounts-url', 'http://127.0.0.1:9', '--quiet'], {
+  const child = spawn(process.execPath, ['--import', 'tsx', 'src/start.ts', '--oidc-port', '0', '--messaging-port', '0', '--fake-apps-port', '0', '--iris-port', '0', '--accounts-url', 'http://127.0.0.1:9', '--quiet'], {
     cwd: testkitRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -35,9 +35,9 @@ async function startCli(): Promise<{ child: ReturnType<typeof spawn>; urls: Reco
 
 describe('pnpm start', () => {
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-    test(`starts the three servers and stops cleanly on ${signal}`, async () => {
+    test(`starts the four servers and stops cleanly on ${signal}`, async () => {
       const { child, urls } = await startCli();
-      for (const key of ['oidc', 'messaging', 'fake_apps']) {
+      for (const key of ['oidc', 'messaging', 'fake_apps', 'iris']) {
         const res = await fetch(`${urls[key]}/_health`);
         assert.equal(res.status, 200, key);
         assert.equal(((await res.json()) as { ok: boolean }).ok, true);
@@ -53,7 +53,7 @@ describe('pnpm start', () => {
     const { child, urls } = await startCli();
     try {
       const port = new URL(urls.oidc ?? '').port;
-      const second = spawn(process.execPath, ['--import', 'tsx', 'src/start.ts', '--oidc-port', port, '--messaging-port', '0', '--fake-apps-port', '0', '--quiet'], { cwd: testkitRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+      const second = spawn(process.execPath, ['--import', 'tsx', 'src/start.ts', '--oidc-port', port, '--messaging-port', '0', '--fake-apps-port', '0', '--iris-port', '0', '--quiet'], { cwd: testkitRoot, stdio: ['ignore', 'pipe', 'pipe'] });
       let err = '';
       second.stderr?.on('data', (chunk: Buffer) => {
         err += chunk.toString();

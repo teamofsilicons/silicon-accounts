@@ -1,7 +1,8 @@
 /**
  * Live interaction checks of the developer pages, in a real browser against a running site and accounts-api: tabs that
  * switch without the server, saving with expected_version, conflicts (both ways out, and an automatic rebase), text
- * typed into a list field and ⌘S, the leave guard (links, the phone dock's sheet, number keys) and its kept draft,
+ * typed into a list field and ⌘S, the leave guard (links, the phone dock's sheet, number keys, the command palette, the
+ * user menu's Settings and signing out) and its kept draft,
  * focus after Save, Discard, a conflict's choice and a revoke, local refusals, version history, the branding preview
  * and contrast rule, the embed preview after a save, the import wizard through "Import for real", the user base,
  * webhook deliveries (retries, attempts, replays, a rotated secret) and ATA proofs. Each check fails on a broken
@@ -177,6 +178,23 @@ const checks: Check[] = [
     },
   },
   {
+    name: "tabs: an address that names no tab answers 404 with the not-found page; a real tab answers 200",
+    run: async env => {
+      const { page } = env;
+      // The 404s are the point here: the browser logs them as console errors, which this check expects.
+      const before = problems.length;
+      for (const path of ["no-such-tab", "sign-in/extra"]) {
+        const response = await page.goto(`${env.base}/developer/${APP}/${path}`);
+        expect(response?.status(), path).toBe(404);
+        await expect(page.getByText("Nothing lives at this address")).toBeVisible();
+      }
+      problems.splice(before);
+      const response = await page.goto(`${env.base}/developer/${APP}/webhooks`);
+      expect(response?.status()).toBe(200);
+      await expect(page.getByRole("tab", { name: /^Webhooks/ })).toHaveAttribute("aria-selected", "true");
+    },
+  },
+  {
     name: "sign-in: a toggle saves as the next version",
     run: async env => {
       const { page } = env;
@@ -340,6 +358,52 @@ const checks: Check[] = [
       await page.goto(tab(env, "sign-in"));
       await expect(title).toHaveValue(stored);
       await expect(saveBar(page)).toHaveCount(0);
+    },
+  },
+  {
+    name: "leave guard through the shell: the command palette, the user menu's Settings and signing out ask too",
+    run: async env => {
+      const { page, run } = env;
+      await page.goto(tab(env, "sign-in"));
+      const title = page.getByRole("textbox", { name: "Title", exact: true });
+      const stored = await title.inputValue();
+      await title.fill(`Shell ${run}`);
+      const dialog = page.getByRole("dialog", { name: "Leave with unsaved changes?" });
+      // The palette's "Go to" commands ask (they used to leave without asking and only keep the draft).
+      await page.keyboard.press("ControlOrMeta+k");
+      await page.keyboard.type("Apps", { delay: 15 });
+      await page.keyboard.press("Enter");
+      await expect(dialog).toBeVisible();
+      await dialog.getByRole("button", { name: "Keep editing" }).click();
+      await expect(dialog).toBeHidden();
+      await expect(page).toHaveURL(new RegExp(`/developer/${APP}/sign-in$`));
+      await expect(title).toHaveValue(`Shell ${run}`);
+      // The user menu's Settings asks.
+      const menu = page.locator("nav[aria-label='Account sections']").getByRole("button").last();
+      await menu.click();
+      await page.getByRole("menuitem", { name: "Settings" }).click();
+      await expect(dialog).toBeVisible();
+      await dialog.getByRole("button", { name: "Keep editing" }).click();
+      await expect(dialog).toBeHidden();
+      // Signing out asks, and offers no draft to keep (nothing in this tab survives it); staying keeps the session.
+      await menu.click();
+      await page.getByRole("menuitem", { name: /Sign out/ }).click();
+      const signOut = page.getByRole("dialog", { name: "Sign out with unsaved changes?" });
+      await expect(signOut).toBeVisible();
+      await expect(signOut.getByRole("button", { name: "Leave, keep the draft" })).toHaveCount(0);
+      await signOut.getByRole("button", { name: "Keep editing" }).click();
+      await expect(signOut).toBeHidden();
+      expect((await page.request.get(`${env.base}/v1/session`)).status(), "still signed in").toBe(200);
+      // Discarding through the palette leaves without a draft, and without the browser's own question.
+      const asked = unloadQuestions.length;
+      await page.keyboard.press("ControlOrMeta+k");
+      await page.keyboard.type("Silicons", { delay: 15 });
+      await page.keyboard.press("Enter");
+      await dialog.getByRole("button", { name: "Discard and leave" }).click();
+      await expect(page).toHaveURL(`${env.base}/silicons`);
+      expect(unloadQuestions.length, "no Leave site? after discarding").toBe(asked);
+      await page.goto(tab(env, "sign-in"));
+      await expect(title).toHaveValue(stored);
     },
   },
   {

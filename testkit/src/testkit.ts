@@ -1,22 +1,25 @@
-// Starts all three testkit servers in-process, wired to the dev credentials:
+// Starts the testkit servers in-process, wired to the dev credentials:
 // mock-oidc knows the managed Google/Apple clients and the bring-your-own clients of
 // acme-notes (Google) and orbit-games (Apple); mock-messaging accepts the dev
-// Postmark/Twilio credentials; the fake app server talks to Silicon Accounts at accountsUrl.
+// Postmark/Twilio credentials; the fake app server talks to Silicon Accounts at accountsUrl;
+// mock-iris draws the default profile photos (ACCOUNTS_IRIS_BASE_URL).
 
 import { accountsEnvForMocks } from '../lib/env.ts';
 import { loadDevCredentials, type DevCredentials } from './credentials.ts';
 import { start as startFakeApps, type FakeAppServer } from './fake-app-server.ts';
 import { loadFakeApps } from './fake-apps/load.ts';
 import type { SiliconAppsApp } from './fake-apps/types.ts';
+import { start as startIris, type MockIris } from './mock-iris.ts';
 import { start as startMessaging, type MockMessaging } from './mock-messaging.ts';
 import { start as startOidc, type MockOidc, type OidcClientInput } from './mock-oidc.ts';
 
 export interface TestkitOptions {
   host?: string;
-  /** Ports (defaults 8591/8592/8593; 0 = any free port). */
+  /** Ports (defaults 8591/8592/8593/8594; 0 = any free port). */
   oidcPort?: number;
   messagingPort?: number;
   fakeAppsPort?: number;
+  irisPort?: number;
   /** Silicon Accounts for the fake apps' server-to-server calls (default $ACCOUNTS_URL or http://127.0.0.1:8589). */
   accountsUrl?: string;
   /** Silicon Accounts as browsers see it (default $ACCOUNTS_PUBLIC_URL, else discovered via /v1/meta). */
@@ -27,6 +30,7 @@ export interface TestkitOptions {
   oidc?: boolean;
   messaging?: boolean;
   fakeApps?: boolean;
+  iris?: boolean;
   log?: boolean | ((line: string) => void);
 }
 
@@ -34,6 +38,7 @@ export interface RunningTestkit {
   oidc: MockOidc | null;
   messaging: MockMessaging | null;
   fakeApps: FakeAppServer | null;
+  iris: MockIris | null;
   credentials: DevCredentials;
   /** ACCOUNTS_* variables pointing Silicon Accounts at these mocks. */
   accountsEnv: Record<string, string>;
@@ -125,12 +130,25 @@ export async function startTestkit(options: TestkitOptions = {}): Promise<Runnin
             log: options.log ?? false,
           });
     if (fakeApps) started.push(fakeApps);
+    const iris =
+      options.iris === false
+        ? null
+        : await startIris({
+            ...(options.host ? { host: options.host } : {}),
+            port: options.irisPort ?? 8594,
+            log: options.log ?? false,
+          });
+    if (iris) started.push(iris);
     return {
       oidc,
       messaging,
       fakeApps,
+      iris,
       credentials,
-      accountsEnv: accountsEnvForMocks({ oidcUrl: oidc?.url ?? 'http://127.0.0.1:8591', messagingUrl: messaging?.url ?? 'http://127.0.0.1:8592' }, credentials),
+      accountsEnv: accountsEnvForMocks(
+        { oidcUrl: oidc?.url ?? 'http://127.0.0.1:8591', messagingUrl: messaging?.url ?? 'http://127.0.0.1:8592', irisUrl: iris?.url ?? 'http://127.0.0.1:8594' },
+        credentials,
+      ),
       async stop() {
         await Promise.all(started.map((s) => s.stop()));
       },

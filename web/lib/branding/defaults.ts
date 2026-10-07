@@ -18,7 +18,7 @@ export const DEFAULT_LIGHT: Palette = {
 /**
  * The Silicon Accounts dark palette (crates/core signin_config.rs `default_dark`): filled buttons keep the brand blue
  * #1F5FB8 under #FFFDF9 text (6.1:1); the lighter #5B8FE0 is only an ink for links on dark (it would put button text
- * at 3.2:1).
+ * at 3.2:1). Error text is #FF8A80 (5.45:1 on the #353432 card; the old #F97066 read at 4.46:1, migration 0004).
  */
 export const DEFAULT_DARK: Palette = {
   primary: "#1F5FB8",
@@ -28,7 +28,7 @@ export const DEFAULT_DARK: Palette = {
   foreground: "#FFFDF9",
   muted: "#B5B0A8",
   border: "#4A4845",
-  danger: "#F97066",
+  danger: "#FF8A80",
 };
 
 export const DEFAULT_BRANDING: Branding = {

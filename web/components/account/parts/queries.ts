@@ -9,21 +9,20 @@
  * - `useConnectProvider`: POST /v1/me/identities/{google|apple} (connect Google or Apple to the signed-in Carbon).
  * - `useLinkFlow`: GET /v1/flows/{id} for the reason a connection ended (`?link_error=…&flow=…`).
  * - `useSetMeView`: replaces or patches the cached Me view (optimistic edits, answers that carry a new Me).
- * - `useEveryApp`, `useEveryProof`, `useEverySilicon`, `useEveryCustodianRequest`, `useEverySession`: whole lists
- *   (every page of 200, following `next_cursor`), where the shared hooks read the first page only.
- * - `useCreateSiliconOnce`, `useRotateStkOnce`, `useSetSiliconWebhookOnce`: the shared actions whose answers carry a
- *   secret shown once, without TanStack keeping a copy of the answer (or of a chosen STK) after it is handed over.
+ * - `useEveryApp`, `useEveryProof`, `useEverySilicon`, `useEveryCustodianRequest`, `useEverySession`: the shared list
+ *   hooks, which read whole lists now (lib/query/pages.ts); the names stay for the pages that use them.
+ * - `useCreateSiliconOnce`, `useRotateStkOnce`, `useSetSiliconWebhookOnce`: the shared secret actions (lib/query
+ *   useSecretMutation: never cached, reset after hand-off); the names stay for the pages that use them.
  * - `useChangeOwnId`, `useChangeSiliconIdInForm`: id changes whose refusals the id form explains in place (no toast).
  */
 import { useCallback } from "react";
-import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/endpoints";
 import type { ApiError } from "@/lib/api/errors";
 import { request } from "@/lib/api/http";
-import type { CreateSilicon, CustodianRequest, EmailView, IdAvailability, ManagedSilicon, Me, MyApp, MyProof, Page, PageQuery, PendingTransfer, PhoneView, Provider, SessionInfo, SiliconCreated, SiliconWebhook, StkRotated, Timestamp, TransferRequest } from "@/lib/api/types";
-import { useIdempotentMutation } from "@/lib/query/idempotency";
+import type { CustodianRequest, EmailView, IdAvailability, ManagedSilicon, Me, MyApp, MyProof, Page, PendingTransfer, PhoneView, Provider, SessionInfo, Timestamp, TransferRequest } from "@/lib/api/types";
 import { queryKeys } from "@/lib/query/keys";
-import { setMe, useSession } from "@/lib/query/session";
+import { setMe } from "@/lib/query/session";
 
 /** `GET /v1/ids/available?id=…[&for=…]`, cached per id and subject. Disabled while `id` is null. */
 export function useIdCheckQuery(id: string | null, forUuid?: string | null) {
@@ -310,71 +309,12 @@ export function useDecideRequest() {
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
-/* Whole lists                                                                                                         */
+/* Whole lists (the shared hooks read every page of 200 now: lib/query/pages.ts)                                       */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-/** The API's largest page. */
-const PAGE_LIMIT = 200;
-/** A guard against a runaway list: 25 pages of 200. A longer list keeps its `next_cursor`, and the page says so. */
-export const MAX_LIST_PAGES = 25;
-
-/**
- * Reads a list to its end, following `next_cursor` (the API answers at most 200 per page). The answer has the shape of
- * one page, so the cache entries the shared hooks and mutations write keep working: `next_cursor` is null when every
- * item is there, and the cursor to go on from when the guard stopped it.
- */
-export async function readEveryPage<T>(fetchPage: (query: PageQuery) => Promise<Page<T>>): Promise<Page<T>> {
-  const items: T[] = [];
-  let cursor: string | null = null;
-  for (let read = 0; read < MAX_LIST_PAGES; read += 1) {
-    const page: Page<T> = await fetchPage({ limit: PAGE_LIMIT, cursor });
-    items.push(...page.items);
-    if (!page.next_cursor) return { items, next_cursor: null };
-    cursor = page.next_cursor;
-  }
-  return { items, next_cursor: cursor };
-}
-
-function useEveryPage<T>(queryKey: QueryKey, fetchPage: (query: PageQuery) => Promise<Page<T>>, enabled: boolean) {
-  return useQuery<Page<T>, ApiError>({
-    queryKey,
-    queryFn: () => readEveryPage(fetchPage),
-    enabled,
-    // A shared hook elsewhere caches just the first page under the same key (developer pages read your apps that way):
-    // a list that stops short is read again in full whenever a page here shows it.
-    refetchOnMount: query => (query.state.data?.next_cursor ? "always" : true),
-  });
-}
-
-/** Every app this account signed into (the shared `useMyApps` reads one page). */
-export function useEveryApp() {
-  const { status } = useSession();
-  return useEveryPage<MyApp>(queryKeys.me.apps, query => api.me.apps.list(query), status === "signed_in");
-}
-
-/** Every OBO proof about this account, active and ended. */
-export function useEveryProof() {
-  const { status } = useSession();
-  return useEveryPage<MyProof>(queryKeys.me.proofs, query => api.me.proofs.list(query), status === "signed_in");
-}
-
-/** Every browser and terminal signed in to this account. */
-export function useEverySession() {
-  const { status } = useSession();
-  return useEveryPage<SessionInfo>(queryKeys.me.sessions, query => api.me.sessions.list(query), status === "signed_in");
-}
-
-/** Every Silicon this Carbon is custodian of. */
-export function useEverySilicon() {
-  const { status, session } = useSession();
-  return useEveryPage<ManagedSilicon>(queryKeys.me.silicons, query => api.me.silicons.list(query), status === "signed_in" && session?.account.kind === "carbon");
-}
-
-/** Every custodian request waiting for this Carbon. */
-export function useEveryCustodianRequest() {
-  const { status, session } = useSession();
-  return useEveryPage<CustodianRequest>(queryKeys.me.custodianRequests, query => api.me.custodianRequests.list(query), status === "signed_in" && session?.account.kind === "carbon");
-}
+export { MAX_LIST_PAGES, readEveryPage } from "@/lib/query/pages";
+export { useMyApps as useEveryApp, useMyProofs as useEveryProof, useSessions as useEverySession } from "@/lib/query/account";
+export { useSilicons as useEverySilicon, useCustodianRequests as useEveryCustodianRequest } from "@/lib/query/silicons";
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Id changes, answered in the form                                                                                    */
@@ -410,7 +350,7 @@ export function useChangeSiliconIdInForm() {
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
-/* Answers that carry a secret shown once                                                                              */
+/* Answers that carry a secret shown once (the shared secret mutations: lib/query/idempotency.ts useSecretMutation)     */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
 /** Puts a Silicon the server just returned into its own cache entry and the list (adding it when it is new). */
@@ -421,68 +361,4 @@ function upsertSilicon(client: ReturnType<typeof useQueryClient>, silicon: Manag
     : page));
 }
 
-/**
- * An idempotent action whose answer carries a secret shown once (an STK, a webhook signing secret). `run(input)` resolves
- * with the answer and then resets the mutation, and the mutation is never kept after that (gcTime 0): the reveal card
- * the caller hands the secret to is its only copy, so "I've stored it" really drops it. A chosen STK in the input goes
- * the same way. A failure keeps its Idempotency-Key (a retry of the same input reuses it), but not the input.
- */
-function useOnceMutation<TData, TVars>(
-  fn: (variables: TVars, idempotencyKey: string) => Promise<TData>,
-  onSuccess: (data: TData, variables: TVars) => void,
-  errorTitle: string,
-) {
-  const mutation = useIdempotentMutation<TData, TVars>(fn, { gcTime: 0, onSuccess, meta: { errorTitle } });
-  const { mutateAsync, reset } = mutation;
-  const run = useCallback(async (variables: TVars): Promise<TData> => {
-    try {
-      return await mutateAsync(variables);
-    } finally {
-      reset();
-    }
-  }, [mutateAsync, reset]);
-  return { run, isPending: mutation.isPending };
-}
-
-/** Creates a Silicon with me as custodian; its generated STK and webhook secret come back once. */
-export function useCreateSiliconOnce() {
-  const client = useQueryClient();
-  return useOnceMutation<SiliconCreated, CreateSilicon>(
-    (body, idempotencyKey) => api.me.silicons.create(body, { idempotencyKey }),
-    created => {
-      upsertSilicon(client, created.silicon);
-      refreshSiliconViews(client);
-    },
-    "Could not create the Silicon",
-  );
-}
-
-/** Rotates a Silicon's STK (the old one dies at once); a generated STK comes back once. */
-export function useRotateStkOnce() {
-  const client = useQueryClient();
-  return useOnceMutation<StkRotated, { uuid: string; stk?: string }>(
-    ({ uuid, stk }, idempotencyKey) => api.me.silicons.rotateStk(uuid, stk, { idempotencyKey }),
-    (_answer, { uuid }) => {
-      void client.invalidateQueries({ queryKey: queryKeys.me.silicon(uuid) });
-      refreshSiliconViews(client);
-    },
-    "Could not rotate the STK",
-  );
-}
-
-/**
- * Sets a Silicon's webhook; its new signing secret comes back once. The PUT takes no Idempotency-Key: a retry after a
- * lost answer sets the same URL again with a fresh secret, and the unseen one simply stops working.
- */
-export function useSetSiliconWebhookOnce() {
-  const client = useQueryClient();
-  return useOnceMutation<SiliconWebhook, { uuid: string; url: string }>(
-    ({ uuid, url }) => api.me.silicons.setWebhook(uuid, url),
-    (answer, { uuid }) => {
-      storeSiliconItem(client, uuid, current => ({ ...current, webhook_url: answer.webhook_url }));
-      void client.invalidateQueries({ queryKey: queryKeys.me.silicon(uuid) });
-      void client.invalidateQueries({ queryKey: queryKeys.me.silicons });
-    },
-    "Could not set the webhook",
-  );
-}
+export { useCreateSilicon as useCreateSiliconOnce, useRotateStk as useRotateStkOnce, useSetSiliconWebhook as useSetSiliconWebhookOnce } from "@/lib/query/silicons";

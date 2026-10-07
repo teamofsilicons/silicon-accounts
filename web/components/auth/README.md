@@ -10,7 +10,7 @@ branding runtime); the product contract is `understanding/UNDERSTANDING.md`.
 | `/authorize/flow/[id]` | `flow-page.tsx` | One sign-in, driven by `FlowView.step`: `choose_method` (Continue as / Use another account, Google and Apple, email or phone), `verify_code`, `signup`, `requirements`, `consent`, `complete`, `failed`. Google and Apple come back here. |
 | `/sign-in` | `sign-in.tsx` | Both ends of the account site's own sign-in (first-party app `accounts`, redirect `{origin}/sign-in`): starts it with `return_to` remembered against the state, and finishes it (`?code&state`, or `?error&state` with a way to try again). A code or error counts only when this browser saved its state; the page never shows the address's `error` or `error_description` (fixed words per error code), so nobody can put their own text on it with a link. |
 | `/device` | `device.tsx` | Approving a CLI sign-in: enter (or arrive with) the code, review it (the whole client label, who approves, when it expires), approve or deny, and every status after; a code that runs out while the page is open turns into "This code expired" by the clock. Signed out, it signs in and comes back with the code. |
-| `/embed/v1/buttons` | `embed/embed-buttons.tsx` | The buttons apps frame; the page declares the frame's color scheme from `theme` on the first byte. |
+| `/embed/v1/buttons` | `embed/embed-buttons.tsx` | The buttons apps frame; the page declares the frame's color scheme from `theme` on the first byte. A config fetch the browser cut off is tried twice more before `network_error` (Safari cancels a frame's requests when the page around it starts leaving). |
 
 ## Inside
 
@@ -26,19 +26,20 @@ branding runtime); the product contract is `understanding/UNDERSTANDING.md`.
 - `flow/morph.tsx`: the card morph between steps (Arc's sign-in block motion); the leaving step is inert.
 - `flow/parts.tsx`: headings, field notes, alerts, rows, provider buttons, the code entry (submits on the sixth digit,
   shakes, tries left, a live lockout, expiry, resend), and the email/phone form.
-- `flow/phone-field.tsx` + `phone-data.ts`: a phone number from any country. Arc's picker knows 49 countries; a number
-  it would rewrite moves to a field for the number with its country code and is sent exactly as typed.
+- Phone numbers go through the foundation's `components/foundation/phone-field` (PhoneField + phone-data, moved there
+  from this area so the account site's "Add a phone number" takes any country too): Arc's picker knows 49 countries; a
+  number it would rewrite moves to a field for the number with its country code and is sent exactly as typed.
 - `flow/id-field.tsx`, `id-check.ts`: the c:id with live availability and free ids. `flow/dob-field.tsx`: Arc's date
   picker look with a year grid behind the month title.
-- `flow/combobox-field.tsx`: Arc's Combobox with the WAI-ARIA keyboard behaviour (the sign-up timezone): the list
-  opens on typing, ArrowDown or a click rather than on focus, closes when focus moves on, and is no Tab stop. Arc's own
-  Combobox does none of these yet (a request to the foundation); the wrapper adds them from outside.
+- The sign-up timezone is Arc's Combobox as is: the list opens on typing, ArrowDown or a click rather than on focus,
+  closes when focus moves on, and is no Tab stop (fixed in Arc itself; the former `flow/combobox-field.tsx` wrapper is
+  gone).
 - `flow/legible.ts`: error text stays at 4.5:1 in every app's colours: a `danger` below that on the card or page moves
-  toward the text colour (the default dark #F97066, 4.46:1 on #353432, becomes the site's #FF8A80). Every other colour
-  stays as the app chose it.
-- Keyboard focus shows on everything (Arc draws no rings): the hosted pages add fills or edges where Arc and the
-  foundation show none (Email | Phone, the date of birth trigger, the consent switches' rows, the footer links and
-  "Powered by").
+  toward the text colour. Every other colour stays as the app chose it. (The default dark danger is #FF8A80 now, 5.45:1
+  on #353432; migration 0004 moved stored configs off the old #F97066.)
+- Keyboard focus shows on everything (Arc draws no rings). Arc's Switch, SegmentedControl and DatePicker trigger and
+  the foundation's "Powered by" pill show it themselves now; the hosted pages add the rest (the consent switches' rows,
+  the footer links, the date of birth trigger's refused state).
 - `steps/*`: one file per step. `mocks/flows.ts`: sample FlowViews for every step.
 
 The sign-up photo uploads to the sign-up itself as soon as it is picked (`POST /v1/flows/{id}/signup/photo`); the

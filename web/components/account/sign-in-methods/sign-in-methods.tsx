@@ -27,22 +27,15 @@ import { FitPrompt } from "../parts/fit-prompt";
 import { focusAfterRemoval } from "../parts/focus";
 import { AnimatedRows } from "../parts/animated-rows";
 import { useConnectProvider, useLinkFlow, useRemoveContact, useSetMeView, useUnlinkProvider } from "../parts/queries";
+import { guessCountry } from "@/components/foundation/phone-field/phone-data";
 import { ContactAdder } from "./contact-adder";
 import styles from "./sign-in-methods.module.css";
 
 const LIMIT = 10;
 const PROVIDER_NAMES: Record<Provider, string> = { google: "Google", apple: "Apple" };
 
-/** The browser's region (en-IN → IN) as the default country for local phone numbers. */
-function defaultCountry(): string {
-  try {
-    const region = new Intl.Locale(navigator.language).maximize().region;
-    if (region && /^[A-Z]{2}$/.test(region)) return region;
-  } catch {
-    // Fall through to US.
-  }
-  return "US";
-}
+/** The visitor's likely country for local phone numbers: the timezone's country, else the browser language's region. */
+const defaultCountry = (): string => guessCountry();
 
 export function SignInMethods() {
   const me = useMe();

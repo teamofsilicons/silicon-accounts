@@ -7,11 +7,12 @@
  */
 export { createQueryClient, type QueryMeta } from "./client";
 export { queryKeys } from "./keys";
-export { useIdempotencyKey, useIdempotentMutation, stableSignature, type IdempotencyKeys } from "./idempotency";
+export { useIdempotencyKey, useIdempotentMutation, useSecretMutation, stableSignature, type IdempotencyKeys, type SecretMutation } from "./idempotency";
+export { readEveryPage, useWholeList, MAX_LIST_PAGES, PAGE_LIMIT } from "./pages";
 export {
   useMeta, useSession, useMe, setMe, markSignedOut, useSignOut, useRefreshSession, useTelemetryEnabled,
-  safeReturnPath, firstPartySignInUrl, beginSignIn, isSignInReturn, consumeSignInReturn, FIRST_PARTY_APP_ID,
-  type SessionStatus, type SignInReturn,
+  sameSitePath, safeReturnPath, firstPartySignInUrl, savedSignInReturn, forgetSignInReturn, beginSignIn, FIRST_PARTY_APP_ID,
+  type SessionStatus,
 } from "./session";
 export {
   useUpdateProfile, useUploadPhoto, useRemovePhoto, useChangeId, useIdAvailability, useAccount, useDeleteAccount,

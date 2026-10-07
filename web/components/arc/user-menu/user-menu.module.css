@@ -5,6 +5,9 @@
 .trigger[data-name] { padding-right: 10px; }
 @media (hover: hover) and (pointer: fine) { .trigger:hover { --presence-surface: var(--surface-muted); --sq-fill: var(--surface-muted); } }
 .trigger[data-state="open"] { --presence-surface: var(--surface-muted); --sq-fill: var(--surface-muted); }
+/* Keyboard focus: the hover fill plus an edge in the text colour (focus never shows as a ring). */
+.trigger:focus-visible { outline: none; --presence-surface: var(--surface-muted); --sq-fill: var(--surface-muted); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.trigger:focus-visible .chevron { color: var(--foreground); }
 .trigger:active { --presence-surface: color-mix(in oklab, var(--surface-muted), var(--foreground) 8%); --sq-fill: color-mix(in oklab, var(--surface-muted), var(--foreground) 8%); }
 .triggerName { max-width: 11rem; overflow: hidden; font-weight: 500; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
 .chevron { flex: none; margin-left: -2px; color: var(--text-muted); transition: transform var(--duration-spring) var(--ease-spring), color var(--duration-fast) var(--ease-standard); }

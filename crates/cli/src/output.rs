@@ -279,8 +279,23 @@ pub fn relative(seconds: u64) -> String {
 
 /// JSON value of an RFC 3339 timestamp (or null).
 pub fn json_time(t: Option<OffsetDateTime>) -> Value {
-    t.and_then(|t| t.format(&Rfc3339).ok())
-        .map_or(Value::Null, Value::String)
+    t.map_or(Value::Null, |t| Value::String(rfc3339_ms(t)))
+}
+
+/// A timestamp the way the API writes them: RFC 3339 in UTC with exactly three fractional digits
+/// (`2026-10-06T12:00:00.000Z`), so the CLI's `--json` never differs from the service's own answers.
+pub fn rfc3339_ms(t: OffsetDateTime) -> String {
+    let t = t.to_offset(time::UtcOffset::UTC);
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+        t.year(),
+        u8::from(t.month()),
+        t.day(),
+        t.hour(),
+        t.minute(),
+        t.second(),
+        t.millisecond()
+    )
 }
 
 /// Serializes any value for `--json` output.
@@ -314,6 +329,21 @@ mod tests {
             ("empty", String::new()),
         ]);
         assert_eq!(text, "id        c:saket\ntimezone  UTC\n");
+    }
+
+    #[test]
+    fn json_times_match_the_api() {
+        use time::macros::datetime;
+        // Microseconds and another offset come out as the API writes them: UTC, milliseconds.
+        assert_eq!(
+            json_time(Some(datetime!(2026-10-06 21:17:33.925326 +05:30))),
+            Value::String("2026-10-06T15:47:33.925Z".into())
+        );
+        assert_eq!(
+            json_time(Some(datetime!(2029-03-24 20:47:33 UTC))),
+            Value::String("2029-03-24T20:47:33.000Z".into())
+        );
+        assert_eq!(json_time(None), Value::Null);
     }
 
     #[test]

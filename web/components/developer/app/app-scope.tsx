@@ -11,10 +11,12 @@
  * connection; Back and Forward move between tabs the same way. The page below (`children`) renders nothing: it names
  * the tab in the document title on a load and sends an unknown tab to the overview.
  *
- * Leaving with unsaved changes asks first when it starts from a link (the dock and its phone sheet, the brand, "Your
- * apps") or a section's number key; the browser asks before a reload or close (lib/editor.ts). A navigation that
- * cannot ask (the command palette, Back) keeps the draft: the editor stays in memory for this browser tab, a notice on
- * the next page offers the way back (lib/kept-drafts.ts), and the save bar greets the Carbon when they return.
+ * Leaving with unsaved changes asks first, whatever starts it: the dock and its phone sheet, the brand, the command
+ * palette, a section's number key, the user menu's Settings, signing out, or a link on the page ("Your apps"). The
+ * layout registers a navigation guard (lib/navigation-guard.ts) and the shell asks it before every move; the browser
+ * asks before a reload or close (lib/editor.ts). A navigation that cannot ask (Back, a typed address) keeps the draft:
+ * the editor stays in memory for this browser tab, a notice on the next page offers the way back (lib/kept-drafts.ts),
+ * and the save bar greets the Carbon when they return.
  */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -33,8 +35,9 @@ import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, Surface } from "@/components/foundation/layout/layout";
 import type { ApiError } from "@/lib/api/errors";
 import type { AppDetail, Meta } from "@/lib/api/types";
-import { useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
-import { DEVELOPER_TABS, DEVELOPER_TAB_LABELS, SECTIONS, navigationType, paths, type DeveloperTab } from "@/lib/navigation";
+import { useRegisterCommands } from "@/lib/commands";
+import { DEVELOPER_TABS, DEVELOPER_TAB_LABELS, navigationType, paths, type DeveloperTab } from "@/lib/navigation";
+import { useNavigationGuard, type LeaveRequest } from "@/lib/navigation-guard";
 import { useApp } from "@/lib/query/developer";
 import { queryKeys } from "@/lib/query/keys";
 import { useMeta } from "@/lib/query/session";
@@ -67,20 +70,6 @@ function tabOf(pathname: string): DeveloperTab {
 }
 
 const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-
-/** True when the key goes into a text field (the shell's own rule: its number keys never fire there). */
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (target.tagName === "TEXTAREA" || target.tagName === "SELECT") return true;
-  if (target.tagName !== "INPUT") return false;
-  return !["button", "checkbox", "radio", "submit", "reset", "range", "color", "file"].includes((target as HTMLInputElement).type);
-}
-
-/** Closes an open Radix layer (a dialog, a sheet) as its own Escape would: the layer listens on the document. */
-function closeLayer(layer: HTMLElement): void {
-  layer.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true, cancelable: true }));
-}
 
 export function AppScope({ appId, children }: { appId: string; children: ReactNode }) {
   const query = useApp(appId);
@@ -146,15 +135,15 @@ function Loaded({ appId, app, meta }: { appId: string; app: AppDetail; meta: Met
   const pathname = usePathname();
   const router = useRouter();
   const client = useQueryClient();
-  const paletteOpen = useCommandPaletteOpen();
   const tab = tabOf(pathname);
   const appBase = paths.developerApp(appId);
   const tabsRef = useRef<HTMLDivElement>(null);
   const [editor] = useState(() => obtainEditor(appId, app));
   const view = useEditor(editor);
   const [importJob, setImportJob] = useState<string | null>(null);
-  /** Where a navigation that waits for the leave question goes. */
-  const [leaving, setLeaving] = useState<string | null>(null);
+  /** The navigation waiting for the leave question (the shell asked this app's guard), with its answer. */
+  const [leaving, setLeaving] = useState<LeaveRequest | null>(null);
+  const answer = useRef<((leave: boolean) => void) | null>(null);
   /** Where focus goes back when the Carbon stays: the link or the key's control, or what opened the phone sheet. */
   const returnFocus = useRef<HTMLElement | null>(null);
   /** What the kept-draft notice needs after this page is gone. */
@@ -234,62 +223,31 @@ function Loaded({ appId, app, meta }: { appId: string; app: AppDetail; meta: Met
     setImportJob,
   }), [appId, app, meta, editor, openTab, reload, setApp, importJob]);
 
-  // Leaving with unsaved changes: links and the section keys ask first (the browser asks before a reload or close).
+  // Leaving with unsaved changes: the shell asks this guard before every way out (links, the dock and its sheet, the
+  // palette, number keys, Settings, signing out). Moving between this app's tabs never asks.
   const anyDirty = view.anyDirty;
-  useEffect(() => {
-    if (!anyDirty) return;
-    const inside = (path: string) => path === appBase || path.startsWith(`${appBase}/`);
-    const ask = (href: string, focusBack: HTMLElement | null) => {
-      returnFocus.current = focusBack;
-      setLeaving(href);
-    };
-    // Capturing on window runs before React's own listeners (on the document), so a Link never starts navigating.
-    const onClick = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
-      if (!anchor || (anchor.target && anchor.target !== "_self") || anchor.hasAttribute("download")) return;
-      const url = new URL(anchor.href, window.location.href);
-      if (url.origin !== window.location.origin || inside(url.pathname)) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      // A link in an open layer (the phone dock's "Go to" sheet) never runs its own handler, which would close the
-      // layer: close it here, so the question is not asked over it and nothing stays open behind the next page.
-      const layer = anchor.closest<HTMLElement>("[role='dialog']");
-      const opener = layer?.id ? document.querySelector<HTMLElement>(`[aria-controls="${CSS.escape(layer.id)}"]`) : null;
-      if (layer) closeLayer(layer);
-      ask(`${url.pathname}${url.search}${url.hash}`, layer ? opener : anchor);
-    };
-    // The number keys jump to a section (the shell's shortcut; never while typing): ask first. With a layer open (a
-    // dialog, a drawer, a menu) the key does nothing, as the shell means it to; its own check misses Radix dialogs,
-    // which carry no aria-modal.
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.repeat || paletteOpen) return;
-      const section = SECTIONS.find(entry => entry.shortcut === event.key);
-      if (!section || inside(section.href) || isTypingTarget(event.target)) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (document.querySelector("[role='dialog'], [role='alertdialog'], [role='menu']")) return;
-      ask(section.href, event.target instanceof HTMLElement && event.target !== document.body ? event.target : null);
-    };
-    window.addEventListener("click", onClick, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("click", onClick, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [anyDirty, appBase, paletteOpen]);
+  useNavigationGuard(anyDirty ? {
+    protects: (href, reason) => reason === "sign-out" || !(href === appBase || href.startsWith(`${appBase}/`) || href.startsWith(`${appBase}?`)),
+    confirm: request => new Promise<boolean>(resolve => {
+      answer.current?.(false);
+      answer.current = resolve;
+      returnFocus.current = request.returnFocus;
+      setLeaving(request);
+    }),
+  } : null);
 
-  const leave = (discard: boolean) => {
-    const target = leaving;
-    // The next page takes focus; nothing here gets it back.
-    returnFocus.current = null;
-    setLeaving(null);
-    if (!target) return;
-    if (discard) {
+  /** Answers the question: leave (keeping the draft, or discarding it first) or stay. */
+  const decide = (choice: "stay" | "keep" | "discard") => {
+    const resolve = answer.current;
+    answer.current = null;
+    // Leaving: the next page takes focus; nothing here gets it back.
+    if (choice !== "stay") returnFocus.current = null;
+    if (choice === "discard") {
       editor.discard("signin");
       editor.discard("branding");
     }
-    router.push(target, { transitionTypes: [navigationType(pathname, target)] });
+    setLeaving(null);
+    resolve?.(choice !== "stay");
   };
 
   useRegisterCommands(() => DEVELOPER_TABS.map(value => ({
@@ -346,10 +304,10 @@ function Loaded({ appId, app, meta }: { appId: string; app: AppDetail; meta: Met
           <TabsContent value={tab} forceMount className={styles.panel}><DeveloperTabPage tab={tab} /></TabsContent>
         </Tabs>
       </div>
-      <Dialog open={!!leaving} onOpenChange={open => { if (!open) setLeaving(null); }}>
+      <Dialog open={!!leaving} onOpenChange={open => { if (!open) decide("stay"); }}>
         <DialogContent
           className={styles.leaveDialog}
-          title="Leave with unsaved changes?"
+          title={leaving?.reason === "sign-out" ? "Sign out with unsaved changes?" : "Leave with unsaved changes?"}
           description={`Your changes to ${draftSections(view) || "the sign-in setup"} of ${app.name} are not saved yet.`}
           onCloseAutoFocus={event => {
             // Staying: focus goes back where the Carbon was (the dialog has no trigger of its own to return to).
@@ -361,11 +319,15 @@ function Loaded({ appId, app, meta }: { appId: string; app: AppDetail; meta: Met
           }}
         >
           <div className={styles.leaveBody}>
-            <p>Leave them as a draft to come back to in this browser tab (reloading the page loses it), or discard them.</p>
+            {leaving?.reason === "sign-out" ? (
+              <p>Signing out ends this browser tab&apos;s drafts too, so they would be lost. Save them first, or discard them.</p>
+            ) : (
+              <p>Leave them as a draft to come back to in this browser tab (reloading the page loses it), or discard them.</p>
+            )}
             <div className={styles.leaveActions}>
-              <Button variant="danger" className={styles.leaveDiscard} onClick={() => leave(true)}>Discard and leave</Button>
-              <Button variant="ghost" onClick={() => setLeaving(null)}>Keep editing</Button>
-              <Button variant="secondary" onClick={() => leave(false)}>Leave, keep the draft</Button>
+              <Button variant="danger" className={styles.leaveDiscard} onClick={() => decide("discard")}>{leaving?.reason === "sign-out" ? "Discard and sign out" : "Discard and leave"}</Button>
+              <Button variant="ghost" onClick={() => decide("stay")}>Keep editing</Button>
+              {leaving?.reason === "sign-out" ? null : <Button variant="secondary" onClick={() => decide("keep")}>Leave, keep the draft</Button>}
             </div>
           </div>
         </DialogContent>

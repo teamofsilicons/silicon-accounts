@@ -1,13 +1,15 @@
 // `pnpm -C testkit start` (alias `pnpm -C testkit mocks`): starts mock-oidc (8591),
-// mock-messaging (8592) and the fake app server (8593) until Ctrl-C / SIGTERM.
+// mock-messaging (8592), the fake app server (8593) and mock-iris (8594, the default profile
+// photos) until Ctrl-C / SIGTERM.
 //
 // Flags (env in brackets):
 //   --host <ip>              [TESTKIT_HOST]          bind address (default 127.0.0.1)
 //   --oidc-port <n>          [MOCK_OIDC_PORT]        default 8591
 //   --messaging-port <n>     [MOCK_MESSAGING_PORT]   default 8592
 //   --fake-apps-port <n>     [FAKE_APPS_PORT]        default 8593
+//   --iris-port <n>          [MOCK_IRIS_PORT]        default 8594
 //   --accounts-url <url>     [ACCOUNTS_URL]          Silicon Accounts for the fake apps (default http://127.0.0.1:8589)
-//   --ready-file <path>                              write {"oidc","messaging","fake_apps"} URLs as JSON once listening
+//   --ready-file <path>                              write {"oidc","messaging","fake_apps","iris"} URLs as JSON once listening
 //   --log                    [TESTKIT_LOG=1]         one line per request on stderr
 //   --quiet                                          only print errors
 
@@ -15,13 +17,13 @@ import { writeFileSync } from 'node:fs';
 import { startTestkit } from './testkit.ts';
 
 function usage(problem: string): never {
-  process.stderr.write(`error: ${problem}\nhint: pnpm -C testkit start [--host 127.0.0.1] [--oidc-port 8591] [--messaging-port 8592] [--fake-apps-port 8593] [--accounts-url http://127.0.0.1:8589] [--ready-file path] [--log] [--quiet]\n`);
+  process.stderr.write(`error: ${problem}\nhint: pnpm -C testkit start [--host 127.0.0.1] [--oidc-port 8591] [--messaging-port 8592] [--fake-apps-port 8593] [--iris-port 8594] [--accounts-url http://127.0.0.1:8589] [--ready-file path] [--log] [--quiet]\n`);
   process.exit(2);
 }
 
 const args = process.argv.slice(2);
 const flags = new Map<string, string | true>();
-const VALUE_FLAGS = new Set(['host', 'oidc-port', 'messaging-port', 'fake-apps-port', 'accounts-url', 'ready-file']);
+const VALUE_FLAGS = new Set(['host', 'oidc-port', 'messaging-port', 'fake-apps-port', 'iris-port', 'accounts-url', 'ready-file']);
 const BOOLEAN_FLAGS = new Set(['log', 'quiet', 'help']);
 for (let i = 0; i < args.length; i++) {
   const arg = args[i] ?? '';
@@ -39,7 +41,7 @@ for (let i = 0; i < args.length; i++) {
   flags.set(name, value);
 }
 if (flags.has('help')) {
-  process.stdout.write('Starts the Silicon Accounts testkit: mock-oidc, mock-messaging and the fake app server. See testkit/README.md.\n');
+  process.stdout.write('Starts the Silicon Accounts testkit: mock-oidc, mock-messaging, the fake app server and mock-iris. See testkit/README.md.\n');
   process.exit(0);
 }
 
@@ -63,6 +65,7 @@ try {
     oidcPort: port('oidc-port', 'MOCK_OIDC_PORT', 8591),
     messagingPort: port('messaging-port', 'MOCK_MESSAGING_PORT', 8592),
     fakeAppsPort: port('fake-apps-port', 'FAKE_APPS_PORT', 8593),
+    irisPort: port('iris-port', 'MOCK_IRIS_PORT', 8594),
     accountsUrl,
     log,
   });
@@ -71,7 +74,7 @@ try {
   process.exit(1);
 }
 
-const urls = { oidc: kit.oidc?.url ?? null, messaging: kit.messaging?.url ?? null, fake_apps: kit.fakeApps?.url ?? null, accounts_url: accountsUrl };
+const urls = { oidc: kit.oidc?.url ?? null, messaging: kit.messaging?.url ?? null, fake_apps: kit.fakeApps?.url ?? null, iris: kit.iris?.url ?? null, accounts_url: accountsUrl };
 const readyFile = flags.get('ready-file');
 if (typeof readyFile === 'string') writeFileSync(readyFile, `${JSON.stringify(urls, null, 2)}\n`);
 
@@ -82,6 +85,7 @@ if (!quiet) {
       `  mock-oidc        ${urls.oidc}   (Google issuer ${kit.oidc?.issuer.google}, Apple issuer ${kit.oidc?.issuer.apple})`,
       `  mock-messaging   ${urls.messaging}   (Postmark ${kit.messaging?.postmarkApiUrl}, Twilio ${kit.messaging?.twilioApiUrl})`,
       `  fake apps        ${urls.fake_apps}/   (${kit.fakeApps?.apps.length ?? 0} apps, talking to Silicon Accounts at ${accountsUrl})`,
+      `  mock-iris        ${urls.iris}   (default profile photos: ACCOUNTS_IRIS_BASE_URL)`,
       '',
       'Point Silicon Accounts at the mocks with: pnpm -s -C testkit accounts-env > .env.mocks (see testkit/README.md)',
       'Press Ctrl-C to stop.',

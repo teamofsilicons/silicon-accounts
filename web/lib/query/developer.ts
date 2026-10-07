@@ -11,18 +11,15 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/endpoints";
 import type { AppDetail, AppProofsQuery, AppUsersQuery, AtaRequest, DeliveriesQuery, ImportJob, ImportOptions, ImportRow, ImportRowsQuery, ReplayRequest, SigninConfigPatch } from "../api/types";
-import { useIdempotentMutation } from "./idempotency";
+import { useIdempotentMutation, useSecretMutation } from "./idempotency";
 import { queryKeys } from "./keys";
+import { useWholeList } from "./pages";
 import { useSession } from "./session";
 
-/** Apps this Carbon owns. */
+/** Every app this Carbon owns (the whole list). */
 export function useOwnedApps() {
   const { status, session } = useSession();
-  return useQuery({
-    queryKey: queryKeys.me.ownedApps,
-    queryFn: () => api.me.ownedApps({ limit: 200 }),
-    enabled: status === "signed_in" && session?.account.kind === "carbon",
-  });
+  return useWholeList(queryKeys.me.ownedApps, query => api.me.ownedApps(query), status === "signed_in" && session?.account.kind === "carbon");
 }
 
 /** An app with its sign-in setup (secrets masked), webhook and stats. 403 not_app_owner, 404 unknown_app. */
@@ -148,10 +145,13 @@ function useRefreshApp(appId: string) {
   };
 }
 
-/** Sets the webhook URL; the answer's `secret` (whsec_…) is shown once. */
-export function useSetWebhook(appId: string) {
+/**
+ * Sets the webhook URL: `run(url)`. The answer's `secret` (whsec_…) is shown once, so this is a secret mutation (never
+ * cached). Pass `{ toast: false }` to explain a refused URL beside the field instead of in a toast.
+ */
+export function useSetWebhook(appId: string, meta: { toast?: boolean } = {}) {
   const refresh = useRefreshApp(appId);
-  return useIdempotentMutation((url: string, idempotencyKey) => api.apps.webhook.set(appId, url, { idempotencyKey }), { onSuccess: refresh, meta: { errorTitle: "Could not set the webhook" } });
+  return useSecretMutation((url: string, idempotencyKey) => api.apps.webhook.set(appId, url, { idempotencyKey }), { onSuccess: refresh, meta: { errorTitle: "Could not set the webhook", ...meta } });
 }
 
 export function useRemoveWebhook(appId: string) {
@@ -159,10 +159,13 @@ export function useRemoveWebhook(appId: string) {
   return useMutation({ mutationFn: () => api.apps.webhook.remove(appId), onSuccess: refresh, meta: { errorTitle: "Could not remove the webhook" } });
 }
 
-/** Rotates the signing secret; the new one is shown once. One rotation per press, even when the answer is lost. */
+/**
+ * Rotates the signing secret: `run()`. The new one is shown once (a secret mutation, never cached). One rotation per
+ * press, even when the answer is lost (the retry reuses the key and the server replays the answer).
+ */
 export function useRotateWebhookSecret(appId: string) {
   const refresh = useRefreshApp(appId);
-  return useIdempotentMutation((_: void, idempotencyKey) => api.apps.webhook.rotateSecret(appId, { idempotencyKey }), { onSuccess: refresh, meta: { errorTitle: "Could not rotate the secret" } });
+  return useSecretMutation((_: void, idempotencyKey) => api.apps.webhook.rotateSecret(appId, { idempotencyKey }), { onSuccess: refresh, meta: { errorTitle: "Could not rotate the secret" } });
 }
 
 /** Enqueues a `ping`. */
@@ -195,12 +198,16 @@ export function useAppProofs(appId: string, query: Omit<AppProofsQuery, "cursor"
   });
 }
 
-/** Issues an app-to-app proof (tokens shown once). The same request keeps one key, so a retry never issues twice. */
-export function useCreateAta(appId: string) {
+/**
+ * Issues an app-to-app proof: `run(body)`. Its proof token and refresh token are shown once, so this is a secret
+ * mutation (never cached). The same request keeps one key, so a retry never issues twice. Pass `{ toast: false }` to
+ * explain a refusal in place.
+ */
+export function useCreateAta(appId: string, meta: { toast?: boolean } = {}) {
   const client = useQueryClient();
-  return useIdempotentMutation((body: AtaRequest, idempotencyKey) => api.apps.proofs.createAta(appId, body, { idempotencyKey }), {
+  return useSecretMutation((body: AtaRequest, idempotencyKey) => api.apps.proofs.createAta(appId, body, { idempotencyKey }), {
     onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.app.root(appId).concat("proofs") }),
-    meta: { errorTitle: "Could not issue the proof" },
+    meta: { errorTitle: "Could not issue the proof", ...meta },
   });
 }
 

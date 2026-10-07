@@ -14,7 +14,6 @@ import { Button } from "@/components/arc/button/button";
 import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popover/popover";
 import { describeError, isDefaultPhoto, PHOTO_ACCEPT, photoProblem } from "./common";
-import { escapeLayer } from "./escape";
 import { FitPrompt } from "./fit-prompt";
 import styles from "./photo.module.css";
 
@@ -120,7 +119,7 @@ export function PhotoControl({ name, src, upload, remove, size = 112, audience =
         <PopoverTrigger data-sq="surface" className={styles.trigger} aria-label={triggerLabel} disabled={uploading}>
           <Camera size={16} strokeWidth={1.75} aria-hidden="true" />
         </PopoverTrigger>
-        <PopoverContent {...escapeLayer} className={styles.menu} side="bottom" align="start" sideOffset={8} aria-labelledby={titleId}>
+        <PopoverContent className={styles.menu} side="bottom" align="start" sideOffset={8} aria-labelledby={titleId}>
           <p id={titleId} className={styles.menuTitle}>Profile photo</p>
           <p className={styles.menuText}>PNG, JPEG, WebP or GIF, up to 2 MB. {audience}</p>
           <button

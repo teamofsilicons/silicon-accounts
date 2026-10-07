@@ -5,6 +5,8 @@
 #   scripts/stop.sh            the stack on ACCOUNTS_PORT (the public site port, default 8590)
 #   scripts/stop.sh --all      every stack scripts/dev.sh started (all ports)
 #   scripts/stop.sh --db       also stop the local Postgres (scripts/dev-db.sh stop)
+#   scripts/stop.sh --clean    also delete the stack's own site build (web/.next-<port>/, recorded in
+#                              .dev/run/<port>/web.dist; the default stack's web/.next is never deleted)
 #   scripts/stop.sh --quiet    print nothing unless something goes wrong
 #
 # Only processes recorded in .dev/run/<port>/*.pid whose command still matches are stopped
@@ -17,15 +19,17 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ALL=0
 DB=0
 QUIET=0
+CLEAN=0
 for arg in "$@"; do
   case "$arg" in
     --all) ALL=1 ;;
     --db) DB=1 ;;
+    --clean) CLEAN=1 ;;
     -q|--quiet) QUIET=1 ;;
     -h|--help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; exit 0 ;;
     *)
       echo "error: unknown argument '$arg'" >&2
-      echo "hint: scripts/stop.sh [--all] [--db] [--quiet]" >&2
+      echo "hint: scripts/stop.sh [--all] [--db] [--clean] [--quiet]" >&2
       exit 2
       ;;
   esac
@@ -38,7 +42,7 @@ expected_command() {
   case "$1" in
     accounts-api) echo 'accounts-api' ;;
     testkit) echo 'start.ts' ;;
-    web) echo "pnpm" ;;
+    web) echo "web" ;;
     proxy) echo 'dev-proxy.mjs' ;;
     *) echo "$1" ;;
   esac
@@ -100,6 +104,27 @@ stop_stack() { # run dir
     [ -f "$f" ] && stop_one "$f"
   done
   rm -f "$dir/testkit.json"
+  [ "$CLEAN" = 1 ] && clean_build "$dir"
+  return 0
+}
+
+# Deletes the site build a stack made in its own directory (web/.next-<port>/ and the .next-<port>.tsconfig.json
+# next.config.ts writes beside it). Only a directory named .next-<something>: never .next, never anything else.
+clean_build() { # run dir
+  local recorded dist name
+  recorded="$(cat "$1/web.dist" 2>/dev/null || true)"
+  [ -n "$recorded" ] || return 0
+  name="$(basename "$recorded")"
+  case "$name" in
+    .next-*) ;;
+    *) return 0 ;;
+  esac
+  dist="$recorded"
+  if [ -d "$dist" ]; then
+    rm -rf "$dist"
+    say "deleted the site build $dist"
+  fi
+  rm -f "$dist.tsconfig.json" "$1/web.dist"
 }
 
 if [ "$ALL" = 1 ]; then
@@ -117,6 +142,7 @@ else
     stop_stack "$dir"
   else
     say "no stack recorded for port $port (.dev/run/$port has no pid files)"
+    if [ "$CLEAN" = 1 ] && [ -d "$dir" ]; then clean_build "$dir"; fi
   fi
 fi
 
