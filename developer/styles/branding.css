@@ -103,10 +103,11 @@
 .sa-brand-aside { display: none; }
 @container sa-brand (min-width: 860px) {
   .sa-brand[data-layout="split"] .sa-brand-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); place-items: stretch; padding: 0; }
+  /* No percentage height here: the grid already stretches the aside to its row, and a percentage of a row sized by
+     its content made WebKit keep the taller page's height after the preview switched to a shorter one. */
   .sa-brand[data-layout="split"] .sa-brand-aside {
     position: relative;
     display: block;
-    min-height: 100%;
     border-right: 1px solid var(--border);
     background: color-mix(in oklab, var(--accent) 7%, var(--surface));
   }
