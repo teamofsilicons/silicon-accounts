@@ -5,7 +5,7 @@ use reqwest::Method;
 use serde_json::json;
 
 use crate::app::AppClient;
-use crate::client::{AccountsClient, Auth, FIRST_PARTY_APP_ID, Request};
+use crate::client::{AccountsClient, Auth, DEVELOPER_APP_ID, FIRST_PARTY_APP_ID, Request};
 use crate::error::{Error, Result};
 use crate::session::AccountSession;
 use crate::types::{
@@ -19,10 +19,25 @@ pub const SLT_GRANT_TYPE: &str = "urn:silicon:params:oauth:grant-type:slt";
 /// The OAuth grant type for device sign-in.
 pub const DEVICE_CODE_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:device_code";
 
+/// Refuses a client id that isn't one of Silicon Accounts' public clients before anything
+/// is sent (apps have secrets: use [`crate::AppClient`]).
+fn check_public_client(client_id: &str) -> Result<()> {
+    if client_id == FIRST_PARTY_APP_ID || client_id == DEVELOPER_APP_ID {
+        return Ok(());
+    }
+    Err(Error::invalid_input(
+        format!(
+            "'{client_id}' is not a public client: only Silicon Accounts' own '{FIRST_PARTY_APP_ID}' and '{DEVELOPER_APP_ID}' sign in without a secret."
+        ),
+        "Apps use their own credentials: AccountsClient::as_app(app_id, app_secret).refresh(…) / .revoke(…).",
+    ))
+}
+
 impl AccountsClient {
     /// Acts as a signed-in Carbon or Silicon with a first-party access token
     /// (`aud = accounts`, from [`AccountsClient::silicon_login`], the device flow or
-    /// [`AccountsClient::cli_login_verify`]).
+    /// [`AccountsClient::cli_login_verify`]). A developer platform token (`aud = developer`)
+    /// works too, but only for reading the account and managing the apps it owns.
     pub fn with_token(&self, access_token: impl Into<String>) -> AccountSession<'_> {
         AccountSession::new(self, access_token.into())
     }
@@ -238,6 +253,26 @@ impl AccountsClient {
     /// Rotates a first-party refresh token (`client_id = accounts`, no secret). The old
     /// refresh token stops working; store the new one before using it.
     pub async fn refresh_first_party(&self, refresh_token: &str) -> Result<TokenResponse> {
+        self.refresh_public_client(FIRST_PARTY_APP_ID, refresh_token)
+            .await
+    }
+
+    /// Revokes a first-party token family (sign out). Always succeeds for unknown tokens
+    /// (RFC 7009).
+    pub async fn revoke_first_party(&self, token: &str) -> Result<()> {
+        self.revoke_public_client(FIRST_PARTY_APP_ID, token).await
+    }
+
+    /// Rotates a refresh token of one of Silicon Accounts' public clients, which have no
+    /// secret: [`FIRST_PARTY_APP_ID`] (`accounts`, the CLI) or [`DEVELOPER_APP_ID`]
+    /// (`developer`, the developer platform). A public client only ever refreshes its own
+    /// tokens. The old refresh token stops working; store the new one before using it.
+    pub async fn refresh_public_client(
+        &self,
+        client_id: &str,
+        refresh_token: &str,
+    ) -> Result<TokenResponse> {
+        check_public_client(client_id)?;
         let request = Request::new(
             Method::POST,
             self.endpoint(&["v1", "oauth", "token"]),
@@ -245,15 +280,18 @@ impl AccountsClient {
         )
         .form(&[
             ("grant_type", "refresh_token"),
-            ("refresh_token", refresh_token),
-            ("client_id", FIRST_PARTY_APP_ID),
+            ("refresh_token", refresh_token.trim()),
+            ("client_id", client_id),
         ]);
         self.execute(request).await?.json()
     }
 
-    /// Revokes a first-party token family (sign out). Always succeeds for unknown tokens
-    /// (RFC 7009).
-    pub async fn revoke_first_party(&self, token: &str) -> Result<()> {
+    /// Ends a sign-in of one of Silicon Accounts' public clients ([`FIRST_PARTY_APP_ID`] or
+    /// [`DEVELOPER_APP_ID`]) with its refresh or access token. Always succeeds for unknown
+    /// tokens (RFC 7009).
+    pub async fn revoke_public_client(&self, client_id: &str, token: &str) -> Result<()> {
+        check_public_client(client_id)?;
+        let token = token.trim();
         let hint = if token.starts_with("sar_") {
             "refresh_token"
         } else {
@@ -267,9 +305,42 @@ impl AccountsClient {
         .form(&[
             ("token", token),
             ("token_type_hint", hint),
-            ("client_id", FIRST_PARTY_APP_ID),
+            ("client_id", client_id),
         ]);
         self.execute(request).await.map(|_| ())
+    }
+
+    /// Exchanges an authorization code of the developer platform's public client
+    /// ([`DEVELOPER_APP_ID`]): no secret, so PKCE with S256 is required — pass the
+    /// `code_verifier` whose S256 challenge went to `/authorize`. The tokens it returns
+    /// (`aud = developer`) read the signed-in Carbon (`GET /v1/me`, `GET /v1/session`) and
+    /// manage the apps they own (`GET /v1/me/owned-apps`, `/v1/apps/{app_id}/…`, e.g. through
+    /// [`crate::AccountSession::app`]); every other route answers 401 `token_wrong_audience`.
+    pub async fn exchange_developer_code(
+        &self,
+        code: &str,
+        redirect_uri: &str,
+        code_verifier: &str,
+    ) -> Result<TokenResponse> {
+        if code_verifier.trim().is_empty() {
+            return Err(Error::invalid_input(
+                "The developer platform is a public client, so exchanging its code needs the PKCE code_verifier.",
+                "Pass the verifier of the pkce_pair() whose challenge went to /authorize (code_challenge_method=S256).",
+            ));
+        }
+        let request = Request::new(
+            Method::POST,
+            self.endpoint(&["v1", "oauth", "token"]),
+            Auth::None,
+        )
+        .form(&[
+            ("grant_type", "authorization_code"),
+            ("code", code.trim()),
+            ("redirect_uri", redirect_uri),
+            ("code_verifier", code_verifier.trim()),
+            ("client_id", DEVELOPER_APP_ID),
+        ]);
+        self.execute(request).await?.json()
     }
 
     /// `POST /v1/reports`: reports a bug to the Silicon Accounts maintainers, optionally

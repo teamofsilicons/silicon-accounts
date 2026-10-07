@@ -58,7 +58,7 @@ describe('lib: sign-in helpers against mocks + stub Accounts', () => {
     assert.equal(kit.accountsEnv.ACCOUNTS_IRIS_BASE_URL, kit.iris?.url);
   });
 
-  test('signInWithCode (email): new Carbon signs up, consents, and the app exchanges the code', async () => {
+  test('signInWithCode (email): new Carbon signs up, continues the details page, and the app exchanges the code', async () => {
     const email = randomEmail('ada');
     const result = await signInWithCode({ accounts, messaging, appId: 'briefcase', email });
     assert.equal(result.flow.step, 'complete');
@@ -141,7 +141,7 @@ describe('lib: sign-in helpers against mocks + stub Accounts', () => {
     flow = await browser.email(flow.id, email);
     flow = await browser.verify(flow.id, await messaging.waitForCode({ to: email, after }));
     flow = await browser.signup(flow.id, { display_name: 'Full Flow', id: flow.signup?.id ?? 'c:full-flow', timezone: 'UTC', dob: '2000-01-01' });
-    flow = await browser.consent(flow.id, true);
+    flow = await browser.detailsContinue(flow.id);
     const result = await fake.callback('briefcase', flow.redirect_to ?? '');
     assert.equal(result.ok, true, JSON.stringify(result));
     assert.equal(result.id, flow.signup?.id);

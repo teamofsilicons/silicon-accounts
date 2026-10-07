@@ -1,0 +1,52 @@
+/* "Powered by Silicon Accounts". Fixed colours (never the app's branding variables) and !important on everything that
+   could hide it, because the line is part of the contract: an app cannot remove it. */
+.powered {
+  position: relative !important;
+  z-index: 5 !important;
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+  pointer-events: none;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  clip-path: none !important;
+}
+.overlay { position: absolute !important; right: 0 !important; bottom: 0 !important; left: 0 !important; }
+.pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-height: 28px !important;
+  padding: 0 12px !important;
+  border: 1px solid rgb(53 52 50 / .12) !important;
+  border-radius: 999px !important;
+  background: rgb(255 253 249 / .88) !important;
+  color: #5E5A55 !important;
+  font: 400 12px/1.4 "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important;
+  letter-spacing: -.01em !important;
+  white-space: nowrap !important;
+  pointer-events: auto;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+@supports (corner-shape: squircle) { .pill { corner-shape: squircle; } }
+.pill a {
+  display: inline !important;
+  color: #353432 !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+.pill a:hover, .pill a:focus-visible { text-decoration: underline !important; text-underline-offset: .2em; }
+/* Keyboard focus also shows as the pill's edge taking the text colour (focus is never a ring on these pages). */
+.pill:has(a:focus-visible) { border-color: currentColor !important; }
+.pill a:focus-visible { outline: none; }
+.mark { display: block !important; width: 14px !important; height: 14px !important; flex: none !important; }
+.dark .pill { border-color: rgb(255 253 249 / .14) !important; background: rgb(42 41 39 / .86) !important; color: #C9C4BC !important; }
+.dark .pill a { color: #FFFDF9 !important; }

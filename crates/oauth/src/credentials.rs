@@ -62,16 +62,16 @@ pub(crate) fn classify(token: &str) -> Presented {
 pub(crate) fn where_to_revoke(prefix: &str) -> &'static str {
     match prefix {
         p if p == prefix::PROOF || p == prefix::PROOF_REFRESH => {
-            "Proofs are revoked by their issuing app with POST /v1/proofs/revoke (or by the account on account.teamofsilicons.com)."
+            "Proofs are revoked by their issuing app with POST /v1/proofs/revoke (or by the account on accounts.teamofsilicons.com)."
         }
         p if p == prefix::AUTH_CODE || p == prefix::SLT => {
             "It is single-use and expires 2 minutes after it was issued, so there is nothing to revoke."
         }
         p if p == prefix::DEVICE_CODE => {
-            "A device code expires 10 minutes after it was issued; the Carbon can also deny it on account.teamofsilicons.com/device."
+            "A device code expires 10 minutes after it was issued; the Carbon can also deny it on accounts.teamofsilicons.com/device."
         }
         p if p == prefix::SESSION => {
-            "A browser session ends with POST /v1/session/signout, or from the sessions list on account.teamofsilicons.com."
+            "A browser session ends with POST /v1/session/signout, or from the sessions list on accounts.teamofsilicons.com."
         }
         p if p == prefix::APP_SECRET => {
             "App secrets are rotated in Silicon Apps. Never send an app secret as a token."

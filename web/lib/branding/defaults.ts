@@ -50,7 +50,7 @@ export const DEFAULT_BRANDING: Branding = {
   dark: DEFAULT_DARK,
 };
 
-export const DEFAULT_COPY: SigninCopy = { title: null, subtitle: null, terms_url: null, privacy_url: null, support_email: null };
+export const DEFAULT_COPY: SigninCopy = { title: null, subtitle: null, terms_url: null, privacy_url: null, support_email: null, opening_title: null, signup_title: null, signup_subtitle: null };
 
 /** The font allowlist, in the order the branding editor lists it. */
 export const BRAND_FONTS: readonly BrandFont[] = ["Geist", "Inter", "IBM Plex Sans", "DM Sans", "Space Grotesk", "Source Serif 4", "Fraunces", "Instrument Serif", "JetBrains Mono", "System"];
@@ -106,5 +106,14 @@ export function normalizeBranding(value: Partial<Branding> | null | undefined): 
 export function normalizeCopy(value: Partial<SigninCopy> | null | undefined): SigninCopy {
   const raw = value ?? {};
   const text = (entry: unknown) => (typeof entry === "string" && entry.trim() ? entry.trim() : null);
-  return { title: text(raw.title), subtitle: text(raw.subtitle), terms_url: text(raw.terms_url), privacy_url: text(raw.privacy_url), support_email: text(raw.support_email) };
+  return {
+    title: text(raw.title),
+    subtitle: text(raw.subtitle),
+    terms_url: text(raw.terms_url),
+    privacy_url: text(raw.privacy_url),
+    support_email: text(raw.support_email),
+    opening_title: text(raw.opening_title),
+    signup_title: text(raw.signup_title),
+    signup_subtitle: text(raw.signup_subtitle),
+  };
 }

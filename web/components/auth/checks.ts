@@ -914,7 +914,7 @@ const hostedChecks: MockCheck[] = [
           expect(box && viewport && box.y + box.height <= viewport.height).toBe(true);
           expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
           if (app === "acme-notes" && width === 1440) expect((box?.x ?? 0) > width / 2).toBe(true);
-          await expect(page.locator("[data-powered-by] a")).toHaveAttribute("href", "https://account.teamofsilicons.com");
+          await expect(page.locator("[data-powered-by] a")).toHaveAttribute("href", "https://accounts.teamofsilicons.com");
         }
       }
     },
@@ -1500,7 +1500,7 @@ const liveChecks: LiveCheck[] = [
       await page.goto(env.authorize("briefcase", { state: "st-live-1", scope: "email" }));
       await expect(heading(page, "Sign in to Briefcase")).toBeVisible();
       await expect(page).toHaveURL(/\/authorize\/flow\//);
-      await expect(page.locator("[data-powered-by] a")).toHaveAttribute("href", "https://account.teamofsilicons.com");
+      await expect(page.locator("[data-powered-by] a")).toHaveAttribute("href", "https://accounts.teamofsilicons.com");
       const sentAt = Date.now() - 2000;
       await page.getByRole("textbox", { name: "Email" }).fill(email);
       await page.getByRole("button", { name: "Continue", exact: true }).click();

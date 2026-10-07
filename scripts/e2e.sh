@@ -13,7 +13,8 @@
 #   scripts/e2e.sh --list                list the suites and journeys, start nothing
 #
 # Ports: the base is the site's port; accounts-api is base-1, mock-oidc base+1, mock-messaging base+2, the fake apps
-# base+3, mock Iris base+4. E2E_PORT_BASE (or --base N) picks it; otherwise the first free base of 9600, 9610, … 9990
+# base+3, mock Iris base+4, the developer platform base+5 (when developer/ has its Next.js app; its build is
+# developer/.next-<base>/). E2E_PORT_BASE (or --base N) picks it; otherwise the first free base of 9600, 9610, … 9990
 # (from E2E_BASE_START when set) is leased (.dev/locks/e2e-<base>/ while this runs), so parallel runs never collide.
 # E2E_BASE_FILE=<path>: write the base this run got there as soon as it has it (scripts/e2e-all.sh reads it).
 # Per stack: database accounts_e2e_<base> (dropped afterwards), site build web/.next-<base>/ (deleted afterwards),
@@ -83,7 +84,7 @@ LEASE=""
 port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 ports_free() { # base
   local offset
-  for offset in -1 0 1 2 3 4; do
+  for offset in -1 0 1 2 3 4 5; do
     if port_busy "$(($1 + offset))"; then return 1; fi
   done
   return 0
@@ -119,7 +120,7 @@ if [ -n "$BASE" ]; then
     "pick another one (E2E_PORT_BASE=9610 …), or leave it out and a free base is chosen"
   if ! ports_free "$BASE"; then
     release
-    fail "a port of base $BASE ($((BASE - 1))–$((BASE + 4))) is in use" "stop what holds it, or leave E2E_PORT_BASE out and a free base is chosen"
+    fail "a port of base $BASE ($((BASE - 1))–$((BASE + 5))) is in use" "stop what holds it, or leave E2E_PORT_BASE out and a free base is chosen"
   fi
 else
   # From E2E_BASE_START up to 9990, then from 9600 up to it: the first base that can be leased and whose ports are free.
@@ -145,10 +146,13 @@ export MOCK_OIDC_PORT="$((BASE + 1))"
 export MOCK_MESSAGING_PORT="$((BASE + 2))"
 export FAKE_APPS_PORT="$((BASE + 3))"
 export MOCK_IRIS_PORT="$((BASE + 4))"
+export DEVELOPER_PORT="$((BASE + 5))"
 export ACCOUNTS_DB_NAME="${E2E_DB_NAME:-accounts_e2e_$BASE}"
 export NEXT_DIST_DIR=".next-$BASE"
+export DEVELOPER_NEXT_DIST_DIR=".next-$BASE"
 export ACCOUNTS_TRUST_FORWARDED_FOR=true
-unset ACCOUNTS_PUBLIC_URL ACCOUNTS_EXTRA_ALLOWED_ORIGINS ACCOUNTS_WEB_DIST ACCOUNTS_IRIS_BASE_URL ACCOUNTS_WEB_DIR
+unset ACCOUNTS_PUBLIC_URL ACCOUNTS_EXTRA_ALLOWED_ORIGINS ACCOUNTS_WEB_DIST ACCOUNTS_IRIS_BASE_URL ACCOUNTS_WEB_DIR \
+  ACCOUNTS_DEVELOPER_URL ACCOUNTS_DEVELOPER_DIR
 ARTIFACTS="$ROOT/web/e2e/.artifacts/$BASE"
 LOG_DIR="$ROOT/.dev/logs/$BASE"
 
@@ -168,11 +172,12 @@ teardown() {
     cp "$LOG_DIR"/*.log "$ARTIFACTS/logs/" 2>/dev/null || true
   fi
   if [ "$KEEP" = 1 ]; then
-    say "the stack keeps running on base $BASE (database $ACCOUNTS_DB_NAME, site build web/$NEXT_DIST_DIR); its ports keep other runs off the base"
+    say "the stack keeps running on base $BASE (database $ACCOUNTS_DB_NAME, site build web/$NEXT_DIST_DIR, developer platform on :$DEVELOPER_PORT); its ports keep other runs off the base"
     say "stop it: ACCOUNTS_PORT=$BASE scripts/stop.sh --clean   walk it again: E2E_PORT_BASE=$BASE pnpm -C web e2e [journey…]"
   else
     ACCOUNTS_PORT="$BASE" "$ROOT/scripts/stop.sh" --quiet --clean || true
     rm -rf "$ROOT/web/$NEXT_DIST_DIR" "$ROOT/web/$NEXT_DIST_DIR.tsconfig.json" "$ROOT/.dev/run/$BASE"
+    rm -rf "$ROOT/developer/$DEVELOPER_NEXT_DIST_DIR" "$ROOT/developer/$DEVELOPER_NEXT_DIST_DIR.tsconfig.json"
     PGOPTIONS='--client-min-messages=warning' "$PG_BIN/dropdb" -h 127.0.0.1 -p "$PGPORT" -U postgres --if-exists --force "$ACCOUNTS_DB_NAME" 2>/dev/null || true
     rm -f "$ROOT/.dev/seed/$ACCOUNTS_DB_NAME-$PGPORT.sha256"
   fi
@@ -183,7 +188,7 @@ trap teardown EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-say "base $BASE: site http://localhost:$BASE, accounts-api :$ACCOUNTS_API_PORT, database $ACCOUNTS_DB_NAME, site build web/$NEXT_DIST_DIR ($ENGINE)"
+say "base $BASE: site http://localhost:$BASE, developer platform http://localhost:$DEVELOPER_PORT, accounts-api :$ACCOUNTS_API_PORT, database $ACCOUNTS_DB_NAME, site build web/$NEXT_DIST_DIR ($ENGINE)"
 DEV_FLAGS=(--detach --reset-db --web=next)
 [ "$PROD" = 1 ] && DEV_FLAGS+=(--prod)
 [ "$NO_BUILD" = 1 ] && DEV_FLAGS+=(--no-build)
@@ -193,6 +198,7 @@ echo
 STATUS=0
 E2E_PORT_BASE="$BASE" \
 E2E_SITE="http://localhost:$BASE" \
+E2E_DEVELOPER="http://localhost:$DEVELOPER_PORT" \
 E2E_API="http://127.0.0.1:$ACCOUNTS_API_PORT" \
 E2E_MESSAGING="http://127.0.0.1:$MOCK_MESSAGING_PORT" \
 E2E_OIDC="http://127.0.0.1:$MOCK_OIDC_PORT" \

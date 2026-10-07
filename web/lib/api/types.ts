@@ -270,10 +270,13 @@ export interface MyApp {
   access_removed_at: Timestamp | null;
 }
 
-/** A browser session or a first-party (CLI / Silicon) sign-in (`GET /v1/me/sessions`). */
+/**
+ * A browser session, a first-party (CLI / Silicon) sign-in, or a sign-in to the developer platform
+ * (developer.teamofsilicons.com) (`GET /v1/me/sessions`).
+ */
 export interface SessionInfo {
   id: string;
-  kind: "browser" | "cli";
+  kind: "browser" | "cli" | "developer";
   /** How it was created: browser, device, cli_code, silicon_login… */
   origin: Open<"browser" | "device" | "cli_code" | "silicon_login">;
   label: string | null;
@@ -326,10 +329,15 @@ export interface Meta {
   delivery: "local" | "providers";
   /**
    * Where the docs live. The server always sends it (ACCOUNTS_DOCS_URL, by default this site's /docs at
-   * https://account.teamofsilicons.com/docs), even before docs are published there: link it only where docs are served
-   * (the landing page lists this site's docs paths in SITE_DOCS_PATHS, empty while there is no app/docs).
+   * https://accounts.teamofsilicons.com/docs): the landing page links it (as a local link when it is this site's /docs).
    */
   docs_url?: string | null;
+  /**
+   * The developer site (ACCOUNTS_DEVELOPER_URL; https://developer.teamofsilicons.com, http://localhost:8600 in
+   * development), where apps' sign-in is set up. The dock's Developer item and /developer[/*] lead there. Optional for
+   * servers before it existed (the site then uses the production address).
+   */
+  developer_url?: string | null;
 }
 
 export interface OidcDiscovery {
@@ -431,15 +439,24 @@ export interface Branding {
   dark: Palette;
 }
 
-/** Texts and links on the hosted pages. */
+/** Texts and links on the hosted pages (every one optional: null keeps the page's own words). */
 export interface SigninCopy {
-  /** ≤ 80 characters. */
+  /** The sign-in page's title (intent=signin), ≤ 80 characters. */
   title: string | null;
   /** ≤ 200 characters. */
   subtitle: string | null;
   terms_url: string | null;
   privacy_url: string | null;
   support_email: string | null;
+  /**
+   * The Opening page's title, ≤ 80 characters; `{provider}` (Google or Apple) and `{app}` (the app's name) are filled
+   * in. Default "Opening {provider} to sign you in to {app}…". Optional for servers before v2.
+   */
+  opening_title?: string | null;
+  /** The sign-up page's title (intent=signup), ≤ 80 characters. Default "Create your {app} account". */
+  signup_title?: string | null;
+  /** The sign-up page's subtitle, ≤ 200 characters. */
+  signup_subtitle?: string | null;
 }
 
 export interface GoogleConfig {
@@ -478,6 +495,33 @@ export interface SigninConfig {
   remember_browser: boolean;
   branding: Branding;
   copy: SigninCopy;
+  /**
+   * Which details the Carbon sees on which page, in what order (null: one page with every requested detail, which is
+   * the what's-shared screen, and no review). Optional for servers before v2.
+   */
+  flow?: SigninFlow | null;
+}
+
+/** One page of an app's flow: which requested details it asks, with its own words and layout. */
+export interface SigninFlowStep {
+  /** `[a-z0-9-]{1,40}`, unique in the flow. */
+  id: string;
+  /** At least one; every requested detail appears in exactly one step. */
+  fields: ContactField[];
+  /** ≤ 80 characters; null keeps the page's own title. */
+  title: string | null;
+  /** ≤ 200 characters. */
+  subtitle: string | null;
+  /** ≤ 30 characters ("Continue" / "Share and continue" when null). */
+  continue_label: string | null;
+  /** null = the branding's layout. */
+  layout: BrandLayout | null;
+}
+
+/** An app's flow: 1..8 steps of details, then an optional review page of everything shared. */
+export interface SigninFlow {
+  steps: SigninFlowStep[];
+  review: boolean;
 }
 
 /** The configuration as `GET /v1/apps/{app_id}` shows it: secrets are never returned, only whether they are set. */
@@ -802,12 +846,26 @@ export const SILICON_EVENT_TYPES = [
 /* Hosted sign-in flow                                                                                                 */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-/** `failed` is used for prompt=none: its redirect_to carries the error and the page should go there. */
-export type FlowStep = "choose_method" | "verify_code" | "signup" | "requirements" | "consent" | "complete" | "failed";
+/**
+ * The steps of a hosted sign-in. `details` is one page of the app's flow (the what's-shared screen when the app has no
+ * flow of its own), `review` the optional page of everything shared. `failed` is used for prompt=none: its redirect_to
+ * carries the error and the page should go there.
+ */
+export type FlowStep = "choose_method" | "verify_code" | "signup" | "details" | "review" | "complete" | "failed";
 
 export type FlowPrompt = "login" | "consent" | "select_account" | "none";
 
-/** `POST /v1/flows` body: the /authorize query, as JSON. state and nonce are byte-exact. */
+/**
+ * Which version of the hosted pages the app asked for: the sign-in or the sign-up page (title, copy and button labels).
+ * The account logic is the same either way: a first visit with an email, phone, Google or Apple is a sign-up.
+ */
+export type FlowIntent = "signin" | "signup";
+
+/**
+ * `POST /v1/flows` body: the /authorize query, as JSON. state and nonce are byte-exact. There is no login_hint: an app
+ * never hands the Carbon's email or phone to the hosted pages (the server ignores one if sent, and the pages never
+ * forward it).
+ */
 export interface FlowCreate {
   app_id?: string;
   /** Alias of app_id. */
@@ -823,8 +881,9 @@ export interface FlowCreate {
   scope?: string;
   nonce?: string;
   prompt?: FlowPrompt;
-  login_hint?: string;
-  /** Jump straight to one enabled method. */
+  /** signin (default) or signup. */
+  intent?: FlowIntent;
+  /** Start on one enabled method: google/apple open the Opening page, email/phone their empty field. */
   method?: SigninMethod;
   /** The browser's IANA time zone (Intl), the fallback for the sign-up suggestion. */
   timezone?: string;
@@ -861,18 +920,58 @@ export interface FlowSignup {
   expires_at: Timestamp;
 }
 
-export interface ConsentRow {
-  scope: Scope;
+/** How an app asks for a detail: required ones are always shared; optional ones only when the Carbon ticks them. */
+export type DetailMode = "required" | "optional";
+
+/** One detail on a details page. */
+export interface FlowDetailField {
+  field: ContactField;
+  mode: DetailMode;
+  /** "Email address", "Phone number", "Date of birth", "Timezone". */
   label: string;
+  /** What would be shared (contact values masked), null when the account has none. */
   value: string | null;
+  /** The account has no such detail yet (email or phone): a required one must be added, with a code, to go on. */
+  missing: boolean;
+  /** Shared when the page continues: always for a required detail; the checkbox's state for an optional one. */
+  shared: boolean;
+  /** The Carbon shared it with this app before. */
+  previously_granted: boolean;
 }
 
-export interface FlowConsent {
-  /** `required[0]` is always `profile`. Contact values are masked. */
-  required: ConsentRow[];
-  /** `granted` is the toggle's initial state. */
-  optional: Array<ConsentRow & { granted: boolean }>;
-  previously_granted: Scope[];
+/** `FlowView.details` (step `details`): one page of the app's flow. */
+export interface FlowDetails {
+  /** 0-based position among the pages this sign-in shows, of `count`. */
+  index: number;
+  count: number;
+  /** The flow step's id (`contact`, `about-you`…). */
+  id: string;
+  /** The app's words for this page; null keeps the page's own. */
+  title: string | null;
+  subtitle: string | null;
+  continue_label: string | null;
+  /** This page's layout; null follows the branding's. */
+  layout: BrandLayout | null;
+  fields: FlowDetailField[];
+  /** The code sent to add a missing email or phone of this page, if one is waiting. */
+  challenge: FlowChallenge | null;
+  /** Continuing from this page opens the review page (the last page of a flow with a review). */
+  review_next?: boolean;
+}
+
+/** One line of the review page. */
+export interface FlowReviewField {
+  /** `profile` (name, id and photo) comes first and is always shared. */
+  field: ContactField | "profile";
+  mode: DetailMode;
+  label: string;
+  value: string | null;
+  shared: boolean;
+}
+
+/** `FlowView.review` (step `review`): everything the app will see, profile first. */
+export interface FlowReview {
+  fields: FlowReviewField[];
 }
 
 /** The state of a hosted sign-in, driven by `step`. */
@@ -892,18 +991,21 @@ export interface FlowView {
   };
   /** Enabled methods, in the configured order. */
   methods: SigninMethod[];
-  /** The browser session's account (unless prompt=login). */
+  /** The browser session's account (unless prompt=login), or the account this flow signs in. */
   signed_in_as: AccountSummary | null;
   challenge: FlowChallenge | null;
   signup: FlowSignup | null;
-  requirements: { missing: ContactField[]; challenge: FlowChallenge | null } | null;
-  consent: FlowConsent | null;
+  /** Set on step `details`. */
+  details: FlowDetails | null;
+  /** Set on step `review`. */
+  review: FlowReview | null;
   /** Set on `complete` and `failed`: where to send the browser. */
   redirect_to: string | null;
   error: { code: string; message: string; hint: string | null } | null;
   /** The /authorize parameters the flow was created with. */
   prompt: FlowPrompt | null;
-  login_hint: string | null;
+  /** signin unless the app asked for the sign-up page. Optional for servers before v2 (then signin). */
+  intent?: FlowIntent | null;
   method_hint: SigninMethod | null;
 }
 
@@ -921,10 +1023,8 @@ export interface SignupSubmit {
   pfp_url?: string | null;
 }
 
-export interface ConsentSubmit {
-  approve: boolean;
-  optional_scopes?: Scope[];
-}
+/** `POST /v1/flows/{id}/details/add`: a missing email, or a missing phone (with its default country). */
+export type DetailsAdd = { email: string } | { phone: string; country?: string };
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Browser session, device approval and CLI sign-in                                                                    */
@@ -1169,10 +1269,9 @@ export interface IssuedProof {
   proof_refresh_token: string;
   refresh_expires_at: Timestamp;
   issuing_app: string;
-  /** OBO: the one receiving app. */
-  receiving_app?: string;
-  /** ATA: every audience. */
-  receiving_apps?: string[];
+  /** The one app that verifies it (OBO and ATA alike: an ATA proof is for exactly one app). */
+  receiving_app: string;
+  /** OBO only. */
   user?: ProofUser;
   scopes: string[];
 }
@@ -1186,8 +1285,12 @@ export interface OboRequest {
   access_ttl_seconds?: number;
 }
 
+/**
+ * `POST /v1/proofs/ata` and `POST /v1/apps/{app_id}/proofs/ata`: an ATA proof is for exactly one app. To talk to two
+ * apps, ask for two proofs (a body with `audiences` is refused: 422 ata_single_app).
+ */
 export interface AtaRequest {
-  audiences: string[];
+  receiving_app: string;
   scopes?: string[];
   access_ttl_seconds?: number;
 }
@@ -1222,7 +1325,8 @@ export type ProofRevokeReason = Open<
 export interface AppProof {
   proof_id: string;
   kind: ProofKind;
-  audiences: string[];
+  /** The one app that verifies it. */
+  receiving_app: string;
   user: AccountSummary | null;
   scopes: string[];
   created_at: Timestamp;

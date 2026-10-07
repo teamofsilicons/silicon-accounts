@@ -19,7 +19,7 @@ use super::browser::{self, BrowserAccount};
 use super::model::{self, Flow, FlowError, Pending, Step};
 use super::signup::{self, NewSignupSession};
 use super::view::{self, ViewContext};
-use super::{FlowApp, FlowResponse, load_bound, next, requirements};
+use super::{FlowApp, FlowResponse, details, load_bound, next};
 use crate::util::telemetry;
 
 /// Builds the response view for a flow.
@@ -90,8 +90,8 @@ pub fn method_not_enabled(state: &AppState, fa: &FlowApp, method: Method) -> Api
 
 /// `GET /v1/flows/{id}` (flow). Also claims a Google/Apple outcome the provider callback left
 /// on the flow: this is where the browser session or sign-up cookie is set (see
-/// [`model::Pending`]). A flow waiting at `requirements` whose missing details were added
-/// meanwhile (another tab, the account site) moves on here.
+/// [`model::Pending`]). A flow on a details page that no longer exists (the app changed its
+/// flow meanwhile) moves on here ([`details::repair`]).
 pub async fn get_flow(
     State(state): State<AppState>,
     meta: ClientMeta,
@@ -125,10 +125,9 @@ pub async fn get_flow(
             model::save(&mut tx, &flow).await?;
         }
     }
-    if flow.step == Step::Requirements
+    if flow.step == Step::Details
         && fa.app.is_active()
-        && requirements::advance_if_satisfied(&mut tx, &state, &headers, &meta, &mut flow, &fa)
-            .await?
+        && details::repair(&mut tx, &state, &headers, &meta, &mut flow, &fa).await?
     {
         model::save(&mut tx, &flow).await?;
     }
@@ -324,8 +323,8 @@ pub async fn switch_account(
             Step::ChooseMethod,
             Step::VerifyCode,
             Step::Signup,
-            Step::Requirements,
-            Step::Consent,
+            Step::Details,
+            Step::Review,
         ],
         "switch account",
     )?;
@@ -490,8 +489,8 @@ async fn send_signin_code(
 }
 
 /// `POST /v1/flows/{id}/resend` (flow): a new code to the same destination (the previous one
-/// stops working; counts toward the send limit). Works for the sign-in code and for the
-/// requirement code.
+/// stops working; counts toward the send limit). Works for the sign-in code and for the code
+/// adding a missing email or phone on a details page.
 pub async fn resend_code(
     State(state): State<AppState>,
     meta: ClientMeta,
@@ -501,23 +500,19 @@ pub async fn resend_code(
     let mut tx = state.db.begin().await?;
     let mut flow = load_bound(&mut tx, &state, &headers, &HttpMethod::POST, &id, true).await?;
     model::ensure_live(&flow)?;
-    model::ensure_step(
-        &flow,
-        &[Step::VerifyCode, Step::Requirements],
-        "resend a code",
-    )?;
+    model::ensure_step(&flow, &[Step::VerifyCode, Step::Details], "resend a code")?;
     let Some(challenge_id) = flow.challenge_id else {
         return Err(ApiError::conflict(
             "no_code_sent",
             format!("Sign-in flow '{}' hasn't sent a code yet, so there is nothing to resend.", flow.id),
         )
         .hint(format!(
-            "Send a code first: POST /v1/flows/{id}/requirements/email or /v1/flows/{id}/requirements/phone."
+            "Send a code first: POST /v1/flows/{id}/details/add with {{\"email\": …}} or {{\"phone\": …}}."
         )));
     };
     let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
     fa.ensure_active()?;
-    if flow.step == Step::Requirements {
+    if flow.step == Step::Details {
         browser::require_flow_account(&mut tx, &state, &headers, &flow).await?;
     }
     let previous = otp::get(&mut tx, challenge_id).await?.ok_or_else(|| {

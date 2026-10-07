@@ -35,7 +35,7 @@ async fn decodes_api_errors_with_hint_details_and_request_id() {
             403,
             json!({"error": {"code": "custodian_pending",
                 "message": "Silicon si:scout can't sign in yet: its custodian c:saket hasn't accepted the request.",
-                "hint": "Wait for c:saket to accept on account.teamofsilicons.com.",
+                "hint": "Wait for c:saket to accept on accounts.teamofsilicons.com.",
                 "details": {"request_id": "r-details"}}}),
         )
         .header("x-request-id", "r-header"),
@@ -50,7 +50,7 @@ async fn decodes_api_errors_with_hint_details_and_request_id() {
     assert_eq!(err.request_id(), Some("r-header"));
     assert_eq!(
         err.to_string(),
-        "Silicon si:scout can't sign in yet: its custodian c:saket hasn't accepted the request. Hint: Wait for c:saket to accept on account.teamofsilicons.com."
+        "Silicon si:scout can't sign in yet: its custodian c:saket hasn't accepted the request. Hint: Wait for c:saket to accept on accounts.teamofsilicons.com."
     );
     let sent = &mock.requests_to("POST", "/v1/silicons/login")[0];
     assert_eq!(
@@ -416,24 +416,42 @@ async fn app_credentials_proofs_and_owner_mode() {
         "POST",
         "/v1/apps/briefcase/proofs/ata",
         Reply::json(201, json!({"proof_id": "p2", "kind": "ata", "proof_token": "sap_ata", "expires_at": "2026-10-06T12:30:00.000Z",
-            "proof_refresh_token": "sapr_ata", "issuing_app": "briefcase", "receiving_apps": ["remind", "waveform"], "scopes": []})),
+            "proof_refresh_token": "sapr_ata", "issuing_app": "briefcase", "receiving_app": "remind", "user": null, "scopes": []})),
     );
     let owner = client.with_token("owner-token");
     let owned = owner.app("briefcase");
     let issued = owned
         .issue_ata(
             &IssueAta {
-                audiences: vec!["remind".into(), "waveform".into()],
+                receiving_app: " remind ".into(),
                 ..Default::default()
             },
             None,
         )
         .await
         .unwrap();
-    assert_eq!(issued.receiving_apps, vec!["remind", "waveform"]);
+    assert_eq!(issued.receiving_app.as_deref(), Some("remind"));
+    let sent = &mock.requests_to("POST", "/v1/apps/briefcase/proofs/ata")[0];
+    assert_eq!(sent.header("authorization"), Some("Bearer owner-token"));
+    assert_eq!(sent.json(), json!({"receiving_app": "remind"}));
+    // An ATA proof is for exactly one app: several are refused before anything is sent.
+    for several in ["remind,waveform", "remind waveform", ""] {
+        let err = owned
+            .issue_ata(
+                &IssueAta {
+                    receiving_app: several.into(),
+                    ..Default::default()
+                },
+                None,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err.code(), "invalid_input", "{several}: {err}");
+    }
     assert_eq!(
-        mock.requests_to("POST", "/v1/apps/briefcase/proofs/ata")[0].header("authorization"),
-        Some("Bearer owner-token")
+        mock.requests_to("POST", "/v1/apps/briefcase/proofs/ata")
+            .len(),
+        1
     );
     // …and calls that need the app secret are refused locally with a precise error.
     let err = owned

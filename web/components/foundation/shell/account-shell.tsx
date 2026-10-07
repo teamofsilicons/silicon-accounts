@@ -19,10 +19,10 @@ import { Button } from "@/components/arc/button/button";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { changeTheme } from "@/lib/theme";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
-import { SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
+import { SECTIONS, navigationType, paths, sectionFor, sectionHref } from "@/lib/navigation";
 import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
-import { beginSignIn, useMe, useSession, useSignOut } from "@/lib/query/session";
+import { beginSignIn, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
 import { BrandMark } from "./brand-mark";
 import { CommandMenu } from "./command-menu";
 import { Dock, type DockAccount } from "./dock";
@@ -71,6 +71,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const isApple = useSyncExternalStore(subscribeNothing, detectApple, () => false);
   const isHome = pathname === "/";
   const active = sectionFor(pathname);
+  const developerUrl = useDeveloperUrl();
 
   // Account routes need a session; "/" shows the landing page instead. (Sign-ins come back to /sign-in, which restores
   // the page: this home page never reads a code, state or error from its address.)
@@ -90,6 +91,11 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const go = useCallback(async (href: string, returnFocus: HTMLElement | null = null) => {
     if (href === pathname) return;
     if (!(await confirmNavigation(href, { returnFocus }))) return;
+    // Another site (the developer site): a full navigation.
+    if (/^https?:\/\//i.test(href) && new URL(href).origin !== window.location.origin) {
+      window.location.assign(href);
+      return;
+    }
     push(href);
   }, [pathname, push]);
 
@@ -129,8 +135,8 @@ export function AccountShell({ children }: { children: ReactNode }) {
         group: "Go to",
         shortcut: section.shortcut,
         icon: <Icon size={16} strokeWidth={1.75} />,
-        keywords: [section.key, "go", "open"],
-        run: () => void go(section.href),
+        keywords: section.external ? [section.key, "apps", "sign-in setup", "developer site", "open"] : [section.key, "go", "open"],
+        run: () => void go(sectionHref(section, developerUrl)),
       };
     }),
     { id: "go.settings", label: "Settings", description: "Theme, telemetry, sessions and your account", group: "Go to", icon: <SettingsIcon size={16} strokeWidth={1.75} />, keywords: ["preferences", "delete", "sessions"], run: () => void go(paths.settings) },
@@ -141,7 +147,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
       ? [{ id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={1.75} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) }]
       : []),
     { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={1.75} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
-  ], [go, doSignOut]);
+  ], [go, doSignOut, developerUrl]);
 
   // ⌘K toggles the palette; 1 to 7 jump to sections (never while typing or with a layer open).
   useEffect(() => {
@@ -159,11 +165,11 @@ export function AccountShell({ children }: { children: ReactNode }) {
       if (!section || status !== "signed_in") return;
       event.preventDefault();
       const from = event.target instanceof HTMLElement && event.target !== document.body ? event.target : null;
-      void go(section.href, from);
+      void go(sectionHref(section, developerUrl), from);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [go, paletteOpen, status]);
+  }, [go, paletteOpen, status, developerUrl]);
 
   const account = useMemo<DockAccount | null>(() => {
     const summary = session?.account;

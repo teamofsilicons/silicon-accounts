@@ -17,10 +17,11 @@
 //! - `/v1/oauth/*` answer errors as RFC 6749 bodies (`{"error","error_description"}`) because
 //!   generic OAuth/OIDC libraries expect them; every description says exactly what was wrong.
 //!   Token, revocation and introspection responses are never cacheable (`Cache-Control: no-store`).
-//! - Clients authenticate with HTTP Basic or `client_id` + `client_secret` in the body. The
-//!   first-party public client (`client_id=accounts`, no secret) is accepted only by the
-//!   `refresh_token` and device-code grants and by revocation, and only ever touches first-party
-//!   (`aud = accounts`) tokens.
+//! - Clients authenticate with HTTP Basic or `client_id` + `client_secret` in the body. Two
+//!   first-party public clients need no secret, and each only ever touches its own tokens:
+//!   `client_id=accounts` (the accounts CLI: the `refresh_token` and device-code grants, and
+//!   revocation) and `client_id=developer` (the developer platform: `authorization_code` with
+//!   PKCE S256 required, `refresh_token`, and revocation).
 //! - An authorization code is consumed and its tokens issued in one transaction that holds the
 //!   code's row lock: exactly one concurrent redemption wins, and every losing redemption runs
 //!   after the winner committed, so the reuse path always revokes the winner's tokens

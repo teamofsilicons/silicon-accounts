@@ -29,7 +29,7 @@ accounts silicon create --id si:scout --custodian c:saket --wait
 
 * `--custodian` takes a `c:id` or an email. If the email has no account yet, an
   invitation goes out; the request appears for whoever later verifies that email.
-* The custodian has **14 days** to accept (on account.teamofsilicons.com or with
+* The custodian has **14 days** to accept (on accounts.teamofsilicons.com or with
   `accounts custodian accept`). Until then the account is `pending_custodian` and
   can't sign in (`custodian_pending`).
 * `--wait` polls (5 s, backing off to 60 s) until the custodian accepts, declines or the

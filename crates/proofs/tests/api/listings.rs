@@ -25,7 +25,7 @@ async fn an_app_lists_what_it_issued() {
         .ata_as(
             &w.dm,
             &w.dm_secret,
-            json!({"audiences": [w.briefcase.app_id, w.other.app_id], "scopes": ["ping"], "access_ttl_seconds": 120}),
+            json!({"receiving_app": w.other.app_id, "scopes": ["ping"], "access_ttl_seconds": 120}),
         )
         .await
         .json;
@@ -33,7 +33,7 @@ async fn an_app_lists_what_it_issued() {
     w.ata_as(
         &w.other,
         &w.other_secret,
-        json!({"audiences": [w.briefcase.app_id]}),
+        json!({"receiving_app": w.briefcase.app_id}),
     )
     .await;
 
@@ -49,7 +49,11 @@ async fn an_app_lists_what_it_issued() {
 
     let o = find(&list, &proof_id(&obo));
     assert_eq!(o["kind"], "obo");
-    assert_eq!(o["audiences"], json!([w.briefcase.app_id]));
+    assert_eq!(o["receiving_app"], w.briefcase.app_id);
+    assert!(
+        o.get("audiences").is_none(),
+        "listings name the one receiving app"
+    );
     assert_eq!(o["user"]["uuid"], w.carbon.uuid);
     assert_eq!(o["user"]["id"], w.carbon.id());
     assert_eq!(o["user"]["kind"], "carbon");
@@ -68,7 +72,8 @@ async fn an_app_lists_what_it_issued() {
     let a = find(&list, &proof_id(&ata));
     assert_eq!(a["kind"], "ata");
     assert_eq!(a["user"], Value::Null);
-    assert_eq!(a["audiences"], json!([w.briefcase.app_id, w.other.app_id]));
+    assert_eq!(a["receiving_app"], w.other.app_id);
+    assert!(a.get("audiences").is_none());
     assert_eq!(a["access_ttl_seconds"], 120);
 
     // The published Rust package parses the page.
@@ -129,7 +134,7 @@ async fn app_listing_access_rules() {
     let w = World::new().await;
     let owner = w.ctx.carbon().await;
     let (app, secret) = w.ctx.app_owned("commit", Some(&owner.uuid)).await;
-    w.ata_as(&app, &secret, json!({"audiences": [w.briefcase.app_id]}))
+    w.ata_as(&app, &secret, json!({"receiving_app": w.briefcase.app_id}))
         .await;
     let path = format!("/v1/apps/{}/proofs", app.app_id);
 
@@ -257,7 +262,7 @@ async fn an_account_sees_its_obo_proofs_with_honest_statuses() {
     w.ata_as(
         &w.dm,
         &w.dm_secret,
-        json!({"audiences": [w.briefcase.app_id]}),
+        json!({"receiving_app": w.briefcase.app_id}),
     )
     .await;
     let other_carbon = w.ctx.carbon().await;

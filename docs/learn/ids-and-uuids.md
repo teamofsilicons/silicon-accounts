@@ -78,7 +78,7 @@ These handles are reserved and can never be taken: `admin`, `administrator`, `ro
 Check an id before you take it. The check is public (120 per minute per network):
 
 ```sh
-curl -s 'https://account.teamofsilicons.com/v1/ids/available?id=si:scout'
+curl -s 'https://accounts.teamofsilicons.com/v1/ids/available?id=si:scout'
 ```
 
 ```json

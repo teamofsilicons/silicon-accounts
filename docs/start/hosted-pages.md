@@ -27,7 +27,7 @@ app's `redirect_uris` ([how to register it](add-sign-in.md#before-you-start)).
 import { createServer, type ServerResponse } from "node:http";
 import { createHash, randomBytes } from "node:crypto";
 
-const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://account.teamofsilicons.com";
+const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com";
 const APP_ID = process.env.ACCOUNTS_APP_ID ?? "briefcase";
 const APP_SECRET = process.env.ACCOUNTS_APP_SECRET ?? ""; // sa_app_…: server side only, never in a page
 const PORT = Number(process.env.PORT ?? 3000);
@@ -99,7 +99,7 @@ createServer(async (req, res) => {
 ```
 
 Run it, open `http://localhost:3000`, and sign in. A first-time Carbon goes through email code,
-sign-up and the what's-shared screen; the callback then shows:
+sign-up and the details page (what's shared with your app); the callback then shows:
 
 ```text
 Signed in as c:grace-hopper (briefcase:ptO)
@@ -131,7 +131,7 @@ What each step protects against:
 
 ## The authorize request
 
-`GET https://account.teamofsilicons.com/authorize?…` is a page, not an API: the browser opens
+`GET https://accounts.teamofsilicons.com/authorize?…` is a page, not an API: the browser opens
 it, and the hosted pages create a sign-in flow bound to that browser.
 
 | Parameter | Required | Rules |
@@ -145,17 +145,21 @@ it, and the hosted pages create a sign-in flow bound to that browser.
 | `scope` | no | Space-separated: `profile` (always granted), `email`, `phone`, `dob`, `timezone`, `openid` (adds an `id_token`), `offline_access` (accepted, ignored: refresh tokens are always issued). Unknown scopes are `invalid_scope`. Without `scope` the request asks for `profile`. |
 | `nonce` | with `openid` | Up to 512 printable characters, copied into the `id_token`. |
 | `prompt` | no | `none`, `login`, `consent`, `select_account`, several separated by spaces; `none` alone. See [prompt](#prompt). |
-| `login_hint` | no | An email or phone number to prefill on the sign-in page (the first 320 characters are kept). |
+| `intent` | no | `signin` (default) or `signup`: the sign-in or the sign-up version of the pages ("Sign in to Briefcase" or "Create your Briefcase account"). Anything else is `invalid_request`. |
 | `method` | no | `google`, `apple`, `email` or `phone`: open that method directly. It must be one of the app's enabled methods, else `method_not_enabled`. |
+
+`login_hint` is accepted and ignored: your app can never hand Silicon Accounts a Carbon's email or
+phone number; the Carbon always types it on the hosted pages.
 
 Other parameters (`max_age`, `ui_locales`, `request`, `claims`, …) are ignored. Repeated
 parameters use their first value.
 
 What you ask for in `scope` is on top of what your sign-in setup already demands: your
 `required_fields` are always required and your `optional_fields` are always offered. A detail
-you ask for in `scope` that isn't required is offered as optional; the Carbon can decline it.
-The [what's-shared screen](../learn/what-apps-see.md#the-whats-shared-screen) explains which
-details end up granted.
+you ask for in `scope` that isn't required is offered as optional (an unticked checkbox on the
+last page); the Carbon can leave it unticked.
+[What your app sees](../learn/what-apps-see.md#the-whats-shared-screen) explains which details
+end up granted.
 
 ## When the browser comes back
 
@@ -173,9 +177,9 @@ http://localhost:3000/callback?error=access_denied&error_description=The+Carbon+
 
 | `error` | When | What to do |
 |---|---|---|
-| `access_denied` | The Carbon chose not to share on the what's-shared screen. | Show your signed-out page; offer to try again. Nothing was shared. |
+| `access_denied` | The Carbon cancelled on a details or review page. | Show your signed-out page; offer to try again. Nothing was shared. |
 | `login_required` | `prompt=none`, and the browser isn't signed in to Silicon Accounts (or your app has `remember_browser` off, so the browser's account can't be reused). | Send the browser to `/authorize` without `prompt=none`. |
-| `consent_required` | `prompt=none`, and the account hasn't granted everything you now ask for. | Same: without `prompt=none`, so the Carbon sees the what's-shared screen. |
+| `consent_required` | `prompt=none`, and the account hasn't granted everything you now ask for. | Same: without `prompt=none`, so the Carbon sees the details pages. |
 | `interaction_required` | `prompt=none`, and the account misses a detail you require (a verified email or phone), or has no verified email at your `allowed_email_domains`. | Same: the pages ask for the missing detail or another account. |
 | `invalid_request`, `invalid_scope`, `unsupported_response_type` | Your authorize URL has a mistake (bad `prompt`, PKCE, `method`, scope, response type). The hosted page says so and offers "Back to the app", which lands here. | Read `error_description`, fix the URL. |
 
@@ -240,37 +244,54 @@ new sign-in.
 
 | `prompt` | The hosted pages |
 |---|---|
-| none given | Offer "Continue as …" when the browser is signed in to Silicon Accounts (and your app allows it), else the sign-in methods. Show the what's-shared screen only when the account hasn't granted everything you need. |
+| none given | Offer "Continue as …" when the browser is signed in to Silicon Accounts (and your app allows it), else the sign-in methods. Show the details pages only when the account hasn't granted everything you need. |
 | `login` | Ignore the browser's session: the Carbon proves who they are again (code, Google or Apple). Use it before sensitive actions, then check `auth_time` in the `id_token`. |
-| `consent` | Always show the what's-shared screen, even when everything was granted before. The Carbon can also take back optional details there. |
+| `consent` | Always show every details page, even when everything was granted before. The Carbon can also untick optional details there. |
 | `select_account` | Show the account chooser. The hosted pages already show it whenever the browser is signed in, so this changes nothing today; it is accepted for OIDC libraries that send it. |
 | `none` | Show nothing: complete at once with the browser's account, or come back with `login_required`, `consent_required` or `interaction_required`. It can't be combined with other values (`invalid_request`). |
 
 `prompt=none` is the way to check silently whether someone is already signed in, for example
 when your page loads. It never shows a page: a Carbon who hasn't granted what you ask for gets
-`consent_required` instead of the what's-shared screen, so send them through a normal sign-in
-next. `max_age` is not supported: use `prompt=login` and compare `auth_time` instead.
+`consent_required` instead of the details pages, so send them through a normal sign-in next. `max_age` is not supported: use `prompt=login` and compare `auth_time` instead.
 
-## Open a method directly, prefill the address
+## Direct buttons and Sign in / Sign up
 
-`method=email` (or `phone`, `google`, `apple`) skips the choice and opens that method; your
-own "Continue with Google" button can send `method=google`. `login_hint=ada@example.com`
-prefills the email (or phone) field. Both only save the Carbon a step: the Carbon can still go
-back and pick another method or address.
+Your own site can carry direct buttons: "Continue with Google", "Continue with Apple",
+"Continue with email", "Continue with phone number". Each is a link to `/authorize` with
+`method=…`:
+
+- `method=email` or `method=phone` opens the hosted page straight on that empty field;
+- `method=google` or `method=apple` first opens our Opening page, "Opening Google to sign you in
+  to {app name}…" in your app's style (with "Powered by Silicon Accounts" at the bottom), then
+  moves on to Google or Apple by itself after a moment. A "Continue to Google" button is there in
+  case it doesn't, and "Other ways to sign in" goes back to your other methods. Change its words
+  with `copy.opening_title`.
+
+Or just a "Sign in" and a "Sign up" button: send `intent=signup` from your sign-up button, and
+the hosted pages show the sign-up version (`copy.signup_title`, default "Create your {app name}
+account"); the sign-in button sends nothing extra. The account logic is the same either way: a
+first visit with an email, phone, Google or Apple is a sign-up. `intent` and `method` combine,
+and the [SDK](sdk.md) and [iframe](iframe.md) render either set of buttons for you.
+
+Every one of these only saves the Carbon a step: they can still go back and pick another method.
+Your app never passes their email or phone: the Carbon types it on our pages.
 
 ## What the Carbon is asked on the way
 
-After proving who they are, the hosted pages may ask for two more things before coming back:
+After proving who they are, the hosted pages show your app's details pages before coming back:
+one page with everything you ask for, or the pages of your own [flow](sign-in-config.md#flows),
+with an optional review page at the end.
 
-- **A missing required detail.** If your `required_fields` include `phone` (or `email`) and
-  the account has no verified one, the Carbon adds it with a 6-digit code right there. Date of
-  birth and timezone are never missing: every account has them.
-- **The what's-shared screen.** The first time an account signs in to your app, and whenever
-  you need more than it granted. Required details are listed as shared; optional ones have a
-  switch.
+- **Required details** are listed as shared (with a lock). If your `required_fields` include
+  `phone` (or `email`) and the account has no verified one, the Carbon adds it with a 6-digit
+  code right there, on that page. Date of birth and timezone are never missing: every account
+  has them.
+- **Optional details** are checkboxes, unticked until the Carbon ticks them.
+- **When.** Every page the first time an account signs in to your app (and with
+  `prompt=consent`); after that only a page with something new, such as a detail you now
+  require. A Carbon with nothing new comes straight back.
 
-Both are explained, with the exact rules for when they appear, in
-[What your app sees about an account](../learn/what-apps-see.md).
+The exact rules are in [What your app sees about an account](../learn/what-apps-see.md).
 
 ## Who may sign in
 
@@ -306,8 +327,8 @@ callback, never your own:
 
 | Provider | Register at the provider | Then send |
 |---|---|---|
-| Google | An OAuth client of type "Web application" with the authorized redirect URI `https://account.teamofsilicons.com/v1/oauth/callback/google` | `{"google": {"mode": "byo", "client_id": "…apps.googleusercontent.com", "client_secret": "GOCSPX-…"}}` |
-| Apple | A Services ID with Sign in with Apple, domain `account.teamofsilicons.com`, return URL `https://account.teamofsilicons.com/v1/oauth/callback/apple`, and a Sign in with Apple key (`.p8`) | `{"apple": {"mode": "byo", "services_id": "com.example.signin", "team_id": "ABCDE12345", "key_id": "XYZ9876543", "private_key": "-----BEGIN PRIVATE KEY-----\n…"}}` |
+| Google | An OAuth client of type "Web application" with the authorized redirect URI `https://accounts.teamofsilicons.com/v1/oauth/callback/google` | `{"google": {"mode": "byo", "client_id": "…apps.googleusercontent.com", "client_secret": "GOCSPX-…"}}` |
+| Apple | A Services ID with Sign in with Apple, domain `accounts.teamofsilicons.com`, return URL `https://accounts.teamofsilicons.com/v1/oauth/callback/apple`, and a Sign in with Apple key (`.p8`) | `{"apple": {"mode": "byo", "services_id": "com.example.signin", "team_id": "ABCDE12345", "key_id": "XYZ9876543", "private_key": "-----BEGIN PRIVATE KEY-----\n…"}}` |
 
 ```sh
 curl -s -X PATCH -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" \
@@ -375,7 +396,7 @@ use silicon_accounts_client::{AuthorizeParams, Config, pkce_pair, random_state};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // ACCOUNTS_URL (default https://account.teamofsilicons.com), ACCOUNTS_APP_ID, ACCOUNTS_APP_SECRET.
+    // ACCOUNTS_URL (default https://accounts.teamofsilicons.com), ACCOUNTS_APP_ID, ACCOUNTS_APP_SECRET.
     let config = Config::from_env()?;
     let client = config.client()?;
     let app = config.app_client(&client).ok_or("set ACCOUNTS_APP_ID and ACCOUNTS_APP_SECRET")?;
@@ -432,7 +453,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```text
 Open this address, sign in, then paste the address you land on:
-https://account.teamofsilicons.com/authorize?response_type=code&app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&state=kSj2dTMJ88E92lB_sXVv7mOHHasuEn5c&code_challenge=_Xwad6JJcE34Gs9gJVVlSABhLnAnsFCd6kYOXrAag5c&code_challenge_method=S256&scope=email
+https://accounts.teamofsilicons.com/authorize?response_type=code&app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&state=kSj2dTMJ88E92lB_sXVv7mOHHasuEn5c&code_challenge=_Xwad6JJcE34Gs9gJVVlSABhLnAnsFCd6kYOXrAag5c&code_challenge_method=S256&scope=email
 signed in: c:lin (uuid nln, membership briefcase:nln)
 local check: sub nln scopes ["profile", "email"]
 introspection: active true
@@ -454,4 +475,4 @@ the service's message and a hint. The whole package is in the
 | The callback gets `error=invalid_request` | A bad `prompt`, `method`, PKCE parameter or `state` (over 1,024 characters or with control characters). | `error_description` names the parameter. |
 | `invalid_grant` "already used" right after a successful sign-in | Your callback ran twice (a double request, a browser prefetch, a retry), so the second exchange revoked the first one's tokens. | Exchange each code once; make the callback idempotent per `state`. |
 | The Carbon lands on your callback with a `state` you don't know | The sign-in was started in another browser, or your state store forgot it. | Refuse it and start a new sign-in. Never exchange a code whose state you can't match. |
-| Every sign-in shows the what's-shared screen | You send `prompt=consent`, or ask in `scope` for details the account declined. | Ask in `scope` only for what you need. |
+| Every sign-in shows the details pages | You send `prompt=consent`, or ask in `scope` for details the account declined. | Ask in `scope` only for what you need. |

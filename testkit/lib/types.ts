@@ -60,11 +60,48 @@ export interface Meta {
   silicon_apps_url: string;
   /** Where the published docs live (ACCOUNTS_DOCS_URL). */
   docs_url?: string;
+  /** developer.teamofsilicons.com (ACCOUNTS_DEVELOPER_URL). */
+  developer_url?: string;
   providers: { google: boolean; apple: boolean };
   delivery: 'local' | 'providers';
 }
 
-export type FlowStep = 'choose_method' | 'verify_code' | 'signup' | 'requirements' | 'consent' | 'complete' | 'failed';
+export type FlowStep = 'choose_method' | 'verify_code' | 'signup' | 'details' | 'review' | 'complete' | 'failed';
+
+export type DetailField = 'email' | 'phone' | 'dob' | 'timezone';
+
+/** One detail on a details page (FlowView.details.fields). */
+export interface FlowDetailField {
+  field: DetailField;
+  mode: 'required' | 'optional';
+  label: string;
+  /** What the app gets (email/phone masked); null when missing. */
+  value: string | null;
+  /** An email/phone the account doesn't have yet: add it with POST …/details/add. */
+  missing: boolean;
+  /** The checkbox: always true for required details; optional ones start unticked unless shared before. */
+  shared: boolean;
+  previously_granted: boolean;
+}
+
+/** The details page on screen (step `details`): one step of the app's flow. */
+export interface FlowDetails {
+  index: number;
+  count: number;
+  id: string;
+  title: string | null;
+  subtitle: string | null;
+  continue_label: string | null;
+  layout: 'card' | 'split' | 'minimal' | null;
+  fields: FlowDetailField[];
+  /** The code sent to add a missing email or phone. */
+  challenge: FlowChallenge | null;
+}
+
+/** The review page (step `review`): everything that will be shared, profile first. */
+export interface FlowReview {
+  fields: Array<{ field: 'profile' | DetailField; mode: 'required' | 'optional'; label: string; value: string | null; shared: boolean }>;
+}
 
 export interface FlowChallenge {
   channel: 'email' | 'phone';
@@ -97,18 +134,18 @@ export interface FlowView {
   signed_in_as: AccountSummary | null;
   challenge: FlowChallenge | null;
   signup: FlowSignup | null;
-  requirements: { missing: Array<'email' | 'phone' | 'dob' | 'timezone'>; challenge: FlowChallenge | null } | null;
-  consent: {
-    required: Array<{ scope: string; label: string; value: string }>;
-    optional: Array<{ scope: string; label: string; value: string; granted: boolean }>;
-    previously_granted: string[];
-  } | null;
+  /** Step `details`: the page of the app's flow on screen. */
+  details: FlowDetails | null;
+  /** Step `review`: everything that will be shared. */
+  review: FlowReview | null;
   redirect_to: string | null;
   error: { code: string; message: string; hint?: string } | null;
   /** What the app asked for at POST /v1/flows. */
   prompt?: string | null;
-  login_hint?: string | null;
-  method_hint?: string | null;
+  /** The sign-in or the sign-up version of the pages. */
+  intent: 'signin' | 'signup';
+  /** A direct method button (`method=`). */
+  method_hint?: 'google' | 'apple' | 'email' | 'phone' | null;
 }
 
 export interface ProofIssued {
@@ -119,8 +156,8 @@ export interface ProofIssued {
   proof_refresh_token: string;
   refresh_expires_at: string;
   issuing_app: string;
-  receiving_app?: string;
-  receiving_apps?: string[];
+  /** The one app this proof is for (OBO and ATA alike). */
+  receiving_app: string;
   user?: { uuid: string; id: string; kind: AccountKind; membership_id: string };
   scopes: string[];
 }

@@ -1,0 +1,106 @@
+/* The developer site's frame: a quiet top bar and the page. */
+.shell { position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; }
+/* While the shell is up, what focus (Tab) or an in-page jump brings into view stops clear of the floating dock and the
+   phone bar (WCAG 2.4.11): the browser scrolls a control near the bottom up above them instead of leaving it under.
+   At the top it keeps 24 px of room, so an edge drawn just above a focused part (a tab panel's accent line, which sits
+   in the gap under its tab list) is never scrolled out of view: a panel taller than the room left by the dock is
+   brought in by its top edge, which used to land at the window's very top with its line above it. */
+:global(html):has(.shell) { scroll-padding-block: 24px calc(96px + env(safe-area-inset-bottom, 0px)); }
+
+.top {
+  display: flex;
+  width: 100%;
+  max-width: var(--page-max);
+  height: 68px;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-inline: auto;
+  padding: 0 var(--gutter);
+}
+/* The padding (taken back by the negative margin, so nothing moves) gives keyboard focus a soft fill to show in. */
+.brand { --sq-r: 12px; --sq-fill: transparent; display: inline-flex; min-width: 0; align-items: center; gap: 10px; margin: -6px -10px; padding: 6px 10px; background: var(--sq-fill); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; letter-spacing: -.01em; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+.brand:hover { color: var(--foreground); }
+.brand:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
+.brandMark { --sq-r: 9px; display: grid; width: 28px; height: 28px; flex: none; place-items: center; background: var(--primary); color: var(--primary-foreground); }
+.brandMark svg { width: 18px; height: 18px; }
+.brandText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brandMuted { color: var(--text-secondary); font-weight: 400; }
+
+.topStart { display: flex; min-width: 0; align-items: center; gap: var(--space-6); }
+.topEnd { display: flex; flex: none; align-items: center; gap: var(--space-2); }
+.nav { display: flex; align-items: center; gap: 2px; }
+.navLink { --sq-r: 10px; --sq-fill: transparent; display: inline-flex; height: 32px; align-items: center; gap: 2px; padding: 0 10px; background: var(--sq-fill); color: var(--text-secondary); font-size: var(--text-sm); font-weight: 500; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
+.navLink:hover { --sq-fill: var(--surface-muted); color: var(--foreground); }
+.navLink:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
+.navLink[aria-current="page"] { color: var(--foreground); }
+.tool { display: inline-flex; align-items: center; }
+.tool > button[aria-pressed] { --sq-fill: transparent; --sq-stroke: transparent; color: var(--text-secondary); }
+@media (hover: hover) and (pointer: fine) { .tool > button[aria-pressed]:hover:not(:disabled) { --sq-fill: var(--surface-muted); --sq-stroke: transparent; color: var(--foreground); box-shadow: none; } }
+.tool > button[aria-pressed]:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
+.searchLabel { white-space: nowrap; }
+@media (max-width: 720px) {
+  .nav { display: none; }
+  .tool { display: none; }
+}
+
+.search {
+  --sq-r: var(--radius-pill);
+  --sq-fill: transparent;
+  --sq-stroke: var(--border);
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+@media (hover: hover) and (pointer: fine) { .search:hover { --sq-fill: var(--surface); --sq-stroke: var(--border-strong); color: var(--foreground); } }
+.search:focus-visible { --sq-fill: var(--surface); --sq-stroke: var(--border-strong); color: var(--foreground); }
+.search kbd { --sq-r: 8px; --sq-fill: var(--surface-muted); --sq-stroke: var(--border); display: inline-flex; height: 24px; min-width: 38px; align-items: center; justify-content: center; padding: 0 6px; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--text-muted); font-family: var(--font-body); font-size: var(--text-xs); }
+@media (max-width: 639px) {
+  .search { width: 36px; justify-content: center; padding: 0; }
+  .searchLabel, .search kbd { display: none; }
+}
+
+.main { position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; outline: none; }
+.main > * { min-width: 0; }
+.page { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+
+/* Loading and failure states of the shell itself. */
+.loading { display: grid; width: 100%; max-width: var(--page-max); gap: var(--space-8); margin-inline: auto; padding: var(--space-6) var(--gutter) var(--dock-clearance); }
+.loadingHeader { display: grid; gap: var(--space-3); }
+.problem { width: 100%; max-width: calc(var(--page-narrow) + 2 * var(--gutter)); margin: var(--space-12) auto; padding: 0 var(--gutter); }
+
+/* A page outside the shell (landing while signed out) fills the viewport. */
+.bare { min-height: 100vh; min-height: 100dvh; }
+
+/* Command palette layer. */
+.paletteOverlay { position: fixed; inset: 0; z-index: 70; background: var(--overlay); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.paletteOverlay[data-state="open"] { animation: palette-fade-in var(--duration-standard) var(--ease-enter) both; }
+.paletteOverlay[data-state="closed"] { animation: palette-fade-out var(--duration-fast) var(--ease-standard) both; }
+.palettePositioner { position: fixed; inset: 0; z-index: 71; display: flex; justify-content: center; padding: min(14vh, 120px) var(--space-4) var(--space-4); pointer-events: none; }
+.palettePanel { width: min(100%, 640px); height: fit-content; outline: none; pointer-events: auto; }
+@keyframes palette-fade-in { from { opacity: 0; } }
+@keyframes palette-fade-out { to { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .search { transition: none; }
+  .paletteOverlay[data-state="open"] { animation-duration: var(--duration-instant); }
+}
+
+/* The shell's "Leave this page?" question (leave-question.tsx). */
+.leaveDialog.leaveDialog { width: min(calc(100vw - var(--space-8)), 460px); }
+.leaveActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+@media (max-width: 520px) {
+  .leaveActions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .leaveActions > * { width: 100%; }
+}

@@ -14,7 +14,7 @@
 import type { AppPublic } from "../../lib/api/types";
 import { appPublic } from "../../scripts/mock/fixtures";
 import type { MockRoute, ScreenSpec } from "../../scripts/screens-types";
-import { FIRST_PARTY, SAMPLE_CALLBACK, nextAfter, portrait, sampleFlow, type Scenario } from "./mocks/flows";
+import { FIRST_PARTY, SAMPLE_CALLBACK, portrait, sampleFlow, scenarioAfter, type SampleAction, type Scenario } from "./mocks/flows";
 
 const BRANDINGS = [
   { key: "default", appId: "briefcase" },
@@ -23,9 +23,12 @@ const BRANDINGS = [
   { key: "orbit", appId: "orbit-games" },
 ] as const;
 
-const SHOT_SCENARIOS: Scenario[] = ["choose_method", "continue_as", "verify_code", "signup", "requirements", "requirements_code", "consent", "complete"];
+const SHOT_SCENARIOS: Scenario[] = ["choose_method", "opening_google", "continue_as", "verify_code", "signup", "details", "details_code", "details_step2", "review", "complete"];
 /** Shown for the default look only: the same parts in other states. */
-const EXTRA_SCENARIOS: Scenario[] = ["provider_cancelled", "verify_phone", "signup_google", "signup_import", "requirements_both", "consent_more", "declined", "failed"];
+const EXTRA_SCENARIOS: Scenario[] = [
+  "signup_intent", "provider_cancelled", "opening_apple", "email_direct", "verify_phone", "signup_google", "signup_import", "details_more",
+  "details_missing", "details_added", "details_profile", "details_step1", "declined", "failed",
+];
 
 export const appOf = (appId: string): AppPublic => (appId === "accounts" ? FIRST_PARTY : appPublic(appId) ?? FIRST_PARTY);
 export const apiError = (status: number, code: string, message: string, hint?: string, details?: Record<string, unknown>) => ({ status, json: { error: { code, message, hint, details } } });
@@ -35,10 +38,29 @@ const parse = (id: string): { app: AppPublic; scenario: Scenario } => {
   return { app: appOf(appId), scenario: scenario as Scenario };
 };
 
+/**
+ * Where each sample flow is now: a GET starts it afresh at the scenario its id names, and every action moves it on
+ * (scenarioAfter), so a multi-page flow clicks through its pages, the review and back.
+ */
+const flowState = new Map<string, Scenario>();
+const current = (id: string): { app: AppPublic; scenario: Scenario } => {
+  const parsed = parse(id);
+  return { app: parsed.app, scenario: flowState.get(id) ?? parsed.scenario };
+};
+const advance = (id: string, action: SampleAction) => {
+  const { app, scenario } = current(id);
+  const next = scenarioAfter(scenario, action);
+  flowState.set(id, next);
+  // The answer keeps the page's flow id: the page goes on calling the flow it started.
+  return flowJson({ ...sampleFlow(app, next), id });
+};
+
 /** A mock of the flow API good enough to click through: each action answers with the sample of the next step. */
 export const flowRoutes: MockRoute[] = [
   ["GET /v1/flows/:id", ({ params }) => {
-    const { app, scenario } = parse(params.id ?? "");
+    const id = params.id ?? "";
+    flowState.delete(id);
+    const { app, scenario } = parse(id);
     return flowJson(sampleFlow(app, scenario));
   }],
   ["POST /v1/flows", ({ body }) => {
@@ -46,24 +68,36 @@ export const flowRoutes: MockRoute[] = [
     const appId = String(input.app_id ?? input.client_id ?? "");
     if (appId === "nope") return apiError(400, "unknown_app", "No app with app_id 'nope' exists in Silicon Accounts.", "Check the app_id in the sign-in link; apps are created in Silicon Apps.");
     if (String(input.redirect_uri ?? "").includes("evil")) {
-      return apiError(400, "redirect_uri_not_registered", `redirect_uri 'https://evil.example/steal' is not registered for the app '${appId}': it must equal one of the app's registered redirect_uris exactly (http://localhost and http://127.0.0.1 match on any port when registered with that host).`, `Register it in the app's sign-in setup (PATCH /v1/apps/${appId}/signin-config with redirect_uris), or use a registered URI.`, { app_id: appId });
+      return apiError(400, "redirect_uri_not_registered", `redirect_uri 'https://evil.example/steal' is not registered for the app '${appId}': it must equal one of the app's registered redirect_uris exactly (http://localhost and http://127.0.0.1 match on any port when registered with that host).`, `Register it in the app's sign-in setup (on developer.teamofsilicons.com, or PATCH /v1/apps/${appId}/signin-config with redirect_uris), or use a registered URI.`, { app_id: appId });
     }
-    return { status: 201, json: { flow: sampleFlow(appOf(appId || "accounts"), "choose_method") } };
+    const method = typeof input.method === "string" ? input.method : null;
+    const scenario: Scenario = method === "google" ? "opening_google" : method === "apple" ? "opening_apple" : method === "email" ? "email_direct" : input.intent === "signup" ? "signup_intent" : "choose_method";
+    return { status: 201, json: { flow: sampleFlow(appOf(appId || "accounts"), scenario) } };
   }],
-  ["POST /v1/flows/:id/email", ({ params }) => flowJson(nextAfter(parse(params.id ?? "").app, "email"))],
-  ["POST /v1/flows/:id/phone", ({ params }) => flowJson(nextAfter(parse(params.id ?? "").app, "phone"))],
-  ["POST /v1/flows/:id/resend", ({ params }) => flowJson(sampleFlow(parse(params.id ?? "").app, parse(params.id ?? "").scenario))],
+  ["POST /v1/flows/:id/email", ({ params }) => advance(params.id ?? "", "email")],
+  ["POST /v1/flows/:id/phone", ({ params }) => advance(params.id ?? "", "phone")],
+  ["POST /v1/flows/:id/resend", ({ params }) => {
+    const { app, scenario } = current(params.id ?? "");
+    return flowJson({ ...sampleFlow(app, scenario), id: params.id ?? "" });
+  }],
   ["POST /v1/flows/:id/verify", ({ params, body }) => {
     const code = String((body as Record<string, unknown> | null)?.code ?? "");
-    if (code === "123456") return flowJson(nextAfter(parse(params.id ?? "").app, "verify"));
+    if (code === "123456") return advance(params.id ?? "", "verify");
     return apiError(422, "invalid_code", "That code is wrong; 9 more tries for s***@gmail.com before a 60 second cooldown.", "Check the latest code you received and type it again.", { remaining_attempts: 9 });
   }],
-  ["POST /v1/flows/:id/continue", ({ params }) => flowJson(nextAfter(parse(params.id ?? "").app, "continue"))],
-  ["POST /v1/flows/:id/switch", ({ params }) => flowJson(nextAfter(parse(params.id ?? "").app, "switch"))],
-  ["POST /v1/flows/:id/signup", ({ params }) => flowJson(nextAfter(parse(params.id ?? "").app, "signup"))],
+  ["POST /v1/flows/:id/continue", ({ params }) => advance(params.id ?? "", "continue")],
+  ["POST /v1/flows/:id/switch", ({ params }) => advance(params.id ?? "", "switch")],
+  ["POST /v1/flows/:id/signup", ({ params }) => advance(params.id ?? "", "signup")],
   ["POST /v1/flows/:id/signup/photo", () => ({ status: 201, json: { pfp_url: portrait("New Photo", 150), photo: { id: "photo-sample", content_type: "image/png", bytes: 1024, width: 8, height: 8 } } })],
-  ["POST /v1/flows/:id/requirements/:kind", ({ params }) => flowJson(nextAfter(parse(params.id ?? "").app, params.kind === "verify" ? "requirement_verify" : "requirement"))],
-  ["POST /v1/flows/:id/consent", ({ params, body }) => flowJson(nextAfter(parse(params.id ?? "").app, (body as { approve?: boolean } | null)?.approve ? "consent" : "decline"))],
+  ["POST /v1/flows/:id/details/add", ({ params }) => advance(params.id ?? "", "details_add")],
+  ["POST /v1/flows/:id/details/verify", ({ params, body }) => {
+    const code = String((body as Record<string, unknown> | null)?.code ?? "");
+    if (code === "123456") return advance(params.id ?? "", "details_verify");
+    return apiError(422, "invalid_code", "That code is wrong; 9 more tries for +1********0142 before a 60 second cooldown.", "Check the latest code you received and type it again.", { remaining_attempts: 9 });
+  }],
+  ["POST /v1/flows/:id/details/continue", ({ params }) => advance(params.id ?? "", "details_continue")],
+  ["POST /v1/flows/:id/details/back", ({ params }) => advance(params.id ?? "", "details_back")],
+  ["POST /v1/flows/:id/review", ({ params, body }) => advance(params.id ?? "", (body as { approve?: boolean } | null)?.approve ? "approve" : "decline")],
   // A real provider would take the browser away; the samples point at an address nothing answers.
   ["POST /v1/flows/:id/oauth/:provider", ({ params }) => ({ json: { authorize_url: `https://provider.example/${params.provider}/authorize?sample=1` } })],
   // Completed samples "redirect" here; 204 keeps the page in place for the screenshot.
@@ -89,15 +123,24 @@ const BACKGROUND_SAMPLE = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="
 export const flowPath = (appId: string, scenario: Scenario) => `/authorize/flow/${encodeURIComponent(`${appId}~${scenario}`)}`;
 export const READY = 'main[data-fonts="ready"]';
 
+/**
+ * The Opening page moves on to the provider by itself after 900 ms: for its screenshots the provider's address takes
+ * its time to come, so the page stays on "Opening Google…" (its bar full, the button busy).
+ */
+const routesFor = (scenario: Scenario): MockRoute[] =>
+  scenario.startsWith("opening")
+    ? [...flowRoutes, ["POST /v1/flows/:id/oauth/:provider", ({ params }) => ({ delay: 60_000, json: { authorize_url: `https://provider.example/${params.provider}/authorize?sample=1` } })]]
+    : flowRoutes;
+
 const stepScreens: ScreenSpec[] = BRANDINGS.flatMap(({ key, appId }) =>
-  SHOT_SCENARIOS.map(scenario => ({ name: `auth-${key}-${scenario}`, path: flowPath(appId, scenario), as: "signed-out" as const, routes: flowRoutes, waitFor: READY, settle: 1000 })),
+  SHOT_SCENARIOS.map(scenario => ({ name: `auth-${key}-${scenario}`, path: flowPath(appId, scenario), as: "signed-out" as const, routes: routesFor(scenario), waitFor: READY, settle: 1000 })),
 );
 
 const extraScreens: ScreenSpec[] = EXTRA_SCENARIOS.map(scenario => ({
   name: `auth-default-${scenario}`,
   path: flowPath("briefcase", scenario),
   as: "signed-out" as const,
-  routes: flowRoutes,
+  routes: routesFor(scenario),
   waitFor: READY,
   settle: 1000,
 }));

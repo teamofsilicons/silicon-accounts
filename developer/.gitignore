@@ -1,0 +1,21 @@
+# Dependencies
+/node_modules
+
+# Next.js (`.next-<port>/` and its `.next-<port>.tsconfig.json`: the build of one local stack, see next.config.ts)
+/.next/
+/.next-*/
+/.next-*.tsconfig.json
+/.next-*.tsconfig.json.*.tmp
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Local environment
+.env*
+!.env.example
+
+# Misc
+.DS_Store
+*.pem
+npm-debug.log*
+.pnpm-debug.log*

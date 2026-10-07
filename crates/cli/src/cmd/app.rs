@@ -460,9 +460,14 @@ async fn new_app(ctx: &Ctx, no_browser: bool) -> CliResult<Outcome> {
     } else {
         meta.silicon_apps_url.clone()
     };
+    let developer_url = meta
+        .developer_url
+        .clone()
+        .filter(|u| !u.is_empty())
+        .unwrap_or_else(|| "https://developer.teamofsilicons.com".to_owned());
     let opened = !no_browser && util::open_browser(&url);
     let text = format!(
-        "Apps are created in Silicon Apps: {url}{}\nAs soon as it exists there, it can sign people in. Then configure it here with `accounts app use <app_id> --secret-stdin` and `accounts app config set`.",
+        "Apps are created in Silicon Apps: {url}{}\nAs soon as it exists there, it can sign people in. Set up its sign-in on the developer platform ({developer_url}), or here with `accounts app use <app_id> --secret-stdin` and `accounts app config set`.",
         if opened {
             " (opened in your browser)"
         } else {
@@ -470,7 +475,7 @@ async fn new_app(ctx: &Ctx, no_browser: bool) -> CliResult<Outcome> {
         }
     );
     Ok(Outcome::new(
-        json!({ "silicon_apps_url": url, "opened": opened }),
+        json!({ "silicon_apps_url": url, "developer_url": developer_url, "opened": opened }),
         text,
     ))
 }
@@ -945,10 +950,7 @@ async fn app_jwks(app: &AppClient<'_>) -> CliResult<silicon_accounts_client::Jwk
 
 async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> CliResult<Outcome> {
     let issued_outcome = |proof: silicon_accounts_client::IssuedProof| {
-        let to = proof
-            .receiving_app
-            .clone()
-            .unwrap_or_else(|| proof.receiving_apps.join(", "));
+        let to = proof.receiving_app.clone().unwrap_or_default();
         let text = format!(
             "{} proof {} from {app_id} for {to}{}.\n{}",
             proof
@@ -1005,13 +1007,31 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
             ttl,
             idempotency_key,
         } => {
-            let audiences: Vec<String> = to
-                .into_iter()
-                .map(|a| a.trim().to_owned())
+            let receiving_app = to.trim().to_owned();
+            let several: Vec<&str> = receiving_app
+                .split(|c: char| c == ',' || c.is_whitespace())
+                .map(str::trim)
                 .filter(|a| !a.is_empty())
                 .collect();
+            if several.len() > 1 {
+                let commands: Vec<String> = several
+                    .iter()
+                    .map(|a| format!("accounts app proof ata --to {a}"))
+                    .collect();
+                return Err(CliError::invalid(
+                    format!(
+                        "An ATA proof is for exactly one app, but --to names {}: {}.",
+                        several.len(),
+                        several.join(", ")
+                    ),
+                    format!(
+                        "Issue one proof per app; each app verifies its own: {}",
+                        commands.join(" ; ")
+                    ),
+                ));
+            }
             let request = IssueAta {
-                audiences,
+                receiving_app,
                 scopes,
                 access_ttl_seconds: ttl,
             };
@@ -1092,7 +1112,7 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
                     vec![
                         p.proof_id.clone(),
                         p.kind.as_str().to_owned(),
-                        p.audiences.join(","),
+                        p.receiving_app.clone(),
                         p.user.as_ref().map(|u| u.id.clone()).unwrap_or_default(),
                         if p.revoked_at.is_some() {
                             "revoked".to_owned()

@@ -4,7 +4,7 @@
 // spec's shapes: token endpoint (authorization_code + PKCE, refresh rotation with reuse
 // detection, SLT), proofs (OBO/ATA issue + verify), app webhook registration, and the
 // hosted flow (flow cookie, Origin check, email/phone codes sent through the mock
-// Postmark/Twilio APIs, signup, consent, Google/Apple via mock-oidc).
+// Postmark/Twilio APIs, signup, the details page + review, Google/Apple via mock-oidc).
 
 import { generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
 import { createRemoteJWKSet, decodeJwt, exportJWK, jwtVerify, SignJWT, type JWK, type JWTPayload } from 'jose';
@@ -296,12 +296,14 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
   router.post('/v1/proofs/ata', async (ctx) => {
     const app = appAuth(ctx);
     const body = await jsonObject(ctx);
-    const audiences = (body.audiences as string[]) ?? [];
+    if (body.audiences !== undefined) throw apiError(422, 'ata_single_app', 'An ATA proof is for exactly one app; ask for one proof per app.');
+    const receiving = String(body.receiving_app ?? '');
+    if (!apps.has(receiving) || receiving === app.app_id) throw apiError(400, 'unknown_receiving_app', `No app ${receiving}.`);
     const token = `sap_${random(32)}`;
     const proofId = randomUUID();
     const ttl = typeof body.access_ttl_seconds === 'number' ? body.access_ttl_seconds : 1800;
-    proofs.set(token, { kind: 'ata', issuing: app.app_id, audiences, user: null, expires: Date.now() + ttl * 1000, scopes: (body.scopes as string[]) ?? [], proof_id: proofId });
-    ctx.sendJson(201, { proof_id: proofId, kind: 'ata', proof_token: token, expires_at: new Date(Date.now() + ttl * 1000).toISOString(), proof_refresh_token: `sapr_${random(32)}`, issuing_app: app.app_id, receiving_apps: audiences, scopes: body.scopes ?? [] });
+    proofs.set(token, { kind: 'ata', issuing: app.app_id, audiences: [receiving], user: null, expires: Date.now() + ttl * 1000, scopes: (body.scopes as string[]) ?? [], proof_id: proofId });
+    ctx.sendJson(201, { proof_id: proofId, kind: 'ata', proof_token: token, expires_at: new Date(Date.now() + ttl * 1000).toISOString(), proof_refresh_token: `sapr_${random(32)}`, issuing_app: app.app_id, receiving_app: receiving, scopes: body.scopes ?? [] });
   });
 
   router.post('/v1/proofs/verify', async (ctx) => {
@@ -358,10 +360,12 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
         signed_in_as: null,
         challenge: flow.challenge ? { channel: flow.challenge.channel, destination: flow.challenge.destination, expires_at: '', resend_available_at: '' } : null,
         signup: flow.signup,
-        requirements: null,
-        consent: flow.step === 'consent' ? { required: [], optional: [], previously_granted: [] } : null,
+        details: flow.step === 'details' ? { index: 0, count: 1, id: 'details', title: null, subtitle: null, continue_label: null, layout: null, fields: [], challenge: null } : null,
+        review: null,
         redirect_to: flow.redirect_to,
         error: null,
+        intent: 'signin',
+        method_hint: null,
       },
     };
   }
@@ -372,7 +376,7 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
     sessions.set(sid, account);
     ctx.addHeader('Set-Cookie', serializeCookie('sa_session', sid, { path: '/' }));
     if (flow.app_id === 'accounts') complete(flow);
-    else flow.step = 'consent';
+    else flow.step = 'details';
   }
 
   function complete(flow: FlowRecord): void {
@@ -490,7 +494,14 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
     ctx.sendJson(200, view(flow));
   });
 
-  router.post('/v1/flows/:id/consent', async (ctx) => {
+  router.post('/v1/flows/:id/details/continue', (ctx) => {
+    const flow = boundFlow(ctx);
+    if (flow.step !== 'details') throw apiError(409, 'invalid_step', `Flow is at ${flow.step}.`);
+    complete(flow);
+    ctx.sendJson(200, view(flow));
+  });
+
+  router.post('/v1/flows/:id/review', async (ctx) => {
     const flow = boundFlow(ctx);
     const body = await jsonObject(ctx);
     if (body.approve === false) {

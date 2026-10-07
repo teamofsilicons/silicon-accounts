@@ -42,12 +42,8 @@ pub struct IssuedProof {
     #[serde(with = "rfc3339_ms")]
     pub refresh_expires_at: OffsetDateTime,
     pub issuing_app: String,
-    /// OBO: the one receiving app.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub receiving_app: Option<String>,
-    /// ATA: every receiving app.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub receiving_apps: Option<Vec<String>>,
+    /// The one app that verifies the proof (OBO and ATA alike).
+    pub receiving_app: String,
     /// OBO: the account; ATA: `null`.
     pub user: Option<ProofUser>,
     pub scopes: Vec<String>,
@@ -64,7 +60,6 @@ impl std::fmt::Debug for IssuedProof {
             .field("refresh_expires_at", &self.refresh_expires_at)
             .field("issuing_app", &self.issuing_app)
             .field("receiving_app", &self.receiving_app)
-            .field("receiving_apps", &self.receiving_apps)
             .field("user", &self.user)
             .field("scopes", &self.scopes)
             .finish()
@@ -72,7 +67,8 @@ impl std::fmt::Debug for IssuedProof {
 }
 
 impl IssuedProof {
-    /// Fills `receiving_app` (OBO) or `receiving_apps` (ATA) from the audiences.
+    /// Fills `receiving_app` from the stored audiences (always one app; a proof issued before
+    /// single-app ATA proofs reports its first).
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         proof_id: Uuid,
@@ -84,10 +80,7 @@ impl IssuedProof {
         user: Option<ProofUser>,
         scopes: Vec<String>,
     ) -> IssuedProof {
-        let (receiving_app, receiving_apps) = match kind {
-            ProofKind::Obo => (audiences.first().cloned(), None),
-            ProofKind::Ata => (None, Some(audiences.to_vec())),
-        };
+        let receiving_app = audiences.first().cloned().unwrap_or_default();
         IssuedProof {
             proof_id,
             kind,
@@ -97,7 +90,6 @@ impl IssuedProof {
             refresh_expires_at,
             issuing_app: issuing_app.to_string(),
             receiving_app,
-            receiving_apps,
             user,
             scopes,
         }
@@ -139,7 +131,9 @@ pub fn invalid_proof() -> Value {
 pub struct AppProofItem {
     pub proof_id: Uuid,
     pub kind: ProofKind,
-    pub audiences: Vec<String>,
+    /// The one app that verifies it (a proof issued before single-app ATA proofs reports its
+    /// first receiving app).
+    pub receiving_app: String,
     /// OBO: the account; ATA: `null`.
     pub user: Option<AccountSummary>,
     pub scopes: Vec<String>,

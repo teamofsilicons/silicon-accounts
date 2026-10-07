@@ -16,7 +16,7 @@ const HOST = /^[A-Za-z0-9.-]+(?::\d{1,5})?$/;
 
 /**
  * The public origin for absolute links: ACCOUNTS_PUBLIC_URL when the server has it, else the host the request came to
- * (X-Forwarded-Host / X-Forwarded-Proto from a load balancer, then Host), else https://account.teamofsilicons.com.
+ * (X-Forwarded-Host / X-Forwarded-Proto from a load balancer, then Host), else https://accounts.teamofsilicons.com.
  */
 export function publicOrigin(headers: Headers, requestUrl: string): string {
   const configured = process.env.ACCOUNTS_PUBLIC_URL?.trim();

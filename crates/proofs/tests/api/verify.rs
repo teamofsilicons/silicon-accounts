@@ -342,7 +342,7 @@ async fn ata_proofs_ignore_account_state() {
         .ata_as(
             &w.dm,
             &w.dm_secret,
-            json!({"audiences": [w.briefcase.app_id]}),
+            json!({"receiving_app": w.briefcase.app_id}),
         )
         .await;
     assert_eq!(r.status, 201);

@@ -221,7 +221,7 @@ pub struct DeviceAuthorization {
     pub device_code: Secret,
     /// The code the Carbon confirms on the site, e.g. `WDJB-MJHT`.
     pub user_code: String,
-    /// Where the Carbon approves, e.g. `https://account.teamofsilicons.com/device`.
+    /// Where the Carbon approves, e.g. `https://accounts.teamofsilicons.com/device`.
     pub verification_uri: String,
     /// The same page with the code filled in.
     #[serde(default, skip_serializing_if = "Option::is_none")]

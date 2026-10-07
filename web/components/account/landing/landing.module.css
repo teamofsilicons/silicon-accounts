@@ -36,9 +36,12 @@
 .footer a { --sq-r: 6px; --sq-fill: transparent; position: relative; margin-inline: -4px; padding: 2px 4px; background: var(--sq-fill); color: var(--text-secondary); transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
 .footer a:hover { color: var(--foreground); }
 .footer a:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
+.footerLinks { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2) var(--space-5); }
 
 @media (max-width: 900px) {
   .hero { grid-template-columns: minmax(0, 1fr); align-content: start; }
   .facts { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) { .brand, .footer a { transition: none; } }
+.noteLink { color: var(--accent-ink, var(--foreground)); font-weight: 500; text-decoration: underline; text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); text-underline-offset: 3px; }
+.noteLink:is(:hover, :focus-visible) { text-decoration-color: currentColor; }

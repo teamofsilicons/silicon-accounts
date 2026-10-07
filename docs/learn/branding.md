@@ -130,7 +130,7 @@ to set one here.
 
 ## Powered by Silicon Accounts
 
-Every page ends with "Powered by Silicon Accounts", linking to `account.teamofsilicons.com`.
+Every page ends with "Powered by Silicon Accounts", linking to `accounts.teamofsilicons.com`.
 It is not a variable, and it is drawn outside the branded part of the page, in its own
 colours, so no branding can hide or restyle it. In the iframe and the snippet it sits on an
 opaque pill of its own, so it reads on any page around it.

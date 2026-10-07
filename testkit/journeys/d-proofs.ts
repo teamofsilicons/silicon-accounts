@@ -22,11 +22,14 @@ console.log(`  timings ${JSON.stringify(ob.timings)}`);
 check(obo.status === 200 && ob.ok === true, 'the OBO demo succeeded', ob);
 check(ob.verification?.valid === true && ob.verification?.kind === 'obo' && ob.verification?.issuing_app?.app_id === 'dm' && ob.verification?.receiving_app?.app_id === 'briefcase' && ob.verification?.user?.uuid === uuid, 'briefcase verified a valid OBO proof for that Carbon', ob.verification);
 
-section('ATA commit → remind + waveform');
+section('ATA commit → remind + waveform (one proof per app)');
 const ata = await fake.notify({ message: 'build green' });
 const ab: any = ata.body;
 console.log(`  timings ${JSON.stringify(ab.timings)}`);
-check(ata.status === 200 && ab.ok === true && ab.results?.remind?.verification?.valid === true && ab.results?.waveform?.verification?.valid === true, 'remind and waveform both verified the ATA proof', ab);
+check(ab.proofs?.remind?.receiving_app === 'remind' && ab.proofs?.waveform?.receiving_app === 'waveform' && ab.proofs.remind.proof_id !== ab.proofs.waveform.proof_id, 'commit made two proofs: one for remind, one for waveform', ab.proofs);
+check(ata.status === 200 && ab.ok === true && ab.results?.remind?.verification?.valid === true && ab.results?.waveform?.verification?.valid === true, 'remind and waveform each verified their own proof', ab);
+const multi: any = await accounts.app('commit').request('POST', '/v1/proofs/ata', { json: { audiences: ['remind', 'waveform'] } });
+check(multi.status === 422 && multi.body?.error?.code === 'ata_single_app', 'a proof for several apps at once is refused (ata_single_app)', multi.body);
 
 section('non-audience verification → exactly {valid:false, expires_at:null}');
 const issued: any = await fake.issueObo('dm', { uuid, receiving_app: 'briefcase' });
@@ -34,8 +37,9 @@ const token = String(issued?.body?.proof_token ?? '');
 check(token.startsWith('sap_'), 'dm issued an OBO proof', issued);
 check(invalidShape((await fake.verifyProof('remind', token)).verification), 'remind (not the audience) → {valid:false, expires_at:null}');
 check((await fake.verifyProof('briefcase', token)).verification?.valid === true, 'briefcase (the audience) → valid');
-const ataIssued: any = (await accounts.app('commit').issueAta({ audiences: ['remind', 'waveform'] })).body;
-check(invalidShape(await accounts.app('briefcase').verifyProof(ataIssued.proof_token)), 'briefcase verifying a commit → [remind, waveform] ATA → invalid');
+const ataIssued: any = (await accounts.app('commit').issueAta({ receiving_app: 'remind' })).body;
+check(invalidShape(await accounts.app('briefcase').verifyProof(ataIssued.proof_token)), 'briefcase verifying a commit → remind ATA proof → invalid');
+check((await accounts.app('remind').verifyProof(ataIssued.proof_token)).valid === true, 'remind (its one app) → valid');
 check(invalidShape(await accounts.app('briefcase').verifyProof('sap_unknown')), 'an unknown token → invalid');
 
 section('verify latency (HTTP round trip from the testkit)');

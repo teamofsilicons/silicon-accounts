@@ -54,9 +54,18 @@ choose_method ──email/phone code──▶ verify_code ──┐
       │  └──Google/Apple (provider round trip)──────┼──▶ signup  (new account, or finishing an imported one)
       └──continue as the browser's account ─────────┤       │
                                                     ▼       ▼
-                                      requirements ──▶ consent ──▶ complete  (redirect_to = code, or error=access_denied)
-prompt=none that can't finish silently ─────────────────────────▶ failed    (redirect_to = error redirect)
+                         details[0] ──▶ details[1] … ──▶ review (flow.review) ──▶ complete  (redirect_to = code)
+                         (Back between pages; Cancel on any page) ─────────────▶ complete  (error=access_denied)
+prompt=none that can't finish silently ───────────────────────────────────────▶ failed    (redirect_to = error redirect)
 ```
+
+`details` is one page of the app's [flow](../../start/sign-in-config.md#flows): the details
+it asks for on that page, each required (always shared; a missing email or phone is added on the
+page with a code) or optional (a checkbox, unticked until the Carbon ticks it). An app without a
+flow of its own gets one page with every detail it asks for. A Carbon sees every page on their
+first sign-in to the app (and with `prompt=consent`); after that only a page with something new
+on it, and a Carbon with nothing new goes straight to `complete`. `review` is shown only when the
+app turned it on. The first-party apps (`accounts`, `developer`) never show these pages.
 
 Rules every flow endpoint follows:
 
@@ -77,7 +86,7 @@ Rules every flow endpoint follows:
 ```json
 {
   "id": "bujeLTroDILuAzYSBod8Lg",
-  "step": "consent",
+  "step": "details",
   "expires_at": "2026-10-07T03:32:36.925Z",
   "app": {
     "app_id": "briefcase",
@@ -96,45 +105,54 @@ Rules every flow endpoint follows:
   },
   "challenge": null,
   "signup": null,
-  "requirements": null,
-  "consent": {
-    "required": [
-      { "scope": "profile", "label": "Name, id and profile photo", "value": "Ada Lovelace (c:ada)" },
-      { "scope": "email", "label": "Email address", "value": "a***@example.test" }
+  "details": {
+    "index": 0,
+    "count": 1,
+    "id": "details",
+    "title": null,
+    "subtitle": null,
+    "continue_label": null,
+    "layout": null,
+    "fields": [
+      { "field": "email", "mode": "required", "label": "Email address", "value": "a***@example.test",
+        "missing": false, "shared": true, "previously_granted": false },
+      { "field": "timezone", "mode": "optional", "label": "Timezone", "value": "Asia/Kolkata",
+        "missing": false, "shared": false, "previously_granted": false }
     ],
-    "optional": [
-      { "scope": "timezone", "label": "Timezone", "value": "Asia/Kolkata", "granted": true }
-    ],
-    "previously_granted": []
+    "challenge": null,
+    "review_next": false
   },
+  "review": null,
   "redirect_to": null,
   "error": null,
   "prompt": null,
-  "login_hint": null,
+  "intent": "signin",
   "method_hint": null
 }
 ```
 
 | Field | |
 |---|---|
-| `step` | `choose_method`, `verify_code`, `signup`, `requirements`, `consent`, `complete` or `failed` |
+| `step` | `choose_method`, `verify_code`, `signup`, `details`, `review`, `complete` or `failed` |
 | `app` | what the page needs to look like the app: name, logos, `branding`, `copy`; `first_party` is true for the account site itself |
 | `methods` | the enabled methods, in the app's order (managed Google/Apple are hidden when this deployment has no credentials for them) |
 | `signed_in_as` | the browser's signed-in Carbon (offered as "Continue as"), or null |
 | `challenge` | at `verify_code`: `{channel, destination (masked), expires_at, resend_available_at}` |
 | `signup` | at `signup`: the prefilled details `{display_name, id, timezone, dob, pfp_url, email, phone, provider, provider_pfp_url, finishing_import, imported_by, expires_at}`; `imported_by` is `{app_id, name}` of the app whose import created the account when `finishing_import` is true (it can be another app than the one being signed into), else null |
-| `requirements` | at `requirements`: `{missing: ["phone"], challenge}` — required details the account lacks |
-| `consent` | at `consent`: `required` and `optional` items `{scope, label, value}` (values masked like code destinations; `optional[].granted` is the toggle's starting state), `previously_granted` |
+| `details` | at `details`: the page on screen. `index` and `count` are its position among the pages this sign-in shows (not every page of the flow); `id`, `title`, `subtitle`, `continue_label` and `layout` come from the app's flow step (null keeps the page's own words, and the branding's layout). `fields[]`: `{field, mode (required\|optional), label, value (contact values masked), missing (an email or phone the account doesn't have yet), shared (the checkbox: always true for required; for optional, the Carbon's answer, else whether they shared it with this app before), previously_granted}`. `challenge` is the code sent to add a missing email or phone. `review_next` is true when continuing opens the review page |
+| `review` | at `review`: `{fields: [{field, mode, label, value, shared}]}`, everything the app will see: `profile` (name, id and photo) first, then each shared detail in flow order |
 | `redirect_to` | at `complete`/`failed`: where to send the browser (your `redirect_uri` with `code` and `state`, or an error) |
 | `error` | the last failure `{code, message, hint}` (a cancelled provider, an expired sign-up…) until the next action |
-| `prompt`, `login_hint`, `method_hint` | echoed from the authorize request so the page can honour them |
+| `prompt`, `intent`, `method_hint` | from the authorize request so the page can honour them: `intent` is `signin` or `signup` (which version of the pages), `method_hint` the app's direct button (`google`/`apple` open the Opening page, `email`/`phone` their empty field). An app's `login_hint` is never stored or echoed |
 
 ### `POST /v1/flows`
 
 Public, same origin. The body is the `/authorize` query as JSON (see
 [the parameters](oauth.md#get-authorize)), plus an optional `timezone` (the browser's IANA
 timezone, used to prefill sign-up). Unknown fields are ignored; empty strings count as absent;
-`state` and `nonce` are kept byte for byte.
+`state` and `nonce` are kept byte for byte. `intent` is `signin` (default) or `signup`; `method`
+is one enabled method. `login_hint` is accepted without an error and ignored: an app can never
+hand Silicon Accounts a Carbon's email or phone, the Carbon always types it on the hosted pages.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/flows" -c jar -b jar -H "Origin: $ACCOUNTS_URL" \
@@ -150,7 +168,7 @@ or `failed` with `error` and `redirect_to` (`login_required`, `consent_required`
 Errors, before the redirect URI is trusted (shown as an error page, never redirected to): 400
 `unknown_app`, `app_disabled`, `redirect_uri_not_registered`, `invalid_request` (no `app_id`, or
 no `redirect_uri`).
-After it: 400 `invalid_request`, `invalid_scope`, `unsupported_response_type` or
+After it: 400 `invalid_request` (also an `intent` other than `signin`/`signup`), `invalid_scope`, `unsupported_response_type` or
 `method_not_enabled`, each with `details.redirect_to` (the RFC 6749 error redirect the page may
 offer as "back to the app"). Also 403 `origin_not_allowed`, 429 `rate_limited` (300 flows per
 minute per IP).
@@ -160,7 +178,7 @@ minute per IP).
   "error": {
     "code": "redirect_uri_not_registered",
     "message": "redirect_uri 'https://evil.example/cb' is not registered for the app 'commit': it must equal one of the app's registered redirect_uris exactly (http://localhost and http://127.0.0.1 match on any port when registered with that host).",
-    "hint": "Register it in the app's sign-in setup (PATCH /v1/apps/commit/signin-config with redirect_uris), or use a registered URI.",
+    "hint": "Register it in the app's sign-in setup (on developer.teamofsilicons.com, or PATCH /v1/apps/commit/signin-config with redirect_uris), or use a registered URI.",
     "details": { "app_id": "commit" }
   }
 }
@@ -175,8 +193,8 @@ on the provider's callback. Errors: 404 `flow_not_found`, 403 `flow_not_bound`, 
 
 ### `POST /v1/flows/{id}/continue`
 
-Continue as the browser's signed-in Carbon (`signed_in_as`). No body. Moves to `requirements`,
-`consent` or `complete`. Errors: 401 `session_required` (the browser isn't signed in), 403
+Continue as the browser's signed-in Carbon (`signed_in_as`). No body. Moves to `details` or
+`complete`. Errors: 401 `session_required` (the browser isn't signed in), 403
 `continue_not_allowed` (the app turned `remember_browser` off), 403 `reauthentication_required`
 (`prompt=login`), 403 `carbon_only` (a Silicon's session), 403 `email_domain_not_allowed`, 409
 `invalid_step`.
@@ -211,8 +229,8 @@ address per 10 minutes, 30 per IP per 10 minutes); 409 `invalid_step`.
 
 ### `POST /v1/flows/{id}/resend`
 
-A new code to the same destination (the sign-in code, or at `requirements` the requirement
-code). The old code stops working; the failure count carries over. Counts toward the send
+A new code to the same destination (the sign-in code, or at `details` the code that adds a
+missing email or phone). The old code stops working; the failure count carries over. Counts toward the send
 limits. 409 `no_code_sent` when nothing was sent yet. `resend_available_at` is a hint for the
 page (30 seconds after a send), not enforced.
 
@@ -221,7 +239,7 @@ page (30 seconds after a send), not enforced.
 `{"code": "594873"}`. A right code:
 
 - an active account's verified address: signs the browser in (`Set-Cookie: sa_session=…`) and
-  moves on (`requirements`, `consent` or `complete`);
+  moves on (`details` or `complete`);
 - an imported account nobody finished: `signup` with `finishing_import: true`, prefilled from
   the import;
 - an unknown address: a sign-up (`Set-Cookie: sa_signup=sau_…; Max-Age=172800`) and `signup`
@@ -284,7 +302,7 @@ missing fields keep the prefill:
 
 Creates the Carbon (or finishes the imported one, keeping its uuid), signs the browser in
 (`Set-Cookie: sa_session=…; Max-Age=77760000`), clears `sa_signup` and moves on, usually to
-`consent`. Errors: 409 `id_taken` (`details.suggestions`), 409 `id_reserved`, 422 `invalid_id`,
+the first `details` page. Errors: 409 `id_taken` (`details.suggestions`), 409 `id_reserved`, 422 `invalid_id`,
 422 `validation_failed`, 403 `signup_not_bound`, 410 `signup_expired`, 409
 `signup_already_completed`, 403 `signup_not_allowed`.
 
@@ -295,24 +313,45 @@ as [`POST /v1/me/photo`](accounts.md#post-v1mephoto) (PNG, JPEG, WebP or GIF, at
 per sign-up per hour). **201** `{"pfp_url", "photo": {"id", "content_type", "bytes", "width",
 "height"}}`; the upload replaces the sign-up's earlier one and becomes `signup.pfp_url`.
 
-### `POST /v1/flows/{id}/requirements/email`, `/phone`, `/verify`
+### The details pages: `POST /v1/flows/{id}/details/…`
 
-At `requirements` (the app requires an email or phone the account doesn't have): send a code
-(`{"email"}` or `{"phone","country"?}`), then `{"code"}` to `/verify`. The verified address is
-added to the account (primary if it had none) and the flow moves on. Needs the flow cookie and
-the browser signed in as the flow's account. Errors: 409 `requirement_not_needed` (it isn't
-missing), 409 `email_in_use` / `phone_in_use` (another account has it), 409 `no_code_sent`, the
-code errors of `/verify` above, 409 `account_changed` (the browser is now signed in as someone
-else).
+Every details endpoint needs the flow cookie, the `Origin` guard and the browser signed in as the
+flow's account (403 `account_changed` when it is now someone else), and answers
+`{"flow": FlowView}`. A page stays on screen until the Carbon continues.
 
-### `POST /v1/flows/{id}/consent`
+**`POST /v1/flows/{id}/details/add`** `{"email": "…"}` or `{"phone": "…", "country"?: "IN"}`:
+sends a 6-digit code to add an email or phone that is `missing` on the page on screen (required,
+or optional). `details.challenge` then holds the masked destination. When the account already has
+it (added in another tab), nothing is sent and the page shows it. Errors: 422
+`validation_failed` (neither or both, or an invalid value), 409 `detail_not_on_page`, 403
+`email_domain_not_allowed`, 409 `email_in_use` / `phone_in_use`, 422 `email_limit_reached` /
+`phone_limit_reached`, 429 `rate_limited`.
 
-`{"approve": true, "optional_scopes": ["timezone"]}` grants `profile` + the required details +
-the chosen optional ones; the flow completes with `redirect_to` carrying `code` and `state`.
-`{"approve": false}` completes with `?error=access_denied`. Consent is skipped (the flow goes
-straight to `complete`) when the account already granted everything the app now asks for and
-`prompt` isn't `consent`; it is never shown for the account site itself. 409
-`requirements_missing` (`details.missing`) when a required detail is still missing.
+**`POST /v1/flows/{id}/details/verify`** `{"code": "594873"}`: adds the address, verified, to the
+account (its primary when it has none). The flow stays on the page, which now shows it; an
+optional detail added this way starts ticked. Errors: 409 `no_code_sent`, the code errors of
+`/verify` above, 409 `email_in_use` / `phone_in_use`, 409 `flow_changed`.
+
+**`POST /v1/flows/{id}/details/continue`** `{"share": ["timezone"]}`: `share` lists the optional
+details of this page the Carbon ticked (required ones are always shared and may be listed). The
+answers are kept per detail, so going back keeps them. Moves to the next page, to `review`, or
+completes. Errors: 409 `requirements_missing` (`details.missing`: a required email or phone of this
+page isn't on the account yet), 422 `validation_failed` (`details.fields["share[0]"]`: not an
+optional detail of this page, or a missing one), 409 `flow_changed` (the app changed its flow and
+this page is gone: `GET /v1/flows/{id}` shows where it is now).
+
+**`POST /v1/flows/{id}/details/back`**: the previous page this sign-in shows (also from `review`,
+back to the last page), answers kept. 409 `no_previous_page` on the first page.
+
+### `POST /v1/flows/{id}/review`
+
+`{"approve": true}` on the review page completes the sign-in: the app is granted `profile`, every
+required detail and the ticked optional ones (`openid` too when the `scope` parameter asked), and
+`redirect_to` carries `code` and `state`. `{"approve": false}`, on the review page or on any
+details page, is Cancel: the flow completes with `?error=access_denied`. Errors: 409
+`invalid_step` (approving before the review page), 409 `requirements_missing` (a required detail
+went missing meanwhile; the flow goes back to its page). Without a review page, the last
+`details/continue` completes the same way.
 
 ```json
 {
@@ -330,14 +369,14 @@ credentials in bring-your-own mode, ours otherwise. Errors: 404 `unknown_provide
 
 ```json
 {
-  "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=…&redirect_uri=https%3A%2F%2Faccount.teamofsilicons.com%2Fv1%2Foauth%2Fcallback%2Fgoogle&response_type=code&state=…&nonce=…&scope=openid+email+profile&code_challenge=…&code_challenge_method=S256&prompt=select_account"
+  "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=…&redirect_uri=https%3A%2F%2Faccounts.teamofsilicons.com%2Fv1%2Foauth%2Fcallback%2Fgoogle&response_type=code&state=…&nonce=…&scope=openid+email+profile&code_challenge=…&code_challenge_method=S256&prompt=select_account"
 }
 ```
 
 ### `GET` / `POST /v1/oauth/callback/{provider}`
 
 Where Google and Apple send the browser back (register
-`https://account.teamofsilicons.com/v1/oauth/callback/google` or `/apple` with the provider when
+`https://accounts.teamofsilicons.com/v1/oauth/callback/google` or `/apple` with the provider when
 you bring your own credentials). The callback verifies the provider's answer (state, PKCE, the
 `id_token` against the provider's keys, issuer, audience, expiry, nonce, a verified email) and
 answers **302** to `{PUBLIC_URL}/authorize/flow/{flow_id}`; the next `GET /v1/flows/{id}` claims
@@ -406,7 +445,7 @@ Removing a link is [`DELETE /v1/me/identities/{provider}/{subject}`](accounts.md
 {
   "account": {
     "uuid": "8HV", "kind": "carbon", "id": "c:ada", "display_name": "Ada King",
-    "pfp_url": "https://account.teamofsilicons.com/v1/photos/01a11437-b512-76e4-ae95-3378b29e547e",
+    "pfp_url": "https://accounts.teamofsilicons.com/v1/photos/01a11437-b512-76e4-ae95-3378b29e547e",
     "status": "active"
   },
   "session": {

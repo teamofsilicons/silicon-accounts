@@ -508,3 +508,128 @@ async fn idempotency_and_auth_rules() {
     .await;
     assert_eq!(r.error_code(), Some("app_mismatch"));
 }
+
+#[tokio::test]
+async fn flows_are_part_of_the_signin_setup() {
+    let ctx = TestContext::new().await;
+    let a = owned_app(&ctx, "flows").await;
+    let r = call(
+        &ctx,
+        patch(
+            &a.app_id,
+            &a.secret,
+            json!({
+                "required_fields": ["email", "phone"],
+                "optional_fields": ["dob", "timezone"],
+                "flow": {"steps": [
+                    {"id": "contact", "fields": ["email", "phone"], "title": "How can we reach you?"},
+                    {"id": "about-you", "fields": ["dob", "timezone"], "continue_label": "Finish", "layout": "split"}
+                ], "review": true},
+                "copy": {"opening_title": "Opening {provider} for {app}…", "signup_title": "Create your account"}
+            }),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let flow = &r.json["signin_config"]["flow"];
+    assert_eq!(flow["review"], true);
+    assert_eq!(flow["steps"][0]["id"], "contact");
+    assert_eq!(
+        flow["steps"][1],
+        json!({"id": "about-you", "fields": ["dob", "timezone"], "title": null, "subtitle": null, "continue_label": "Finish", "layout": "split"})
+    );
+    assert_eq!(
+        r.json["signin_config"]["copy"]["opening_title"],
+        "Opening {provider} for {app}…"
+    );
+
+    // Dropping details keeps the flow valid: phone leaves its page, the emptied page goes.
+    let r = call(
+        &ctx,
+        patch(
+            &a.app_id,
+            &a.secret,
+            json!({"required_fields": ["email"], "optional_fields": []}),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(
+        r.json["signin_config"]["flow"]["steps"],
+        json!([{"id": "contact", "fields": ["email"], "title": "How can we reach you?", "subtitle": null, "continue_label": null, "layout": null}])
+    );
+    let r = call(
+        &ctx,
+        Req::get(&format!(
+            "/v1/apps/{}/signin-config/history?limit=1",
+            a.app_id
+        ))
+        .basic(&a.app_id, &a.secret),
+    )
+    .await;
+    let paths: Vec<&str> = r.json["items"][0]["changes"]
+        .as_array()
+        .expect("changes")
+        .iter()
+        .filter_map(|c| c["path"].as_str())
+        .collect();
+    assert_eq!(
+        paths,
+        vec!["flow.steps", "optional_fields", "required_fields"],
+        "the flow change is part of the same version"
+    );
+
+    // A flow that doesn't match the details is refused with paths.
+    let r = call(
+        &ctx,
+        patch(
+            &a.app_id,
+            &a.secret,
+            json!({"flow": {"steps": [{"id": "x", "fields": ["email", "dob"]}, {"id": "x", "fields": []}], "review": "yes"}}),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, 422, "{}", r.json);
+    let fields = &r.json["error"]["details"]["fields"];
+    assert!(fields["flow.review"].is_string(), "{fields}");
+    let r = call(
+        &ctx,
+        patch(
+            &a.app_id,
+            &a.secret,
+            json!({"flow": {"steps": [{"id": "x", "fields": ["email", "dob"]}, {"id": "x", "fields": []}]}}),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, 422, "{}", r.json);
+    let fields = &r.json["error"]["details"]["fields"];
+    assert!(
+        fields["flow.steps[0].fields[1]"]
+            .as_str()
+            .is_some_and(|m| m.contains("not one of the app's details")),
+        "{fields}"
+    );
+    assert!(fields["flow.steps[1].id"].is_string(), "{fields}");
+    assert!(fields["flow.steps[1].fields"].is_string(), "{fields}");
+    let r = call(
+        &ctx,
+        patch(
+            &a.app_id,
+            &a.secret,
+            json!({"copy": {"opening_title": "Opening {service}"}}),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, 422);
+    assert!(r.json["error"]["details"]["fields"]["copy.opening_title"].is_string());
+
+    // null goes back to the default flow (one page with every detail).
+    let r = call(&ctx, patch(&a.app_id, &a.secret, json!({"flow": null}))).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["signin_config"]["flow"], serde_json::Value::Null);
+
+    // The public config carries the new copy for the embed and the opening page.
+    let r = call(&ctx, Req::get(&format!("/v1/apps/{}/public", a.app_id))).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["copy"]["signup_title"], "Create your account");
+}

@@ -51,7 +51,7 @@ Every command takes these, before or after the command name.
 
 | variable | effect |
 |---|---|
-| `ACCOUNTS_URL` | the Silicon Accounts URL (default `https://account.teamofsilicons.com`) |
+| `ACCOUNTS_URL` | the Silicon Accounts URL (default `https://accounts.teamofsilicons.com`) |
 | `ACCOUNTS_HOME` | the directory holding `.accounts/`; beats the configured home |
 | `SILICON_HOME` | the home when nothing else sets one (else `~`); also where `accounts config home` keeps its pointer file |
 | `ACCOUNTS_SILICON`, `ACCOUNTS_STK` | a Silicon's si:id and STK for `accounts login` |
@@ -74,7 +74,7 @@ First match wins:
 3. `url` in `{home}/.accounts/config.json` (`accounts config set url …`);
 4. the URL of the stored session;
 5. the URL of a code sign-in waiting for its code (`accounts login --email … --url …`);
-6. `https://account.teamofsilicons.com`.
+6. `https://accounts.teamofsilicons.com`.
 
 Plain `http://` is refused for any host but this machine (`localhost`, `*.localhost`,
 `127.0.0.0/8`, `::1`) unless `ACCOUNTS_ALLOW_INSECURE_HTTP=1`: exit code `2`, error code
@@ -431,7 +431,7 @@ As `accounts --help` prints it:
                                             list
       app proof obo                         Issue an OBO proof: act at another app on behalf of an
                                             account that consented in your app
-      app proof ata                         Issue an ATA proof that the listed apps can verify
+      app proof ata                         Issue an ATA proof that one other app can verify (one proof per app)
       app proof verify <TOKEN>              Verify a proof token as this app: exit 0 when valid, 2
                                             when not
       app proof refresh <REFRESH_TOKEN>     Get a new proof token with the proof refresh token (it
@@ -1129,7 +1129,7 @@ Custodian tasks:
 
 Create a Silicon account.
 
-Signed in as a Carbon: you create it and become its custodian; it can sign in right away. Otherwise (or with --self-create) the Silicon creates its own account and names its custodian (--custodian c:id or email), who has 14 days to accept on account.teamofsilicons.com or with `accounts custodian accept`. With --wait the command polls until the custodian decides (5 s backing off to 60 s) and then signs the Silicon in; without it, check later with `accounts silicon request status <id>`.
+Signed in as a Carbon: you create it and become its custodian; it can sign in right away. Otherwise (or with --self-create) the Silicon creates its own account and names its custodian (--custodian c:id or email), who has 14 days to accept on accounts.teamofsilicons.com or with `accounts custodian accept`. With --wait the command polls until the custodian decides (5 s backing off to 60 s) and then signs the Silicon in; without it, check later with `accounts silicon request status <id>`.
 
 The generated STK is printed exactly once: store it. Choose your own with --stk-stdin (8 to 32 hex characters).
 
@@ -1468,7 +1468,7 @@ accounts custodian decline [OPTIONS] <ID>
 
 Approve or deny a CLI sign-in code shown on another machine (Carbons).
 
-Same as approving on account.teamofsilicons.com/device: the other machine's `accounts login` gets signed in as you.
+Same as approving on accounts.teamofsilicons.com/device: the other machine's `accounts login` gets signed in as you.
 
 ```text
 accounts device [OPTIONS] <COMMAND>
@@ -1943,7 +1943,7 @@ accounts app proof [OPTIONS] <COMMAND>
 | subcommand | what it does |
 |---|---|
 | [`obo`](#accounts-app-proof-obo) | Issue an OBO proof: act at another app on behalf of an account that consented in your app |
-| [`ata`](#accounts-app-proof-ata) | Issue an ATA proof that the listed apps can verify |
+| [`ata`](#accounts-app-proof-ata) | Issue an ATA proof that one other app can verify (one proof per app) |
 | [`verify`](#accounts-app-proof-verify) | Verify a proof token as this app: exit 0 when valid, 2 when not |
 | [`refresh`](#accounts-app-proof-refresh) | Get a new proof token with the proof refresh token (it rotates) |
 | [`revoke`](#accounts-app-proof-revoke) | Revoke a proof this app issued (by id, proof token or refresh token) |
@@ -1978,15 +1978,19 @@ accounts app proof obo --subject-token "$ACCESS_TOKEN" --to briefcase \
 
 ##### `accounts app proof ata`
 
-Issue an ATA proof that the listed apps can verify
+Issue an ATA proof that one other app can verify (one proof per app)
 
 ```text
-accounts app proof ata [OPTIONS] --to <APP_IDS>
+accounts app proof ata [OPTIONS] --to <APP_ID>
 ```
+
+An ATA proof is always for exactly one app: to talk to several apps, issue one proof per app, and
+each app verifies its own. A list in `--to` (`remind,waveform`) exits 2 before anything is sent,
+with one command per app in the hint.
 
 | argument or option | meaning |
 |---|---|
-| `--to <APP_IDS>` | Receiving app ids, comma-separated |
+| `--to <APP_ID>` | The one receiving app id (issue one proof per app) |
 | `--scope <SCOPE>` | App-defined scope (repeatable) |
 | `--ttl <SECONDS>` | Proof token lifetime in seconds (60..=1800) |
 | `--idempotency-key <KEY>` | Idempotency key [default: random] |
@@ -1996,7 +2000,9 @@ Also takes the [app credentials options](#accounts-app) and the [global options]
 Examples, as `--help` prints them:
 
 ```text
-accounts app proof ata --to remind,waveform --ttl 300
+accounts app proof ata --to remind --ttl 300
+accounts app proof ata --to waveform --scope notifications.send
+accounts app proof list --kind ata
 ```
 
 ##### `accounts app proof verify`

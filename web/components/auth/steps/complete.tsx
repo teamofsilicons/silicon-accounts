@@ -14,7 +14,7 @@ import { useReducedMotion } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
 import { ButtonLink } from "@/components/foundation/button-link";
-import { appHome, firstName, markRedirected, redirectError, safeRedirect, wasRedirected, type HostedFlow } from "../flow/model";
+import { appHome, destinationName, firstName, markRedirected, redirectError, safeRedirect, wasRedirected, type HostedFlow } from "../flow/model";
 import { StepHeading, SuccessMark } from "../flow/parts";
 import styles from "../flow/flow.module.css";
 
@@ -26,7 +26,7 @@ export function Complete({ flow }: CompleteProps) {
   const reduce = !!useReducedMotion();
   const redirectTo = safeRedirect(flow.redirect_to);
   const failure = redirectError(redirectTo);
-  const appName = flow.app.first_party ? "your account" : flow.app.name;
+  const appName = destinationName(flow.app);
   /** The flow ended, but where it points cannot be opened safely: say so instead of going anywhere. */
   const blocked = !!flow.redirect_to && !redirectTo;
   // Decided once: a flow this browser already left for shows the way back instead of a second redirect.
@@ -87,7 +87,7 @@ export function Complete({ flow }: CompleteProps) {
     <div className={styles.complete}>
       {who ? <SuccessMark name={who.display_name} photo={who.pfp_url} /> : null}
       <StepHeading
-        title={flow.app.first_party ? `Welcome, ${firstName(who?.display_name ?? "")}` : `Signed in to ${flow.app.name}`}
+        title={flow.app.app_id === "accounts" ? `Welcome, ${firstName(who?.display_name ?? "")}` : `Signed in to ${flow.app.name}`}
         description={<>{who?.id ? <>As <span className={styles.mono}>{who.id}</span>. </> : null}Taking you to {appName} now.</>}
         noFocus
       />

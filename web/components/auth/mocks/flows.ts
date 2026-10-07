@@ -5,29 +5,38 @@
  *
  * Plain TypeScript with type-only imports, so the Node runners load it without the browser code.
  */
-import type { AccountSummary, AppPublic, Branding, FlowView, SigninCopy } from "../../../lib/api/types";
+import type { AccountSummary, AppPublic, Branding, FlowDetailField, FlowDetails, FlowView, SigninCopy } from "../../../lib/api/types";
 
 export type Scenario =
   | "choose_method"
+  | "signup_intent"
   | "continue_as"
   | "provider_cancelled"
+  | "opening_google"
+  | "opening_apple"
+  | "email_direct"
   | "verify_code"
   | "verify_phone"
   | "signup"
   | "signup_google"
   | "signup_import"
-  | "requirements"
-  | "requirements_code"
-  | "requirements_both"
-  | "consent"
-  | "consent_more"
+  | "details"
+  | "details_more"
+  | "details_missing"
+  | "details_code"
+  | "details_added"
+  | "details_profile"
+  | "details_step1"
+  | "details_step2"
+  | "review"
   | "complete"
   | "declined"
   | "failed";
 
 export const SCENARIOS: readonly Scenario[] = [
-  "choose_method", "continue_as", "provider_cancelled", "verify_code", "verify_phone", "signup", "signup_google", "signup_import",
-  "requirements", "requirements_code", "requirements_both", "consent", "consent_more", "complete", "declined", "failed",
+  "choose_method", "signup_intent", "continue_as", "provider_cancelled", "opening_google", "opening_apple", "email_direct", "verify_code",
+  "verify_phone", "signup", "signup_google", "signup_import", "details", "details_more", "details_missing", "details_code", "details_added",
+  "details_profile", "details_step1", "details_step2", "review", "complete", "declined", "failed",
 ];
 
 /** A soft squircle-friendly portrait with initials, as an SVG data URI (no network in screenshot runs). */
@@ -81,12 +90,12 @@ export function sampleFlow(app: AppPublic, scenario: Scenario, extra: Partial<Fl
     signed_in_as: null,
     challenge: null,
     signup: null,
-    requirements: null,
-    consent: null,
+    details: null,
+    review: null,
     redirect_to: null,
     error: null,
     prompt: null,
-    login_hint: null,
+    intent: "signin",
     method_hint: null,
   };
   const emailChallenge = { channel: "email" as const, destination: "s***@gmail.com", expires_at: minutes(10), resend_available_at: seconds(27) };
@@ -104,21 +113,32 @@ export function sampleFlow(app: AppPublic, scenario: Scenario, extra: Partial<Fl
     finishing_import: false,
     expires_at: minutes(60 * 48),
   };
-  const required = [
-    { scope: "profile" as const, label: "Name, id and profile photo", value: "Saket Dev (c:saket)" },
-    { scope: "email" as const, label: "Email address", value: "s***@gmail.com" },
-  ];
-  const optional = [
-    { scope: "timezone" as const, label: "Timezone", value: "Asia/Kolkata", granted: true },
-    { scope: "dob" as const, label: "Date of birth", value: "1998-03-14", granted: false },
-    { scope: "phone" as const, label: "Phone number", value: null, granted: false },
-  ];
+  const field = (name: FlowDetailField["field"], mode: FlowDetailField["mode"], value: string | null, extra: Partial<FlowDetailField> = {}): FlowDetailField => ({
+    field: name,
+    mode,
+    label: { email: "Email address", phone: "Phone number", dob: "Date of birth", timezone: "Timezone" }[name],
+    value,
+    missing: value === null && (name === "email" || name === "phone"),
+    shared: mode === "required",
+    previously_granted: false,
+    ...extra,
+  });
+  const page = (fields: FlowDetailField[], extra: Partial<FlowDetails> = {}): FlowDetails => ({ index: 0, count: 1, id: "details", title: null, subtitle: null, continue_label: null, layout: null, fields, challenge: null, review_next: false, ...extra });
+  const whatsShared = [field("email", "required", "s***@gmail.com"), field("timezone", "optional", "Asia/Kolkata"), field("dob", "optional", "1998-03-14"), field("phone", "optional", null)];
   const step = (patch: Partial<FlowView>): FlowView => ({ ...base, ...patch, ...extra });
   switch (scenario) {
+    case "signup_intent":
+      return step({ intent: "signup" });
     case "continue_as":
       return step({ signed_in_as: SAMPLE_ACCOUNT });
     case "provider_cancelled":
-      return step({ error: { code: "provider_cancelled", message: "The Google sign-in was cancelled before it finished.", hint: "Pick a sign-in method again." } });
+      return step({ method_hint: "google", error: { code: "provider_cancelled", message: "The Google sign-in was cancelled before it finished.", hint: "Pick a sign-in method again." } });
+    case "opening_google":
+      return step({ method_hint: "google" });
+    case "opening_apple":
+      return step({ method_hint: "apple" });
+    case "email_direct":
+      return step({ method_hint: "email" });
     case "verify_code":
       return step({ step: "verify_code", challenge: emailChallenge });
     case "verify_phone":
@@ -130,16 +150,58 @@ export function sampleFlow(app: AppPublic, scenario: Scenario, extra: Partial<Fl
     case "signup_import":
       // Legacy CRM imported the Carbon; they may finish the account while signing into any app.
       return step({ step: "signup", signup: { ...signup, display_name: "Saket D.", id: "c:saket-crm", timezone: "America/New_York", dob: "1994-07-21", finishing_import: true, imported_by: { app_id: "legacy-crm", name: "Legacy CRM" } } });
-    case "requirements":
-      return step({ step: "requirements", signed_in_as: SAMPLE_ACCOUNT, requirements: { missing: ["phone"], challenge: null } });
-    case "requirements_code":
-      return step({ step: "requirements", signed_in_as: SAMPLE_ACCOUNT, requirements: { missing: ["phone"], challenge: phoneChallenge } });
-    case "requirements_both":
-      return step({ step: "requirements", signed_in_as: SAMPLE_ACCOUNT, requirements: { missing: ["email", "phone"], challenge: null } });
-    case "consent":
-      return step({ step: "consent", signed_in_as: SAMPLE_ACCOUNT, consent: { required, optional, previously_granted: [] } });
-    case "consent_more":
-      return step({ step: "consent", signed_in_as: SAMPLE_ACCOUNT, consent: { required, optional, previously_granted: ["profile", "email"] } });
+    case "details":
+      // No flow of the app's own: one page with every detail (the what's-shared screen).
+      return step({ step: "details", signed_in_as: SAMPLE_ACCOUNT, details: page(whatsShared) });
+    case "details_more":
+      // A returning Carbon: the app asks for more than before; what was shared before stays ticked.
+      return step({
+        step: "details",
+        signed_in_as: SAMPLE_ACCOUNT,
+        details: page([
+          field("email", "required", "s***@gmail.com", { previously_granted: true }),
+          field("timezone", "optional", "Asia/Kolkata", { previously_granted: true, shared: true }),
+          field("dob", "optional", "1998-03-14"),
+          field("phone", "optional", null),
+        ]),
+      });
+    case "details_missing":
+      return step({ step: "details", signed_in_as: SAMPLE_ACCOUNT, details: page([field("email", "required", "s***@gmail.com"), field("phone", "required", null)]) });
+    case "details_code":
+      return step({ step: "details", signed_in_as: SAMPLE_ACCOUNT, details: page([field("email", "required", "s***@gmail.com"), field("phone", "required", null)], { challenge: phoneChallenge }) });
+    case "details_added":
+      return step({ step: "details", signed_in_as: SAMPLE_ACCOUNT, details: page([field("email", "required", "s***@gmail.com"), field("phone", "required", "+1********0142")]) });
+    case "details_profile":
+      // An app that asks for no details still shows, on the first sign-in, that it sees the profile.
+      return step({ step: "details", signed_in_as: SAMPLE_ACCOUNT, details: page([]) });
+    case "details_step1":
+      // A flow of the app's own (ledgerly's): contact first, with its own title…
+      return step({
+        step: "details",
+        signed_in_as: SAMPLE_ACCOUNT,
+        details: page([field("email", "required", "s***@gmail.com"), field("phone", "optional", null)], { index: 0, count: 2, id: "contact", title: "How can we reach you?" }),
+      });
+    case "details_step2":
+      // …then about you, in the split layout, with "Finish" on its button; a review follows.
+      return step({
+        step: "details",
+        signed_in_as: SAMPLE_ACCOUNT,
+        details: page([field("dob", "required", "1998-03-14"), field("timezone", "optional", "Asia/Kolkata")], { index: 1, count: 2, id: "about-you", continue_label: "Finish", layout: "split", review_next: true }),
+      });
+    case "review":
+      return step({
+        step: "review",
+        signed_in_as: SAMPLE_ACCOUNT,
+        review: {
+          fields: [
+            { field: "profile", mode: "required", label: "Name, id and profile photo", value: "Saket Dev (c:saket)", shared: true },
+            { field: "email", mode: "required", label: "Email address", value: "s***@gmail.com", shared: true },
+            { field: "dob", mode: "required", label: "Date of birth", value: "1998-03-14", shared: true },
+            { field: "timezone", mode: "optional", label: "Timezone", value: "Asia/Kolkata", shared: true },
+            { field: "phone", mode: "optional", label: "Phone number", value: null, shared: false },
+          ],
+        },
+      });
     case "complete":
       return step({ step: "complete", signed_in_as: SAMPLE_ACCOUNT, redirect_to: `${SAMPLE_CALLBACK}?code=sac_sample&state=xyz` });
     case "declined":
@@ -156,27 +218,39 @@ export function sampleFlow(app: AppPublic, scenario: Scenario, extra: Partial<Fl
   }
 }
 
-/** The answer after a step's action succeeds, for interactive samples. */
-export function nextAfter(app: AppPublic, action: "email" | "phone" | "verify" | "signup" | "requirement" | "requirement_verify" | "consent" | "decline" | "continue" | "switch"): FlowView {
+/** Actions of the hosted pages, for interactive samples. */
+export type SampleAction = "email" | "phone" | "verify" | "signup" | "continue" | "switch" | "details_add" | "details_verify" | "details_continue" | "details_back" | "approve" | "decline";
+
+/** The scenario after an action succeeds on `from`, for interactive samples (a multi-page flow walks its pages). */
+export function scenarioAfter(from: Scenario, action: SampleAction): Scenario {
   switch (action) {
     case "email":
-      return sampleFlow(app, "verify_code");
+      return "verify_code";
     case "phone":
-      return sampleFlow(app, "verify_phone");
+      return "verify_phone";
     case "verify":
-      return sampleFlow(app, "signup");
+      return "signup";
     case "signup":
     case "continue":
-      return sampleFlow(app, "consent");
-    case "requirement":
-      return sampleFlow(app, "requirements_code");
-    case "requirement_verify":
-      return sampleFlow(app, "consent");
-    case "consent":
-      return sampleFlow(app, "complete");
-    case "decline":
-      return sampleFlow(app, "declined");
+      return "details";
     case "switch":
-      return sampleFlow(app, "choose_method");
+      return "choose_method";
+    case "details_add":
+      return "details_code";
+    case "details_verify":
+      return "details_added";
+    case "details_continue":
+      return from === "details_step1" ? "details_step2" : from === "details_step2" ? "review" : "complete";
+    case "details_back":
+      return from === "review" ? "details_step2" : "details_step1";
+    case "approve":
+      return "complete";
+    case "decline":
+      return "declined";
   }
+}
+
+/** The answer after a step's action succeeds, for interactive samples. */
+export function nextAfter(app: AppPublic, action: SampleAction, from: Scenario = "choose_method"): FlowView {
+  return sampleFlow(app, scenarioAfter(from, action));
 }

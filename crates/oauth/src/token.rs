@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use accounts_core::http::{ClientAuth, ClientMeta, authenticate_client};
 use accounts_core::views::TokenResponse;
-use accounts_core::{AppState, FIRST_PARTY_APP_ID, OAuthError};
+use accounts_core::{AppState, DEVELOPER_APP_ID, FIRST_PARTY_APP_ID, OAuthError};
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::extract::rejection::BytesRejection;
@@ -156,9 +156,14 @@ async fn handle(
     trace.app_id = Some(client.app.app_id.clone());
     match grant {
         Grant::AuthorizationCode => {
-            refuse_public_client(&client, grant)?;
+            // The developer platform is a public client: it redeems its own codes, and the
+            // grant requires PKCE S256 for it (a code alone proves nothing without a secret).
+            if client.app.app_id != DEVELOPER_APP_ID {
+                refuse_public_client(&client, grant)?;
+            }
             grants::code::exchange(state, &client, &params, meta).await
         }
+        // Public or not, a client only ever refreshes its own tokens (core checks the family).
         Grant::RefreshToken => grants::refresh::exchange(state, &client, &params, meta).await,
         Grant::Slt => {
             refuse_public_client(&client, grant)?;
@@ -171,12 +176,20 @@ async fn handle(
     }
 }
 
-/// The public first-party client may only refresh and poll device codes.
+/// The public first-party clients: `accounts` may only refresh and poll device codes,
+/// `developer` may only redeem its codes (PKCE S256) and refresh.
 fn refuse_public_client(client: &ClientAuth, grant: Grant) -> Result<(), OAuthError> {
     if client.public {
+        let allowed = if client.app.app_id == DEVELOPER_APP_ID {
+            "grant_type=authorization_code (with PKCE S256) and grant_type=refresh_token"
+                .to_string()
+        } else {
+            format!("grant_type=refresh_token and grant_type={DEVICE_CODE_GRANT_TYPE}")
+        };
         return Err(OAuthError::unauthorized_client(format!(
-            "grant_type={} needs a confidential client. client_id={FIRST_PARTY_APP_ID} without a client_secret is the first-party public client, which may only use grant_type=refresh_token and grant_type={DEVICE_CODE_GRANT_TYPE}; apps authenticate with their own client_id and client_secret (HTTP Basic or in the body).",
-            grant.as_str()
+            "grant_type={} needs a confidential client. client_id={} without a client_secret is a first-party public client, which may only use {allowed}; apps authenticate with their own client_id and client_secret (HTTP Basic or in the body).",
+            grant.as_str(),
+            client.app.app_id
         )));
     }
     Ok(())

@@ -51,7 +51,7 @@ printf '%s' "$STK" | accounts login --silicon si:scout --stk-stdin
 ```text
 Signed in as si:scout (Scout), a Silicon.
 uuid          8HV
-url           https://account.teamofsilicons.com
+url           https://accounts.teamofsilicons.com
 access token  2026-10-07T03:01:30Z (in 29m) (refreshed automatically)
 session ends  2029-03-25T02:31:29Z (in 899d)
 ```
@@ -83,7 +83,7 @@ accounts login status --json
   "id": "si:scout",
   "kind": "silicon",
   "refresh_expires_at": "2029-03-25T02:31:29.998Z",
-  "url": "https://account.teamofsilicons.com",
+  "url": "https://accounts.teamofsilicons.com",
   "uuid": "8HV",
   "verified": true
 }
@@ -95,7 +95,7 @@ the service confirmed the session just now; `--offline` reads only the stored fi
 ### Over HTTP
 
 ```sh
-curl -s -X POST https://account.teamofsilicons.com/v1/silicons/login \
+curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons/login \
   -H 'Content-Type: application/json' \
   -d '{"id":"si:scout","stk":"stk-59e5f08f3bbe","client_label":"scout on build-box"}'
 ```
@@ -132,7 +132,7 @@ apps. `client_label` (up to 100 characters) names this sign-in in `accounts sess
 Refresh the access token before it expires, and store the new refresh token every time:
 
 ```sh
-curl -s -X POST https://account.teamofsilicons.com/v1/oauth/token \
+curl -s -X POST https://accounts.teamofsilicons.com/v1/oauth/token \
   -d grant_type=refresh_token -d client_id=accounts -d "refresh_token=$REFRESH_TOKEN"
 ```
 
@@ -153,7 +153,7 @@ use silicon_accounts_client::AccountsClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://account.teamofsilicons.com".into());
+    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://accounts.teamofsilicons.com".into());
     let client = AccountsClient::new(url)?;
     let si_id = std::env::var("ACCOUNTS_SILICON")?; // si:scout
     let stk = std::env::var("ACCOUNTS_STK")?; // stk-…
@@ -229,7 +229,7 @@ printf '%s' "$STK" | accounts login --silicon si:scout --stk-stdin --app remind 
 Over HTTP, with your first-party access token:
 
 ```sh
-curl -s -X POST https://account.teamofsilicons.com/v1/me/short-lived-tokens \
+curl -s -X POST https://accounts.teamofsilicons.com/v1/me/short-lived-tokens \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H 'Content-Type: application/json' -d '{"app_id":"remind"}'
 ```
@@ -271,7 +271,7 @@ refused token can't be retried.
 An app receives the SLT and exchanges it at the token endpoint with its own credentials:
 
 ```sh
-curl -s -u "remind:$REMIND_APP_SECRET" https://account.teamofsilicons.com/v1/oauth/token \
+curl -s -u "remind:$REMIND_APP_SECRET" https://accounts.teamofsilicons.com/v1/oauth/token \
   -d grant_type=urn:silicon:params:oauth:grant-type:slt -d "slt=$SLT"
 ```
 
@@ -307,7 +307,7 @@ curl -s -u "remind:$REMIND_APP_SECRET" https://account.teamofsilicons.com/v1/oau
 
 ```json
 {
-  "iss": "https://account.teamofsilicons.com",
+  "iss": "https://accounts.teamofsilicons.com",
   "sub": "8HV",
   "aud": "remind",
   "exp": 1791342112,
@@ -330,7 +330,7 @@ every field and scope.
 The same endpoint in a TypeScript app (Node 22 or later):
 
 ```ts
-const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? 'https://account.teamofsilicons.com';
+const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? 'https://accounts.teamofsilicons.com';
 
 // POST /silicon-login {"slt": "slt_…"}: exchange it and start this app's own session.
 export async function exchangeSlt(slt: string) {
@@ -360,7 +360,7 @@ use silicon_accounts_client::AccountsClient;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let slt = std::env::args().nth(1).ok_or("usage: exchange <slt_…>")?;
-    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://account.teamofsilicons.com".into());
+    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://accounts.teamofsilicons.com".into());
     let client = AccountsClient::new(url)?;
     let app = client.as_app("remind", std::env::var("APP_SECRET")?);
 

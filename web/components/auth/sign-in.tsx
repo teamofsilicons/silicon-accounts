@@ -13,8 +13,9 @@
  * plain visit, and it never shows the address's own `error` or `error_description`: an ended sign-in reads in fixed
  * words chosen by its error code (`endedCopy`).
  *
- * `prompt`, `login_hint` and `method` pass through, so the account site (and the CLI's device page) can ask for a fresh
- * sign-in or a method. A browser that is already signed in (and asks for no prompt) goes straight to return_to.
+ * `prompt`, `method` and `intent` pass through (never an email or phone: login_hint is ignored), so the account site
+ * (and the CLI's device page) can ask for a fresh sign-in, a method or the sign-up page. A browser that is already
+ * signed in (and asks for no prompt) goes straight to return_to.
  *
  * The round trip's helpers (firstPartySignInUrl, sameSitePath, the saved return per state) are the foundation's, in
  * lib/query/session.ts: every first-party sign-in ends here, and /device gets its code back after signing in.
@@ -99,9 +100,9 @@ function SignInRoundTrip() {
   const left = useRef(false);
 
   const startFlow = (returnTo: string | null, prompt?: FlowPrompt) => {
-    const loginHint = search.get("login_hint")?.trim();
     const method = METHODS.find(value => value === search.get("method"));
-    router.replace(firstPartySignInUrl(returnTo, { prompt, login_hint: loginHint ? loginHint.slice(0, 320) : undefined, method }));
+    const intent = search.get("intent") === "signup" ? "signup" : undefined;
+    router.replace(firstPartySignInUrl(returnTo, { prompt, method, intent }));
   };
 
   const onReady = useEffectEvent(() => {

@@ -163,7 +163,7 @@ function drafts(credentials: DevCredentials): Draft[] {
         optional_fields: ['timezone'],
         allow_signup: true,
         remember_browser: true,
-        copy: { title: 'Sign in to Briefcase', subtitle: 'Your files, for every Carbon and Silicon.', terms_url: FIRST_PARTY_TERMS, privacy_url: FIRST_PARTY_PRIVACY, support_email: 'support@teamofsilicons.com' },
+        copy: { title: 'Sign in to Briefcase', subtitle: 'Your files, for every Carbon and Silicon.', signup_title: 'Create your Briefcase account', terms_url: FIRST_PARTY_TERMS, privacy_url: FIRST_PARTY_PRIVACY, support_email: 'support@teamofsilicons.com' },
       },
       testkit: {
         category: 'files',
@@ -194,11 +194,25 @@ function drafts(credentials: DevCredentials): Draft[] {
           dark: { primary: '#34B38A', primary_foreground: '#06231A', background: '#2A2927', surface: '#353432', foreground: '#FFFDF9', muted: '#B5B0A8', border: '#4A4845', danger: '#FF8A80' },
         },
         copy: { title: 'Sign in to DM', subtitle: 'Messages between Carbons and Silicons.', terms_url: FIRST_PARTY_TERMS, privacy_url: FIRST_PARTY_PRIVACY, support_email: 'support@teamofsilicons.com' },
+        // One page with every detail, with DM's own words on it.
+        flow: {
+          steps: [
+            {
+              id: 'dm-setup',
+              fields: ['phone', 'email', 'timezone'],
+              title: 'Set up DM',
+              subtitle: 'DM needs your phone number. Email and timezone are up to you.',
+              continue_label: 'Start messaging',
+              layout: null,
+            },
+          ],
+          review: false,
+        },
       },
       testkit: {
         category: 'messaging',
-        purpose: 'Requires a phone number (asks for it when the Carbon has none); issues OBO proofs to Briefcase.',
-        exercises: ['phone required → requirements step', 'email + phone only', 'OBO issuer (dm → briefcase)', 'webhooks'],
+        purpose: 'Requires a phone number (added on its details page when the Carbon has none); issues OBO proofs to Briefcase.',
+        exercises: ['phone required → added on the details page with a code', 'one custom-titled flow step with optional email + timezone (unticked by default)', 'email + phone only', 'OBO issuer (dm → briefcase)', 'webhooks'],
         integration: 'hosted',
         proofs: { obo_issuer_to: ['briefcase'], obo_receiver: false, ata_issuer_to: [], ata_receiver: false },
         silicon_slt: true,
@@ -381,7 +395,7 @@ function drafts(credentials: DevCredentials): Draft[] {
         allow_signup: true,
         remember_browser: true,
         branding: acmeBranding,
-        copy: { title: 'Welcome back to Acme Notes', subtitle: 'Sign in to pick up where you left off.', terms_url: 'https://acme-notes.test/terms', privacy_url: 'https://acme-notes.test/privacy', support_email: 'help@acme-notes.test' },
+        copy: { title: 'Welcome back to Acme Notes', subtitle: 'Sign in to pick up where you left off.', opening_title: 'Taking you to {provider} for {app}…', signup_title: 'Start your Acme notebook', terms_url: 'https://acme-notes.test/terms', privacy_url: 'https://acme-notes.test/privacy', support_email: 'help@acme-notes.test' },
       },
       testkit: {
         category: 'external (notes)',
@@ -436,12 +450,28 @@ function drafts(credentials: DevCredentials): Draft[] {
         allow_signup: true,
         remember_browser: true,
         branding: ledgerlyBranding,
-        copy: { title: 'Sign in to Ledgerly', subtitle: 'We need your phone and date of birth to keep your books safe.', terms_url: 'https://ledgerly.test/terms', privacy_url: 'https://ledgerly.test/privacy', support_email: 'support@ledgerly.test' },
+        copy: {
+          title: 'Sign in to Ledgerly',
+          subtitle: 'We need your phone and date of birth to keep your books safe.',
+          signup_title: 'Create your Ledgerly account',
+          signup_subtitle: 'Bookkeeping for freelancers, set up in two steps.',
+          terms_url: 'https://ledgerly.test/terms',
+          privacy_url: 'https://ledgerly.test/privacy',
+          support_email: 'support@ledgerly.test',
+        },
+        // Two pages, then a review of everything that will be shared.
+        flow: {
+          steps: [
+            { id: 'contact', fields: ['phone'], title: 'How can we reach you?', subtitle: 'We text you when an invoice is paid.', continue_label: null, layout: null },
+            { id: 'about-you', fields: ['dob', 'timezone'], title: 'About you', subtitle: 'Your date of birth keeps your tax year right.', continue_label: 'Review', layout: 'split' },
+          ],
+          review: true,
+        },
       },
       testkit: {
         category: 'external (finance)',
-        purpose: 'Requires phone and date of birth, optional timezone, sign-up allowed.',
-        exercises: ['requirements: phone + dob', 'optional timezone', 'allow_signup true'],
+        purpose: 'Requires phone and date of birth, optional timezone, sign-up allowed; a two-step flow with a review page.',
+        exercises: ['flow: 2 steps (contact → about-you, split layout) + review', 'required phone added on its page', 'required dob', 'optional timezone (unticked by default)', 'signup intent copy', 'allow_signup true'],
         integration: 'hosted',
         silicon_slt: false,
         accent: '#14532D',

@@ -1,5 +1,5 @@
 /**
- * The branding runtime for hosted sign-in pages (and the developer area's live preview). Framework-free pieces here;
+ * The branding runtime for hosted sign-in pages (the developer site copies it for its previews). Framework-free pieces here;
  * the React components (BrandingScope, BrandStage, BrandAside, BrandPanel, PoweredBy) are in
  * components/foundation/branding. See web/README.md, "Branding runtime".
  */

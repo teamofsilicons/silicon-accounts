@@ -187,7 +187,7 @@ fn wrap_html(title: &str, body_html: &str) -> String {
          font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif\">\
          <div style=\"max-width:480px;margin:0 auto\"><p style=\"font-size:13px;color:#6F6B66\">{}</p>{}\
          <p style=\"font-size:12px;color:#6F6B66;margin-top:32px\">Sent by Silicon Accounts · \
-         <a href=\"{}\" style=\"color:#1F5FB8\">account.teamofsilicons.com</a></p></div></body></html>",
+         <a href=\"{}\" style=\"color:#1F5FB8\">accounts.teamofsilicons.com</a></p></div></body></html>",
         templates::escape_html(title),
         body_html,
         accounts_core::PRODUCT_SITE
@@ -452,12 +452,12 @@ mod tests {
             "si:scout",
             "c:<saket>",
             datetime!(2026-10-20 10:00 UTC),
-            "https://account.teamofsilicons.com",
+            "https://accounts.teamofsilicons.com",
         );
         assert!(r.subject.contains("si:scout"));
         assert!(
             r.text
-                .contains("sign up at https://account.teamofsilicons.com")
+                .contains("sign up at https://accounts.teamofsilicons.com")
         );
         assert!(r.text.contains("2026-10-20T10:00:00.000Z"));
         assert!(r.html.contains("c:&lt;saket&gt;"));
@@ -469,7 +469,7 @@ mod tests {
 
     #[test]
     fn self_created_silicon_emails_name_it_by_id_only() {
-        let site = "https://account.teamofsilicons.com";
+        let site = "https://accounts.teamofsilicons.com";
         let at = datetime!(2026-10-20 10:00 UTC);
         let request = self_created_request_email("si:scout", at, site);
         assert_eq!(request.subject, "si:scout asked you to be its custodian");

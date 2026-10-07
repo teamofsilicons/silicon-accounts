@@ -1,8 +1,9 @@
 //! `POST /v1/oauth/revoke` (RFC 7009): ends the sign-in (token family) behind a refresh token
 //! or an access token of the calling client.
 //!
-//! - Apps authenticate as usual; the first-party public client (`client_id=accounts`, no
-//!   secret) can revoke first-party tokens only (`accounts logout`).
+//! - Apps authenticate as usual; the first-party public clients (`client_id=accounts` or
+//!   `client_id=developer`, no secret) can revoke their own tokens only (`accounts logout`, the
+//!   developer platform's sign-out).
 //! - A token of another app is never revoked, and is answered exactly like an unknown one, so
 //!   the endpoint can't be used to probe other apps' tokens.
 //! - An access token is accepted even after it expired (its signature still proves which
@@ -20,7 +21,7 @@ use accounts_core::http::{ClientAuth, ClientMeta, authenticate_client};
 use accounts_core::models::ActorKind;
 use accounts_core::repo::audit;
 use accounts_core::repo::tokens::{self, TokenFamily};
-use accounts_core::{AppState, FIRST_PARTY_APP_ID, OAuthError};
+use accounts_core::{AppState, OAuthError, is_first_party_app_id};
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::extract::rejection::BytesRejection;
@@ -136,7 +137,7 @@ async fn end_sign_in(
     family: TokenFamily,
     token_type: &str,
 ) -> Result<(), OAuthError> {
-    let first_party = family.app_id == FIRST_PARTY_APP_ID;
+    let first_party = is_first_party_app_id(&family.app_id);
     let reason = if first_party {
         signout_reason::USER_SIGNED_OUT
     } else {

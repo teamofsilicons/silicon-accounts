@@ -241,7 +241,7 @@ accounts profile set --display-name "Ada Lovelace" --timezone Europe/Paris --pho
 ```
 
 ```text
-Updated: photo → https://account.teamofsilicons.com/v1/photos/01a1144d-bbfa-75d3-bc7a-063f1d0d1332, timezone → Europe/Paris.
+Updated: photo → https://accounts.teamofsilicons.com/v1/photos/01a1144d-bbfa-75d3-bc7a-063f1d0d1332, timezone → Europe/Paris.
 Apps that can see these fields were notified.
 ```
 

@@ -340,10 +340,10 @@ fn validate(state: &AppState, apps: &[SiliconAppsApp]) -> Result<Vec<ValidApp>, 
         let app_id = a.app_id.trim().to_string();
         if let Err(m) = validate_app_id(&app_id) {
             f.add(at("app_id"), m);
-        } else if app_id == accounts_core::FIRST_PARTY_APP_ID {
+        } else if accounts_core::is_first_party_app_id(&app_id) {
             f.add(
                 at("app_id"),
-                "'accounts' is Silicon Accounts' own app and can't be synced",
+                format!("'{app_id}' is one of Silicon Accounts' own apps and can't be synced"),
             );
         } else if seen.contains(&app_id) {
             f.add(

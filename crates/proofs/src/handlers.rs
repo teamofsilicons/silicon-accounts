@@ -81,15 +81,16 @@ pub async fn issue_ata(
     );
     let issuer = Issuer::app(&auth.app, meta.ip.as_deref());
     let response = idempotency::run(&state, key.as_deref(), &scope, &body, true, || async {
-        let proof = issue::ata(&state, &issuer, &body).await?;
+        let proof = issue::ata(&state, &issuer, &body, "/v1/proofs/ata").await?;
         Ok((StatusCode::CREATED, serde_json::to_value(&proof)?))
     })
     .await?;
     Ok(no_store(response))
 }
 
-/// `POST /v1/apps/{app_id}/proofs/ata` (app-or-owner, IDEMPOTENT): the ATA page stand-in for
-/// Silicon Apps. Same body and response as `POST /v1/proofs/ata`.
+/// `POST /v1/apps/{app_id}/proofs/ata` (app-or-owner, IDEMPOTENT): the app's ATA page (on
+/// developer.teamofsilicons.com, through the owner's session). Same body and response as
+/// `POST /v1/proofs/ata`.
 pub async fn issue_ata_for_app(
     State(state): State<AppState>,
     who: AppOrOwner,
@@ -113,8 +114,9 @@ pub async fn issue_ata_for_app(
         actor_id,
         ip: meta.ip.as_deref(),
     };
+    let endpoint = format!("/v1/apps/{}/proofs/ata", who.app.app_id);
     let response = idempotency::run(&state, key.as_deref(), &scope, &body, true, || async {
-        let proof = issue::ata(&state, &issuer, &body).await?;
+        let proof = issue::ata(&state, &issuer, &body, &endpoint).await?;
         Ok((StatusCode::CREATED, serde_json::to_value(&proof)?))
     })
     .await?;
@@ -165,7 +167,7 @@ pub async fn refresh(
 
 // ---- verify ----------------------------------------------------------------------------------
 
-/// `POST /v1/proofs/verify` (the verifying app, which must be one of the proof's audiences).
+/// `POST /v1/proofs/verify` (the verifying app, which must be the proof's receiving app).
 ///
 /// One indexed query (plus the cached credential check of the extractor). Valid →
 /// `{"valid":true,"proof_id","kind","expires_at","issuing_app","receiving_app","user","scopes"}`;
@@ -569,7 +571,7 @@ fn app_item(r: store::AppProofRow) -> AppProofItem {
     AppProofItem {
         proof_id: r.id,
         kind,
-        audiences: r.audiences,
+        receiving_app: r.audiences.into_iter().next().unwrap_or_default(),
         user,
         scopes: r.scopes,
         status: parse_status(&r.status),

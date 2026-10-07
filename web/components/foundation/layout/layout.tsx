@@ -1,5 +1,5 @@
 /**
- * Layout primitives for account and developer pages:
+ * Layout primitives for the account pages:
  *   <Page>            the one page container (gutters, max width, room for the dock)
  *   <PageHeader>      the page's h1 in the display serif, a line of context, actions, a back link
  *   <Section>         a titled region (h2) with an optional description and actions

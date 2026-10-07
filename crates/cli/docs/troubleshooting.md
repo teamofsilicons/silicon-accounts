@@ -30,13 +30,15 @@ on stdout instead. Quote the request id when you report a bug.
 | `invalid_code` / `code_expired` | wrong or old 6-digit code | retry (`details.remaining_attempts`) or send a new code |
 | `verification_locked` | 10 wrong codes in a row | wait one minute |
 | `rate_limited` | 10 codes sent to one address within 10 minutes | wait until `retry_after_seconds` |
-| `account_not_found` | no Carbon has that email/phone | sign up at account.teamofsilicons.com first |
+| `account_not_found` | no Carbon has that email/phone | sign up at accounts.teamofsilicons.com first |
 | `id_taken` / `id_reserved` | someone has the id, or it is held for 10 days after a change | pick another (`details.suggestions`) |
 | `requirements_missing` | the app needs a detail you haven't added (e.g. phone) | add it (`accounts phone add`) and retry |
 | `not a directory: …` | the home setting points at something that isn't a directory | create it, or `accounts config home --reset` |
 | `connection_failed` | the URL is wrong or the service is unreachable | check `accounts config get url` and your network |
 | `app_credentials_required` | an `accounts app` command has no secret and you aren't the owner | `accounts app use <app_id> --secret-stdin` |
 | `invalid_grant` | a code/refresh token/SLT was used, expired or belongs to another app | start the sign-in again |
+| `token_wrong_audience` | the access token was issued to another app; a developer platform token (aud `developer`) only reads your account and manages the apps you own | use a token issued to `accounts` (`accounts login`) |
+| `ata_single_app` | an ATA proof request named several apps (`audiences`) | one proof per app: `accounts app proof ata --to <app>` for each |
 
 ## Signed in to the wrong place?
 

@@ -120,8 +120,10 @@ export function carbonError(error: ErrorLike, context: ErrorContext = {}): Carbo
       return make("Sign in again to continue", `${app} asked for a fresh sign-in, so this browser's account cannot be reused. Choose a way to sign in below.`);
     case "requirements_missing":
       return make("One more detail is needed", `${app} needs ${missingDetails(error)} on your account before you continue. Add it below.`);
-    case "requirement_not_needed":
-      return make("That detail is already there", "Your account already has it, so nothing more is needed for it.");
+    case "detail_not_on_page":
+      return make("That detail is not asked here any more", `${app} changed what this page asks for. The page now shows what it needs.`);
+    case "no_previous_page":
+      return make("This is the first page", "There is no page before this one. Continue, or cancel signing in.");
     case "no_code_sent":
     case "challenge_not_found":
       return make("No code is waiting", "Send a new code, then type it here.");

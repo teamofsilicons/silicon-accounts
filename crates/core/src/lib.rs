@@ -56,11 +56,22 @@ pub use state::{AppState, Keys};
 /// The `app_id` of the first-party app: the account site and the accounts CLI.
 pub const FIRST_PARTY_APP_ID: &str = "accounts";
 
+/// The `app_id` of the developer platform (developer.teamofsilicons.com): a first-party public
+/// client (no secret, PKCE required) whose tokens (`aud = developer`) may only read the
+/// signed-in Carbon's identity and manage the apps they own (see `http::auth`).
+pub const DEVELOPER_APP_ID: &str = "developer";
+
+/// True for Silicon Accounts' own apps (`accounts`, `developer`): no consent screen, no
+/// membership, and their sign-ins are never reported to app webhooks.
+pub fn is_first_party_app_id(app_id: &str) -> bool {
+    app_id == FIRST_PARTY_APP_ID || app_id == DEVELOPER_APP_ID
+}
+
 /// Product name used in copy, emails and the `Powered by` line.
 pub const PRODUCT_NAME: &str = "Silicon Accounts";
 
 /// The public site of Silicon Accounts (the `Powered by Silicon Accounts` link target).
-pub const PRODUCT_SITE: &str = "https://account.teamofsilicons.com";
+pub const PRODUCT_SITE: &str = "https://accounts.teamofsilicons.com";
 
 /// Version of the running service (from Cargo).
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

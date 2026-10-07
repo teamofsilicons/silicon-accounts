@@ -5,21 +5,22 @@
 //!       │  └──google/apple (callback)──────────┼──▶ signup (new / finishing an import)
 //!       └──continue as the browser's account ──┤        │
 //!                                              ▼        ▼
-//!                                   requirements ──▶ consent ──▶ complete (code or access_denied)
-//! prompt=none that can't sign in silently ───────────────────────▶ failed (error redirect)
+//!                              details (one page per flow step) ──▶ review ──▶ complete
+//!                                                                  (flow.review)  (code, or
+//!                                                                                 access_denied)
+//! prompt=none that can't sign in silently ───────────────────────────────────▶ failed (error redirect)
 //! ```
 //!
 //! Every endpoint except `POST /v1/flows` needs the flow's binding cookie (`sa_flow`) and,
 //! for POSTs, an allowed `Origin` (CSRF guard). Steps that act for the signed-in account
-//! (requirements, consent) also need the browser session of the flow's account.
+//! (details, review) also need the browser session of the flow's account.
 
 pub mod browser;
-pub mod consent;
 pub mod create;
+pub mod details;
 pub mod handlers;
 pub mod model;
 pub mod next;
-pub mod requirements;
 pub mod signup;
 pub mod view;
 
@@ -58,7 +59,7 @@ impl FlowApp {
         Ok(FlowApp { app, config })
     }
 
-    /// The first-party app (`accounts`): no consent screen, no requirements.
+    /// A first-party app (`accounts`, `developer`): no details pages, no membership.
     pub fn first_party(&self) -> bool {
         self.app.is_first_party()
     }

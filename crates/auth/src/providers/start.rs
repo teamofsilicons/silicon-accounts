@@ -120,9 +120,8 @@ pub(crate) async fn begin_leg(
                 if let Some(hd) = &fa.config.google.hosted_domain {
                     q.append_pair("hd", hd);
                 }
-                if let Some(hint) = &flow.login_hint {
-                    q.append_pair("login_hint", hint);
-                }
+                // No login_hint: apps can't hand us a Carbon's email or phone, so none is
+                // forwarded to Google either (the Carbon picks the account on Google's page).
                 verifier_enc = Some(encrypt_text(&state.keys.keyring, &verifier)?);
             }
             Provider::Apple => {

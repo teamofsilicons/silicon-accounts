@@ -7,8 +7,9 @@
 //!   access token; it trades that token (`subject_token`) for a proof that app B verifies. The
 //!   proof stands on the account's sign-in at app A and dies with it (sign-in revoked or expired,
 //!   app access removed, account deleted).
-//! - **ATA** (app to app): app A gets a proof for the apps it names (the audiences); each of
-//!   them can verify that the token really comes from app A.
+//! - **ATA** (app to app): app A gets a proof for exactly one other app (`receiving_app`), which
+//!   verifies that the token really comes from app A. An app that talks to several apps asks for
+//!   one proof per app; a body naming `audiences` is refused with 422 `ata_single_app`.
 //!
 //! Proofs follow the sign-in token logic: a proof token (`sap_…`, 60..1800 s, default 1800 s)
 //! plus a proof refresh token (`sapr_…`) kept by the issuing app, rotated on every refresh, with
@@ -23,7 +24,7 @@
 //! | `POST /v1/proofs/verify` | receiving app | `{"valid":true,…}` or exactly `{"valid":false,"expires_at":null}` |
 //! | `POST /v1/proofs/revoke` | issuing app | by `proof_id`, `proof_token` or `proof_refresh_token` |
 //! | `GET /v1/apps/{app_id}/proofs` | app or owner | proofs the app issued |
-//! | `POST /v1/apps/{app_id}/proofs/ata` | app or owner | the ATA page stand-in (IDEMPOTENT) |
+//! | `POST /v1/apps/{app_id}/proofs/ata` | app or owner | the app's ATA page on developer.teamofsilicons.com (IDEMPOTENT) |
 //! | `DELETE /v1/apps/{app_id}/proofs/{proof_id}` | app or owner | revoke |
 //! | `GET /v1/me/proofs` | session | OBO proofs issued on my behalf |
 //! | `DELETE /v1/me/proofs/{proof_id}` | session | revoke one |

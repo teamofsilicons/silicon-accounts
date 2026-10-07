@@ -245,7 +245,8 @@ export class AppApi {
     return this.request<ProofIssued>('POST', '/v1/proofs/obo', { json: body, idempotencyKey });
   }
 
-  issueAta(body: { audiences: string[]; scopes?: string[]; access_ttl_seconds?: number }, idempotencyKey: string = randomUUID()): Promise<HttpResponse<ProofIssued>> {
+  /** An ATA proof is for exactly one app: make one proof per receiving app. */
+  issueAta(body: { receiving_app: string; scopes?: string[]; access_ttl_seconds?: number }, idempotencyKey: string = randomUUID()): Promise<HttpResponse<ProofIssued>> {
     return this.request<ProofIssued>('POST', '/v1/proofs/ata', { json: body, idempotencyKey });
   }
 
@@ -488,7 +489,9 @@ export interface CreateFlowParams {
   scope?: string;
   nonce?: string;
   prompt?: string;
-  login_hint?: string;
+  /** `signin` (default) or `signup`: which version of the hosted pages. */
+  intent?: 'signin' | 'signup';
+  /** A direct method button: `google`, `apple`, `email` or `phone`. */
   method?: string;
   /** Browser Intl timezone (signup suggestion fallback). */
   timezone?: string;
@@ -569,16 +572,33 @@ export class BrowserSession {
     return expectStatus(await this.signupPhotoRaw(id, bytes, contentType), 201).body;
   }
 
-  requirement(id: string, kind: 'email' | 'phone', value: string, country?: string): Promise<FlowView> {
-    return this.step(`/v1/flows/${encodeURIComponent(id)}/requirements/${kind}`, { [kind]: value, ...(country ? { country } : {}) });
+  /** POST /v1/flows/{id}/details/add — sends a code to add a missing email or phone of the page on screen. */
+  detailsAdd(id: string, kind: 'email' | 'phone', value: string, country?: string): Promise<FlowView> {
+    return this.step(`/v1/flows/${encodeURIComponent(id)}/details/add`, { [kind]: value, ...(country ? { country } : {}) });
   }
 
-  requirementVerify(id: string, code: string): Promise<FlowView> {
-    return this.step(`/v1/flows/${encodeURIComponent(id)}/requirements/verify`, { code });
+  /** POST /v1/flows/{id}/details/verify — the code from detailsAdd; the page then shows the detail. */
+  detailsVerify(id: string, code: string): Promise<FlowView> {
+    return this.step(`/v1/flows/${encodeURIComponent(id)}/details/verify`, { code });
   }
 
-  consent(id: string, approve = true, optionalScopes: string[] = []): Promise<FlowView> {
-    return this.step(`/v1/flows/${encodeURIComponent(id)}/consent`, { approve, optional_scopes: optionalScopes });
+  /** POST /v1/flows/{id}/details/continue — `share` = the optional details of this page the Carbon ticked. */
+  detailsContinueRaw(id: string, share: string[] = []): Promise<HttpResponse<{ flow: FlowView }>> {
+    return this.http.post<{ flow: FlowView }>(`/v1/flows/${encodeURIComponent(id)}/details/continue`, { json: { share } });
+  }
+
+  detailsContinue(id: string, share: string[] = []): Promise<FlowView> {
+    return this.step(`/v1/flows/${encodeURIComponent(id)}/details/continue`, { share });
+  }
+
+  /** POST /v1/flows/{id}/details/back — the previous page (answers kept). */
+  detailsBack(id: string): Promise<FlowView> {
+    return this.step(`/v1/flows/${encodeURIComponent(id)}/details/back`);
+  }
+
+  /** POST /v1/flows/{id}/review — approve (review page) or cancel (any details page or the review page). */
+  review(id: string, approve = true): Promise<FlowView> {
+    return this.step(`/v1/flows/${encodeURIComponent(id)}/review`, { approve });
   }
 
   continueAs(id: string): Promise<FlowView> {
@@ -657,20 +677,36 @@ export interface DriveOptions {
   messaging: MockMessagingClient;
   /** Override prefilled signup fields (default: accept the prefill as-is). */
   signup?: SignupFields;
-  /** Values for the requirements step (default: fresh random ones). */
+  /** Values for a missing required email/phone on a details page (default: fresh random ones). */
   requirements?: { email?: string; phone?: string; country?: string };
-  /** Consent answer (default approve with no optional scopes). */
+  /** false = cancel on the first details page (error=access_denied); default true. */
   approve?: boolean;
-  optionalScopes?: string[];
+  /** Optional details to tick where a page offers them (default none: optional details start unticked). */
+  share?: string[];
   /** On choose_method with a signed-in browser: continue as that account (default true). */
   continueAs?: boolean;
   codeTimeoutMs?: number;
 }
 
-/** Advances a flow through signup → requirements → consent until it completes (or fails). */
+/** Adds a missing required email/phone of the details page on screen (code from mock-messaging). */
+async function addMissing(browser: BrowserSession, flow: FlowView, options: DriveOptions): Promise<FlowView> {
+  const missing = (flow.details?.fields ?? []).find((f) => f.mode === 'required' && f.missing);
+  if (!missing) return flow;
+  if (missing.field !== 'email' && missing.field !== 'phone') {
+    throw new Error(`Flow ${flow.id} requires ${missing.field}, which the helper cannot fill (only email and phone can be missing).`);
+  }
+  const kind = missing.field;
+  const value = kind === 'email' ? (options.requirements?.email ?? randomEmail('detail')) : (options.requirements?.phone ?? randomPhone());
+  const after = await options.messaging.lastSeq();
+  await browser.detailsAdd(flow.id, kind, value, options.requirements?.country);
+  const code = await options.messaging.waitForCode({ to: value, after, ...(options.codeTimeoutMs ? { timeoutMs: options.codeTimeoutMs } : {}) });
+  return browser.detailsVerify(flow.id, code);
+}
+
+/** Advances a flow through signup → the app's details pages → review until it completes (or fails). */
 export async function driveFlow(browser: BrowserSession, start: FlowView, options: DriveOptions): Promise<FlowView> {
   let flow = start;
-  for (let guard = 0; guard < 12; guard++) {
+  for (let guard = 0; guard < 24; guard++) {
     if (flow.step === 'complete' || flow.step === 'failed') return flow;
     switch (flow.step) {
       case 'signup': {
@@ -685,19 +721,21 @@ export async function driveFlow(browser: BrowserSession, start: FlowView, option
         });
         break;
       }
-      case 'requirements': {
-        const missing = flow.requirements?.missing ?? [];
-        const kind = missing.find((m): m is 'email' | 'phone' => m === 'email' || m === 'phone');
-        if (!kind) throw new Error(`Flow ${flow.id} requires ${missing.join(', ')}, which the helper cannot fill (only email and phone are collected in the flow).`);
-        const value = kind === 'email' ? (options.requirements?.email ?? randomEmail('requirement')) : (options.requirements?.phone ?? randomPhone());
-        const after = await options.messaging.lastSeq();
-        await browser.requirement(flow.id, kind, value, options.requirements?.country);
-        const code = await options.messaging.waitForCode({ to: value, after, ...(options.codeTimeoutMs ? { timeoutMs: options.codeTimeoutMs } : {}) });
-        flow = await browser.requirementVerify(flow.id, code);
+      case 'details': {
+        if (options.approve === false) {
+          flow = await browser.review(flow.id, false);
+          break;
+        }
+        // Add every missing required email/phone of the page, one at a time.
+        for (let i = 0; i < 4 && flow.step === 'details' && (flow.details?.fields ?? []).some((f) => f.mode === 'required' && f.missing); i++) {
+          flow = await addMissing(browser, flow, options);
+        }
+        const share = (flow.details?.fields ?? []).filter((f) => f.mode === 'optional' && !f.missing && (options.share ?? []).includes(f.field)).map((f) => f.field);
+        flow = await browser.detailsContinue(flow.id, share);
         break;
       }
-      case 'consent':
-        flow = await browser.consent(flow.id, options.approve ?? true, options.optionalScopes ?? []);
+      case 'review':
+        flow = await browser.review(flow.id, options.approve ?? true);
         break;
       case 'choose_method':
         if (flow.signed_in_as && options.continueAs !== false) {
@@ -711,7 +749,7 @@ export async function driveFlow(browser: BrowserSession, start: FlowView, option
         throw new Error(`Flow ${flow.id} is at an unknown step "${String(flow.step)}".`);
     }
   }
-  throw new Error(`Flow ${flow.id} did not complete after 12 steps (stuck at ${flow.step}).`);
+  throw new Error(`Flow ${flow.id} did not complete after 24 steps (stuck at ${flow.step}).`);
 }
 
 export interface SignInOptions extends Omit<DriveOptions, 'messaging'> {
@@ -722,7 +760,10 @@ export interface SignInOptions extends Omit<DriveOptions, 'messaging'> {
   redirectUri?: string;
   scope?: string;
   prompt?: string;
-  loginHint?: string;
+  /** `signin` (default) or `signup` version of the hosted pages. */
+  intent?: 'signin' | 'signup';
+  /** A direct method button (`google`, `apple`, `email`, `phone`). */
+  method?: string;
   /** Use PKCE S256 (default true). */
   pkce?: boolean;
   /** Nonce to send (default random; null = none). */
@@ -772,7 +813,8 @@ async function beginFlow(options: SignInOptions): Promise<{ browser: BrowserSess
     ...(options.scope ? { scope: options.scope } : {}),
     ...(nonce ? { nonce } : {}),
     ...(options.prompt ? { prompt: options.prompt } : {}),
-    ...(options.loginHint ? { login_hint: options.loginHint } : {}),
+    ...(options.intent ? { intent: options.intent } : {}),
+    ...(options.method ? { method: options.method } : {}),
     timezone: options.timezone ?? 'UTC',
   });
   return { browser, flow, base: { redirectUri, state, codeVerifier: pkce?.code_verifier ?? null, nonce } };
@@ -780,7 +822,8 @@ async function beginFlow(options: SignInOptions): Promise<{ browser: BrowserSess
 
 /**
  * Signs in to `appId` with an email or phone code read from mock-messaging, accepting the
- * signup prefill and approving consent, and returns the authorization code.
+ * signup prefill, going through the app's details pages (adding a missing required
+ * email/phone, ticking `share`) and approving the review page, and returns the authorization code.
  */
 export async function signInWithCode(options: SignInOptions & ({ email: string } | { phone: string; country?: string })): Promise<SignInResult> {
   const { browser, flow: created, base } = await beginFlow(options);

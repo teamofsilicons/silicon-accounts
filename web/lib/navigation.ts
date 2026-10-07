@@ -1,10 +1,31 @@
 /**
  * The account site's top-level sections (the dock, the phone sheet, number-key shortcuts and the command palette all
  * read this list) and the route paths every page links to. Link with `paths`, never string literals.
+ *
+ * Building apps is not part of the account site: the Developer section leads to the developer site
+ * (developer.teamofsilicons.com, `developer_url` in GET /v1/meta), and /developer[/*] here redirects there (proxy.ts).
  */
 import type { LucideIcon } from "lucide-react";
 import { Braces, Cpu, History, IdCard, KeyRound, LayoutGrid, ShieldCheck } from "lucide-react";
-import { DEVELOPER_TABS, developerTabFrom, type DeveloperTab } from "./developer-tabs";
+
+/** The developer site when GET /v1/meta does not name one (servers before it existed). */
+export const DEFAULT_DEVELOPER_URL = "https://developer.teamofsilicons.com";
+
+/**
+ * The developer site's address from GET /v1/meta `developer_url`, when it is a usable http(s) address; else the
+ * production one. Trailing slashes are dropped, so paths can be appended.
+ */
+export function developerSiteUrl(value: unknown): string {
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const url = new URL(value.trim());
+      if (url.protocol === "https:" || url.protocol === "http:") return url.href.replace(/\/+$/, "");
+    } catch {
+      // Not an address: the default below.
+    }
+  }
+  return DEFAULT_DEVELOPER_URL;
+}
 
 /** Every route of the web app. */
 export const paths = {
@@ -19,24 +40,10 @@ export const paths = {
   proofs: "/proofs",
   activity: "/activity",
   settings: "/settings",
-  developer: "/developer",
-  developerApp: (appId: string, tab?: DeveloperTab) => `/developer/${encodeURIComponent(appId)}${tab && tab !== "overview" ? `/${tab}` : ""}`,
+  docs: "/docs",
   embedButtons: "/embed/v1/buttons",
   kitchen: "/__kitchen",
 } as const;
-
-/** Tabs of an app in the developer area (`/developer/[appId]/[[...tab]]`; no tab = overview): lib/developer-tabs.ts. */
-export { DEVELOPER_TABS, developerTabFrom, type DeveloperTab };
-export const DEVELOPER_TAB_LABELS: Record<DeveloperTab, string> = {
-  overview: "Overview",
-  "sign-in": "Sign-in",
-  branding: "Branding",
-  users: "Users",
-  import: "Import",
-  webhooks: "Webhooks",
-  proofs: "Proofs",
-  embed: "Embed",
-};
 
 export type SectionKey = "identity" | "sign-in" | "apps" | "silicons" | "proofs" | "activity" | "developer";
 
@@ -45,10 +52,13 @@ export interface Section {
   label: string;
   /** One line for the command palette and the phone sheet. */
   description: string;
+  /** A path of this site, or (external) the default address of another site: use `sectionHref` for the live one. */
   href: string;
   icon: LucideIcon;
   /** The number key that jumps here. */
   shortcut: string;
+  /** Another site (the developer site): a full navigation, never a page of the shell. */
+  external?: boolean;
 }
 
 export const SECTIONS: readonly Section[] = [
@@ -58,13 +68,18 @@ export const SECTIONS: readonly Section[] = [
   { key: "silicons", label: "Silicons", description: "Silicons you are custodian of", href: paths.silicons, icon: Cpu, shortcut: "4" },
   { key: "proofs", label: "Proofs", description: "Proofs apps hold on your behalf", href: paths.proofs, icon: ShieldCheck, shortcut: "5" },
   { key: "activity", label: "Activity", description: "Sign-ins and changes, by day", href: paths.activity, icon: History, shortcut: "6" },
-  { key: "developer", label: "Developer", description: "Apps you own and how they sign people in", href: paths.developer, icon: Braces, shortcut: "7" },
+  { key: "developer", label: "Developer", description: "Set up sign-in for the apps you build", href: DEFAULT_DEVELOPER_URL, icon: Braces, shortcut: "7", external: true },
 ];
+
+/** Where a section leads: its path, or for the developer site the address the service names (developerSiteUrl). */
+export function sectionHref(section: Section, developerUrl: string = DEFAULT_DEVELOPER_URL): string {
+  return section.key === "developer" ? developerUrl : section.href;
+}
 
 /** The section a path belongs to (Settings belongs to none: the dock shows no active section there). */
 export function sectionFor(pathname: string): Section | undefined {
   if (pathname === "/" || pathname === "") return SECTIONS[0];
-  return SECTIONS.find(section => section.href !== "/" && (pathname === section.href || pathname.startsWith(`${section.href}/`)));
+  return SECTIONS.find(section => !section.external && section.href !== "/" && (pathname === section.href || pathname.startsWith(`${section.href}/`)));
 }
 
 export function sectionIndex(pathname: string): number {

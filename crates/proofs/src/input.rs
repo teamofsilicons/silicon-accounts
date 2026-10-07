@@ -2,14 +2,16 @@
 //!
 //! Shape problems (wrong types, unknown or missing fields) are rejected by the JSON extractor
 //! with 422 `validation_failed`; this module adds the proof rules (scope syntax and count,
-//! token lifetime bounds, receiving-app syntax), all reported together in `details.fields`.
+//! token lifetime bounds, receiving-app syntax, one app per ATA proof), all reported together
+//! in `details.fields` (`ata_single_app` has its own code).
 
-use accounts_core::FieldErrors;
 use accounts_core::crypto::describe_token;
+use accounts_core::{ApiError, FieldErrors};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::model::{
-    DEFAULT_ACCESS_TTL_SECONDS, MAX_ACCESS_TTL_SECONDS, MAX_AUDIENCES, MAX_SCOPE_LEN, MAX_SCOPES,
+    DEFAULT_ACCESS_TTL_SECONDS, MAX_ACCESS_TTL_SECONDS, MAX_SCOPE_LEN, MAX_SCOPES,
     MIN_ACCESS_TTL_SECONDS,
 };
 
@@ -27,16 +29,75 @@ pub struct IssueOboBody {
     pub access_ttl_seconds: Option<i64>,
 }
 
-/// `POST /v1/proofs/ata` and `POST /v1/apps/{app_id}/proofs/ata`.
+/// `POST /v1/proofs/ata` and `POST /v1/apps/{app_id}/proofs/ata`:
+/// `{"receiving_app": "remind", "scopes"?, "access_ttl_seconds"?}`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IssueAtaBody {
-    /// The apps that may verify the proof.
-    pub audiences: Vec<String>,
+    /// The one app that may verify the proof (required; see [`IssueAtaBody::receiving_app`]).
+    #[serde(default)]
+    pub receiving_app: Option<String>,
+    /// Accepted only to refuse it precisely: an ATA proof is for exactly one app, so a body
+    /// naming `audiences` (any length) gets 422 `ata_single_app` ([`ata_single_app`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audiences: Option<Value>,
     #[serde(default)]
     pub scopes: Option<Vec<String>>,
     #[serde(default)]
     pub access_ttl_seconds: Option<i64>,
+}
+
+impl IssueAtaBody {
+    /// The receiving app: 422 `ata_single_app` when the body lists `audiences` (the pre-v2
+    /// shape), else the normalized `receiving_app` (a missing or malformed one is added to
+    /// `fields`). `endpoint` is the route the caller used, for the hint.
+    pub fn receiving_app(
+        &self,
+        endpoint: &str,
+        fields: &mut FieldErrors,
+    ) -> Result<Option<String>, ApiError> {
+        if let Some(audiences) = &self.audiences {
+            return Err(ata_single_app(endpoint, audiences));
+        }
+        match self.receiving_app.as_deref() {
+            None => {
+                fields.add(
+                    "receiving_app",
+                    "is required: the one app that may verify the proof, e.g. \"remind\"",
+                );
+                Ok(None)
+            }
+            Some(raw) => Ok(app_ref(raw, "receiving_app", fields)),
+        }
+    }
+}
+
+/// 422 `ata_single_app`: the body named `audiences`. An ATA proof is always for exactly one
+/// app (UNDERSTANDING.md); an app that talks to several apps asks for one proof per app.
+pub fn ata_single_app(endpoint: &str, audiences: &Value) -> ApiError {
+    let apps: Vec<String> = audiences
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_str)
+                .map(|s| s.trim().to_ascii_lowercase())
+                .filter(|s| accounts_core::ids::validate_app_id(s).is_ok())
+                .collect()
+        })
+        .unwrap_or_default();
+    let example = apps.first().map_or("remind", String::as_str).to_string();
+    let mut e = ApiError::unprocessable(
+        "ata_single_app",
+        "An ATA proof is for exactly one app; ask for one proof per app.",
+    )
+    .hint(format!(
+        "Send {{\"receiving_app\": \"{example}\"}} to POST {endpoint} instead of \"audiences\", and call it once for every app that should verify a proof from you; each app verifies its own proof."
+    ))
+    .detail("field", "audiences");
+    if !apps.is_empty() {
+        e = e.detail("apps", apps);
+    }
+    e
 }
 
 /// `POST /v1/proofs/refresh`. `Debug` never prints the refresh token.
@@ -296,35 +357,6 @@ pub fn app_ref(raw: &str, field: &str, fields: &mut FieldErrors) -> Option<Strin
     }
 }
 
-/// Validates an ATA audience list: 1 to 20 app ids, duplicates dropped (order preserved).
-pub fn audiences(raw: &[String], fields: &mut FieldErrors) -> Vec<String> {
-    if raw.is_empty() {
-        fields.add(
-            "audiences",
-            "must list at least one app that may verify the proof, e.g. [\"remind\"]",
-        );
-        return Vec::new();
-    }
-    let mut out: Vec<String> = Vec::new();
-    for (i, a) in raw.iter().enumerate() {
-        if let Some(id) = app_ref(a, &format!("audiences[{i}]"), fields)
-            && !out.contains(&id)
-        {
-            out.push(id);
-        }
-    }
-    if out.len() > MAX_AUDIENCES {
-        fields.add(
-            "audiences",
-            format!(
-                "an ATA proof names at most {MAX_AUDIENCES} apps; this request names {}",
-                out.len()
-            ),
-        );
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -392,22 +424,61 @@ mod tests {
     }
 
     #[test]
-    fn audience_rules() {
+    fn ata_is_for_exactly_one_app() {
+        let body = |v: serde_json::Value| -> IssueAtaBody {
+            serde_json::from_value(v).expect("body parses")
+        };
         let mut f = FieldErrors::new();
         assert_eq!(
-            audiences(&strings(&[" Remind", "waveform", "remind"]), &mut f),
-            strings(&["remind", "waveform"])
+            body(serde_json::json!({"receiving_app": " Remind"}))
+                .receiving_app("/v1/proofs/ata", &mut f)
+                .expect("ok"),
+            Some("remind".to_string())
         );
         assert!(f.is_empty());
+
         let mut f = FieldErrors::new();
-        audiences(&[], &mut f);
-        assert!(f.get("audiences").is_some());
-        let mut f = FieldErrors::new();
-        audiences(&strings(&["ok-app", "Not An App!"]), &mut f);
+        assert_eq!(
+            body(serde_json::json!({}))
+                .receiving_app("/v1/proofs/ata", &mut f)
+                .expect("no error"),
+            None
+        );
         assert!(
-            f.get("audiences[1]")
+            f.get("receiving_app")
+                .is_some_and(|m| m.contains("required"))
+        );
+
+        let mut f = FieldErrors::new();
+        body(serde_json::json!({"receiving_app": "Not An App!"}))
+            .receiving_app("/v1/proofs/ata", &mut f)
+            .expect("no error");
+        assert!(
+            f.get("receiving_app")
                 .is_some_and(|m| m.contains("not an app id"))
         );
+
+        for audiences in [
+            serde_json::json!(["remind", "waveform"]),
+            serde_json::json!(["remind"]),
+            serde_json::json!([]),
+            serde_json::json!("remind"),
+        ] {
+            let mut f = FieldErrors::new();
+            let e = body(serde_json::json!({"audiences": audiences, "receiving_app": "remind"}))
+                .receiving_app("/v1/apps/commit/proofs/ata", &mut f)
+                .expect_err("audiences are refused");
+            assert_eq!(e.code, "ata_single_app");
+            assert_eq!(e.status.as_u16(), 422);
+            assert!(e.message.contains("exactly one app"), "{}", e.message);
+            assert!(
+                e.hint
+                    .as_deref()
+                    .is_some_and(|h| h.contains("POST /v1/apps/commit/proofs/ata")),
+                "{:?}",
+                e.hint
+            );
+        }
     }
 
     #[test]

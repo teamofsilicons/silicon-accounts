@@ -1,0 +1,10 @@
+/* Not found and error pages: one calm message in the middle of the page. */
+.problem {
+  display: grid;
+  min-height: 100vh;
+  min-height: 100dvh;
+  place-items: center;
+  padding: var(--space-12) var(--gutter);
+}
+.problem > * { width: min(100%, var(--page-narrow)); }
+.details { margin-top: var(--space-3); color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; overflow-wrap: anywhere; }

@@ -55,15 +55,18 @@ What this deployment is. Public.
   "name": "Silicon Accounts",
   "version": "0.1.0",
   "environment": "production",
-  "public_url": "https://account.teamofsilicons.com",
+  "public_url": "https://accounts.teamofsilicons.com",
   "silicon_apps_url": "https://apps.teamofsilicons.com",
-  "docs_url": "https://account.teamofsilicons.com/docs",
+  "docs_url": "https://accounts.teamofsilicons.com/docs",
+  "developer_url": "https://developer.teamofsilicons.com",
   "providers": { "google": true, "apple": true },
   "delivery": "providers"
 }
 ```
 
-`environment` is `production`, `development` or `test`; `providers` says whether one-click
+`environment` is `production`, `development` or `test`; `developer_url` is the developer
+platform, where apps' sign-in is set up (`ACCOUNTS_DEVELOPER_URL`; the account site's
+`/developer` pages redirect there); `providers` says whether one-click
 (managed) Google and Apple are configured; `delivery` is `providers` (Postmark and Twilio) or
 `local` (nothing is sent; development only).
 
@@ -146,7 +149,7 @@ forwards), and on `accounts-api`'s own address any unknown path at all:
   "error": {
     "code": "route_not_found",
     "message": "There is no endpoint GET /v1/nope in Silicon Accounts.",
-    "hint": "Check the method and the path: the API lives under /v1 (plus /.well-known, /healthz and /readyz). GET /v1/meta describes this server; the API reference is at https://account.teamofsilicons.com/docs."
+    "hint": "Check the method and the path: the API lives under /v1 (plus /.well-known, /healthz and /readyz). GET /v1/meta describes this server; the API reference is at https://accounts.teamofsilicons.com/docs."
   }
 }
 ```

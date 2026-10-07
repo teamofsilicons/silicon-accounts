@@ -10,7 +10,7 @@ you can do here you can also do from Rust, and the other way round.
 Pick the line that matches you:
 
 ```sh
-# A Carbon, with a browser: prints a code, opens account.teamofsilicons.com/device
+# A Carbon, with a browser: prints a code, opens accounts.teamofsilicons.com/device
 accounts login
 
 # A Carbon, without a browser: a 6-digit code goes to your email (or --phone)
@@ -76,7 +76,7 @@ instance, e.g. a local one at `http://localhost:8590` (the account site, which f
 
 * `--json` prints machine-readable output on stdout, errors included
   (`{"error":{"code","message","hint"}}`).
-* Human mode prints the result on stdout and progress, notices and next-step
+* Text mode (the default) prints the result on stdout and progress, notices and next-step
   suggestions on stderr; `-q` silences the extras.
 * Exit codes: 0 ok, 1 failure, 2 invalid input (or an invalid proof/token being
   checked), 3 sign-in required or refused, 4 not found, 5 conflict, 6 rate limited or

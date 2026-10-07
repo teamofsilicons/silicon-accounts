@@ -16,10 +16,15 @@ use crate::serde_util::describe;
 use crate::types::Page;
 
 /// The production Silicon Accounts URL.
-pub const DEFAULT_BASE_URL: &str = "https://account.teamofsilicons.com";
+pub const DEFAULT_BASE_URL: &str = "https://accounts.teamofsilicons.com";
 /// The app id of Silicon Accounts itself (the account site and the CLI). First-party
 /// tokens (Carbon CLI sign-in, Silicon login) are issued with `aud = "accounts"`.
 pub const FIRST_PARTY_APP_ID: &str = "accounts";
+
+/// The developer platform's app id (developer.teamofsilicons.com): a public client (no
+/// secret, PKCE S256 required). Its tokens (`aud = developer`) only read the signed-in Carbon
+/// and manage the apps they own; anything else answers 401 `token_wrong_audience`.
+pub const DEVELOPER_APP_ID: &str = "developer";
 /// This crate's version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -63,7 +68,7 @@ impl Default for ClientBuilder {
 }
 
 impl ClientBuilder {
-    /// The Silicon Accounts URL (default `https://account.teamofsilicons.com`).
+    /// The Silicon Accounts URL (default `https://accounts.teamofsilicons.com`).
     pub fn base_url(mut self, url: impl Into<String>) -> Self {
         self.base_url = url.into();
         self
@@ -175,7 +180,7 @@ fn parse_base_url(raw: &str, allow_insecure_http: bool) -> Result<Url> {
     if url.query().is_some() || url.fragment().is_some() {
         return Err(Error::invalid_input(
             format!("The Silicon Accounts URL `{trimmed}` has a query string or fragment."),
-            "Pass only the origin (and an optional path prefix), e.g. https://account.teamofsilicons.com.",
+            "Pass only the origin (and an optional path prefix), e.g. https://accounts.teamofsilicons.com.",
         ));
     }
     if !url.username().is_empty() || url.password().is_some() {
@@ -197,7 +202,7 @@ fn parse_base_url(raw: &str, allow_insecure_http: bool) -> Result<Url> {
 /// ```no_run
 /// # async fn demo() -> silicon_accounts_client::Result<()> {
 /// use silicon_accounts_client::AccountsClient;
-/// let client = AccountsClient::new("https://account.teamofsilicons.com")?;
+/// let client = AccountsClient::new("https://accounts.teamofsilicons.com")?;
 /// let tokens = client.silicon_login("si:scout", "stk-0123456789ab", Some("scout on build box")).await?;
 /// let me = client.with_token(tokens.access_token.expose()).me().await?;
 /// println!("signed in as {} ({})", me.id, me.uuid);
@@ -759,7 +764,7 @@ mod tests {
 
     #[test]
     fn base_url_rules() {
-        assert!(parse_base_url("https://account.teamofsilicons.com/", false).is_ok());
+        assert!(parse_base_url("https://accounts.teamofsilicons.com/", false).is_ok());
         assert!(parse_base_url("http://127.0.0.1:8590", false).is_ok());
         assert!(parse_base_url("http://localhost:8590", false).is_ok());
         assert!(parse_base_url("http://[::1]:8590", false).is_ok());

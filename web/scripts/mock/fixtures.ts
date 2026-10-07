@@ -59,6 +59,8 @@ export const meta: Meta = {
   environment: "development",
   public_url: "http://localhost:8590",
   silicon_apps_url: "https://apps.teamofsilicons.com",
+  developer_url: "http://localhost:8600",
+  docs_url: "http://localhost:8590/docs",
   providers: { google: true, apple: true },
   delivery: "local",
 };
@@ -245,12 +247,27 @@ export function flowView(appId: string, step: FlowView["step"] = "choose_method"
     signed_in_as: null,
     challenge: step === "verify_code" ? { channel: "email", destination: "s***@gmail.com", expires_at: iso(10), resend_available_at: iso(0.5) } : null,
     signup: step === "signup" ? { display_name: "Saket", id: "c:saket-2", timezone: "Asia/Kolkata", dob: "2008-10-06", pfp_url: portrait("Saket", 206), email: "saket@example.test", phone: null, provider: null, provider_pfp_url: null, finishing_import: false, expires_at: iso(60 * 48) } : null,
-    requirements: step === "requirements" ? { missing: ["phone"], challenge: null } : null,
-    consent: step === "consent" ? { required: [{ scope: "profile", label: "Name, id and profile photo", value: null }, { scope: "email", label: "Email address", value: "s***@gmail.com" }], optional: [{ scope: "timezone", label: "Timezone", value: "Asia/Kolkata", granted: false }], previously_granted: ["profile"] } : null,
+    details: step === "details"
+      ? {
+        index: 0,
+        count: 1,
+        id: "details",
+        title: null,
+        subtitle: null,
+        continue_label: null,
+        layout: null,
+        fields: [
+          { field: "email", mode: "required", label: "Email address", value: "s***@gmail.com", missing: false, shared: true, previously_granted: false },
+          { field: "timezone", mode: "optional", label: "Timezone", value: "Asia/Kolkata", missing: false, shared: false, previously_granted: false },
+        ],
+        challenge: null,
+      }
+      : null,
+    review: null,
     redirect_to: step === "complete" ? `http://127.0.0.1:8593/${appId}/callback?code=sac_sample&state=xyz` : null,
     error: null,
     prompt: null,
-    login_hint: null,
+    intent: "signin",
     method_hint: null,
   };
 }

@@ -97,11 +97,15 @@ async fn health_ready_and_meta() {
     assert_eq!(r.json["public_url"], "http://localhost:8590");
     assert_eq!(
         r.json["docs_url"],
-        "https://account.teamofsilicons.com/docs"
+        "https://accounts.teamofsilicons.com/docs"
     );
     assert_eq!(
         r.json["silicon_apps_url"],
         "https://apps.teamofsilicons.com"
+    );
+    assert_eq!(
+        r.json["developer_url"], "http://localhost:8600",
+        "the developer platform (ACCOUNTS_DEVELOPER_URL; local default outside production)"
     );
     assert_eq!(
         r.json["providers"],

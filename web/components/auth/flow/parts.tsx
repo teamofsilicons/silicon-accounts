@@ -44,10 +44,12 @@ export interface StepHeadingProps {
   noFocus?: boolean;
   /** The app's own title: hidden visually in the split layout, where it already stands large beside the form. */
   appTitle?: boolean;
+  /** What heads the form instead in the split layout ("Sign in", or "Sign up" on the sign-up page). */
+  splitLabel?: string;
 }
 
 /** The step's h1. When a step arrives after the first, focus moves here so screen readers hear the new step. */
-export function StepHeading({ title, description, noFocus, appTitle }: StepHeadingProps) {
+export function StepHeading({ title, description, noFocus, appTitle, splitLabel = "Sign in" }: StepHeadingProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const arrivalRef = useContext(ArrivalContext);
   const skipFocus = useRef(noFocus);
@@ -63,7 +65,7 @@ export function StepHeading({ title, description, noFocus, appTitle }: StepHeadi
   }, [arrivalRef]);
   return (
     <div className={[styles.heading, appTitle ? styles.appTitle : ""].filter(Boolean).join(" ")}>
-      {appTitle ? <p className={styles.splitLabel} aria-hidden="true">Sign in</p> : null}
+      {appTitle ? <p className={styles.splitLabel} aria-hidden="true">{splitLabel}</p> : null}
       <h1 ref={heading} tabIndex={-1} className={styles.title}>{title}</h1>
       {description ? <p className={styles.description}>{description}</p> : null}
     </div>
@@ -514,6 +516,8 @@ export interface ContactFormProps {
   note?: string;
   /** Context for error copy. */
   errorContext?: ErrorContext;
+  /** The Email | Phone switch's name ("Sign in with", "Sign up with", "Add"). */
+  kindsLabel?: string;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -522,7 +526,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
  * Email or phone, with client checks that mirror the server's and its own words when it refuses. A phone number from
  * any country goes through PhoneField, which never sends a number the Carbon did not type.
  */
-export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, submitLabel, onSubmit, autoFocus, note, errorContext }: ContactFormProps) {
+export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, submitLabel, onSubmit, autoFocus, note, errorContext, kindsLabel = "Sign in with" }: ContactFormProps) {
   const [kind, setKind] = useState<ContactKind>(() => (initialKind && kinds.includes(initialKind) ? initialKind : kinds[0] ?? "email"));
   const [email, setEmail] = useState(initialEmail ?? "");
   /** The phone as PhoneField last reported it; it is also where the field starts again after Email ⇄ Phone. */
@@ -574,7 +578,7 @@ export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, su
     <form className={styles.form} noValidate onSubmit={event => void submit(event)}>
       {several ? (
         <SegmentedControl
-          label="Sign in with"
+          label={kindsLabel}
           options={options}
           value={kind}
           onValueChange={value => {

@@ -17,7 +17,7 @@ use crate::types::account::{AccountKind, AccountSummary, AppSummary};
 pub enum ProofKind {
     /// On behalf of: app A acts at app B for an account that consented at app A.
     Obo,
-    /// App to app: app A proves its identity to the listed apps.
+    /// App to app: app A proves its identity to one other app (one proof per app).
     Ata,
 }
 
@@ -59,7 +59,7 @@ pub struct ProofUser {
 }
 
 /// A newly issued (or refreshed) proof. Keep `proof_refresh_token` on the issuing app's
-/// side; send `proof_token` to the receiving app(s).
+/// side; send `proof_token` to the receiving app.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct IssuedProof {
@@ -95,22 +95,15 @@ pub struct IssuedProof {
         skip_serializing_if = "Option::is_none"
     )]
     pub issuing_app: Option<String>,
-    /// OBO: the receiving app id.
+    /// The one app that verifies the proof (OBO and ATA alike).
     #[serde(
         default,
         deserialize_with = "app_id_or_object",
         skip_serializing_if = "Option::is_none"
     )]
     pub receiving_app: Option<String>,
-    /// ATA: the receiving app ids.
-    #[serde(
-        default,
-        deserialize_with = "lenient_vec",
-        skip_serializing_if = "Vec::is_empty"
-    )]
-    pub receiving_apps: Vec<String>,
-    /// OBO: the account.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// OBO: the account; ATA: `None` (serialized as `null`, like the service sends it).
+    #[serde(default)]
     pub user: Option<ProofUser>,
     /// App-defined scopes.
     #[serde(default, deserialize_with = "lenient_vec")]
@@ -197,8 +190,8 @@ pub struct ValidProof {
     pub issuing_app: ProofApp,
     /// Who it is for (the verifying app).
     pub receiving_app: ProofApp,
-    /// OBO: the account it speaks for.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// OBO: the account it speaks for; ATA: `None` (serialized as `null`, like the service).
+    #[serde(default)]
     pub user: Option<ProofUser>,
     /// App-defined scopes.
     #[serde(default, deserialize_with = "lenient_vec")]
@@ -236,11 +229,11 @@ pub struct AppProof {
     pub proof_id: String,
     /// `obo` or `ata`.
     pub kind: ProofKind,
-    /// Receiving app ids.
-    #[serde(default, deserialize_with = "lenient_vec")]
-    pub audiences: Vec<String>,
-    /// OBO: the account.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// The one app that verifies it.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub receiving_app: String,
+    /// OBO: the account; ATA: `None` (serialized as `null`, like the service sends it).
+    #[serde(default)]
     pub user: Option<AccountSummary>,
     /// Scopes.
     #[serde(default, deserialize_with = "lenient_vec")]
@@ -386,11 +379,12 @@ pub struct IssueObo {
     pub access_ttl_seconds: Option<u32>,
 }
 
-/// `POST /v1/proofs/ata`.
+/// `POST /v1/proofs/ata` (or the app's ATA page, `POST /v1/apps/{app_id}/proofs/ata`). An
+/// ATA proof is for exactly one app: to talk to several apps, issue one proof per app.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct IssueAta {
-    /// The apps that may verify the proof.
-    pub audiences: Vec<String>,
+    /// The one app that may verify the proof.
+    pub receiving_app: String,
     /// App-defined scopes.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub scopes: Vec<String>,

@@ -16,7 +16,7 @@ use accounts_core::models::{
     AccountStatus, App, MembershipStatus, scopes_from_strings, scopes_to_string,
 };
 use accounts_core::repo::{accounts, tokens};
-use accounts_core::{AppState, FIRST_PARTY_APP_ID, OAuthError};
+use accounts_core::{AppState, OAuthError, is_first_party_app_id};
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::extract::rejection::BytesRejection;
@@ -66,7 +66,8 @@ async fn handle(
     .await?;
     if client.public {
         return Err(OAuthError::invalid_client(format!(
-            "Token introspection needs the app's own credentials (HTTP Basic, or client_id and client_secret in the body). client_id={FIRST_PARTY_APP_ID} without a secret is only accepted by the refresh_token and device-code grants and by /v1/oauth/revoke."
+            "Token introspection needs the app's own credentials (HTTP Basic, or client_id and client_secret in the body). client_id={} without a secret is a first-party public client, accepted only by its own grants and by /v1/oauth/revoke.",
+            client.app.app_id
         )));
     }
     let token = opt(params.token.as_deref()).ok_or_else(|| {
@@ -89,7 +90,7 @@ async fn membership_live(
     app: &App,
     account_uuid: &str,
 ) -> Result<bool, OAuthError> {
-    if app.app_id == FIRST_PARTY_APP_ID {
+    if is_first_party_app_id(&app.app_id) {
         return Ok(true);
     }
     Ok(membership_status(conn, &app.app_id, account_uuid).await? == Some(MembershipStatus::Active))
@@ -150,7 +151,8 @@ async fn refresh_token(
     if info.app_id != app.app_id || !info.family_active || info.used {
         return Ok(None);
     }
-    if app.app_id != FIRST_PARTY_APP_ID && info.membership_status != Some(MembershipStatus::Active)
+    if !is_first_party_app_id(&app.app_id)
+        && info.membership_status != Some(MembershipStatus::Active)
     {
         return Ok(None);
     }

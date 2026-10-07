@@ -37,7 +37,31 @@ async fn creates_a_bound_flow_with_the_spec_view() {
     assert_eq!(f["signed_in_as"], serde_json::Value::Null);
     assert_eq!(f["challenge"], serde_json::Value::Null);
     assert_eq!(f["redirect_to"], serde_json::Value::Null);
-    assert_eq!(f["login_hint"], "ada@example.test");
+    assert!(
+        f.get("login_hint").is_none(),
+        "an app's login_hint is ignored entirely: never echoed"
+    );
+    let (column, stored): (bool, String) = sqlx::query_as(
+        "select exists (select 1 from information_schema.columns \
+                         where table_name = 'signin_flows' and column_name = 'login_hint'), \
+                coalesce(provider_state::text, '') from signin_flows where id = $1",
+    )
+    .bind(f["id"].as_str().expect("id"))
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("flow row");
+    assert!(!column, "no column keeps a login_hint (dropped by 0005)");
+    assert!(!stored.contains("ada@example.test"), "nor stored: {stored}");
+    assert_eq!(f["intent"], "signin");
+    assert_eq!(f["method_hint"], serde_json::Value::Null);
+    assert_eq!(f["details"], serde_json::Value::Null);
+    assert_eq!(f["review"], serde_json::Value::Null);
+    for gone in ["requirements", "consent"] {
+        assert!(
+            f.get(gone).is_none(),
+            "{gone} is no longer part of FlowView"
+        );
+    }
     let expires = accounts_core::timefmt::parse_rfc3339(f["expires_at"].as_str().expect("expires"))
         .expect("ts");
     let left = expires - time::OffsetDateTime::now_utc();
@@ -491,13 +515,7 @@ async fn state_and_nonce_come_back_exactly_as_sent() {
     let id = id_of(&f);
     let r = email_and_verify(&ctx, &mut b, &id, &email).await;
     assert_eq!(r.status, 200, "{}", r.json);
-    let r = b
-        .post(
-            &ctx,
-            &format!("/v1/flows/{id}/consent"),
-            json!({"approve": true}),
-        )
-        .await;
+    let r = continue_page(&ctx, &mut b, &id, &[]).await;
     let to = r.json["flow"]["redirect_to"]
         .as_str()
         .expect("redirect_to")
@@ -520,4 +538,49 @@ async fn state_and_nonce_come_back_exactly_as_sent() {
         );
         assert!(r.json["error"]["details"]["redirect_to"].is_string());
     }
+}
+
+#[tokio::test]
+async fn intents_choose_the_sign_in_or_sign_up_pages() {
+    let ctx = TestContext::new().await;
+    let (app, _) = ctx.app("briefcase").await;
+    let mut b = Browser::new(&ctx);
+    let f = new_flow(&ctx, &mut b, &app.app_id, json!({"intent": "signup"})).await;
+    assert_eq!(f["intent"], "signup");
+    let f = new_flow(
+        &ctx,
+        &mut b,
+        &app.app_id,
+        json!({"intent": "signin", "method": "email"}),
+    )
+    .await;
+    assert_eq!(
+        (f["intent"].clone(), f["method_hint"].clone()),
+        (json!("signin"), json!("email"))
+    );
+    let id = id_of(&f);
+    let r = b.get(&ctx, &format!("/v1/flows/{id}")).await;
+    assert_eq!(r.json["flow"]["intent"], "signin", "kept on the flow");
+    let r = start_flow(&ctx, &mut b, &app.app_id, json!({"intent": "register"})).await;
+    assert_eq!(r.status, 400, "{}", r.json);
+    assert_eq!(r.error_code(), Some("invalid_request"));
+    assert!(
+        r.json["error"]["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("intent=signin or intent=signup")),
+        "{}",
+        r.json
+    );
+    let to = r.json["error"]["details"]["redirect_to"]
+        .as_str()
+        .expect("redirect_to");
+    assert_eq!(query_param(to, "error").as_deref(), Some("invalid_request"));
+    // The account logic is the same: a sign-up intent with an existing account signs it in.
+    let carbon = ctx.carbon().await;
+    let email = format!("{}@example.test", carbon.id().trim_start_matches("c:"));
+    let id = id_of(&new_flow(&ctx, &mut b, &app.app_id, json!({"intent": "signup"})).await);
+    let r = email_and_verify(&ctx, &mut b, &id, &email).await;
+    assert_eq!(r.json["flow"]["step"], "details", "{}", r.json);
+    assert_eq!(r.json["flow"]["signed_in_as"]["uuid"], carbon.uuid.as_str());
+    assert_eq!(r.json["flow"]["intent"], "signup");
 }

@@ -2,7 +2,8 @@
 //!
 //! Reads the ACCOUNTS_* settings (and `.env` outside production; every problem is reported at
 //! once), connects to Postgres, refuses a database with pending migrations, loads the
-//! phone-number metadata, starts the background tasks when ACCOUNTS_WORKER_ENABLED, and serves
+//! phone-number metadata, records ACCOUNTS_DEVELOPER_URL in the developer platform's stored
+//! sign-in setup, starts the background tasks when ACCOUNTS_WORKER_ENABLED, and serves
 //! on ACCOUNTS_BIND_ADDR until Ctrl-C / SIGTERM. On shutdown, at the same moment, it stops
 //! accepting connections and lets in-flight requests finish (at most 30 s), and the worker stops
 //! claiming work and finishes the sends it has in flight (normally within one 10 s send timeout;
@@ -103,6 +104,22 @@ async fn run() -> Result<(), (u8, String)> {
             format!("error: {e}\nhint: check ACCOUNTS_TOKEN_PEPPER, ACCOUNTS_ENCRYPTION_KEYRING and ACCOUNTS_JWT_PRIVATE_KEY."),
         )
     })?;
+    // The stored setup of the developer platform's app says this deployment's callback.
+    match accounts_server::first_party::sync_developer_app(&state).await {
+        Ok(accounts_server::first_party::DeveloperSync::Updated { version }) => tracing::info!(
+            redirect_uri = %state.settings.developer_callback_url(),
+            version,
+            "the developer platform's stored redirect URI now follows ACCOUNTS_DEVELOPER_URL"
+        ),
+        Ok(accounts_server::first_party::DeveloperSync::Unchanged) => {}
+        Ok(accounts_server::first_party::DeveloperSync::Missing) => tracing::warn!(
+            "the first-party app 'developer' is missing, so the developer platform can't sign anyone in; run accounts-migrate"
+        ),
+        Err(e) => tracing::warn!(
+            error = %e,
+            "could not record ACCOUNTS_DEVELOPER_URL in the developer platform's stored sign-in setup (its sign-ins are unaffected)"
+        ),
+    }
     let listener = tokio::net::TcpListener::bind(bind_addr).await.map_err(|e| {
         (
             1,

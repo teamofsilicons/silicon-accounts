@@ -4,6 +4,7 @@
 
 mod code;
 mod common;
+mod developer;
 mod device;
 mod discovery;
 mod introspect;

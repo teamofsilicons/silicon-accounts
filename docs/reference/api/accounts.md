@@ -226,7 +226,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/me/photo" -H "Authorization: Bearer $TOKEN" \
 
 ```json
 {
-  "pfp_url": "https://account.teamofsilicons.com/v1/photos/01a11437-b512-76e4-ae95-3378b29e547e",
+  "pfp_url": "https://accounts.teamofsilicons.com/v1/photos/01a11437-b512-76e4-ae95-3378b29e547e",
   "photo": {
     "id": "01a11437-b512-76e4-ae95-3378b29e547e",
     "content_type": "image/png",
@@ -234,7 +234,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/me/photo" -H "Authorization: Bearer $TOKEN" \
     "width": 64,
     "height": 64
   },
-  "me": { "uuid": "8HV", "pfp_url": "https://account.teamofsilicons.com/v1/photos/01a11437-…", "…": "…" }
+  "me": { "uuid": "8HV", "pfp_url": "https://accounts.teamofsilicons.com/v1/photos/01a11437-…", "…": "…" }
 }
 ```
 
@@ -395,7 +395,8 @@ can't lose access; revoke its sessions instead).
 
 ### `GET /v1/me/sessions`
 
-Browser sessions and live first-party sign-ins (CLI, Silicon login, device flow), newest first.
+Browser sessions, live first-party sign-ins (CLI, Silicon login, device flow) and sign-ins to the
+developer platform (developer.teamofsilicons.com), newest first.
 
 ```json
 {
@@ -429,13 +430,15 @@ Browser sessions and live first-party sign-ins (CLI, Silicon login, device flow)
 }
 ```
 
-`origin` for CLI sign-ins is `cli_code`, `device` or `silicon_login`; `current` marks the
-session making the request.
+`kind` is `browser`, `cli` or `developer` (a developer-platform sign-in, labelled "Silicon
+Developer (developer.teamofsilicons.com)"). `origin` for CLI sign-ins is `cli_code`, `device` or
+`silicon_login`; `current` marks the session making the request.
 
 ### `DELETE /v1/me/sessions/{id}`
 
-**204.** That browser or CLI is signed out at once (a revoked cookie answers 401
-`session_expired`); revoking the calling cookie session also clears the cookie. 404
+**204.** That browser, CLI or developer-platform sign-in is signed out at once (a revoked cookie
+answers 401 `session_expired`, a revoked token 401 `token_revoked`); revoking the calling cookie
+session also clears the cookie. 404
 `session_not_found` (unknown, another account's, or an app's sign-in: apps are removed with
 `DELETE /v1/me/apps/{app_id}`).
 

@@ -1,0 +1,169 @@
+/*
+ * Branded hosted pages: layout, background and button-style classes. Everything here is scoped to `.sa-brand`, the
+ * element applyBranding() paints, so nothing leaks into the account site. Structure (see web/README.md):
+ *
+ *   .sa-brand[data-layout][data-bg][data-corner][data-button-style][data-density]   (BrandingScope)
+ *     .sa-brand-stage                     centres the content for the layout
+ *       .sa-brand-aside                   split layout: the app's side (logo, name, title, subtitle), its content in
+ *         .sa-brand-aside-inner           a sticky block at most one viewport tall
+ *       .sa-brand-panel                   the sign-in card
+ *         .sa-brand-header                logo + app name
+ *         .sa-brand-title / .sa-brand-subtitle
+ *         .sa-brand-body                  the step content (a step's own heading goes in here)
+ *         .sa-brand-legal                 terms and privacy links
+ *   .sa-powered                           "Powered by Silicon Accounts" (PoweredBy, outside the branded subtree)
+ *
+ * Render the app's identity twice: in .sa-brand-aside and at the top of .sa-brand-panel. The aside shows only in the
+ * split layout on a wide branded area; there the panel's own header, title and subtitle hide, so nothing repeats.
+ */
+
+.sa-brand {
+  /* Layout responds to the branded area's own width, so a phone-width preview inside a wide page folds correctly. */
+  container: sa-brand / inline-size;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-width: 0;
+  min-height: 100%;
+  flex-direction: column;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  letter-spacing: var(--tracking-body);
+  transition: background-color var(--duration-standard) var(--ease-standard), color var(--duration-standard) var(--ease-standard);
+}
+
+/* Backgrounds. Decoration sits on ::before behind the stage, so it never affects layout or contrast of the card. */
+.sa-brand::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.sa-brand[data-bg="dots"]::before {
+  background-image: radial-gradient(var(--dot-color) 1px, transparent 1.3px);
+  background-size: 22px 22px;
+  background-position: 11px 11px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 100%);
+}
+.sa-brand[data-bg="grain"]::before {
+  opacity: var(--grain-opacity, .07);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.4 -.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+  mix-blend-mode: multiply;
+}
+.sa-brand[data-theme="dark"][data-bg="grain"]::before { mix-blend-mode: screen; }
+.sa-brand[data-bg="gradient"]::before {
+  background: radial-gradient(120% 80% at 15% 0%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 60%),
+    radial-gradient(90% 70% at 100% 100%, color-mix(in oklab, var(--accent) 10%, transparent), transparent 55%);
+}
+.sa-brand[data-bg="image"]::before {
+  background: linear-gradient(color-mix(in oklab, var(--background) 30%, transparent), color-mix(in oklab, var(--background) 30%, transparent)),
+    var(--brand-bg-image) center / cover no-repeat;
+}
+
+/* The stage centres whatever the layout puts on the page. */
+.sa-brand-stage {
+  display: grid;
+  width: 100%;
+  min-height: 100%;
+  flex: 1;
+  place-items: center;
+  padding: clamp(16px, 5cqi, 48px) clamp(16px, 4cqi, 32px) calc(clamp(16px, 5cqi, 48px) + 40px);
+}
+
+.sa-brand-panel {
+  --sq-r: var(--radius-surface);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  position: relative;
+  display: grid;
+  width: min(100%, var(--brand-panel-width, 420px));
+  min-width: 0;
+  gap: var(--brand-gap, 16px);
+  padding: var(--brand-pad, 32px);
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  box-shadow: var(--shadow-raised);
+}
+
+.sa-brand-header { display: flex; min-width: 0; align-items: center; gap: var(--space-3); }
+.sa-brand-logo { display: block; width: auto; max-width: 100%; height: var(--brand-logo-height, 36px); object-fit: contain; }
+.sa-brand-name { min-width: 0; overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.sa-brand-title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.15; text-wrap: balance; }
+.sa-brand-subtitle { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); text-wrap: pretty; }
+.sa-brand-body { display: grid; min-width: 0; gap: var(--brand-gap, 16px); }
+.sa-brand-legal { margin: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
+.sa-brand-legal a { color: inherit; text-decoration: underline; text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); }
+
+/* Split: the app's side on the left, the form on the right. Folds into a card on narrow screens. */
+.sa-brand-aside { display: none; }
+@container sa-brand (min-width: 860px) {
+  .sa-brand[data-layout="split"] .sa-brand-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); place-items: stretch; padding: 0; }
+  .sa-brand[data-layout="split"] .sa-brand-aside {
+    position: relative;
+    display: block;
+    min-height: 100%;
+    border-right: 1px solid var(--border);
+    background: color-mix(in oklab, var(--accent) 7%, var(--surface));
+  }
+  /* The app's side stays in view while a long step (setting up, what is shared) scrolls the page: its content sticks to
+     the top and is at most one viewport tall, so the logo stays at the top and the hero copy at the foot of the screen
+     instead of falling below the fold. */
+  .sa-brand[data-layout="split"] .sa-brand-aside-inner {
+    position: sticky;
+    top: 0;
+    display: flex;
+    box-sizing: border-box;
+    height: min(100%, 100vh);
+    height: min(100%, 100dvh);
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--space-8);
+    padding: clamp(32px, 5cqi, 64px);
+  }
+  .sa-brand[data-layout="split"] .sa-brand-aside .sa-brand-title { font-size: clamp(var(--text-3xl), 3.6cqi, var(--text-4xl)); }
+  .sa-brand[data-layout="split"] .sa-brand-panel { align-self: center; justify-self: center; margin: clamp(32px, 5cqi, 64px) var(--space-6); border-color: transparent; background: transparent; box-shadow: none; }
+  .sa-brand[data-layout="split"] .sa-brand-panel { --sq-fill: transparent; --sq-stroke: transparent; }
+  .sa-brand[data-layout="split"] .sa-brand-panel > :is(.sa-brand-header, .sa-brand-title, .sa-brand-subtitle) { display: none; }
+  .sa-brand[data-layout="split"] .sa-brand-aside .sa-brand-subtitle { max-width: 36ch; margin-top: var(--space-3); font-size: var(--text-base); }
+}
+
+/* Minimal: no card chrome, a narrower column and more air. */
+.sa-brand[data-layout="minimal"] .sa-brand-panel { --sq-fill: transparent; --sq-stroke: transparent; width: min(100%, 360px); padding-inline: 0; border-color: transparent; background: transparent; box-shadow: none; }
+
+/* Density. */
+.sa-brand[data-density="compact"] .sa-brand-title { font-size: var(--text-xl); }
+
+/* Button styles for primary actions (Arc Button and ActionButton expose data-variant). */
+.sa-brand.sa-brand[data-button-style="soft"] [data-variant="primary"] {
+  --sq-fill: color-mix(in oklab, var(--primary) 14%, var(--surface));
+  --sq-stroke: color-mix(in oklab, var(--primary) 20%, var(--surface));
+  color: var(--accent-ink);
+}
+.sa-brand.sa-brand[data-button-style="soft"] [data-variant="primary"]:is(:hover, :focus-visible):not(:disabled) {
+  --sq-fill: color-mix(in oklab, var(--primary) 20%, var(--surface));
+  --sq-stroke: color-mix(in oklab, var(--primary) 28%, var(--surface));
+  box-shadow: none;
+}
+/* An outline button's words take the accent ink and its edge the accent line: the primary, or (when the primary
+   would vanish into the page) a shade the branding runtime keeps readable (lib/branding/apply.ts accentInk/accentLine). */
+.sa-brand.sa-brand[data-button-style="outline"] [data-variant="primary"] {
+  --sq-fill: transparent;
+  --sq-stroke: var(--accent-line, var(--primary));
+  color: var(--accent-ink);
+}
+.sa-brand.sa-brand[data-button-style="outline"] [data-variant="primary"]:is(:hover, :focus-visible):not(:disabled) {
+  --sq-fill: color-mix(in oklab, var(--primary) 8%, transparent);
+  --sq-stroke: var(--accent-line, var(--primary));
+  box-shadow: none;
+}
+.sa-brand.sa-brand[data-button-style="soft"] [data-variant="primary"]:active:not(:disabled),
+.sa-brand.sa-brand[data-button-style="outline"] [data-variant="primary"]:active:not(:disabled) {
+  --sq-fill: color-mix(in oklab, var(--primary) 18%, var(--surface));
+}
+
+@media (prefers-reduced-motion: reduce) { .sa-brand { transition: none; } }

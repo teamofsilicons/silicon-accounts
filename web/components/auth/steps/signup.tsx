@@ -23,7 +23,7 @@ import { describe } from "../flow/errors";
 import { useNow } from "../flow/hooks";
 import { cleanHandle, handleProblem, useIdCheck } from "../flow/id-check";
 import { IdField } from "../flow/id-field";
-import { importerName, type HostedFlow } from "../flow/model";
+import { destinationName, importerName, type HostedFlow } from "../flow/model";
 import { AppleMark, DestinationRow, FieldNote, FlowAlert, GoogleMark, StepHeading, useStepErrors } from "../flow/parts";
 import styles from "../flow/flow.module.css";
 
@@ -72,7 +72,7 @@ export function Signup(props: SignupProps) {
 
 function SignupForm({ flow, ctl, notice, prefill }: SignupProps & { prefill: FlowSignup }) {
   const app = flow.app;
-  const destinationName = app.first_party ? "your account" : app.name;
+  const destination = destinationName(app);
   /**
    * Who added the Carbon, when finishing an import: the app whose import created the account, which need not be the
    * app being signed into (legacy-crm imported them, they first sign into briefcase). Never the flow's app by default.
@@ -276,8 +276,8 @@ function SignupForm({ flow, ctl, notice, prefill }: SignupProps & { prefill: Flo
         description={prefill.finishing_import
           ? importedHere && importer
             ? `${importer} added you to Silicon Accounts. Check the details it gave us, then continue.`
-            : `${importer ?? "An app you use"} added you to Silicon Accounts. Check the details it gave us, then continue to ${destinationName}.`
-          : `This is your first time here, so we filled it all in. Check it, then continue to ${destinationName}. You can change any of it later.`}
+            : `${importer ?? "An app you use"} added you to Silicon Accounts. Check the details it gave us, then continue to ${destination}.`
+          : `This is your first time here, so we filled it all in. Check it, then continue to ${destination}. You can change any of it later.`}
       />
       <FlowAlert error={errors.current} app={app.name} onSwitch={() => ctl.switchAccount()} />
       <DestinationRow

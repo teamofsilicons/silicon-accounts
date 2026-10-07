@@ -11,7 +11,7 @@ use crate::error::{Error, Result};
 ///
 /// | variable | meaning |
 /// |---|---|
-/// | `ACCOUNTS_URL` | Silicon Accounts URL (default `https://account.teamofsilicons.com`) |
+/// | `ACCOUNTS_URL` | Silicon Accounts URL (default `https://accounts.teamofsilicons.com`) |
 /// | `ACCOUNTS_APP_ID` / `ACCOUNTS_APP_SECRET` | app credentials |
 /// | `ACCOUNTS_TELEMETRY` | `0`, `off`, `false` or `no` disables telemetry |
 /// | `ACCOUNTS_TIMEOUT_SECONDS` | request timeout (default 30) |

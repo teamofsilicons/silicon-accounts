@@ -179,7 +179,7 @@ async fn sync_validates_everything_before_writing() {
     no_secret.as_object_mut().map(|o| o.remove("secret"));
     let r = call(
         &ctx,
-        sync(json!({"apps": [bad_branding, {"app_id": "Bad Id", "name": "x"}, {"app_id": "accounts", "name": "x"}]})),
+        sync(json!({"apps": [bad_branding, {"app_id": "Bad Id", "name": "x"}, {"app_id": "accounts", "name": "x"}, {"app_id": "developer", "name": "x"}]})),
     )
     .await;
     assert_eq!(r.status, 422, "{}", r.json);
@@ -189,13 +189,15 @@ async fn sync_validates_everything_before_writing() {
         "{fields}"
     );
     assert!(fields["apps[1].app_id"].is_string(), "{fields}");
-    assert!(
-        fields["apps[2].app_id"]
-            .as_str()
-            .is_some_and(|m| m.contains("own app")),
-        "{fields}"
-    );
-    let count: i64 = sqlx::query_scalar("select count(*) from apps where app_id <> 'accounts'")
+    for i in [2, 3] {
+        assert!(
+            fields[format!("apps[{i}].app_id")]
+                .as_str()
+                .is_some_and(|m| m.contains("own apps")),
+            "{fields}"
+        );
+    }
+    let count: i64 = sqlx::query_scalar("select count(*) from apps where source <> 'first_party'")
         .fetch_one(&ctx.state.db)
         .await
         .expect("count");

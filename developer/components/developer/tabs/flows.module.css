@@ -1,0 +1,76 @@
+/* Flows tab: the journey and the page cards on the left, the live page on the right. */
+.layout { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); gap: var(--space-10); align-items: start; }
+.layout[data-room] { padding-bottom: 88px; }
+@media (min-width: 1120px) { .layout { grid-template-columns: minmax(0, 1fr) 380px; } }
+.main { display: grid; min-width: 0; gap: var(--space-10); }
+.muted { color: var(--text-secondary); font-size: var(--text-sm); }
+.mono { font-family: var(--font-mono); letter-spacing: 0; font-variant-ligatures: none; }
+.fieldError { margin: 0; color: var(--danger); font-size: var(--text-sm); line-height: var(--leading-body); }
+
+/* The journey: a row of nodes joined by arrows, the app's own pages accented. */
+.journey { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.journey li { display: inline-flex; align-items: center; gap: var(--space-2); }
+.journey li + li::before { content: ""; width: 14px; height: 1px; background: var(--border-strong); }
+.node { --sq-r: var(--radius-pill); display: inline-flex; min-height: 32px; align-items: center; gap: 6px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-secondary); font: inherit; font-size: var(--text-xs); font-weight: 500; white-space: nowrap; }
+.node em { color: var(--text-muted); font-style: normal; font-weight: 400; }
+.node[data-optional] { border-style: dashed; }
+.node[data-own] { border-color: color-mix(in oklab, var(--accent) 35%, var(--border)); background: var(--accent-subtle); color: var(--foreground); }
+button.node { cursor: pointer; }
+button.node:hover, button.node:focus-visible { outline: none; border-color: var(--accent); }
+button.node[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+.empty { display: grid; justify-items: start; gap: var(--space-4); }
+.empty p { margin: 0; max-width: 64ch; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+
+/* Page cards. */
+.cards { display: grid; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.card {
+  --sq-r: var(--radius-panel);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  list-style: none;
+}
+.card[data-selected] { --sq-stroke: color-mix(in oklab, var(--accent) 55%, var(--border)); }
+.card[data-problem] { --sq-stroke: color-mix(in oklab, var(--warning) 50%, var(--border)); }
+.card[data-dragging] { z-index: 2; box-shadow: var(--shadow-raised); }
+.cardHead { display: flex; min-width: 0; align-items: center; gap: var(--space-2); }
+.handle { --sq-r: 10px; --sq-fill: transparent; position: relative; display: grid; width: 32px; height: 36px; flex: none; place-items: center; border: 0; background: var(--sq-fill); color: var(--text-muted); cursor: grab; touch-action: none; }
+.handle:hover, .handle:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
+.handle:active { cursor: grabbing; }
+.pageBadge { flex: none; color: var(--accent-ink); font-size: var(--text-xs); font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+.cardTitle { min-width: 0; flex: 1; overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.remove { flex: none; }
+
+/* The details on a page: chips in a drop zone. */
+.drop { display: flex; min-width: 0; min-height: 56px; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px dashed var(--border); border-radius: 14px; background: var(--surface-muted); transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+.drop[data-over] { border-color: var(--accent); background: var(--accent-subtle); }
+.drop[data-empty] { justify-content: center; }
+.dropHint { color: var(--text-secondary); font-size: var(--text-sm); text-align: center; }
+.chip { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; padding: 2px 3px 2px 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); cursor: grab; user-select: none; }
+.chip:hover { border-color: var(--border-strong); }
+.chipLabel { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; white-space: nowrap; }
+.chipMenu { --sq-r: 999px; --sq-fill: transparent; display: grid; width: 28px; height: 28px; place-items: center; border: 0; background: var(--sq-fill); color: var(--text-secondary); cursor: pointer; }
+.chipMenu:hover, .chipMenu:focus-visible, .chipMenu[data-state="open"] { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
+.menuItem[data-highlighted] { background: var(--surface-muted); }
+.chip[data-dragging] { opacity: .45; }
+.chip:active { cursor: grabbing; }
+.chipGrip { flex: none; color: var(--text-muted); }
+
+.cardFields { display: grid; min-width: 0; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--space-3) var(--space-4); align-items: start; }
+
+.addRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+/* Preview. */
+.preview { display: grid; min-width: 0; gap: var(--space-3); justify-items: center; }
+@media (min-width: 1120px) { .preview { position: sticky; top: var(--space-5); } }
+.previewTools { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); }
+.previewNote { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); text-align: center; }
+
+@media (prefers-reduced-motion: reduce) { .drop { transition: none; } }

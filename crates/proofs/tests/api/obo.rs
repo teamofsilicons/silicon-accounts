@@ -510,7 +510,7 @@ async fn issuance_is_idempotent() {
             Req::post("/v1/proofs/ata")
                 .basic(&w.other.app_id, &w.other_secret)
                 .header("idempotency-key", "k-1")
-                .json(json!({"audiences": [w.briefcase.app_id]})),
+                .json(json!({"receiving_app": w.briefcase.app_id})),
         )
         .await;
     assert_eq!(r.status, 201, "{}", r.json);

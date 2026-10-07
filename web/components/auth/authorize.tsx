@@ -1,9 +1,13 @@
 "use client";
 
 /**
- * /authorize: where apps send browsers to sign in (`/authorize?app_id=…&redirect_uri=…&state=…`). It creates the flow
- * from the query (POST /v1/flows, with the browser's time zone for the sign-up suggestion) and continues at
- * /authorize/flow/[id] without asking for the flow again (the query cache hands it over).
+ * /authorize: where apps send browsers to sign in (`/authorize?app_id=…&redirect_uri=…&state=…`, optionally
+ * `intent=signin|signup` and `method=google|apple|email|phone`). It creates the flow from the query (POST /v1/flows,
+ * with the browser's time zone for the sign-up suggestion) and continues at /authorize/flow/[id] without asking for
+ * the flow again (the query cache hands it over).
+ *
+ * An app can never hand us a Carbon's email or phone: `login_hint` (and any email or phone in the query) is dropped
+ * here and never reaches the flow; the Carbon always types it on our pages.
  *
  * A link that cannot start shows why and never redirects: an unknown app or an unregistered redirect URI must not
  * send anyone anywhere. Mistakes the server can safely report to the app (its redirect URI is registered) offer a way
@@ -49,6 +53,8 @@ function AuthorizeStart({ query }: AuthorizeProps) {
   const create = useCreateFlow();
   const params = new URLSearchParams(query);
   params.delete("timezone");
+  // Nothing about the Carbon comes from the app (UNDERSTANDING.md: "The Carbon always types it on our pages").
+  for (const key of ["login_hint", "email", "phone"]) params.delete(key);
   const appId = (params.get("app_id") ?? params.get("client_id") ?? "").trim() || null;
   const redirectUri = (params.get("redirect_uri") ?? "").trim() || null;
   const search = params.toString();
@@ -100,7 +106,7 @@ function AuthorizeStart({ query }: AuthorizeProps) {
       app={look ? { app_id: look.app_id, name: look.name, branding: look.branding } : SILICON_ACCOUNTS}
       site={!look || firstParty}
       plain={!look && !firstParty}
-      title={look ? `Sign in to ${look.name}` : "Signing in"}
+      title={look ? (params.get("intent") === "signup" ? `Create your ${look.name} account` : `Sign in to ${look.name}`) : "Signing in"}
       busy
     >
       <LoadingCard />

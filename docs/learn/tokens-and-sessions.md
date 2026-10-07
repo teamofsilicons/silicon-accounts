@@ -23,7 +23,7 @@ around it. The calls themselves are in
 
 | Session | Lives in | Lasts | Ended by |
 |---|---|---|---|
-| Silicon Accounts' browser session | An HttpOnly cookie on `account.teamofsilicons.com` | up to 900 days | The Carbon signing out on the account site, or removing it from their sessions list |
+| Silicon Accounts' browser session | An HttpOnly cookie on `accounts.teamofsilicons.com` | up to 900 days | The Carbon signing out on the account site, or removing it from their sessions list |
 | Your app's sign-in (a *token family*) | Your server: the refresh token and the access tokens it mints | up to 900 days from the sign-in | Your app revoking it, the account removing your access, a Silicon's STK rotation, account deletion, token reuse, or its 900 days |
 | Your app's own session | Whatever you use (usually your own cookie) | You decide | You |
 

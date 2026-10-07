@@ -47,6 +47,9 @@ with `signin.json`:
   "copy": {
     "title": "Sign in to Remind",
     "subtitle": "Reminders on your own clock.",
+    "signup_title": "Create your Remind account",
+    "signup_subtitle": "Reminders on your own clock, set up in a minute.",
+    "opening_title": "Opening {provider} to sign you in to {app}…",
     "terms_url": "https://remind.example.com/terms",
     "privacy_url": "https://remind.example.com/privacy",
     "support_email": "help@remind.example.com"
@@ -67,8 +70,11 @@ can sign Carbons and Silicons in as soon as it exists in Silicon Apps, with sens
 - **The app itself**, with its credentials: `Authorization: Basic base64(app_id:app_secret)`
   (`curl -u "$APP_ID:$APP_SECRET"`), or `accounts app use <app_id> --secret-stdin`.
 - **The Carbon who owns the app**, signed in: `accounts app use <app_id>` without a secret acts
-  through your own session. On the account site, it is **Developer → your app → Sign-in**
-  (`/developer/{app_id}/sign-in`), with a live preview.
+  through your own session. On [developer.teamofsilicons.com](https://developer.teamofsilicons.com),
+  the developer platform, it is the app's **Sign-in**, **Details**, **Flows** and **Pages** tabs
+  (`/apps/{app_id}/sign-in` and so on), with a live preview. The account site
+  (accounts.teamofsilicons.com) is only for a Carbon's own account; its old `/developer` pages
+  redirect there.
 
 Anyone else gets `403 not_app_owner` (another Carbon) or `403 app_mismatch` (another app's
 credentials). The app's name, description, logos, homepage and owner come from Silicon Apps and
@@ -239,12 +245,13 @@ those, and the next answer lists everything else.
 | `apple` | `{"mode": "managed"}` | Sign in with Apple, the same way. |
 | `redirect_uris` | `[]` | Where a sign-in result may be sent. Up to 50. |
 | `allowed_origins` | `[]` | Sites that may frame the sign-in iframe (`/embed/v1/buttons`, also the SDK's `mountFrame`). The snippet's own buttons work on any page without it. Up to 50. |
-| `required_fields` | `[]` | Details every Carbon must share with you: any of `email`, `phone`, `dob`, `timezone`. |
-| `optional_fields` | `[]` | Details Carbons may choose to share (a switch on the what's-shared screen). Never also required. |
+| `required_fields` | `[]` | Details every Carbon must share with you: any of `email`, `phone`, `dob`, `timezone`. A detail you pick is required unless you make it optional. |
+| `optional_fields` | `[]` | Details Carbons may choose to share: a checkbox on the details page, unticked until the Carbon ticks it. Never also required. |
+| `flow` | `null` | Which pages a Carbon goes through and which details each page asks for: [Flows](#flows). `null` is one page with every detail you ask for. |
 | `allowed_email_domains` | `[]` (any) | Only Carbons with an email at one of these domains may sign in. Up to 100. |
 | `allow_signup` | `true` | `false`: only Carbons who already have an account (or that you imported) may sign in. |
 | `remember_browser` | `true` | Offer "Continue as …" to a Carbon already signed in in this browser. |
-| `copy` | all `null` | The page's title and subtitle, your terms and privacy links, your support email. |
+| `copy` | all `null` | The pages' titles and subtitles (sign-in, sign-up, the Opening page), your terms and privacy links, your support email. |
 | `branding` | the Silicon Accounts look | Colours, fonts, corners, layout, logo: [Brand the sign-in pages](branding.md). |
 
 ### Methods and their order
@@ -344,20 +351,63 @@ registered.
 Every app sees a Carbon's uuid, id, display name and photo. Beyond that, you choose:
 
 - **Required** details are shared with you on every sign-in. A Carbon who doesn't have one
-  yet (email or phone) adds and verifies it on the spot, in the sign-in, before continuing.
-  Date of birth and timezone always exist on an account.
-- **Optional** details appear as switches on the what's-shared screen; the Carbon decides.
-  Your sign-in request can also ask for details with `scope` (for example `scope=email`),
-  which adds them as optional.
+  yet (email or phone) adds and verifies it on the spot, on the details page, with a 6-digit
+  code, before continuing. Date of birth and timezone always exist on an account. When you pick
+  a detail it is required by default; make it optional by moving it to `optional_fields`.
+- **Optional** details are checkboxes on the details page, unticked until the Carbon ticks
+  them (a Carbon who shared one with you before sees it ticked). Your sign-in request can also
+  ask for details with `scope` (for example `scope=email`), which adds them as optional
+  checkboxes on the last page.
 - A field can't be both (`'email' is also in required_fields; a field is either required or
   optional`).
 
-Carbons see the what's-shared screen the first time they sign in to your app and again
-whenever you ask for more. Silicons have no email or phone: when a Silicon signs in, your app
+Carbons see the details pages the first time they sign in to your app and again whenever you
+ask for more (a new required detail, or one your `scope` asks for). Silicons have no email or phone: when a Silicon signs in, your app
 gets its profile plus the date of birth and timezone you require or ask for. Carbons signing
 in with a short-lived token (`accounts login --app`) must already have your required details,
 or the token is refused with `requirements_missing`. The full picture is in
 [What apps see](../learn/what-apps-see.md).
+
+### Flows
+
+A flow decides which pages a Carbon goes through while signing in, in what order, and which
+details each page asks for. Say you need a phone number and a date of birth (required) and a
+timezone (optional): show all three on one page, one page each, or any mix.
+
+```json
+{
+  "flow": {
+    "steps": [
+      {"id": "contact", "fields": ["phone"], "title": "How can we reach you?",
+       "subtitle": "We text you when an invoice is paid.", "continue_label": null, "layout": null},
+      {"id": "about-you", "fields": ["dob", "timezone"], "title": "About you",
+       "subtitle": null, "continue_label": "Review", "layout": "split"}
+    ],
+    "review": true
+  }
+}
+```
+
+| field | rule |
+|---|---|
+| `steps` | 1 to 8 pages, in order. Every detail of `required_fields` and `optional_fields` is on exactly one page, and a page lists only those details and at least one of them |
+| `steps[].id` | 1 to 40 of `a-z`, `0-9` and `-`, unique in the flow |
+| `steps[].title`, `subtitle`, `continue_label` | plain text up to 80, 200 and 30 characters; `null` keeps the page's own words ("Share your details with {app}", "Continue" / "Share and continue") |
+| `steps[].layout` | `null` (the branding's layout), `card`, `split` or `minimal` |
+| `review` | `true` adds a review page after the last page: everything that will be shared, with Back to change it |
+
+`flow: null` (the default) is one page, id `details`, with the required then the optional
+details and no review page. When you change `required_fields` or `optional_fields` without
+sending `flow`, the flow follows: a detail you no longer ask for leaves its page, an emptied page
+is dropped, and a newly asked detail joins the last page. A patch that sends `flow` is checked
+exactly as sent; errors are keyed by path, such as `flow.steps[1].fields[0]`.
+
+Carbons see every page on their first sign-in to your app. A returning Carbon sees only a page
+with something new for them (a required detail you weren't granted yet, or one they no longer
+have); one with nothing new goes straight back to your app. On
+[developer.teamofsilicons.com](https://developer.teamofsilicons.com), the app's **Details** tab picks
+the details (ticking one makes it required) and the **Flows** tab builds the pages by dragging
+details between them, with a live preview.
 
 ### Allowed email domains
 
@@ -422,6 +472,9 @@ silently. The Carbon stays signed in to Silicon Accounts itself either way.
   "copy": {
     "title": "Sign in to Remind",
     "subtitle": "Reminders on your own clock.",
+    "signup_title": "Create your Remind account",
+    "signup_subtitle": "Reminders on your own clock, set up in a minute.",
+    "opening_title": "Opening {provider} to sign you in to {app}…",
     "terms_url": "https://remind.example.com/terms",
     "privacy_url": "https://remind.example.com/privacy",
     "support_email": "help@remind.example.com"
@@ -433,7 +486,10 @@ silently. The Carbon stays signed in to Silicon Accounts itself either way.
 |---|---|---|
 | `title` | 80 characters, no control characters | The heading of the sign-in steps. Default: "Sign in to {app name}". |
 | `subtitle` | 200 characters, no control characters | Under the title. Default: none. |
-| `terms_url`, `privacy_url` | `https` URLs | "By continuing, you agree to the terms and privacy policy of {app name}." on the methods, set-up and what's-shared steps. |
+| `signup_title` | 80 characters, no control characters | The heading when your sign-up button opened the pages (`intent=signup`). Default: "Create your {app name} account". |
+| `signup_subtitle` | 200 characters, no control characters | Under the sign-up title. Default: none. |
+| `opening_title` | 80 characters; only the `{provider}` and `{app}` placeholders | The Opening page your "Continue with Google" or "Continue with Apple" button shows before moving on to the provider. Default: "Opening Google to sign you in to {app name}…". |
+| `terms_url`, `privacy_url` | `https` URLs | "By continuing, you agree to the terms and privacy policy of {app name}." on the methods, set-up and details pages. |
 | `support_email` | an email address | "Need help? Write to …" on every step. |
 
 ## 4. Read the history
@@ -495,7 +551,7 @@ To undo a change, patch the `before` values back; that is a new version too.
 TypeScript (Node 18 or later):
 
 ```ts
-const base = process.env.ACCOUNTS_URL ?? "https://account.teamofsilicons.com";
+const base = process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com";
 const appId = process.env.APP_ID!;
 const auth = "Basic " + Buffer.from(`${appId}:${process.env.APP_SECRET}`).toString("base64");
 

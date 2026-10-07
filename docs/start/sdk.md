@@ -15,7 +15,7 @@ related:
 You'll add one `<script>` tag that renders your app's sign-in buttons (the methods you enabled,
 in your branding) where you want them, pass it a `state` and PKCE challenge made by your
 server, and finish on your redirect URI exactly like the [hosted pages](hosted-pages.md). The
-script is `https://account.teamofsilicons.com/sdk/v1.js`: about 20 KB, no dependencies,
+script is `https://accounts.teamofsilicons.com/sdk/v1.js`: about 20 KB, no dependencies,
 served with `Access-Control-Allow-Origin: *` and cached for 5 minutes.
 
 ```ts
@@ -24,7 +24,7 @@ served with `Access-Control-Allow-Origin: *` and cached for 5 minutes.
 import { createServer, type ServerResponse } from "node:http";
 import { createHash, randomBytes } from "node:crypto";
 
-const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://account.teamofsilicons.com";
+const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com";
 const APP_ID = process.env.ACCOUNTS_APP_ID ?? "briefcase";
 const APP_SECRET = process.env.ACCOUNTS_APP_SECRET ?? "";
 const PORT = Number(process.env.PORT ?? 3000);
@@ -98,7 +98,7 @@ email" and "Continue with phone" (briefcase's methods, in its order) and the "Po
 Silicon Accounts" line. Choosing email went to:
 
 ```text
-https://account.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&response_type=code&state=GQe4rfj-DYDcsc1QSee9P0knbkY4YaF83btELqx-7Lo&code_challenge=9oFWaKZEmIFd4oWb4yVL2fRCaobJFwMKi1wdbMs-A50&code_challenge_method=S256&scope=email&method=email
+https://accounts.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&response_type=code&state=GQe4rfj-DYDcsc1QSee9P0knbkY4YaF83btELqx-7Lo&code_challenge=9oFWaKZEmIFd4oWb4yVL2fRCaobJFwMKi1wdbMs-A50&code_challenge_method=S256&scope=email&method=email
 ```
 
 and the callback answered `Signed in as c:grace-hopper (briefcase:ptO)`.
@@ -109,8 +109,8 @@ leak into your page. Its styles are a constructed stylesheet, so a page with a s
 elements, and a click is a plain navigation to `/authorize`. Only an iframe
 (`mountFrame`, or the [iframe](iframe.md) you write yourself) needs your origin listed. If
 your page has a Content-Security-Policy, allow the SDK and its one request:
-`script-src https://account.teamofsilicons.com; connect-src https://account.teamofsilicons.com`
-(add `frame-src https://account.teamofsilicons.com` if you use `mountFrame`).
+`script-src https://accounts.teamofsilicons.com; connect-src https://accounts.teamofsilicons.com`
+(add `frame-src https://accounts.teamofsilicons.com` if you use `mountFrame`).
 
 ## Script attributes
 
@@ -125,7 +125,9 @@ your page has a Content-Security-Policy, allow the SDK and its one request:
 | `data-state` | Your `state`. Without it the SDK makes one and keeps it in `sessionStorage` (see below). |
 | `data-code-challenge`, `data-code-challenge-method` | Your PKCE challenge (`S256`, or `plain`). |
 | `data-pkce="S256"` | Have the SDK make the PKCE pair itself when you pass no challenge. |
-| `data-scope`, `data-nonce`, `data-prompt`, `data-login-hint`, `data-method` | Passed to [`/authorize`](hosted-pages.md#the-authorize-request). `data-method` also shows only that method's button. |
+| `data-scope`, `data-nonce`, `data-prompt`, `data-method` | Passed to [`/authorize`](hosted-pages.md#the-authorize-request). `data-method` also shows only that method's button. |
+| `data-buttons` | `methods` (default): a button per method your app turned on ("Continue with Google", "Continue with Apple", "Continue with email", "Continue with phone number"), each opening our pages on that method; Google and Apple go through the Opening page first. `intents`: a "Sign in" and a "Sign up" button that open our pages with every method. |
+| `data-intent` | `signup` opens the sign-up version of our pages ("Create your {app} account"); with `data-buttons="intents"` it keeps only the "Sign up" button. Default `signin`. | |
 | `data-theme` | `light` or `dark` paints the buttons that way. Otherwise your branding's forced theme wins, else the SDK reads the page behind the buttons (the first opaque background, else the page's `color-scheme`) and follows it when your page switches theme. |
 
 Email (else phone) is the one filled button; Google and Apple stay neutral, as their
@@ -147,7 +149,7 @@ so the app secret still never reaches the browser. Register the callback page
 // Node 24+: ACCOUNTS_APP_ID=briefcase ACCOUNTS_APP_SECRET=sa_app_… node sdk-static.ts, then open http://localhost:3000/
 import { createServer } from "node:http";
 
-const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://account.teamofsilicons.com";
+const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com";
 const APP_ID = process.env.ACCOUNTS_APP_ID ?? "briefcase";
 const APP_SECRET = process.env.ACCOUNTS_APP_SECRET ?? "";
 const PORT = Number(process.env.PORT ?? 3000);
@@ -227,13 +229,16 @@ CORS preflight your server never answers.
 
 Every option is optional when the script tag already carries it; options override attributes.
 Options use camelCase: `appId`, `redirectUri`, `state`, `codeChallenge`,
-`codeChallengeMethod`, `scope`, `nonce`, `prompt`, `loginHint`, `method`, `pkce` (`"S256"` or
-`true`), `theme`.
+`codeChallengeMethod`, `scope`, `nonce`, `prompt`, `intent` (`"signin"` or `"signup"`), `method`,
+`buttons` (`"methods"` or `"intents"`, for `renderButtons`), `pkce` (`"S256"` or `true`), `theme`.
+There is no email or phone option: `loginHint`, `data-login-hint`, `email` and `phone` are
+ignored with one console warning, because your app never hands Silicon Accounts a Carbon's
+email or phone; the Carbon types it on our pages.
 
 | Call | Does |
 |---|---|
 | `authorizeUrl(options)` | Returns the `/authorize` URL; no side effects. Throws when `appId` or `redirectUri` is missing, or `method` isn't google, apple, email or phone. |
-| `signIn(options)` | Sends this window to sign in, making the state (and PKCE when `pkce` is set) and saving them as above. Use it for your own button. |
+| `signIn(options)` | Sends this window to sign in, making the state (and PKCE when `pkce` is set) and saving them as above. Use it for your own buttons: `signIn({method: "google"})` for "Continue with Google", `signIn({intent: "signup"})` for "Sign up". |
 | `renderButtons(target, options)` | Renders the buttons into `target` (an element or a selector). Resolves to `{app, destroy()}`, where `app` is your public sign-in config; rejects after drawing the reason in place. |
 | `mountFrame(target, options)` | Appends the [iframe](iframe.md) version (`/embed/v1/buttons`), sized to its content. Resolves to `{iframe, destroy()}`. Needs your origin in `allowed_origins`. |
 | `handleCallback(url?)` | On your callback page: reads `?code=&state=` (or `?error=`), matches the state to a sign-in this tab started, and returns `{code, state, codeVerifier, nonce, redirectUri, appId}`. |
@@ -253,7 +258,7 @@ the API), so code that runs before an `async` script finishes can wait for it:
 
 ```html
 <button id="sign-in">Sign in</button>
-<script src="https://account.teamofsilicons.com/sdk/v1.js" async></script>
+<script src="https://accounts.teamofsilicons.com/sdk/v1.js" async></script>
 <script>
   document.addEventListener("silicon-accounts:ready", ({ detail: sdk }) => {
     document.getElementById("sign-in").onclick = () =>
@@ -273,7 +278,7 @@ correctly") and logged to the console with the same words:
 | data-redirect-uri is missing. | No `data-redirect-uri` and no `redirectUri` option. |
 | No app with app_id 'nope' exists in Silicon Accounts. | The service's own answer for your public config (`GET /v1/apps/{app_id}/public`). A disabled app reads "The app '…' is disabled, so nobody can sign in to it right now." |
 | Briefcase has no sign-in methods turned on. / Briefcase does not offer sign-in with "phone". | Turn the method on in your sign-in setup, or drop `data-method`. |
-| could not reach https://account.teamofsilicons.com | The config fetch failed three times (it retries after 0.5 s and 1.5 s, so a page that is navigating away never reports it). Check `connect-src`. |
+| could not reach https://accounts.teamofsilicons.com | The config fetch failed three times (it retries after 0.5 s and 1.5 s, so a page that is navigating away never reports it). Check `connect-src`. |
 
 Like the iframe, the snippet doesn't check `data-redirect-uri` against your registered list
 until a button is clicked: an unregistered one stops at the hosted page.

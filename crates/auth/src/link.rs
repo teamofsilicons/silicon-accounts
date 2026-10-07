@@ -150,7 +150,6 @@ pub async fn start_link(
             nonce: None,
             requested_scopes: &[Scope::Profile],
             prompt: Prompt::default(),
-            login_hint: None,
             method_hint: Some(method),
         },
     )

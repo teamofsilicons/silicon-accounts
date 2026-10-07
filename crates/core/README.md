@@ -134,7 +134,10 @@ async fn change_my_id(
 | `http` | extractors and helpers | `AccountAuth`, `CarbonAuth`, `SiliconAuth`, `AppAuth`, `AppOrOwner`, `authenticate_client`, `ClientMeta`, `IdempotencyKey`, `Json`, `Query`, `Path`, `parse_form_or_json`, `check_origin`, `cookies::*`, `pagination::*`, `request_id::middleware` |
 | `test_support` (feature) | tests | `TestContext`, `TestDb`, `Req`, `call`, factories |
 
-Constants: `FIRST_PARTY_APP_ID = "accounts"`, `PRODUCT_NAME`, `PRODUCT_SITE`, `VERSION`.
+Constants: `FIRST_PARTY_APP_ID = "accounts"`, `DEVELOPER_APP_ID = "developer"` (and
+`is_first_party_app_id`), `PRODUCT_NAME`, `PRODUCT_SITE` (`https://accounts.teamofsilicons.com`),
+`VERSION`. Settings: `developer_url` (ACCOUNTS_DEVELOPER_URL), `developer_callback_url()`,
+`developer_redirect_allowed(uri)`.
 
 ## config / state
 
@@ -259,8 +262,17 @@ for `primary_foreground`/`primary` (button text) and `foreground`/`background` (
 themes (message includes the measured ratio), font allowlist,
 radius 0..40, logo height 16..96, https/data-image logos, background image required for
 `image`, redirect URIs (https; http only on localhost/127.0.0.1/[::1]; reverse-domain native
-schemes), origins, disjoint required/optional fields, domains, copy lengths, BYO requirements
-(`google.client_id` + `google.client_secret`; `apple.services_id`/`team_id`/`key_id` + `apple.private_key`).
+schemes), origins, disjoint required/optional fields, domains, copy lengths (`copy.opening_title`
+≤ 80 with only the `{provider}`/`{app}` placeholders, `signup_title` ≤ 80, `signup_subtitle` ≤ 200),
+BYO requirements (`google.client_id` + `google.client_secret`; `apple.services_id`/`team_id`/`key_id`
++ `apple.private_key`), and the `flow` (1 to 8 steps, ids `[a-z0-9-]{1,40}` unique, every requested
+detail on exactly one step and nothing else, no empty step, short plain titles, subtitles and
+continue labels, `layout` null or card|split|minimal; errors keyed `flow.steps[i].fields[j]` etc.).
+`effective_flow()` is the flow a sign-in walks: the app's own, or (`flow: null`) one step `details`
+with the required then the optional details and no review page. The PATCH merge keeps `flow`
+valid when the details change without it: a detail no longer requested leaves its step, an emptied
+step is dropped (no step left = `null`), a newly requested detail joins the last step; a PATCH that
+carries `flow` is validated exactly as sent.
 `first_party_redirect_allowed(settings, uri)` compares parsed origins.
 
 Default palettes (`Palette::default_light`, `default_dark`): filled buttons are the brand blue
@@ -401,7 +413,8 @@ use it for you.
 ## repo::memberships
 
 - `upsert_signin(&mut conn, app_id, uuid, MembershipSource::Signin|Slt, &scopes, GrantMode::Replace|Union)`
-  — active, sign-in times, granted scopes (Replace for the consent screen, Union for SLT/continue-as).
+  — active, sign-in times, granted scopes (Replace when the Carbon went through the details pages
+  of the hosted flow, Union for SLT/continue-as).
 - `upsert_imported(&mut conn, app_id, uuid, external_id, imported_profile, overwrite)` — status
   `imported` unless already active; 409 `external_id_conflict`. A membership whose account removed
   the app's access is returned untouched (`access_removed`): an import never undoes that; only a
@@ -546,17 +559,22 @@ Postmark posts to `{ACCOUNTS_POSTMARK_API_URL}/email`; Twilio to
 ## http
 
 - `AccountAuth` — cookie `sa_session` (`__Host-sa_session` when secure) or `Bearer` access token with
-  `aud = accounts` and an active family. Cookie-authenticated POST/PUT/PATCH/DELETE must carry an
+  `aud = accounts` and an active family. A developer platform token (`aud = developer`) is accepted
+  only on `GET /v1/me`, `GET /v1/session` and `GET /v1/me/owned-apps` (`DEVELOPER_READ_ROUTES`,
+  judged by the matched route) and by `AppOrOwner`; anywhere else it is 401
+  `token_wrong_audience` naming the route. Cookie-authenticated POST/PUT/PATCH/DELETE must carry an
   allowed `Origin` (403 `origin_not_allowed`). `auth.uuid()`, `auth.kind()`, `auth.account`,
   `auth.session_id()`, `auth.family_id()`, `auth.is_cookie()`. `Option<AccountAuth>` for optional
   auth (a dead cookie = anonymous; a bad Bearer = 401).
 - `CarbonAuth` / `SiliconAuth` deref to `AccountAuth` (403 `carbon_only` / `silicon_only`).
 - `AppAuth { app }` — `Authorization: Basic base64(app_id:secret)`.
 - `authenticate_client(&state, &headers, form.client_id, form.client_secret)` → `ClientAuth { app,
-  public }` for `/v1/oauth/*` (Basic or body; `client_id=accounts` alone = the public first-party
-  client: allow it only for the device-code, refresh and CLI grants of `accounts`).
+  public }` for `/v1/oauth/*` (Basic or body; `client_id=accounts` or `client_id=developer` alone =
+  a public first-party client: `accounts` only for the device-code and refresh grants, `developer`
+  only for the code grant with PKCE S256 and refresh; both may revoke their own tokens).
 - `AppOrOwner { app, actor }` on routes with `{app_id}`: the app's credentials (403 `app_mismatch`
-  for another app) or its owner's session (403 `not_app_owner`, 404 `unknown_app`).
+  for another app) or its owner's session — cookie, `aud = accounts` or `aud = developer` Bearer
+  (403 `not_app_owner`, 404 `unknown_app`).
   `history_actor()` → `"app"` | owner uuid; `audit_actor()`.
 - `ClientMeta { ip, user_agent, ip_timezone, origin }` — serve with
   `into_make_service_with_connect_info::<SocketAddr>()`; with ACCOUNTS_TRUST_FORWARDED_FOR the IP is
@@ -616,8 +634,10 @@ cargo run -p silicon-accounts-server --bin accounts-migrate  # applies migration
   (`scope_strings`) and read `Vec<String>` (`scopes_from_strings`).
 - Account uuids are case-sensitive (`text collate "C"`); ids (`c:`/`si:`) are stored lowercase.
 - `c:saket` and `si:saket` are different ids; reserved words apply to both.
-- The first-party app `accounts` exists after migration; its redirect URIs are not stored
-  (`SigninConfig::effective` + `redirect_allowed` handle it) and it never shows consent.
+- The first-party apps `accounts` and `developer` (migration 0005) exist after migration; their
+  redirect rules are applied in code (`SigninConfig::effective` + `redirect_allowed`: any URL on
+  the public origin for `accounts`, exactly `{ACCOUNTS_DEVELOPER_URL}/auth/callback` for
+  `developer`) and they never show the details pages or record memberships.
 - Contract numbers live in code: OTP 600 s / 60 s lock / 10 tries / 10 sends per 10 min (both per
   address); access token 1800 s; refresh 900 days; codes and SLTs 120 s; device codes 600 s (poll
   5 s); id reservations 10 days; 10 emails and 10 phones. Beyond the contract: 5 id changes per
@@ -627,6 +647,9 @@ cargo run -p silicon-accounts-server --bin accounts-migrate  # applies migration
   `token_families.auth_time`, `webhook_deliveries.requeued_at`, and indexes for proof listings and
   sweeps, photo pruning and webhook attempts) and `0003_signup_photos_and_dark_palette`
   (`photos.signup_session_id` with one owner per photo; moves stored sign-in configs off the old
-  default dark primary `#5B8FE0` to `#1F5FB8` with a `system` history entry). Never edit an applied
+  default dark primary `#5B8FE0` to `#1F5FB8` with a `system` history entry), `0004_dark_danger`
+  (the dark default error colour) and `0005_developer_platform` (the first-party app `developer`,
+  the `accounts` app's homepage on accounts.teamofsilicons.com, and `signin_flows.login_hint`
+  dropped: an app's login_hint is ignored). Never edit an applied
   migration. Test a data migration with `TestDb::empty()`, `db::MIGRATOR.run_to(n, &db.pool)`,
   rows, then `db::migrate` (see `tests/migrations.rs`).

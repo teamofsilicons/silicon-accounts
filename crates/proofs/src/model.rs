@@ -16,8 +16,6 @@ pub const FAMILY_TTL_DAYS: i64 = accounts_core::repo::tokens::REFRESH_TOKEN_DAYS
 pub const MAX_SCOPES: usize = 20;
 /// Longest scope string.
 pub const MAX_SCOPE_LEN: usize = 100;
-/// Most receiving apps one ATA proof may name.
-pub const MAX_AUDIENCES: usize = 20;
 /// Proof tokens are deleted this many days after they expire (nothing can use them then; the
 /// grace keeps "expired" answers precise for a day).
 pub const EXPIRED_TOKEN_RETENTION_DAYS: i32 = 1;
@@ -31,7 +29,7 @@ pub const ENDED_PROOF_RETENTION_DAYS: i32 = 30;
 pub enum ProofKind {
     /// App A acts at app B for an account that signed into app A.
     Obo,
-    /// App A proves itself to the apps it names.
+    /// App A proves itself to one other app (one proof per receiving app).
     Ata,
 }
 
@@ -98,7 +96,7 @@ pub mod revoke_reason {
     pub const REVOKED_BY_APP: &str = "revoked_by_app";
     /// The app's owner revoked it on the app's proofs page.
     pub const REVOKED_BY_OWNER: &str = "revoked_by_owner";
-    /// The account it speaks for revoked it on account.teamofsilicons.com.
+    /// The account it speaks for revoked it on accounts.teamofsilicons.com.
     pub const REVOKED_BY_ACCOUNT: &str = "revoked_by_account";
     /// A used proof refresh token was presented again.
     pub const REFRESH_TOKEN_REUSE: &str = "refresh_token_reuse";

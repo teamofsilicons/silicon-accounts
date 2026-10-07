@@ -1,5 +1,5 @@
 //! Issuing proofs: OBO (`POST /v1/proofs/obo`) and ATA (`POST /v1/proofs/ata`, and the ATA page
-//! stand-in `POST /v1/apps/{app_id}/proofs/ata`).
+//! `POST /v1/apps/{app_id}/proofs/ata`). Both are always for exactly one receiving app.
 
 use accounts_core::models::{ActorKind, App, AppStatus};
 use accounts_core::repo::audit::{self, AuditEntry};
@@ -128,12 +128,16 @@ pub async fn obo(
     ))
 }
 
-/// Issues an ATA proof for every app in `audiences`.
+/// Issues an ATA proof for the one app in `receiving_app` (a body naming `audiences` gets 422
+/// `ata_single_app`, see [`IssueAtaBody::receiving_app`]). `endpoint` is the route called.
 pub async fn ata(
     state: &AppState,
     issuer: &Issuer<'_>,
     body: &IssueAtaBody,
+    endpoint: &str,
 ) -> Result<IssuedProof, ApiError> {
+    let mut fields = FieldErrors::new();
+    let receiving = body.receiving_app(endpoint, &mut fields)?;
     if issuer.app.status != AppStatus::Active {
         return Err(ApiError::forbidden(
             "app_disabled",
@@ -144,11 +148,11 @@ pub async fn ata(
         )
         .hint("Re-enable the app in Silicon Apps first."));
     }
-    let mut fields = FieldErrors::new();
-    let audiences = input::audiences(&body.audiences, &mut fields);
     let scopes = input::scopes(body.scopes.as_deref(), &mut fields);
     let ttl = input::access_ttl(body.access_ttl_seconds, &mut fields);
     fields.into_result()?;
+    // Stored as a one-app audience list (the column predates single-app ATA proofs).
+    let audiences = vec![receiving.unwrap_or_default()];
 
     let mut tx = state.db.begin().await?;
     check_receivers(&mut tx, issuer.app, &audiences).await?;
@@ -175,7 +179,7 @@ pub async fn ata(
             details: json!({
                 "kind": "ata",
                 "issuing_app": issuer.app.app_id,
-                "audiences": audiences,
+                "receiving_app": audiences[0],
                 "scopes": scopes,
                 "access_ttl_seconds": ttl,
                 "expires_at": accounts_core::timefmt::format_rfc3339_ms(family.expires_at),
@@ -186,7 +190,7 @@ pub async fn ata(
     )
     .await?;
     tx.commit().await?;
-    tracing::info!(proof_id = %family.id, issuing_app = %issuer.app.app_id, audiences = ?audiences, "ATA proof issued");
+    tracing::info!(proof_id = %family.id, issuing_app = %issuer.app.app_id, receiving_app = %audiences[0], "ATA proof issued");
     Ok(IssuedProof::new(
         family.id,
         ProofKind::Ata,

@@ -7,6 +7,10 @@
 #     profile photos from mock Iris, so no page loads anything from the internet)
 #   → the account site (Next.js, web/) on http://localhost:8590: the public origin. It serves the
 #     pages and proxies /v1/* and /.well-known/* to accounts-api (ACCOUNTS_API_URL).
+#   → the developer platform (Next.js, developer/) on http://localhost:8600, when developer/package.json exists:
+#     its Next server signs Carbons in through the account site (first-party app `developer`) and calls
+#     accounts-api server to server. accounts-api gets ACCOUNTS_DEVELOPER_URL so the developer platform's sign-ins may return to
+#     {its URL}/auth/callback.
 #
 #   scripts/dev.sh               run in the foreground; Ctrl-C stops everything it started
 #   scripts/dev.sh --detach      start in the background, print the URLs and return
@@ -22,6 +26,11 @@
 #       external  nothing; you run the site yourself:
 #                 PORT=8590 ACCOUNTS_API_URL=http://127.0.0.1:8589 pnpm -C web dev
 #       none      API only: the public URL is accounts-api's own origin (http://localhost:8589)
+#   scripts/dev.sh --developer=MODE   the developer platform (developer/):
+#       auto      (default) start it when developer/package.json depends on "next" and the site mode is next
+#                 (its sign-in goes through the account site's hosted pages)
+#       on        always start it (fails when developer/ has no Next.js app)
+#       off       never start it
 #   scripts/dev.sh --api-only    same as --web=none;   scripts/dev.sh --proxy   same as --web=proxy
 #   scripts/dev.sh --no-build    use the binaries that are already built (skip cargo build)
 #   scripts/dev.sh --release     build and run the release binaries
@@ -35,6 +44,11 @@
 # Environment (defaults in brackets) — set them to run a second stack on other ports:
 #   ACCOUNTS_PORT [8590] (the public site)   ACCOUNTS_API_PORT [8589] (accounts-api)
 #   MOCK_OIDC_PORT [8591]   MOCK_MESSAGING_PORT [8592]   FAKE_APPS_PORT [8593]   MOCK_IRIS_PORT [8594]
+#   DEVELOPER_PORT [8600 on the default stack, else ACCOUNTS_PORT+5] (the developer platform)
+#   ACCOUNTS_DEVELOPER_URL [http://localhost:$DEVELOPER_PORT]   the developer platform's public URL (accounts-api's
+#                redirect rule for the `developer` app, GET /v1/meta developer_url, and the developer site's own origin)
+#   ACCOUNTS_DEVELOPER_DIR [developer]   the developer platform's Next.js app
+#   DEVELOPER_NEXT_DIST_DIR [like NEXT_DIST_DIR]   the developer platform's build directory inside its directory
 #   ACCOUNTS_PGPORT [5444]  ACCOUNTS_DB_NAME [silicon_accounts]
 #   ACCOUNTS_PUBLIC_URL [http://localhost:$ACCOUNTS_PORT; with --web=none http://localhost:$ACCOUNTS_API_PORT]
 #   ACCOUNTS_EXTRA_ALLOWED_ORIGINS [the public URL's port on 127.0.0.1]
@@ -64,6 +78,7 @@ RESEED=0
 RESET_DB=0
 PROD=0
 WEB_MODE=auto
+DEVELOPER_MODE=auto
 for arg in "$@"; do
   case "$arg" in
     -d|--detach) DETACH=1 ;;
@@ -75,10 +90,11 @@ for arg in "$@"; do
     --api-only) WEB_MODE=none ;;
     --proxy) WEB_MODE=proxy ;;
     --web=*) WEB_MODE="${arg#--web=}" ;;
+    --developer=*) DEVELOPER_MODE="${arg#--developer=}" ;;
     -h|--help) usage; exit 0 ;;
     *)
       echo "error: unknown argument '$arg'" >&2
-      echo "hint: scripts/dev.sh [--detach] [--prod] [--web=auto|next|proxy|external|none] [--api-only] [--proxy] [--no-build] [--release] [--reseed] [--reset-db]" >&2
+      echo "hint: scripts/dev.sh [--detach] [--prod] [--web=auto|next|proxy|external|none] [--developer=auto|on|off] [--api-only] [--proxy] [--no-build] [--release] [--reseed] [--reset-db]" >&2
       exit 2
       ;;
   esac
@@ -88,6 +104,14 @@ case "$WEB_MODE" in
   *)
     echo "error: --web=$WEB_MODE is not a mode" >&2
     echo "hint: use --web=auto, next, proxy, external or none (scripts/dev.sh --help explains each)" >&2
+    exit 2
+    ;;
+esac
+case "$DEVELOPER_MODE" in
+  auto|on|off) ;;
+  *)
+    echo "error: --developer=$DEVELOPER_MODE is not a mode" >&2
+    echo "hint: use --developer=auto, on or off (scripts/dev.sh --help explains each)" >&2
     exit 2
     ;;
 esac
@@ -104,15 +128,19 @@ fail() {
 WEB_DIR="${ACCOUNTS_WEB_DIR:-$ROOT/web}"
 case "$WEB_DIR" in /*) ;; *) WEB_DIR="$ROOT/$WEB_DIR" ;; esac
 
-# Does the site directory hold the Next.js site (a "next" dependency in its package.json)?
-web_has_next() {
-  [ -f "$WEB_DIR/package.json" ] || return 1
+DEVELOPER_DIR="${ACCOUNTS_DEVELOPER_DIR:-$ROOT/developer}"
+case "$DEVELOPER_DIR" in /*) ;; *) DEVELOPER_DIR="$ROOT/$DEVELOPER_DIR" ;; esac
+
+# Does a directory hold a Next.js app (a "next" dependency in its package.json)?
+has_next() {
+  [ -f "$1/package.json" ] || return 1
   node -e '
     const p = require(process.argv[1]);
     const has = (d) => !!(d && Object.prototype.hasOwnProperty.call(d, "next"));
     process.exit(has(p.dependencies) || has(p.devDependencies) ? 0 : 1);
-  ' "$WEB_DIR/package.json" 2>/dev/null
+  ' "$1/package.json" 2>/dev/null
 }
+web_has_next() { has_next "$WEB_DIR"; }
 
 if [ "$WEB_MODE" = auto ]; then
   if web_has_next; then
@@ -131,17 +159,34 @@ if [ "$PROD" = 1 ] && [ "$WEB_MODE" != next ]; then
     "drop --prod, or use it with --web=next once web/ has its Next.js app"
 fi
 
+# The developer platform: on by default next to the Next.js site (its sign-in uses the site's hosted pages).
+START_DEVELOPER=0
+case "$DEVELOPER_MODE" in
+  on)
+    has_next "$DEVELOPER_DIR" || fail "--developer=on needs the developer platform, but $(rel "$DEVELOPER_DIR")/package.json has no \"next\" dependency" \
+      "build the developer platform in developer/ first, or use --developer=off"
+    START_DEVELOPER=1
+    ;;
+  auto)
+    if [ "$WEB_MODE" = next ] && has_next "$DEVELOPER_DIR"; then START_DEVELOPER=1; fi
+    ;;
+esac
+
 ACCOUNTS_PORT="${ACCOUNTS_PORT:-8590}"
 API_PORT="${ACCOUNTS_API_PORT:-8589}"
 MOCK_OIDC_PORT="${MOCK_OIDC_PORT:-8591}"
 MOCK_MESSAGING_PORT="${MOCK_MESSAGING_PORT:-8592}"
 FAKE_APPS_PORT="${FAKE_APPS_PORT:-8593}"
 MOCK_IRIS_PORT="${MOCK_IRIS_PORT:-8594}"
+# The developer platform: 8600 next to the default site (its fixed local origin), else base+5 so stacks on port
+# bases 10 apart (scripts/e2e.sh) never collide.
+if [ "$ACCOUNTS_PORT" = 8590 ]; then DEFAULT_DEVELOPER_PORT=8600; else DEFAULT_DEVELOPER_PORT=$((ACCOUNTS_PORT + 5)); fi
+DEVELOPER_PORT="${DEVELOPER_PORT:-$DEFAULT_DEVELOPER_PORT}"
 PGPORT="${ACCOUNTS_PGPORT:-5444}"
 DB="${ACCOUNTS_DB_NAME:-silicon_accounts}"
 PG_BIN="${PG_BIN:-/opt/homebrew/opt/postgresql@16/bin}"
 
-for p in "$ACCOUNTS_PORT" "$API_PORT" "$MOCK_OIDC_PORT" "$MOCK_MESSAGING_PORT" "$FAKE_APPS_PORT" "$MOCK_IRIS_PORT" "$PGPORT"; do
+for p in "$ACCOUNTS_PORT" "$API_PORT" "$MOCK_OIDC_PORT" "$MOCK_MESSAGING_PORT" "$FAKE_APPS_PORT" "$MOCK_IRIS_PORT" "$DEVELOPER_PORT" "$PGPORT"; do
   case "$p" in
     ''|*[!0-9]*) echo "error: ports must be numbers, got '$p'" >&2; exit 2 ;;
   esac
@@ -166,6 +211,11 @@ TESTKIT_ACCOUNTS_URL="${TESTKIT_ACCOUNTS_URL:-$API_URL}"
 DB_URL="postgres://postgres@127.0.0.1:$PGPORT/$DB"
 IRIS_URL="${ACCOUNTS_IRIS_BASE_URL:-http://127.0.0.1:$MOCK_IRIS_PORT}"
 IRIS_URL="${IRIS_URL%/}"
+# The developer platform's public URL: accounts-api only lets the `developer` app's sign-ins return to
+# {DEVELOPER_URL}/auth/callback, and reports it as GET /v1/meta developer_url (the account site's /developer redirect).
+DEVELOPER_URL="${ACCOUNTS_DEVELOPER_URL:-http://localhost:$DEVELOPER_PORT}"
+DEVELOPER_URL="${DEVELOPER_URL%/}"
+DEVELOPER_FRONT_URL="http://127.0.0.1:$DEVELOPER_PORT"
 
 # The site's build directory (inside the site's directory). The default stack keeps Next's own .next; any other port
 # gets .next-<port>, because ACCOUNTS_API_URL is baked into each build (web/next.config.ts reads NEXT_DIST_DIR).
@@ -176,6 +226,13 @@ case "$DIST_DIR" in
   *) fail "NEXT_DIST_DIR must be .next or .next-<name> (a directory inside the site's directory), got '$DIST_DIR'" ;;
 esac
 case "$DIST_DIR" in */*|*' '*) fail "NEXT_DIST_DIR must be a plain directory name like .next-9600, got '$DIST_DIR'" ;; esac
+# The developer platform builds into a directory of the same name inside developer/.
+DEVELOPER_DIST_DIR="${DEVELOPER_NEXT_DIST_DIR:-$DIST_DIR}"
+case "$DEVELOPER_DIST_DIR" in
+  .next|.next-*) ;;
+  *) fail "DEVELOPER_NEXT_DIST_DIR must be .next or .next-<name> (a directory inside developer/), got '$DEVELOPER_DIST_DIR'" ;;
+esac
+case "$DEVELOPER_DIST_DIR" in */*|*' '*) fail "DEVELOPER_NEXT_DIST_DIR must be a plain directory name like .next-9600, got '$DEVELOPER_DIST_DIR'" ;; esac
 
 RUN_DIR="$ROOT/.dev/run/$ACCOUNTS_PORT"
 if [ "$ACCOUNTS_PORT" = 8590 ]; then LOG_DIR="$ROOT/.dev/logs"; else LOG_DIR="$ROOT/.dev/logs/$ACCOUNTS_PORT"; fi
@@ -202,10 +259,11 @@ fi
 
 ports_to_check=("$API_PORT" "$MOCK_OIDC_PORT" "$MOCK_MESSAGING_PORT" "$FAKE_APPS_PORT" "$MOCK_IRIS_PORT")
 case "$WEB_MODE" in next|proxy) ports_to_check+=("$ACCOUNTS_PORT") ;; esac
+[ "$START_DEVELOPER" = 1 ] && ports_to_check+=("$DEVELOPER_PORT")
 for p in "${ports_to_check[@]}"; do
   if port_busy "$p"; then
     fail "port $p is already in use by $(who_listens "$p" || echo 'another process')" \
-      "stop it, or pick other ports: ACCOUNTS_PORT=9590 ACCOUNTS_API_PORT=9589 MOCK_OIDC_PORT=9591 MOCK_MESSAGING_PORT=9592 FAKE_APPS_PORT=9593 MOCK_IRIS_PORT=9594 scripts/dev.sh"
+      "stop it, or pick other ports: ACCOUNTS_PORT=9590 ACCOUNTS_API_PORT=9589 MOCK_OIDC_PORT=9591 MOCK_MESSAGING_PORT=9592 FAKE_APPS_PORT=9593 MOCK_IRIS_PORT=9594 DEVELOPER_PORT=9595 scripts/dev.sh"
   fi
 done
 
@@ -238,6 +296,7 @@ base_env() {
   export ACCOUNTS_BIND_ADDR="127.0.0.1:$API_PORT"
   export ACCOUNTS_PUBLIC_URL="$PUBLIC_URL"
   export ACCOUNTS_EXTRA_ALLOWED_ORIGINS="$EXTRA_ORIGINS"
+  export ACCOUNTS_DEVELOPER_URL="$DEVELOPER_URL"
 }
 
 say "applying migrations to $DB_URL"
@@ -360,12 +419,31 @@ wait_ready() {
 # uses (<dir>/types, or <dir>/dev/types for next dev). A stack's own directory (.next-<port>) is deleted with the
 # stack, so point the file back at .next/types, what `next build` and `pnpm typecheck` (next typegen) write and editors
 # expect. A temporary file and a rename: other stacks may be building right now.
-restore_next_env() {
-  local file="$WEB_DIR/next-env.d.ts" pattern
-  [ "$DIST_DIR" != .next ] && [ -f "$file" ] || return 0
-  pattern="\./${DIST_DIR//./\\.}/"
+restore_next_env() { # [app dir] [build dir name]; default: the site
+  local dir="${1:-$WEB_DIR}" dist="${2:-$DIST_DIR}"
+  local file="$dir/next-env.d.ts" pattern
+  [ "$dist" != .next ] && [ -f "$file" ] || return 0
+  pattern="\./${dist//./\\.}/"
   grep -q "$pattern" "$file" 2>/dev/null || return 0
   sed -e "s#${pattern}dev/types/#./.next/types/#g" -e "s#$pattern#./.next/#g" "$file" >"$file.$$.tmp" && mv -f "$file.$$.tmp" "$file"
+}
+
+# Waits until the HTTP server on $2 answers at all (any status: a page that fails to render is the app's problem,
+# not the stack's), while process $3 lives; $1 names it, $4 is the timeout (s). Warns when the answer is a 5xx.
+wait_http() {
+  local name="$1" url="$2" pid="$3" timeout="$4" code
+  local deadline=$((SECONDS + timeout))
+  while :; do
+    code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "$url" 2>/dev/null || true)"
+    case "$code" in ''|000) ;; *) break ;; esac
+    if ! kill -0 "$pid" 2>/dev/null; then
+      tail -n 30 "$LOG_DIR/$name.log" >&2
+      fail "$name exited during start-up (log: $LOG_DIR/$name.log)"
+    fi
+    [ "$SECONDS" -lt "$deadline" ] || fail "$name did not answer $url within $timeout s (log: $LOG_DIR/$name.log)"
+    sleep 0.3
+  done
+  case "$code" in 5*) warn "$name answers $url with HTTP $code; see $LOG_DIR/$name.log" ;; esac
 }
 
 rm -f "$RUN_DIR/testkit.json"
@@ -405,6 +483,7 @@ ENV_FILE="$RUN_DIR/accounts-api.env"
     "ACCOUNTS_BIND_ADDR=127.0.0.1:$API_PORT" \
     "ACCOUNTS_PUBLIC_URL=$PUBLIC_URL" \
     "ACCOUNTS_EXTRA_ALLOWED_ORIGINS=$EXTRA_ORIGINS" \
+    "ACCOUNTS_DEVELOPER_URL=$DEVELOPER_URL" \
     "ACCOUNTS_TRUST_FORWARDED_FOR=$TRUST_FORWARDED_FOR" \
     "ACCOUNTS_IRIS_BASE_URL=$IRIS_URL" \
     "ACCOUNTS_DELIVERY=providers" \
@@ -435,7 +514,7 @@ case "$WEB_MODE" in
         || { tail -n 20 "$LOG_DIR/web-install.log" >&2; fail "pnpm install in web/ failed (log: $LOG_DIR/web-install.log)"; }
     fi
     # ACCOUNTS_IRIS_BASE_URL: the site's CSP lets pages show the mock Iris's photos (web/proxy.ts).
-    web_env=(PORT="$ACCOUNTS_PORT" ACCOUNTS_API_URL="$API_URL" ACCOUNTS_PUBLIC_URL="$PUBLIC_URL" ACCOUNTS_IRIS_BASE_URL="$IRIS_URL" NEXT_DIST_DIR="$DIST_DIR" NEXT_TELEMETRY_DISABLED=1)
+    web_env=(PORT="$ACCOUNTS_PORT" ACCOUNTS_API_URL="$API_URL" ACCOUNTS_PUBLIC_URL="$PUBLIC_URL" ACCOUNTS_DEVELOPER_URL="$DEVELOPER_URL" ACCOUNTS_IRIS_BASE_URL="$IRIS_URL" NEXT_DIST_DIR="$DIST_DIR" NEXT_TELEMETRY_DISABLED=1)
     printf '%s\n' "$WEB_DIR" >"$RUN_DIR/web.match"
     printf '%s\n' "$WEB_DIR/$DIST_DIR" >"$RUN_DIR/web.dist"
     if [ "$PROD" = 1 ]; then
@@ -485,6 +564,59 @@ case "$WEB_MODE" in
     ;;
 esac
 
+# --- 7. the developer platform --------------------------------------------------------------------
+# developer/ (Next.js): the browser only talks to it; its Next server signs Carbons in through the account site's
+# hosted pages (first-party app `developer`, PKCE) and calls accounts-api server to server with their tokens.
+DEV_PID=""
+if [ "$START_DEVELOPER" = 1 ]; then
+  command -v pnpm >/dev/null 2>&1 || fail "pnpm is not installed" "install Node >= 24 and pnpm (corepack enable), then run this again"
+  if [ ! -e "$DEVELOPER_DIR/node_modules/.bin/next" ]; then
+    say "installing the developer platform's dependencies (pnpm -C $(rel "$DEVELOPER_DIR") install)"
+    install_flags=()
+    [ -f "$DEVELOPER_DIR/pnpm-lock.yaml" ] && install_flags=(--frozen-lockfile)
+    pnpm -C "$DEVELOPER_DIR" install ${install_flags[@]+"${install_flags[@]}"} >"$LOG_DIR/developer-install.log" 2>&1 \
+      || { tail -n 20 "$LOG_DIR/developer-install.log" >&2; fail "pnpm install in developer/ failed (log: $LOG_DIR/developer-install.log)"; }
+  fi
+  # DEVELOPER_SESSION_SECRET seals the developer platform's session cookies; a production build refuses to run
+  # without one, so every local stack gets its own (local only, never a real secret).
+  dev_env=(PORT="$DEVELOPER_PORT" ACCOUNTS_API_URL="$API_URL" ACCOUNTS_PUBLIC_URL="$PUBLIC_URL"
+    ACCOUNTS_DEVELOPER_URL="$DEVELOPER_URL" DEVELOPER_PUBLIC_URL="$DEVELOPER_URL" ACCOUNTS_IRIS_BASE_URL="$IRIS_URL"
+    DEVELOPER_SESSION_SECRET="${DEVELOPER_SESSION_SECRET:-local-stack-$ACCOUNTS_PORT-developer-session-secret-not-for-production}"
+    NEXT_DIST_DIR="$DEVELOPER_DIST_DIR" NEXT_TELEMETRY_DISABLED=1)
+  printf '%s\n' "$DEVELOPER_DIR" >"$RUN_DIR/developer.match"
+  printf '%s\n' "$DEVELOPER_DIR/$DEVELOPER_DIST_DIR" >"$RUN_DIR/developer.dist"
+  if [ "$PROD" = 1 ]; then
+    say "building the developer platform for production into $(rel "$DEVELOPER_DIR")/$DEVELOPER_DIST_DIR (log: $(rel "$LOG_DIR")/developer-build.log)"
+    build_status=0
+    take_build_slot
+    env "${dev_env[@]}" NODE_ENV=production pnpm -C "$DEVELOPER_DIR" build >"$LOG_DIR/developer-build.log" 2>&1 || build_status=$?
+    release_build_slot
+    restore_next_env "$DEVELOPER_DIR" "$DEVELOPER_DIST_DIR"
+    [ "$build_status" = 0 ] || { tail -n 40 "$LOG_DIR/developer-build.log" >&2; fail "pnpm -C developer build failed (log: $LOG_DIR/developer-build.log)"; }
+    standalone="$DEVELOPER_DIR/$DEVELOPER_DIST_DIR/standalone"
+    if [ -f "$standalone/server.js" ]; then
+      rm -rf "$standalone/$DEVELOPER_DIST_DIR/static" "$standalone/public"
+      mkdir -p "$standalone/$DEVELOPER_DIST_DIR"
+      cp -R "$DEVELOPER_DIR/$DEVELOPER_DIST_DIR/static" "$standalone/$DEVELOPER_DIST_DIR/static"
+      [ -d "$DEVELOPER_DIR/public" ] && cp -R "$DEVELOPER_DIR/public" "$standalone/public"
+      say "starting the developer platform (standalone production server) on $DEVELOPER_FRONT_URL"
+      printf '%s\n' "next-server" >"$RUN_DIR/developer.match"
+      launch developer env "${dev_env[@]}" NODE_ENV=production HOSTNAME=0.0.0.0 node "$standalone/server.js"
+    else
+      say "starting the developer platform (next start) on $DEVELOPER_FRONT_URL"
+      launch developer env "${dev_env[@]}" NODE_ENV=production pnpm -C "$DEVELOPER_DIR" start
+    fi
+    DEV_PID="$LAST_PID"
+    wait_http developer "$DEVELOPER_FRONT_URL/" "$DEV_PID" 120
+  else
+    say "starting the developer platform (next dev, build directory $(rel "$DEVELOPER_DIR")/$DEVELOPER_DIST_DIR) on $DEVELOPER_FRONT_URL"
+    launch developer env "${dev_env[@]}" pnpm -C "$DEVELOPER_DIR" dev
+    DEV_PID="$LAST_PID"
+    wait_http developer "$DEVELOPER_FRONT_URL/" "$DEV_PID" 180
+    restore_next_env "$DEVELOPER_DIR" "$DEVELOPER_DIST_DIR"
+  fi
+fi
+
 # Up: from here on a detached stack stays up even if printing the summary fails (closed pipe).
 started=1
 case "$WEB_MODE" in
@@ -493,17 +625,23 @@ case "$WEB_MODE" in
   external) site_line="$PUBLIC_URL   (not started: PORT=$ACCOUNTS_PORT ACCOUNTS_API_URL=$API_URL pnpm -C $(rel "$WEB_DIR") dev)" ;;
   none) site_line="$PUBLIC_URL   (API only: no site; this is accounts-api itself)" ;;
 esac
+if [ "$START_DEVELOPER" = 1 ]; then
+  developer_line="$DEVELOPER_URL   (Next.js $( [ "$PROD" = 1 ] && echo 'production build' || echo 'dev server'), build $(rel "$DEVELOPER_DIR")/$DEVELOPER_DIST_DIR; signs in as the app 'developer')"
+else
+  developer_line="not started (--developer=on, or $(rel "$DEVELOPER_DIR") with a Next.js app next to --web=next); accounts-api expects it at $DEVELOPER_URL"
+fi
 cat <<EOF
 
 Silicon Accounts dev stack is up
   public URL (site)    $site_line
+  developer platform   $developer_line
   accounts-api         $API_URL   (readiness: /readyz, dev outbox: /v1/dev/outbox)
   fake apps            http://127.0.0.1:$FAKE_APPS_PORT/
   mock Google/Apple    http://127.0.0.1:$MOCK_OIDC_PORT   (/_requests, /_identities)
   mock email/SMS       http://127.0.0.1:$MOCK_MESSAGING_PORT/_messages
   profile photos       $IRIS_URL   ($( [ "$IRIS_URL" = "http://127.0.0.1:$MOCK_IRIS_PORT" ] && echo 'mock Iris' || echo 'ACCOUNTS_IRIS_BASE_URL'))
   database             $DB_URL
-  logs                 $(rel "$LOG_DIR")/ (accounts-api.log, testkit.log$( [ -n "$FRONT_NAME" ] && echo ", $FRONT_NAME.log"), migrate.log, seed.log)$( [ "$WEB_MODE" = next ] && printf '\n  site build           %s/%s' "$(rel "$WEB_DIR")" "$DIST_DIR")
+  logs                 $(rel "$LOG_DIR")/ (accounts-api.log, testkit.log$( [ -n "$FRONT_NAME" ] && echo ", $FRONT_NAME.log")$( [ "$START_DEVELOPER" = 1 ] && echo ", developer.log"), migrate.log, seed.log)$( [ "$WEB_MODE" = next ] && printf '\n  site build           %s/%s' "$(rel "$WEB_DIR")" "$DIST_DIR")
   CLI                  $(rel "$BIN")/accounts --url $PUBLIC_URL --help
 EOF
 
@@ -516,13 +654,15 @@ echo "  Ctrl-C stops everything"
 # Foreground: stay until Ctrl-C, or stop everything when one of the services exits on its own.
 alive_all() {
   kill -0 "$API_PID" 2>/dev/null && kill -0 "$TESTKIT_PID" 2>/dev/null \
-    && { [ -z "$FRONT_PID" ] || kill -0 "$FRONT_PID" 2>/dev/null; }
+    && { [ -z "$FRONT_PID" ] || kill -0 "$FRONT_PID" 2>/dev/null; } \
+    && { [ -z "$DEV_PID" ] || kill -0 "$DEV_PID" 2>/dev/null; }
 }
 while alive_all; do
   sleep 1
 done
 if ! kill -0 "$API_PID" 2>/dev/null; then dead=accounts-api
 elif ! kill -0 "$TESTKIT_PID" 2>/dev/null; then dead=testkit
+elif [ -n "$DEV_PID" ] && ! kill -0 "$DEV_PID" 2>/dev/null; then dead=developer
 else dead="$FRONT_NAME"; fi
 say "$dead exited on its own; last lines of $(rel "$LOG_DIR")/$dead.log:"
 tail -n 20 "$LOG_DIR/$dead.log" >&2 || true

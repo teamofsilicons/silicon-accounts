@@ -1,13 +1,15 @@
 //! Where the account is signed in to Silicon Accounts itself: browser sessions (the account site
-//! and hosted pages) and first-party sign-ins (`aud = accounts` token families: the CLI, the
-//! package, Silicon logins). Apps' own sign-ins are managed per app at `/v1/me/apps`.
+//! and hosted pages), first-party sign-ins (`aud = accounts` token families: the CLI, the
+//! package, Silicon logins) and sign-ins to the developer platform (`aud = developer` token
+//! families: developer.teamofsilicons.com). Apps' own sign-ins are managed per app at
+//! `/v1/me/apps`.
 
 use accounts_core::http::cookies::{SESSION_COOKIE, append_cookie, clear_cookie};
 use accounts_core::http::pagination::encode_cursor;
 use accounts_core::http::{AccountAuth, ClientMeta, Json, Path, Query};
 use accounts_core::repo::{sessions, tokens};
 use accounts_core::views::Page;
-use accounts_core::{ApiError, ApiResult, AppState, FIRST_PARTY_APP_ID};
+use accounts_core::{ApiError, ApiResult, AppState, DEVELOPER_APP_ID, FIRST_PARTY_APP_ID};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -37,11 +39,15 @@ struct Row {
     origin: Option<String>,
 }
 
+/// The first-party apps whose token families are sessions of Silicon Accounts itself.
+const SESSION_APPS: [&str; 2] = [FIRST_PARTY_APP_ID, DEVELOPER_APP_ID];
+
 /// One entry of `GET /v1/me/sessions`.
 #[derive(Debug, Serialize)]
 pub(crate) struct SessionView {
     id: String,
-    /// `browser` (cookie session) or `cli` (first-party sign-in: CLI, package, Silicon login).
+    /// `browser` (cookie session), `cli` (first-party sign-in: CLI, package, Silicon login) or
+    /// `developer` (a sign-in to the developer platform, developer.teamofsilicons.com).
     kind: String,
     label: Option<String>,
     /// For `cli` sessions: how they signed in (`device`, `cli_code`, `silicon_login`,
@@ -194,7 +200,10 @@ pub(crate) fn describe_user_agent(ua: &str) -> Option<String> {
     })
 }
 
-fn family_label(origin: Option<&str>) -> &'static str {
+fn family_label(kind: &str, origin: Option<&str>) -> &'static str {
+    if kind == "developer" {
+        return "Silicon Developer (developer.teamofsilicons.com)";
+    }
     match origin {
         Some("device") => "accounts CLI (approved in the browser)",
         Some("cli_code") => "accounts CLI (email or phone code)",
@@ -228,10 +237,10 @@ pub(crate) async fn list(
                and (s.created_at, s.id) < ($2, $3) \
              order by s.created_at desc, s.id desc limit $4) \
            union all \
-           (select 'cli'::text, f.id, f.label, f.ip, f.user_agent, f.created_at, \
-                   coalesce(f.last_used_at, f.created_at), f.expires_at, f.origin \
+           (select case when f.app_id = $6 then 'developer' else 'cli' end::text, f.id, f.label, f.ip, \
+                   f.user_agent, f.created_at, coalesce(f.last_used_at, f.created_at), f.expires_at, f.origin \
               from token_families f \
-             where f.account_uuid = $1 and f.app_id = $5 and f.revoked_at is null and f.expires_at > now() \
+             where f.account_uuid = $1 and f.app_id = any($5) and f.revoked_at is null and f.expires_at > now() \
                and (f.created_at, f.id) < ($2, $3) \
              order by f.created_at desc, f.id desc limit $4) \
          ) x order by x.created_at desc, x.id desc limit $4",
@@ -240,7 +249,8 @@ pub(crate) async fn list(
     .bind(cursor_at)
     .bind(cursor_id)
     .bind(limit + 1)
-    .bind(FIRST_PARTY_APP_ID)
+    .bind(&SESSION_APPS[..])
+    .bind(DEVELOPER_APP_ID)
     .fetch_all(&state.db)
     .await?;
     let current_session = me.session_id();
@@ -254,10 +264,15 @@ pub(crate) async fn list(
             };
             let label = match r.kind.as_str() {
                 "browser" => r.user_agent.as_deref().and_then(describe_user_agent),
-                _ => r
+                // A developer-platform sign-in is always named as such. A family made by the
+                // authorization_code grant stores an internal `code:<hash>` marker as its
+                // label (code-reuse revocation), which is not a name to show.
+                "developer" => Some(family_label("developer", r.origin.as_deref()).to_string()),
+                kind => r
                     .label
                     .clone()
-                    .or_else(|| Some(family_label(r.origin.as_deref()).to_string())),
+                    .filter(|l| !l.starts_with("code:"))
+                    .or_else(|| Some(family_label(kind, r.origin.as_deref()).to_string())),
             };
             SessionView {
                 id: r.id.to_string(),
@@ -295,9 +310,9 @@ fn session_not_found(id: &str) -> ApiError {
     .hint("List your sessions with GET /v1/me/sessions and use an id from there.")
 }
 
-/// `DELETE /v1/me/sessions/{id}` → 204. Signs that browser or first-party sign-in out (its
-/// cookie or refresh token stops working at once). Revoking the session making the request is
-/// allowed: that is signing out (the cookie is cleared).
+/// `DELETE /v1/me/sessions/{id}` → 204. Signs that browser, first-party or developer-platform
+/// sign-in out (its cookie or refresh token stops working at once). Revoking the session making
+/// the request is allowed: that is signing out (the cookie is cleared).
 pub(crate) async fn revoke(
     State(state): State<AppState>,
     me: AccountAuth,
@@ -316,14 +331,18 @@ pub(crate) async fn revoke(
         "browser"
     } else {
         match tokens::find_family(&mut tx, id).await? {
-            Some(f) if f.account_uuid == me.uuid() && f.app_id == FIRST_PARTY_APP_ID => {
+            Some(f) if f.account_uuid == me.uuid() && SESSION_APPS.contains(&f.app_id.as_str()) => {
                 tokens::revoke_family(
                     &mut tx,
                     id,
                     accounts_core::events::signout_reason::SESSION_REVOKED,
                 )
                 .await?;
-                "cli"
+                if f.app_id == DEVELOPER_APP_ID {
+                    "developer"
+                } else {
+                    "cli"
+                }
             }
             _ => return Err(session_not_found(&raw)),
         }

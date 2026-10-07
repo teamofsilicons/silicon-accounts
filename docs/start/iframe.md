@@ -48,7 +48,7 @@ for the hosted pages, so the callback is the same:
 import { createServer, type ServerResponse } from "node:http";
 import { createHash, randomBytes } from "node:crypto";
 
-const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://account.teamofsilicons.com";
+const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com";
 const APP_ID = process.env.ACCOUNTS_APP_ID ?? "briefcase";
 const APP_SECRET = process.env.ACCOUNTS_APP_SECRET ?? "";
 const PORT = Number(process.env.PORT ?? 3000);
@@ -132,12 +132,12 @@ In a browser, the frame shows the app's four methods (each a link with `target="
 reports its height, 264 px here. Choosing email took the window to:
 
 ```text
-https://account.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&state=-V6HjsnYz78--44vVIH-TCym7jQBur7OcUCSaIcU7Ek&code_challenge=fo6rK7yEC-w7zkC04MxhbnUMyDW0ZPoAbQyKoiMdtTM&code_challenge_method=S256&scope=email&method=email
+https://accounts.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&state=-V6HjsnYz78--44vVIH-TCym7jQBur7OcUCSaIcU7Ek&code_challenge=fo6rK7yEC-w7zkC04MxhbnUMyDW0ZPoAbQyKoiMdtTM&code_challenge_method=S256&scope=email&method=email
 ```
 
 and after the sign-in, the callback answered `Signed in as c:grace-hopper (briefcase:ptO)`.
-The Embed tab of your app under Developer on the account site prints this iframe for your own
-app id and redirect URIs.
+The app's Embed tab on developer.teamofsilicons.com prints this iframe for your own app id and
+redirect URIs, with a live preview.
 
 ## Allow your origin
 
@@ -145,7 +145,7 @@ Browsers only show the frame on pages whose origin is in your `allowed_origins`:
 page answers with `Content-Security-Policy: frame-ancestors 'self' <your allowed_origins>`.
 
 ```sh
-curl -sI "https://account.teamofsilicons.com/embed/v1/buttons?app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback" \
+curl -sI "https://accounts.teamofsilicons.com/embed/v1/buttons?app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback" \
   | grep -i -o "frame-ancestors[^;]*"
 # frame-ancestors 'self' http://localhost:3000
 ```
@@ -162,7 +162,7 @@ On an origin that isn't listed, the frame stays empty and the browser's console 
 for example in Chromium:
 
 ```text
-Framing 'https://account.teamofsilicons.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' http://localhost:3000". The request has been blocked.
+Framing 'https://accounts.teamofsilicons.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' http://localhost:3000". The request has been blocked.
 ```
 
 Why a list at all: a page that can frame the buttons can also dress them up (overlays,
@@ -173,11 +173,14 @@ other page of Silicon Accounts refuses to be framed by anyone.
 
 The iframe's `src` takes the parameters of the [authorize request](hosted-pages.md#the-authorize-request):
 `app_id` (or `client_id`) and `redirect_uri` are required; `state`, `code_challenge`,
-`code_challenge_method`, `scope`, `nonce`, `prompt`, `login_hint` and `response_type` are
-passed on to `/authorize` unchanged when a button is clicked. Two more shape the frame itself:
+`code_challenge_method`, `scope`, `nonce`, `prompt`, `intent` and `response_type` are passed on
+to `/authorize` unchanged when a button is clicked. `login_hint`, `email` and `phone` are dropped:
+your app never hands Silicon Accounts a Carbon's email or phone. These shape the frame itself:
 
 | Parameter | Effect |
 |---|---|
+| `buttons` | `methods` (default): one button per enabled method, "Continue with Google", "Continue with Apple", "Continue with email", "Continue with phone number", each opening our pages on that method (Google and Apple through the Opening page). `intents`: a "Sign in" and a "Sign up" button that open our pages with every method. |
+| `intent` | `signup` opens the sign-up version of our pages ("Create your {app} account"). With `buttons=intents` it keeps only the "Sign up" button; `signin` only "Sign in". |
 | `method` | Show only that method's button (`google`, `apple`, `email`, `phone`). Each button adds its own `method=` to `/authorize`. |
 | `theme` | Your page's theme: `light`, `dark` or `auto`. It sets the frame's color scheme so its background stays transparent on your page. The buttons paint in `light` or `dark` when you give one; otherwise in your branding's forced theme, else (with `auto`) the device's theme, else light. Not passed to `/authorize`. |
 
@@ -202,7 +205,7 @@ for `handleCallback`).
 ## Why the click leaves your page
 
 The buttons are links with `target="_top"`: the sign-in itself always runs in the whole
-window at `account.teamofsilicons.com`, never inside the frame. The Carbon sees the real
+window at `accounts.teamofsilicons.com`, never inside the frame. The Carbon sees the real
 address before typing a code, the Silicon Accounts session works without third-party
 cookies (which browsers block in frames), and Google and Apple, which refuse to be framed,
 work the same way. Your page gets the result on the redirect URI, like every other way.

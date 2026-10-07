@@ -4,11 +4,14 @@
  * The account site's navigation: a floating dock at the bottom centre (from 640px) and, on phones, a compact bar that
  * opens the same sections in a bottom sheet. One highlight glides between sections on the morph spring while the
  * active section's label opens and the previous one closes, all on the same spring so they stay in step.
+ *
+ * Developer is another site (developer.teamofsilicons.com, from GET /v1/meta): a plain link that leaves the account
+ * site (after the page's navigation guards), marked with an arrow, and never the active section.
  */
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { animate, useReducedMotion, type AnimationPlaybackControls } from "motion/react";
-import { ChevronUp, Search, Settings } from "lucide-react";
+import { ArrowUpRight, ChevronUp, Search, Settings } from "lucide-react";
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { ThemeSwitch } from "@/components/arc/theme-switch/theme-switch";
@@ -16,8 +19,9 @@ import { Tooltip } from "@/components/arc/tooltip/tooltip";
 import { UserMenu, type UserMenuUser } from "@/components/arc/user-menu/user-menu";
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
 import { useTheme, type ThemePreference } from "@/components/foundation/theme/use-theme";
-import { SECTIONS, type SectionKey } from "@/lib/navigation";
+import { SECTIONS, sectionHref, type SectionKey } from "@/lib/navigation";
 import { GUARDED_NAVIGATION } from "@/lib/navigation-guard";
+import { useDeveloperUrl } from "@/lib/query/session";
 import styles from "./dock.module.css";
 
 export interface DockAccount extends UserMenuUser {
@@ -27,8 +31,9 @@ export interface DockAccount extends UserMenuUser {
 export interface DockProps {
   activeKey: SectionKey | undefined;
   /**
-   * Navigates (inside a page transition, after asking the page's navigation guards). Called for unmodified primary
-   * clicks only, with the element focus should go back to when the Carbon stays.
+   * Navigates (inside a page transition, after asking the page's navigation guards; another site's address is a full
+   * navigation). Called for unmodified primary clicks only, with the element focus should go back to when the Carbon
+   * stays.
    */
   onNavigate: (href: string, returnFocus: HTMLElement | null) => void;
   account: DockAccount | null;
@@ -57,6 +62,7 @@ export function Dock(props: DockProps) {
 
 function FullDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, onOpenPalette, isApple }: DockProps) {
   const { theme, preference, change } = useTheme();
+  const developerUrl = useDeveloperUrl();
   const reduced = useReducedMotion() ?? false;
   const listRef = useRef<HTMLUListElement>(null);
   const highlightRef = useRef<HTMLSpanElement>(null);
@@ -154,24 +160,9 @@ function FullDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, o
         {SECTIONS.map((section, index) => {
           const current = section.key === activeKey;
           const Icon = section.icon;
-          const link = (
-            <Link
-              ref={node => {
-                links.current[index] = node;
-              }}
-              href={section.href}
-              data-sq="surface"
-              className={styles.item}
-              aria-current={current ? "page" : undefined}
-              aria-label={section.label}
-              aria-keyshortcuts={section.shortcut}
-              {...{ [GUARDED_NAVIGATION]: "" }}
-              onClick={event => {
-                if (!plainClick(event)) return;
-                event.preventDefault();
-                onNavigate(section.href, event.currentTarget);
-              }}
-            >
+          const href = sectionHref(section, developerUrl);
+          const inner = (
+            <>
               <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
               <span
                 ref={node => {
@@ -182,9 +173,31 @@ function FullDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, o
               >
                 <span className={styles.label}>{section.label}</span>
               </span>
-            </Link>
+            </>
           );
-          return <li key={section.key}>{current ? link : <Tooltip content={`${section.label}  ${section.shortcut}`}>{link}</Tooltip>}</li>;
+          const shared = {
+            ref: (node: HTMLAnchorElement | null) => {
+              links.current[index] = node;
+            },
+            href,
+            "data-sq": "surface",
+            className: styles.item,
+            "aria-keyshortcuts": section.shortcut,
+            [GUARDED_NAVIGATION]: "",
+            onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+              if (!plainClick(event)) return;
+              event.preventDefault();
+              onNavigate(href, event.currentTarget);
+            },
+          };
+          const link = section.external ? (
+            // Another site: a plain link (a full navigation), named as the site it opens.
+            <a {...shared} aria-label={`${section.label} site`} data-external="">{inner}</a>
+          ) : (
+            <Link {...shared} aria-current={current ? "page" : undefined} aria-label={section.label}>{inner}</Link>
+          );
+          const tip = section.external ? `${section.label} site ↗  ${section.shortcut}` : `${section.label}  ${section.shortcut}`;
+          return <li key={section.key}>{current ? link : <Tooltip content={tip}>{link}</Tooltip>}</li>;
         })}
       </ul>
       <span className={styles.separator} aria-hidden="true" />
@@ -218,6 +231,7 @@ const themeOptions: { value: ThemePreference; label: string }[] = [
 
 function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, onOpenPalette }: DockProps) {
   const { preference, change } = useTheme();
+  const developerUrl = useDeveloperUrl();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const active = SECTIONS.find(section => section.key === activeKey);
@@ -240,29 +254,40 @@ function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings
         <ul className={styles.sheetList} role="list">
           {SECTIONS.map(section => {
             const Icon = section.icon;
+            const href = sectionHref(section, developerUrl);
+            const shared = {
+              href,
+              "data-sq": "surface",
+              className: styles.sheetItem,
+              [GUARDED_NAVIGATION]: "",
+              onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+                if (!plainClick(event)) return;
+                event.preventDefault();
+                // The sheet closes first, so a question about unsaved work is never asked over it; staying puts
+                // focus back on the button that opened it.
+                setOpen(false);
+                onNavigate(href, menuButton.current);
+              },
+            };
+            const inner = (
+              <>
+                <span className={styles.sheetIcon} aria-hidden="true"><Icon size={20} strokeWidth={1.75} /></span>
+                <span className={styles.sheetText}>
+                  <span className={styles.sheetLabel}>
+                    {section.external ? `${section.label} site` : section.label}
+                    {section.external ? <ArrowUpRight className={styles.externalMark} size={14} strokeWidth={1.75} aria-hidden="true" /> : null}
+                  </span>
+                  <span className={styles.sheetDescription}>{section.description}</span>
+                </span>
+              </>
+            );
             return (
               <li key={section.key}>
-                <Link
-                  href={section.href}
-                  data-sq="surface"
-                  className={styles.sheetItem}
-                  aria-current={section.key === activeKey ? "page" : undefined}
-                  {...{ [GUARDED_NAVIGATION]: "" }}
-                  onClick={event => {
-                    if (!plainClick(event)) return;
-                    event.preventDefault();
-                    // The sheet closes first, so a question about unsaved work is never asked over it; staying puts
-                    // focus back on the button that opened it.
-                    setOpen(false);
-                    onNavigate(section.href, menuButton.current);
-                  }}
-                >
-                  <span className={styles.sheetIcon} aria-hidden="true"><Icon size={20} strokeWidth={1.75} /></span>
-                  <span className={styles.sheetText}>
-                    <span className={styles.sheetLabel}>{section.label}</span>
-                    <span className={styles.sheetDescription}>{section.description}</span>
-                  </span>
-                </Link>
+                {section.external ? (
+                  <a {...shared} data-external="">{inner}</a>
+                ) : (
+                  <Link {...shared} aria-current={section.key === activeKey ? "page" : undefined}>{inner}</Link>
+                )}
               </li>
             );
           })}

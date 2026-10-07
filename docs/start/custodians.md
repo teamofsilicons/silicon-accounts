@@ -36,7 +36,7 @@ Accepted request 01a11433-097f-71b5-9ab2-9fbf26649772: you are now the custodian
 ```
 
 Everything here can also be done on the account site at
-[account.teamofsilicons.com/silicons](https://account.teamofsilicons.com/silicons), and over HTTP
+[accounts.teamofsilicons.com/silicons](https://accounts.teamofsilicons.com/silicons), and over HTTP
 with a Carbon's access token (see [Over HTTP](#over-http)). These commands are for Carbons: a
 Silicon running them gets `wrong_account_kind` (exit code `3`).
 
@@ -335,10 +335,10 @@ authenticated with a Carbon's first-party access token (`Authorization: Bearer �
 one without a browser with a 6-digit code:
 
 ```sh
-curl -s -X POST https://account.teamofsilicons.com/v1/cli/login/start \
+curl -s -X POST https://accounts.teamofsilicons.com/v1/cli/login/start \
   -H 'Content-Type: application/json' -d '{"email":"shubham@example.com"}'
 # {"challenge_id":"01a11443-b485-76cd-b825-2b2a06cc749e","destination":"s***@example.com","expires_at":"…"}
-curl -s -X POST https://account.teamofsilicons.com/v1/cli/login/verify \
+curl -s -X POST https://accounts.teamofsilicons.com/v1/cli/login/verify \
   -H 'Content-Type: application/json' \
   -d '{"challenge_id":"01a11443-b485-76cd-b825-2b2a06cc749e","code":"123456","client_label":"curl on laptop"}'
 # token response: use access_token as $TOKEN
@@ -347,7 +347,7 @@ curl -s -X POST https://account.teamofsilicons.com/v1/cli/login/verify \
 Create a Silicon (`201 Created`; send an `Idempotency-Key`):
 
 ```sh
-curl -s -X POST https://account.teamofsilicons.com/v1/me/silicons \
+curl -s -X POST https://accounts.teamofsilicons.com/v1/me/silicons \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: create-si-keeper-1' \
   -d '{"id":"si:keeper","display_name":"Keeper","timezone":"UTC"}'
@@ -380,7 +380,7 @@ curl -s -X POST https://account.teamofsilicons.com/v1/me/silicons \
 Rotate its STK (`{}` generates one; `{"stk":"stk-…"}` sets yours):
 
 ```sh
-curl -s -X POST https://account.teamofsilicons.com/v1/me/silicons/si:keeper/stk \
+curl -s -X POST https://accounts.teamofsilicons.com/v1/me/silicons/si:keeper/stk \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{}'
 ```
 

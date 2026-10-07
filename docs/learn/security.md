@@ -32,7 +32,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/me/custodian-requests/$REQUEST_ID/accept" -b "
 {
   "error": {
     "code": "origin_not_allowed",
-    "message": "A cookie-authenticated POST must send an Origin header equal to https://account.teamofsilicons.com.",
+    "message": "A cookie-authenticated POST must send an Origin header equal to https://accounts.teamofsilicons.com.",
     "hint": "Browsers send Origin automatically; other clients should use an Authorization: Bearer access token."
   }
 }
@@ -178,6 +178,11 @@ Answers are shaped so they don't reveal more than the caller already knows:
 - **Audience.** An access token carries the app it was issued to (`aud`). An app's token is
   refused on account endpoints (`token_wrong_audience`) and at another app's introspection; to act
   for an account at another app, an app gets an OBO proof, which the account can see and revoke.
+  The developer platform's tokens (`aud = developer`) are narrower still: they only read the
+  signed-in Carbon and manage the apps that Carbon owns, so a leak of one can't change an
+  account's emails, Silicons or apps signed into. They never reach a browser: the developer
+  platform's server holds them in a sealed, httpOnly cookie, and the Carbon can sign it out from
+  their account's sessions at any time.
 - **Rotation with reuse detection.** Refresh tokens, proof refresh tokens and authorization codes
   are single use. Presenting a used one is treated as theft: the whole sign-in (or proof) is
   revoked and the app is told (`membership.signed_out`, reason `refresh_token_reuse` or

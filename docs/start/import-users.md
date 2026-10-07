@@ -93,11 +93,11 @@ same ones (an id can differ if someone takes it in between).
   are `Authorization: Basic base64(app_id:app_secret)`, which is what `curl -u` sends. With
   the CLI, `accounts app use legacy-crm --secret-stdin` stores the secret (mode 0600); run
   `accounts app use legacy-crm` without a secret to act as the owner through your own session.
-- **Where.** The CLI talks to `https://account.teamofsilicons.com` unless `--url` or
+- **Where.** The CLI talks to `https://accounts.teamofsilicons.com` unless `--url` or
   `ACCOUNTS_URL` says otherwise. The curl examples assume:
 
   ```sh
-  export ACCOUNTS_URL=https://account.teamofsilicons.com   # not deployed yet; a local stack: http://localhost:8590
+  export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # not deployed yet; a local stack: http://localhost:8590
   export APP_ID=legacy-crm
   export APP_SECRET=sa_app_…        # from Silicon Apps; never commit it
   ```
@@ -106,8 +106,9 @@ same ones (an id can differ if someone takes it in between).
   It counts like an import toward your budgets (60 requests per hour, 2,000,000 rows per 24
   hours), so dry-run the whole file once rather than piece by piece.
 
-On the account site the same flow is under **Developer → your app → Import**
-(`/developer/{app_id}/import`): pick the file, read the dry-run report, then import it for real.
+On [developer.teamofsilicons.com](https://developer.teamofsilicons.com) the same flow is the app's
+**Import** tab (`/apps/{app_id}/import`): pick the file, read the dry-run report, then import it
+for real.
 
 ## 1. Prepare the file
 
@@ -182,7 +183,7 @@ addresses for them stay in your imported data until they add and verify them the
 - Options may also be query parameters. The same option given in both places with different
   values is refused (`validation_failed`): a dry run must never turn into a real import by
   accident.
-- The CLI and the account site also accept a file that is just the array (`[{…}, {…}]`) and wrap
+- The CLI and the developer platform's Import tab also accept a file that is just the array (`[{…}, {…}]`) and wrap
   it for you; the HTTP API needs `{"rows": […]}`.
 
 ## 2. Check it with a dry run
@@ -570,7 +571,7 @@ These answers come back before a job exists: nothing was imported. Errors have t
 TypeScript (Node 18 or later, no dependencies):
 
 ```ts
-const base = process.env.ACCOUNTS_URL ?? "https://account.teamofsilicons.com";
+const base = process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com";
 const appId = process.env.APP_ID!;
 const auth = "Basic " + Buffer.from(`${appId}:${process.env.APP_SECRET}`).toString("base64");
 

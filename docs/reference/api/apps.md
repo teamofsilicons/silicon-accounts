@@ -139,13 +139,14 @@ GET. No change means no new version; every change adds a history entry.
 | `apple.services_id`, `apple.team_id`, `apple.key_id` | null | required with `byo` (with a `private_key`); team and key ids are 10 letters or digits |
 | `redirect_uris` | `[]` | at most 50; https, or http on `localhost` / `127.0.0.1` / `[::1]`, or a reverse-domain native scheme |
 | `allowed_origins` | `[]` | at most 50 origins that may frame the iframe (`/embed/v1/buttons`, the SDK's `mountFrame`); the SDK's buttons need none |
-| `required_fields` | `[]` | any of `email`, `phone`, `dob`, `timezone`: asked before the app gets the account |
-| `optional_fields` | `[]` | the same values, offered on the consent screen; never also required |
+| `required_fields` | `[]` | any of `email`, `phone`, `dob`, `timezone`: always shared; a missing email or phone is added on the details page before the app gets the account |
+| `optional_fields` | `[]` | the same values, a checkbox on the details page (unticked until the Carbon ticks it); never also required |
+| `flow` | `null` | the app's pages: `{steps: [{id, fields, title, subtitle, continue_label, layout}], review}`; 1–8 steps, every requested detail on exactly one step; `null` is one page with every detail. See [Flows](../../start/sign-in-config.md#flows). Without `flow` in a patch, a detail no longer asked leaves its step (an emptied step is dropped) and a new one joins the last step |
 | `allowed_email_domains` | `[]` | at most 100 domains; empty = any |
 | `allow_signup` | `true` | `false` = only existing (and imported) accounts may sign in |
 | `remember_browser` | `true` | offer "Continue as …" for the browser's signed-in Carbon |
 | `branding` | the Silicon Accounts look | see [Branding](../../start/branding.md): `theme`, `logo_url`, `logo_dark_url`, `logo_height` (16–96), `show_app_name`, `font_family`, `heading_font_family`, `corner_style`, `radius` (0–40), `button_style`, `layout`, `background_style`, `background_image_url`, `density`, `light` and `dark` palettes (`#RRGGBB`; button text and page text need 4.5:1 contrast) |
-| `copy` | nulls | `title` (≤ 80 characters), `subtitle` (≤ 200), `terms_url`, `privacy_url`, `support_email` |
+| `copy` | nulls | `title` (≤ 80 characters), `subtitle` (≤ 200), `signup_title` (≤ 80), `signup_subtitle` (≤ 200), `opening_title` (≤ 80, only the `{provider}` and `{app}` placeholders), `terms_url`, `privacy_url`, `support_email` |
 
 The page footer always says "Powered by Silicon Accounts"; no setting removes it. Errors: 422
 `validation_failed` with every problem keyed by path, 409 `config_version_conflict`
@@ -212,7 +213,7 @@ phone only where you were granted that scope), `status` (`active`, `imported`,
       "kind": "carbon",
       "id": "c:ada",
       "display_name": "Ada King",
-      "pfp_url": "https://account.teamofsilicons.com/v1/photos/01a11437-b512-76e4-ae95-3378b29e547e",
+      "pfp_url": "https://accounts.teamofsilicons.com/v1/photos/01a11437-b512-76e4-ae95-3378b29e547e",
       "email": "ada.work@example.test",
       "timezone": "Europe/London",
       "status": "active",

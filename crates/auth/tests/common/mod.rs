@@ -232,6 +232,87 @@ pub async fn email_signup(
     r.json["flow"].clone()
 }
 
+/// `POST /v1/flows/{id}/details/continue` with these optional details ticked.
+pub async fn continue_page(
+    ctx: &TestContext,
+    b: &mut Browser,
+    flow_id: &str,
+    share: &[&str],
+) -> Resp {
+    b.post(
+        ctx,
+        &format!("/v1/flows/{flow_id}/details/continue"),
+        json!({"share": share}),
+    )
+    .await
+}
+
+/// Continues every details page (ticking the optional details in `share` where a page offers
+/// them) and approves the review page; returns the last response (the completed flow, or the
+/// first refusal).
+pub async fn finish_pages(
+    ctx: &TestContext,
+    b: &mut Browser,
+    flow_id: &str,
+    share: &[&str],
+) -> Resp {
+    let mut r = b.get(ctx, &format!("/v1/flows/{flow_id}")).await;
+    for _ in 0..12 {
+        if r.status != 200 {
+            return r;
+        }
+        match r.json["flow"]["step"].as_str() {
+            Some("details") => {
+                let offered: Vec<String> = r.json["flow"]["details"]["fields"]
+                    .as_array()
+                    .map(|fields| {
+                        fields
+                            .iter()
+                            .filter(|f| f["mode"] == "optional")
+                            .filter_map(|f| f["field"].as_str())
+                            .filter(|f| share.contains(f))
+                            .map(str::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let offered: Vec<&str> = offered.iter().map(String::as_str).collect();
+                r = continue_page(ctx, b, flow_id, &offered).await;
+            }
+            Some("review") => {
+                r = b
+                    .post(
+                        ctx,
+                        &format!("/v1/flows/{flow_id}/review"),
+                        json!({"approve": true}),
+                    )
+                    .await;
+            }
+            _ => return r,
+        }
+    }
+    r
+}
+
+/// The `(field, mode, shared, missing)` rows of the details page in a flow view.
+pub fn page_fields(flow: &Value) -> Vec<(String, String, bool, bool)> {
+    flow["details"]["fields"]
+        .as_array()
+        .map(|fields| {
+            fields
+                .iter()
+                .map(|f| {
+                    (
+                        f["field"].as_str().unwrap_or_default().to_string(),
+                        f["mode"].as_str().unwrap_or_default().to_string(),
+                        f["shared"].as_bool().unwrap_or_default(),
+                        f["missing"].as_bool().unwrap_or_default(),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// The `code` query parameter of a redirect.
 pub fn code_of(redirect_to: &str) -> String {
     query_param(redirect_to, "code").unwrap_or_else(|| panic!("no code in {redirect_to}"))

@@ -23,7 +23,7 @@ pub fn command() -> Command {
     }
     let tail = [
         "Environment:",
-        "  ACCOUNTS_URL                    Silicon Accounts URL (default account.teamofsilicons.com)",
+        "  ACCOUNTS_URL                    Silicon Accounts URL (default accounts.teamofsilicons.com)",
         "  ACCOUNTS_HOME                   directory holding .accounts/ (beats the configured home)",
         "  SILICON_HOME                    the home when nothing else is set (else ~)",
         "  ACCOUNTS_SILICON, ACCOUNTS_STK  a Silicon's si:id and STK for `accounts login`",
@@ -40,9 +40,11 @@ pub fn command() -> Command {
         "  130 interrupted",
         "",
         "Links:",
-        "  Docs     https://account.teamofsilicons.com/docs",
-        "  GitHub   https://github.com/teamofsilicons/silicon-accounts",
-        "  Package  silicon-accounts-client on crates.io (this CLI is built on it)",
+        "  Docs       https://accounts.teamofsilicons.com/docs",
+        "  Account    https://accounts.teamofsilicons.com (your own account)",
+        "  Developer  https://developer.teamofsilicons.com (your apps' sign-in setup)",
+        "  GitHub     https://github.com/teamofsilicons/silicon-accounts",
+        "  Package    silicon-accounts-client on crates.io (this CLI is built on it)",
         "",
         "Updates are managed by Silicon Apps; this CLI never updates itself.",
     ]

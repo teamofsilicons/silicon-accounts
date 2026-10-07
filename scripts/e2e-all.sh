@@ -84,7 +84,7 @@ for suite in "${SUITES[@]}"; do
   done
 done
 TOTAL="${#RUN_SUITE[@]}"
-[ "$((BASE_START + 10 * (TOTAL - 1) + 4))" -le 65535 ] || fail "$TOTAL runs from base $BASE_START run past port 65535"
+[ "$((BASE_START + 10 * (TOTAL - 1) + 5))" -le 65535 ] || fail "$TOTAL runs from base $BASE_START run past port 65535"
 if [ -z "$JOBS" ]; then JOBS="$TOTAL"; [ "$JOBS" -le 10 ] || JOBS=10; fi
 case "$JOBS" in ''|*[!0-9]*|0) fail "--jobs must be a positive number, got '$JOBS'" ;; esac
 

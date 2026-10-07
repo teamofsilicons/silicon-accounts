@@ -10,7 +10,7 @@ section('quill-docs: scope openid → an id_token the fake app verifies (EdDSA, 
   const browser = await newBrowser();
   const s = await startAppSignIn('quill-docs', browser, { scope: 'openid email' });
   let flow = await codeStep(browser, s.flow, { email: randomEmail('oidc') });
-  flow = await driveFlow(browser, flow, { messaging, optionalScopes: ['email'] });
+  flow = await driveFlow(browser, flow, { messaging, share: ['email'] });
   const cb: any = await s.fake.callback('quill-docs', flow.redirect_to!);
   check(cb.id_token?.verified === true && typeof cb.id_token?.claims?.auth_time === 'number', `id_token verified (claims: ${Object.keys(cb.id_token?.claims ?? {}).join(', ')})`, cb.id_token);
 }

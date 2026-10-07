@@ -1,0 +1,101 @@
+/* The live preview of the hosted sign-in page: a browser or phone frame around the branded page. Everything inside
+   .page is painted by the app's branding (BrandingScope), so it uses the semantic tokens like the hosted pages do. */
+
+.frame {
+  --sq-r: var(--radius-panel);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  position: relative;
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+}
+.frame[data-device="phone"] {
+  --sq-r: 44px;
+  --sq-fill: var(--surface-muted);
+  --sq-stroke: var(--border-strong);
+  justify-self: center;
+  width: min(100%, var(--phone-width, 410px));
+  padding: 9px;
+}
+
+.chrome { display: flex; height: 38px; align-items: center; gap: var(--space-3); padding: 0 var(--space-4); border-bottom: 1px solid var(--border); background: var(--surface-muted); }
+.dots { display: inline-flex; gap: 6px; }
+.dots i { width: 10px; height: 10px; border-radius: 50%; background: color-mix(in oklab, var(--foreground) 16%, transparent); }
+.address { --sq-r: var(--radius-pill); --sq-fill: var(--surface); position: relative; min-width: 0; flex: 1; max-width: 420px; overflow: hidden; margin-inline: auto; padding: 4px 12px; background: var(--sq-fill); color: var(--text-secondary); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+
+.scaledOuter { position: relative; width: 100%; min-width: 0; height: calc(var(--h) * var(--scale, 1)); overflow: hidden; }
+.scaledInner { position: absolute; top: 0; left: var(--offset, 0px); width: var(--w); height: var(--h); transform: scale(var(--scale, 1)); transform-origin: top left; }
+
+.page { --sq-r: 0px; position: relative; width: 100%; height: 100%; overflow: hidden; container: preview-page / inline-size; }
+.frame[data-device="phone"] .page { --sq-r: 36px; }
+.scope { height: 100%; overflow: hidden; }
+
+/* The split layout as the hosted page draws it (components/auth/flow/flow.module.css): a short "Sign in" heads the
+   form on the first step (the app's title is beside it), and "Powered by" belongs to the form's half, never across the
+   line between the halves. */
+.splitLabel { display: none; }
+@container sa-brand (min-width: 860px) {
+  :global(.sa-brand[data-layout="split"]) .splitLabel { display: block; margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-xl); font-weight: 400; letter-spacing: var(--tracking-display); line-height: 1.2; }
+}
+@container preview-page (min-width: 860px) {
+  .page[data-layout="split"] .powered { left: 50% !important; width: 50% !important; }
+}
+
+/* Step content, inside the branded panel. */
+.stepTrack { position: relative; display: grid; min-width: 0; }
+.step { display: grid; min-width: 0; gap: var(--brand-gap, 16px); }
+.providers { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); }
+.providerButton { width: 100%; }
+.providerButton > span { gap: var(--space-2); }
+.form { display: grid; min-width: 0; gap: var(--space-3); }
+.wide { width: 100%; }
+.textLink { color: var(--accent-ink); font-size: var(--text-sm); font-weight: 500; }
+.small, .empty { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.divider { display: flex; align-items: center; gap: var(--space-3); color: var(--text-muted); font-size: var(--text-xs); }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.stepHeading { display: grid; gap: var(--space-1); }
+.stepHeading h2 { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-xl); font-weight: 500; line-height: 1.2; }
+.stepHeading p { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.account { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); --sq-stroke: var(--border); position: relative; display: flex; min-width: 0; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.accountText { display: grid; min-width: 0; flex: 1; gap: 1px; }
+.accountName { overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.accountDetail { color: var(--text-secondary); font-size: var(--text-xs); }
+.resend { justify-self: center; color: var(--text-secondary); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.signupPhoto { display: flex; align-items: center; gap: var(--space-3); }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); }
+.shared { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.shared li { display: flex; min-height: 52px; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--border); }
+.sharedText { display: grid; min-width: 0; gap: 2px; color: var(--foreground); font-size: var(--text-sm); }
+.sharedValue { overflow: hidden; color: var(--text-secondary); font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
+.lock { flex: none; color: var(--text-muted); }
+.actions { display: grid; gap: var(--space-2); }
+.inlineIcon { display: inline-block; margin-right: 6px; vertical-align: -1px; }
+
+/* The Opening page: the provider's mark, the app's words, a quiet progress line, and the fallback button. */
+.opening { display: grid; justify-items: center; gap: var(--space-4); padding: var(--space-4) 0 var(--space-2); text-align: center; }
+.opening .stepHeading { justify-items: center; }
+.openingMark { --sq-r: 16px; display: grid; width: 56px; height: 56px; place-items: center; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.openingBar { position: relative; display: block; width: min(220px, 70%); height: 3px; overflow: hidden; border-radius: 3px; background: var(--surface-muted); }
+.openingBar i { position: absolute; inset: 0 auto 0 0; width: 62%; border-radius: 3px; background: var(--accent); }
+
+/* A required email or phone the Carbon has not added yet: added (with a code) before continuing. */
+.missing { flex-wrap: wrap; }
+.addRow { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-2); }
+
+/* The app's own site with the embed buttons. */
+.site { position: relative; display: grid; width: 100%; height: 100%; grid-template-rows: auto 1fr; background: var(--background); color: var(--foreground); }
+.siteBar { display: flex; align-items: center; gap: var(--space-5); padding: 14px var(--space-6); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: var(--text-sm); }
+.siteBar b { color: var(--foreground); font-weight: 600; }
+.siteSpacer { flex: 1; }
+.siteBody { position: relative; display: grid; align-content: center; justify-items: center; gap: var(--space-6); padding: var(--space-8) var(--space-6); }
+.siteScope { width: 100%; background: transparent !important; }
+.siteColumns { display: grid; width: min(100%, 760px); grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-5); margin-inline: auto; }
+.siteCard { display: grid; align-content: start; gap: var(--space-3); padding: var(--space-6); border: 1px dashed var(--border); border-radius: 16px; background: color-mix(in oklab, var(--surface) 70%, transparent); }
+.siteEyebrow { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); letter-spacing: .02em; text-transform: uppercase; }
+.siteTitle { margin: 0 0 var(--space-2); color: var(--foreground); font-size: var(--text-xl); font-weight: 500; line-height: 1.2; }
+.siteButtons { display: grid; gap: var(--space-2); }
+.siteButtons > button > span { gap: var(--space-2); }
+.sitePowered { padding: 0 !important; }

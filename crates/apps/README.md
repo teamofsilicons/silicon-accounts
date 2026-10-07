@@ -54,6 +54,23 @@ is refused with the measured ratio in the message). No change → no new
 version. Each change → `version + 1`, `app_config_history` row `changes: [{path, before, after}]`
 (secrets as `"[redacted]"` with `"secret": true`), audit `app.signin_config.updated`.
 
+**Details and flows.** `required_fields` / `optional_fields` are disjoint subsets of email, phone,
+dob, timezone (the developer site ticks a detail as required; it can be switched to optional).
+`flow` decides the pages that ask for them:
+`{"steps": [{"id": "contact", "fields": ["email","phone"], "title", "subtitle", "continue_label", "layout"}…], "review": bool}`
+— 1 to 8 steps, ids `[a-z0-9-]{1,40}` unique, every requested detail on exactly one step and
+nothing else, title ≤ 80 / subtitle ≤ 200 / continue_label ≤ 30 characters of plain text, layout
+`card|split|minimal` or null (= `branding.layout`); errors keyed `flow.steps[1].fields[0]` etc.
+`flow: null` (the default) = one page with every requested detail and no review. A PATCH without
+`flow` keeps the stored flow valid: a detail no longer requested leaves its step, an emptied step
+is dropped (no steps left → `null`), a newly requested detail joins the last step. A PATCH with a
+`flow` object is validated as sent; while the stored flow is `null` the object merges into the
+default flow (`{"flow":{"review":true}}` turns the review page on). An app with no details can't
+have a flow (422 `flow.steps`). `copy` also takes `opening_title` (the page before Google/Apple,
+≤ 80, placeholders `{provider}` and `{app}` only), `signup_title` (≤ 80) and `signup_subtitle`
+(≤ 200) for `intent=signup`. The first-party apps `accounts` and `developer` can't be synced and
+never ask for details.
+
 ## User base
 
 Contact fields follow what the app may see: `active` → the account's primary email/phone (Carbons

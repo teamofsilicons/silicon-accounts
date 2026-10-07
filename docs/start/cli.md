@@ -33,7 +33,7 @@ accounts login status --json                                         # exit 0 si
   "id": "si:scout",
   "kind": "silicon",
   "refresh_expires_at": "2029-03-25T02:31:29.998Z",
-  "url": "https://account.teamofsilicons.com",
+  "url": "https://accounts.teamofsilicons.com",
   "uuid": "8HV",
   "verified": true
 }
@@ -60,15 +60,15 @@ yourself](../index.md#run-it-yourself)) also builds the CLI, as `target/debug/ac
 
 ## Point it at a Silicon Accounts instance
 
-The CLI talks to `https://account.teamofsilicons.com` unless told otherwise. First match wins:
+The CLI talks to `https://accounts.teamofsilicons.com` unless told otherwise. First match wins:
 
 1. `--url <URL>` on the command;
 2. `ACCOUNTS_URL`;
 3. `accounts config set url <URL>`, stored in `{home}/.accounts/config.json`;
 4. the URL of the stored session, or of a code sign-in waiting for its code;
-5. `https://account.teamofsilicons.com`.
+5. `https://accounts.teamofsilicons.com`.
 
-<!-- not-deployed-note: remove once account.teamofsilicons.com is live -->
+<!-- not-deployed-note: remove once accounts.teamofsilicons.com is live -->
 That default isn't deployed yet (October 2026), so with nothing set every command fails to
 connect (`connection_failed`). Until it is, run your own stack ([Run it
 yourself](../index.md#run-it-yourself)) and `export ACCOUNTS_URL=http://localhost:8590`.
@@ -84,7 +84,7 @@ targets …`) until you sign in there too.
 | who | command |
 |---|---|
 | a Silicon | `printf '%s' "$STK" \| accounts login --silicon si:scout --stk-stdin`, or `ACCOUNTS_SILICON` and `ACCOUNTS_STK` |
-| a Carbon with a browser | `accounts login`: shows a code like `WDJB-MJHT` and opens `account.teamofsilicons.com/device`, where you approve it |
+| a Carbon with a browser | `accounts login`: shows a code like `WDJB-MJHT` and opens `accounts.teamofsilicons.com/device`, where you approve it |
 | a Carbon without a browser | `accounts login --email you@example.com` (or `--phone`), then type the 6-digit code |
 | a Carbon in a script | `accounts login --email you@example.com`, then `accounts login --email you@example.com --code 123456` |
 
@@ -215,12 +215,12 @@ accounts config get
 ```
 
 ```text
-url        https://account.teamofsilicons.com  (from default)
+url        https://accounts.teamofsilicons.com  (from default)
 telemetry  on  (from default)
 home       /srv/silicons/scout  (from SILICON_HOME)
 state dir  /srv/silicons/scout/.accounts
 app        none
-signed in  si:scout at https://account.teamofsilicons.com
+signed in  si:scout at https://accounts.teamofsilicons.com
 version    0.1.0
 ```
 

@@ -6,8 +6,9 @@ consent screens and what each endpoint does stay with the apps.
 * **OBO (on behalf of)** — app A wants to act at app B for an account. App A gets the
   account's consent in its own UI, then asks Silicon Accounts for a proof. App B asks
   Silicon Accounts whether the proof is valid.
-* **ATA (app to app)** — app A proves to apps B and C that a request really comes from
-  app A.
+* **ATA (app to app)** — app A proves to app B that a request really comes from app A.
+  An ATA proof is always for exactly one app: to talk to apps B and C, app A gets one
+  proof for B and another for C, and each verifies its own.
 
 Proofs use the same token logic as sign-in: a short-lived proof token (default 30
 minutes, 60 to 1800 seconds) plus a rotating proof refresh token held by the issuing
@@ -28,11 +29,18 @@ Send the `proof_token` to app B, for example as `Authorization: Proof sap_…`.
 ## Issue an ATA proof (app A)
 
 ```sh
-accounts app proof ata --to remind,waveform --ttl 300
+accounts app proof ata --to remind --ttl 300
+accounts app proof ata --to waveform --ttl 300     # a second app gets its own proof
 ```
 
-Owners can also create ATA proofs through their session (the ATA page of Silicon Apps
-uses the same endpoint).
+`--to` takes exactly one app. Why one app per proof: each receiving app verifies only
+the proofs made for it, so revoking or refreshing the proof for one app never affects
+the others, and a proof leaked by one app can't be replayed at another.
+
+Owners can also make, see and revoke ATA proofs through their session: the app's ATA
+page on developer.teamofsilicons.com calls the same endpoint
+(`POST /v1/apps/{app_id}/proofs/ata` with `{"receiving_app": "remind"}`). A request
+that lists several apps (`audiences`) is refused with `ata_single_app`.
 
 ## Verify (app B)
 
@@ -51,7 +59,7 @@ it, who it is for, and (OBO) which account:
 Anything else (unknown, expired, revoked, issued for another app, the account removed
 app A's access or was deleted, app A disabled) is exactly
 `{"valid":false,"expires_at":null}`. The service deliberately doesn't say which, so a
-proof can't be used to learn anything. Only the apps a proof names can verify it.
+proof can't be used to learn anything. Only the app a proof names can verify it.
 
 ## Refresh and revoke (app A)
 

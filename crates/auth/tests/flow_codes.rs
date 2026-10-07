@@ -53,7 +53,7 @@ async fn existing_account_signs_in_with_an_email_code() {
     assert_eq!(r.status, 200, "{}", r.json);
     let f = &r.json["flow"];
     assert_eq!(
-        f["step"], "consent",
+        f["step"], "details",
         "first sign-in to the app shows what's shared"
     );
     assert_eq!(f["signed_in_as"]["uuid"], carbon.uuid.as_str());
@@ -61,16 +61,15 @@ async fn existing_account_signs_in_with_an_email_code() {
         b.cookie("sa_session")
             .is_some_and(|c| c.starts_with("sas_"))
     );
-    assert_eq!(f["consent"]["required"][0]["scope"], "profile");
-    assert_eq!(f["consent"]["previously_granted"], json!([]));
+    // An app that asks for no details: one what's-shared page showing the profile.
+    assert_eq!(f["details"]["id"], "details");
+    assert_eq!(f["details"]["fields"], json!([]));
+    assert_eq!(
+        (f["details"]["index"].clone(), f["details"]["count"].clone()),
+        (json!(0), json!(1))
+    );
 
-    let r = b
-        .post(
-            &ctx,
-            &format!("/v1/flows/{id}/consent"),
-            json!({"approve": true}),
-        )
-        .await;
+    let r = continue_page(&ctx, &mut b, &id, &[]).await;
     assert_eq!(r.status, 200, "{}", r.json);
     let f = &r.json["flow"];
     assert_eq!(f["step"], "complete");
@@ -427,7 +426,7 @@ async fn closed_apps_refuse_new_accounts_but_not_existing_ones() {
 
     let r = email_and_verify(&ctx, &mut b, &id, &existing).await;
     assert_eq!(r.status, 200, "{}", r.json);
-    assert_eq!(r.json["flow"]["step"], "consent");
+    assert_eq!(r.json["flow"]["step"], "details");
     assert_eq!(r.json["flow"]["error"], serde_json::Value::Null);
 }
 
@@ -455,18 +454,29 @@ async fn steps_are_enforced() {
         .post(&ctx, &format!("/v1/flows/{id}/resend"), json!({}))
         .await;
     assert_eq!(r.error_code(), Some("invalid_step"));
-    let r = b
-        .post(
-            &ctx,
-            &format!("/v1/flows/{id}/consent"),
-            json!({"approve": true}),
-        )
-        .await;
-    assert_eq!(r.error_code(), Some("invalid_step"));
-    let r = b
-        .post(&ctx, &format!("/v1/flows/{id}/signup"), json!({}))
-        .await;
-    assert_eq!(r.error_code(), Some("invalid_step"));
+    for (path, body) in [
+        ("review", json!({"approve": true})),
+        ("review", json!({"approve": false})),
+        ("details/continue", json!({"share": []})),
+        ("details/back", json!({})),
+        ("details/add", json!({"email": "x@example.test"})),
+        ("details/verify", json!({"code": "123456"})),
+        ("signup", json!({})),
+    ] {
+        let r = b.post(&ctx, &format!("/v1/flows/{id}/{path}"), body).await;
+        assert_eq!(r.error_code(), Some("invalid_step"), "{path}: {}", r.json);
+    }
+    // The old steps' endpoints are gone.
+    for path in ["consent", "requirements/email"] {
+        let r = b
+            .post(
+                &ctx,
+                &format!("/v1/flows/{id}/{path}"),
+                json!({"approve": true}),
+            )
+            .await;
+        assert_eq!(r.status, 404, "{path}: {}", r.json);
+    }
 }
 
 /// A 6-digit code that isn't any of `codes`.

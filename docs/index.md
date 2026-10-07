@@ -21,7 +21,7 @@ up, the pages Carbons see, and the app's own user base.
 You can talk to it without an account:
 
 ```sh
-export ACCOUNTS_URL=https://account.teamofsilicons.com   # or a local stack: http://localhost:8590
+export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # or a local stack: http://localhost:8590
 curl -s "$ACCOUNTS_URL/v1/ids/available?id=si:head_of_growth"
 ```
 
@@ -29,13 +29,13 @@ curl -s "$ACCOUNTS_URL/v1/ids/available?id=si:head_of_growth"
 {"id": "si:head_of_growth", "available": true, "reason": null, "message": "si:head_of_growth is available.", "reclaimable": false, "suggestions": []}
 ```
 
-<!-- not-deployed-note: remove once account.teamofsilicons.com is live -->
+<!-- not-deployed-note: remove once accounts.teamofsilicons.com is live -->
 > [!IMPORTANT]
-> The hosted service isn't deployed yet (October 2026): `account.teamofsilicons.com` has no DNS
+> The hosted service isn't deployed yet (October 2026): `accounts.teamofsilicons.com` has no DNS
 > record, so the command above fails with `curl: (6) Could not resolve host`. Until it is, run
 > your own stack ([Run it yourself](#run-it-yourself)) and set
 > `ACCOUNTS_URL=http://localhost:8590`. The CLI and the code samples read `ACCOUNTS_URL`;
-> wherever an example spells out `https://account.teamofsilicons.com` (a `curl` command, a
+> wherever an example spells out `https://accounts.teamofsilicons.com` (a `curl` command, a
 > `<script src>`), put your local URL in its place. The examples in these docs were run against
 > such a stack.
 
@@ -59,14 +59,16 @@ own for reading offline: `accounts docs` lists them, `accounts docs imports` ope
 1. [Add sign-in](start/add-sign-in.md): send Carbons to the hosted pages, drop in the iframe or
    the snippet, or use any OpenID Connect library, then exchange the code for tokens.
 2. [Configure sign-in](start/sign-in-config.md): methods and their order, redirect URIs,
-   which details Carbons share with you, who may sign in.
+   which details Carbons share with you (required or optional), your flows, who may sign in.
+   The developer platform, [developer.teamofsilicons.com](https://developer.teamofsilicons.com),
+   does all of it with live previews.
 3. [Brand the pages](start/branding.md) so they look like your app.
 4. [Import your existing users](start/import-users.md) so nobody starts over.
 5. [Verify tokens](start/tokens.md), [receive webhooks](start/webhooks.md) about the accounts
    in your user base, and act at other apps with [proofs](start/verify-a-proof.md).
 
 **You are a Carbon.** Your account lives at
-[account.teamofsilicons.com](https://account.teamofsilicons.com): your details, your emails
+[accounts.teamofsilicons.com](https://accounts.teamofsilicons.com): your details, your emails
 and phone numbers, the apps you signed in to (and what each one sees), the proofs apps issued
 on your behalf, and the Silicons you are custodian of. [Being a custodian](start/custodians.md)
 explains what you are responsible for; [Accounts](learn/accounts.md) explains what your account
@@ -89,7 +91,7 @@ holds and what deleting it does.
 | Carbon | A person. Every person's account is a Carbon account. |
 | Silicon | An agent. Its account is a Silicon account, with a password called an STK. |
 | Custodian | The one Carbon responsible for a Silicon. Every Silicon always has exactly one. |
-| App | Any application that signs its users in with Silicon Accounts. Apps are created in Silicon Apps. |
+| App | Any application that signs its users in with Silicon Accounts. Apps are created in Silicon Apps; their sign-in is set up on the developer platform, developer.teamofsilicons.com. |
 | uuid | The permanent identifier of an account, like `a8K`. It never changes and is never reused. |
 | `c:id`, `si:id` | The public, changeable id of a Carbon or a Silicon, like `c:saket` or `si:head_of_growth`. |
 | Membership | An account's relationship with an app: `{app_id}:{uuid}`, like `briefcase:a8K`. |
@@ -128,7 +130,8 @@ Numbers worth knowing (all of them are in [limits](reference/limits.md)):
 ## Run it yourself
 
 A local stack is the whole service on your machine: Postgres, `accounts-api`, the account site,
-mock Google and Apple, a mock email and SMS sender, and fake apps (`briefcase`, `dm`, `remind`,
+the developer platform (http://localhost:8600, where you sign in as an app's owner and set up its
+sign-in), mock Google and Apple, a mock email and SMS sender, and fake apps (`briefcase`, `dm`, `remind`,
 …) with fixed development secrets. No code reaches a real inbox or phone and no sign-in reaches
 the real Google or Apple, so it is also the safe place to try a change before you make it in
 production. From a checkout of the repository:
@@ -150,9 +153,14 @@ every option, including the ports and database of a second stack.
 
 ## Where to find more
 
-- The account site: [account.teamofsilicons.com](https://account.teamofsilicons.com).
+- The account site: [accounts.teamofsilicons.com](https://accounts.teamofsilicons.com), where a
+  Carbon manages their own account.
+- The developer platform: [developer.teamofsilicons.com](https://developer.teamofsilicons.com),
+  where developers set up everything about their apps' sign-in: methods, Google and Apple, the
+  details they ask for, flows and pages, redirect URLs, user base and imports, webhooks and ATA
+  proofs. The settings themselves are stored in Silicon Accounts.
 - Discovery for OpenID Connect libraries:
-  `https://account.teamofsilicons.com/.well-known/openid-configuration`, keys at
+  `https://accounts.teamofsilicons.com/.well-known/openid-configuration`, keys at
   `/.well-known/jwks.json`.
 - Source of the service, the account site, the CLI, the Rust package and these docs: the
   `silicon-accounts` repository. Its public home,

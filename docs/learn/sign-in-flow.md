@@ -29,18 +29,23 @@ choose_method ──email/phone──▶ verify_code ──┐
       │  └──Google/Apple─────────────────────┼──▶ signup (first time, or finishing an import)
       └──Continue as the browser's Carbon ───┤        │
                                              ▼        ▼
-                                  requirements ──▶ consent ──▶ complete: redirect_uri?code=…&state=…
-                                                               (or error=access_denied)
+                       details[0] ──▶ details[1] … ──▶ review ──▶ complete: redirect_uri?code=…&state=…
+                       (Back between pages; Cancel anywhere)       (or error=access_denied)
 prompt=none that can't sign in silently ──────────────────────▶ failed:   redirect_uri?error=…&state=…
 ```
 
 - **choose_method**: the app's enabled methods in its order (Google, Apple, email, phone by
-  default), and "Continue as …" when the browser is already signed in to Silicon Accounts.
+  default), and "Continue as …" when the browser is already signed in to Silicon Accounts. The
+  sign-up version when the app sent `intent=signup`. An app's direct button opens one method:
+  `email`/`phone` on its empty field, `google`/`apple` on the Opening page ("Opening Google to
+  sign you in to {app}…"), which moves on to the provider by itself.
 - **verify_code**: a 6-digit code went to the email or phone.
 - **signup**: the email, phone or Google/Apple identity belongs to nobody yet, so this is the
   Carbon's sign-up.
-- **requirements**: your app requires a detail the account doesn't have yet.
-- **consent**: the what's-shared screen.
+- **details**: the pages of your app's flow, each with the details it asks for: required ones
+  (a missing email or phone is added on the page, with a code) and optional checkboxes,
+  unticked until the Carbon ticks them. One page when your app has no flow of its own.
+- **review**: everything that will be shared, when your flow turns the review page on.
 - **complete** or **failed**: the flow is over, and the browser is sent to your redirect URI.
 
 Steps are skipped when they have nothing to ask: an existing Carbon who already granted
@@ -135,7 +140,7 @@ Some details shape who becomes what:
   it.
 - **`allowed_email_domains`** is checked before an email code is sent, on Google and Apple
   emails, for "Continue as" (the account needs a verified email at one of the domains), and on
-  an email the requirements step adds. A phone code isn't checked today, so an account that
+  an email added on a details page. A phone code isn't checked today, so an account that
   signs in by phone gets through even when its email is at another domain (requiring `email`
   doesn't help when the account already has one). Keep `phone` off on an app that restricts
   domains.
@@ -143,7 +148,7 @@ Some details shape who becomes what:
 ## Continue as …
 
 Silicon Accounts keeps its own session in the browser (an HttpOnly cookie on
-`account.teamofsilicons.com`, up to 900 days). When a flow starts in a browser that is signed
+`accounts.teamofsilicons.com`, up to 900 days). When a flow starts in a browser that is signed
 in, `choose_method` offers "Continue as Grace Hopper": one click, no code. This is what makes
 one account across many apps pleasant, and it only ever works in the browser that holds the
 session.
@@ -164,8 +169,8 @@ doesn't end your app's sign-in. See [Tokens and sessions](tokens-and-sessions.md
 - `login`: the Carbon must prove who they are again; the `id_token`'s `auth_time` then shows
   the new moment. "Continue as" and `prompt=none` keep the earlier `auth_time`, which is how
   you can tell a fresh proof from a remembered one.
-- `consent`: show the what's-shared screen even when nothing new is asked. The Carbon can
-  switch optional details off there, which replaces the grant.
+- `consent`: show every details page even when nothing new is asked. The Carbon can untick
+  optional details there, which replaces the grant.
 - `select_account`: show the chooser. The hosted pages never continue silently with the
   browser's account, so the chooser already appears whenever there is one.
 - `none`: show nothing. The flow either completes at once with the browser's account or fails
@@ -181,7 +186,9 @@ quotas and reviews are yours. In both modes Silicon Accounts is the medium: the 
 the Carbon back to Silicon Accounts' callback (`/v1/oauth/callback/google` or `/apple`), which
 finishes the sign-in and sends the browser on to your redirect URI. That's why the address
 you register with Google or Apple is Silicon Accounts', and why sign-up, linking and the
-what's-shared screen behave the same for every method.
+details pages behave the same for every method. A direct "Continue with Google" button on your
+own site first shows the Opening page in your app's style, so the Carbon sees who is asking
+before the provider's page appears.
 
 **What is checked.** The provider's `id_token` is verified against the provider's keys:
 signature, issuer, audience (the client that was used), expiry, the nonce Silicon Accounts

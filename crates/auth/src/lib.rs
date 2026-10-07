@@ -3,10 +3,11 @@
 //! Signing Carbons in. This crate owns:
 //!
 //! - **The hosted sign-in flow** (`/v1/flows/*`), driven by the SPA at `/authorize`:
-//!   `choose_method → verify_code → (signup | requirements | consent | complete)`. Email and
-//!   phone codes, sign-up with a 48-hour sign-up session, the requirements step (add a missing
-//!   email or phone with an inline code), the what's-shared (consent) screen and the
-//!   authorization code that ends the flow. See [`flow`].
+//!   `choose_method → verify_code → signup → details → review → complete`. Email and phone
+//!   codes, sign-up with a 48-hour sign-up session, the app's flow pages (what's shared with
+//!   the app, required details with an inline code to add a missing email or phone, optional
+//!   details unticked until the Carbon ticks them), the optional review page and the
+//!   authorization code that ends the flow. See [`flow`] and [`flow::details`].
 //! - **Google and Apple** (`/v1/flows/{id}/oauth/{provider}` and
 //!   `/v1/oauth/callback/{provider}`): one-click (managed) or bring-your-own credentials, the
 //!   Apple ES256 client secret, id_token verification against the provider's JWKS and identity
@@ -76,22 +77,21 @@ pub fn router() -> Router<AppState> {
             "/v1/flows/{id}/signup/photo",
             post(flow::signup::upload_signup_photo),
         )
+        // The app's flow pages and the review page.
         .route(
-            "/v1/flows/{id}/requirements/email",
-            post(flow::requirements::send_email_requirement),
+            "/v1/flows/{id}/details/add",
+            post(flow::details::add_detail),
         )
         .route(
-            "/v1/flows/{id}/requirements/phone",
-            post(flow::requirements::send_phone_requirement),
+            "/v1/flows/{id}/details/verify",
+            post(flow::details::verify_detail),
         )
         .route(
-            "/v1/flows/{id}/requirements/verify",
-            post(flow::requirements::verify_requirement),
+            "/v1/flows/{id}/details/continue",
+            post(flow::details::continue_details),
         )
-        .route(
-            "/v1/flows/{id}/consent",
-            post(flow::consent::submit_consent),
-        )
+        .route("/v1/flows/{id}/details/back", post(flow::details::back))
+        .route("/v1/flows/{id}/review", post(flow::details::review))
         // Google and Apple.
         .route(
             "/v1/flows/{id}/oauth/{provider}",

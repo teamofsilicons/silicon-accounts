@@ -52,6 +52,27 @@ describe('fake-app-server', () => {
     assert.equal(attr(html, /<script src="[^"]*\/sdk\/v1\.js"[^>]*>/, 'data-app-id'), 'briefcase');
     assert.equal(attr(html, /<script src="[^"]*\/sdk\/v1\.js"[^>]*>/, 'data-target'), '#silicon-accounts');
     assert.ok(attr(html, /<script src="[^"]*\/sdk\/v1\.js"[^>]*>/, 'data-state'));
+    // The app's own buttons: Create an account (intent=signup) and direct "Continue with …"
+    // buttons in its method order, each its own sign-in; never a login_hint.
+    const signup = new URL(attr(html, /<a id="signup-hosted"[^>]*>/, 'href') ?? '');
+    assert.equal(signup.searchParams.get('intent'), 'signup');
+    assert.notEqual(signup.searchParams.get('state'), hosted.searchParams.get('state'));
+    const direct = [...html.matchAll(/<a id="continue-([a-z]+)"[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]]);
+    assert.deepEqual(direct, [
+      ['google', 'Continue with Google'],
+      ['apple', 'Continue with Apple'],
+      ['email', 'Continue with email'],
+      ['phone', 'Continue with phone number'],
+    ]);
+    const google = new URL(attr(html, /<a id="continue-google"[^>]*>/, 'href') ?? '');
+    assert.equal(google.searchParams.get('method'), 'google');
+    assert.equal(google.searchParams.get('login_hint'), null);
+    const waveform = await openPage('waveform', '?only=hosted');
+    assert.deepEqual(
+      [...waveform.html.matchAll(/<a id="continue-([a-z]+)"/g)].map((m) => m[1]),
+      ['apple', 'google'],
+      'only the methods the app turned on, in its order',
+    );
     // interface's sign-in links carry prompt=select_account by default.
     const iface = await openPage('interface', '?only=hosted');
     assert.equal(new URL(attr(iface.html, /<a id="signin-hosted"[^>]*>/, 'href') ?? '').searchParams.get('prompt'), 'select_account');
@@ -335,13 +356,18 @@ describe('fake-app-server', () => {
       assert.match(String((body.error as Record<string, unknown>).hint), /slt-login/);
     });
 
-    test('ATA: commit gets one proof for remind + waveform and both verify it', async () => {
+    test('ATA: commit gets one proof for remind and another for waveform; each verifies its own', async () => {
       const { status, body } = await client.notify({ message: 'standup in 5' });
       assert.equal(status, 200, JSON.stringify(body));
       const results = body.results as Record<string, Record<string, unknown>>;
       assert.equal(results.remind?.ok, true);
       assert.equal(results.waveform?.ok, true);
-      const timings = body.timings as { issue_ms: number; verify_ms: Record<string, number>; total_ms: number };
+      const proofs = body.proofs as Record<string, Record<string, unknown>>;
+      assert.equal(proofs.remind?.receiving_app, 'remind');
+      assert.equal(proofs.waveform?.receiving_app, 'waveform');
+      assert.notEqual(proofs.remind?.proof_id, proofs.waveform?.proof_id, 'two proofs, one per app');
+      const timings = body.timings as { issue_ms: Record<string, number>; verify_ms: Record<string, number>; total_ms: number };
+      assert.equal(typeof timings.issue_ms.remind, 'number');
       assert.equal(typeof timings.verify_ms.remind, 'number');
       assert.equal(typeof timings.verify_ms.waveform, 'number');
       const remindState = await client.state('remind');

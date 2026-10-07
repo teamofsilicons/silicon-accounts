@@ -11,8 +11,10 @@ pub mod signin_config;
 
 pub use signin_config::{
     AppleConfig, BackgroundStyle, Branding, ButtonStyle, ConfigSecretsPresent, CornerStyle,
-    Density, FontFamily, GoogleConfig, Layout, Methods, Palette, ProviderMode, SigninConfig,
-    SigninCopy, Theme, contrast_ratio, first_party_redirect_allowed, redirect_uri_matches,
+    DEFAULT_FLOW_STEP_ID, Density, FieldMode, FlowConfig, FlowStepConfig, FontFamily, GoogleConfig,
+    Layout, MAX_FLOW_STEPS, Methods, OPENING_TITLE_PLACEHOLDERS, Palette, ProviderMode,
+    SigninConfig, SigninCopy, Theme, contrast_ratio, first_party_redirect_allowed, is_flow_step_id,
+    redirect_uri_matches,
 };
 
 /// Defines a fieldless enum stored and serialized as text.
@@ -588,8 +590,10 @@ impl App {
         self.status == AppStatus::Active
     }
 
+    /// Silicon Accounts' own apps (`accounts`, `developer`): no what's-shared pages, no
+    /// membership.
     pub fn is_first_party(&self) -> bool {
-        self.source == AppSource::FirstParty || self.app_id == crate::FIRST_PARTY_APP_ID
+        self.source == AppSource::FirstParty || crate::is_first_party_app_id(&self.app_id)
     }
 }
 

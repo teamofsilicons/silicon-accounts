@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { BrandAside, BrandPanel, BrandStage, BrandingScope, PoweredBy } from "@/components/foundation/branding/branding";
 import { useTheme } from "@/components/foundation/theme/use-theme";
-import type { Branding } from "@/lib/api/types";
+import type { BrandLayout, Branding } from "@/lib/api/types";
 import { brandLogo, resolveBrandTheme, type PaintTheme } from "@/lib/branding/apply";
 import { normalizeBranding } from "@/lib/branding/defaults";
 import { legibleBranding } from "./legible";
@@ -32,7 +32,8 @@ export function usePaint(app: FrameApp | null, site: boolean): PaintTheme {
 export function AppIdentity({ app, paint, hideName, className }: { app: FrameApp | null; paint: PaintTheme; hideName?: boolean; className?: string }) {
   const branding = normalizeBranding(app?.branding as Partial<Branding> | undefined);
   const own = app ? brandLogo(branding, { logo_url: app.logo_url ?? null, logo_dark_url: app.logo_dark_url ?? null }, paint) : null;
-  const logo = own ?? (app?.app_id === "accounts" ? SILICON_ACCOUNTS_MARK : null);
+  // Our own first-party apps (the account site, the developer site) wear the Silicon Accounts mark.
+  const logo = own ?? (app?.app_id === "accounts" || app?.first_party ? SILICON_ACCOUNTS_MARK : null);
   const [broken, setBroken] = useState<string | null>(null);
   if (!app || (!logo && !branding.show_app_name)) return null;
   const showLogo = !!logo && broken !== logo;
@@ -67,13 +68,18 @@ export interface HostedFrameProps {
   plain?: boolean;
   /** The step's title already says the app's name: show the logo alone. */
   hideName?: boolean;
+  /** This page's own layout (a flow step can choose one); null or missing follows the branding's. */
+  layout?: BrandLayout | null;
 }
 
-export function HostedFrame({ app, site: siteProp, title, subtitle, children, footer, busy, poweredBy = true, plain, hideName }: HostedFrameProps) {
+export function HostedFrame({ app, site: siteProp, title, subtitle, children, footer, busy, poweredBy = true, plain, hideName, layout: pageLayout }: HostedFrameProps) {
   const site = !!siteProp || !app;
   const paint = usePaint(app, site);
-  // The app's branding, with its error text kept readable (flow/legible.ts).
-  const branding = useMemo(() => legibleBranding(normalizeBranding(app?.branding as Partial<Branding> | undefined)), [app?.branding]);
+  // The app's branding, with its error text kept readable (flow/legible.ts), in this page's layout.
+  const branding = useMemo(() => {
+    const base = legibleBranding(normalizeBranding(app?.branding as Partial<Branding> | undefined));
+    return pageLayout && pageLayout !== base.layout ? { ...base, layout: pageLayout } : base;
+  }, [app?.branding, pageLayout]);
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [fontsTimedOut, setFontsTimedOut] = useState(false);
   // Fonts load on demand; the step fades in once they are there (or after 1.5 s), so headings never jump.

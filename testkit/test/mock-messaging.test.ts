@@ -12,7 +12,7 @@ function otpEmail(to: string, code: string): Record<string, unknown> {
     From: 'Silicon Accounts <accounts@teamofsilicons.com>',
     To: to,
     Subject: `${code} is your Silicon Accounts code`,
-    TextBody: `Your code is ${code}. It expires in 10 minutes.\nhttps://account.teamofsilicons.com/`,
+    TextBody: `Your code is ${code}. It expires in 10 minutes.\nhttps://accounts.teamofsilicons.com/`,
     HtmlBody: `<p>Your code is <strong>${code}</strong></p>`,
     MessageStream: 'outbound',
   };
@@ -61,7 +61,7 @@ describe('mock-messaging', () => {
       assert.equal(message?.code, '482913');
       assert.equal(message?.provider, 'postmark');
       assert.equal(message?.to, 'ada@example.test');
-      assert.deepEqual(message?.links, ['https://account.teamofsilicons.com/']);
+      assert.deepEqual(message?.links, ['https://accounts.teamofsilicons.com/']);
     });
 
     test('an unconfirmed sender, a missing body and bad JSON are 422 with Postmark error codes', async () => {
@@ -113,7 +113,7 @@ describe('mock-messaging', () => {
     });
 
     test('a valid send returns a Message resource and is captured with the code', async () => {
-      const res = await sendSms(mock.url, { To: '+14155550123', Body: 'Your Silicon Accounts code is 905112.\n\n@account.teamofsilicons.com #905112', MessagingServiceSid: TWILIO.messagingServiceSids[0]! });
+      const res = await sendSms(mock.url, { To: '+14155550123', Body: 'Your Silicon Accounts code is 905112.\n\n@accounts.teamofsilicons.com #905112', MessagingServiceSid: TWILIO.messagingServiceSids[0]! });
       assert.equal(res.status, 201);
       assert.match(String(res.body.sid), /^SM[0-9a-f]{32}$/);
       assert.equal(res.body.status, 'accepted');

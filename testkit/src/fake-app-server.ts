@@ -350,7 +350,9 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
   interface SigninParams {
     scope: string | null;
     prompt: string | null;
-    login_hint: string | null;
+    /** signin | signup: which version of the hosted pages (the app's own "Sign up" button sends signup). */
+    intent: string | null;
+    /** A direct method button: google | apple | email | phone. Apps never send a Carbon's email or phone. */
     method: string | null;
     nonce: boolean;
     pkce: 'S256' | 'plain' | 'none';
@@ -371,7 +373,7 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     return {
       scope: get('scope'),
       prompt: get('prompt'),
-      login_hint: get('login_hint'),
+      intent: get('intent'),
       method: get('method'),
       nonce: get('nonce') !== '0',
       pkce,
@@ -414,7 +416,7 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     if (params.scope) q.set('scope', params.scope);
     if (pending.nonce) q.set('nonce', pending.nonce);
     if (params.prompt) q.set('prompt', params.prompt);
-    if (params.login_hint) q.set('login_hint', params.login_hint);
+    if (params.intent) q.set('intent', params.intent);
     if (params.method) q.set('method', params.method);
     return q;
   }
@@ -433,7 +435,7 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     if (params.scope) attrs['data-scope'] = params.scope;
     if (pending.nonce) attrs['data-nonce'] = pending.nonce;
     if (params.prompt) attrs['data-prompt'] = params.prompt;
-    if (params.login_hint) attrs['data-login-hint'] = params.login_hint;
+    if (params.intent) attrs['data-intent'] = params.intent;
     if (params.method) attrs['data-method'] = params.method;
     if (params.theme) attrs['data-theme'] = params.theme;
     return attrs;
@@ -590,13 +592,23 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
       return q.toString();
     };
     const signed = sessionAccount(rt, ctx);
+    // The app's own buttons (UNDERSTANDING.md "Adding sign-in to an app"): a Sign up button
+    // (intent=signup) and direct "Continue with …" buttons (method=…), each its own sign-in.
+    const hostedLink = (extra: Partial<SigninParams>): { url: string; state: string } => {
+      const linkParams = { ...params, ...extra };
+      const pending = newPending(rt, sid, 'hosted', linkParams);
+      return { url: `${publicUrl}/authorize?${authorizeQuery(rt, pending, linkParams).toString()}`, state: pending.state };
+    };
+    const methods = rt.app.signin_defaults.methods ?? {};
+    const order = rt.app.signin_defaults.method_order ?? ['google', 'apple', 'email', 'phone'];
+    const direct = hostedPending ? order.filter((m) => methods[m]).map((method) => ({ method, ...hostedLink({ method }) })) : [];
     ctx.sendHtml(
       200,
       appPage({
         app: rt.app,
         accountsPublicUrl: publicUrl,
         signedIn: signed ? view(signed) : null,
-        hosted: hostedPending ? { url: `${publicUrl}/authorize?${authorizeQuery(rt, hostedPending, params).toString()}`, state: hostedPending.state } : null,
+        hosted: hostedPending ? { url: `${publicUrl}/authorize?${authorizeQuery(rt, hostedPending, params).toString()}`, state: hostedPending.state, signup: hostedLink({ intent: 'signup' }), direct } : null,
         iframe: iframePending ? { url: `${publicUrl}/embed/v1/buttons?${embedQuery(iframePending)}`, state: iframePending.state } : null,
         sdk: sdkPending ? { attributes: sdkAttributes(rt, sdkPending, params), state: sdkPending.state } : null,
         redirectUri: params.redirect_uri,
@@ -1109,13 +1121,15 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     ctx.sendJson(res.status === 0 ? 502 : res.status, { status: res.status, body: res.body ?? res.error, issue_ms: res.ms });
   });
 
+  // An ATA proof is for exactly one app: {"receiving_app": "remind"} (default: the app's first ATA receiver).
   router.post('/:app/actions/issue-ata', async (ctx) => {
     const rt = runtime(ctx.params.app);
     const body = await jsonObject(ctx);
-    const audiences = Array.isArray(body.audiences) ? body.audiences : rt.app.testkit?.proofs.ata_issuer_to;
+    const receiving = str(body.receiving_app) ?? rt.app.testkit?.proofs.ata_issuer_to[0];
+    if (!receiving) throw apiError(422, 'no_receiving_app', `${rt.app.name} has no ATA receiver configured; send {"receiving_app":"remind"}.`);
     const res = await callAccounts('/v1/proofs/ata', {
       app: rt.app,
-      json: { audiences, ...(Array.isArray(body.scopes) ? { scopes: body.scopes } : {}), ...(typeof body.access_ttl_seconds === 'number' ? { access_ttl_seconds: body.access_ttl_seconds } : {}) },
+      json: { receiving_app: receiving, ...(Array.isArray(body.scopes) ? { scopes: body.scopes } : {}), ...(typeof body.access_ttl_seconds === 'number' ? { access_ttl_seconds: body.access_ttl_seconds } : {}) },
       headers: { 'Idempotency-Key': str(body.idempotency_key) ?? uuid() },
     });
     ctx.sendJson(res.status === 0 ? 502 : res.status, { status: res.status, body: res.body ?? res.error, issue_ms: res.ms });
@@ -1169,34 +1183,40 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     });
   });
 
-  // ATA demo: commit gets one proof for remind + waveform and pings both.
+  // ATA demo: an ATA proof is for exactly one app, so commit gets one proof for remind and
+  // another for waveform (issued in parallel), then pings each app with its own proof.
   router.post('/:app/actions/notify', async (ctx) => {
     const rt = runtime(ctx.params.app);
     const started = performance.now();
     const body = ctx.contentType() === 'application/json' ? await jsonObject(ctx) : {};
     const audiences = (Array.isArray(body.audiences) ? body.audiences.filter((a): a is string => typeof a === 'string') : rt.app.testkit?.proofs.ata_issuer_to) ?? [];
-    if (audiences.length === 0) throw apiError(422, 'no_audiences', `${rt.app.name} has no ATA audiences configured; send {"audiences":["remind","waveform"]}.`);
-    const issue = await callAccounts('/v1/proofs/ata', {
-      app: rt.app,
-      json: {
-        audiences,
-        scopes: Array.isArray(body.scopes) ? body.scopes : ['notifications.send'],
-        access_ttl_seconds: typeof body.access_ttl_seconds === 'number' ? body.access_ttl_seconds : 300,
-      },
-      headers: { 'Idempotency-Key': uuid() },
-    });
-    const proofToken = isRecord(issue.body) ? str(issue.body.proof_token) : undefined;
-    if ((issue.status !== 201 && issue.status !== 200) || !proofToken) {
-      ctx.sendJson(502, { ok: false, stage: 'issue', status: issue.status, error: issue.body ?? issue.error, timings: { issue_ms: issue.ms, total_ms: roundMs(performance.now() - started) } });
-      return;
-    }
+    if (audiences.length === 0) throw apiError(422, 'no_audiences', `${rt.app.name} has no ATA receivers configured; send {"audiences":["remind","waveform"]} (one proof is made per app).`);
     const message = str(body.message) ?? `${rt.app.name}: something is due`;
+    const proofs: Record<string, unknown> = {};
     const results: Record<string, unknown> = {};
+    const issueTimes: Record<string, number | null> = {};
     const verifyTimes: Record<string, number | null> = {};
     await Promise.all(
       audiences.map(async (audience) => {
+        const issue = await callAccounts('/v1/proofs/ata', {
+          app: rt.app,
+          json: {
+            receiving_app: audience,
+            scopes: Array.isArray(body.scopes) ? body.scopes : ['notifications.send'],
+            access_ttl_seconds: typeof body.access_ttl_seconds === 'number' ? body.access_ttl_seconds : 300,
+          },
+          headers: { 'Idempotency-Key': uuid() },
+        });
+        issueTimes[audience] = issue.ms;
+        const proofToken = isRecord(issue.body) ? str(issue.body.proof_token) : undefined;
+        if ((issue.status !== 201 && issue.status !== 200) || !proofToken) {
+          results[audience] = { ok: false, stage: 'issue', status: issue.status, error: issue.body ?? issue.error };
+          verifyTimes[audience] = null;
+          return;
+        }
+        proofs[audience] = proofSummary(issue.body);
         if (!runtimes.has(audience)) {
-          results[audience] = { ok: false, error: `${audience} is not hosted by this fake app server.` };
+          results[audience] = { ok: false, stage: 'deliver', error: `${audience} is not hosted by this fake app server.` };
           verifyTimes[audience] = null;
           return;
         }
@@ -1209,9 +1229,9 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     const allOk = Object.values(results).every((r) => isRecord(r) && r.ok === true);
     ctx.sendJson(allOk ? 200 : 502, {
       ok: allOk,
-      proof: proofSummary(issue.body),
+      proofs,
       results,
-      timings: { issue_ms: issue.ms, verify_ms: verifyTimes, total_ms: roundMs(performance.now() - started) },
+      timings: { issue_ms: issueTimes, verify_ms: verifyTimes, total_ms: roundMs(performance.now() - started) },
     });
   });
 

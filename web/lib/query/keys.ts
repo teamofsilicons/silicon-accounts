@@ -4,7 +4,7 @@
  *   queryClient.invalidateQueries({ queryKey: queryKeys.me.root })            // everything under /v1/me
  *   queryClient.setQueryData(queryKeys.flow(flow.id), flow)
  */
-import type { AppProofsQuery, AppUsersQuery, DeliveriesQuery, HistoryKind, ImportRowsQuery } from "../api/types";
+import type { HistoryKind } from "../api/types";
 
 export const queryKeys = {
   meta: ["meta"] as const,
@@ -28,22 +28,11 @@ export const queryKeys = {
     silicons: ["me", "silicons"] as const,
     silicon: (uuid: string) => ["me", "silicons", uuid] as const,
     custodianRequests: ["me", "custodian-requests"] as const,
-    ownedApps: ["me", "owned-apps"] as const,
   },
 
+  /** An app's public sign-in look (the embed reads it itself). */
   app: {
-    root: (appId: string) => ["apps", appId] as const,
     public: (appId: string) => ["apps", appId, "public"] as const,
-    detail: (appId: string) => ["apps", appId, "detail"] as const,
-    configHistory: (appId: string) => ["apps", appId, "config-history"] as const,
-    users: (appId: string, query: Omit<AppUsersQuery, "cursor" | "limit"> = {}) => ["apps", appId, "users", query] as const,
-    user: (appId: string, uuid: string) => ["apps", appId, "user", uuid] as const,
-    imports: (appId: string) => ["apps", appId, "imports"] as const,
-    import: (appId: string, jobId: string) => ["apps", appId, "imports", jobId] as const,
-    importRows: (appId: string, jobId: string, query: Omit<ImportRowsQuery, "cursor" | "limit"> = {}) => ["apps", appId, "imports", jobId, "rows", query] as const,
-    deliveries: (appId: string, query: Omit<DeliveriesQuery, "cursor" | "limit"> = {}) => ["apps", appId, "deliveries", query] as const,
-    delivery: (appId: string, deliveryId: string) => ["apps", appId, "delivery", deliveryId] as const,
-    proofs: (appId: string, query: Omit<AppProofsQuery, "cursor" | "limit"> = {}) => ["apps", appId, "proofs", query] as const,
   },
 
   flow: (id: string) => ["flows", id] as const,

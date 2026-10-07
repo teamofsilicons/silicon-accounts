@@ -107,7 +107,7 @@ service's logs (`accounts report` and `POST /v1/reports` take it in the message)
 | `account_auth_required` | 401 | app credentials (Basic) were sent to an endpoint that acts for an account |
 | `invalid_authorization` | 401 | the `Authorization` header is unreadable or uses an unsupported scheme |
 | `invalid_token` | 401 | not an access token, a bad signature, or expired (access tokens last 30 minutes: refresh) |
-| `token_wrong_audience` | 401 | an app's token was used where a first-party (`aud = accounts`) token is needed |
+| `token_wrong_audience` | 401 | an app's token was used where a first-party (`aud = accounts`) token is needed, or a developer-platform token (`aud = developer`, `details.aud`) outside the routes it may use (`GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and the owner routes under `/v1/apps/{app_id}/…`); the message names the method and route |
 | `token_revoked` | 401 | the sign-in behind the token ended (signed out, STK rotated, account deleted, refresh token reuse); the message says when and why; sign in again |
 | `session_expired` | 401 | the session cookie was signed out, revoked or expired |
 | `account_deleted` | 401 / 403 / 404 / 409 | the account was deleted: 401 for its own tokens, 403 at Silicon sign-in, 404 at lookups, 409 when it happened during the request |
@@ -218,7 +218,7 @@ service's logs (`accounts report` and `POST /v1/reports` take it in the message)
 | `flow_expired` | 410 | flows last 60 minutes; start again from the app |
 | `invalid_step` | 409 | the flow is at another step (the message names the allowed ones) |
 | `flow_completed` / `flow_failed` | 409 | the flow ended; `GET /v1/flows/{id}` returns its `redirect_to` |
-| `flow_changed` | 409 | the flow moved on in another tab while this request ran |
+| `flow_changed` | 409 | the flow moved on in another tab while this request ran, or the app changed its flow and the details page is gone: `GET /v1/flows/{id}` shows where it is now |
 | `account_changed` | 409 | the browser is now signed in as a different account than the flow's |
 | `account_unavailable` | 409 | the address belongs to an account that can't sign in |
 | `session_required` | 401 | "continue as" without a browser session |
@@ -229,12 +229,14 @@ service's logs (`accounts report` and `POST /v1/reports` take it in the message)
 | `signup_not_bound` | 403 | the sign-up belongs to another browser |
 | `signup_expired` | 410 | sign-ups last 48 hours; verify the address again |
 | `signup_already_completed` | 409 | this sign-up already created an account; sign in instead |
-| `requirement_not_needed` | 409 | that detail isn't missing |
+| `detail_not_on_page` | 409 | `details/add` for a detail that isn't on the page on screen |
+| `no_previous_page` | 409 | `details/back` on the first page |
+| `requirements_missing` | 409 | a required email or phone of the page isn't on the account yet (`details.missing`): add it with `details/add` + `details/verify` |
 | `invalid_state` | 400 | a provider callback with a malformed `state` |
 
 Codes carried in `flow.error` (and in `?error=` on your redirect URI) rather than as HTTP errors:
 `login_required`, `consent_required`, `interaction_required` (`prompt=none`), `access_denied`
-(declined), `provider_cancelled`, `provider_error`, `provider_token_invalid`,
+(cancelled on a details or review page), `provider_cancelled`, `provider_error`, `provider_token_invalid`,
 `provider_unavailable`, `provider_config_changed`, `provider_answer_elsewhere`,
 `provider_email_invalid`, `email_not_verified`, `hosted_domain_mismatch` (a Google account
 outside the app's `google.hosted_domain`), `signup_expired`, `session_changed` (linking),
@@ -299,9 +301,10 @@ Import rows carry their own message codes (`missing_identifier`, `ambiguous_matc
 |---|---|---|
 | `invalid_subject_token` | 400 | the subject token isn't a live access token (`details.reason`: `not_an_access_token`, `invalid`, `expired`, `revoked`) |
 | `subject_token_wrong_app` | 403 | the subject token belongs to another app (`details.token_app`) |
-| `unknown_receiving_app` | 400 | a receiving app doesn't exist (`details.app_ids`) |
-| `invalid_receiving_app` | 400 | the issuer itself, or `accounts` |
-| `receiving_app_disabled` | 403 | a receiving app is disabled |
+| `ata_single_app` | 422 | an ATA request named apps in `audiences`: an ATA proof is for exactly one app; send `{"receiving_app": "…"}` once per app (`details.field`, `details.apps`) |
+| `unknown_receiving_app` | 400 | the receiving app doesn't exist (`details.app_ids`) |
+| `invalid_receiving_app` | 400 | the issuer itself, or Silicon Accounts itself (`accounts`, `developer`) |
+| `receiving_app_disabled` | 403 | the receiving app is disabled |
 | `invalid_proof_refresh_token` | 400 | not a `sapr_` token, or unknown (mistyped, another environment, or its proof ended over 30 days ago) |
 | `not_issuing_app` | 403 | only the issuing app refreshes or revokes a proof |
 | `proof_refresh_token_reused` | 400 | a used refresh token was presented: the proof is now revoked |

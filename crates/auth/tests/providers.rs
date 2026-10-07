@@ -150,8 +150,9 @@ async fn google_new_identity_signs_up_with_its_name_and_picture() {
         Some("select_account")
     );
     assert_eq!(
-        query_param(&url, "login_hint").as_deref(),
-        Some("ada@example.test")
+        query_param(&url, "login_hint"),
+        None,
+        "an app's login_hint is never forwarded: apps can't hand us a Carbon's email"
     );
     assert!(
         query_param(&url, "state")
@@ -190,7 +191,7 @@ async fn google_new_identity_signs_up_with_its_name_and_picture() {
         .post(&ctx, &format!("/v1/flows/{id}/signup"), json!({}))
         .await;
     assert_eq!(r.status, 200, "{}", r.json);
-    assert_eq!(r.json["flow"]["step"], "consent");
+    assert_eq!(r.json["flow"]["step"], "details");
     let uuid = r.json["flow"]["signed_in_as"]["uuid"]
         .as_str()
         .expect("uuid")
@@ -222,13 +223,7 @@ async fn google_new_identity_signs_up_with_its_name_and_picture() {
         (client.as_str(), subject.as_str()),
         (mock_oidc::MANAGED_GOOGLE_ID, "g-ada-1")
     );
-    let r = b
-        .post(
-            &ctx,
-            &format!("/v1/flows/{id}/consent"),
-            json!({"approve": true}),
-        )
-        .await;
+    let r = continue_page(&ctx, &mut b, &id, &[]).await;
     assert_eq!(r.json["flow"]["step"], "complete");
     let method: String =
         sqlx::query_scalar("select method from signin_history where account_uuid = $1")
@@ -287,7 +282,7 @@ async fn known_identities_and_verified_emails_sign_in_existing_accounts() {
             "round {round}: signed in when the bound browser claimed it"
         );
         if round == 1 {
-            assert_eq!(r.json["flow"]["step"], "consent");
+            assert_eq!(r.json["flow"]["step"], "details");
             let linked = scalar_i64(
                 &ctx,
                 "select count(*) from identities where account_uuid = $1",
@@ -295,12 +290,7 @@ async fn known_identities_and_verified_emails_sign_in_existing_accounts() {
             )
             .await;
             assert_eq!(linked, 1, "the identity was linked by its verified email");
-            b.post(
-                &ctx,
-                &format!("/v1/flows/{id}/consent"),
-                json!({"approve": true}),
-            )
-            .await;
+            continue_page(&ctx, &mut b, &id, &[]).await;
         } else {
             assert_eq!(
                 r.json["flow"]["step"], "complete",

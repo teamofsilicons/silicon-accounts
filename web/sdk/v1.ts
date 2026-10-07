@@ -3,7 +3,7 @@
  * sends people to the hosted sign-in pages.
  *
  *   <div id="silicon-accounts"></div>
- *   <script src="https://account.teamofsilicons.com/sdk/v1.js" data-app-id="briefcase"
+ *   <script src="https://accounts.teamofsilicons.com/sdk/v1.js" data-app-id="briefcase"
  *           data-redirect-uri="https://briefcase.example/callback" data-target="#silicon-accounts" async></script>
  *
  * Script attributes (data-app-id and data-redirect-uri are required for the automatic buttons):
@@ -11,7 +11,16 @@
  *   data-state                    your state; without it the SDK creates one and keeps it in sessionStorage
  *   data-code-challenge(-method)  your PKCE challenge (S256 or plain)
  *   data-pkce="S256"              have the SDK create PKCE itself (the verifier goes to sessionStorage)
- *   data-scope, data-nonce, data-prompt, data-login-hint, data-method, data-theme (light | dark | auto)
+ *   data-buttons                  methods (default: "Continue with Google", "Continue with email"… one per method the
+ *                                 app turned on, each opening our pages on that method) or intents ("Sign in" and
+ *                                 "Sign up"; our pages then show every method)
+ *   data-intent                   signin (default) | signup: which of our pages opens (the sign-in or the sign-up
+ *                                 version); with data-buttons="intents" it keeps just that button
+ *   data-method                   google | apple | email | phone: show just that method's button
+ *   data-scope, data-nonce, data-prompt, data-theme (light | dark | auto)
+ *
+ * An app never passes a Carbon's email or phone: there is no login hint. The Carbon always types it on our pages
+ * (data-login-hint and any email or phone option are ignored, with a warning on the console).
  *
  * window.SiliconAccounts:
  *   authorizeUrl(options)          the /authorize URL for these options (no side effects; options override attributes)
@@ -31,7 +40,10 @@
  * color-scheme), read again when the page changes its theme. Everything the SDK draws is opaque, the "Powered by
  * Silicon Accounts" pill included, so it reads on any page.
  */
-import { METHOD_LABEL, METHOD_MARK, POWERED_BY_HREF, POWERED_MARK, isButtonMethod, primaryMethod, visibleMethods, type ButtonMethod } from "./methods";
+import {
+  INTENT_LABEL, METHOD_LABEL, METHOD_MARK, POWERED_BY_HREF, POWERED_MARK, isButtonIntent, isButtonMethod, isButtonSet, primaryMethod, visibleIntents,
+  visibleMethods, type ButtonIntent, type ButtonMethod, type ButtonSet,
+} from "./methods";
 
 type Theme = "light" | "dark" | "auto";
 type Prompt = "login" | "consent" | "select_account" | "none";
@@ -46,9 +58,13 @@ export interface AuthorizeOptions {
   scope?: string;
   nonce?: string;
   prompt?: Prompt;
-  loginHint?: string;
-  /** Jump straight to one enabled method. */
-  method?: ButtonMethod;
+  /** Which of our pages opens: the sign-in (default) or the sign-up version. */
+  intent?: ButtonIntent;
+  /**
+   * Open our pages on one enabled method: google and apple first show "Opening Google…" and move on to the provider,
+   * email and phone open on their empty field. null leaves out the script tag's data-method.
+   */
+  method?: ButtonMethod | null;
 }
 
 export interface SignInOptions extends AuthorizeOptions {
@@ -59,6 +75,8 @@ export interface SignInOptions extends AuthorizeOptions {
 export interface RenderOptions extends SignInOptions {
   /** Match your page: light, dark, or auto (the app's branding, else the device). */
   theme?: Theme;
+  /** methods (default): a button per method; intents: "Sign in" and "Sign up" (narrowed by `intent`). */
+  buttons?: ButtonSet;
 }
 
 export interface RenderedButtons {
@@ -118,16 +136,35 @@ const defaults: RenderOptions = {
   scope: attribute("scope"),
   nonce: attribute("nonce"),
   prompt: attribute("prompt") as Prompt | undefined,
-  loginHint: attribute("login-hint"),
+  intent: attribute("intent") as ButtonIntent | undefined,
   method: attribute("method") as ButtonMethod | undefined,
+  buttons: attribute("buttons") as ButtonSet | undefined,
   theme: attribute("theme") as Theme | undefined,
   pkce: attribute("pkce") ? attribute("pkce") !== "false" : undefined,
 };
 
+/** Options an app may try that would hand us the Carbon's email or phone: never forwarded. */
+const CONTACT_OPTIONS = ["loginHint", "login_hint", "email", "phone"];
+let warnedContact = false;
+function warnContact(): void {
+  if (warnedContact) return;
+  warnedContact = true;
+  console.warn(`${TAG} an email or phone (login hint) passed by the app is ignored: the Carbon always types it on the Silicon Accounts pages.`);
+}
+if (script?.hasAttribute("data-login-hint") || script?.hasAttribute("data-email") || script?.hasAttribute("data-phone")) warnContact();
+
 /** Defaults from the script tag, overridden by every option that is set. */
 function merge<T extends object>(options: T | undefined): RenderOptions & T {
   const out: Record<string, unknown> = { ...defaults };
-  for (const [key, value] of Object.entries(options ?? {})) if (value !== undefined && value !== null && value !== "") out[key] = value;
+  for (const [key, value] of Object.entries(options ?? {})) {
+    if (CONTACT_OPTIONS.includes(key)) {
+      if (value) warnContact();
+      continue;
+    }
+    // null: leave the script tag's value out (an intent button opens no particular method).
+    if (value === null) delete out[key];
+    else if (value !== undefined && value !== "") out[key] = value;
+  }
   return out as RenderOptions & T;
 }
 
@@ -155,6 +192,7 @@ function authorizeUrl(options?: AuthorizeOptions): string {
   if (!o.appId) throw new Error(`${TAG} appId is missing. Set data-app-id on the script tag or pass { appId }.`);
   if (!o.redirectUri) throw new Error(`${TAG} redirectUri is missing. Set data-redirect-uri on the script tag or pass { redirectUri } (a callback URL registered for the app).`);
   if (o.method && !isButtonMethod(o.method)) throw new Error(`${TAG} method must be google, apple, email or phone (got "${o.method}").`);
+  if (o.intent && !isButtonIntent(o.intent)) throw new Error(`${TAG} intent must be signin or signup (got "${o.intent}").`);
   const query = new URLSearchParams({ app_id: o.appId, redirect_uri: o.redirectUri, response_type: "code" });
   const add = (key: string, value: string | undefined) => {
     if (value) query.set(key, value);
@@ -165,8 +203,9 @@ function authorizeUrl(options?: AuthorizeOptions): string {
   add("scope", o.scope);
   add("nonce", o.nonce);
   add("prompt", o.prompt);
-  add("login_hint", o.loginHint);
-  add("method", o.method);
+  // The sign-in page is the default: only the sign-up page needs saying.
+  if (o.intent === "signup") add("intent", o.intent);
+  add("method", o.method ?? undefined);
   return `${base}/authorize?${query.toString()}`;
 }
 
@@ -282,6 +321,7 @@ async function mountFrame(target: Element | string, options?: FrameOptions): Pro
   const o = await prepare(options);
   const query = new URL(authorizeUrl(o)).searchParams;
   if (o.theme) query.set("theme", o.theme);
+  if (o.buttons && isButtonSet(o.buttons)) query.set("buttons", o.buttons);
   const iframe = document.createElement("iframe");
   iframe.src = `${base}/embed/v1/buttons?${query.toString()}`;
   iframe.title = options?.title ?? "Sign in with Silicon Accounts";
@@ -625,26 +665,33 @@ async function renderButtons(target: Element | string, options?: RenderOptions):
   } catch (error) {
     throw fail(error instanceof Error ? error.message : String(error), "");
   }
-  const methods = visibleMethods(app.methods, o.method);
+  if (o.buttons && !isButtonSet(o.buttons)) throw fail(`buttons must be "methods" or "intents" (got "${o.buttons}").`, 'Use data-buttons="methods" for a button per sign-in method, or "intents" for Sign in and Sign up.');
+  if (o.intent && !isButtonIntent(o.intent)) throw fail(`intent must be "signin" or "signup" (got "${o.intent}").`, "");
+  const intents = o.buttons === "intents";
+  const methods = intents ? [] : visibleMethods(app.methods, o.method);
   repaint();
-  if (methods.length === 0) {
-    throw fail(o.method ? `${app.name} does not offer sign-in with "${o.method}".` : `${app.name} has no sign-in methods turned on.`, "Turn the method on in the app's sign-in settings, or remove the method option.");
+  if (!intents && methods.length === 0) {
+    throw fail(o.method ? `${app.name} does not offer sign-in with "${o.method}".` : `${app.name} has no sign-in methods turned on.`, "Turn the method on in the app's sign-in setup on the developer site, or remove the method option.");
   }
 
   const primary = primaryMethod(methods);
+  const label = o.intent === "signup" ? `Sign up for ${app.name}` : `Sign in to ${app.name}`;
   root.removeAttribute("aria-busy");
   root.innerHTML =
-    `<div class="g" role="group" aria-label="${escapeHtml(`Sign in to ${app.name}`)}">` +
-    methods
-      .map(method => `<button type="button" class="b${method === primary ? " p" : ""}" part="button" data-method="${method}">${METHOD_MARK[method]}<span>${METHOD_LABEL[method]}</span></button>`)
-      .join("") +
+    `<div class="g" role="group" aria-label="${escapeHtml(intents ? app.name : label)}">` +
+    (intents
+      ? visibleIntents(o.intent).map((intent, index) => `<button type="button" class="b${index === 0 ? " p" : ""}" part="button" data-intent="${intent}"><span>${INTENT_LABEL[intent]}</span></button>`).join("")
+      : methods.map(method => `<button type="button" class="b${method === primary ? " p" : ""}" part="button" data-method="${method}">${METHOD_MARK[method]}<span>${METHOD_LABEL[method]}</span></button>`).join("")) +
     `</div>${POWERED}`;
   reshape();
   root.addEventListener("click", event => {
-    const button = (event.target as Element).closest<HTMLButtonElement>("button[data-method]");
+    const button = (event.target as Element).closest<HTMLButtonElement>("button[data-method], button[data-intent]");
     if (!button || busy) return;
     busy = true;
-    signIn({ ...o, method: button.dataset.method as ButtonMethod }).catch(error => {
+    const choice: SignInOptions = button.dataset.intent
+      ? { ...o, intent: button.dataset.intent as ButtonIntent, method: null }
+      : { ...o, method: button.dataset.method as ButtonMethod };
+    signIn(choice).catch(error => {
       busy = false;
       console.error(error instanceof Error ? error.message : error);
     });

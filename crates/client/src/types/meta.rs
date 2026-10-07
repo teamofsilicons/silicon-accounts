@@ -35,6 +35,14 @@ pub struct Meta {
         skip_serializing_if = "Option::is_none"
     )]
     pub docs_url: Option<String>,
+    /// The developer platform, where apps' sign-in is set up (absent on servers that don't
+    /// report it).
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub developer_url: Option<String>,
     /// Which managed sign-in providers are configured.
     #[serde(default)]
     pub providers: Providers,

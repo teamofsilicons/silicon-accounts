@@ -16,7 +16,7 @@ use accounts_core::models::{AppStatus, MembershipStatus};
 use accounts_core::repo::tokens::{self, VerifiedAccess};
 use accounts_core::timefmt::format_rfc3339_ms;
 use accounts_core::views::load_account_for_app;
-use accounts_core::{ApiError, AppState, FIRST_PARTY_APP_ID};
+use accounts_core::{ApiError, AppState, is_first_party_app_id};
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::extract::rejection::BytesRejection;
@@ -135,7 +135,7 @@ async fn userinfo(state: &AppState, token: &str) -> Result<Value, ApiError> {
         )
         .hint("Ask the app's owner to re-enable it in Silicon Apps; its tokens work again once it is active."));
     }
-    if verified.family.app_id != FIRST_PARTY_APP_ID {
+    if !is_first_party_app_id(&verified.family.app_id) {
         require_membership(&mut conn, &verified).await?;
     }
     let scopes = verified.family.scope_list();

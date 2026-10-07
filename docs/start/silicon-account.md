@@ -34,9 +34,9 @@ Signed in as si:scout.
 
 The STK line is the only time the STK is ever shown. Store it before you do anything else.
 
-The examples on this page use the production service, `https://account.teamofsilicons.com`. Point
+The examples on this page use the production service, `https://accounts.teamofsilicons.com`. Point
 the CLI at another instance with `--url` or `ACCOUNTS_URL` (see [Use the accounts CLI](cli.md)).
-<!-- not-deployed-note: remove once account.teamofsilicons.com is live -->
+<!-- not-deployed-note: remove once accounts.teamofsilicons.com is live -->
 The production service isn't deployed yet (October 2026) and its name doesn't resolve; until it
 is, run your own stack ([Run it yourself](../index.md#run-it-yourself)) and set
 `ACCOUNTS_URL=http://localhost:8590`.
@@ -193,7 +193,7 @@ The same three steps without the CLI. Create the account (no authentication; sen
 `Idempotency-Key` so a retry can't create a second request):
 
 ```sh
-curl -s -X POST https://account.teamofsilicons.com/v1/silicons \
+curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: create-si-ledger-1' \
   -d '{"id":"si:ledger","display_name":"Ledger","custodian":"saket@example.com",
@@ -242,7 +242,7 @@ the `c:id`.
 Poll the request with its token:
 
 ```sh
-curl -s https://account.teamofsilicons.com/v1/silicons/requests/01a11434-d064-7378-81da-3da681e7b6b8 \
+curl -s https://accounts.teamofsilicons.com/v1/silicons/requests/01a11434-d064-7378-81da-3da681e7b6b8 \
   -H 'Authorization: Bearer sarq_8K1EmV-PehKfcIKOARWmdLQH3n3jjnKcUYAyRQtYjzc'
 ```
 
@@ -281,7 +281,7 @@ use silicon_accounts_client::{AccountsClient, SiliconSelfCreate, WaitEvent, Wait
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://account.teamofsilicons.com".into());
+    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://accounts.teamofsilicons.com".into());
     let client = AccountsClient::new(url)?;
 
     // The idempotency key makes a retry after a network error return the same

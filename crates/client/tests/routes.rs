@@ -100,13 +100,18 @@ async fn public_calls() {
         "/v1/meta",
         Reply::json(
             200,
-            json!({"name": "Silicon Accounts", "docs_url": "https://account.teamofsilicons.com/docs"}),
+            json!({"name": "Silicon Accounts", "docs_url": "https://accounts.teamofsilicons.com/docs",
+                "developer_url": "https://developer.teamofsilicons.com"}),
         ),
     );
     let meta = c.meta().await.unwrap();
     assert_eq!(
         meta.docs_url.as_deref(),
-        Some("https://account.teamofsilicons.com/docs")
+        Some("https://accounts.teamofsilicons.com/docs")
+    );
+    assert_eq!(
+        meta.developer_url.as_deref(),
+        Some("https://developer.teamofsilicons.com")
     );
     mock.on(
         "GET",
@@ -178,6 +183,61 @@ async fn public_calls() {
         c.revoke_first_party("sar_x")
     );
     assert_eq!(r.form()["client_id"], "accounts");
+    // The developer platform's public client: PKCE code exchange, refresh and revoke without
+    // a secret (and nothing for other client ids).
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/oauth/token",
+        Reply::json(200, tokens()),
+        c.exchange_developer_code(
+            " sac_x ",
+            "http://localhost:8600/auth/callback",
+            "verifier-1"
+        )
+    );
+    let form = r.form();
+    assert_eq!(form["grant_type"], "authorization_code");
+    assert_eq!(form["client_id"], "developer");
+    assert_eq!(form["code"], "sac_x");
+    assert_eq!(form["redirect_uri"], "http://localhost:8600/auth/callback");
+    assert_eq!(form["code_verifier"], "verifier-1");
+    assert!(!form.contains_key("client_secret"));
+    assert!(r.header("authorization").is_none());
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/oauth/token",
+        Reply::json(200, tokens()),
+        c.refresh_public_client("developer", "sar_dev")
+    );
+    assert_eq!(r.form()["client_id"], "developer");
+    assert_eq!(r.form()["refresh_token"], "sar_dev");
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/oauth/revoke",
+        Reply::empty(200),
+        c.revoke_public_client("developer", "sar_dev")
+    );
+    assert_eq!(r.form()["client_id"], "developer");
+    assert_eq!(r.form()["token_type_hint"], "refresh_token");
+    let sent_before = mock.requests_to("POST", "/v1/oauth/token").len();
+    let err = c
+        .refresh_public_client("briefcase", "sar_x")
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "invalid_input");
+    let err = c
+        .exchange_developer_code("sac_x", "http://localhost:8600/auth/callback", " ")
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "invalid_input");
+    assert_eq!(
+        mock.requests_to("POST", "/v1/oauth/token").len(),
+        sent_before,
+        "refused locally"
+    );
     let r = check!(
         mock,
         "POST",
@@ -882,7 +942,7 @@ async fn app_calls() {
         Reply::json(201, proof()),
         a.issue_ata(
             &IssueAta {
-                audiences: vec!["remind".into()],
+                receiving_app: "remind".into(),
                 ..Default::default()
             },
             None

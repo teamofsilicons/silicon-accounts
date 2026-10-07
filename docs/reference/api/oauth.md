@@ -76,15 +76,19 @@ The hosted sign-in page on the account site. Send the browser here; it comes bac
 | `scope` | no | space-separated: `profile` (always granted), `email`, `phone`, `dob`, `timezone`, `openid` (adds an `id_token`), `offline_access` (accepted and ignored: refresh tokens are always issued) |
 | `nonce` | with `openid` | echoed in the `id_token` unchanged |
 | `prompt` | no | `login` (ignore the browser's session), `consent` (always show what is shared), `select_account` (show the chooser), `none` (never show a page: complete silently or fail) |
-| `login_hint` | no | prefills the email (and is passed to Google) |
-| `method` | no | jump straight to `google`, `apple`, `email` or `phone`, if the app enabled it |
+| `intent` | no | `signin` (default) or `signup`: which version of the pages opens ("Sign in to Briefcase" or "Create your Briefcase account"). The account logic is the same: a first visit is a sign-up either way |
+| `method` | no | the app's own direct button: `google` or `apple` first show the Opening page ("Opening Google to sign you in to {app}…") and move on to the provider by themselves; `email` or `phone` open on that empty field. Must be enabled for the app |
 | `response_type` | no | only `code` is supported |
+
+`login_hint` is accepted without an error and ignored: it is not prefilled, not stored, not
+echoed and not forwarded to Google or Apple. An app can never hand Silicon Accounts a Carbon's
+email or phone; the Carbon always types it on the hosted pages.
 
 Back on your `redirect_uri`:
 
 - success: `?code=sac_…&state=…` — exchange the code within 2 minutes;
 - refusal: `?error=…&error_description=…&state=…` with `error` = `access_denied` (the Carbon
-  declined the consent screen), `login_required`, `consent_required` or `interaction_required`
+  cancelled on a details or review page), `login_required`, `consent_required` or `interaction_required`
   (`prompt=none` couldn't finish silently), `invalid_scope`, `invalid_request` or
   `unsupported_response_type`.
 
@@ -101,9 +105,11 @@ never redirected to, so the page can't be used to send codes to someone else's U
 | `openid` | an `id_token` in the token response |
 
 Besides `scope`, the app's sign-in setup decides what is shared: its `required_fields` are always
-asked for (and must exist on the account before the code is issued), its `optional_fields` are
-offered as toggles on the consent screen. Silicons never have an email or a phone: those scopes
-are simply left out for them and never block a Silicon.
+shared (and must exist on the account before the code is issued: a missing email or phone is
+added on the page, with a code), its `optional_fields` are checkboxes on the details pages,
+unticked until the Carbon ticks them. Details `scope` asks for that the app doesn't configure are
+optional checkboxes on the last page. Silicons never have an email or a phone: those scopes are
+simply left out for them and never block a Silicon.
 [What apps see](../../learn/what-apps-see.md) explains the rules.
 
 ## `GET /.well-known/openid-configuration`
@@ -116,15 +122,15 @@ curl -s "$ACCOUNTS_URL/.well-known/openid-configuration"
 
 ```json
 {
-  "issuer": "https://account.teamofsilicons.com",
-  "authorization_endpoint": "https://account.teamofsilicons.com/authorize",
-  "token_endpoint": "https://account.teamofsilicons.com/v1/oauth/token",
-  "userinfo_endpoint": "https://account.teamofsilicons.com/v1/userinfo",
-  "jwks_uri": "https://account.teamofsilicons.com/.well-known/jwks.json",
-  "revocation_endpoint": "https://account.teamofsilicons.com/v1/oauth/revoke",
-  "introspection_endpoint": "https://account.teamofsilicons.com/v1/oauth/introspect",
-  "device_authorization_endpoint": "https://account.teamofsilicons.com/v1/device/authorize",
-  "service_documentation": "https://account.teamofsilicons.com/docs",
+  "issuer": "https://accounts.teamofsilicons.com",
+  "authorization_endpoint": "https://accounts.teamofsilicons.com/authorize",
+  "token_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/token",
+  "userinfo_endpoint": "https://accounts.teamofsilicons.com/v1/userinfo",
+  "jwks_uri": "https://accounts.teamofsilicons.com/.well-known/jwks.json",
+  "revocation_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/revoke",
+  "introspection_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/introspect",
+  "device_authorization_endpoint": "https://accounts.teamofsilicons.com/v1/device/authorize",
+  "service_documentation": "https://accounts.teamofsilicons.com/docs",
   "response_types_supported": ["code"],
   "response_modes_supported": ["query"],
   "grant_types_supported": [
@@ -175,7 +181,14 @@ Responses are `Cache-Control: no-store`; errors are RFC 6749 bodies.
 (`invalid_request`). A `client_id` in the body must match the Basic credentials
 (`invalid_client`). `client_id=accounts` with no secret is the first-party public client (the
 `accounts` CLI): it may only use `refresh_token` and the device-code grant
-(`unauthorized_client` otherwise).
+(`unauthorized_client` otherwise). `client_id=developer` with no secret is the developer
+platform (developer.teamofsilicons.com, whose server holds the tokens): it may only use
+`authorization_code` with PKCE `S256` (a missing challenge or `plain` is `invalid_grant`, and the
+code is burnt), `refresh_token` for its own tokens, and `/v1/oauth/revoke`; other grants are
+`unauthorized_client` and introspection is `invalid_client`. Its tokens have `aud: "developer"`
+and act for their Carbon only on `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and
+the owner routes under `/v1/apps/{app_id}/…`; anywhere else they get 401
+`token_wrong_audience`.
 
 ### `grant_type=authorization_code`
 
@@ -307,7 +320,7 @@ Access token claims (first-party tokens have `aud: "accounts"`):
 
 ```json
 {
-  "iss": "https://account.teamofsilicons.com",
+  "iss": "https://accounts.teamofsilicons.com",
   "sub": "8HV",
   "aud": "briefcase",
   "exp": 1791342182,
@@ -331,7 +344,7 @@ id, `fid` the token family (the sign-in). Verify the signature with the JWKS, `e
 
 ```json
 {
-  "iss": "https://account.teamofsilicons.com",
+  "iss": "https://accounts.teamofsilicons.com",
   "sub": "8HV",
   "aud": "briefcase",
   "exp": 1791342182,
@@ -409,7 +422,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/introspect" -u "$APP_ID:$APP_SECRET" -d 
 ```json
 {
   "active": true,
-  "iss": "https://account.teamofsilicons.com",
+  "iss": "https://accounts.teamofsilicons.com",
   "sub": "8HV",
   "aud": "briefcase",
   "client_id": "briefcase",
@@ -495,8 +508,8 @@ curl -s -X POST "$ACCOUNTS_URL/v1/device/authorize" \
 {
   "device_code": "sad_bXmMc5C9tF_K7UZl8cLE5Ff2R1Q0_hbtXv87TIkbngU",
   "user_code": "MVHB-KQAW",
-  "verification_uri": "https://account.teamofsilicons.com/device",
-  "verification_uri_complete": "https://account.teamofsilicons.com/device?code=MVHB-KQAW",
+  "verification_uri": "https://accounts.teamofsilicons.com/device",
+  "verification_uri_complete": "https://accounts.teamofsilicons.com/device?code=MVHB-KQAW",
   "expires_in": 600,
   "interval": 5,
   "expires_at": "2026-10-07T02:46:05.176Z"

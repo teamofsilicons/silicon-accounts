@@ -1,13 +1,11 @@
-//! `FlowView`: what the hosted pages render (02-api.md), plus `prompt`, `login_hint` and
-//! `method_hint` so the SPA can honour them.
+//! `FlowView`: what the hosted pages render (02-api.md and the build spec 06-v2.md), plus
+//! `prompt`, `intent` and `method_hint` so the pages can honour them. An app's `login_hint` is
+//! never echoed (apps can't hand us a Carbon's email or phone).
 
 use accounts_core::http::ClientMeta;
-use accounts_core::models::{
-    Account, Branding, ContactField, Method, OtpChannel, OtpPurpose, Scope, SigninCopy,
-};
-use accounts_core::repo::contacts::{self, ContactKind};
-use accounts_core::repo::{accounts, memberships, otp};
-use accounts_core::timefmt::{format_date, rfc3339_ms};
+use accounts_core::models::{Branding, Method, OtpChannel, OtpPurpose, SigninCopy};
+use accounts_core::repo::{accounts, otp};
+use accounts_core::timefmt::rfc3339_ms;
 use accounts_core::views::AccountSummary;
 use accounts_core::{ApiResult, AppState};
 use serde::Serialize;
@@ -17,8 +15,9 @@ use uuid::Uuid;
 
 use super::FlowApp;
 use super::browser::BrowserAccount;
-use super::model::{Flow, FlowError, Step};
-use super::{next, signup};
+use super::details::{self, DetailsView, ReviewView};
+use super::model::{Flow, FlowError, Intent, Step};
+use super::signup;
 use crate::util::decrypt_text;
 
 /// The flow as the hosted pages see it.
@@ -37,18 +36,20 @@ pub struct FlowView {
     pub challenge: Option<ChallengeView>,
     /// Prefilled sign-up details (step `signup`).
     pub signup: Option<signup::SignupView>,
-    /// Details the app needs that the account lacks (step `requirements`).
-    pub requirements: Option<RequirementsView>,
-    /// What's shared with the app (step `consent`).
-    pub consent: Option<ConsentView>,
+    /// The details page on screen (step `details`).
+    pub details: Option<DetailsView>,
+    /// Everything that will be shared (step `review`).
+    pub review: Option<ReviewView>,
     /// Where to send the browser (steps `complete` and `failed`).
     pub redirect_to: Option<String>,
     pub error: Option<FlowError>,
     /// `prompt` as given to /authorize (canonical order), e.g. `select_account`.
     pub prompt: Option<String>,
-    /// `login_hint` as given to /authorize (prefill the email or phone field).
-    pub login_hint: Option<String>,
-    /// `method` as given to /authorize (jump straight to that method).
+    /// `intent` as given to /authorize: the sign-in or the sign-up version of the pages.
+    pub intent: Intent,
+    /// `method` as given to /authorize: the app's own "Continue with …" button. `email`/`phone`
+    /// open that method's entry field; `google`/`apple` show the opening page, then go on to
+    /// the provider.
     pub method_hint: Option<Method>,
 }
 
@@ -78,7 +79,7 @@ pub struct ChallengeView {
 }
 
 impl ChallengeView {
-    fn from_challenge(c: &otp::OtpChallenge) -> ChallengeView {
+    pub(crate) fn from_challenge(c: &otp::OtpChallenge) -> ChallengeView {
         ChallengeView {
             channel: c.channel,
             destination: c.masked_destination(),
@@ -86,42 +87,6 @@ impl ChallengeView {
             resend_available_at: c.resend_available_at(),
         }
     }
-}
-
-/// The requirements step.
-#[derive(Debug, Clone, Serialize)]
-pub struct RequirementsView {
-    pub missing: Vec<ContactField>,
-    /// The code sent to the detail being added, if any.
-    pub challenge: Option<ChallengeView>,
-}
-
-/// A required row of the what's-shared screen (always shared).
-#[derive(Debug, Clone, Serialize)]
-pub struct ConsentItem {
-    pub scope: Scope,
-    pub label: &'static str,
-    /// The value that will be shared (null when the account doesn't have it).
-    pub value: Option<String>,
-}
-
-/// An optional row of the what's-shared screen.
-#[derive(Debug, Clone, Serialize)]
-pub struct ConsentOptional {
-    pub scope: Scope,
-    pub label: &'static str,
-    pub value: Option<String>,
-    /// The toggle's initial state: granted before, or asked for in the `scope` parameter.
-    pub granted: bool,
-}
-
-/// The what's-shared screen.
-#[derive(Debug, Clone, Serialize)]
-pub struct ConsentView {
-    pub required: Vec<ConsentItem>,
-    pub optional: Vec<ConsentOptional>,
-    /// What the account granted this app before (empty the first time).
-    pub previously_granted: Vec<Scope>,
 }
 
 /// Request context for building a view.
@@ -174,20 +139,13 @@ pub async fn build(
         _ => None,
     };
 
-    let requirements = match (flow.step, &account) {
-        (Step::Requirements, Some(a)) => {
-            let missing = next::missing_requirements(conn, &fa.config, a).await?;
-            let challenge = match flow.challenge_id {
-                Some(id) => live_challenge(conn, id, OtpPurpose::Requirement).await?,
-                None => None,
-            };
-            Some(RequirementsView { missing, challenge })
-        }
+    let details = match (flow.step, &account) {
+        (Step::Details, Some(a)) => details::details_view(conn, flow, fa, a).await?,
         _ => None,
     };
 
-    let consent = match (flow.step, &account) {
-        (Step::Consent, Some(a)) => Some(consent_view(conn, flow, fa, a).await?),
+    let review = match (flow.step, &account) {
+        (Step::Review, Some(a)) => Some(details::review_view(conn, flow, fa, a).await?),
         _ => None,
     };
 
@@ -221,18 +179,18 @@ pub async fn build(
         signed_in_as,
         challenge,
         signup,
-        requirements,
-        consent,
+        details,
+        review,
         redirect_to,
         error: flow.extras.error.clone(),
         prompt: flow.prompt.to_stored(),
-        login_hint: flow.login_hint.clone(),
+        intent: flow.extras.intent,
         method_hint: flow.method_hint,
     })
 }
 
 /// A challenge that can still be answered (not consumed, not retired by a resend).
-async fn live_challenge(
+pub(crate) async fn live_challenge(
     conn: &mut PgConnection,
     id: Uuid,
     purpose: OtpPurpose,
@@ -241,62 +199,6 @@ async fn live_challenge(
         .await?
         .filter(|c| c.purpose == purpose && c.consumed_at.is_none())
         .map(|c| ChallengeView::from_challenge(&c)))
-}
-
-/// Builds the what's-shared screen for an account.
-pub async fn consent_view(
-    conn: &mut PgConnection,
-    flow: &Flow,
-    fa: &FlowApp,
-    account: &Account,
-) -> ApiResult<ConsentView> {
-    // Masked like the code destinations (02-api.md shows "s***@gmail.com" on this screen).
-    let email = contacts::primary(conn, ContactKind::Email, &account.uuid)
-        .await?
-        .filter(|c| c.verified)
-        .map(|c| accounts_core::normalize::mask_email(&c.value));
-    let phone = contacts::primary(conn, ContactKind::Phone, &account.uuid)
-        .await?
-        .filter(|c| c.verified)
-        .map(|c| accounts_core::normalize::mask_phone(&c.value));
-    let value_of = |s: Scope| -> Option<String> {
-        match s {
-            Scope::Profile => Some(format!("{} ({})", account.display_name, account.id())),
-            Scope::Email => email.clone(),
-            Scope::Phone => phone.clone(),
-            Scope::Dob => Some(format_date(account.dob)),
-            Scope::Timezone => Some(account.timezone.clone()),
-            Scope::Openid | Scope::OfflineAccess => None,
-        }
-    };
-    let previously_granted: Vec<Scope> =
-        match memberships::get(conn, &fa.app.app_id, &account.uuid).await? {
-            Some(m) if m.is_live() => m.scopes(),
-            _ => Vec::new(),
-        };
-    let requested = next::requested_contact_scopes(flow);
-    let required = std::iter::once(Scope::Profile)
-        .chain(next::required_scopes(&fa.config))
-        .map(|s| ConsentItem {
-            scope: s,
-            label: s.label(),
-            value: value_of(s),
-        })
-        .collect();
-    let optional = next::optional_scopes(flow, &fa.config)
-        .into_iter()
-        .map(|s| ConsentOptional {
-            scope: s,
-            label: s.label(),
-            value: value_of(s),
-            granted: previously_granted.contains(&s) || requested.contains(&s),
-        })
-        .collect();
-    Ok(ConsentView {
-        required,
-        optional,
-        previously_granted,
-    })
 }
 
 /// Today's date (UTC) — the sign-up dob suggestion is based on it.

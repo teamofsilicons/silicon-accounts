@@ -7,17 +7,50 @@
  * needed for a sign-in to work. Everything that touches `window` checks for it, so these helpers are safe to import
  * from code that also renders on the server.
  */
-import type { AccountSummary, Branding, FlowChallenge, FlowView, SigninCopy, SigninMethod } from "@/lib/api/types";
+import type { AccountSummary, Branding, FlowChallenge, FlowIntent, FlowView, SigninCopy, SigninMethod } from "@/lib/api/types";
 
 export type HostedFlow = FlowView;
 export type HostedStep = FlowView["step"];
 export type { AccountSummary, FlowChallenge };
 
 /** The order steps usually come in, for the direction of the card morph. */
-export const STEP_ORDER: readonly HostedStep[] = ["choose_method", "verify_code", "signup", "requirements", "consent", "complete", "failed"];
+export const STEP_ORDER: readonly HostedStep[] = ["choose_method", "verify_code", "signup", "details", "review", "complete", "failed"];
 
-/** The title the app chose, or "Sign in to {name}". */
-export const appTitle = (flow: Pick<HostedFlow, "app">): string => flow.app.copy.title?.trim() || `Sign in to ${flow.app.name}`;
+/** Which page the app asked for: the sign-in page (default) or the sign-up page. */
+export const intentOf = (flow: Pick<HostedFlow, "intent">): FlowIntent => (flow.intent === "signup" ? "signup" : "signin");
+
+/**
+ * The page's title: the app's own (copy.title, or copy.signup_title on the sign-up page), else "Sign in to {name}" or
+ * "Create your {name} account".
+ */
+export const appTitle = (flow: Pick<HostedFlow, "app" | "intent">): string =>
+  intentOf(flow) === "signup"
+    // Silicon Accounts' own sign-up is "Create your account" (never "Create your Silicon Accounts account").
+    ? flow.app.copy.signup_title?.trim() || (flow.app.first_party ? "Create your account" : `Create your ${flow.app.name} account`)
+    : flow.app.copy.title?.trim() || `Sign in to ${flow.app.name}`;
+
+/** The app's subtitle for the page (copy.subtitle, or copy.signup_subtitle on the sign-up page), or null. */
+export const appSubtitle = (flow: Pick<HostedFlow, "app" | "intent">): string | null =>
+  (intentOf(flow) === "signup" ? flow.app.copy.signup_subtitle?.trim() : flow.app.copy.subtitle?.trim()) || null;
+
+export const providerName = (provider: "google" | "apple"): string => (provider === "google" ? "Google" : "Apple");
+
+/**
+ * The Opening page's title: the app's copy.opening_title with {provider} and {app} filled in, else
+ * "Opening Google to sign you in to Briefcase…".
+ */
+export function openingTitle(app: { name: string; copy?: Partial<SigninCopy> | null }, provider: "google" | "apple"): string {
+  const own = app.copy?.opening_title?.trim();
+  const name = providerName(provider);
+  if (own) return own.replace(/\{provider\}/g, name).replace(/\{app\}/g, app.name);
+  return `Opening ${name} to sign you in to ${app.name}…`;
+}
+
+/**
+ * Where the Carbon goes after signing in, in a sentence: "your account" for the account site itself (app `accounts`),
+ * else the app's name (also for our other first-party app, the developer site, "Silicon Developer").
+ */
+export const destinationName = (app: Pick<HostedFlow["app"], "app_id" | "name">): string => (app.app_id === "accounts" ? "your account" : app.name);
 
 /** Google and Apple are providers; email and phone are contact methods with a code. */
 export const isProvider = (method: SigninMethod): method is "google" | "apple" => method === "google" || method === "apple";
@@ -92,10 +125,15 @@ export function wasRedirected(flowId: string): boolean {
   return read("session", REDIRECTED_PREFIX + flowId) !== null;
 }
 
-/** `method=google|apple` jumps straight to the provider once per flow, never in a loop after a cancel. */
+/** `method=google|apple` opens the provider (after the Opening page) once per flow, never in a loop after a cancel. */
 export function claimAutoStart(flowId: string): boolean {
   if (read("session", AUTOSTART_PREFIX + flowId) !== null) return false;
   write("session", AUTOSTART_PREFIX + flowId, "1");
+  return read("session", AUTOSTART_PREFIX + flowId) !== null;
+}
+
+/** True when this tab already moved this flow on to the provider once (the Opening page then waits for a press). */
+export function autoStartClaimed(flowId: string): boolean {
   return read("session", AUTOSTART_PREFIX + flowId) !== null;
 }
 
@@ -201,9 +239,9 @@ export interface HeroCopy {
 
 /**
  * The large copy beside the form in the split layout, following where the Carbon is. The app's own title and
- * subtitle are the sign-in page's copy, so they win on the sign-in steps; once the Carbon is past them, the hero says
- * what is true now: a first visit is a welcome ("Welcome to Acme Notes") and never a "welcome back", and only a
- * Carbon who has been to the app before is welcomed back.
+ * subtitle are the sign-in page's copy (or the sign-up page's, when the app asked for it), so they win on the sign-in
+ * steps; once the Carbon is past them, the hero says what is true now: a first visit is a welcome ("Welcome to Acme
+ * Notes") and never a "welcome back", and only a Carbon who has been to the app before is welcomed back.
  *
  * `firstVisit`: this page showed the sign-up step of this flow (a new account, or one an app imported).
  */
@@ -211,9 +249,10 @@ export function heroCopy(flow: HostedFlow, journey: { firstVisit: boolean }): He
   return heroCopyFor({
     name: flow.app.name,
     copy: flow.app.copy,
+    intent: intentOf(flow),
     step: flow.step,
     firstVisit: journey.firstVisit,
-    knowsApp: (flow.consent?.previously_granted ?? []).some(scope => scope !== "profile" && scope !== "openid" && scope !== "offline_access"),
+    knowsApp: (flow.details?.fields ?? []).some(field => field.previously_granted),
     finishingImport: !!flow.signup?.finishing_import,
     importedBy: flow.signup?.imported_by?.name ?? null,
   });
@@ -222,11 +261,13 @@ export function heroCopy(flow: HostedFlow, journey: { firstVisit: boolean }): He
 /** What heroCopyFor needs: the app's name and copy, the step, and what the page knows about the Carbon. */
 export interface HeroInput {
   name: string;
-  copy: Pick<HostedFlow["app"]["copy"], "title" | "subtitle">;
+  copy: Pick<SigninCopy, "title" | "subtitle"> & Partial<Pick<SigninCopy, "signup_title" | "signup_subtitle">>;
+  /** The page the app asked for (default signin). */
+  intent?: FlowIntent;
   step: HostedFlow["step"];
   /** This page showed the sign-up step of this flow (a new account, or one an app imported). */
   firstVisit: boolean;
-  /** The Carbon granted the app something before (beyond its name, id and photo). */
+  /** The Carbon shared something with the app before (beyond its name, id and photo). */
   knowsApp?: boolean;
   /** The sign-up finishes an account an app imported. */
   finishingImport?: boolean;
@@ -242,12 +283,11 @@ export function importerName(importedBy: string | null | undefined): string | nu
   return importedBy?.trim() || null;
 }
 
-/**
- * heroCopy without a FlowView: the same rules for anything that knows the step and the app (the developer area's
- * Branding preview draws the split layout's copy with it).
- */
-export function heroCopyFor({ name: app, copy, step, firstVisit, knowsApp = false, finishingImport = false, importedBy = null }: HeroInput): HeroCopy {
-  const signIn: HeroCopy = { title: copy.title?.trim() || `Sign in to ${app}`, subtitle: copy.subtitle?.trim() || null };
+/** heroCopy without a FlowView: the same rules for anything that knows the step and the app. */
+export function heroCopyFor({ name: app, copy, intent = "signin", step, firstVisit, knowsApp = false, finishingImport = false, importedBy = null }: HeroInput): HeroCopy {
+  const signIn: HeroCopy = intent === "signup"
+    ? { title: copy.signup_title?.trim() || `Create your ${app} account`, subtitle: copy.signup_subtitle?.trim() || null }
+    : { title: copy.title?.trim() || `Sign in to ${app}`, subtitle: copy.subtitle?.trim() || null };
   switch (step) {
     case "choose_method":
     case "verify_code":
@@ -258,14 +298,12 @@ export function heroCopyFor({ name: app, copy, step, firstVisit, knowsApp = fals
       const importer = importerName(importedBy);
       return { title: `Welcome to ${app}`, subtitle: `${importer ?? "An app you use"} set up an account for you. Check what it filled in, and you are in.` };
     }
-    case "requirements":
-      return firstVisit
-        ? { title: `Welcome to ${app}`, subtitle: `${app} needs one more detail before you continue.` }
-        : { title: `One more detail for ${app}`, subtitle: "Add it once and it stays on your account, for the apps you choose to share it with." };
-    case "consent":
+    case "details":
       return knowsApp && !firstVisit
         ? { title: `Welcome back to ${app}`, subtitle: `${app} is asking for a little more than before. You choose what it sees.` }
         : { title: `Welcome to ${app}`, subtitle: `You choose what ${app} sees, and you can change it any time in your account.` };
+    case "review":
+      return { title: `Almost in to ${app}`, subtitle: `Check what ${app} sees. Nothing is shared until you continue.` };
     case "complete":
     case "failed":
       return firstVisit ? { title: `Welcome to ${app}`, subtitle: "Taking you there now." } : { title: `Signed in to ${app}`, subtitle: "Taking you there now." };

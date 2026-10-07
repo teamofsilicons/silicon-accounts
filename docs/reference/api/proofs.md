@@ -50,7 +50,7 @@ unknown fields. Proof responses are `Cache-Control: no-store`.
 | proof token (`sap_…`) lifetime | `access_ttl_seconds`, 60 to 1800, default 1800 |
 | proof lifetime (its `sapr_…` refresh token) | 900 days; an OBO proof never outlives the sign-in it stands on |
 | scopes | at most 20 distinct strings, each 1–100 characters of `A-Z a-z 0-9 _ . : / -`, defined by the apps |
-| ATA audiences | 1 to 20 app ids |
+| ATA receiving apps | exactly 1 per proof (`receiving_app`); one proof per app |
 
 ## The issued proof
 
@@ -71,8 +71,7 @@ unknown fields. Proof responses are `Cache-Control: no-store`.
 }
 ```
 
-An ATA proof has `"kind": "ata"`, `"receiving_apps": ["remind", "waveform"]` instead of
-`receiving_app`, and `"user": null`. Give the `proof_token` to the receiving app; keep the
+An ATA proof has `"kind": "ata"`, its one `receiving_app`, and `"user": null`. Give the `proof_token` to the receiving app; keep the
 `proof_refresh_token` yourself. Lifetimes are absolute timestamps (no `expires_in`), so a replayed
 idempotent response still tells the truth about what is left.
 
@@ -120,14 +119,19 @@ Accounts doesn't show a consent screen for proofs.
 
 ## `POST /v1/proofs/ata`
 
-**Idempotent** (10 minutes). `{"audiences": ["remind", "waveform"], "scopes"?, "access_ttl_seconds"?}`
-→ **201** the issued ATA proof. Errors: 400 `unknown_receiving_app`, 400 `invalid_receiving_app`,
-403 `receiving_app_disabled`, 422 `validation_failed` (`audiences[i]`, …).
+**Idempotent** (10 minutes). `{"receiving_app": "remind", "scopes"?, "access_ttl_seconds"?}`
+→ **201** the issued ATA proof. An ATA proof is always for exactly one app: to talk to `remind`
+and `waveform`, issue one proof for each. Errors: 422 `ata_single_app` (the body has `audiences`,
+of any length: "An ATA proof is for exactly one app; ask for one proof per app.", with
+`details.field: "audiences"` and `details.apps`), 400 `unknown_receiving_app`, 400
+`invalid_receiving_app` (your own app, or `accounts`/`developer`), 403 `receiving_app_disabled`,
+422 `validation_failed` (`receiving_app`, `scopes[i]`, `access_ttl_seconds`).
 
 ## `POST /v1/apps/{app_id}/proofs/ata`
 
-The same for **app or owner**: the app's owner can issue ATA proofs from the account site (the
-ATA page) without the app secret. Same body and response; 403 `app_disabled` for a disabled app.
+The same for **app or owner**: the app's owner can issue ATA proofs from the app's ATA page on
+developer.teamofsilicons.com without the app secret. Same body and response (and the same 422
+`ata_single_app` for `audiences`); 403 `app_disabled` for a disabled app.
 
 ## `POST /v1/proofs/refresh`
 
@@ -163,7 +167,7 @@ sign-in ended).
 ```
 
 A proof is valid only when the token is a known, unexpired proof token; the proof is not revoked;
-the calling app is one of its audiences; the issuing app is active; and, for OBO, the account is
+the calling app is its receiving app; the issuing app is active; and, for OBO, the account is
 active, its membership with the issuing app is active and the sign-in behind the subject token is
 still live. Every other case gets the same body, so a caller learns nothing about proofs that
 aren't theirs. A malformed input (a refresh token, a JWT, an empty string) adds an
@@ -194,7 +198,7 @@ yours; another app's proof id looks unknown), 400 `invalid_proof_id`, 403 `not_i
     {
       "proof_id": "01a11438-f6ef-75f2-86a0-091d4d1b9b37",
       "kind": "obo",
-      "audiences": ["briefcase"],
+      "receiving_app": "briefcase",
       "user": { "uuid": "8HV", "kind": "carbon", "id": "c:ada", "display_name": "Ada King", "pfp_url": "…", "status": "active" },
       "scopes": ["files.write"],
       "status": "revoked",

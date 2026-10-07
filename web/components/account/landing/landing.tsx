@@ -10,10 +10,11 @@
  * pointing at it holds it still, and any key press or touch stops it for good.
  *
  * The docs links show only where there are docs to read. The service always names a docs URL (`docs_url` in GET
- * /v1/meta), by default this site's /docs (https://account.teamofsilicons.com/docs), and this site has no docs pages
- * yet: a docs URL on this site (or on account.teamofsilicons.com, which is this site) gets a link only for a path in
- * SITE_DOCS_PATHS, as a local link, so development never sends visitors to production. Docs on another host are linked
- * as they are.
+ * /v1/meta), by default this site's /docs (https://accounts.teamofsilicons.com/docs): a docs URL on this site (or on
+ * accounts.teamofsilicons.com, which is this site) gets a link for a path in SITE_DOCS_PATHS, as a local link, so
+ * development never sends visitors to production. Docs on another host are linked as they are.
+ *
+ * Building an app is not done here: a quiet line points developers to the developer site (`developer_url`).
  */
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -25,7 +26,7 @@ import { ButtonLink } from "@/components/foundation/button-link";
 import { IdentityCard, IdentityField, LiveClock, StampRow } from "@/components/foundation/identity/identity-card";
 import { BrandMark } from "@/components/foundation/shell/brand-mark";
 import { useTheme } from "@/components/foundation/theme/use-theme";
-import { paths } from "@/lib/navigation";
+import { developerSiteUrl, paths } from "@/lib/navigation";
 import { useMeta } from "@/lib/query/session";
 import styles from "./landing.module.css";
 
@@ -49,13 +50,10 @@ const TURN_EVERY_MS = 5600;
 const TURNS = 2;
 
 /** The account site's public host: a docs URL there names a page of this very site. */
-const SITE_HOSTS = new Set(["account.teamofsilicons.com"]);
+const SITE_HOSTS = new Set(["accounts.teamofsilicons.com"]);
 
-/**
- * Paths of this site that serve docs: none yet (there is no app/docs). Add the path ("/docs") when the docs are
- * published here, and the landing page links to them.
- */
-const SITE_DOCS_PATHS: readonly string[] = [];
+/** Paths of this site that serve docs (app/(docs)): a docs URL on this site under one of them is linked locally. */
+const SITE_DOCS_PATHS: readonly string[] = ["/docs"];
 
 /**
  * The docs link to show, or null. A docs URL on another site is linked as it is; one on this site only when its path is
@@ -80,6 +78,7 @@ export function Landing() {
   const reduced = useReducedMotion() ?? false;
   const meta = useMeta();
   const docs = docsLink(meta.data?.docs_url);
+  const developerUrl = developerSiteUrl(meta.data?.developer_url);
   const [flipped, setFlipped] = useState(false);
   const art = useRef<HTMLDivElement>(null);
 
@@ -143,7 +142,9 @@ export function Landing() {
                 </ButtonLink>
               ) : null}
             </div>
-            <p className={styles.note}>New here? Signing in with your email or phone creates your account.</p>
+            <p className={styles.note}>
+              New here? <Link href={`${paths.signIn}?intent=signup`} className={styles.noteLink}>Create your account</Link>: signing in for the first time with your email, phone, Google or Apple makes it.
+            </p>
           </div>
           {/* Decorative: hidden from assistive technology; each face's content is inert. */}
           <div ref={art} className={styles.art} aria-hidden="true">
@@ -198,7 +199,11 @@ export function Landing() {
       </main>
       <footer className={styles.footer}>
         <span>Silicon Accounts</span>
-        {docs ? <a data-sq="surface" href={docs} target="_blank" rel="noopener">Docs</a> : null}
+        <span className={styles.footerLinks}>
+          {docs ? <a data-sq="surface" href={docs} target="_blank" rel="noopener">Docs</a> : null}
+          {/* Building apps happens on the developer site, not here. */}
+          <a data-sq="surface" href={developerUrl} title="Set up sign-in for the apps you build">Developer site</a>
+        </span>
       </footer>
     </div>
   );

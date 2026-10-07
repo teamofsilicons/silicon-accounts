@@ -248,7 +248,7 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
                     404,
                     "account_not_found",
                     "No Carbon account has that email or phone.",
-                    "Sign up at account.teamofsilicons.com first.",
+                    "Sign up at accounts.teamofsilicons.com first.",
                 )
             }
         }
@@ -393,6 +393,24 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
                 "messages": [{ "level": "error", "code": "missing_identifier", "message": "Row 3 has no valid email or phone.", "field": null }],
                 "input": { "name": "Nobody" } }], "next_cursor": null }),
         ),
+        ("POST", "/v1/proofs/ata") if app_auth => {
+            if json_body.get("audiences").is_some() {
+                error(
+                    422,
+                    "ata_single_app",
+                    "An ATA proof is for exactly one app; ask for one proof per app.",
+                    "Send {\"receiving_app\": \"remind\"} to POST /v1/proofs/ata instead of \"audiences\".",
+                )
+            } else {
+                (
+                    201,
+                    json!({ "proof_id": "p-ata", "kind": "ata", "proof_token": "sap_ata", "expires_at": "2099-01-01T00:30:00.000Z",
+                        "proof_refresh_token": "sapr_ata", "refresh_expires_at": "2099-06-01T00:00:00.000Z",
+                        "issuing_app": APP_ID, "receiving_app": json_body["receiving_app"], "user": null,
+                        "scopes": json_body.get("scopes").cloned().unwrap_or_else(|| json!([])) }),
+                )
+            }
+        }
         ("POST", "/v1/proofs/verify") if app_auth => {
             if json_body["proof_token"] == "sap_valid" {
                 (

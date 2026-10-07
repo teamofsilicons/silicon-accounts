@@ -9,7 +9,8 @@
  * here instead:
  *   - fatal ones (the flow expired, ended, or belongs to another browser): the page shows a full problem page;
  *   - ones after which the server moved the flow on its own (a sign-up that ran out, a domain the app refuses, a
- *     detail that went missing): the flow is read again, and the error stays visible on the step it moved to.
+ *     detail that went missing or was added elsewhere): the flow is read again, and the error stays visible on the
+ *     step it moved to.
  *
  * Flow failures are never toasts: the Carbon reads them on the card.
  */
@@ -17,7 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/endpoints";
 import { ApiError } from "@/lib/api/errors";
-import type { ConsentSubmit, FlowView, SignupPhoto, SignupSubmit } from "@/lib/api/types";
+import type { ContactField, FlowView, SignupPhoto, SignupSubmit } from "@/lib/api/types";
 import { queryKeys } from "@/lib/query/keys";
 import { rememberLook, type HostedFlow } from "./model";
 
@@ -30,13 +31,13 @@ const FATAL = new Set(["flow_expired", "flow_not_found", "flow_not_bound"]);
  */
 const RESYNC = new Set([
   "email_domain_not_allowed", "signup_not_allowed", "account_unavailable", "account_not_active", "app_disabled", "signup_expired",
-  "signup_already_completed", "requirements_missing", "requirement_not_needed", "flow_changed", "flow_completed", "flow_failed",
-  "invalid_step", "code_already_used", "challenge_not_found", "no_code_sent", "session_required", "method_not_enabled",
-  "continue_not_allowed", "reauthentication_required",
+  "signup_already_completed", "requirements_missing", "detail_not_on_page", "no_previous_page",
+  "flow_changed", "flow_completed", "flow_failed", "invalid_step", "code_already_used", "challenge_not_found", "no_code_sent",
+  "session_required", "method_not_enabled", "continue_not_allowed", "reauthentication_required",
 ]);
 
 /**
- * Refusals of a send (POST …/email, …/phone, …/requirements/{kind}) that the server answers before it touches the flow:
+ * Refusals of a send (POST …/email, …/phone, …/details/add) that the server answers before it touches the flow:
  * re-reading would change nothing, and the error belongs under the field that sent it. (A refused domain at verify
  * time is different: the server then saves it on the flow and moves it back to the methods.)
  */
@@ -62,10 +63,18 @@ export interface FlowActions {
   uploadSignupPhoto: (file: Blob) => Promise<SignupPhoto | ApiError>;
   /** Creates the account (or finishes an imported one). */
   signup: (body: SignupSubmit) => Promise<ActionResult>;
-  requirementEmail: (email: string) => Promise<ActionResult>;
-  requirementPhone: (phone: string, country?: string) => Promise<ActionResult>;
-  requirementVerify: (code: string) => Promise<ActionResult>;
-  consent: (body: ConsentSubmit) => Promise<ActionResult>;
+  /** Sends a code to add a missing email of the current details page. */
+  detailsAddEmail: (email: string) => Promise<ActionResult>;
+  /** Sends a code to add a missing phone number of the current details page. */
+  detailsAddPhone: (phone: string, country?: string) => Promise<ActionResult>;
+  /** The code: the email or phone joins the account. */
+  detailsVerify: (code: string) => Promise<ActionResult>;
+  /** Shares the required details of this page and the ticked optional ones (`share`), then moves on. */
+  detailsContinue: (share: ContactField[]) => Promise<ActionResult>;
+  /** The previous details page (from the review: the last one). */
+  detailsBack: () => Promise<ActionResult>;
+  /** Approves what is shared (completes), or cancels the sign-in (`false`, from any details page or the review). */
+  review: (approve: boolean) => Promise<ActionResult>;
 }
 
 export interface FlowController extends FlowActions {
@@ -174,10 +183,12 @@ export function useFlowController(id: string): FlowController {
         }
       },
       signup: body => run(() => api.flows.signup(id, body)),
-      requirementEmail: email => run(() => api.flows.requirementEmail(id, email), SEND_REFUSALS),
-      requirementPhone: (phone, country) => run(() => api.flows.requirementPhone(id, phone, country), SEND_REFUSALS),
-      requirementVerify: code => run(() => api.flows.requirementVerify(id, code)),
-      consent: body => run(() => api.flows.consent(id, body)),
+      detailsAddEmail: email => run(() => api.flows.detailsAdd(id, { email }), SEND_REFUSALS),
+      detailsAddPhone: (phone, country) => run(() => api.flows.detailsAdd(id, country ? { phone, country } : { phone }), SEND_REFUSALS),
+      detailsVerify: code => run(() => api.flows.detailsVerify(id, code)),
+      detailsContinue: share => run(() => api.flows.detailsContinue(id, share)),
+      detailsBack: () => run(() => api.flows.detailsBack(id)),
+      review: approve => run(() => api.flows.review(id, approve)),
     };
   }, [client, id]);
 

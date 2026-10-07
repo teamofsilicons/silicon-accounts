@@ -9,6 +9,8 @@
 //!   middleware stack ([`middleware`]: request ids, logging + Space Station telemetry, security
 //!   headers, CORS, JSON errors, body limits, time budgets, panic recovery).
 //! - [`spawn_background`]: every crate's background tasks, with a graceful stop for the worker.
+//! - [`first_party::sync_developer_app`]: at start-up, the stored redirect URI of the developer
+//!   platform's first-party app follows `ACCOUNTS_DEVELOPER_URL`.
 //! - [`shutdown_signal`]: Ctrl-C / SIGTERM.
 //!
 //! The binaries live in `src/bin/`: `accounts-api` (the service), `accounts-migrate` (applies
@@ -18,6 +20,7 @@ use accounts_core::AppState;
 use axum::Router;
 
 pub mod background;
+pub mod first_party;
 pub mod middleware;
 pub mod paths;
 pub mod routes;

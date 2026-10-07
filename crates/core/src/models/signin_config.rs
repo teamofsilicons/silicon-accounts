@@ -7,9 +7,25 @@
 //!   replace, `null` resets a field to its default), rejects unknown keys, reports type errors
 //!   with their path, normalizes and validates — returning [`FieldErrors`] keyed by path such as
 //!   `branding.light.primary`.
-//! - [`SigninConfig::effective`] applies the first-party rules for app `accounts`.
+//! - [`SigninConfig::effective`] applies the first-party rules for apps `accounts` and
+//!   `developer`.
+//!
+//! ## Details and flows
+//!
+//! An app asks for details (`required_fields`, `optional_fields`: disjoint subsets of email,
+//! phone, dob, timezone). Its optional `flow` decides on which pages they are asked: an ordered
+//! list of steps, each with the details it shows (every requested detail on exactly one step),
+//! its own title, subtitle, continue label and layout, plus `review` (a last page listing
+//! everything that will be shared). `flow: null` (the default) is one step with every requested
+//! detail and no review: that step is the what's-shared screen ([`SigninConfig::effective_flow`]).
+//!
+//! A PATCH that leaves `flow` out keeps the stored flow valid when the details change: a detail
+//! that is no longer requested leaves its step (an emptied step is dropped, and a flow without
+//! steps goes back to `null`), and a newly requested detail joins the last step. A PATCH that
+//! sends `flow` is validated as sent. Sending a `flow` object while the stored flow is `null`
+//! merges it into the default flow, so `{"flow":{"review":true}}` turns the review page on.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -417,6 +433,62 @@ pub struct SigninCopy {
     pub terms_url: Option<String>,
     pub privacy_url: Option<String>,
     pub support_email: Option<String>,
+    /// The opening page shown before Google or Apple ("Opening Google to sign you in to
+    /// Briefcase…"): ≤ 80 characters, may contain `{provider}` and `{app}`.
+    pub opening_title: Option<String>,
+    /// The sign-up version of `title` (`intent=signup`, e.g. "Create your Briefcase account"):
+    /// ≤ 80 characters.
+    pub signup_title: Option<String>,
+    /// The sign-up version of `subtitle`: ≤ 200 characters.
+    pub signup_subtitle: Option<String>,
+}
+
+/// Placeholders `copy.opening_title` may contain.
+pub const OPENING_TITLE_PLACEHOLDERS: [&str; 2] = ["{provider}", "{app}"];
+
+text_enum! {
+    /// Whether an app requires a detail or only asks for it.
+    pub enum FieldMode {
+        /// Always shared; a missing email or phone must be added before continuing.
+        Required = "required",
+        /// A checkbox the Carbon ticks to share it (unticked until they do).
+        Optional = "optional",
+    }
+}
+
+/// The id of the single step of the default flow (`flow: null`).
+pub const DEFAULT_FLOW_STEP_ID: &str = "details";
+
+/// Most steps a flow can have.
+pub const MAX_FLOW_STEPS: usize = 8;
+
+/// One page of an app's sign-in flow: the details it asks for, with its own copy and layout.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct FlowStepConfig {
+    /// `[a-z0-9-]{1,40}`, unique in the flow (`contact`, `about-you`).
+    pub id: String,
+    /// The requested details shown on this page (each requested detail is on exactly one step).
+    pub fields: Vec<ContactField>,
+    /// ≤ 80 characters of plain text; `null` = the hosted page's own title.
+    pub title: Option<String>,
+    /// ≤ 200 characters of plain text.
+    pub subtitle: Option<String>,
+    /// The continue button's label, ≤ 30 characters of plain text (`Finish`).
+    pub continue_label: Option<String>,
+    /// `null` = `branding.layout`.
+    pub layout: Option<Layout>,
+}
+
+/// Which pages a Carbon goes through while signing in, in what order, and which details are
+/// asked on which page (UNDERSTANDING.md "Flows").
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct FlowConfig {
+    /// 1 to 8 steps.
+    pub steps: Vec<FlowStepConfig>,
+    /// Show a last page listing everything that will be shared before finishing.
+    pub review: bool,
 }
 
 /// An app's whole sign-in configuration (no secrets).
@@ -440,6 +512,9 @@ pub struct SigninConfig {
     pub remember_browser: bool,
     pub branding: Branding,
     pub copy: SigninCopy,
+    /// The pages that ask for the details; `null` = one page with every requested detail (see
+    /// the module docs).
+    pub flow: Option<FlowConfig>,
 }
 
 impl Default for SigninConfig {
@@ -458,6 +533,7 @@ impl Default for SigninConfig {
             remember_browser: true,
             branding: Branding::default(),
             copy: SigninCopy::default(),
+            flow: None,
         }
     }
 }
@@ -502,24 +578,28 @@ impl SigninConfig {
         value: &Value,
         secrets: ConfigSecretsPresent,
     ) -> Result<SigninConfig, FieldErrors> {
+        let mut config = SigninConfig::parse_document(value)?;
+        config.normalize();
+        config.validate(secrets)?;
+        Ok(config)
+    }
+
+    /// Unknown keys and type errors (with their path), without normalizing or validating.
+    fn parse_document(value: &Value) -> Result<SigninConfig, FieldErrors> {
         let mut errors = FieldErrors::new();
-        let template = serde_json::to_value(SigninConfig::default()).unwrap_or(Value::Null);
-        unknown_keys(value, &template, "", &mut errors);
+        unknown_keys(value, &config_template(), "", &mut errors);
         if !errors.is_empty() {
             return Err(errors);
         }
-        let mut config: SigninConfig = match serde_path_to_error::deserialize(value.clone()) {
-            Ok(c) => c,
+        match serde_path_to_error::deserialize(value.clone()) {
+            Ok(c) => Ok(c),
             Err(e) => {
                 let path = e.path().to_string();
                 let path = if path == "." { String::new() } else { path };
                 errors.add(path, clean_serde_message(&e.inner().to_string()));
-                return Err(errors);
+                Err(errors)
             }
-        };
-        config.normalize();
-        config.validate(secrets)?;
-        Ok(config)
+        }
     }
 
     /// Applies a PATCH body to this document (see module docs) and returns the validated result.
@@ -529,18 +609,119 @@ impl SigninConfig {
         secrets: ConfigSecretsPresent,
     ) -> Result<SigninConfig, FieldErrors> {
         let mut errors = FieldErrors::new();
-        if !patch.is_object() {
+        let Value::Object(patch_map) = patch else {
             errors.add("", "the sign-in config patch must be a JSON object");
             return Err(errors);
-        }
-        let template = serde_json::to_value(SigninConfig::default()).unwrap_or(Value::Null);
-        unknown_keys(patch, &template, "", &mut errors);
+        };
+        unknown_keys(patch, &config_template(), "", &mut errors);
         if !errors.is_empty() {
             return Err(errors);
         }
         let mut current = serde_json::to_value(self).unwrap_or_else(|_| Value::Object(Map::new()));
-        merge_patch(&mut current, patch);
-        SigninConfig::parse_strict(&current, secrets)
+        // Everything but the flow first: the default flow a `flow` object merges into is made
+        // of the details as they are after this patch.
+        let mut rest = patch_map.clone();
+        let flow_patch = rest.remove("flow");
+        merge_patch(&mut current, &Value::Object(rest));
+        if let (Some(flow_patch), Value::Object(doc)) = (&flow_patch, &mut current) {
+            match flow_patch {
+                Value::Object(_) => {
+                    let base = match doc.get("flow") {
+                        Some(existing) if existing.is_object() => existing.clone(),
+                        _ => default_flow_value(doc),
+                    };
+                    let mut merged = base;
+                    merge_patch(&mut merged, flow_patch);
+                    doc.insert("flow".into(), merged);
+                }
+                // `null` resets to the default flow; anything else is reported by the parser.
+                other => {
+                    doc.insert("flow".into(), other.clone());
+                }
+            }
+        }
+        let mut config = SigninConfig::parse_document(&current)?;
+        config.normalize();
+        if flow_patch.is_none() {
+            // The stored flow follows the details this patch changed (see the module docs).
+            config.reconcile_flow();
+        }
+        config.validate(secrets)?;
+        Ok(config)
+    }
+
+    /// Every detail the app asks for: the required ones, then the optional ones.
+    pub fn requested_fields(&self) -> Vec<ContactField> {
+        let mut out: Vec<ContactField> = Vec::new();
+        for f in self.required_fields.iter().chain(&self.optional_fields) {
+            if !out.contains(f) {
+                out.push(*f);
+            }
+        }
+        out
+    }
+
+    /// How the app asks for `field`, if it does.
+    pub fn mode_of(&self, field: ContactField) -> Option<FieldMode> {
+        if self.required_fields.contains(&field) {
+            Some(FieldMode::Required)
+        } else if self.optional_fields.contains(&field) {
+            Some(FieldMode::Optional)
+        } else {
+            None
+        }
+    }
+
+    /// The default flow: one step with every requested detail (none for an app that asks for
+    /// no details: its one step shows the profile), no review page.
+    pub fn default_flow(&self) -> FlowConfig {
+        FlowConfig {
+            steps: vec![FlowStepConfig {
+                id: DEFAULT_FLOW_STEP_ID.into(),
+                fields: self.requested_fields(),
+                ..Default::default()
+            }],
+            review: false,
+        }
+    }
+
+    /// The flow the hosted pages walk: the configured one, kept consistent with the requested
+    /// details (a stored document always is; this also covers documents written around the
+    /// validation), or [`SigninConfig::default_flow`]. Always at least one step.
+    pub fn effective_flow(&self) -> FlowConfig {
+        let mut copy = self.clone();
+        copy.reconcile_flow();
+        match copy.flow {
+            Some(flow) if !flow.steps.is_empty() => flow,
+            _ => self.default_flow(),
+        }
+    }
+
+    /// Keeps the flow consistent with the requested details: a detail that isn't requested any
+    /// more leaves its step, a requested detail on no step joins the last step, an emptied step
+    /// is dropped, and a flow left without steps becomes `null` (the default flow).
+    pub fn reconcile_flow(&mut self) {
+        let requested = self.requested_fields();
+        let Some(flow) = &mut self.flow else {
+            return;
+        };
+        let mut placed: BTreeSet<ContactField> = BTreeSet::new();
+        for step in &mut flow.steps {
+            step.fields
+                .retain(|f| requested.contains(f) && placed.insert(*f));
+        }
+        let missing: Vec<ContactField> = requested
+            .iter()
+            .copied()
+            .filter(|f| !placed.contains(f))
+            .collect();
+        if let Some(last) = flow.steps.last_mut() {
+            last.fields.extend(missing);
+        }
+        flow.steps.retain(|s| !s.fields.is_empty());
+        if flow.steps.is_empty() {
+            self.flow = None;
+        }
     }
 
     /// Canonicalizes the document: trims, drops empty strings, uppercases colours, dedupes lists,
@@ -568,8 +749,29 @@ impl SigninConfig {
             &mut self.copy.terms_url,
             &mut self.copy.privacy_url,
             &mut self.copy.support_email,
+            &mut self.copy.opening_title,
+            &mut self.copy.signup_title,
+            &mut self.copy.signup_subtitle,
         ] {
             trim_opt(v);
+        }
+        if let Some(flow) = &mut self.flow {
+            for step in &mut flow.steps {
+                let trimmed = step.id.trim();
+                if trimmed.len() != step.id.len() {
+                    step.id = trimmed.to_string();
+                }
+                for v in [
+                    &mut step.title,
+                    &mut step.subtitle,
+                    &mut step.continue_label,
+                ] {
+                    trim_opt(v);
+                }
+                // The same detail twice on one step is the same request.
+                let mut seen = BTreeSet::new();
+                step.fields.retain(|f| seen.insert(*f));
+            }
         }
         if let Some(d) = &mut self.google.hosted_domain {
             *d = d.to_ascii_lowercase();
@@ -737,22 +939,29 @@ impl SigninConfig {
         validate_branding(&self.branding, &mut e);
 
         // Copy
-        if let Some(t) = &self.copy.title {
-            if t.chars().count() > 80 {
-                e.add("copy.title", "must be at most 80 characters");
-            }
-            if t.chars().any(char::is_control) {
-                e.add("copy.title", "must not contain control characters");
+        for (path, value, max) in [
+            ("copy.title", &self.copy.title, 80),
+            ("copy.subtitle", &self.copy.subtitle, 200),
+            ("copy.opening_title", &self.copy.opening_title, 80),
+            ("copy.signup_title", &self.copy.signup_title, 80),
+            ("copy.signup_subtitle", &self.copy.signup_subtitle, 200),
+        ] {
+            validate_text(&mut e, path, value.as_deref(), max);
+        }
+        if let Some(t) = &self.copy.opening_title {
+            for placeholder in placeholders(t) {
+                if !OPENING_TITLE_PLACEHOLDERS.contains(&placeholder.as_str()) {
+                    e.add(
+                        "copy.opening_title",
+                        format!(
+                            "'{placeholder}' is not a placeholder of the opening page; use {{provider}} (Google or Apple) and {{app}} (the app's name), e.g. \"Opening {{provider}} to sign you in to {{app}}…\""
+                        ),
+                    );
+                }
             }
         }
-        if let Some(t) = &self.copy.subtitle {
-            if t.chars().count() > 200 {
-                e.add("copy.subtitle", "must be at most 200 characters");
-            }
-            if t.chars().any(char::is_control) {
-                e.add("copy.subtitle", "must not contain control characters");
-            }
-        }
+
+        validate_flow(self, &mut e);
         for (path, v) in [
             ("copy.terms_url", &self.copy.terms_url),
             ("copy.privacy_url", &self.copy.privacy_url),
@@ -772,11 +981,13 @@ impl SigninConfig {
         e.into_ok()
     }
 
-    /// Applies first-party rules for app `accounts`: email + phone always on, Google/Apple only
-    /// when managed credentials exist, no required fields, signup allowed, redirect URIs on the
-    /// public URL.
+    /// Applies the first-party rules for apps `accounts` (the account site and the CLI) and
+    /// `developer` (developer.teamofsilicons.com): email + phone always on, Google/Apple only
+    /// when managed credentials exist, no details asked (so no flow), signup allowed, and their
+    /// fixed redirect URIs (any URL on the public origin for `accounts`; exactly
+    /// `{developer_url}/auth/callback` for `developer`).
     pub fn effective(mut self, settings: &Settings, app_id: &str) -> SigninConfig {
-        if app_id == crate::FIRST_PARTY_APP_ID {
+        if crate::is_first_party_app_id(app_id) {
             self.methods = Methods {
                 email: true,
                 phone: true,
@@ -785,9 +996,14 @@ impl SigninConfig {
             };
             self.google.mode = ProviderMode::Managed;
             self.apple.mode = ProviderMode::Managed;
-            self.redirect_uris = vec![format!("{}/", settings.public_url)];
+            self.redirect_uris = if app_id == crate::DEVELOPER_APP_ID {
+                vec![settings.developer_callback_url()]
+            } else {
+                vec![format!("{}/", settings.public_url)]
+            };
             self.required_fields.clear();
             self.optional_fields.clear();
+            self.flow = None;
             self.allowed_email_domains.clear();
             self.allow_signup = true;
         }
@@ -821,10 +1037,13 @@ impl SigninConfig {
     }
 
     /// True when `uri` may receive the authorization result for this app.
-    /// First-party (`accounts`): any URL on the public origin or an extra allowed origin.
+    /// First-party `accounts`: any URL on the public origin or an extra allowed origin.
+    /// First-party `developer`: exactly `{developer_url}/auth/callback`.
     pub fn redirect_allowed(&self, settings: &Settings, app_id: &str, uri: &str) -> bool {
         if app_id == crate::FIRST_PARTY_APP_ID {
             first_party_redirect_allowed(settings, uri)
+        } else if app_id == crate::DEVELOPER_APP_ID {
+            settings.developer_redirect_allowed(uri)
         } else {
             redirect_uri_matches(&self.redirect_uris, uri)
         }
@@ -847,6 +1066,168 @@ impl FieldErrors {
     fn into_ok(self) -> Result<(), FieldErrors> {
         if self.is_empty() { Ok(()) } else { Err(self) }
     }
+}
+
+/// Plain text shown on a hosted page: at most `max` characters, no control characters.
+fn validate_text(e: &mut FieldErrors, path: &str, value: Option<&str>, max: usize) {
+    let Some(t) = value else { return };
+    if t.chars().count() > max {
+        e.add(path, format!("must be at most {max} characters"));
+    }
+    if t.chars().any(char::is_control) {
+        e.add(path, "must not contain control characters");
+    }
+}
+
+/// Every `{…}` placeholder in a text, braces included.
+fn placeholders(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = text;
+    while let Some(start) = rest.find('{') {
+        let after = &rest[start..];
+        match after.find('}') {
+            Some(end) => {
+                out.push(after[..=end].to_string());
+                rest = &after[end + 1..];
+            }
+            None => {
+                out.push(after.to_string());
+                break;
+            }
+        }
+    }
+    out
+}
+
+/// True for a flow step id: `[a-z0-9-]{1,40}`.
+pub fn is_flow_step_id(id: &str) -> bool {
+    (1..=40).contains(&id.len())
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+}
+
+fn validate_flow(c: &SigninConfig, e: &mut FieldErrors) {
+    let Some(flow) = &c.flow else { return };
+    let requested = c.requested_fields();
+    if requested.is_empty() {
+        e.add(
+            "flow.steps",
+            "can't be set: the app asks for no details (required_fields and optional_fields are empty), so there is nothing to put on a step; send \"flow\": null to keep the single what's-shared page that shows the profile",
+        );
+        return;
+    }
+    if !(1..=MAX_FLOW_STEPS).contains(&flow.steps.len()) {
+        e.add(
+            "flow.steps",
+            format!(
+                "has {} steps; a flow has 1 to {MAX_FLOW_STEPS} steps",
+                flow.steps.len()
+            ),
+        );
+    }
+    let mut ids: Vec<&str> = Vec::new();
+    let mut placed: BTreeMap<ContactField, usize> = BTreeMap::new();
+    for (i, step) in flow.steps.iter().enumerate() {
+        let at = |key: &str| format!("flow.steps[{i}].{key}");
+        if step.id.is_empty() {
+            e.add(
+                at("id"),
+                "is required: a short name for the step, 1 to 40 lowercase letters, digits or '-', like contact or about-you",
+            );
+        } else if !is_flow_step_id(&step.id) {
+            e.add(
+                at("id"),
+                format!(
+                    "'{}' must be 1 to 40 lowercase letters, digits or '-', like contact or about-you",
+                    step.id
+                ),
+            );
+        } else if let Some(j) = ids.iter().position(|id| *id == step.id) {
+            e.add(
+                at("id"),
+                format!(
+                    "'{}' is already the id of flow.steps[{j}]; step ids must be unique",
+                    step.id
+                ),
+            );
+        }
+        ids.push(&step.id);
+        if step.fields.is_empty() {
+            e.add(
+                at("fields"),
+                "must list at least one of the app's details (email, phone, dob or timezone from required_fields or optional_fields)",
+            );
+        }
+        for (k, field) in step.fields.iter().enumerate() {
+            let path = format!("flow.steps[{i}].fields[{k}]");
+            if !requested.contains(field) {
+                e.add(
+                    path,
+                    format!(
+                        "'{field}' is not one of the app's details; add it to required_fields or optional_fields first, or take it off this step"
+                    ),
+                );
+            } else if let Some(j) = placed.get(field) {
+                e.add(
+                    path,
+                    format!(
+                        "'{field}' is already on flow.steps[{j}]; each detail is asked on exactly one step"
+                    ),
+                );
+            } else {
+                placed.insert(*field, i);
+            }
+        }
+        validate_text(e, &at("title"), step.title.as_deref(), 80);
+        validate_text(e, &at("subtitle"), step.subtitle.as_deref(), 200);
+        validate_text(e, &at("continue_label"), step.continue_label.as_deref(), 30);
+    }
+    let unplaced: Vec<String> = requested
+        .iter()
+        .filter(|f| !placed.contains_key(f))
+        .map(|f| format!("'{f}'"))
+        .collect();
+    if !unplaced.is_empty() && !flow.steps.is_empty() {
+        e.add(
+            "flow.steps",
+            format!(
+                "{} {} requested (required_fields or optional_fields) but on no step; every requested detail must be on exactly one step",
+                unplaced.join(" and "),
+                if unplaced.len() == 1 { "is" } else { "are" }
+            ),
+        );
+    }
+}
+
+/// The fully serialized default document, with a sample flow step so unknown keys inside
+/// `flow` are reported too.
+fn config_template() -> Value {
+    let mut template = serde_json::to_value(SigninConfig::default()).unwrap_or(Value::Null);
+    if let Value::Object(map) = &mut template {
+        let step = serde_json::to_value(FlowStepConfig::default()).unwrap_or(Value::Null);
+        map.insert(
+            "flow".into(),
+            serde_json::json!({"steps": [step], "review": false}),
+        );
+    }
+    template
+}
+
+/// The default flow (one step with every requested detail) of a document being merged, as
+/// JSON. Details that don't parse are left out (the parser reports them).
+fn default_flow_value(doc: &Map<String, Value>) -> Value {
+    let fields = |key: &str| -> Vec<ContactField> {
+        doc.get(key)
+            .and_then(|v| serde_json::from_value::<Vec<ContactField>>(v.clone()).ok())
+            .unwrap_or_default()
+    };
+    let draft = SigninConfig {
+        required_fields: fields("required_fields"),
+        optional_fields: fields("optional_fields"),
+        ..SigninConfig::default()
+    };
+    serde_json::to_value(draft.default_flow()).unwrap_or(Value::Null)
 }
 
 fn trim_opt(v: &mut Option<String>) {
@@ -904,7 +1285,16 @@ pub fn merge_patch(target: &mut Value, patch: &Value) {
 }
 
 /// Reports every key of `value` that the template (a fully serialized default) does not have.
+/// Array items are checked against the template array's first item (`flow.steps[2].colour`).
 fn unknown_keys(value: &Value, template: &Value, path: &str, errors: &mut FieldErrors) {
+    if let (Value::Array(items), Value::Array(t)) = (value, template)
+        && let Some(item_template) = t.first()
+    {
+        for (i, item) in items.iter().enumerate() {
+            unknown_keys(item, item_template, &format!("{path}[{i}]"), errors);
+        }
+        return;
+    }
     let (Value::Object(v), Value::Object(t)) = (value, template) else {
         return;
     };
@@ -1461,6 +1851,296 @@ mod tests {
         ));
     }
 
+    fn with_details(required: &[&str], optional: &[&str]) -> SigninConfig {
+        SigninConfig::default()
+            .apply_patch(
+                &json!({"required_fields": required, "optional_fields": optional}),
+                no_secrets(),
+            )
+            .expect("details")
+    }
+
+    #[test]
+    fn flows_are_validated_with_paths() {
+        let base = with_details(&["email", "phone"], &["dob"]);
+        let ok = base
+            .apply_patch(
+                &json!({"flow": {"steps": [
+                    {"id": "contact", "fields": ["email", "phone"], "title": " How can we reach you? "},
+                    {"id": "about-you", "fields": ["dob"], "continue_label": "Finish", "layout": "split"}
+                ], "review": true}}),
+                no_secrets(),
+            )
+            .expect("valid flow");
+        let flow = ok.flow.as_ref().expect("flow");
+        assert!(flow.review);
+        assert_eq!(
+            flow.steps[0].title.as_deref(),
+            Some("How can we reach you?")
+        );
+        assert_eq!(flow.steps[1].layout, Some(Layout::Split));
+
+        let err = base
+            .apply_patch(
+                &json!({"flow": {"steps": [
+                    {"id": "Contact!", "fields": ["email", "timezone"]},
+                    {"id": "b", "fields": ["email"], "colour": "red"}
+                ]}}),
+                no_secrets(),
+            )
+            .expect_err("unknown key");
+        assert!(
+            err.get("flow.steps[1].colour")
+                .is_some_and(|m| m.contains("unknown field")),
+            "{err:?}"
+        );
+
+        let err = base
+            .apply_patch(
+                &json!({"flow": {"steps": [
+                    {"id": "Contact!", "fields": ["email", "timezone"], "title": "x".repeat(81)},
+                    {"id": "b", "fields": ["email"], "continue_label": "y".repeat(31)},
+                    {"id": "b", "fields": []}
+                ]}}),
+                no_secrets(),
+            )
+            .expect_err("invalid flow");
+        assert!(err.get("flow.steps[0].id").is_some(), "{err:?}");
+        assert!(
+            err.get("flow.steps[0].fields[1]")
+                .is_some_and(|m| m.contains("'timezone' is not one of the app's details")),
+            "{err:?}"
+        );
+        assert!(err.get("flow.steps[0].title").is_some(), "{err:?}");
+        assert!(
+            err.get("flow.steps[1].fields[0]")
+                .is_some_and(|m| m.contains("already on flow.steps[0]")),
+            "{err:?}"
+        );
+        assert!(err.get("flow.steps[1].continue_label").is_some(), "{err:?}");
+        assert!(
+            err.get("flow.steps[2].id")
+                .is_some_and(|m| m.contains("already the id of flow.steps[1]")),
+            "{err:?}"
+        );
+        assert!(err.get("flow.steps[2].fields").is_some(), "{err:?}");
+        assert!(
+            err.get("flow.steps")
+                .is_some_and(|m| m.contains("'phone' and 'dob'")),
+            "{err:?}"
+        );
+
+        let err = base
+            .apply_patch(&json!({"flow": {"steps": []}}), no_secrets())
+            .expect_err("no steps");
+        assert!(err.get("flow.steps").is_some_and(|m| m.contains("1 to 8")));
+        let nine: Vec<Value> = (0..9)
+            .map(|i| json!({"id": format!("s{i}"), "fields": ["email"]}))
+            .collect();
+        let err = base
+            .apply_patch(&json!({"flow": {"steps": nine}}), no_secrets())
+            .expect_err("nine steps");
+        assert!(
+            err.get("flow.steps")
+                .is_some_and(|m| m.contains("has 9 steps"))
+        );
+        let err = base
+            .apply_patch(
+                &json!({"flow": {"steps": [{"id": "a", "fields": ["email", "phone", "dob"], "layout": "grid"}]}}),
+                no_secrets(),
+            )
+            .expect_err("layout");
+        assert!(err.get("flow.steps[0].layout").is_some(), "{err:?}");
+    }
+
+    #[test]
+    fn a_flow_object_merges_into_the_default_flow() {
+        let base = with_details(&["email"], &["timezone"]);
+        assert_eq!(base.flow, None);
+        assert_eq!(base.effective_flow(), base.default_flow());
+        assert_eq!(
+            base.default_flow().steps[0].fields,
+            vec![ContactField::Email, ContactField::Timezone]
+        );
+        let c = base
+            .apply_patch(&json!({"flow": {"review": true}}), no_secrets())
+            .expect("review on the default flow");
+        let flow = c.flow.clone().expect("flow");
+        assert!(flow.review);
+        assert_eq!(flow.steps.len(), 1);
+        assert_eq!(flow.steps[0].id, DEFAULT_FLOW_STEP_ID);
+        // Step fields replace (arrays replace); review stays.
+        let c = c
+            .apply_patch(
+                &json!({"flow": {"steps": [{"id": "one", "fields": ["timezone"]}, {"id": "two", "fields": ["email"], "title": "Last"}]}}),
+                no_secrets(),
+            )
+            .expect("two steps");
+        assert!(
+            c.flow
+                .as_ref()
+                .is_some_and(|f| f.review && f.steps.len() == 2)
+        );
+        // null resets to the default flow.
+        let reset = c
+            .apply_patch(&json!({"flow": null}), no_secrets())
+            .expect("reset");
+        assert_eq!(reset.flow, None);
+        // An app with no details has no flow to configure.
+        let err = SigninConfig::default()
+            .apply_patch(&json!({"flow": {"review": true}}), no_secrets())
+            .expect_err("nothing to ask");
+        assert!(
+            err.get("flow.steps")
+                .is_some_and(|m| m.contains("asks for no details")),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn changing_the_details_keeps_the_stored_flow_valid() {
+        let c = with_details(&["email", "phone"], &["dob", "timezone"])
+            .apply_patch(
+                &json!({"flow": {"steps": [
+                    {"id": "contact", "fields": ["email", "phone"]},
+                    {"id": "about-you", "fields": ["dob", "timezone"], "title": "About you"}
+                ], "review": true}}),
+                no_secrets(),
+            )
+            .expect("flow");
+        // Removing phone takes it off its step; removing dob and timezone drops their step.
+        let fewer = c
+            .apply_patch(
+                &json!({"required_fields": ["email"], "optional_fields": []}),
+                no_secrets(),
+            )
+            .expect("fewer details");
+        let flow = fewer.flow.as_ref().expect("flow kept");
+        assert_eq!(flow.steps.len(), 1);
+        assert_eq!(flow.steps[0].id, "contact");
+        assert_eq!(flow.steps[0].fields, vec![ContactField::Email]);
+        assert!(flow.review);
+        // A newly requested detail joins the last step.
+        let more = c
+            .apply_patch(
+                &json!({"optional_fields": ["dob"], "required_fields": ["email", "phone", "timezone"]}),
+                no_secrets(),
+            )
+            .expect("moved between lists");
+        assert_eq!(
+            more.flow, c.flow,
+            "moving a detail between lists keeps its step"
+        );
+        // No details at all: back to the default flow.
+        let none = c
+            .apply_patch(
+                &json!({"required_fields": [], "optional_fields": []}),
+                no_secrets(),
+            )
+            .expect("no details");
+        assert_eq!(none.flow, None);
+        // Swapping the only detail keeps the step.
+        let one = with_details(&["email"], &[])
+            .apply_patch(
+                &json!({"flow": {"steps": [{"id": "contact", "fields": ["email"], "title": "Reach"}]}}),
+                no_secrets(),
+            )
+            .expect("one step")
+            .apply_patch(&json!({"required_fields": ["phone"]}), no_secrets())
+            .expect("swap");
+        let step = &one.flow.as_ref().expect("flow").steps[0];
+        assert_eq!(
+            (step.id.as_str(), step.fields.clone(), step.title.as_deref()),
+            ("contact", vec![ContactField::Phone], Some("Reach"))
+        );
+        // A patch that sends the flow is validated as sent.
+        let err = c
+            .apply_patch(
+                &json!({"optional_fields": [], "flow": {"steps": [{"id": "contact", "fields": ["email", "phone", "dob"]}]}}),
+                no_secrets(),
+            )
+            .expect_err("explicit flow");
+        assert!(err.get("flow.steps[0].fields[2]").is_some(), "{err:?}");
+    }
+
+    #[test]
+    fn copy_additions_are_validated() {
+        let c = SigninConfig::default()
+            .apply_patch(
+                &json!({"copy": {"opening_title": "Opening {provider} for {app}…", "signup_title": "Create your account", "signup_subtitle": "It takes a minute."}}),
+                no_secrets(),
+            )
+            .expect("valid copy");
+        assert_eq!(
+            c.copy.opening_title.as_deref(),
+            Some("Opening {provider} for {app}…")
+        );
+        let err = SigninConfig::default()
+            .apply_patch(
+                &json!({"copy": {"opening_title": "Opening {service}", "signup_title": "x".repeat(81), "signup_subtitle": "a\u{7}b"}}),
+                no_secrets(),
+            )
+            .expect_err("invalid copy");
+        assert!(
+            err.get("copy.opening_title")
+                .is_some_and(|m| m.contains("'{service}'")),
+            "{err:?}"
+        );
+        assert!(err.get("copy.signup_title").is_some());
+        assert!(err.get("copy.signup_subtitle").is_some());
+        assert_eq!(
+            placeholders("a {b} c {d"),
+            vec!["{b}".to_string(), "{d".to_string()]
+        );
+        // Documents stored before these existed still load.
+        let old = SigninConfig::from_stored(&json!({"copy": {"title": "Hi"}}));
+        assert_eq!(old.copy.title.as_deref(), Some("Hi"));
+        assert_eq!(old.copy.opening_title, None);
+        assert_eq!(old.flow, None);
+    }
+
+    #[test]
+    fn the_effective_flow_tolerates_documents_written_around_validation() {
+        let mut c = with_details(&["email"], &["timezone"]);
+        c.flow = Some(FlowConfig {
+            steps: vec![
+                FlowStepConfig {
+                    id: "a".into(),
+                    fields: vec![ContactField::Phone, ContactField::Email],
+                    ..Default::default()
+                },
+                FlowStepConfig {
+                    id: "b".into(),
+                    fields: vec![ContactField::Email],
+                    ..Default::default()
+                },
+            ],
+            review: true,
+        });
+        let flow = c.effective_flow();
+        // phone isn't requested and email is already on step a; timezone joins the last step.
+        assert_eq!(flow.steps.len(), 2);
+        assert_eq!(flow.steps[0].fields, vec![ContactField::Email]);
+        assert_eq!(flow.steps[1].fields, vec![ContactField::Timezone]);
+        assert!(flow.review);
+        c.flow = Some(FlowConfig {
+            steps: vec![FlowStepConfig {
+                id: "a".into(),
+                fields: vec![ContactField::Dob],
+                ..Default::default()
+            }],
+            review: false,
+        });
+        assert_eq!(
+            c.effective_flow().steps[0].fields,
+            vec![ContactField::Email, ContactField::Timezone],
+            "a step left with only details the app doesn't ask for still gets the requested ones"
+        );
+        let none = SigninConfig::default().effective_flow();
+        assert_eq!(none.steps.len(), 1);
+        assert!(none.steps[0].fields.is_empty(), "the profile-only step");
+    }
+
     #[test]
     fn first_party_effective_config() {
         let mut settings = Settings::for_tests();
@@ -1482,5 +2162,27 @@ mod tests {
             .apply_patch(&json!({"methods": {"apple": true}}), no_secrets())
             .expect("valid");
         assert_eq!(other.available_methods(&settings), vec![Method::Email]);
+
+        // The developer site: same rules, details never asked, one exact redirect URI.
+        let stored = with_details(&["email"], &["timezone"])
+            .apply_patch(&json!({"flow": {"review": true}}), no_secrets())
+            .expect("flow");
+        let dev = stored.effective(&settings, crate::DEVELOPER_APP_ID);
+        assert!(dev.methods.email && dev.methods.phone);
+        assert!(dev.required_fields.is_empty() && dev.optional_fields.is_empty());
+        assert_eq!(dev.flow, None);
+        let callback = settings.developer_callback_url();
+        assert_eq!(dev.redirect_uris, vec![callback.clone()]);
+        assert!(dev.redirect_allowed(&settings, crate::DEVELOPER_APP_ID, &callback));
+        assert!(!dev.redirect_allowed(
+            &settings,
+            crate::DEVELOPER_APP_ID,
+            &format!("{callback}?x=1")
+        ));
+        assert!(!dev.redirect_allowed(
+            &settings,
+            crate::DEVELOPER_APP_ID,
+            &format!("{}/", settings.public_url)
+        ));
     }
 }

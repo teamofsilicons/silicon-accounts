@@ -29,7 +29,7 @@ const options = {
   sourcemap: false,
   legalComments: "none",
   define: { __ACCOUNTS_WEB_VERSION__: JSON.stringify(pkg.version ?? "0.0.0") },
-  banner: { js: `/* Silicon Accounts SDK v1 (${pkg.version}). https://account.teamofsilicons.com */` },
+  banner: { js: `/* Silicon Accounts SDK v1 (${pkg.version}). https://accounts.teamofsilicons.com */` },
   logLevel: "warning",
 };
 

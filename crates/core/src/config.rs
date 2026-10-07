@@ -30,7 +30,18 @@ pub const CONTRACT_OTP_LOCK_SECONDS: i64 = 60;
 pub const CONTRACT_ACCESS_TOKEN_TTL_SECONDS: i64 = 1800;
 
 /// Where the published docs live unless ACCOUNTS_DOCS_URL says otherwise.
-pub const DEFAULT_DOCS_URL: &str = "https://account.teamofsilicons.com/docs";
+pub const DEFAULT_DOCS_URL: &str = "https://accounts.teamofsilicons.com/docs";
+
+/// The developer platform in production unless ACCOUNTS_DEVELOPER_URL says otherwise.
+pub const DEFAULT_DEVELOPER_URL: &str = "https://developer.teamofsilicons.com";
+
+/// The developer platform's default outside production: `next dev` in developer/ on port 8600
+/// (scripts/dev.sh sets ACCOUNTS_DEVELOPER_URL for stacks on other ports).
+pub const DEV_DEVELOPER_URL: &str = "http://localhost:8600";
+
+/// Where the developer platform receives its sign-in result: the only redirect URI of the
+/// first-party app `developer`, compared exactly (`{developer_url}{DEVELOPER_CALLBACK_PATH}`).
+pub const DEVELOPER_CALLBACK_PATH: &str = "/auth/callback";
 
 /// Every environment variable the service reads (all documented in `.env.example`).
 pub const VARIABLES: &[&str] = &[
@@ -48,6 +59,7 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_DATABASE_MAX_CONNECTIONS",
     "ACCOUNTS_DATABASE_URL",
     "ACCOUNTS_DELIVERY",
+    "ACCOUNTS_DEVELOPER_URL",
     "ACCOUNTS_DOCS_URL",
     "ACCOUNTS_ENCRYPTION_CURRENT_VERSION",
     "ACCOUNTS_ENCRYPTION_KEYRING",
@@ -269,6 +281,12 @@ pub struct Settings {
     pub silicon_apps_url: String,
     /// ACCOUNTS_DOCS_URL: where the published docs live (`GET /v1/meta` `docs_url`).
     pub docs_url: String,
+    /// ACCOUNTS_DEVELOPER_URL without a trailing slash: the developer platform
+    /// (`GET /v1/meta` `developer_url`). The first-party app `developer` may only redirect to
+    /// `{developer_url}/auth/callback`.
+    pub developer_url: String,
+    /// Origin (`scheme://host[:port]`) of `developer_url`.
+    pub developer_origin: String,
     /// ACCOUNTS_INTERNAL_TOKEN (service token for `/v1/internal/*`).
     pub internal_token: Option<SecretString>,
     /// ACCOUNTS_REPORT_RECIPIENTS.
@@ -528,6 +546,18 @@ impl Settings {
             trust_forwarded_for: false,
             silicon_apps_url: "https://apps.teamofsilicons.com".into(),
             docs_url: DEFAULT_DOCS_URL.into(),
+            developer_url: if prod {
+                DEFAULT_DEVELOPER_URL
+            } else {
+                DEV_DEVELOPER_URL
+            }
+            .into(),
+            developer_origin: if prod {
+                DEFAULT_DEVELOPER_URL
+            } else {
+                DEV_DEVELOPER_URL
+            }
+            .into(),
             internal_token: None,
             report_recipients: vec![
                 "saketdev12@gmail.com".into(),
@@ -820,6 +850,13 @@ impl Settings {
             "https://apps.teamofsilicons.com",
         );
         s.docs_url = r.http_url("ACCOUNTS_DOCS_URL", DEFAULT_DOCS_URL);
+        let developer_default = if prod {
+            DEFAULT_DEVELOPER_URL
+        } else {
+            DEV_DEVELOPER_URL
+        };
+        s.developer_url = r.http_url("ACCOUNTS_DEVELOPER_URL", developer_default);
+        s.developer_origin = origin_of(&s.developer_url).unwrap_or_else(|| s.developer_url.clone());
         s.internal_token = r.secret("ACCOUNTS_INTERNAL_TOKEN");
         if let Some(t) = &s.internal_token
             && t.expose_secret().len() < 32
@@ -899,6 +936,15 @@ impl Settings {
                     ),
                 );
             }
+            if !s.developer_url.starts_with("https://") {
+                r.problem(
+                    "ACCOUNTS_DEVELOPER_URL",
+                    format!(
+                        "is '{}' but production must send developer sign-ins to an https site (its tokens travel on that redirect)",
+                        s.developer_url
+                    ),
+                );
+            }
             if !s.cookie_secure {
                 r.problem(
                     "ACCOUNTS_COOKIE_SECURE",
@@ -954,6 +1000,18 @@ impl Settings {
             .chain(self.extra_allowed_origins.iter().map(String::as_str))
     }
 
+    /// The only redirect URI of the first-party app `developer`:
+    /// `{ACCOUNTS_DEVELOPER_URL}/auth/callback`.
+    pub fn developer_callback_url(&self) -> String {
+        format!("{}{DEVELOPER_CALLBACK_PATH}", self.developer_url)
+    }
+
+    /// True when `uri` is exactly the developer platform's callback (the redirect rule of the
+    /// first-party app `developer`; surrounding whitespace is ignored, nothing else is).
+    pub fn developer_redirect_allowed(&self, uri: &str) -> bool {
+        uri.trim() == self.developer_callback_url()
+    }
+
     /// True when `origin` (an Origin header value) is the site or an extra allowed origin.
     pub fn is_allowed_origin(&self, origin: &str) -> bool {
         let o = origin.trim().trim_end_matches('/');
@@ -995,7 +1053,12 @@ mod tests {
         assert_eq!(s.environment, Environment::Development);
         // The API listens on 8589 behind the account site, which serves the public 8590.
         assert_eq!(s.bind_addr, SocketAddr::from(([127, 0, 0, 1], 8589)));
-        assert_eq!(s.docs_url, "https://account.teamofsilicons.com/docs");
+        assert_eq!(s.docs_url, "https://accounts.teamofsilicons.com/docs");
+        assert_eq!(s.developer_url, "http://localhost:8600");
+        assert_eq!(
+            s.developer_callback_url(),
+            "http://localhost:8600/auth/callback"
+        );
         assert_eq!(s.public_url, "http://localhost:8590");
         assert_eq!(s.public_origin, "http://localhost:8590");
         assert!(!s.cookie_secure);
@@ -1017,9 +1080,21 @@ mod tests {
             ("ACCOUNTS_DELIVERY", "providers"),
             ("ACCOUNTS_IP_TIMEZONE_HEADERS", "X-Test-TZ"),
             ("ACCOUNTS_DOCS_URL", "https://docs.example.test/accounts/"),
+            ("ACCOUNTS_DEVELOPER_URL", "http://localhost:8600/"),
         ]))
         .expect("valid");
         assert_eq!(s.docs_url, "https://docs.example.test/accounts");
+        assert_eq!(s.developer_url, "http://localhost:8600");
+        assert_eq!(s.developer_origin, "http://localhost:8600");
+        assert!(s.developer_redirect_allowed("http://localhost:8600/auth/callback"));
+        assert!(s.developer_redirect_allowed(" http://localhost:8600/auth/callback "));
+        assert!(!s.developer_redirect_allowed("http://localhost:8600/auth/callback?x=1"));
+        assert!(!s.developer_redirect_allowed("http://localhost:8601/auth/callback"));
+        assert!(!s.developer_redirect_allowed("http://localhost:8600/"));
+        assert!(
+            !s.is_allowed_origin("http://localhost:8600"),
+            "the developer platform is a server-side client: it never needs the cookie CSRF allowance"
+        );
         assert_eq!(s.public_url, "https://account.example.test");
         assert_eq!(
             s.extra_allowed_origins,
@@ -1053,6 +1128,7 @@ mod tests {
             ("ACCOUNTS_JWT_PRIVATE_KEY", DEV_JWT_SEED),
             ("ACCOUNTS_EXPOSE_DEV_OUTBOX", "true"),
             ("ACCOUNTS_WEBHOOK_ALLOW_PRIVATE", "true"),
+            ("ACCOUNTS_DEVELOPER_URL", "http://localhost:8600"),
         ]))
         .expect_err("must refuse");
         let vars: Vec<_> = err.problems.iter().map(|p| p.var.as_str()).collect();
@@ -1064,6 +1140,7 @@ mod tests {
             "ACCOUNTS_EXPOSE_DEV_OUTBOX",
             "ACCOUNTS_PUBLIC_URL",
             "ACCOUNTS_WEBHOOK_ALLOW_PRIVATE",
+            "ACCOUNTS_DEVELOPER_URL",
         ] {
             assert!(vars.contains(&v), "expected a problem for {v}: {err}");
         }
@@ -1080,7 +1157,7 @@ mod tests {
     fn production_accepts_real_secrets() {
         let s = Settings::from_lookup(lookup(&[
             ("ACCOUNTS_ENVIRONMENT", "production"),
-            ("ACCOUNTS_PUBLIC_URL", "https://account.teamofsilicons.com"),
+            ("ACCOUNTS_PUBLIC_URL", "https://accounts.teamofsilicons.com"),
             (
                 "ACCOUNTS_TOKEN_PEPPER",
                 "ZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1-f4CBgoM",
@@ -1098,6 +1175,7 @@ mod tests {
             ("ACCOUNTS_POSTMARK_SERVER_TOKEN", "pm-token"),
         ]))
         .expect("valid production settings");
+        assert_eq!(s.developer_url, "https://developer.teamofsilicons.com");
         assert!(s.cookie_secure);
         assert!(!s.webhook_allow_private);
         assert_eq!(s.encryption_current_version, 2);

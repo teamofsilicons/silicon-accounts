@@ -629,7 +629,7 @@ pub mod templates {
              font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif\">\
              <div style=\"max-width:480px;margin:0 auto\"><p style=\"font-size:13px;color:#6F6B66\">{}</p>{}\
              <p style=\"font-size:12px;color:#6F6B66;margin-top:32px\">Sent by Silicon Accounts · \
-             <a href=\"{}\" style=\"color:#1F5FB8\">account.teamofsilicons.com</a></p></div></body></html>",
+             <a href=\"{}\" style=\"color:#1F5FB8\">accounts.teamofsilicons.com</a></p></div></body></html>",
             escape_html(title),
             body_html,
             crate::PRODUCT_SITE
@@ -648,7 +648,7 @@ pub mod templates {
         let text = format!(
             "Your Silicon Accounts verification code is {code}.\n\n{line} It expires in {minutes} minutes.\n\n\
              If you didn't ask for this code, ignore this email: nobody can use your account without it.\n\n\
-             Silicon Accounts · account.teamofsilicons.com\n"
+             Silicon Accounts · accounts.teamofsilicons.com\n"
         );
         let html = wrap_html(
             "Silicon Accounts",

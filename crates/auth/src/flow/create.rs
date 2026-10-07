@@ -18,7 +18,8 @@ use serde::Deserialize;
 use serde_json::json;
 
 use super::browser;
-use super::model::{self, FlowError, NewFlow, Prompt, Step};
+use super::details::{self, Plan, Standing};
+use super::model::{self, FlowError, Intent, NewFlow, Prompt, Step};
 use super::next;
 use super::signup;
 use super::view::{self, ViewContext};
@@ -31,6 +32,10 @@ pub const FLOW_CREATE_PER_IP: Limit = Limit::new(300, 60);
 /// The authorize request as the SPA forwards it (query parameters as JSON). Unknown fields
 /// are ignored; empty strings count as absent. `state` and `nonce` are kept exactly as sent
 /// (they must come back byte for byte); everything else is trimmed.
+///
+/// `login_hint` is ignored entirely: an app can never hand Silicon Accounts a Carbon's email
+/// or phone (UNDERSTANDING.md "Adding sign-in to an app"), so it is not prefilled, not stored,
+/// not echoed and not forwarded to Google or Apple.
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct CreateFlowBody {
@@ -46,7 +51,9 @@ pub struct CreateFlowBody {
     pub scope: Option<String>,
     pub nonce: Option<String>,
     pub prompt: Option<String>,
-    pub login_hint: Option<String>,
+    /// `signin` (default) or `signup`: which version of the pages to show.
+    pub intent: Option<String>,
+    /// A direct method button (`google`, `apple`, `email`, `phone`).
     pub method: Option<String>,
     /// The browser's `Intl` timezone (sign-up suggestion fallback).
     pub timezone: Option<String>,
@@ -156,7 +163,12 @@ pub async fn create_flow(
         .config
         .redirect_allowed(&state.settings, &app_id, &redirect_uri)
     {
-        let rule = if fa.first_party() {
+        let rule = if app_id == accounts_core::DEVELOPER_APP_ID {
+            format!(
+                "the developer site only redirects to {}",
+                state.settings.developer_callback_url()
+            )
+        } else if fa.first_party() {
             format!(
                 "the first-party app only redirects to {} (or an ACCOUNTS_EXTRA_ALLOWED_ORIGINS origin)",
                 state.settings.public_origin
@@ -164,13 +176,28 @@ pub async fn create_flow(
         } else {
             "it must equal one of the app's registered redirect_uris exactly (http://localhost and http://127.0.0.1 match on any port when registered with that host)".to_string()
         };
+        // First-party apps have no sign-in setup anyone can change: their redirect rule comes
+        // from accounts-api's own settings.
+        let hint = if app_id == accounts_core::DEVELOPER_APP_ID {
+            format!(
+                "The developer platform signs in only through {}. If the developer platform runs at another address, set ACCOUNTS_DEVELOPER_URL on accounts-api to its origin.",
+                state.settings.developer_callback_url()
+            )
+        } else if fa.first_party() {
+            format!(
+                "Send redirect_uri on {}, or add the origin to ACCOUNTS_EXTRA_ALLOWED_ORIGINS on accounts-api.",
+                state.settings.public_origin
+            )
+        } else {
+            format!(
+                "Register it in the app's sign-in setup (on developer.teamofsilicons.com, or PATCH /v1/apps/{app_id}/signin-config with redirect_uris), or use a registered URI."
+            )
+        };
         return Err(ApiError::bad_request(
             "redirect_uri_not_registered",
             format!("redirect_uri '{redirect_uri}' is not registered for the app '{app_id}': {rule}."),
         )
-        .hint(format!(
-            "Register it in the app's sign-in setup (PATCH /v1/apps/{app_id}/signin-config with redirect_uris), or use a registered URI."
-        ))
+        .hint(hint)
         .detail("app_id", app_id.as_str()));
     }
 
@@ -303,7 +330,19 @@ pub async fn create_flow(
             st,
         ));
     }
-    let login_hint = clean(&body.login_hint).map(|h| h.chars().take(320).collect::<String>());
+    let intent = match clean(&body.intent) {
+        None => Intent::Signin,
+        Some(raw) => Intent::parse(raw).ok_or_else(|| {
+            request_error(
+                "invalid_request",
+                "invalid_request",
+                format!("intent '{raw}' is not supported; use intent=signin or intent=signup."),
+                "Leave intent out for the sign-in pages, or send intent=signup for the sign-up version.",
+                &redirect_uri,
+                st,
+            )
+        })?,
+    };
     let method_hint = match clean(&body.method) {
         None => None,
         Some(m) => {
@@ -361,11 +400,11 @@ pub async fn create_flow(
             nonce: nonce.as_deref(),
             requested_scopes: &requested_scopes,
             prompt,
-            login_hint: login_hint.as_deref(),
             method_hint,
         },
     )
     .await?;
+    flow.extras.intent = intent;
     flow.extras.browser_timezone = clean(&body.timezone).and_then(|t| normalize_timezone(t).ok());
 
     let current = browser::current(&mut tx, &state, &headers).await?;
@@ -407,6 +446,7 @@ pub async fn create_flow(
             "pkce": code_challenge_method,
             "openid": flow.wants_openid(),
             "method_hint": method_hint.map(|m| m.as_str()),
+            "intent": intent.as_str(),
         }),
     );
     Ok(FlowResponse {
@@ -452,39 +492,38 @@ async fn silent_sign_in(
             ),
         );
     }
-    if !next::missing_requirements(conn, &fa.config, &b.account)
-        .await?
-        .is_empty()
-    {
-        return next::fail(
-            state,
-            flow,
-            FlowError::new(
-                "interaction_required",
-                format!(
-                    "The signed-in account is missing details {} requires.",
-                    fa.app.name
+    if !fa.first_party() {
+        let standing = Standing::load(conn, &fa.app.app_id, &b.account).await?;
+        if !details::missing_required_fields(&fa.config, &standing).is_empty() {
+            return next::fail(
+                state,
+                flow,
+                FlowError::new(
+                    "interaction_required",
+                    format!(
+                        "The signed-in account is missing details {} requires.",
+                        fa.app.name
+                    ),
+                    "Send the browser to /authorize without prompt=none so the Carbon can add them.",
                 ),
-                "Send the browser to /authorize without prompt=none so the Carbon can add them.",
-            ),
-        );
+            );
+        }
+        if details::any_page(&Plan::of(flow, &fa.config), &standing, flow) {
+            return next::fail(
+                state,
+                flow,
+                FlowError::new(
+                    "consent_required",
+                    format!(
+                        "The signed-in account hasn't agreed to share what {} asks for.",
+                        fa.app.name
+                    ),
+                    "Send the browser to /authorize without prompt=none so the Carbon can see what is shared.",
+                ),
+            );
+        }
     }
     flow.account_uuid = Some(b.account.uuid.clone());
-    if next::needs_consent(conn, flow, fa, &b.account).await? {
-        flow.account_uuid = None;
-        return next::fail(
-            state,
-            flow,
-            FlowError::new(
-                "consent_required",
-                format!(
-                    "The signed-in account hasn't agreed to share what {} asks for.",
-                    fa.app.name
-                ),
-                "Send the browser to /authorize without prompt=none so the Carbon can see what is shared.",
-            ),
-        );
-    }
     flow.extras.auth_method = Some(accounts_core::repo::audit::method::SESSION.to_string());
     flow.extras.browser_session_id = Some(b.session_id);
     next::complete(conn, state, meta, flow, fa, &b.account, next::Grant::Auto).await

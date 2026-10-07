@@ -11,8 +11,33 @@ export const METHOD_LABEL: Readonly<Record<ButtonMethod, string>> = {
   google: "Continue with Google",
   apple: "Continue with Apple",
   email: "Continue with email",
-  phone: "Continue with phone",
+  phone: "Continue with phone number",
 };
+
+/** Which hosted page a button opens: the sign-in page or the sign-up page (the account logic is the same). */
+export type ButtonIntent = "signin" | "signup";
+
+/** `Sign in` / `Sign up` buttons, for apps that let our pages show every method. */
+export const INTENT_LABEL: Readonly<Record<ButtonIntent, string>> = { signin: "Sign in", signup: "Sign up" };
+
+export function isButtonIntent(value: unknown): value is ButtonIntent {
+  return value === "signin" || value === "signup";
+}
+
+/**
+ * What the buttons show: one button per method (`methods`, the default: "Continue with Google"…, each opening our
+ * pages on that method), or `intents`: "Sign in" and "Sign up", and our pages show every method.
+ */
+export type ButtonSet = "methods" | "intents";
+
+export function isButtonSet(value: unknown): value is ButtonSet {
+  return value === "methods" || value === "intents";
+}
+
+/** The intent buttons to show: both (Sign in first, the primary one), or the one `only` names. */
+export function visibleIntents(only?: string | null): ButtonIntent[] {
+  return isButtonIntent(only) ? [only] : ["signin", "signup"];
+}
 
 /**
  * 18 px marks as trusted, static SVG markup. Google's mark keeps its colours; Apple's draws in the text colour, as
@@ -34,9 +59,12 @@ export const POWERED_MARK =
   '<svg viewBox="0 0 64 64" width="14" height="14" aria-hidden="true"><path fill="#1F5FB8" d="M32 0c19.6 0 25.4 1.4 28.6 3.4C62.6 6.6 64 12.4 64 32s-1.4 25.4-3.4 28.6C57.4 62.6 51.6 64 32 64S6.6 62.6 3.4 60.6C1.4 57.4 0 51.6 0 32S1.4 6.6 3.4 3.4C6.6 1.4 12.4 0 32 0Z"/><circle cx="32" cy="25" r="9" fill="#FFFDF9"/><path fill="#FFFDF9" d="M15 49c2.6-8 9.2-12.5 17-12.5S46.4 41 49 49c-4.6 3-10.4 4.6-17 4.6S19.6 52 15 49Z"/></svg>';
 
 /** Where "Powered by Silicon Accounts" links. Not configurable: an app cannot remove or change the line. */
-export const POWERED_BY_HREF = "https://account.teamofsilicons.com";
+export const POWERED_BY_HREF = "https://accounts.teamofsilicons.com";
 
-/** The /authorize parameters an embed or SDK passes through (anything else in its URL is not forwarded). */
+/**
+ * The /authorize parameters an embed or SDK passes through (anything else in its URL is not forwarded). There is no
+ * login_hint, email or phone: an app never hands us a Carbon's email or phone; the Carbon types it on our pages.
+ */
 export const AUTHORIZE_PARAMS = [
   "app_id",
   "client_id",
@@ -48,7 +76,7 @@ export const AUTHORIZE_PARAMS = [
   "scope",
   "nonce",
   "prompt",
-  "login_hint",
+  "intent",
 ] as const;
 
 export function isButtonMethod(value: unknown): value is ButtonMethod {

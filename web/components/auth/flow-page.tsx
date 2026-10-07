@@ -3,7 +3,8 @@
 /**
  * /authorize/flow/[id]: the hosted sign-in, driven by FlowView.step and painted with the app's branding.
  *
- *   choose_method → verify_code → signup (new) → requirements (a missing email/phone) → consent → complete
+ *   (opening, for method=google|apple) → choose_method → verify_code → signup (new) → details (each page of the app's
+ *   flow; missing required emails and phones are added there) → review (when the app's flow has one) → complete
  *   (or failed, for prompt=none)
  *
  * The card morphs between steps. The page never decides where a sign-in goes next: the server answers every action
@@ -22,20 +23,31 @@ import { useFlowController } from "./flow/controller";
 import { carbonError } from "./flow/errors";
 import { useHydrated } from "./flow/hooks";
 import { HostedFrame } from "./flow/hosted-frame";
-import { appHome, appTitle, authorizeQueryOf, heroCopy, lookOfFlow, type FrameApp, type HostedFlow } from "./flow/model";
+import { appHome, appTitle, authorizeQueryOf, heroCopy, isProvider, lookOfFlow, type FrameApp, type HostedFlow } from "./flow/model";
 import { StepMorph } from "./flow/morph";
 import { ArrivalContext } from "./flow/parts";
 import { LoadingCard, Problem } from "./flow/problem";
 import { ChooseMethod, type ContactMemory } from "./steps/choose-method";
 import { Complete } from "./steps/complete";
-import { Consent } from "./steps/consent";
-import { Requirements } from "./steps/requirements";
+import { Details } from "./steps/details";
+import { Opening } from "./steps/opening";
+import { Review } from "./steps/review";
 import { Signup } from "./steps/signup";
 import { VerifyCode } from "./steps/verify-code";
 import styles from "./flow/flow.module.css";
 
 /** Views in their usual order (sub-views sort just after their step) for the direction of the morph. */
-const VIEW_ORDER = ["loading", "choose_method", "verify_code", "signup", "requirements", "consent", "complete", "failed"] as const;
+const VIEW_ORDER = ["loading", "opening", "choose_method", "verify_code", "signup", "details", "review", "complete", "failed"] as const;
+
+/**
+ * The provider whose Opening page this flow starts on: the app's own "Continue with Google/Apple" (method=google|apple)
+ * on a flow that has not moved yet. A flow that came back from the provider with an error shows the methods instead.
+ */
+function openingProvider(flow: HostedFlow): "google" | "apple" | null {
+  const hint = flow.method_hint;
+  if (flow.step !== "choose_method" || !hint || !isProvider(hint) || !flow.methods.includes(hint) || flow.error) return null;
+  return hint;
+}
 
 export function Flow({ id }: { id: string }) {
   const hydrated = useHydrated();
@@ -63,6 +75,8 @@ function FlowPage({ id }: { id: string }) {
   const [firstVisit, setFirstVisit] = useState(false);
   const [canRestart] = useState(() => !!authorizeQueryOf(id));
   const [look] = useState(() => lookOfFlow(id));
+  /** "Other ways to sign in" on the Opening page: the app's methods, all of them. */
+  const [wide, setWide] = useState(false);
 
   // Leaving the code to send it elsewhere ends when the flow moves on (a new code, another step), and only then: a
   // re-read that changes neither (after a refused address, say) keeps the field and its error on screen.
@@ -103,19 +117,28 @@ function FlowPage({ id }: { id: string }) {
     );
   }
 
+  const opening = flow && !wide ? openingProvider(flow) : null;
   const view = !flow
     ? "loading"
-    : flow.step === "verify_code" && changing
-      ? "choose_method:change"
-      : flow.step === "choose_method" && flow.signed_in_as
-        ? "choose_method:account"
-        : flow.step === "complete" || flow.step === "failed"
-          ? `${flow.step}:${restored}`
-          : flow.step;
+    : opening
+      ? `opening:${opening}`
+      : flow.step === "verify_code" && changing
+        ? "choose_method:change"
+        : flow.step === "choose_method" && flow.signed_in_as
+          ? "choose_method:account"
+          : flow.step === "details"
+            ? `details:${flow.details?.index ?? 0}`
+            : flow.step === "complete" || flow.step === "failed"
+              ? `${flow.step}:${restored}`
+              : flow.step;
 
   const renderView = (key: string) => {
     if (!flow) return <LoadingCard />;
     switch (key.split(":")[0]) {
+      case "opening": {
+        const provider = key.endsWith("apple") ? "apple" : "google";
+        return <Opening flow={flow} ctl={ctl} provider={provider} onOtherWays={flow.methods.length > 1 ? () => setWide(true) : undefined} />;
+      }
       case "choose_method":
         return (
           <ChooseMethod
@@ -126,16 +149,17 @@ function FlowPage({ id }: { id: string }) {
             onSent={(kind, value) => setMemory(current => (kind === "email" ? { kind, email: value, phone: current.phone } : { kind, phone: value, email: current.email }))}
             changing={key === "choose_method:change"}
             onBack={() => setChanging(false)}
+            wide={wide}
           />
         );
       case "verify_code":
         return <VerifyCode flow={flow} ctl={ctl} notice={ctl.notice} onChange={() => setChanging(true)} />;
       case "signup":
         return <Signup flow={flow} ctl={ctl} notice={ctl.notice} />;
-      case "requirements":
-        return <Requirements flow={flow} ctl={ctl} notice={ctl.notice} />;
-      case "consent":
-        return <Consent flow={flow} ctl={ctl} notice={ctl.notice} />;
+      case "details":
+        return <Details flow={flow} ctl={ctl} notice={ctl.notice} />;
+      case "review":
+        return <Review flow={flow} ctl={ctl} notice={ctl.notice} />;
       case "complete":
       case "failed":
         return <Complete flow={flow} />;
@@ -148,6 +172,8 @@ function FlowPage({ id }: { id: string }) {
   const site = flow ? flow.app.first_party : !look;
   const hero = flow ? heroCopy(flow, { firstVisit }) : { title: look ? `Sign in to ${look.name}` : "Signing in", subtitle: null };
   const hideName = !!flow && view.startsWith("choose_method") && appTitle(flow).trim().toLowerCase() === flow.app.name.trim().toLowerCase();
+  // A flow page may choose its own layout; every other page follows the branding's.
+  const layout = flow?.step === "details" ? flow.details?.layout ?? null : null;
 
   return (
     <ArrivalContext.Provider value={arrival}>
@@ -158,6 +184,7 @@ function FlowPage({ id }: { id: string }) {
         subtitle={hero.subtitle}
         busy={ctl.loading}
         hideName={hideName}
+        layout={layout}
         footer={flow ? <FlowFooter flow={flow} step={view} /> : null}
       >
         <StepMorph view={view} order={VIEW_ORDER}>{renderView}</StepMorph>
@@ -166,11 +193,11 @@ function FlowPage({ id }: { id: string }) {
   );
 }
 
-/** Terms and privacy where the Carbon commits (methods, sign-up, consent), and the app's support address. */
+/** Terms and privacy where the Carbon commits (methods, sign-up, sharing details), and the app's support address. */
 function FlowFooter({ flow, step }: { flow: HostedFlow; step: string }) {
   const copy = flow.app.copy;
   const base = step.split(":")[0] ?? "";
-  const legal = ["choose_method", "signup", "consent"].includes(base) && !!(copy.terms_url || copy.privacy_url);
+  const legal = ["opening", "choose_method", "signup", "details", "review"].includes(base) && !!(copy.terms_url || copy.privacy_url);
   if (!legal && !copy.support_email) return null;
   return (
     <div className={styles.footer}>

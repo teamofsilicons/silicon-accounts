@@ -29,13 +29,13 @@ HTTP.
 ## Try it
 
 ```sh
-export ACCOUNTS_URL=https://account.teamofsilicons.com   # a local stack: http://localhost:8590
+export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # a local stack: http://localhost:8590
 curl -s "$ACCOUNTS_URL/v1/meta"
 ```
 
-<!-- not-deployed-note: remove once account.teamofsilicons.com is live -->
+<!-- not-deployed-note: remove once accounts.teamofsilicons.com is live -->
 > [!IMPORTANT]
-> The production service isn't deployed yet (October 2026): `account.teamofsilicons.com` doesn't
+> The production service isn't deployed yet (October 2026): `accounts.teamofsilicons.com` doesn't
 > resolve (`curl: (6) Could not resolve host`). Run your own stack
 > ([Run it yourself](../index.md#run-it-yourself)) and use `ACCOUNTS_URL=http://localhost:8590`;
 > every example on these pages runs there, and the answers differ only as described below.
@@ -45,9 +45,9 @@ curl -s "$ACCOUNTS_URL/v1/meta"
   "name": "Silicon Accounts",
   "version": "0.1.0",
   "environment": "production",
-  "public_url": "https://account.teamofsilicons.com",
+  "public_url": "https://accounts.teamofsilicons.com",
   "silicon_apps_url": "https://apps.teamofsilicons.com",
-  "docs_url": "https://account.teamofsilicons.com/docs",
+  "docs_url": "https://accounts.teamofsilicons.com/docs",
   "providers": { "google": true, "apple": true },
   "delivery": "providers"
 }
@@ -105,7 +105,7 @@ export APP_SECRET=sa_app_briefcase_AMVzlxdzf7qyZky8KlQdEekYO2kKkq7QhPhqWvWK   # 
 
 | | URL |
 |---|---|
-| Production | `https://account.teamofsilicons.com` |
+| Production | `https://accounts.teamofsilicons.com` |
 | Local stack (`scripts/dev.sh`) | `http://localhost:8590` (the account site, which forwards the API) |
 | Local API directly | `http://127.0.0.1:8589` |
 
@@ -346,10 +346,11 @@ pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)
 | `POST /v1/flows/{id}/verify` | flow | | 200 flow |
 | `POST /v1/flows/{id}/signup` | flow + `sa_signup` | | 200 flow |
 | `POST /v1/flows/{id}/signup/photo` | flow + `sa_signup` | | 201 photo |
-| `POST /v1/flows/{id}/requirements/email` | flow + account (cookie) | | 200 flow |
-| `POST /v1/flows/{id}/requirements/phone` | flow + account (cookie) | | 200 flow |
-| `POST /v1/flows/{id}/requirements/verify` | flow + account (cookie) | | 200 flow |
-| `POST /v1/flows/{id}/consent` | flow + account (cookie) | | 200 flow |
+| `POST /v1/flows/{id}/details/add` | flow + account (cookie) | | 200 flow |
+| `POST /v1/flows/{id}/details/verify` | flow + account (cookie) | | 200 flow |
+| `POST /v1/flows/{id}/details/continue` | flow + account (cookie) | | 200 flow |
+| `POST /v1/flows/{id}/details/back` | flow + account (cookie) | | 200 flow |
+| `POST /v1/flows/{id}/review` | flow + account (cookie) | | 200 flow |
 | `POST /v1/flows/{id}/oauth/{provider}` | flow | | 200 provider URL |
 | `GET`, `POST /v1/oauth/callback/{provider}` | the starting browser | | 302 / 303 |
 | `POST /v1/me/identities/{provider}` | account (Carbon, cookie) | | 201 provider URL |

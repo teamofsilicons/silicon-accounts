@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Stops what scripts/dev.sh started: the site (Next.js) or its stand-in proxy, accounts-api and
-# the testkit (mock Google/Apple, mock Postmark/Twilio, the fake app server).
+# Stops what scripts/dev.sh started: the site (Next.js) or its stand-in proxy, the developer platform
+# (Next.js, developer/), accounts-api and the testkit (mock Google/Apple, mock Postmark/Twilio, the fake app server).
 #
 #   scripts/stop.sh            the stack on ACCOUNTS_PORT (the public site port, default 8590)
 #   scripts/stop.sh --all      every stack scripts/dev.sh started (all ports)
 #   scripts/stop.sh --db       also stop the local Postgres (scripts/dev-db.sh stop)
-#   scripts/stop.sh --clean    also delete the stack's own site build (web/.next-<port>/, recorded in
-#                              .dev/run/<port>/web.dist; the default stack's web/.next is never deleted)
+#   scripts/stop.sh --clean    also delete the stack's own builds (web/.next-<port>/ and developer/.next-<port>/,
+#                              recorded in .dev/run/<port>/web.dist and developer.dist; the default stack's .next
+#                              directories are never deleted)
 #   scripts/stop.sh --quiet    print nothing unless something goes wrong
 #
 # Only processes recorded in .dev/run/<port>/*.pid whose command still matches are stopped
@@ -43,6 +44,7 @@ expected_command() {
     accounts-api) echo 'accounts-api' ;;
     testkit) echo 'start.ts' ;;
     web) echo "web" ;;
+    developer) echo "developer" ;;
     proxy) echo 'dev-proxy.mjs' ;;
     *) echo "$1" ;;
   esac
@@ -74,7 +76,7 @@ stop_one() { # pid file
   # the testkit and the proxy within 5 s.
   case "$name" in
     accounts-api) grace=35 ;;
-    web) grace=12 ;;
+    web|developer) grace=12 ;;
     *) grace=8 ;;
   esac
   # dev.sh starts each service as its own process group (pgid = pid); fall back to the pid.
@@ -95,9 +97,9 @@ stop_one() { # pid file
 
 stop_stack() { # run dir
   local dir="$1" f
-  # The site first (it fronts accounts-api), then accounts-api (it talks to the fake apps while
+  # The sites first (they front accounts-api), then accounts-api (it talks to the fake apps while
   # it drains), then the testkit.
-  for f in "$dir/web.pid" "$dir/proxy.pid" "$dir/accounts-api.pid" "$dir/testkit.pid"; do
+  for f in "$dir/web.pid" "$dir/developer.pid" "$dir/proxy.pid" "$dir/accounts-api.pid" "$dir/testkit.pid"; do
     [ -f "$f" ] && stop_one "$f"
   done
   for f in "$dir"/*.pid; do
@@ -108,23 +110,26 @@ stop_stack() { # run dir
   return 0
 }
 
-# Deletes the site build a stack made in its own directory (web/.next-<port>/ and the .next-<port>.tsconfig.json
-# next.config.ts writes beside it). Only a directory named .next-<something>: never .next, never anything else.
+# Deletes the builds a stack made in its own directories (web/.next-<port>/, developer/.next-<port>/ and the
+# .next-<port>.tsconfig.json each next.config.ts writes beside them). Only a directory named .next-<something>: never
+# .next, never anything else.
 clean_build() { # run dir
-  local recorded dist name
-  recorded="$(cat "$1/web.dist" 2>/dev/null || true)"
-  [ -n "$recorded" ] || return 0
-  name="$(basename "$recorded")"
-  case "$name" in
-    .next-*) ;;
-    *) return 0 ;;
-  esac
-  dist="$recorded"
-  if [ -d "$dist" ]; then
-    rm -rf "$dist"
-    say "deleted the site build $dist"
-  fi
-  rm -f "$dist.tsconfig.json" "$1/web.dist"
+  local recorded dist name record
+  for record in web.dist developer.dist; do
+    recorded="$(cat "$1/$record" 2>/dev/null || true)"
+    [ -n "$recorded" ] || continue
+    name="$(basename "$recorded")"
+    case "$name" in
+      .next-*) ;;
+      *) continue ;;
+    esac
+    dist="$recorded"
+    if [ -d "$dist" ]; then
+      rm -rf "$dist"
+      say "deleted the build $dist"
+    fi
+    rm -f "$dist.tsconfig.json" "$1/$record"
+  done
 }
 
 if [ "$ALL" = 1 ]; then

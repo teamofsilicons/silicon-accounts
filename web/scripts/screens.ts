@@ -95,7 +95,6 @@ const foundationScreens: ScreenSpec[] = [
     await page.locator("[data-vt='dock'] button[aria-haspopup='dialog']").first().click();
     await page.waitForTimeout(900);
   } },
-  { name: "shell-developer", path: "/developer" },
   { name: "embed-buttons", path: `/embed/v1/buttons?${EMBED_QUERY("briefcase", "http://127.0.0.1:8593/briefcase/callback")}`, as: "signed-out", waitFor: "#silicon-accounts-embed[data-ready]", widths: [390] },
   { name: "embed-buttons-branded", path: `/embed/v1/buttons?${EMBED_QUERY("pixel-studio", "http://127.0.0.1:8593/pixel-studio/callback")}&theme=light`, as: "signed-out", waitFor: "#silicon-accounts-embed[data-ready]", widths: [390], themes: ["light"] },
   { name: "not-found", path: "/no-such-page", as: "signed-out", status: 404 },

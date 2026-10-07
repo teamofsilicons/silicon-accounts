@@ -12,7 +12,7 @@ related:
 
 # Use any OpenID Connect library
 
-You'll give your OpenID Connect library the issuer `https://account.teamofsilicons.com`, your
+You'll give your OpenID Connect library the issuer `https://accounts.teamofsilicons.com`, your
 app id as `client_id` and your app secret as `client_secret`, and let it run the
 authorization code flow with PKCE and a nonce. Silicon Accounts is an OIDC provider: the
 library discovers every endpoint, validates the `id_token` (signed with EdDSA, Ed25519) and
@@ -30,7 +30,7 @@ npm init -y && npm pkg set type=module && npm install openid-client
 import { createServer } from "node:http";
 import * as oidc from "openid-client";
 
-const ISSUER = new URL(process.env.ACCOUNTS_URL ?? "https://account.teamofsilicons.com");
+const ISSUER = new URL(process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com");
 const APP_ID = process.env.ACCOUNTS_APP_ID ?? "briefcase"; // your client_id
 const APP_SECRET = process.env.ACCOUNTS_APP_SECRET ?? ""; // your client_secret
 const PORT = Number(process.env.PORT ?? 3000);
@@ -96,7 +96,7 @@ After a sign-in, the callback shows the validated claims and the userinfo:
 ```json
 {
   "claims": {
-    "iss": "https://account.teamofsilicons.com",
+    "iss": "https://accounts.teamofsilicons.com",
     "sub": "aQm",
     "aud": "briefcase",
     "exp": 1791343503,
@@ -138,7 +138,7 @@ metadata.
 
 | Setting | Value |
 |---|---|
-| Issuer (discovery) | `https://account.teamofsilicons.com`, exactly, with no trailing slash. Discovery is at `/.well-known/openid-configuration`, keys at `/.well-known/jwks.json` (both cacheable 5 minutes). |
+| Issuer (discovery) | `https://accounts.teamofsilicons.com`, exactly, with no trailing slash. Discovery is at `/.well-known/openid-configuration`, keys at `/.well-known/jwks.json` (both cacheable 5 minutes). |
 | `client_id` | Your app id, e.g. `briefcase`. |
 | `client_secret` | Your app secret. Auth method `client_secret_basic` or `client_secret_post`. |
 | Redirect URI | One of your app's `redirect_uris`, character for character. |
@@ -151,30 +151,30 @@ metadata.
 
 ```json
 {
-  "authorization_endpoint": "https://account.teamofsilicons.com/authorize",
+  "authorization_endpoint": "https://accounts.teamofsilicons.com/authorize",
   "claims_parameter_supported": false,
   "claims_supported": ["iss", "sub", "aud", "exp", "iat", "auth_time", "nonce", "name", "picture", "preferred_username", "email", "email_verified", "phone_number", "phone_number_verified", "zoneinfo", "birthdate"],
   "code_challenge_methods_supported": ["S256", "plain"],
-  "device_authorization_endpoint": "https://account.teamofsilicons.com/v1/device/authorize",
+  "device_authorization_endpoint": "https://accounts.teamofsilicons.com/v1/device/authorize",
   "grant_types_supported": ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code", "urn:silicon:params:oauth:grant-type:slt"],
   "id_token_signing_alg_values_supported": ["EdDSA"],
-  "introspection_endpoint": "https://account.teamofsilicons.com/v1/oauth/introspect",
+  "introspection_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/introspect",
   "introspection_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-  "issuer": "https://account.teamofsilicons.com",
-  "jwks_uri": "https://account.teamofsilicons.com/.well-known/jwks.json",
+  "issuer": "https://accounts.teamofsilicons.com",
+  "jwks_uri": "https://accounts.teamofsilicons.com/.well-known/jwks.json",
   "prompt_values_supported": ["none", "login", "consent", "select_account"],
   "request_parameter_supported": false,
   "request_uri_parameter_supported": false,
   "response_modes_supported": ["query"],
   "response_types_supported": ["code"],
-  "revocation_endpoint": "https://account.teamofsilicons.com/v1/oauth/revoke",
+  "revocation_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/revoke",
   "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
   "scopes_supported": ["profile", "email", "phone", "dob", "timezone", "openid", "offline_access"],
-  "service_documentation": "https://account.teamofsilicons.com/docs",
+  "service_documentation": "https://accounts.teamofsilicons.com/docs",
   "subject_types_supported": ["public"],
-  "token_endpoint": "https://account.teamofsilicons.com/v1/oauth/token",
+  "token_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/token",
   "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-  "userinfo_endpoint": "https://account.teamofsilicons.com/v1/userinfo"
+  "userinfo_endpoint": "https://accounts.teamofsilicons.com/v1/userinfo"
 }
 ```
 
@@ -189,7 +189,7 @@ again with every refresh of that sign-in.
 
 | Claim | Value |
 |---|---|
-| `iss` | `https://account.teamofsilicons.com` |
+| `iss` | `https://accounts.teamofsilicons.com` |
 | `sub` | The account's `uuid`: permanent, the same in every token and webhook. Key your user on it. |
 | `aud` | Your app id. |
 | `exp`, `iat` | Same lifetime as the access token: 30 minutes. |

@@ -3,13 +3,16 @@
 /**
  * The embedded sign-in buttons, served at `/embed/v1/buttons` for apps to put in an iframe:
  *
- *   <iframe src="https://account.teamofsilicons.com/embed/v1/buttons?app_id=briefcase
+ *   <iframe src="https://accounts.teamofsilicons.com/embed/v1/buttons?app_id=briefcase
  *     &redirect_uri=https%3A%2F%2Fbriefcase.example%2Fcallback&state=…&code_challenge=…&code_challenge_method=S256"
  *     title="Sign in with Silicon Accounts" style="border:0;width:100%"></iframe>
  *
  * The page reads the authorize parameters from its own query, loads the app's public sign-in config
- * (GET /v1/apps/{app_id}/public) and renders one button per enabled method in the app's branding. Each button is a
- * plain link with target=_top, so choosing a method takes the whole window to /authorize?…&method=<method>. The page
+ * (GET /v1/apps/{app_id}/public) and renders one button per enabled method in the app's branding ("Continue with
+ * Google"…, narrowed by `method=`), or with `buttons=intents` a "Sign in" and a "Sign up" button (narrowed by
+ * `intent=`) that open our pages on every method. Each button is a plain link with target=_top, so it takes the whole
+ * window to /authorize?…&method=<method> (or &intent=signup). `intent=signup` opens the sign-up version of our pages.
+ * An email or phone in the query (login_hint) is never passed on: the Carbon types it on our pages. The page
  * reports its height to the parent as {type: "silicon-accounts:resize", height} so the iframe can fit it exactly
  * (sdk/v1.js resizes every such frame on the page). A broken embed URL or app shows a configuration error inside the
  * frame, in the server's own words, with a data-error-code.
@@ -31,7 +34,10 @@ import type { AppPublic } from "@/lib/api/types";
 import { brandingAttributes, brandingVariables, resolveBrandTheme, type PaintTheme } from "@/lib/branding/apply";
 import { normalizeBranding } from "@/lib/branding/defaults";
 import { loadBrandingFonts } from "@/lib/branding/fonts";
-import { AUTHORIZE_PARAMS, METHOD_LABEL, METHOD_MARK, POWERED_BY_HREF, POWERED_MARK, primaryMethod, visibleMethods, type ButtonMethod } from "@/sdk/methods";
+import {
+  AUTHORIZE_PARAMS, INTENT_LABEL, METHOD_LABEL, METHOD_MARK, POWERED_BY_HREF, POWERED_MARK, isButtonIntent, primaryMethod, visibleIntents, visibleMethods,
+  type ButtonIntent, type ButtonMethod,
+} from "@/sdk/methods";
 import styles from "./embed.module.css";
 
 export interface EmbedButtonsProps {
@@ -91,7 +97,7 @@ async function loadApp(id: string): Promise<AppPublic> {
     await new Promise(done => setTimeout(done, wait));
     read = await readConfig(url);
   }
-  const hint = "Reload the page. If it keeps happening, check the app's status in Developer.";
+  const hint = "Reload the page. If it keeps happening, check the app's status on the developer site.";
   if (read.cut) {
     if (read.status === null) throw { code: "network_error", message: "Silicon Accounts could not be reached.", hint: "Check the connection, then reload the page." } satisfies Problem;
     throw { code: `http_${read.status}`, message: `The sign-in config of "${id}" could not be read (HTTP ${read.status}, the answer was cut off or was not JSON).`, hint } satisfies Problem;
@@ -130,6 +136,9 @@ export function EmbedButtons({ query, framingAllowed }: EmbedButtonsProps) {
   const redirectUri = (query.redirect_uri ?? "").trim();
   const themeParam = query.theme;
   const onlyMethod = query.method ?? null;
+  /** "Sign in" and "Sign up" instead of a button per method. */
+  const intents = query.buttons === "intents";
+  const intent: ButtonIntent | null = isButtonIntent(query.intent) ? query.intent : null;
   const rootRef = useRef<HTMLElement>(null);
   // Read after hydration (the server cannot know): framed or opened on its own, and the device's theme.
   const framed = useSyncExternalStore(subscribeNothing, () => window.parent !== window, () => null);
@@ -171,15 +180,15 @@ export function EmbedButtons({ query, framingAllowed }: EmbedButtonsProps) {
   }, []);
 
   let problem: Problem | null = null;
-  if (!appId) problem = { code: "missing_app_id", message: "The embed URL has no app_id.", hint: "Add app_id=<your app id> to the iframe src. Your app's Embed tab in Developer has the exact snippet." };
+  if (!appId) problem = { code: "missing_app_id", message: "The embed URL has no app_id.", hint: "Add app_id=<your app id> to the iframe src. Your app's embed snippet on the developer site has it exactly." };
   else if (!redirectUri) problem = { code: "missing_redirect_uri", message: "The embed URL has no redirect_uri.", hint: "Add redirect_uri=<a callback URL registered for the app>, URL-encoded." };
   else if (app.error) problem = asProblem(app.error);
 
-  const methods: ButtonMethod[] = app.data ? visibleMethods(app.data.methods, onlyMethod) : [];
-  if (!problem && app.data && methods.length === 0) {
+  const methods: ButtonMethod[] = app.data && !intents ? visibleMethods(app.data.methods, onlyMethod) : [];
+  if (!problem && app.data && !intents && methods.length === 0) {
     problem = onlyMethod
-      ? { code: "method_not_enabled", message: `${app.data.name} does not offer sign-in with "${onlyMethod}".`, hint: "Remove method= from the embed URL, or turn that method on in the app's sign-in settings." }
-      : { code: "no_methods", message: `${app.data.name} has no sign-in methods turned on.`, hint: "Turn on at least one method in the app's sign-in settings." };
+      ? { code: "method_not_enabled", message: `${app.data.name} does not offer sign-in with "${onlyMethod}".`, hint: "Remove method= from the embed URL, or turn that method on in the app's sign-in setup on the developer site." }
+      : { code: "no_methods", message: `${app.data.name} has no sign-in methods turned on.`, hint: "Turn on at least one method in the app's sign-in setup on the developer site." };
   }
   // Developers integrating the embed read the console too.
   useEffect(() => {
@@ -187,16 +196,19 @@ export function EmbedButtons({ query, framingAllowed }: EmbedButtonsProps) {
   }, [problem?.code]); // eslint-disable-line react-hooks/exhaustive-deps -- once per distinct problem
 
   const ready = !!problem || (!!app.data && (fontsReady || !branding));
-  const authorizeHref = (method: ButtonMethod) => {
+  const authorizeHref = (choice: { method: ButtonMethod } | { intent: ButtonIntent }) => {
     const params = new URLSearchParams();
     for (const key of AUTHORIZE_PARAMS) {
       const value = query[key];
       if (value) params.set(key, value);
     }
-    params.set("method", method);
+    if ("method" in choice) params.set("method", choice.method);
+    else if (choice.intent === "signup") params.set("intent", "signup");
+    else params.delete("intent");
     return `/authorize?${params.toString()}`;
   };
   const primary = primaryMethod(methods);
+  const groupLabel = !app.data ? "" : intents ? app.data.name : intent === "signup" ? `Sign up for ${app.data.name}` : `Sign in to ${app.data.name}`;
 
   return (
     <main
@@ -218,20 +230,26 @@ export function EmbedButtons({ query, framingAllowed }: EmbedButtonsProps) {
       ) : !app.data ? (
         <div data-sq="surface" className={styles.skeleton} aria-hidden="true" />
       ) : (
-        <div className={styles.buttons} role="group" aria-label={`Sign in to ${app.data.name}`}>
-          {methods.map(method => (
-            <a key={method} data-sq="surface" className={styles.button} href={authorizeHref(method)} target="_top" data-method={method} data-variant={method === primary ? "primary" : "secondary"}>
-              <Mark svg={METHOD_MARK[method]} />
-              <span>{METHOD_LABEL[method]}</span>
-            </a>
-          ))}
+        <div className={styles.buttons} role="group" aria-label={groupLabel}>
+          {intents
+            ? visibleIntents(intent).map((choice, index) => (
+              <a key={choice} data-sq="surface" className={styles.button} href={authorizeHref({ intent: choice })} target="_top" data-intent={choice} data-variant={index === 0 ? "primary" : "secondary"}>
+                <span>{INTENT_LABEL[choice]}</span>
+              </a>
+            ))
+            : methods.map(method => (
+              <a key={method} data-sq="surface" className={styles.button} href={authorizeHref({ method })} target="_top" data-method={method} data-variant={method === primary ? "primary" : "secondary"}>
+                <Mark svg={METHOD_MARK[method]} />
+                <span>{METHOD_LABEL[method]}</span>
+              </a>
+            ))}
         </div>
       )}
       {!problem && app.data && framed === false && !framingAllowed ? (
         <div data-sq="surface" className={`${styles.problem} ${styles.note}`} role="status" data-error-code="no_allowed_origins">
           <strong>Other sites cannot show these buttons yet</strong>
           <p>{app.data.name} lists no allowed origins, so browsers refuse to show this page inside another site&apos;s iframe.</p>
-          <p className={styles.hint}>Add your site&apos;s origin (for example https://app.example.com) to allowed_origins in the app&apos;s sign-in setup in Developer.</p>
+          <p className={styles.hint}>Add your site&apos;s origin (for example https://app.example.com) to the app&apos;s allowed origins in its sign-in setup on the developer site.</p>
           <code>no_allowed_origins</code>
         </div>
       ) : null}

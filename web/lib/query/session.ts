@@ -10,9 +10,9 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api, authorizeUrl } from "../api/endpoints";
 import { ApiError } from "../api/errors";
-import type { BrowserSession, FlowPrompt, Me, SigninMethod } from "../api/types";
+import type { BrowserSession, FlowIntent, FlowPrompt, Me, SigninMethod } from "../api/types";
 import { browserTimezone } from "../format";
-import { paths } from "../navigation";
+import { developerSiteUrl, paths } from "../navigation";
 import { modernTimezone } from "../timezones";
 import { setTelemetryEnabled, subscribeTelemetry, telemetryEnabled } from "../telemetry";
 import { queryKeys } from "./keys";
@@ -26,6 +26,14 @@ const RETURN_PREFIX = "silicon-accounts:return:";
 /** `GET /v1/meta` (cached for the tab's life; the values only change with a deploy). */
 export function useMeta() {
   return useQuery({ queryKey: queryKeys.meta, queryFn: ({ signal }) => api.meta.get(signal), staleTime: Infinity });
+}
+
+/**
+ * The developer site (GET /v1/meta `developer_url`), where apps' sign-in is set up: the production address until the
+ * meta answers or when it names none.
+ */
+export function useDeveloperUrl(): string {
+  return developerSiteUrl(useMeta().data?.developer_url);
 }
 
 /**
@@ -152,7 +160,7 @@ function randomState(): string {
  * `returnTo` (a same-site path) is remembered against the state in this tab, and /sign-in restores it when the flow
  * comes back.
  */
-export function firstPartySignInUrl(returnTo?: string | null, extra: { prompt?: FlowPrompt; login_hint?: string; method?: SigninMethod } = {}): string {
+export function firstPartySignInUrl(returnTo?: string | null, extra: { prompt?: FlowPrompt; method?: SigninMethod; intent?: FlowIntent } = {}): string {
   const state = randomState();
   try {
     sessionStorage.setItem(RETURN_PREFIX + state, sameSitePath(returnTo) ?? paths.home);

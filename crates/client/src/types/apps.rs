@@ -158,6 +158,16 @@ pub struct CopyText {
     /// Support address.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub support_email: Option<String>,
+    /// Title of the Opening page shown before Google or Apple (≤ 80 chars; may contain
+    /// `{provider}` and `{app}`), e.g. "Opening {provider} to sign you in to {app}…".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening_title: Option<String>,
+    /// Title of the sign-up version of the hosted pages (`intent=signup`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signup_title: Option<String>,
+    /// Subtitle of the sign-up version of the hosted pages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signup_subtitle: Option<String>,
     /// Fields added after this client was released.
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -295,9 +305,85 @@ pub struct SigninConfig {
     /// Page copy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub copy: Option<CopyText>,
+    /// The app's flow: which pages a Carbon goes through and which details each page asks.
+    /// `null` (the default) is one page with every requested detail, which is also the
+    /// what's-shared screen. Always serialized (as `null` when unset), like the service
+    /// returns it.
+    #[serde(default)]
+    pub flow: Option<SigninFlow>,
     /// Settings added after this client was released.
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// An app's sign-in flow (`signin_config.flow`): 1 to 8 pages of details. Every requested
+/// detail (`required_fields` ∪ `optional_fields`) appears on exactly one page.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SigninFlow {
+    /// The detail pages, in order.
+    #[serde(default, deserialize_with = "lenient_vec")]
+    pub steps: Vec<FlowStep>,
+    /// Show a final review page of everything that will be shared.
+    #[serde(default, deserialize_with = "lenient_bool")]
+    pub review: bool,
+    /// Settings added after this client was released.
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl SigninFlow {
+    /// A flow with these pages.
+    pub fn new(steps: Vec<FlowStep>, review: bool) -> Self {
+        Self {
+            steps,
+            review,
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// One page of a [`SigninFlow`]. `null` texts and layout mean the defaults (the layout then
+/// follows `branding.layout`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct FlowStep {
+    /// `[a-z0-9-]{1,40}`, unique within the flow.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub id: String,
+    /// The details asked on this page: `email`, `phone`, `dob`, `timezone`.
+    #[serde(default, deserialize_with = "lenient_vec")]
+    pub fields: Vec<String>,
+    /// Page title (≤ 80 chars).
+    #[serde(default)]
+    pub title: Option<String>,
+    /// Page subtitle (≤ 200 chars).
+    #[serde(default)]
+    pub subtitle: Option<String>,
+    /// The continue button's label (≤ 30 chars).
+    #[serde(default)]
+    pub continue_label: Option<String>,
+    /// `card`, `split` or `minimal`.
+    #[serde(default)]
+    pub layout: Option<String>,
+    /// Settings added after this client was released.
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl FlowStep {
+    /// A page `id` asking these details, with default texts and layout.
+    pub fn new<I, S>(id: impl Into<String>, fields: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self {
+            id: id.into(),
+            fields: fields.into_iter().map(Into::into).collect(),
+            ..Self::default()
+        }
+    }
 }
 
 impl SigninConfig {
@@ -1025,5 +1111,66 @@ fn value_count(value: &Value) -> u64 {
         Value::Number(n) => n.as_u64().unwrap_or(0),
         Value::Array(items) => items.len() as u64,
         _ => 0,
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn sign_in_setups_keep_their_flow_and_page_copy() {
+        let api = json!({
+            "methods": {"email": true},
+            "required_fields": ["email", "dob"],
+            "optional_fields": ["timezone"],
+            "copy": {"title": null, "opening_title": "Opening {provider} for {app}…",
+                     "signup_title": "Create your Ledgerly account", "signup_subtitle": null},
+            "flow": {
+                "steps": [
+                    {"id": "contact", "fields": ["email"], "title": "How can we reach you?",
+                     "subtitle": null, "continue_label": null, "layout": null},
+                    {"id": "about-you", "fields": ["dob", "timezone"], "title": null,
+                     "subtitle": null, "continue_label": "Finish", "layout": "split"}
+                ],
+                "review": true
+            }
+        });
+        let config: SigninConfig = serde_json::from_value(api).unwrap();
+        let flow = config.flow.as_ref().unwrap();
+        assert!(flow.review);
+        assert_eq!(flow.steps.len(), 2);
+        assert_eq!(flow.steps[1].fields, vec!["dob", "timezone"]);
+        assert_eq!(flow.steps[1].continue_label.as_deref(), Some("Finish"));
+        assert_eq!(flow.steps[1].layout.as_deref(), Some("split"));
+        let copy = config.copy.as_ref().unwrap();
+        assert_eq!(
+            copy.opening_title.as_deref(),
+            Some("Opening {provider} for {app}…")
+        );
+        assert_eq!(
+            copy.signup_title.as_deref(),
+            Some("Create your Ledgerly account")
+        );
+        // What `--json` prints keeps the flow, null texts included.
+        let out = serde_json::to_value(&config).unwrap();
+        assert_eq!(out["flow"]["steps"][0]["subtitle"], Value::Null);
+        assert_eq!(out["flow"]["steps"][0]["title"], "How can we reach you?");
+        assert_eq!(out["flow"]["review"], true);
+
+        // The default flow is null, and stays null on the way out.
+        let config: SigninConfig = serde_json::from_value(json!({"flow": null})).unwrap();
+        assert!(config.flow.is_none());
+        assert_eq!(serde_json::to_value(&config).unwrap()["flow"], Value::Null);
+
+        let built = SigninFlow::new(vec![FlowStep::new("contact", ["email", "phone"])], false);
+        assert_eq!(
+            serde_json::to_value(&built).unwrap(),
+            json!({"steps": [{"id": "contact", "fields": ["email", "phone"], "title": null,
+                              "subtitle": null, "continue_label": null, "layout": null}],
+                   "review": false})
+        );
     }
 }

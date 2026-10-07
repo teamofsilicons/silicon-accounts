@@ -152,7 +152,7 @@ Real payloads:
     "account": {
       "uuid": "8HV", "membership_id": "briefcase:8HV", "kind": "carbon", "id": "c:ada",
       "display_name": "Ada King",
-      "pfp_url": "https://account.teamofsilicons.com/v1/photos/01a11437-b512-76e4-ae95-3378b29e547e",
+      "pfp_url": "https://accounts.teamofsilicons.com/v1/photos/01a11437-b512-76e4-ae95-3378b29e547e",
       "email": "ada.work@example.test", "email_verified": true, "timezone": "Europe/London",
       "updated_at": "2026-10-07T02:35:57.585Z", "version": 7
     }

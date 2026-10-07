@@ -1,7 +1,8 @@
 //! Authentication extractors.
 //!
 //! - [`AccountAuth`]: the session cookie (`sa_session` / `__Host-sa_session`), or
-//!   `Authorization: Bearer <access JWT>` whose `aud` is `accounts` and whose family is active.
+//!   `Authorization: Bearer <access JWT>` whose `aud` is `accounts` (or `developer` on the
+//!   routes listed below) and whose family is active.
 //!   Cookie-authenticated POST/PUT/PATCH/DELETE must pass the origin guard (CSRF).
 //!   `Option<AccountAuth>` = optional auth: no credentials → `None`; an invalid cookie → `None`;
 //!   an invalid Bearer token → error (explicit credentials are never silently ignored).
@@ -9,14 +10,26 @@
 //! - [`AppAuth`]: `Authorization: Basic base64(app_id:app_secret)`, verified through the 60 s
 //!   credential cache.
 //! - [`authenticate_client`]: client authentication for `/v1/oauth/*` (Basic or body fields,
-//!   plus the public first-party client `accounts`), with RFC 6749 errors.
+//!   plus the public first-party clients `accounts` and `developer`), with RFC 6749 errors.
 //! - [`AppOrOwner`]: for `/v1/apps/{app_id}/…` — the app's own credentials or its owner's
 //!   (Carbon) session.
+//!
+//! # Developer platform tokens (`aud = developer`)
+//!
+//! developer.teamofsilicons.com signs Carbons in as the first-party public client `developer`.
+//! Its access tokens act for the Carbon they belong to on exactly these routes
+//! ([`developer_audience_allowed`]): `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps`,
+//! and every owner route of an app ([`AppOrOwner`]: `/v1/apps/{app_id}/…` — details, sign-in
+//! setup and its history, user base, imports, webhook and deliveries, proofs). Everywhere else
+//! they are refused with 401 `token_wrong_audience`, so a leaked developer-platform token can't
+//! change the account itself (ids, emails, Silicons, STKs, sessions, apps signed into).
 
-use axum::extract::{FromRef, FromRequestParts, OptionalFromRequestParts, RawPathParams};
-use axum::http::HeaderMap;
+use axum::extract::{
+    FromRef, FromRequestParts, MatchedPath, OptionalFromRequestParts, RawPathParams,
+};
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
+use axum::http::{HeaderMap, Method};
 use base64::Engine as _;
 use uuid::Uuid;
 
@@ -85,10 +98,63 @@ fn unauthenticated() -> ApiError {
     .hint("Carbons: run `accounts login`. Silicons: run `accounts login --silicon si:<handle> --stk <stk>`.")
 }
 
+/// Read-only identity routes a developer platform token may use (method GET or HEAD). The
+/// owner routes of apps accept it through [`AppOrOwner`].
+pub const DEVELOPER_READ_ROUTES: &[&str] = &["/v1/me", "/v1/session", "/v1/me/owned-apps"];
+
+/// True when an access token issued to the developer platform (`aud = developer`) may act on
+/// this request outside [`AppOrOwner`]: a GET (or HEAD) of one of [`DEVELOPER_READ_ROUTES`],
+/// judged by the route the request matched (axum's `MatchedPath`).
+pub fn developer_audience_allowed(parts: &Parts) -> bool {
+    if !matches!(parts.method, Method::GET | Method::HEAD) {
+        return false;
+    }
+    parts
+        .extensions
+        .get::<MatchedPath>()
+        .is_some_and(|p| DEVELOPER_READ_ROUTES.contains(&p.as_str()))
+}
+
+/// 401 `token_wrong_audience` for a valid access token whose `aud` can't act here.
+fn wrong_audience(parts: &Parts, aud: &str, developer_allowed: bool) -> ApiError {
+    let route = parts
+        .extensions
+        .get::<MatchedPath>()
+        .map_or_else(|| parts.uri.path().to_string(), |p| p.as_str().to_string());
+    if aud == crate::DEVELOPER_APP_ID {
+        return ApiError::unauthenticated(
+            "token_wrong_audience",
+            format!(
+                "This access token was issued to the developer platform (aud '{}'), which may only read the signed-in account (GET /v1/me, GET /v1/session), list the apps it owns (GET /v1/me/owned-apps) and manage them (/v1/apps/{{app_id}}/…); it can't be used for {} {route}.",
+                crate::DEVELOPER_APP_ID,
+                parts.method
+            ),
+        )
+        .hint("Use a token issued to 'accounts' for this: sign in with `accounts login` (Carbons) or `accounts login --silicon si:… --stk …` (Silicons), or use the account site.")
+        .detail("aud", aud.to_string());
+    }
+    let expected = if developer_allowed {
+        format!(
+            "'{}' (or '{}')",
+            crate::FIRST_PARTY_APP_ID,
+            crate::DEVELOPER_APP_ID
+        )
+    } else {
+        format!("'{}'", crate::FIRST_PARTY_APP_ID)
+    };
+    ApiError::unauthenticated(
+        "token_wrong_audience",
+        format!("This access token was issued to the app '{aud}', but this endpoint needs a token issued to {expected}."),
+    )
+    .hint("Use a first-party token: sign in with `accounts login` (Carbons) or `accounts login --silicon si:… --stk …` (Silicons).")
+    .detail("aud", aud.to_string())
+}
+
 async fn resolve(
     parts: &Parts,
     state: &AppState,
     optional: bool,
+    developer_allowed: bool,
 ) -> Result<Option<AccountAuth>, ApiError> {
     if let Some(h) = parts.headers.get(AUTHORIZATION) {
         let raw = h
@@ -113,13 +179,15 @@ async fn resolve(
                 .hint("Send Authorization: Bearer <access token>."));
             }
             let mut conn = state.db.acquire().await?;
-            let v = tokens::verify_access_token(
-                &mut conn,
-                &state.keys,
-                rest,
-                Some(crate::FIRST_PARTY_APP_ID),
-            )
-            .await?;
+            // The audience is checked here rather than by core's verification: which first-party
+            // audiences may act depends on the route (see the module docs).
+            let v = tokens::verify_access_token(&mut conn, &state.keys, rest, None).await?;
+            let aud = v.claims.aud.as_str();
+            let accepted = aud == crate::FIRST_PARTY_APP_ID
+                || (aud == crate::DEVELOPER_APP_ID && developer_allowed);
+            if !accepted {
+                return Err(wrong_audience(parts, aud, developer_allowed));
+            }
             return Ok(Some(AccountAuth {
                 account: v.account,
                 via: AuthVia::Bearer {
@@ -184,7 +252,8 @@ where
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let state = AppState::from_ref(state);
-        resolve(parts, &state, false)
+        let developer_allowed = developer_audience_allowed(parts);
+        resolve(parts, &state, false, developer_allowed)
             .await?
             .ok_or_else(unauthenticated)
     }
@@ -202,7 +271,8 @@ where
         state: &S,
     ) -> Result<Option<Self>, Self::Rejection> {
         let state = AppState::from_ref(state);
-        resolve(parts, &state, true).await
+        let developer_allowed = developer_audience_allowed(parts);
+        resolve(parts, &state, true, developer_allowed).await
     }
 }
 
@@ -349,13 +419,16 @@ where
 #[derive(Debug, Clone)]
 pub struct ClientAuth {
     pub app: App,
-    /// True for the first-party public client (`client_id=accounts` without a secret): only the
-    /// device-code, refresh-token and CLI grants of the first-party app may accept it.
+    /// True for a first-party public client sent without a secret: `client_id=accounts` (the
+    /// accounts CLI: device-code and refresh-token grants, revocation) or `client_id=developer`
+    /// (the developer platform: authorization code with PKCE S256, refresh token, revocation).
+    /// Each only ever touches its own tokens.
     pub public: bool,
 }
 
 /// Authenticates the client of a token/revoke/introspect request: HTTP Basic, or `client_id` +
-/// `client_secret` in the body, or `client_id=accounts` alone (public first-party client).
+/// `client_secret` in the body, or `client_id=accounts` / `client_id=developer` alone (the
+/// first-party public clients; what each may do is decided by the endpoint).
 pub async fn authenticate_client(
     state: &AppState,
     headers: &HeaderMap,
@@ -378,16 +451,21 @@ pub async fn authenticate_client(
         }
         (Some((id, secret)), _, None) => (id, secret),
         (None, Some(id), Some(secret)) => (id.to_string(), secret.to_string()),
-        (None, Some(id), None) if id == crate::FIRST_PARTY_APP_ID => {
+        (None, Some(id), None) if crate::is_first_party_app_id(id) => {
             let mut conn = state.db.acquire().await?;
             let app = apps::get(&mut conn, id)
                 .await
                 .map_err(|e| OAuthError::server_error(e.message))?
                 .ok_or_else(|| {
-                    OAuthError::server_error(
-                        "the first-party app 'accounts' is missing; run the migrations",
-                    )
+                    OAuthError::server_error(format!(
+                        "the first-party app '{id}' is missing; run the migrations (accounts-migrate)"
+                    ))
                 })?;
+            if !app.is_active() {
+                return Err(OAuthError::invalid_client(format!(
+                    "The first-party client '{id}' is disabled on this deployment."
+                )));
+            }
             return Ok(ClientAuth { app, public: true });
         }
         (None, Some(id), None) => {
@@ -489,7 +567,8 @@ where
                 })
             }
             Ok(None) => {
-                let auth = resolve(parts, &app_state, false).await?.ok_or_else(|| {
+                // Every owner route of an app accepts the developer platform's tokens.
+                let auth = resolve(parts, &app_state, false, true).await?.ok_or_else(|| {
                     ApiError::unauthenticated(
                         "unauthenticated",
                         format!(

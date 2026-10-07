@@ -190,7 +190,7 @@ already revoked. Share one request between callers:
 ```ts
 // refresh.ts: one refresh per sign-in at a time. Two parallel refreshes with the same token
 // count as reuse and end the sign-in, so callers that race share one request.
-const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://account.teamofsilicons.com";
+const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com";
 const APP_ID = process.env.ACCOUNTS_APP_ID ?? "briefcase";
 const APP_SECRET = process.env.ACCOUNTS_APP_SECRET ?? "";
 
@@ -270,7 +270,7 @@ An access token's claims:
 
 ```json
 {
-  "iss": "https://account.teamofsilicons.com",
+  "iss": "https://accounts.teamofsilicons.com",
   "sub": "ptO",
   "aud": "briefcase",
   "exp": 1791343596,
@@ -296,7 +296,7 @@ header names the key: `{"typ": "JWT", "alg": "EdDSA", "kid": "…"}`.
 // verify.ts: check an access token locally (no call to Silicon Accounts per request).
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
-const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://account.teamofsilicons.com";
+const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com";
 const APP_ID = process.env.ACCOUNTS_APP_ID ?? "briefcase";
 // Fetched once, cached, refetched when a token names an unknown kid.
 const jwks = createRemoteJWKSet(new URL("/.well-known/jwks.json", ACCOUNTS_URL));
@@ -340,7 +340,7 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/i
   "exp": 1791343603,
   "iat": 1791341803,
   "id": "c:grace-hopper",
-  "iss": "https://account.teamofsilicons.com",
+  "iss": "https://accounts.teamofsilicons.com",
   "jti": "01a1144a-b941-7705-99bc-1f9792d04d22",
   "kind": "carbon",
   "membership_id": "briefcase:ptO",
@@ -420,7 +420,7 @@ credentials check out, as RFC 7009 asks; the body says what happened:
 |---|---|
 | `{"revoked":true}` | The sign-in is ended (also when it was already ended: revoking twice is harmless). |
 | `{"revoked":false,"message":"Nothing was revoked: this is not a refresh or access token issued to 'briefcase' (it is unknown, malformed, or belongs to another app). RFC 7009 answers 200 either way."}` | Not a token of yours. The answer never says which, so the endpoint can't probe other apps' tokens. |
-| `{"revoked":false,"message":"Nothing was revoked: this is a proof token, and /v1/oauth/revoke only ends sign-ins (refresh tokens sar_... and access tokens). Proofs are revoked by their issuing app with POST /v1/proofs/revoke (or by the account on account.teamofsilicons.com)."}` | A credential this endpoint doesn't end; the message says where it is ended. |
+| `{"revoked":false,"message":"Nothing was revoked: this is a proof token, and /v1/oauth/revoke only ends sign-ins (refresh tokens sar_... and access tokens). Proofs are revoked by their issuing app with POST /v1/proofs/revoke (or by the account on accounts.teamofsilicons.com)."}` | A credential this endpoint doesn't end; the message says where it is ended. |
 
 `accounts app token revoke <token>` and `app.revoke(token)` in Rust do the same.
 

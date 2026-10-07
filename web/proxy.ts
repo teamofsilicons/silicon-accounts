@@ -15,12 +15,11 @@
  *
  * Request headers handed to the render: x-nonce, x-sa-surface (site | embed), x-sa-embed-framing (allowed | none).
  *
- * An address under an app's developer pages that names no tab (/developer/briefcase/bogus) is answered here with the
- * site's not-found page and a real 404: the page itself could only stream a "soft" 404 under a 200 once the shell's
- * layout has started.
+ * /developer and everything under it moved to the developer site (developer.teamofsilicons.com): a 307 to the address
+ * GET /v1/meta names as `developer_url` (cached briefly; ACCOUNTS_DEVELOPER_URL, then the production address, when the
+ * API cannot say). /developer → its home, /developer/{app_id}[/{tab}] → /apps/{app_id}[/{tab}] there, query kept.
  */
 import { NextResponse, type NextRequest } from "next/server";
-import { isUnknownDeveloperTab } from "./lib/developer-tabs";
 
 /** Where the Rust API listens (server side). Read at request time, so it can differ from the build's. */
 const apiUrl = () => (process.env.ACCOUNTS_API_URL ?? "http://127.0.0.1:8589").replace(/\/+$/, "");
@@ -75,6 +74,46 @@ async function frameAncestors(appId: string | null): Promise<string[]> {
   return origins;
 }
 
+const DEVELOPER_TTL_MS = 60_000;
+let developerCache: { url: string; until: number } | null = null;
+
+/** A clean http(s) origin-and-path without a trailing slash, or null. */
+function siteUrl(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href.replace(/\/+$/, "") : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The developer site: GET /v1/meta `developer_url`, else ACCOUNTS_DEVELOPER_URL, else production. */
+async function developerUrl(): Promise<string> {
+  if (developerCache && developerCache.until > Date.now()) return developerCache.url;
+  let url: string | null = null;
+  try {
+    const response = await fetch(`${apiUrl()}/v1/meta`, { headers: { Accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(2500) });
+    if (response.ok) url = siteUrl(((await response.json()) as { developer_url?: unknown }).developer_url);
+  } catch {
+    url = null;
+  }
+  const resolved = url ?? siteUrl(process.env.ACCOUNTS_DEVELOPER_URL) ?? "https://developer.teamofsilicons.com";
+  // An answer from the API is kept for a minute; a fallback only briefly, so the real one is picked up soon.
+  developerCache = { url: resolved, until: Date.now() + (url ? DEVELOPER_TTL_MS : 5_000) };
+  return resolved;
+}
+
+/** Where an old /developer address of this site lives on the developer site. */
+async function developerRedirect(request: NextRequest): Promise<NextResponse> {
+  const { pathname, search } = request.nextUrl;
+  const rest = pathname.replace(/^\/developer\/?/, "").replace(/\/+$/, "");
+  const target = new URL(`${await developerUrl()}/`);
+  target.pathname = `${target.pathname.replace(/\/+$/, "")}${rest ? `/apps/${rest}` : "/"}`;
+  target.search = search;
+  return NextResponse.redirect(target, 307);
+}
+
 /**
  * Default profile photos come from Iris (ACCOUNTS_IRIS_BASE_URL, read at request time like ACCOUNTS_API_URL).
  * Production's Iris is https and already allowed by `https:`. A local stack points it at the testkit's mock Iris
@@ -109,6 +148,7 @@ function contentSecurityPolicy(nonce: string, frameAncestorsValue: string): stri
 
 export async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
+  if (pathname === "/developer" || pathname.startsWith("/developer/")) return developerRedirect(request);
   const nonce = btoa(crypto.randomUUID());
   const embed = pathname === "/embed/v1/buttons" || pathname.startsWith("/embed/");
   const ancestors = embed ? await frameAncestors(searchParams.get("app_id") ?? searchParams.get("client_id")) : [];
@@ -120,10 +160,7 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-sa-surface", embed ? "embed" : "site");
   requestHeaders.set("x-sa-embed-framing", embed && ancestors.length ? "allowed" : "none");
 
-  // No page lives here: render the not-found page (an address no route matches) with a 404 status.
-  const response = isUnknownDeveloperTab(pathname)
-    ? NextResponse.rewrite(new URL("/_sa/not-found", request.url), { status: 404, request: { headers: requestHeaders } })
-    : NextResponse.next({ request: { headers: requestHeaders } });
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
   if (!ancestors.length) response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");

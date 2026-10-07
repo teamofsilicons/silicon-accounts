@@ -193,3 +193,60 @@ async fn only_your_own_first_party_sessions_can_be_revoked() {
     let r = call(&ctx, Req::delete("/v1/me/sessions/not-a-uuid").bearer(&tok)).await;
     assert_error(&r, 404, "session_not_found");
 }
+
+/// Sign-ins to the developer platform (developer.teamofsilicons.com, aud = developer) are
+/// sessions of Silicon Accounts too: listed, named, and ended from the account site.
+#[tokio::test]
+async fn developer_platform_sign_ins_are_listed_and_can_be_signed_out() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let cookie = ctx.browser_session(&carbon).await;
+    let developer = ctx
+        .tokens_for(&carbon, accounts_core::DEVELOPER_APP_ID, &[Scope::Profile])
+        .await;
+
+    let r = call(
+        &ctx,
+        Req::get("/v1/me/sessions").session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_status(&r, 200);
+    let items = sessions_of(&r.json);
+    assert_eq!(items.len(), 2, "{}", r.json);
+    let dev = items
+        .iter()
+        .find(|s| s["kind"] == "developer")
+        .expect("developer platform session");
+    assert_eq!(
+        dev["label"], "Silicon Developer (developer.teamofsilicons.com)",
+        "{dev}"
+    );
+    assert_eq!(dev["current"], false);
+    let dev_id = dev["id"].as_str().expect("id").to_string();
+
+    let r = call(
+        &ctx,
+        Req::delete(&format!("/v1/me/sessions/{dev_id}")).session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_status(&r, 204);
+    let revoked: Option<time::OffsetDateTime> =
+        sqlx::query_scalar("select revoked_at from token_families where id = $1::uuid")
+            .bind(&dev_id)
+            .fetch_one(&ctx.state.db)
+            .await
+            .expect("family");
+    assert!(revoked.is_some(), "the developer platform's refresh token stops working");
+    assert!(!developer.refresh_token.is_empty());
+
+    let r = call(
+        &ctx,
+        Req::get("/v1/me/sessions").session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert!(
+        sessions_of(&r.json).iter().all(|s| s["kind"] != "developer"),
+        "{}",
+        r.json
+    );
+}

@@ -135,7 +135,10 @@ function Step({ custom, children, ref }: { custom: Custom; children: ReactNode; 
 export interface StepMorphProps {
   /** The view to show; a new key morphs the card. */
   view: string;
-  /** Keys in their usual order (a sub-view "step:detail" sorts just after its step), to tell forward from back. */
+  /**
+   * Keys in their usual order (a sub-view "step:detail" sorts just after its step, and numbered ones such as
+   * "details:0", "details:1" in their number's order), to tell forward from back.
+   */
   order: readonly string[];
   children: (view: string) => ReactNode;
   className?: string;
@@ -144,9 +147,12 @@ export interface StepMorphProps {
 export function StepMorph({ view, order, children, className }: StepMorphProps) {
   const reduce = !!useReducedMotion();
   const rank = (key: string) => {
-    const base = key.split(":")[0] ?? key;
+    const [base = key, sub] = key.split(":");
     const index = order.indexOf(base);
-    return index < 0 ? order.length : index + (key.includes(":") ? 0.5 : 0);
+    if (index < 0) return order.length;
+    if (sub === undefined) return index;
+    const number = /^\d+$/.test(sub) ? Number(sub) : 0;
+    return index + 0.5 + Math.min(number, 400) / 1000;
   };
   const [last, setLast] = useState({ view, direction: 1 });
   if (last.view !== view) setLast({ view, direction: Math.sign(rank(view) - rank(last.view)) || 1 });

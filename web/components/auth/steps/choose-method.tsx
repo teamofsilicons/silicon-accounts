@@ -1,18 +1,22 @@
 "use client";
 
 /**
- * choose_method: how the Carbon signs in. A browser that is already signed in is offered "Continue as" first (with
- * "Use another account", which tells the server to forget it for this flow). Otherwise the app's methods show in its
- * order: Google and Apple as neutral buttons, email and phone as one field with a code. `login_hint` fills the field;
- * `method` narrows the page to one method (Google and Apple open at once, a single time per flow).
+ * choose_method: how the Carbon signs in (or signs up: the app's intent=signup shows the sign-up version of the page,
+ * "Create your Briefcase account"; the account logic is the same). A browser that is already signed in is offered
+ * "Continue as" first (with "Use another account", which tells the server to forget it for this flow). Otherwise the
+ * app's methods show in its order: Google and Apple as neutral buttons, email and phone as one field with a code.
+ *
+ * `method` narrows the page to one method until the Carbon asks for the others: email or phone opens on that empty
+ * field (nothing is ever filled in for the Carbon: an app cannot hand us an email or phone, and login_hint is ignored);
+ * Google and Apple first show the Opening page (steps/opening.tsx), and this page only when they come back.
  */
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert } from "@/components/arc/alert/alert";
 import { Button } from "@/components/arc/button/button";
 import type { ApiError } from "@/lib/api/errors";
 import type { FlowController } from "../flow/controller";
 import { useFinePointer } from "../flow/hooks";
-import { appTitle, claimAutoStart, firstName, isProvider, type HostedFlow } from "../flow/model";
+import { appSubtitle, appTitle, firstName, intentOf, isProvider, type HostedFlow } from "../flow/model";
 import { AccountRow, ContactForm, FlowAlert, OrDivider, ProviderButton, StepHeading, contactKinds, useStepErrors, type ContactKind } from "../flow/parts";
 import styles from "../flow/flow.module.css";
 
@@ -31,14 +35,17 @@ export interface ChooseMethodProps {
   /** Came back from the code to send it somewhere else: show the field only, with a way back. */
   changing?: boolean;
   onBack?: () => void;
+  /** Every method from the start (the Carbon chose "Other ways to sign in" on the Opening page). */
+  wide?: boolean;
 }
 
-export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBack }: ChooseMethodProps) {
+export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBack, wide }: ChooseMethodProps) {
   const [busy, setBusy] = useState<string | null>(null);
   // Newest first: the error the flow arrived with (a cancelled Google sign-in…) steps aside once the Carbon tries
   // something else, so a new failure is never hidden behind an old one.
   const errors = useStepErrors(flow.error ?? notice);
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(!!wide);
+  const signup = intentOf(flow) === "signup";
   const fine = useFinePointer();
   const methods = flow.methods;
   const providers = methods.filter(isProvider);
@@ -57,9 +64,7 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
   const firstContact = methods.findIndex(method => method === "email" || method === "phone");
   const providersFirst = firstProvider >= 0 && (firstContact < 0 || firstProvider < firstContact);
   const signedIn = changing ? null : flow.signed_in_as;
-  const loginHint = flow.login_hint ?? "";
-  const hintedPhone = loginHint.replace(/[\s().-]/g, "");
-  const initialKind: ContactKind | undefined = memory.kind ?? (hint === "email" || hint === "phone" ? hint : loginHint.includes("@") ? "email" : /^\+?[\d\s().-]{6,}$/.test(loginHint) ? "phone" : undefined);
+  const initialKind: ContactKind | undefined = memory.kind ?? (hint === "email" || hint === "phone" ? hint : undefined);
 
   const startProvider = async (provider: "google" | "apple") => {
     errors.begin();
@@ -79,21 +84,6 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
     };
     window.addEventListener("pageshow", onShow);
     return () => window.removeEventListener("pageshow", onShow);
-  }, []);
-
-  // method=google|apple: open the provider straight away, once per flow, never after it came back with an error. It is
-  // the press of the button, done for the Carbon: a start that fails (the provider is not set up, the network is down)
-  // says why on the card exactly as a press would.
-  const autoStart = useRef({ method: hint, flowId: flow.id, allowed: !!hint && isProvider(hint) && methods.includes(hint) && !flow.error && !flow.signed_in_as && !changing });
-  const startHinted = useEffectEvent((provider: "google" | "apple") => void startProvider(provider));
-  useEffect(() => {
-    const { method, flowId, allowed } = autoStart.current;
-    if (!allowed || !method || !isProvider(method)) return;
-    // Claimed when it runs (not when scheduled), so a remounted page in development still starts it once.
-    const timer = window.setTimeout(() => {
-      if (claimAutoStart(flowId)) startHinted(method);
-    }, 0);
-    return () => window.clearTimeout(timer);
   }, []);
 
   const continueAs = async () => {
@@ -131,12 +121,13 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
     <ContactForm
       kinds={visibleContacts}
       initialKind={initialKind}
-      initialEmail={memory.email ?? (loginHint.includes("@") ? loginHint : "")}
-      initialPhone={memory.phone ?? (/^\+\d{6,}$/.test(hintedPhone) ? hintedPhone : "")}
+      initialEmail={memory.email ?? ""}
+      initialPhone={memory.phone ?? ""}
       submitLabel={changing ? "Send code" : "Continue"}
       onSubmit={send}
       autoFocus={fine && !signedIn}
       errorContext={{ app: flow.app.name }}
+      kindsLabel={signup ? "Sign up with" : "Sign in with"}
     />
   ) : null;
   const both = !!providerButtons && !!contactForm;
@@ -146,7 +137,7 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
       {changing ? (
         <StepHeading title="Send the code somewhere else" description={`Enter the ${changeTarget} to send a new 6 digit code to.`} />
       ) : (
-        <StepHeading title={appTitle(flow)} description={flow.app.copy.subtitle ?? undefined} appTitle noFocus />
+        <StepHeading title={appTitle(flow)} description={appSubtitle(flow) ?? undefined} appTitle splitLabel={signup ? "Sign up" : "Sign in"} noFocus />
       )}
       <FlowAlert error={errors.current} app={flow.app.name} />
 
@@ -175,12 +166,12 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
               {providerButtons}
             </>
           )}
-          {narrowed ? <button type="button" className={styles.textButton} onClick={() => setShowAll(true)}>Other ways to sign in</button> : null}
+          {narrowed ? <button type="button" className={styles.textButton} onClick={() => setShowAll(true)}>{signup ? "Other ways to sign up" : "Other ways to sign in"}</button> : null}
           {changing && onBack ? <button type="button" className={styles.textButton} onClick={onBack}>Back to the code</button> : null}
         </div>
       ) : (
         <Alert tone="warning" title={`${flow.app.name} has no sign-in methods yet`}>
-          {`Nobody can sign in to ${flow.app.name} until it turns on at least one method. If you run this app, turn one on in its sign-in setup.`}
+          {`Nobody can sign in to ${flow.app.name} until it turns on at least one method. If you run this app, turn one on in its sign-in setup on the developer site.`}
         </Alert>
       )}
     </>

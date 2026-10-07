@@ -9,7 +9,6 @@
 import { useEffect, useState } from "react";
 import { animate } from "motion/react";
 import { ArrowUpRight, LayoutGrid } from "lucide-react";
-import Link from "next/link";
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
@@ -21,8 +20,7 @@ import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader } from "@/components/foundation/layout/layout";
 import type { Me, MyApp, Scope } from "@/lib/api/types";
 import { formatDate, formatPhone, formatRelative, plural } from "@/lib/format";
-import { paths } from "@/lib/navigation";
-import { useMe, useMeta } from "@/lib/query/session";
+import { useDeveloperUrl, useMe, useMeta } from "@/lib/query/session";
 import { timezoneLabel } from "@/lib/timezones";
 import { AnimatedRows } from "../parts/animated-rows";
 import { AppMark } from "../parts/app-mark";
@@ -68,6 +66,7 @@ const host = (url: string | null) => {
 export function Apps() {
   const apps = useEveryApp();
   const meta = useMeta();
+  const developerUrl = useDeveloperUrl();
   const me = useMe();
   const [view, setView] = useState<View>("access");
   const now = useNow(30_000);
@@ -159,7 +158,13 @@ export function Apps() {
               </a>
               ,
             </span>{" "}
-            and the ones you own are under <Link data-sq="surface" href={paths.developer}>Developer</Link>.
+            and you set up how people sign in to the ones you build on the{" "}
+            <span className={styles.keep}>
+              <a data-sq="surface" href={developerUrl}>
+                developer site<ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
+              </a>
+              .
+            </span>
           </p>
         </>
       )}

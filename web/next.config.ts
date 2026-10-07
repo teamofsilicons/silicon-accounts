@@ -2,7 +2,7 @@
  * Next.js config for the Silicon Accounts web app.
  *
  * Topology: Next serves the whole site on the public origin (dev http://localhost:8590, prod
- * https://account.teamofsilicons.com) and proxies the API with rewrites, so the browser stays same-origin (cookies,
+ * https://accounts.teamofsilicons.com) and proxies the API with rewrites, so the browser stays same-origin (cookies,
  * the API's Origin check): /v1/* and /.well-known/* → ACCOUNTS_API_URL (default http://127.0.0.1:8589). Provider
  * callbacks (/v1/oauth/callback/*, Apple's form_post too) and every API call pass through unchanged, Set-Cookie and
  * Location included.

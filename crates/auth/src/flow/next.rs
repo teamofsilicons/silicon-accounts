@@ -1,22 +1,20 @@
-//! Moving a flow forward once it knows its account: requirements → consent → complete.
+//! Moving a flow forward once it knows its account: the details pages (see [`super::details`])
+//! → complete.
 //!
-//! Scope rules (02-api.md):
+//! Scope rules:
 //! - `profile` is always granted;
-//! - the app's `required_fields` are required: missing email/phone sends the flow to the
-//!   requirements step (dob and timezone always exist);
-//! - optional = the app's `optional_fields` plus any detail the `scope` parameter asks for that
-//!   isn't required (the Carbon may decline each);
-//! - consent is skipped when the account already granted everything the app now needs
-//!   (profile + required + details asked for in `scope`) and `prompt` isn't `consent`; the
-//!   first-party app never shows it.
+//! - the app's `required_fields` are always shared (a missing email/phone is added on its
+//!   details page);
+//! - optional details (the app's `optional_fields`, plus any detail the `scope` parameter asks
+//!   for that the app doesn't request) are shared only when the Carbon ticks them;
+//! - a Carbon who has nothing new to see (signed in before, granted everything the app requires
+//!   and the `scope` parameter asks for, nothing missing, `prompt` isn't `consent`) completes
+//!   straight away; the first-party apps (`accounts`, `developer`) never show the pages.
 
 use accounts_core::http::ClientMeta;
-use accounts_core::models::{
-    Account, ContactField, MembershipSource, MembershipStatus, Scope, SigninConfig,
-    normalize_scopes,
-};
+use accounts_core::models::{Account, MembershipSource, Scope, SigninConfig, normalize_scopes};
 use accounts_core::repo::audit::{self, SigninRecord};
-use accounts_core::repo::contacts::{self, ContactKind};
+use accounts_core::repo::contacts;
 use accounts_core::repo::memberships::{self, GrantMode};
 use accounts_core::repo::sessions;
 use accounts_core::repo::tokens::{self, NewAuthCode};
@@ -25,101 +23,20 @@ use serde_json::json;
 use sqlx::PgConnection;
 
 use super::FlowApp;
+use super::details;
 use super::model::{Flow, FlowError, Step};
 use crate::util::{encrypt_text, telemetry, with_query};
 
-/// Contact scopes (the details an app can see beyond its profile).
-const CONTACT_SCOPES: [Scope; 4] = [Scope::Email, Scope::Phone, Scope::Dob, Scope::Timezone];
-
-/// Scopes of the app's required fields.
-pub fn required_scopes(config: &SigninConfig) -> Vec<Scope> {
-    let mut out: Vec<Scope> = config.required_fields.iter().map(|f| f.scope()).collect();
-    out.sort();
-    out.dedup();
-    out
-}
-
-/// Details the `scope` parameter asked for (email, phone, dob, timezone).
-pub fn requested_contact_scopes(flow: &Flow) -> Vec<Scope> {
-    flow.requested_scopes
-        .iter()
-        .copied()
-        .filter(|s| CONTACT_SCOPES.contains(s))
-        .collect()
-}
-
-/// Optional details: the app's optional fields plus requested ones that aren't required.
-pub fn optional_scopes(flow: &Flow, config: &SigninConfig) -> Vec<Scope> {
-    let required = required_scopes(config);
-    let mut out: Vec<Scope> = config
-        .optional_fields
-        .iter()
-        .map(|f| f.scope())
-        .chain(requested_contact_scopes(flow))
-        .filter(|s| !required.contains(s))
-        .collect();
-    out.sort();
-    out.dedup();
-    out
-}
-
-/// What the app needs now: profile + required + requested details.
+/// What a returning Carbon's grant must cover without showing a page: profile + required
+/// details + details the `scope` parameter asks for.
 pub fn needed_scopes(flow: &Flow, config: &SigninConfig) -> Vec<Scope> {
     let mut out = vec![Scope::Profile];
-    out.extend(required_scopes(config));
-    out.extend(requested_contact_scopes(flow));
+    out.extend(config.required_fields.iter().map(|f| f.scope()));
+    out.extend(details::asked_in_scope(flow).iter().map(|f| f.scope()));
     normalize_scopes(out)
 }
 
-/// Required details the account doesn't have yet (only email and phone can be missing: every
-/// account has a date of birth and a timezone). A detail counts only when its primary is
-/// verified.
-pub async fn missing_requirements(
-    conn: &mut PgConnection,
-    config: &SigninConfig,
-    account: &Account,
-) -> ApiResult<Vec<ContactField>> {
-    let mut missing = Vec::new();
-    for field in &config.required_fields {
-        let kind = match field {
-            ContactField::Email => ContactKind::Email,
-            ContactField::Phone => ContactKind::Phone,
-            ContactField::Dob | ContactField::Timezone => continue,
-        };
-        let primary = contacts::primary(conn, kind, &account.uuid).await?;
-        if !primary.is_some_and(|p| p.verified) && !missing.contains(field) {
-            missing.push(*field);
-        }
-    }
-    Ok(missing)
-}
-
-/// True when the what's-shared screen must be shown.
-pub async fn needs_consent(
-    conn: &mut PgConnection,
-    flow: &Flow,
-    fa: &FlowApp,
-    account: &Account,
-) -> ApiResult<bool> {
-    if fa.first_party() {
-        return Ok(false);
-    }
-    if flow.prompt.consent {
-        return Ok(true);
-    }
-    let Some(m) = memberships::get(conn, &fa.app.app_id, &account.uuid).await? else {
-        return Ok(true);
-    };
-    if m.status != MembershipStatus::Active {
-        return Ok(true);
-    }
-    let granted = m.scopes();
-    Ok(!needed_scopes(flow, &fa.config)
-        .iter()
-        .all(|s| granted.contains(s)))
-}
-
-/// After the account is known: requirements, consent or straight to complete.
+/// After the account is known: the first details page, or straight to complete.
 pub async fn advance(
     conn: &mut PgConnection,
     state: &AppState,
@@ -134,27 +51,17 @@ pub async fn advance(
     flow.extras.provider = None;
     flow.extras.pending = None;
     flow.extras.error = None;
-    if !missing_requirements(conn, &fa.config, account)
-        .await?
-        .is_empty()
-    {
-        flow.step = Step::Requirements;
-        return Ok(());
-    }
-    if needs_consent(conn, flow, fa, account).await? {
-        flow.step = Step::Consent;
-        return Ok(());
-    }
-    complete(conn, state, meta, flow, fa, account, Grant::Auto).await
+    details::start(conn, state, meta, flow, fa, account).await
 }
 
 /// How the grant of a completing flow is decided.
 #[derive(Debug, Clone)]
 pub enum Grant {
-    /// No consent screen: keep what was granted before (adding nothing new).
+    /// No page was shown: keep what was granted before, plus what the app needs now.
     Auto,
-    /// The consent screen's answer: exactly these scopes (replacing the previous grant).
-    Consent(Vec<Scope>),
+    /// The Carbon's answers on the details pages: exactly these scopes (replacing the previous
+    /// grant, so an optional detail they unticked stops being shared).
+    Chosen(Vec<Scope>),
 }
 
 /// Ends the flow with an authorization code: membership (except for the first-party app),
@@ -174,7 +81,7 @@ pub async fn complete(
     } else {
         let (scopes, mode) = match grant {
             Grant::Auto => (needed_scopes(flow, &fa.config), GrantMode::Union),
-            Grant::Consent(s) => (s, GrantMode::Replace),
+            Grant::Chosen(s) => (s, GrantMode::Replace),
         };
         memberships::upsert_signin(
             conn,
@@ -253,7 +160,8 @@ pub async fn complete(
     Ok(())
 }
 
-/// The Carbon declined on the what's-shared screen: `redirect_uri?error=access_denied&state=…`.
+/// The Carbon cancelled on a details page or the review page:
+/// `redirect_uri?error=access_denied&state=…`.
 pub async fn decline(
     conn: &mut PgConnection,
     state: &AppState,

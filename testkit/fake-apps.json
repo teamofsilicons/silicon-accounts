@@ -46,6 +46,7 @@
         "copy": {
           "title": "Sign in to Briefcase",
           "subtitle": "Your files, for every Carbon and Silicon.",
+          "signup_title": "Create your Briefcase account",
           "terms_url": "https://teamofsilicons.com/legal/terms",
           "privacy_url": "https://teamofsilicons.com/legal/privacy",
           "support_email": "support@teamofsilicons.com"
@@ -146,6 +147,23 @@
           "privacy_url": "https://teamofsilicons.com/legal/privacy",
           "support_email": "support@teamofsilicons.com"
         },
+        "flow": {
+          "steps": [
+            {
+              "id": "dm-setup",
+              "fields": [
+                "phone",
+                "email",
+                "timezone"
+              ],
+              "title": "Set up DM",
+              "subtitle": "DM needs your phone number. Email and timezone are up to you.",
+              "continue_label": "Start messaging",
+              "layout": null
+            }
+          ],
+          "review": false
+        },
         "redirect_uris": [
           "http://127.0.0.1:8593/dm/callback"
         ],
@@ -158,9 +176,10 @@
       "webhook_secret": "whsec_zUpC02FM_og8hd3mYrqekmGvWZvl1gUFbMIJ2AbtO_E",
       "testkit": {
         "category": "messaging",
-        "purpose": "Requires a phone number (asks for it when the Carbon has none); issues OBO proofs to Briefcase.",
+        "purpose": "Requires a phone number (added on its details page when the Carbon has none); issues OBO proofs to Briefcase.",
         "exercises": [
-          "phone required → requirements step",
+          "phone required → added on the details page with a code",
+          "one custom-titled flow step with optional email + timezone (unticked by default)",
           "email + phone only",
           "OBO issuer (dm → briefcase)",
           "webhooks"
@@ -686,6 +705,8 @@
         "copy": {
           "title": "Welcome back to Acme Notes",
           "subtitle": "Sign in to pick up where you left off.",
+          "opening_title": "Taking you to {provider} for {app}…",
+          "signup_title": "Start your Acme notebook",
           "terms_url": "https://acme-notes.test/terms",
           "privacy_url": "https://acme-notes.test/privacy",
           "support_email": "help@acme-notes.test"
@@ -900,9 +921,37 @@
         "copy": {
           "title": "Sign in to Ledgerly",
           "subtitle": "We need your phone and date of birth to keep your books safe.",
+          "signup_title": "Create your Ledgerly account",
+          "signup_subtitle": "Bookkeeping for freelancers, set up in two steps.",
           "terms_url": "https://ledgerly.test/terms",
           "privacy_url": "https://ledgerly.test/privacy",
           "support_email": "support@ledgerly.test"
+        },
+        "flow": {
+          "steps": [
+            {
+              "id": "contact",
+              "fields": [
+                "phone"
+              ],
+              "title": "How can we reach you?",
+              "subtitle": "We text you when an invoice is paid.",
+              "continue_label": null,
+              "layout": null
+            },
+            {
+              "id": "about-you",
+              "fields": [
+                "dob",
+                "timezone"
+              ],
+              "title": "About you",
+              "subtitle": "Your date of birth keeps your tax year right.",
+              "continue_label": "Review",
+              "layout": "split"
+            }
+          ],
+          "review": true
         },
         "redirect_uris": [
           "http://127.0.0.1:8593/ledgerly/callback"
@@ -916,10 +965,13 @@
       "webhook_secret": "whsec_hGZYsYHnQDsVZjcJVluA0o-uaoh1t9wm2RmeS6TRjDw",
       "testkit": {
         "category": "external (finance)",
-        "purpose": "Requires phone and date of birth, optional timezone, sign-up allowed.",
+        "purpose": "Requires phone and date of birth, optional timezone, sign-up allowed; a two-step flow with a review page.",
         "exercises": [
-          "requirements: phone + dob",
-          "optional timezone",
+          "flow: 2 steps (contact → about-you, split layout) + review",
+          "required phone added on its page",
+          "required dob",
+          "optional timezone (unticked by default)",
+          "signup intent copy",
           "allow_signup true"
         ],
         "integration": "hosted",

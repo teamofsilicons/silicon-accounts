@@ -21,7 +21,7 @@ export const GITHUB_BRANCH = "main";
 export const GITHUB_PUBLISHED = false;
 
 /** The public origin of the account site, used when a request names no better one (llms.txt links). */
-export const CANONICAL_ORIGIN = "https://account.teamofsilicons.com";
+export const CANONICAL_ORIGIN = "https://accounts.teamofsilicons.com";
 
 export type SectionKey = "start" | "learn" | "reference";
 

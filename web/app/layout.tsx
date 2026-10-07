@@ -3,7 +3,7 @@
  * no-flash theme boot script (inline, with the request's CSP nonce) and the shared providers.
  *
  * Two surfaces share it, told apart by proxy.ts through the `x-sa-surface` request header:
- *   site   the account site, hosted sign-in pages and developer pages
+ *   site   the account site, the docs and the hosted sign-in pages
  *   embed  /embed/v1/buttons, a transparent document inside an app's iframe (no theme boot, no toasts)
  * Every page is rendered per request (the nonce changes each time), so `headers()` and `cookies()` are fine here.
  */

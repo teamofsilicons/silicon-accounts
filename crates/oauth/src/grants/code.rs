@@ -30,7 +30,7 @@ use accounts_core::repo::memberships::{self, GrantMode};
 use accounts_core::repo::tokens::{self, AUTH_CODE_TTL_SECONDS, AuthCode, IssueRequest};
 use accounts_core::timefmt::format_rfc3339_ms;
 use accounts_core::views::TokenResponse;
-use accounts_core::{AppState, FIRST_PARTY_APP_ID, OAuthError, events};
+use accounts_core::{AppState, OAuthError, events, is_first_party_app_id};
 use serde_json::json;
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -108,7 +108,14 @@ pub(crate) async fn exchange(
         .bind(&auth.code_hash)
         .execute(&mut *tx)
         .await?;
-    if let Some(reason) = refusal(&auth, expired, app_id, redirect_uri, verifier) {
+    if let Some(reason) = refusal(
+        &auth,
+        expired,
+        app_id,
+        redirect_uri,
+        verifier,
+        client.public,
+    ) {
         tx.commit().await?;
         return Err(OAuthError::invalid_grant(reason));
     }
@@ -153,12 +160,16 @@ pub(crate) async fn exchange(
 }
 
 /// Why a redemption is refused, checked in this order: app, expiry, `redirect_uri`, PKCE.
+/// A public client (`public`: the developer platform, which has no secret) must have used
+/// PKCE with S256: without a secret the verifier is the only proof that the redeemer started
+/// the sign-in.
 fn refusal(
     auth: &AuthCode,
     expired: bool,
     app_id: &str,
     redirect_uri: &str,
     verifier: Option<&str>,
+    public: bool,
 ) -> Option<String> {
     if auth.app_id != app_id {
         return Some(format!(
@@ -178,6 +189,16 @@ fn refusal(
         ));
     }
     let method = auth.code_challenge_method.as_deref().unwrap_or("S256");
+    if public && (auth.code_challenge.is_none() || method != "S256") {
+        return Some(format!(
+            "'{app_id}' is a public client (it has no client_secret), so its sign-ins must use PKCE with code_challenge_method=S256; this authorization request {}. Start the sign-in again with code_challenge=BASE64URL(SHA256(code_verifier)) and code_challenge_method=S256, then send that code_verifier here.",
+            if auth.code_challenge.is_none() {
+                "sent no code_challenge".to_string()
+            } else {
+                format!("used code_challenge_method={method}")
+            }
+        ));
+    }
     match (auth.code_challenge.as_deref(), verifier) {
         (None, None) => None,
         (Some(_), None) => Some(format!(
@@ -277,7 +298,7 @@ async fn revoke_tokens_of_reused_code(
         families = revoked.len(),
         "authorization code reuse detected; the tokens issued from it were revoked"
     );
-    if auth.app_id != FIRST_PARTY_APP_ID {
+    if !is_first_party_app_id(&auth.app_id) {
         events::membership_signed_out(
             conn,
             &auth.app_id,

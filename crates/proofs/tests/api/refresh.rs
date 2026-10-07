@@ -76,13 +76,14 @@ async fn refresh_rotates_both_tokens() {
         .ata_as(
             &w.dm,
             &w.dm_secret,
-            json!({"audiences": [w.briefcase.app_id]}),
+            json!({"receiving_app": w.briefcase.app_id}),
         )
         .await;
     let r = w.refresh(&refresh_token(&a.json)).await;
     assert_eq!(r.status, 200, "{}", r.json);
     assert_eq!(r.json["kind"], "ata");
-    assert_eq!(r.json["receiving_apps"], json!([w.briefcase.app_id]));
+    assert_eq!(r.json["receiving_app"], w.briefcase.app_id);
+    assert!(r.json.get("receiving_apps").is_none());
     assert_eq!(r.json["user"], serde_json::Value::Null);
     assert_eq!(w.verify_bc(&token(&r.json)).await["valid"], true);
 }

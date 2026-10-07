@@ -64,6 +64,31 @@ export interface Copy {
   terms_url: string | null;
   privacy_url: string | null;
   support_email: string | null;
+  /** The opening page before Google/Apple (≤ 80 chars, may contain {provider} and {app}). */
+  opening_title: string | null;
+  /** Sign-up versions of title/subtitle (intent=signup). */
+  signup_title: string | null;
+  signup_subtitle: string | null;
+}
+
+/** One page of an app's sign-in flow: the requested details it asks for, with its own copy. */
+export interface FlowStep {
+  /** [a-z0-9-]{1,40}, unique in the flow. */
+  id: string;
+  /** Every requested detail (required_fields ∪ optional_fields) is on exactly one step. */
+  fields: ProfileField[];
+  title: string | null;
+  subtitle: string | null;
+  continue_label: string | null;
+  /** null = branding.layout. */
+  layout: 'card' | 'split' | 'minimal' | null;
+}
+
+/** Which pages a Carbon goes through and which details each asks (null = one page with every detail). */
+export interface Flow {
+  steps: FlowStep[];
+  /** A last page listing everything that will be shared. */
+  review: boolean;
 }
 
 /**
@@ -97,6 +122,7 @@ export interface SigninDefaults {
   remember_browser?: boolean;
   branding?: Partial<Branding>;
   copy?: Partial<Copy>;
+  flow?: Flow | null;
 }
 
 /** Testkit-only metadata (ignored by Silicon Accounts; drives the fake app server and docs). */

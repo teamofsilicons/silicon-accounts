@@ -1,6 +1,6 @@
 //! # silicon-accounts-client
 //!
-//! The stateless Rust package for [Silicon Accounts](https://account.teamofsilicons.com):
+//! The stateless Rust package for [Silicon Accounts](https://accounts.teamofsilicons.com):
 //! one personal account for every Carbon and Silicon, and the sign-in layer for apps.
 //! It never stores anything; you decide where tokens live. The `accounts` CLI is built
 //! on this package only.
@@ -12,7 +12,7 @@
 //!   ```no_run
 //!   # async fn demo() -> silicon_accounts_client::Result<()> {
 //!   use silicon_accounts_client::AccountsClient;
-//!   let client = AccountsClient::new("https://account.teamofsilicons.com")?;
+//!   let client = AccountsClient::new("https://accounts.teamofsilicons.com")?;
 //!   let tokens = client.silicon_login("si:scout", "stk-0123456789ab", None).await?;
 //!   let session = client.with_token(tokens.access_token.expose());
 //!   let slt = session.short_lived_token("remind").await?;
@@ -24,7 +24,7 @@
 //!   ```no_run
 //!   # async fn demo(code: &str, verifier: &str) -> silicon_accounts_client::Result<()> {
 //!   use silicon_accounts_client::AccountsClient;
-//!   let client = AccountsClient::new("https://account.teamofsilicons.com")?;
+//!   let client = AccountsClient::new("https://accounts.teamofsilicons.com")?;
 //!   let app = client.as_app("briefcase", "sa_app_…");
 //!   let tokens = app.exchange_code(code, "https://briefcase.example/callback", Some(verifier)).await?;
 //!   let account = tokens.account.expect("token responses carry the account");
@@ -59,8 +59,8 @@ mod webhook;
 
 pub use app::{AppClient, MAX_IMPORT_BYTES};
 pub use client::{
-    AccountsClient, ClientBuilder, DEFAULT_BASE_URL, FIRST_PARTY_APP_ID, IDEMPOTENCY_HEADER,
-    IDEMPOTENT_REPLAYED_HEADER, REQUEST_ID_HEADER, TELEMETRY_HEADER, VERSION,
+    AccountsClient, ClientBuilder, DEFAULT_BASE_URL, DEVELOPER_APP_ID, FIRST_PARTY_APP_ID,
+    IDEMPOTENCY_HEADER, IDEMPOTENT_REPLAYED_HEADER, REQUEST_ID_HEADER, TELEMETRY_HEADER, VERSION,
 };
 pub use config::{Config, parse_flag};
 pub use error::{ApiError, Error, OAuthError, Result, TokenError, WebhookError};

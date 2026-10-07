@@ -83,7 +83,7 @@ pub fn index() -> String {
     for (name, summary, _) in TOPICS {
         text.push_str(&format!("  {name:<width$}  {summary}\n"));
     }
-    text.push_str("\nOnline: https://account.teamofsilicons.com/docs\n");
+    text.push_str("\nOnline: https://accounts.teamofsilicons.com/docs\n");
     text
 }
 
@@ -104,6 +104,7 @@ mod tests {
                 "backend",
                 " AI ",
                 "human",
+                "Human",
             ] {
                 assert!(
                     !content.contains(banned),

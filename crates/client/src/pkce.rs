@@ -84,10 +84,15 @@ pub struct AuthorizeParams {
     pub nonce: Option<String>,
     /// `login`, `consent`, `select_account` or `none`.
     pub prompt: Option<String>,
-    /// Pre-fills the email on the sign-in page.
-    pub login_hint: Option<String>,
-    /// Jump straight to a method: `google`, `apple`, `email` or `phone`.
+    /// Jump straight to a method — a direct `Continue with …` button on your site: `google` /
+    /// `apple` (the hosted "Opening Google…" page, then the provider), `email` / `phone` (the
+    /// hosted page opens on that method's empty entry field). There is deliberately no way to
+    /// pass a Carbon's email or phone: they always type it on the hosted pages.
     pub method: Option<String>,
+    /// `signin` (default) or `signup`: whether the hosted pages show the sign-in or the
+    /// sign-up version ("Sign in to Briefcase" / "Create your Briefcase account"). The
+    /// account logic is the same either way (a first-time Carbon signs up).
+    pub intent: Option<String>,
 }
 
 impl AuthorizeParams {
@@ -135,15 +140,15 @@ impl AuthorizeParams {
         self
     }
 
-    /// Sets `login_hint`.
-    pub fn login_hint(mut self, hint: impl Into<String>) -> Self {
-        self.login_hint = Some(hint.into());
+    /// Sets `method` (a direct method button: `google`, `apple`, `email` or `phone`).
+    pub fn method(mut self, method: impl Into<String>) -> Self {
+        self.method = Some(method.into());
         self
     }
 
-    /// Sets `method`.
-    pub fn method(mut self, method: impl Into<String>) -> Self {
-        self.method = Some(method.into());
+    /// Sets `intent`: `signin` or `signup` (your site's `Sign in` / `Sign up` buttons).
+    pub fn intent(mut self, intent: impl Into<String>) -> Self {
+        self.intent = Some(intent.into());
         self
     }
 }
@@ -155,7 +160,7 @@ impl AccountsClient {
     ///
     /// ```
     /// use silicon_accounts_client::{AccountsClient, AuthorizeParams, pkce_pair, random_state};
-    /// let client = AccountsClient::new("https://account.teamofsilicons.com").unwrap();
+    /// let client = AccountsClient::new("https://accounts.teamofsilicons.com").unwrap();
     /// let pkce = pkce_pair();
     /// let url = client.authorize_url(
     ///     &AuthorizeParams::new("briefcase", "https://briefcase.example/callback")
@@ -163,7 +168,7 @@ impl AccountsClient {
     ///         .pkce(&pkce)
     ///         .scopes(["email"]),
     /// );
-    /// assert!(url.as_str().starts_with("https://account.teamofsilicons.com/authorize?"));
+    /// assert!(url.as_str().starts_with("https://accounts.teamofsilicons.com/authorize?"));
     /// ```
     pub fn authorize_url(&self, params: &AuthorizeParams) -> Url {
         let mut url = self.endpoint(&["authorize"]);
@@ -191,11 +196,11 @@ impl AccountsClient {
             if let Some(prompt) = &params.prompt {
                 query.append_pair("prompt", prompt);
             }
-            if let Some(hint) = &params.login_hint {
-                query.append_pair("login_hint", hint);
-            }
             if let Some(method) = &params.method {
                 query.append_pair("method", method);
+            }
+            if let Some(intent) = &params.intent {
+                query.append_pair("intent", intent);
             }
         }
         url
@@ -245,8 +250,8 @@ mod tests {
                 .scopes(["openid", "email"])
                 .nonce("n1")
                 .prompt("login")
-                .login_hint("a@b.test")
-                .method("google"),
+                .method("google")
+                .intent("signup"),
         );
         assert_eq!(url.path(), "/authorize");
         let pairs: Vec<(String, String)> = url
@@ -271,7 +276,12 @@ mod tests {
         assert_eq!(get("scope"), Some("openid email"));
         assert_eq!(get("nonce"), Some("n1"));
         assert_eq!(get("prompt"), Some("login"));
-        assert_eq!(get("login_hint"), Some("a@b.test"));
+        assert_eq!(
+            get("login_hint"),
+            None,
+            "apps never pass a Carbon's email or phone"
+        );
         assert_eq!(get("method"), Some("google"));
+        assert_eq!(get("intent"), Some("signup"));
     }
 }

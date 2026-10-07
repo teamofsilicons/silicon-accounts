@@ -18,7 +18,7 @@ Set your app's endpoint (the signing secret is returned once, store it now):
 
 ```bash
 curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" \
-  -X PUT https://account.teamofsilicons.com/v1/apps/briefcase/webhook \
+  -X PUT https://accounts.teamofsilicons.com/v1/apps/briefcase/webhook \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: set-webhook-1" \
   -d '{"url":"https://briefcase.example/webhooks/accounts"}'
@@ -53,7 +53,7 @@ printf '%s' '1791340349.{"app_id":"dm","data":{},"event_id":"01a11434-82ea-71e3-
 
 ## Steps
 
-1. **Set the endpoint and keep the secret.** For an app: `PUT /v1/apps/{app_id}/webhook` (above), `accounts app webhook set <url>`, or the Webhooks tab of the app's developer pages on the account site. For a Silicon: see [Silicon webhooks](#silicon-webhooks). Every time you set the URL, a new `whsec_…` secret is generated and shown once; a retry with the same `Idempotency-Key` within 10 minutes returns the same secret instead of making another. In production the URL must be `https` and reach a public address.
+1. **Set the endpoint and keep the secret.** For an app: `PUT /v1/apps/{app_id}/webhook` (above), `accounts app webhook set <url>`, or the app's Webhooks tab on developer.teamofsilicons.com. For a Silicon: see [Silicon webhooks](#silicon-webhooks). Every time you set the URL, a new `whsec_…` secret is generated and shown once; a retry with the same `Idempotency-Key` within 10 minutes returns the same secret instead of making another. In production the URL must be `https` and reach a public address.
 2. **Verify every delivery before you trust it:**
    1. Read the raw request body as bytes. Verify those bytes, never JSON you re-serialized.
    2. Read `X-Accounts-Timestamp` (unix seconds). Refuse it if it is more than 5 minutes from your clock. Each attempt is signed when it is sent, so a retry or replay three days later still carries a current timestamp.
@@ -310,7 +310,7 @@ It accepted a real `ping` delivery and refused a forged one. To unit-test either
 
 ```bash
 curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" -X POST \
-  https://account.teamofsilicons.com/v1/apps/briefcase/webhook/test
+  https://accounts.teamofsilicons.com/v1/apps/briefcase/webhook/test
 ```
 
 `202 {"delivery_id":"01a11434-82ea-71e3-ae97-5786bbb906fd","event_id":"01a11434-82ea-71e3-ae97-5785e3a06c73","type":"ping"}` queues a `ping`; it arrived about a second later in the local runs. With an `Idempotency-Key`, a retried test queues no second ping. `accounts app webhook test` does the same. Without a webhook URL the answer is `409 webhook_not_set`.
@@ -319,7 +319,7 @@ curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" -X POST \
 
 ```bash
 curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" \
-  "https://account.teamofsilicons.com/v1/apps/briefcase/webhook/deliveries?status=failed&limit=20"
+  "https://accounts.teamofsilicons.com/v1/apps/briefcase/webhook/deliveries?status=failed&limit=20"
 ```
 
 Each item: `id` (the delivery), `event_id`, `type`, `account_uuid`, `url`, `status` (`pending`, `delivered` or `failed`), `attempts`, `last_status`, `last_error` (exact text, such as `HTTP 500 Internal Server Error: the endpoint must answer with a 2xx status within 10 seconds. Response body: …`), `next_attempt_at` (pending only), `last_attempt_at`, `delivered_at`, `created_at`, `manual_replays`. `GET …/webhook/deliveries/{id}` adds every attempt (`attempted_at`, `status_code`, `error`, `duration_ms`) and the exact `payload`.
@@ -328,7 +328,7 @@ A delivery that doesn't get a `2xx` is retried 10 s, 30 s, 1 min, 5 min, 15 min 
 
 ```bash
 curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" -X POST \
-  https://account.teamofsilicons.com/v1/apps/briefcase/webhook/replay \
+  https://accounts.teamofsilicons.com/v1/apps/briefcase/webhook/replay \
   -H "Content-Type: application/json" -H "Idempotency-Key: $(uuidgen)" \
   -d '{"status":"failed"}'
 ```
@@ -347,7 +347,7 @@ With the CLI: `accounts app webhook deliveries --status failed`, `accounts app w
 
 ```bash
 curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" -X POST \
-  https://account.teamofsilicons.com/v1/apps/briefcase/webhook/rotate-secret \
+  https://accounts.teamofsilicons.com/v1/apps/briefcase/webhook/rotate-secret \
   -H "Idempotency-Key: rotate-2026-10-07"
 ```
 

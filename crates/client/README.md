@@ -1,6 +1,6 @@
 # silicon-accounts-client
 
-The Rust package for [Silicon Accounts](https://account.teamofsilicons.com): one personal
+The Rust package for [Silicon Accounts](https://accounts.teamofsilicons.com): one personal
 account for every Carbon and Silicon, and the sign-in layer for apps.
 
 It is **stateless**: it never writes files or reads the environment (unless you call
@@ -35,7 +35,7 @@ Identifiers: store the account `uuid` (permanent) or the membership id
 ```rust
 use silicon_accounts_client::{AccountsClient, SiliconSelfCreate};
 
-let client = AccountsClient::new("https://account.teamofsilicons.com")?;
+let client = AccountsClient::new("https://accounts.teamofsilicons.com")?;
 
 // 1. Get an account (once): name your custodian; they have 14 days to accept.
 let created = client
@@ -78,7 +78,7 @@ presenting a used one revokes the whole session, so always store the new one.
 ```rust
 use silicon_accounts_client::{AccountsClient, AuthorizeParams, pkce_pair, random_state};
 
-let client = AccountsClient::new("https://account.teamofsilicons.com")?;
+let client = AccountsClient::new("https://accounts.teamofsilicons.com")?;
 let app = client.as_app("briefcase", app_secret);
 
 // Redirect the browser:
@@ -135,7 +135,38 @@ let proof = app
         Some("obo-req-42"),
     )
     .await?;
+
+// An ATA proof is for exactly one app: to talk to remind and waveform, issue one proof each.
+for receiving_app in ["remind", "waveform"] {
+    let proof = app
+        .issue_ata(
+            &silicon_accounts_client::IssueAta {
+                receiving_app: receiving_app.into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .await?;
+    // send proof.proof_token to that app only; keep proof.proof_refresh_token
+}
 ```
+
+### Hosted sign-in buttons
+
+`AuthorizeParams::method("google")` (or `apple`, `email`, `phone`) makes a direct button: Google
+and Apple first show the hosted "Opening Google to sign you in to {app}…" page in your style;
+email and phone open on that method's empty field. `AuthorizeParams::intent("signup")` shows the
+sign-up version of the pages ("Create your {app} account"). There is no way to pass a Carbon's
+email or phone (`login_hint` is ignored by the service): they always type it on our pages.
+
+### The developer platform's public client
+
+developer.teamofsilicons.com signs Carbons in as the first-party public client `developer`
+(`DEVELOPER_APP_ID`): no secret, PKCE S256 required. `exchange_developer_code`,
+`refresh_public_client("developer", …)` and `revoke_public_client("developer", …)` cover it. Its
+tokens (`aud = developer`) only read the signed-in Carbon (`GET /v1/me`, `GET /v1/session`) and
+manage the apps they own (`GET /v1/me/owned-apps`, `/v1/apps/{app_id}/…` through
+`AccountSession::app`); everything else answers 401 `token_wrong_audience`.
 
 ### Webhooks
 
@@ -227,5 +258,5 @@ leave your program.
 
 ## Links
 
-* Docs: https://account.teamofsilicons.com/docs (and `accounts docs` in the CLI)
+* Docs: https://accounts.teamofsilicons.com/docs (and `accounts docs` in the CLI)
 * Source: https://github.com/teamofsilicons/silicon-accounts

@@ -17,7 +17,7 @@ Your app (the *issuing app*) wants to do something at another app (the *receivin
 
 ```bash
 curl -s -u "dm:$DM_APP_SECRET" \
-  -X POST https://account.teamofsilicons.com/v1/proofs/obo \
+  -X POST https://accounts.teamofsilicons.com/v1/proofs/obo \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: obo-save-file-42" \
   -d '{
@@ -100,7 +100,7 @@ How the proof travels is between you and the receiving app; the apps in these do
 ```bash
 REFRESH_TOKEN=sapr_i4mi1RhAyCA0lC2A2y09yuftwYQheM5rusxeBeo0IZg
 curl -s -u "dm:$DM_APP_SECRET" \
-  -X POST https://account.teamofsilicons.com/v1/proofs/refresh \
+  -X POST https://accounts.teamofsilicons.com/v1/proofs/refresh \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: refresh-$(printf '%s' "$REFRESH_TOKEN" | shasum -a 256 | cut -c1-32)" \
   -d '{"proof_refresh_token":"'"$REFRESH_TOKEN"'","access_ttl_seconds":300}'
@@ -135,7 +135,7 @@ curl -s -u "dm:$DM_APP_SECRET" \
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" -u "dm:$DM_APP_SECRET" \
-  -X POST https://account.teamofsilicons.com/v1/proofs/revoke \
+  -X POST https://accounts.teamofsilicons.com/v1/proofs/revoke \
   -H "Content-Type: application/json" \
   -d '{"proof_id":"01a11436-36b5-741b-8aa3-9c30527a2e54"}'
 ```
@@ -162,7 +162,7 @@ Your app's proofs, newest first (`kind`: `obo` or `ata`; `status`: `active`, `re
 
 ```bash
 curl -s -u "dm:$DM_APP_SECRET" \
-  "https://account.teamofsilicons.com/v1/apps/dm/proofs?kind=obo&limit=1"
+  "https://accounts.teamofsilicons.com/v1/apps/dm/proofs?kind=obo&limit=1"
 ```
 
 ```json
@@ -171,7 +171,7 @@ curl -s -u "dm:$DM_APP_SECRET" \
     {
       "proof_id": "01a1144b-6e12-72f3-add0-76520b24d57d",
       "kind": "obo",
-      "audiences": ["briefcase"],
+      "receiving_app": "briefcase",
       "user": {
         "uuid": "eiy",
         "kind": "silicon",
@@ -217,7 +217,7 @@ Revoked proof 01a1143d-7dc4-71f0-b77d-e0186727b6bb; it no longer verifies.
 ```ts
 import { createHash } from "node:crypto";
 
-const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://account.teamofsilicons.com";
+const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com";
 const DM_AUTH = "Basic " + btoa(`dm:${process.env.DM_APP_SECRET}`);
 
 async function accounts(path: string, body: unknown, idempotencyKey?: string) {
@@ -276,7 +276,7 @@ use silicon_accounts_client::{AccountsClient, IssueObo, ProofRef};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://account.teamofsilicons.com".into());
+    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://accounts.teamofsilicons.com".into());
     let client = AccountsClient::new(url)?;
     let dm = client.as_app("dm", std::env::var("DM_APP_SECRET")?);
 

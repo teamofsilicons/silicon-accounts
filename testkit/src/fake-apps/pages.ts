@@ -1,6 +1,8 @@
 // HTML for the fake app server. Plain server-rendered pages with stable ids so
-// Playwright tests can drive them: #signin-hosted, #signin-iframe, #silicon-accounts
-// (SDK mount), #signed-in-as, #account (AccountForApp JSON), #token, #id-token, #error.
+// Playwright tests can drive them: #signin-hosted, #signup-hosted (intent=signup),
+// #continue-{google|apple|email|phone} (direct method buttons), #signin-iframe,
+// #silicon-accounts (SDK mount), #signed-in-as, #account (AccountForApp JSON), #token,
+// #id-token, #error.
 
 import { escapeHtml } from '../shared/util.ts';
 import { jsonPre, page } from '../shared/page.ts';
@@ -51,11 +53,26 @@ ${cards}
   });
 }
 
+/** The app's own button labels (UNDERSTANDING.md "Adding sign-in to an app"). */
+const METHOD_LABELS: Record<string, string> = {
+  google: 'Continue with Google',
+  apple: 'Continue with Apple',
+  email: 'Continue with email',
+  phone: 'Continue with phone number',
+};
+
 export interface AppPageOptions {
   app: SiliconAppsApp;
   accountsPublicUrl: string;
   signedIn: SignedInView | null;
-  hosted: { url: string; state: string } | null;
+  hosted: {
+    url: string;
+    state: string;
+    /** The app's own "Create an account" button (intent=signup). */
+    signup?: { url: string; state: string };
+    /** Direct "Continue with …" buttons (method=…), in the app's method order. */
+    direct?: Array<{ method: string; url: string; state: string }>;
+  } | null;
   iframe: { url: string; state: string } | null;
   sdk: { attributes: Record<string, string>; state: string } | null;
   redirectUri: string;
@@ -79,7 +96,18 @@ export function appPage(options: AppPageOptions): string {
     ? `<section class="card" id="integration-hosted">
 <h2>1. Hosted sign-in page${badge('hosted')}</h2>
 <p class="muted">The app sends the browser to Silicon Accounts and gets it back on <code>${escapeHtml(options.redirectUri)}</code> with a code it exchanges server-side (state + PKCE).</p>
+<div class="row">
 <a id="signin-hosted" class="button" href="${escapeHtml(options.hosted.url)}" data-state="${escapeHtml(options.hosted.state)}">Sign in with Silicon Accounts</a>
+${options.hosted.signup ? `<a id="signup-hosted" class="button secondary" href="${escapeHtml(options.hosted.signup.url)}" data-state="${escapeHtml(options.hosted.signup.state)}">Create an account</a>` : ''}
+</div>
+${
+  options.hosted.direct?.length
+    ? `<p class="muted">Or the app's own direct buttons (the hosted page opens on that method; Google and Apple show the opening page first):</p>
+<div class="row" id="direct-buttons">${options.hosted.direct
+        .map((d) => `<a id="continue-${escapeHtml(d.method)}" class="button secondary" href="${escapeHtml(d.url)}" data-state="${escapeHtml(d.state)}" data-method="${escapeHtml(d.method)}">${escapeHtml(METHOD_LABELS[d.method] ?? d.method)}</a>`)
+        .join('\n')}</div>`
+    : ''
+}
 </section>`
     : '';
 

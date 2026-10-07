@@ -28,7 +28,7 @@ use silicon_accounts_client::AccountsClient;
 
 #[tokio::main]
 async fn main() -> silicon_accounts_client::Result<()> {
-    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://account.teamofsilicons.com".into());
+    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://accounts.teamofsilicons.com".into());
     let client = AccountsClient::new(url)?;
     let stk = std::env::var("STK").expect("set STK");
 
@@ -96,7 +96,7 @@ Exchanging a short-lived token needs app briefcase's own credentials (app_id + a
 
 | Method | Default | |
 |---|---|---|
-| `.base_url(url)` | `https://account.teamofsilicons.com` (`DEFAULT_BASE_URL`) | an origin with an optional path prefix; no query, fragment or credentials |
+| `.base_url(url)` | `https://accounts.teamofsilicons.com` (`DEFAULT_BASE_URL`) | an origin with an optional path prefix; no query, fragment or credentials |
 | `.timeout(d)` | 30 s | whole request |
 | `.connect_timeout(d)` | 10 s | |
 | `.user_agent("my-app/1.2")` | — | prepended to `silicon-accounts-client/<version>` |
@@ -141,6 +141,8 @@ let client = AccountsClient::builder()
 | `cli_login_verify(challenge_id, code, client_label)` | `POST /v1/cli/login/verify` | `TokenResponse` |
 | `refresh_first_party(refresh_token)` | `POST /v1/oauth/token` (`client_id=accounts`) | `TokenResponse` with a new refresh token |
 | `revoke_first_party(token)` | `POST /v1/oauth/revoke` (`client_id=accounts`) | `()` |
+| `exchange_developer_code(code, redirect_uri, code_verifier)` | `POST /v1/oauth/token` (`client_id=developer`, PKCE S256, no secret) | `TokenResponse` with `aud = developer` tokens (the developer platform's server side) |
+| `refresh_public_client(client_id, refresh_token)`, `revoke_public_client(client_id, token)` | `POST /v1/oauth/token` / `revoke` for `accounts` or `developer` | `TokenResponse` / `()` |
 | `report(message, pr_url, access_token, idempotency_key)` | `POST /v1/reports` | `ReportReceipt` |
 | `send_telemetry(&[TelemetryEvent])` | `POST /v1/telemetry/events` (3-second timeout) | `()`; nothing when telemetry is off |
 | `with_token(access_token)` | — | `AccountSession` |
@@ -332,8 +334,10 @@ let url = client.authorize_url(
 let tokens = app.exchange_code(&code, "https://briefcase.example/auth/callback", Some(&pkce.verifier)).await?;
 ```
 
-`url` is `https://account.teamofsilicons.com/authorize?response_type=code&app_id=briefcase&redirect_uri=…&state=…&code_challenge=…&code_challenge_method=S256&scope=openid+email`.
-`AuthorizeParams` also takes `.nonce()`, `.prompt()`, `.login_hint()` and `.method()`.
+`url` is `https://accounts.teamofsilicons.com/authorize?response_type=code&app_id=briefcase&redirect_uri=…&state=…&code_challenge=…&code_challenge_method=S256&scope=openid+email`.
+`AuthorizeParams` also takes `.nonce()`, `.prompt()`, `.intent()` (`signin` or `signup`: your
+"Sign in" and "Sign up" buttons) and `.method()` (a direct "Continue with …" button). There is
+no `login_hint`: an app never hands Silicon Accounts a Carbon's email or phone.
 
 ### A Carbon signs in on a device
 
@@ -346,7 +350,7 @@ println!("signed in as {} ({})", me.id, me.uuid);
 ```
 
 ```text
-Open https://account.teamofsilicons.com/device and enter PJG8-55WW
+Open https://accounts.teamofsilicons.com/device and enter PJG8-55WW
 signed in as c:ada (8HV)
 ```
 
@@ -453,7 +457,7 @@ match app_b.verify_proof(&proof_token).await? {
     _ => { /* not valid: refuse */ }
 }
 
-let ata = commit.issue_ata(&IssueAta { audiences: vec!["remind".into()], scopes: vec!["builds.read".into()], access_ttl_seconds: Some(600) }, Some("ata-1")).await?;
+let ata = commit.issue_ata(&IssueAta { receiving_app: "remind".into(), scopes: vec!["builds.read".into()], access_ttl_seconds: Some(600) }, Some("ata-1")).await?;
 commit.revoke_proof(&ProofRef::Id(ata.proof_id.clone())).await?;
 ```
 
@@ -516,7 +520,8 @@ Local verification can't see revocation (a sign-out, removed access); access tok
 
 ## Constants
 
-`DEFAULT_BASE_URL` (`https://account.teamofsilicons.com`), `FIRST_PARTY_APP_ID` (`accounts`),
+`DEFAULT_BASE_URL` (`https://accounts.teamofsilicons.com`), `FIRST_PARTY_APP_ID` (`accounts`),
+`DEVELOPER_APP_ID` (`developer`),
 `VERSION`, `SLT_GRANT_TYPE` (`urn:silicon:params:oauth:grant-type:slt`),
 `DEVICE_CODE_GRANT_TYPE` (`urn:ietf:params:oauth:grant-type:device_code`), `TELEMETRY_HEADER`,
 `IDEMPOTENCY_HEADER`, `IDEMPOTENT_REPLAYED_HEADER`, `REQUEST_ID_HEADER`.

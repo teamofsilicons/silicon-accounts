@@ -37,7 +37,7 @@ pub(crate) fn inactive_account(account: &Account) -> OAuthError {
             account.uuid
         ),
         AccountStatus::PendingCustodian => format!(
-            "The Silicon {id} can't sign in yet: its custodian hasn't accepted it. Tokens are issued once the custodian accepts the request on account.teamofsilicons.com."
+            "The Silicon {id} can't sign in yet: its custodian hasn't accepted it. Tokens are issued once the custodian accepts the request on accounts.teamofsilicons.com."
         ),
         AccountStatus::Unclaimed => format!(
             "The Carbon {id} was imported by an app and hasn't finished setting up the account; it must sign in once through the hosted pages (/authorize) before tokens can be issued."

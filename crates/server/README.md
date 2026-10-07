@@ -4,7 +4,7 @@ The Silicon Accounts service: composes every feature crate into one HTTP router,
 middleware stack, and ships the three binaries.
 
 **Topology.** The account site (Next.js, `web/`) serves the public origin
-(`ACCOUNTS_PUBLIC_URL`, `https://account.teamofsilicons.com`; `http://localhost:8590` locally):
+(`ACCOUNTS_PUBLIC_URL`, `https://accounts.teamofsilicons.com`; `http://localhost:8590` locally):
 its pages, the embed page and `sdk/v1.js`, and it proxies `/v1/*` and `/.well-known/*` to
 `accounts-api` (its `rewrites`, target `ACCOUNTS_API_URL`; `127.0.0.1:8589` locally). Browsers,
 apps and the CLI only ever use the public origin, so cookies, the CSRF `Origin` guard, provider
@@ -14,6 +14,17 @@ absolute `Location` headers pass through the proxy unchanged. Behind it, run `ac
 entry. Next.js forwards that header as it arrives and adds none, so in production the load
 balancer in front of the site must append the client address (an ALB does); without one every
 request counts as the site's own address. Server-to-server callers may call either origin.
+
+The developer platform (Next.js, `developer/`; `ACCOUNTS_DEVELOPER_URL`,
+`https://developer.teamofsilicons.com`; `http://localhost:8600` locally) is a separate site in
+front of the same API: its Next server signs Carbons in through the account site's hosted
+pages as the first-party public client `developer` (PKCE S256, no secret; it may only return to
+`{ACCOUNTS_DEVELOPER_URL}/auth/callback`) and calls `accounts-api` server to server with their
+tokens. Those tokens (`aud = developer`) only read the signed-in Carbon (`GET /v1/me`,
+`GET /v1/session`) and manage the apps they own (`GET /v1/me/owned-apps`, `/v1/apps/{app_id}/…`);
+every other route answers 401 `token_wrong_audience`. At start-up `accounts-api` writes this
+deployment's callback into the `developer` app's stored sign-in setup
+(`first_party::sync_developer_app`; the rule itself is applied in code).
 
 | binary | what it does |
 |---|---|
@@ -25,7 +36,8 @@ request counts as the site's own address. Server-to-server callers may call eith
 
 One command brings up the whole stack (Postgres, migrations, the fake apps, the testkit's mock
 Google/Apple and Postmark/Twilio, the fake app server, accounts-api wired to them on
-`127.0.0.1:8589`, and the Next.js site on `http://localhost:8590` in front of it):
+`127.0.0.1:8589`, the Next.js site on `http://localhost:8590` in front of it, and the developer
+platform from `developer/` on `http://localhost:8600` when it has its Next.js app):
 
 ```bash
 scripts/dev.sh               # foreground, Ctrl-C stops everything; --detach + scripts/stop.sh otherwise
@@ -37,8 +49,10 @@ scripts/journeys.sh --proxy  # the same through scripts/dev-proxy.mjs (the site'
 scripts/journeys.sh --next   # the same through the real Next.js site
 ```
 
-`scripts/dev.sh --help` lists every flag (`--web=auto|next|proxy|external|none`, `--prod`,
-`--no-build`, `--release`, `--reseed`, `--reset-db`) and the port/database overrides. Without a
+`scripts/dev.sh --help` lists every flag (`--web=auto|next|proxy|external|none`,
+`--developer=auto|on|off`, `--prod`, `--no-build`, `--release`, `--reseed`, `--reset-db`) and the
+port/database overrides (the developer platform runs on `DEVELOPER_PORT`: 8600 next to the
+default site, else the site's port + 5). Without a
 Next.js app in `web/` (no `"next"` dependency in `web/package.json`) it warns and serves the API
 only. By hand:
 
@@ -66,7 +80,7 @@ stop takes at most 30 s.
 |---|---|
 | `GET /healthz` | `200 ok` (liveness; no dependencies checked) |
 | `GET /readyz` | `200 {"database":"ok"}`, or `503` with an error object |
-| `GET /v1/meta` | name, version, environment, public URL, Silicon Apps URL, docs URL (`docs_url`, ACCOUNTS_DOCS_URL, default `https://account.teamofsilicons.com/docs`), managed providers, delivery mode |
+| `GET /v1/meta` | name, version, environment, public URL, Silicon Apps URL, docs URL (`docs_url`, ACCOUNTS_DOCS_URL, default `https://accounts.teamofsilicons.com/docs`), developer platform (`developer_url`, ACCOUNTS_DEVELOPER_URL, default `https://developer.teamofsilicons.com`, `http://localhost:8600` outside production), managed providers, delivery mode |
 | `POST /v1/reports` | bug report (optional session; 5/hour per IP; message 1..10000 chars; `pr_url` https; `Idempotency-Key`) mailed to every `ACCOUNTS_REPORT_RECIPIENTS` address → `201 {"report_id","status":"queued","recipients":3}` |
 | `POST /v1/telemetry/events` | ≤ 50 events named `^[a-z0-9_.]{1,64}$` (the CLI sends `cli.command` / `cli.step`), forwarded to Space Station unless the caller opted out (`X-Accounts-Telemetry: off` or the cookie `sa_telemetry=off`) → `202 {"accepted","forwarded"}` |
 | `GET /v1/dev/outbox?to=&purpose=&limit=` | recorded messages with the parsed OTP `code`; only with `ACCOUNTS_EXPOSE_DEV_OUTBOX=true` outside production (production answers like an unknown route) |

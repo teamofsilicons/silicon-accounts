@@ -3,7 +3,9 @@
 
 use accounts_core::crypto::prefix;
 use accounts_core::http::cookies::{FLOW_COOKIE, read_cookie};
-use accounts_core::models::{Method, Provider, ProviderMode, Scope, scopes_from_strings};
+use accounts_core::models::{
+    ContactField, Method, Provider, ProviderMode, Scope, scopes_from_strings,
+};
 use accounts_core::{ApiError, ApiResult, AppState, Settings};
 use axum::http::HeaderMap;
 use serde::{Deserialize, Serialize};
@@ -23,10 +25,11 @@ pub enum Step {
     VerifyCode,
     /// First time with this email/phone/identity (or finishing an imported account).
     Signup,
-    /// The app needs a detail the account doesn't have yet.
-    Requirements,
-    /// What's shared with the app.
-    Consent,
+    /// A page of the app's flow: the details it asks for (what's shared with the app, adding a
+    /// missing email or phone, ticking optional details). See `flow::details`.
+    Details,
+    /// The last page of a flow with `review: true`: everything that will be shared.
+    Review,
     /// Done: `redirect_to` carries the code (or `error=access_denied`).
     Complete,
     /// Ended without a sign-in (`prompt=none` couldn't sign in silently).
@@ -40,8 +43,8 @@ impl Step {
             Step::ChooseMethod => "choose_method",
             Step::VerifyCode => "verify_code",
             Step::Signup => "signup",
-            Step::Requirements => "requirements",
-            Step::Consent => "consent",
+            Step::Details => "details",
+            Step::Review => "review",
             Step::Complete => "complete",
             Step::Failed => "failed",
         }
@@ -53,8 +56,11 @@ impl Step {
             "choose_method" => Step::ChooseMethod,
             "verify_code" => Step::VerifyCode,
             "signup" => Step::Signup,
-            "requirements" => Step::Requirements,
-            "consent" => Step::Consent,
+            "details" => Step::Details,
+            "review" => Step::Review,
+            // Flows stored before the details pages replaced these steps continue at the
+            // details pages (`GET /v1/flows/{id}` puts them on the right one).
+            "requirements" | "consent" => Step::Details,
             "complete" => Step::Complete,
             "failed" => Step::Failed,
             _ => return None,
@@ -129,6 +135,74 @@ impl Prompt {
             parts.push("select_account");
         }
         (!parts.is_empty()).then(|| parts.join(" "))
+    }
+}
+
+/// Which version of the hosted pages the app asked for (`intent=signin|signup` on
+/// `/authorize`). Only the pages change ("Sign in to Briefcase" or "Create your Briefcase
+/// account"); the account logic is the same: a first time is a sign-up either way.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Intent {
+    #[default]
+    Signin,
+    Signup,
+}
+
+impl Intent {
+    /// Parses `intent` (`signin` or `signup`).
+    pub fn parse(s: &str) -> Option<Intent> {
+        match s {
+            "signin" => Some(Intent::Signin),
+            "signup" => Some(Intent::Signup),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Intent::Signin => "signin",
+            Intent::Signup => "signup",
+        }
+    }
+}
+
+/// Where a Carbon is in the app's details pages (`step = details | review`). Each detail is on
+/// exactly one step, so the Carbon's answers are kept per detail.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DetailsProgress {
+    /// The id of the details step on screen (`step = details`).
+    pub current: Option<String>,
+    /// Ids of the steps the Carbon continued through in this flow.
+    pub done: Vec<String>,
+    /// Optional details the Carbon ticked on a step they continued through.
+    pub ticked: Vec<ContactField>,
+    /// Optional details the Carbon left unticked on a step they continued through.
+    pub unticked: Vec<ContactField>,
+}
+
+impl DetailsProgress {
+    /// The Carbon's answer for an optional detail, when they gave one in this flow.
+    pub fn choice(&self, field: ContactField) -> Option<bool> {
+        if self.ticked.contains(&field) {
+            Some(true)
+        } else if self.unticked.contains(&field) {
+            Some(false)
+        } else {
+            None
+        }
+    }
+
+    /// Records the Carbon's answer for an optional detail.
+    pub fn set_choice(&mut self, field: ContactField, shared: bool) {
+        self.ticked.retain(|f| *f != field);
+        self.unticked.retain(|f| *f != field);
+        if shared {
+            self.ticked.push(field);
+        } else {
+            self.unticked.push(field);
+        }
     }
 }
 
@@ -260,6 +334,10 @@ pub struct FlowExtras {
     pub browser_session_id: Option<Uuid>,
     /// Set when this flow connects a provider to a signed-in Carbon (see [`LinkIntent`]).
     pub link: Option<LinkIntent>,
+    /// `intent` as given to /authorize (default `signin`).
+    pub intent: Intent,
+    /// The details pages (`step = details | review`).
+    pub details: DetailsProgress,
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -274,7 +352,6 @@ struct FlowRow {
     nonce: Option<String>,
     requested_scopes: Vec<String>,
     prompt: Option<String>,
-    login_hint: Option<String>,
     method_hint: Option<String>,
     step: String,
     account_uuid: Option<String>,
@@ -302,13 +379,14 @@ pub struct Flow {
     /// Scopes from the `scope` parameter (always includes `profile`).
     pub requested_scopes: Vec<Scope>,
     pub prompt: Prompt,
-    pub login_hint: Option<String>,
+    /// `method` as given to /authorize: the app's own "Continue with Google" (or email, phone,
+    /// Apple) button, so the hosted page goes straight to that method.
     pub method_hint: Option<Method>,
     pub step: Step,
     pub account_uuid: Option<String>,
     pub signup_session_id: Option<Uuid>,
-    /// The live code challenge: the sign-in code at `verify_code`, the requirement code at
-    /// `requirements`.
+    /// The live code challenge: the sign-in code at `verify_code`, the code adding a missing
+    /// email or phone at `details`.
     pub challenge_id: Option<Uuid>,
     pub extras: FlowExtras,
     /// The final redirect (keyring-encrypted; it carries the authorization code).
@@ -347,7 +425,6 @@ impl FlowRow {
             requested_scopes: scopes_from_strings(&self.requested_scopes),
             // Stored values were validated at creation.
             prompt: Prompt::parse(self.prompt.as_deref()).unwrap_or_default(),
-            login_hint: self.login_hint,
             method_hint: self.method_hint.as_deref().and_then(Method::parse),
             step,
             account_uuid: self.account_uuid,
@@ -367,7 +444,7 @@ macro_rules! flow_select {
     ($suffix:literal) => {
         concat!(
             "select id, binding_hash, app_id, redirect_uri, state, code_challenge, code_challenge_method, nonce, \
-             requested_scopes, prompt, login_hint, method_hint, step, account_uuid, signup_session_id, challenge_id, \
+             requested_scopes, prompt, method_hint, step, account_uuid, signup_session_id, challenge_id, \
              provider_state, result_redirect, created_at, expires_at, completed_at, (expires_at <= now()) as expired \
              from signin_flows where id = $1",
             $suffix
@@ -422,16 +499,16 @@ pub struct NewFlow<'a> {
     pub nonce: Option<&'a str>,
     pub requested_scopes: &'a [Scope],
     pub prompt: Prompt,
-    pub login_hint: Option<&'a str>,
     pub method_hint: Option<Method>,
 }
 
-/// Creates a flow at `choose_method` (expires in 60 minutes).
+/// Creates a flow at `choose_method` (expires in 60 minutes). An app's `login_hint` is never
+/// stored: apps can't hand Silicon Accounts a Carbon's email or phone (UNDERSTANDING.md).
 pub async fn insert(conn: &mut PgConnection, new: &NewFlow<'_>) -> ApiResult<Flow> {
     sqlx::query(
         "insert into signin_flows (id, binding_hash, app_id, redirect_uri, state, code_challenge, code_challenge_method, \
-           nonce, requested_scopes, prompt, login_hint, method_hint, step, expires_at) \
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'choose_method', now() + make_interval(mins => $13))",
+           nonce, requested_scopes, prompt, method_hint, step, expires_at) \
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'choose_method', now() + make_interval(mins => $12))",
     )
     .bind(new.id)
     .bind(new.binding_hash)
@@ -443,7 +520,6 @@ pub async fn insert(conn: &mut PgConnection, new: &NewFlow<'_>) -> ApiResult<Flo
     .bind(new.nonce)
     .bind(accounts_core::models::scope_strings(new.requested_scopes))
     .bind(new.prompt.to_stored())
-    .bind(new.login_hint)
     .bind(new.method_hint.map(|m| m.as_str()))
     .bind(FLOW_TTL_MINUTES as i32)
     .execute(&mut *conn)
@@ -485,6 +561,7 @@ impl Flow {
         self.extras.auth_method = None;
         self.extras.new_account = false;
         self.extras.browser_session_id = None;
+        self.extras.details = DetailsProgress::default();
     }
 
     /// True when the `scope` parameter asked for OpenID Connect.
@@ -624,14 +701,17 @@ mod tests {
             Step::ChooseMethod,
             Step::VerifyCode,
             Step::Signup,
-            Step::Requirements,
-            Step::Consent,
+            Step::Details,
+            Step::Review,
             Step::Complete,
             Step::Failed,
         ] {
             assert_eq!(Step::parse(s.as_str()), Some(s));
         }
-        assert!(Step::Complete.is_terminal() && !Step::Consent.is_terminal());
+        assert!(Step::Complete.is_terminal() && !Step::Review.is_terminal());
+        // Flows stored by the previous version continue at the details pages.
+        assert_eq!(Step::parse("consent"), Some(Step::Details));
+        assert_eq!(Step::parse("requirements"), Some(Step::Details));
     }
 
     #[test]
@@ -660,5 +740,27 @@ mod tests {
         let partial: FlowExtras =
             serde_json::from_value(serde_json::json!({"switched": true})).expect("partial");
         assert!(partial.switched && partial.provider.is_none());
+        assert_eq!(partial.intent, Intent::Signin);
+        assert_eq!(partial.details, DetailsProgress::default());
+    }
+
+    #[test]
+    fn details_choices_and_intents() {
+        let mut d = DetailsProgress::default();
+        assert_eq!(d.choice(ContactField::Timezone), None);
+        d.set_choice(ContactField::Timezone, true);
+        d.set_choice(ContactField::Email, false);
+        assert_eq!(d.choice(ContactField::Timezone), Some(true));
+        d.set_choice(ContactField::Timezone, false);
+        assert_eq!(d.choice(ContactField::Timezone), Some(false));
+        assert_eq!(d.ticked, Vec::<ContactField>::new());
+        let v = serde_json::to_value(&d).expect("json");
+        assert_eq!(v["unticked"], serde_json::json!(["email", "timezone"]));
+        assert_eq!(Intent::parse("signup"), Some(Intent::Signup));
+        assert_eq!(Intent::parse("register"), None);
+        assert_eq!(
+            serde_json::to_value(Intent::Signin).expect("json"),
+            serde_json::json!("signin")
+        );
     }
 }

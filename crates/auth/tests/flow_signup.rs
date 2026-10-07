@@ -94,7 +94,7 @@ async fn new_carbons_sign_up_with_everything_prefilled() {
         .await;
     assert_eq!(r.status, 200, "{}", r.json);
     let f = &r.json["flow"];
-    assert_eq!(f["step"], "consent");
+    assert_eq!(f["step"], "details");
     assert!(b.cookie("sa_session").is_some(), "the browser is signed in");
     assert!(
         b.cookie("sa_signup").is_none(),
@@ -121,13 +121,7 @@ async fn new_carbons_sign_up_with_everything_prefilled() {
     assert!(emails[0].is_primary && emails[0].verified_at.is_some());
     drop(conn);
 
-    let r = b
-        .post(
-            &ctx,
-            &format!("/v1/flows/{id}/consent"),
-            json!({"approve": true}),
-        )
-        .await;
+    let r = continue_page(&ctx, &mut b, &id, &[]).await;
     assert_eq!(r.json["flow"]["step"], "complete");
     let outcome: String =
         sqlx::query_scalar("select outcome from signin_history where account_uuid = $1")
@@ -377,8 +371,8 @@ async fn imported_accounts_finish_setup_with_their_imported_data() {
         .await;
     assert_eq!(r.status, 200, "{}", r.json);
     assert_eq!(
-        r.json["flow"]["step"], "consent",
-        "the import was not a consent"
+        r.json["flow"]["step"], "details",
+        "the import was not a consent: the what's-shared page is shown"
     );
     let mut conn = ctx.conn().await;
     let account = accounts_core::repo::accounts::require(&mut conn, &imported.uuid)
@@ -421,13 +415,7 @@ async fn imported_accounts_finish_setup_with_their_imported_data() {
     );
     assert!(types.contains(&"account.updated".to_string()), "{types:?}");
 
-    let r = b
-        .post(
-            &ctx,
-            &format!("/v1/flows/{id}/consent"),
-            json!({"approve": true}),
-        )
-        .await;
+    let r = continue_page(&ctx, &mut b, &id, &[]).await;
     assert_eq!(r.json["flow"]["step"], "complete");
     let mut conn = ctx.conn().await;
     let membership = accounts_core::repo::memberships::get(&mut conn, &app.app_id, &imported.uuid)

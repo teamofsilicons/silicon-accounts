@@ -257,7 +257,7 @@ async fn the_app_page_revokes_for_the_app_or_its_owner() {
         .ata_as(
             &w.other,
             &w.other_secret,
-            json!({"audiences": [w.briefcase.app_id]}),
+            json!({"receiving_app": w.briefcase.app_id}),
         )
         .await;
     let r = w
@@ -311,7 +311,7 @@ async fn an_account_revokes_proofs_issued_on_its_behalf() {
         .ata_as(
             &w.dm,
             &w.dm_secret,
-            json!({"audiences": [w.briefcase.app_id]}),
+            json!({"receiving_app": w.briefcase.app_id}),
         )
         .await;
     assert_eq!(ata.status, 201);

@@ -7,7 +7,7 @@
  * always has exactly one.
  */
 import { useState } from "react";
-import { ArrowRight, Monitor, Smartphone, SquareTerminal, Trash2 } from "lucide-react";
+import { ArrowRight, Code, Monitor, Smartphone, SquareTerminal, Trash2 } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { Badge } from "@/components/arc/badge/badge";
@@ -52,6 +52,7 @@ function leaveDeletedAccount(): void {
 
 /** A readable name for a session: its label, or how it was made. */
 function sessionName(session: SessionInfo): string {
+  if (session.kind === "developer") return "Silicon Developer";
   if (session.label) return session.label;
   if (session.kind === "cli") return session.origin === "silicon_login" ? "A Silicon sign-in" : "The accounts CLI";
   return "A browser";
@@ -61,7 +62,7 @@ function SessionIcon({ session }: { session: SessionInfo }) {
   const phone = /iphone|android|mobile/i.test(`${session.label ?? ""} ${session.user_agent ?? ""}`);
   return (
     <span className={styles.sessionIcon} aria-hidden="true">
-      {session.kind === "cli" ? <SquareTerminal size={20} strokeWidth={1.75} /> : phone ? <Smartphone size={20} strokeWidth={1.75} /> : <Monitor size={20} strokeWidth={1.75} />}
+      {session.kind === "cli" ? <SquareTerminal size={20} strokeWidth={1.75} /> : session.kind === "developer" ? <Code size={20} strokeWidth={1.75} /> : phone ? <Smartphone size={20} strokeWidth={1.75} /> : <Monitor size={20} strokeWidth={1.75} />}
     </span>
   );
 }
@@ -127,7 +128,7 @@ export function Settings() {
         </SettingsGroup>
       </Section>
 
-      <Section title="Where you are signed in" description="Browsers and terminals signed in to Silicon Accounts. Signing one out ends that session at once; apps you signed into keep their own sessions.">
+      <Section title="Where you are signed in" description="Browsers, terminals and the developer platform signed in to Silicon Accounts. Signing one out ends that session at once; apps you signed into keep their own sessions.">
         {sessions.error && !sessions.data ? (
           <Alert tone="danger" title="Your sessions did not load">
             {describeError(sessions.error)}
@@ -168,7 +169,7 @@ export function Settings() {
 
 function SessionRow({ session, now, signingOut, onSignOutHere, onRevoke }: { session: SessionInfo; now: number; signingOut: boolean; onSignOutHere: () => void; onRevoke: () => Promise<unknown> }) {
   const [error, setError] = useState<string | null>(null);
-  const how = session.kind === "cli" ? SESSION_ORIGINS[session.origin] : null;
+  const how = session.kind === "cli" ? SESSION_ORIGINS[session.origin] : session.kind === "developer" ? "developer.teamofsilicons.com" : null;
   const facts = [
     session.current ? "Active now" : session.last_seen_at ? `Active ${formatRelative(session.last_seen_at, now)}` : null,
     `signed in ${formatDate(session.created_at)}`,

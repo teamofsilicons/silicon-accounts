@@ -7,8 +7,10 @@ stay with the apps (`understanding/UNDERSTANDING.md`, "Proofs (OBO and ATA)").
 - **OBO** (on behalf of): app A already has an account's consent and holds the account's access
   token. It trades that token (`subject_token`) for a proof that app B verifies. The proof stands
   on the account's sign-in at app A and ends with it.
-- **ATA** (app to app): app A gets one proof for the apps it names (its audiences); each of them
-  can verify that the token really comes from app A.
+- **ATA** (app to app): app A gets a proof for exactly one other app (`receiving_app`), which
+  verifies that the token really comes from app A. To talk to several apps, app A gets one proof
+  per app; a body naming `audiences` (the pre-v2 shape, any length) is refused with 422
+  `ata_single_app` ("An ATA proof is for exactly one app; ask for one proof per app.").
 
 Proofs follow the sign-in token logic: a proof token (`sap_…`) the receiving app verifies, and a
 proof refresh token (`sapr_…`) the issuing app keeps and rotates. Only `HMAC(pepper, token)` is
@@ -19,7 +21,7 @@ stored.
 | proof token lifetime | 60..=1800 s, default 1800 (`access_ttl_seconds`) |
 | proof lifetime (refresh token) | 900 days; an OBO proof never outlives the sign-in it stands on |
 | scopes | ≤ 20 distinct app-defined strings, each 1..=100 chars of `A-Z a-z 0-9 _ . : / -` |
-| ATA audiences | 1..=20 app ids |
+| receiving apps | exactly 1 per proof (OBO and ATA); stored as a one-app `audiences` array |
 
 ## Endpoints
 
@@ -31,12 +33,14 @@ stored.
 | `POST /v1/proofs/verify` | the verifying app | 200 valid / exactly `{"valid":false,"expires_at":null}` |
 | `POST /v1/proofs/revoke` | the issuing app | 204 (`{"proof_id"}` or `{"proof_token"}` or `{"proof_refresh_token"}`) |
 | `GET /v1/apps/{app_id}/proofs` | app or owner | 200 page (`?kind=obo\|ata&status=active\|revoked\|expired&limit&cursor`) |
-| `POST /v1/apps/{app_id}/proofs/ata` | app or owner (IDEMPOTENT) | 201 issued proof (the ATA page stand-in) |
+| `POST /v1/apps/{app_id}/proofs/ata` | app or owner (IDEMPOTENT; the owner's session, CLI token or developer platform token) | 201 issued proof (the app's ATA page on developer.teamofsilicons.com) |
 | `DELETE /v1/apps/{app_id}/proofs/{proof_id}` | app or owner | 204 |
 | `GET /v1/me/proofs` | session (Carbon or Silicon) | 200 page of OBO proofs about me (`?status&limit&cursor`) |
 | `DELETE /v1/me/proofs/{proof_id}` | session | 204 |
 
-Issued proof (OBO; ATA has `receiving_apps: [...]` instead of `receiving_app` and `user: null`):
+ATA request body: `{"receiving_app": "remind", "scopes"?, "access_ttl_seconds"?}`.
+
+Issued proof (OBO; ATA has the same shape with `"kind":"ata"` and `user: null`):
 
 ```json
 {"proof_id":"0192…","kind":"obo","proof_token":"sap_…","expires_at":"2026-10-06T12:30:00.000Z",
@@ -62,14 +66,15 @@ account's current id):
 ```
 
 A proof verifies only when: the token is a known, unexpired proof token; the proof is not
-revoked and within its lifetime; the verifying app is one of its audiences; the issuing app is
+revoked and within its lifetime; the verifying app is its receiving app; the issuing app is
 active; and, for OBO, the account is active, its membership with the issuing app is active and
 the sign-in behind the subject token is neither revoked nor expired. Everything else gets exactly
 `{"valid":false,"expires_at":null}`. A syntactically wrong input (a refresh token, a JWT, an
 empty string) gets the same body plus an `x-accounts-hint` header describing the input only.
 
-Listing items add `status` (`active` | `revoked` | `expired`), `revoke_reason`, `revoked_at`,
-`token_expires_at` (newest proof token) and, for apps, `access_ttl_seconds`. `status` is honest
+Listing items name the proof's one `receiving_app` (a proof issued before single-app ATA proofs
+shows its first) and add `status` (`active` | `revoked` | `expired`), `revoke_reason`,
+`revoked_at`, `token_expires_at` (newest proof token) and, for apps, `access_ttl_seconds`. `status` is honest
 about OBO grants, live:
 
 - the sign-in behind the proof was revoked (signed out, STK rotated, sign-in refresh token
@@ -103,7 +108,8 @@ about OBO grants, live:
 | 410 | `proof_expired` | refresh past the proof's lifetime or its sign-in's expiry |
 | 400 | `invalid_proof_id` | not a UUID. Only short id-shaped values are repeated in the message; a token (alone or wrapped, `Bearer sap_…`, `Proof sap_…`), a JWT or an STK is described, never echoed |
 | 404 | `proof_not_found` | no such proof for this app / account (another app's proof id looks unknown; an ATA proof id at `/v1/me/proofs`); revoke by a token the sweep already deleted (the message says so; revoke by `proof_id` instead) |
-| 422 | `validation_failed` | body rules (`details.fields`: `scopes[3]`, `access_ttl_seconds`, `audiences[1]`, …) |
+| 422 | `validation_failed` | body rules (`details.fields`: `scopes[3]`, `access_ttl_seconds`, `receiving_app`, …) |
+| 422 | `ata_single_app` | an ATA body named `audiences`: one proof per app (`details.apps` lists the valid app ids it named; the hint names the endpoint called) |
 | 409 | `idempotency_key_reused` | same `Idempotency-Key`, different body |
 
 ## History

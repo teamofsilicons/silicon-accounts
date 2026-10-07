@@ -1,6 +1,6 @@
 /**
- * The account shell around the account and developer areas (foundation-owned). One instance stays mounted while you
- * move between /apps, /silicons, /developer…, so the dock's highlight glides instead of reappearing.
+ * The account shell around the account pages (foundation-owned). One instance stays mounted while you
+ * move between /apps, /silicons, /proofs…, so the dock's highlight glides instead of reappearing.
  */
 import type { ReactNode } from "react";
 import { AccountShell } from "@/components/foundation/shell/account-shell";

@@ -22,7 +22,7 @@ Silicon Accounts runs everything in between: the sign-in methods (email code, ph
 Google, Apple), sign-up, the pages Carbons see, and your app's user base.
 
 ```sh
-export ACCOUNTS_URL=https://account.teamofsilicons.com   # not deployed yet; a local stack: http://localhost:8590
+export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # not deployed yet; a local stack: http://localhost:8590
 export ACCOUNTS_APP_ID=briefcase                 # your app_id
 export ACCOUNTS_APP_SECRET=sa_app_briefcase_…    # your app secret: server side only
 
@@ -136,7 +136,7 @@ your server exchanges the code. They differ only in how the browser gets to `/au
 
 Why the buttons in the iframe and the snippet never sign anyone in inside your page: a click
 always takes the whole window to `/authorize`. The Carbon then sees
-`account.teamofsilicons.com` in the address bar, the Silicon Accounts session cookie works
+`accounts.teamofsilicons.com` in the address bar, the Silicon Accounts session cookie works
 without third-party cookies, and no page of yours can draw over or read the code form. The
 reasons are in [How the hosted sign-in works](../learn/sign-in-flow.md).
 

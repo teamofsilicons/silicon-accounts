@@ -13,20 +13,23 @@ let tasks = accounts_auth::spawn_background(state.clone());        // sweep of e
 
 | route | auth | does |
 |---|---|---|
-| `POST /v1/flows` | public, same Origin | validates the authorize request, creates the flow (60 min), sets `sa_flow`, `201 {"flow": FlowView}` |
+| `POST /v1/flows` | public, same Origin | validates the authorize request (`intent=signin\|signup`, `method=google\|apple\|email\|phone`; `login_hint` is ignored entirely), creates the flow (60 min), sets `sa_flow`, `201 {"flow": FlowView}` |
 | `GET /v1/flows/{id}` | flow | the flow; also **claims** a Google/Apple outcome (sets `sa_session` / `sa_signup`, see below) |
 | `POST /v1/flows/{id}/continue` | flow + session | continue as the browser's Carbon |
 | `POST /v1/flows/{id}/switch` | flow | forget the chosen account → `choose_method` (the browser's account is not offered again). At the `signup` step ("Not you?") that sign-up ends: its session expires (no later flow resumes it), its photo upload is dropped and `sa_signup` is cleared when it names that sign-up (a newer sign-up of the same browser keeps its cookie). A signed-in browser stays signed in |
 | `POST /v1/flows/{id}/email` · `/phone` | flow | send a 6-digit sign-in code (`{"email"}` · `{"phone","country"?}`) → `verify_code` |
-| `POST /v1/flows/{id}/resend` | flow | new code to the same destination (sign-in code, or the requirement code) |
+| `POST /v1/flows/{id}/resend` | flow | new code to the same destination (sign-in code, or the code adding a missing detail) |
 | `POST /v1/flows/{id}/verify` | flow | `{"code"}` → signs in / sign-up / finishing an import |
 | `POST /v1/flows/{id}/oauth/{google\|apple}` | flow | `{"authorize_url"}` |
 | `GET\|POST /v1/oauth/callback/{google\|apple}` | the starting browser | provider answer → 302 `{PUBLIC_URL}/authorize/flow/{id}`; a cookieless form_post → 303 `GET …?ticket=` (see below); a connection (next row) → 302 back to its `return_to` |
 | `POST /v1/me/identities/{google\|apple}` | session (Carbon, browser cookie + Origin) | connect Google/Apple to the signed-in Carbon (the account site's "Connect Google"): optional `{"return_to":"/sign-in-methods"}` (a path or URL on the site; default `/sign-in-methods`) → 201 `{"authorize_url","flow_id","provider","expires_at"}` + `sa_flow`. The browser navigates to `authorize_url`; the callback connects the provider account to this Carbon and adds its verified email **without a code** (UNDERSTANDING.md), then redirects to `return_to?linked={provider}&email_added=true\|false`, or `return_to?link_error={code}&provider={provider}&flow={flow_id}` (`GET /v1/flows/{flow_id}` → step `complete` with `error{code,message,hint}`). Refusals change nothing: `identity_in_use` (connected to another account), `email_in_use`, `email_limit_reached`, `email_not_verified`, `provider_email_invalid`, `session_changed` (the browser is no longer signed in as that Carbon), `provider_cancelled` / `provider_error` / `provider_token_invalid`. Errors at the start: 400 `browser_session_required` (an access token, not the site's cookie), 403 `method_not_enabled` (no managed Google/Apple credentials), 404 `unknown_provider`, 422 `return_to`, 429 after 30 per hour |
 | `POST /v1/flows/{id}/signup/photo` | flow + `sa_signup` | the photo picked on the sign-up page, before the account exists: raw image, same rules as `POST /v1/me/photo` (≤ 2 MB, PNG/JPEG/WebP/GIF, 20 per sign-up per hour) → 201 `{"pfp_url","photo":{…}}`; replaces the sign-up's earlier upload and becomes `signup.pfp_url` |
 | `POST /v1/flows/{id}/signup` | flow + `sa_signup` | create the Carbon (or finish the imported one) |
-| `POST /v1/flows/{id}/requirements/email` · `/phone` · `/verify` | flow + session | add a missing required detail with an inline code |
-| `POST /v1/flows/{id}/consent` | flow + session | `{"approve","optional_scopes"}` → code (or `error=access_denied`) |
+| `POST /v1/flows/{id}/details/add` | flow + session | `{"email"}` or `{"phone","country"?}`: a 6-digit code to add a **missing** email/phone of the page on screen (required or optional; purpose `requirement`). Already on the account (another tab): nothing is sent, the page shows it. 409 `detail_not_on_page` / `email_in_use` / `phone_in_use`, 403 `email_domain_not_allowed`, 429 as every code send |
+| `POST /v1/flows/{id}/details/verify` | flow + session | `{"code"}` → the email/phone is added verified (primary when none is verified); the page stays and shows it (an optional one starts ticked). 409 `no_code_sent`, code errors as `/verify` |
+| `POST /v1/flows/{id}/details/continue` | flow + session | `{"share": ["timezone"]}` = the optional details of this page the Carbon ticked (required ones may be listed). Records the answers → next page, `review`, or complete (the code). 422 `share[i]` (not an optional detail of this page, or a missing email/phone), 409 `requirements_missing` (`details.missing`), 409 `flow_changed` (the app's flow changed: GET shows the new page) |
+| `POST /v1/flows/{id}/details/back` | flow + session | the previous page (from `review`: the last details page); answers kept. 409 `no_previous_page` |
+| `POST /v1/flows/{id}/review` | flow + session | `{"approve": true}` on the review page → code; `{"approve": false}` on any details page or the review page → `error=access_denied`. 409 `requirements_missing` (a required detail went missing: back on its page) |
 | `GET /v1/session`, `POST /v1/session/signout` | session | the browser session; sign-out clears `sa_session` + `sa_signup` (204). Without a live session: 401, and stale cookies are cleared only for the site's own pages (Origin passes the CSRF guard): a cross-site form POST carries no SameSite=Lax cookie, but its browser would apply a clearing Set-Cookie (logout CSRF) |
 | `GET /v1/device/{user_code}`, `POST …/approve`, `POST …/deny` | session (Carbon) | CLI device approval (204) |
 | `POST /v1/cli/login/start`, `POST /v1/cli/login/verify` | public | headless code sign-in → token response (aud = `accounts`) |
@@ -42,19 +45,31 @@ choose_method ──email/phone──▶ verify_code ──┐
       │  └──google/apple (callback + claim)──┼──▶ signup (new / finishing an import, 48 h sign-up session)
       └──continue as the browser's Carbon ───┤        │
                                              ▼        ▼
-                                  requirements ──▶ consent ──▶ complete (code, or error=access_denied)
-prompt=none that can't sign in silently ──────────────────────▶ failed (error redirect)
+                     details (one page per step of the app's flow) ──▶ review (flow.review) ──▶ complete
+                                                                       (code, or error=access_denied)
+prompt=none that can't sign in silently ─────────────────────────────────────────────▶ failed (error redirect)
 ```
 
-- **Consent** is skipped when the membership is active and already grants profile + required +
-  details asked for in `scope`, unless `prompt=consent`; never shown for app `accounts` (which also
-  creates no membership). Optional = the app's `optional_fields` plus `scope` details that aren't
-  required; `consent.optional[].granted` is the toggle's initial state (granted before, or asked for).
-- **Requirements**: only email/phone can be missing (a verified primary is needed); dob and timezone
-  always exist. A flow never stays stuck there: when nothing is missing any more (added in another
-  tab or on the account site, or the app stopped requiring it), `GET /v1/flows/{id}` and the
-  requirement send endpoints move it on (consent or complete), for the browser signed in as the
-  flow's account.
+- **The details pages** (`flow::details`) replace the old requirements and consent steps. The
+  app's `flow` (sign-in config) lists its steps; `flow: null` is one step with every requested
+  detail (the what's-shared page; with no requested details it shows the profile). Every page is
+  shown the first time the Carbon signs in to the app (no active membership) and with
+  `prompt=consent`; after that only a page with something new: a required detail not granted yet,
+  a required email/phone the account doesn't have (verified), or a `scope` detail not granted.
+  Nothing new: straight to complete. Never shown for the first-party apps `accounts` and
+  `developer` (no membership either).
+- **Required** details are always shared; only email/phone can be missing (a verified primary is
+  needed; dob and timezone always exist) and are added on the page with a code before continuing.
+  **Optional** details (the app's `optional_fields`, plus `scope` details the app doesn't request,
+  which join the last page) are checkboxes, unticked unless the Carbon ticks them; one shared before
+  starts ticked, one added on the page starts ticked. Answers are kept per detail, so `back` keeps
+  them. Grant = profile + required + ticked optional (+ openid); an optional detail on a page the
+  Carbon didn't see keeps its previous grant.
+- A page stays until the Carbon continues (also once its missing detail was added elsewhere: it
+  shows `missing: false`). When the app changes its flow mid-sign-in and the page is gone, actions on
+  it answer 409 `flow_changed` and `GET /v1/flows/{id}` (by the browser signed in as the flow's
+  account) moves the flow to its next page. Flows stored at the old `requirements`/`consent` steps
+  continue on the details pages.
 - **prompt**: `login` ignores the browser session; `consent` forces the screen; `select_account` shows
   the chooser (it is always shown when the browser is signed in — flows never auto-continue);
   `none` completes silently or ends `failed` with `login_required` / `consent_required` /
@@ -90,7 +105,7 @@ prompt=none that can't sign in silently ─────────────�
   data); in an app that takes no new accounts such a sign-up ends with `signup_not_allowed` and the
   flow goes back to the methods.
 - **Codes** (core's `repo::otp`): the 10-tries lockout counts per address, not per flow. Wrong
-  codes of every live code to the same email/phone (any flow, the CLI, requirements, the account
+  codes of every live code to the same email/phone (any flow, the CLI, the details pages, the account
   site's add codes) add up; the 10th in a row locks all of them for 60 s
   (`details.remaining_attempts` counts down for the address), and while one is locked no code to the
   address is checked (423). A right code ends the streak. Sends to one address are serialized, so
@@ -106,10 +121,16 @@ prompt=none that can't sign in silently ─────────────�
 
 ### FlowView
 
-As in 02-api.md, plus `prompt`, `login_hint` and `method_hint` (so the SPA can honour them), and
-`signup.provider_pfp_url` (the Google picture the page may offer). `state` and `nonce` are stored
-and echoed exactly as sent (never trimmed; control characters are refused).
-`consent.required` starts with `profile`; email/phone values are masked like code destinations.
+As in 02-api.md and the build spec 06-v2.md: plus `prompt`, `intent` (`signin`/`signup`: which
+version of the pages) and `method_hint` (the app's own "Continue with …" button: `email`/`phone`
+open that entry field, `google`/`apple` show the opening page first), and
+`signup.provider_pfp_url` (the Google picture the page may offer). `details` (step `details`):
+`{index, count, id, title, subtitle, continue_label, layout, fields: [{field, mode, label, value,
+missing, shared, previously_granted}], challenge}`; `review` (step `review`): `{fields: [{field,
+mode, label, value, shared}]}`, the profile first, then every detail that will be shared. There is
+no `requirements`, `consent` or `login_hint` any more. `state` and `nonce` are stored and echoed
+exactly as sent (never trimmed; control characters are refused). Email/phone values are masked
+like code destinations.
 `redirect_to` is set at `complete`/`failed` (the stored copy is keyring-encrypted: it holds a code).
 `error` carries the last failure (provider cancelled, `signup_expired`, …) until the next action.
 
@@ -124,7 +145,8 @@ otherwise let through) ·
 (`details.remaining_attempts`) · `verification_locked` 423 · `code_expired` 410 · `rate_limited` 429
 (`Retry-After`) · `email_domain_not_allowed` 403 · `signup_not_allowed` 403 · `signup_not_bound` 403 ·
 `signup_expired` 410 · `id_taken` 409 (`details.suggestions`) · `validation_failed` 422 ·
-`requirements_missing` 409 · `email_in_use` / `phone_in_use` 409 · `session_required` 401 ·
+`requirements_missing` 409 · `detail_not_on_page` 409 · `no_previous_page` 409 · `flow_changed` 409 ·
+`email_in_use` / `phone_in_use` 409 · `session_required` 401 ·
 `account_changed` 409 · `continue_not_allowed` / `reauthentication_required` 403 ·
 `provider_not_configured` 503 · `unknown_provider` 404. Callback pages: `invalid_state` 400,
 `flow_not_bound` 403 (an answer delivered by another browser); flow errors include
@@ -135,7 +157,8 @@ otherwise let through) ·
 
 - Start: state = `{flow_id}.{32 random bytes}` (only its HMAC is stored), nonce, PKCE S256 (Google;
   verifier keyring-encrypted), redirect_uri `{PUBLIC_URL}/v1/oauth/callback/{provider}`. Google:
-  `scope=openid email profile`, `prompt`/`hd` from the app config, `login_hint` passed through.
+  `scope=openid email profile`, `prompt`/`hd` from the app config; never a `login_hint` (apps can't
+  hand us a Carbon's email or phone, so none is forwarded).
   Apple: `response_mode=form_post`, `scope=name email`.
 - Credentials: `mode: managed` → `ACCOUNTS_GOOGLE_*` / `ACCOUNTS_APPLE_*`; `mode: byo` → the app's
   client id/Services ID from its config and the secret/.p8 key from `app_signin_configs` (keyring).
@@ -178,7 +201,7 @@ Owns `signin_flows` and `signup_sessions` (and sets `browser_sessions.authentica
 `signin_flows.provider_state` (`FlowExtras`: provider leg, pending outcome, error, browser timezone,
 auth method, …). The binding cookie value is reused for every flow of a browser, so parallel
 sign-ins stay bound. History: `signin_history` at completion (method email/phone/google/apple/
-session, outcome success/new_account), on a declined consent, on a code lockout and on a refused
+session, outcome success/new_account), on a cancelled sign-in (`review` with `approve: false`), on a code lockout and on a refused
 provider answer for a linked identity (outcome failed); `audit_log` (`account.created`,
 `account.claimed`, `identity.linked`, `contact.added`, `contact.unverified_removed`,
 `signin.locked`, `signin.refused`, `session.signed_out`, `session.created`, `device.approved|denied`).

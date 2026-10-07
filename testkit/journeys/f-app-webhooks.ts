@@ -14,13 +14,13 @@ const refusedBefore = { briefcase: await refused('briefcase'), browser: await re
 section('sign into briefcase (email + optional timezone granted) and browser (profile only)');
 const b = await startAppSignIn('briefcase', carbon.browser);
 let flow = await carbon.browser.continueAs(b.flow.id);
-check(flow.step === 'consent' && flow.consent?.required[0]?.scope === 'profile', 'consent lists profile first', flow.consent);
-flow = await carbon.browser.consent(flow.id, true, ['timezone']);
+check(flow.step === 'details' && (flow.details?.fields ?? []).some((f) => f.field === 'timezone' && f.mode === 'optional' && !f.shared), 'the details page shows the optional timezone unticked', flow.details);
+flow = await carbon.browser.detailsContinue(flow.id, ['timezone']);
 const bcb: any = await b.fake.callback('briefcase', flow.redirect_to!);
 check(!!bcb.account?.timezone && !!bcb.account?.email, 'briefcase sees email and timezone', bcb);
 const w = await startAppSignIn('browser', carbon.browser);
 flow = await carbon.browser.continueAs(w.flow.id);
-if (flow.step === 'consent') flow = await carbon.browser.consent(flow.id, true, []);
+if (flow.step === 'details') flow = await carbon.browser.detailsContinue(flow.id);
 const wcb: any = await w.fake.callback('browser', flow.redirect_to!);
 check(wcb.ok === true && wcb.account?.timezone === undefined && wcb.account?.email === undefined, 'browser sees neither', wcb);
 

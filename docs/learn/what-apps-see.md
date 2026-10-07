@@ -1,6 +1,6 @@
 ---
 title: What your app sees about an account
-description: The identifiers to store, which details each scope shares, how the what's-shared screen and required details decide the grant, what your user base holds, and which webhooks keep your copy in sync.
+description: The identifiers to store, which details each scope shares, how the details pages (required and optional details, flows) decide the grant, what your user base holds, and which webhooks keep your copy in sync.
 kind: informative
 order: 12
 related:
@@ -98,49 +98,56 @@ Carbon responsible for it.
 ## The what's-shared screen
 
 The first time an account signs in to your app, the hosted pages show what your app will
-receive before anything is shared:
+receive before anything is shared. These are your app's **details pages**: one page with every
+detail you ask for, or the pages of your own [flow](../start/sign-in-config.md#flows) (say,
+"How can we reach you?" with the phone, then "About you" with the date of birth and timezone),
+and, when you turn it on, a review page of everything that will be shared.
 
 | Shown as | For | The Carbon can |
 |---|---|---|
-| "Name, id and profile photo: Grace Hopper (c:grace-hopper)" | `profile` | only accept |
-| "Email address: g***@example.com" | each of your `required_fields` | only accept |
-| "Timezone: Asia/Kolkata", with a switch | each of your `optional_fields`, and each detail you ask for in `scope` that isn't required | switch it on or off |
+| "Name, id and profile photo: Grace Hopper (c:grace-hopper)" (first page) | `profile` | only accept |
+| "Email address: g***@example.com", with a lock | each of your `required_fields` | only accept (and add it first when it's missing) |
+| "Timezone: Asia/Kolkata", with a checkbox | each of your `optional_fields`, and each detail you ask for in `scope` that isn't required (on the last page) | tick it to share it |
 
 Values are shown the way your app will get them (email and phone masked on screen). An
-optional switch starts on when the account granted that detail before or your `scope` asks for
-it, and off otherwise. Declining the whole screen sends the browser back with
-`error=access_denied`; nothing is shared and no membership is created.
+optional checkbox starts unticked, unless the account shared that detail with your app before,
+or the Carbon added the email or phone on the page just now. Back keeps the answers of every
+page. Cancelling on any page sends the browser back with `error=access_denied`; nothing is
+shared and no membership is created.
 
-The answer becomes the grant: `profile`, the required details, and the optional ones left on
-(plus `openid` when you asked for it). The screen is shown again only when it has something new
+The answers become the grant: `profile`, the required details, and the ticked optional ones
+(plus `openid` when you asked for it). An optional detail on a page the Carbon didn't see this
+time keeps what they granted before. The pages are shown again only when they have something new
 to ask:
 
 - **Skipped** when the account's membership is active and already grants `profile`, every
   required detail and every detail your `scope` asks for. Most sign-ins after the first go
-  straight back to your app.
-- **Shown again** when you start requiring a new detail, ask for a new one in `scope`, send
-  `prompt=consent`, or the account had removed your access.
+  straight back to your app (no review page either).
+- **Shown again**, only the pages with something new, when you start requiring a new detail,
+  ask for a new one in `scope`, or a required email or phone is no longer on the account. Every
+  page is shown again with `prompt=consent`, or when the account had removed your access.
 
 Grants accumulate: a later sign-in that asks for less still returns everything granted so far.
-On a screen shown again, the Carbon's new answer replaces the old one, which is how an optional
-detail can be taken back. Silicons never see this screen: their short-lived token grants
+On a page shown again, the Carbon's new answer replaces the old one, which is how an optional
+detail can be taken back. Silicons never see these pages: their short-lived token grants
 `profile` plus the date of birth and timezone your app asks for.
 
 ## Required details
 
 A required `email` or `phone` must be a verified primary on the account. If it's missing, the
-hosted pages ask for it right after sign-in (the requirements step): the Carbon types it,
-proves it with a 6-digit code, and it becomes theirs (and the primary, if they had none). An
-address that already belongs to another account is refused (`email_in_use` /
-`phone_in_use`). Date of birth and timezone are never missing: every account has both from the
-moment it exists.
+details page that asks for it lets the Carbon add it right there: they type it, prove it with
+a 6-digit code, and it becomes theirs (and the primary, if they had none). Continue stays
+blocked until it is added. An address that already belongs to another account is refused
+(`email_in_use` / `phone_in_use`). Date of birth and timezone are never missing: every account
+has both from the moment it exists. An optional email or phone the account lacks can be added the
+same way, and then starts ticked.
 
 Required details are why a Carbon who signs in by phone can still be required to add an email.
-With `allowed_email_domains`, the requirements step only accepts an email at your domains; but
-a Carbon who signs in by phone and already has a verified email elsewhere skips that step, so
-your app can receive an email outside your domains (keep `phone` off on such an app). A Carbon
-using the CLI to get a short-lived token can't do the requirements step there, so a missing
-detail answers `409 requirements_missing` and names it.
+With `allowed_email_domains`, the details page only accepts an email at your domains; but a
+Carbon who signs in by phone and already has a verified email elsewhere doesn't add one, so your
+app can receive an email outside your domains (keep `phone` off on such an app). A Carbon using
+the CLI to get a short-lived token can't add a detail there, so a missing detail answers
+`409 requirements_missing` and names it.
 
 ## Your user base
 

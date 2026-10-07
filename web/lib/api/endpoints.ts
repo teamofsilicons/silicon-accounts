@@ -10,8 +10,8 @@
 import { request, seg, formBody, type RequestOptions } from "./http";
 import type {
   AccountSummary, AppDetail, AppProof, AppProofsQuery, AppPublic, AppUser, AppUserDetail, AppUsersQuery, AtaRequest,
-  BrowserSession, CliLoginChallenge, ConfigHistoryItem, ConsentSubmit, ContactChallenge, CreateSilicon,
-  CustodianRequest, CustodianRequestStatus, DeliveriesQuery, DeviceAuthorization, DeviceRequest, EmailView, FlowCreate,
+  BrowserSession, CliLoginChallenge, ConfigHistoryItem, ContactChallenge, ContactField, CreateSilicon,
+  CustodianRequest, CustodianRequestStatus, DeliveriesQuery, DetailsAdd, DeviceAuthorization, DeviceRequest, EmailView, FlowCreate,
   FlowEnvelope, FlowView, HistoryItem, HistoryQuery, IdAvailability, IdentityView, ImportJob, ImportOptions, ImportRow,
   ImportRowResult, ImportRowsQuery, Introspection, IssuedProof, Jwks, ManagedSilicon, Me, Meta, MyApp, MyProof,
   OboRequest, OidcDiscovery, OutboxMessage, OwnedApp, Page, PageQuery, PhoneView, PhotoUploaded, ProfileUpdate,
@@ -102,14 +102,25 @@ export const flows = {
     request<SignupPhoto>(`/v1/flows/${seg(id)}/signup/photo`, { method: "POST", raw: file, contentType: file.type || "application/octet-stream" }),
   /** Create the account (or finish an imported one). 409 id_taken with details.suggestions. */
   signup: (id: string, body: SignupSubmit) => flowCall(`/v1/flows/${seg(id)}/signup`, body),
-  /** Send a code to add a missing required email. 409 email_in_use. */
-  requirementEmail: (id: string, email: string) => flowCall(`/v1/flows/${seg(id)}/requirements/email`, { email }),
-  /** Send a code to add a missing required phone. 409 phone_in_use. */
-  requirementPhone: (id: string, phone: string, country?: string) => flowCall(`/v1/flows/${seg(id)}/requirements/phone`, { phone, country }),
-  /** Verify the requirement code; the email/phone is added to the account. */
-  requirementVerify: (id: string, code: string) => flowCall(`/v1/flows/${seg(id)}/requirements/verify`, { code }),
-  /** Approve (with the chosen optional scopes) or decline what is shared. */
-  consent: (id: string, body: ConsentSubmit) => flowCall(`/v1/flows/${seg(id)}/consent`, body),
+  /**
+   * `POST /v1/flows/{id}/details/add` (step details): sends a code to a missing email or phone of the current page
+   * (`{email}` or `{phone, country?}`). 409 email_in_use / phone_in_use; send limits as for sign-in codes.
+   */
+  detailsAdd: (id: string, body: DetailsAdd) => flowCall(`/v1/flows/${seg(id)}/details/add`, body),
+  /** `POST /v1/flows/{id}/details/verify`: the code; the email or phone joins the account (primary when it has none). */
+  detailsVerify: (id: string, code: string) => flowCall(`/v1/flows/${seg(id)}/details/verify`, { code }),
+  /**
+   * `POST /v1/flows/{id}/details/continue`: `share` = the optional details of this page the Carbon ticked. Moves on to
+   * the next page, the review, or completes. 409 requirements_missing (details.missing) while a required one is missing.
+   */
+  detailsContinue: (id: string, share: ContactField[]) => flowCall(`/v1/flows/${seg(id)}/details/continue`, { share }),
+  /** `POST /v1/flows/{id}/details/back`: the previous page (choices kept); from the review, the last page. */
+  detailsBack: (id: string) => flowCall(`/v1/flows/${seg(id)}/details/back`),
+  /**
+   * `POST /v1/flows/{id}/review`: approve completes the sign-in (code); `approve: false` cancels it from any details page
+   * or the review (the browser goes back with error=access_denied).
+   */
+  review: (id: string, approve: boolean) => flowCall(`/v1/flows/${seg(id)}/review`, { approve }),
 };
 
 /** The /authorize URL an app sends a browser to (also what /sign-in builds for the account site itself). */
@@ -233,7 +244,7 @@ export const me = {
     test: () => request<SiliconWebhookTestQueued>("/v1/me/webhook/test", { method: "POST", body: {} }),
   },
 
-  /** Apps this Carbon owns (developer area). */
+  /** Apps this Carbon owns (the developer site lists them; kept here for tools and docs). */
   ownedApps: (query?: PageQuery) => request<Page<OwnedApp>>("/v1/me/owned-apps", { query: pageQuery(query) }),
 
   /** Silicons this Carbon is custodian of. `{uuid}` accepts the si:id too. Unknown body fields answer 422. */
@@ -352,7 +363,7 @@ export const apps = {
     /** Proofs issued by the app. */
     list: (appId: string, query?: AppProofsQuery, credentials?: Owner) =>
       request<Page<AppProof>>(`/v1/apps/${seg(appId)}/proofs`, { query: { ...pageQuery(query), kind: query?.kind, status: query?.status }, auth: ownerAuth(credentials) }),
-    /** The ATA page stand-in: issue an app-to-app proof for `audiences` (201; tokens shown once). The owner's session is enough. */
+    /** Issue an app-to-app proof for exactly one `receiving_app` (201; tokens shown once). The owner's session is enough. */
     createAta: (appId: string, body: AtaRequest, options?: OwnerCall) =>
       request<IssuedProof>(`/v1/apps/${seg(appId)}/proofs/ata`, { method: "POST", body, idempotencyKey: options?.idempotencyKey, auth: ownerAuth(options?.credentials), signal: options?.signal }),
     revoke: (appId: string, proofId: string, credentials?: Owner) => request<null>(`/v1/apps/${seg(appId)}/proofs/${seg(proofId)}`, { method: "DELETE", auth: ownerAuth(credentials) }),
@@ -368,7 +379,7 @@ export const proofs = {
     request<IssuedProof>("/v1/proofs/ata", { method: "POST", body, auth: asApp(credentials), idempotencyKey: options?.idempotencyKey, signal: options?.signal }),
   refresh: (credentials: AppCredentials, proofRefreshToken: string, accessTtlSeconds?: number) =>
     request<IssuedProof>("/v1/proofs/refresh", { method: "POST", body: { proof_refresh_token: proofRefreshToken, access_ttl_seconds: accessTtlSeconds }, auth: asApp(credentials) }),
-  /** The verifying app must be one of the audiences; anything else answers exactly {valid:false, expires_at:null}. */
+  /** The verifying app must be the proof's receiving app; anything else answers exactly {valid:false, expires_at:null}. */
   verify: (credentials: AppCredentials, proofToken: string) => request<ProofVerification>("/v1/proofs/verify", { method: "POST", body: { proof_token: proofToken }, auth: asApp(credentials) }),
   revoke: (credentials: AppCredentials, body: ProofRevokeRequest) => request<null>("/v1/proofs/revoke", { method: "POST", body, auth: asApp(credentials) }),
 };

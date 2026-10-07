@@ -1,6 +1,6 @@
 /**
  * Screen specs for scripts/screens.ts. Each area may export `screens: ScreenSpec[]` from
- * `components/<area>/screens.ts` (account, auth, developer); the runner picks them up automatically.
+ * `components/<area>/screens.ts` (account, auth, docs); the runner picks them up automatically.
  */
 import type { Page } from "@playwright/test";
 import type { MockRoute } from "./mock/api";

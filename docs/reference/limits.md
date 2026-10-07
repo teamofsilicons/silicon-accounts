@@ -114,7 +114,7 @@ IP" means the client address (the right-most `X-Forwarded-For` entry behind the 
 | Concurrent import parses | 2 per server; a request waits up to 30 seconds for a slot, then 503 `imports_busy` (`Retry-After: 15`) |
 | Webhook replay | 100 deliveries per request |
 | Proof scopes | 20 per proof, each 1–100 characters of `A-Z a-z 0-9 _ . : / -` |
-| ATA audiences | 1–20 apps |
+| ATA receiving apps | exactly 1 per proof |
 | Report message | 1–10,000 characters; `pr_url` https |
 | Telemetry batch | 50 events; `name` `^[a-z0-9_.]{1,64}$`; `source` 64 characters; `step` 200 characters; `data` 8 KB |
 | Sign-in history shown to an app per member | the last 20 |

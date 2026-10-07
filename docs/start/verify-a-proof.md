@@ -16,7 +16,7 @@ Your app receives a call from another app, and the call carries a proof token (`
 
 ```bash
 curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" \
-  -X POST https://account.teamofsilicons.com/v1/proofs/verify \
+  -X POST https://accounts.teamofsilicons.com/v1/proofs/verify \
   -H "Content-Type: application/json" \
   -d '{"proof_token":"sap_OMGtGwcBe5QgGJng3SIp0yGOh1nxefxCufefPXqr7dk"}'
 ```
@@ -64,7 +64,7 @@ These are real responses from a local Silicon Accounts stack, like every respons
 ```ts
 import { createServer } from "node:http";
 
-const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://account.teamofsilicons.com";
+const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com";
 const BRIEFCASE_AUTH = "Basic " + btoa(`briefcase:${process.env.BRIEFCASE_APP_SECRET}`);
 
 /** The verification, or null when the proof is not valid for briefcase right now. */
@@ -124,7 +124,7 @@ async fn check_proof(app: &AppClient<'_>, token: &str, needed_scope: &str) -> Re
 
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
-    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://account.teamofsilicons.com".into());
+    let url = std::env::var("ACCOUNTS_URL").unwrap_or_else(|_| "https://accounts.teamofsilicons.com".into());
     let client = AccountsClient::new(url)?;
     let briefcase = client.as_app("briefcase", std::env::var("BRIEFCASE_APP_SECRET")?);
     let token = std::env::args().nth(1).ok_or("pass the proof token as the first argument")?;

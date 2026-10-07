@@ -59,8 +59,8 @@ export function Data() {
       </Specimen>
       <Specimens>
         <Specimen title="CodeBlock (snippets)">
-          <CodeBlock filename="Sign-in link" language="html" code={`<a href="https://account.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=https%3A%2F%2Fbriefcase.example%2Fcallback&state=…">\n  Sign in with Silicon Accounts\n</a>`} />
-          <CodeBlock filename="Verify a proof" language="bash" code={`curl -u briefcase:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -d '{"proof_token":"sap_…"}' \\\n  https://account.teamofsilicons.com/v1/proofs/verify`} />
+          <CodeBlock filename="Sign-in link" language="html" code={`<a href="https://accounts.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=https%3A%2F%2Fbriefcase.example%2Fcallback&state=…">\n  Sign in with Silicon Accounts\n</a>`} />
+          <CodeBlock filename="Verify a proof" language="bash" code={`curl -u briefcase:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -d '{"proof_token":"sap_…"}' \\\n  https://accounts.teamofsilicons.com/v1/proofs/verify`} />
         </Specimen>
         <Specimen title="JsonViewer (webhook payload)">
           <JsonViewer data={PAYLOAD} rootName="event" defaultExpandDepth={2} maxHeight={300} label="Webhook payload" />

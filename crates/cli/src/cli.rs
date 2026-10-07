@@ -33,7 +33,7 @@ pub struct GlobalArgs {
     #[arg(long, global = true, help_heading = "Global options")]
     pub json: bool,
 
-    /// Silicon Accounts URL [default: ACCOUNTS_URL, then `accounts config set url`, then https://account.teamofsilicons.com].
+    /// Silicon Accounts URL [default: ACCOUNTS_URL, then `accounts config set url`, then https://accounts.teamofsilicons.com].
     #[arg(
         long,
         global = true,
@@ -174,7 +174,7 @@ pub enum Commands {
 
     /// Approve or deny a CLI sign-in code shown on another machine (Carbons).
     ///
-    /// Same as approving on account.teamofsilicons.com/device: the other machine's `accounts login` gets signed in as you.
+    /// Same as approving on accounts.teamofsilicons.com/device: the other machine's `accounts login` gets signed in as you.
     #[command(
         after_long_help = "Examples:\n  accounts device show WDJB-MJHT\n  accounts device approve WDJB-MJHT"
     )]
@@ -641,7 +641,7 @@ pub struct SiliconArgs {
 pub enum SiliconCommand {
     /// Create a Silicon account.
     ///
-    /// Signed in as a Carbon: you create it and become its custodian; it can sign in right away. Otherwise (or with --self-create) the Silicon creates its own account and names its custodian (--custodian c:id or email), who has 14 days to accept on account.teamofsilicons.com or with `accounts custodian accept`. With --wait the command polls until the custodian decides (5 s backing off to 60 s) and then signs the Silicon in; without it, check later with `accounts silicon request status <id>`.
+    /// Signed in as a Carbon: you create it and become its custodian; it can sign in right away. Otherwise (or with --self-create) the Silicon creates its own account and names its custodian (--custodian c:id or email), who has 14 days to accept on accounts.teamofsilicons.com or with `accounts custodian accept`. With --wait the command polls until the custodian decides (5 s backing off to 60 s) and then signs the Silicon in; without it, check later with `accounts silicon request status <id>`.
     ///
     /// The generated STK is printed exactly once: store it. Choose your own with --stk-stdin (8 to 32 hex characters).
     #[command(
@@ -1173,14 +1173,15 @@ pub enum ProofCommand {
         #[arg(long, value_name = "KEY")]
         idempotency_key: Option<String>,
     },
-    /// Issue an ATA proof that the listed apps can verify.
+    /// Issue an ATA proof that one other app can verify (one proof per app).
     #[command(
-        after_long_help = "Examples:\n  accounts app proof ata --to remind,waveform --ttl 300"
+        long_about = "Issue an ATA (app to app) proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An ATA proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Owners can also make, see and revoke ATA proofs on the app's ATA page at developer.teamofsilicons.com.",
+        after_long_help = "Examples:\n  accounts app proof ata --to remind --ttl 300\n  accounts app proof ata --to waveform --scope notifications.send\n  accounts app proof list --kind ata"
     )]
     Ata {
-        /// Receiving app ids, comma-separated.
-        #[arg(long, value_name = "APP_IDS", value_delimiter = ',', required = true)]
-        to: Vec<String>,
+        /// The one receiving app id (issue one proof per app).
+        #[arg(long, value_name = "APP_ID", required = true)]
+        to: String,
         /// App-defined scope (repeatable).
         #[arg(long = "scope", value_name = "SCOPE")]
         scopes: Vec<String>,

@@ -709,3 +709,79 @@ fn app_use_stores_credentials_for_later_commands() {
         .stdout(predicate::str::contains("google, email"))
         .stdout(predicate::str::contains("acting as"));
 }
+
+#[test]
+fn ata_proofs_are_for_exactly_one_app() {
+    let mock = Mock::start();
+    let env = Env::new();
+    let base = [
+        "--url",
+        mock.url.as_str(),
+        "app",
+        "--app-id",
+        APP_ID,
+        "--app-secret-stdin",
+        "proof",
+        "ata",
+    ];
+    let output = env
+        .cmd()
+        .args(base)
+        .args(["--to", "remind", "--scope", "notifications.send", "--json"])
+        .write_stdin(APP_SECRET)
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json = stdout_json(&output);
+    assert_eq!(json["kind"], "ata");
+    assert_eq!(json["receiving_app"], "remind");
+    assert_eq!(json["issuing_app"], APP_ID);
+    assert!(
+        json.get("user").is_some_and(Value::is_null),
+        "--json keeps the API's \"user\": null: {json}"
+    );
+    let sent = mock.requests("POST", "/v1/proofs/ata");
+    assert_eq!(sent.len(), 1);
+    let body: Value = serde_json::from_str(&sent[0].1).unwrap();
+    assert_eq!(
+        body,
+        json!({"receiving_app": "remind", "scopes": ["notifications.send"]})
+    );
+
+    // Several apps: refused before anything is sent, with one command per app as the fix.
+    for several in ["remind,waveform", "remind waveform"] {
+        let output = env
+            .cmd()
+            .args(base)
+            .args(["--to", several, "--json"])
+            .write_stdin(APP_SECRET)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{several}");
+        let json = stdout_json(&output);
+        let message = json["error"]["message"].as_str().unwrap();
+        assert!(message.contains("exactly one app"), "{message}");
+        let hint = json["error"]["hint"].as_str().unwrap();
+        assert!(
+            hint.contains("accounts app proof ata --to remind")
+                && hint.contains("accounts app proof ata --to waveform"),
+            "{hint}"
+        );
+    }
+    assert_eq!(mock.count("POST", "/v1/proofs/ata"), 1);
+
+    env.cmd()
+        .args(base)
+        .args(["--to", "remind"])
+        .write_stdin(APP_SECRET)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "ATA proof p-ata from briefcase for remind",
+        ));
+}

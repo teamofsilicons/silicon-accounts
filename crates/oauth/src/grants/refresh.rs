@@ -18,7 +18,7 @@ use accounts_core::repo::audit;
 use accounts_core::repo::tokens::{self, GrantError};
 use accounts_core::timefmt::format_rfc3339_ms;
 use accounts_core::views::TokenResponse;
-use accounts_core::{ApiError, AppState, FIRST_PARTY_APP_ID, OAuthError};
+use accounts_core::{ApiError, AppState, OAuthError, is_first_party_app_id};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -55,7 +55,8 @@ pub(crate) async fn exchange(
         if let Some(info) =
             info.filter(|i| i.app_id == client.app.app_id && i.family_active && !i.used)
         {
-            if info.app_id != FIRST_PARTY_APP_ID
+            // Silicon Accounts' own apps (`accounts`, `developer`) have no memberships.
+            if !is_first_party_app_id(&info.app_id)
                 && info.membership_status != Some(MembershipStatus::Active)
             {
                 return Err(end_orphaned_sign_in(state, &info).await?);
@@ -151,7 +152,7 @@ async fn after_reuse(
 ) {
     let result: Result<(), ApiError> = async {
         let mut tx = state.db.begin().await?;
-        if app_id != FIRST_PARTY_APP_ID {
+        if !is_first_party_app_id(app_id) {
             events::membership_signed_out(
                 &mut tx,
                 app_id,

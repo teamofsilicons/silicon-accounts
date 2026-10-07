@@ -16,7 +16,7 @@ related:
 A proof is a statement that Silicon Accounts makes about a call between two apps. There are two kinds:
 
 - **OBO (on behalf of):** "app A may act at app B for this account." The account signed into app A and agreed, in app A's own screens, to what app A will do at app B.
-- **ATA (app to app):** "this call comes from app A." App A names the apps that may check it.
+- **ATA (app to app):** "this call comes from app A, to app B." Each ATA proof is for exactly one app: to talk to app B and app C, app A gets one proof for each, so a token one app received can never be replayed to another, and each proof can be revoked on its own.
 
 Silicon Accounts only issues proofs and verifies them. It never sees the call between the apps, never runs either app's endpoints and never shows a consent screen for a proof. What a scope means, what the receiving app allows, and how the issuing app asks for consent all stay with the apps. This page explains why the pieces are shaped the way they are, so you can decide well when the instructions don't cover your case.
 
@@ -158,7 +158,7 @@ ATA proofs stand only on themselves and the issuing app: they end when revoked, 
 | action | OBO | ATA |
 |---|---|---|
 | issue | the issuing app, with its credentials and the account's access token | the issuing app with its credentials, or its owner through the ATA page (`POST /v1/apps/{app_id}/proofs/ata` with their session) |
-| verify | only the receiving app | only the apps listed in `audiences` |
+| verify | only the receiving app | only the receiving app (an ATA proof is for exactly one app; one proof per app) |
 | refresh | only the issuing app | only the issuing app |
 | revoke | the issuing app (by `proof_id`, `proof_token` or `proof_refresh_token`), its owner (by id), and the account it speaks for (by id) | the issuing app and its owner |
 | list | the issuing app and its owner (`GET /v1/apps/{app_id}/proofs`); the account (`GET /v1/me/proofs`) | the issuing app and its owner |

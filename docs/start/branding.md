@@ -103,9 +103,11 @@ curl -s "$ACCOUNTS_URL/v1/apps/waveform/public"
 }
 ```
 
-On the account site, **Developer → your app → Branding** (`/developer/{app_id}/branding`)
-edits the same variables with a live preview of every step, in light and dark, desktop and
-phone. The app's own credentials or its owner's session can change branding; see
+On [developer.teamofsilicons.com](https://developer.teamofsilicons.com), the app's **Pages** tab
+(`/apps/{app_id}/pages`) edits the same variables and every page's words with a live preview of
+every page (sign-in and sign-up, the Opening page for Google and Apple, the code pages, setting up
+an account, each page of the app's flow, the review page and the embed buttons), in light and
+dark, desktop and phone. The app's own credentials or its owner's session can change branding; see
 [who can change the setup](sign-in-config.md#who-can-change-it).
 
 ## The variables
@@ -232,7 +234,7 @@ font with a body font is the usual pairing: `"font_family": "Inter", "heading_fo
 ## "Powered by Silicon Accounts"
 
 Every page ends with "Powered by Silicon Accounts", with "Silicon Accounts" linking to
-`https://account.teamofsilicons.com`. It is not a variable: it can't be removed, hidden,
+`https://accounts.teamofsilicons.com`. It is not a variable: it can't be removed, hidden,
 recoloured or restyled, and it is drawn outside the branded part of the page, in Silicon
 Accounts' own colours (light or dark with the visitor), so no branding reaches it. The iframe and the snippet show it too, on an
 opaque pill of their own so it reads on any page. [Why](../learn/branding.md#powered-by-silicon-accounts).
