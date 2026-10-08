@@ -11,7 +11,7 @@
  *
  * The live interaction checks (a real code, a real STK rotation) ran against the API; these are for looking.
  */
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import type { AccountSummary, CustodianRequest, MyProof } from "../../lib/api/types";
 import * as data from "../../scripts/mock/fixtures";
 import type { MockReply, MockRoute, ScreenSpec } from "../../scripts/screens-types";
@@ -107,7 +107,11 @@ const shown: ScreenSpec[] = [
   { name: "account-apps-removed", path: "/apps", prepare: async page => { await click(page, /^Access removed/); await wait(page, 900); } },
 
   // Proofs: the active one with its ring, the revoke question, the ended ones.
-  { name: "account-proofs", path: "/proofs" },
+  { name: "account-proofs", path: "/proofs", prepare: async page => {
+    await expect(page.getByRole("heading", { name: "User verification", exact: true })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Active verifications", exact: true })).toBeVisible();
+    await expect(page).toHaveTitle(/User verification/);
+  } },
   { name: "account-proofs-revoke", path: "/proofs", prepare: async page => { await click(page, "Revoke"); await wait(page, 600); } },
   { name: "account-proofs-ended", path: "/proofs", prepare: async page => { await click(page, /^Ended/); await wait(page, 900); } },
 

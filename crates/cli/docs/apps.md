@@ -10,7 +10,7 @@ exists there it can sign people in. You get an `app_id` and an app secret.
 
 Everything about an app's sign-in is set up on the developer platform,
 https://developers.teamofsilicons.com (its methods, Google and Apple, details and flows,
-page styling, redirect URLs, user base and imports, webhooks, ATA proofs). The settings
+page styling, redirect URLs, user base and imports, webhooks, App verification proofs). The settings
 live in Silicon Accounts, so this CLI reads and changes the same setup.
 
 ## 1. Configure sign-in

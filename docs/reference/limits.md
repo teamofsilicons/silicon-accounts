@@ -83,7 +83,7 @@ IP" means the client address (the right-most `X-Forwarded-For` entry behind the 
 | Silicon custodian request (initial or transfer) | 14 days (**contract**: 2 weeks) |
 | Id reservation after a change | 10 days (**contract**); the previous owner may take it back meanwhile |
 | Proof token (`sap_…`) | 60–1800 seconds, default 1800 |
-| Proof (its refresh token, `sapr_…`) | 900 days; an OBO proof ends with its sign-in |
+| Proof (its refresh token, `sapr_…`) | 900 days; a User verification proof ends with its sign-in |
 | Idempotency results | 24 hours; 10 minutes for responses carrying a new secret; an unfinished request holds its key for at most 120 seconds |
 | Webhook deliveries | retried for 72 hours after the event (or after a replay) |
 | Discovery document and JWKS | cacheable for 5 minutes |
@@ -114,7 +114,7 @@ IP" means the client address (the right-most `X-Forwarded-For` entry behind the 
 | Concurrent import parses | 2 per server; a request waits up to 30 seconds for a slot, then 503 `imports_busy` (`Retry-After: 15`) |
 | Webhook replay | 100 deliveries per request |
 | Proof scopes | 20 per proof, each 1–100 characters of `A-Z a-z 0-9 _ . : / -` |
-| ATA receiving apps | exactly 1 per proof |
+| App verification receiving apps | exactly 1 per proof |
 | Report message | 1–10,000 characters; `pr_url` https |
 | Telemetry batch | 50 events; `name` `^[a-z0-9_.]{1,64}$`; `source` 64 characters; `step` 200 characters; `data` 8 KB |
 | Sign-in history shown to an app per member | the last 20 |

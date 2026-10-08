@@ -288,7 +288,7 @@ of `accounts proofs`, not the guide. `accounts help imports` does print the guid
 | `silicons` (`silicon`, `stk`) | how a Silicon gets an account, signs in, and signs into apps |
 | `custodians` (`custodian`, `transfer`) | being a Silicon's custodian |
 | `apps` (`app`, `sign-in`, `signin`, `oauth`, `tokens`) | adding sign-in to an app |
-| `proofs` (`proof`, `obo`, `ata`) | OBO and ATA proofs |
+| `proofs` (`proof`, `obo`, `ata`, `app-verification`, `user-verification`) | User verification and App verification proofs |
 | `webhooks` (`webhook`, `events`) | app and Silicon webhooks |
 | `imports` (`import`) | bringing an app's existing users |
 | `ids` (`id`, `uuid`, `identifiers`) | uuids, ids, reservations, membership ids |
@@ -296,6 +296,8 @@ of `accounts proofs`, not the guide. `accounts help imports` does print the guid
 | `links` (`link`, `repo`, `github`, `crate`) | the repository, online docs and the Rust package |
 
 An unknown topic exits `4` with `unknown_topic` and lists the topics.
+
+The compatibility commands `accounts app proof ata`, `accounts app proof obo` and `accounts proofs` remain supported. The CLI also accepts `accounts app proof app-verification`, `accounts app proof user-verification` and `accounts user-verification` as visible aliases. JSON kinds stay `ata` and `obo`.
 
 ## Command tree
 
@@ -346,10 +348,10 @@ As `accounts --help` prints it:
     apps list                               List the apps you signed into, with what you share
                                             with each
     apps remove <APP_ID>                    Remove an app's access to your account
-  proofs                                    OBO proofs apps issued on your behalf: list or revoke
-                                            them
-    proofs list                             List OBO proofs issued on your behalf
-    proofs revoke <PROOF_ID>                Revoke an OBO proof
+  proofs                                    User verification proofs apps issued on your behalf:
+                                            list or revoke them
+    proofs list                             List User verification proofs issued on your behalf
+    proofs revoke <PROOF_ID>                Revoke a User verification proof
   sessions                                  Your browser sessions and CLI sign-ins: list or revoke
                                             them
     sessions list                           List browser sessions and CLI sign-ins
@@ -443,12 +445,12 @@ As `accounts --help` prints it:
       app token verify <ACCESS_TOKEN>       Verify an access token locally with the JWKS (exit 0
                                             valid, 2 invalid)
     app userinfo <ACCESS_TOKEN>             Fetch userinfo with an access token issued to this app
-    app proof                               OBO and ATA proofs: issue, verify, refresh, revoke,
-                                            list
-      app proof obo                         Issue an OBO proof: act at another app on behalf of an
-                                            account that consented in your app
-      app proof ata                         Issue an ATA proof that one other app can verify (one
-                                            proof per app)
+    app proof                               User verification and App verification proofs: issue,
+                                            verify, refresh, revoke, list
+      app proof obo                         Issue a User verification proof: act at another app on
+                                            behalf of an account that consented in your app
+      app proof ata                         Issue an App verification proof that one other app can
+                                            verify (one proof per app)
       app proof verify <TOKEN>              Verify a proof token as this app: exit 0 when valid, 2
                                             when not
       app proof refresh <REFRESH_TOKEN>     Get a new proof token with the proof refresh token (it
@@ -961,7 +963,7 @@ accounts identities remove [OPTIONS] <PROVIDER> <SUBJECT>
 
 Apps you signed into: list them, or remove an app's access.
 
-Removing access revokes the app's tokens for you and the OBO proofs it issued about you, and tells the app (membership.access_removed).
+Removing access revokes the app's tokens for you and the User verification proofs it issued about you, and tells the app (membership.access_removed).
 
 ```text
 accounts apps [OPTIONS] <COMMAND>
@@ -1001,7 +1003,7 @@ accounts apps remove [OPTIONS] <APP_ID>
 
 ### `accounts proofs`
 
-OBO proofs apps issued on your behalf: list or revoke them
+User verification proofs apps issued on your behalf: list or revoke them
 
 ```text
 accounts proofs [OPTIONS] <COMMAND>
@@ -1009,8 +1011,8 @@ accounts proofs [OPTIONS] <COMMAND>
 
 | subcommand | what it does |
 |---|---|
-| [`list`](#accounts-proofs-list) | List OBO proofs issued on your behalf |
-| [`revoke`](#accounts-proofs-revoke) | Revoke an OBO proof |
+| [`list`](#accounts-proofs-list) | List User verification proofs issued on your behalf |
+| [`revoke`](#accounts-proofs-revoke) | Revoke a User verification proof |
 
 Examples, as `--help` prints them:
 
@@ -1021,7 +1023,7 @@ accounts proofs revoke 0192f0c2-…
 
 #### `accounts proofs list`
 
-List OBO proofs issued on your behalf
+List User verification proofs issued on your behalf
 
 ```text
 accounts proofs list [OPTIONS]
@@ -1029,7 +1031,7 @@ accounts proofs list [OPTIONS]
 
 #### `accounts proofs revoke`
 
-Revoke an OBO proof
+Revoke a User verification proof
 
 ```text
 accounts proofs revoke [OPTIONS] <PROOF_ID>
@@ -1687,7 +1689,7 @@ accounts device deny [OPTIONS] <CODE>
 
 App mode: an app's sign-in setup, user base, imports, tokens, webhooks and proofs.
 
-Acts with the app's credentials (--app-id/--app-secret, ACCOUNTS_APP_ID/ACCOUNTS_APP_SECRET, or `accounts app use <app_id> --secret-stdin`), or as the app's owner when you are signed in as the Carbon who owns it. Token calls, OBO proofs, proof verification and refresh need the app's own credentials; an owner can issue ATA proofs (the app's ATA page) and revoke the app's proofs by id. Apps are created in Silicon Apps (`accounts app new`).
+Acts with the app's credentials (--app-id/--app-secret, ACCOUNTS_APP_ID/ACCOUNTS_APP_SECRET, or `accounts app use <app_id> --secret-stdin`), or as the app's owner when you are signed in as the Carbon who owns it. Token calls, User verification proofs, proof verification and refresh need the app's own credentials; an owner can issue App verification proofs (the app's App verification page) and revoke the app's proofs by id. Apps are created in Silicon Apps (`accounts app new`).
 
 ```text
 accounts app [OPTIONS] <COMMAND>
@@ -1705,7 +1707,7 @@ accounts app [OPTIONS] <COMMAND>
 | [`import`](#accounts-app-import) | Import existing users (CSV or JSON), or inspect import jobs |
 | [`token`](#accounts-app-token) | Token endpoint calls: exchange codes and SLTs, refresh, introspect, revoke, verify |
 | [`userinfo`](#accounts-app-userinfo) | Fetch userinfo with an access token issued to this app |
-| [`proof`](#accounts-app-proof) | OBO and ATA proofs: issue, verify, refresh, revoke, list |
+| [`proof`](#accounts-app-proof) | User verification and App verification proofs: issue, verify, refresh, revoke, list |
 | [`webhook`](#accounts-app-webhook) | The app's webhook: endpoint, secret, test, deliveries, replay |
 | [`lookup`](#accounts-app-lookup) | Look up an account by uuid or id with the app's credentials |
 
@@ -2095,7 +2097,7 @@ Also takes the [app credentials options](#accounts-app) and the [global options]
 
 #### `accounts app proof`
 
-OBO and ATA proofs: issue, verify, refresh, revoke, list
+User verification and App verification proofs: issue, verify, refresh, revoke, list
 
 ```text
 accounts app proof [OPTIONS] <COMMAND>
@@ -2103,8 +2105,8 @@ accounts app proof [OPTIONS] <COMMAND>
 
 | subcommand | what it does |
 |---|---|
-| [`obo`](#accounts-app-proof-obo) | Issue an OBO proof: act at another app on behalf of an account that consented in your app |
-| [`ata`](#accounts-app-proof-ata) | Issue an ATA proof that one other app can verify (one proof per app) |
+| [`obo`](#accounts-app-proof-obo) | Issue a User verification proof: act at another app on behalf of an account that consented in your app |
+| [`ata`](#accounts-app-proof-ata) | Issue an App verification proof that one other app can verify (one proof per app) |
 | [`verify`](#accounts-app-proof-verify) | Verify a proof token as this app: exit 0 when valid, 2 when not |
 | [`refresh`](#accounts-app-proof-refresh) | Get a new proof token with the proof refresh token (it rotates) |
 | [`revoke`](#accounts-app-proof-revoke) | Revoke a proof this app issued (by id, proof token or refresh token) |
@@ -2114,7 +2116,7 @@ Also takes the [app credentials options](#accounts-app) and the [global options]
 
 ##### `accounts app proof obo`
 
-Issue an OBO proof: act at another app on behalf of an account that consented in your app
+Issue a User verification proof: act at another app on behalf of an account that consented in your app
 
 ```text
 accounts app proof obo [OPTIONS] --subject-token <TOKEN> --to <APP_ID>
@@ -2139,7 +2141,7 @@ accounts app proof obo --subject-token "$ACCESS_TOKEN" --to briefcase \
 
 ##### `accounts app proof ata`
 
-Issue an ATA (app to app) proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An ATA proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Owners can also make, see and revoke ATA proofs on the app's ATA page at developers.teamofsilicons.com.
+Issue an App verification proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An App verification proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Managers can also make, see and revoke these proofs in the developer portal. The central history at developers.teamofsilicons.com/app-verification retains records and token events for apps you manage; raw token values are shown only when generated.
 
 ```text
 accounts app proof ata [OPTIONS] --to <APP_ID>

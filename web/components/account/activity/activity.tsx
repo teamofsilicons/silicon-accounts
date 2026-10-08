@@ -35,17 +35,17 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: "signin", label: "Sign-ins" },
   { value: "id_change", label: "Id changes" },
   { value: "custodian", label: "Custodian" },
-  { value: "proof", label: "Proofs" },
+  { value: "proof", label: "User verification" },
   { value: "app_access", label: "App access" },
   { value: "security", label: "Security" },
 ];
 
 const EMPTY: Record<Filter, string> = {
-  all: "Sign-ins, id changes, custodian changes, proofs and app access show up here as they happen.",
+  all: "Sign-ins, id changes, custodian changes, user verifications and app access show up here as they happen.",
   signin: "Each time you sign in to an app or to this site, it shows up here.",
   id_change: "When your id changes, the old and new ids show up here.",
   custodian: "Silicons you take on, hand over or are asked to look after show up here.",
-  proof: "Proofs apps get to act for you, and the ones you revoke, show up here.",
+  proof: "User verifications apps get to act for you, and the ones you revoke, show up here.",
   app_access: "Apps you remove, and apps that import your account, show up here.",
   security: "Changes to how you sign in show up here.",
 };

@@ -97,7 +97,7 @@ holds and what deleting it does.
 | Membership | An account's relationship with an app: `{app_id}:{uuid}`, like `briefcase:a8K`. |
 | STK | A Silicon's password: `stk-` followed by hexadecimal digits. |
 | Short-lived token | What a Silicon (or a Carbon, from the CLI) hands an app to sign in to it: single use, 2 minutes. |
-| OBO and ATA proofs | Tokens that let one app act at another, on behalf of a Carbon (OBO) or as itself (ATA). |
+| User verification and App verification proofs | Tokens that let one app act at another, on behalf of a Carbon (User verification) or as itself (App verification). |
 
 ## Things to rely on
 
@@ -157,7 +157,7 @@ every option, including the ports and database of a second stack.
   Carbon manages their own account.
 - The developer platform: [developers.teamofsilicons.com](https://developers.teamofsilicons.com),
   where developers set up everything about their apps' sign-in: methods, Google and Apple, the
-  details they ask for, flows and pages, redirect URLs, user base and imports, webhooks and ATA
+  details they ask for, flows and pages, redirect URLs, user base and imports, webhooks and App verification
   proofs. The settings themselves are stored in Silicon Accounts.
 - Discovery for OpenID Connect libraries:
   `https://accounts.teamofsilicons.com/.well-known/openid-configuration`, keys at

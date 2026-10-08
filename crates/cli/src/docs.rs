@@ -24,7 +24,7 @@ pub const TOPICS: &[(&str, &str, &str)] = &[
     ),
     (
         "proofs",
-        "OBO and ATA proofs: issue, verify, refresh, revoke",
+        "User verification and App verification proofs: issue, verify, refresh, revoke",
         include_str!("../docs/proofs.md"),
     ),
     (
@@ -62,7 +62,7 @@ pub fn find(topic: &str) -> Option<(&'static str, &'static str)> {
         "silicon" | "stk" => "silicons",
         "custodian" | "transfer" => "custodians",
         "app" | "sign-in" | "signin" | "oauth" | "tokens" => "apps",
-        "proof" | "obo" | "ata" => "proofs",
+        "proof" | "obo" | "ata" | "app-verification" | "user-verification" => "proofs",
         "webhook" | "events" => "webhooks",
         "import" => "imports",
         "id" | "uuid" | "identifiers" => "ids",
@@ -113,7 +113,9 @@ mod tests {
             }
         }
         assert_eq!(find("silicon").map(|(n, _)| n), Some("silicons"));
-        assert_eq!(find("OBO").map(|(n, _)| n), Some("proofs"));
+        for alias in ["ATA", "OBO", "App verification", "User verification"] {
+            assert_eq!(find(alias).map(|(n, _)| n), Some("proofs"));
+        }
         assert!(find("nope").is_none());
     }
 }

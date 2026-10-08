@@ -38,7 +38,7 @@ async function describedError(field: Locator): Promise<string> {
 
 async function choose(page: Page, id: string): Promise<void> {
   // A receiver already chosen stays until removed (one app per proof).
-  const chosen = page.getByRole("tabpanel", { name: "ATA" }).getByRole("button", { name: /^Remove [a-z0-9-]+$/ });
+  const chosen = page.getByRole("tabpanel", { name: "App verification" }).getByRole("button", { name: /^Remove [a-z0-9-]+$/ });
   if (await chosen.count()) await chosen.first().click();
   const field = page.getByRole("textbox", { name: "The app that receives it" });
   await field.fill(id);
@@ -49,13 +49,13 @@ async function choose(page: Page, id: string): Promise<void> {
 /** Makes the proof with the tab's button and reads the reveal: both tokens (shown with their eye buttons) and its words. */
 async function makeProof(page: Page): Promise<{ token: string; refresh: string; masked: string; text: string; ms: number }> {
   const started = performance.now();
-  await page.getByRole("button", { name: "Make the proof" }).click();
-  const reveal = page.getByRole("group", { name: "Your proof" });
+  await page.getByRole("button", { name: "Create token" }).click();
+  const reveal = page.getByRole("group", { name: "Your verification tokens" });
   await reveal.waitFor({ timeout: 20_000 });
   const ms = performance.now() - started;
   const masked = ((await reveal.locator("code").first().textContent()) ?? "").trim();
-  await reveal.getByRole("button", { name: "Show the proof token" }).click();
-  await reveal.getByRole("button", { name: "Show the proof refresh token" }).click();
+  await reveal.getByRole("button", { name: "Show the verification token" }).click();
+  await reveal.getByRole("button", { name: "Show the verification refresh token" }).click();
   const shown = await reveal.locator("code[data-shown]").allTextContents();
   return { token: (shown[0] ?? "").trim(), refresh: (shown[1] ?? "").trim(), masked, text: (await reveal.innerText()).replace(/\s+/g, " "), ms };
 }
@@ -68,7 +68,7 @@ export const journey: Journey = {
     const t = tag();
     const { context, page } = await ownerSignIn(ctx, APP, { label: "ata", returnTo: `/apps/${APP}/ata`, expected: [/status of 422 \(Unprocessable Entity\) @ .*\/proofs\/ata/, /status of 404 \(Not Found\) @ .*\/api\/accounts\/apps\/no-such-app-[a-z0-9]+\/public/] });
     try {
-      const panel = page.getByRole("tabpanel", { name: "ATA" });
+      const panel = page.getByRole("tabpanel", { name: "App verification" });
       const field = panel.getByRole("textbox", { name: "The app that receives it" });
       await field.waitFor({ timeout: 30_000 });
       const proofs = async (query = "") => (await developerApi<{ items?: ListedProof[] }>(env, page, `/apps/${APP}/proofs?limit=100${query}`)).body.items ?? [];
@@ -85,7 +85,7 @@ export const journey: Journey = {
       const missing = panel.getByRole("alert").filter({ hasText: "This app can't receive the proof" });
       await missing.waitFor({ timeout: 10_000 }).catch(() => undefined);
       const missingText = (await missing.innerText().catch(() => "")).replace(/\s+/g, " ");
-      results.check("an app id that does not exist is looked up and refused before anything is sent (Make the proof stays off)", missingText.includes(`no-such-app-${t}`) && (await panel.getByRole("button", { name: "Make the proof" }).isDisabled()), missingText);
+      results.check("an app id that does not exist is looked up and refused before anything is sent (Make the proof stays off)", missingText.includes(`no-such-app-${t}`) && (await panel.getByRole("button", { name: "Create token" }).isDisabled()), missingText);
       await panel.getByRole("button", { name: `Remove no-such-app-${t}` }).click();
       await panel.getByRole("button", { name: "remind", exact: true }).click();
       await sleep(300);
@@ -120,7 +120,7 @@ export const journey: Journey = {
       const wrong = await verifyProof(ctx, "waveform", first.token, { direct: true });
       results.check("waveform, which the proof is not for, is told {valid: false, expires_at: null}", wrong.body.valid === false && wrong.body.expires_at === null && Object.keys(wrong.body).length === 2, JSON.stringify(wrong.body));
 
-      await page.getByRole("group", { name: "Your proof" }).getByRole("button", { name: "I've stored them" }).click();
+      await page.getByRole("group", { name: "Your verification tokens" }).getByRole("button", { name: "I've stored them" }).click();
       await sleep(500);
       const content = await page.content();
       results.check("\"I've stored them\" takes both tokens off the page for good", !content.includes(first.token) && !content.includes(first.refresh));
@@ -138,7 +138,7 @@ export const journey: Journey = {
       await choose(page, "waveform");
       await pressSegment(panel, "Token lifetime", "30 minutes");
       const second = await makeProof(page);
-      await page.getByRole("group", { name: "Your proof" }).getByRole("button", { name: "I've stored them" }).click();
+      await page.getByRole("group", { name: "Your verification tokens" }).getByRole("button", { name: "I've stored them" }).click();
       const secondValid = await verifyProof(ctx, "waveform", second.token, { direct: true });
       results.check("a proof for waveform (typed: not one of the owner's apps), verified by waveform", secondValid.body.valid === true && appIdOf(secondValid.body.receiving_app) === "waveform", JSON.stringify(secondValid.body).slice(0, 200));
 
@@ -158,7 +158,7 @@ export const journey: Journey = {
       // The list on the tab: kinds and statuses.
       await page.reload();
       await field.waitFor({ timeout: 30_000 });
-      const list = panel.locator("ul[role='list']").filter({ has: page.getByText("ATA", { exact: true }) }).first();
+      const list = panel.locator("ul[role='list']").filter({ has: page.getByText("App verification", { exact: true }) }).first();
       await list.waitFor({ timeout: 20_000 });
       const statusFilter = async (label: string) => {
         await pressSegment(panel, "Status", label);
@@ -170,11 +170,11 @@ export const journey: Journey = {
       const active = await statusFilter("Active");
       results.check("Status filters: Expired, Revoked and Active show only those", expired.length >= 1 && expired.every(row => /Expired/.test(row)) && revokedRows.length >= 1 && revokedRows.every(row => /Revoked/.test(row)) && active.length >= 1 && active.every(row => /Active/.test(row)), `expired ${expired.length}, revoked ${revokedRows.length}, active ${active.length}`);
       await pressSegment(panel, "Status", "Any status");
-      await pressSegment(panel, "Kind", "On behalf of");
+      await pressSegment(panel, "Kind", "User verification");
       await sleep(700);
       const obo = (await panel.innerText()).replace(/\s+/g, " ");
-      results.check("Kind · On behalf of: Commit issued no OBO proof, and the tab says so", /No proofs match/.test(obo) && /Try another kind or status/.test(obo), obo.slice(obo.indexOf("Proofs this app issued"), obo.indexOf("Proofs this app issued") + 200));
-      await pressSegment(panel, "Kind", "App to app");
+      results.check("Kind · On behalf of: Commit issued no OBO proof, and the tab says so", /No verifications match/.test(obo) && /Try another kind or status/.test(obo), obo.slice(obo.indexOf("Verifications this app issued"), obo.indexOf("Verifications this app issued") + 200));
+      await pressSegment(panel, "Kind", "App verification");
       await sleep(600);
 
       // Revoke the waveform proof from its row.
@@ -191,7 +191,7 @@ export const journey: Journey = {
       const before = (await proofs()).length;
       const several = await developerApi(env, page, `/apps/${APP}/proofs/ata`, { method: "POST", json: { audiences: ["remind", "waveform"] }, headers: { "idempotency-key": `ds-${t}-several` } });
       const one = await developerApi(env, page, `/apps/${APP}/proofs/ata`, { method: "POST", json: { audiences: ["remind"] }, headers: { "idempotency-key": `ds-${t}-one` } });
-      results.check("a proof for several apps (audiences) is refused through the BFF: 422 ata_single_app, \"An ATA proof is for exactly one app; ask for one proof per app.\"", several.status === 422 && errorCode(several.body) === "ata_single_app" && /An ATA proof is for exactly one app; ask for one proof per app\./.test(errorMessage(several.body)), `${several.status} ${JSON.stringify(several.body).slice(0, 240)}`);
+      results.check("a proof for several apps (audiences) is refused through the BFF: 422 ata_single_app, \"An App verification is for exactly one app; ask for one proof per app.\"", several.status === 422 && errorCode(several.body) === "ata_single_app" && /An App verification is for exactly one app; ask for one proof per app\./.test(errorMessage(several.body)), `${several.status} ${JSON.stringify(several.body).slice(0, 240)}`);
       results.check("…even with one app in `audiences` (receiving_app is the only way)", one.status === 422 && errorCode(one.body) === "ata_single_app", `${one.status} ${errorCode(one.body)}`);
       results.check("…and nothing was made", (await proofs()).length === before, `${before} → ${(await proofs()).length}`);
     } finally {

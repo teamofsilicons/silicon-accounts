@@ -271,7 +271,7 @@ function DeleteAccount({ id, custodianOf, onDeleted }: { id: string; custodianOf
         </div>
       ) : (
         <p className={styles.dangerText}>
-          Your account ends for good. Every app you signed into is told and loses access, your sessions and proofs end, your
+          Your account ends for good. Every app you signed into is told and loses access, your sessions and user verifications end, your
           emails and phone numbers are freed, and <span className="mono">{id}</span> stays reserved for 10 days before anyone
           can take it. This cannot be undone.
         </p>

@@ -57,7 +57,7 @@ export function Overlays() {
           onSelect={item => notify.info(item.label, "A sample command (nothing happened).")}
           items={[
             { id: "apps", label: "Apps", description: "Apps you signed into", group: "Go to", icon: <LayoutGrid {...icon} />, shortcut: "3" },
-            { id: "proofs", label: "Proofs", description: "Proofs apps hold on your behalf", group: "Go to", icon: <ShieldCheck {...icon} />, shortcut: "5" },
+            { id: "proofs", label: "User verification", description: "App actions on your behalf", group: "Go to", icon: <ShieldCheck {...icon} />, shortcut: "5" },
             { id: "silicon", label: "Create a Silicon", group: "Silicons", icon: <Cpu {...icon} /> },
           ]}
         />

@@ -12,7 +12,7 @@ import { accessibleText, appDetail, ownerSignIn, type AppDetailView } from "./_h
 const METHOD: Record<string, string> = { google: "Google", apple: "Apple", email: "Email", phone: "Phone" };
 const FIELD: Record<string, string> = { email: "Email address", phone: "Phone number", dob: "Date of birth", timezone: "Timezone" };
 const plural = (count: number, one: string, other = `${one}s`) => `${count.toLocaleString("en-US")} ${count === 1 ? one : other}`;
-const TABS: Array<[string, string]> = [["overview", "Overview"], ["sign-in", "Sign-in"], ["details", "Details"], ["flows", "Flows"], ["pages", "Pages"], ["users", "Users"], ["import", "Import"], ["webhooks", "Webhooks"], ["ata", "ATA"], ["embed", "Embed"]];
+const TABS: Array<[string, string]> = [["overview", "Overview"], ["sign-in", "Sign-in"], ["details", "Details"], ["flows", "Flows"], ["pages", "Pages"], ["users", "Users"], ["import", "Import"], ["webhooks", "Webhooks"], ["ata", "App verification"], ["embed", "Embed"]];
 
 /** What the Overview's setup cards say for a stored setup (developer/components/developer/tabs/overview.tsx). */
 function expectedCards(app: AppDetailView): Record<string, string[]> {
@@ -32,7 +32,7 @@ function expectedCards(app: AppDetailView): Record<string, string[]> {
     Users: [plural(app.stats.users, "Carbon or Silicon", "Carbons and Silicons"), `${app.stats.active_last_30d.toLocaleString("en-US")} signed in during the last 30 days`],
     Import: [app.stats.imported_unclaimed ? `${app.stats.imported_unclaimed.toLocaleString("en-US")} imported, not claimed yet` : "Bring your existing users"],
     Webhooks: app.webhook.url ? [hostOf(app.webhook.url), app.webhook.secret_set ? "Signed with a whsec_ secret" : "No signing secret stored"] : ["No webhook yet"],
-    ATA: ["App-to-app proofs, one app per proof"],
+    "App verification": ["Verify your app to one other app", "Create, review and revoke verification tokens"],
     Embed: [c.allowed_origins.length ? `${plural(c.allowed_origins.length, "allowed origin")} for the iframe` : "The hosted link and the SDK's buttons work on any site"],
   };
 }
@@ -125,11 +125,11 @@ export const journey: Journey = {
     const stillKept = await page.evaluate(() => (window as unknown as { __dsMarker?: number }).__dsMarker === 1);
     results.check("all ten tabs open in place with their address and document title (\"Sign-in · commit · Silicon Developer\")", wrongTabs.length === 0 && stillKept, wrongTabs.join(" | ") || titles.slice(0, 3).join(" | "));
     await page.goBack();
-    await page.getByRole("tabpanel", { name: "ATA" }).waitFor({ timeout: 10_000 });
+    await page.getByRole("tabpanel", { name: "App verification" }).waitFor({ timeout: 10_000 });
     const afterBack = `${page.url()} ${await selectedTab(page)}`;
     await page.goForward();
     await page.getByRole("tabpanel", { name: "Embed" }).waitFor({ timeout: 10_000 });
-    results.check("Back and Forward move between tabs", afterBack === `${env.developer}/apps/${appId}/ata ATA` && page.url() === `${env.developer}/apps/${appId}/embed`, `${afterBack} → ${page.url()}`);
+    results.check("Back and Forward move between tabs", afterBack === `${env.developer}/apps/${appId}/ata App verification` && page.url() === `${env.developer}/apps/${appId}/embed`, `${afterBack} → ${page.url()}`);
 
     // The account site's old tab names redirect; an unknown tab is a real 404.
     const branding = await page.goto(`${env.developer}/apps/${appId}/branding`);

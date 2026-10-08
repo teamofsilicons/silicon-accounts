@@ -109,7 +109,7 @@ export function Apps() {
     <Page width="default">
       <PageHeader
         title="Apps you have signed into"
-        description="What each app can see about you and when it last saw you. Removing an app's access signs you out of it everywhere and ends the proofs it holds about you."
+        description="What each app can see about you and when it last saw you. Removing an app's access signs you out of it everywhere and ends its user verifications for you."
       />
       {apps.error && !apps.data ? (
         <Alert tone="danger" title="Your apps did not load">

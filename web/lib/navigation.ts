@@ -66,7 +66,7 @@ export const SECTIONS: readonly Section[] = [
   { key: "sign-in", label: "Sign-in", description: "Emails, phone numbers and Google or Apple", href: paths.signInMethods, icon: KeyRound, shortcut: "2" },
   { key: "apps", label: "Apps", description: "Apps you signed into and what they can see", href: paths.apps, icon: LayoutGrid, shortcut: "3" },
   { key: "silicons", label: "Silicons", description: "Silicons you are custodian of", href: paths.silicons, icon: Cpu, shortcut: "4" },
-  { key: "proofs", label: "Proofs", description: "Proofs apps hold on your behalf", href: paths.proofs, icon: ShieldCheck, shortcut: "5" },
+  { key: "proofs", label: "User verification", description: "Apps acting on your behalf", href: paths.proofs, icon: ShieldCheck, shortcut: "5" },
   { key: "activity", label: "Activity", description: "Sign-ins and changes, by day", href: paths.activity, icon: History, shortcut: "6" },
   { key: "developer", label: "Developer", description: "Set up sign-in for the apps you build", href: DEFAULT_DEVELOPER_URL, icon: Braces, shortcut: "7", external: true },
 ];

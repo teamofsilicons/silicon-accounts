@@ -13,7 +13,7 @@ import type { Journey } from "../../context";
 import { DEVELOPER_SIGNED_OUT, api, cli, cliHome, developerApi, fakeApp, issueAta, newContext, signInOnDeveloper, sql, tag, verifyProof, type IssuedProof } from "../../lib";
 import { SEEDED_OWNER_PHOTO, appIdOf, basicAuth, median, type ApiErrorBody } from "./_helpers";
 
-const ATA_MESSAGE = "An ATA proof is for exactly one app; ask for one proof per app.";
+const ATA_MESSAGE = "An App verification is for exactly one app; ask for one proof per app.";
 
 export const journey: Journey = {
   name: "v2-flows-ata-single-app",

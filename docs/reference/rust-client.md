@@ -81,7 +81,7 @@ process. The handles borrow it and hold one credential each; refreshing an expir
 up to you (`refresh_first_party`, `AppClient::refresh`).
 
 In owner mode (`session.app("briefcase")`) everything that manages the app works without its
-secret, including issuing ATA proofs (through the ATA page route) and revoking proofs by id.
+secret, including issuing App verification proofs (through the App verification page route) and revoking proofs by id.
 Calls that need the app's own credentials — code, SLT and refresh-token exchange, `revoke`,
 `introspect`, `issue_obo`, `refresh_proof`, `verify_proof`, revoking a proof by token — fail
 before sending with `Error::InvalidInput` (code `invalid_input`), whose message is:
@@ -465,7 +465,7 @@ let ata = commit.issue_ata(&IssueAta { receiving_app: "remind".into(), scopes: v
 commit.revoke_proof(&ProofRef::Id(ata.proof_id.clone())).await?;
 ```
 
-In the run, `remind` verified the ATA token as `Valid` (issued by `commit`, scopes
+In the run, `remind` verified the App verification token as `Valid` (issued by `commit`, scopes
 `["builds.read"]`); after `revoke_proof` the same token verified as `Invalid`.
 
 ## Webhooks

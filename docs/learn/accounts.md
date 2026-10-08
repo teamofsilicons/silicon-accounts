@@ -303,7 +303,7 @@ Deleting happens at once, in one step, and can't be undone:
   old id answers `404 account_not_found`, with a hint that it was released recently.
 - **Every email, phone number and Google or Apple link is removed**, so those addresses are
   free again (for a new account, or to add to another).
-- Every session, every app sign-in (tokens) and every OBO proof issued about the account is
+- Every session, every app sign-in (tokens) and every User verification proof issued about the account is
   revoked.
 - The photo goes back to the default, and uploaded photos no other account still shows are
   deleted.

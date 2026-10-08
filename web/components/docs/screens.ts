@@ -7,7 +7,7 @@
  * app (see web/README.md, Docs), and in `next dev` React logs a warning about the root layout's theme script while it
  * does, which would fail the run. Check it against a production server instead.
  */
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import type { ScreenSpec } from "@/scripts/screens-types";
 
 /** Scrolls so the element is just below the sticky docs header, for viewport shots of the middle of a page. */
@@ -20,6 +20,16 @@ const scrollTo = (selector: string) => async (page: Page) => {
 };
 
 export const screens: ScreenSpec[] = [
+  { name: "docs-app-verification", path: "/docs/start/ata", as: "signed-out", fullPage: false },
+  {
+    name: "docs-verification-search", path: "/docs", as: "signed-out", fullPage: false,
+    prepare: async page => {
+      await page.keyboard.press("/");
+      await page.getByRole("combobox").fill("App verification");
+      await expect(page.getByRole("option").filter({ hasText: "App verification" }).first()).toBeVisible();
+      await page.waitForTimeout(700);
+    },
+  },
   { name: "docs-home", path: "/docs", as: "signed-out", fullPage: false },
   { name: "docs-home-every-page", path: "/docs", as: "signed-out", fullPage: false, prepare: scrollTo("#every-page") },
   { name: "docs-start-page", path: "/docs/start/add-sign-in", as: "signed-out", fullPage: false },

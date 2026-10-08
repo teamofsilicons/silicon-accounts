@@ -1049,6 +1049,14 @@ async fn app_jwks(app: &AppClient<'_>) -> CliResult<silicon_accounts_client::Jwk
 
 // ---- proofs --------------------------------------------------------------------------------
 
+fn verification_name(kind: &str) -> &str {
+    match kind {
+        "ata" => "App verification",
+        "obo" => "User verification",
+        other => other,
+    }
+}
+
 async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> CliResult<Outcome> {
     let issued_outcome = |proof: silicon_accounts_client::IssuedProof| {
         let to = proof.receiving_app.clone().unwrap_or_default();
@@ -1056,7 +1064,7 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
             "{} proof {} from {app_id} for {to}{}.\n{}",
             proof
                 .kind
-                .map(|k| k.as_str().to_uppercase())
+                .map(|k| verification_name(k.as_str()))
                 .unwrap_or_default(),
             proof.proof_id,
             proof
@@ -1121,7 +1129,7 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
                     .collect();
                 return Err(CliError::invalid(
                     format!(
-                        "An ATA proof is for exactly one app, but --to names {}: {}.",
+                        "An App verification proof is for exactly one app, but --to names {}: {}.",
                         several.len(),
                         several.join(", ")
                     ),
@@ -1146,7 +1154,7 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
                 ProofVerification::Valid(proof) => {
                     let text = format!(
                         "valid: {} proof from {} for {}{}{}, until {}",
-                        proof.kind.as_str().to_uppercase(),
+                        verification_name(proof.kind.as_str()),
                         proof.issuing_app.app_id,
                         proof.receiving_app.app_id,
                         proof.user.as_ref().map(|u| format!(", on behalf of {} ({})", u.id, u.uuid)).unwrap_or_default(),
@@ -1212,7 +1220,7 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
                 .map(|p| {
                     vec![
                         p.proof_id.clone(),
-                        p.kind.as_str().to_owned(),
+                        verification_name(p.kind.as_str()).to_owned(),
                         p.receiving_app.clone(),
                         p.user.as_ref().map(|u| u.id.clone()).unwrap_or_default(),
                         if p.revoked_at.is_some() {

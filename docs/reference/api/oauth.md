@@ -372,7 +372,7 @@ appear with the `phone` and `dob` scopes. A refresh returns a fresh `id_token` t
 | 401 | `invalid_client` | unknown app, wrong secret, disabled app, no credentials (with `WWW-Authenticate: Basic`) |
 | 400 | `invalid_grant` | the code, refresh token, SLT or device code is unknown, expired, already used, revoked, issued to another app, or its account was deleted or removed the app's access; a `redirect_uri` or PKCE mismatch |
 | 400 | `unauthorized_client` | the public client asked for a grant only confidential clients may use, or an app asked for the device-code grant |
-| 400 | `unsupported_grant_type` | any other `grant_type` (the description says what to use instead: ATA proofs for `client_credentials`, OBO proofs for token exchange) |
+| 400 | `unsupported_grant_type` | any other `grant_type` (the description says what to use instead: App verification proofs for `client_credentials`, User verification proofs for token exchange) |
 | 400 | `invalid_scope` | a refresh asked for a scope that wasn't granted, or an unknown scope |
 | 400 | `authorization_pending`, `slow_down`, `access_denied`, `expired_token` | device-code polling (above) |
 | 413 | `invalid_request` | the body is over 64 KB |

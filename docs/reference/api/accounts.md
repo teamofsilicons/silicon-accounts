@@ -385,7 +385,7 @@ itself is not listed.
 
 ### `DELETE /v1/me/apps/{app_id}`
 
-Remove an app's access. **204.** The app's tokens for you and the OBO proofs it issued about you
+Remove an app's access. **204.** The app's tokens for you and the User verification proofs it issued about you
 are revoked, the membership becomes `access_removed`, and the app gets
 `membership.access_removed`. Repeating it does nothing more. Signing into the app again restores
 the membership. Errors: 404 `membership_not_found`, 400 `first_party_app` (the account site
@@ -483,7 +483,7 @@ Delete your account. **account (Carbon).** `{"confirm": "c:ada"}` (your current 
 prefix don't matter). **204** (a cookie session's cookie is cleared).
 
 In one step: the account becomes `deleted`, its id is reserved for 10 days, emails, phones and
-linked identities are removed, every session, sign-in and OBO proof about it is revoked, the
+linked identities are removed, every session, sign-in and User verification proof about it is revoked, the
 photo goes back to the default, apps lose the personal data they imported about it, and every app
 it signed into gets `account.deleted`. Self-created Silicons still waiting for you to accept are
 released and told (`silicon.custodian.declined`, reason `custodian_account_deleted`).

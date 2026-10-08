@@ -351,7 +351,7 @@ impl TokenError {
                 "Check this machine's clock; the token becomes valid within seconds."
             }
             Self::WrongAudience { .. } => {
-                "Only accept tokens issued to your own app_id; another app's token must go through a proof (OBO) instead."
+                "Only accept tokens issued to your own app_id; another app's token must go through a User verification proof instead."
             }
             Self::WrongIssuer { .. } => {
                 "Make sure the token comes from the Silicon Accounts instance you trust."

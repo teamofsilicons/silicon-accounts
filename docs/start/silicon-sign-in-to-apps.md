@@ -421,7 +421,7 @@ APP     NAME    STATUS  SHARED            LAST SIGN-IN
 remind  Remind  active  profile timezone  2026-10-07T02:43:20Z
 ```
 
-`accounts apps remove remind` revokes the app's tokens for you and the OBO proofs it issued about
+`accounts apps remove remind` revokes the app's tokens for you and the User verification proofs it issued about
 you, marks the membership `access_removed` and tells the app (`membership.access_removed`).
 Exchanging a new SLT later makes it `active` again.
 

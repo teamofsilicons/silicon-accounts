@@ -252,6 +252,46 @@ mod tests {
     }
 
     #[test]
+    fn verification_aliases_keep_existing_commands() {
+        for (old, new) in [
+            (vec!["proofs", "list"], vec!["user-verification", "list"]),
+            (
+                vec!["proofs", "revoke", "test-id"],
+                vec!["user-verification", "revoke", "test-id"],
+            ),
+            (
+                vec!["app", "proof", "ata", "--to", "remind"],
+                vec!["app", "proof", "app-verification", "--to", "remind"],
+            ),
+            (
+                vec![
+                    "app",
+                    "proof",
+                    "obo",
+                    "--subject-token",
+                    "test-token",
+                    "--to",
+                    "remind",
+                ],
+                vec![
+                    "app",
+                    "proof",
+                    "user-verification",
+                    "--subject-token",
+                    "test-token",
+                    "--to",
+                    "remind",
+                ],
+            ),
+        ] {
+            assert_eq!(
+                format!("{:?}", parse(&old).command),
+                format!("{:?}", parse(&new).command)
+            );
+        }
+    }
+
+    #[test]
     fn webhook_endpoints_are_not_the_service_url() {
         let hook = "https://hooks.example/silicon";
         let cli = parse(&["webhook", "set", hook]);

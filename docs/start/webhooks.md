@@ -73,9 +73,9 @@ App webhooks only carry events about accounts with a live membership with your a
 |---|---|---|
 | `account.id_changed` | `uuid`, `membership_id`, `kind`, `old_id`, `new_id` | Show `new_id`. Keep keying on the uuid, which never changes. |
 | `account.updated` | `uuid`, `membership_id`, `changed`, `account` | Replace the fields you store with `account` (the account as your app may see it) if `account.version` is newer. `changed` lists only fields your app may see. |
-| `account.deleted` | `uuid`, `membership_id` | Delete or anonymise the account's data. Its tokens and OBO proofs already ended. |
-| `membership.signed_out` | `uuid`, `membership_id`, `reason` | End the account's sessions in your app. Its tokens are already revoked, and OBO proofs your app issued from them ended. `reason`: `app_revoked`, `stk_rotated`, `refresh_token_reuse` or `authorization_code_reuse`. |
-| `membership.access_removed` | `uuid`, `membership_id` | The account removed your app's access: stop using its data. Its tokens and your OBO proofs for it ended. It can sign in again later. |
+| `account.deleted` | `uuid`, `membership_id` | Delete or anonymise the account's data. Its tokens and User verification proofs already ended. |
+| `membership.signed_out` | `uuid`, `membership_id`, `reason` | End the account's sessions in your app. Its tokens are already revoked, and User verification proofs your app issued from them ended. `reason`: `app_revoked`, `stk_rotated`, `refresh_token_reuse` or `authorization_code_reuse`. |
+| `membership.access_removed` | `uuid`, `membership_id` | The account removed your app's access: stop using its data. Its tokens and your User verification proofs for it ended. It can sign in again later. |
 | `silicon.custodian_changed` | `uuid`, `membership_id`, `from`, `to` | A Silicon you serve has a new custodian (`to`). |
 | `ping` | `{}` | A test delivery. Answer `2xx`. |
 
@@ -426,5 +426,5 @@ The custodian does the same for its Silicon, signed in as itself: `GET /v1/me/si
 ## Related
 
 - [How webhooks work](../learn/webhooks.md): every event with a real payload, who receives what, retries, ordering and replay rules, and why.
-- [Act for an account at another app (OBO)](obo.md): `membership.signed_out`, `membership.access_removed` and `account.deleted` also end your OBO proofs.
+- [Act for an account at another app (User verification)](obo.md): `membership.signed_out`, `membership.access_removed` and `account.deleted` also end your User verification proofs.
 - [Webhooks reference](../reference/api/webhooks.md): headers, body and every event type in one place; the endpoints are in [App endpoints](../reference/api/apps.md).

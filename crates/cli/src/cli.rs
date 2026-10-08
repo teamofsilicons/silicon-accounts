@@ -128,14 +128,15 @@ pub enum Commands {
 
     /// Apps you signed into: list them, or remove an app's access.
     ///
-    /// Removing access revokes the app's tokens for you and the OBO proofs it issued about you, and tells the app (membership.access_removed).
+    /// Removing access revokes the app's tokens for you and the User verification proofs it issued about you, and tells the app (membership.access_removed).
     #[command(
         after_long_help = "Examples:\n  accounts apps list\n  accounts apps remove briefcase"
     )]
     Apps(MyAppsArgs),
 
-    /// OBO proofs apps issued on your behalf: list or revoke them.
+    /// User verification proofs apps issued on your behalf: list or revoke them.
     #[command(
+        visible_alias = "user-verification",
         after_long_help = "Examples:\n  accounts proofs list\n  accounts proofs revoke 0192f0c2-…"
     )]
     Proofs(MyProofsArgs),
@@ -184,7 +185,7 @@ pub enum Commands {
 
     /// App mode: an app's sign-in setup, user base, imports, tokens, webhooks and proofs.
     ///
-    /// Acts with the app's credentials (--app-id/--app-secret, ACCOUNTS_APP_ID/ACCOUNTS_APP_SECRET, or `accounts app use <app_id> --secret-stdin`), or as the app's owner when you are signed in as the Carbon who owns it. Token calls, OBO proofs, proof verification and refresh need the app's own credentials; an owner can issue ATA proofs (the app's ATA page) and revoke the app's proofs by id. Apps are created in Silicon Apps (`accounts app new`).
+    /// Acts with the app's credentials (--app-id/--app-secret, ACCOUNTS_APP_ID/ACCOUNTS_APP_SECRET, or `accounts app use <app_id> --secret-stdin`), or as the app's owner when you are signed in as the Carbon who owns it. Token calls, User verification proofs, proof verification and refresh need the app's own credentials; an owner can issue App verification proofs (the app's App verification page) and revoke the app's proofs by id. Apps are created in Silicon Apps (`accounts app new`).
     #[command(after_long_help = APP_EXAMPLES)]
     App(AppArgs),
 
@@ -539,9 +540,9 @@ pub struct MyProofsArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum MyProofsCommand {
-    /// List OBO proofs issued on your behalf.
+    /// List User verification proofs issued on your behalf.
     List,
-    /// Revoke an OBO proof.
+    /// Revoke a User verification proof.
     Revoke {
         /// The proof id.
         proof_id: String,
@@ -1046,7 +1047,7 @@ pub enum AppCommand {
         /// The access token (or - to read it from stdin).
         access_token: String,
     },
-    /// OBO and ATA proofs: issue, verify, refresh, revoke, list.
+    /// User verification and App verification proofs: issue, verify, refresh, revoke, list.
     Proof(ProofArgs),
     /// The app's webhook: endpoint, secret, test, deliveries, replay.
     Webhook(AppWebhookArgs),
@@ -1251,8 +1252,9 @@ pub struct ProofArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum ProofCommand {
-    /// Issue an OBO proof: act at another app on behalf of an account that consented in your app.
+    /// Issue a User verification proof: act at another app on behalf of an account that consented in your app.
     #[command(
+        visible_alias = "user-verification",
         after_long_help = "Examples:\n  accounts app proof obo --subject-token \"$ACCESS_TOKEN\" --to briefcase \\\n      --scope files.write --ttl 600"
     )]
     Obo {
@@ -1272,9 +1274,10 @@ pub enum ProofCommand {
         #[arg(long, value_name = "KEY")]
         idempotency_key: Option<String>,
     },
-    /// Issue an ATA proof that one other app can verify (one proof per app).
+    /// Issue an App verification proof that one other app can verify (one proof per app).
     #[command(
-        long_about = "Issue an ATA (app to app) proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An ATA proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Owners can also make, see and revoke ATA proofs on the app's ATA page at developers.teamofsilicons.com.",
+        visible_alias = "app-verification",
+        long_about = "Issue an App verification proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An App verification proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Managers can also make, see and revoke these proofs in the developer portal. The central history at developers.teamofsilicons.com/app-verification retains records and token events for apps you manage; raw token values are shown only when generated.",
         after_long_help = "Examples:\n  accounts app proof ata --to remind --ttl 300\n  accounts app proof ata --to waveform --scope notifications.send\n  accounts app proof list --kind ata"
     )]
     Ata {

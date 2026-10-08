@@ -177,7 +177,7 @@ Answers are shaped so they don't reveal more than the caller already knows:
 
 - **Audience.** An access token carries the app it was issued to (`aud`). An app's token is
   refused on account endpoints (`token_wrong_audience`) and at another app's introspection; to act
-  for an account at another app, an app gets an OBO proof, which the account can see and revoke.
+  for an account at another app, an app gets a User verification proof, which the account can see and revoke.
   The developer platform's tokens (`aud = developer`) are narrower still: they only read the
   signed-in Carbon and manage the apps that Carbon owns, so a leak of one can't change an
   account's emails, Silicons or apps signed into. They never reach a browser: the developer
@@ -188,9 +188,9 @@ Answers are shaped so they don't reveal more than the caller already knows:
   revoked and the app is told (`membership.signed_out`, reason `refresh_token_reuse` or
   `authorization_code_reuse`).
 - **Cascades.** Rotating a Silicon's STK ends every sign-in of it, including short-lived tokens
-  already issued. Removing an app's access revokes its tokens and the OBO proofs it issued about
+  already issued. Removing an app's access revokes its tokens and the User verification proofs it issued about
   the account. Deleting an account revokes everything. Proof verification checks the sign-in
-  behind an OBO proof live, so nothing waits for a sweep or a webhook.
+  behind a User verification proof live, so nothing waits for a sweep or a webhook.
 - **Short access tokens.** A locally verified access token can't know it was revoked, so it lives
   30 minutes. When you must know at once, call `POST /v1/oauth/introspect`.
 

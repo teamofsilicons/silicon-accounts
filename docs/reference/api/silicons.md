@@ -603,7 +603,7 @@ Cancel the pending transfer. **204.** 404 `transfer_not_found`.
 
 Delete the Silicon's account. `{"confirm": "si:scout"}` (its current id). **204.** Same effects
 as [deleting an account](accounts.md#delete-v1me): apps get `account.deleted`, the id is reserved
-10 days, sign-ins and OBO proofs end. The Silicon's webhook is kept so the events already queued
+10 days, sign-ins and User verification proofs end. The Silicon's webhook is kept so the events already queued
 still arrive. Errors: 422 `confirmation_required` / `confirmation_mismatch`.
 
 ## Requests addressed to you

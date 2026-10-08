@@ -54,7 +54,7 @@ belongs to (`fid`) and the granted scopes.
   immediately and also refuses tokens whose membership is no longer active.
 - **Audience-bound**, so a token minted for one app is useless at another. Your API must check
   `aud`; the libraries do it when you pass your app id. To act at another app on an account's
-  behalf, apps use [OBO proofs](../start/obo.md), not each other's tokens.
+  behalf, apps use [User verification proofs](../start/obo.md), not each other's tokens.
 
 ## Refresh tokens: rotated, reuse-detected, 900 days at most
 
@@ -90,7 +90,7 @@ and save the new refresh token before using anything else from the answer.
 | 900 days pass | nothing | `The refresh token expired at …` |
 
 When the account removes your access, Silicon Accounts revokes every sign-in your app holds for
-it (and the OBO proofs your app issued about it), marks the membership `access_removed` in
+it (and the User verification proofs your app issued about it), marks the membership `access_removed` in
 your user base, and stops showing you its contact details. It comes back only when the account
 signs in to your app again, through the what's-shared screen.
 

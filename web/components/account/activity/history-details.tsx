@@ -125,7 +125,7 @@ const LABELS: Record<string, string> = {
   deleted_photos: "Old photos deleted",
   membership_id: "Membership",
   revoked_sessions: "Sessions ended",
-  revoked_proofs: "Proofs revoked",
+  revoked_proofs: "User verifications revoked",
   revoked_token_families: "Sign-ins ended",
   revoked_families: "Sign-ins ended",
   revoked_browser_sessions: "Browser sessions ended",
@@ -272,7 +272,7 @@ function proofRows(item: HistoryItem, meta: Meta): DetailRow[] {
     if (reason) rows.push({ label: "Why it ended", value: proofReason(reason, item.app?.name ?? issuing ?? "The app") });
   }
   const id = str(meta.proof_id);
-  if (id) rows.push({ label: "Proof id", value: mono(id) });
+  if (id) rows.push({ label: "Verification id", value: mono(id) });
   return rows;
 }
 

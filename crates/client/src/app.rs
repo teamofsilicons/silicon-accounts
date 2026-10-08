@@ -637,7 +637,7 @@ impl<'a> AppClient<'a> {
         request: &IssueObo,
         idempotency_key: Option<&str>,
     ) -> Result<IssuedProof> {
-        let auth = self.credentials("Issuing an OBO proof")?;
+        let auth = self.credentials("Issuing a User verification proof")?;
         let request = Request::new(
             Method::POST,
             self.client.endpoint(&["v1", "proofs", "obo"]),
@@ -648,9 +648,9 @@ impl<'a> AppClient<'a> {
         self.client.execute(request).await?.json()
     }
 
-    /// Issues an ATA proof for exactly one app (`request.receiving_app`). With app
+    /// Issues an App verification proof for exactly one app (`request.receiving_app`). With app
     /// credentials this calls `POST /v1/proofs/ata`; through the owner's session it calls
-    /// `POST /v1/apps/{app_id}/proofs/ata` (the app's ATA page). To talk to several apps,
+    /// `POST /v1/apps/{app_id}/proofs/ata` (the app's App verification page). To talk to several apps,
     /// issue one proof per app: each app verifies its own.
     pub async fn issue_ata(
         &self,
@@ -660,14 +660,14 @@ impl<'a> AppClient<'a> {
         let receiving_app = request.receiving_app.trim();
         if receiving_app.is_empty() {
             return Err(Error::invalid_input(
-                "An ATA proof needs the one app that will verify it (receiving_app).",
+                "An App verification proof needs the one app that will verify it (receiving_app).",
                 "Pass that app's id, e.g. remind; to talk to several apps, issue one proof per app.",
             ));
         }
         if receiving_app.contains(',') || receiving_app.chars().any(char::is_whitespace) {
             return Err(Error::invalid_input(
                 format!(
-                    "An ATA proof is for exactly one app, but receiving_app '{receiving_app}' names several."
+                    "An App verification proof is for exactly one app, but receiving_app '{receiving_app}' names several."
                 ),
                 "Issue one proof per app: call issue_ata once for every app that should verify a proof from you.",
             ));

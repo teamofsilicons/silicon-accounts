@@ -147,7 +147,7 @@ Where the first-party access token comes from (all have `aud = accounts` and las
 
 An access token issued to an app (`aud` = that app) is refused on account endpoints with 401
 `token_wrong_audience`: an app acts for an account at another app with an
-[OBO proof](api/proofs.md), never with the account's token.
+[User verification proof](api/proofs.md), never with the account's token.
 
 **Cookies are for the account site.** A request authenticated by the session cookie that changes
 something (POST, PUT, PATCH, DELETE) must carry an `Origin` header equal to the public origin, or
@@ -452,7 +452,7 @@ pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)
 | `POST /v1/apps/{app_id}/webhook/replay` | app or owner | yes | 200 result |
 | `POST /v1/internal/apps/sync` | internal | | 200 synced apps |
 
-### Proofs — [proofs.md](api/proofs.md)
+### App verification and User verification — [proofs.md](api/proofs.md)
 
 | Method and path | Auth | Idem. | Success |
 |---|---|---|---|
@@ -464,7 +464,9 @@ pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)
 | `GET /v1/apps/{app_id}/proofs` | app or owner | | 200 list |
 | `POST /v1/apps/{app_id}/proofs/ata` | app or owner | yes | 201 proof |
 | `DELETE /v1/apps/{app_id}/proofs/{proof_id}` | app or owner | | 204 |
-| `GET /v1/me/proofs` | account | | 200 list |
+| `GET /v1/me/app-verifications` | signed-in manager | | 200 retained App verification records |
+| `GET /v1/apps/{app_id}/proofs/{proof_id}/history` | signed-in manager | | 200 retained verification history |
+| `GET /v1/me/proofs` | account | | 200 User verification list |
 | `DELETE /v1/me/proofs/{proof_id}` | account | | 204 |
 
 ### Webhooks — [webhooks.md](api/webhooks.md)

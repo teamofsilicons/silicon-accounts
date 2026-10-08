@@ -478,7 +478,7 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
                 error(
                     422,
                     "ata_single_app",
-                    "An ATA proof is for exactly one app; ask for one proof per app.",
+                    "An App verification is for exactly one app; ask for one proof per app.",
                     "Send {\"receiving_app\": \"remind\"} to POST /v1/proofs/ata instead of \"audiences\".",
                 )
             } else {

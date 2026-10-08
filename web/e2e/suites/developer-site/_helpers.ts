@@ -297,7 +297,7 @@ export async function signOutOfDeveloper(env: Env, page: Page): Promise<void> {
 /* The developer site's pages and controls                                                                             */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-const TAB_LABEL: Record<string, string> = { overview: "Overview", "sign-in": "Sign-in", details: "Details", flows: "Flows", pages: "Pages", users: "Users", import: "Import", webhooks: "Webhooks", ata: "ATA", embed: "Embed" };
+const TAB_LABEL: Record<string, string> = { overview: "Overview", "sign-in": "Sign-in", details: "Details", flows: "Flows", pages: "Pages", users: "Users", import: "Import", webhooks: "Webhooks", ata: "App verification", embed: "Embed" };
 
 /** Opens one tab of an app with a full load and waits for its panel. */
 export async function openAppTab(env: Env, page: Page, appId: string, tab: string): Promise<Locator> {

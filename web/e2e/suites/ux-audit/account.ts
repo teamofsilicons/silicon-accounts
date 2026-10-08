@@ -18,7 +18,7 @@ export const ACCOUNT_PAGES: Array<{ path: string; name: string; ready: RegExp }>
   { path: "/sign-in-methods", name: "sign-in-methods", ready: /Email|email/ },
   { path: "/apps", name: "apps", ready: /App|app/ },
   { path: "/silicons", name: "silicons", ready: /Silicon/ },
-  { path: "/proofs", name: "proofs", ready: /[Pp]roof/ },
+  { path: "/proofs", name: "proofs", ready: /User verification/ },
   { path: "/activity", name: "activity", ready: /./ },
   { path: "/settings", name: "settings", ready: /./ },
 ];

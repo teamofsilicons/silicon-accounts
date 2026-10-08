@@ -639,7 +639,7 @@ pub async fn my_apps(ctx: &Ctx, args: MyAppsArgs) -> CliResult<Outcome> {
             Ok(Outcome::new(
                 json!({ "removed": true, "app_id": app_id }),
                 format!(
-                    "Removed {app_id}'s access: its tokens for you and the OBO proofs it issued about you are revoked, and it was told (membership.access_removed)."
+                    "Removed {app_id}'s access: its tokens for you and the User verification proofs it issued about you are revoked, and it was told (membership.access_removed)."
                 ),
             ))
         }
@@ -667,7 +667,7 @@ pub async fn my_proofs(ctx: &Ctx, args: MyProofsArgs) -> CliResult<Outcome> {
                 table(
                     &["PROOF", "APPS", "SCOPES", "STATUS", "EXPIRES"],
                     &rows,
-                    "No OBO proofs were issued on your behalf.",
+                    "No User verification proofs were issued on your behalf.",
                 ),
             )
             .next("accounts proofs revoke <proof_id>", "revoke one"))

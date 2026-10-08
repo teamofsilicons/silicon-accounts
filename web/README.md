@@ -4,7 +4,7 @@ The public site of Silicon Accounts (accounts.teamofsilicons.com): the account p
 hosted sign-in pages apps send people to, the docs, the embeddable sign-in buttons and the SDK script.
 
 Building apps is not done here. Everything about an app's sign-in (its methods, Google and Apple, details and flows,
-page styling, redirect URLs, user base and imports, webhooks, ATA proofs, embed snippets) lives on the developer site,
+page styling, redirect URLs, user base and imports, webhooks, App verification proofs, embed snippets) lives on the developer site,
 developers.teamofsilicons.com (`developer/` in this repository, its own Next.js app). This site only links there: the
 dock's Developer item, the landing page's footer and the apps page lead to `developer_url` from `GET /v1/meta`, and
 `/developer[/*]` redirects there (see Topology).
@@ -345,12 +345,12 @@ the developer site (`developer/`) and accounts-api behind them. The core suite (
 briefcase's hosted sign-in with its what's-shared page and dm's "Continue as" with its own page adding the phone it
 requires (optional details unticked until ticked); Google and Apple (managed and the apps' own) and the apps' direct
 buttons (the Opening page, email and phone opening on their field); the CLI (device sign-in approved in the browser,
-`silicon create`, a self-created Silicon accepted on /silicons, `login --silicon`, an SLT for remind); OBO and ATA
-through the fake apps (one ATA proof per app, with timings); dirty.csv imported on the developer site (signed in
+`silicon create`, a self-created Silicon accepted on /silicons, `login --silicon`, an SLT for remind); User verification and App verification
+through the fake apps (one App verification proof per app, with timings); dirty.csv imported on the developer site (signed in
 through its BFF) and with the CLI, and an imported Carbon finishing setup; webhooks with valid signatures; every page in
 an app's own style with "Powered by", Sign in / Sign up buttons, the embed and the SDK; ledgerly's two-page flow with
-its review (Back, Cancel); the developer site as an owner (a saved title on the hosted page, an ATA proof made and
-revoked on its ATA tab); the shared behaviours (the developer site's unsaved-work guard, Escape in layers, the Combobox,
+its review (Back, Cancel); the developer site as an owner (a saved title on the hosted page, an App verification proof made and
+revoked on its App verification tab); the shared behaviours (the developer site's unsaved-work guard, Escape in layers, the Combobox,
 focus states, any-country phones, dark tokens, /developer leading to the developer site); a Silicon's secrets on the
 account site; connecting Google and Apple. Other suites live in `e2e/suites/<suite>/`.
 
@@ -365,7 +365,7 @@ pnpm e2e --list
 
 **`e2e/README.md` is the guide**: suites (`e2e/journeys/*.ts` is the core suite, `e2e/suites/<suite>/*.ts` the
 others, found without editing run.ts), the v2 helpers in `e2e/lib.ts` (the details pages, intents and method buttons,
-the Opening page, the developer site's sign-in through its BFF, single-app ATA proofs), port bases (the developer site
+the Opening page, the developer site's sign-in through its BFF, single-app App verification proofs), port bases (the developer site
 is base + 5), per-stack builds of both sites, reports (`e2e/.artifacts/<base>/report.json` and `report.md`,
 `e2e/.artifacts/summary.md`), the mock Iris, forwarded addresses and time travel. Each journey records checks and fails
 on console errors, uncaught page errors, CSP refusals and failed requests (`e2e/lib.ts`). `e2e/` is part of
@@ -403,7 +403,7 @@ Every shared-foundation request from the area builders, resolved in the shared c
 - **Whole lists** (`lib/query/pages.ts`): `useMyApps`, `useMyProofs`, `useSessions`, `useSilicons`,
   `useCustodianRequests` and `useOwnedApps` read every page; the account area's `useEvery*` are re-exports.
 - **Secret mutations** (`useSecretMutation`): every action whose answer carries a secret; the account area's `*Once`
-  hooks are re-exports, and the developer area's webhook and ATA forms use the shared hooks.
+  hooks are re-exports, and the developer area's webhook and App verification forms use the shared hooks.
 - **First-party sign-in** ends on /sign-in only: the shell no longer reads `/?state&code|error` (a link could put its
   own words in a toast there); `consumeSignInReturn` / `isSignInReturn` are gone, `/device` is a valid return path.
 - **Arc**: Combobox, Escape in layers, PhoneInput, Timeline, OTP input, focus states (see Local edits).
@@ -465,7 +465,7 @@ What changed on this site for UNDERSTANDING.md v2 (build spec 06-v2.md):
   client (`api.flows.detailsAdd/detailsVerify/detailsContinue/detailsBack/review`).
 - **Types** (`lib/api/types.ts`): FlowView v2 (`intent`, `details`, `review`; no `requirements`, `consent`,
   `login_hint`), `FlowCreate.intent`, `SigninCopy.opening_title/signup_title/signup_subtitle`, `SigninConfig.flow`
-  (`SigninFlow`, `SigninFlowStep`), ATA proofs for exactly one `receiving_app` (`AtaRequest`, `IssuedProof`, `AppProof`).
+  (`SigninFlow`, `SigninFlowStep`), App verification proofs for exactly one `receiving_app` (`AtaRequest`, `IssuedProof`, `AppProof`).
 - **SDK and embed**: `intent` / `data-intent`, `buttons: "intents"` ("Sign in" / "Sign up"), "Continue with phone
   number", no login hint (see SDK).
 - **Mocks and screens**: `components/auth/mocks/flows.ts` samples every v2 page (Opening, intents, details pages, the
@@ -486,3 +486,7 @@ What changed on this site for UNDERSTANDING.md v2 (build spec 06-v2.md):
   `findPage` / `isGroup`) is rewritten to `/docs/404` with status 404, which renders the docs' "No page here" inside
   the docs frame with the theme boot script. The Markdown files, the search index and client-side navigations (RSC
   requests, where the catch-all's `notFound()` renders as before) pass through.
+
+### Verification terminology (2026-10-08)
+
+The shared account navigation, phone sheet and command palette call `/proofs` **User verification**. Page metadata, cards, activity filters and related copy use the same name; the route, query keys, API values and revoke behavior remain unchanged. Root `docs/` supplies the updated App verification and User verification titles to the docs navigation and search. The central managed-app history lives at `https://developers.teamofsilicons.com/app-verification`; it retains events, never raw token values.

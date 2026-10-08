@@ -1,6 +1,6 @@
 ---
-title: Act for an account at another app (OBO)
-description: Trade an account's access token for an OBO proof so your app can act at another app on its behalf, then refresh it, revoke it and react when the account's grant ends.
+title: Act for an account at another app (User verification)
+description: Trade an account's access token for a User verification proof so your app can act at another app on its behalf, then refresh it, revoke it and react when the account's grant ends.
 kind: instructive
 order: 41
 related:
@@ -11,7 +11,7 @@ related:
   - reference/api/proofs.md
 ---
 
-# Act for an account at another app (OBO)
+# Act for an account at another app (User verification)
 
 Your app (the *issuing app*) wants to do something at another app (the *receiving app*) for an account that signed into your app: `dm` saves a file to the account's `briefcase`. You ask the account in your own screens, trade the account's access token for a proof that names `briefcase`, and send the proof token with your call. `briefcase` [verifies it](verify-a-proof.md).
 
@@ -59,7 +59,7 @@ Every response on this page is real, from a local Silicon Accounts stack. There,
 ## Before you start
 
 - **The account signed into your app, and you hold its access token** (a JWT whose `aud` is your app id). You get it from the authorization code exchange ([Add sign-in to an app](add-sign-in.md)) or, for a Silicon, from exchanging its short-lived token ([How a Silicon signs into apps](silicon-sign-in-to-apps.md)). Access tokens last 30 minutes; if it expired, refresh the account's tokens first.
-- **The account agreed, in your app, to what you'll do at the receiving app.** Silicon Accounts shows no consent screen for proofs: the issuing app owns that conversation (for a Silicon, the instruction it gave you is that agreement). The account can see and revoke every OBO proof issued on its behalf, so ask for what you need and no more.
+- **The account agreed, in your app, to what you'll do at the receiving app.** Silicon Accounts shows no consent screen for proofs: the issuing app owns that conversation (for a Silicon, the instruction it gave you is that agreement). The account can see and revoke every User verification proof issued on its behalf, so ask for what you need and no more.
 - **You know the scopes the receiving app expects.** Scopes are strings the two apps agree on; Silicon Accounts carries them and doesn't interpret them.
 
 ## 1. Issue the proof
@@ -144,7 +144,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -u "dm:$DM_APP_SECRET" \
 
 ## When the account's grant ends
 
-An OBO proof stands on the account's sign-in at your app, its membership with your app, and the account itself. When any of them ends, the proof ends with it, immediately: the receiving app gets `{"valid": false, "expires_at": null}` and your next refresh says why. Your [webhook](webhooks.md) tells you when it happens:
+A User verification proof stands on the account's sign-in at your app, its membership with your app, and the account itself. When any of them ends, the proof ends with it, immediately: the receiving app gets `{"valid": false, "expires_at": null}` and your next refresh says why. Your [webhook](webhooks.md) tells you when it happens:
 
 | you receive | because | your proofs for that account | refresh says |
 |---|---|---|---|
@@ -154,7 +154,7 @@ An OBO proof stands on the account's sign-in at your app, its membership with yo
 | `account.deleted` | the account was deleted | end | `410 proof_revoked`, `account_deleted` |
 | nothing | the account revoked one proof on the account site or with `accounts proofs revoke` | that proof ends | `410 proof_revoked`, `revoked_by_account` |
 
-Stop using those proofs. Once the account signs into your app again, you hold a new access token and can issue a new proof. Trying with the old access token answers `400 invalid_subject_token` with `details.reason: "revoked"` and the time and cause, for example `(access_removed)`. The full list of ends is in [How proofs work](../learn/proofs.md#what-an-obo-proof-stands-on).
+Stop using those proofs. Once the account signs into your app again, you hold a new access token and can issue a new proof. Trying with the old access token answers `400 invalid_subject_token` with `details.reason: "revoked"` and the time and cause, for example `(access_removed)`. The full list of ends is in [How proofs work](../learn/proofs.md#what-a-user-verification-proof-stands-on).
 
 ## List the proofs
 
@@ -199,7 +199,7 @@ curl -s -u "dm:$DM_APP_SECRET" \
 
 `expires_at` here is the proof's end; `token_expires_at` is when its newest proof token stops verifying. `status` is computed live: a proof whose sign-in was revoked reads `revoked` with `revoke_reason: "sign_in_revoked"` from that moment on. Your app's owner can read the same list with their session.
 
-The account sees its side with `GET /v1/me/proofs` (OBO proofs issued on its behalf, with both apps' names and logos) and revokes one with `DELETE /v1/me/proofs/{proof_id}`. From the CLI:
+The account sees its side with `GET /v1/me/proofs` (User verification proofs issued on its behalf, with both apps' names and logos) and revokes one with `DELETE /v1/me/proofs/{proof_id}`. From the CLI:
 
 ```
 $ accounts proofs list
@@ -329,7 +329,7 @@ App commands take the app's credentials from `--app-id` and `--app-secret-stdin`
 ```
 $ export ACCOUNTS_APP_ID=dm ACCOUNTS_APP_SECRET=…
 $ printf '%s' "$ACCESS_TOKEN" | accounts app proof obo --subject-token - --to briefcase --scope files.write --ttl 600
-OBO proof 01a1143d-7cf0-72cb-a6aa-92936511127a from dm for briefcase on behalf of si:scout_two (8HV).
+User verification proof 01a1143d-7cf0-72cb-a6aa-92936511127a from dm for briefcase on behalf of si:scout_two (8HV).
 proof token    sap_b-W-7LIru72TQVEMyH_9LikGdngf7TdEcGEupmQmI0o
 expires        2026-10-07T02:52:16Z (in 9m)
 refresh token  sapr_LkCj5s0_zZDrJTnHIAQpGAzP0ulTCBcMWzNO2m6B0zc
@@ -371,6 +371,6 @@ App authentication errors (`401 app_credentials_required`, `401 invalid_app_cred
 
 - [Verify a proof](verify-a-proof.md): the receiving app's side.
 - [How proofs work](../learn/proofs.md): why the proof stands on the sign-in, why refresh tokens rotate, and what each end means.
-- [Prove your app to other apps (ATA)](ata.md): when no account is involved.
+- [Prove your app to other apps (App verification)](ata.md): when no account is involved.
 - [Receive webhooks](webhooks.md): how you learn that an account's grant ended.
 - [Proofs API reference](../reference/api/proofs.md): every proof endpoint, field and error.

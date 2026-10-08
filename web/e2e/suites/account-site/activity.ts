@@ -123,7 +123,7 @@ const activity: Journey = {
     const signins = await filter(page, "Sign-ins");
     results.check("Sign-ins: only sign-ins and the sign-up", signins.rows.length >= 3 && signins.rows.every(row => /^(Signed (in|up)|Failed sign-in)/.test(row)) && signins.rows.some(row => row.startsWith("Signed in to Briefcase")) && signins.rows.some(row => row.startsWith("Signed in to Commit")), signins.rows.join(" | ").slice(0, 300));
     results.check("…including the failed sign-in, as the history words it", signins.rows.some(row => row.startsWith(failed[0]?.title ?? "Failed sign-in")), signins.rows.filter(row => row.startsWith("Failed")).join(" | ") || "no failed sign-in row");
-    const proofs = await filter(page, "Proofs");
+    const proofs = await filter(page, "User verification");
     results.check("Proofs: issued and revoked", proofs.rows.length === 2 && proofs.rows.some(row => row.startsWith("Briefcase got a proof to act for you at Commit")) && proofs.rows.some(row => row.startsWith("Proof for Briefcase to act for you at Commit revoked")), proofs.rows.join(" | "));
     const access = await filter(page, "App access");
     // v2 keeps each answer on an app's what's-shared page (audit `consent.granted`), filed under App access: such a row
@@ -137,7 +137,7 @@ const activity: Journey = {
     results.check("Security: the profile changes, 50 at a time", security.rows.length === 50 && security.rows.every(row => /^(Profile updated|Session created|[^ ]+ account|Email|Phone|A (browser|CLI))/.test(row)) && (await page.getByRole("button", { name: "Show older activity" }).count()) === 1, `${security.rows.length} rows; ${security.rows.slice(0, 2).join(" | ")}`);
 
     // A row with details opens in place.
-    await filter(page, "Proofs");
+    await filter(page, "User verification");
     const trigger = page.getByRole("region", { name: "Account activity" }).locator("[data-timeline-trigger]").first();
     const hasDetail = (await trigger.count()) === 1;
     if (hasDetail) {

@@ -295,7 +295,7 @@ Deleted si:archivist. Apps it signed into were told; its id is held for 10 days.
 ```
 
 Deleting is permanent. `--confirm` must be the Silicon's current si:id (in a terminal the CLI asks
-for it instead). The Silicon's sessions and the OBO proofs about it are revoked, its uploaded
+for it instead). The Silicon's sessions and the User verification proofs about it are revoked, its uploaded
 photos are deleted, apps it signed into get `account.deleted`, and signing in answers
 `403 account_deleted`. Its si:id stays reserved for 10 days; its uuid is never reused.
 

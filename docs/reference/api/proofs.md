@@ -1,6 +1,6 @@
 ---
-title: Proof endpoints
-description: Reference for OBO and ATA proofs — issuing, refreshing, verifying, revoking and listing them, with every field, lifetime, limit and error.
+title: App verification and User verification endpoints
+description: Reference for User verification and App verification proofs — issuing, refreshing, verifying, revoking and listing them, with every field, lifetime, limit and error.
 kind: informative
 order: 66
 related:
@@ -12,13 +12,13 @@ related:
   - reference/errors.md
 ---
 
-# Proof endpoints
+# App verification and User verification endpoints
 
-Silicon Accounts issues and verifies proofs; what each proof allows is up to the apps. An **OBO**
-proof (on behalf of) lets app A act at app B for an account that consented in app A. An **ATA**
+Silicon Accounts issues and verifies proofs; what each proof allows is up to the apps. A **User verification**
+proof (on behalf of) lets app A act at app B for an account that consented in app A. An **App verification**
 proof (app to app) lets app A prove itself to the apps it names. The guides are
-[Verify a proof](../../start/verify-a-proof.md), [OBO](../../start/obo.md) and
-[ATA](../../start/ata.md); the reasons are in [How proofs work](../../learn/proofs.md).
+[Verify a proof](../../start/verify-a-proof.md), [User verification](../../start/obo.md) and
+[App verification](../../start/ata.md); the reasons are in [How proofs work](../../learn/proofs.md).
 
 The receiving app verifies a proof token:
 
@@ -48,9 +48,9 @@ unknown fields. Proof responses are `Cache-Control: no-store`.
 | Number | Value |
 |---|---|
 | proof token (`sap_…`) lifetime | `access_ttl_seconds`, 60 to 1800, default 1800 |
-| proof lifetime (its `sapr_…` refresh token) | 900 days; an OBO proof never outlives the sign-in it stands on |
+| proof lifetime (its `sapr_…` refresh token) | 900 days; a User verification proof never outlives the sign-in it stands on |
 | scopes | at most 20 distinct strings, each 1–100 characters of `A-Z a-z 0-9 _ . : / -`, defined by the apps |
-| ATA receiving apps | exactly 1 per proof (`receiving_app`); one proof per app |
+| App verification receiving apps | exactly 1 per proof (`receiving_app`); one proof per app |
 
 ## The issued proof
 
@@ -71,7 +71,7 @@ unknown fields. Proof responses are `Cache-Control: no-store`.
 }
 ```
 
-An ATA proof has `"kind": "ata"`, its one `receiving_app`, and `"user": null`. Give the `proof_token` to the receiving app; keep the
+An App verification proof has `"kind": "ata"`, its one `receiving_app`, and `"user": null`. Give the `proof_token` to the receiving app; keep the
 `proof_refresh_token` yourself. Lifetimes are absolute timestamps (no `expires_in`), so a replayed
 idempotent response still tells the truth about what is left.
 
@@ -110,7 +110,7 @@ Accounts doesn't show a consent screen for proofs.
 {
   "error": {
     "code": "subject_token_wrong_app",
-    "message": "subject_token was issued to the app 'dm', but 'briefcase' is asking for the proof. An app can only turn access tokens it received itself into OBO proofs.",
+    "message": "subject_token was issued to the app 'dm', but 'briefcase' is asking for the proof. An app can only turn access tokens it received itself into User verifications.",
     "hint": "Use the access token 'briefcase' received when the account signed into 'briefcase'.",
     "details": { "token_app": "dm" }
   }
@@ -120,16 +120,16 @@ Accounts doesn't show a consent screen for proofs.
 ## `POST /v1/proofs/ata`
 
 **Idempotent** (10 minutes). `{"receiving_app": "remind", "scopes"?, "access_ttl_seconds"?}`
-→ **201** the issued ATA proof. An ATA proof is always for exactly one app: to talk to `remind`
+→ **201** the issued App verification proof. An App verification proof is always for exactly one app: to talk to `remind`
 and `waveform`, issue one proof for each. Errors: 422 `ata_single_app` (the body has `audiences`,
-of any length: "An ATA proof is for exactly one app; ask for one proof per app.", with
+of any length: "An App verification is for exactly one app; ask for one proof per app.", with
 `details.field: "audiences"` and `details.apps`), 400 `unknown_receiving_app`, 400
 `invalid_receiving_app` (your own app, or `accounts`/`developer`), 403 `receiving_app_disabled`,
 422 `validation_failed` (`receiving_app`, `scopes[i]`, `access_ttl_seconds`).
 
 ## `POST /v1/apps/{app_id}/proofs/ata`
 
-The same for **app or owner**: the app's owner can issue ATA proofs from the app's ATA page on
+The same for **app or owner**: the app's owner can issue App verification proofs from the app's App verification page on
 developers.teamofsilicons.com without the app secret. Same body and response (and the same 422
 `ata_single_app` for `audiences`); 403 `app_disabled` for a disabled app.
 
@@ -154,7 +154,7 @@ Presenting a refresh token that was already used revokes the whole proof (400
 ```
 
 Other errors: 400 `invalid_proof_refresh_token` (not a `sapr_` token, or unknown), 403
-`not_issuing_app`, 410 `proof_expired`, 410 `proof_revoked` (revoked, or an OBO proof whose
+`not_issuing_app`, 410 `proof_expired`, 410 `proof_revoked` (revoked, or a User verification proof whose
 sign-in ended).
 
 ## `POST /v1/proofs/verify`
@@ -167,7 +167,7 @@ sign-in ended).
 ```
 
 A proof is valid only when the token is a known, unexpired proof token; the proof is not revoked;
-the calling app is its receiving app; the issuing app is active; and, for OBO, the account is
+the calling app is its receiving app; the issuing app is active; and, for User verification, the account is
 active, its membership with the issuing app is active and the sign-in behind the subject token is
 still live. Every other case gets the same body, so a caller learns nothing about proofs that
 aren't theirs. A malformed input (a refresh token, a JWT, an empty string) adds an
@@ -215,7 +215,7 @@ yours; another app's proof id looks unknown), 400 `invalid_proof_id`, 403 `not_i
 }
 ```
 
-`expires_at` is the proof's end, `token_expires_at` its newest token's. `status` is live for OBO
+`expires_at` is the proof's end, `token_expires_at` its newest token's. `status` is live for User verification
 grants: a proof whose sign-in was revoked shows `revoked` with `revoke_reason` `sign_in_revoked`.
 Reasons: `revoked_by_app`, `revoked_by_owner`, `revoked_by_account`, `refresh_token_reuse`,
 `sign_in_revoked`, `access_removed`, `account_deleted`, `membership_inactive`,
@@ -226,9 +226,19 @@ Reasons: `revoked_by_app`, `revoked_by_owner`, `revoked_by_account`, `refresh_to
 **app or owner**: revoke one of the app's proofs. **204.** 404 `proof_not_found`, 400
 `invalid_proof_id`.
 
+## `GET /v1/me/app-verifications`
+
+**signed-in manager**: retained App verification records issued by the apps you currently manage, including records generated through the portal, CLI or API. This is the central developer portal history. Filter with `app_id` or `status=active|revoked|expired`; use `limit` and the returned `next_cursor` for pagination. Results are newest first. Being a receiving app alone grants no access to another app's records.
+
+## `GET /v1/apps/{app_id}/proofs/{proof_id}/history`
+
+**signed-in manager**: retained issuance, refresh and revocation history for one App verification record. The request checks current management access to the issuing app. Historical expiry values distinguish explicitly recorded information from derived legacy information; missing values are not reconstructed as facts. No raw proof or refresh token values are returned.
+
+Records and their history remain after credential material expires or is removed. See [central history](../../start/ata.md#central-history-for-apps-you-manage) for the portal flow. Existing `ata` / `obo` routes and JSON values continue to mean App verification / User verification.
+
 ## `GET /v1/me/proofs`
 
-**account**: the OBO proofs apps issued about you, newest first (`?status=active|revoked|expired`,
+**account**: the User verification proofs apps issued about you, newest first (`?status=active|revoked|expired`,
 `limit`, `cursor`; unknown query parameters are refused).
 Items: `proof_id`, `issuing_app` and `receiving_app` (app summaries), `scopes`, `status`,
 `created_at`, `expires_at`, `token_expires_at`, `last_refreshed_at`, `revoked_at`,
@@ -251,7 +261,7 @@ Items: `proof_id`, `issuing_app` and `receiving_app` (app summaries), `scopes`, 
 
 ## What ends a proof
 
-Besides revocation and expiry, an OBO proof ends with the grant it stands on: the account signing
+Besides revocation and expiry, a User verification proof ends with the grant it stands on: the account signing
 out of the issuing app or removing its access, the sign-in being revoked (STK rotation, refresh
 token reuse), or the account being deleted. Verification checks all of it live, so no webhook has
 to arrive first.

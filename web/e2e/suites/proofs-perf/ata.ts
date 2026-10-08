@@ -204,10 +204,10 @@ export const journeys: Journey[] = [
           const answer = await issueAtaRaw(ctx, "commit", { ...body, scopes: [scope] }, { path });
           const e = answer.body.error;
           results.check(
-            `${where} with ${shape} → 422 ata_single_app: "An ATA proof is for exactly one app; ask for one proof per app.", the hint naming receiving_app and ${path}, details.field audiences${apps.length ? ` and details.apps ${JSON.stringify(apps)}` : ""}; nothing stored`,
+            `${where} with ${shape} → 422 ata_single_app: "An App verification is for exactly one app; ask for one proof per app.", the hint naming receiving_app and ${path}, details.field audiences${apps.length ? ` and details.apps ${JSON.stringify(apps)}` : ""}; nothing stored`,
             answer.status === 422 &&
               e?.code === "ata_single_app" &&
-              e.message === "An ATA proof is for exactly one app; ask for one proof per app." &&
+              e.message === "An App verification is for exactly one app; ask for one proof per app." &&
               (e.hint ?? "").includes("receiving_app") &&
               (e.hint ?? "").includes(`POST ${path}`) &&
               e.details?.field === "audiences" &&

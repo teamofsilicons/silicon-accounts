@@ -60,11 +60,11 @@ export const journey: Journey = {
     await receiver.waitFor({ timeout: 30_000 });
     await receiver.fill("remind");
     await page.getByRole("button", { name: "Choose", exact: true }).click();
-    const make = page.getByRole("button", { name: "Make the proof" });
+    const make = page.getByRole("button", { name: "Create token" });
     await make.click({ timeout: 15_000 });
-    const reveal = page.getByRole("group", { name: "Your proof" });
+    const reveal = page.getByRole("group", { name: "Your verification tokens" });
     await reveal.waitFor({ timeout: 20_000 });
-    await reveal.getByRole("button", { name: "Show the proof token" }).click();
+    await reveal.getByRole("button", { name: "Show the verification token" }).click();
     const token = (await reveal.locator("code[data-shown]").first().innerText()).trim();
     await sleep(400);
     await shot(env, page, "j-03-ata-proof");

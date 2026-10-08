@@ -37,7 +37,7 @@ The receiver checked the signature with `dm`'s secret and answered `200`; from t
 
 - **Ids change.** A Carbon's `c:` id and a Silicon's `si:` id can be changed at any time; the old one stays reserved for its owner for 10 days, then anyone can take it. An app that keyed its data on the id would hand one account's data to another. Key on the `uuid`, which never changes, and use `account.id_changed` to update the id you show.
 - **Details change.** Display names, photos, time zones, primary emails and phones change; `account.updated` carries the new values your app may see.
-- **Permission ends.** A sign-out, a removed access or a deleted account means the app may no longer act for the account. These events arrive as soon as it happens, and the tokens and OBO proofs involved have already stopped working ([How proofs work](proofs.md#what-an-obo-proof-stands-on)).
+- **Permission ends.** A sign-out, a removed access or a deleted account means the app may no longer act for the account. These events arrive as soon as it happens, and the tokens and User verification proofs involved have already stopped working ([How proofs work](proofs.md#what-a-user-verification-proof-stands-on)).
 - **A Silicon's custodian changes.** Apps that show who is responsible for a Silicon learn about transfers.
 
 ## Two kinds of webhook
@@ -281,7 +281,7 @@ Sent when an account is deleted (a Carbon deleting itself, or a custodian deleti
 }
 ```
 
-Do: delete or anonymise the account's data. Its tokens are revoked, your OBO proofs for it read `account_deleted`, and `GET /v1/accounts/{uuid}` now answers `404 account_deleted`. The uuid is never reused.
+Do: delete or anonymise the account's data. Its tokens are revoked, your User verification proofs for it read `account_deleted`, and `GET /v1/accounts/{uuid}` now answers `404 account_deleted`. The uuid is never reused.
 
 ### membership.signed_out
 
@@ -305,7 +305,7 @@ Sent to one app when the account's sign-in there ends without the account leavin
 }
 ```
 
-Do: end the account's sessions in your app; its tokens no longer work and OBO proofs issued from them have ended (`sign_in_revoked`). The membership stays, so later events about the account keep arriving.
+Do: end the account's sessions in your app; its tokens no longer work and User verification proofs issued from them have ended (`sign_in_revoked`). The membership stays, so later events about the account keep arriving.
 
 ### membership.access_removed
 
@@ -322,7 +322,7 @@ Sent to one app when the account removes its access (on the account site, with `
 }
 ```
 
-Do: stop using the account's data. Its tokens are revoked, your OBO proofs for it read `access_removed`, and you get no more events about it unless it signs into your app again.
+Do: stop using the account's data. Its tokens are revoked, your User verification proofs for it read `access_removed`, and you get no more events about it unless it signs into your app again.
 
 ### silicon.custodian_changed
 
@@ -583,6 +583,6 @@ The Silicon (or its custodian) asked for a test: `"app_id": null`, `"silicon": "
 ## Related
 
 - [Receive webhooks](../start/webhooks.md): set the endpoint, verify signatures in Node.js, Web Crypto and Rust, replay.
-- [How proofs work](proofs.md): the OBO proofs that end with `membership.signed_out`, `membership.access_removed` and `account.deleted`.
-- [Act for an account at another app (OBO)](../start/obo.md).
+- [How proofs work](proofs.md): the User verification proofs that end with `membership.signed_out`, `membership.access_removed` and `account.deleted`.
+- [Act for an account at another app (User verification)](../start/obo.md).
 - [Webhooks reference](../reference/api/webhooks.md): headers, body and every event type in one place.

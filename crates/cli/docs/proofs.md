@@ -1,20 +1,20 @@
-# Proofs: OBO and ATA
+# App verification and User verification
 
 Silicon Accounts doesn't run any app's endpoints. It issues proofs and verifies them;
 consent screens and what each endpoint does stay with the apps.
 
-* **OBO (on behalf of)** — app A wants to act at app B for an account. App A gets the
+* **User verification (on behalf of)** — app A wants to act at app B for an account. App A gets the
   account's consent in its own UI, then asks Silicon Accounts for a proof. App B asks
   Silicon Accounts whether the proof is valid.
-* **ATA (app to app)** — app A proves to app B that a request really comes from app A.
-  An ATA proof is always for exactly one app: to talk to apps B and C, app A gets one
+* **App verification (app to app)** — app A proves to app B that a request really comes from app A.
+  An App verification proof is always for exactly one app: to talk to apps B and C, app A gets one
   proof for B and another for C, and each verifies its own.
 
 Proofs use the same token logic as sign-in: a short-lived proof token (default 30
 minutes, 60 to 1800 seconds) plus a rotating proof refresh token held by the issuing
 app.
 
-## Issue an OBO proof (app A)
+## Issue a User verification proof (app A)
 
 ```sh
 accounts app --app-id dm proof obo --subject-token "$ACCOUNT_ACCESS_TOKEN" --to briefcase --scope files.write --ttl 600
@@ -26,7 +26,7 @@ still have an active membership with app A. Scopes are your own strings (up to 2
 
 Send the `proof_token` to app B, for example as `Authorization: Proof sap_…`.
 
-## Issue an ATA proof (app A)
+## Issue an App verification proof (app A)
 
 ```sh
 accounts app proof ata --to remind --ttl 300
@@ -37,7 +37,7 @@ accounts app proof ata --to waveform --ttl 300     # a second app gets its own p
 the proofs made for it, so revoking or refreshing the proof for one app never affects
 the others, and a proof leaked by one app can't be replayed at another.
 
-Owners can also make, see and revoke ATA proofs through their session: the app's ATA
+Owners can also make, see and revoke App verification proofs through their session: the app's App verification
 page on developers.teamofsilicons.com calls the same endpoint
 (`POST /v1/apps/{app_id}/proofs/ata` with `{"receiving_app": "remind"}`). A request
 that lists several apps (`audiences`) is refused with `ata_single_app`.
@@ -49,7 +49,7 @@ accounts app --app-id briefcase proof verify sap_… --json && echo valid
 ```
 
 Exit code 0 means valid, 2 means not valid. A valid answer says until when, who issued
-it, who it is for, and (OBO) which account:
+it, who it is for, and (User verification) which account:
 
 ```json
 {"valid":true,"kind":"obo","expires_at":"…","issuing_app":{"app_id":"dm"},
@@ -74,7 +74,23 @@ refresh tokens.
 
 ## What accounts see
 
-A Carbon or Silicon sees every OBO proof issued on its behalf
+A Carbon or Silicon sees every User verification proof issued on its behalf
 (`accounts proofs list`, or the account site) and can revoke any of them
 (`accounts proofs revoke <proof-id>`). Removing an app's access also invalidates the
-OBO proofs that app issued.
+User verification proofs that app issued.
+
+## Retained App verification history
+
+The central App verification page at https://developers.teamofsilicons.com/app-verification
+shows records issued by every app you currently manage, including records generated through
+the CLI or API. Filter by issuing app and status, then expand a record to see issuance,
+refreshes and revocation. An active proof family and its current token have separate expiry times.
+Older derived expiry values are identified; missing historical values are not invented.
+
+The records and events remain after credentials expire or are removed. Raw proof and refresh
+tokens are shown when generated and cannot be recovered from history. Current management
+access is checked on every request; being the receiving app alone grants no history access.
+
+Existing `ata` and `obo` commands and JSON kinds remain compatible. This CLI also accepts
+`accounts app proof app-verification`, `accounts app proof user-verification`, and
+`accounts user-verification list` / `revoke`. These aliases perform the same operations.

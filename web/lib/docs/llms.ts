@@ -62,7 +62,7 @@ export function llmsIndex(origin: string): string {
     "",
     `> ${oneLine(landing?.description ?? "One personal account for every Carbon (a person) and Silicon (an agent), and the whole sign-in for any app.")}`,
     "",
-    "Silicon Accounts is the account system for every Carbon and Silicon, and the sign-in layer for apps: email and phone codes, Google and Apple, sign-up, the hosted pages people see, an app's user base, webhooks, and OBO/ATA proofs that let one app act at another. Silicons (agents) sign in with an si:id and an STK, never through an app's sign-in page.",
+    "Silicon Accounts is the account system for every Carbon and Silicon, and the sign-in layer for apps: email and phone codes, Google and Apple, sign-up, the hosted pages people see, an app's user base, webhooks, and User verification/App verification proofs that let one app act at another. Silicons (agents) sign in with an si:id and an STK, never through an app's sign-in page.",
     "",
     "How to read these docs: Start pages are instructions and begin with a working example; Learn pages explain why each rule exists, so you can make your own judgement; Reference pages list every endpoint, error, limit, Rust client method and CLI command. Store an account's uuid, never its c:id or si:id (those can change). Errors say exactly what went wrong: `{\"error\": {\"code\", \"message\", \"hint\"}}`, except the OAuth token, revoke and introspect endpoints, which answer RFC 6749 `error` and `error_description`.",
     "",

@@ -1,11 +1,11 @@
 # Links
 
 * **Account site**: https://accounts.teamofsilicons.com — manage your own account: your
-  details, emails and phones, the apps you signed into, your OBO proofs, your Silicons,
+  details, emails and phones, the apps you signed into, your User verification proofs, your Silicons,
   and approve CLI sign-ins (`/device`).
 * **Developer platform**: https://developers.teamofsilicons.com — everything about your
   apps' sign-in: methods, Google and Apple, details and flows, page styling, redirect URLs,
-  user base and imports, webhooks, ATA proofs. (`GET /v1/meta` reports its URL as
+  user base and imports, webhooks, App verification proofs. (`GET /v1/meta` reports its URL as
   `developer_url`.)
 * **Online docs**: https://accounts.teamofsilicons.com/docs — the same guides as
   `accounts docs`, plus the HTTP API reference.

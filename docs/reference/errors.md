@@ -301,14 +301,14 @@ Import rows carry their own message codes (`missing_identifier`, `ambiguous_matc
 |---|---|---|
 | `invalid_subject_token` | 400 | the subject token isn't a live access token (`details.reason`: `not_an_access_token`, `invalid`, `expired`, `revoked`) |
 | `subject_token_wrong_app` | 403 | the subject token belongs to another app (`details.token_app`) |
-| `ata_single_app` | 422 | an ATA request named apps in `audiences`: an ATA proof is for exactly one app; send `{"receiving_app": "…"}` once per app (`details.field`, `details.apps`) |
+| `ata_single_app` | 422 | an App verification request named apps in `audiences`: an App verification proof is for exactly one app; send `{"receiving_app": "…"}` once per app (`details.field`, `details.apps`) |
 | `unknown_receiving_app` | 400 | the receiving app doesn't exist (`details.app_ids`) |
 | `invalid_receiving_app` | 400 | the issuer itself, or Silicon Accounts itself (`accounts`, `developer`) |
 | `receiving_app_disabled` | 403 | the receiving app is disabled |
 | `invalid_proof_refresh_token` | 400 | not a `sapr_` token, or unknown (mistyped, another environment, or its proof ended over 30 days ago) |
 | `not_issuing_app` | 403 | only the issuing app refreshes or revokes a proof |
 | `proof_refresh_token_reused` | 400 | a used refresh token was presented: the proof is now revoked |
-| `proof_revoked` | 410 | the proof was revoked, or its OBO sign-in ended (`details.reason`, `revoked_at`) |
+| `proof_revoked` | 410 | the proof was revoked, or its User verification sign-in ended (`details.reason`, `revoked_at`) |
 | `proof_expired` | 410 | past the proof's lifetime |
 | `invalid_proof_id` | 400 | not a UUID |
 | `proof_not_found` | 404 | not a proof you can see |

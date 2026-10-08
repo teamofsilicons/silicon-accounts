@@ -1,6 +1,6 @@
 ---
-title: Prove your app to other apps (ATA)
-description: Issue an ATA proof for one other app, so it knows a call really comes from your app; one proof per app; refresh, revoke and list them.
+title: Prove your app to other apps (App verification)
+description: Issue an App verification proof for one other app, so it knows a call really comes from your app; one proof per app; refresh, revoke and list them.
 kind: instructive
 order: 42
 related:
@@ -10,9 +10,9 @@ related:
   - reference/api/proofs.md
 ---
 
-# Prove your app to other apps (ATA)
+# Prove your app to other apps (App verification)
 
-Your app calls other apps as itself, with no account involved: `commit` tells `remind` and `waveform` that a build finished. An ATA proof is always for exactly one app, so `commit` gets one proof for `remind` and another for `waveform`, sends each app its own token, and each of them [verifies](verify-a-proof.md) that the call really comes from `commit`.
+Your app calls other apps as itself, with no account involved: `commit` tells `remind` and `waveform` that a build finished. An App verification proof is always for exactly one app, so `commit` gets one proof for `remind` and another for `waveform`, sends each app its own token, and each of them [verifies](verify-a-proof.md) that the call really comes from `commit`.
 
 ```bash
 curl -s -u "commit:$COMMIT_APP_SECRET" \
@@ -62,19 +62,19 @@ Asking for several apps at once is refused, so a proof can never be replayed fro
 {
   "error": {
     "code": "ata_single_app",
-    "message": "An ATA proof is for exactly one app; ask for one proof per app.",
+    "message": "An App verification is for exactly one app; ask for one proof per app.",
     "hint": "Send {\"receiving_app\": \"remind\"} to POST /v1/proofs/ata instead of \"audiences\", and call it once for every app that should verify a proof from you; each app verifies its own proof.",
     "details": { "field": "audiences", "apps": ["remind", "waveform"] }
   }
 }
 ```
 
-## ATA or OBO
+## App verification or User verification
 
-- Use **ATA** when the call is about your app itself: notifications, syncing, one service calling another. The receiving app learns *which app* is calling, and nothing about any account.
-- Use **[OBO](obo.md)** when you act for an account. The receiving app then learns which account, and the proof ends by itself when the account signs out of your app, removes its access or is deleted.
+- Use **App verification** when the call is about your app itself: notifications, syncing, one service calling another. The receiving app learns *which app* is calling, and nothing about any account.
+- Use **[User verification](obo.md)** when you act for an account. The receiving app then learns which account, and the proof ends by itself when the account signs out of your app, removes its access or is deleted.
 
-Don't stretch ATA to act for accounts by putting an account id in your own payload: the receiving app couldn't tell whether the account agreed or still uses your app, and the account couldn't see or revoke it. That is exactly what OBO is for.
+Don't stretch App verification to act for accounts by putting an account id in your own payload: the receiving app couldn't tell whether the account agreed or still uses your app, and the account couldn't see or revoke it. That is exactly what User verification is for.
 
 ## 1. Issue the proof
 
@@ -88,9 +88,9 @@ With your app's credentials: `POST /v1/proofs/ata`.
 
 Send an `Idempotency-Key`: a retry with the same key and body within 10 minutes returns the same proof instead of a second one.
 
-The answer has the same fields as an OBO proof, with `user: null`. `refresh_expires_at` is 900 days after issuing. Keep `proof_refresh_token` on your side; send `proof_token` to the apps.
+The answer has the same fields as a User verification proof, with `user: null`. `refresh_expires_at` is 900 days after issuing. Keep `proof_refresh_token` on your side; send `proof_token` to the apps.
 
-**As the app's owner.** Every app has an ATA page on [developers.teamofsilicons.com](https://developers.teamofsilicons.com) (`/apps/<app_id>/ata`) where its owner makes, sees and revokes ATA proofs, one app at a time. Behind it is the owner endpoint, which takes the owner's session instead of the app secret, with the same body and the same answer:
+**As the app's owner.** Every app has an App verification page on [developers.teamofsilicons.com](https://developers.teamofsilicons.com) (`/apps/<app_id>/ata`) where its owner makes, sees and revokes App verification proofs, one app at a time. Behind it is the owner endpoint, which takes the owner's session instead of the app secret, with the same body and the same answer:
 
 ```bash
 curl -s -X POST https://accounts.teamofsilicons.com/v1/apps/commit/proofs/ata \
@@ -100,7 +100,17 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/apps/commit/proofs/ata \
   -d '{"receiving_app":"remind","scopes":["notify"]}'
 ```
 
-`$OWNER_ACCESS_TOKEN` is the owner's access token for Silicon Accounts itself (audience `accounts`), from the code login (`POST /v1/cli/login/start`, then `POST /v1/cli/login/verify`) or the device flow. The CLI handles that for you: signed in as the owner with `accounts login`, run `accounts app --app-id commit proof ata …` without the secret ([below](#with-the-cli)). The developer platform's ATA page does the same with its own sign-in (audience `developer`). A Carbon who doesn't own the app gets `403 not_app_owner`. The proof is still issued *by the app*: refreshing it needs the app's credentials, so hand the refresh token to the app's server, or issue proofs from the server directly.
+`$OWNER_ACCESS_TOKEN` is the owner's access token for Silicon Accounts itself (audience `accounts`), from the code login (`POST /v1/cli/login/start`, then `POST /v1/cli/login/verify`) or the device flow. The CLI handles that for you: signed in as the owner with `accounts login`, run `accounts app --app-id commit proof ata …` without the secret ([below](#with-the-cli)). The developer platform's App verification page does the same with its own sign-in (audience `developer`). A Carbon who doesn't own the app gets `403 not_app_owner`. The proof is still issued *by the app*: refreshing it needs the app's credentials, so hand the refresh token to the app's server, or issue proofs from the server directly.
+
+## Central history for apps you manage
+
+Open [App verification](https://developers.teamofsilicons.com/app-verification) in the common developer portal to see every retained App verification record issued by apps you currently manage. Records from the portal, CLI and API appear together, including active, expired and revoked records. Filter by issuing app or status, and load subsequent pages to see older records.
+
+Expand a record to see issuance, token refreshes and revocation. The proof family's expiry and each token's expiry are separate: an active family can be refreshed even after its current proof token expires. History labels distinguish recorded expiry times from derived legacy values; unavailable information stays unavailable.
+
+Proof and refresh token values are shown only when generated. History retains the records after credential material expires or is removed, without recovering raw secrets. Every list and history request checks current management access; receiving a proof does not give its recipient access to the issuing app's history.
+
+The per-app App verification tab keeps its existing `/apps/<app_id>/ata` address and links to this central history with the issuing app selected. API integrations use `GET /v1/me/app-verifications` and `GET /v1/apps/{app_id}/proofs/{proof_id}/history` ([reference](../reference/api/proofs.md)). Existing `ata` commands, endpoints and wire values still mean App verification; `obo` means User verification.
 
 ## 2. Send the token with each call
 
@@ -108,7 +118,7 @@ Send `proof_token` to the one app it is for, for example as `Authorization: Proo
 
 ## 3. Refresh, revoke, list
 
-These work exactly as for OBO proofs, with your app's credentials:
+These work exactly as for User verification proofs, with your app's credentials:
 
 - `POST /v1/proofs/refresh` `{"proof_refresh_token": "sapr_…"}` returns a new proof token and a new refresh token; the used refresh token must never be presented again (that revokes the proof). Without `access_ttl_seconds` the new token gets the proof's own lifetime: refreshing the 60-second proof from a local test gave another 60-second token, which verified, while the expired first token answered `{"valid": false, "expires_at": null}`. See [Refresh before the proof token expires](obo.md#3-refresh-before-the-proof-token-expires).
 - `POST /v1/proofs/revoke` with one of `proof_id`, `proof_token` or `proof_refresh_token` returns `204`; the owner can use `DELETE /v1/apps/{app_id}/proofs/{proof_id}` with their session.
@@ -137,7 +147,7 @@ These work exactly as for OBO proofs, with your app's credentials:
 }
 ```
 
-An ATA proof ends only when it is revoked or reaches `refresh_expires_at`. While your app is disabled, its proofs don't verify and it can't issue new ones (`403 app_disabled`).
+An App verification proof ends only when it is revoked or reaches `refresh_expires_at`. While your app is disabled, its proofs don't verify and it can't issue new ones (`403 app_disabled`).
 
 ## In Rust
 
@@ -163,7 +173,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(&format!("ata-notify-batch-0193-{app}")),
             )
             .await?;
-        println!("ATA proof {} for {}", proof.proof_id, proof.receiving_app.as_deref().unwrap_or("?"));
+        println!("App verification proof {} for {}", proof.proof_id, proof.receiving_app.as_deref().unwrap_or("?"));
         proofs.push(proof);
     }
     let proof = &proofs[0]; // remind's
@@ -181,19 +191,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 ```
-ATA proof 01a1165d-… for remind
-ATA proof 01a1165d-… for waveform
+App verification proof 01a1165d-… for remind
+App verification proof 01a1165d-… for waveform
 remind: accepted, from commit until 2026-10-07 12:41:09.361 +00:00:00
 ```
 
-`issue_ata` calls `POST /v1/proofs/ata` with app credentials (it refuses a `receiving_app` that names several apps before sending anything), and the owner endpoint when the client acts as the app's owner (`client.with_token(owner_token).app("commit")`). `refresh_proof` and `revoke_proof` work as shown in [the OBO example](obo.md#in-rust).
+`issue_ata` calls `POST /v1/proofs/ata` with app credentials (it refuses a `receiving_app` that names several apps before sending anything), and the owner endpoint when the client acts as the app's owner (`client.with_token(owner_token).app("commit")`). `refresh_proof` and `revoke_proof` work as shown in [the User verification example](obo.md#in-rust).
 
 ## With the CLI
 
 ```
 $ export ACCOUNTS_APP_ID=commit ACCOUNTS_APP_SECRET=…
 $ accounts app proof ata --to waveform --scope notify --ttl 300
-ATA proof 01a1165d-49c5-72e3-a5e1-c38f003d30d7 from commit for waveform.
+App verification proof 01a1165d-49c5-72e3-a5e1-c38f003d30d7 from commit for waveform.
 proof token    sap_MJMgDB69Mp_WgDKGdoR_OxnDs8Nf0eg-KmDcCGZM48Q
 expires        2026-10-07T12:41:14Z (in 4m)
 refresh token  sapr_umG_g5wmVYV48Yp2uXeHS36ya-E2u0yMPsLVqE2xFcM
@@ -205,11 +215,11 @@ scopes         notify
 
 ```
 $ accounts app proof ata --to remind,waveform
-error: An ATA proof is for exactly one app, but --to names 2: remind, waveform.
+error: An App verification proof is for exactly one app, but --to names 2: remind, waveform.
 hint: Issue one proof per app; each app verifies its own: accounts app proof ata --to remind ; accounts app proof ata --to waveform
 ```
 
-Signed in as the app's owner (`accounts login`), `accounts app --app-id commit proof ata --to remind --scope notify` works without the secret, through the owner endpoint. `accounts app proof list --kind ata`, `refresh` and `revoke` work as for OBO; refreshing and verifying need the app's own credentials.
+Signed in as the app's owner (`accounts login`), `accounts app --app-id commit proof ata --to remind --scope notify` works without the secret, through the owner endpoint. `accounts app proof list --kind ata`, `refresh` and `revoke` work as for User verification; refreshing and verifying need the app's own credentials.
 
 ## Errors
 
@@ -224,11 +234,11 @@ Signed in as the app's owner (`accounts login`), `accounts app --app-id commit p
 | 403 | `not_app_owner` / `app_mismatch` | Owner endpoint: you don't own the app, or your app credentials belong to another app than the one in the URL. |
 | 409 | `idempotency_key_reused` | The `Idempotency-Key` was used with a different body. |
 
-Refresh and revoke errors are the same as for OBO: see [the OBO errors](obo.md#errors).
+Refresh and revoke errors are the same as for User verification: see [the User verification errors](obo.md#errors).
 
 ## Related
 
 - [Verify a proof](verify-a-proof.md): what each receiving app does.
 - [How proofs work](../learn/proofs.md): why proofs are short-lived, rotate and verify live.
-- [Act for an account at another app (OBO)](obo.md).
+- [Act for an account at another app (User verification)](obo.md).
 - [Proofs API reference](../reference/api/proofs.md): every proof endpoint, field and error.

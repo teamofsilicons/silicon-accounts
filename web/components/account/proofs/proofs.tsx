@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /proofs: the OBO proofs apps hold about you, every one of them (the list is read to its end). Each is drawn as the
+ * /proofs: the User verification proofs apps hold about you, every one of them (the list is read to its end). Each is drawn as the
  * issuing app acting at the receiving app, with a dash flowing along the connector while it is live and a ring that
  * empties as its current proof token runs out (the issuing app refreshes it; the proof itself can last until its
  * sign-in ends). Revoking one makes the receiving app's next check fail at once.
@@ -64,22 +64,22 @@ export function Proofs() {
   const revokeOne = useCallback(async (proofId: string) => {
     await revoke(proofId);
     // "Revoked" shows in place, then the card moves to the ended proofs; focus goes to the next proof, else the switch.
-    window.setTimeout(() => focusAfterRemoval(() => pageMain()?.querySelector('[role="list"][aria-label="Active proofs"]'), pressedViewOption), 960);
+    window.setTimeout(() => focusAfterRemoval(() => pageMain()?.querySelector('[role="list"][aria-label="Active verifications"]'), pressedViewOption), 960);
   }, [revoke]);
 
   return (
     <Page width="reading">
       <PageHeader
-        title="Proofs about you"
-        description="When one app acts at another for you, it carries a proof from Silicon Accounts that the other app checks with us. Revoke one and the receiving app stops accepting it at once."
+        title="User verification"
+        description="See how apps act on your behalf at other apps. Each user verification lets the receiving app check that action with Silicon Accounts. Revoke one to stop it at once."
       />
       {proofs.error && !proofs.data ? (
-        <Alert tone="danger" title="Your proofs did not load">
+        <Alert tone="danger" title="Your verifications did not load">
           {describeError(proofs.error)}
           <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void proofs.refetch()}>Try again</Button></span>
         </Alert>
       ) : !proofs.data ? (
-        <div className={styles.list} aria-busy="true" aria-label="Loading your proofs">
+        <div className={styles.list} aria-busy="true" aria-label="Loading your verifications">
           <SkeletonBlock width="260px" height="40px" radius="14px" />
           {[0, 1].map(index => <SkeletonBlock key={index} width="100%" height="232px" radius="var(--radius-surface)" index={index + 1} />)}
         </div>
@@ -87,7 +87,7 @@ export function Proofs() {
         <>
           <div className={styles.toolbar}>
             <SegmentedControl
-              label="Which proofs"
+              label="Which verifications"
               value={view}
               onValueChange={value => setView(value as View)}
               options={[
@@ -97,21 +97,21 @@ export function Proofs() {
             />
           </div>
           {/* Names what the switch shows, so the empty state's heading sits one level under the page's: h1, h2, h3. */}
-          <h2 className="sr-only">{view === "active" ? "Active proofs" : "Ended proofs"}</h2>
+          <h2 className="sr-only">{view === "active" ? "Active verifications" : "Ended verifications"}</h2>
           {shown.length ? (
-            <AnimatedRows items={shown} keyOf={item => item.proof_id} className={styles.list} label={view === "active" ? "Active proofs" : "Ended proofs"}>
+            <AnimatedRows items={shown} keyOf={item => item.proof_id} className={styles.list} label={view === "active" ? "Active verifications" : "Ended verifications"}>
               {item => <ProofCard proof={item} now={now} onRevoke={revokeOne} />}
             </AnimatedRows>
           ) : (
             <div data-sq="surface" className={styles.empty}>
               <EmptyState
                 icon={<ShieldCheck width={24} height={24} strokeWidth={1.5} />}
-                title={view === "active" ? "No app is acting for you" : "No ended proofs"}
-                description={view === "active" ? "When an app you use acts at another app on your behalf, its proof appears here and you can revoke it." : "Proofs that expire or are revoked appear here."}
+                title={view === "active" ? "No app is acting for you" : "No ended verifications"}
+                description={view === "active" ? "When an app you use acts at another app on your behalf, its user verification appears here and you can revoke it." : "Verifications that expire or are revoked appear here."}
               />
             </div>
           )}
-          <ListCap page={proofs.data} noun="proofs" command="accounts proofs list" />
+          <ListCap page={proofs.data} noun="verifications" command="accounts proofs list" />
         </>
       )}
     </Page>
@@ -198,7 +198,7 @@ const ProofCard = memo(function ProofCard({ proof, now, onRevoke }: { proof: MyP
         <div className={styles.end}>
           <AppMark app={receiving} size={52} />
           <span className={styles.endName}>{receiving.name}</span>
-          <span className={styles.endRole}>checks the proof</span>
+          <span className={styles.endRole}>verifies the action</span>
         </div>
       </div>
       <Status proof={proof} />
@@ -228,7 +228,7 @@ const ProofCard = memo(function ProofCard({ proof, now, onRevoke }: { proof: MyP
         {live ? (
           <ConfirmMorph
             label="Revoke"
-            prompt={<FitPrompt full={`Revoke ${issuing.name}'s proof?`} short="Revoke this proof?" tiny="Revoke it?" />}
+            prompt={<FitPrompt full={`Revoke ${issuing.name}'s verification?`} short="Revoke it?" />}
             confirmLabel="Revoke"
             pendingLabel="Revoking"
             doneLabel="Revoked"

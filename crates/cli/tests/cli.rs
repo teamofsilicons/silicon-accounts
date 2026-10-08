@@ -454,7 +454,7 @@ fn proof_verify_exit_codes() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "valid: OBO proof from dm for briefcase",
+            "valid: User verification proof from dm for briefcase",
         ));
 
     // Wrong app credentials are an auth error (3), not "invalid proof".
@@ -753,6 +753,20 @@ fn ata_proofs_are_for_exactly_one_app() {
         json!({"receiving_app": "remind", "scopes": ["notifications.send"]})
     );
 
+    // The product terminology is an alias only: the same API path, payload and JSON kind.
+    let mut alias = base;
+    alias[7] = "app-verification";
+    let aliased = env
+        .cmd()
+        .args(alias)
+        .args(["--to", "remind", "--json"])
+        .write_stdin(APP_SECRET)
+        .output()
+        .unwrap();
+    assert!(aliased.status.success());
+    assert_eq!(stdout_json(&aliased)["kind"], "ata");
+    assert_eq!(mock.count("POST", "/v1/proofs/ata"), 2);
+
     // Several apps: refused before anything is sent, with one command per app as the fix.
     for several in ["remind,waveform", "remind waveform"] {
         let output = env
@@ -773,7 +787,7 @@ fn ata_proofs_are_for_exactly_one_app() {
             "{hint}"
         );
     }
-    assert_eq!(mock.count("POST", "/v1/proofs/ata"), 1);
+    assert_eq!(mock.count("POST", "/v1/proofs/ata"), 2);
 
     env.cmd()
         .args(base)
@@ -782,6 +796,6 @@ fn ata_proofs_are_for_exactly_one_app() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "ATA proof p-ata from briefcase for remind",
+            "App verification proof p-ata from briefcase for remind",
         ));
 }

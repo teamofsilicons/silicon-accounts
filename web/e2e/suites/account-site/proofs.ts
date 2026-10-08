@@ -63,7 +63,7 @@ const proofs: Journey = {
     results.check("/v1/me/proofs lists exactly the three OBO proofs (no ATA)", listed.length === 3 && [ids.read, ids.write, ids.message].every(id => listed.some(item => item.proof_id === id)), listed.map(item => `${item.issuing_app.app_id}→${item.receiving_app.app_id}`).join(", "));
     const started = Date.now();
     await page.goto(`${env.site}/proofs`);
-    const active = page.getByRole("list", { name: "Active proofs" });
+    const active = page.getByRole("list", { name: "Active verifications" });
     await active.waitFor({ timeout: 30_000 });
     results.metric("/proofs list visible after navigation", Date.now() - started);
     await sleep(1200);
@@ -94,7 +94,7 @@ const proofs: Journey = {
     results.check("Briefcase can no longer refresh the revoked proof; the write proof refreshes, and its new token verifies", deadRefresh.status >= 400 && deadRefresh.status < 500 && !!codeOf(deadRefresh.body) && liveRefresh.status === 200 && fresh.valid === true, `revoked: ${deadRefresh.status} ${codeOf(deadRefresh.body)}; write: ${liveRefresh.status} → valid ${String(fresh.valid)}`);
     await until(async () => page.getByRole("button", { name: "Ended (1)" }).count(), n => n === 1, 8_000);
     await page.getByRole("button", { name: "Ended (1)" }).click();
-    const ended = page.getByRole("list", { name: "Ended proofs" });
+    const ended = page.getByRole("list", { name: "Ended verifications" });
     await ended.waitFor({ timeout: 10_000 });
     await sleep(800);
     const endedText = (await ended.innerText()).replace(/\s+/g, " ");
@@ -108,7 +108,7 @@ const proofs: Journey = {
     await page.getByRole("button", { name: /^Ended \(\d+\)$/ }).waitFor({ timeout: 30_000 });
     results.check("after expiry: 1 active (DM), 2 ended", (await page.getByRole("button", { name: "Active (1)" }).count()) === 1 && (await page.getByRole("button", { name: "Ended (2)" }).count()) === 1);
     await page.getByRole("button", { name: "Ended (2)" }).click();
-    const expiredCard = page.getByRole("list", { name: "Ended proofs" }).getByRole("article").filter({ hasText: "files.write" });
+    const expiredCard = page.getByRole("list", { name: "Ended verifications" }).getByRole("article").filter({ hasText: "files.write" });
     await expiredCard.waitFor({ timeout: 10_000 });
     const expiredText = (await expiredCard.innerText()).replace(/\s+/g, " ");
     results.check("the expired proof says Expired", /Expired/.test(expiredText), expiredText.slice(0, 200));
@@ -123,7 +123,7 @@ const proofs: Journey = {
     results.check("…and the proof says why (access_removed)", third?.status === "revoked" && third.revoke_reason === "access_removed", JSON.stringify(third && { status: third.status, reason: third.revoke_reason }));
     await page.reload();
     await page.getByRole("button", { name: "Ended (3)" }).click({ timeout: 30_000 });
-    const dmCard = page.getByRole("list", { name: "Ended proofs" }).getByRole("article", { name: "Briefcase acts at DM for you" });
+    const dmCard = page.getByRole("list", { name: "Ended verifications" }).getByRole("article", { name: "Briefcase acts at DM for you" });
     await dmCard.waitFor({ timeout: 10_000 });
     const dmText = (await dmCard.innerText()).replace(/\s+/g, " ");
     results.check("the page says it ended when Briefcase's access was removed", dmText.includes("Ended when Briefcase's access was removed"), dmText.slice(0, 200));
