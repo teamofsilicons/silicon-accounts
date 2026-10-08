@@ -25,10 +25,10 @@ We should be as simple as Supabase and as deep as WorkOS or Okta. Turning on sig
 
 There are three sites:
 - `accounts.teamofsilicons.com` - this one. It's where every Carbon manages their own account. User facing.
-- `apps.teamofsilicons.com` - Silicon Apps. User facing, built later.
-- `developer.teamofsilicons.com` - the developer platform. A single place for developers to maintain everything they build with us. Each of our services keeps its own backend; this is just one unified frontend on top of them.
+- `apps.teamofsilicons.com` - Silicon Apps. Where people discover and install apps. App creation and management take them to the developer platform.
+- `developers.teamofsilicons.com` - the developer platform. A single shared frontend for Silicon Apps and Silicon Accounts, where developers maintain everything they build with us. Each service keeps its own backend. App discovery lives in Silicon Apps, not in the developer platform.
 
-Everything about creating and setting up an app's authentication happens on `developer.teamofsilicons.com`: its sign-in methods, Google and Apple, its flows and pages, the details it asks for, its redirect URLs, its user base and imports, its webhooks and its ATA proofs. The settings themselves are stored in Silicon Accounts.
+Everything about creating and setting up an app's authentication happens on `developers.teamofsilicons.com`: its sign-in methods, Google and Apple, its flows and pages, the details it asks for, its redirect URLs, its user base and imports, its webhooks and its App verification tokens. The settings themselves are stored in Silicon Accounts.
 
 
 # Accounts
@@ -194,9 +194,9 @@ An app can import its existing users through an import users flow, so it can bri
 
 # Apps
 
-Apps are created in Silicon Apps. As soon as an app is created there it can be used to sign users in. On `developer.teamofsilicons.com` a developer sees the list of apps they have and makes new ones.
+Apps are registered through Silicon Apps in the shared developer portal. As soon as an app is created there it can be used to sign users in. On `developers.teamofsilicons.com` a developer sees the list of apps they have and makes new ones.
 
-The app's sign-in setup (its sign-in methods, Google and Apple, flows, page styling, required and optional details and redirect URLs) is configured on `developer.teamofsilicons.com` and stored in Silicon Accounts.
+The app's sign-in setup (its sign-in methods, Google and Apple, flows, page styling, required and optional details and redirect URLs) is configured on `developers.teamofsilicons.com` and stored in Silicon Accounts.
 
 ### Until Silicon Apps exists
 
@@ -217,21 +217,29 @@ Every event has an `event_id` so apps can deduplicate, and is signed so apps kno
 Silicon webhooks (see Silicon account) are separate from app webhooks but follow these same rules.
 
 
-# Proofs (OBO and ATA)
+# App verification and User verification
 
 Silicon Accounts doesn't handle any app's endpoints anymore. Our job is just to issue and verify proofs. Consent screens, and which endpoint does what, are handled entirely by the apps themselves.
 
-`OBO` (on behalf of) - when App A wants to perform an action at App B on behalf of a user, App A gets the user's consent itself and then gets a proof token from us. App B can then ask us to verify that proof token.
+`User verification` - when App A wants to perform an action at App B on behalf of a user, App A gets the user's consent itself and then gets a proof token from us. App B can then ask us to verify that proof token.
 
-`ATA` (app to app) - each app gets an ATA page on `developer.teamofsilicons.com` where it can make new ATA proofs. An ATA proof is always for exactly one app; a proof can't be made for several apps at once. If App A wants to talk to App B and App C, it makes one proof for App B and another one for App C, and each of them verifies its own proof with us.
+`App verification` - each app gets an App verification page on `developers.teamofsilicons.com` where its managers can make new App verification tokens. An App verification proof is always for exactly one app; a proof can't be made for several apps at once. If App A wants to talk to App B and App C, it makes one proof for App B and another one for App C, and each of them verifies its own proof with us.
+
+These are the names used in the product and documentation. Existing `ata` and `obo` API values, routes and integration commands remain compatible; they mean App verification and User verification respectively.
 
 Proofs work with the same access token and refresh token logic as sign-in. The issuing app holds the refresh token and uses it to get new proof tokens, and each proof token has a validity of its own.
 
 When a proof is verified we send back whether it's valid and until when:
-- valid: `{valid: true, expires_at, issuing app, receiving app, user (for OBO)}`
+- valid: `{valid: true, expires_at, issuing app, receiving app, user (for User verification)}`
 - not valid, expired, revoked, or for a user or app that isn't valid: `{valid: false, expires_at: null}`
 
-A user can see every OBO proof issued on their behalf on `accounts.teamofsilicons.com` and revoke it.
+A user can see every User verification proof issued on their behalf on `accounts.teamofsilicons.com` and revoke it.
+
+There is also a central App verification page at `developers.teamofsilicons.com/app-verification`. Each signed-in user can see all App verification records ever generated by the apps they currently manage, whether generated in the portal, through the CLI or through the API. This includes active, expired and revoked records. Being the receiving app alone does not grant access to another app's history.
+
+The central page can be filtered by issuing app and status, and shows the newest records first with pagination. Each record shows the issuing and receiving apps, scopes, creation time, expiry and revocation state. Its history includes issuance, token refreshes and revocation, so refreshing a token does not hide how its tokens changed over time. Every page and history request checks current management access; losing access to an app removes access to its verification history too.
+
+Keep verification records and their history after the credential material expires or is removed. Raw proof and refresh token values are shown when generated, not recovered from history. Older history must distinguish derived expiry information from explicitly recorded expiry information, and show missing information honestly.
 
 
 # accounts.teamofsilicons.com
@@ -240,15 +248,15 @@ This is where a Carbon manages their account. They should be able to:
 - see and edit their details
 - add, remove and change their primary emails and phone numbers
 - see every app they've signed into, and remove an app's access
-- see and revoke their OBO proofs
+- see and revoke their User verification proofs
 - see the Silicons they're custodian of, create a new Silicon, rotate its STK, and transfer it to another Carbon
 
-Anything about building apps lives on `developer.teamofsilicons.com`, not here.
+Anything about building apps lives on `developers.teamofsilicons.com`, not here.
 
 
-# developer.teamofsilicons.com
+# developers.teamofsilicons.com
 
-This is where a developer sets up everything about their apps' authentication. For each app they should be able to:
+This is the shared frontend for Silicon Accounts configuration and Silicon Apps publishing. A developer sets up everything about their apps' authentication here, alongside their app's publishing, packages, releases and authors. For each app they should be able to:
 - see their apps and make a new one
 - pick the sign-in methods, and set up Google and Apple (one click or bring your own)
 - pick the details the app wants, each required or optional
@@ -256,12 +264,14 @@ This is where a developer sets up everything about their apps' authentication. F
 - set the redirect URLs and where the iframe and snippet may be used
 - see the app's user base and import its existing users
 - set up the app's webhook, and see and replay its deliveries
-- make, see and revoke the app's ATA proofs, one app at a time
+- make, see and revoke the app's App verification proofs, one receiving app per proof
+
+The top-level App verification page brings together all verification records and their history for the apps the signed-in user manages. Each app's App verification page links to that central history with the app selected.
 
 
 # History
 
-Keep a good store of everything: sign-in history per account and per app, every c:id and si:id change, every custodian transfer, every proof issued and revoked, and every change to an app's sign-in setup.
+Keep a good store of everything: sign-in history per account and per app, every c:id and si:id change, every custodian transfer, every App verification and User verification proof issued, refreshed and revoked, and every change to an app's sign-in setup.
 
 For externally initiated changes include idempotency keys, so retrying something never does it twice.
 
@@ -313,9 +323,6 @@ Silicon Apps manages updates for the installed Accounts CLI. Accounts must not r
 Carbon IDs use `c:{handle}` (for example `c:saket`), Silicon IDs use `si:{handle}` (for example `si:head_of_growth`), and app IDs are the bare `{app_id}` (for example `briefcase`). Each prefix appears exactly once.
 
 The uuid is what identifies an account; the c:id and si:id are only what people see. A membership with an app is `{app_id}:{uuid}`.
-
-
-
 
 
 
