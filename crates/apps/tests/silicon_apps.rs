@@ -143,6 +143,7 @@ async fn selected_webhook_updates_are_stored_and_filter_deliveries() {
 async fn apps_mail_resolves_contacts_privately_and_deduplicates() {
     let mut settings = Settings::for_tests();
     settings.internal_token = Some(SecretString::from(TOKEN));
+    settings.silicon_apps_url = "https://apps.example.test".into();
     let ctx = TestContext::with_settings(settings).await;
     let app = common::owned_app(&ctx, "mail").await;
     let body = json!({"kind":"mail.invite","body":{"id":"invitation-one","app_id":app.app_id,"to":app.owner.handle,"account_uuid":app.owner.uuid}});
@@ -165,6 +166,12 @@ async fn apps_mail_resolves_contacts_privately_and_deduplicates() {
             .await
             .unwrap();
     assert_eq!(count, 1);
+    let body: String =
+        sqlx::query_scalar("select text_body from outbound_messages where purpose='apps_invite'")
+            .fetch_one(&ctx.state.db)
+            .await
+            .unwrap();
+    assert!(body.contains("https://apps.example.test/developer/invitations"));
     let response=call(&ctx,Req::post("/v1/internal/apps/mail").bearer(TOKEN).header("Idempotency-Key","report-mail-one").json(json!({"kind":"mail.report","body":{"message":"Local test report","pr":"https://github.com/teamofsilicons/silicon-apps/pull/1"}}))).await;
     assert_eq!(response.status, 202, "{}", response.json);
     assert_eq!(response.json["recipients"], 3);
