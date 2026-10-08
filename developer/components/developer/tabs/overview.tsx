@@ -113,10 +113,10 @@ export function OverviewTab() {
     },
     {
       tab: "ata",
-      title: "ATA",
+      title: "App verification",
       icon: <ShieldCheck size={18} strokeWidth={1.75} />,
-      summary: "App-to-app proofs, one app per proof",
-      detail: "Make, see and revoke the proofs this app issued",
+      summary: "Verify your app to one other app",
+      detail: "Create, review and revoke verification tokens",
     },
     {
       tab: "embed",

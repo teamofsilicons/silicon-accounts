@@ -3,7 +3,7 @@
 The developer platform: one place where developers maintain everything they build with us. Each of our services keeps
 its own backend; this site is one frontend on top of them. It combines Silicon Apps publishing with Silicon Accounts: everything about creating
 and setting up an app's authentication (its sign-in methods, Google and Apple, the details it asks for, its flows and
-pages, redirect URIs and allowed origins, its user base and imports, its webhook and deliveries, its ATA proofs, and the
+pages, redirect URIs and allowed origins, its user base and imports, its webhook and deliveries, its app verifications, and the
 snippets to embed sign-in). The same app workspace also creates apps, saves seven setup steps, uploads and validates packages, manages releases and authors, and publishes through Silicon Apps. Each service retains its own backend. The portal contains no store catalog; discovery and installation live at apps.teamofsilicons.com.
 
 Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Arc UI, TanStack Query. The
@@ -36,7 +36,7 @@ Silicon Accounts and Apps APIs, server to server:
 | `/auth/callback` | The state must be one this browser started; the code is exchanged server side (`POST /v1/oauth/token`, `client_id=developer`, no secret, the PKCE verifier), and the tokens are sealed into the session cookie. Failures land on `/sign-in?error=<code>` with fixed words per code (the address's `error_description` is never shown). |
 | `/auth/sign-out` (POST) | Revokes the refresh token (`/v1/oauth/revoke`, `client_id=developer`) and clears the cookie. The account site's own sign-in is untouched. |
 | `/auth/session` | `{"signed_in": bool}` from the sealed cookie alone (no API call). The pages ask it before `/api/accounts/me`, so a signed-out visit never logs a 401. |
-| `/api/accounts/*` | The proxy: `{ACCOUNTS_API_URL}/v1/*` with `Authorization: Bearer <access token>`. Public reads (`meta`, `apps/{id}/public`, `.well-known/openid-configuration`, `.well-known/jwks.json`) go without a token. Account reads: `me`, `me/owned-apps`. Everything under `apps/{app_id}/…` (the owner routes). Anything else answers 404 `not_proxied`. |
+| `/api/accounts/*` | The proxy: `{ACCOUNTS_API_URL}/v1/*` with `Authorization: Bearer <access token>`. Public reads (`meta`, `apps/{id}/public`, `.well-known/openid-configuration`, `.well-known/jwks.json`) go without a token. Account reads: `me`, `me/owned-apps`, `me/app-verifications`. Everything under `apps/{app_id}/…` (the owner routes). Anything else answers 404 `not_proxied`. |
 | `/api/apps/*` | Restricted publishing proxy to `{APPS_API_URL}/v1/*`, using the same server-held `aud=developer` access token. Own-app listing requires `mine=true`. Store reviews, install receipts, package resolution, reports and platform registration are not proxied. Media paths use this proxy too, preserving private visibility checks. |
 | everything else | the pages |
 
@@ -62,7 +62,7 @@ A refused refresh (`invalid_grant`) clears the cookie and answers 401 `signed_ou
 then sends the visitor to `/sign-in?return_to=…`.
 
 The server checks the developer audience itself (06-v2 §2): a token with `aud=developer` acts for its Carbon only on
-`GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and the owner routes under `/v1/apps/{app_id}/…`.
+`GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps`, `GET /v1/me/app-verifications` and the app management routes under `/v1/apps/{app_id}/…`.
 
 **Pages' headers** (`proxy.ts`, pages only; the route handlers set their own): a nonce CSP (`script-src 'self'
 'nonce-…' 'strict-dynamic'`, `connect-src 'self' <accounts site>` for the Embed tab's live SDK, `img-src 'self' https:
@@ -108,7 +108,8 @@ checking pages with curl or a browser without the hosted sign-in.
 | Shell | every signed-in page: the top bar (brand, Apps, Docs, ⌘K, theme, account menu), the sign-in gate, page transitions | `app/(shell)/layout.tsx`, `components/foundation/shell/` |
 | Sign-in | `/sign-in` (the front door and where failed sign-ins land) | `app/sign-in/`, `components/sign-in/` |
 | Apps home | `/` (owned and authored apps; “New app” registers it through Apps and shows the secret once) | `components/developer/home/` |
-| An app | `/apps/[appId]/[[...tab]]`: Overview, Publishing, Releases, Authors, History, Sign-in, Details, Flows, Pages, Users, Import, Webhooks, ATA, Embed | `components/developer/app/` (scope, tab frame), `components/developer/tabs/`, `lib/app-tabs.ts` |
+| An app | `/apps/[appId]/[[...tab]]`: Overview, Publishing, Releases, Authors, History, Sign-in, Details, Flows, Pages, Users, Import, Webhooks, App verification, Embed | `components/developer/app/` (scope, tab frame), `components/developer/tabs/`, `lib/app-tabs.ts` |
+| Verification history | `/app-verification` | `components/developer/verification/` |
 | Invitations, docs and preferences | `/invitations`, public `/docs`, `/settings` | `components/publishing/`, native shell pages |
 | Copied from `web/` and adapted | Arc UI, the foundation (layout, branding runtime, squircles, theme, providers), the API client and hooks | `components/arc/`, `components/foundation/`, `lib/` |
 
@@ -148,8 +149,8 @@ tokens, Carbons/Silicons vocabulary, errors in the server's words). `lib/api/htt
   (`web/components/auth/steps/*.tsx` and `flow-page.tsx`'s footer): change the preview when those words change. Leaving
   the Image background drops an image URL the server would refuse (`backgroundStyleEdits`), so a hidden field never
   blocks saving.
-- **ATA** (`tabs/ata.tsx`): one receiving app per proof (`{receiving_app}`); the proof and refresh tokens are shown
-  once; the list (ATA by default, OBO one filter away) revokes any active proof.
+- **App verification** (`tabs/ata.tsx`, keeping `/apps/{id}/ata` compatible): create a verification for one receiving app (`{receiving_app}`). Its verification and refresh tokens are shown once, kept only in component state, and never stored in the query cache or browser storage. The per-app list labels the wire kinds `ata` and `obo` as App verification and User verification.
+- **Central App verification** (`/app-verification`, `components/developer/verification/`): retained app verifications across apps the signed-in developer currently manages, with issuing-app and status filters and global cursor pagination. Each record opens separately paginated issuance, refresh and revocation history. `GET /v1/me/app-verifications` and `GET /v1/apps/{id}/proofs/{proof_id}/history` use the sealed session through the BFF. Existing app-owner/accepted-author authorization is enforced by Accounts; this grants no broader authority. Active describes the verification refresh lifetime, separate from the latest access token expiry. Expired credentials are removed, but history remains; historical token expiry is marked recorded, derived from historical metadata, or unavailable. Raw tokens and hashes are never returned by these read endpoints. Revocation uses the existing per-app DELETE and refreshes both lists and history.
 - **Embed** (`tabs/embed.tsx`): the hosted link (with `intent` and `method`), the iframe, the SDK (one button per method
   or Sign in and Sign up), direct buttons for the app's own site, the server calls, OIDC discovery, and a live preview
   that runs the accounts site's real `/sdk/v1.js`. Apps never pass a Carbon's email or phone.

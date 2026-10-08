@@ -12,7 +12,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ViewTransition, useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
-import { Settings, Mail, BookOpen, Boxes, CircleUserRound, LogOut, Monitor, Moon, Search, Sun } from "lucide-react";
+import { Settings, ShieldCheck, Mail, BookOpen, Boxes, CircleUserRound, LogOut, Monitor, Moon, Search, Sun } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
 import { Button } from "@/components/arc/button/button";
 import { ThemeSwitch } from "@/components/arc/theme-switch/theme-switch";
@@ -113,6 +113,7 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
 
   useRegisterCommands(() => [
     { id: "go.apps", label: "Your apps", description: "Every app you own", group: "Go to", icon: <Boxes size={16} strokeWidth={1.75} />, keywords: ["apps", "home"], run: () => void go(paths.home) },
+    { id: "go.app-verification", label: "App verification", description: "Issued tokens and history across your apps", group: "Go to", icon: <ShieldCheck size={16} />, keywords: ["verification", "token", "proof", "ata", "history"], run: () => void go(paths.appVerification()) },
     { id: "go.invitations", label: "Author invitations", group: "Go to", icon: <Mail size={16} />, keywords: ["invite", "author"], run: () => void go(paths.invitations) },
     { id: "go.settings", label: "Developer settings", group: "Go to", icon: <Settings size={16} />, keywords: ["telemetry", "preferences"], run: () => void go(paths.settings) },
     { id: "go.docs", label: "Developer docs", description: "Accounts and Apps guides", group: "Go to", icon: <BookOpen size={16} strokeWidth={1.75} />, keywords: ["docs", "help", "guide"], run: () => void go(docsUrl) },
@@ -156,6 +157,7 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
               event.preventDefault();
               void go(paths.home, event.currentTarget);
             }}>Apps</Link>
+            <Link href={paths.appVerification()} data-sq="surface" className={styles.navLink} aria-current={pathname === paths.appVerification() ? "page" : undefined}>App verification</Link>
             <Link href={paths.invitations} data-sq="surface" className={styles.navLink}>Invitations</Link>
             <Link href={docsUrl} data-sq="surface" className={styles.navLink}>Docs</Link>
           </nav>
@@ -178,6 +180,7 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
               align="end"
               items={[
                 { label: "Your account", icon: <CircleUserRound size={16} strokeWidth={1.75} />, onSelect: () => openExternal(accountsUrl) },
+                { label: "App verification", icon: <ShieldCheck size={16} />, onSelect: () => void go(paths.appVerification()) },
                 { label: "Author invitations", icon: <Mail size={16} />, onSelect: () => void go(paths.invitations) },
                 { label: "Developer settings", icon: <Settings size={16} />, onSelect: () => void go(paths.settings) },
                 { label: "Docs", icon: <BookOpen size={16} strokeWidth={1.75} />, onSelect: () => void go(docsUrl) },

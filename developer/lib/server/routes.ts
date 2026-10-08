@@ -3,12 +3,12 @@
  * plus the public reads the pages need. Framework-free, so it is testable on its own.
  *
  *   GET  meta, apps/{id}/public, .well-known/openid-configuration, .well-known/jwks.json   (public: sent without a token)
- *   GET  me, me/owned-apps                                                                (the signed-in Carbon)
+ *   GET  me, me/owned-apps, me/app-verifications                                                                (the signed-in Carbon)
  *   ANY  apps/{id}, apps/{id}/…                                                            (the app's owner routes)
  */
 const APP = "[a-z0-9_-]{2,40}";
 const PUBLIC_GET = [/^v1\/meta$/, new RegExp(`^v1/apps/${APP}/public$`), /^\.well-known\/(openid-configuration|jwks\.json)$/];
-const ACCOUNT_GET = [/^v1\/me$/, /^v1\/me\/owned-apps$/];
+const ACCOUNT_GET = [/^v1\/me$/, /^v1\/me\/owned-apps$/, /^v1\/me\/app-verifications$/];
 const OWNER = new RegExp(`^v1/apps/${APP}(/[A-Za-z0-9._~%:@-]+)*$`);
 
 export type ProxyKind = "public" | "account";

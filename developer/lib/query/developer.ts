@@ -10,7 +10,7 @@
  */
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/endpoints";
-import type { AppDetail, AppProofsQuery, AppUsersQuery, AtaRequest, DeliveriesQuery, ImportJob, ImportOptions, ImportRow, ImportRowsQuery, ReplayRequest, SigninConfigPatch } from "../api/types";
+import type { AppDetail, AppProofsQuery, AppUsersQuery, AtaRequest, DeliveriesQuery, ImportJob, ImportOptions, ImportRow, ImportRowsQuery, ManagedAppProofsQuery, ReplayRequest, SigninConfigPatch } from "../api/types";
 import { useIdempotentMutation, useSecretMutation } from "./idempotency";
 import { queryKeys } from "./keys";
 import { useWholeList } from "./pages";
@@ -198,6 +198,25 @@ export function useAppProofs(appId: string, query: Omit<AppProofsQuery, "cursor"
   });
 }
 
+export function useManagedAppProofs(query: Omit<ManagedAppProofsQuery, "cursor" | "limit"> = {}) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.me.appProofs(query),
+    queryFn: ({ pageParam }) => api.me.appProofs({ ...query, limit: 50, cursor: pageParam }),
+    initialPageParam: null as string | null,
+    getNextPageParam: page => page.next_cursor,
+  });
+}
+
+export function useAppProofHistory(appId: string, proofId: string, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.app.proofHistory(appId, proofId),
+    queryFn: ({ pageParam }) => api.apps.proofs.history(appId, proofId, { limit: 50, cursor: pageParam }),
+    initialPageParam: null as string | null,
+    getNextPageParam: page => page.next_cursor,
+    enabled,
+  });
+}
+
 /**
  * Issues an app-to-app proof for exactly one receiving app: `run({ receiving_app, scopes, access_ttl_seconds })`. Its proof token and refresh token are shown once, so this is a secret
  * mutation (never cached). The same request keeps one key, so a retry never issues twice. Pass `{ toast: false }` to
@@ -206,7 +225,12 @@ export function useAppProofs(appId: string, query: Omit<AppProofsQuery, "cursor"
 export function useCreateAta(appId: string, meta: { toast?: boolean } = {}) {
   const client = useQueryClient();
   return useSecretMutation((body: AtaRequest, idempotencyKey) => api.apps.proofs.createAta(appId, body, { idempotencyKey }), {
-    onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.app.root(appId).concat("proofs") }),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.app.root(appId).concat("proofs") }),
+        client.invalidateQueries({ queryKey: queryKeys.me.appProofsRoot }),
+      ]);
+    },
     meta: { errorTitle: "Could not issue the proof", ...meta },
   });
 }
@@ -215,7 +239,12 @@ export function useRevokeAppProof(appId: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (proofId: string) => api.apps.proofs.revoke(appId, proofId),
-    onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.app.root(appId).concat("proofs") }),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.app.root(appId).concat("proofs") }),
+        client.invalidateQueries({ queryKey: queryKeys.me.appProofsRoot }),
+      ]);
+    },
     meta: { errorTitle: "Could not revoke the proof" },
   });
 }

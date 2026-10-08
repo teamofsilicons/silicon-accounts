@@ -7,6 +7,8 @@
  * each. Every proof this app issued is listed (ATA by default; OBO proofs, issued by the app's server for an account,
  * are one filter away), and any active one can be revoked.
  */
+import Link from "next/link";
+import { paths } from "@/lib/navigation";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, ShieldCheck, X } from "lucide-react";
 import { Input } from "@/components/arc/input/input";
@@ -69,7 +71,7 @@ function ProofRow({ proof, appName, logo, lookups, onRevoke }: { proof: AppProof
   return (
     <li className={styles.proof}>
       <div className={styles.flow} aria-label={`${appName} to ${receivers.join(", ")}`}>
-        <Badge size="sm" tone={proof.kind === "ata" ? "info" : "neutral"}>{proof.kind === "ata" ? "ATA" : "OBO"}</Badge>
+        <Badge size="sm" tone={proof.kind === "ata" ? "info" : "neutral"}>{proof.kind === "ata" ? "App verification" : "User verification"}</Badge>
         <AppIcon name={appName} src={logo} size={32} decorative />
         <span className={styles.connector} data-active={active || undefined} aria-hidden="true"><i /><ArrowRight size={14} strokeWidth={1.75} /></span>
         <span className={styles.receivers}>
@@ -97,7 +99,7 @@ function ProofRow({ proof, appName, logo, lookups, onRevoke }: { proof: AppProof
         <span className={styles.statusFocus} tabIndex={-1} data-proof-status={proof.proof_id}>
           <Badge size="sm" tone={status.tone}>{status.label}</Badge>
         </span>
-        {active ? <ConfirmMorph label="Revoke" prompt="Revoke this proof?" confirmLabel="Revoke" pendingLabel="Revoking" doneLabel="Revoked" onConfirm={() => onRevoke(proof.proof_id)} /> : null}
+        {active ? <ConfirmMorph label="Revoke" prompt="Revoke this verification?" confirmLabel="Revoke" pendingLabel="Revoking" doneLabel="Revoked" onConfirm={() => onRevoke(proof.proof_id)} /> : null}
       </div>
     </li>
   );
@@ -183,11 +185,11 @@ export function AtaTab() {
   const refreshCurl = `# Run by ${appId} when the token expires; the refresh token rotates every time\ncurl -u ${appId}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -d "{\\"proof_refresh_token\\":\\"$PROOF_REFRESH_TOKEN\\"}" \\\n  ${ctx.publicUrl}/v1/proofs/refresh`;
   const oboCurl = `# Your server, after the account agreed in your app\ncurl -u ${appId}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: 4f1c…' \\\n  -d '{"subject_token":"<their access token for ${appId}>","receiving_app":"briefcase","scopes":["files.write"],"access_ttl_seconds":600}' \\\n  ${ctx.publicUrl}/v1/proofs/obo\n\n# → { "proof_id": "…", "proof_token": "sap_…", "proof_refresh_token": "sapr_…", "expires_at": "…", … }\n# The receiving app verifies it with POST /v1/proofs/verify and its own credentials.`;
   const filtered = kind !== "all" || status !== "all";
-  const ataCurl = `# Your server: one proof per receiving app (an ATA proof is for exactly one app)\ncurl -u ${appId}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: 9b2e…' \\\n  -d '{"receiving_app":"${receiver ?? "remind"}","scopes":["notify.send"],"access_ttl_seconds":1800}' \\\n  ${ctx.publicUrl}/v1/proofs/ata`;
+  const ataCurl = `# Your server: one proof per receiving app (an app verification is for exactly one app)\ncurl -u ${appId}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: 9b2e…' \\\n  -d '{"receiving_app":"${receiver ?? "remind"}","scopes":["notify.send"],"access_ttl_seconds":1800}' \\\n  ${ctx.publicUrl}/v1/proofs/ata`;
 
   return (
     <div className={styles.proofs}>
-      <Section title="Make an ATA proof" description={`A proof from ${ctx.app.name} that exactly one app can verify with Silicon Accounts. To talk to several apps, make one proof for each: each app verifies its own.`}>
+      <Section title="Create an app verification token" description={`A proof from ${ctx.app.name} that exactly one app can verify with Silicon Accounts. To talk to several apps, make one proof for each: each app verifies its own.`}>
         <Surface className={styles.creator}>
           <div className={styles.audiences}>
             {receiver ? (
@@ -247,17 +249,17 @@ export function AtaTab() {
             </Alert>
           ) : null}
           <div className={styles.creatorActions}>
-            <Button loading={issue.isPending} disabled={!receiver || !!receiverProblem || resolving} onClick={() => void submit()}>Make the proof</Button>
+            <Button loading={issue.isPending} disabled={!receiver || !!receiverProblem || resolving} onClick={() => void submit()}>Create token</Button>
             <span className={styles.muted}>{receiver ? `For ${receiver} only, valid ${ttlLabel(Number(ttl))} at a time` : "Choose the one app that receives it"}</span>
           </div>
         </Surface>
         {issued ? (
           <SecretReveal
-            title="Your proof"
+            title="Your verification tokens"
             description={`${ctx.app.name} → ${issued.receiving_app ?? issued.receiving_apps?.[0] ?? ""}${issued.scopes.length ? `, scopes ${issued.scopes.join(" ")}` : ""}. Keep the refresh token on your server.`}
             secrets={[
-              { label: "Proof token", value: issued.proof_token, note: `Send it to the receiving app. Expires ${formatRelative(issued.expires_at)} (${formatDateTime(issued.expires_at)}).` },
-              { label: "Proof refresh token", value: issued.proof_refresh_token, note: `Gets new proof tokens until ${formatDateTime(issued.refresh_expires_at)}. Presenting a used one revokes the proof.` },
+              { label: "Verification token", value: issued.proof_token, note: `Send it to the receiving app. Expires ${formatRelative(issued.expires_at)} (${formatDateTime(issued.expires_at)}).` },
+              { label: "Verification refresh token", value: issued.proof_refresh_token, note: `Gets new proof tokens until ${formatDateTime(issued.refresh_expires_at)}. Presenting a used one revokes the proof.` },
             ]}
             doneLabel="I've stored them"
             onDone={() => setIssued(null)}
@@ -268,23 +270,23 @@ export function AtaTab() {
         ) : null}
       </Section>
 
-      <Section id="proofs-issued" title="Proofs this app issued" description="Active proofs verify until their token expires; revoking one stops it at once, refresh token included.">
+      <Section id="proofs-issued" title="Verifications this app issued" description="Active verifications can be refreshed until their refresh period ends. Revoking one stops it at once, refresh token included." actions={<Link href={paths.appVerification(appId)}>All app verification history <ArrowRight size={14} aria-hidden="true" /></Link>}>
         <div className={styles.filters}>
-          <SegmentedControl label="Kind" value={kind} onValueChange={value => setKind(value as KindFilter)} options={[{ value: "ata", label: "App to app" }, { value: "obo", label: "On behalf of" }, { value: "all", label: "All" }]} />
+          <SegmentedControl label="Kind" value={kind} onValueChange={value => setKind(value as KindFilter)} options={[{ value: "ata", label: "App verification" }, { value: "obo", label: "User verification" }, { value: "all", label: "All" }]} />
           <SegmentedControl label="Status" value={status} onValueChange={value => setStatus(value as StatusFilter)} options={[{ value: "all", label: "Any status" }, { value: "active", label: "Active" }, { value: "expired", label: "Expired" }, { value: "revoked", label: "Revoked" }]} />
         </div>
         {list.error ? (
-          <Alert tone="danger" title="Proofs could not be loaded">
+          <Alert tone="danger" title="Verifications could not be loaded">
             {list.error.message} {list.error.hint}
             <span className={styles.problemLines}><Button size="sm" variant="secondary" onClick={() => void list.refetch()}>Try again</Button></span>
           </Alert>
         ) : null}
-        {list.isPending ? <Skeleton lines={4} avatar label="Loading proofs" /> : !proofs.length && !list.error ? (
+        {list.isPending ? <Skeleton lines={4} avatar label="Loading verifications" /> : !proofs.length && !list.error ? (
           <Surface padding="none">
             <EmptyState
               icon={<ShieldCheck size={24} strokeWidth={1.5} />}
-              title={filtered ? "No proofs match" : "No proofs yet"}
-              description={filtered ? (kind === "ata" && status === "all" ? `ATA proofs ${ctx.app.name} makes, here or from its server, appear here.` : "Try another kind or status.") : `Proofs ${ctx.app.name} issues, from here or from its server, appear here.`}
+              title={filtered ? "No verifications match" : "No verifications yet"}
+              description={filtered ? (kind === "ata" && status === "all" ? `App verifications ${ctx.app.name} creates, here or from its server, appear here.` : "Try another kind or status.") : `Verifications ${ctx.app.name} issues, from here or from its server, appear here.`}
             />
           </Surface>
         ) : proofs.length ? (
@@ -304,16 +306,16 @@ export function AtaTab() {
                 />
               ))}
             </ul>
-            {list.hasNextPage ? <Button size="sm" variant="secondary" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>Load more proofs</Button> : null}
-            <p className={styles.footnote}>{plural(proofs.length, "proof")} shown.</p>
+            {list.hasNextPage ? <Button size="sm" variant="secondary" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>Load more verifications</Button> : null}
+            <p className={styles.footnote}>{plural(proofs.length, "verification")} shown.</p>
           </>
         ) : null}
       </Section>
 
-      <Section title="From your server" description={`${ctx.app.name}'s server can make the same proofs with its app id and secret. On-behalf-of proofs (when ${ctx.app.name} acts at another app for an account, after asking the account itself) come only from the server; the account sees and can revoke them on accounts.teamofsilicons.com.`}>
+      <Section title="From your server" description={`${ctx.app.name}'s server can make the same proofs with its app id and secret. User verification tokens (when ${ctx.app.name} acts at another app for an account, after asking the account itself) come only from the server; the account sees and can revoke them on accounts.teamofsilicons.com.`}>
         <Accordion defaultOpen={-1} items={[
-          { title: "Make an ATA proof from your server", content: <div className={styles.wrapCode}><CodeBlock filename="POST /v1/proofs/ata" language="bash" code={ataCurl} /></div> },
-          { title: "Issue an OBO proof from your server", content: <div className={styles.wrapCode}><CodeBlock filename="POST /v1/proofs/obo" language="bash" code={oboCurl} /></div> },
+          { title: "Create an app verification token from your server", content: <div className={styles.wrapCode}><CodeBlock filename="POST /v1/proofs/ata" language="bash" code={ataCurl} /></div> },
+          { title: "Issue a user verification token from your server", content: <div className={styles.wrapCode}><CodeBlock filename="POST /v1/proofs/obo" language="bash" code={oboCurl} /></div> },
         ]} />
       </Section>
     </div>

@@ -12,7 +12,7 @@ export function Docs() {
         description="Follow a task from the first command to a published app."
       />
       <div className="docs-layout">
-        <Section title="Silicon Accounts"><p>Configure sign-in methods, fields, hosted pages, webhooks, users and ATA in your app’s Accounts tabs.</p><a href="https://accounts.teamofsilicons.com/docs" target="_blank" rel="noopener noreferrer">Read the Accounts integration guide <ArrowUpRight size={16} /></a></Section>
+        <Section title="Silicon Accounts"><p>Configure sign-in methods, fields, hosted pages, webhooks, users and app verification in your app’s Accounts tabs.</p><a href="https://accounts.teamofsilicons.com/docs" target="_blank" rel="noopener noreferrer">Read the Accounts integration guide <ArrowUpRight size={16} /></a></Section>
         <Section title="Install the Apps CLI">
           <p>
             Download the installer for your system, review it, then run it. The

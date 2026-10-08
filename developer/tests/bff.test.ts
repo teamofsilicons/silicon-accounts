@@ -39,6 +39,10 @@ test("the proxy forwards only the developer audience's routes", () => {
   assert.deepEqual(proxyRoute(".well-known/openid-configuration", "GET"), { path: ".well-known/openid-configuration", kind: "public" });
   assert.deepEqual(proxyRoute("me", "GET"), { path: "v1/me", kind: "account" });
   assert.deepEqual(proxyRoute("me/owned-apps", "GET"), { path: "v1/me/owned-apps", kind: "account" });
+  assert.deepEqual(proxyRoute("me/app-verifications", "GET"), { path: "v1/me/app-verifications", kind: "account" });
+  assert.equal(proxyRoute("me/app-verifications", "POST"), null);
+  assert.equal(proxyRoute("me/app-verifications/other", "GET"), null);
+  assert.deepEqual(proxyRoute("apps/briefcase/proofs/example/history", "GET"), { path: "v1/apps/briefcase/proofs/example/history", kind: "account" });
   assert.deepEqual(proxyRoute("apps/briefcase/signin-config", "PATCH"), { path: "v1/apps/briefcase/signin-config", kind: "account" });
   assert.deepEqual(proxyRoute("apps/briefcase/proofs/ata", "POST"), { path: "v1/apps/briefcase/proofs/ata", kind: "account" });
   assert.equal(proxyRoute("me", "PATCH"), null, "the account itself is never changed through the developer site");

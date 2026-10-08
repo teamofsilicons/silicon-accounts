@@ -12,6 +12,7 @@ export const paths = {
   docs: "/docs",
   settings: "/settings",
   invitations: "/invitations",
+  appVerification: (appId?: string) => `/app-verification${appId ? `?app_id=${encodeURIComponent(appId)}` : ""}`,
   /** The apps home. */
   developer: "/",
   developerApp: (appId: string, tab?: AppTab) => `/apps/${encodeURIComponent(appId)}${tab && tab !== "overview" ? `/${tab}` : ""}`,
@@ -39,7 +40,7 @@ export const DEVELOPER_TAB_LABELS: Record<AppTab, string> = {
   users: "Users",
   import: "Import",
   webhooks: "Webhooks",
-  ata: "ATA",
+  ata: "App verification",
   embed: "Embed",
 };
 

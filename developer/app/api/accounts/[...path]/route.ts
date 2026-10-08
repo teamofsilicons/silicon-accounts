@@ -6,7 +6,7 @@
  *
  * Only what the developer site uses is proxied (the developer audience's allowlist, see 06-v2 §2):
  *   GET  meta, apps/{id}/public, .well-known/openid-configuration, .well-known/jwks.json   (public, sent without a token)
- *   GET  me, me/owned-apps
+ *   GET  me, me/owned-apps, me/app-verifications
  *   ANY  apps/{id}, apps/{id}/…                                                              (the app's owner routes)
  * Anything else answers 404 `not_proxied`. State-changing requests must come from this site's pages (Origin check).
  */
@@ -74,7 +74,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   const raw = request.nextUrl.pathname.startsWith(PREFIX) ? request.nextUrl.pathname.slice(PREFIX.length) : "";
   const target = proxyRoute(raw, method);
   if (!target) {
-    return json(404, errorBody("not_proxied", `${method} /api/accounts/${raw} is not something the developer site forwards to Silicon Accounts.`, "The developer site forwards meta, me, me/owned-apps and the owner routes under apps/{app_id}/."));
+    return json(404, errorBody("not_proxied", `${method} /api/accounts/${raw} is not something the developer site forwards to Silicon Accounts.`, "The developer site forwards meta, me, me/owned-apps, me/app-verifications and the app management routes under apps/{app_id}/."));
   }
   const problem = sameOriginProblem(request);
   if (problem) return json(403, errorBody("cross_site_request", problem, "Use the developer site's own pages."));

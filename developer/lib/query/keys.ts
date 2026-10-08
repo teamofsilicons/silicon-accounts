@@ -4,7 +4,7 @@
  *   queryClient.invalidateQueries({ queryKey: queryKeys.me.root })            // everything under /v1/me
  *   queryClient.setQueryData(queryKeys.flow(flow.id), flow)
  */
-import type { AppProofsQuery, AppUsersQuery, DeliveriesQuery, HistoryKind, ImportRowsQuery } from "../api/types";
+import type { AppProofsQuery, AppUsersQuery, DeliveriesQuery, HistoryKind, ImportRowsQuery, ManagedAppProofsQuery } from "../api/types";
 
 export const queryKeys = {
   meta: ["meta"] as const,
@@ -25,6 +25,8 @@ export const queryKeys = {
     historyRoot: ["me", "history"] as const,
     history: (kind?: HistoryKind | null) => ["me", "history", kind ?? "all"] as const,
     proofs: ["me", "proofs"] as const,
+    appProofsRoot: ["me", "app-proofs"] as const,
+    appProofs: (query: Omit<ManagedAppProofsQuery, "cursor" | "limit"> = {}) => ["me", "app-proofs", query] as const,
     silicons: ["me", "silicons"] as const,
     silicon: (uuid: string) => ["me", "silicons", uuid] as const,
     custodianRequests: ["me", "custodian-requests"] as const,
@@ -44,6 +46,7 @@ export const queryKeys = {
     deliveries: (appId: string, query: Omit<DeliveriesQuery, "cursor" | "limit"> = {}) => ["apps", appId, "deliveries", query] as const,
     delivery: (appId: string, deliveryId: string) => ["apps", appId, "delivery", deliveryId] as const,
     proofs: (appId: string, query: Omit<AppProofsQuery, "cursor" | "limit"> = {}) => ["apps", appId, "proofs", query] as const,
+    proofHistory: (appId: string, proofId: string) => ["apps", appId, "proofs", "history", proofId] as const,
   },
 
   flow: (id: string) => ["flows", id] as const,

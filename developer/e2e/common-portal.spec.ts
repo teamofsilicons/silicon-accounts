@@ -4,7 +4,7 @@ import { mock } from "./fixtures";
 test("one workspace retains Accounts tabs beside Apps publishing without store exploration", async ({ page }) => {
   await mock(page, true);
   await page.goto("/apps/test-app/publishing");
-  const tabs = ["Overview", "Publishing", "Releases", "Authors", "History", "Sign-in", "Details", "Flows", "Pages", "Users", "Import", "Webhooks", "ATA", "Embed"];
+  const tabs = ["Overview", "Publishing", "Releases", "Authors", "History", "Sign-in", "Details", "Flows", "Pages", "Users", "Import", "Webhooks", "App verification", "Embed"];
   for (const name of tabs) await expect(page.getByRole("tab", { name, exact: true })).toBeVisible();
   await page.getByRole("tab", {name: "Sign-in", exact: true}).click();
   await expect(page).toHaveURL(/\/apps\/test-app\/sign-in$/);

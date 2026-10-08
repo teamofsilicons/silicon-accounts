@@ -9,11 +9,11 @@
  */
 import { request, seg, formBody, type RequestOptions } from "./http";
 import type {
-  AccountSummary, AppDetail, AppProof, AppProofsQuery, AppPublic, AppUser, AppUserDetail, AppUsersQuery, AtaRequest,
+  AccountSummary, AppDetail, AppProof, AppProofHistoryEvent, AppProofsQuery, AppPublic, AppUser, AppUserDetail, AppUsersQuery, AtaRequest,
   BrowserSession, CliLoginChallenge, ConfigHistoryItem, ConsentSubmit, ContactChallenge, CreateSilicon,
   CustodianRequest, CustodianRequestStatus, DeliveriesQuery, DeviceAuthorization, DeviceRequest, EmailView, FlowCreate,
   FlowEnvelope, FlowView, HistoryItem, HistoryQuery, IdAvailability, IdentityView, ImportJob, ImportOptions, ImportRow,
-  ImportRowResult, ImportRowsQuery, Introspection, IssuedProof, Jwks, ManagedSilicon, Me, Meta, MyApp, MyProof,
+  ImportRowResult, ImportRowsQuery, Introspection, IssuedProof, Jwks, ManagedAppProof, ManagedAppProofsQuery, ManagedSilicon, Me, Meta, MyApp, MyProof,
   OboRequest, OidcDiscovery, OutboxMessage, OwnedApp, Page, PageQuery, PhoneView, PhotoUploaded, ProfileUpdate,
   ProofRevokeRequest, ProofVerification, ReplayRequest, ReplayResult, ReportReceipt, SessionInfo, ShortLivedToken,
   SigninConfigPatch, SiliconAppsApp, SiliconCreated, SiliconPhotoUploaded, SiliconSelfCreate, SiliconSelfCreated,
@@ -222,6 +222,10 @@ export const me = {
     revoke: (proofId: string) => request<null>(`/v1/me/proofs/${seg(proofId)}`, { method: "DELETE" }),
   },
 
+  appProofs: (query?: ManagedAppProofsQuery) => request<Page<ManagedAppProof>>("/v1/me/app-verifications", {
+    query: { ...pageQuery(query), app_id: query?.app_id, status: query?.status },
+  }),
+
   /** `POST /v1/me/short-lived-tokens`: a 2-minute, single-use token an app exchanges for this account's tokens. */
   shortLivedToken: (appId: string) => request<ShortLivedToken>("/v1/me/short-lived-tokens", { method: "POST", body: { app_id: appId } }),
 
@@ -352,6 +356,7 @@ export const apps = {
     /** Proofs issued by the app. */
     list: (appId: string, query?: AppProofsQuery, credentials?: Owner) =>
       request<Page<AppProof>>(`/v1/apps/${seg(appId)}/proofs`, { query: { ...pageQuery(query), kind: query?.kind, status: query?.status }, auth: ownerAuth(credentials) }),
+    history: (appId: string, proofId: string, query?: PageQuery) => request<Page<AppProofHistoryEvent>>(`/v1/apps/${seg(appId)}/proofs/${seg(proofId)}/history`, { query: pageQuery(query) }),
     /** The ATA page stand-in: issue an app-to-app proof for `audiences` (201; tokens shown once). The owner's session is enough. */
     createAta: (appId: string, body: AtaRequest, options?: OwnerCall) =>
       request<IssuedProof>(`/v1/apps/${seg(appId)}/proofs/ata`, { method: "POST", body, idempotencyKey: options?.idempotencyKey, auth: ownerAuth(options?.credentials), signal: options?.signal }),

@@ -32,8 +32,8 @@
 .proof { position: relative; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(10rem, auto); align-items: center; gap: var(--space-3) var(--space-5); padding: var(--space-4) var(--space-5); }
 .proof + .proof { border-top: 1px solid var(--border-subtle); }
 @media (max-width: 900px) { .proof { grid-template-columns: minmax(0, 1fr); } }
-.flow { display: grid; min-width: 0; grid-template-columns: 44px auto auto minmax(0, 1fr); align-items: center; gap: var(--space-2); }
-.flow > :first-child { justify-self: start; }
+.flow { display: grid; min-width: 0; grid-template-columns: 32px 44px minmax(0, 1fr); align-items: center; gap: var(--space-2); }
+.flow > :first-child { grid-column: 1 / -1; justify-self: start; }
 .connector { position: relative; display: inline-flex; width: 44px; align-items: center; color: var(--text-muted); }
 .connector i { flex: 1; height: 0; border-top: 1.5px dashed currentColor; }
 .connector[data-active] { color: var(--accent); }
@@ -42,7 +42,7 @@
 .receivers { display: flex; min-width: 0; flex-wrap: wrap; gap: var(--space-1); }
 /* A narrow list puts the receiving apps on their own line, so their names stay whole beside their ids. */
 @container (max-width: 440px) {
-  .flow { grid-template-columns: 44px auto minmax(0, 1fr); }
+  .flow { grid-template-columns: 32px 44px minmax(0, 1fr); }
   .receivers { grid-column: 1 / -1; }
 }
 .proofMeta { display: grid; min-width: 0; gap: var(--space-1); font-size: var(--text-sm); }

@@ -17,7 +17,7 @@ import { fontVariables } from "./fonts";
 
 export const metadata: Metadata = {
   title: { default: "Silicon Developer", template: "%s · Silicon Developer" },
-  description: "Publish through Silicon Apps and configure Silicon Accounts: methods, Google and Apple, details, flows, pages, users, webhooks and ATA proofs.",
+  description: "Publish through Silicon Apps and configure Silicon Accounts: methods, Google and Apple, details, flows, pages, users, webhooks and app verification.",
   applicationName: "Silicon Developer",
   referrer: "strict-origin-when-cross-origin",
   robots: { index: false, follow: false },

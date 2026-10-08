@@ -1293,6 +1293,39 @@ export interface AppProofsQuery extends PageQuery {
   status?: "active" | "revoked" | "expired";
 }
 
+/** App verification history across apps this signed-in developer may manage. No credential values. */
+export interface ManagedAppProof extends AppProof {
+  issuing_app: AppSummary;
+}
+
+export interface ManagedAppProofsQuery extends PageQuery {
+  app_id?: string;
+  status?: "active" | "revoked" | "expired";
+}
+
+/** A retained issuance, refresh or revocation event. Historical metadata may be absent. */
+export interface AppProofHistoryEvent {
+  event_id: string;
+  at: Timestamp;
+  action: "proof.issued" | "proof.refreshed" | "proof.revoked" | "proof.refresh_token_reused";
+  actor: { kind: string; id: string | null };
+  token_expires_at: Timestamp | null;
+  token_expiry_source: "recorded" | "derived" | null;
+  details: {
+    kind?: ProofKind;
+    issuing_app?: string;
+    receiving_app?: string;
+    audiences?: string[];
+    scopes?: string[];
+    access_ttl_seconds?: number;
+    expires_at?: Timestamp;
+    reason?: string;
+    via?: string;
+    revoked_at?: Timestamp;
+    sign_in_revoke_reason?: string;
+  };
+}
+
 /** `GET /v1/me/proofs` items: OBO proofs issued on my behalf. */
 export interface MyProof {
   proof_id: string;

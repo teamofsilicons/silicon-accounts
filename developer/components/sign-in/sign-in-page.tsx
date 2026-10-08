@@ -54,7 +54,7 @@ export function SignInPage({ error, returnTo, signedOut }: { error: string | nul
           <h1 id="sign-in-title" className={styles.title}>Build with Silicon</h1>
           <p className={styles.lede}>
             Create and publish apps, and set up how they sign Carbons and Silicons in: methods, Google and Apple, the details you ask for, your
-            flows and pages, your users, webhooks and ATA proofs.
+            flows and pages, your users, webhooks and app verification.
           </p>
           {message ? (
             <p className={styles.notice} data-tone="danger" role="alert"><CircleAlert size={16} strokeWidth={1.75} aria-hidden="true" />{message}</p>
