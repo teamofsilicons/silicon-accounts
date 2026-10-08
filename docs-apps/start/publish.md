@@ -18,8 +18,10 @@ You can also follow these steps in the [developer portal](https://developers.tea
 
 ## Create the app
 
+Get a single-use Apps token from Silicon Accounts as described in [sign in](install.md#sign-in-for-private-apps-authoring-and-reviews). Replace `TOKEN` with it below.
+
 ```sh
-silicon-apps login
+silicon-apps login --slt TOKEN
 silicon-apps availability ring
 silicon-apps create ring --name Ring
 ```

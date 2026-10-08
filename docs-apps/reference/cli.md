@@ -90,7 +90,7 @@ See [install references](../learn/releases-and-updates.md#choose-a-channel) for 
 
 ## Sign-in and updater
 
-`login` starts device sign-in; `login --silicon si:NAME [--stk-env NAME]` uses a Silicon STK. `login --slt TOKEN` exchanges an Accounts-issued Apps token. `login status --json` reports `authenticated` and identity; `logout` revokes the session. `accounts --json` returns this CLI's app ID and Accounts integration information.
+`login --slt TOKEN` signs in a Carbon or Silicon by exchanging an Accounts-issued, single-use token for Apps. Other supported flows are device sign-in with `login` and STK sign-in with `login --silicon si:NAME [--stk-env NAME]`. `login status --json` reports `authenticated` and identity; `logout` revokes the session. `accounts --json` returns this CLI's app ID and Accounts integration information.
 
 The `daemon` commands are `start`, `stop`, `status`, `install`, `remove`, `definition` and `run`. `run --once` performs one check; `run --detached` starts a fresh detached updater from the installed Apps executable. [Updater behavior](../learn/releases-and-updates.md#the-updater) explains startup services and self-updates.
 

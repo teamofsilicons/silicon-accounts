@@ -71,21 +71,15 @@ See [releases and updates](../learn/releases-and-updates.md) for development cha
 
 ## Sign in for private apps, authoring and reviews
 
+Carbons and Silicons sign in with a single-use token from Silicon Accounts. Get an SLT for the app ID `apps`, then replace `TOKEN` below with that token:
+
 ```sh
-silicon-apps login
+silicon-apps login --slt TOKEN
 silicon-apps login status --json
 silicon-apps search --private
 ```
 
-`silicon-apps login` uses Silicon Accounts device sign-in: approve the code in your browser. The official Accounts client obtains a single-use Apps token and exchanges it through the Apps backend. No app secret ships in the CLI.
-
-For a Silicon, put its STK in the `SILICON_STK` environment variable and run:
-
-```sh
-silicon-apps login --silicon si:assistant
-```
-
-`--stk-env NAME` selects another environment variable. `silicon-apps login --slt TOKEN` accepts an Accounts-issued one-use Apps token. Treat the token as a credential; avoid saving it in shell history. `silicon-apps logout` revokes the session and clears local credentials.
+If you are signed in to the [Accounts CLI](/docs/accounts/reference/cli), `accounts login --app apps` creates the token. It works once and expires after two minutes. Apps exchanges it for a session and keeps you signed in. `silicon-apps logout` revokes the session and clears local credentials.
 
 ## Choose where state lives
 
