@@ -13,8 +13,8 @@ import {
   asApp,
   errorCode,
   isExactlyInvalid,
-  issueAtaFor,
-  issueObo,
+  issueAppVerificationFor,
+  issueUserVerification,
   refreshAs,
   revokeAs,
   row,
@@ -36,7 +36,7 @@ export const journeys: Journey[] = [
       const { env, results } = ctx;
       const carbon = await signInToApp(ctx, "dm");
       const subject = (await appTokens(env, "dm", carbon.uuid)).access_token;
-      const issue = async (label: string) => (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: [`pp.${label}`] })).body;
+      const issue = async (label: string) => (await issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", scopes: [`pp.${label}`] })).body;
       const [byId, byToken, byRefresh, byPage, survivor] = [await issue("by-id"), await issue("by-token"), await issue("by-refresh"), await issue("by-page"), await issue("survivor")];
       results.check("dm issued five proofs that Briefcase verifies", (await Promise.all([byId, byToken, byRefresh, byPage, survivor].map(p => verifyAs(ctx, "briefcase", p.proof_token)))).every(answer => answer.body.valid === true));
 
@@ -101,18 +101,18 @@ export const journeys: Journey[] = [
   },
   {
     name: "proofs-perf-revoke-on-site",
-    title: "the Carbon revokes one OBO proof on /proofs in the browser: only that proof stops verifying at once, dm can't refresh it (revoked_by_account), the card moves to Ended with the reason; another Carbon can neither see nor revoke it; ATA proofs are not the account's; a cross-site revoke is refused",
+    title: "the Carbon revokes one User verification proof on /proofs in the browser: only that proof stops verifying at once, dm can't refresh it (revoked_by_account), the card moves to Ended with the reason; another Carbon can neither see nor revoke it; App verification proofs are not the account's; a cross-site revoke is refused",
     async run(ctx) {
       const { env, results, browser } = ctx;
       const carbon = await signInToApp(ctx, "dm");
       const subject = (await appTokens(env, "dm", carbon.uuid)).access_token;
       const mark = randomUUID().slice(0, 8);
-      const keep = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: [`pp.keep.${mark}`] })).body;
-      const gone = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: [`pp.revoke.${mark}`] })).body;
-      const ata = (await issueAtaFor(ctx, "commit", "remind")).body;
+      const keep = (await issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", scopes: [`pp.keep.${mark}`] })).body;
+      const gone = (await issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", scopes: [`pp.revoke.${mark}`] })).body;
+      const app_verification = (await issueAppVerificationFor(ctx, "commit", "remind")).body;
 
       const listed = (await carbon.session.call<{ items: MyProofItem[] }>("GET", "/v1/me/proofs?limit=200")).body.items ?? [];
-      results.check("GET /v1/me/proofs lists both OBO proofs about the Carbon and no ATA proof", listed.some(item => item.proof_id === keep.proof_id) && listed.some(item => item.proof_id === gone.proof_id) && !listed.some(item => item.proof_id === ata.proof_id) && listed.length === 2, listed.map(item => `${item.proof_id}:${item.status}`).join(", "));
+      results.check("GET /v1/me/proofs lists both User verification proofs about the Carbon and no App verification proof", listed.some(item => item.proof_id === keep.proof_id) && listed.some(item => item.proof_id === gone.proof_id) && !listed.some(item => item.proof_id === app_verification.proof_id) && listed.length === 2, listed.map(item => `${item.proof_id}:${item.status}`).join(", "));
 
       const context = await newContext(browser);
       await carbon.session.into(context);
@@ -155,14 +155,14 @@ export const journeys: Journey[] = [
       const history = (await carbon.session.call<{ items: Array<{ id: string; title: string }> }>("GET", "/v1/me/history?kind=proof&limit=50")).body.items ?? [];
       results.check("the Carbon's history has the revocation", history.some(item => item.id === `proof:${gone.proof_id}:revoked`), history.map(item => item.id).join(", ").slice(0, 300));
 
-      // Nobody else, and nothing that is not an OBO proof about the account.
+      // Nobody else, and nothing that is not a user verification proof about the account.
       const stranger = await signInToApp(ctx, "briefcase");
       const theirs = (await stranger.session.call<{ items: MyProofItem[] }>("GET", "/v1/me/proofs?limit=200")).body.items ?? [];
       results.check("another Carbon's /v1/me/proofs does not show these proofs", !theirs.some(item => item.proof_id === keep.proof_id), `${theirs.length} item(s)`);
       const steal = await stranger.session.call<ApiErrorBody>("DELETE", `/v1/me/proofs/${keep.proof_id}`);
       results.check("another Carbon revoking it → 404 proof_not_found, and it still verifies", steal.status === 404 && errorCode(steal.body) === "proof_not_found" && (await verifyAs(ctx, "briefcase", keep.proof_token)).body.valid === true, `${steal.status} ${short(steal.body)}`);
-      const ataAsMine = await carbon.session.call<ApiErrorBody>("DELETE", `/v1/me/proofs/${ata.proof_id}`);
-      results.check("an ATA proof id at /v1/me/proofs → 404 (ATA proofs are no account's), and it still verifies", ataAsMine.status === 404 && (await verifyAs(ctx, "remind", ata.proof_token)).body.valid === true, `${ataAsMine.status} ${short(ataAsMine.body)}`);
+      const ataAsMine = await carbon.session.call<ApiErrorBody>("DELETE", `/v1/me/proofs/${app_verification.proof_id}`);
+      results.check("an app verification proof id at /v1/me/proofs → 404 (App verification proofs are no account's), and it still verifies", ataAsMine.status === 404 && (await verifyAs(ctx, "remind", app_verification.proof_token)).body.valid === true, `${ataAsMine.status} ${short(ataAsMine.body)}`);
       const crossSite = await carbon.session.call<ApiErrorBody>("DELETE", `/v1/me/proofs/${keep.proof_id}`, undefined, { origin: "http://evil.example" });
       results.check("a revoke with the session cookie from a foreign Origin → 403, and the proof still verifies", crossSite.status === 403 && (await verifyAs(ctx, "briefcase", keep.proof_token)).body.valid === true, `${crossSite.status} ${short(crossSite.body)}`);
       const unauthenticated = await new SiteSession(env).call<ApiErrorBody>("DELETE", `/v1/me/proofs/${keep.proof_id}`);

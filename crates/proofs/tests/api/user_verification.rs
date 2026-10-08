@@ -1,4 +1,4 @@
-//! `POST /v1/proofs/obo`: issuance, every refusal, idempotency.
+//! `POST /v1/proofs/user-verification`: issuance, every refusal, idempotency.
 
 use accounts_core::models::Scope;
 use accounts_core::test_support::Req;
@@ -7,16 +7,16 @@ use serde_json::json;
 use crate::common::{World, assert_token_ttl, proof_id, refresh_token, token};
 
 #[tokio::test]
-async fn issues_an_obo_proof_with_the_contract_shape() {
+async fn issues_an_user_verification_proof_with_the_contract_shape() {
     let w = World::new().await;
-    let r = w.obo(w.obo_body()).await;
+    let r = w.user_verification(w.user_verification_body()).await;
     assert_eq!(r.status, 201, "{}", r.json);
     assert_eq!(
         r.headers.get("cache-control").and_then(|v| v.to_str().ok()),
         Some("no-store")
     );
     let b = &r.json;
-    assert_eq!(b["kind"], "obo");
+    assert_eq!(b["kind"], "user_verification");
     assert!(token(b).starts_with("sap_") && token(b).len() == 4 + 43);
     assert!(refresh_token(b).starts_with("sapr_") && refresh_token(b).len() == 5 + 43);
     assert_eq!(b["issuing_app"], w.dm.app_id);
@@ -81,7 +81,7 @@ async fn issues_an_obo_proof_with_the_contract_shape() {
         .count(&format!(
             "select count(*) from audit_log where action = 'proof.issued' and target_kind = 'proof' \
              and target_id = '{id}' and actor_kind = 'app' and actor_id = '{}' and app_id = '{}' \
-             and account_uuid = '{}' and details->>'kind' = 'obo' and details->>'receiving_app' = '{}'",
+             and account_uuid = '{}' and details->>'kind' = 'user_verification' and details->>'receiving_app' = '{}'",
             w.dm.app_id, w.dm.app_id, w.carbon.uuid, w.briefcase.app_id
         ))
         .await;
@@ -105,7 +105,7 @@ async fn issues_an_obo_proof_with_the_contract_shape() {
 #[tokio::test]
 async fn token_lifetime_and_scopes_are_validated() {
     let w = World::new().await;
-    let p = w.issue_obo_ttl(60).await;
+    let p = w.issue_user_verification_ttl(60).await;
     assert_token_ttl(&p, 60);
 
     for (ttl, ok) in [
@@ -115,9 +115,9 @@ async fn token_lifetime_and_scopes_are_validated() {
         (1801, false),
         (-5, false),
     ] {
-        let mut body = w.obo_body();
+        let mut body = w.user_verification_body();
         body["access_ttl_seconds"] = json!(ttl);
-        let r = w.obo(body).await;
+        let r = w.user_verification(body).await;
         if ok {
             assert_eq!(r.status, 201, "ttl {ttl}: {}", r.json);
         } else {
@@ -133,10 +133,10 @@ async fn token_lifetime_and_scopes_are_validated() {
         }
     }
 
-    let mut body = w.obo_body();
+    let mut body = w.user_verification_body();
     body["scopes"] = json!(["files.write", "files write", "", "x".repeat(101)]);
     body["access_ttl_seconds"] = json!(5000);
-    let r = w.obo(body).await;
+    let r = w.user_verification(body).await;
     assert_eq!(r.status, 422);
     let fields = &r.json["error"]["details"]["fields"];
     assert!(
@@ -156,9 +156,9 @@ async fn token_lifetime_and_scopes_are_validated() {
         "all problems reported at once"
     );
 
-    let mut body = w.obo_body();
+    let mut body = w.user_verification_body();
     body["scopes"] = json!((0..21).map(|i| format!("s{i}")).collect::<Vec<_>>());
-    let r = w.obo(body).await;
+    let r = w.user_verification(body).await;
     assert_eq!(r.status, 422);
     assert!(
         r.json["error"]["details"]["fields"]["scopes"]
@@ -167,27 +167,31 @@ async fn token_lifetime_and_scopes_are_validated() {
     );
 
     // Duplicates collapse; 20 distinct scopes of 100 chars are fine.
-    let mut body = w.obo_body();
+    let mut body = w.user_verification_body();
     let mut scopes: Vec<String> = (0..20).map(|i| format!("{i:0>100}")).collect();
     scopes.push(scopes[0].clone());
     body["scopes"] = json!(scopes);
-    let r = w.obo(body).await;
+    let r = w.user_verification(body).await;
     assert_eq!(r.status, 201, "{}", r.json);
     assert_eq!(r.json["scopes"].as_array().map(Vec::len), Some(20));
 
     // No scopes at all → [].
     let r = w
-        .obo(json!({"subject_token": w.subject_token, "receiving_app": w.briefcase.app_id}))
+        .user_verification(
+            json!({"subject_token": w.subject_token, "receiving_app": w.briefcase.app_id}),
+        )
         .await;
     assert_eq!(r.status, 201);
     assert_eq!(r.json["scopes"], json!([]));
 
     // Shape problems are named precisely.
-    let r = w.obo(json!({"receiving_app": w.briefcase.app_id})).await;
+    let r = w
+        .user_verification(json!({"receiving_app": w.briefcase.app_id}))
+        .await;
     assert_eq!(r.status, 422);
     assert!(r.json["error"]["details"]["fields"]["subject_token"].is_string());
     let r = w
-        .obo(json!({"subject_token": w.subject_token, "receiving_app": w.briefcase.app_id, "scope": ["x"]}))
+        .user_verification(json!({"subject_token": w.subject_token, "receiving_app": w.briefcase.app_id, "scope": ["x"]}))
         .await;
     assert_eq!(r.status, 422, "unknown fields are refused: {}", r.json);
     assert!(
@@ -196,7 +200,7 @@ async fn token_lifetime_and_scopes_are_validated() {
             .is_some_and(|m| m.contains("scope"))
     );
     let r = w
-        .obo(json!({"subject_token": " ", "receiving_app": "Not An App!"}))
+        .user_verification(json!({"subject_token": " ", "receiving_app": "Not An App!"}))
         .await;
     assert_eq!(r.status, 422);
     let fields = &r.json["error"]["details"]["fields"];
@@ -212,7 +216,7 @@ async fn refuses_bad_subject_tokens_precisely() {
     let body = |t: &str| json!({"subject_token": t, "receiving_app": w.briefcase.app_id});
 
     // A refresh token instead of the access token.
-    let r = w.obo(body(&w.subject_refresh)).await;
+    let r = w.user_verification(body(&w.subject_refresh)).await;
     assert_eq!(r.status, 400);
     assert_eq!(r.error_code(), Some("invalid_subject_token"));
     assert_eq!(r.json["error"]["details"]["reason"], "not_an_access_token");
@@ -224,7 +228,9 @@ async fn refuses_bad_subject_tokens_precisely() {
     assert!(r.json["error"]["hint"].is_string());
 
     // The access token behind a label (copied from an Authorization header).
-    let r = w.obo(body(&format!("Bearer {}", w.subject_token))).await;
+    let r = w
+        .user_verification(body(&format!("Bearer {}", w.subject_token)))
+        .await;
     assert_eq!(r.status, 400);
     assert_eq!(r.json["error"]["details"]["reason"], "not_an_access_token");
     assert!(
@@ -237,7 +243,9 @@ async fn refuses_bad_subject_tokens_precisely() {
     assert!(!r.json.to_string().contains(&w.subject_token));
 
     // Garbage JWT.
-    let r = w.obo(body("eyJhbGciOiJFZERTQSJ9.e30.AAAA")).await;
+    let r = w
+        .user_verification(body("eyJhbGciOiJFZERTQSJ9.e30.AAAA"))
+        .await;
     assert_eq!(r.status, 400);
     assert_eq!(r.json["error"]["details"]["reason"], "invalid");
 
@@ -246,13 +254,13 @@ async fn refuses_bad_subject_tokens_precisely() {
     let mut tampered: Vec<char> = w.subject_token.chars().collect();
     tampered[sig_at] = if tampered[sig_at] == 'A' { 'B' } else { 'A' };
     let tampered: String = tampered.into_iter().collect();
-    let r = w.obo(body(&tampered)).await;
+    let r = w.user_verification(body(&tampered)).await;
     assert_eq!(r.status, 400, "{}", r.json);
     assert_eq!(r.error_code(), Some("invalid_subject_token"));
 
     // Expired access token.
     let expired = w.expired_token(&w.carbon, &w.dm.app_id, w.subject_family());
-    let r = w.obo(body(&expired)).await;
+    let r = w.user_verification(body(&expired)).await;
     assert_eq!(r.status, 400);
     assert_eq!(r.json["error"]["details"]["reason"], "expired");
     assert!(
@@ -269,13 +277,13 @@ async fn refuses_bad_subject_tokens_precisely() {
         .ctx
         .tokens_for(&w.carbon, &w.other.app_id, &[Scope::Profile])
         .await;
-    let r = w.obo(body(&foreign.access_token)).await;
+    let r = w.user_verification(body(&foreign.access_token)).await;
     assert_eq!(r.status, 403);
     assert_eq!(r.error_code(), Some("subject_token_wrong_app"));
     assert_eq!(r.json["error"]["details"]["token_app"], w.other.app_id);
     // Also a first-party (accounts) token.
     let first_party = w.ctx.first_party_tokens(&w.carbon).await;
-    let r = w.obo(body(&first_party.access_token)).await;
+    let r = w.user_verification(body(&first_party.access_token)).await;
     assert_eq!(r.error_code(), Some("subject_token_wrong_app"));
 
     // The sign-in behind it was revoked.
@@ -285,7 +293,7 @@ async fn refuses_bad_subject_tokens_precisely() {
             "update token_families set revoked_at = now(), revoke_reason = 'user_signed_out' where id = '{fid}'"
         ))
         .await;
-    let r = w.obo(body(&w.subject_token)).await;
+    let r = w.user_verification(body(&w.subject_token)).await;
     assert_eq!(r.status, 400);
     assert_eq!(r.json["error"]["details"]["reason"], "revoked");
     assert!(
@@ -300,7 +308,7 @@ async fn refuses_bad_subject_tokens_precisely() {
             "update token_families set revoked_at = null, revoke_reason = null, expires_at = now() - interval '1 second' where id = '{fid}'"
         ))
         .await;
-    let r = w.obo(body(&w.subject_token)).await;
+    let r = w.user_verification(body(&w.subject_token)).await;
     assert_eq!(r.status, 400);
     assert_eq!(r.json["error"]["details"]["reason"], "expired");
     assert_eq!(
@@ -321,7 +329,7 @@ async fn refuses_inactive_memberships_and_accounts() {
             w.dm.app_id, w.carbon.uuid
         ))
         .await;
-    let r = w.obo(w.obo_body()).await;
+    let r = w.user_verification(w.user_verification_body()).await;
     assert_eq!(r.status, 403, "{}", r.json);
     assert_eq!(r.error_code(), Some("membership_inactive"));
     assert_eq!(
@@ -341,7 +349,7 @@ async fn refuses_inactive_memberships_and_accounts() {
             w.dm.app_id, w.carbon.uuid
         ))
         .await;
-    let r = w.obo(w.obo_body()).await;
+    let r = w.user_verification(w.user_verification_body()).await;
     assert_eq!(r.error_code(), Some("membership_inactive"));
     assert!(
         r.json["error"]["message"]
@@ -359,7 +367,7 @@ async fn refuses_inactive_memberships_and_accounts() {
             w.carbon.uuid
         ))
         .await;
-    let r = w.obo(w.obo_body()).await;
+    let r = w.user_verification(w.user_verification_body()).await;
     assert_eq!(r.status, 403);
     assert_eq!(r.error_code(), Some("account_not_active"));
     assert_eq!(r.json["error"]["details"]["status"], "unclaimed");
@@ -370,7 +378,7 @@ async fn refuses_bad_receiving_apps() {
     let w = World::new().await;
     let body = |app: &str| json!({"subject_token": w.subject_token, "receiving_app": app});
 
-    let r = w.obo(body("no-such-app")).await;
+    let r = w.user_verification(body("no-such-app")).await;
     assert_eq!(r.status, 400);
     assert_eq!(r.error_code(), Some("unknown_receiving_app"));
     assert_eq!(
@@ -383,7 +391,7 @@ async fn refuses_bad_receiving_apps() {
             .is_some_and(|m| m.contains("'no-such-app'"))
     );
 
-    let r = w.obo(body(&w.dm.app_id)).await;
+    let r = w.user_verification(body(&w.dm.app_id)).await;
     assert_eq!(r.status, 400);
     assert_eq!(r.error_code(), Some("invalid_receiving_app"));
     assert!(
@@ -392,7 +400,7 @@ async fn refuses_bad_receiving_apps() {
             .is_some_and(|m| m.contains("itself"))
     );
 
-    let r = w.obo(body("accounts")).await;
+    let r = w.user_verification(body("accounts")).await;
     assert_eq!(r.status, 400);
     assert_eq!(r.error_code(), Some("invalid_receiving_app"));
 
@@ -402,13 +410,13 @@ async fn refuses_bad_receiving_apps() {
             w.briefcase.app_id
         ))
         .await;
-    let r = w.obo(body(&w.briefcase.app_id)).await;
+    let r = w.user_verification(body(&w.briefcase.app_id)).await;
     assert_eq!(r.status, 403);
     assert_eq!(r.error_code(), Some("receiving_app_disabled"));
 
     // App ids are case-insensitive and trimmed on input.
     let r = w
-        .obo(body(&format!(" {} ", w.other.app_id.to_uppercase())))
+        .user_verification(body(&format!(" {} ", w.other.app_id.to_uppercase())))
         .await;
     assert_eq!(r.status, 201, "{}", r.json);
     assert_eq!(r.json["receiving_app"], w.other.app_id);
@@ -417,14 +425,16 @@ async fn refuses_bad_receiving_apps() {
 #[tokio::test]
 async fn app_credentials_are_required_and_checked() {
     let w = World::new().await;
-    let r = w.call(Req::post("/v1/proofs/obo").json(w.obo_body())).await;
+    let r = w
+        .call(Req::post("/v1/proofs/user-verification").json(w.user_verification_body()))
+        .await;
     assert_eq!(r.status, 401);
     assert_eq!(r.error_code(), Some("app_credentials_required"));
     let r = w
         .call(
-            Req::post("/v1/proofs/obo")
+            Req::post("/v1/proofs/user-verification")
                 .basic(&w.dm.app_id, "sa_app_wrong")
-                .json(w.obo_body()),
+                .json(w.user_verification_body()),
         )
         .await;
     assert_eq!(r.status, 401);
@@ -433,9 +443,9 @@ async fn app_credentials_are_required_and_checked() {
     let fp = w.ctx.first_party_tokens(&w.carbon).await;
     let r = w
         .call(
-            Req::post("/v1/proofs/obo")
+            Req::post("/v1/proofs/user-verification")
                 .bearer(&fp.access_token)
-                .json(w.obo_body()),
+                .json(w.user_verification_body()),
         )
         .await;
     assert_eq!(r.status, 401);
@@ -447,13 +457,13 @@ async fn app_credentials_are_required_and_checked() {
         ))
         .await;
     w.ctx.state.app_cache.invalidate(&w.dm.app_id);
-    let r = w.obo(w.obo_body()).await;
+    let r = w.user_verification(w.user_verification_body()).await;
     assert_eq!(r.status, 403);
     assert_eq!(r.error_code(), Some("app_disabled"));
     // Wrong content type.
     let r = w
         .call(
-            Req::post("/v1/proofs/obo")
+            Req::post("/v1/proofs/user-verification")
                 .basic(&w.briefcase.app_id, &w.briefcase_secret)
                 .form(&[("subject_token", "x"), ("receiving_app", "dm")]),
         )
@@ -466,15 +476,15 @@ async fn app_credentials_are_required_and_checked() {
 async fn issuance_is_idempotent() {
     let w = World::new().await;
     let send = |key: &str, body: serde_json::Value| {
-        Req::post("/v1/proofs/obo")
+        Req::post("/v1/proofs/user-verification")
             .basic(&w.dm.app_id, &w.dm_secret)
             .header("idempotency-key", key)
             .json(body)
     };
-    let first = w.call(send("k-1", w.obo_body())).await;
+    let first = w.call(send("k-1", w.user_verification_body())).await;
     assert_eq!(first.status, 201);
     assert!(first.headers.get("idempotent-replayed").is_none());
-    let again = w.call(send("k-1", w.obo_body())).await;
+    let again = w.call(send("k-1", w.user_verification_body())).await;
     assert_eq!(again.status, 201);
     assert_eq!(
         again
@@ -493,7 +503,7 @@ async fn issuance_is_idempotent() {
     );
 
     // Same key, different body → 409.
-    let mut other = w.obo_body();
+    let mut other = w.user_verification_body();
     other["scopes"] = json!(["files.read"]);
     let r = w.call(send("k-1", other.clone())).await;
     assert_eq!(r.status, 409);
@@ -507,7 +517,7 @@ async fn issuance_is_idempotent() {
     // Keys are scoped per app and endpoint: another app may use the same key string.
     let r = w
         .call(
-            Req::post("/v1/proofs/ata")
+            Req::post("/v1/proofs/app-verification")
                 .basic(&w.other.app_id, &w.other_secret)
                 .header("idempotency-key", "k-1")
                 .json(json!({"receiving_app": w.briefcase.app_id})),
@@ -523,7 +533,7 @@ async fn issuance_is_idempotent() {
             w.briefcase.app_id
         ))
         .await;
-    let r = w.call(send("k-3", w.obo_body())).await;
+    let r = w.call(send("k-3", w.user_verification_body())).await;
     assert_eq!(r.error_code(), Some("receiving_app_disabled"));
     w.ctx
         .exec(&format!(
@@ -531,7 +541,7 @@ async fn issuance_is_idempotent() {
             w.briefcase.app_id
         ))
         .await;
-    let r = w.call(send("k-3", w.obo_body())).await;
+    let r = w.call(send("k-3", w.user_verification_body())).await;
     assert_eq!(r.status, 201, "{}", r.json);
 }
 
@@ -544,7 +554,9 @@ async fn silicons_can_be_represented_too() {
         .await;
     let t = w.ctx.tokens_for(&si, &w.dm.app_id, &[Scope::Profile]).await;
     let r = w
-        .obo(json!({"subject_token": t.access_token, "receiving_app": w.briefcase.app_id}))
+        .user_verification(
+            json!({"subject_token": t.access_token, "receiving_app": w.briefcase.app_id}),
+        )
         .await;
     assert_eq!(r.status, 201, "{}", r.json);
     assert_eq!(r.json["user"]["kind"], "silicon");

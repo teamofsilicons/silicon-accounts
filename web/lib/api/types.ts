@@ -1250,10 +1250,10 @@ export interface ShortLivedToken {
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
-/* Proofs (OBO and ATA)                                                                                                */
+/* Proofs (User verification and App verification)                                                                                                */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-export type ProofKind = "obo" | "ata";
+export type ProofKind = "user_verification" | "app_verification";
 export type ProofStatus = Open<"active" | "revoked" | "expired">;
 
 export interface ProofUser {
@@ -1263,7 +1263,7 @@ export interface ProofUser {
   membership_id: string;
 }
 
-/** `POST /v1/proofs/obo` | `/ata` | `/v1/apps/{id}/proofs/ata` response (tokens shown once). */
+/** `POST /v1/proofs/user-verification` | `/app_verification` | `/v1/apps/{id}/proofs/app-verification` response (tokens shown once). */
 export interface IssuedProof {
   proof_id: string;
   kind: ProofKind;
@@ -1274,14 +1274,14 @@ export interface IssuedProof {
   proof_refresh_token: string;
   refresh_expires_at: Timestamp;
   issuing_app: string;
-  /** The one app that verifies it (OBO and ATA alike: an ATA proof is for exactly one app). */
+  /** The one app that verifies it (User verification and App verification alike: an app verification proof is for exactly one app). */
   receiving_app: string;
-  /** OBO only. */
+  /** User verification only. */
   user?: ProofUser;
   scopes: string[];
 }
 
-export interface OboRequest {
+export interface UserVerificationRequest {
   /** A user access token issued to the calling app. */
   subject_token: string;
   receiving_app: string;
@@ -1291,10 +1291,10 @@ export interface OboRequest {
 }
 
 /**
- * `POST /v1/proofs/ata` and `POST /v1/apps/{app_id}/proofs/ata`: an ATA proof is for exactly one app. To talk to two
- * apps, ask for two proofs (a body with `audiences` is refused: 422 ata_single_app).
+ * `POST /v1/proofs/app-verification` and `POST /v1/apps/{app_id}/proofs/app-verification`: an app verification proof is for exactly one app. To talk to two
+ * apps, ask for two proofs (a body with `audiences` is refused: 422 app_verification_single_app).
  */
-export interface AtaRequest {
+export interface AppVerificationRequest {
   receiving_app: string;
   scopes?: string[];
   access_ttl_seconds?: number;
@@ -1351,7 +1351,7 @@ export interface AppProofsQuery extends PageQuery {
   status?: "active" | "revoked" | "expired";
 }
 
-/** `GET /v1/me/proofs` items: OBO proofs issued on my behalf. */
+/** `GET /v1/me/proofs` items: User verification proofs issued on my behalf. */
 export interface MyProof {
   proof_id: string;
   issuing_app: AppSummary;

@@ -140,7 +140,7 @@ fn event(row: EventRow) -> VerificationEvent {
     let derived = minted
         .then(|| {
             let ttl = row.details.get("access_ttl_seconds")?.as_i64()?;
-            if row.details.get("kind")?.as_str()? != "ata"
+            if row.details.get("kind")?.as_str()? != "app_verification"
                 || !(MIN_ACCESS_TTL_SECONDS..=MAX_ACCESS_TTL_SECONDS).contains(&ttl)
             {
                 return None;
@@ -210,7 +210,7 @@ pub async fn history(
     let mut conn = state.db.acquire().await?;
     let visible: bool = sqlx::query_scalar(
         "select exists(select 1 from proof_families f join apps a on a.app_id=f.issuing_app \
-         where f.id=$1 and f.issuing_app=$2 and f.kind='ata' \
+         where f.id=$1 and f.issuing_app=$2 and f.kind='app_verification' \
          and (a.owner_uuid=$3 or exists(select 1 from app_authors aa \
          where aa.app_id=a.app_id and aa.account_uuid=$3)))",
     )
@@ -227,7 +227,7 @@ pub async fn history(
          from audit_log e join proof_families f on f.id=$1 \
          join apps a on a.app_id=f.issuing_app \
          where e.target_kind='proof' and e.target_id=$1::text and e.app_id=$2 \
-         and f.issuing_app=$2 and f.kind='ata' \
+         and f.issuing_app=$2 and f.kind='app_verification' \
          and (a.owner_uuid=$3 or exists(select 1 from app_authors aa \
          where aa.app_id=a.app_id and aa.account_uuid=$3)) \
          and e.action in ('proof.issued','proof.refreshed','proof.revoked','proof.refresh_token_reused') \

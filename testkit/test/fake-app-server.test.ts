@@ -324,7 +324,7 @@ describe('fake-app-server', () => {
   });
 
   describe('proof demos', () => {
-    test('OBO: dm saves a file into Briefcase on behalf of a signed-in account, with timings', async () => {
+    test('User verification: dm saves a file into Briefcase on behalf of a signed-in account, with timings', async () => {
       const grace = stub.createAccount({ id: 'c:grace', display_name: 'Grace', email: 'grace@example.test' });
       assert.equal((await client.sltLogin('dm', stub.issueSlt('dm', grace))).ok, true);
       const { status, body } = await client.saveToBriefcase({ uuid: grace.uuid, filename: 'notes.txt' });
@@ -340,23 +340,23 @@ describe('fake-app-server', () => {
       assert.deepEqual(stub.verifyRequests.at(-1), { app_id: 'briefcase', valid: true });
     });
 
-    test('OBO: a proof for Briefcase is invalid when another app verifies it', async () => {
+    test('User verification: a proof for Briefcase is invalid when another app verifies it', async () => {
       const linus = stub.createAccount({ id: 'c:linus', display_name: 'Linus' });
       await client.sltLogin('dm', stub.issueSlt('dm', linus));
-      const issued = await client.issueObo('dm', { uuid: linus.uuid });
+      const issued = await client.issueUserVerification('dm', { uuid: linus.uuid });
       assert.equal(issued.status, 201);
       const token = String((issued.body as Record<string, unknown>).proof_token);
       assert.deepEqual((await client.verifyProof('commit', token)).verification, { valid: false, expires_at: null });
       assert.equal((await client.verifyProof('briefcase', token)).verification.valid, true);
     });
 
-    test('OBO without a stored sign-in is a precise 404', async () => {
+    test('User verification without a stored sign-in is a precise 404', async () => {
       const { status, body } = await client.saveToBriefcase({ uuid: 'nobody' });
       assert.equal(status, 404);
       assert.match(String((body.error as Record<string, unknown>).hint), /slt-login/);
     });
 
-    test('ATA: commit gets one proof for remind and another for waveform; each verifies its own', async () => {
+    test('App verification: commit gets one proof for remind and another for waveform; each verifies its own', async () => {
       const { status, body } = await client.notify({ message: 'standup in 5' });
       assert.equal(status, 200, JSON.stringify(body));
       const results = body.results as Record<string, Record<string, unknown>>;

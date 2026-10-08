@@ -12,7 +12,7 @@ import { accessibleText, appDetail, ownerSignIn, type AppDetailView } from "./_h
 const METHOD: Record<string, string> = { google: "Google", apple: "Apple", email: "Email", phone: "Phone" };
 const FIELD: Record<string, string> = { email: "Email address", phone: "Phone number", dob: "Date of birth", timezone: "Timezone" };
 const plural = (count: number, one: string, other = `${one}s`) => `${count.toLocaleString("en-US")} ${count === 1 ? one : other}`;
-const TABS: Array<[string, string]> = [["overview", "Overview"], ["sign-in", "Sign-in"], ["details", "Details"], ["flows", "Flows"], ["pages", "Pages"], ["users", "Users"], ["import", "Import"], ["webhooks", "Webhooks"], ["ata", "App verification"], ["embed", "Embed"]];
+const TABS: Array<[string, string]> = [["overview", "Overview"], ["sign-in", "Sign-in"], ["details", "Details"], ["flows", "Flows"], ["pages", "Pages"], ["users", "Users"], ["import", "Import"], ["webhooks", "Webhooks"], ["app_verification", "App verification"], ["embed", "Embed"]];
 
 /** What the Overview's setup cards say for a stored setup (developer/components/developer/tabs/overview.tsx). */
 function expectedCards(app: AppDetailView): Record<string, string[]> {
@@ -129,13 +129,13 @@ export const journey: Journey = {
     const afterBack = `${page.url()} ${await selectedTab(page)}`;
     await page.goForward();
     await page.getByRole("tabpanel", { name: "Embed" }).waitFor({ timeout: 10_000 });
-    results.check("Back and Forward move between tabs", afterBack === `${env.developer}/apps/${appId}/ata App verification` && page.url() === `${env.developer}/apps/${appId}/embed`, `${afterBack} → ${page.url()}`);
+    results.check("Back and Forward move between tabs", afterBack === `${env.developer}/apps/${appId}/app-verification App verification` && page.url() === `${env.developer}/apps/${appId}/embed`, `${afterBack} → ${page.url()}`);
 
     // The account site's old tab names redirect; an unknown tab is a real 404.
     const branding = await page.goto(`${env.developer}/apps/${appId}/branding`);
     results.check("/apps/commit/branding (the old name) lands on the Pages tab", page.url() === `${env.developer}/apps/${appId}/pages` && branding?.status() === 200 && branding.request().redirectedFrom() !== null, page.url());
     await page.goto(`${env.developer}/apps/${appId}/proofs`);
-    results.check("/apps/commit/proofs (the old name) lands on the ATA tab", page.url() === `${env.developer}/apps/${appId}/ata`, page.url());
+    results.check("/apps/commit/proofs (the old name) lands on the App verification tab", page.url() === `${env.developer}/apps/${appId}/app-verification`, page.url());
     const unknown = await page.goto(`${env.developer}/apps/${appId}/settings`);
     const unknownText = (await page.locator("body").innerText()).replace(/\s+/g, " ");
     results.check("an unknown tab answers a real 404 with the not-found page", unknown?.status() === 404 && /Nothing lives at this address/.test(unknownText), `${unknown?.status()} ${unknownText.slice(0, 120)}`);

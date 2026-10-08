@@ -7,9 +7,9 @@
  *              an app that does not exist, an unknown tab, and signing out of the developer site
  *   empty      a new Carbon: the apps home without apps; then an app of their own (made in the stack's database, as
  *              Silicon Apps would deliver it): the home with it and every tab (Overview, Sign-in, Details, Flows, Pages,
- *              Users, Import, Webhooks, ATA, Embed) in its empty state; the selected tab in view on a phone; the Pages
+ *              Users, Import, Webhooks, App verification, Embed) in its empty state; the selected tab in view on a phone; the Pages
  *              tab's contrast readout judging a 3.62:1 button pair "Too low"
- *   briefcase  briefcase's owner (the seeded c:saket) after a new Carbon signed in, an import and an ATA proof: every tab
+ *   briefcase  briefcase's owner (the seeded c:saket) after a new Carbon signed in, an import and an app verification proof: every tab
  *              with data
  *   ledgerly   ledgerly's owner (c:ledgerly-dev): the Details and Flows tabs with a two-page flow and a review, and the
  *              Pages tab's preview of every page (method choice in both intents, Opening Google and Apple, the codes,
@@ -224,7 +224,7 @@ export const journeys: Journey[] = [
   },
   {
     name: "ux-audit-developer-briefcase",
-    title: "briefcase's owner after a new Carbon signed in, a dry-run import and an ATA proof: the apps home and every tab with data, light/dark × 1440/390, the selected tab in view on a phone",
+    title: "briefcase's owner after a new Carbon signed in, a dry-run import and an app verification proof: the apps home and every tab with data, light/dark × 1440/390, the selected tab in view on a phone",
     timeoutMs: 1_500_000,
     async run(ctx) {
       const { env, results, browser } = ctx;
@@ -256,8 +256,8 @@ export const journeys: Journey[] = [
       ];
       const dry = await developerApi(env, page, "/apps/briefcase/imports", { json: { rows, options: { dry_run: true } }, headers: { "idempotency-key": `uxa-dry-${tag()}` } });
       results.check("developer-briefcase: a dry-run import ran through the BFF (the Import tab has a recent import)", dry.status >= 200 && dry.status < 300, `${dry.status} ${JSON.stringify(dry.body).slice(0, 200)}`);
-      const ata = await developerApi(env, page, "/apps/briefcase/proofs/ata", { json: { receiving_app: "remind" }, headers: { "idempotency-key": `uxa-ata-${tag()}` } });
-      results.check("developer-briefcase: an ATA proof for one app (remind) was made through the BFF (the ATA tab lists it)", ata.status >= 200 && ata.status < 300, `${ata.status} ${JSON.stringify(ata.body).slice(0, 160)}`);
+      const app_verification = await developerApi(env, page, "/apps/briefcase/proofs/app-verification", { json: { receiving_app: "remind" }, headers: { "idempotency-key": `uxa-app_verification-${tag()}` } });
+      results.check("developer-briefcase: an app verification proof for one app (remind) was made through the BFF (the App verification tab lists it)", app_verification.status >= 200 && app_verification.status < 300, `${app_verification.status} ${JSON.stringify(app_verification.body).slice(0, 160)}`);
       await auditApp(ctx, page, findings, "developer-briefcase", "briefcase", /Briefcase/);
       results.check("developer-briefcase: findings saved", true, saveFindings(ctx, findings));
       await context.close();

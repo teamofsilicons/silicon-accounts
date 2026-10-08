@@ -11,7 +11,7 @@ import { listeningAt, logTime, parseSweepLines } from "../_sweep";
 const LOG = [
   "2026-10-07T10:26:19.876397Z  INFO accounts_worker::messages: outbound message sender started delivery=\"providers\" sender=\"providers\" concurrency=8",
   "2026-10-07T10:26:19.882565Z  INFO accounts_api: Silicon Accounts is listening bind=127.0.0.1:9649 public_url=http://localhost:9650 environment=development background_tasks=9",
-  "2026-10-07T10:26:25.751597Z  INFO request{method=POST route=/v1/proofs/ata request_id=01a115e6-6f53-751a-b061-e449d3eebe7c}: accounts_proofs::issue: ATA proof issued proof_id=01a115e6-6f56-735e-8b74-6abb3d600159 issuing_app=commit",
+  "2026-10-07T10:26:25.751597Z  INFO request{method=POST route=/v1/proofs/app-verification request_id=01a115e6-6f53-751a-b061-e449d3eebe7c}: accounts_proofs::issue: App verification proof issued proof_id=01a115e6-6f56-735e-8b74-6abb3d600159 issuing_app=commit",
   "2026-10-07T10:28:19.890112Z  INFO accounts_proofs: proof sweep sign_in_revocations_recorded=3 expired_access_tokens=1 dead_family_tokens=4",
   "2026-10-07T10:30:00.000001Z  WARN accounts_proofs: proof sweep failed; retrying next hour error=pool timed out",
 ].join("\n");

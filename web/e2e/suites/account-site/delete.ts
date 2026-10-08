@@ -119,7 +119,7 @@ const deletion: Journey = {
       results.check(`setup: signed into ${app}`, account?.uuid === uuid);
     }
     const removed = await call(leaver.probe, "/v1/me/apps/browser", { method: "DELETE" });
-    const proof = (await postJson<{ body?: { proof_token?: string } }>(`${env.apps}/briefcase/actions/issue-obo`, { uuid, receiving_app: "commit", scopes: ["files.read"] })).body.body?.proof_token ?? "";
+    const proof = (await postJson<{ body?: { proof_token?: string } }>(`${env.apps}/briefcase/actions/issue-user_verification`, { uuid, receiving_app: "commit", scopes: ["files.read"] })).body.body?.proof_token ?? "";
     const second = await signInAgain(ctx, leaver.email, "acct-leaver-2");
     // The developer site too (developers.teamofsilicons.com, the first-party app `developer`): its server holds tokens
     // for this Carbon, which the deletion must end like every other sign-in.

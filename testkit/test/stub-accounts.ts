@@ -2,7 +2,7 @@
 // 02-api.md the testkit talks to — so the fake app server and the lib helpers can be
 // tested end to end before (and independently of) the real service. It follows the
 // spec's shapes: token endpoint (authorization_code + PKCE, refresh rotation with reuse
-// detection, SLT), proofs (OBO/ATA issue + verify), app webhook registration, and the
+// detection, SLT), proofs (User verification/App verification issue + verify), app webhook registration, and the
 // hosted flow (flow cookie, Origin check, email/phone codes sent through the mock
 // Postmark/Twilio APIs, signup, the details page + review, Google/Apple via mock-oidc).
 
@@ -103,7 +103,7 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
   const slts = new Map<string, { app_id: string; account: StubAccount; used: boolean }>();
   const refresh = new Map<string, { family: string; app_id: string; account: StubAccount; used: boolean }>();
   const revokedFamilies = new Set<string>();
-  const proofs = new Map<string, { kind: 'obo' | 'ata'; issuing: string; audiences: string[]; user: StubAccount | null; expires: number; scopes: string[]; proof_id: string }>();
+  const proofs = new Map<string, { kind: 'user_verification' | 'app_verification'; issuing: string; audiences: string[]; user: StubAccount | null; expires: number; scopes: string[]; proof_id: string }>();
   const flows = new Map<string, FlowRecord>();
   const sessions = new Map<string, StubAccount>();
   const tokenRequests: StubAccounts['tokenRequests'] = [];
@@ -267,7 +267,7 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
 
   // --------------------------------------------------------------- proofs
 
-  router.post('/v1/proofs/obo', async (ctx) => {
+  router.post('/v1/proofs/user-verification', async (ctx) => {
     const app = appAuth(ctx);
     const body = await jsonObject(ctx);
     const claims = await verifyAccess(String(body.subject_token ?? ''));
@@ -279,10 +279,10 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
     const token = `sap_${random(32)}`;
     const proofId = randomUUID();
     const ttl = typeof body.access_ttl_seconds === 'number' ? body.access_ttl_seconds : 1800;
-    proofs.set(token, { kind: 'obo', issuing: app.app_id, audiences: [receiving], user, expires: Date.now() + ttl * 1000, scopes: (body.scopes as string[]) ?? [], proof_id: proofId });
+    proofs.set(token, { kind: 'user_verification', issuing: app.app_id, audiences: [receiving], user, expires: Date.now() + ttl * 1000, scopes: (body.scopes as string[]) ?? [], proof_id: proofId });
     ctx.sendJson(201, {
       proof_id: proofId,
-      kind: 'obo',
+      kind: 'user_verification',
       proof_token: token,
       expires_at: new Date(Date.now() + ttl * 1000).toISOString(),
       proof_refresh_token: `sapr_${random(32)}`,
@@ -293,17 +293,17 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
     });
   });
 
-  router.post('/v1/proofs/ata', async (ctx) => {
+  router.post('/v1/proofs/app-verification', async (ctx) => {
     const app = appAuth(ctx);
     const body = await jsonObject(ctx);
-    if (body.audiences !== undefined) throw apiError(422, 'ata_single_app', 'An ATA proof is for exactly one app; ask for one proof per app.');
+    if (body.audiences !== undefined) throw apiError(422, 'app_verification_single_app', 'An app verification proof is for exactly one app; ask for one proof per app.');
     const receiving = String(body.receiving_app ?? '');
     if (!apps.has(receiving) || receiving === app.app_id) throw apiError(400, 'unknown_receiving_app', `No app ${receiving}.`);
     const token = `sap_${random(32)}`;
     const proofId = randomUUID();
     const ttl = typeof body.access_ttl_seconds === 'number' ? body.access_ttl_seconds : 1800;
-    proofs.set(token, { kind: 'ata', issuing: app.app_id, audiences: [receiving], user: null, expires: Date.now() + ttl * 1000, scopes: (body.scopes as string[]) ?? [], proof_id: proofId });
-    ctx.sendJson(201, { proof_id: proofId, kind: 'ata', proof_token: token, expires_at: new Date(Date.now() + ttl * 1000).toISOString(), proof_refresh_token: `sapr_${random(32)}`, issuing_app: app.app_id, receiving_app: receiving, scopes: body.scopes ?? [] });
+    proofs.set(token, { kind: 'app_verification', issuing: app.app_id, audiences: [receiving], user: null, expires: Date.now() + ttl * 1000, scopes: (body.scopes as string[]) ?? [], proof_id: proofId });
+    ctx.sendJson(201, { proof_id: proofId, kind: 'app_verification', proof_token: token, expires_at: new Date(Date.now() + ttl * 1000).toISOString(), proof_refresh_token: `sapr_${random(32)}`, issuing_app: app.app_id, receiving_app: receiving, scopes: body.scopes ?? [] });
   });
 
   router.post('/v1/proofs/verify', async (ctx) => {

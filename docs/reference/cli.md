@@ -14,7 +14,7 @@ related:
 
 # accounts CLI reference
 
-This reference lists the commands in `accounts` 0.1.0. The [command sections](#commands) come from the CLI’s `--help` output. Run `accounts <command> --help` to check the options in your installed version.
+This reference lists the commands in `accounts` 0.2.0. The [command sections](#commands) come from the CLI’s `--help` output. Run `accounts <command> --help` to check the options in your installed version.
 
 If you are using the CLI for the first time, start with [Use the accounts CLI](../start/cli.md).
 
@@ -42,7 +42,7 @@ Every command takes these, before or after the command name.
 | `--home <DIR>` | The directory that holds `.accounts/`. See [Home directory](#home-directory). |
 | `-q`, `--quiet` | No progress, notices or next-step suggestions; results and errors still print. |
 | `-h`, `--help` | Help: `-h` a summary, `--help` the full text with examples. |
-| `-V`, `--version` | Print the version (`accounts 0.1.0`). |
+| `-V`, `--version` | Print the version (`accounts 0.2.0`). |
 
 `accounts app` commands also take `--app-id <APP_ID>`, `--app-secret <SECRET>` and
 `--app-secret-stdin`; see [`accounts app`](#accounts-app).
@@ -288,7 +288,7 @@ of `accounts proofs`, not the guide. `accounts help imports` does print the guid
 | `silicons` (`silicon`, `stk`) | how a Silicon gets an account, signs in, and signs into apps |
 | `custodians` (`custodian`, `transfer`) | being a Silicon's custodian |
 | `apps` (`app`, `sign-in`, `signin`, `oauth`, `tokens`) | adding sign-in to an app |
-| `proofs` (`proof`, `obo`, `ata`, `app-verification`, `user-verification`) | User verification and App verification proofs |
+| `proofs` (`proof`, `app-verification`, `user-verification`) | User verification and App verification proofs |
 | `webhooks` (`webhook`, `events`) | app and Silicon webhooks |
 | `imports` (`import`) | bringing an app's existing users |
 | `ids` (`id`, `uuid`, `identifiers`) | uuids, ids, reservations, membership ids |
@@ -297,7 +297,7 @@ of `accounts proofs`, not the guide. `accounts help imports` does print the guid
 
 An unknown topic exits `4` with `unknown_topic` and lists the topics.
 
-The compatibility commands `accounts app proof ata`, `accounts app proof obo` and `accounts proofs` remain supported. The CLI also accepts `accounts app proof app-verification`, `accounts app proof user-verification` and `accounts user-verification` as visible aliases. JSON kinds stay `ata` and `obo`.
+Use `accounts app proof app-verification` to verify an app and `accounts app proof user-verification` to act for an account. `accounts proofs` lists proofs issued on your behalf; `accounts user-verification` is an alias for this list and its revoke command. JSON kinds are `app_verification` and `user_verification`.
 
 ## Command tree
 
@@ -447,9 +447,9 @@ As `accounts --help` prints it:
     app userinfo <ACCESS_TOKEN>             Fetch userinfo with an access token issued to this app
     app proof                               User verification and App verification proofs: issue,
                                             verify, refresh, revoke, list
-      app proof obo                         Issue a User verification proof: act at another app on
+      app proof user-verification           Issue a User verification proof: act at another app on
                                             behalf of an account that consented in your app
-      app proof ata                         Issue an App verification proof that one other app can
+      app proof app-verification            Issue an app verification proof that one other app can
                                             verify (one proof per app)
       app proof verify <TOKEN>              Verify a proof token as this app: exit 0 when valid, 2
                                             when not
@@ -1730,7 +1730,7 @@ accounts app import users.csv --default-country US --wait
 accounts app token exchange --code sac_… --code-verifier … \
     --redirect-uri https://briefcase.example/callback
 accounts app token slt slt_…
-accounts app proof obo --subject-token eyJ… --to briefcase --scope files.write
+accounts app proof user-verification --subject-token eyJ… --to briefcase --scope files.write
 accounts app proof verify sap_… && echo valid
 accounts app webhook set https://briefcase.example/webhooks
 accounts app webhook replay --failed
@@ -2105,8 +2105,8 @@ accounts app proof [OPTIONS] <COMMAND>
 
 | subcommand | what it does |
 |---|---|
-| [`obo`](#accounts-app-proof-obo) | Issue a User verification proof: act at another app on behalf of an account that consented in your app |
-| [`ata`](#accounts-app-proof-ata) | Issue an App verification proof that one other app can verify (one proof per app) |
+| [`user-verification`](#accounts-app-proof-user-verification) | Issue a User verification proof: act at another app on behalf of an account that consented in your app |
+| [`app-verification`](#accounts-app-proof-app-verification) | Issue an app verification proof that one other app can verify (one proof per app) |
 | [`verify`](#accounts-app-proof-verify) | Verify a proof token as this app: exit 0 when valid, 2 when not |
 | [`refresh`](#accounts-app-proof-refresh) | Get a new proof token with the proof refresh token (it rotates) |
 | [`revoke`](#accounts-app-proof-revoke) | Revoke a proof this app issued (by id, proof token or refresh token) |
@@ -2114,12 +2114,12 @@ accounts app proof [OPTIONS] <COMMAND>
 
 Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
 
-##### `accounts app proof obo`
+##### `accounts app proof user-verification`
 
 Issue a User verification proof: act at another app on behalf of an account that consented in your app
 
 ```text
-accounts app proof obo [OPTIONS] --subject-token <TOKEN> --to <APP_ID>
+accounts app proof user-verification [OPTIONS] --subject-token <TOKEN> --to <APP_ID>
 ```
 
 | argument or option | meaning |
@@ -2135,16 +2135,16 @@ Also takes the [app credentials options](#accounts-app) and the [global options]
 Examples, as `--help` prints them:
 
 ```text
-accounts app proof obo --subject-token "$ACCESS_TOKEN" --to briefcase \
+accounts app proof user-verification --subject-token "$ACCESS_TOKEN" --to briefcase \
     --scope files.write --ttl 600
 ```
 
-##### `accounts app proof ata`
+##### `accounts app proof app-verification`
 
-Issue an App verification proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An App verification proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Managers can also make, see and revoke these proofs in the developer portal. The central history at developers.teamofsilicons.com/app-verification retains records and token events for apps you manage; raw token values are shown only when generated.
+Issue an app verification proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An app verification proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Managers can also make, see and revoke these proofs in the developer portal. The central history at developers.teamofsilicons.com/app-verification retains records and token events for apps you manage; raw token values are shown only when generated.
 
 ```text
-accounts app proof ata [OPTIONS] --to <APP_ID>
+accounts app proof app-verification [OPTIONS] --to <APP_ID>
 ```
 
 A list in `--to` (`remind,waveform`) exits 2 before anything is sent, with one command per app in
@@ -2162,9 +2162,9 @@ Also takes the [app credentials options](#accounts-app) and the [global options]
 Examples, as `--help` prints them:
 
 ```text
-accounts app proof ata --to remind --ttl 300
-accounts app proof ata --to waveform --scope notifications.send
-accounts app proof list --kind ata
+accounts app proof app-verification --to remind --ttl 300
+accounts app proof app-verification --to waveform --scope notifications.send
+accounts app proof list --kind app_verification
 ```
 
 ##### `accounts app proof verify`
@@ -2229,7 +2229,7 @@ accounts app proof list [OPTIONS]
 
 | argument or option | meaning |
 |---|---|
-| `--kind <KIND>` | obo or ata |
+| `--kind <KIND>` | user_verification or app_verification |
 | `--status <STATUS>` | active or revoked |
 | `--limit <N>` | Rows per page |
 | `--cursor <CURSOR>` | Continue from next_cursor |

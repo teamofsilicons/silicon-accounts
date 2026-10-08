@@ -78,7 +78,7 @@ const slt = await run('login --app briefcase (a Carbon\'s SLT)', home, ['login',
 check(((await fake.sltLogin('briefcase', slt.json?.slt ?? '')) as any).account?.uuid === carbon.me.uuid, 'briefcase exchanged the SLT');
 const slt2 = await run('login --app dm', home, ['login', '--app', 'dm'], (r) => /^slt_/.test(r.json?.slt ?? ''));
 await fake.sltLogin('dm', slt2.json?.slt ?? '');
-check((await fake.saveToBriefcase({ uuid: carbon.me.uuid, filename: 'cli.txt' })).status === 200, 'dm issued an OBO proof about the Carbon');
+check((await fake.saveToBriefcase({ uuid: carbon.me.uuid, filename: 'cli.txt' })).status === 200, 'dm issued a user verification proof about the Carbon');
 await run('apps list', home, ['apps', 'list'], (r) => r.code === 0 && JSON.stringify(r.json).includes('"briefcase"') && JSON.stringify(r.json).includes('"dm"'));
 const proofs = await run('proofs list', home, ['proofs', 'list'], (r) => r.code === 0 && (r.json?.items ?? []).some((p: any) => p.issuing_app?.app_id === 'dm' && p.status === 'active'));
 await run('proofs revoke', home, ['proofs', 'revoke', (proofs.json?.items ?? [])[0]?.proof_id ?? 'missing']);

@@ -49,7 +49,7 @@ To build it from source, with Rust 1.98 or later, from a checkout of the reposit
 ```sh
 cd /path/to/silicon-accounts               # your checkout
 cargo install --path crates/cli --locked   # installs the `accounts` binary into ~/.cargo/bin
-accounts --version                         # accounts 0.1.0
+accounts --version                         # accounts 0.2.0
 ```
 
 Get the source from the [Silicon Accounts repository](https://github.com/teamofsilicons/silicon-accounts), then run the commands above from your checkout. A [local stack](../index.md#run-it-yourself) also builds the CLI at `target/debug/accounts`.
@@ -214,7 +214,7 @@ home       /srv/silicons/scout  (from SILICON_HOME)
 state dir  /srv/silicons/scout/.accounts
 app        none
 signed in  si:scout at https://accounts.teamofsilicons.com
-version    0.1.0
+version    0.2.0
 ```
 
 | command | does |

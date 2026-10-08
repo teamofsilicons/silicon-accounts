@@ -3,22 +3,22 @@
  * is stored to expire 60 s after the proof was issued, verifies while its expires_at is ahead and is exactly invalid
  * once it is behind (through the site and straight at accounts-api), and the issuing app refreshes it into a new 60 s
  * token; an expired proof token of a longer-lived proof (the proof lives on: the issuing app refreshes it), a proof past
- * its own lifetime, and an OBO proof whose sign-in expired. Every expiry answer is exactly {valid:false, expires_at:null}.
+ * its own lifetime, and a user verification proof whose sign-in expired. Every expiry answer is exactly {valid:false, expires_at:null}.
  */
 import type { Journey } from "../../context";
 import { sql } from "../../lib";
-import { appListing, appTokens, errorCode, familyOf, isExactlyInvalid, issueObo, row, secondsBetween, short, signInToApp, refreshAs, verifyAs, type MyProofItem } from "./_helpers";
+import { appListing, appTokens, errorCode, familyOf, isExactlyInvalid, issueUserVerification, row, secondsBetween, short, signInToApp, refreshAs, verifyAs, type MyProofItem } from "./_helpers";
 
 export const journey: Journey = {
   name: "proofs-perf-expiry",
-  title: "a 60 s proof token (stored to expire 60 s after issue) verifies while its expires_at is ahead and is exactly invalid once it is behind, then refreshes into a new 60 s token; an expired token of a longer proof (refreshable), a proof past its lifetime (410 proof_expired) and an OBO proof whose sign-in expired — all by SQL time travel, no waiting",
+  title: "a 60 s proof token (stored to expire 60 s after issue) verifies while its expires_at is ahead and is exactly invalid once it is behind, then refreshes into a new 60 s token; an expired token of a longer proof (refreshable), a proof past its lifetime (410 proof_expired) and a user verification proof whose sign-in expired — all by SQL time travel, no waiting",
   async run(ctx) {
     const { env, results } = ctx;
     const carbon = await signInToApp(ctx, "dm");
     const subject = (await appTokens(env, "dm", carbon.uuid)).access_token;
 
     // A 60-second proof token: its stored lifetime, then its expiry moved instead of waited for.
-    const short60 = await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", access_ttl_seconds: 60, scopes: ["files.read"] });
+    const short60 = await issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", access_ttl_seconds: 60, scopes: ["files.read"] });
     const p60 = short60.body;
     const life = await row(env, `select extract(epoch from (t.expires_at - f.created_at)) from proof_tokens t join proof_families f on f.id = t.family_id where f.id = '${p60.proof_id}' and t.kind = 'access'`);
     results.check("access_ttl_seconds 60: the proof token expires 60 s after the proof was issued (database clock)", short60.status === 201 && Math.abs(Number(life?.[0]) - 60) < 0.05, `${short60.status} ${life?.[0]} s`);
@@ -44,7 +44,7 @@ export const journey: Journey = {
     results.check("…while the expired token stays exactly invalid", isExactlyInvalid((await verifyAs(ctx, "briefcase", p60.proof_token)).body));
 
     // Time travel 1: the proof token expired, the proof did not: verify says invalid, the issuing app refreshes it.
-    const a = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", access_ttl_seconds: 600 })).body;
+    const a = (await issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", access_ttl_seconds: 600 })).body;
     results.check("a 600 s proof verifies", (await verifyAs(ctx, "briefcase", a.proof_token)).body.valid === true);
     await sql(env, `update proof_tokens set expires_at = now() - interval '1 second' where family_id = '${a.proof_id}' and kind = 'access'`);
     const expiredToken = await verifyAs(ctx, "briefcase", a.proof_token);
@@ -56,7 +56,7 @@ export const journey: Journey = {
     results.check("the new token verifies; the expired one still does not", (await verifyAs(ctx, "briefcase", renewed.body.proof_token)).body.valid === true && isExactlyInvalid((await verifyAs(ctx, "briefcase", a.proof_token)).body));
 
     // Time travel 2: the proof itself past its lifetime (900 days, or the end of its sign-in).
-    const b = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", access_ttl_seconds: 1800, scopes: ["pp.lifetime"] })).body;
+    const b = (await issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", access_ttl_seconds: 1800, scopes: ["pp.lifetime"] })).body;
     await sql(env, `update proof_families set expires_at = now() - interval '1 second' where id = '${b.proof_id}'`);
     const pastLife = await verifyAs(ctx, "briefcase", b.proof_token);
     results.check("a proof past its lifetime → exactly invalid, although its token's own expiry is 30 minutes away", isExactlyInvalid(pastLife.body), JSON.stringify(pastLife.body));
@@ -69,14 +69,14 @@ export const journey: Journey = {
     const stillTokenAfterRefresh = await row(env, `select count(*) from proof_tokens where family_id = '${b.proof_id}' and used_at is not null`);
     results.check("the refused refresh did not consume the refresh token", stillTokenAfterRefresh?.[0] === "0", short(stillTokenAfterRefresh));
 
-    // Time travel 3: an OBO proof never outlives the sign-in it stands on (a second Carbon, whose dm sign-in expires).
+    // Time travel 3: a user verification proof never outlives the sign-in it stands on (a second Carbon, whose dm sign-in expires).
     const other = await signInToApp(ctx, "dm");
     const otherSubject = (await appTokens(env, "dm", other.uuid)).access_token;
-    const c = (await issueObo(ctx, "dm", otherSubject, { receiving_app: "briefcase", access_ttl_seconds: 1800 })).body;
+    const c = (await issueUserVerification(ctx, "dm", otherSubject, { receiving_app: "briefcase", access_ttl_seconds: 1800 })).body;
     results.check("the second Carbon's proof verifies before its sign-in ends", (await verifyAs(ctx, "briefcase", c.proof_token)).body.valid === true);
     // Its sign-in now ends in 30 s: a new proof asking for 1800 s gets a token and a lifetime that end with the sign-in.
     await sql(env, `update token_families set expires_at = now() + interval '30 seconds' where id = '${familyOf(otherSubject)}'`);
-    const capped = await issueObo(ctx, "dm", otherSubject, { receiving_app: "briefcase", access_ttl_seconds: 1800 });
+    const capped = await issueUserVerification(ctx, "dm", otherSubject, { receiving_app: "briefcase", access_ttl_seconds: 1800 });
     const cappedToken = (Date.parse(capped.body.expires_at) - Date.now()) / 1000;
     const cappedLife = (Date.parse(capped.body.refresh_expires_at) - Date.now()) / 1000;
     results.check("a sign-in ending in 30 s caps a new proof: its 1800 s token and its whole lifetime end with the sign-in", capped.status === 201 && cappedToken > 20 && cappedToken <= 31 && cappedLife > 20 && cappedLife <= 31 && capped.body.expires_at === capped.body.refresh_expires_at, `${capped.status} token ${cappedToken.toFixed(1)} s, proof ${cappedLife.toFixed(1)} s`);
@@ -88,7 +88,7 @@ export const journey: Journey = {
     results.check("refreshing it → 410 proof_expired, details.reason sign_in_expired", refreshAfterSignIn.status === 410 && errorCode(refreshAfterSignIn.body) === "proof_expired" && refreshAfterSignIn.body.error?.details?.reason === "sign_in_expired", `${refreshAfterSignIn.status} ${short(refreshAfterSignIn.body.error)}`);
     const listedC = await appListing(ctx, "dm", c.proof_id);
     results.check("dm's listing reports it expired", listedC?.status === "expired", short(listedC));
-    const reissue = await issueObo(ctx, "dm", otherSubject, { receiving_app: "briefcase" });
+    const reissue = await issueUserVerification(ctx, "dm", otherSubject, { receiving_app: "briefcase" });
     results.check("a new proof from the expired sign-in's access token → 400 invalid_subject_token (reason expired)", reissue.status === 400 && errorCode(reissue.body) === "invalid_subject_token" && reissue.body.error?.details?.reason === "expired", `${reissue.status} ${short(reissue.body.error)}`);
   },
 };

@@ -20,9 +20,9 @@ fn find<'a>(items: &'a [Value], id: &str) -> &'a Value {
 #[tokio::test]
 async fn an_app_lists_what_it_issued() {
     let w = World::new().await;
-    let obo = w.issue_obo().await;
-    let ata = w
-        .ata_as(
+    let user_verification = w.issue_user_verification().await;
+    let app_verification = w
+        .app_verification_as(
             &w.dm,
             &w.dm_secret,
             json!({"receiving_app": w.other.app_id, "scopes": ["ping"], "access_ttl_seconds": 120}),
@@ -30,7 +30,7 @@ async fn an_app_lists_what_it_issued() {
         .await
         .json;
     // Another app's proof never shows up.
-    w.ata_as(
+    w.app_verification_as(
         &w.other,
         &w.other_secret,
         json!({"receiving_app": w.briefcase.app_id}),
@@ -45,10 +45,13 @@ async fn an_app_lists_what_it_issued() {
     let list = items(&r.json);
     assert_eq!(list.len(), 2);
     assert_eq!(r.json["next_cursor"], Value::Null);
-    assert_eq!(list[0]["proof_id"], ata["proof_id"], "newest first");
+    assert_eq!(
+        list[0]["proof_id"], app_verification["proof_id"],
+        "newest first"
+    );
 
-    let o = find(&list, &proof_id(&obo));
-    assert_eq!(o["kind"], "obo");
+    let o = find(&list, &proof_id(&user_verification));
+    assert_eq!(o["kind"], "user_verification");
     assert_eq!(o["receiving_app"], w.briefcase.app_id);
     assert!(
         o.get("audiences").is_none(),
@@ -64,13 +67,13 @@ async fn an_app_lists_what_it_issued() {
     assert_eq!(o["revoked_at"], Value::Null);
     assert_eq!(o["revoke_reason"], Value::Null);
     assert_eq!(o["last_refreshed_at"], Value::Null);
-    assert_eq!(o["expires_at"], obo["refresh_expires_at"]);
-    assert_eq!(o["token_expires_at"], obo["expires_at"]);
+    assert_eq!(o["expires_at"], user_verification["refresh_expires_at"]);
+    assert_eq!(o["token_expires_at"], user_verification["expires_at"]);
     assert_eq!(o["access_ttl_seconds"], 1800);
     assert!(o["created_at"].as_str().is_some_and(|s| s.ends_with('Z')));
 
-    let a = find(&list, &proof_id(&ata));
-    assert_eq!(a["kind"], "ata");
+    let a = find(&list, &proof_id(&app_verification));
+    assert_eq!(a["kind"], "app_verification");
     assert_eq!(a["user"], Value::Null);
     assert_eq!(a["receiving_app"], w.other.app_id);
     assert!(a.get("audiences").is_none());
@@ -84,22 +87,29 @@ async fn an_app_lists_what_it_issued() {
 
     // Filters.
     let r = w
-        .call(Req::get(&format!("{path}?kind=ata")).basic(&w.dm.app_id, &w.dm_secret))
+        .call(Req::get(&format!("{path}?kind=app_verification")).basic(&w.dm.app_id, &w.dm_secret))
         .await;
     assert_eq!(items(&r.json).len(), 1);
-    assert_eq!(items(&r.json)[0]["kind"], "ata");
-    w.revoke_as(&w.dm, &w.dm_secret, json!({"proof_id": proof_id(&obo)}))
-        .await;
+    assert_eq!(items(&r.json)[0]["kind"], "app_verification");
+    w.revoke_as(
+        &w.dm,
+        &w.dm_secret,
+        json!({"proof_id": proof_id(&user_verification)}),
+    )
+    .await;
     let r = w
         .call(Req::get(&format!("{path}?status=revoked")).basic(&w.dm.app_id, &w.dm_secret))
         .await;
     let revoked = items(&r.json);
     assert_eq!(revoked.len(), 1);
-    assert_eq!(revoked[0]["proof_id"], obo["proof_id"]);
+    assert_eq!(revoked[0]["proof_id"], user_verification["proof_id"]);
     assert_eq!(revoked[0]["revoke_reason"], "revoked_by_app");
     assert!(revoked[0]["revoked_at"].is_string());
     let r = w
-        .call(Req::get(&format!("{path}?status=active&kind=obo")).basic(&w.dm.app_id, &w.dm_secret))
+        .call(
+            Req::get(&format!("{path}?status=active&kind=user_verification"))
+                .basic(&w.dm.app_id, &w.dm_secret),
+        )
         .await;
     assert!(items(&r.json).is_empty());
 
@@ -134,7 +144,7 @@ async fn app_listing_access_rules() {
     let w = World::new().await;
     let owner = w.ctx.carbon().await;
     let (app, secret) = w.ctx.app_owned("commit", Some(&owner.uuid)).await;
-    w.ata_as(&app, &secret, json!({"receiving_app": w.briefcase.app_id}))
+    w.app_verification_as(&app, &secret, json!({"receiving_app": w.briefcase.app_id}))
         .await;
     let path = format!("/v1/apps/{}/proofs", app.app_id);
 
@@ -164,7 +174,7 @@ async fn listings_paginate_with_a_stable_cursor() {
     let w = World::new().await;
     let mut issued = Vec::new();
     for _ in 0..5 {
-        issued.push(proof_id(&w.issue_obo().await));
+        issued.push(proof_id(&w.issue_user_verification().await));
     }
     issued.reverse(); // newest first
     let base = format!("/v1/apps/{}/proofs?limit=2", w.dm.app_id);
@@ -253,13 +263,13 @@ async fn listings_paginate_with_a_stable_cursor() {
 }
 
 #[tokio::test]
-async fn an_account_sees_its_obo_proofs_with_honest_statuses() {
+async fn an_account_sees_its_user_verification_proofs_with_honest_statuses() {
     let w = World::new().await;
-    let active = w.issue_obo().await;
-    let revoked = w.issue_obo().await;
-    let expired = w.issue_obo().await;
-    // An ATA proof and another account's OBO proof never show up.
-    w.ata_as(
+    let active = w.issue_user_verification().await;
+    let revoked = w.issue_user_verification().await;
+    let expired = w.issue_user_verification().await;
+    // An app verification proof and another account's User verification proof never show up.
+    w.app_verification_as(
         &w.dm,
         &w.dm_secret,
         json!({"receiving_app": w.briefcase.app_id}),
@@ -282,7 +292,9 @@ async fn an_account_sees_its_obo_proofs_with_honest_statuses() {
         )
         .await;
     let r = w
-        .obo(json!({"subject_token": t.access_token, "receiving_app": w.briefcase.app_id}))
+        .user_verification(
+            json!({"subject_token": t.access_token, "receiving_app": w.briefcase.app_id}),
+        )
         .await;
     assert_eq!(r.status, 201);
 
@@ -400,7 +412,7 @@ async fn membership_and_account_ends_are_derived_live() {
     // sign-in stays live): listings derive the end, with when and why, and the sweep doesn't
     // make it permanent (the real paths store access_removed / account_deleted themselves).
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let id = proof_id(&p);
     let cookie = w.ctx.browser_session(&w.carbon).await;
 
@@ -518,7 +530,9 @@ async fn a_silicon_sees_its_proofs_too() {
         .tokens_for(&si, &w.dm.app_id, &[accounts_core::models::Scope::Profile])
         .await;
     let p = w
-        .obo(json!({"subject_token": t.access_token, "receiving_app": w.briefcase.app_id}))
+        .user_verification(
+            json!({"subject_token": t.access_token, "receiving_app": w.briefcase.app_id}),
+        )
         .await;
     assert_eq!(p.status, 201);
     let fp = w.ctx.first_party_tokens(&si).await;
@@ -536,9 +550,9 @@ async fn a_silicon_sees_its_proofs_too() {
 #[tokio::test]
 async fn the_sweep_deletes_only_dead_tokens() {
     let w = World::new().await;
-    let live = w.issue_obo().await;
-    let old_token = w.issue_obo().await;
-    let dead = w.issue_obo().await;
+    let live = w.issue_user_verification().await;
+    let old_token = w.issue_user_verification().await;
+    let dead = w.issue_user_verification().await;
     w.ctx
         .exec(&format!(
             "update proof_tokens set expires_at = now() - interval '2 days' \

@@ -114,7 +114,7 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
 
   useRegisterCommands(() => [
     { id: "go.apps", label: "Your apps", description: "Every app you own", group: "Go to", icon: <Boxes size={16} strokeWidth={1.75} />, keywords: ["apps", "home"], run: () => void go(paths.home) },
-    { id: "go.app-verification", label: "App verification", description: "Issued tokens and history across your apps", group: "Go to", icon: <ShieldCheck size={16} />, keywords: ["verification", "token", "proof", "ata", "history"], run: () => void go(paths.appVerification()) },
+    { id: "go.app-verification", label: "App verification", description: "Issued tokens and history across your apps", group: "Go to", icon: <ShieldCheck size={16} />, keywords: ["verification", "token", "proof", "app-verification", "history"], run: () => void go(paths.appVerification()) },
     { id: "go.invitations", label: "Author invitations", group: "Go to", icon: <Mail size={16} />, keywords: ["invite", "author"], run: () => void go(paths.invitations) },
     { id: "go.settings", label: "Developer settings", group: "Go to", icon: <Settings size={16} />, keywords: ["telemetry", "preferences"], run: () => void go(paths.settings) },
     { id: "go.docs", label: "Developer docs", description: "Accounts and Apps guides", group: "Go to", icon: <BookOpen size={16} strokeWidth={1.75} />, keywords: ["docs", "help", "guide"], run: () => void go(docsUrl) },

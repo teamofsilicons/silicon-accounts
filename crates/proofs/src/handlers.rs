@@ -19,8 +19,8 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::input::{
-    IssueAtaBody, IssueOboBody, ProofReference, RefreshBody, RevokeBody, VerifyBody,
-    describe_input, echo_safe,
+    IssueAppVerificationBody, IssueUserVerificationBody, ProofReference, RefreshBody, RevokeBody,
+    VerifyBody, describe_input, echo_safe,
 };
 use crate::issue::{self, Issuer};
 use crate::model::{
@@ -44,59 +44,60 @@ fn no_store(mut response: Response) -> Response {
 
 // ---- issue -----------------------------------------------------------------------------------
 
-/// `POST /v1/proofs/obo` (app, IDEMPOTENT).
-pub async fn issue_obo(
+/// `POST /v1/proofs/user-verification` (app, IDEMPOTENT).
+pub async fn issue_user_verification(
     State(state): State<AppState>,
     auth: AppAuth,
     meta: ClientMeta,
     key: Option<IdempotencyKey>,
-    Json(body): Json<IssueOboBody>,
+    Json(body): Json<IssueUserVerificationBody>,
 ) -> Result<Response, ApiError> {
     let scope = idempotency::scope(
         &format!("app:{}", auth.app.app_id),
         "POST",
-        "/v1/proofs/obo",
+        "/v1/proofs/user-verification",
     );
     let issuer = Issuer::app(&auth.app, meta.ip.as_deref());
     let response = idempotency::run(&state, key.as_deref(), &scope, &body, true, || async {
-        let proof = issue::obo(&state, &issuer, &body).await?;
+        let proof = issue::user_verification(&state, &issuer, &body).await?;
         Ok((StatusCode::CREATED, serde_json::to_value(&proof)?))
     })
     .await?;
     Ok(no_store(response))
 }
 
-/// `POST /v1/proofs/ata` (app, IDEMPOTENT).
-pub async fn issue_ata(
+/// `POST /v1/proofs/app-verification` (app, IDEMPOTENT).
+pub async fn issue_app_verification(
     State(state): State<AppState>,
     auth: AppAuth,
     meta: ClientMeta,
     key: Option<IdempotencyKey>,
-    Json(body): Json<IssueAtaBody>,
+    Json(body): Json<IssueAppVerificationBody>,
 ) -> Result<Response, ApiError> {
     let scope = idempotency::scope(
         &format!("app:{}", auth.app.app_id),
         "POST",
-        "/v1/proofs/ata",
+        "/v1/proofs/app-verification",
     );
     let issuer = Issuer::app(&auth.app, meta.ip.as_deref());
     let response = idempotency::run(&state, key.as_deref(), &scope, &body, true, || async {
-        let proof = issue::ata(&state, &issuer, &body, "/v1/proofs/ata").await?;
+        let proof =
+            issue::app_verification(&state, &issuer, &body, "/v1/proofs/app-verification").await?;
         Ok((StatusCode::CREATED, serde_json::to_value(&proof)?))
     })
     .await?;
     Ok(no_store(response))
 }
 
-/// `POST /v1/apps/{app_id}/proofs/ata` (app-or-owner, IDEMPOTENT): the app's ATA page (on
+/// `POST /v1/apps/{app_id}/proofs/app-verification` (app-or-owner, IDEMPOTENT): the app's App verification page (on
 /// developers.teamofsilicons.com, through the owner's session). Same body and response as
-/// `POST /v1/proofs/ata`.
-pub async fn issue_ata_for_app(
+/// `POST /v1/proofs/app-verification`.
+pub async fn issue_app_verification_for_app(
     State(state): State<AppState>,
     who: AppOrOwner,
     meta: ClientMeta,
     key: Option<IdempotencyKey>,
-    Json(body): Json<IssueAtaBody>,
+    Json(body): Json<IssueAppVerificationBody>,
 ) -> Result<Response, ApiError> {
     let (actor_kind, actor_id) = who.audit_actor();
     let caller = match &who.actor {
@@ -106,7 +107,7 @@ pub async fn issue_ata_for_app(
     let scope = idempotency::scope(
         &caller,
         "POST",
-        &format!("/v1/apps/{}/proofs/ata", who.app.app_id),
+        &format!("/v1/apps/{}/proofs/app-verification", who.app.app_id),
     );
     let issuer = Issuer {
         app: &who.app,
@@ -114,9 +115,9 @@ pub async fn issue_ata_for_app(
         actor_id,
         ip: meta.ip.as_deref(),
     };
-    let endpoint = format!("/v1/apps/{}/proofs/ata", who.app.app_id);
+    let endpoint = format!("/v1/apps/{}/proofs/app-verification", who.app.app_id);
     let response = idempotency::run(&state, key.as_deref(), &scope, &body, true, || async {
-        let proof = issue::ata(&state, &issuer, &body, &endpoint).await?;
+        let proof = issue::app_verification(&state, &issuer, &body, &endpoint).await?;
         Ok((StatusCode::CREATED, serde_json::to_value(&proof)?))
     })
     .await?;
@@ -282,7 +283,7 @@ fn unknown_proof_token(field: &str) -> ApiError {
 /// Revokes `family` (if still live) and writes the audit entry. Returns whether this call
 /// revoked it.
 ///
-/// An OBO proof whose sign-in was revoked already ended then (verification has refused it
+/// A user verification proof whose sign-in was revoked already ended then (verification has refused it
 /// since); that first end is stored instead (`sign_in_revoked`, see
 /// [`store::record_sign_in_revoked`]) and this call is a no-op, so the proof's history doesn't
 /// change its mind about when and why it ended.
@@ -297,7 +298,7 @@ async fn revoke_family(
     via: &str,
     ip: Option<&str>,
 ) -> Result<bool, ApiError> {
-    if family.kind() == ProofKind::Obo
+    if family.kind() == ProofKind::UserVerification
         && family.revoked_at.is_none()
         && store::record_sign_in_revoked(conn, family.id).await?
     {
@@ -455,7 +456,7 @@ pub async fn revoke_app_proof(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `DELETE /v1/me/proofs/{proof_id}` (session): revoke an OBO proof issued on your behalf → 204.
+/// `DELETE /v1/me/proofs/{proof_id}` (session): revoke a user verification proof issued on your behalf → 204.
 pub async fn revoke_my_proof(
     State(state): State<AppState>,
     me: AccountAuth,
@@ -465,7 +466,12 @@ pub async fn revoke_my_proof(
     let id = parse_proof_id(&proof_id)?;
     let mut tx = state.db.begin().await?;
     let family = match store::family(&mut tx, id).await? {
-        Some(f) if f.kind() == ProofKind::Obo && f.account_uuid.as_deref() == Some(me.uuid()) => f,
+        Some(f)
+            if f.kind() == ProofKind::UserVerification
+                && f.account_uuid.as_deref() == Some(me.uuid()) =>
+        {
+            f
+        }
         _ => {
             return Err(proof_not_found(format!(
                 "No User verification with id {id} was issued on behalf of {}.",
@@ -491,7 +497,7 @@ pub async fn revoke_my_proof(
 
 // ---- listings --------------------------------------------------------------------------------
 
-/// `?kind=obo|ata&status=active|revoked|expired&limit&cursor`.
+/// `?kind=user_verification|app_verification&status=active|revoked|expired&limit&cursor`.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AppProofsQuery {
@@ -556,7 +562,7 @@ pub async fn list_app_proofs(
 }
 
 pub(crate) fn app_item(r: store::AppProofRow) -> AppProofItem {
-    let kind = ProofKind::parse(&r.kind).unwrap_or(ProofKind::Obo);
+    let kind = ProofKind::parse(&r.kind).unwrap_or(ProofKind::UserVerification);
     let user = match (r.account_uuid, r.account_kind, r.account_status) {
         (Some(uuid), Some(account_kind), Some(status)) => Some(AccountSummary {
             uuid,
@@ -585,7 +591,7 @@ pub(crate) fn app_item(r: store::AppProofRow) -> AppProofItem {
     }
 }
 
-/// `GET /v1/me/proofs` (session): OBO proofs issued on the signed-in account's behalf.
+/// `GET /v1/me/proofs` (session): User verification proofs issued on the signed-in account's behalf.
 pub async fn list_my_proofs(
     State(state): State<AppState>,
     me: AccountAuth,

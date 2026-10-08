@@ -44,7 +44,7 @@ test("the proxy forwards only the developer audience's routes", () => {
   assert.equal(proxyRoute("me/app-verifications/other", "GET"), null);
   assert.deepEqual(proxyRoute("apps/briefcase/proofs/example/history", "GET"), { path: "v1/apps/briefcase/proofs/example/history", kind: "account" });
   assert.deepEqual(proxyRoute("apps/briefcase/signin-config", "PATCH"), { path: "v1/apps/briefcase/signin-config", kind: "account" });
-  assert.deepEqual(proxyRoute("apps/briefcase/proofs/ata", "POST"), { path: "v1/apps/briefcase/proofs/ata", kind: "account" });
+  assert.deepEqual(proxyRoute("apps/briefcase/proofs/app-verification", "POST"), { path: "v1/apps/briefcase/proofs/app-verification", kind: "account" });
   assert.equal(proxyRoute("me", "PATCH"), null, "the account itself is never changed through the developer site");
   assert.equal(proxyRoute("me/apps", "GET"), null);
   assert.equal(proxyRoute("me/silicons", "GET"), null);
@@ -61,7 +61,7 @@ test("the proxy forwards only the developer audience's routes", () => {
 test("the account site's old developer tabs land on their new names", async () => {
   const { renamedAppTab, isUnknownAppTab } = await import("../lib/app-tabs");
   assert.equal(renamedAppTab("/apps/briefcase/branding"), "/apps/briefcase/pages");
-  assert.equal(renamedAppTab("/apps/briefcase/proofs/"), "/apps/briefcase/ata");
+  assert.equal(renamedAppTab("/apps/briefcase/proofs/"), "/apps/briefcase/app-verification");
   assert.equal(renamedAppTab("/apps/briefcase/flows"), null);
   assert.equal(isUnknownAppTab("/apps/briefcase/flows"), false);
   assert.equal(isUnknownAppTab("/apps/briefcase/bogus"), true);

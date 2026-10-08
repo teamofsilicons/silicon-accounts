@@ -1139,7 +1139,7 @@ export async function signInOnDeveloper(env: Env, page: Page, email: string | nu
 /**
  * Calls the developer site's BFF (`/api/accounts/<path>` → accounts-api `/v1/<path>`) as the browser context signed in
  * there: its sealed session cookie, and the developer site's Origin on every call (its guard refuses writes from
- * elsewhere). `path` starts with "/", e.g. "/apps/commit/proofs/ata".
+ * elsewhere). `path` starts with "/", e.g. "/apps/commit/proofs/app-verification".
  */
 export async function developerApi<T = unknown>(env: Env, page: Page, path: string, init: { method?: string; json?: unknown; headers?: Record<string, string> } = {}): Promise<JsonAnswer<T>> {
   const response = await page.request.fetch(`${env.developer}/api/accounts${path}`, {
@@ -1161,10 +1161,10 @@ export async function developerApi<T = unknown>(env: Env, page: Page, path: stri
 /* Proofs                                                                                                              */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-/** POST /v1/proofs/ata and /v1/proofs/obo answer this. */
+/** POST /v1/proofs/app-verification and /v1/proofs/user-verification answer this. */
 export interface IssuedProof {
   proof_id: string;
-  kind: "ata" | "obo";
+  kind: "app_verification" | "user_verification";
   proof_token: string;
   /** The issuing app keeps it to get new proof tokens (POST /v1/proofs/refresh). */
   proof_refresh_token?: string | null;
@@ -1184,13 +1184,13 @@ export interface ProofVerification {
 const basic = (appId: string) => `Basic ${Buffer.from(`${appId}:${fakeApp(appId).secret}`).toString("base64")}`;
 
 /**
- * Issues an ATA proof as the fake app `app` (its own credentials) for exactly one receiving app (UNDERSTANDING.md:
- * "An ATA proof is always for exactly one app"): POST /v1/proofs/ata `{receiving_app}` with an Idempotency-Key.
+ * Issues an app verification proof as the fake app `app` (its own credentials) for exactly one receiving app (UNDERSTANDING.md:
+ * "An app verification proof is always for exactly one app"): POST /v1/proofs/app-verification `{receiving_app}` with an Idempotency-Key.
  * Talking to two apps is two proofs, two calls. Through the site's /v1 unless `direct`; `ms` is the round trip.
  */
-export async function issueAta(ctx: { env: Env; ip: string }, app: string, receivingApp: string, options: { scopes?: string[]; ttlSeconds?: number; idempotencyKey?: string; direct?: boolean } = {}): Promise<JsonAnswer<IssuedProof> & { ms: number }> {
+export async function issueAppVerification(ctx: { env: Env; ip: string }, app: string, receivingApp: string, options: { scopes?: string[]; ttlSeconds?: number; idempotencyKey?: string; direct?: boolean } = {}): Promise<JsonAnswer<IssuedProof> & { ms: number }> {
   const started = performance.now();
-  const answer = await api<IssuedProof>(ctx, "/v1/proofs/ata", {
+  const answer = await api<IssuedProof>(ctx, "/v1/proofs/app-verification", {
     method: "POST",
     direct: options.direct,
     headers: { authorization: basic(app), "idempotency-key": options.idempotencyKey ?? `e2e-${Date.now()}-${tag()}` },

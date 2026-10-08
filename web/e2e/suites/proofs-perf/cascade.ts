@@ -1,5 +1,5 @@
 /**
- * Cascades: an OBO proof stands on the account's grant at the issuing app and ends with it. Removing dm's access on
+ * Cascades: a user verification proof stands on the account's grant at the issuing app and ends with it. Removing dm's access on
  * the account site (in a real browser), dm signing the account out (its sign-in revoked), the account being deleted,
  * and a custodian rotating a Silicon's STK: each makes the proofs standing on that grant exactly invalid at once and
  * unrefreshable, while proofs standing on other grants live on.
@@ -13,7 +13,7 @@ import {
   errorCode,
   familyOf,
   isExactlyInvalid,
-  issueObo,
+  issueUserVerification,
   newPhone,
   refreshAs,
   row,
@@ -29,17 +29,17 @@ import {
 export const journeys: Journey[] = [
   {
     name: "proofs-perf-cascade-remove-access",
-    title: "the Carbon removes dm's access on /apps in the browser: every OBO proof dm holds for it is exactly invalid at once and unrefreshable (access_removed), dm can't issue new ones; proofs other apps issued live on; signing into dm again gives new proofs but never revives the old ones",
+    title: "the Carbon removes dm's access on /apps in the browser: every User verification proof dm holds for it is exactly invalid at once and unrefreshable (access_removed), dm can't issue new ones; proofs other apps issued live on; signing into dm again gives new proofs but never revives the old ones",
     async run(ctx) {
       const { env, results, browser } = ctx;
       const carbon = await signInToApp(ctx, "dm");
       await signInToApp(ctx, "briefcase", { session: carbon.session });
       const dmSubject = (await appTokens(env, "dm", carbon.uuid)).access_token;
       const briefcaseSubject = (await appTokens(env, "briefcase", carbon.uuid)).access_token;
-      const toBriefcase = (await issueObo(ctx, "dm", dmSubject, { receiving_app: "briefcase", scopes: ["files.write"] })).body;
-      const toWaveform = (await issueObo(ctx, "dm", dmSubject, { receiving_app: "waveform", scopes: ["voice.send"] })).body;
-      const fromBriefcase = (await issueObo(ctx, "briefcase", briefcaseSubject, { receiving_app: "remind", scopes: ["reminders.write"] })).body;
-      const intoDm = (await issueObo(ctx, "briefcase", briefcaseSubject, { receiving_app: "dm", scopes: ["messages.send"] })).body;
+      const toBriefcase = (await issueUserVerification(ctx, "dm", dmSubject, { receiving_app: "briefcase", scopes: ["files.write"] })).body;
+      const toWaveform = (await issueUserVerification(ctx, "dm", dmSubject, { receiving_app: "waveform", scopes: ["voice.send"] })).body;
+      const fromBriefcase = (await issueUserVerification(ctx, "briefcase", briefcaseSubject, { receiving_app: "remind", scopes: ["reminders.write"] })).body;
+      const intoDm = (await issueUserVerification(ctx, "briefcase", briefcaseSubject, { receiving_app: "dm", scopes: ["messages.send"] })).body;
       const before = await Promise.all([verifyAs(ctx, "briefcase", toBriefcase.proof_token), verifyAs(ctx, "waveform", toWaveform.proof_token), verifyAs(ctx, "remind", fromBriefcase.proof_token), verifyAs(ctx, "dm", intoDm.proof_token)]);
       results.check("before: dm's proofs (→ briefcase, → waveform) and Briefcase's (→ remind, → dm) all verify", before.every(answer => answer.body.valid === true), before.map(answer => answer.body.valid).join(", "));
 
@@ -75,7 +75,7 @@ export const journeys: Journey[] = [
       results.check("dm's listing: revoked, access_removed", listed?.status === "revoked" && listed.revoke_reason === "access_removed", short(listed));
       const stored = await row(env, `select count(*) filter (where revoke_reason = 'access_removed' and revoked_by = '${carbon.uuid}'), count(*) from proof_families where account_uuid = '${carbon.uuid}' and issuing_app = 'dm'`);
       results.check("both of dm's proofs are stored revoked (access_removed, by the Carbon)", stored?.[0] === "2" && stored[1] === "2", short(stored));
-      const reissue = await issueObo(ctx, "dm", dmSubject, { receiving_app: "briefcase" });
+      const reissue = await issueUserVerification(ctx, "dm", dmSubject, { receiving_app: "briefcase" });
       results.check("dm can't issue a new proof with the access token it still holds → 400 invalid_subject_token (sign-in revoked) or 403 membership_inactive", (reissue.status === 400 && errorCode(reissue.body) === "invalid_subject_token") || (reissue.status === 403 && errorCode(reissue.body) === "membership_inactive"), `${reissue.status} ${short(reissue.body.error)}`);
       const survivor = await verifyAs(ctx, "remind", fromBriefcase.proof_token);
       results.check("Briefcase's proof for Remind (another grant) still verifies", survivor.body.valid === true, short(survivor.body));
@@ -96,7 +96,7 @@ export const journeys: Journey[] = [
       // Signing into dm again: new proofs work, the old ones stay dead.
       const again = await signInToApp(ctx, "dm", { session: carbon.session, phone: newPhone() });
       const newSubject = (await appTokens(env, "dm", again.uuid)).access_token;
-      const fresh = await issueObo(ctx, "dm", newSubject, { receiving_app: "briefcase" });
+      const fresh = await issueUserVerification(ctx, "dm", newSubject, { receiving_app: "briefcase" });
       results.check("after signing into dm again dm gets a new proof that verifies", again.uuid === carbon.uuid && fresh.status === 201 && (await verifyAs(ctx, "briefcase", fresh.body.proof_token)).body.valid === true, `${fresh.status} ${short(fresh.body.error)}`);
       results.check("…and the old proofs stay exactly invalid (no resurrection)", isExactlyInvalid((await verifyAs(ctx, "briefcase", toBriefcase.proof_token)).body) && (await refreshAs(ctx, "dm", toBriefcase.proof_refresh_token)).status === 410);
       results.check("nothing /apps and /proofs loaded left the machine", outside().length === 0, outside().join(", ") || "none");
@@ -112,10 +112,10 @@ export const journeys: Journey[] = [
       // Two dm sign-ins of one Carbon (two token families); dm signs the first one out.
       const carbon = await signInToApp(ctx, "dm");
       const first = await appTokens(env, "dm", carbon.uuid);
-      const onFirst = (await issueObo(ctx, "dm", first.access_token, { receiving_app: "briefcase", scopes: ["pp.first"] })).body;
+      const onFirst = (await issueUserVerification(ctx, "dm", first.access_token, { receiving_app: "briefcase", scopes: ["pp.first"] })).body;
       await signInToApp(ctx, "dm", { session: carbon.session });
       const second = await appTokens(env, "dm", carbon.uuid);
-      const onSecond = (await issueObo(ctx, "dm", second.access_token, { receiving_app: "briefcase", scopes: ["pp.second"] })).body;
+      const onSecond = (await issueUserVerification(ctx, "dm", second.access_token, { receiving_app: "briefcase", scopes: ["pp.second"] })).body;
       results.check("two sign-ins (token families) at dm, a proof on each, both verify", familyOf(first.access_token) !== familyOf(second.access_token) && (await verifyAs(ctx, "briefcase", onFirst.proof_token)).body.valid === true && (await verifyAs(ctx, "briefcase", onSecond.proof_token)).body.valid === true, `${familyOf(first.access_token)} / ${familyOf(second.access_token)}`);
       const revoke = await api<unknown>(ctx, "/v1/oauth/revoke", {
         method: "POST",
@@ -139,13 +139,13 @@ export const journeys: Journey[] = [
       const firstMine = mine.find(item => item.proof_id === onFirst.proof_id);
       const secondMine = mine.find(item => item.proof_id === onSecond.proof_id);
       results.check("the Carbon's /v1/me/proofs: the first revoked (sign_in_revoked), the second active", firstMine?.status === "revoked" && firstMine.revoke_reason === "sign_in_revoked" && secondMine?.status === "active", `${short(firstMine?.status)} ${short(firstMine?.revoke_reason)} / ${short(secondMine?.status)}`);
-      const fromDeadToken = await issueObo(ctx, "dm", first.access_token, { receiving_app: "briefcase" });
+      const fromDeadToken = await issueUserVerification(ctx, "dm", first.access_token, { receiving_app: "briefcase" });
       results.check("a new proof from the signed-out sign-in's access token → 400 invalid_subject_token (revoked)", fromDeadToken.status === 400 && errorCode(fromDeadToken.body) === "invalid_subject_token" && fromDeadToken.body.error?.details?.reason === "revoked", `${fromDeadToken.status} ${short(fromDeadToken.body.error)}`);
 
       // The account is deleted: its proofs end with it.
       const doomed = await signInToApp(ctx, "dm");
       const doomedSubject = (await appTokens(env, "dm", doomed.uuid)).access_token;
-      const doomedProof = (await issueObo(ctx, "dm", doomedSubject, { receiving_app: "briefcase" })).body;
+      const doomedProof = (await issueUserVerification(ctx, "dm", doomedSubject, { receiving_app: "briefcase" })).body;
       results.check("a second Carbon's proof verifies before the account is deleted", (await verifyAs(ctx, "briefcase", doomedProof.proof_token)).body.valid === true);
       const deleted = await doomed.session.call<ApiErrorBody | null>("DELETE", "/v1/me", { confirm: doomed.id });
       results.check("the Carbon deletes its account (DELETE /v1/me with its id) → 204", deleted.status === 204, `${deleted.status} ${short(deleted.body)}`);
@@ -167,9 +167,9 @@ export const journeys: Journey[] = [
       const sltLogin = await json<{ ok?: boolean; uuid?: string }>(`${env.apps}/dm/slt-login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slt: slt.body.slt }) });
       results.check("the Silicon signs in (si:id + STK), gets a short-lived token for dm, and dm exchanges it", login.status === 200 && slt.status < 300 && sltLogin.body.ok === true && sltLogin.body.uuid === silicon.uuid, `${login.status} ${slt.status} ${short(sltLogin.body)}`);
       const save = await json<{ ok?: boolean; verification?: Verification; proof?: { proof_id: string } }>(`${env.apps}/dm/actions/save-to-briefcase`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ uuid: silicon.uuid, filename: "scout.txt" }) });
-      results.check("dm saves a file to Briefcase on the Silicon's behalf: Briefcase verifies an OBO proof for a silicon (its si:id, dm:<uuid>)", save.body.ok === true && save.body.verification?.user?.kind === "silicon" && save.body.verification.user.id === silicon.id && save.body.verification.user.membership_id === `dm:${silicon.uuid}`, short(save.body.verification ?? save.body));
+      results.check("dm saves a file to Briefcase on the Silicon's behalf: Briefcase verifies a user verification proof for a silicon (its si:id, dm:<uuid>)", save.body.ok === true && save.body.verification?.user?.kind === "silicon" && save.body.verification.user.id === silicon.id && save.body.verification.user.membership_id === `dm:${silicon.uuid}`, short(save.body.verification ?? save.body));
       const siliconSubject = (await appTokens(env, "dm", silicon.uuid)).access_token;
-      const siliconProof = (await issueObo(ctx, "dm", siliconSubject, { receiving_app: "briefcase", scopes: ["pp.silicon"] })).body;
+      const siliconProof = (await issueUserVerification(ctx, "dm", siliconSubject, { receiving_app: "briefcase", scopes: ["pp.silicon"] })).body;
       results.check("…and a proof dm keeps for it verifies", (await verifyAs(ctx, "briefcase", siliconProof.proof_token)).body.valid === true);
       const rotated = await custodian.session.call<{ stk?: string }>("POST", `/v1/me/silicons/${silicon.uuid}/stk`, {});
       results.check("the custodian rotates the Silicon's STK → 200 with a new STK", rotated.status === 200 && /^stk-/.test(rotated.body.stk ?? "") && rotated.body.stk !== created.body.stk, `${rotated.status} ${short(rotated.body)}`);

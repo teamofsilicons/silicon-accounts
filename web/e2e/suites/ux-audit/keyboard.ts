@@ -281,7 +281,7 @@ export const journeys: Journey[] = [
       const { page } = carbon;
       results.watch(page, "keyboard-account");
       collectConsole(page);
-      // Something on every page: briefcase and dm (an OBO proof dm holds), a Silicon.
+      // Something on every page: briefcase and dm (a user verification proof dm holds), a Silicon.
       for (const app of ["briefcase", "dm"]) {
         await page.goto(await hostedLink(env, page, app));
         await page.getByRole("button", { name: /^Continue as/ }).click({ timeout: 30_000 });
@@ -301,8 +301,8 @@ export const journeys: Journey[] = [
         } else await page.getByRole("button", { name: "Share and continue", exact: true }).click({ timeout: 30_000 });
         await page.waitForURL(url => url.href.startsWith(`${env.apps}/${app}/`), { timeout: 30_000 });
       }
-      const issued = await fetch(`${env.apps}/dm/actions/issue-obo`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ uuid: carbon.uuid, receiving_app: "briefcase", scopes: ["files.write"] }) });
-      results.check("keyboard-account: dm holds an OBO proof on the Carbon's behalf", issued.ok, String(issued.status));
+      const issued = await fetch(`${env.apps}/dm/actions/issue-user_verification`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ uuid: carbon.uuid, receiving_app: "briefcase", scopes: ["files.write"] }) });
+      results.check("keyboard-account: dm holds a user verification proof on the Carbon's behalf", issued.ok, String(issued.status));
       await page.goto(`${env.site}/`);
       await page.locator("main").first().waitFor({ timeout: 30_000 });
       const created = await pageFetch(page, "/v1/me/silicons", { method: "POST", body: { id: `si:uxa-keys-${Date.now().toString(36)}`, display_name: "Keyboard Scout" } });
@@ -414,7 +414,7 @@ export const journeys: Journey[] = [
       await sleep(400);
       await checkSkipShape(ctx, page, "keyboard: the developer site");
       const tabs: Array<readonly [string, string, readonly RegExp[]]> = [["/", "home", [/Briefcase/, /Search and jump/]]];
-      for (const tab of TABS) tabs.push([tabPath("briefcase", tab), tab, [new RegExp(`^${tab === "ata" ? "ATA" : tab === "sign-in" ? "Sign-in" : tab[0]!.toUpperCase() + tab.slice(1)}$`)]]);
+      for (const tab of TABS) tabs.push([tabPath("briefcase", tab), tab, [new RegExp(`^${tab === "app_verification" ? "App verification" : tab === "sign-in" ? "Sign-in" : tab[0]!.toUpperCase() + tab.slice(1)}$`)]]);
       for (const [path, name, expected] of tabs) {
         await openDeveloperPage(ctx, page, path);
         await walkStep(ctx, page, findings, `keyboard-developer ${name}`, [...expected], false);

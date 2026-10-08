@@ -4,7 +4,7 @@
 //! Carbon is custodian of any Silicon that isn't deleted (409 `custodian_of_silicons`: a Silicon
 //! always has exactly one custodian; transfer it first); otherwise status `deleted`, the id
 //! reserved for 10 days, emails/phones/identities removed, browser sessions, token families and
-//! OBO proofs revoked, pending custodian requests cancelled, the photo back to the default and the
+//! User verification proofs revoked, pending custodian requests cancelled, the photo back to the default and the
 //! uploads no other account shows deleted, the apps' imported data about the account dropped, and
 //! `account.deleted` to every app the account had a live membership with (memberships stay as
 //! the apps' history).

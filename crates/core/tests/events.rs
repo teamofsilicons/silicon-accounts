@@ -289,7 +289,7 @@ async fn core_proof_revocations_are_audited() {
     for app in [&issuer.app_id, &other.app_id] {
         sqlx::query(
             "insert into proof_families (id, kind, issuing_app, audiences, account_uuid, access_ttl_seconds, expires_at) \
-             values ($1, 'obo', $2, array['receiver'], $3, 1800, now() + interval '1 day')",
+             values ($1, 'user_verification', $2, array['receiver'], $3, 1800, now() + interval '1 day')",
         )
         .bind(uuid::Uuid::now_v7())
         .bind(app)
@@ -328,7 +328,7 @@ async fn core_proof_revocations_are_audited() {
     assert_eq!(audited[1].0, "system");
     assert_eq!(audited[1].2, other.app_id);
     assert_eq!(audited[1].3["reason"], "account_deleted");
-    assert_eq!(audited[1].3["kind"], "obo");
+    assert_eq!(audited[1].3["kind"], "user_verification");
 }
 
 /// A custodian's new c:id reaches the apps of its Silicons, which show it as the Silicon's

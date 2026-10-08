@@ -3,21 +3,21 @@
  * the stack's first sweep, 120 s after accounts-api started (_sweep.ts). It makes the proofs that sweep must store,
  * delete or keep, moving time only on its own rows:
  *
- * - B's OBO proof on a dm sign-in that dm ended (POST /v1/oauth/revoke): invalid at once, but nothing touches the proof
+ * - B's User verification proof on a dm sign-in that dm ended (POST /v1/oauth/revoke): invalid at once, but nothing touches the proof
  *   afterwards, so its end is not stored yet (the listing derives it live); storing it is the sweep's job;
  * - A's proofs: a proof token that expired 25 h ago (deleted: more than a day) and one 23 h ago (kept); proofs dm
- *   revoked 31 days ago (every token deleted) and 29 days ago (kept); Commit's ATA proof for remind whose lifetime ended
+ *   revoked 31 days ago (every token deleted) and 29 days ago (kept); Commit's App verification proof for remind whose lifetime ended
  *   31 days ago (every token deleted); a live proof refreshed once, whose used refresh token must be kept so that reuse
  *   is still caught.
  */
 import type { Journey } from "../../context";
 import { api, sql } from "../../lib";
-import { appListing, appTokens, basicAuth, familyOf, isExactlyInvalid, issueAtaFor, issueObo, refreshAs, revokeAs, row, short, signInToApp, verifyAs, type IssuedProof } from "./_helpers";
+import { appListing, appTokens, basicAuth, familyOf, isExactlyInvalid, issueAppVerificationFor, issueUserVerification, refreshAs, revokeAs, row, short, signInToApp, verifyAs, type IssuedProof } from "./_helpers";
 import { FIRST_SWEEP_AFTER_MS, SETUP_MARGIN_MS, SWEEP_KEY, apiListeningAt, apiLogFile, sweepOptIn, type SweepSetup } from "./_sweep";
 
 export const journey: Journey = {
   name: "proofs-perf-sweep-setup",
-  ...sweepOptIn("before the stack's first hourly proof sweep (120 s after accounts-api starts): an OBO proof whose dm sign-in dm ended (its end not stored yet), proof tokens expired 25 h and 23 h ago, proofs revoked 31 and 29 days ago, an ATA proof that ended 31 days ago, and a live proof with a used refresh token"),
+  ...sweepOptIn("before the stack's first hourly proof sweep (120 s after accounts-api starts): a user verification proof whose dm sign-in dm ended (its end not stored yet), proof tokens expired 25 h and 23 h ago, proofs revoked 31 and 29 days ago, an app verification proof that ended 31 days ago, and a live proof with a used refresh token"),
   provides: [SWEEP_KEY],
   async run(ctx) {
     const { env, results, shared } = ctx;
@@ -36,36 +36,36 @@ export const journey: Journey = {
     // Carbon A, signed into dm.
     const a = await signInToApp(ctx, "dm");
     const subjectA = (await appTokens(env, "dm", a.uuid)).access_token;
-    const obo = async (label: string): Promise<IssuedProof> => {
-      const answer = await issueObo(ctx, "dm", subjectA, { receiving_app: "briefcase", scopes: [`pp.sweep.${label}`], access_ttl_seconds: 600 });
+    const user_verification = async (label: string): Promise<IssuedProof> => {
+      const answer = await issueUserVerification(ctx, "dm", subjectA, { receiving_app: "briefcase", scopes: [`pp.sweep.${label}`], access_ttl_seconds: 600 });
       if (answer.status !== 201) throw new Error(`issuing the ${label} proof answered ${answer.status} ${short(answer.body)}`);
       return answer.body;
     };
-    const live = await obo("live");
+    const live = await user_verification("live");
     const refreshed = await refreshAs(ctx, "dm", live.proof_refresh_token);
     if (refreshed.status !== 200) throw new Error(`refreshing the live proof answered ${refreshed.status} ${short(refreshed.body)}`);
-    const staleToken = await obo("stale-token");
-    const recentToken = await obo("recent-token");
-    const endedLongAgo = await obo("ended-long-ago");
-    const endedRecently = await obo("ended-recently");
+    const staleToken = await user_verification("stale-token");
+    const recentToken = await user_verification("recent-token");
+    const endedLongAgo = await user_verification("ended-long-ago");
+    const endedRecently = await user_verification("ended-recently");
     for (const ended of [endedLongAgo, endedRecently]) {
       const revoked = await revokeAs(ctx, "dm", { proof_id: ended.proof_id });
       if (revoked.status !== 204) throw new Error(`dm revoking ${ended.proof_id} answered ${revoked.status} ${short(revoked.body)}`);
     }
-    const ata = await issueAtaFor(ctx, "commit", "remind", { scopes: ["pp.sweep.ata-ended-long-ago"] });
-    if (ata.status !== 201) throw new Error(`issuing the ATA proof answered ${ata.status} ${short(ata.body)}`);
+    const app_verification = await issueAppVerificationFor(ctx, "commit", "remind", { scopes: ["pp.sweep.app_verification-ended-long-ago"] });
+    if (app_verification.status !== 201) throw new Error(`issuing the App verification proof answered ${app_verification.status} ${short(app_verification.body)}`);
 
     // Time travel, on these proofs only.
     await sql(env, `update proof_tokens set expires_at = now() - interval '25 hours' where family_id = '${staleToken.proof_id}' and kind = 'access'`);
     await sql(env, `update proof_tokens set expires_at = now() - interval '23 hours' where family_id = '${recentToken.proof_id}' and kind = 'access'`);
     await sql(env, `update proof_families set created_at = now() - interval '40 days', revoked_at = now() - interval '31 days' where id = '${endedLongAgo.proof_id}'`);
     await sql(env, `update proof_families set created_at = now() - interval '40 days', revoked_at = now() - interval '29 days' where id = '${endedRecently.proof_id}'`);
-    await sql(env, `update proof_families set created_at = now() - interval '931 days', expires_at = now() - interval '31 days' where id = '${ata.body.proof_id}'`);
+    await sql(env, `update proof_families set created_at = now() - interval '931 days', expires_at = now() - interval '31 days' where id = '${app_verification.body.proof_id}'`);
 
     // Carbon B: dm ends B's sign-in; nothing touches B's proof afterwards.
     const b = await signInToApp(ctx, "dm");
     const tokensB = await appTokens(env, "dm", b.uuid);
-    const issuedB = await issueObo(ctx, "dm", tokensB.access_token, { receiving_app: "briefcase", scopes: ["pp.sweep.sign-in-ended"] });
+    const issuedB = await issueUserVerification(ctx, "dm", tokensB.access_token, { receiving_app: "briefcase", scopes: ["pp.sweep.sign-in-ended"] });
     if (issuedB.status !== 201) throw new Error(`issuing B's proof answered ${issuedB.status} ${short(issuedB.body)}`);
     const signInEnded = issuedB.body;
     const signOut = await api<unknown>(ctx, "/v1/oauth/revoke", {
@@ -87,7 +87,7 @@ export const journey: Journey = {
     // What the other proofs look like before the sweep.
     results.check("the proof tokens moved 25 h and 23 h into the past are exactly invalid", isExactlyInvalid((await verifyAs(ctx, "briefcase", staleToken.proof_token)).body) && isExactlyInvalid((await verifyAs(ctx, "briefcase", recentToken.proof_token)).body));
     results.check("the live proof's first and current proof tokens both verify", (await verifyAs(ctx, "briefcase", live.proof_token)).body.valid === true && (await verifyAs(ctx, "briefcase", refreshed.body.proof_token)).body.valid === true);
-    const ids = [live, staleToken, recentToken, endedLongAgo, endedRecently, ata.body, signInEnded].map(p => p.proof_id);
+    const ids = [live, staleToken, recentToken, endedLongAgo, endedRecently, app_verification.body, signInEnded].map(p => p.proof_id);
     const counts = await sql(env, `select family_id, count(*) from proof_tokens where family_id in (${ids.map(id => `'${id}'`).join(", ")}) group by family_id`);
     const tokensBefore = Object.fromEntries(ids.map(id => [id, Number(counts.find(([family_id]) => family_id === id)?.[1] ?? 0)]));
     results.check("every one of these proofs still has its tokens (2 each; 4 for the live proof refreshed once)", ids.every(id => tokensBefore[id] === (id === live.proof_id ? 4 : 2)), JSON.stringify(tokensBefore));
@@ -110,7 +110,7 @@ export const journey: Journey = {
       recentToken,
       endedLongAgo,
       endedRecently,
-      ataExpiredLongAgo: ata.body,
+      ataExpiredLongAgo: app_verification.body,
       signInEnded,
       tokensBefore,
     } satisfies SweepSetup;

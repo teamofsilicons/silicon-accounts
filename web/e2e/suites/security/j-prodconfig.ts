@@ -262,7 +262,7 @@ const developerSite: Journey = {
       ];
       const passed: string[] = [];
       for (const [label, origin] of writes) {
-        const reply = await call(`${url}/api/accounts/apps/pixel-studio/proofs/ata`, { json: { receiving_app: "remind" }, headers: { cookie: `__Host-sa_dev_session=${sealed}` }, origin });
+        const reply = await call(`${url}/api/accounts/apps/pixel-studio/proofs/app-verification`, { json: { receiving_app: "remind" }, headers: { cookie: `__Host-sa_dev_session=${sealed}` }, origin });
         if (reply.status !== 403 || errorOf(reply).code !== "cross_site_request") passed.push(`${label}: ${brief(reply)}`);
       }
       const own = await call(`${url}/api/accounts/apps/pixel-studio/signin-config`, { method: "PATCH", json: { allowed_email_domains: "not-a-list" }, headers: { cookie: `__Host-sa_dev_session=${sealed}`, "sec-fetch-site": "same-origin" }, origin: publicUrl });

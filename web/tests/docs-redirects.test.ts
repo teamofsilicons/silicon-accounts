@@ -12,7 +12,7 @@ const cases = [
   ["/docs/", "/docs"],
   ["/docs/start/add-sign-in", "/docs/accounts/start/add-sign-in"],
   ["/docs/reference/api/apps", "/docs/accounts/reference/api/apps"],
-  ["/docs/start/ata.md", "/docs/accounts/start/ata.md"],
+  ["/docs/start/app-verification.md", "/docs/accounts/start/app-verification.md"],
   ["/docs/index.md", "/docs/accounts/index.md"],
   ["/docs.md", "/docs/accounts/index.md"],
   ["/docs/no-such-page", "/docs/accounts/no-such-page"],
@@ -37,10 +37,10 @@ test("legacy documentation permanently redirects using the service's developer o
         assert.equal(response.headers.has("set-cookie"), false);
       }
     }
-    const request = new NextRequest("https://accounts.example.test/docs/start/ata?return_to=https%3A%2F%2Fevil.invalid", {
+    const request = new NextRequest("https://accounts.example.test/docs/start/app-verification?return_to=https%3A%2F%2Fevil.invalid", {
       headers: { "x-forwarded-host": "evil.invalid", rsc: "1", "next-router-prefetch": "1" },
     });
-    assert.equal((await proxy(request)).headers.get("location"), "https://developers.example.test/portal/docs/accounts/start/ata?return_to=https%3A%2F%2Fevil.invalid");
+    assert.equal((await proxy(request)).headers.get("location"), "https://developers.example.test/portal/docs/accounts/start/app-verification?return_to=https%3A%2F%2Fevil.invalid");
   } finally {
     globalThis.fetch = originalFetch;
   }

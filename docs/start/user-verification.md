@@ -6,7 +6,7 @@ order: 41
 related:
   - start/verify-a-proof.md
   - learn/proofs.md
-  - start/ata.md
+  - start/app-verification.md
   - start/webhooks.md
   - reference/api/proofs.md
 ---
@@ -21,9 +21,9 @@ In this example, DM is the **issuing app** and Briefcase is the **receiving app*
 
 ```bash
 curl -s -u "dm:$DM_APP_SECRET" \
-  -X POST https://accounts.teamofsilicons.com/v1/proofs/obo \
+  -X POST https://accounts.teamofsilicons.com/v1/proofs/user-verification \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: obo-save-file-42" \
+  -H "Idempotency-Key: user_verification-save-file-42" \
   -d '{
     "subject_token": "'"$ACCESS_TOKEN"'",
     "receiving_app": "briefcase",
@@ -38,7 +38,7 @@ curl -s -u "dm:$DM_APP_SECRET" \
 {
   "expires_at": "2026-10-07T02:43:13.274Z",
   "issuing_app": "dm",
-  "kind": "obo",
+  "kind": "user_verification",
   "proof_id": "01a11435-333a-725d-bb0e-75adde136703",
   "proof_refresh_token": "sapr_i4mi1RhAyCA0lC2A2y09yuftwYQheM5rusxeBeo0IZg",
   "proof_token": "sap_OMGtGwcBe5QgGJng3SIp0yGOh1nxefxCufefPXqr7dk",
@@ -68,7 +68,7 @@ Every response on this page is real, from a local Silicon Accounts stack. There,
 
 ## 1. Issue the proof
 
-`POST /v1/proofs/obo`, authenticated as your app (`Authorization: Basic base64(app_id:app_secret)`).
+`POST /v1/proofs/user-verification`, authenticated as your app (`Authorization: Basic base64(app_id:app_secret)`).
 
 | field | required | rules |
 |---|---|---|
@@ -84,7 +84,7 @@ The answer:
 | field | what it is |
 |---|---|
 | `proof_id` | The proof. Revoke and find it with this id. |
-| `kind` | `obo` |
+| `kind` | `user_verification` |
 | `proof_token` | `sap_…`: what you send to the receiving app. |
 | `expires_at` | When this `proof_token` stops verifying. |
 | `proof_refresh_token` | `sapr_…`: keep it secret, on your side only. It gets you the next proof token. |
@@ -118,7 +118,7 @@ curl -s -u "dm:$DM_APP_SECRET" \
 {
   "expires_at": "2026-10-07T02:39:03.864Z",
   "issuing_app": "dm",
-  "kind": "obo",
+  "kind": "user_verification",
   "proof_id": "01a11435-333a-725d-bb0e-75adde136703",
   "proof_refresh_token": "sapr_5AtMMvORp7DLyrDA7k-pdjxqmr0wA4PJdQPbDZR-npg",
   "proof_token": "sap_8q8BBqlAwMIOOpiFwMpTFnMpyKnFJpoPY3xh_jMDT78",
@@ -162,11 +162,11 @@ Stop using those proofs. Once the account signs into your app again, you hold a 
 
 ## List the proofs
 
-Your app's proofs, newest first (`kind`: `obo` or `ata`; `status`: `active`, `revoked` or `expired`; `limit`; `cursor` from `next_cursor`):
+Your app's proofs, newest first (`kind`: `user_verification` or `app_verification`; `status`: `active`, `revoked` or `expired`; `limit`; `cursor` from `next_cursor`):
 
 ```bash
 curl -s -u "dm:$DM_APP_SECRET" \
-  "https://accounts.teamofsilicons.com/v1/apps/dm/proofs?kind=obo&limit=1"
+  "https://accounts.teamofsilicons.com/v1/apps/dm/proofs?kind=user_verification&limit=1"
 ```
 
 ```json
@@ -174,7 +174,7 @@ curl -s -u "dm:$DM_APP_SECRET" \
   "items": [
     {
       "proof_id": "01a1144b-6e12-72f3-add0-76520b24d57d",
-      "kind": "obo",
+      "kind": "user_verification",
       "receiving_app": "briefcase",
       "user": {
         "uuid": "eiy",
@@ -243,11 +243,11 @@ async function accounts(path: string, body: unknown, idempotencyKey?: string) {
 }
 
 /** Gets a proof that dm may act at briefcase for the account behind `subjectToken`. */
-export async function issueObo(subjectToken: string, requestId: string) {
+export async function issueUserVerification(subjectToken: string, requestId: string) {
   return accounts(
-    "/v1/proofs/obo",
+    "/v1/proofs/user-verification",
     { subject_token: subjectToken, receiving_app: "briefcase", scopes: ["files.write"], access_ttl_seconds: 600 },
-    `obo-${requestId}`, // the same key on a retry returns the same proof instead of a second one
+    `user_verification-${requestId}`, // the same key on a retry returns the same proof instead of a second one
   );
 }
 
@@ -263,7 +263,7 @@ export async function refreshProof(proofRefreshToken: string) {
 Then send the proof token with your call:
 
 ```ts
-const proof = await issueObo(accessToken, requestId);
+const proof = await issueUserVerification(accessToken, requestId);
 await fetch("https://briefcase.example/api/files", {
   method: "POST",
   headers: { authorization: `Proof ${proof.proof_token}`, "content-type": "application/json" },
@@ -271,12 +271,12 @@ await fetch("https://briefcase.example/api/files", {
 });
 ```
 
-Run against the local stack: a retried `issueObo` with the same request id returned the same `proof_id`; the receiving endpoint from [Verify a proof](verify-a-proof.md#in-typescript) answered `201` before and after a refresh; a retried `refreshProof` returned the identical new refresh token; and presenting the used refresh token without that key answered `400 proof_refresh_token_reused`, after which the endpoint answered `403`.
+Run against the local stack: a retried `issueUserVerification` with the same request id returned the same `proof_id`; the receiving endpoint from [Verify a proof](verify-a-proof.md#in-typescript) answered `201` before and after a refresh; a retried `refreshProof` returned the identical new refresh token; and presenting the used refresh token without that key answered `400 proof_refresh_token_reused`, after which the endpoint answered `403`.
 
 ## In Rust
 
 ```rust
-use silicon_accounts_client::{AccountsClient, IssueObo, ProofRef};
+use silicon_accounts_client::{AccountsClient, IssueUserVerification, ProofRef};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -286,14 +286,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. Trade the account's access token at dm for a proof that briefcase can verify.
     let proof = dm
-        .issue_obo(
-            &IssueObo {
+        .issue_user_verification(
+            &IssueUserVerification {
                 subject_token: std::env::var("SUBJECT_TOKEN")?, // the account's access token at dm
                 receiving_app: "briefcase".into(),
                 scopes: vec!["files.write".into()],
                 access_ttl_seconds: Some(600),
             },
-            Some("obo-save-file-7f3a"), // a retry with this key returns this same proof
+            Some("user_verification-save-file-7f3a"), // a retry with this key returns this same proof
         )
         .await?;
     println!("send `Authorization: Proof {}` to briefcase", proof.proof_token.expose());
@@ -332,7 +332,7 @@ App commands take the app's credentials from `--app-id` and `--app-secret-stdin`
 
 ```
 $ export ACCOUNTS_APP_ID=dm ACCOUNTS_APP_SECRET=…
-$ printf '%s' "$ACCESS_TOKEN" | accounts app proof obo --subject-token - --to briefcase --scope files.write --ttl 600
+$ printf '%s' "$ACCESS_TOKEN" | accounts app proof user-verification --subject-token - --to briefcase --scope files.write --ttl 600
 User verification proof 01a1143d-7cf0-72cb-a6aa-92936511127a from dm for briefcase on behalf of si:scout_two (8HV).
 proof token    sap_b-W-7LIru72TQVEMyH_9LikGdngf7TdEcGEupmQmI0o
 expires        2026-10-07T02:52:16Z (in 9m)
@@ -341,10 +341,10 @@ refresh until  2029-03-25T02:42:16Z (in 899d)
 scopes         files.write
 $ accounts app proof refresh sapr_LkCj5s0_zZDrJTnHIAQpGAzP0ulTCBcMWzNO2m6B0zc --ttl 900
 $ accounts app proof revoke 01a1143d-7cf0-72cb-a6aa-92936511127a
-$ accounts app proof list --kind obo
+$ accounts app proof list --kind user_verification
 ```
 
-`--scope` repeats; `--json` prints the service's answer; `accounts app proof revoke` also takes `--token` or `--refresh-token` instead of the id. `obo` sends a random `Idempotency-Key` unless you pass `--idempotency-key`.
+`--scope` repeats; `--json` prints the service's answer; `accounts app proof revoke` also takes `--token` or `--refresh-token` instead of the id. `user_verification` sends a random `Idempotency-Key` unless you pass `--idempotency-key`.
 
 ## Errors
 
@@ -375,6 +375,6 @@ App authentication errors (`401 app_credentials_required`, `401 invalid_app_cred
 
 - [Verify a proof](verify-a-proof.md): the receiving app's side.
 - [How proofs work](../learn/proofs.md): why the proof stands on the sign-in, why refresh tokens rotate, and what each end means.
-- [Prove your app to other apps (App verification)](ata.md): when no account is involved.
+- [Prove your app to other apps (App verification)](app-verification.md): when no account is involved.
 - [Receive webhooks](webhooks.md): how you learn that an account's grant ended.
 - [Proofs API reference](../reference/api/proofs.md): every proof endpoint, field and error.

@@ -1,6 +1,6 @@
 // App mode of the CLI, with the app's credentials and as the app's owner: app details and sign-in
 // setup (patch, conflicts, validation, history), code exchange, users, introspect/verify/userinfo,
-// refresh, OBO/ATA proofs, webhooks (test, deliveries, replay, rotate, set), imports, revoke.
+// refresh, User verification/App verification proofs, webhooks (test, deliveries, replay, rotate, set), imports, revoke.
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import {
@@ -58,15 +58,15 @@ await run('app lookup <uuid>', home, ['app', 'lookup', uuid], (r) => r.json?.uui
 section('proofs');
 const dmEnv = { ACCOUNTS_APP_ID: 'dm', ACCOUNTS_APP_SECRET: fakeApp('dm').secret };
 const dmHome = newHome('app-dm');
-const obo = await run('app proof obo --to dm', home, ['app', 'proof', 'obo', '--subject-token', rt.json?.access_token, '--to', 'dm', '--scope', 'files.read', '--ttl', '600'], (r) => /^sap_/.test(r.json?.proof_token ?? '') && r.json?.user?.uuid === uuid);
-await run('app proof verify as dm (the audience) → exit 0', dmHome, ['app', 'proof', 'verify', obo.json?.proof_token], (r) => r.code === 0 && r.json?.valid === true, { env: dmEnv });
-await run('app proof verify as briefcase (not the audience) → exit 2 {valid:false, expires_at:null}', home, ['app', 'proof', 'verify', obo.json?.proof_token], (r) => r.code === 2 && r.json?.valid === false && r.json?.expires_at === null);
-const pr = await run('app proof refresh', home, ['app', 'proof', 'refresh', obo.json?.proof_refresh_token], (r) => /^sap_/.test(r.json?.proof_token ?? ''));
-await run('app proof list --kind obo', home, ['app', 'proof', 'list', '--kind', 'obo'], (r) => (r.json?.items ?? []).some((p: any) => p.proof_id === obo.json?.proof_id && p.status === 'active'));
-await run('app proof revoke <id>', home, ['app', 'proof', 'revoke', obo.json?.proof_id]);
+const user_verification = await run('app proof user-verification --to dm', home, ['app', 'proof', 'user_verification', '--subject-token', rt.json?.access_token, '--to', 'dm', '--scope', 'files.read', '--ttl', '600'], (r) => /^sap_/.test(r.json?.proof_token ?? '') && r.json?.user?.uuid === uuid);
+await run('app proof verify as dm (the audience) → exit 0', dmHome, ['app', 'proof', 'verify', user_verification.json?.proof_token], (r) => r.code === 0 && r.json?.valid === true, { env: dmEnv });
+await run('app proof verify as briefcase (not the audience) → exit 2 {valid:false, expires_at:null}', home, ['app', 'proof', 'verify', user_verification.json?.proof_token], (r) => r.code === 2 && r.json?.valid === false && r.json?.expires_at === null);
+const pr = await run('app proof refresh', home, ['app', 'proof', 'refresh', user_verification.json?.proof_refresh_token], (r) => /^sap_/.test(r.json?.proof_token ?? ''));
+await run('app proof list --kind user_verification', home, ['app', 'proof', 'list', '--kind', 'user_verification'], (r) => (r.json?.items ?? []).some((p: any) => p.proof_id === user_verification.json?.proof_id && p.status === 'active'));
+await run('app proof revoke <id>', home, ['app', 'proof', 'revoke', user_verification.json?.proof_id]);
 await run('verify after revoke → exit 2', dmHome, ['app', 'proof', 'verify', pr.json?.proof_token], (r) => r.code === 2, { env: dmEnv });
-const ata = await run('app proof ata --to remind,waveform', home, ['app', 'proof', 'ata', '--to', 'remind,waveform'], (r) => /^sap_/.test(r.json?.proof_token ?? ''));
-await run('app proof revoke --token', home, ['app', 'proof', 'revoke', '--token', ata.json?.proof_token]);
+const app_verification = await run('app proof app-verification --to remind,waveform', home, ['app', 'proof', 'app_verification', '--to', 'remind,waveform'], (r) => /^sap_/.test(r.json?.proof_token ?? ''));
+await run('app proof revoke --token', home, ['app', 'proof', 'revoke', '--token', app_verification.json?.proof_token]);
 
 section('webhooks');
 await run('app webhook test', home, ['app', 'webhook', 'test'], (r) => typeof r.json?.event_id === 'string');
@@ -105,7 +105,7 @@ section("owner mode: c:saket manages briefcase with a session, not the secret");
   await run('app show --app-id briefcase', ho, ['app', 'show', '--app-id', 'briefcase'], (r) => r.json?.app_id === 'briefcase' && r.json?.acting_as !== undefined);
   await run('app users --app-id briefcase', ho, ['app', 'users', '--app-id', 'briefcase', '--limit', '3']);
   await run('app webhook deliveries --app-id briefcase', ho, ['app', 'webhook', 'deliveries', '--app-id', 'briefcase', '--limit', '2']);
-  await run('app proof ata as owner (the ATA page)', ho, ['app', 'proof', 'ata', '--app-id', 'briefcase', '--to', 'dm'], (r) => /^sap_/.test(r.json?.proof_token ?? ''));
+  await run('app proof app-verification as owner (the App verification page)', ho, ['app', 'proof', 'app_verification', '--app-id', 'briefcase', '--to', 'dm'], (r) => /^sap_/.test(r.json?.proof_token ?? ''));
   await run("someone else's app → exit 3 not_app_owner", ho, ['app', 'show', '--app-id', 'acme-notes'], (r) => r.code === 3 && r.json?.error?.code === 'not_app_owner');
 }
 

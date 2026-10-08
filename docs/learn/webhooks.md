@@ -6,7 +6,7 @@ order: 50
 related:
   - start/webhooks.md
   - learn/proofs.md
-  - start/obo.md
+  - start/user-verification.md
   - reference/api/webhooks.md
 ---
 
@@ -590,5 +590,5 @@ The Silicon (or its custodian) asked for a test: `"app_id": null`, `"silicon": "
 
 - [Receive webhooks](../start/webhooks.md): set the endpoint, verify signatures in Node.js, Web Crypto and Rust, replay.
 - [How proofs work](proofs.md): the User verification proofs that end with `membership.signed_out`, `membership.access_removed` and `account.deleted`.
-- [Act for an account at another app (User verification)](../start/obo.md).
+- [Act for an account at another app (User verification)](../start/user-verification.md).
 - [Webhooks reference](../reference/api/webhooks.md): headers, body and every event type in one place.

@@ -40,7 +40,7 @@ export const DEVELOPER_TAB_LABELS: Record<AppTab, string> = {
   users: "Users",
   import: "Import",
   webhooks: "Webhooks",
-  ata: "App verification",
+  "app-verification": "App verification",
   embed: "Embed",
 };
 

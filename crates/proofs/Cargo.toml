@@ -1,6 +1,6 @@
 [package]
 name = "silicon-accounts-proofs"
-description = "Silicon Accounts service: OBO and ATA proofs (issue, refresh, verify, revoke, listings)"
+description = "Silicon Accounts service: User verification and App verification proofs (issue, refresh, verify, revoke, listings)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -7,9 +7,9 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use silicon_accounts_client::{
     AppClient, AppDetails, DeliveriesQuery, DeliveryDetail, ImportInput, ImportJob, ImportOptions,
-    ImportRowsQuery, IssueAta, IssueObo, MAX_IMPORT_BYTES, Page, PageRequest, ProofRef,
-    ProofVerification, ProofsQuery, ReplayRequest, ReplayResult, UsersQuery, WaitEvent,
-    WaitOptions, WebhookDelivery,
+    ImportRowsQuery, IssueAppVerification, IssueUserVerification, MAX_IMPORT_BYTES, Page,
+    PageRequest, ProofRef, ProofVerification, ProofsQuery, ReplayRequest, ReplayResult, UsersQuery,
+    WaitEvent, WaitOptions, WebhookDelivery,
 };
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
@@ -1051,8 +1051,8 @@ async fn app_jwks(app: &AppClient<'_>) -> CliResult<silicon_accounts_client::Jwk
 
 fn verification_name(kind: &str) -> &str {
     match kind {
-        "ata" => "App verification",
-        "obo" => "User verification",
+        "app_verification" => "App verification",
+        "user_verification" => "User verification",
         other => other,
     }
 }
@@ -1093,7 +1093,7 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
         )
     };
     match command {
-        ProofCommand::Obo {
+        ProofCommand::UserVerification {
             subject_token,
             to,
             scopes,
@@ -1101,16 +1101,18 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
             idempotency_key,
         } => {
             let subject_token = util::arg_or_stdin(&subject_token, "the subject token")?;
-            let request = IssueObo {
+            let request = IssueUserVerification {
                 subject_token,
                 receiving_app: to,
                 scopes,
                 access_ttl_seconds: ttl,
             };
             let key = idempotency_key.unwrap_or_else(util::idempotency_key);
-            Ok(issued_outcome(app.issue_obo(&request, Some(&key)).await?))
+            Ok(issued_outcome(
+                app.issue_user_verification(&request, Some(&key)).await?,
+            ))
         }
-        ProofCommand::Ata {
+        ProofCommand::AppVerification {
             to,
             scopes,
             ttl,
@@ -1125,11 +1127,11 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
             if several.len() > 1 {
                 let commands: Vec<String> = several
                     .iter()
-                    .map(|a| format!("accounts app proof ata --to {a}"))
+                    .map(|a| format!("accounts app proof app-verification --to {a}"))
                     .collect();
                 return Err(CliError::invalid(
                     format!(
-                        "An App verification proof is for exactly one app, but --to names {}: {}.",
+                        "An app verification proof is for exactly one app, but --to names {}: {}.",
                         several.len(),
                         several.join(", ")
                     ),
@@ -1139,13 +1141,15 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
                     ),
                 ));
             }
-            let request = IssueAta {
+            let request = IssueAppVerification {
                 receiving_app,
                 scopes,
                 access_ttl_seconds: ttl,
             };
             let key = idempotency_key.unwrap_or_else(util::idempotency_key);
-            Ok(issued_outcome(app.issue_ata(&request, Some(&key)).await?))
+            Ok(issued_outcome(
+                app.issue_app_verification(&request, Some(&key)).await?,
+            ))
         }
         ProofCommand::Verify { token } => {
             let token = util::arg_or_stdin(&token, "the proof token")?;

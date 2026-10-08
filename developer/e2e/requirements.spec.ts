@@ -499,5 +499,5 @@ test("online docs include a concrete publishing path and explain state and updat
   await page.goto("/docs/apps/learn/releases-and-updates");
   await expect(page.getByText(/An exact version selects the initial release/)).toBeVisible();
   await page.goto("/docs/apps/start/install");
-  await expect(page.getByText(/Saving a home does not migrate files/)).toBeVisible();
+  await expect(page.getByText(/Changing the saved home does not move your existing files/)).toBeVisible();
 });

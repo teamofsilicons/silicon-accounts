@@ -10,7 +10,7 @@ use crate::common::{World, invalid, proof_id, refresh_token, token};
 async fn the_issuing_app_revokes_by_id_token_or_refresh_token() {
     let w = World::new().await;
     for by in ["proof_id", "proof_token", "proof_refresh_token"] {
-        let p = w.issue_obo().await;
+        let p = w.issue_user_verification().await;
         let value = match by {
             "proof_id" => proof_id(&p),
             "proof_token" => token(&p),
@@ -58,7 +58,7 @@ async fn the_issuing_app_revokes_by_id_token_or_refresh_token() {
 #[tokio::test]
 async fn revoke_refusals_are_precise() {
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
 
     // Another app: by id it looks unknown (no existence leak), by token it is named.
     let r = w
@@ -217,7 +217,7 @@ async fn the_app_page_revokes_for_the_app_or_its_owner() {
         .await;
     let cookie = w.ctx.browser_session(&owner).await;
 
-    let p1 = w.issue_obo().await;
+    let p1 = w.issue_user_verification().await;
     let r = w
         .call(
             Req::delete(&format!(
@@ -238,7 +238,7 @@ async fn the_app_page_revokes_for_the_app_or_its_owner() {
         .await;
     assert_eq!(row, Some(format!("{}/revoked_by_owner", owner.uuid)));
 
-    let p2 = w.issue_obo().await;
+    let p2 = w.issue_user_verification().await;
     let r = w
         .call(
             Req::delete(&format!(
@@ -254,7 +254,7 @@ async fn the_app_page_revokes_for_the_app_or_its_owner() {
 
     // A proof of another app through this app's page → 404; another app's credentials → 403.
     let a = w
-        .ata_as(
+        .app_verification_as(
             &w.other,
             &w.other_secret,
             json!({"receiving_app": w.briefcase.app_id}),
@@ -296,10 +296,10 @@ async fn the_app_page_revokes_for_the_app_or_its_owner() {
 #[tokio::test]
 async fn an_account_revokes_proofs_issued_on_its_behalf() {
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let cookie = w.ctx.browser_session(&w.carbon).await;
 
-    // Someone else can't (404, no existence leak), and an ATA proof is never "mine".
+    // Someone else can't (404, no existence leak), and an app verification proof is never "mine".
     let stranger = w.ctx.carbon().await;
     let fp = w.ctx.first_party_tokens(&stranger).await;
     let r = w
@@ -307,24 +307,27 @@ async fn an_account_revokes_proofs_issued_on_its_behalf() {
         .await;
     assert_eq!(r.status, 404);
     assert_eq!(r.error_code(), Some("proof_not_found"));
-    let ata = w
-        .ata_as(
+    let app_verification = w
+        .app_verification_as(
             &w.dm,
             &w.dm_secret,
             json!({"receiving_app": w.briefcase.app_id}),
         )
         .await;
-    assert_eq!(ata.status, 201);
+    assert_eq!(app_verification.status, 201);
     let r = w
         .call(
-            Req::delete(&format!("/v1/me/proofs/{}", proof_id(&ata.json)))
-                .session(&w.ctx.state.settings, &cookie),
+            Req::delete(&format!(
+                "/v1/me/proofs/{}",
+                proof_id(&app_verification.json)
+            ))
+            .session(&w.ctx.state.settings, &cookie),
         )
         .await;
     assert_eq!(r.status, 404, "{}", r.json);
     assert_eq!(r.error_code(), Some("proof_not_found"));
     assert_eq!(
-        w.verify_bc(&token(&ata.json)).await["valid"],
+        w.verify_bc(&token(&app_verification.json)).await["valid"],
         true,
         "untouched"
     );

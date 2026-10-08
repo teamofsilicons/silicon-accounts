@@ -19,10 +19,10 @@ async fn grant_type_is_required_and_must_be_supported() {
     assert_oauth_error(&r, 400, "invalid_request", "grant_type is required");
     for (grant, mentions) in [
         ("password", "/authorize"),
-        ("client_credentials", "/v1/proofs/ata"),
+        ("client_credentials", "/v1/proofs/app-verification"),
         (
             "urn:ietf:params:oauth:grant-type:token-exchange",
-            "/v1/proofs/obo",
+            "/v1/proofs/user-verification",
         ),
         ("implicit", "PKCE"),
         ("magic", "'magic' is not supported"),

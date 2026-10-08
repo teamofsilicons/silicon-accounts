@@ -161,7 +161,7 @@ pub struct AccessRemoved {
 }
 
 /// Removes an app's access to an account: membership `access_removed`, the app's token families
-/// for the account revoked (`access_removed`), and OBO proofs that app issued about the account
+/// for the account revoked (`access_removed`), and User verification proofs that app issued about the account
 /// revoked (by `actor`, each with a `proof.revoked` audit entry). Emit
 /// `events::membership_access_removed` after. Error: 404 `membership_not_found`.
 pub async fn remove_access(

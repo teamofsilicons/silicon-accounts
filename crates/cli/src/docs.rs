@@ -62,7 +62,8 @@ pub fn find(topic: &str) -> Option<(&'static str, &'static str)> {
         "silicon" | "stk" => "silicons",
         "custodian" | "transfer" => "custodians",
         "app" | "sign-in" | "signin" | "oauth" | "tokens" => "apps",
-        "proof" | "obo" | "ata" | "app-verification" | "user-verification" => "proofs",
+        "proof" | "user_verification" | "app_verification" | "app-verification"
+        | "user-verification" => "proofs",
         "webhook" | "events" => "webhooks",
         "import" => "imports",
         "id" | "uuid" | "identifiers" => "ids",
@@ -113,7 +114,12 @@ mod tests {
             }
         }
         assert_eq!(find("silicon").map(|(n, _)| n), Some("silicons"));
-        for alias in ["ATA", "OBO", "App verification", "User verification"] {
+        for alias in [
+            "App verification",
+            "User verification",
+            "App verification",
+            "User verification",
+        ] {
             assert_eq!(find(alias).map(|(n, _)| n), Some("proofs"));
         }
         assert!(find("nope").is_none());

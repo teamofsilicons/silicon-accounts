@@ -5,7 +5,7 @@
  *
  * One key belongs to one action with one input: a person who presses "Create" again after a lost answer sends the same
  * key, so the server replays its stored answer instead of creating twice. The key changes only when the input changes
- * or the action succeeded (the review of the Solid build found fresh keys per click turning a retry into a second ATA
+ * or the action succeeded (the review of the Solid build found fresh keys per click turning a retry into a second App verification
  * proof). The idempotent mutation hooks in lib/query use this; reach for it directly for custom calls:
  *
  *   const keys = useIdempotencyKey();

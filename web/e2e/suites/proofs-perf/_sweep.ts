@@ -115,9 +115,9 @@ export type SweepSetup =
       /** Revoked by dm, 31 days ago (every token deleted) and 29 days ago (kept). */
       endedLongAgo: IssuedProof;
       endedRecently: IssuedProof;
-      /** An ATA proof (commit → remind) whose 900-day lifetime ended 31 days ago (every token deleted). */
+      /** An app verification proof (commit → remind) whose 900-day lifetime ended 31 days ago (every token deleted). */
       ataExpiredLongAgo: IssuedProof;
-      /** B's OBO proof on the sign-in dm ended: invalid at once, its end stored by nobody but the sweep. */
+      /** B's User verification proof on the sign-in dm ended: invalid at once, its end stored by nobody but the sweep. */
       signInEnded: IssuedProof;
       /** proof_tokens rows per proof right after the setup. */
       tokensBefore: Record<string, number>;

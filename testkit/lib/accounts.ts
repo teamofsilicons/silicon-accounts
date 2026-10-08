@@ -241,13 +241,13 @@ export class AppApi {
 
   // -- proofs
 
-  issueObo(body: { subject_token: string; receiving_app: string; scopes?: string[]; access_ttl_seconds?: number }, idempotencyKey: string = randomUUID()): Promise<HttpResponse<ProofIssued>> {
-    return this.request<ProofIssued>('POST', '/v1/proofs/obo', { json: body, idempotencyKey });
+  issueUserVerification(body: { subject_token: string; receiving_app: string; scopes?: string[]; access_ttl_seconds?: number }, idempotencyKey: string = randomUUID()): Promise<HttpResponse<ProofIssued>> {
+    return this.request<ProofIssued>('POST', '/v1/proofs/user-verification', { json: body, idempotencyKey });
   }
 
-  /** An ATA proof is for exactly one app: make one proof per receiving app. */
-  issueAta(body: { receiving_app: string; scopes?: string[]; access_ttl_seconds?: number }, idempotencyKey: string = randomUUID()): Promise<HttpResponse<ProofIssued>> {
-    return this.request<ProofIssued>('POST', '/v1/proofs/ata', { json: body, idempotencyKey });
+  /** An app verification proof is for exactly one app: make one proof per receiving app. */
+  issueAppVerification(body: { receiving_app: string; scopes?: string[]; access_ttl_seconds?: number }, idempotencyKey: string = randomUUID()): Promise<HttpResponse<ProofIssued>> {
+    return this.request<ProofIssued>('POST', '/v1/proofs/app-verification', { json: body, idempotencyKey });
   }
 
   refreshProof(proofRefreshToken: string, accessTtlSeconds?: number): Promise<HttpResponse<ProofIssued>> {
@@ -262,7 +262,7 @@ export class AppApi {
     return this.request('POST', '/v1/proofs/revoke', { json: body });
   }
 
-  async proofs(query: { kind?: 'obo' | 'ata'; status?: 'active' | 'revoked'; limit?: number; cursor?: string } = {}): Promise<Page<Record<string, unknown>>> {
+  async proofs(query: { kind?: 'user_verification' | 'app_verification'; status?: 'active' | 'revoked'; limit?: number; cursor?: string } = {}): Promise<Page<Record<string, unknown>>> {
     return expectStatus(await this.request<Page<Record<string, unknown>>>('GET', this.path('/proofs'), { query }), 200).body;
   }
 

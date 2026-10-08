@@ -12,7 +12,7 @@ const appIdOf = (value: unknown) => (typeof value === "string" ? value : value &
 
 export const journey: Journey = {
   name: "j-developer",
-  title: "the developer site as an app's owner: signed in through its BFF, the apps they own, a sign-in title saved on the Pages tab and shown by the hosted page at once, an ATA proof made for exactly one app on the ATA tab (verified by it, refused to another, revoked there), signing out of the developer site only",
+  title: "the developer site as an app's owner: signed in through its BFF, the apps they own, a sign-in title saved on the Pages tab and shown by the hosted page at once, an app verification proof made for exactly one app on the App verification tab (verified by it, refused to another, revoked there), signing out of the developer site only",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const context = await newContext(browser);
@@ -54,8 +54,8 @@ export const journey: Journey = {
     await save.click({ timeout: 10_000 });
     await save.waitFor({ state: "detached", timeout: 20_000 });
 
-    // The ATA tab: a proof from commit for remind alone.
-    await page.goto(`${env.developer}/apps/commit/ata`);
+    // The App verification tab: a proof from commit for remind alone.
+    await page.goto(`${env.developer}/apps/commit/app-verification`);
     const receiver = page.getByRole("textbox", { name: "The app that receives it" });
     await receiver.waitFor({ timeout: 30_000 });
     await receiver.fill("remind");
@@ -67,21 +67,21 @@ export const journey: Journey = {
     await reveal.getByRole("button", { name: "Show the verification token" }).click();
     const token = (await reveal.locator("code[data-shown]").first().innerText()).trim();
     await sleep(400);
-    await shot(env, page, "j-03-ata-proof");
+    await shot(env, page, "j-03-app_verification-proof");
     results.check("Make the proof shows the proof token once", /^sap_/.test(token), token.slice(0, 12));
     const verified = await verifyProof(ctx, "remind", token);
     results.check("remind verifies it: issued by commit, for remind", verified.body.valid === true && appIdOf(verified.body.issuing_app) === "commit" && appIdOf(verified.body.receiving_app) === "remind", JSON.stringify(verified.body).slice(0, 200));
     const other = await verifyProof(ctx, "waveform", token);
     results.check("waveform is told {valid:false, expires_at:null}: the proof is for remind alone", other.body.valid === false && other.body.expires_at === null, JSON.stringify(other.body));
     await reveal.getByRole("button", { name: "I've stored them" }).click();
-    const proofs = async () => (await developerApi<{ items?: AppProof[] }>(env, page, "/apps/commit/proofs?kind=ata&limit=50")).body.items ?? [];
+    const proofs = async () => (await developerApi<{ items?: AppProof[] }>(env, page, "/apps/commit/proofs?kind=app_verification&limit=50")).body.items ?? [];
     const newest = (await proofs())[0];
-    results.check("the proof is listed with its one receiving app", newest?.kind === "ata" && appIdOf(newest.receiving_app) === "remind" && newest.status === "active", JSON.stringify(newest).slice(0, 200));
+    results.check("the proof is listed with its one receiving app", newest?.kind === "app_verification" && appIdOf(newest.receiving_app) === "remind" && newest.status === "active", JSON.stringify(newest).slice(0, 200));
     await page.getByRole("button", { name: "Revoke", exact: true }).first().click({ timeout: 15_000 });
     await page.getByRole("button", { name: "Revoke", exact: true }).first().click({ timeout: 10_000 });
     await sleep(1500);
     const revoked = (await proofs()).find(proof => proof.proof_id === newest?.proof_id);
-    results.check("Revoke on the ATA tab revokes it", revoked?.status === "revoked", String(revoked?.status));
+    results.check("Revoke on the App verification tab revokes it", revoked?.status === "revoked", String(revoked?.status));
     const after = await verifyProof(ctx, "remind", token);
     results.check("…and remind's verify then answers {valid:false, expires_at:null}", after.body.valid === false && after.body.expires_at === null, JSON.stringify(after.body));
 

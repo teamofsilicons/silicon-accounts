@@ -11,7 +11,7 @@
  * - X-Frame-Options DENY, nosniff, Referrer-Policy, and HSTS in production over https.
  *
  * An address under an app that names no tab (/apps/briefcase/bogus) is answered with the not-found page and a real 404;
- * the account site's old tab names (branding, proofs) redirect to their tabs here (pages, ata).
+ * the account site's old tab names (branding, proofs) redirect to their tabs here (pages, app_verification).
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { findPage, findPageByPath, isGroup } from "./lib/docs/content";
@@ -53,7 +53,7 @@ export function proxy(request: NextRequest) {
     target.pathname = target.pathname.replace(/^\/apps\/apps(?=\/|$)/, "/apps/silicon-apps");
     return NextResponse.redirect(target, 308);
   }
-  // The account site's old developer tabs (its /developer redirects keep their names): Branding is Pages, Proofs is ATA.
+  // The account site's old developer tabs (its /developer redirects keep their names): Branding is Pages, Proofs is App verification.
   const renamed = renamedAppTab(request.nextUrl.pathname);
   if (renamed) {
     const target = new URL(request.url);

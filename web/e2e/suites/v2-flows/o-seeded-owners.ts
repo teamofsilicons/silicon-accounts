@@ -1,7 +1,7 @@
 /**
  * The stack itself: every page a journey opens loads nothing from the internet (web/e2e/README.md "Mock Iris": every
  * account's default photo comes from the stack's mock Iris, ACCOUNTS_IRIS_BASE_URL). The fake apps' owners are seeded
- * by accounts-seed (scripts/dev.sh), and the developer site shows their photo once they sign in there (the ATA journey
+ * by accounts-seed (scripts/dev.sh), and the developer site shows their photo once they sign in there (the App verification journey
  * signs in as commit's owner), so their stored default photo must be the stack's Iris too.
  */
 import { readFileSync } from "node:fs";

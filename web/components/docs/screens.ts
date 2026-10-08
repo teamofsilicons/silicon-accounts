@@ -20,7 +20,7 @@ const scrollTo = (selector: string) => async (page: Page) => {
 };
 
 export const screens: ScreenSpec[] = [
-  { name: "docs-app-verification", path: "/docs/start/ata", as: "signed-out", fullPage: false },
+  { name: "docs-app-verification", path: "/docs/start/app-verification", as: "signed-out", fullPage: false },
   {
     name: "docs-verification-search", path: "/docs", as: "signed-out", fullPage: false,
     prepare: async page => {

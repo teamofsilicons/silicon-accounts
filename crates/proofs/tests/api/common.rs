@@ -25,7 +25,7 @@ pub struct World {
     /// An unrelated app.
     pub other: App,
     pub other_secret: String,
-    /// The Carbon's access token at dm (the OBO subject token).
+    /// The Carbon's access token at dm (the User verification subject token).
     pub subject_token: String,
     pub subject_refresh: String,
 }
@@ -60,18 +60,18 @@ impl World {
         self.ctx.call(accounts_proofs::router(), req).await
     }
 
-    /// `POST /v1/proofs/obo` as dm.
-    pub async fn obo(&self, body: Value) -> Resp {
+    /// `POST /v1/proofs/user-verification` as dm.
+    pub async fn user_verification(&self, body: Value) -> Resp {
         self.call(
-            Req::post("/v1/proofs/obo")
+            Req::post("/v1/proofs/user-verification")
                 .basic(&self.dm.app_id, &self.dm_secret)
                 .json(body),
         )
         .await
     }
 
-    /// The standard OBO body: the Carbon's dm token → briefcase, scope files.write.
-    pub fn obo_body(&self) -> Value {
+    /// The standard User verification body: the Carbon's dm token → briefcase, scope files.write.
+    pub fn user_verification_body(&self) -> Value {
         json!({
             "subject_token": self.subject_token,
             "receiving_app": self.briefcase.app_id,
@@ -79,26 +79,26 @@ impl World {
         })
     }
 
-    /// Issues the standard OBO proof (asserting 201) and returns the response body.
-    pub async fn issue_obo(&self) -> Value {
-        let r = self.obo(self.obo_body()).await;
+    /// Issues the standard User verification proof (asserting 201) and returns the response body.
+    pub async fn issue_user_verification(&self) -> Value {
+        let r = self.user_verification(self.user_verification_body()).await;
         assert_eq!(r.status, 201, "{}", r.json);
         r.json
     }
 
-    /// Issues an OBO proof with a given token lifetime.
-    pub async fn issue_obo_ttl(&self, ttl: i64) -> Value {
-        let mut body = self.obo_body();
+    /// Issues a user verification proof with a given token lifetime.
+    pub async fn issue_user_verification_ttl(&self, ttl: i64) -> Value {
+        let mut body = self.user_verification_body();
         body["access_ttl_seconds"] = json!(ttl);
-        let r = self.obo(body).await;
+        let r = self.user_verification(body).await;
         assert_eq!(r.status, 201, "{}", r.json);
         r.json
     }
 
-    /// `POST /v1/proofs/ata` as `app`.
-    pub async fn ata_as(&self, app: &App, secret: &str, body: Value) -> Resp {
+    /// `POST /v1/proofs/app-verification` as `app`.
+    pub async fn app_verification_as(&self, app: &App, secret: &str, body: Value) -> Resp {
         self.call(
-            Req::post("/v1/proofs/ata")
+            Req::post("/v1/proofs/app-verification")
                 .basic(&app.app_id, secret)
                 .json(body),
         )

@@ -100,7 +100,7 @@ export const journey: Journey = {
     const helpTopic = await local(["help", "proofs"]);
     const docsList = await local(["docs", "--json"]);
     const topics = ((docsList.json?.topics ?? []) as Json[]).map(entry => str(entry.topic));
-    results.check("`accounts help proofs` and `accounts docs --json` reach the bundled docs (10 topics)", helpTopic.code === 0 && /OBO|ATA/.test(helpTopic.stdout) && JSON.stringify(topics) === JSON.stringify(TOPICS), short(topics));
+    results.check("`accounts help proofs` and `accounts docs --json` reach the bundled docs (10 topics)", helpTopic.code === 0 && /User verification|App verification/.test(helpTopic.stdout) && JSON.stringify(topics) === JSON.stringify(TOPICS), short(topics));
     const silicons = await local(["docs", "silicons", "--json"]);
     results.check("`accounts docs silicons --json`: the guide on how a Silicon gets an account", silicons.code === 0 && silicons.json?.topic === "silicons" && /custodian/i.test(str(silicons.json?.content)) && /STK/.test(str(silicons.json?.content)), said(silicons));
     const unknownTopic = await local(["docs", "nonsense", "--json"]);

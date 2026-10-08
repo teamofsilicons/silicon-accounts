@@ -109,7 +109,7 @@ async fn deleting_an_account_removes_it_everywhere() {
     let proof = Uuid::now_v7();
     sqlx::query(
         "insert into proof_families (id, kind, issuing_app, audiences, account_uuid, access_ttl_seconds, expires_at) \
-         values ($1, 'obo', $2, '{other}', $3, 600, now() + interval '900 days')",
+         values ($1, 'user_verification', $2, '{other}', $3, 600, now() + interval '900 days')",
     )
     .bind(proof)
     .bind(&app)

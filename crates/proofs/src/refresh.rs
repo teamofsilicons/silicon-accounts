@@ -50,7 +50,7 @@ pub async fn refresh(
                 "The proof refresh token is not known: it is mistyped, it belongs to another environment, or its proof was revoked or expired more than {ENDED_PROOF_RETENTION_DAYS} days ago (every token of a proof is deleted then)."
             ),
         )
-        .hint("Send the proof_refresh_token (sapr_…) from the latest issue or refresh response of this proof. If the proof ended, issue a new one (POST /v1/proofs/obo or POST /v1/proofs/ata)."));
+        .hint("Send the proof_refresh_token (sapr_…) from the latest issue or refresh response of this proof. If the proof ended, issue a new one (POST /v1/proofs/user-verification or POST /v1/proofs/app-verification)."));
     };
     if token.kind != "refresh" {
         return Err(invalid_refresh(
@@ -103,12 +103,12 @@ pub async fn refresh(
         .detail("proof_id", proof_id)
         .detail("expires_at", format_rfc3339_ms(family.expires_at)));
     }
-    // The grant of an OBO proof is read before reuse detection: a proof whose sign-in was
+    // The grant of a user verification proof is read before reuse detection: a proof whose sign-in was
     // revoked already ended then (verification has refused it since), exactly like a stored
     // revocation above, whichever of its refresh tokens is presented.
     let grant = match kind {
-        ProofKind::Ata => None,
-        ProofKind::Obo => Some(store::grant_state(&mut tx, family.id).await?),
+        ProofKind::AppVerification => None,
+        ProofKind::UserVerification => Some(store::grant_state(&mut tx, family.id).await?),
     };
     if let Some(grant) = grant.as_ref().filter(|g| g.sign_in_revoked()) {
         // A revoked sign-in never comes back: store the proof's end now (the hourly sweep
@@ -226,14 +226,14 @@ pub async fn refresh(
 
 fn reissue_hint(kind: ProofKind) -> &'static str {
     match kind {
-        ProofKind::Obo => {
-            "Issue a new proof with POST /v1/proofs/obo (the account must still be signed into your app)."
+        ProofKind::UserVerification => {
+            "Issue a new proof with POST /v1/proofs/user-verification (the account must still be signed into your app)."
         }
-        ProofKind::Ata => "Issue a new proof with POST /v1/proofs/ata.",
+        ProofKind::AppVerification => "Issue a new proof with POST /v1/proofs/app-verification.",
     }
 }
 
-/// The account an OBO proof speaks for, for messages: its id, else its uuid.
+/// The account a user verification proof speaks for, for messages: its id, else its uuid.
 fn who(grant: &GrantState) -> String {
     grant
         .account_handle
@@ -242,7 +242,7 @@ fn who(grant: &GrantState) -> String {
         .unwrap_or_else(|| "the account".into())
 }
 
-/// 410 `proof_revoked` for an OBO proof whose grant ended (`details.reason`).
+/// 410 `proof_revoked` for a user verification proof whose grant ended (`details.reason`).
 fn grant_ended(
     grant: &GrantState,
     issuing_app: &str,
@@ -254,7 +254,7 @@ fn grant_ended(
     let who = who(grant);
     let mut e = ApiError::gone("proof_revoked", message)
         .hint(format!(
-            "User verifications end with the grant they were issued under. Once {who} signs into '{issuing_app}' again, issue a new proof with POST /v1/proofs/obo."
+            "User verifications end with the grant they were issued under. Once {who} signs into '{issuing_app}' again, issue a new proof with POST /v1/proofs/user-verification."
         ))
         .detail("proof_id", proof_id.to_string())
         .detail("reason", reason);
@@ -289,7 +289,7 @@ fn sign_in_revoked_error(grant: &GrantState, issuing_app: &str, proof_id: &str) 
     )
 }
 
-/// An OBO proof can only be refreshed while its grant lives: the account's sign-in at the
+/// A user verification proof can only be refreshed while its grant lives: the account's sign-in at the
 /// issuing app (not revoked, not expired), its membership with the issuing app (active) and the
 /// account itself (active). 410 `proof_revoked` / `proof_expired` otherwise.
 fn check_grant(grant: &GrantState, issuing_app: &str, proof_id: &str) -> Result<(), ApiError> {
@@ -337,7 +337,7 @@ fn check_grant(grant: &GrantState, issuing_app: &str, proof_id: &str) -> Result<
             ),
         )
         .hint(format!(
-            "Once {who} signs into '{issuing_app}' again, issue a new proof with POST /v1/proofs/obo."
+            "Once {who} signs into '{issuing_app}' again, issue a new proof with POST /v1/proofs/user-verification."
         ))
         .detail("proof_id", proof_id.to_string())
         .detail("reason", revoke_reason::SIGN_IN_EXPIRED));

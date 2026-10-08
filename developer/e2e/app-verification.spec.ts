@@ -4,7 +4,7 @@ import { mock } from "./fixtures";
 
 const app = { app_id: "test-app", name: "A useful app", logo_url: null, logo_dark_url: null, homepage_url: null };
 const verification = (proof_id: string, status: ManagedAppProof["status"] = "active"): ManagedAppProof => ({
-  proof_id, kind: "ata", issuing_app: app, receiving_app: "receiver", user: null, scopes: ["files.write"],
+  proof_id, kind: "app_verification", issuing_app: app, receiving_app: "receiver", user: null, scopes: ["files.write"],
   created_at: "2026-10-01T12:00:00Z", expires_at: "2029-03-19T12:00:00Z", token_expires_at: "2026-10-01T12:30:00Z",
   last_refreshed_at: null, revoked_at: status === "revoked" ? "2026-10-02T12:00:00Z" : null,
   revoke_reason: status === "revoked" ? "revoked_by_owner" : null, status, access_ttl_seconds: 1800,
@@ -147,8 +147,8 @@ test("per-app verification keeps the old URL, clear kind labels and one-time cre
   await setup(page);
   let created = false; const kinds: string[] = [];
   await page.route("**/api/accounts/apps/test-app/proofs?**", route => { kinds.push(new URL(route.request().url()).searchParams.get("kind") ?? "all"); return route.fulfill({ json: { items: created ? [verification("created-record")] : [], next_cursor: null } }); });
-  await page.route("**/api/accounts/apps/test-app/proofs/ata", route => { created = true; expect(route.request().postDataJSON().receiving_app).toBe("receiver"); return route.fulfill({ status: 201, json: { proof_id: "created-record", kind: "ata", receiving_app: "receiver", scopes: [], proof_token: "sap_fixture_once", proof_refresh_token: "sapr_fixture_once", expires_at: "2026-10-08T12:30:00Z", refresh_expires_at: "2029-03-19T12:00:00Z" } }); });
-  await page.goto("/apps/test-app/ata");
+  await page.route("**/api/accounts/apps/test-app/proofs/app-verification", route => { created = true; expect(route.request().postDataJSON().receiving_app).toBe("receiver"); return route.fulfill({ status: 201, json: { proof_id: "created-record", kind: "app_verification", receiving_app: "receiver", scopes: [], proof_token: "sap_fixture_once", proof_refresh_token: "sapr_fixture_once", expires_at: "2026-10-08T12:30:00Z", refresh_expires_at: "2029-03-19T12:00:00Z" } }); });
+  await page.goto("/apps/test-app/app-verification");
   await expect(page.getByRole("tab", { name: "App verification", exact: true })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("textbox", { name: "The app that receives it" }).fill("receiver");
   await page.getByRole("button", { name: "Choose", exact: true }).click();
@@ -161,7 +161,7 @@ test("per-app verification keeps the old URL, clear kind labels and one-time cre
   await expect(reveal).toHaveCount(0);
   expect(await page.evaluate(() => JSON.stringify(localStorage) + JSON.stringify(sessionStorage))).not.toContain("fixture_once");
   await page.getByRole("button", { name: "User verification", exact: true }).click();
-  await expect.poll(() => kinds.at(-1)).toBe("obo");
+  await expect.poll(() => kinds.at(-1)).toBe("user_verification");
   await expect(page.getByRole("link", { name: "All app verification history" })).toHaveAttribute("href", "/app-verification?app_id=test-app");
 });
 

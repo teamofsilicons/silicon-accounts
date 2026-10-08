@@ -58,7 +58,7 @@ function compare(name: string, raw: unknown, printed: unknown, extra: string[] =
 const fake = new FakeAppsClient(fakeAppsUrl);
 const cliJson = async (home: string, args: string[], env: Record<string, string> = {}) => (await cli(home, [...args, '--json'], { env })).json;
 
-// A Carbon with a Silicon (pending transfer), app memberships, a phone and an OBO proof about it.
+// A Carbon with a Silicon (pending transfer), app memberships, a phone and a user verification proof about it.
 const carbon = await signUpCarbon({ accounts, messaging });
 const other = await signUpCarbon({ accounts, messaging });
 const home = newHome('contract');

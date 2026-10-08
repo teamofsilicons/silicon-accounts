@@ -14,7 +14,7 @@
  * - security-developer-browser: the same in a real browser: after signing in and walking the owner's pages no response,
  *   storage or script-visible cookie holds a token (the sealed cookie is opened with the stack's secret to know exactly
  *   which values to look for), no request carries an Authorization header, and attacker pages on a same-site and a
- *   cross-site origin can't use the session (forged ATA proof, sign-out).
+ *   cross-site origin can't use the session (forged App verification proof, sign-out).
  */
 import type { Journey } from "../../context";
 import { DEVELOPER_SIGNED_OUT, newContext, shot, signInOnDeveloper, sleep, tag } from "../../lib";
@@ -113,7 +113,7 @@ const bff: Journey = {
       ["DELETE", "/me", undefined],
       ["POST", "/me/short-lived-tokens", { app_id: "remind" }],
       ["POST", "/me/silicons", { id: `si:bff-${tag()}`, display_name: "x" }],
-      ["POST", "/proofs/ata", { receiving_app: "remind" }],
+      ["POST", "/proofs/app-verification", { receiving_app: "remind" }],
       ["POST", "/proofs/verify", { proof_token: "x" }],
       ["POST", "/oauth/token", { grant_type: "refresh_token" }],
       ["POST", "/oauth/revoke", { token: "x" }],
@@ -152,7 +152,7 @@ const bff: Journey = {
       if (reply.status === 200 && Array.isArray(body.items)) forwarded.push(`${path}: 200 with items (forwarded to an account route)`);
       else if (reply.status < 400 && reply.status !== 308 && reply.status !== 307) forwarded.push(`${path}: ${reply.status}`);
     }
-    results.check(`the BFF forwards only the developer audience's routes: ${notForwarded.length} other API paths (Silicons, apps signed into, sessions, emails, proofs, history, account changes, SLTs, ATA/verify outside an app, OAuth, userinfo, device flow, lookups, internal sync, the dev outbox, flows) answer 404 not_proxied, and ${traversals.length} traversal spellings (.., %2e%2e, %2f, %5c, //, double encoding) reach no account route`, forwarded.length === 0, forwarded.join(" | ") || "all refused");
+    results.check(`the BFF forwards only the developer audience's routes: ${notForwarded.length} other API paths (Silicons, apps signed into, sessions, emails, proofs, history, account changes, SLTs, App verification/verify outside an app, OAuth, userinfo, device flow, lookups, internal sync, the dev outbox, flows) answer 404 not_proxied, and ${traversals.length} traversal spellings (.., %2e%2e, %2f, %5c, //, double encoding) reach no account route`, forwarded.length === 0, forwarded.join(" | ") || "all refused");
     const accountCookieOnly = await call(`${env.developer}/api/accounts/me`, { headers: { cookie: `sa_session=${account.jar.get("sa_session")}` }, ip: ctx.ip });
     results.check("the BFF never uses the browser's own Silicon Accounts cookie: with only the account site's sa_session (no developer session) /api/accounts/me answers 401 signed_out", accountCookieOnly.status === 401 && errorOf(accountCookieOnly).code === "signed_out", brief(accountCookieOnly));
 
@@ -195,7 +195,7 @@ const bff: Journey = {
     const writes: Array<[string, string, string, unknown]> = [
       ["change the sign-in title", "PATCH", `/apps/${OWNED}/signin-config`, { copy: { title: `CSRF ${tag()}` } }],
       ["add a redirect URI", "PATCH", `/apps/${OWNED}/signin-config`, { redirect_uris: ["https://evil.example/cb"] }],
-      ["make an ATA proof", "POST", `/apps/${OWNED}/proofs/ata`, { receiving_app: "remind" }],
+      ["make an app verification proof", "POST", `/apps/${OWNED}/proofs/app-verification`, { receiving_app: "remind" }],
       ["set the webhook", "PUT", `/apps/${OWNED}/webhook`, { url: "https://evil.example/hook" }],
       ["remove the webhook", "DELETE", `/apps/${OWNED}/webhook`, undefined],
     ];
@@ -214,7 +214,7 @@ const bff: Journey = {
     const after = await configOf();
     const proofsAfter = ((await viaBff<{ items?: unknown[] }>(env, signIn.devJar, `/apps/${OWNED}/proofs?limit=100`, { ip: ctx.ip })).body.items ?? []).length;
     const stillIn = await viaBff(env, signIn.devJar, "/me", { ip: ctx.ip });
-    results.check(`every write through the BFF (${writes.length} kinds: sign-in setup ×2, an ATA proof, the webhook ×2, and sign-out) from ${attackers.length} wrong origins (another site, the account site, another port, 127.0.0.1, https, "null", none, Sec-Fetch-Site cross-site / same-site) is refused 403 cross_site_request without a cookie change (${csrfTries} tries)`, csrfFailures.length === 0, csrfFailures.slice(0, 6).join(" | ") || `${csrfTries} × 403`);
+    results.check(`every write through the BFF (${writes.length} kinds: sign-in setup ×2, an app verification proof, the webhook ×2, and sign-out) from ${attackers.length} wrong origins (another site, the account site, another port, 127.0.0.1, https, "null", none, Sec-Fetch-Site cross-site / same-site) is refused 403 cross_site_request without a cookie change (${csrfTries} tries)`, csrfFailures.length === 0, csrfFailures.slice(0, 6).join(" | ") || `${csrfTries} × 403`);
     results.check("…and nothing changed: the same sign-in title and config version, no new proof, still signed in to the developer site", after.config_version === before.config_version && after.signin_config?.copy?.title === before.signin_config?.copy?.title && proofsAfter === proofsBefore && stillIn.status === 200, `version ${before.config_version} → ${after.config_version}; title ${before.signin_config?.copy?.title} → ${after.signin_config?.copy?.title}; proofs ${proofsBefore} → ${proofsAfter}; me ${stillIn.status}`);
     const title = `Acme ${tag()}`;
     const ok = await viaBff<ConfigBody>(env, signIn.devJar, `/apps/${OWNED}/signin-config`, { method: "PATCH", json: { copy: { title } }, headers: { "sec-fetch-site": "same-origin", "idempotency-key": `sec-${tag()}${tag()}` }, ip: ctx.ip });
@@ -226,7 +226,7 @@ const bff: Journey = {
       ["GET", `/apps/${FOREIGN_APP}`, undefined],
       ["GET", `/apps/${FOREIGN_APP}/users`, undefined],
       ["PATCH", `/apps/${FOREIGN_APP}/signin-config`, { redirect_uris: ["https://evil.example/cb"] }],
-      ["POST", `/apps/${FOREIGN_APP}/proofs/ata`, { receiving_app: "remind" }],
+      ["POST", `/apps/${FOREIGN_APP}/proofs/app-verification`, { receiving_app: "remind" }],
       ["GET", `/apps/${FOREIGN_APP}/webhook/deliveries`, undefined],
       ["POST", `/apps/${FOREIGN_APP}/imports?dry_run=true`, { rows: [] }],
     ];
@@ -236,7 +236,7 @@ const bff: Journey = {
       if (reply.status !== 403 || errorOf(reply).code !== "not_app_owner") foreignLeaks.push(`${method} ${path}: ${brief(reply)}`);
     }
     const unknownApp = await viaBff(env, signIn.devJar, `/apps/no-such-app-${tag()}`, { ip: ctx.ip });
-    results.check(`through the BFF the owner of ${OWNED} gets 403 not_app_owner on ${foreign.length} routes of ${FOREIGN_APP} (another Carbon's app: details, users, sign-in setup, ATA proof, deliveries, import), and 404 for an app that doesn't exist`, foreignLeaks.length === 0 && unknownApp.status === 404, `${foreignLeaks.join(" | ") || "all 403"}; unknown app ${brief(unknownApp)}`);
+    results.check(`through the BFF the owner of ${OWNED} gets 403 not_app_owner on ${foreign.length} routes of ${FOREIGN_APP} (another Carbon's app: details, users, sign-in setup, App verification proof, deliveries, import), and 404 for an app that doesn't exist`, foreignLeaks.length === 0 && unknownApp.status === 404, `${foreignLeaks.join(" | ") || "all 403"}; unknown app ${brief(unknownApp)}`);
 
     // 7. /auth/callback: only a state this browser started; never the provider's words; single use.
     const attacker = await signInWithEmail(t, { label: "devattacker" });
@@ -292,7 +292,7 @@ const bff: Journey = {
       ["/auth/callback?code=x&state=y", "/"],
       ["/api/accounts/me", "/"],
       ["/sign-in?return_to=//evil.example", "/"],
-      [`/apps/${OWNED}/ata?tab=1#proofs`, `/apps/${OWNED}/ata?tab=1#proofs`],
+      [`/apps/${OWNED}/app-verification?tab=1#proofs`, `/apps/${OWNED}/app-verification?tab=1#proofs`],
     ];
     const strays: string[] = [];
     const landings: string[] = [];
@@ -319,7 +319,7 @@ const bff: Journey = {
 
 const browserWalk: Journey = {
   name: "security-developer-browser",
-  title: "the developer site in a real browser: signed in through the BFF and walking an owner's pages, no response, storage, script-visible cookie or request ever carries the developer platform's tokens (checked against the sealed cookie's real values) or any token-shaped value; a same-site and a cross-site attacker page can neither make an ATA proof nor sign the developer out",
+  title: "the developer site in a real browser: signed in through the BFF and walking an owner's pages, no response, storage, script-visible cookie or request ever carries the developer platform's tokens (checked against the sealed cookie's real values) or any token-shaped value; a same-site and a cross-site attacker page can neither make an app verification proof nor sign the developer out",
   async run(ctx) {
     const { env, results, browser } = ctx;
     const t = viaSite(ctx);
@@ -360,12 +360,12 @@ const browserWalk: Journey = {
       void response.text().then(text => bodies.push({ url: response.url(), text }), () => undefined);
     });
     await signInOnDeveloper(env, page, null, { returnTo: `/apps/${OWNED}` });
-    for (const path of ["/", `/apps/${OWNED}`, `/apps/${OWNED}/users`, `/apps/${OWNED}/sign-in`, `/apps/${OWNED}/webhooks`, `/apps/${OWNED}/ata`, `/apps/${OWNED}/embed`]) {
+    for (const path of ["/", `/apps/${OWNED}`, `/apps/${OWNED}/users`, `/apps/${OWNED}/sign-in`, `/apps/${OWNED}/webhooks`, `/apps/${OWNED}/app-verification`, `/apps/${OWNED}/embed`]) {
       await page.goto(`${env.developer}${path}`);
       await page.waitForLoadState("networkidle").catch(() => undefined);
       await sleep(150);
     }
-    await shot(env, page, "security-developer-browser-01-ata");
+    await shot(env, page, "security-developer-browser-01-app_verification");
     const cookies = await context.cookies(env.developer);
     const sealedCookie = cookies.find(cookie => cookie.name === DEV_SESSION);
     const opened = unsealDeveloper<DeveloperSession>(sealedCookie?.value, DEV_SESSION, secret);
@@ -413,11 +413,11 @@ const browserWalk: Journey = {
     const crossSite = `http://127.0.0.1:${sparePort(env, 6)}`;
     const attackerPage = `<!doctype html><title>attacker</title>
 <form id="signout" method="POST" action="${env.developer}/auth/sign-out"></form>
-<form id="ata" method="POST" action="${env.developer}/api/accounts/apps/${OWNED}/proofs/ata" enctype="text/plain"><input name='{"receiving_app":"remind","x":"' value='"}'></form>
+<form id="app_verification" method="POST" action="${env.developer}/api/accounts/apps/${OWNED}/proofs/app-verification" enctype="text/plain"><input name='{"receiving_app":"remind","x":"' value='"}'></form>
 <script>
 window.shoot = async () => {
   const out = {};
-  try { const r = await fetch(${JSON.stringify(`${env.developer}/api/accounts/apps/${OWNED}/proofs/ata`)}, { method: "POST", mode: "no-cors", credentials: "include", headers: { "content-type": "text/plain" }, body: '{"receiving_app":"remind"}' }); out.fetch = "sent " + r.type; } catch (e) { out.fetch = "error " + e; }
+  try { const r = await fetch(${JSON.stringify(`${env.developer}/api/accounts/apps/${OWNED}/proofs/app-verification`)}, { method: "POST", mode: "no-cors", credentials: "include", headers: { "content-type": "text/plain" }, body: '{"receiving_app":"remind"}' }); out.fetch = "sent " + r.type; } catch (e) { out.fetch = "error " + e; }
   try { const r = await fetch(${JSON.stringify(`${env.developer}/api/accounts/me`)}, { credentials: "include" }); out.read = "read " + r.status + " " + (await r.text()).slice(0, 60); } catch (e) { out.read = "blocked"; }
   return out;
 };
@@ -441,11 +441,11 @@ window.shoot = async () => {
       await attackerTab.goto(`${origin}/fetch.html`);
       const shot1 = await attackerTab.evaluate(() => (window as unknown as { shoot: () => Promise<Record<string, string>> }).shoot());
       await sleep(400);
-      const fetchAnswer = answers.find(answer => answer.method === "POST" && answer.url.includes("/proofs/ata"));
+      const fetchAnswer = answers.find(answer => answer.method === "POST" && answer.url.includes("/proofs/app-verification"));
       // Each promise gets its handlers at once: a navigation that fails before it is awaited must not crash the walk.
-      const ataForm = attackerTab.waitForResponse(response => response.url().includes("/proofs/ata") && response.request().method() === "POST", { timeout: 15_000 }).then(response => response.status(), () => 0);
+      const ataForm = attackerTab.waitForResponse(response => response.url().includes("/proofs/app-verification") && response.request().method() === "POST", { timeout: 15_000 }).then(response => response.status(), () => 0);
       await attackerTab.goto(`${origin}/form.html`);
-      await attackerTab.evaluate(() => (document.getElementById("ata") as HTMLFormElement).submit());
+      await attackerTab.evaluate(() => (document.getElementById("app_verification") as HTMLFormElement).submit());
       const formStatus = await ataForm;
       await attackerTab.waitForURL(url => url.href.startsWith(env.developer), { timeout: 10_000 }).catch(() => undefined);
       await attackerTab.waitForLoadState("load").catch(() => undefined);
@@ -458,13 +458,13 @@ window.shoot = async () => {
       await sleep(400);
       const held = (await context.cookies(env.developer)).some(cookie => cookie.name === DEV_SESSION && cookie.value === sealedCookie?.value);
       const live = (await call(`${env.developer}/api/accounts/me`, { headers: { cookie: `${DEV_SESSION}=${sealedCookie?.value ?? ""}` }, ip: ctx.ip })).status === 200;
-      outcomes.push(`${kind}: fetch ${fetchAnswer?.status ?? "not seen"} (${shot1.fetch}), read ${shot1.read?.slice(0, 20)}, form ATA ${formStatus}, form sign-out ${signoutStatus}, session ${held && live ? "kept" : "LOST"}`);
+      outcomes.push(`${kind}: fetch ${fetchAnswer?.status ?? "not seen"} (${shot1.fetch}), read ${shot1.read?.slice(0, 20)}, form App verification ${formStatus}, form sign-out ${signoutStatus}, session ${held && live ? "kept" : "LOST"}`);
       if (![403, 401].includes(fetchAnswer?.status ?? 0) || !/blocked/.test(shot1.read ?? "") || ![403, 401].includes(formStatus) || ![403].includes(signoutStatus) || !held || !live) failures.push(outcomes[outcomes.length - 1]!);
     }
     const proofsAfter = await proofs();
     await shot(env, attackerTab, "security-developer-browser-02-attacker");
     results.check("(note) photos the stack's seeded owners have on the production Iris, served from the mock Iris instead", true, `${productionIris.length} requests${productionIris[0] ? ` (e.g. ${productionIris[0]})` : ""}`);
-    results.check("attacker pages on a same-site origin (the cookie goes along: 403 by Origin) and a cross-site one (SameSite=Lax keeps it home) can't make an ATA proof (fetch or text/plain form), can't read the BFF, and can't sign the developer out (403); the developer stays signed in and no proof was made", failures.length === 0 && proofsAfter === proofsBefore, `${outcomes.join(" | ")}; proofs ${proofsBefore} → ${proofsAfter}`);
+    results.check("attacker pages on a same-site origin (the cookie goes along: 403 by Origin) and a cross-site one (SameSite=Lax keeps it home) can't make an app verification proof (fetch or text/plain form), can't read the BFF, and can't sign the developer out (403); the developer stays signed in and no proof was made", failures.length === 0 && proofsAfter === proofsBefore, `${outcomes.join(" | ")}; proofs ${proofsBefore} → ${proofsAfter}`);
     await context.close();
   },
 };

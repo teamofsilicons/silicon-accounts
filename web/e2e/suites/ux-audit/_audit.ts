@@ -764,7 +764,7 @@ export async function signInAsSeededOwnerOnDeveloper(ctx: Ctx, page: Page, findi
 /* ------------------------------------------------------------------------------------------------------------------ */
 
 /** The tabs of an app on the developer site (developer/lib/app-tabs.ts), and the address of each. */
-export const TABS = ["overview", "sign-in", "details", "flows", "pages", "users", "import", "webhooks", "ata", "embed"] as const;
+export const TABS = ["overview", "sign-in", "details", "flows", "pages", "users", "import", "webhooks", "app_verification", "embed"] as const;
 export const tabPath = (appId: string, tab: (typeof TABS)[number]) => `/apps/${appId}${tab === "overview" ? "" : `/${tab}`}`;
 
 /** What the developer site's pages log on purpose: the session probe's 401 before signing in. */

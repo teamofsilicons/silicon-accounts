@@ -2,8 +2,8 @@
 //!
 //! Shape problems (wrong types, unknown or missing fields) are rejected by the JSON extractor
 //! with 422 `validation_failed`; this module adds the proof rules (scope syntax and count,
-//! token lifetime bounds, receiving-app syntax, one app per ATA proof), all reported together
-//! in `details.fields` (`ata_single_app` has its own code).
+//! token lifetime bounds, receiving-app syntax, one app per App verification proof), all reported together
+//! in `details.fields` (`app_verification_single_app` has its own code).
 
 use accounts_core::crypto::describe_token;
 use accounts_core::{ApiError, FieldErrors};
@@ -15,10 +15,10 @@ use crate::model::{
     MIN_ACCESS_TTL_SECONDS,
 };
 
-/// `POST /v1/proofs/obo`. `Debug` never prints the subject token.
+/// `POST /v1/proofs/user-verification`. `Debug` never prints the subject token.
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct IssueOboBody {
+pub struct IssueUserVerificationBody {
     /// The account's access token, issued to the calling app.
     pub subject_token: String,
     /// The app the proof is for.
@@ -29,16 +29,16 @@ pub struct IssueOboBody {
     pub access_ttl_seconds: Option<i64>,
 }
 
-/// `POST /v1/proofs/ata` and `POST /v1/apps/{app_id}/proofs/ata`:
+/// `POST /v1/proofs/app-verification` and `POST /v1/apps/{app_id}/proofs/app-verification`:
 /// `{"receiving_app": "remind", "scopes"?, "access_ttl_seconds"?}`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct IssueAtaBody {
-    /// The one app that may verify the proof (required; see [`IssueAtaBody::receiving_app`]).
+pub struct IssueAppVerificationBody {
+    /// The one app that may verify the proof (required; see [`IssueAppVerificationBody::receiving_app`]).
     #[serde(default)]
     pub receiving_app: Option<String>,
-    /// Accepted only to refuse it precisely: an ATA proof is for exactly one app, so a body
-    /// naming `audiences` (any length) gets 422 `ata_single_app` ([`ata_single_app`]).
+    /// Accepted only to refuse it precisely: an app verification proof is for exactly one app, so a body
+    /// naming `audiences` (any length) gets 422 `app_verification_single_app` ([`app_verification_single_app`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audiences: Option<Value>,
     #[serde(default)]
@@ -47,8 +47,8 @@ pub struct IssueAtaBody {
     pub access_ttl_seconds: Option<i64>,
 }
 
-impl IssueAtaBody {
-    /// The receiving app: 422 `ata_single_app` when the body lists `audiences` (the pre-v2
+impl IssueAppVerificationBody {
+    /// The receiving app: 422 `app_verification_single_app` when the body lists `audiences` (the pre-v2
     /// shape), else the normalized `receiving_app` (a missing or malformed one is added to
     /// `fields`). `endpoint` is the route the caller used, for the hint.
     pub fn receiving_app(
@@ -57,7 +57,7 @@ impl IssueAtaBody {
         fields: &mut FieldErrors,
     ) -> Result<Option<String>, ApiError> {
         if let Some(audiences) = &self.audiences {
-            return Err(ata_single_app(endpoint, audiences));
+            return Err(app_verification_single_app(endpoint, audiences));
         }
         match self.receiving_app.as_deref() {
             None => {
@@ -72,9 +72,9 @@ impl IssueAtaBody {
     }
 }
 
-/// 422 `ata_single_app`: the body named `audiences`. An ATA proof is always for exactly one
+/// 422 `app_verification_single_app`: the body named `audiences`. An app verification proof is always for exactly one
 /// app (UNDERSTANDING.md); an app that talks to several apps asks for one proof per app.
-pub fn ata_single_app(endpoint: &str, audiences: &Value) -> ApiError {
+pub fn app_verification_single_app(endpoint: &str, audiences: &Value) -> ApiError {
     let apps: Vec<String> = audiences
         .as_array()
         .map(|a| {
@@ -87,8 +87,8 @@ pub fn ata_single_app(endpoint: &str, audiences: &Value) -> ApiError {
         .unwrap_or_default();
     let example = apps.first().map_or("remind", String::as_str).to_string();
     let mut e = ApiError::unprocessable(
-        "ata_single_app",
-        "An App verification is for exactly one app; ask for one proof per app.",
+        "app_verification_single_app",
+        "An app verification is for exactly one app; ask for one proof per app.",
     )
     .hint(format!(
         "Send {{\"receiving_app\": \"{example}\"}} to POST {endpoint} instead of \"audiences\", and call it once for every app that should verify a proof from you; each app verifies its own proof."
@@ -155,9 +155,9 @@ impl std::fmt::Debug for ProofReference {
     }
 }
 
-impl std::fmt::Debug for IssueOboBody {
+impl std::fmt::Debug for IssueUserVerificationBody {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("IssueOboBody")
+        f.debug_struct("IssueUserVerificationBody")
             .field("subject_token", &REDACTED)
             .field("receiving_app", &self.receiving_app)
             .field("scopes", &self.scopes)
@@ -424,14 +424,14 @@ mod tests {
     }
 
     #[test]
-    fn ata_is_for_exactly_one_app() {
-        let body = |v: serde_json::Value| -> IssueAtaBody {
+    fn app_verification_is_for_exactly_one_app() {
+        let body = |v: serde_json::Value| -> IssueAppVerificationBody {
             serde_json::from_value(v).expect("body parses")
         };
         let mut f = FieldErrors::new();
         assert_eq!(
             body(serde_json::json!({"receiving_app": " Remind"}))
-                .receiving_app("/v1/proofs/ata", &mut f)
+                .receiving_app("/v1/proofs/app-verification", &mut f)
                 .expect("ok"),
             Some("remind".to_string())
         );
@@ -440,7 +440,7 @@ mod tests {
         let mut f = FieldErrors::new();
         assert_eq!(
             body(serde_json::json!({}))
-                .receiving_app("/v1/proofs/ata", &mut f)
+                .receiving_app("/v1/proofs/app-verification", &mut f)
                 .expect("no error"),
             None
         );
@@ -451,7 +451,7 @@ mod tests {
 
         let mut f = FieldErrors::new();
         body(serde_json::json!({"receiving_app": "Not An App!"}))
-            .receiving_app("/v1/proofs/ata", &mut f)
+            .receiving_app("/v1/proofs/app-verification", &mut f)
             .expect("no error");
         assert!(
             f.get("receiving_app")
@@ -466,15 +466,15 @@ mod tests {
         ] {
             let mut f = FieldErrors::new();
             let e = body(serde_json::json!({"audiences": audiences, "receiving_app": "remind"}))
-                .receiving_app("/v1/apps/commit/proofs/ata", &mut f)
+                .receiving_app("/v1/apps/commit/proofs/app-verification", &mut f)
                 .expect_err("audiences are refused");
-            assert_eq!(e.code, "ata_single_app");
+            assert_eq!(e.code, "app_verification_single_app");
             assert_eq!(e.status.as_u16(), 422);
             assert!(e.message.contains("exactly one app"), "{}", e.message);
             assert!(
                 e.hint
                     .as_deref()
-                    .is_some_and(|h| h.contains("POST /v1/apps/commit/proofs/ata")),
+                    .is_some_and(|h| h.contains("POST /v1/apps/commit/proofs/app-verification")),
                 "{:?}",
                 e.hint
             );
@@ -494,7 +494,7 @@ mod tests {
             proof_token: "sap_secretvalue".into(),
         };
         assert!(!format!("{v:?}").contains("secretvalue"));
-        let o = IssueOboBody {
+        let o = IssueUserVerificationBody {
             subject_token: "eyJsecretvalue".into(),
             receiving_app: "briefcase".into(),
             scopes: None,

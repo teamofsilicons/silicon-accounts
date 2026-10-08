@@ -73,7 +73,7 @@ const pages: Journey = {
     const phone = await addContact(env, probe, "phone", randomPhone());
     const briefcase = await signIntoApp(env, page, "briefcase");
     const commit = await signIntoApp(env, page, "commit");
-    const issue = async () => (await postJson<{ body?: { proof_id?: string } }>(`${env.apps}/briefcase/actions/issue-obo`, { uuid, receiving_app: "commit", scopes: ["files.read"] })).body.body?.proof_id ?? "";
+    const issue = async () => (await postJson<{ body?: { proof_id?: string } }>(`${env.apps}/briefcase/actions/issue-user_verification`, { uuid, receiving_app: "commit", scopes: ["files.read"] })).body.body?.proof_id ?? "";
     const kept = await issue();
     const ended = await issue();
     const revoked = await call(probe, `/v1/me/proofs/${ended}`, { method: "DELETE" });

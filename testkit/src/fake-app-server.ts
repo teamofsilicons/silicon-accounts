@@ -11,7 +11,7 @@
 //  - POST /<app>/slt-login   a Silicon's short-lived token → tokens.
 //  - POST /<app>/webhooks    verifies X-Accounts-Signature, dedupes by event_id, records.
 //  - POST /hooks/<key>       the same receiver for any other webhook (e.g. a Silicon's own).
-//  - OBO demo (dm → briefcase) and ATA demo (commit → remind + waveform) with timings.
+//  - User verification demo (dm → briefcase) and App verification demo (commit → remind + waveform) with timings.
 //  - /<app>/_state, /_events, /_webhook-secret, /_webhook-faults … for test assertions.
 //
 // Silicon Accounts is reached at ACCOUNTS_URL (server to server, default accounts-api at
@@ -1107,13 +1107,13 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     ctx.sendJson(res.status === 0 ? 502 : 200, { status: res.status, verification: res.body ?? res.error, verify_ms: res.ms });
   });
 
-  router.post('/:app/actions/issue-obo', async (ctx) => {
+  router.post('/:app/actions/issue-user_verification', async (ctx) => {
     const rt = runtime(ctx.params.app);
     const body = await jsonObject(ctx);
     const stored = rt.accounts.get(str(body.uuid) ?? '');
     if (!stored) throw apiError(404, 'not_signed_in', `${rt.app.name} holds no tokens for account ${str(body.uuid) ?? '(none)'}; sign in to ${rt.app.app_id} first.`);
     await ensureFresh(rt, stored);
-    const res = await callAccounts('/v1/proofs/obo', {
+    const res = await callAccounts('/v1/proofs/user-verification', {
       app: rt.app,
       json: { subject_token: stored.access_token, receiving_app: str(body.receiving_app) ?? 'briefcase', ...(Array.isArray(body.scopes) ? { scopes: body.scopes } : {}), ...(typeof body.access_ttl_seconds === 'number' ? { access_ttl_seconds: body.access_ttl_seconds } : {}) },
       headers: { 'Idempotency-Key': str(body.idempotency_key) ?? uuid() },
@@ -1121,13 +1121,13 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     ctx.sendJson(res.status === 0 ? 502 : res.status, { status: res.status, body: res.body ?? res.error, issue_ms: res.ms });
   });
 
-  // An ATA proof is for exactly one app: {"receiving_app": "remind"} (default: the app's first ATA receiver).
-  router.post('/:app/actions/issue-ata', async (ctx) => {
+  // An app verification proof is for exactly one app: {"receiving_app": "remind"} (default: the app's first App verification receiver).
+  router.post('/:app/actions/issue-app_verification', async (ctx) => {
     const rt = runtime(ctx.params.app);
     const body = await jsonObject(ctx);
-    const receiving = str(body.receiving_app) ?? rt.app.testkit?.proofs.ata_issuer_to[0];
-    if (!receiving) throw apiError(422, 'no_receiving_app', `${rt.app.name} has no ATA receiver configured; send {"receiving_app":"remind"}.`);
-    const res = await callAccounts('/v1/proofs/ata', {
+    const receiving = str(body.receiving_app) ?? rt.app.testkit?.proofs.app_verification_issuer_to[0];
+    if (!receiving) throw apiError(422, 'no_receiving_app', `${rt.app.name} has no App verification receiver configured; send {"receiving_app":"remind"}.`);
+    const res = await callAccounts('/v1/proofs/app-verification', {
       app: rt.app,
       json: { receiving_app: receiving, ...(Array.isArray(body.scopes) ? { scopes: body.scopes } : {}), ...(typeof body.access_ttl_seconds === 'number' ? { access_ttl_seconds: body.access_ttl_seconds } : {}) },
       headers: { 'Idempotency-Key': str(body.idempotency_key) ?? uuid() },
@@ -1135,7 +1135,7 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     ctx.sendJson(res.status === 0 ? 502 : res.status, { status: res.status, body: res.body ?? res.error, issue_ms: res.ms });
   });
 
-  // OBO demo: dm saves a file into Briefcase on behalf of a Carbon or Silicon signed in to dm.
+  // User verification demo: dm saves a file into Briefcase on behalf of a Carbon or Silicon signed in to dm.
   router.post('/:app/actions/save-to-briefcase', async (ctx) => {
     const rt = runtime(ctx.params.app);
     const started = performance.now();
@@ -1147,7 +1147,7 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     }
     const receiving = str(body.receiving_app) ?? 'briefcase';
     await ensureFresh(rt, stored);
-    const issue = await callAccounts('/v1/proofs/obo', {
+    const issue = await callAccounts('/v1/proofs/user-verification', {
       app: rt.app,
       json: {
         subject_token: stored.access_token,
@@ -1163,7 +1163,7 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     }
     const proofToken = isRecord(issue.body) ? str(issue.body.proof_token) : undefined;
     if (!proofToken) {
-      ctx.sendJson(502, { ok: false, stage: 'issue', error: 'POST /v1/proofs/obo returned no proof_token.', response: issue.body });
+      ctx.sendJson(502, { ok: false, stage: 'issue', error: 'POST /v1/proofs/user-verification returned no proof_token.', response: issue.body });
       return;
     }
     if (!runtimes.has(receiving)) {
@@ -1183,14 +1183,14 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     });
   });
 
-  // ATA demo: an ATA proof is for exactly one app, so commit gets one proof for remind and
+  // App verification demo: an app verification proof is for exactly one app, so commit gets one proof for remind and
   // another for waveform (issued in parallel), then pings each app with its own proof.
   router.post('/:app/actions/notify', async (ctx) => {
     const rt = runtime(ctx.params.app);
     const started = performance.now();
     const body = ctx.contentType() === 'application/json' ? await jsonObject(ctx) : {};
-    const audiences = (Array.isArray(body.audiences) ? body.audiences.filter((a): a is string => typeof a === 'string') : rt.app.testkit?.proofs.ata_issuer_to) ?? [];
-    if (audiences.length === 0) throw apiError(422, 'no_audiences', `${rt.app.name} has no ATA receivers configured; send {"audiences":["remind","waveform"]} (one proof is made per app).`);
+    const audiences = (Array.isArray(body.audiences) ? body.audiences.filter((a): a is string => typeof a === 'string') : rt.app.testkit?.proofs.app_verification_issuer_to) ?? [];
+    if (audiences.length === 0) throw apiError(422, 'no_audiences', `${rt.app.name} has no App verification receivers configured; send {"audiences":["remind","waveform"]} (one proof is made per app).`);
     const message = str(body.message) ?? `${rt.app.name}: something is due`;
     const proofs: Record<string, unknown> = {};
     const results: Record<string, unknown> = {};
@@ -1198,7 +1198,7 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     const verifyTimes: Record<string, number | null> = {};
     await Promise.all(
       audiences.map(async (audience) => {
-        const issue = await callAccounts('/v1/proofs/ata', {
+        const issue = await callAccounts('/v1/proofs/app-verification', {
           app: rt.app,
           json: {
             receiving_app: audience,

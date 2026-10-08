@@ -196,7 +196,7 @@ export const journey: Journey = {
       [`/sign-in?error=${encodeURIComponent("<b>x</b>")}&return_to=${encodeURIComponent("//evil.example/")}`, 200],
       ["/", 200],
       ["/apps/briefcase", 200],
-      ["/apps/briefcase/ata", 200],
+      ["/apps/briefcase/app-verification", 200],
       [`/apps/briefcase/bogus-${tag()}`, 404],
       [`/no-such-page-${tag()}`, 404],
     ];
@@ -216,7 +216,7 @@ export const journey: Journey = {
       ["GET", "/api/accounts/me", 401, "application/json"],
       ["GET", "/api/accounts/apps/briefcase", 401, "application/json"],
       ["GET", "/api/accounts/me/silicons", 404, "application/json"],
-      ["POST", "/api/accounts/apps/briefcase/proofs/ata", 403, "application/json"],
+      ["POST", "/api/accounts/apps/briefcase/proofs/app-verification", 403, "application/json"],
       ["POST", "/auth/sign-out", 403, "application/json"],
     ];
     const bffFailures: string[] = [];
@@ -406,7 +406,7 @@ export const journey: Journey = {
     await framed.route(`${attacker}/**`, route =>
       route.fulfill({
         contentType: "text/html",
-        body: `<!doctype html><title>attacker</title><iframe id="home" src="${env.site}/"></iframe><iframe id="signin" src="${env.site}/sign-in"></iframe><iframe id="embed" src="${env.site}/embed/v1/buttons?app_id=briefcase&redirect_uri=${encodeURIComponent(callback)}&state=x"></iframe><iframe id="devsignin" src="${env.developer}/sign-in"></iframe><iframe id="devapp" src="${env.developer}/apps/briefcase/ata"></iframe>`,
+        body: `<!doctype html><title>attacker</title><iframe id="home" src="${env.site}/"></iframe><iframe id="signin" src="${env.site}/sign-in"></iframe><iframe id="embed" src="${env.site}/embed/v1/buttons?app_id=briefcase&redirect_uri=${encodeURIComponent(callback)}&state=x"></iframe><iframe id="devsignin" src="${env.developer}/sign-in"></iframe><iframe id="devapp" src="${env.developer}/apps/briefcase/app-verification"></iframe>`,
       }),
     );
     const evil = await framed.newPage();

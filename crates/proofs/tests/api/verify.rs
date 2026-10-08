@@ -9,7 +9,7 @@ use crate::common::{World, assert_token_ttl, invalid, proof_id, token};
 #[tokio::test]
 async fn valid_proofs_have_the_exact_contract_shape() {
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let r = w
         .verify_as(&w.briefcase, &w.briefcase_secret, &token(&p))
         .await;
@@ -21,7 +21,7 @@ async fn valid_proofs_have_the_exact_contract_shape() {
     let expected = json!({
         "valid": true,
         "proof_id": proof_id(&p),
-        "kind": "obo",
+        "kind": "user_verification",
         "expires_at": p["expires_at"],
         "issuing_app": {"app_id": w.dm.app_id, "name": w.dm.name},
         "receiving_app": {"app_id": w.briefcase.app_id, "name": w.briefcase.name},
@@ -59,7 +59,7 @@ async fn valid_proofs_have_the_exact_contract_shape() {
 #[tokio::test]
 async fn anything_else_is_exactly_invalid() {
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let t = token(&p);
 
     // Wrong audience: an unrelated app, and the issuing app itself.
@@ -152,7 +152,7 @@ async fn anything_else_is_exactly_invalid() {
 #[tokio::test]
 async fn proofs_expire_with_their_token_lifetime() {
     let w = World::new().await;
-    let p = w.issue_obo_ttl(60).await;
+    let p = w.issue_user_verification_ttl(60).await;
     assert_token_ttl(&p, 60);
     let t = token(&p);
     let v = w.verify_bc(&t).await;
@@ -193,7 +193,7 @@ async fn proofs_expire_with_their_token_lifetime() {
 /// Issues a proof, applies `sql` (with `{dm}`, `{uuid}`, `{fid}`, `{bc}` placeholders), and
 /// returns the verification body.
 async fn after(w: &World, sql: &str) -> (Value, Value) {
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     assert_eq!(w.verify_bc(&token(&p)).await["valid"], true);
     let sql = sql
         .replace("{dm}", &w.dm.app_id)
@@ -239,7 +239,7 @@ async fn cascade_when_the_account_removes_the_issuing_apps_access() {
 #[tokio::test]
 async fn cascade_through_the_core_remove_access_path() {
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let mut conn = w.ctx.conn().await;
     let removed = accounts_core::repo::memberships::remove_access(
         &mut conn,
@@ -290,7 +290,7 @@ async fn cascade_when_the_account_is_deleted_or_inactive() {
 
     // Through the real deletion path too.
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let mut conn = w.ctx.conn().await;
     let deleted = accounts_core::repo::accounts::delete_account(
         &mut conn,
@@ -336,17 +336,17 @@ async fn revoked_proofs_are_invalid() {
 }
 
 #[tokio::test]
-async fn ata_proofs_ignore_account_state() {
+async fn app_verification_proofs_ignore_account_state() {
     let w = World::new().await;
     let r = w
-        .ata_as(
+        .app_verification_as(
             &w.dm,
             &w.dm_secret,
             json!({"receiving_app": w.briefcase.app_id}),
         )
         .await;
     assert_eq!(r.status, 201);
-    // Nothing about accounts matters to an ATA proof.
+    // Nothing about accounts matters to an app verification proof.
     w.ctx
         .exec(&format!(
             "update memberships set status = 'access_removed' where account_uuid = '{}'",

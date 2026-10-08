@@ -16,7 +16,7 @@ test("publishing proxy forwards only authoring with own-app catalog and immutabl
 test("the same underscore app ID reaches Accounts settings and all native publishing tabs", () => {
   assert.ok(accountsRoute("apps/my_app/signin-config", "PATCH"));
   assert.ok(accountsRoute("apps/_my_app/signin-config", "PATCH"));
-  for (const tab of ["publishing", "releases", "authors", "history", "sign-in", "details", "flows", "pages", "users", "import", "webhooks", "ata", "embed"]) {
+  for (const tab of ["publishing", "releases", "authors", "history", "sign-in", "details", "flows", "pages", "users", "import", "webhooks", "app-verification", "embed"]) {
     assert.ok(APP_TABS.includes(tab as typeof APP_TABS[number]));
     assert.equal(appTabFrom([tab]), tab);
   }

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /apps/[appId]/…: one app's pages, in tabs (Overview, Sign-in, Details, Flows, Pages, Users, Import, Webhooks, ATA,
+ * /apps/[appId]/…: one app's pages, in tabs (Overview, Sign-in, Details, Flows, Pages, Users, Import, Webhooks, App verification,
  * Embed). This is the app's layout: it stays mounted while the tab changes, so the app is read once
  * (GET /v1/apps/{app_id}, through the BFF) and shared with every tab together with one draft of its sign-in setup;
  * switching tabs never loses an edit.
@@ -64,7 +64,7 @@ const TAB_ICONS: Record<DeveloperTab, ReactNode> = {
   users: <Users size={16} strokeWidth={1.75} />,
   import: <Upload size={16} strokeWidth={1.75} />,
   webhooks: <Webhook size={16} strokeWidth={1.75} />,
-  ata: <ShieldCheck size={16} strokeWidth={1.75} />,
+  "app-verification": <ShieldCheck size={16} strokeWidth={1.75} />,
   embed: <Code size={16} strokeWidth={1.75} />,
 };
 

@@ -36,7 +36,7 @@ To use a local stack instead, follow [Run it yourself](../index.md#run-it-yourse
 ```json
 {
   "name": "Silicon Accounts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "environment": "production",
   "public_url": "https://accounts.teamofsilicons.com",
   "silicon_apps_url": "https://apps.teamofsilicons.com",
@@ -261,7 +261,7 @@ The endpoints that accept a key, with how long their result is kept:
 | `PATCH /v1/apps/{app_id}/signin-config`, `POST /v1/apps/{app_id}/imports` | 24 h |
 | `PUT /v1/apps/{app_id}/webhook`, `POST /v1/apps/{app_id}/webhook/rotate-secret` | 10 min |
 | `POST /v1/apps/{app_id}/webhook/test`, `POST /v1/apps/{app_id}/webhook/replay` | 24 h |
-| `POST /v1/proofs/obo`, `POST /v1/proofs/ata`, `POST /v1/apps/{app_id}/proofs/ata`, `POST /v1/proofs/refresh` | 10 min |
+| `POST /v1/proofs/user-verification`, `POST /v1/proofs/app-verification`, `POST /v1/apps/{app_id}/proofs/app-verification`, `POST /v1/proofs/refresh` | 10 min |
 | `POST /v1/reports` | 24 h |
 
 ## Pagination
@@ -448,13 +448,13 @@ pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)
 
 | Method and path | Auth | Idem. | Success |
 |---|---|---|---|
-| `POST /v1/proofs/obo` | app | yes | 201 proof |
-| `POST /v1/proofs/ata` | app | yes | 201 proof |
+| `POST /v1/proofs/user-verification` | app | yes | 201 proof |
+| `POST /v1/proofs/app-verification` | app | yes | 201 proof |
 | `POST /v1/proofs/refresh` | app (the issuer) | yes | 200 proof |
 | `POST /v1/proofs/verify` | app (an audience) | | 200 valid or not |
 | `POST /v1/proofs/revoke` | app (the issuer) | | 204 |
 | `GET /v1/apps/{app_id}/proofs` | app or owner | | 200 list |
-| `POST /v1/apps/{app_id}/proofs/ata` | app or owner | yes | 201 proof |
+| `POST /v1/apps/{app_id}/proofs/app-verification` | app or owner | yes | 201 proof |
 | `DELETE /v1/apps/{app_id}/proofs/{proof_id}` | app or owner | | 204 |
 | `GET /v1/me/app-verifications` | signed-in manager | | 200 retained App verification records |
 | `GET /v1/apps/{app_id}/proofs/{proof_id}/history` | signed-in manager | | 200 retained verification history |

@@ -51,7 +51,7 @@ What this deployment is. Public.
 ```json
 {
   "name": "Silicon Accounts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "environment": "production",
   "public_url": "https://accounts.teamofsilicons.com",
   "silicon_apps_url": "https://apps.teamofsilicons.com",

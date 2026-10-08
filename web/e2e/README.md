@@ -10,7 +10,7 @@ It follows UNDERSTANDING.md v2 (build spec 06-v2): the hosted sign-in goes `choo
 app's own Google/Apple button) → `verify_code` → `signup` → the app's `details` pages (required details locked, a
 missing email or phone added there with a code, optional details unticked until ticked) → `review` (when the app's flow
 has one) → the app; apps start it as a sign-in or a sign-up (`intent`), with a direct method button or not, and never
-hand over an email or phone; everything about building apps is on the developer site; an ATA proof is for exactly one
+hand over an email or phone; everything about building apps is on the developer site; an app verification proof is for exactly one
 app.
 
 ```
@@ -122,7 +122,7 @@ data: `results.check(name, ok, detail)` never throws, so a journey keeps going a
   PKCE, `/auth/callback`; `null` continues as the account site's signed-in Carbon), `developerApi` (a call through the
   developer site's BFF with the context's sealed session and its Origin), `DEVELOPER_SIGNED_OUT` (the 401 of the
   developer site's session probe while signed out, for `results.watch`);
-- proofs: `issueAta(ctx, app, receivingApp)` (one ATA proof for exactly one app, with the fake app's credentials),
+- proofs: `issueAppVerification(ctx, app, receivingApp)` (one App verification proof for exactly one app, with the fake app's credentials),
   `verifyProof(ctx, app, token)`.
 
 The testkit's own helpers (`testkit/lib`) work too, pointed at `ctx.env`.
@@ -135,12 +135,12 @@ The testkit's own helpers (`testkit/lib`) work too, pointed at `ctx.env`.
 | `b-apps` | briefcase: a sign-up and its what's-shared page (email required, timezone optional and unticked); dm: Continue as, its one custom page adds the missing phone with a code and shares the ticked email; provides `brook` |
 | `c-providers` | Google and Apple, managed and the apps' own; the apps' direct buttons: the Opening page (default and custom title, the app's style, Powered by, moving on by itself) and email/phone opening on their empty field; a `login_hint` ignored |
 | `d-cli` | the CLI: device sign-in approved in the browser, silicon create, a self-created Silicon accepted on the site, login --silicon, an SLT |
-| `e-proofs` | OBO dm → briefcase and ATA commit → remind and waveform (one proof per app) with timings; a proof for two apps refused (`ata_single_app`), `accounts app proof ata --to` once only; revoking an OBO proof on /proofs |
+| `e-proofs` | User verification dm → briefcase and App verification commit → remind and waveform (one proof per app) with timings; a proof for two apps refused (`app_verification_single_app`), `accounts app proof app-verification --to` once only; revoking a user verification proof on /proofs |
 | `f-import` | dirty.csv into legacy-crm on the developer site (dry run, for real), the CLI's re-import, an imported Carbon finishing setup (a kept stack walked again: the rows match instead, and the Carbon signs straight in) |
 | `g-webhooks` | account changes reaching the fake apps' webhooks, signatures verified |
 | `h-branding` | acme-notes and pixel-studio in their own style on every page at 1440 and 390 px, Sign in / Sign up buttons, the SDK, the embed's framing |
 | `i-flows` | ledgerly's two-page flow with a review: intent=signup, a page per step, its own split layout, Back keeps choices, Cancel → access_denied |
-| `j-developer` | the developer site as an owner: its apps, a saved title shown by the hosted page, an ATA proof made, verified and revoked on its ATA tab, signing out of it only |
+| `j-developer` | the developer site as an owner: its apps, a saved title shown by the hosted page, an app verification proof made, verified and revoked on its App verification tab, signing out of it only |
 | `x-shared` | the developer site's unsaved-work guard from every way out and its 404; Escape, the Combobox and focus states; any-country phones; dark tokens; /developer on the account site → the developer site |
 | `y-silicons` | a Silicon on the account site: STK and webhook secret shown once, STK rotated by holding |
 | `z-connect` | connecting Google and Apple on Sign-in methods |

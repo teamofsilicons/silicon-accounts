@@ -473,19 +473,19 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
                 "messages": [{ "level": "error", "code": "missing_identifier", "message": "Row 3 has no valid email or phone.", "field": null }],
                 "input": { "name": "Nobody" } }], "next_cursor": null }),
         ),
-        ("POST", "/v1/proofs/ata") if app_auth => {
+        ("POST", "/v1/proofs/app-verification") if app_auth => {
             if json_body.get("audiences").is_some() {
                 error(
                     422,
-                    "ata_single_app",
-                    "An App verification is for exactly one app; ask for one proof per app.",
-                    "Send {\"receiving_app\": \"remind\"} to POST /v1/proofs/ata instead of \"audiences\".",
+                    "app_verification_single_app",
+                    "An app verification is for exactly one app; ask for one proof per app.",
+                    "Send {\"receiving_app\": \"remind\"} to POST /v1/proofs/app-verification instead of \"audiences\".",
                 )
             } else {
                 (
                     201,
-                    json!({ "proof_id": "p-ata", "kind": "ata", "proof_token": "sap_ata", "expires_at": "2099-01-01T00:30:00.000Z",
-                        "proof_refresh_token": "sapr_ata", "refresh_expires_at": "2099-06-01T00:00:00.000Z",
+                    json!({ "proof_id": "p-app_verification", "kind": "app_verification", "proof_token": "sap_app_verification", "expires_at": "2099-01-01T00:30:00.000Z",
+                        "proof_refresh_token": "sapr_app_verification", "refresh_expires_at": "2099-06-01T00:00:00.000Z",
                         "issuing_app": APP_ID, "receiving_app": json_body["receiving_app"], "user": null,
                         "scopes": json_body.get("scopes").cloned().unwrap_or_else(|| json!([])) }),
                 )
@@ -495,7 +495,7 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
             if json_body["proof_token"] == "sap_valid" {
                 (
                     200,
-                    json!({ "valid": true, "proof_id": "p1", "kind": "obo", "expires_at": "2099-01-01T00:30:00.000Z",
+                    json!({ "valid": true, "proof_id": "p1", "kind": "user_verification", "expires_at": "2099-01-01T00:30:00.000Z",
                     "issuing_app": { "app_id": "dm", "name": "DM" }, "receiving_app": { "app_id": APP_ID, "name": "Briefcase" },
                     "user": { "uuid": CARBON_UUID, "id": CARBON_ID, "kind": "carbon", "membership_id": "dm:a8K" }, "scopes": ["files.write"] }),
                 )

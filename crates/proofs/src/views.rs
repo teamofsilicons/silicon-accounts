@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::model::{ProofKind, ProofStatus};
 
-/// The account an OBO proof speaks for: `{"uuid","id","kind","membership_id"}`. The membership
+/// The account a user verification proof speaks for: `{"uuid","id","kind","membership_id"}`. The membership
 /// is the account's membership with the *issuing* app — the grant the proof stands on.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ProofUser {
@@ -21,7 +21,7 @@ pub struct ProofUser {
     pub membership_id: String,
 }
 
-/// A freshly issued or refreshed proof (`POST /v1/proofs/obo|ata|refresh`). `Debug` never
+/// A freshly issued or refreshed proof (`POST /v1/proofs/user-verification|app_verification|refresh`). `Debug` never
 /// prints the tokens.
 ///
 /// There is deliberately no relative `expires_in`: an `Idempotency-Key` retry replays the
@@ -42,9 +42,9 @@ pub struct IssuedProof {
     #[serde(with = "rfc3339_ms")]
     pub refresh_expires_at: OffsetDateTime,
     pub issuing_app: String,
-    /// The one app that verifies the proof (OBO and ATA alike).
+    /// The one app that verifies the proof (User verification and App verification alike).
     pub receiving_app: String,
-    /// OBO: the account; ATA: `null`.
+    /// User verification: the account; App verification: `null`.
     pub user: Option<ProofUser>,
     pub scopes: Vec<String>,
 }
@@ -68,7 +68,7 @@ impl std::fmt::Debug for IssuedProof {
 
 impl IssuedProof {
     /// Fills `receiving_app` from the stored audiences (always one app; a proof issued before
-    /// single-app ATA proofs reports its first).
+    /// single-app App verification proofs reports its first).
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         proof_id: Uuid,
@@ -120,7 +120,7 @@ pub struct ValidProof {
 }
 
 /// Exactly `{"valid":false,"expires_at":null}`: unknown, expired, revoked, not for the
-/// verifying app, issuing app disabled, or (OBO) the grant behind it ended. Deliberately says
+/// verifying app, issuing app disabled, or (User verification) the grant behind it ended. Deliberately says
 /// nothing more.
 pub fn invalid_proof() -> Value {
     json!({ "valid": false, "expires_at": null })
@@ -131,10 +131,10 @@ pub fn invalid_proof() -> Value {
 pub struct AppProofItem {
     pub proof_id: Uuid,
     pub kind: ProofKind,
-    /// The one app that verifies it (a proof issued before single-app ATA proofs reports its
+    /// The one app that verifies it (a proof issued before single-app App verification proofs reports its
     /// first receiving app).
     pub receiving_app: String,
-    /// OBO: the account; ATA: `null`.
+    /// User verification: the account; App verification: `null`.
     pub user: Option<AccountSummary>,
     pub scopes: Vec<String>,
     pub status: ProofStatus,
@@ -149,14 +149,14 @@ pub struct AppProofItem {
     pub token_expires_at: Option<OffsetDateTime>,
     #[serde(with = "rfc3339_ms_option")]
     pub last_refreshed_at: Option<OffsetDateTime>,
-    /// When it was revoked, or (OBO) when the grant behind it ended, if known.
+    /// When it was revoked, or (User verification) when the grant behind it ended, if known.
     #[serde(with = "rfc3339_ms_option")]
     pub revoked_at: Option<OffsetDateTime>,
     /// Why it is revoked (see `model::revoke_reason`), `null` while active.
     pub revoke_reason: Option<String>,
 }
 
-/// One OBO proof in `GET /v1/me/proofs`.
+/// One User verification proof in `GET /v1/me/proofs`.
 #[derive(Debug, Clone, Serialize)]
 pub struct MyProofItem {
     pub proof_id: Uuid,

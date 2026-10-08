@@ -1063,7 +1063,7 @@ pub struct DeletedAccount {
 /// - status `deleted`, `version` bumps; the id is reserved for 10 days (`reserve_id`), or
 ///   released at once (`false`);
 /// - emails, phones and Google/Apple identities removed; browser sessions, token families
-///   (`account_deleted`) and the OBO proofs about the account revoked (each with a
+///   (`account_deleted`) and the User verification proofs about the account revoked (each with a
 ///   `proof.revoked` audit entry);
 /// - the photo back to the Iris default, and its uploads that no other account shows deleted;
 /// - memberships stay as the apps' history, without the personal data an app imported

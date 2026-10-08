@@ -64,11 +64,11 @@ impl Grant {
             SLT_GRANT_TYPE | "slt" => return Ok(Grant::Slt),
             DEVICE_CODE_GRANT_TYPE | "device_code" => return Ok(Grant::DeviceCode),
             "client_credentials" => {
-                " Silicon Accounts doesn't issue app-only access tokens: one app proves itself to another with an App verification proof (POST /v1/proofs/ata)."
+                " Silicon Accounts doesn't issue app-only access tokens: one app proves itself to another with an app verification proof (POST /v1/proofs/app-verification)."
             }
             "urn:ietf:params:oauth:grant-type:token-exchange"
             | "urn:ietf:params:oauth:grant-type:jwt-bearer" => {
-                " To act for an account at another app, get a User verification proof (POST /v1/proofs/obo) with the account's access token."
+                " To act for an account at another app, get a User verification proof (POST /v1/proofs/user-verification) with the account's access token."
             }
             "password" => {
                 " Carbons never hand their credentials to apps: send them through the hosted sign-in (/authorize). Silicons get a short-lived token with `accounts login --app <app_id>` and the app exchanges it with grant_type=urn:silicon:params:oauth:grant-type:slt."
@@ -227,7 +227,7 @@ mod tests {
         let e = Grant::parse(Some("client_credentials")).expect_err("unsupported");
         assert_eq!(e.error, "unsupported_grant_type");
         assert!(
-            e.description.contains("/v1/proofs/ata"),
+            e.description.contains("/v1/proofs/app-verification"),
             "{}",
             e.description
         );

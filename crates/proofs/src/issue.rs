@@ -1,18 +1,18 @@
-//! Issuing proofs: OBO (`POST /v1/proofs/obo`) and ATA (`POST /v1/proofs/ata`, and the ATA page
-//! `POST /v1/apps/{app_id}/proofs/ata`). Both are always for exactly one receiving app.
+//! Issuing proofs: User verification (`POST /v1/proofs/user-verification`) and App verification (`POST /v1/proofs/app-verification`, and the App verification page
+//! `POST /v1/apps/{app_id}/proofs/app-verification`). Both are always for exactly one receiving app.
 
 use accounts_core::models::{ActorKind, App, AppStatus};
 use accounts_core::repo::audit::{self, AuditEntry};
 use accounts_core::{ApiError, AppState, FieldErrors};
 use serde_json::json;
 
-use crate::input::{self, IssueAtaBody, IssueOboBody};
+use crate::input::{self, IssueAppVerificationBody, IssueUserVerificationBody};
 use crate::model::{AUDIT_TARGET, ProofKind, action};
 use crate::store::{self, NewProof};
 use crate::subject;
 use crate::views::{IssuedProof, ProofUser};
 
-/// Who is issuing: the issuing app, the actor (the app itself, or its owner on the ATA page)
+/// Who is issuing: the issuing app, the actor (the app itself, or its owner on the App verification page)
 /// and the caller's IP for the audit log.
 #[derive(Debug, Clone)]
 pub struct Issuer<'a> {
@@ -34,12 +34,12 @@ impl<'a> Issuer<'a> {
     }
 }
 
-/// Issues an OBO proof (see [`subject::verify`] for the subject checks and
+/// Issues a user verification proof (see [`subject::verify`] for the subject checks and
 /// [`check_receivers`] for the receiving app).
-pub async fn obo(
+pub async fn user_verification(
     state: &AppState,
     issuer: &Issuer<'_>,
-    body: &IssueOboBody,
+    body: &IssueUserVerificationBody,
 ) -> Result<IssuedProof, ApiError> {
     let mut fields = FieldErrors::new();
     if body.subject_token.trim().is_empty() {
@@ -74,7 +74,7 @@ pub async fn obo(
         &mut tx,
         &state.keys.pepper,
         &NewProof {
-            kind: ProofKind::Obo,
+            kind: ProofKind::UserVerification,
             issuing_app: &issuer.app.app_id,
             audiences: &audiences,
             subject: Some((
@@ -96,7 +96,7 @@ pub async fn obo(
             app_id: Some(&issuer.app.app_id),
             account_uuid: Some(&subject.account.uuid),
             details: json!({
-                "kind": "obo",
+                "kind": "user_verification",
                 "issuing_app": issuer.app.app_id,
                 "receiving_app": audiences[0],
                 "scopes": scopes,
@@ -119,7 +119,7 @@ pub async fn obo(
     };
     Ok(IssuedProof::new(
         family.id,
-        ProofKind::Obo,
+        ProofKind::UserVerification,
         tokens,
         family.expires_at,
         &issuer.app.app_id,
@@ -129,12 +129,12 @@ pub async fn obo(
     ))
 }
 
-/// Issues an ATA proof for the one app in `receiving_app` (a body naming `audiences` gets 422
-/// `ata_single_app`, see [`IssueAtaBody::receiving_app`]). `endpoint` is the route called.
-pub async fn ata(
+/// Issues an app verification proof for the one app in `receiving_app` (a body naming `audiences` gets 422
+/// `app_verification_single_app`, see [`IssueAppVerificationBody::receiving_app`]). `endpoint` is the route called.
+pub async fn app_verification(
     state: &AppState,
     issuer: &Issuer<'_>,
-    body: &IssueAtaBody,
+    body: &IssueAppVerificationBody,
     endpoint: &str,
 ) -> Result<IssuedProof, ApiError> {
     let mut fields = FieldErrors::new();
@@ -152,7 +152,7 @@ pub async fn ata(
     let scopes = input::scopes(body.scopes.as_deref(), &mut fields);
     let ttl = input::access_ttl(body.access_ttl_seconds, &mut fields);
     fields.into_result()?;
-    // Stored as a one-app audience list (the column predates single-app ATA proofs).
+    // Stored as a one-app audience list (the column predates single-app App verification proofs).
     let audiences = vec![receiving.unwrap_or_default()];
 
     let mut tx = state.db.begin().await?;
@@ -161,7 +161,7 @@ pub async fn ata(
         &mut tx,
         &state.keys.pepper,
         &NewProof {
-            kind: ProofKind::Ata,
+            kind: ProofKind::AppVerification,
             issuing_app: &issuer.app.app_id,
             audiences: &audiences,
             subject: None,
@@ -178,7 +178,7 @@ pub async fn ata(
             target_id: Some(&proof_id),
             app_id: Some(&issuer.app.app_id),
             details: json!({
-                "kind": "ata",
+                "kind": "app_verification",
                 "issuing_app": issuer.app.app_id,
                 "receiving_app": audiences[0],
                 "scopes": scopes,
@@ -195,7 +195,7 @@ pub async fn ata(
     tracing::info!(proof_id = %family.id, issuing_app = %issuer.app.app_id, receiving_app = %audiences[0], "App verification issued");
     Ok(IssuedProof::new(
         family.id,
-        ProofKind::Ata,
+        ProofKind::AppVerification,
         tokens,
         family.expires_at,
         &issuer.app.app_id,

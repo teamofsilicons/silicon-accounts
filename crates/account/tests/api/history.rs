@@ -69,7 +69,7 @@ async fn one_timeline_over_every_source() {
     sqlx::query(
         "insert into proof_families (id, kind, issuing_app, audiences, account_uuid, scopes, access_ttl_seconds, expires_at, \
            revoked_at, revoked_by, revoke_reason) \
-         values ($1, 'obo', $2, $3, $4, '{files.write}', 600, now() + interval '900 days', now() + interval '1 millisecond', $4, 'revoked_by_account')",
+         values ($1, 'user_verification', $2, $3, $4, '{files.write}', 600, now() + interval '900 days', now() + interval '1 millisecond', $4, 'revoked_by_account')",
     )
     .bind(proof)
     .bind(&app)
@@ -687,7 +687,7 @@ async fn a_revoked_proof_says_why_in_words() {
         sqlx::query(
             "insert into proof_families (id, kind, issuing_app, audiences, account_uuid, scopes, access_ttl_seconds, expires_at, \
                revoked_at, revoked_by, revoke_reason) \
-             values ($1, 'obo', $2, $3, $4, '{files.write}', 600, now() + interval '900 days', now(), $5, $6)",
+             values ($1, 'user_verification', $2, $3, $4, '{files.write}', 600, now() + interval '900 days', now(), $5, $6)",
         )
         .bind(Uuid::now_v7())
         .bind(&issuer)

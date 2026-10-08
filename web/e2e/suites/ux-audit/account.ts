@@ -3,7 +3,7 @@
  *
  *   empty   a Carbon who just signed up: every page's empty state
  *   full    a Carbon with two apps (briefcase, dm with a phone), a second email, two Silicons and a Silicon's pending
- *           request to be its custodian, OBO proofs (one revoked) and the activity all of that leaves
+ *           request to be its custodian, User verification proofs (one revoked) and the activity all of that leaves
  *
  * Every page: the generic audit (_audit.ts), and at the bottom of the page no content under the floating dock (the
  * desktop dock at 1440, the compact bar at 390): the orchestrator's UX note 2.
@@ -78,7 +78,7 @@ export const journeys: Journey[] = [
   },
   {
     name: "ux-audit-account-full",
-    title: "a Carbon with apps, a phone and a second email, Silicons and a custodian request, OBO proofs (one revoked) and activity: every account page, light/dark × 1440/390, and the dock never covers the last content",
+    title: "a Carbon with apps, a phone and a second email, Silicons and a custodian request, User verification proofs (one revoked) and activity: every account page, light/dark × 1440/390, and the dock never covers the last content",
     timeoutMs: 900_000,
     async run(ctx) {
       const { env, results } = ctx;
@@ -112,13 +112,13 @@ export const journeys: Journey[] = [
       const asking = await api(ctx, "/v1/silicons", { method: "POST", json: { id: `si:uxa-asks-${t}`, display_name: `Asks ${t}`, custodian: carbon.id }, headers: { "idempotency-key": `uxa-${t}-asks` } });
       results.check("account-full: a Silicon asked this Carbon to be its custodian", asking.status === 200 || asking.status === 201 || asking.status === 202, `${asking.status} ${JSON.stringify(asking.body).slice(0, 200)}`);
 
-      // OBO proofs dm → briefcase on the Carbon's behalf; the Carbon revokes one.
+      // User verification proofs dm → briefcase on the Carbon's behalf; the Carbon revokes one.
       const proofIds: string[] = [];
       for (let i = 0; i < 2; i++) {
-        const issued = await postJson<{ body?: { proof_id?: string } }>(`${env.apps}/dm/actions/issue-obo`, { uuid: carbon.uuid, receiving_app: "briefcase", scopes: ["files.write"] });
+        const issued = await postJson<{ body?: { proof_id?: string } }>(`${env.apps}/dm/actions/issue-user_verification`, { uuid: carbon.uuid, receiving_app: "briefcase", scopes: ["files.write"] });
         if (issued.body.body?.proof_id) proofIds.push(issued.body.body.proof_id);
       }
-      results.check("account-full: dm holds two OBO proofs on the Carbon's behalf", proofIds.length === 2, proofIds.join(", "));
+      results.check("account-full: dm holds two User verification proofs on the Carbon's behalf", proofIds.length === 2, proofIds.join(", "));
       if (proofIds[0]) {
         const revoked = await pageFetch(page, `/v1/me/proofs/${encodeURIComponent(proofIds[0])}`, { method: "DELETE" });
         results.check("account-full: one proof revoked", revoked.status === 200 || revoked.status === 204, String(revoked.status));
@@ -158,10 +158,10 @@ export const journeys: Journey[] = [
       results.watch(page, "account-states", [/status of 4\d\d .*\/v1\/ids\/available/]);
       collectConsole(page, [/status of 4\d\d .*\/v1\/ids\/available/]);
       const t = tag();
-      // Something to remove and revoke: briefcase and dm (dm holds an OBO proof), a second email, a Silicon.
+      // Something to remove and revoke: briefcase and dm (dm holds a user verification proof), a second email, a Silicon.
       await signIntoApp(ctx, page, "briefcase");
       await signIntoApp(ctx, page, "dm", `+1202555${String(Math.floor(1000 + Math.random() * 8999))}`);
-      for (let i = 0; i < 2; i++) await postJson(`${env.apps}/dm/actions/issue-obo`, { uuid: carbon.uuid, receiving_app: "briefcase", scopes: ["files.write"] });
+      for (let i = 0; i < 2; i++) await postJson(`${env.apps}/dm/actions/issue-user_verification`, { uuid: carbon.uuid, receiving_app: "briefcase", scopes: ["files.write"] });
       await page.goto(`${env.site}/`);
       await page.locator("main").first().waitFor({ timeout: 30_000 });
       const second = `uxa.states.second.${t}@example.test`;

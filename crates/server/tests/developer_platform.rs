@@ -58,7 +58,7 @@ async fn developer_tokens_read_the_carbon_and_manage_their_apps_only() {
     }
     let r = send(
         &ctx,
-        Req::post(&format!("{base}/proofs/ata"))
+        Req::post(&format!("{base}/proofs/app-verification"))
             .bearer(&dev)
             .json(json!({"receiving_app": remind.app_id})),
     )

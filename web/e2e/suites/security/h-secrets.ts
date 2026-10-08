@@ -185,10 +185,10 @@ export const journey: Journey = {
     const config = await call(`${env.site}/v1/apps/acme-notes/signin-config/history`, { basic: appCredentials("acme-notes"), ip: ctx.ip });
     results.check("a bring-your-own Google secret never comes back (acme-notes' details and config history show client_secret_set, not GOCSPX-…)", acme.status === 200 && !/GOCSPX-|-----BEGIN/.test(acme.text) && /client_secret_set/.test(acme.text) && !/GOCSPX-|-----BEGIN/.test(config.text), `details ${acme.status}, history ${config.status}`);
     // Proofs: the token and the refresh token are shown once, when issued; listings never carry them.
-    const issued = await call<{ proof_id?: string; proof_token?: string; proof_refresh_token?: string }>(`${env.site}/v1/proofs/ata`, { json: { receiving_app: "remind" }, basic: appCredentials("commit"), ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}` } });
+    const issued = await call<{ proof_id?: string; proof_token?: string; proof_refresh_token?: string }>(`${env.site}/v1/proofs/app-verification`, { json: { receiving_app: "remind" }, basic: appCredentials("commit"), ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}` } });
     remember(ctx, "proof token", issued.body.proof_token, issued.body.proof_refresh_token);
     const listed = await call(`${env.site}/v1/apps/commit/proofs?limit=100`, { basic: appCredentials("commit"), ip: ctx.ip });
-    results.check("an ATA proof's token and refresh token come back once, when it is made, and the app's proof listing never carries any proof token (sap_/sapr_)", issued.status === 201 && (issued.body.proof_token ?? "").startsWith("sap_") && listed.status === 200 && listed.text.includes(issued.body.proof_id ?? "~") && !/\bsapr?_[A-Za-z0-9_-]{20,}/.test(listed.text), `issued ${issued.status}; listing ${listed.status}, ${listed.text.length} bytes`);
+    results.check("an app verification proof's token and refresh token come back once, when it is made, and the app's proof listing never carries any proof token (sap_/sapr_)", issued.status === 201 && (issued.body.proof_token ?? "").startsWith("sap_") && listed.status === 200 && listed.text.includes(issued.body.proof_id ?? "~") && !/\bsapr?_[A-Za-z0-9_-]{20,}/.test(listed.text), `issued ${issued.status}; listing ${listed.status}, ${listed.text.length} bytes`);
     const meCarbon = await call(`${env.site}/v1/me/silicons`, { jar: carbon.jar, ip: ctx.ip });
     const login = await siliconLogin(t, silicon.id, silicon.stk);
     remember(ctx, "access token", login.body.access_token);

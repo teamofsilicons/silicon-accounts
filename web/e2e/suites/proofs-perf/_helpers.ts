@@ -1,5 +1,5 @@
 /**
- * Helpers of the proofs-perf suite (OBO and ATA proofs end to end, their failure modes, and their latency).
+ * Helpers of the proofs-perf suite (User verification and App verification proofs end to end, their failure modes, and their latency).
  *
  * Kept in the suite (README: "keep it in the suite (_helpers.ts) and say so"): a Carbon signed into a fake app without
  * a browser (the v2 hosted flow driven through the site's /v1: email code, sign-up, the app's details pages — a missing
@@ -51,10 +51,10 @@ export interface ApiErrorBody {
   error: { code: string; message: string; hint?: string; details?: Record<string, unknown> };
 }
 
-/** What POST /v1/proofs/obo|ata|refresh answers (v2: `receiving_app` names the one app, OBO and ATA alike). */
+/** What POST /v1/proofs/user-verification|app_verification|refresh answers (v2: `receiving_app` names the one app, User verification and App verification alike). */
 export interface IssuedProof {
   proof_id: string;
-  kind: "obo" | "ata";
+  kind: "user_verification" | "app_verification";
   proof_token: string;
   expires_at: string;
   proof_refresh_token: string;
@@ -77,32 +77,32 @@ export interface Verification {
   scopes?: string[];
 }
 
-/** The keys of a valid verification (UNDERSTANDING.md: valid, expires_at, issuing app, receiving app, user for OBO). */
+/** The keys of a valid verification (UNDERSTANDING.md: valid, expires_at, issuing app, receiving app, user for User verification). */
 export const VALID_KEYS = ["expires_at", "issuing_app", "kind", "proof_id", "receiving_app", "scopes", "user", "valid"];
 
 /** The keys of an issue or refresh answer. */
 export const ISSUED_KEYS = ["expires_at", "issuing_app", "kind", "proof_id", "proof_refresh_token", "proof_token", "receiving_app", "refresh_expires_at", "scopes", "user"];
 
-export const issueObo = (ctx: Ctx, appId: string, subjectToken: string, body: { receiving_app: string; scopes?: string[]; access_ttl_seconds?: number }, options: AppCallOptions = {}) =>
-  asApp<IssuedProof>(ctx, appId, "POST", "/v1/proofs/obo", { subject_token: subjectToken, ...body }, { key: randomUUID(), ...options });
+export const issueUserVerification = (ctx: Ctx, appId: string, subjectToken: string, body: { receiving_app: string; scopes?: string[]; access_ttl_seconds?: number }, options: AppCallOptions = {}) =>
+  asApp<IssuedProof>(ctx, appId, "POST", "/v1/proofs/user-verification", { subject_token: subjectToken, ...body }, { key: randomUUID(), ...options });
 
-/** POST /v1/proofs/ata (or `path`, the ATA page's POST /v1/apps/{app_id}/proofs/ata) with any body: for refusals. */
-export const issueAtaRaw = (ctx: Ctx, appId: string, body: Record<string, unknown>, options: AppCallOptions & { path?: string } = {}) =>
-  asApp<IssuedProof>(ctx, appId, "POST", options.path ?? "/v1/proofs/ata", body, { key: randomUUID(), ...options });
+/** POST /v1/proofs/app-verification (or `path`, the App verification page's POST /v1/apps/{app_id}/proofs/app-verification) with any body: for refusals. */
+export const issueAppVerificationRaw = (ctx: Ctx, appId: string, body: Record<string, unknown>, options: AppCallOptions & { path?: string } = {}) =>
+  asApp<IssuedProof>(ctx, appId, "POST", options.path ?? "/v1/proofs/app-verification", body, { key: randomUUID(), ...options });
 
 /**
- * An ATA proof for exactly one app (UNDERSTANDING.md: "An ATA proof is always for exactly one app; a proof can't be made
- * for several apps at once"): `{"receiving_app": app}`. `path` is POST /v1/proofs/ata (default) or the ATA page's
- * POST /v1/apps/{app_id}/proofs/ata; `as` calls with another app's credentials.
+ * An app verification proof for exactly one app (UNDERSTANDING.md: "An app verification proof is always for exactly one app; a proof can't be made
+ * for several apps at once"): `{"receiving_app": app}`. `path` is POST /v1/proofs/app-verification (default) or the App verification page's
+ * POST /v1/apps/{app_id}/proofs/app-verification; `as` calls with another app's credentials.
  */
-export function issueAtaFor(
+export function issueAppVerificationFor(
   ctx: Ctx,
   issuer: string,
   receiver: string,
   extra: { scopes?: string[]; access_ttl_seconds?: number } = {},
   options: AppCallOptions & { path?: string; as?: string } = {},
 ): Promise<JsonAnswer<IssuedProof>> {
-  const { path = "/v1/proofs/ata", as = issuer, ...call } = options;
+  const { path = "/v1/proofs/app-verification", as = issuer, ...call } = options;
   return asApp<IssuedProof>(ctx, as, "POST", path, { receiving_app: receiver, ...extra }, { key: randomUUID(), ...call });
 }
 

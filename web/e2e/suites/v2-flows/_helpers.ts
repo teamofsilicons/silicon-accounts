@@ -2,7 +2,7 @@
  * Helpers of the v2-flows suite: UNDERSTANDING.md v2 ("What's shared with the app", "Flows", "Adding sign-in to an
  * app", "Proofs") and build spec 06-v2.md — the details pages of an app's flow and its review page, intents, direct
  * method buttons, the Opening Google/Apple page, no login_hint, the embed's and the SDK's Sign in / Sign up buttons,
- * and ATA proofs for exactly one app.
+ * and App verification proofs for exactly one app.
  *
  * Everything here talks to the stack the way an app, a Carbon's browser or an app's owner would: the fake apps'
  * credentials (Basic) for an app's own sign-in setup, the browser's own cookies for the hosted flow's API, and the

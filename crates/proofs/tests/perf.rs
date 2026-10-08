@@ -69,7 +69,7 @@ async fn verify_latency_sequential_and_concurrent() {
         .expect("pool");
     let state = accounts_core::test_support::test_state(pool);
     let app = accounts_proofs::router().with_state(state);
-    let proof = w.issue_obo().await;
+    let proof = w.issue_user_verification().await;
     let t = token(&proof);
     let (bc_id, bc_secret) = (w.briefcase.app_id.clone(), w.briefcase_secret.clone());
     let req = move |t: &str| {

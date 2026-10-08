@@ -136,9 +136,9 @@ pub enum Commands {
 
     /// User verification proofs apps issued on your behalf: list or revoke them.
     #[command(
-        visible_alias = "user-verification",
         after_long_help = "Examples:\n  accounts proofs list\n  accounts proofs revoke 0192f0c2-…"
     )]
+    #[command(visible_alias = "user-verification")]
     Proofs(MyProofsArgs),
 
     /// Your browser sessions and CLI sign-ins: list or revoke them.
@@ -263,7 +263,7 @@ const APP_EXAMPLES: &str = "Examples:
   accounts app token exchange --code sac_… --code-verifier … \\
       --redirect-uri https://briefcase.example/callback
   accounts app token slt slt_…
-  accounts app proof obo --subject-token eyJ… --to briefcase --scope files.write
+  accounts app proof user-verification --subject-token eyJ… --to briefcase --scope files.write
   accounts app proof verify sap_… && echo valid
   accounts app webhook set https://briefcase.example/webhooks
   accounts app webhook replay --failed";
@@ -1254,10 +1254,9 @@ pub struct ProofArgs {
 pub enum ProofCommand {
     /// Issue a User verification proof: act at another app on behalf of an account that consented in your app.
     #[command(
-        visible_alias = "user-verification",
-        after_long_help = "Examples:\n  accounts app proof obo --subject-token \"$ACCESS_TOKEN\" --to briefcase \\\n      --scope files.write --ttl 600"
+        after_long_help = "Examples:\n  accounts app proof user-verification --subject-token \"$ACCESS_TOKEN\" --to briefcase \\\n      --scope files.write --ttl 600"
     )]
-    Obo {
+    UserVerification {
         /// The account's access token issued to this app (or - for stdin).
         #[arg(long, value_name = "TOKEN")]
         subject_token: String,
@@ -1274,13 +1273,12 @@ pub enum ProofCommand {
         #[arg(long, value_name = "KEY")]
         idempotency_key: Option<String>,
     },
-    /// Issue an App verification proof that one other app can verify (one proof per app).
+    /// Issue an app verification proof that one other app can verify (one proof per app).
     #[command(
-        visible_alias = "app-verification",
-        long_about = "Issue an App verification proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An App verification proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Managers can also make, see and revoke these proofs in the developer portal. The central history at developers.teamofsilicons.com/app-verification retains records and token events for apps you manage; raw token values are shown only when generated.",
-        after_long_help = "Examples:\n  accounts app proof ata --to remind --ttl 300\n  accounts app proof ata --to waveform --scope notifications.send\n  accounts app proof list --kind ata"
+        long_about = "Issue an app verification proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An app verification proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Managers can also make, see and revoke these proofs in the developer portal. The central history at developers.teamofsilicons.com/app-verification retains records and token events for apps you manage; raw token values are shown only when generated.",
+        after_long_help = "Examples:\n  accounts app proof app-verification --to remind --ttl 300\n  accounts app proof app-verification --to waveform --scope notifications.send\n  accounts app proof list --kind app_verification"
     )]
-    Ata {
+    AppVerification {
         /// The one receiving app id (issue one proof per app).
         #[arg(long, value_name = "APP_ID", required = true)]
         to: String,
@@ -1324,7 +1322,7 @@ pub enum ProofCommand {
     },
     /// List proofs this app issued.
     List {
-        /// obo or ata.
+        /// user_verification or app_verification.
         #[arg(long, value_name = "KIND")]
         kind: Option<String>,
         /// active or revoked.

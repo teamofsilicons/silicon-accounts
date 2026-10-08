@@ -16,18 +16,18 @@
  * holds the machine's benchmark slot (lib.ts withBenchSlot), so the twin stack of scripts/e2e-all.sh never benchmarks at
  * the same moment. A run during which this process stood still for seconds (the machine slept: lib.ts watchStalls) is
  * void and measured again, and no request waits more than 30 s. Around the gate, for reading the numbers: a verify
- * refused before any database work, verifies of an ATA proof, of an unknown token and by a non-audience app (each with
+ * refused before any database work, verifies of an app verification proof, of an unknown token and by a non-audience app (each with
  * /readyz interleaved), the database's execution time of the verify query (EXPLAIN ANALYZE) and the machine's load.
  *
- * Then the round trips: OBO dm → briefcase and ATA commit → remind and commit → waveform (a proof per app: an ATA proof
- * is always for exactly one app) through the fake apps, and an app's whole OBO cycle (issue, verify, refresh, verify,
+ * Then the round trips: User verification dm → briefcase and App verification commit → remind and commit → waveform (a proof per app: an app verification proof
+ * is always for exactly one app) through the fake apps, and an app's whole User verification cycle (issue, verify, refresh, verify,
  * revoke, verify) timed step by step.
  */
 import { randomUUID } from "node:crypto";
 import http from "node:http";
 import type { Ctx, Journey } from "../../context";
 import { FROZEN_STALL_MS, json, sql, waitForCalm, watchStalls, withBenchSlot } from "../../lib";
-import { apiLogSize, appTokens, basicAuth, describeStats, isExactlyInvalid, issueAtaFor, issueObo, machineLoad, namesOnly, refreshAs, revokeAs, serverDurations, short, signInToApp, stats, verifyAs, type Stats } from "./_helpers";
+import { apiLogSize, appTokens, basicAuth, describeStats, isExactlyInvalid, issueAppVerificationFor, issueUserVerification, machineLoad, namesOnly, refreshAs, revokeAs, serverDurations, short, signInToApp, stats, verifyAs, type Stats } from "./_helpers";
 import { LATENCY_GATE, MAX_FROZEN_RUNS, decide, frozenVerdict, gateWords, judge, type Verdict } from "./_latency-gate";
 
 export interface Answer {
@@ -203,7 +203,7 @@ const VERIFY_SQL = (hashHex: string, verifier: string) =>
   `select f.id as proof_id, f.kind, f.scopes, t.expires_at as token_expires_at, ia.app_id as issuing_app_id, ia.name as issuing_app_name, ` +
   `f.account_uuid, a.handle as account_handle, a.kind as account_kind, t.expires_at <= now() as token_expired, f.revoked_at is not null as family_revoked, ` +
   `f.expires_at <= now() as family_expired, ia.status <> 'active' as issuer_inactive, coalesce(not ('${verifier}' = any(f.audiences)), true) as not_audience, ` +
-  `(f.kind = 'obo' and not coalesce(tf.id is not null and tf.revoked_at is null and tf.expires_at > now() and m.status = 'active' and a.status = 'active', false)) as grant_ended ` +
+  `(f.kind = 'user_verification' and not coalesce(tf.id is not null and tf.revoked_at is null and tf.expires_at > now() and m.status = 'active' and a.status = 'active', false)) as grant_ended ` +
   `from proof_tokens t join proof_families f on f.id = t.family_id join apps ia on ia.app_id = f.issuing_app ` +
   `left join accounts a on a.uuid = f.account_uuid left join memberships m on m.app_id = f.issuing_app and m.account_uuid = f.account_uuid ` +
   `left join token_families tf on tf.id = f.subject_family_id where t.token_hash = '\\x${hashHex}'::bytea and t.kind = 'access'`;
@@ -230,9 +230,9 @@ export const journeys: Journey[] = [
       const { env, results } = ctx;
       const carbon = await signInToApp(ctx, "dm");
       const subject = (await appTokens(env, "dm", carbon.uuid)).access_token;
-      const obo = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: ["files.write"] })).body;
-      const ata = (await issueAtaFor(ctx, "commit", "remind")).body;
-      results.check("an OBO proof (dm → briefcase) and an ATA proof (commit → remind) to verify", obo.proof_token?.startsWith("sap_") === true && ata.proof_token?.startsWith("sap_") === true, `${short(obo.error ?? obo.proof_id)} / ${short(ata.error ?? ata.proof_id)}`);
+      const user_verification = (await issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", scopes: ["files.write"] })).body;
+      const app_verification = (await issueAppVerificationFor(ctx, "commit", "remind")).body;
+      results.check("a user verification proof (dm → briefcase) and an app verification proof (commit → remind) to verify", user_verification.proof_token?.startsWith("sap_") === true && app_verification.proof_token?.startsWith("sap_") === true, `${short(user_verification.error ?? user_verification.proof_id)} / ${short(app_verification.error ?? app_verification.proof_id)}`);
 
       const verifySend =
         (base: string, app: string | null, token: string): Send =>
@@ -261,8 +261,8 @@ export const journeys: Journey[] = [
         console.log(`        benchmark slot: ${slot.held ? "held" : "NOT held (it stayed taken)"} after ${(slot.waitedMs / 1000).toFixed(1)} s${slot.heldBy ? ` (held by ${slot.heldBy})` : ""}`);
 
         // Warm up both paths (connections, the app credential cache, the site's proxy).
-        await measure("warm-up api", 100, 10, [verifyKind(env.api, "briefcase", obo.proof_token, valid), readyz]);
-        await measure("warm-up site", 100, 10, [verifyKind(env.site, "briefcase", obo.proof_token, valid), passthrough(env.site), readyz]);
+        await measure("warm-up api", 100, 10, [verifyKind(env.api, "briefcase", user_verification.proof_token, valid), readyz]);
+        await measure("warm-up site", 100, 10, [verifyKind(env.site, "briefcase", user_verification.proof_token, valid), passthrough(env.site), readyz]);
 
         // For reading the numbers (never gated), each with /readyz interleaved: the HTTP stack without the database, and
         // verifies of other kinds of tokens.
@@ -275,8 +275,8 @@ export const journeys: Journey[] = [
           console.log(`        ${label}: ${describeStats(s)}; /readyz ${describeStats(control)}; ${throughput(r).toFixed(0)} req/s${server ? `; accounts-api ${describeStats(server)}` : ""}; ${loadText(r)}`);
           return { r, s, control, server, kind: kind.name, voided };
         };
-        const floor = await informational("verify refused before the database (no app credentials, 401) api, sequential", 1000, 1, verifyKind(env.api, null, obo.proof_token, status(401)));
-        const floorConcurrent = await informational("verify refused before the database (no app credentials, 401) api, 50 concurrent", 1000, 50, verifyKind(env.api, null, obo.proof_token, status(401)));
+        const floor = await informational("verify refused before the database (no app credentials, 401) api, sequential", 1000, 1, verifyKind(env.api, null, user_verification.proof_token, status(401)));
+        const floorConcurrent = await informational("verify refused before the database (no app credentials, 401) api, 50 concurrent", 1000, 50, verifyKind(env.api, null, user_verification.proof_token, status(401)));
 
         // The gated measurements. After a run that missed the gate, wait (up to E2E_BENCH_CALM_WAIT_MS in all, default 3
         // minutes) for the load to come down before the next run.
@@ -292,7 +292,7 @@ export const journeys: Journey[] = [
               console.log(`        waited ${(calm.waitedMs / 1000).toFixed(1)} s for a calmer machine before run ${attempt}: load ${calm.load} on ${calm.cores} cores${calm.calm ? "" : " (still busy)"}`);
             }
             const control = path === "api" ? readyz : passthrough(env.site);
-            const kinds = path === "api" ? [verifyKind(base, "briefcase", obo.proof_token, valid), readyz] : [verifyKind(base, "briefcase", obo.proof_token, valid), control, readyz];
+            const kinds = path === "api" ? [verifyKind(base, "briefcase", user_verification.proof_token, valid), readyz] : [verifyKind(base, "briefcase", user_verification.proof_token, valid), control, readyz];
             const logFrom = apiLogSize(env);
             const measured = await measureAwake(ctx, `${label}${attempt > 1 ? ` (run ${attempt})` : ""}`, n, concurrency, kinds);
             const r = measured.run;
@@ -312,20 +312,20 @@ export const journeys: Journey[] = [
           }
           return { runs, decision: decide(runs.map(run => run.verdict)), path };
         };
-        const seq = await gated("verify OBO api, 1000 sequential", 1000, 1, "api");
-        const conc = await gated("verify OBO api, 1000 from 50 concurrent", 1000, 50, "api");
-        const siteSeq = await gated("verify OBO site, 1000 sequential", 1000, 1, "site");
-        const siteConc = await gated("verify OBO site, 1000 from 50 concurrent", 1000, 50, "site");
+        const seq = await gated("verify User verification api, 1000 sequential", 1000, 1, "api");
+        const conc = await gated("verify User verification api, 1000 from 50 concurrent", 1000, 50, "api");
+        const siteSeq = await gated("verify User verification site, 1000 sequential", 1000, 1, "site");
+        const siteConc = await gated("verify User verification site, 1000 from 50 concurrent", 1000, 50, "site");
 
-        // More verdicts, timed but not gated: an ATA proof, an unknown token, and an app that is not the receiving app.
-        const ataSeq = await informational("verify ATA (commit → remind) api, 300 sequential", 300, 1, verifyKind(env.api, "remind", ata.proof_token, valid));
+        // More verdicts, timed but not gated: an app verification proof, an unknown token, and an app that is not the receiving app.
+        const ataSeq = await informational("verify App verification (commit → remind) api, 300 sequential", 300, 1, verifyKind(env.api, "remind", app_verification.proof_token, valid));
         const unknown = `sap_${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url")}`;
         const invalidSeq = await informational("verify unknown token api, 300 sequential", 300, 1, verifyKind(env.api, "briefcase", unknown, invalid));
-        const nonAudience = await informational("verify by a non-audience app api, 300 sequential", 300, 1, verifyKind(env.api, "remind", obo.proof_token, invalid));
+        const nonAudience = await informational("verify by a non-audience app api, 300 sequential", 300, 1, verifyKind(env.api, "remind", user_verification.proof_token, invalid));
 
         // The verify query in the database itself (EXPLAIN ANALYZE, 20 times): what is left of a verify once HTTP, the
         // connection pool and the machine's scheduling are taken away.
-        const [[hash] = []] = await sql(env, `select encode(token_hash, 'hex') from proof_tokens where family_id = '${obo.proof_id}' and kind = 'access'`);
+        const [[hash] = []] = await sql(env, `select encode(token_hash, 'hex') from proof_tokens where family_id = '${user_verification.proof_id}' and kind = 'access'`);
         const executions: number[] = [];
         const nodes = new Set<string>();
         const walk = (node: { "Node Type"?: string; "Relation Name"?: string; "Index Name"?: string; Plans?: unknown[] }) => {
@@ -416,7 +416,7 @@ export const journeys: Journey[] = [
   },
   {
     name: "proofs-perf-latency-roundtrip",
-    title: "round-trip timings, each beside a GET /readyz taken at the same moments: 50 OBO saves dm → briefcase and 50 rounds of ATA notifies commit → [remind, waveform] (two proofs a round, one per app) through the fake apps, and 50 whole OBO cycles of an app (issue, verify, refresh, verify, revoke, verify) step by step",
+    title: "round-trip timings, each beside a GET /readyz taken at the same moments: 50 User verification saves dm → briefcase and 50 rounds of App verification notifies commit → [remind, waveform] (two proofs a round, one per app) through the fake apps, and 50 whole User verification cycles of an app (issue, verify, refresh, verify, revoke, verify) step by step",
     timeoutMs: 12 * 60_000,
     async run(ctx) {
       const { env, results } = ctx;
@@ -438,72 +438,72 @@ export const journeys: Journey[] = [
         return `${name} p50 ${s.p50.toFixed(2)} ms (${(s.p50 - c.p50).toFixed(2)} ms over /readyz)`;
       };
 
-      // OBO through the fake apps.
-      const obo: Record<string, number[]> = { issue_ms: [], verify_ms: [], call_ms: [], total_ms: [], client_ms: [], readyz_ms: [] };
+      // User verification through the fake apps.
+      const user_verification: Record<string, number[]> = { issue_ms: [], verify_ms: [], call_ms: [], total_ms: [], client_ms: [], readyz_ms: [] };
       let oboOk = 0;
       let readyzBad = 0;
       const oboLoad = machineLoad();
       for (let i = 0; i < N; i++) {
-        if ((await readyz(obo.readyz_ms!)) !== 200) readyzBad++;
+        if ((await readyz(user_verification.readyz_ms!)) !== 200) readyzBad++;
         const t0 = performance.now();
         const answer = await json<{ ok?: boolean; timings?: Record<string, number | null> }>(`${env.apps}/dm/actions/save-to-briefcase`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ uuid: carbon.uuid, filename: `bench-${i}.txt` }) });
-        obo.client_ms!.push(performance.now() - t0);
+        user_verification.client_ms!.push(performance.now() - t0);
         if (answer.status === 200 && answer.body.ok === true) oboOk++;
-        for (const key of ["issue_ms", "verify_ms", "call_ms", "total_ms"]) if (typeof answer.body.timings?.[key] === "number") obo[key]!.push(answer.body.timings[key] as number);
+        for (const key of ["issue_ms", "verify_ms", "call_ms", "total_ms"]) if (typeof answer.body.timings?.[key] === "number") user_verification[key]!.push(answer.body.timings[key] as number);
       }
-      for (const [key, values] of Object.entries(obo)) {
+      for (const [key, values] of Object.entries(user_verification)) {
         const s = stats(values);
-        results.metric(`OBO save via fake apps ${key} p50`, s.p50);
-        results.metric(`OBO save via fake apps ${key} p95`, s.p95);
-        results.metric(`OBO save via fake apps ${key} max`, s.max);
+        results.metric(`User verification save via fake apps ${key} p50`, s.p50);
+        results.metric(`User verification save via fake apps ${key} p95`, s.p95);
+        results.metric(`User verification save via fake apps ${key} max`, s.max);
       }
       results.check(
-        `${N} OBO saves dm → briefcase through the fake apps all succeeded (issued, verified, stored)`,
+        `${N} User verification saves dm → briefcase through the fake apps all succeeded (issued, verified, stored)`,
         oboOk === N,
-        `${oboOk}/${N}; ${Object.entries(obo).map(([key, values]) => `${key} ${describeStats(stats(values))}`).join("; ")}; ${controlNote("OBO save end to end (client)", obo.client_ms!, obo.readyz_ms!)}; load ${oboLoad.load1} on ${oboLoad.cores} cores`,
+        `${oboOk}/${N}; ${Object.entries(user_verification).map(([key, values]) => `${key} ${describeStats(stats(values))}`).join("; ")}; ${controlNote("User verification save end to end (client)", user_verification.client_ms!, user_verification.readyz_ms!)}; load ${oboLoad.load1} on ${oboLoad.cores} cores`,
       );
 
-      // ATA through the fake apps: Commit notifies Remind and Waveform at once, which the fake app does with a proof
-      // for each app, issued in parallel (UNDERSTANDING.md: an ATA proof is always for exactly one app).
+      // App verification through the fake apps: Commit notifies Remind and Waveform at once, which the fake app does with a proof
+      // for each app, issued in parallel (UNDERSTANDING.md: an app verification proof is always for exactly one app).
       type Notify = {
         ok?: boolean;
         proofs?: Record<string, { proof_id?: string; receiving_app?: string } | undefined>;
         timings?: { issue_ms?: Record<string, number | null>; verify_ms?: Record<string, number | null>; total_ms?: number };
       };
       const ataApps = ["remind", "waveform"] as const;
-      const ata: Record<string, number[]> = { round_client_ms: [], round_total_ms: [], readyz_ms: [] };
-      for (const app of ataApps) for (const key of ["issue_ms", "verify_ms"]) ata[`${app}_${key}`] = [];
+      const app_verification: Record<string, number[]> = { round_client_ms: [], round_total_ms: [], readyz_ms: [] };
+      for (const app of ataApps) for (const key of ["issue_ms", "verify_ms"]) app_verification[`${app}_${key}`] = [];
       let ataOk = 0;
       let firstBad = "";
       for (let i = 0; i < N; i++) {
-        if ((await readyz(ata.readyz_ms!)) !== 200) readyzBad++;
+        if ((await readyz(app_verification.readyz_ms!)) !== 200) readyzBad++;
         const t0 = performance.now();
         const answer = await json<Notify>(`${env.apps}/commit/actions/notify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ audiences: [...ataApps], message: `bench ${i}` }) });
-        ata.round_client_ms!.push(performance.now() - t0);
+        app_verification.round_client_ms!.push(performance.now() - t0);
         const proofs = answer.body.proofs ?? {};
         const ids = ataApps.map(app => proofs[app]?.proof_id);
         const good = answer.status === 200 && answer.body.ok === true && ataApps.every(app => namesOnly(proofs[app], app)) && !!ids[0] && !!ids[1] && ids[0] !== ids[1];
         if (good) ataOk++;
         else firstBad ||= `${answer.status} ${short(answer.body, 300)}`;
         const t = answer.body.timings;
-        if (typeof t?.total_ms === "number") ata.round_total_ms!.push(t.total_ms);
+        if (typeof t?.total_ms === "number") app_verification.round_total_ms!.push(t.total_ms);
         for (const app of ataApps) {
-          if (typeof t?.issue_ms?.[app] === "number") ata[`${app}_issue_ms`]!.push(t.issue_ms[app]!);
-          if (typeof t?.verify_ms?.[app] === "number") ata[`${app}_verify_ms`]!.push(t.verify_ms[app]!);
+          if (typeof t?.issue_ms?.[app] === "number") app_verification[`${app}_issue_ms`]!.push(t.issue_ms[app]!);
+          if (typeof t?.verify_ms?.[app] === "number") app_verification[`${app}_verify_ms`]!.push(t.verify_ms[app]!);
         }
       }
-      for (const [key, values] of Object.entries(ata)) {
+      for (const [key, values] of Object.entries(app_verification)) {
         const s = stats(values);
-        results.metric(`ATA notify via fake apps ${key} p50`, s.p50);
-        results.metric(`ATA notify via fake apps ${key} p95`, s.p95);
+        results.metric(`App verification notify via fake apps ${key} p50`, s.p50);
+        results.metric(`App verification notify via fake apps ${key} p95`, s.p95);
       }
       results.check(
-        `${N} rounds of ATA notifies through the fake apps, commit → remind and commit → waveform at once: every round two proofs, each naming only its app, both pings accepted`,
+        `${N} rounds of App verification notifies through the fake apps, commit → remind and commit → waveform at once: every round two proofs, each naming only its app, both pings accepted`,
         ataOk === N,
-        `${ataOk}/${N}${firstBad ? `; first bad: ${firstBad}` : ""}; ${Object.entries(ata).map(([key, values]) => `${key} ${describeStats(stats(values))}`).join("; ")}; ${controlNote("ATA round end to end (client)", ata.round_client_ms!, ata.readyz_ms!)}`,
+        `${ataOk}/${N}${firstBad ? `; first bad: ${firstBad}` : ""}; ${Object.entries(app_verification).map(([key, values]) => `${key} ${describeStats(stats(values))}`).join("; ")}; ${controlNote("App verification round end to end (client)", app_verification.round_client_ms!, app_verification.readyz_ms!)}`,
       );
 
-      // An app's whole OBO cycle, step by step, straight at accounts-api (as an app server calls it).
+      // An app's whole User verification cycle, step by step, straight at accounts-api (as an app server calls it).
       const subject = (await appTokens(env, "dm", carbon.uuid)).access_token;
       const steps: Record<string, number[]> = { readyz: [], issue: [], verify: [], refresh: [], verify_refreshed: [], revoke: [], verify_revoked: [], cycle: [] };
       let cycleOk = 0;
@@ -516,7 +516,7 @@ export const journeys: Journey[] = [
       for (let i = 0; i < N; i++) {
         if ((await readyz(steps.readyz!)) !== 200) readyzBad++;
         const t0 = performance.now();
-        const issued = await time("issue", () => issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: ["bench"], access_ttl_seconds: 300 }, { direct: true }));
+        const issued = await time("issue", () => issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", scopes: ["bench"], access_ttl_seconds: 300 }, { direct: true }));
         const v1 = await time("verify", () => verifyAs(ctx, "briefcase", issued.body.proof_token, { direct: true }));
         const refreshed = await time("refresh", () => refreshAs(ctx, "dm", issued.body.proof_refresh_token, {}, { direct: true }));
         const v2 = await time("verify_refreshed", () => verifyAs(ctx, "briefcase", refreshed.body.proof_token, { direct: true }));
@@ -527,14 +527,14 @@ export const journeys: Journey[] = [
       }
       for (const [name, values] of Object.entries(steps)) {
         const s = stats(values);
-        results.metric(`OBO cycle ${name} p50`, s.p50);
-        results.metric(`OBO cycle ${name} p95`, s.p95);
-        results.metric(`OBO cycle ${name} max`, s.max);
+        results.metric(`User verification cycle ${name} p50`, s.p50);
+        results.metric(`User verification cycle ${name} p95`, s.p95);
+        results.metric(`User verification cycle ${name} max`, s.max);
       }
       const load = machineLoad();
-      const overReadyz = ["issue", "verify", "refresh", "verify_refreshed", "revoke", "verify_revoked"].map(name => controlNote(`OBO cycle ${name}`, steps[name]!, steps.readyz!)).join("; ");
+      const overReadyz = ["issue", "verify", "refresh", "verify_refreshed", "revoke", "verify_revoked"].map(name => controlNote(`User verification cycle ${name}`, steps[name]!, steps.readyz!)).join("; ");
       results.check(
-        `${N} whole OBO cycles straight at accounts-api (issue 201, verify valid, refresh 200, verify valid, revoke 204, verify exactly invalid) all behaved`,
+        `${N} whole User verification cycles straight at accounts-api (issue 201, verify valid, refresh 200, verify valid, revoke 204, verify exactly invalid) all behaved`,
         cycleOk === N,
         `${cycleOk}/${N}; ${Object.entries(steps).map(([name, values]) => `${name} ${describeStats(stats(values))}`).join("; ")}; ${overReadyz}; load ${load.load1} on ${load.cores} cores`,
       );

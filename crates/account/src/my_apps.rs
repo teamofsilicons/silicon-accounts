@@ -185,7 +185,7 @@ fn first_party_refusal(app_id: &str) -> ApiError {
 }
 
 /// `DELETE /v1/me/apps/{app_id}` → 204. Removes the app's access: its sign-ins (token families)
-/// for this account are revoked, the OBO proofs it issued about this account are revoked, the
+/// for this account are revoked, the User verification proofs it issued about this account are revoked, the
 /// membership becomes `access_removed`, and the app gets `membership.access_removed`. Removing
 /// access that is already removed changes nothing (no second webhook). Silicon Accounts' own apps
 /// are refused (see [`first_party_refusal`]).

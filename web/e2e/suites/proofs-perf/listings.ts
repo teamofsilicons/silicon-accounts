@@ -1,11 +1,11 @@
 /**
  * Listings and identity: the account's /v1/me/proofs and the issuing app's /v1/apps/{app_id}/proofs page with a stable
  * cursor, newest first, filter by status and kind, and refuse bad parameters precisely; a verification names the
- * account's current id after an id change (the uuid and membership stay); an OBO proof needs no membership with the
+ * account's current id after an id change (the uuid and membership stay); a user verification proof needs no membership with the
  * receiving app.
  */
 import type { Journey } from "../../context";
-import { appTokens, asApp, errorCode, issueObo, refreshAs, short, signInToApp, verifyAs, type AppProofItem, type IssuedProof, type MyProofItem } from "./_helpers";
+import { appTokens, asApp, errorCode, issueUserVerification, refreshAs, short, signInToApp, verifyAs, type AppProofItem, type IssuedProof, type MyProofItem } from "./_helpers";
 
 interface Page<T> {
   items: T[];
@@ -20,7 +20,7 @@ export const journey: Journey = {
     const carbon = await signInToApp(ctx, "dm");
     const subject = (await appTokens(env, "dm", carbon.uuid)).access_token;
     const proofs: IssuedProof[] = [];
-    for (let i = 1; i <= 5; i++) proofs.push((await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: [`pp.list.${i}`] })).body);
+    for (let i = 1; i <= 5; i++) proofs.push((await issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", scopes: [`pp.list.${i}`] })).body);
     const [p1, p2, p3, p4, p5] = proofs as [IssuedProof, IssuedProof, IssuedProof, IssuedProof, IssuedProof];
     await asApp(ctx, "dm", "POST", "/v1/proofs/revoke", { proof_id: p2.proof_id });
     await carbon.session.call("DELETE", `/v1/me/proofs/${p4.proof_id}`);
@@ -46,7 +46,7 @@ export const journey: Journey = {
     const clampedLow = await carbon.session.call<Page<MyProofItem>>("GET", "/v1/me/proofs?limit=0");
     const clampedHigh = await carbon.session.call<Page<MyProofItem>>("GET", "/v1/me/proofs?limit=5000");
     results.check("limit is clamped to 1..200 (limit=0 → one item and a cursor; limit=5000 → all five)", clampedLow.status === 200 && clampedLow.body.items?.length === 1 && !!clampedLow.body.next_cursor && clampedHigh.status === 200 && clampedHigh.body.items?.length === 5, `${clampedLow.status} ${clampedLow.body.items?.length} / ${clampedHigh.status} ${clampedHigh.body.items?.length}`);
-    for (const [query, what] of [["status=bogus", "an unknown status"], ["cursor=not-a-cursor", "a forged cursor"], ["kind=obo", "a filter this listing doesn't have"], ["foo=1", "an unknown parameter"]] as const) {
+    for (const [query, what] of [["status=bogus", "an unknown status"], ["cursor=not-a-cursor", "a forged cursor"], ["kind=user_verification", "a filter this listing doesn't have"], ["foo=1", "an unknown parameter"]] as const) {
       const answer = await carbon.session.call<Page<MyProofItem>>("GET", `/v1/me/proofs?${query}`);
       results.check(`/v1/me/proofs?${query} (${what}) → 400/422 with an error code, not a silent list`, (answer.status === 400 || answer.status === 422) && !!errorCode(answer.body), `${answer.status} ${short(answer.body)}`);
     }
@@ -69,10 +69,10 @@ export const journey: Journey = {
     results.check("dm's listing, 9 at a time across every page: no proof twice, newest first, ours in order", new Set(ids).size === ids.length && JSON.stringify(ids.filter(id => mine.has(id))) === JSON.stringify(newestFirst) && everything.every((item, i) => i === 0 || Date.parse(everything[i - 1]!.created_at) >= Date.parse(item.created_at)), `${ids.length} proofs listed`);
     const shapes = everything.filter(item => typeof item.receiving_app !== "string" || "audiences" in item || "receiving_apps" in item);
     results.check("every entry names its one receiving app as receiving_app (a string), never a list of apps", everything.length > 0 && shapes.length === 0 && everything.filter(item => mine.has(item.proof_id)).every(item => item.receiving_app === "briefcase"), shapes.length ? short(shapes[0]) : `${everything.length} entries`);
-    const revokedObo = (await collect("&kind=obo&status=revoked")).filter(item => mine.has(item.proof_id));
-    results.check("?kind=obo&status=revoked has exactly our two revoked proofs, with who revoked them", JSON.stringify(revokedObo.map(item => `${item.proof_id}:${item.revoke_reason}`)) === JSON.stringify([`${p4.proof_id}:revoked_by_account`, `${p2.proof_id}:revoked_by_app`]), short(revokedObo.map(item => item.revoke_reason)));
-    const ataOnly = await collect("&kind=ata");
-    results.check("?kind=ata lists no OBO proof", ataOnly.every(item => item.kind === "ata" && item.user === null), `${ataOnly.length} ATA proof(s)`);
+    const revokedUserVerification = (await collect("&kind=user_verification&status=revoked")).filter(item => mine.has(item.proof_id));
+    results.check("?kind=user_verification&status=revoked has exactly our two revoked proofs, with who revoked them", JSON.stringify(revokedUserVerification.map(item => `${item.proof_id}:${item.revoke_reason}`)) === JSON.stringify([`${p4.proof_id}:revoked_by_account`, `${p2.proof_id}:revoked_by_app`]), short(revokedUserVerification.map(item => item.revoke_reason)));
+    const ataOnly = await collect("&kind=app_verification");
+    results.check("?kind=app_verification lists no User verification proof", ataOnly.every(item => item.kind === "app_verification" && item.user === null), `${ataOnly.length} App verification proof(s)`);
     const badKind = await asApp<Page<AppProofItem>>(ctx, "dm", "GET", "/v1/apps/dm/proofs?kind=xyz");
     results.check("?kind=xyz → 400/422", badKind.status === 400 || badKind.status === 422, `${badKind.status} ${short(badKind.body)}`);
 
@@ -88,6 +88,6 @@ export const journey: Journey = {
 
     // The receiving app needs no membership: the Carbon never signed into Briefcase.
     const apps = (await carbon.session.call<Page<{ app: { app_id: string } }>>("GET", "/v1/me/apps?limit=200")).body.items ?? [];
-    results.check("the Carbon never signed into Briefcase, yet Briefcase verified proofs about it (OBO needs the issuing app's grant only)", !apps.some(item => item.app.app_id === "briefcase") && apps.some(item => item.app.app_id === "dm"), apps.map(item => item.app.app_id).join(", "));
+    results.check("the Carbon never signed into Briefcase, yet Briefcase verified proofs about it (User verification needs the issuing app's grant only)", !apps.some(item => item.app.app_id === "briefcase") && apps.some(item => item.app.app_id === "dm"), apps.map(item => item.app.app_id).join(", "));
   },
 };

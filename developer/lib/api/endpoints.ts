@@ -9,12 +9,12 @@
  */
 import { request, seg, formBody, type RequestOptions } from "./http";
 import type {
-  AccountSummary, AccountVerificationRequestResult, AccountVerificationRequestState, AppDetail, AppProof, AppProofHistoryEvent, AppProofsQuery, AppPublic, AppUser, AppUserDetail, AppUsersQuery, AtaRequest,
+  AccountSummary, AccountVerificationRequestResult, AccountVerificationRequestState, AppDetail, AppProof, AppProofHistoryEvent, AppProofsQuery, AppPublic, AppUser, AppUserDetail, AppUsersQuery, AppVerificationRequest,
   BrowserSession, CliLoginChallenge, ConfigHistoryItem, ConsentSubmit, ContactChallenge, CreateSilicon,
   CustodianRequest, CustodianRequestStatus, DeliveriesQuery, DeviceAuthorization, DeviceRequest, EmailView, FlowCreate,
   FlowEnvelope, FlowView, HistoryItem, HistoryQuery, IdAvailability, IdentityView, ImportJob, ImportOptions, ImportRow,
   ImportRowResult, ImportRowsQuery, Introspection, IssuedProof, Jwks, ManagedAppProof, ManagedAppProofsQuery, ManagedSilicon, Me, Meta, MyApp, MyProof,
-  OboRequest, OidcDiscovery, OutboxMessage, OwnedApp, Page, PageQuery, PhoneView, PhotoUploaded, ProfileUpdate,
+  UserVerificationRequest, OidcDiscovery, OutboxMessage, OwnedApp, Page, PageQuery, PhoneView, PhotoUploaded, ProfileUpdate,
   ProofRevokeRequest, ProofVerification, ReplayRequest, ReplayResult, ReportReceipt, SessionInfo, ShortLivedToken,
   SigninConfigPatch, SiliconAppsApp, SiliconCreated, SiliconPhotoUploaded, SiliconSelfCreate, SiliconSelfCreated,
   SiliconWebhook, SiliconWebhookTestQueued, SignupPhoto, SignupSubmit, StkRotated, TelemetryEvent, TokenRequest, TokenResponse,
@@ -203,7 +203,7 @@ export const me = {
   apps: {
     /** Apps I have signed into (the first-party `accounts` is never listed). */
     list: (query?: PageQuery) => request<Page<MyApp>>("/v1/me/apps", { query: pageQuery(query) }),
-    /** Removes an app's access (204): its sessions and OBO proofs about me are revoked and it is told. */
+    /** Removes an app's access (204): its sessions and User verification proofs about me are revoked and it is told. */
     removeAccess: (appId: string) => request<null>(`/v1/me/apps/${seg(appId)}`, { method: "DELETE" }),
   },
 
@@ -217,7 +217,7 @@ export const me = {
   history: (query?: HistoryQuery) => request<Page<HistoryItem>>("/v1/me/history", { query: { ...pageQuery(query), kind: query?.kind } }),
 
   proofs: {
-    /** OBO proofs issued on my behalf. */
+    /** User verification proofs issued on my behalf. */
     list: (query?: PageQuery) => request<Page<MyProof>>("/v1/me/proofs", { query: pageQuery(query) }),
     revoke: (proofId: string) => request<null>(`/v1/me/proofs/${seg(proofId)}`, { method: "DELETE" }),
   },
@@ -361,9 +361,9 @@ export const apps = {
     list: (appId: string, query?: AppProofsQuery, credentials?: Owner) =>
       request<Page<AppProof>>(`/v1/apps/${seg(appId)}/proofs`, { query: { ...pageQuery(query), kind: query?.kind, status: query?.status }, auth: ownerAuth(credentials) }),
     history: (appId: string, proofId: string, query?: PageQuery) => request<Page<AppProofHistoryEvent>>(`/v1/apps/${seg(appId)}/proofs/${seg(proofId)}/history`, { query: pageQuery(query) }),
-    /** The ATA page stand-in: issue an app-to-app proof for `audiences` (201; tokens shown once). The owner's session is enough. */
-    createAta: (appId: string, body: AtaRequest, options?: OwnerCall) =>
-      request<IssuedProof>(`/v1/apps/${seg(appId)}/proofs/ata`, { method: "POST", body, idempotencyKey: options?.idempotencyKey, auth: ownerAuth(options?.credentials), signal: options?.signal }),
+    /** The App verification page stand-in: issue an app-to-app proof for `audiences` (201; tokens shown once). The owner's session is enough. */
+    createAppVerification: (appId: string, body: AppVerificationRequest, options?: OwnerCall) =>
+      request<IssuedProof>(`/v1/apps/${seg(appId)}/proofs/app-verification`, { method: "POST", body, idempotencyKey: options?.idempotencyKey, auth: ownerAuth(options?.credentials), signal: options?.signal }),
     revoke: (appId: string, proofId: string, credentials?: Owner) => request<null>(`/v1/apps/${seg(appId)}/proofs/${seg(proofId)}`, { method: "DELETE", auth: ownerAuth(credentials) }),
   },
 };
@@ -371,10 +371,10 @@ export const apps = {
 /* ------------------------------------------- proofs (app credentials) ------------------------------------------- */
 
 export const proofs = {
-  issueObo: (credentials: AppCredentials, body: OboRequest, options?: CallOptions) =>
-    request<IssuedProof>("/v1/proofs/obo", { method: "POST", body, auth: asApp(credentials), idempotencyKey: options?.idempotencyKey, signal: options?.signal }),
-  issueAta: (credentials: AppCredentials, body: AtaRequest, options?: CallOptions) =>
-    request<IssuedProof>("/v1/proofs/ata", { method: "POST", body, auth: asApp(credentials), idempotencyKey: options?.idempotencyKey, signal: options?.signal }),
+  issueUserVerification: (credentials: AppCredentials, body: UserVerificationRequest, options?: CallOptions) =>
+    request<IssuedProof>("/v1/proofs/user-verification", { method: "POST", body, auth: asApp(credentials), idempotencyKey: options?.idempotencyKey, signal: options?.signal }),
+  issueAppVerification: (credentials: AppCredentials, body: AppVerificationRequest, options?: CallOptions) =>
+    request<IssuedProof>("/v1/proofs/app-verification", { method: "POST", body, auth: asApp(credentials), idempotencyKey: options?.idempotencyKey, signal: options?.signal }),
   refresh: (credentials: AppCredentials, proofRefreshToken: string, accessTtlSeconds?: number) =>
     request<IssuedProof>("/v1/proofs/refresh", { method: "POST", body: { proof_refresh_token: proofRefreshToken, access_ttl_seconds: accessTtlSeconds }, auth: asApp(credentials) }),
   /** The verifying app must be one of the audiences; anything else answers exactly {valid:false, expires_at:null}. */

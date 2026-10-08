@@ -1,13 +1,13 @@
 //! SQL for proofs: families (`proof_families`) and their tokens (`proof_tokens`).
 //!
-//! A proof family is one proof: its kind, issuing app, audiences, the OBO subject and grant,
+//! A proof family is one proof: its kind, issuing app, audiences, the User verification subject and grant,
 //! scopes and lifetime. It holds a chain of tokens: proof tokens (`sap_…`, `kind = access`) that
 //! receiving apps verify, and proof refresh tokens (`sapr_…`, `kind = refresh`) that the issuing
 //! app rotates — the same logic as sign-in token families. Only `HMAC(pepper, token)` is stored.
 //!
 //! Every expiry is decided with Postgres `now()`, so tests can time-travel by editing rows.
 //!
-//! An OBO proof stands on the account's sign-in at the issuing app (the token family of its
+//! A user verification proof stands on the account's sign-in at the issuing app (the token family of its
 //! subject token). When that sign-in is revoked anywhere in the service (signed out, STK
 //! rotated, sign-in refresh token reused, …) the proof is revoked too: verification and
 //! listings check it live, and [`record_sign_in_revoked`] / [`sweep`] store it on the proof
@@ -34,7 +34,7 @@ macro_rules! family_columns {
     };
 }
 
-/// Joins that tell whether an OBO proof's grant is still alive (subject sign-in, membership with
+/// Joins that tell whether a user verification proof's grant is still alive (subject sign-in, membership with
 /// the issuing app, account). Alias `f` is the family.
 macro_rules! grant_joins {
     () => {
@@ -44,13 +44,13 @@ macro_rules! grant_joins {
     };
 }
 
-/// True when an OBO proof's sign-in was revoked before the proof expired on its own (or the
+/// True when a user verification proof's sign-in was revoked before the proof expired on its own (or the
 /// sign-in is missing): the proof was revoked then, whether or not that is stored yet. This is
 /// exactly what [`record_sign_in_revoked`] and [`sweep`] store (needs `tf` from
 /// [`grant_joins`]). A sign-in revoked after the proof had already expired leaves it `expired`.
 macro_rules! sign_in_revoked_sql {
     () => {
-        "(f.kind = 'obo' and (tf.id is null or tf.revoked_at < f.expires_at))"
+        "(f.kind = 'user_verification' and (tf.id is null or tf.revoked_at < f.expires_at))"
     };
 }
 
@@ -62,19 +62,19 @@ macro_rules! sign_in_revoked_at_sql {
     };
 }
 
-/// True when an OBO proof's membership with the issuing app or its account is not active
+/// True when a user verification proof's membership with the issuing app or its account is not active
 /// (needs [`grant_joins`]). The service's real paths store these ends themselves
 /// (`access_removed`, `account_deleted`); anything else is derived live and never made
 /// permanent here.
 macro_rules! grant_inactive_sql {
     () => {
-        "(f.kind = 'obo' and (m.status is distinct from 'active' or a.status is distinct from 'active'))"
+        "(f.kind = 'user_verification' and (m.status is distinct from 'active' or a.status is distinct from 'active'))"
     };
 }
 
 /// `active` | `revoked` | `expired`, as listings report it (needs [`grant_joins`]). Order:
-/// revoked (stored, or its sign-in revoked before it expired), past its own lifetime, (OBO)
-/// membership or account not active, (OBO) sign-in expired. Storing a sign-in revocation never
+/// revoked (stored, or its sign-in revoked before it expired), past its own lifetime, (User verification)
+/// membership or account not active, (User verification) sign-in expired. Storing a sign-in revocation never
 /// changes what a listing says.
 macro_rules! status_sql {
     () => {
@@ -83,13 +83,13 @@ macro_rules! status_sql {
             sign_in_revoked_sql!(),
             " then 'revoked' when f.expires_at <= now() then 'expired' when ",
             grant_inactive_sql!(),
-            " then 'revoked' when f.kind = 'obo' and tf.expires_at <= now() then 'expired' \
+            " then 'revoked' when f.kind = 'user_verification' and tf.expires_at <= now() then 'expired' \
                else 'active' end)"
         )
     };
 }
 
-/// When it was revoked, or when the grant behind an OBO proof ended (if known); `null` unless
+/// When it was revoked, or when the grant behind a user verification proof ended (if known); `null` unless
 /// the status is `revoked`.
 macro_rules! effective_revoked_at_sql {
     () => {
@@ -99,14 +99,14 @@ macro_rules! effective_revoked_at_sql {
             " then ",
             sign_in_revoked_at_sql!(),
             " when f.expires_at <= now() then null \
-               when f.kind = 'obo' and m.status is distinct from 'active' then m.access_removed_at \
-               when f.kind = 'obo' and a.status is distinct from 'active' then a.deleted_at \
+               when f.kind = 'user_verification' and m.status is distinct from 'active' then m.access_removed_at \
+               when f.kind = 'user_verification' and a.status is distinct from 'active' then a.deleted_at \
                else null end)"
         )
     };
 }
 
-/// Why it is revoked (the stored reason, or the derived reason of an ended OBO grant); `null`
+/// Why it is revoked (the stored reason, or the derived reason of an ended User verification grant); `null`
 /// unless the status is `revoked`. The literals are `model::revoke_reason` values (checked by a
 /// unit test).
 macro_rules! effective_reason_sql {
@@ -115,8 +115,8 @@ macro_rules! effective_reason_sql {
             "(case when f.revoked_at is not null then f.revoke_reason when ",
             sign_in_revoked_sql!(),
             " then 'sign_in_revoked' when f.expires_at <= now() then null \
-               when f.kind = 'obo' and m.status is distinct from 'active' then 'membership_inactive' \
-               when f.kind = 'obo' and a.status is distinct from 'active' then 'account_inactive' \
+               when f.kind = 'user_verification' and m.status is distinct from 'active' then 'membership_inactive' \
+               when f.kind = 'user_verification' and a.status is distinct from 'active' then 'account_inactive' \
                else null end)"
         )
     };
@@ -149,9 +149,9 @@ pub struct FamilyRow {
 }
 
 impl FamilyRow {
-    /// The kind (`obo` unless the row says `ata`; the column has a check constraint).
+    /// The kind (`user_verification` unless the row says `app_verification`; the column has a check constraint).
     pub fn kind(&self) -> ProofKind {
-        ProofKind::parse(&self.kind).unwrap_or(ProofKind::Obo)
+        ProofKind::parse(&self.kind).unwrap_or(ProofKind::UserVerification)
     }
 }
 
@@ -161,7 +161,7 @@ pub struct NewProof<'a> {
     pub kind: ProofKind,
     pub issuing_app: &'a str,
     pub audiences: &'a [String],
-    /// OBO: (account uuid, the account's token family at the issuing app, its expiry).
+    /// User verification: (account uuid, the account's token family at the issuing app, its expiry).
     pub subject: Option<(&'a str, Uuid, OffsetDateTime)>,
     pub scopes: &'a [String],
     pub access_ttl_seconds: i64,
@@ -188,7 +188,7 @@ impl std::fmt::Debug for MintedTokens {
 
 /// Creates a proof family and its first tokens. Call inside a transaction.
 ///
-/// The family lives 900 days, and an OBO family never outlives the sign-in it stands on
+/// The family lives 900 days, and a user verification family never outlives the sign-in it stands on
 /// (`least(now() + 900 days, subject expiry)`).
 pub async fn create(
     conn: &mut PgConnection,
@@ -329,7 +329,7 @@ pub async fn revoke(
 
 // ---- sign-in revoked: stored -----------------------------------------------------------------
 
-/// Stores the end of OBO proofs whose sign-in was revoked ([`sign_in_revoked_sql`]) and that
+/// Stores the end of User verification proofs whose sign-in was revoked ([`sign_in_revoked_sql`]) and that
 /// nobody revoked yet: `revoked_at` = [`sign_in_revoked_at_sql`], `revoked_by` = `$2`,
 /// `revoke_reason` = `$3`, plus one audit entry each (`actor_kind` `$4`, `action` `$5`,
 /// `target_kind` `$6`, `details.via` = the reason, `details.sign_in_revoke_reason` = why the
@@ -371,7 +371,7 @@ const RECORD_SIGN_INS_REVOKED: &str =
 const RECORD_SIGN_IN_REVOKED_ONE: &str =
     record_sign_in_revoked_sql!("f.id = $7", "for update of f");
 
-/// If the sign-in an OBO proof stands on was revoked (before the proof expired) and the proof
+/// If the sign-in a user verification proof stands on was revoked (before the proof expired) and the proof
 /// isn't revoked yet, stores that it was revoked then (`sign_in_revoked`, by `system`, with its
 /// `proof.revoked` audit entry). `true` when this call stored it. Call inside the caller's
 /// transaction; refresh and revoke call it so the first end of a proof is the one its history
@@ -448,7 +448,7 @@ pub async fn lock_family(conn: &mut PgConnection, id: Uuid) -> ApiResult<Option<
     .await?)
 }
 
-/// The state of the grant behind an OBO proof (all `None` for ATA).
+/// The state of the grant behind a user verification proof (all `None` for App verification).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct GrantState {
     pub account_uuid: Option<String>,
@@ -512,7 +512,7 @@ pub async fn touch_refreshed(conn: &mut PgConnection, id: Uuid) -> ApiResult<Off
 
 /// Everything `POST /v1/proofs/verify` needs, from one indexed lookup
 /// (`proof_tokens` PK → `proof_families` PK → `apps` PK, plus `accounts`, `memberships` and
-/// `token_families` PKs for OBO).
+/// `token_families` PKs for User verification).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct VerifyRow {
     pub proof_id: Uuid,
@@ -553,7 +553,7 @@ impl VerifyRow {
     }
 
     pub fn kind(&self) -> ProofKind {
-        ProofKind::parse(&self.kind).unwrap_or(ProofKind::Obo)
+        ProofKind::parse(&self.kind).unwrap_or(ProofKind::UserVerification)
     }
 }
 
@@ -573,7 +573,7 @@ pub async fn verify_lookup(
                 f.expires_at <= now() as family_expired, \
                 ia.status <> 'active' as issuer_inactive, \
                 coalesce(not ($2 = any(f.audiences)), true) as not_audience, \
-                (f.kind = 'obo' and not coalesce(tf.id is not null and tf.revoked_at is null \
+                (f.kind = 'user_verification' and not coalesce(tf.id is not null and tf.revoked_at is null \
                     and tf.expires_at > now() and m.status = 'active' and a.status = 'active', false)) as grant_ended \
          from proof_tokens t \
          join proof_families f on f.id = t.family_id \
@@ -760,7 +760,7 @@ pub async fn list_managed(
 ) -> ApiResult<Vec<ManagedProofRow>> {
     Ok(sqlx::query_as::<_, ManagedProofRow>(concat!(
         "with f as materialized (select f.* from proof_families f join apps issuer \
-         on issuer.app_id=f.issuing_app where f.kind='ata' \
+         on issuer.app_id=f.issuing_app where f.kind='app_verification' \
          and (issuer.owner_uuid=$1 or exists(select 1 from app_authors aa \
            where aa.app_id=issuer.app_id and aa.account_uuid=$1)) \
          and ($2::text is null or f.issuing_app=$2) \
@@ -786,7 +786,7 @@ pub async fn list_managed(
     .await?)
 }
 
-/// A row of an account's OBO proof listing.
+/// A row of an account's User verification proof listing.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct MyProofRow {
     pub id: Uuid,
@@ -810,7 +810,7 @@ pub struct MyProofRow {
     pub receiving_homepage_url: Option<String>,
 }
 
-/// Select list + joins of an account's OBO proof listing (alias `f` = the families).
+/// Select list + joins of an account's User verification proof listing (alias `f` = the families).
 macro_rules! my_list_select_from {
     ($source:literal) => {
         concat!(
@@ -840,7 +840,7 @@ macro_rules! my_list_select_from {
 /// Page first (see [`APP_LIST_PAGE_FIRST`]). $1 account, $2/$3 cursor, $4 rows.
 const MY_LIST_PAGE_FIRST: &str = concat!(
     "with f as materialized (select * from proof_families f \
-       where f.account_uuid = $1 and f.kind = 'obo' \
+       where f.account_uuid = $1 and f.kind = 'user_verification' \
          and ($2::timestamptz is null or (f.created_at, f.id) < ($2, $3::uuid)) \
        order by f.created_at desc, f.id desc limit $4) ",
     my_list_select_from!("f"),
@@ -850,7 +850,7 @@ const MY_LIST_PAGE_FIRST: &str = concat!(
 /// Status first (see [`APP_LIST_BY_STATUS`]). $1 account, $2/$3 cursor, $4 status, $5 rows.
 const MY_LIST_BY_STATUS: &str = concat!(
     my_list_select_from!("proof_families f"),
-    "where f.account_uuid = $1 and f.kind = 'obo' \
+    "where f.account_uuid = $1 and f.kind = 'user_verification' \
        and ($2::timestamptz is null or (f.created_at, f.id) < ($2, $3::uuid)) \
        and ",
     status_sql!(),
@@ -858,7 +858,7 @@ const MY_LIST_BY_STATUS: &str = concat!(
      order by f.created_at desc, f.id desc limit $5"
 );
 
-/// OBO proofs issued on an account's behalf, newest first.
+/// User verification proofs issued on an account's behalf, newest first.
 pub async fn list_for_account(
     conn: &mut PgConnection,
     account_uuid: &str,
@@ -901,7 +901,7 @@ pub async fn apps_by_id(conn: &mut PgConnection, app_ids: &[String]) -> ApiResul
 /// What [`sweep`] stored and deleted.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SweepReport {
-    /// OBO proofs whose sign-in had been revoked, now stored as revoked (`sign_in_revoked`).
+    /// User verification proofs whose sign-in had been revoked, now stored as revoked (`sign_in_revoked`).
     pub sign_in_revocations_recorded: u64,
     /// Proof tokens that expired more than a day ago.
     pub expired_access_tokens: u64,
@@ -928,7 +928,7 @@ const DELETE_DEAD_PROOF_TOKENS: &str = "delete from proof_tokens where token_has
 
 /// The hourly maintenance:
 ///
-/// 1. stores the end of OBO proofs whose sign-in was revoked ([`record_sign_in_revoked`]), so
+/// 1. stores the end of User verification proofs whose sign-in was revoked ([`record_sign_in_revoked`]), so
 ///    the account's history shows them revoked and step 3 can delete their tokens;
 /// 2. deletes proof tokens that expired more than a day ago;
 /// 3. deletes every token of proofs revoked or expired more than 30 days ago.

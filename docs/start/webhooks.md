@@ -5,7 +5,7 @@ kind: instructive
 order: 50
 related:
   - learn/webhooks.md
-  - start/obo.md
+  - start/user-verification.md
   - learn/proofs.md
   - reference/api/webhooks.md
 ---
@@ -428,5 +428,5 @@ The custodian does the same for its Silicon, signed in as itself: `GET /v1/me/si
 ## Related
 
 - [How webhooks work](../learn/webhooks.md): every event with a real payload, who receives what, retries, ordering and replay rules, and why.
-- [Act for an account at another app (User verification)](obo.md): `membership.signed_out`, `membership.access_removed` and `account.deleted` also end your User verification proofs.
+- [Act for an account at another app (User verification)](user-verification.md): `membership.signed_out`, `membership.access_removed` and `account.deleted` also end your User verification proofs.
 - [Webhooks reference](../reference/api/webhooks.md): headers, body and every event type in one place; the endpoints are in [App endpoints](../reference/api/apps.md).

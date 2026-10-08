@@ -76,9 +76,9 @@ export const journey: Journey = {
       ["approve the attacker's CLI device code", "POST", `/v1/device/${userCode}/approve`, undefined],
       ["remove an app's access", "DELETE", "/v1/me/apps/briefcase", undefined],
       ["revoke a session", "DELETE", "/v1/me/sessions/00000000-0000-0000-0000-000000000000", undefined],
-      ["revoke an OBO proof", "DELETE", "/v1/me/proofs/00000000-0000-0000-0000-000000000000", undefined],
+      ["revoke a user verification proof", "DELETE", "/v1/me/proofs/00000000-0000-0000-0000-000000000000", undefined],
       ["connect Google", "POST", "/v1/me/identities/google", {}],
-      ["make an ATA proof as the owner of an app", "POST", "/v1/apps/briefcase/proofs/ata", { receiving_app: "remind" }],
+      ["make an app verification proof as the owner of an app", "POST", "/v1/apps/briefcase/proofs/app-verification", { receiving_app: "remind" }],
       ["change an app's sign-in setup as its owner", "PATCH", "/v1/apps/briefcase/signin-config", { redirect_uris: ["https://evil.example/cb"] }],
     ];
     const notRefused: string[] = [];
@@ -87,7 +87,7 @@ export const journey: Journey = {
       if (reply.status !== 403 || errorOf(reply).code !== "origin_not_allowed") notRefused.push(`${label}: ${brief(reply)}`);
       noteCookies(label, reply);
     }
-    results.check(`${attempts.length} other cookie mutations from a foreign origin (sign-out, delete, Silicon, email, id, SLT, device approval, app access, sessions, OBO proofs, Google, an owner's ATA proof and sign-in setup) are refused 403 origin_not_allowed`, notRefused.length === 0, notRefused.join(" | ") || attempts.map(([label]) => label).join(", "));
+    results.check(`${attempts.length} other cookie mutations from a foreign origin (sign-out, delete, Silicon, email, id, SLT, device approval, app access, sessions, User verification proofs, Google, an owner's App verification proof and sign-in setup) are refused 403 origin_not_allowed`, notRefused.length === 0, notRefused.join(" | ") || attempts.map(([label]) => label).join(", "));
     const session = await call<{ account?: { id: string } }>(`${env.site}/v1/session`, { jar: victim.jar, ip: ctx.ip });
     const silicons = await call<{ items?: Array<{ id?: string; silicon?: { id?: string } }> }>(`${env.site}/v1/me/silicons`, { jar: victim.jar, ip: ctx.ip });
     const emails = await call<{ items?: Array<{ email: string }> } | Array<{ email: string }>>(`${env.site}/v1/me/emails`, { jar: victim.jar, ip: ctx.ip });

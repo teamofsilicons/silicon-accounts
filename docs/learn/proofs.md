@@ -5,8 +5,8 @@ kind: informative
 order: 40
 related:
   - start/verify-a-proof.md
-  - start/obo.md
-  - start/ata.md
+  - start/user-verification.md
+  - start/app-verification.md
   - learn/webhooks.md
   - reference/api/proofs.md
 ---
@@ -22,18 +22,18 @@ The apps send requests directly to each other. Accounts issues and checks the pr
 
 The issuing app asks for the user’s consent. The receiving app decides which actions to allow. Both apps must agree on what the scopes mean. This page explains those responsibilities and how proof tokens behave.
 
-To do the work, read the instructive pages: [Verify a proof](../start/verify-a-proof.md), [Act for an account at another app (User verification)](../start/obo.md) and [Prove your app to other apps (App verification)](../start/ata.md).
+To do the work, read the instructive pages: [Verify a proof](../start/verify-a-proof.md), [Act for an account at another app (User verification)](../start/user-verification.md) and [Prove your app to other apps (App verification)](../start/app-verification.md).
 
 The whole exchange, as it ran on a local stack (tokens shortened):
 
 ```
 # dm holds si:scout's access token at dm, and asks for a proof to act at briefcase
-POST /v1/proofs/obo     (as dm)         {"subject_token":"eyJ…","receiving_app":"briefcase","scopes":["files.write"],"access_ttl_seconds":600}
+POST /v1/proofs/user-verification     (as dm)         {"subject_token":"eyJ…","receiving_app":"briefcase","scopes":["files.write"],"access_ttl_seconds":600}
 → 201 {"proof_id":"01a11435-333a-…","proof_token":"sap_OMGt…","expires_at":"2026-10-07T02:43:13.274Z","proof_refresh_token":"sapr_i4mi…",…}
 
 # dm calls briefcase with "Authorization: Proof sap_OMGt…"; briefcase asks Silicon Accounts
 POST /v1/proofs/verify  (as briefcase)  {"proof_token":"sap_OMGt…"}
-→ 200 {"valid":true,"kind":"obo","issuing_app":{"app_id":"dm",…},"user":{"uuid":"8HV","id":"si:scout",…},"scopes":["files.write"],…}
+→ 200 {"valid":true,"kind":"user_verification","issuing_app":{"app_id":"dm",…},"user":{"uuid":"8HV","id":"si:scout",…},"scopes":["files.write"],…}
 
 # the same token, checked by remind, which the proof doesn't name
 POST /v1/proofs/verify  (as remind)     {"proof_token":"sap_OMGt…"}
@@ -98,7 +98,7 @@ A valid answer tells the receiving app everything it needs:
 {
   "valid": true,
   "proof_id": "01a11435-333a-725d-bb0e-75adde136703",
-  "kind": "obo",
+  "kind": "user_verification",
   "expires_at": "2026-10-07T02:43:13.274Z",
   "issuing_app": { "app_id": "dm", "name": "DM" },
   "receiving_app": { "app_id": "briefcase", "name": "Briefcase" },
@@ -161,8 +161,8 @@ App verification proofs stand only on themselves and the issuing app: they end w
 
 | action | User verification | App verification |
 |---|---|---|
-| issue | the issuing app, with its credentials and the account's access token | the issuing app with its credentials, or its owner through the App verification page (`POST /v1/apps/{app_id}/proofs/ata` with their session) |
-| verify | only the receiving app | only the receiving app (an App verification proof is for exactly one app; one proof per app) |
+| issue | the issuing app, with its credentials and the account's access token | the issuing app with its credentials, or its owner through the App verification page (`POST /v1/apps/{app_id}/proofs/app-verification` with their session) |
+| verify | only the receiving app | only the receiving app (an app verification proof is for exactly one app; one proof per app) |
 | refresh | only the issuing app | only the issuing app |
 | revoke | the issuing app (by `proof_id`, `proof_token` or `proof_refresh_token`), its owner (by id), and the account it speaks for (by id) | the issuing app and its owner |
 | list | the issuing app and its owner (`GET /v1/apps/{app_id}/proofs`); the account (`GET /v1/me/proofs`) | the issuing app and its owner |
@@ -177,7 +177,7 @@ Scopes are app-defined strings carried as they are: at most 20 distinct ones per
 
 ## Idempotent issuing
 
-`POST /v1/proofs/obo`, `POST /v1/proofs/ata` and `POST /v1/apps/{app_id}/proofs/ata` take an `Idempotency-Key` header, and `POST /v1/proofs/refresh` accepts one. A retry with the same key and the same body within 10 minutes returns the first response again, with the header `idempotent-replayed: true`, instead of issuing a second proof (or, for a refresh, instead of presenting a used refresh token and revoking the proof). The same key with a different body is `409 idempotency_key_reused`. The stored response holds the tokens, so it is kept encrypted.
+`POST /v1/proofs/user-verification`, `POST /v1/proofs/app-verification` and `POST /v1/apps/{app_id}/proofs/app-verification` take an `Idempotency-Key` header, and `POST /v1/proofs/refresh` accepts one. A retry with the same key and the same body within 10 minutes returns the first response again, with the header `idempotent-replayed: true`, instead of issuing a second proof (or, for a refresh, instead of presenting a used refresh token and revoking the proof). The same key with a different body is `409 idempotency_key_reused`. The stored response holds the tokens, so it is kept encrypted.
 
 A replay returns the original answer even if that proof has ended since. Use a new key for each new logical request, and the same key only to retry.
 
@@ -188,8 +188,8 @@ Silicon Accounts stores only an HMAC of each proof token and proof refresh token
 ## Related
 
 - [Verify a proof](../start/verify-a-proof.md): the receiving app's side, step by step.
-- [Act for an account at another app (User verification)](../start/obo.md): issuing, refreshing and revoking.
-- [Prove your app to other apps (App verification)](../start/ata.md).
+- [Act for an account at another app (User verification)](../start/user-verification.md): issuing, refreshing and revoking.
+- [Prove your app to other apps (App verification)](../start/app-verification.md).
 - [How webhooks work](webhooks.md): the events that announce the same ends (`membership.signed_out`, `membership.access_removed`, `account.deleted`).
 - [Proofs API reference](../reference/api/proofs.md): every proof endpoint, field and error.
 
@@ -199,4 +199,4 @@ Silicon Accounts stores only an HMAC of each proof token and proof refresh token
 
 History never reveals raw proof or refresh tokens. Copy those only when they are generated. Each history request checks current management access; receiving a proof does not grant access to the issuing app's history. Accounts see and revoke their own User verifications at the account site's existing `/proofs` route.
 
-The product names are App verification and User verification. Protocol values and existing integration commands remain `ata` and `obo` respectively.
+The product names are App verification and User verification. API kinds are `app_verification` and `user_verification`. The CLI commands are `accounts app proof app-verification` and `accounts app proof user-verification`.

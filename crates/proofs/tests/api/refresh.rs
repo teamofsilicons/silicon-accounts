@@ -11,7 +11,7 @@ use crate::common::{World, api_time, assert_token_ttl, invalid, proof_id, refres
 #[tokio::test]
 async fn refresh_rotates_both_tokens() {
     let w = World::new().await;
-    let p = w.issue_obo_ttl(600).await;
+    let p = w.issue_user_verification_ttl(600).await;
     let r = w.refresh(&refresh_token(&p)).await;
     assert_eq!(r.status, 200, "{}", r.json);
     assert_eq!(
@@ -20,7 +20,7 @@ async fn refresh_rotates_both_tokens() {
     );
     let n = &r.json;
     assert_eq!(n["proof_id"], p["proof_id"], "same proof");
-    assert_eq!(n["kind"], "obo");
+    assert_eq!(n["kind"], "user_verification");
     assert_ne!(token(n), token(&p));
     assert_ne!(refresh_token(n), refresh_token(&p));
     assert_token_ttl(n, 600); // keeps the proof's token lifetime
@@ -71,9 +71,9 @@ async fn refresh_rotates_both_tokens() {
         "audited, but kept out of the account's history"
     );
 
-    // ATA proofs refresh the same way.
+    // App verification proofs refresh the same way.
     let a = w
-        .ata_as(
+        .app_verification_as(
             &w.dm,
             &w.dm_secret,
             json!({"receiving_app": w.briefcase.app_id}),
@@ -81,7 +81,7 @@ async fn refresh_rotates_both_tokens() {
         .await;
     let r = w.refresh(&refresh_token(&a.json)).await;
     assert_eq!(r.status, 200, "{}", r.json);
-    assert_eq!(r.json["kind"], "ata");
+    assert_eq!(r.json["kind"], "app_verification");
     assert_eq!(r.json["receiving_app"], w.briefcase.app_id);
     assert!(r.json.get("receiving_apps").is_none());
     assert_eq!(r.json["user"], serde_json::Value::Null);
@@ -91,7 +91,7 @@ async fn refresh_rotates_both_tokens() {
 #[tokio::test]
 async fn reusing_a_refresh_token_revokes_the_proof() {
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let first = refresh_token(&p);
     let r = w.refresh(&first).await;
     assert_eq!(r.status, 200);
@@ -134,7 +134,7 @@ async fn reusing_a_refresh_token_revokes_the_proof() {
 #[tokio::test]
 async fn refresh_refusals_are_precise() {
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
 
     // Wrong kind of credential.
     let r = w.refresh(&token(&p)).await;
@@ -233,10 +233,10 @@ async fn refresh_refusals_are_precise() {
 }
 
 #[tokio::test]
-async fn obo_refresh_stops_when_the_grant_ends() {
+async fn user_verification_refresh_stops_when_the_grant_ends() {
     // Subject sign-in revoked.
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let id = proof_id(&p);
     let fid = w.subject_family();
     w.ctx
@@ -310,7 +310,7 @@ async fn obo_refresh_stops_when_the_grant_ends() {
     // Membership removed (simulated: only the membership row; the real removal also revokes
     // the sign-in and stores access_removed). Refused, but not stored: it isn't final.
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     w.ctx
         .exec(&format!(
             "update memberships set status = 'access_removed', access_removed_at = now() \
@@ -332,7 +332,7 @@ async fn obo_refresh_stops_when_the_grant_ends() {
 
     // Account deleted (directly) → account_inactive.
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     w.ctx
         .exec(&format!(
             "update accounts set status = 'deleted', deleted_at = now() where uuid = '{}'",
@@ -345,7 +345,7 @@ async fn obo_refresh_stops_when_the_grant_ends() {
 
     // Subject sign-in expired → proof_expired.
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     w.ctx
         .exec(&format!(
             "update token_families set expires_at = now() - interval '1 second' where id = '{}'",
@@ -359,7 +359,7 @@ async fn obo_refresh_stops_when_the_grant_ends() {
 }
 
 #[tokio::test]
-async fn an_obo_proof_never_outlives_its_sign_in() {
+async fn an_user_verification_proof_never_outlives_its_sign_in() {
     let w = World::new().await;
     let fid = w.subject_family();
     // The sign-in ends in 10 minutes: the proof (and its token) end with it.
@@ -368,7 +368,7 @@ async fn an_obo_proof_never_outlives_its_sign_in() {
             "update token_families set expires_at = now() + interval '10 minutes' where id = '{fid}'"
         ))
         .await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     assert_eq!(
         p["refresh_expires_at"], p["expires_at"],
         "capped at the sign-in's expiry"
@@ -379,7 +379,7 @@ async fn an_obo_proof_never_outlives_its_sign_in() {
 #[tokio::test]
 async fn idempotent_refresh_replays_instead_of_tripping_reuse_detection() {
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let send = || {
         Req::post("/v1/proofs/refresh")
             .basic(&w.dm.app_id, &w.dm_secret)
@@ -409,7 +409,7 @@ async fn a_revoked_sign_in_ends_the_proof_before_reuse_detection() {
     // The sign-in ended first, so that is the proof's end, even when the token presented
     // afterwards is a used one.
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let first = refresh_token(&p);
     let r = w.refresh(&first).await;
     assert_eq!(r.status, 200, "{}", r.json);
@@ -449,7 +449,7 @@ async fn concurrent_refreshes_of_one_token_rotate_it_once() {
     // rotates it, the next one is a reuse and revokes the proof, the rest find it revoked.
     const N: usize = 6;
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let rt = refresh_token(&p);
     let router = accounts_proofs::router().with_state(w.ctx.state.clone());
     let start = Arc::new(tokio::sync::Barrier::new(N));

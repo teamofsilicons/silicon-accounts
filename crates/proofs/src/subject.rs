@@ -1,4 +1,4 @@
-//! The OBO subject: the account's access token that the issuing app presents as
+//! The User verification subject: the account's access token that the issuing app presents as
 //! `subject_token`. It proves the account signed into (and consented at) the issuing app; the
 //! proof then stands on that sign-in (its token family) and dies with it.
 

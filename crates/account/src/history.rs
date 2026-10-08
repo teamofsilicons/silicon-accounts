@@ -6,7 +6,7 @@
 //! | `signin` | `signin_history` (successful, failed and sign-up attempts) |
 //! | `id_change` | `handle_history` (creation, every id change, release) |
 //! | `custodian` | `custodian_history` (as the Silicon, the new or the old custodian) + audit actions about custodian requests/transfers |
-//! | `proof` | `proof_families` (OBO proofs about the account: issued and revoked) |
+//! | `proof` | `proof_families` (User verification proofs about the account: issued and revoked) |
 //! | `app_access` | `memberships` (first sign-in to an app, an app's import) + audit actions `membership.*`, `consent.*`, `app_access.*` |
 //! | `security` | every other audit action about the account (profile, photo, emails, phones, identities, sessions, STK, …) |
 //!

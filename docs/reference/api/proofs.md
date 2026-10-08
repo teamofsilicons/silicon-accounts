@@ -6,8 +6,8 @@ order: 66
 related:
   - reference/api.md
   - start/verify-a-proof.md
-  - start/obo.md
-  - start/ata.md
+  - start/user-verification.md
+  - start/app-verification.md
   - learn/proofs.md
   - reference/errors.md
 ---
@@ -16,7 +16,7 @@ related:
 
 Silicon Accounts creates proof tokens and checks them for the receiving app. A **User verification** proof identifies the account an app is acting for. An **App verification** proof identifies the app itself. Each proof names one receiving app.
 
-The apps decide what the proof’s scopes mean and which actions to allow. Follow [Verify a proof](../../start/verify-a-proof.md), [User verification](../../start/obo.md) or [App verification](../../start/ata.md) for the steps. [How proofs work](../../learn/proofs.md) explains the responsibilities of each app.
+The apps decide what the proof’s scopes mean and which actions to allow. Follow [Verify a proof](../../start/verify-a-proof.md), [User verification](../../start/user-verification.md) or [App verification](../../start/app-verification.md) for the steps. [How proofs work](../../learn/proofs.md) explains the responsibilities of each app.
 
 The receiving app verifies a proof token:
 
@@ -29,7 +29,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/proofs/verify" -u "briefcase:$BRIEFCASE_SECRET
 {
   "valid": true,
   "proof_id": "01a11438-f6ef-75f2-86a0-091d4d1b9b37",
-  "kind": "obo",
+  "kind": "user_verification",
   "expires_at": "2026-10-07T02:47:19.983Z",
   "issuing_app": { "app_id": "dm", "name": "DM" },
   "receiving_app": { "app_id": "briefcase", "name": "Briefcase" },
@@ -52,12 +52,12 @@ unknown fields. Proof responses are `Cache-Control: no-store`.
 
 ## The issued proof
 
-`POST /v1/proofs/obo`, `/ata`, `/refresh` and `POST /v1/apps/{app_id}/proofs/ata` answer:
+`POST /v1/proofs/user-verification`, `/app-verification`, `/refresh` and `POST /v1/apps/{app_id}/proofs/app-verification` answer:
 
 ```json
 {
   "proof_id": "01a11438-f6ef-75f2-86a0-091d4d1b9b37",
-  "kind": "obo",
+  "kind": "user_verification",
   "proof_token": "sap_ynFCe2dYOohw67CJrGQkC5yFjq4HJxUD2SukHLHZ7J4",
   "expires_at": "2026-10-07T02:47:19.983Z",
   "proof_refresh_token": "sapr_Y06gz3yM8kR4BPPZT_xRDu93d86hGImeipKkaycO2as",
@@ -69,11 +69,11 @@ unknown fields. Proof responses are `Cache-Control: no-store`.
 }
 ```
 
-An App verification proof has `"kind": "ata"`, its one `receiving_app`, and `"user": null`. Give the `proof_token` to the receiving app; keep the
+An app verification proof has `"kind": "app_verification"`, its one `receiving_app`, and `"user": null`. Give the `proof_token` to the receiving app; keep the
 `proof_refresh_token` yourself. Lifetimes are absolute timestamps (no `expires_in`), so a replayed
 idempotent response still tells the truth about what is left.
 
-## `POST /v1/proofs/obo`
+## `POST /v1/proofs/user-verification`
 
 **Idempotent** (10 minutes). Body:
 
@@ -85,8 +85,8 @@ idempotent response still tells the truth about what is left.
 | `access_ttl_seconds` | optional, 60–1800 |
 
 ```sh
-curl -s -X POST "$ACCOUNTS_URL/v1/proofs/obo" -u "dm:$DM_SECRET" \
-  -H 'Content-Type: application/json' -H 'Idempotency-Key: obo-briefcase-8HV-1' \
+curl -s -X POST "$ACCOUNTS_URL/v1/proofs/user-verification" -u "dm:$DM_SECRET" \
+  -H 'Content-Type: application/json' -H 'Idempotency-Key: user_verification-briefcase-8HV-1' \
   -d '{"subject_token":"'"$ACCOUNT_ACCESS_TOKEN"'","receiving_app":"briefcase","scopes":["files.write"],"access_ttl_seconds":600}'
 ```
 
@@ -115,21 +115,21 @@ Accounts doesn't show a consent screen for proofs.
 }
 ```
 
-## `POST /v1/proofs/ata`
+## `POST /v1/proofs/app-verification`
 
 **Idempotent** (10 minutes). `{"receiving_app": "remind", "scopes"?, "access_ttl_seconds"?}`
-→ **201** the issued App verification proof. An App verification proof is always for exactly one app: to talk to `remind`
-and `waveform`, issue one proof for each. Errors: 422 `ata_single_app` (the body has `audiences`,
-of any length: "An App verification is for exactly one app; ask for one proof per app.", with
+→ **201** the issued App verification proof. An app verification proof is always for exactly one app: to talk to `remind`
+and `waveform`, issue one proof for each. Errors: 422 `app_verification_single_app` (the body has `audiences`,
+of any length: "An app verification is for exactly one app; ask for one proof per app.", with
 `details.field: "audiences"` and `details.apps`), 400 `unknown_receiving_app`, 400
 `invalid_receiving_app` (your own app, or `accounts`/`developer`), 403 `receiving_app_disabled`,
 422 `validation_failed` (`receiving_app`, `scopes[i]`, `access_ttl_seconds`).
 
-## `POST /v1/apps/{app_id}/proofs/ata`
+## `POST /v1/apps/{app_id}/proofs/app-verification`
 
 The same for **app or owner**: the app's owner can issue App verification proofs from the app's App verification page on
 developers.teamofsilicons.com without the app secret. Same body and response (and the same 422
-`ata_single_app` for `audiences`); 403 `app_disabled` for a disabled app.
+`app_verification_single_app` for `audiences`); 403 `app_disabled` for a disabled app.
 
 ## `POST /v1/proofs/refresh`
 
@@ -145,7 +145,7 @@ Presenting a refresh token that was already used revokes the whole proof (400
   "error": {
     "code": "proof_revoked",
     "message": "Proof 01a11438-f6ef-75f2-86a0-091d4d1b9b37 was revoked at 2026-10-07T02:37:31.704Z because one of its proof refresh tokens was presented again after it had been used (refresh_token_reuse), so it can't be refreshed.",
-    "hint": "Issue a new proof with POST /v1/proofs/obo (the account must still be signed into your app).",
+    "hint": "Issue a new proof with POST /v1/proofs/user-verification (the account must still be signed into your app).",
     "details": { "proof_id": "01a11438-f6ef-75f2-86a0-091d4d1b9b37", "reason": "refresh_token_reuse", "revoked_at": "2026-10-07T02:37:31.704Z" }
   }
 }
@@ -187,7 +187,7 @@ yours; another app's proof id looks unknown), 400 `invalid_proof_id`, 403 `not_i
 
 ## `GET /v1/apps/{app_id}/proofs`
 
-**app or owner**: proofs the app issued, newest first. Query: `kind` (`obo`, `ata`), `status`
+**app or owner**: proofs the app issued, newest first. Query: `kind` (`user_verification`, `app_verification`), `status`
 (`active`, `revoked`, `expired`), `limit`, `cursor`.
 
 ```json
@@ -195,7 +195,7 @@ yours; another app's proof id looks unknown), 400 `invalid_proof_id`, 403 `not_i
   "items": [
     {
       "proof_id": "01a11438-f6ef-75f2-86a0-091d4d1b9b37",
-      "kind": "obo",
+      "kind": "user_verification",
       "receiving_app": "briefcase",
       "user": { "uuid": "8HV", "kind": "carbon", "id": "c:ada", "display_name": "Ada King", "pfp_url": "…", "status": "active" },
       "scopes": ["files.write"],
@@ -232,7 +232,7 @@ Reasons: `revoked_by_app`, `revoked_by_owner`, `revoked_by_account`, `refresh_to
 
 **signed-in manager**: retained issuance, refresh and revocation history for one App verification record. The request checks current management access to the issuing app. Historical expiry values distinguish explicitly recorded information from derived legacy information; missing values are not reconstructed as facts. No raw proof or refresh token values are returned.
 
-Records and their history remain after credential material expires or is removed. See [central history](../../start/ata.md#central-history-for-apps-you-manage) for the portal flow. Existing `ata` / `obo` routes and JSON values continue to mean App verification / User verification.
+Records and their history remain after credential material expires or is removed. See [central history](../../start/app-verification.md#central-history-for-apps-you-manage) for the portal flow. The API uses `app_verification` and `user_verification` as JSON kinds. Issuance routes use `/app-verification` and `/user-verification`.
 
 ## `GET /v1/me/proofs`
 

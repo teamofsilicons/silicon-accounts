@@ -9,8 +9,8 @@ use common::{Mock, Reply};
 use serde_json::{Value, json};
 use silicon_accounts_client::{
     AccountsClient, Contact, CreateSilicon, DeliveriesQuery, HistoryQuery, ImportInput,
-    ImportOptions, ImportRow, ImportRowsQuery, IssueAta, IssueObo, PageRequest, ProfileUpdate,
-    ProofRef, ProofsQuery, ReplayRequest, UpdateSilicon, UsersQuery,
+    ImportOptions, ImportRow, ImportRowsQuery, IssueAppVerification, IssueUserVerification,
+    PageRequest, ProfileUpdate, ProofRef, ProofsQuery, ReplayRequest, UpdateSilicon, UsersQuery,
 };
 
 fn me() -> Value {
@@ -34,7 +34,7 @@ fn job() -> Value {
 }
 
 fn proof() -> Value {
-    json!({"proof_id": "p1", "kind": "obo", "proof_token": "sap_x", "proof_refresh_token": "sapr_x", "issuing_app": "dm", "receiving_app": "briefcase", "scopes": []})
+    json!({"proof_id": "p1", "kind": "user_verification", "proof_token": "sap_x", "proof_refresh_token": "sapr_x", "issuing_app": "dm", "receiving_app": "briefcase", "scopes": []})
 }
 
 fn app_details() -> Value {
@@ -1044,10 +1044,10 @@ async fn app_calls() {
     let r = check!(
         mock,
         "POST",
-        "/v1/proofs/obo",
+        "/v1/proofs/user-verification",
         Reply::json(201, proof()),
-        a.issue_obo(
-            &IssueObo {
+        a.issue_user_verification(
+            &IssueUserVerification {
                 subject_token: "eyJ".into(),
                 receiving_app: "briefcase".into(),
                 ..Default::default()
@@ -1062,10 +1062,10 @@ async fn app_calls() {
     check!(
         mock,
         "POST",
-        "/v1/proofs/ata",
+        "/v1/proofs/app-verification",
         Reply::json(201, proof()),
-        a.issue_ata(
-            &IssueAta {
+        a.issue_app_verification(
+            &IssueAppVerification {
                 receiving_app: "remind".into(),
                 ..Default::default()
             },
@@ -1097,7 +1097,7 @@ async fn app_calls() {
         "/v1/apps/briefcase/proofs",
         Reply::json(200, json!({"items": []})),
         a.proofs(&ProofsQuery {
-            kind: Some("ata".into()),
+            kind: Some("app_verification".into()),
             ..Default::default()
         })
     );

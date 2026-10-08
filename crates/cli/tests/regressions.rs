@@ -336,7 +336,7 @@ fn json_argument_errors_name_the_missing_argument() {
         .args([
             "app",
             "proof",
-            "ata",
+            "app-verification",
             "--app-id",
             APP_ID,
             "--app-secret-stdin",

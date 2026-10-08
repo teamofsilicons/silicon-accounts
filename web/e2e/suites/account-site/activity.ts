@@ -43,7 +43,7 @@ const activity: Journey = {
     for (let i = 0; i < 10; i++) refusals.push((await api(ctx, "/v1/cli/login/verify", { method: "POST", json: { challenge_id: attempt.body.challenge_id, code: wrong } })).status);
     const newId = `${carbon.id}-v2`;
     const changed = await call(probe, "/v1/me/id", { method: "POST", json: { id: newId } });
-    const issued = (await postJson<{ body?: { proof_id?: string } }>(`${env.apps}/briefcase/actions/issue-obo`, { uuid, receiving_app: "commit", scopes: ["files.read"] })).body.body?.proof_id ?? "";
+    const issued = (await postJson<{ body?: { proof_id?: string } }>(`${env.apps}/briefcase/actions/issue-user_verification`, { uuid, receiving_app: "commit", scopes: ["files.read"] })).body.body?.proof_id ?? "";
     const revoked = await call(probe, `/v1/me/proofs/${issued}`, { method: "DELETE" });
     const removed = await call(probe, "/v1/me/apps/commit", { method: "DELETE" });
     // 55 changes Briefcase can't see (date of birth), so the history passes one page without a webhook storm.

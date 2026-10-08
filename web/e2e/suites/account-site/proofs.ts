@@ -1,7 +1,7 @@
 /**
- * /proofs: the OBO proofs apps hold about the Carbon (issuing app → receiving app, scopes, the current token's time),
+ * /proofs: the User verification proofs apps hold about the Carbon (issuing app → receiving app, scopes, the current token's time),
  * revoking one on the page (the receiving app's next verify fails at once, the others stay valid), an expired one
- * (time travel), and the ones that end with an app's access. ATA proofs are about apps, never listed here.
+ * (time travel), and the ones that end with an app's access. App verification proofs are about apps, never listed here.
  */
 import type { Journey } from "../../context";
 import { api, postJson, shot, sleep, sql } from "../../lib";
@@ -32,7 +32,7 @@ interface MyProof {
 
 const proofs: Journey = {
   name: "account-site-proofs",
-  title: "OBO proofs on /proofs: Briefcase acting at Commit and DM, listed with scopes and token time; one revoked on the page (Commit's verify fails at once, the rest stay valid), one expired (time travel), one ended with Briefcase's access; ATA proofs never listed",
+  title: "User verification proofs on /proofs: Briefcase acting at Commit and DM, listed with scopes and token time; one revoked on the page (Commit's verify fails at once, the rest stay valid), one expired (time travel), one ended with Briefcase's access; App verification proofs never listed",
   async run(ctx) {
     const { env, results } = ctx;
     const carbon = await newCarbon(ctx, "acct-proofs");
@@ -40,27 +40,27 @@ const proofs: Journey = {
     const signed = await signIntoApp(env, page, "briefcase");
     results.check("setup: signed into Briefcase", signed?.uuid === uuid);
 
-    const issue = async (receiving: string, scopes: string[], ttl?: number) => (await postJson<Issued>(`${env.apps}/briefcase/actions/issue-obo`, { uuid, receiving_app: receiving, scopes, ...(ttl ? { access_ttl_seconds: ttl } : {}) })).body;
+    const issue = async (receiving: string, scopes: string[], ttl?: number) => (await postJson<Issued>(`${env.apps}/briefcase/actions/issue-user_verification`, { uuid, receiving_app: receiving, scopes, ...(ttl ? { access_ttl_seconds: ttl } : {}) })).body;
     const verify = async (app: string, token: string) => (await postJson<{ verification?: Verification }>(`${env.apps}/${app}/api/verify-proof`, { proof_token: token })).body.verification ?? {};
     const read = await issue("commit", ["files.read"], 600);
     const write = await issue("commit", ["files.write"]);
     const message = await issue("dm", ["messages.send"]);
     const ids = { read: read.body?.proof_id ?? "", write: write.body?.proof_id ?? "", message: message.body?.proof_id ?? "" };
     const tokens = { read: read.body?.proof_token ?? "", write: write.body?.proof_token ?? "", message: message.body?.proof_token ?? "" };
-    results.check("Briefcase got three OBO proofs for this Carbon (two for Commit, one for DM)", read.status === 201 && write.status === 201 && message.status === 201 && read.body?.user?.uuid === uuid, JSON.stringify(read).slice(0, 200));
-    // An ATA proof is for exactly one app (06-v2 §7): Commit's for Remind.
-    const ata = (await postJson<Issued>(`${env.apps}/commit/actions/issue-ata`, { receiving_app: "remind" })).body;
-    results.check("setup: Commit also holds an ATA proof for Remind (app to app, no Carbon in it)", ata.status === 201 && !!ata.body?.proof_token, JSON.stringify(ata).slice(0, 160));
+    results.check("Briefcase got three User verification proofs for this Carbon (two for Commit, one for DM)", read.status === 201 && write.status === 201 && message.status === 201 && read.body?.user?.uuid === uuid, JSON.stringify(read).slice(0, 200));
+    // An app verification proof is for exactly one app (06-v2 §7): Commit's for Remind.
+    const app_verification = (await postJson<Issued>(`${env.apps}/commit/actions/issue-app_verification`, { receiving_app: "remind" })).body;
+    results.check("setup: Commit also holds an app verification proof for Remind (app to app, no Carbon in it)", app_verification.status === 201 && !!app_verification.body?.proof_token, JSON.stringify(app_verification).slice(0, 160));
 
     const v1 = await verify("commit", tokens.read);
     results.check("Commit verifies the read proof: valid, Briefcase → Commit, for this Carbon, its scopes", v1.valid === true && v1.issuing_app?.app_id === "briefcase" && v1.receiving_app?.app_id === "commit" && v1.user?.uuid === uuid && JSON.stringify(v1.scopes) === '["files.read"]', JSON.stringify(v1).slice(0, 240));
     const notAudience = await verify("dm", tokens.read);
     results.check("DM is not its audience: exactly {valid:false, expires_at:null}", notAudience.valid === false && notAudience.expires_at === null && Object.keys(notAudience).length === 2, JSON.stringify(notAudience));
 
-    // The page lists the three OBO proofs, nothing about the ATA one.
+    // The page lists the three User verification proofs, nothing about the App verification one.
     const mine = async () => (await call<{ items: MyProof[] }>(probe, "/v1/me/proofs?limit=200")).body.items;
     const listed = await mine();
-    results.check("/v1/me/proofs lists exactly the three OBO proofs (no ATA)", listed.length === 3 && [ids.read, ids.write, ids.message].every(id => listed.some(item => item.proof_id === id)), listed.map(item => `${item.issuing_app.app_id}→${item.receiving_app.app_id}`).join(", "));
+    results.check("/v1/me/proofs lists exactly the three User verification proofs (no App verification)", listed.length === 3 && [ids.read, ids.write, ids.message].every(id => listed.some(item => item.proof_id === id)), listed.map(item => `${item.issuing_app.app_id}→${item.receiving_app.app_id}`).join(", "));
     const started = Date.now();
     await page.goto(`${env.site}/proofs`);
     const active = page.getByRole("list", { name: "Active verifications" });

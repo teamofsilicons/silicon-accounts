@@ -302,7 +302,7 @@ Import rows carry their own message codes (`missing_identifier`, `ambiguous_matc
 |---|---|---|
 | `invalid_subject_token` | 400 | the subject token isn't a live access token (`details.reason`: `not_an_access_token`, `invalid`, `expired`, `revoked`) |
 | `subject_token_wrong_app` | 403 | the subject token belongs to another app (`details.token_app`) |
-| `ata_single_app` | 422 | an App verification request named apps in `audiences`: an App verification proof is for exactly one app; send `{"receiving_app": "…"}` once per app (`details.field`, `details.apps`) |
+| `app_verification_single_app` | 422 | an app verification request named apps in `audiences`: an app verification proof is for exactly one app; send `{"receiving_app": "…"}` once per app (`details.field`, `details.apps`) |
 | `unknown_receiving_app` | 400 | the receiving app doesn't exist (`details.app_ids`) |
 | `invalid_receiving_app` | 400 | the issuer itself, or Silicon Accounts itself (`accounts`, `developer`) |
 | `receiving_app_disabled` | 403 | the receiving app is disabled |

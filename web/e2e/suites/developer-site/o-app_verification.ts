@@ -1,16 +1,16 @@
 /**
- * The ATA tab (UNDERSTANDING "Proofs (OBO and ATA)"): Commit's owner makes app-to-app proofs on the developer site, each
+ * The App verification tab (UNDERSTANDING "Proofs (User verification and App verification)"): Commit's owner makes app-to-app proofs on the developer site, each
  * for exactly one receiving app. The receiver is picked once (typed or from the owner's own apps; a second pick
  * replaces the first; the issuing app itself, a malformed id and an app that does not exist are refused in place),
  * scopes are checked as they are typed, the lifetime is chosen; the proof token and its refresh token are shown once,
  * masked until shown. The receiving app verifies it ({valid, expires_at, issuing app, receiving app}); any other app
  * is told {valid: false, expires_at: null}. The refresh token gets new proof tokens, and presenting a used one revokes
  * the proof. Every proof Commit issued is listed by kind and status (an expired one by SQL time travel), any active one
- * is revoked from its row, and a request for several apps at once is refused with `ata_single_app` through the BFF.
+ * is revoked from its row, and a request for several apps at once is refused with `app_verification_single_app` through the BFF.
  */
 import type { Locator, Page } from "@playwright/test";
 import type { Journey } from "../../context";
-import { api, developerApi, issueAta, shot, sleep, sql, tag, verifyProof } from "../../lib";
+import { api, developerApi, issueAppVerification, shot, sleep, sql, tag, verifyProof } from "../../lib";
 import { addTag, appBasic, errorCode, errorMessage, ownerSignIn, pressSegment } from "./_helpers";
 import { until } from "./_kit";
 
@@ -61,12 +61,12 @@ async function makeProof(page: Page): Promise<{ token: string; refresh: string; 
 }
 
 export const journey: Journey = {
-  name: "developer-site-ata",
-  title: "the ATA tab: one receiving app per proof (typed or suggested; a second pick replaces the first; itself, a malformed id and a missing app refused), scopes checked as typed, the lifetime chosen, both tokens shown once; the receiver verifies it and any other app is told valid:false; refresh and reuse; listed by kind and status (expired by time travel); revoked from its row; several apps at once refused (ata_single_app) through the BFF",
+  name: "developer-site-app_verification",
+  title: "the App verification tab: one receiving app per proof (typed or suggested; a second pick replaces the first; itself, a malformed id and a missing app refused), scopes checked as typed, the lifetime chosen, both tokens shown once; the receiver verifies it and any other app is told valid:false; refresh and reuse; listed by kind and status (expired by time travel); revoked from its row; several apps at once refused (app_verification_single_app) through the BFF",
   async run(ctx) {
     const { env, results } = ctx;
     const t = tag();
-    const { context, page } = await ownerSignIn(ctx, APP, { label: "ata", returnTo: `/apps/${APP}/ata`, expected: [/status of 422 \(Unprocessable Entity\) @ .*\/proofs\/ata/, /status of 404 \(Not Found\) @ .*\/api\/accounts\/apps\/no-such-app-[a-z0-9]+\/public/] });
+    const { context, page } = await ownerSignIn(ctx, APP, { label: "app_verification", returnTo: `/apps/${APP}/app-verification`, expected: [/status of 422 \(Unprocessable Entity\) @ .*\/proofs\/app_verification/, /status of 404 \(Not Found\) @ .*\/api\/accounts\/apps\/no-such-app-[a-z0-9]+\/public/] });
     try {
       const panel = page.getByRole("tabpanel", { name: "App verification" });
       const field = panel.getByRole("textbox", { name: "The app that receives it" });
@@ -143,13 +143,13 @@ export const journey: Journey = {
       results.check("a proof for waveform (typed: not one of the owner's apps), verified by waveform", secondValid.body.valid === true && appIdOf(secondValid.body.receiving_app) === "waveform", JSON.stringify(secondValid.body).slice(0, 200));
 
       // One more from the server, which ends (time travel on its own family).
-      const third = await issueAta(ctx, APP, "remind", { direct: true });
+      const third = await issueAppVerification(ctx, APP, "remind", { direct: true });
       if (third.body.proof_id) await sql(env, `update proof_families set expires_at = now() - interval '1 second' where id = '${third.body.proof_id}'`);
       const listed = await until(async () => {
         const items = await proofs();
         return items.some(item => item.proof_id === third.body.proof_id) ? items : null;
       }, 10_000) ?? [];
-      const mine = listed.filter(item => [first, second].length && item.kind === "ata");
+      const mine = listed.filter(item => [first, second].length && item.kind === "app_verification");
       const firstListed = listed.find(item => item.status === "revoked" && (item.receiving_app ?? item.audiences?.[0]) === "remind" && item.scopes.includes("notify.send"));
       const secondListed = listed.find(item => item.status === "active" && (item.receiving_app ?? item.audiences?.[0]) === "waveform");
       const thirdListed = listed.find(item => item.proof_id === third.body.proof_id);
@@ -172,8 +172,8 @@ export const journey: Journey = {
       await pressSegment(panel, "Status", "Any status");
       await pressSegment(panel, "Kind", "User verification");
       await sleep(700);
-      const obo = (await panel.innerText()).replace(/\s+/g, " ");
-      results.check("Kind · On behalf of: Commit issued no OBO proof, and the tab says so", /No verifications match/.test(obo) && /Try another kind or status/.test(obo), obo.slice(obo.indexOf("Verifications this app issued"), obo.indexOf("Verifications this app issued") + 200));
+      const user_verification = (await panel.innerText()).replace(/\s+/g, " ");
+      results.check("Kind · On behalf of: Commit issued no User verification proof, and the tab says so", /No verifications match/.test(user_verification) && /Try another kind or status/.test(user_verification), user_verification.slice(user_verification.indexOf("Verifications this app issued"), user_verification.indexOf("Verifications this app issued") + 200));
       await pressSegment(panel, "Kind", "App verification");
       await sleep(600);
 
@@ -189,10 +189,10 @@ export const journey: Journey = {
 
       // Several apps at once, through the developer site's BFF: refused, nothing made.
       const before = (await proofs()).length;
-      const several = await developerApi(env, page, `/apps/${APP}/proofs/ata`, { method: "POST", json: { audiences: ["remind", "waveform"] }, headers: { "idempotency-key": `ds-${t}-several` } });
-      const one = await developerApi(env, page, `/apps/${APP}/proofs/ata`, { method: "POST", json: { audiences: ["remind"] }, headers: { "idempotency-key": `ds-${t}-one` } });
-      results.check("a proof for several apps (audiences) is refused through the BFF: 422 ata_single_app, \"An App verification is for exactly one app; ask for one proof per app.\"", several.status === 422 && errorCode(several.body) === "ata_single_app" && /An App verification is for exactly one app; ask for one proof per app\./.test(errorMessage(several.body)), `${several.status} ${JSON.stringify(several.body).slice(0, 240)}`);
-      results.check("…even with one app in `audiences` (receiving_app is the only way)", one.status === 422 && errorCode(one.body) === "ata_single_app", `${one.status} ${errorCode(one.body)}`);
+      const several = await developerApi(env, page, `/apps/${APP}/proofs/app-verification`, { method: "POST", json: { audiences: ["remind", "waveform"] }, headers: { "idempotency-key": `ds-${t}-several` } });
+      const one = await developerApi(env, page, `/apps/${APP}/proofs/app-verification`, { method: "POST", json: { audiences: ["remind"] }, headers: { "idempotency-key": `ds-${t}-one` } });
+      results.check("a proof for several apps (audiences) is refused through the BFF: 422 app_verification_single_app, \"An app verification is for exactly one app; ask for one proof per app.\"", several.status === 422 && errorCode(several.body) === "app_verification_single_app" && /An app verification is for exactly one app; ask for one proof per app\./.test(errorMessage(several.body)), `${several.status} ${JSON.stringify(several.body).slice(0, 240)}`);
+      results.check("…even with one app in `audiences` (receiving_app is the only way)", one.status === 422 && errorCode(one.body) === "app_verification_single_app", `${one.status} ${errorCode(one.body)}`);
       results.check("…and nothing was made", (await proofs()).length === before, `${before} → ${(await proofs()).length}`);
     } finally {
       await context.close();

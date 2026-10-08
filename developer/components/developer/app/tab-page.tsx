@@ -38,7 +38,7 @@ const LOADERS: Record<DeveloperTab, () => Promise<ComponentType>> = {
   users: () => import("../tabs/users").then(module => module.UsersTab),
   import: () => import("../tabs/import").then(module => module.ImportTab),
   webhooks: () => import("../tabs/webhooks").then(module => module.WebhooksTab),
-  ata: () => import("../tabs/ata").then(module => module.AtaTab),
+  "app-verification": () => import("../tabs/app_verification").then(module => module.AppVerificationTab),
   embed: () => import("../tabs/embed").then(module => module.EmbedTab),
 };
 

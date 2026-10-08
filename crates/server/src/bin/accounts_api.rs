@@ -104,6 +104,14 @@ async fn run() -> Result<(), (u8, String)> {
             format!("error: {e}\nhint: check ACCOUNTS_TOKEN_PEPPER, ACCOUNTS_ENCRYPTION_KEYRING and ACCOUNTS_JWT_PRIVATE_KEY."),
         )
     })?;
+    accounts_proofs::migration::migrate_retry_responses(&state)
+        .await
+        .map_err(|e| {
+            (
+                2,
+                format!("error: verification retry migration failed: {e}"),
+            )
+        })?;
     // The stored setup of the developer platform's app says this deployment's callback.
     match accounts_server::first_party::sync_developer_app(&state).await {
         Ok(accounts_server::first_party::DeveloperSync::Updated { version }) => tracing::info!(

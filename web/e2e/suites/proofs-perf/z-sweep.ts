@@ -3,7 +3,7 @@
  * stack's first sweep (120 s after accounts-api started, logged as "proof sweep" with what it did), then checks it
  * against the documented maintenance (crates/proofs store::sweep):
  *
- * 1. it stores the end of an OBO proof whose sign-in was revoked (sign_in_revoked, by system, at the moment the sign-in
+ * 1. it stores the end of a user verification proof whose sign-in was revoked (sign_in_revoked, by system, at the moment the sign-in
  *    ended) with exactly one proof.revoked audit entry, so the account's history shows the proof revoked;
  * 2. it deletes proof tokens that expired more than a day ago, and keeps younger ones;
  * 3. it deletes every token of proofs revoked or ended more than 30 days ago, and keeps younger ones;
@@ -19,7 +19,7 @@ import { FIRST_SWEEP_AFTER_MS, SWEEP_KEY, SWEEP_WAIT_MS, sweepLines, sweepOptIn,
 
 export const journey: Journey = {
   name: "proofs-perf-sweep",
-  ...sweepOptIn("the stack's first hourly proof sweep: stores the end of the OBO proof whose sign-in ended (sign_in_revoked by system, one audit entry, now in the Carbon's history), deletes proof tokens expired over a day and every token of proofs ended over 30 days, keeps the proofs themselves, younger tokens, the refresh token of a still-live proof and a live proof's used refresh token (reuse still caught)"),
+  ...sweepOptIn("the stack's first hourly proof sweep: stores the end of the User verification proof whose sign-in ended (sign_in_revoked by system, one audit entry, now in the Carbon's history), deletes proof tokens expired over a day and every token of proofs ended over 30 days, keeps the proofs themselves, younger tokens, the refresh token of a still-live proof and a live proof's used refresh token (reuse still caught)"),
   needs: [SWEEP_KEY],
   timeoutMs: 8 * 60_000,
   async run(ctx) {
@@ -101,10 +101,10 @@ export const journey: Journey = {
     results.check("…and its proof token is exactly invalid", isExactlyInvalid((await verifyAs(ctx, "briefcase", longAgo.proof_token)).body));
     const recentlyLeft = await tokens(setup.endedRecently.proof_id);
     results.check("the tokens of the proof dm revoked 29 days ago are kept", recentlyLeft.access === 1 && recentlyLeft.refresh === 1, JSON.stringify(recentlyLeft));
-    const ata = setup.ataExpiredLongAgo;
-    const ataLeft = await tokens(ata.proof_id);
-    const listedAta = await appListing(ctx, "commit", ata.proof_id, "&kind=ata");
-    results.check("every token of Commit's ATA proof whose lifetime ended 31 days ago is deleted; Commit's listing keeps the proof, expired", ataLeft.access === 0 && ataLeft.refresh === 0 && listedAta?.status === "expired", `${JSON.stringify(ataLeft)} ${short(listedAta)}`);
+    const app_verification = setup.ataExpiredLongAgo;
+    const ataLeft = await tokens(app_verification.proof_id);
+    const listedAppVerification = await appListing(ctx, "commit", app_verification.proof_id, "&kind=app_verification");
+    results.check("every token of Commit's App verification proof whose lifetime ended 31 days ago is deleted; Commit's listing keeps the proof, expired", ataLeft.access === 0 && ataLeft.refresh === 0 && listedAppVerification?.status === "expired", `${JSON.stringify(ataLeft)} ${short(listedAppVerification)}`);
 
     // 4. The live proof is untouched, and its used refresh token is kept: reuse is still caught.
     const live = setup.live;

@@ -1,12 +1,12 @@
 ---
 title: Verify a proof
-description: Check an App verification or User verification token sent to your app. Read the result and decide whether to allow the requested action.
+description: Check an app verification or User verification token sent to your app. Read the result and decide whether to allow the requested action.
 kind: instructive
 order: 40
 related:
   - learn/proofs.md
-  - start/obo.md
-  - start/ata.md
+  - start/user-verification.md
+  - start/app-verification.md
   - reference/api/proofs.md
 ---
 
@@ -29,7 +29,7 @@ A valid proof answers `200` with everything you need to decide:
 {
   "valid": true,
   "proof_id": "01a11435-333a-725d-bb0e-75adde136703",
-  "kind": "obo",
+  "kind": "user_verification",
   "expires_at": "2026-10-07T02:43:13.274Z",
   "issuing_app": { "app_id": "dm", "name": "DM" },
   "receiving_app": { "app_id": "briefcase", "name": "Briefcase" },
@@ -52,7 +52,7 @@ These are real responses from a local Silicon Accounts stack, like every respons
 2. **Ask Silicon Accounts** with `POST /v1/proofs/verify`, authenticated as your app (`Authorization: Basic base64(app_id:app_secret)`) and the body `{"proof_token": "sap_…"}`. A proof verifies only for the apps it names, and only when they ask with their own credentials: the same token checked by `remind` instead of `briefcase` is `{"valid": false, "expires_at": null}`.
 3. **Refuse unless `valid` is `true`.** Every other case gets the same answer on purpose (see [Valid, or not valid, and nothing more](../learn/proofs.md#valid-or-not-valid-and-nothing-more)), so there is nothing to branch on.
 4. **Check what this call needs** before acting:
-   - `kind`: `obo` means the issuing app acts for an account; `ata` means the issuing app calls as itself and `user` is `null`.
+   - `kind`: `user_verification` means the issuing app acts for an account; `app_verification` means the issuing app calls as itself and `user` is `null`.
    - `issuing_app.app_id`: the app making the call. Accept only the apps you decided to trust for this endpoint.
    - `scopes`: must contain the scope this endpoint requires. Scopes are strings the apps agree on; Silicon Accounts carries them and never interprets them. A valid proof without the scope you need is still a refusal.
    - `user.uuid` (User verification): the account to act for. Key your data on the uuid, which never changes; `user.id` (`c:…` or `si:…`) is for display and can change.
@@ -138,7 +138,7 @@ async fn main() -> Result<(), BoxError> {
 }
 ```
 
-`verify_proof` returns `ProofVerification::Invalid` for every `{"valid": false}` answer, and an `Err` only when the request itself failed (bad credentials, network). Against the local stack, `check_proof` returned `Some("eiy")` for a valid User verification proof from `dm`, `None` for the same proof with the scope `files.delete`, `None` when `remind` checked it, and `Some("commit")` for an App verification proof from `commit`; the program printed `refuse the call` for `sap_nope`.
+`verify_proof` returns `ProofVerification::Invalid` for every `{"valid": false}` answer, and an `Err` only when the request itself failed (bad credentials, network). Against the local stack, `check_proof` returned `Some("eiy")` for a valid User verification proof from `dm`, `None` for the same proof with the scope `files.delete`, `None` when `remind` checked it, and `Some("commit")` for an app verification proof from `commit`; the program printed `refuse the call` for `sap_nope`.
 
 ## With the CLI
 
@@ -173,6 +173,6 @@ Verify on every call that needs the proof. It's cheap: on a local stack, one ver
 ## Related
 
 - [How proofs work](../learn/proofs.md): what a proof stands on, why the invalid answer says nothing more, and every way a proof ends.
-- [Act for an account at another app (User verification)](obo.md): the issuing app's side.
-- [Prove your app to other apps (App verification)](ata.md).
+- [Act for an account at another app (User verification)](user-verification.md): the issuing app's side.
+- [Prove your app to other apps (App verification)](app-verification.md).
 - [Proofs API reference](../reference/api/proofs.md): every proof endpoint, field and error.

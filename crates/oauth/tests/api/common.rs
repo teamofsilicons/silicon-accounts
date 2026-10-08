@@ -296,7 +296,7 @@ pub async fn wait_for_lock_waiters(ctx: &TestContext, n: i64) {
 }
 
 /// What `DELETE /v1/me/apps/{app_id}` does (account crate): lock the membership, then remove
-/// the access (membership, the app's token families, its OBO proofs). The transaction is left
+/// the access (membership, the app's token families, its User verification proofs). The transaction is left
 /// open so a test can run something while the removal is in flight.
 pub async fn begin_access_removal(
     state: &AppState,

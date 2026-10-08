@@ -1,6 +1,6 @@
 /**
  * Links inside the docs are written for the files, the way GitHub reads them: `../learn/proofs.md#what-ends-a-proof`
- * from start/obo.md, `start/cli.md` from index.md. This resolves them for the site:
+ * from start/user-verification.md, `start/cli.md` from index.md. This resolves them for the site:
  *
  *   ../learn/proofs.md#x   → /docs/learn/proofs#x        (a page of the docs)
  *   #x                     → #x                          (this page)

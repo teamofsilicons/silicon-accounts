@@ -105,7 +105,7 @@ export const journey: Journey = {
       ["/auth/callback?code=x", "/"],
       ["/api/accounts/me", "/"],
       ["/sign-in?return_to=/", "/"],
-      [`/apps/${appId}/ata?kind=all#issued`, `/apps/${appId}/ata?kind=all#issued`],
+      [`/apps/${appId}/app-verification?kind=all#issued`, `/apps/${appId}/app-verification?kind=all#issued`],
     ];
     const kept: string[] = [];
     for (const [input, expected] of cases) {
@@ -119,8 +119,8 @@ export const journey: Journey = {
     results.check("a router prefetch of /auth/sign-in starts nothing (204, no cookie)", prefetch.status === 204 && !prefetch.setCookie, `${prefetch.status} ${prefetch.setCookie.slice(0, 40)}`);
 
     // 6. Signing in again: the browser is still signed in to the account site, so the hosted page offers "Continue as".
-    await signInOnDeveloper(env, page, null, { returnTo: `/apps/${appId}/ata` });
-    results.check("signing in again with \"Continue as\" comes back to return_to", page.url() === `${env.developer}/apps/${appId}/ata`, page.url());
+    await signInOnDeveloper(env, page, null, { returnTo: `/apps/${appId}/app-verification` });
+    results.check("signing in again with \"Continue as\" comes back to return_to", page.url() === `${env.developer}/apps/${appId}/app-verification`, page.url());
     const third = (await readDevSession(context, env)).session as DevSession;
     results.check("…as a new sign-in (new tokens)", !!third && third.rt !== before.rt && third.rt !== second.rt);
 
@@ -137,7 +137,7 @@ export const journey: Journey = {
     // The reload races the page's own move to the sign-in card (the shell sees the 401 first).
     await page.reload().catch(() => undefined);
     await page.waitForURL(url => url.pathname === "/sign-in", { timeout: 30_000 });
-    results.check("…so the open page goes to the sign-in card, keeping where it was", new URL(page.url()).searchParams.get("return_to") === `/apps/${appId}/ata`, page.url());
+    results.check("…so the open page goes to the sign-in card, keeping where it was", new URL(page.url()).searchParams.get("return_to") === `/apps/${appId}/app-verification`, page.url());
 
     // 8. Without its PKCE verifier a code is worth nothing to the public client `developer`.
     let captured = "";

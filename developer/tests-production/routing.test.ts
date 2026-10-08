@@ -43,7 +43,7 @@ test("standalone routing remains internal behind Caddy HTTPS forwarding", { time
         if (forwarded) assert.match(response.headers.get("strict-transport-security") ?? "", /max-age=/);
         if (path.startsWith("/docs/")) assert.match(await response.text(), /No page here/);
       }
-      for (const [from, to] of [["branding", "pages"], ["proofs", "ata"]]) {
+      for (const [from, to] of [["branding", "pages"], ["proofs", "app-verification"]]) {
         const response = await fetch(`${origin}/apps/briefcase/${from}?from=x`, { headers, redirect: "manual", signal: AbortSignal.timeout(5000) });
         assert.equal(response.status, 308);
         assert.equal(response.headers.get("location"), `/apps/briefcase/${to}?from=x`);

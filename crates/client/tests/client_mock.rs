@@ -10,8 +10,8 @@ use common::{Mock, Reply};
 use serde_json::json;
 use silicon_accounts_client::{
     AccountKind, AccountsClient, Contact, CreateSilicon, DevicePoll, Error, ImportInput,
-    ImportOptions, IssueAta, MAX_IMPORT_BYTES, ProofVerification, SiliconSelfCreate, WaitEvent,
-    WaitOptions,
+    ImportOptions, IssueAppVerification, MAX_IMPORT_BYTES, ProofVerification, SiliconSelfCreate,
+    WaitEvent, WaitOptions,
 };
 
 fn token_body(aud_id: &str) -> serde_json::Value {
@@ -381,7 +381,7 @@ async fn app_credentials_proofs_and_owner_mode() {
     mock.on(
         "POST",
         "/v1/proofs/verify",
-        Reply::json(200, json!({"valid": true, "proof_id": "p1", "kind": "obo", "expires_at": "2026-10-06T12:30:00.000Z",
+        Reply::json(200, json!({"valid": true, "proof_id": "p1", "kind": "user_verification", "expires_at": "2026-10-06T12:30:00.000Z",
             "issuing_app": {"app_id": "dm", "name": "DM"}, "receiving_app": {"app_id": "briefcase", "name": "Briefcase"},
             "user": {"uuid": "a8K", "id": "c:saket", "kind": "carbon", "membership_id": "dm:a8K"}, "scopes": ["files.write"]})),
     );
@@ -414,15 +414,15 @@ async fn app_credentials_proofs_and_owner_mode() {
     // Owner mode: app-or-owner endpoints use the owner's bearer token…
     mock.on(
         "POST",
-        "/v1/apps/briefcase/proofs/ata",
-        Reply::json(201, json!({"proof_id": "p2", "kind": "ata", "proof_token": "sap_ata", "expires_at": "2026-10-06T12:30:00.000Z",
-            "proof_refresh_token": "sapr_ata", "issuing_app": "briefcase", "receiving_app": "remind", "user": null, "scopes": []})),
+        "/v1/apps/briefcase/proofs/app-verification",
+        Reply::json(201, json!({"proof_id": "p2", "kind": "app_verification", "proof_token": "sap_app_verification", "expires_at": "2026-10-06T12:30:00.000Z",
+            "proof_refresh_token": "sapr_app_verification", "issuing_app": "briefcase", "receiving_app": "remind", "user": null, "scopes": []})),
     );
     let owner = client.with_token("owner-token");
     let owned = owner.app("briefcase");
     let issued = owned
-        .issue_ata(
-            &IssueAta {
+        .issue_app_verification(
+            &IssueAppVerification {
                 receiving_app: " remind ".into(),
                 ..Default::default()
             },
@@ -431,14 +431,14 @@ async fn app_credentials_proofs_and_owner_mode() {
         .await
         .unwrap();
     assert_eq!(issued.receiving_app.as_deref(), Some("remind"));
-    let sent = &mock.requests_to("POST", "/v1/apps/briefcase/proofs/ata")[0];
+    let sent = &mock.requests_to("POST", "/v1/apps/briefcase/proofs/app-verification")[0];
     assert_eq!(sent.header("authorization"), Some("Bearer owner-token"));
     assert_eq!(sent.json(), json!({"receiving_app": "remind"}));
-    // An ATA proof is for exactly one app: several are refused before anything is sent.
+    // An app verification proof is for exactly one app: several are refused before anything is sent.
     for several in ["remind,waveform", "remind waveform", ""] {
         let err = owned
-            .issue_ata(
-                &IssueAta {
+            .issue_app_verification(
+                &IssueAppVerification {
                     receiving_app: several.into(),
                     ..Default::default()
                 },
@@ -449,7 +449,7 @@ async fn app_credentials_proofs_and_owner_mode() {
         assert_eq!(err.code(), "invalid_input", "{several}: {err}");
     }
     assert_eq!(
-        mock.requests_to("POST", "/v1/apps/briefcase/proofs/ata")
+        mock.requests_to("POST", "/v1/apps/briefcase/proofs/app-verification")
             .len(),
         1
     );

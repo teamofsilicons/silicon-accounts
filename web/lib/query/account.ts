@@ -229,7 +229,7 @@ export function useHistory(kind?: HistoryKind | null) {
   });
 }
 
-/** Every OBO proof about this account, active and ended (the whole list). */
+/** Every User verification proof about this account, active and ended (the whole list). */
 export function useMyProofs() {
   const { status } = useSession();
   return useWholeList(queryKeys.me.proofs, query => api.me.proofs.list(query), status === "signed_in");

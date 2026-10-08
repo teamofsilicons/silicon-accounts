@@ -130,8 +130,8 @@ describe('fake-apps.json', () => {
     assert.deepEqual(app('briefcase').required_fields, ['email']);
     assert.ok(byId.get('briefcase')?.webhook_url);
     assert.deepEqual(app('dm').required_fields, ['phone']);
-    assert.deepEqual(byId.get('dm')?.testkit.proofs.obo_issuer_to, ['briefcase']);
-    assert.deepEqual(byId.get('commit')?.testkit.proofs.ata_issuer_to, ['remind', 'waveform']);
+    assert.deepEqual(byId.get('dm')?.testkit.proofs.user_verification_issuer_to, ['briefcase']);
+    assert.deepEqual(byId.get('commit')?.testkit.proofs.app_verification_issuer_to, ['remind', 'waveform']);
     assert.deepEqual(app('waveform').methods, { google: true, apple: true, email: false, phone: false });
     assert.deepEqual(app('remind').methods, { email: true, phone: false, google: false, apple: false });
     assert.deepEqual(app('spacestation').optional_fields, ['timezone']);

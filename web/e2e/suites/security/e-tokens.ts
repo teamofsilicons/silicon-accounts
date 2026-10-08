@@ -52,7 +52,7 @@ export const journey: Journey = {
       ["GET", "/v1/me/proofs", undefined],
       ["POST", "/v1/me/silicons", { id: `si:tok-${tag()}`, display_name: "x" }],
       ["GET", "/v1/apps/briefcase", undefined],
-      ["POST", "/v1/apps/briefcase/proofs/ata", { receiving_app: "remind" }],
+      ["POST", "/v1/apps/briefcase/proofs/app-verification", { receiving_app: "remind" }],
       ["DELETE", "/v1/me", { confirm: carbon.id }],
     ];
     const opened: string[] = [];
@@ -69,14 +69,14 @@ export const journey: Journey = {
     // 2. Every other kind of credential as a Bearer token.
     const slt = await call<{ slt?: string }>(`${env.site}/v1/me/short-lived-tokens`, { json: { app_id: "remind" }, jar: carbon.jar, origin: env.site, ip: ctx.ip });
     remember(ctx, "slt", slt.body.slt);
-    const ata = await call<{ proof_token?: string; proof_refresh_token?: string; proof_id?: string }>(`${env.site}/v1/proofs/ata`, { json: { receiving_app: "remind" }, basic: appCredentials("commit"), ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}` } });
-    remember(ctx, "proof token", ata.body.proof_token, ata.body.proof_refresh_token);
+    const app_verification = await call<{ proof_token?: string; proof_refresh_token?: string; proof_id?: string }>(`${env.site}/v1/proofs/app-verification`, { json: { receiving_app: "remind" }, basic: appCredentials("commit"), ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}` } });
+    remember(ctx, "proof token", app_verification.body.proof_token, app_verification.body.proof_refresh_token);
     const others: Array<[string, string]> = [
       ["briefcase's refresh token", bc.refresh_token],
       ["briefcase's id_token (a JWT signed by the same key)", bc.id_token ?? ""],
       ["a short-lived token for remind", slt.body.slt ?? ""],
-      ["an ATA proof token", ata.body.proof_token ?? ""],
-      ["a proof refresh token", ata.body.proof_refresh_token ?? ""],
+      ["an app verification proof token", app_verification.body.proof_token ?? ""],
+      ["a proof refresh token", app_verification.body.proof_refresh_token ?? ""],
       ["the browser's session cookie value", carbon.jar.get("sa_session") ?? ""],
       ["an app secret", appCredentials("briefcase")[1]],
       ["an empty token", ""],
@@ -186,7 +186,7 @@ export const journey: Journey = {
       ["briefcase", "a first-party refresh token", firstParty.body.refresh_token],
       ["briefcase", "the developer platform's access token", dev.access_token],
       ["briefcase", "the developer platform's refresh token", dev.refresh_token],
-      ["remind", "a proof token for remind", ata.body.proof_token ?? ""],
+      ["remind", "a proof token for remind", app_verification.body.proof_token ?? ""],
       ["briefcase", "an unknown token", `sar_${base64url(Buffer.from(randomUUID()))}`],
     ];
     const leaks: string[] = [];
@@ -201,8 +201,8 @@ export const journey: Journey = {
     const badSecret = await introspect("briefcase", bc.access_token, ["briefcase", wrongSecret]);
     results.check("introspection needs real app credentials: the public client ids accounts and developer alone, and a wrong secret, get 401 invalid_client (and the wrong secret is not echoed)", publicClient.status === 401 && publicClient.body.error === "invalid_client" && developerClient.status === 401 && developerClient.body.error === "invalid_client" && badSecret.status === 401 && !badSecret.text.includes(wrongSecret), `${publicClient.status} ${publicClient.body.error} / developer ${developerClient.status} ${developerClient.body.error} / ${badSecret.status} ${badSecret.text.slice(0, 100)}`);
 
-    // OBO: an app turns only access tokens it received itself into proofs (aud = the issuing app).
-    const obo = (app: string, subject: string) => call<{ proof_token?: string; proof_refresh_token?: string }>(`${env.site}/v1/proofs/obo`, { json: { subject_token: subject, receiving_app: "remind" }, basic: appCredentials(app), ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}${tag()}` } });
+    // User verification: an app turns only access tokens it received itself into proofs (aud = the issuing app).
+    const user_verification = (app: string, subject: string) => call<{ proof_token?: string; proof_refresh_token?: string }>(`${env.site}/v1/proofs/user-verification`, { json: { subject_token: subject, receiving_app: "remind" }, basic: appCredentials(app), ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}${tag()}` } });
     const oboCases: Array<[string, string, string]> = [
       ["dm presenting briefcase's access token", "dm", bc.access_token],
       ["briefcase presenting the developer platform's token", "briefcase", dev.access_token],
@@ -212,13 +212,13 @@ export const journey: Journey = {
     ];
     const oboIssued: string[] = [];
     for (const [label, app, subject] of oboCases) {
-      const reply = await obo(app, subject);
+      const reply = await user_verification(app, subject);
       remember(ctx, "proof token", reply.body?.proof_token, reply.body?.proof_refresh_token);
       if (reply.status === 201 || reply.status < 400 || !/subject_token/.test(errorOf(reply).code ?? "")) oboIssued.push(`${label}: ${brief(reply)}`);
     }
-    const ownObo = await obo("briefcase", bc.access_token);
-    remember(ctx, "proof token", ownObo.body?.proof_token, ownObo.body?.proof_refresh_token);
-    results.check(`an OBO proof needs the issuing app's own access token for the Carbon: ${oboCases.length} others are refused (another app's, the developer platform's, a first-party token, an id_token, a refresh token), briefcase's own works`, oboIssued.length === 0 && ownObo.status === 201, `${oboIssued.join(" | ") || "all refused"}; own ${brief(ownObo)}`);
+    const ownUserVerification = await user_verification("briefcase", bc.access_token);
+    remember(ctx, "proof token", ownUserVerification.body?.proof_token, ownUserVerification.body?.proof_refresh_token);
+    results.check(`a user verification proof needs the issuing app's own access token for the Carbon: ${oboCases.length} others are refused (another app's, the developer platform's, a first-party token, an id_token, a refresh token), briefcase's own works`, oboIssued.length === 0 && ownUserVerification.status === 201, `${oboIssued.join(" | ") || "all refused"}; own ${brief(ownUserVerification)}`);
 
     // 5. The developer platform's audience: reads of the account and the owner routes, nothing else.
     const asDeveloper = (method: string, path: string, json?: unknown, accessToken = dev.access_token) => call(`${env.site}${path}`, { method, ...(json !== undefined ? { json } : method === "GET" || method === "HEAD" ? {} : { body: "" }), bearer: accessToken, ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}${tag()}` } });
@@ -277,7 +277,7 @@ export const journey: Journey = {
       ["GET", "/v1/apps/briefcase/users", undefined],
       ["GET", "/v1/apps/briefcase/signin-config/history", undefined],
       ["PATCH", "/v1/apps/briefcase/signin-config", { redirect_uris: ["https://evil.example/cb"] }],
-      ["POST", "/v1/apps/briefcase/proofs/ata", { receiving_app: "remind" }],
+      ["POST", "/v1/apps/briefcase/proofs/app-verification", { receiving_app: "remind" }],
       ["GET", "/v1/apps/briefcase/proofs", undefined],
       ["PUT", "/v1/apps/briefcase/webhook", { url: "https://hooks.example.com/x" }],
       ["GET", "/v1/apps/briefcase/webhook/deliveries", undefined],
@@ -288,7 +288,7 @@ export const journey: Journey = {
       const reply = await asDeveloper(method, path, json);
       if (reply.status !== 403 || errorOf(reply).code !== "not_app_owner") ownerLeaks.push(`${method} ${path}: ${brief(reply)}`);
     }
-    results.check(`a Carbon who owns no app gets 403 not_app_owner on ${notOwned.length} owner routes of briefcase with the developer platform's token (details, users, setup history, setup change, ATA proofs, proof list, webhook, deliveries, imports)`, ownerLeaks.length === 0, ownerLeaks.join(" | ") || "all 403");
+    results.check(`a Carbon who owns no app gets 403 not_app_owner on ${notOwned.length} owner routes of briefcase with the developer platform's token (details, users, setup history, setup change, App verification proofs, proof list, webhook, deliveries, imports)`, ownerLeaks.length === 0, ownerLeaks.join(" | ") || "all 403");
 
     // The owner of briefcase (c:saket, seeded): their developer-platform token manages briefcase, not dm (c:shubham's).
     const owner = appOwner("briefcase");
@@ -303,18 +303,18 @@ export const journey: Journey = {
     const ownedIds = ((ownedList.body as { items?: Array<{ app_id: string }> }).items ?? []).map(item => item.app_id);
     const details = await asDeveloper("GET", "/v1/apps/briefcase", undefined, saketDev.access_token);
     const users = await asDeveloper("GET", "/v1/apps/briefcase/users?limit=5", undefined, saketDev.access_token);
-    const ownerAta = await call<{ proof_id?: string; proof_token?: string; receiving_app?: string }>(`${env.site}/v1/apps/briefcase/proofs/ata`, { json: { receiving_app: "remind" }, bearer: saketDev.access_token, ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}${tag()}` } });
-    remember(ctx, "proof token", ownerAta.body.proof_token);
+    const ownerAppVerification = await call<{ proof_id?: string; proof_token?: string; receiving_app?: string }>(`${env.site}/v1/apps/briefcase/proofs/app-verification`, { json: { receiving_app: "remind" }, bearer: saketDev.access_token, ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}${tag()}` } });
+    remember(ctx, "proof token", ownerAppVerification.body.proof_token);
     // Someone else's developer-platform token can't revoke the owner's proof; the owner's own can.
-    const strangerRevoke = await call(`${env.site}/v1/apps/briefcase/proofs/${ownerAta.body.proof_id ?? "x"}`, { method: "DELETE", bearer: dev.access_token, ip: ctx.ip });
-    const stillValid = await call<{ valid?: boolean }>(`${env.site}/v1/proofs/verify`, { json: { proof_token: ownerAta.body.proof_token ?? "" }, basic: appCredentials("remind"), ip: ctx.ip });
-    const ownerRevoke = ownerAta.body.proof_id ? await call(`${env.site}/v1/apps/briefcase/proofs/${ownerAta.body.proof_id}`, { method: "DELETE", bearer: saketDev.access_token, ip: ctx.ip }) : null;
-    const afterRevoke = await call<{ valid?: boolean }>(`${env.site}/v1/proofs/verify`, { json: { proof_token: ownerAta.body.proof_token ?? "" }, basic: appCredentials("remind"), ip: ctx.ip });
-    results.check("an ATA proof made by briefcase's owner can't be revoked with another Carbon's developer-platform token (403 not_app_owner, it still verifies), and the owner's revokes it (remind is then told valid:false)", strangerRevoke.status === 403 && errorOf(strangerRevoke).code === "not_app_owner" && stillValid.body.valid === true && !!ownerRevoke && ownerRevoke.status < 300 && afterRevoke.body.valid === false, `stranger ${brief(strangerRevoke)}; still valid ${stillValid.body.valid}; owner ${ownerRevoke ? brief(ownerRevoke) : "-"}; after ${afterRevoke.body.valid}`);
+    const strangerRevoke = await call(`${env.site}/v1/apps/briefcase/proofs/${ownerAppVerification.body.proof_id ?? "x"}`, { method: "DELETE", bearer: dev.access_token, ip: ctx.ip });
+    const stillValid = await call<{ valid?: boolean }>(`${env.site}/v1/proofs/verify`, { json: { proof_token: ownerAppVerification.body.proof_token ?? "" }, basic: appCredentials("remind"), ip: ctx.ip });
+    const ownerRevoke = ownerAppVerification.body.proof_id ? await call(`${env.site}/v1/apps/briefcase/proofs/${ownerAppVerification.body.proof_id}`, { method: "DELETE", bearer: saketDev.access_token, ip: ctx.ip }) : null;
+    const afterRevoke = await call<{ valid?: boolean }>(`${env.site}/v1/proofs/verify`, { json: { proof_token: ownerAppVerification.body.proof_token ?? "" }, basic: appCredentials("remind"), ip: ctx.ip });
+    results.check("an app verification proof made by briefcase's owner can't be revoked with another Carbon's developer-platform token (403 not_app_owner, it still verifies), and the owner's revokes it (remind is then told valid:false)", strangerRevoke.status === 403 && errorOf(strangerRevoke).code === "not_app_owner" && stillValid.body.valid === true && !!ownerRevoke && ownerRevoke.status < 300 && afterRevoke.body.valid === false, `stranger ${brief(strangerRevoke)}; still valid ${stillValid.body.valid}; owner ${ownerRevoke ? brief(ownerRevoke) : "-"}; after ${afterRevoke.body.valid}`);
     const dmDetails = await asDeveloper("GET", "/v1/apps/dm", undefined, saketDev.access_token);
-    const dmAta = await asDeveloper("POST", "/v1/apps/dm/proofs/ata", { receiving_app: "remind" }, saketDev.access_token);
+    const dmAppVerification = await asDeveloper("POST", "/v1/apps/dm/proofs/app-verification", { receiving_app: "remind" }, saketDev.access_token);
     const dmPatch = await asDeveloper("PATCH", "/v1/apps/dm/signin-config", { redirect_uris: ["https://evil.example/cb"] }, saketDev.access_token);
-    results.check("the owner's developer-platform token lists and manages briefcase (owned apps, details, users, an ATA proof for remind) and gets 403 not_app_owner on dm, another Carbon's app (details, ATA proof, sign-in setup)", ownedIds.includes("briefcase") && !ownedIds.includes("dm") && details.status === 200 && users.status === 200 && ownerAta.status === 201 && [dmDetails, dmAta, dmPatch].every(reply => reply.status === 403 && errorOf(reply).code === "not_app_owner"), `owned ${ownedIds.join(",")}; details ${details.status}; users ${users.status}; ata ${brief(ownerAta)}; dm: ${[dmDetails, dmAta, dmPatch].map(brief).join(" / ")}`);
+    results.check("the owner's developer-platform token lists and manages briefcase (owned apps, details, users, an app verification proof for remind) and gets 403 not_app_owner on dm, another Carbon's app (details, App verification proof, sign-in setup)", ownedIds.includes("briefcase") && !ownedIds.includes("dm") && details.status === 200 && users.status === 200 && ownerAppVerification.status === 201 && [dmDetails, dmAppVerification, dmPatch].every(reply => reply.status === 403 && errorOf(reply).code === "not_app_owner"), `owned ${ownedIds.join(",")}; details ${details.status}; users ${users.status}; app_verification ${brief(ownerAppVerification)}; dm: ${[dmDetails, dmAppVerification, dmPatch].map(brief).join(" / ")}`);
     // An accounts token (the CLI's, from the device flow) works on the same owner routes; briefcase's own token doesn't.
     const saketCli = await deviceTokens(t, saket.jar, "security suite (owner)");
     remember(ctx, "access token", saketCli.access_token);
@@ -412,14 +412,14 @@ export const journey: Journey = {
     const stolenSlt = await token(t, { grant_type: "urn:silicon:params:oauth:grant-type:slt", slt: slt.body.slt ?? "" }, appCredentials("briefcase"));
     results.check("briefcase can't redeem a short-lived token minted for remind (400 invalid_grant, SLT not echoed)", stolenSlt.status === 400 && stolenSlt.body.error === "invalid_grant" && !stolenSlt.text.includes(slt.body.slt ?? "~"), `${stolenSlt.status} ${stolenSlt.body.error}: ${stolenSlt.body.error_description ?? ""}`.slice(0, 200));
 
-    const verify = (app: string) => call(`${env.site}/v1/proofs/verify`, { json: { proof_token: ata.body.proof_token }, basic: appCredentials(app), ip: ctx.ip });
+    const verify = (app: string) => call(`${env.site}/v1/proofs/verify`, { json: { proof_token: app_verification.body.proof_token }, basic: appCredentials(app), ip: ctx.ip });
     const byBriefcase2 = await verify("briefcase");
     const byWaveform = await verify("waveform");
     const byIssuer = await verify("commit");
     const byRemind = await verify("remind");
-    results.check("an ATA proof from commit for remind verifies as exactly {valid:false, expires_at:null} for briefcase, for waveform and for its own issuer, and valid for remind alone", exactly(byBriefcase2, { valid: false, expires_at: null }) && exactly(byWaveform, { valid: false, expires_at: null }) && exactly(byIssuer, { valid: false, expires_at: null }) && (byRemind.body as { valid?: boolean }).valid === true, `briefcase ${byBriefcase2.text.slice(0, 60)} / waveform ${byWaveform.text.slice(0, 60)} / commit ${byIssuer.text.slice(0, 60)} / remind valid=${(byRemind.body as { valid?: boolean }).valid}`);
-    const twoApps = await call(`${env.site}/v1/proofs/ata`, { json: { audiences: ["remind", "waveform"] }, basic: appCredentials("commit"), ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}` } });
-    results.check("an ATA proof for two apps at once is refused (422 ata_single_app): a proof can never be verified by a second app", twoApps.status === 422 && errorOf(twoApps).code === "ata_single_app", brief(twoApps));
+    results.check("an app verification proof from commit for remind verifies as exactly {valid:false, expires_at:null} for briefcase, for waveform and for its own issuer, and valid for remind alone", exactly(byBriefcase2, { valid: false, expires_at: null }) && exactly(byWaveform, { valid: false, expires_at: null }) && exactly(byIssuer, { valid: false, expires_at: null }) && (byRemind.body as { valid?: boolean }).valid === true, `briefcase ${byBriefcase2.text.slice(0, 60)} / waveform ${byWaveform.text.slice(0, 60)} / commit ${byIssuer.text.slice(0, 60)} / remind valid=${(byRemind.body as { valid?: boolean }).valid}`);
+    const twoApps = await call(`${env.site}/v1/proofs/app-verification`, { json: { audiences: ["remind", "waveform"] }, basic: appCredentials("commit"), ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}` } });
+    results.check("an app verification proof for two apps at once is refused (422 app_verification_single_app): a proof can never be verified by a second app", twoApps.status === 422 && errorOf(twoApps).code === "app_verification_single_app", brief(twoApps));
 
     // 8. A sign-in past its 900 days (time travel on the family) ends everything issued under it at once.
     const fresh = ownRefresh.body;

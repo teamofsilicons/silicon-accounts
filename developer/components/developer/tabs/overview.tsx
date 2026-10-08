@@ -112,7 +112,7 @@ export function OverviewTab() {
       attention: webhook.url ? undefined : "Recommended: ids change and accounts get deleted",
     },
     {
-      tab: "ata",
+      tab: "app-verification",
       title: "App verification",
       icon: <ShieldCheck size={18} strokeWidth={1.75} />,
       summary: "Verify your app to one other app",

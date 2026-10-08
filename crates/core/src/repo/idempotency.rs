@@ -52,7 +52,7 @@ const SEALED: &str = "$sealed";
 /// secrets in clear, so it gets 409 `idempotency_result_unavailable`.
 const UNAVAILABLE: &str = "$unavailable";
 
-/// The scope string: `"{caller} {METHOD} {route}"`, e.g. `"app:briefcase POST /v1/proofs/obo"`.
+/// The scope string: `"{caller} {METHOD} {route}"`, e.g. `"app:briefcase POST /v1/proofs/user-verification"`.
 /// For public endpoints use the client IP as caller (`"ip:1.2.3.4"`).
 pub fn scope(caller: &str, method: &str, route: &str) -> String {
     format!("{caller} {method} {route}")

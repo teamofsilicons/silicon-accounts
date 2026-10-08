@@ -369,8 +369,8 @@ export class FakeAppsClient {
     return expectStatus(await this.http.post<{ status: number; verification: Record<string, unknown>; verify_ms: number }>(`/${appId}/api/verify-proof`, { json: { proof_token: proofToken } }), 200).body;
   }
 
-  async issueObo(appId: string, input: { uuid: string; receiving_app?: string; scopes?: string[]; access_ttl_seconds?: number }): Promise<{ status: number; body: Record<string, unknown> }> {
-    const res = await this.http.post<{ status: number; body: Record<string, unknown> }>(`/${appId}/actions/issue-obo`, { json: input });
+  async issueUserVerification(appId: string, input: { uuid: string; receiving_app?: string; scopes?: string[]; access_ttl_seconds?: number }): Promise<{ status: number; body: Record<string, unknown> }> {
+    const res = await this.http.post<{ status: number; body: Record<string, unknown> }>(`/${appId}/actions/issue-user_verification`, { json: input });
     return res.body;
   }
 

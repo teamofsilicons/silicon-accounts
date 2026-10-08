@@ -137,10 +137,10 @@ export interface TestkitMeta {
   /** Default query params for the app's sign-in links (overridable per page load). */
   authorize_params: Record<string, string>;
   proofs: {
-    obo_issuer_to: string[];
-    obo_receiver: boolean;
-    ata_issuer_to: string[];
-    ata_receiver: boolean;
+    user_verification_issuer_to: string[];
+    user_verification_receiver: boolean;
+    app_verification_issuer_to: string[];
+    app_verification_receiver: boolean;
   };
   /** Silicons sign in to this app with short-lived tokens in the e2e suites. */
   silicon_slt: boolean;

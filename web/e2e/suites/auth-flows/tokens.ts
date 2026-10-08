@@ -142,7 +142,7 @@ const codeReuse: Journey = {
     results.check("a refresh token as code → invalid_grant naming what it is", refreshAsCode.status === 400 && /refresh token/.test(refreshAsCode.body.error_description ?? ""), brief(refreshAsCode));
     const noGrant = await appForm<Record<string, string>>(env, "briefcase", "/v1/oauth/token", { code: s.code });
     results.check("no grant_type → 400 invalid_request", noGrant.status === 400 && noGrant.body.error === "invalid_request", brief(noGrant));
-    for (const [grant, hint] of [["password", "/authorize"], ["client_credentials", "ATA"], ["implicit", "PKCE"]] as const) {
+    for (const [grant, hint] of [["password", "/authorize"], ["client_credentials", "App verification"], ["implicit", "PKCE"]] as const) {
       const reply = await appForm<Record<string, string>>(env, "briefcase", "/v1/oauth/token", { grant_type: grant });
       results.check(`grant_type=${grant} → unsupported_grant_type explaining the alternative (${hint})`, reply.status === 400 && reply.body.error === "unsupported_grant_type" && (reply.body.error_description ?? "").includes(hint), brief(reply));
     }

@@ -6,7 +6,7 @@
 import { randomUUID } from "node:crypto";
 import type { Journey } from "../../context";
 import { sql } from "../../lib";
-import { appListing, appTokens, errorCode, isExactlyInvalid, issueObo, row, short, signInToApp, refreshAs, verifyAs, type IssuedProof, type MyProofItem } from "./_helpers";
+import { appListing, appTokens, errorCode, isExactlyInvalid, issueUserVerification, row, short, signInToApp, refreshAs, verifyAs, type IssuedProof, type MyProofItem } from "./_helpers";
 
 export const journey: Journey = {
   name: "proofs-perf-refresh-reuse",
@@ -15,13 +15,13 @@ export const journey: Journey = {
     const { env, results } = ctx;
     const carbon = await signInToApp(ctx, "dm");
     const subject = (await appTokens(env, "dm", carbon.uuid)).access_token;
-    const p0 = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", access_ttl_seconds: 600, scopes: ["files.write"] })).body;
+    const p0 = (await issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", access_ttl_seconds: 600, scopes: ["files.write"] })).body;
 
     // A refresh: same proof, both tokens new, the absolute lifetime unchanged.
     const r1 = await refreshAs(ctx, "dm", p0.proof_refresh_token);
     const p1 = r1.body;
     results.check("refresh → 200 with Cache-Control: no-store", r1.status === 200 && r1.headers.get("cache-control") === "no-store", `${r1.status} ${short(p1.error)}`);
-    results.check("the same proof (proof_id, kind, receiving app, user, scopes) with a new proof token and a new refresh token", p1.proof_id === p0.proof_id && p1.kind === "obo" && p1.receiving_app === "briefcase" && JSON.stringify(p1.user) === JSON.stringify(p0.user) && JSON.stringify(p1.scopes) === '["files.write"]' && p1.proof_token !== p0.proof_token && p1.proof_refresh_token !== p0.proof_refresh_token, short(p1));
+    results.check("the same proof (proof_id, kind, receiving app, user, scopes) with a new proof token and a new refresh token", p1.proof_id === p0.proof_id && p1.kind === "user_verification" && p1.receiving_app === "briefcase" && JSON.stringify(p1.user) === JSON.stringify(p0.user) && JSON.stringify(p1.scopes) === '["files.write"]' && p1.proof_token !== p0.proof_token && p1.proof_refresh_token !== p0.proof_refresh_token, short(p1));
     results.check("refresh_expires_at is unchanged (a proof's lifetime is absolute) and the new token keeps the proof's 600 s", p1.refresh_expires_at === p0.refresh_expires_at && Math.abs((Date.parse(p1.expires_at) - Date.now()) / 1000 - 600) < 30, `${p1.refresh_expires_at} vs ${p0.refresh_expires_at}; ${p1.expires_at}`);
     const old = await verifyAs(ctx, "briefcase", p0.proof_token);
     const fresh = await verifyAs(ctx, "briefcase", p1.proof_token);
@@ -80,7 +80,7 @@ export const journey: Journey = {
     results.check("the Carbon's history shows the proof issued and revoked", history.some(item => item.id === `proof:${p0.proof_id}:issued`) && history.some(item => item.id === `proof:${p0.proof_id}:revoked`), history.map(item => item.id).join(", ").slice(0, 300));
 
     // A retry storm without a key: the token row lock serializes them, one rotation, one reuse, the rest find it revoked.
-    const q = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: ["pp.storm"] })).body;
+    const q = (await issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", scopes: ["pp.storm"] })).body;
     const storm = await Promise.all(Array.from({ length: 8 }, () => refreshAs(ctx, "dm", q.proof_refresh_token)));
     const codes = storm.map(answer => (answer.status === 200 ? "200" : `${answer.status} ${errorCode(answer.body)}`)).sort();
     const count = (code: string) => codes.filter(value => value === code).length;
@@ -89,7 +89,7 @@ export const journey: Journey = {
     results.check("…so the proof minted in that race doesn't verify (the storm revoked it)", !!minted && isExactlyInvalid((await verifyAs(ctx, "briefcase", minted.proof_token)).body));
 
     // The same storm with one Idempotency-Key: one rotation, the rest replay it or are told it is in progress.
-    const s = (await issueObo(ctx, "dm", subject, { receiving_app: "briefcase", scopes: ["pp.storm-keyed"] })).body;
+    const s = (await issueUserVerification(ctx, "dm", subject, { receiving_app: "briefcase", scopes: ["pp.storm-keyed"] })).body;
     const stormKey = randomUUID();
     const keyed = await Promise.all(Array.from({ length: 8 }, () => refreshAs(ctx, "dm", s.proof_refresh_token, {}, { key: stormKey })));
     const ok = keyed.filter(answer => answer.status === 200);

@@ -312,7 +312,7 @@ mod tests {
     fn command() -> Command {
         Command::new("accounts")
             .subcommand(
-                Command::new("ata")
+                Command::new("app_verification")
                     .arg(
                         Arg::new("to")
                             .long("to")
@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn json_argument_errors_name_the_missing_argument() {
         let err = command()
-            .try_get_matches_from(["accounts", "ata", "--scope", "x"])
+            .try_get_matches_from(["accounts", "app_verification", "--scope", "x"])
             .unwrap_err();
         let cli = CliError::from(&err);
         assert_eq!(cli.code, "invalid_arguments");
@@ -342,14 +342,17 @@ mod tests {
             "the following required arguments were not provided: --to <APP_ID>"
         );
         let hint = cli.hint.clone().unwrap_or_default();
-        assert!(hint.contains("Usage: accounts ata --to <APP_ID>"), "{hint}");
+        assert!(
+            hint.contains("Usage: accounts app_verification --to <APP_ID>"),
+            "{hint}"
+        );
         let details = cli.details.clone().unwrap_or_default();
         assert_eq!(details["arguments"], json!(["--to <APP_ID>"]));
         assert_eq!(details["kind"], "missing_required_argument");
 
         // Several missing arguments are all named.
         let err = command()
-            .try_get_matches_from(["accounts", "ata"])
+            .try_get_matches_from(["accounts", "app_verification"])
             .unwrap_err();
         let cli = CliError::from(&err);
         assert_eq!(

@@ -23,7 +23,7 @@ async fn managed() -> (World, String) {
 
 async fn issue(w: &World) -> Value {
     let r = w
-        .ata_as(
+        .app_verification_as(
             &w.dm,
             &w.dm_secret,
             json!({"receiving_app":w.briefcase.app_id,"access_ttl_seconds":300,"scopes":["read"]}),
@@ -58,7 +58,7 @@ async fn managed_history_lists_all_retained_states_and_pages_without_cross_app_l
         .await
         .expect("author");
     let authored = w
-        .ata_as(
+        .app_verification_as(
             &w.other,
             &w.other_secret,
             json!({"receiving_app":w.briefcase.app_id}),
@@ -66,14 +66,14 @@ async fn managed_history_lists_all_retained_states_and_pages_without_cross_app_l
         .await
         .json;
     let hidden = w
-        .ata_as(
+        .app_verification_as(
             &w.briefcase,
             &w.briefcase_secret,
             json!({"receiving_app":w.dm.app_id}),
         )
         .await
         .json;
-    let obo = w.issue_obo().await;
+    let user_verification = w.issue_user_verification().await;
     accounts_proofs::store::sweep(&w.ctx.state.db)
         .await
         .expect("sweep");
@@ -106,8 +106,8 @@ async fn managed_history_lists_all_retained_states_and_pages_without_cross_app_l
         4
     );
     assert!(
-        !all.iter()
-            .any(|x| x["proof_id"] == hidden["proof_id"] || x["proof_id"] == obo["proof_id"])
+        !all.iter().any(|x| x["proof_id"] == hidden["proof_id"]
+            || x["proof_id"] == user_verification["proof_id"])
     );
     let find = |p: &Value| {
         all.iter()
@@ -157,7 +157,7 @@ async fn managed_history_lists_all_retained_states_and_pages_without_cross_app_l
             404
         );
     }
-    for query in ["status=missing", "kind=obo", "cursor=broken"] {
+    for query in ["status=missing", "kind=user_verification", "cursor=broken"] {
         assert_eq!(
             w.call(Req::get(&format!("/v1/me/app-verifications?{query}")).bearer(&dev))
                 .await
@@ -225,7 +225,7 @@ async fn managed_history_lists_all_retained_states_and_pages_without_cross_app_l
 #[tokio::test]
 async fn immutable_events_survive_token_sweep_and_keep_generation_expiry_honest() {
     let (w, dev) = managed().await;
-    let create_path = format!("/v1/apps/{}/proofs/ata", w.dm.app_id);
+    let create_path = format!("/v1/apps/{}/proofs/app-verification", w.dm.app_id);
     let create_body = json!({"receiving_app":w.briefcase.app_id,"access_ttl_seconds":300});
     let p = w
         .call(
@@ -334,14 +334,14 @@ async fn only_live_first_party_managers_can_read_portal_history() {
         .await
         .access_token;
     let (apps, _) = w.ctx.app("apps").await;
-    sqlx::query("insert into apps(app_id,name,secret_hash,status,source) select 'apps',name,secret_hash,status,source from apps where app_id=$1")
+    sqlx::query("insert into apps(app_id,name,secret_hash,status,source) select 'silicon-apps',name,secret_hash,status,source from apps where app_id=$1")
         .bind(&apps.app_id).execute(&w.ctx.state.db).await.expect("canonical Apps fixture");
     w.ctx
-        .membership("apps", &w.carbon.uuid, &[Scope::Profile])
+        .membership("silicon-apps", &w.carbon.uuid, &[Scope::Profile])
         .await;
     let apps_token = w
         .ctx
-        .tokens_for(&w.carbon, "apps", &[Scope::Profile])
+        .tokens_for(&w.carbon, "silicon-apps", &[Scope::Profile])
         .await
         .access_token;
     let cookie = w.ctx.browser_session(&w.carbon).await;
@@ -379,13 +379,13 @@ async fn only_live_first_party_managers_can_read_portal_history() {
         )
         .is_empty()
     );
-    let obo = w.issue_obo().await;
+    let user_verification = w.issue_user_verification().await;
     assert_eq!(
         w.call(
             Req::get(&format!(
                 "/v1/apps/{}/proofs/{}/history",
                 w.dm.app_id,
-                proof_id(&obo)
+                proof_id(&user_verification)
             ))
             .bearer(&dev)
         )

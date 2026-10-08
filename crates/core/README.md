@@ -335,7 +335,7 @@ moved stored configs that still paired the old `#F97066` (4.46:1) with the defau
 - `delete_account(&mut conn, &settings, uuid, actor, reserve_id)` → `DeletedAccount { before, old_id,
   revoked_families, revoked_proofs, deleted_photos, released_silicons, deleted_now }`, one
   transaction: status deleted, handle null (reserved 10 days when `reserve_id`), emails/phones/
-  identities removed, sessions + token families (`account_deleted`) + OBO proofs revoked (with
+  identities removed, sessions + token families (`account_deleted`) + User verification proofs revoked (with
   `proof.revoked` audit rows), the photo back to the Iris default and uploads nobody else shows
   deleted, memberships kept as history without `imported_profile` (the app's `external_id` stays),
   STK cleared, the Silicon webhook **kept** (events emitted before still reach it), pending custodian
@@ -420,7 +420,7 @@ use it for you.
   the app's access is returned untouched (`access_removed`): an import never undoes that; only a
   new sign-in (`upsert_signin`) does.
 - `remove_access(&mut conn, app_id, uuid, actor)` → `AccessRemoved` (membership `access_removed`,
-  the app's families revoked, OBO proofs that app issued about the account revoked with
+  the app's families revoked, User verification proofs that app issued about the account revoked with
   `proof.revoked` audit rows). Then `events::membership_access_removed`.
 - `webhook_targets(&mut conn, uuid)` — live members (active/imported) of apps with a webhook, disabled apps
   included (the worker holds their deliveries until the app is re-enabled).

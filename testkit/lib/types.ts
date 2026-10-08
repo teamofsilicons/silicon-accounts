@@ -150,13 +150,13 @@ export interface FlowView {
 
 export interface ProofIssued {
   proof_id: string;
-  kind: 'obo' | 'ata';
+  kind: 'user_verification' | 'app_verification';
   proof_token: string;
   expires_at: string;
   proof_refresh_token: string;
   refresh_expires_at: string;
   issuing_app: string;
-  /** The one app this proof is for (OBO and ATA alike). */
+  /** The one app this proof is for (User verification and App verification alike). */
   receiving_app: string;
   user?: { uuid: string; id: string; kind: AccountKind; membership_id: string };
   scopes: string[];
@@ -166,7 +166,7 @@ export type ProofVerification =
   | {
       valid: true;
       proof_id: string;
-      kind: 'obo' | 'ata';
+      kind: 'user_verification' | 'app_verification';
       expires_at: string;
       issuing_app: { app_id: string; name: string };
       receiving_app: { app_id: string; name: string };

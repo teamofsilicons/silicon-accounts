@@ -68,7 +68,7 @@ function VerificationRow({ proof, receiver }: { proof: ManagedAppProof; receiver
     <li data-sq="surface" className={styles.record} aria-label={`Verification ${proof.proof_id}`}>
       <div className={styles.recordHead}>
         <div className={styles.appFlow}>
-          <div className={styles.appIdentity}><AppIcon name={proof.issuing_app.name} src={proof.issuing_app.logo_url} size={32} decorative /><div><Link href={paths.developerApp(proof.issuing_app.app_id, "ata")}>{proof.issuing_app.name}</Link><code>{proof.issuing_app.app_id}</code></div></div>
+          <div className={styles.appIdentity}><AppIcon name={proof.issuing_app.name} src={proof.issuing_app.logo_url} size={32} decorative /><div><Link href={paths.developerApp(proof.issuing_app.app_id, "app-verification")}>{proof.issuing_app.name}</Link><code>{proof.issuing_app.app_id}</code></div></div>
           <ArrowRight size={16} aria-label="verifies to" />
           <div className={styles.appIdentity}><AppIcon name={receivingApp?.name ?? receivingId} src={receivingApp?.logo_url ?? null} size={32} decorative /><div><span>{receivingApp?.name ?? receivingId}</span><code>{receivingId}</code></div></div>
         </div>

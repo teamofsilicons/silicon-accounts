@@ -1,5 +1,5 @@
-//! ATA proofs (always for exactly one app): `POST /v1/proofs/ata` and the app's ATA page
-//! `POST /v1/apps/{app_id}/proofs/ata`.
+//! App verification proofs (always for exactly one app): `POST /v1/proofs/app-verification` and the app's App verification page
+//! `POST /v1/apps/{app_id}/proofs/app-verification`.
 
 use accounts_core::test_support::Req;
 use serde_json::json;
@@ -7,13 +7,13 @@ use serde_json::json;
 use crate::common::{World, assert_token_ttl, invalid, proof_id, token};
 
 #[tokio::test]
-async fn an_ata_proof_verifies_for_its_one_app_and_nobody_else() {
+async fn an_app_verification_proof_verifies_for_its_one_app_and_nobody_else() {
     let w = World::new().await;
     let (remind, remind_secret) = w.ctx.app("remind").await;
     let (waveform, waveform_secret) = w.ctx.app("waveform").await;
     let (commit, commit_secret) = w.ctx.app("commit").await;
     let r = w
-        .ata_as(
+        .app_verification_as(
             &commit,
             &commit_secret,
             json!({
@@ -25,15 +25,18 @@ async fn an_ata_proof_verifies_for_its_one_app_and_nobody_else() {
         .await;
     assert_eq!(r.status, 201, "{}", r.json);
     let b = &r.json;
-    assert_eq!(b["kind"], "ata");
+    assert_eq!(b["kind"], "app_verification");
     assert_eq!(b["issuing_app"], commit.app_id);
-    assert_eq!(b["receiving_app"], remind.app_id, "normalized like OBO");
+    assert_eq!(
+        b["receiving_app"], remind.app_id,
+        "normalized like User verification"
+    );
     assert!(b.get("receiving_apps").is_none());
     assert_eq!(b["user"], serde_json::Value::Null);
     assert_token_ttl(b, 300);
     assert_eq!(b["scopes"], json!(["notifications.send"]));
     let parsed: silicon_accounts_client::IssuedProof =
-        serde_json::from_value(b.clone()).expect("client parses an ATA IssuedProof");
+        serde_json::from_value(b.clone()).expect("client parses an App verification IssuedProof");
     assert_eq!(
         parsed.receiving_app.as_deref(),
         Some(remind.app_id.as_str())
@@ -44,7 +47,7 @@ async fn an_ata_proof_verifies_for_its_one_app_and_nobody_else() {
     let v = w.verify_as(&remind, &remind_secret, &t).await;
     assert_eq!(v.status, 200);
     assert_eq!(v.json["valid"], true, "{}", v.json);
-    assert_eq!(v.json["kind"], "ata");
+    assert_eq!(v.json["kind"], "app_verification");
     assert_eq!(v.json["issuing_app"]["app_id"], commit.app_id);
     assert_eq!(v.json["issuing_app"]["name"], commit.name);
     assert_eq!(v.json["receiving_app"]["app_id"], remind.app_id);
@@ -64,7 +67,7 @@ async fn an_ata_proof_verifies_for_its_one_app_and_nobody_else() {
 
     // Talking to a second app takes a second proof, which only that app verifies.
     let second = w
-        .ata_as(
+        .app_verification_as(
             &commit,
             &commit_secret,
             json!({"receiving_app": waveform.app_id}),
@@ -82,11 +85,11 @@ async fn an_ata_proof_verifies_for_its_one_app_and_nobody_else() {
         invalid()
     );
 
-    // Audit (no account: ATA is about apps).
+    // Audit (no account: App verification is about apps).
     let n = w
         .count(&format!(
             "select count(*) from audit_log where action = 'proof.issued' and target_id = '{}' \
-             and account_uuid is null and details->>'kind' = 'ata' and details->>'receiving_app' = '{}'",
+             and account_uuid is null and details->>'kind' = 'app_verification' and details->>'receiving_app' = '{}'",
             proof_id(b),
             remind.app_id
         ))
@@ -103,9 +106,9 @@ async fn an_ata_proof_verifies_for_its_one_app_and_nobody_else() {
 }
 
 #[tokio::test]
-async fn ata_requests_are_validated() {
+async fn app_verification_requests_are_validated() {
     let w = World::new().await;
-    let ata = |body| w.ata_as(&w.dm, &w.dm_secret, body);
+    let app_verification = |body| w.app_verification_as(&w.dm, &w.dm_secret, body);
 
     // The pre-v2 shape names several apps: refused with its own code, whatever the list.
     for audiences in [
@@ -113,51 +116,52 @@ async fn ata_requests_are_validated() {
         json!([w.briefcase.app_id]),
         json!([]),
     ] {
-        let r = ata(json!({"audiences": audiences})).await;
+        let r = app_verification(json!({"audiences": audiences})).await;
         assert_eq!(r.status, 422, "{}", r.json);
-        assert_eq!(r.error_code(), Some("ata_single_app"));
+        assert_eq!(r.error_code(), Some("app_verification_single_app"));
         assert_eq!(
             r.json["error"]["message"],
-            "An App verification is for exactly one app; ask for one proof per app."
+            "An app verification is for exactly one app; ask for one proof per app."
         );
         assert!(
             r.json["error"]["hint"]
                 .as_str()
-                .is_some_and(|h| h.contains("POST /v1/proofs/ata") && h.contains("receiving_app")),
+                .is_some_and(|h| h.contains("POST /v1/proofs/app-verification")
+                    && h.contains("receiving_app")),
             "{}",
             r.json
         );
     }
-    let r = ata(json!({"audiences": [w.briefcase.app_id, w.other.app_id], "receiving_app": w.briefcase.app_id})).await;
-    assert_eq!(r.error_code(), Some("ata_single_app"));
+    let r = app_verification(json!({"audiences": [w.briefcase.app_id, w.other.app_id], "receiving_app": w.briefcase.app_id})).await;
+    assert_eq!(r.error_code(), Some("app_verification_single_app"));
     assert_eq!(
         r.json["error"]["details"]["apps"],
         json!([w.briefcase.app_id, w.other.app_id])
     );
 
-    let r = ata(json!({})).await;
+    let r = app_verification(json!({})).await;
     assert_eq!(r.status, 422, "receiving_app is required: {}", r.json);
     assert!(r.json["error"]["details"]["fields"]["receiving_app"].is_string());
 
-    let r = ata(json!({"receiving_app": "Bad App!"})).await;
+    let r = app_verification(json!({"receiving_app": "Bad App!"})).await;
     assert_eq!(r.status, 422);
     assert!(r.json["error"]["details"]["fields"]["receiving_app"].is_string());
 
-    let r = ata(json!({"receiving_app": [w.briefcase.app_id]})).await;
+    let r = app_verification(json!({"receiving_app": [w.briefcase.app_id]})).await;
     assert_eq!(r.status, 422, "one app, as a string: {}", r.json);
 
-    let r = ata(json!({"receiving_app": "ghost-one"})).await;
+    let r = app_verification(json!({"receiving_app": "ghost-one"})).await;
     assert_eq!(r.status, 400);
     assert_eq!(r.error_code(), Some("unknown_receiving_app"));
     assert_eq!(r.json["error"]["details"]["app_ids"], json!(["ghost-one"]));
 
-    let r = ata(json!({"receiving_app": w.dm.app_id})).await;
+    let r = app_verification(json!({"receiving_app": w.dm.app_id})).await;
     assert_eq!(r.status, 400);
     assert_eq!(r.error_code(), Some("invalid_receiving_app"));
 
     // Silicon Accounts' own apps never receive proofs.
     for own in ["accounts", "developer"] {
-        let r = ata(json!({"receiving_app": own})).await;
+        let r = app_verification(json!({"receiving_app": own})).await;
         assert_eq!(r.status, 400, "{own}: {}", r.json);
         assert_eq!(r.error_code(), Some("invalid_receiving_app"));
         assert_eq!(r.json["error"]["details"]["app_ids"], json!([own]));
@@ -169,7 +173,7 @@ async fn ata_requests_are_validated() {
             w.other.app_id
         ))
         .await;
-    let r = ata(json!({"receiving_app": w.other.app_id})).await;
+    let r = app_verification(json!({"receiving_app": w.other.app_id})).await;
     assert_eq!(r.status, 403);
     assert_eq!(r.error_code(), Some("receiving_app_disabled"));
     assert_eq!(
@@ -177,19 +181,21 @@ async fn ata_requests_are_validated() {
         json!([w.other.app_id])
     );
 
-    let r = ata(json!({"receiving_app": w.briefcase.app_id, "access_ttl_seconds": 30})).await;
+    let r =
+        app_verification(json!({"receiving_app": w.briefcase.app_id, "access_ttl_seconds": 30}))
+            .await;
     assert_eq!(r.status, 422);
 
     assert_eq!(w.count("select count(*) from proof_families").await, 0);
 }
 
 #[tokio::test]
-async fn the_ata_page_works_for_the_app_and_its_owner() {
+async fn the_app_verification_page_works_for_the_app_and_its_owner() {
     let w = World::new().await;
     let owner = w.ctx.carbon().await;
     let stranger = w.ctx.carbon().await;
     let (commit, commit_secret) = w.ctx.app_owned("commit", Some(&owner.uuid)).await;
-    let path = format!("/v1/apps/{}/proofs/ata", commit.app_id);
+    let path = format!("/v1/apps/{}/proofs/app-verification", commit.app_id);
     let body = json!({"receiving_app": w.briefcase.app_id, "scopes": ["ping"]});
 
     // The owner, with the account site's session cookie.
@@ -221,7 +227,7 @@ async fn the_ata_page_works_for_the_app_and_its_owner() {
         .await;
     assert_eq!(r.status, 201, "{}", r.json);
 
-    // The owner on the app's ATA page at developers.teamofsilicons.com (a developer platform
+    // The owner on the app's App verification page at developers.teamofsilicons.com (a developer platform
     // token), where several apps are refused with a hint naming this page's endpoint.
     let dev = w
         .ctx
@@ -248,7 +254,7 @@ async fn the_ata_page_works_for_the_app_and_its_owner() {
         )
         .await;
     assert_eq!(r.status, 422, "{}", r.json);
-    assert_eq!(r.error_code(), Some("ata_single_app"));
+    assert_eq!(r.error_code(), Some("app_verification_single_app"));
     assert!(
         r.json["error"]["hint"]
             .as_str()
@@ -326,7 +332,7 @@ async fn the_ata_page_works_for_the_app_and_its_owner() {
     let send = || {
         Req::post(&path)
             .session(&w.ctx.state.settings, &cookie)
-            .header("idempotency-key", "ata-page-1")
+            .header("idempotency-key", "app_verification-page-1")
             .json(body.clone())
     };
     let a = w.call(send()).await;
@@ -360,7 +366,7 @@ async fn the_ata_page_works_for_the_app_and_its_owner() {
     // Unknown app.
     let r = w
         .call(
-            Req::post("/v1/apps/no-such-app/proofs/ata")
+            Req::post("/v1/apps/no-such-app/proofs/app-verification")
                 .session(&w.ctx.state.settings, &cookie)
                 .json(body),
         )

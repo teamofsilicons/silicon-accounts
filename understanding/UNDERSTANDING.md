@@ -235,9 +235,9 @@ Silicon Accounts doesn't handle any app's endpoints anymore. Our job is just to 
 
 `User verification` - when App A wants to perform an action at App B on behalf of a user, App A gets the user's consent itself and then gets a proof token from us. App B can then ask us to verify that proof token.
 
-`App verification` - each app gets an App verification page on `developers.teamofsilicons.com` where its managers can make new App verification tokens. An App verification proof is always for exactly one app; a proof can't be made for several apps at once. If App A wants to talk to App B and App C, it makes one proof for App B and another one for App C, and each of them verifies its own proof with us.
+`App verification` - each app gets an app verification page on `developers.teamofsilicons.com` where its managers can make new App verification tokens. An app verification proof is always for exactly one app; a proof can't be made for several apps at once. If App A wants to talk to App B and App C, it makes one proof for App B and another one for App C, and each of them verifies its own proof with us.
 
-These are the names used in the product and documentation. Existing `ata` and `obo` API values, routes and integration commands remain compatible; they mean App verification and User verification respectively.
+Use App verification and User verification throughout the product, API, clients and documentation. The API issue routes are `/v1/proofs/app-verification` and `/v1/proofs/user-verification`; kind values are `app_verification` and `user_verification`. Client methods, CLI commands, portal URLs and examples use these full names too. Existing verification history and active tokens must remain valid when the stored kind values are migrated.
 
 Proofs work with the same access token and refresh token logic as sign-in. The issuing app holds the refresh token and uses it to get new proof tokens, and each proof token has a validity of its own.
 

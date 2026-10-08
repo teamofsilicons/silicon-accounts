@@ -7,7 +7,7 @@ consent screens and what each endpoint does stay with the apps.
   account's consent in its own UI, then asks Silicon Accounts for a proof. App B asks
   Silicon Accounts whether the proof is valid.
 * **App verification (app to app)** — app A proves to app B that a request really comes from app A.
-  An App verification proof is always for exactly one app: to talk to apps B and C, app A gets one
+  An app verification proof is always for exactly one app: to talk to apps B and C, app A gets one
   proof for B and another for C, and each verifies its own.
 
 Proofs use the same token logic as sign-in: a short-lived proof token (default 30
@@ -17,7 +17,7 @@ app.
 ## Issue a User verification proof (app A)
 
 ```sh
-accounts app --app-id dm proof obo --subject-token "$ACCOUNT_ACCESS_TOKEN" --to briefcase --scope files.write --ttl 600
+accounts app --app-id dm proof user-verification --subject-token "$ACCOUNT_ACCESS_TOKEN" --to briefcase --scope files.write --ttl 600
 ```
 
 `--subject-token` is the account's access token issued to app A. The account must
@@ -26,11 +26,11 @@ still have an active membership with app A. Scopes are your own strings (up to 2
 
 Send the `proof_token` to app B, for example as `Authorization: Proof sap_…`.
 
-## Issue an App verification proof (app A)
+## Issue an app verification proof (app A)
 
 ```sh
-accounts app proof ata --to remind --ttl 300
-accounts app proof ata --to waveform --ttl 300     # a second app gets its own proof
+accounts app proof app-verification --to remind --ttl 300
+accounts app proof app-verification --to waveform --ttl 300     # a second app gets its own proof
 ```
 
 `--to` takes exactly one app. Why one app per proof: each receiving app verifies only
@@ -39,8 +39,8 @@ the others, and a proof leaked by one app can't be replayed at another.
 
 Owners can also make, see and revoke App verification proofs through their session: the app's App verification
 page on developers.teamofsilicons.com calls the same endpoint
-(`POST /v1/apps/{app_id}/proofs/ata` with `{"receiving_app": "remind"}`). A request
-that lists several apps (`audiences`) is refused with `ata_single_app`.
+(`POST /v1/apps/{app_id}/proofs/app-verification` with `{"receiving_app": "remind"}`). A request
+that lists several apps (`audiences`) is refused with `app_verification_single_app`.
 
 ## Verify (app B)
 
@@ -52,7 +52,7 @@ Exit code 0 means valid, 2 means not valid. A valid answer says until when, who 
 it, who it is for, and (User verification) which account:
 
 ```json
-{"valid":true,"kind":"obo","expires_at":"…","issuing_app":{"app_id":"dm"},
+{"valid":true,"kind":"user_verification","expires_at":"…","issuing_app":{"app_id":"dm"},
  "receiving_app":{"app_id":"briefcase"},"user":{"uuid":"a8K","membership_id":"dm:a8K"},"scopes":["files.write"]}
 ```
 
@@ -66,7 +66,7 @@ proof can't be used to learn anything. Only the app a proof names can verify it.
 ```sh
 accounts app proof refresh sapr_… --ttl 900     # new proof token + rotated refresh token
 accounts app proof revoke <proof-id>
-accounts app proof list --kind obo
+accounts app proof list --kind user_verification
 ```
 
 Presenting an already-used proof refresh token revokes the proof, as with sign-in
@@ -91,6 +91,6 @@ The records and events remain after credentials expire or are removed. Raw proof
 tokens are shown when generated and cannot be recovered from history. Current management
 access is checked on every request; being the receiving app alone grants no history access.
 
-Existing `ata` and `obo` commands and JSON kinds remain compatible. This CLI also accepts
-`accounts app proof app-verification`, `accounts app proof user-verification`, and
-`accounts user-verification list` / `revoke`. These aliases perform the same operations.
+Use `accounts app proof app-verification` and `accounts app proof user-verification` to issue
+verification tokens. JSON kinds are `app_verification` and `user_verification`.
+`accounts user-verification list` and `revoke` are aliases for `accounts proofs list` and `revoke`.

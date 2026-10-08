@@ -56,7 +56,7 @@ interface Draft {
 }
 
 function noProofs(): TestkitMeta['proofs'] {
-  return { obo_issuer_to: [], obo_receiver: false, ata_issuer_to: [], ata_receiver: false };
+  return { user_verification_issuer_to: [], user_verification_receiver: false, app_verification_issuer_to: [], app_verification_receiver: false };
 }
 
 function drafts(credentials: DevCredentials): Draft[] {
@@ -167,10 +167,10 @@ function drafts(credentials: DevCredentials): Draft[] {
       },
       testkit: {
         category: 'files',
-        purpose: 'Every sign-in method with the default Silicon Accounts look; the OBO receiver (dm saves files here).',
-        exercises: ['email + phone + Google + Apple (managed)', 'required email', 'default branding (screenshot baseline)', 'webhooks', 'OBO receiver', 'Silicon SLT sign-in'],
+        purpose: 'Every sign-in method with the default Silicon Accounts look; the User verification receiver (dm saves files here).',
+        exercises: ['email + phone + Google + Apple (managed)', 'required email', 'default branding (screenshot baseline)', 'webhooks', 'User verification receiver', 'Silicon SLT sign-in'],
         integration: 'hosted',
-        proofs: { obo_issuer_to: [], obo_receiver: true, ata_issuer_to: [], ata_receiver: false },
+        proofs: { user_verification_issuer_to: [], user_verification_receiver: true, app_verification_issuer_to: [], app_verification_receiver: false },
         silicon_slt: true,
         accent: '#2F4B7C',
       },
@@ -211,10 +211,10 @@ function drafts(credentials: DevCredentials): Draft[] {
       },
       testkit: {
         category: 'messaging',
-        purpose: 'Requires a phone number (added on its details page when the Carbon has none); issues OBO proofs to Briefcase.',
-        exercises: ['phone required → added on the details page with a code', 'one custom-titled flow step with optional email + timezone (unticked by default)', 'email + phone only', 'OBO issuer (dm → briefcase)', 'webhooks'],
+        purpose: 'Requires a phone number (added on its details page when the Carbon has none); issues User verification proofs to Briefcase.',
+        exercises: ['phone required → added on the details page with a code', 'one custom-titled flow step with optional email + timezone (unticked by default)', 'email + phone only', 'User verification issuer (dm → briefcase)', 'webhooks'],
         integration: 'hosted',
-        proofs: { obo_issuer_to: ['briefcase'], obo_receiver: false, ata_issuer_to: [], ata_receiver: false },
+        proofs: { user_verification_issuer_to: ['briefcase'], user_verification_receiver: false, app_verification_issuer_to: [], app_verification_receiver: false },
         silicon_slt: true,
         accent: '#17775C',
       },
@@ -238,10 +238,10 @@ function drafts(credentials: DevCredentials): Draft[] {
       },
       testkit: {
         category: 'todos',
-        purpose: 'Email + Google; issues ATA proofs to Remind and Waveform.',
-        exercises: ['email + Google (managed)', 'ATA issuer (commit → remind, waveform)', 'continue-as across apps'],
+        purpose: 'Email + Google; issues App verification proofs to Remind and Waveform.',
+        exercises: ['email + Google (managed)', 'App verification issuer (commit → remind, waveform)', 'continue-as across apps'],
         integration: 'hosted',
-        proofs: { obo_issuer_to: [], obo_receiver: false, ata_issuer_to: ['remind', 'waveform'], ata_receiver: false },
+        proofs: { user_verification_issuer_to: [], user_verification_receiver: false, app_verification_issuer_to: ['remind', 'waveform'], app_verification_receiver: false },
         silicon_slt: true,
         accent: '#5B4BD5',
       },
@@ -266,10 +266,10 @@ function drafts(credentials: DevCredentials): Draft[] {
       },
       testkit: {
         category: 'voice',
-        purpose: 'Google + Apple only (no codes); receives ATA proofs from Commit.',
-        exercises: ['Google + Apple only, Apple first', 'profile-only required scopes', 'ATA receiver'],
+        purpose: 'Google + Apple only (no codes); receives App verification proofs from Commit.',
+        exercises: ['Google + Apple only, Apple first', 'profile-only required scopes', 'App verification receiver'],
         integration: 'hosted',
-        proofs: { obo_issuer_to: [], obo_receiver: false, ata_issuer_to: [], ata_receiver: true },
+        proofs: { user_verification_issuer_to: [], user_verification_receiver: false, app_verification_issuer_to: [], app_verification_receiver: true },
         silicon_slt: false,
         accent: '#C2410C',
       },
@@ -292,10 +292,10 @@ function drafts(credentials: DevCredentials): Draft[] {
       },
       testkit: {
         category: 'reminders',
-        purpose: 'Email only; Silicons sign in with short-lived tokens; receives ATA proofs from Commit.',
-        exercises: ['email only', 'required timezone (always present)', 'Silicon SLT sign-in', 'ATA receiver'],
+        purpose: 'Email only; Silicons sign in with short-lived tokens; receives App verification proofs from Commit.',
+        exercises: ['email only', 'required timezone (always present)', 'Silicon SLT sign-in', 'App verification receiver'],
         integration: 'hosted',
-        proofs: { obo_issuer_to: [], obo_receiver: false, ata_issuer_to: [], ata_receiver: true },
+        proofs: { user_verification_issuer_to: [], user_verification_receiver: false, app_verification_issuer_to: [], app_verification_receiver: true },
         silicon_slt: true,
         accent: '#A16207',
       },

@@ -101,7 +101,7 @@ primary that gets verified (apps see `email_verified` / `phone_verified` change)
   `{"app":{"app_id","name","logo_url","logo_dark_url","homepage_url"},"membership_id","status","source","granted_scopes","first_signed_in_at","last_signed_in_at","access_removed_at","active_sessions"}`,
   most recently used first; the first-party apps (`accounts`: the account site and CLI;
   `developer`: the developer platform) are not listed.
-- `DELETE /v1/me/apps/{app_id}` → 204: the app's token families for the account and the OBO
+- `DELETE /v1/me/apps/{app_id}` → 204: the app's token families for the account and the User verification
   proofs it issued about the account are revoked, the membership becomes `access_removed`, the
   app gets `membership.access_removed`. Repeating it does nothing (no second webhook). 404
   `membership_not_found`, 400 `first_party_app` for `accounts` and `developer` (Silicon
@@ -123,7 +123,7 @@ primary that gets verified (apps see `email_verified` / `phone_verified` change)
 `GET /v1/me/history?kind=signin|id_change|custodian|proof|app_access|security&limit&cursor` →
 items `{"id","kind","at","title","detail","app":AppSummary|null,"meta":{…}}`, newest first,
 stable keyset pagination. Sources: `signin_history` (signin), `handle_history` (id_change),
-`custodian_history` (custodian), `proof_families` OBO proofs about the account, issued and
+`custodian_history` (custodian), `proof_families` User verification proofs about the account, issued and
 revoked (proof), `memberships` first sign-in and imports (app_access), and `audit_log` rows
 with `account_uuid` = the account: actions `membership.*`, `consent.*`, `app_access.*` →
 app_access; actions containing `custodian` or `transfer` → custodian; everything else →
@@ -163,7 +163,7 @@ label as detail, never the internal `code:…` marker) or "Signed out of the dev
 409 `custodian_of_silicons` (`details.silicons`: AccountSummary list) while custodian of any
 non-deleted Silicon; Silicons get 403 `custodian_required` (their custodian deletes them). The
 deletion is core's `accounts::delete_account`, in one transaction: status `deleted`, id reserved
-10 days, emails/phones/identities removed, sessions, token families and OBO proofs revoked,
+10 days, emails/phones/identities removed, sessions, token families and User verification proofs revoked,
 pending custodian requests cancelled, `pfp_url` reset and the uploads no other account shows
 deleted, the apps' imported personal data about the account dropped (`imported_profile`; their
 `external_id` stays), `account.deleted` to every live member app. A second `DELETE /v1/me`

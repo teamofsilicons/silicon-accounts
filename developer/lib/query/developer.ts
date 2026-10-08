@@ -2,7 +2,7 @@
 
 /**
  * Queries and mutations for the developer site (/, /apps/[appId]/[[...tab]]): owned apps, an app's sign-in setup with
- * optimistic concurrency, its user base, imports, webhook deliveries and ATA proofs. Every call goes through the BFF.
+ * optimistic concurrency, its user base, imports, webhook deliveries and App verification proofs. Every call goes through the BFF.
  *
  * Saving the sign-in setup: send `expected_version` (the version the draft started from); a 409
  * `config_version_conflict` means someone saved in between. Never move the draft's base version silently after a
@@ -10,7 +10,7 @@
  */
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/endpoints";
-import type { AppDetail, AppProofsQuery, AppUsersQuery, AtaRequest, DeliveriesQuery, ImportJob, ImportOptions, ImportRow, ImportRowsQuery, ManagedAppProofsQuery, ReplayRequest, SigninConfigPatch } from "../api/types";
+import type { AppDetail, AppProofsQuery, AppUsersQuery, AppVerificationRequest, DeliveriesQuery, ImportJob, ImportOptions, ImportRow, ImportRowsQuery, ManagedAppProofsQuery, ReplayRequest, SigninConfigPatch } from "../api/types";
 import { useIdempotentMutation, useSecretMutation } from "./idempotency";
 import { queryKeys } from "./keys";
 import { useWholeList } from "./pages";
@@ -237,9 +237,9 @@ export function useAppProofHistory(appId: string, proofId: string, enabled: bool
  * mutation (never cached). The same request keeps one key, so a retry never issues twice. Pass `{ toast: false }` to
  * explain a refusal in place.
  */
-export function useCreateAta(appId: string, meta: { toast?: boolean } = {}) {
+export function useCreateAppVerification(appId: string, meta: { toast?: boolean } = {}) {
   const client = useQueryClient();
-  return useSecretMutation((body: AtaRequest, idempotencyKey) => api.apps.proofs.createAta(appId, body, { idempotencyKey }), {
+  return useSecretMutation((body: AppVerificationRequest, idempotencyKey) => api.apps.proofs.createAppVerification(appId, body, { idempotencyKey }), {
     onSuccess: async () => {
       await Promise.all([
         client.invalidateQueries({ queryKey: queryKeys.app.root(appId).concat("proofs") }),

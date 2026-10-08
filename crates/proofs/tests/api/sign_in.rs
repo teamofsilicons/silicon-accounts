@@ -1,4 +1,4 @@
-//! An OBO proof ends with the sign-in it stands on. These tests revoke the sign-in through the
+//! A user verification proof ends with the sign-in it stands on. These tests revoke the sign-in through the
 //! core's real paths (an app signing the account out, an STK rotation, a reused sign-in refresh
 //! token) and check that the proof is refused at once, listed as revoked with when and why, and
 //! stored as revoked (with its `proof.revoked` audit entry) by the sweep, so the account's
@@ -75,7 +75,7 @@ async fn sweep(w: &World) -> accounts_proofs::store::SweepReport {
 #[tokio::test]
 async fn signing_out_ends_the_proof_and_the_sweep_stores_it() {
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let id = proof_id(&p);
     let fid = w.subject_family();
 
@@ -154,7 +154,7 @@ async fn signing_out_ends_the_proof_and_the_sweep_stores_it() {
     assert_eq!(
         details,
         &json!({
-            "kind": "obo",
+            "kind": "user_verification",
             "reason": "sign_in_revoked",
             "via": "sign_in_revoked",
             "audiences": [w.briefcase.app_id],
@@ -272,7 +272,7 @@ async fn every_core_sign_in_revocation_ends_its_proofs() {
 
     // A: the sign-in's refresh token is reused at POST /v1/oauth/token (core refresh): the
     // whole sign-in is revoked.
-    let reused = w.issue_obo().await;
+    let reused = w.issue_user_verification().await;
     tokens::refresh(
         &state.db,
         &state.keys,
@@ -302,7 +302,9 @@ async fn every_core_sign_in_revocation_ends_its_proofs() {
         .await;
     let si_tokens = w.ctx.tokens_for(&si, &w.dm.app_id, &[Scope::Profile]).await;
     let rotated = w
-        .obo(json!({"subject_token": si_tokens.access_token, "receiving_app": w.briefcase.app_id}))
+        .user_verification(
+            json!({"subject_token": si_tokens.access_token, "receiving_app": w.briefcase.app_id}),
+        )
         .await;
     assert_eq!(rotated.status, 201, "{}", rotated.json);
     let mut conn = w.ctx.conn().await;
@@ -325,7 +327,7 @@ async fn every_core_sign_in_revocation_ends_its_proofs() {
         .tokens_for(&w.carbon, &w.dm.app_id, &[Scope::Profile])
         .await;
     let live = w
-        .obo(
+        .user_verification(
             json!({"subject_token": live_tokens.access_token, "receiving_app": w.briefcase.app_id}),
         )
         .await;
@@ -337,7 +339,7 @@ async fn every_core_sign_in_revocation_ends_its_proofs() {
         .tokens_for(&w.carbon, &w.dm.app_id, &[Scope::Profile])
         .await;
     let expired = w
-        .obo(
+        .user_verification(
             json!({"subject_token": late_tokens.access_token, "receiving_app": w.briefcase.app_id}),
         )
         .await;
@@ -417,7 +419,7 @@ async fn revoking_after_the_sign_in_ended_keeps_the_first_end() {
     // The proof already ended with its sign-in; a later revoke (the app tidying up after
     // signing the account out, or the account on the site) is a no-op that stores that end.
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let id = proof_id(&p);
     let fid = w.subject_family();
     w.ctx
@@ -482,7 +484,7 @@ async fn a_proof_never_ends_before_it_was_issued() {
     // The sign-in was revoked while the proof was being issued (the subject check and the
     // insert are separate steps): the proof ends at its own creation, never before it.
     let w = World::new().await;
-    let p = w.issue_obo().await;
+    let p = w.issue_user_verification().await;
     let id = proof_id(&p);
     w.ctx
         .exec(&format!(

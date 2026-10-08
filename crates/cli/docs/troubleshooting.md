@@ -38,7 +38,7 @@ on stdout instead. Quote the request id when you report a bug.
 | `app_credentials_required` | an `accounts app` command has no secret and you aren't the owner | `accounts app use <app_id> --secret-stdin` |
 | `invalid_grant` | a code/refresh token/SLT was used, expired or belongs to another app | start the sign-in again |
 | `token_wrong_audience` | the access token was issued to another app; a developer platform token (aud `developer`) only reads your account and manages the apps you own | use a token issued to `accounts` (`accounts login`) |
-| `ata_single_app` | an App verification proof request named several apps (`audiences`) | one proof per app: `accounts app proof ata --to <app>` for each |
+| `app_verification_single_app` | an app verification proof request named several apps (`audiences`) | one proof per app: `accounts app proof app-verification --to <app>` for each |
 
 ## Signed in to the wrong place?
 

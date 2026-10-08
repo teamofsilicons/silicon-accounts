@@ -52,7 +52,7 @@ belongs to (`fid`) and the granted scopes.
   immediately and also refuses tokens whose membership is no longer active.
 - **Audience-bound**, so a token minted for one app is useless at another. Your API must check
   `aud`; the libraries do it when you pass your app id. To act at another app on an account's
-  behalf, apps use [User verification proofs](../start/obo.md), not each other's tokens.
+  behalf, apps use [User verification proofs](../start/user-verification.md), not each other's tokens.
 
 ## Refresh tokens: rotated, reuse-detected, 900 days at most
 

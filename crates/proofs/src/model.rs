@@ -10,7 +10,7 @@ pub const MAX_ACCESS_TTL_SECONDS: i64 = 1800;
 /// Proof token lifetime when the app doesn't ask for one.
 pub const DEFAULT_ACCESS_TTL_SECONDS: i64 = MAX_ACCESS_TTL_SECONDS;
 /// A proof (and its refresh token) lives at most this long, like a sign-in's refresh token.
-/// An OBO proof also ends when the sign-in it was issued under ends.
+/// A user verification proof also ends when the sign-in it was issued under ends.
 pub const FAMILY_TTL_DAYS: i64 = accounts_core::repo::tokens::REFRESH_TOKEN_DAYS;
 /// Most scopes one proof may carry.
 pub const MAX_SCOPES: usize = 20;
@@ -23,39 +23,39 @@ pub const EXPIRED_TOKEN_RETENTION_DAYS: i32 = 1;
 /// The proof row itself stays forever as history.
 pub const ENDED_PROOF_RETENTION_DAYS: i32 = 30;
 
-/// On behalf of an account (OBO) or app to app (ATA).
+/// On behalf of an account (User verification) or app to app (App verification).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProofKind {
     /// App A acts at app B for an account that signed into app A.
-    Obo,
+    UserVerification,
     /// App A proves itself to one other app (one proof per receiving app).
-    Ata,
+    AppVerification,
 }
 
 impl ProofKind {
     /// The wire and database spelling.
     pub const fn as_str(&self) -> &'static str {
         match self {
-            ProofKind::Obo => "obo",
-            ProofKind::Ata => "ata",
+            ProofKind::UserVerification => "user_verification",
+            ProofKind::AppVerification => "app_verification",
         }
     }
 
     /// Parses the database spelling.
     pub fn parse(s: &str) -> Option<ProofKind> {
         match s {
-            "obo" => Some(ProofKind::Obo),
-            "ata" => Some(ProofKind::Ata),
+            "user_verification" => Some(ProofKind::UserVerification),
+            "app_verification" => Some(ProofKind::AppVerification),
             _ => None,
         }
     }
 
-    /// Product name for messages; wire values remain `obo` and `ata`.
+    /// Product name for messages; wire values remain `user_verification` and `app_verification`.
     pub const fn label(&self) -> &'static str {
         match self {
-            ProofKind::Obo => "User verification",
-            ProofKind::Ata => "App verification",
+            ProofKind::UserVerification => "User verification",
+            ProofKind::AppVerification => "App verification",
         }
     }
 }
@@ -72,10 +72,10 @@ impl std::fmt::Display for ProofKind {
 pub enum ProofStatus {
     /// Usable now (its token verifies until its own expiry and it can be refreshed).
     Active,
-    /// Revoked explicitly, or (OBO) the grant behind it ended: the account's sign-in at the
+    /// Revoked explicitly, or (User verification) the grant behind it ended: the account's sign-in at the
     /// issuing app was revoked, the app's access was removed, or the account was deleted.
     Revoked,
-    /// Past its 900-day lifetime, or (OBO) the sign-in behind it expired.
+    /// Past its 900-day lifetime, or (User verification) the sign-in behind it expired.
     Expired,
 }
 
@@ -139,7 +139,7 @@ pub mod revoke_reason {
 }
 
 /// `audit_log.action` values written by this crate (`target_kind` is always `proof`, `target_id`
-/// the proof id). Issue and revoke entries of OBO proofs carry the account's uuid, so they show
+/// the proof id). Issue and revoke entries of User verification proofs carry the account's uuid, so they show
 /// in that account's history; refresh entries don't (a proof refreshes every few minutes for
 /// up to 900 days, which would drown the history).
 pub mod action {
@@ -171,14 +171,14 @@ mod tests {
 
     #[test]
     fn kinds_round_trip() {
-        for k in [ProofKind::Obo, ProofKind::Ata] {
+        for k in [ProofKind::UserVerification, ProofKind::AppVerification] {
             assert_eq!(ProofKind::parse(k.as_str()), Some(k));
             assert_eq!(
                 serde_json::to_value(k).expect("json"),
                 serde_json::json!(k.as_str())
             );
         }
-        assert_eq!(ProofKind::parse("OBO"), None);
+        assert_eq!(ProofKind::parse("User verification"), None);
         assert_eq!(ProofStatus::Expired.as_str(), "expired");
         assert_eq!(
             serde_json::from_str::<ProofStatus>("\"revoked\"").expect("status"),

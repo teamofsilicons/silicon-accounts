@@ -260,14 +260,14 @@ mod tests {
                 vec!["user-verification", "revoke", "test-id"],
             ),
             (
-                vec!["app", "proof", "ata", "--to", "remind"],
+                vec!["app", "proof", "app-verification", "--to", "remind"],
                 vec!["app", "proof", "app-verification", "--to", "remind"],
             ),
             (
                 vec![
                     "app",
                     "proof",
-                    "obo",
+                    "user-verification",
                     "--subject-token",
                     "test-token",
                     "--to",

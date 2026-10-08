@@ -10,7 +10,7 @@ stay with the apps (`understanding/UNDERSTANDING.md`, "App verification and User
 - **App verification** (app to app): app A gets a proof for exactly one other app (`receiving_app`), which
   verifies that the token really comes from app A. To talk to several apps, app A gets one proof
   per app; a body naming `audiences` (the pre-v2 shape, any length) is refused with 422
-  `ata_single_app` ("An App verification is for exactly one app; ask for one proof per app.").
+  `app_verification_single_app` ("An app verification is for exactly one app; ask for one proof per app.").
 
 Proofs follow the sign-in token logic: a proof token (`sap_…`) the receiving app verifies, and a
 proof refresh token (`sapr_…`) the issuing app keeps and rotates. Only `HMAC(pepper, token)` is
@@ -27,23 +27,23 @@ stored.
 
 | route | auth | success |
 |---|---|---|
-| `POST /v1/proofs/obo` | app (IDEMPOTENT) | 201 issued proof |
-| `POST /v1/proofs/ata` | app (IDEMPOTENT) | 201 issued proof |
+| `POST /v1/proofs/user-verification` | app (IDEMPOTENT) | 201 issued proof |
+| `POST /v1/proofs/app-verification` | app (IDEMPOTENT) | 201 issued proof |
 | `POST /v1/proofs/refresh` | the issuing app (optional `Idempotency-Key`) | 200 issued proof (same `proof_id`) |
 | `POST /v1/proofs/verify` | the verifying app | 200 valid / exactly `{"valid":false,"expires_at":null}` |
 | `POST /v1/proofs/revoke` | the issuing app | 204 (`{"proof_id"}` or `{"proof_token"}` or `{"proof_refresh_token"}`) |
-| `GET /v1/apps/{app_id}/proofs` | app or owner | 200 page (`?kind=obo\|ata&status=active\|revoked\|expired&limit&cursor`) |
-| `POST /v1/apps/{app_id}/proofs/ata` | app or owner (IDEMPOTENT; the owner's session, CLI token or developer platform token) | 201 issued proof (the app's App verification page on developers.teamofsilicons.com) |
+| `GET /v1/apps/{app_id}/proofs` | app or owner | 200 page (`?kind=user_verification\|app_verification&status=active\|revoked\|expired&limit&cursor`) |
+| `POST /v1/apps/{app_id}/proofs/app-verification` | app or owner (IDEMPOTENT; the owner's session, CLI token or developer platform token) | 201 issued proof (the app's App verification page on developers.teamofsilicons.com) |
 | `DELETE /v1/apps/{app_id}/proofs/{proof_id}` | app or owner | 204 |
 | `GET /v1/me/proofs` | session (Carbon or Silicon) | 200 page of User verifications about me (`?status&limit&cursor`) |
 | `DELETE /v1/me/proofs/{proof_id}` | session | 204 |
 
 App verification request body: `{"receiving_app": "remind", "scopes"?, "access_ttl_seconds"?}`.
 
-Issued proof (User verification; App verification has the same shape with `"kind":"ata"` and `user: null`):
+Issued proof (User verification; App verification has the same shape with `"kind":"app_verification"` and `user: null`):
 
 ```json
-{"proof_id":"0192…","kind":"obo","proof_token":"sap_…","expires_at":"2026-10-06T12:30:00.000Z",
+{"proof_id":"0192…","kind":"user_verification","proof_token":"sap_…","expires_at":"2026-10-06T12:30:00.000Z",
  "proof_refresh_token":"sapr_…","refresh_expires_at":"2029-03-24T12:00:00.000Z",
  "issuing_app":"dm","receiving_app":"briefcase",
  "user":{"uuid":"a8K","id":"c:saket","kind":"carbon","membership_id":"dm:a8K"},"scopes":["files.write"]}
@@ -60,7 +60,7 @@ account's membership with the *issuing* app, the grant the proof stands on; `use
 account's current id):
 
 ```json
-{"valid":true,"proof_id":"0192…","kind":"obo","expires_at":"2026-10-06T12:30:00.000Z",
+{"valid":true,"proof_id":"0192…","kind":"user_verification","expires_at":"2026-10-06T12:30:00.000Z",
  "issuing_app":{"app_id":"dm","name":"DM"},"receiving_app":{"app_id":"briefcase","name":"Briefcase"},
  "user":{"uuid":"a8K","id":"c:saket","kind":"carbon","membership_id":"dm:a8K"},"scopes":["files.write"]}
 ```
@@ -107,9 +107,9 @@ about User verification grants, live:
 | 410 | `proof_revoked` | refresh of a revoked proof, or of a User verification whose grant ended (`details.reason`, `details.revoked_at`); a revoked sign-in wins over reuse detection (the proof had already ended) |
 | 410 | `proof_expired` | refresh past the proof's lifetime or its sign-in's expiry |
 | 400 | `invalid_proof_id` | not a UUID. Only short id-shaped values are repeated in the message; a token (alone or wrapped, `Bearer sap_…`, `Proof sap_…`), a JWT or an STK is described, never echoed |
-| 404 | `proof_not_found` | no such proof for this app / account (another app's proof id looks unknown; an App verification id at `/v1/me/proofs`); revoke by a token the sweep already deleted (the message says so; revoke by `proof_id` instead) |
+| 404 | `proof_not_found` | no such proof for this app / account (another app's proof id looks unknown; an app verification id at `/v1/me/proofs`); revoke by a token the sweep already deleted (the message says so; revoke by `proof_id` instead) |
 | 422 | `validation_failed` | body rules (`details.fields`: `scopes[3]`, `access_ttl_seconds`, `receiving_app`, …) |
-| 422 | `ata_single_app` | an App verification body named `audiences`: one proof per app (`details.apps` lists the valid app ids it named; the hint names the endpoint called) |
+| 422 | `app_verification_single_app` | an app verification body named `audiences`: one proof per app (`details.apps` lists the valid app ids it named; the hint names the endpoint called) |
 | 409 | `idempotency_key_reused` | same `Idempotency-Key`, different body |
 
 ## History
@@ -150,7 +150,7 @@ state before the limit, so it reads all of the app's (or account's) proofs.
 index probe per listed proof, however many used refresh tokens a live proof keeps for reuse
 detection. Measured before and with that index (`EXPLAIN ANALYZE` of a 50-proof page, Postgres 16,
 each proof refreshed every 25 minutes for a year): 382 ms without, 0.06–0.2 ms with it. The sweep
-uses `proof_tokens_access_expires_idx` and `proof_families_unrevoked_obo_idx` (also `0002`).
+uses `proof_tokens_access_expires_idx` and `proof_families_unrevoked_user_verification_idx` (also `0002`).
 
 ## Background
 
@@ -181,7 +181,7 @@ The signed-in developer's `/app-verification` portal uses two first-party read e
 
 | route | filters | result |
 |---|---|---|
-| `GET /v1/me/app-verifications` | `app_id`, `status=active|revoked|expired`, `limit`, `cursor` | all retained App verification (`kind: ata`) families issued by apps the account currently manages |
+| `GET /v1/me/app-verifications` | `app_id`, `status=active|revoked|expired`, `limit`, `cursor` | all retained App verification (`kind: app_verification`) families issued by apps the account currently manages |
 | `GET /v1/apps/{app_id}/proofs/{proof_id}/history` | `limit`, `cursor` | retained issuance, refresh and revocation events of that App verification |
 
 Both return `{items, next_cursor}`, newest first with stable timestamp/ID keyset pagination;
@@ -216,5 +216,5 @@ families are never purged. Migration 0008 adds only indexes for these reads.
 The portal shows retained verification records and their token-generation events. It cannot
 recover raw bearer tokens, refresh tokens or purged token identities. No token values,
 hashes, IP addresses, or arbitrary audit payloads appear in these endpoints. Existing wire
-routes, `ata`/`obo` kinds, request/response fields, error codes and SDK compatibility remain
+routes, `app_verification`/`user_verification` kinds, request/response fields, error codes and SDK compatibility remain
 unchanged; their human-facing product names are App verification and User verification.

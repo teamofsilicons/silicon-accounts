@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * ATA: the app's app-to-app proofs (UNDERSTANDING "Proofs"). Silicon Accounts only issues and verifies proofs; what each
- * one allows is up to the apps. An ATA proof is always for exactly one app: pick the one receiving app, its scopes and
+ * App verification: the app's app-to-app proofs (UNDERSTANDING "Proofs"). Silicon Accounts only issues and verifies proofs; what each
+ * one allows is up to the apps. An App verification proof is always for exactly one app: pick the one receiving app, its scopes and
  * the token lifetime; the proof token and its refresh token are shown once. To talk to two apps, make one proof for
- * each. Every proof this app issued is listed (ATA by default; OBO proofs, issued by the app's server for an account,
+ * each. Every proof this app issued is listed (App verification by default; User verification proofs, issued by the app's server for an account,
  * are one filter away), and any active one can be revoked.
  */
 import Link from "next/link";
@@ -27,7 +27,7 @@ import { ApiError } from "@/lib/api/errors";
 import { proofRevokeReason } from "@/lib/api/labels";
 import type { AppProof, IssuedProof } from "@/lib/api/types";
 import { formatDateTime, formatExpiry, formatRelative, plural } from "@/lib/format";
-import { useCreateAta, useOwnedApps, useRevokeAppProof } from "@/lib/query/developer";
+import { useCreateAppVerification, useOwnedApps, useRevokeAppProof } from "@/lib/query/developer";
 import { useAppLookups, type AppLookup, type KnownApp } from "../lib/apps";
 import { useDeveloperApp } from "../lib/context";
 import { PROOF_STATUS, ttlLabel } from "../lib/labels";
@@ -36,10 +36,10 @@ import { appIdProblem, proofScopeProblem } from "../lib/validate";
 import { AppIcon } from "../parts/app-icon";
 import { SecretReveal } from "../parts/secret-reveal";
 import { TagField } from "../parts/tag-field";
-import styles from "./ata.module.css";
+import styles from "./app_verification.module.css";
 
 const TTLS = [60, 300, 900, 1800] as const;
-type KindFilter = "all" | "ata" | "obo";
+type KindFilter = "all" | "app_verification" | "user_verification";
 type StatusFilter = "all" | "active" | "expired" | "revoked";
 
 /** A small chip for an app id: its icon and name once looked up. */
@@ -71,7 +71,7 @@ function ProofRow({ proof, appName, logo, lookups, onRevoke }: { proof: AppProof
   return (
     <li className={styles.proof}>
       <div className={styles.flow} aria-label={`${appName} to ${receivers.join(", ")}`}>
-        <Badge size="sm" tone={proof.kind === "ata" ? "info" : "neutral"}>{proof.kind === "ata" ? "App verification" : "User verification"}</Badge>
+        <Badge size="sm" tone={proof.kind === "app_verification" ? "info" : "neutral"}>{proof.kind === "app_verification" ? "App verification" : "User verification"}</Badge>
         <AppIcon name={appName} src={logo} size={32} decorative />
         <span className={styles.connector} data-active={active || undefined} aria-hidden="true"><i /><ArrowRight size={14} strokeWidth={1.75} /></span>
         <span className={styles.receivers}>
@@ -105,7 +105,7 @@ function ProofRow({ proof, appName, logo, lookups, onRevoke }: { proof: AppProof
   );
 }
 
-export function AtaTab() {
+export function AppVerificationTab() {
   const ctx = useDeveloperApp();
   const { appId } = ctx;
   /** The one app the next proof is for (normalized app id), and what is typed into the field. */
@@ -115,7 +115,7 @@ export function AtaTab() {
   const [scopes, setScopes] = useState<string[]>([]);
   const [ttl, setTtl] = useState("1800");
   const [issued, setIssued] = useState<IssuedProof | null>(null);
-  const [kind, setKind] = useState<KindFilter>("ata");
+  const [kind, setKind] = useState<KindFilter>("app_verification");
   const [status, setStatus] = useState<StatusFilter>("all");
   const owned = useOwnedApps();
 
@@ -147,7 +147,7 @@ export function AtaTab() {
 
   // A secret mutation (lib/query useSecretMutation): the proof and refresh tokens are kept only by the reveal below,
   // never in TanStack's cache. A refusal is shown in place (its own state, since the mutation forgets it).
-  const issue = useCreateAta(appId, { toast: false });
+  const issue = useCreateAppVerification(appId, { toast: false });
   const [issueError, setIssueError] = useState<ApiError | null>(null);
   const revoke = useRevokeAppProof(appId);
 
@@ -183,9 +183,9 @@ export function AtaTab() {
     return `# Run by ${audience}, with its own app secret; PROOF_TOKEN is the proof token above\ncurl -u ${audience}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -d "{\\"proof_token\\":\\"$PROOF_TOKEN\\"}" \\\n  ${ctx.publicUrl}/v1/proofs/verify`;
   };
   const refreshCurl = `# Run by ${appId} when the token expires; the refresh token rotates every time\ncurl -u ${appId}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -d "{\\"proof_refresh_token\\":\\"$PROOF_REFRESH_TOKEN\\"}" \\\n  ${ctx.publicUrl}/v1/proofs/refresh`;
-  const oboCurl = `# Your server, after the account agreed in your app\ncurl -u ${appId}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: 4f1c…' \\\n  -d '{"subject_token":"<their access token for ${appId}>","receiving_app":"briefcase","scopes":["files.write"],"access_ttl_seconds":600}' \\\n  ${ctx.publicUrl}/v1/proofs/obo\n\n# → { "proof_id": "…", "proof_token": "sap_…", "proof_refresh_token": "sapr_…", "expires_at": "…", … }\n# The receiving app verifies it with POST /v1/proofs/verify and its own credentials.`;
+  const oboCurl = `# Your server, after the account agreed in your app\ncurl -u ${appId}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: 4f1c…' \\\n  -d '{"subject_token":"<their access token for ${appId}>","receiving_app":"briefcase","scopes":["files.write"],"access_ttl_seconds":600}' \\\n  ${ctx.publicUrl}/v1/proofs/user-verification\n\n# → { "proof_id": "…", "proof_token": "sap_…", "proof_refresh_token": "sapr_…", "expires_at": "…", … }\n# The receiving app verifies it with POST /v1/proofs/verify and its own credentials.`;
   const filtered = kind !== "all" || status !== "all";
-  const ataCurl = `# Your server: one proof per receiving app (an app verification is for exactly one app)\ncurl -u ${appId}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: 9b2e…' \\\n  -d '{"receiving_app":"${receiver ?? "remind"}","scopes":["notify.send"],"access_ttl_seconds":1800}' \\\n  ${ctx.publicUrl}/v1/proofs/ata`;
+  const ataCurl = `# Your server: one proof per receiving app (an app verification is for exactly one app)\ncurl -u ${appId}:$APP_SECRET \\\n  -H 'Content-Type: application/json' \\\n  -H 'Idempotency-Key: 9b2e…' \\\n  -d '{"receiving_app":"${receiver ?? "remind"}","scopes":["notify.send"],"access_ttl_seconds":1800}' \\\n  ${ctx.publicUrl}/v1/proofs/app-verification`;
 
   return (
     <div className={styles.proofs}>
@@ -272,7 +272,7 @@ export function AtaTab() {
 
       <Section id="proofs-issued" title="Verifications this app issued" description="Active verifications can be refreshed until their refresh period ends. Revoking one stops it at once, refresh token included." actions={<Link href={paths.appVerification(appId)}>All app verification history <ArrowRight size={14} aria-hidden="true" /></Link>}>
         <div className={styles.filters}>
-          <SegmentedControl label="Kind" value={kind} onValueChange={value => setKind(value as KindFilter)} options={[{ value: "ata", label: "App verification" }, { value: "obo", label: "User verification" }, { value: "all", label: "All" }]} />
+          <SegmentedControl label="Kind" value={kind} onValueChange={value => setKind(value as KindFilter)} options={[{ value: "app_verification", label: "App verification" }, { value: "user_verification", label: "User verification" }, { value: "all", label: "All" }]} />
           <SegmentedControl label="Status" value={status} onValueChange={value => setStatus(value as StatusFilter)} options={[{ value: "all", label: "Any status" }, { value: "active", label: "Active" }, { value: "expired", label: "Expired" }, { value: "revoked", label: "Revoked" }]} />
         </div>
         {list.error ? (
@@ -286,7 +286,7 @@ export function AtaTab() {
             <EmptyState
               icon={<ShieldCheck size={24} strokeWidth={1.5} />}
               title={filtered ? "No verifications match" : "No verifications yet"}
-              description={filtered ? (kind === "ata" && status === "all" ? `App verifications ${ctx.app.name} creates, here or from its server, appear here.` : "Try another kind or status.") : `Verifications ${ctx.app.name} issues, from here or from its server, appear here.`}
+              description={filtered ? (kind === "app_verification" && status === "all" ? `App verifications ${ctx.app.name} creates, here or from its server, appear here.` : "Try another kind or status.") : `Verifications ${ctx.app.name} issues, from here or from its server, appear here.`}
             />
           </Surface>
         ) : proofs.length ? (
@@ -314,8 +314,8 @@ export function AtaTab() {
 
       <Section title="From your server" description={`${ctx.app.name}'s server can make the same proofs with its app id and secret. User verification tokens (when ${ctx.app.name} acts at another app for an account, after asking the account itself) come only from the server; the account sees and can revoke them on accounts.teamofsilicons.com.`}>
         <Accordion defaultOpen={-1} items={[
-          { title: "Create an app verification token from your server", content: <div className={styles.wrapCode}><CodeBlock filename="POST /v1/proofs/ata" language="bash" code={ataCurl} /></div> },
-          { title: "Issue a user verification token from your server", content: <div className={styles.wrapCode}><CodeBlock filename="POST /v1/proofs/obo" language="bash" code={oboCurl} /></div> },
+          { title: "Create an app verification token from your server", content: <div className={styles.wrapCode}><CodeBlock filename="POST /v1/proofs/app-verification" language="bash" code={ataCurl} /></div> },
+          { title: "Issue a user verification token from your server", content: <div className={styles.wrapCode}><CodeBlock filename="POST /v1/proofs/user-verification" language="bash" code={oboCurl} /></div> },
         ]} />
       </Section>
     </div>

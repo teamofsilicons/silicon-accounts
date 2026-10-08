@@ -8,7 +8,7 @@ import type { Journey } from "../../context";
 import { developerApi, sleep, shot } from "../../lib";
 import { appDetail, asApp, errorCode, freshSignIn, ownerSignIn } from "./_helpers";
 
-const TABS = ["", "/sign-in", "/details", "/flows", "/pages", "/users", "/import", "/webhooks", "/ata", "/embed"];
+const TABS = ["", "/sign-in", "/details", "/flows", "/pages", "/users", "/import", "/webhooks", "/app_verification", "/embed"];
 /** The browser logs the 403/404 answers these pages are built on as failed resources. */
 const EXPECTED = [/status of 403 \(Forbidden\)/, /status of 404 \(Not Found\)/];
 
@@ -76,7 +76,7 @@ export const journey: Journey = {
       ["POST", "/webhook/test", {}],
       ["POST", "/webhook/replay", { status: "failed" }],
       ["DELETE", "/webhook", undefined],
-      ["POST", "/proofs/ata", { receiving_app: "remind" }],
+      ["POST", "/proofs/app-verification", { receiving_app: "remind" }],
       ["POST", "/imports", { rows: [{ email: "planted@example.test" }], options: {} }],
     ];
     const writeProblems: string[] = [];
@@ -84,7 +84,7 @@ export const journey: Journey = {
       const answer = await developerApi(env, page, `/apps/${target}${path}`, { method, ...(body === undefined ? {} : { json: body }) });
       if (answer.status !== 403 || errorCode(answer.body) !== "not_app_owner") writeProblems.push(`${method} ${path} → ${answer.status} ${errorCode(answer.body)}`);
     }
-    results.check(`the ${writes.length} owner writes (setup, webhook, its secret, test, replay, removal, an ATA proof, an import) answer 403 not_app_owner`, writeProblems.length === 0, writeProblems.join(" | ") || "all refused");
+    results.check(`the ${writes.length} owner writes (setup, webhook, its secret, test, replay, removal, an app verification proof, an import) answer 403 not_app_owner`, writeProblems.length === 0, writeProblems.join(" | ") || "all refused");
     const after = await appDetail(ctx, target);
     const proofsAfter = ((await asApp<{ items?: unknown[] }>(ctx, target, `/v1/apps/${target}/proofs?limit=100`)).body.items ?? []).length;
     results.check(`…and ${target} is untouched: same setup version, same webhook, no new proof`, after.config_version === before.config_version && after.webhook.url === before.webhook.url && after.webhook.secret_set === before.webhook.secret_set && proofsAfter === proofsBefore, `version ${before.config_version}→${after.config_version}, webhook ${after.webhook.url}, proofs ${proofsBefore}→${proofsAfter}`);

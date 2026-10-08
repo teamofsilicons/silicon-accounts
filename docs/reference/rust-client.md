@@ -52,7 +52,7 @@ hand slt_f_92poub5NdUOgmXcmMSPdMIhg3HvS18a1v147ycz3M to briefcase
 
 ```toml
 [dependencies]
-silicon-accounts-client = { path = "/path/to/silicon-accounts/crates/client" }   # your checkout
+silicon-accounts-client = "0.2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -75,7 +75,7 @@ up to you (`refresh_first_party`, `AppClient::refresh`).
 
 In owner mode (`session.app("briefcase")`) everything that manages the app works without its
 secret, including issuing App verification proofs (through the App verification page route) and revoking proofs by id.
-Some calls always need the app’s credentials: code, SLT and refresh-token exchange, `revoke`, `introspect`, `issue_obo`, `refresh_proof`, `verify_proof` and revoking a proof by token. Calling them in owner mode fails before sending a request, with `Error::InvalidInput` and code `invalid_input`. For example:
+Some calls always need the app’s credentials: code, SLT and refresh-token exchange, `revoke`, `introspect`, `issue_user_verification`, `refresh_proof`, `verify_proof` and revoking a proof by token. Calling them in owner mode fails before sending a request, with `Error::InvalidInput` and code `invalid_input`. For example:
 
 ```text
 Exchanging a short-lived token needs app briefcase's own credentials (app_id + app secret); the owner's session can't do it on the app's behalf.
@@ -210,8 +210,8 @@ where the method returns a `Vec`.
 | `set_webhook(url, idempotency_key)`, `remove_webhook()`, `rotate_webhook_secret(key)`, `test_webhook(key)` | `…/webhook…` | `AppWebhook` / `()` / `WebhookSecret` / `WebhookTestResult` |
 | `deliveries(&DeliveriesQuery)`, `delivery(id)` | `…/webhook/deliveries…` | `Page<WebhookDelivery>` / `DeliveryDetail` |
 | `replay(&ReplayRequest, idempotency_key)` | `…/webhook/replay` | `ReplayResult` (`replayed_count()`, `skipped_count()`) |
-| `issue_obo(&IssueObo, key)` | `POST /v1/proofs/obo` | `IssuedProof` |
-| `issue_ata(&IssueAta, key)` | `POST /v1/proofs/ata` (owner mode: `/v1/apps/{app_id}/proofs/ata`) | `IssuedProof` |
+| `issue_user_verification(&IssueUserVerification, key)` | `POST /v1/proofs/user-verification` | `IssuedProof` |
+| `issue_app_verification(&IssueAppVerification, key)` | `POST /v1/proofs/app-verification` (owner mode: `/v1/apps/{app_id}/proofs/app-verification`) | `IssuedProof` |
 | `refresh_proof(refresh_token, access_ttl_seconds)` | `POST /v1/proofs/refresh` | `IssuedProof` |
 | `verify_proof(proof_token)` | `POST /v1/proofs/verify` | `ProofVerification::Valid(..)` or `::Invalid` |
 | `revoke_proof(&ProofRef)` | `POST /v1/proofs/revoke` (owner mode with `ProofRef::Id`: `DELETE …/proofs/{id}`) | `()` |
@@ -226,7 +226,7 @@ it with a wildcard arm.
 ## Types
 
 - **Request types** (`SiliconSelfCreate`, `CreateSilicon`, `UpdateSilicon`, `ProfileUpdate`,
-  `IssueObo`, `IssueAta`, `ImportOptions`, `ImportRow`, the `*Query` types, `PageRequest`,
+  `IssueUserVerification`, `IssueAppVerification`, `ImportOptions`, `ImportRow`, the `*Query` types, `PageRequest`,
   `AuthorizeParams`) implement `Default`: write
   `CreateSilicon { id: "si:scout".into(), display_name: "Scout".into(), ..Default::default() }`.
 - **Response types** are `#[non_exhaustive]`: read their fields; they tolerate fields the service
@@ -437,13 +437,13 @@ In the run, `config_version` went from 2 to 3; sending another patch with the ol
 ### Proofs
 
 ```rust
-use silicon_accounts_client::{IssueAta, IssueObo, ProofRef, ProofVerification};
+use silicon_accounts_client::{IssueAppVerification, IssueUserVerification, ProofRef, ProofVerification};
 
 // App A, for an account that consented in A's own interface:
 let proof = app_a
-    .issue_obo(&IssueObo { subject_token: account_access_token, receiving_app: "briefcase".into(),
+    .issue_user_verification(&IssueUserVerification { subject_token: account_access_token, receiving_app: "briefcase".into(),
                            scopes: vec!["files.write".into()], access_ttl_seconds: Some(600) },
-               Some("obo-req-42"))
+               Some("user_verification-req-42"))
     .await?;
 
 // App B, receiving proof.proof_token:
@@ -452,8 +452,8 @@ match app_b.verify_proof(&proof_token).await? {
     _ => { /* not valid: refuse */ }
 }
 
-let ata = commit.issue_ata(&IssueAta { receiving_app: "remind".into(), scopes: vec!["builds.read".into()], access_ttl_seconds: Some(600) }, Some("ata-1")).await?;
-commit.revoke_proof(&ProofRef::Id(ata.proof_id.clone())).await?;
+let app_verification = commit.issue_app_verification(&IssueAppVerification { receiving_app: "remind".into(), scopes: vec!["builds.read".into()], access_ttl_seconds: Some(600) }, Some("app_verification-1")).await?;
+commit.revoke_proof(&ProofRef::Id(app_verification.proof_id.clone())).await?;
 ```
 
 In the run, `remind` verified the App verification token as `Valid` (issued by `commit`, scopes

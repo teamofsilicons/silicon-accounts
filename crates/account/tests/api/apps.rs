@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use crate::common::*;
 
-/// Inserts an active OBO proof family issued by `issuing_app` about `account_uuid`.
-async fn obo_proof(
+/// Inserts an active User verification proof family issued by `issuing_app` about `account_uuid`.
+async fn user_verification_proof(
     ctx: &TestContext,
     issuing_app: &str,
     audience: &str,
@@ -19,7 +19,7 @@ async fn obo_proof(
     let id = Uuid::now_v7();
     sqlx::query(
         "insert into proof_families (id, kind, issuing_app, audiences, account_uuid, scopes, access_ttl_seconds, expires_at) \
-         values ($1, 'obo', $2, $3, $4, '{files.write}', 600, now() + interval '900 days')",
+         values ($1, 'user_verification', $2, $3, $4, '{files.write}', 600, now() + interval '900 days')",
     )
     .bind(id)
     .bind(issuing_app)
@@ -156,8 +156,8 @@ async fn removing_access_revokes_sign_ins_and_proofs() {
     let other_app = member_app(&ctx, "dm", &carbon, &[Scope::Profile]).await;
     let tokens = ctx.tokens_for(&carbon, &app, &[Scope::Profile]).await;
     let other_tokens = ctx.tokens_for(&carbon, &other_app, &[Scope::Profile]).await;
-    let issued_by_app = obo_proof(&ctx, &app, &other_app, &carbon.uuid).await;
-    let issued_by_other = obo_proof(&ctx, &other_app, &app, &carbon.uuid).await;
+    let issued_by_app = user_verification_proof(&ctx, &app, &other_app, &carbon.uuid).await;
+    let issued_by_other = user_verification_proof(&ctx, &other_app, &app, &carbon.uuid).await;
     let cookie = ctx.browser_session(&carbon).await;
 
     let r = call(

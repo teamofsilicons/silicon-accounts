@@ -141,7 +141,7 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   `useSecretMutation(fn)` (`lib/query/idempotency.ts`): `run(input)` resolves with the answer and resets the mutation,
   and nothing is cached (gcTime 0), so the page that shows the secret holds the only copy. `useCreateSilicon`,
   `useRotateStk`, `useSetSiliconWebhook`, `useSetOwnWebhook`, `useSetWebhook`, `useRotateWebhookSecret` and
-  `useCreateAta` are secret mutations.
+  `useCreateAppVerification` are secret mutations.
 - **Telemetry.** Opted in by default; turning it off (settings) sends `X-Accounts-Telemetry: off` on every API call
   from the first request on, and sets the `sa_telemetry=off` cookie for requests without headers.
 - **Navigation.** `lib/navigation.ts` has every path and the dock's sections. Page changes use View Transitions
@@ -361,7 +361,7 @@ buttons (the Opening page, email and phone opening on their field); the CLI (dev
 through the fake apps (one App verification proof per app, with timings); dirty.csv imported on the developer site (signed in
 through its BFF) and with the CLI, and an imported Carbon finishing setup; webhooks with valid signatures; every page in
 an app's own style with "Powered by", Sign in / Sign up buttons, the embed and the SDK; ledgerly's two-page flow with
-its review (Back, Cancel); the developer site as an owner (a saved title on the hosted page, an App verification proof made and
+its review (Back, Cancel); the developer site as an owner (a saved title on the hosted page, an app verification proof made and
 revoked on its App verification tab); the shared behaviours (the developer site's unsaved-work guard, Escape in layers, the Combobox,
 focus states, any-country phones, dark tokens, /developer leading to the developer site); a Silicon's secrets on the
 account site; connecting Google and Apple. Other suites live in `e2e/suites/<suite>/`.
@@ -477,7 +477,7 @@ What changed on this site for UNDERSTANDING.md v2 (build spec 06-v2.md):
   client (`api.flows.detailsAdd/detailsVerify/detailsContinue/detailsBack/review`).
 - **Types** (`lib/api/types.ts`): FlowView v2 (`intent`, `details`, `review`; no `requirements`, `consent`,
   `login_hint`), `FlowCreate.intent`, `SigninCopy.opening_title/signup_title/signup_subtitle`, `SigninConfig.flow`
-  (`SigninFlow`, `SigninFlowStep`), App verification proofs for exactly one `receiving_app` (`AtaRequest`, `IssuedProof`, `AppProof`).
+  (`SigninFlow`, `SigninFlowStep`), App verification proofs for exactly one `receiving_app` (`AppVerificationRequest`, `IssuedProof`, `AppProof`).
 - **SDK and embed**: `intent` / `data-intent`, `buttons: "intents"` ("Sign in" / "Sign up"), "Continue with phone
   number", no login hint (see SDK).
 - **Mocks and screens**: `components/auth/mocks/flows.ts` samples every v2 page (Opening, intents, details pages, the
