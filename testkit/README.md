@@ -90,11 +90,11 @@ Programmatically: `accountsEnvForMocks({ oidcUrl, messagingUrl })` and
 ## dev-credentials.json
 
 Generated once by `scripts/generate-dev-credentials.ts` and committed. **Development only** — nothing
-but the testkit accepts these values; never use them in production.
+but the testkit accepts these values; never use them in production. Google clients and Twilio account IDs use explicit mock prefixes so committed fixtures cannot be mistaken for live credentials.
 
 | key | contents |
 |---|---|
-| `managed.google` | `client_id` (`<12 digits>-<32>.apps.googleusercontent.com`), `client_secret` (`GOCSPX-…`) |
+| `managed.google` | `client_id` (`mock-google-….invalid`), `client_secret` (`mock-google-…`) |
 | `managed.apple` | `services_id`, `team_id`, `key_id`, `private_key_pem` (p8, EC P-256), `public_key_pem` |
 | `byo['acme-notes'].google` | acme-notes' own Google client (bring your own) — also embedded in `fake-apps.json` |
 | `byo['orbit-games'].apple` | orbit-games' own Apple Services ID + p8 key — also embedded in `fake-apps.json` |

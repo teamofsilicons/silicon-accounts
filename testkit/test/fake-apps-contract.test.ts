@@ -165,12 +165,12 @@ describe('fake-apps.json', () => {
 
   test('dev credentials are mock-only and well-formed', () => {
     const creds = loadDevCredentials();
-    assert.match(creds.managed.google.client_id, /^\d{12}-[a-z0-9]{32}\.apps\.googleusercontent\.com$/);
-    assert.match(creds.managed.google.client_secret, /^GOCSPX-/);
+    assert.match(creds.managed.google.client_id, /^mock-google-[a-z0-9-]+\.invalid$/);
+    assert.match(creds.managed.google.client_secret, /^mock-google-/);
     assert.match(creds.managed.apple.team_id, /^[A-Z0-9]{10}$/);
     assert.match(creds.managed.apple.key_id, /^[A-Z0-9]{10}$/);
     assert.match(creds.managed.apple.private_key_pem, /^-----BEGIN PRIVATE KEY-----/);
-    assert.match(creds.messaging.twilio.account_sid, /^AC[0-9a-f]{32}$/);
+    assert.match(creds.messaging.twilio.account_sid, /^mock-twilio-/);
     assert.match(creds.messaging.twilio.messaging_service_sid, /^MG[0-9a-f]{32}$/);
     assert.notEqual(creds.managed.google.client_id, creds.byo['acme-notes'].google.client_id);
   });

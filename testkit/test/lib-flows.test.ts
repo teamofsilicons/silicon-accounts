@@ -151,6 +151,6 @@ describe('lib: sign-in helpers against mocks + stub Accounts', () => {
 
   test('fake app data helpers expose the fixed credentials', () => {
     assert.equal(appCredentials('briefcase').secret, fakeApp('briefcase').secret);
-    assert.match(fakeApp('acme-notes').signin_defaults.google?.client_id ?? '', /apps\.googleusercontent\.com$/);
+    assert.match(fakeApp('acme-notes').signin_defaults.google?.client_id ?? '', /^mock-google-.*\.invalid$/);
   });
 });

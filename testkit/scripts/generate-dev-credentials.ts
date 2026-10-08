@@ -9,13 +9,13 @@
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { existsSync, writeFileSync } from 'node:fs';
 import { DEV_CREDENTIALS_PATH, type AppleClientCredentials, type DevCredentials, type GoogleClientCredentials } from '../src/credentials.ts';
-import { randomDigits, randomFrom, randomHex, randomLowerAlnum, randomUpperAlnum } from '../src/shared/util.ts';
+import { randomHex, randomLowerAlnum, randomUpperAlnum } from '../src/shared/util.ts';
 
 function googleClient(): GoogleClientCredentials {
-  // Real shape: <project number>-<32 chars>.apps.googleusercontent.com and GOCSPX-<28 chars>.
+  // Deliberately invalid for real providers; safe to commit without resembling live credentials.
   return {
-    client_id: `${randomDigits(12)}-${randomLowerAlnum(32)}.apps.googleusercontent.com`,
-    client_secret: `GOCSPX-${randomFrom('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', 28)}`,
+    client_id: `mock-google-${randomLowerAlnum(32)}.invalid`,
+    client_secret: `mock-google-secret-${randomHex(28)}`,
   };
 }
 
@@ -59,7 +59,7 @@ const credentials: DevCredentials = {
   messaging: {
     postmark: { server_token: randomUUID(), from: 'accounts@teamofsilicons.com', message_stream: 'outbound' },
     twilio: {
-      account_sid: `AC${randomHex(32)}`,
+      account_sid: `mock-twilio-${randomHex(32)}`,
       auth_token: randomHex(32),
       messaging_service_sid: `MG${randomHex(32)}`,
       // Twilio's magic "valid" test sender number.
