@@ -17,11 +17,11 @@ Use `silicon-apps-package` to check manifests, build archives and calculate chec
 
 ```toml
 [dependencies]
-silicon-apps-client = "0.1.5"
+silicon-apps-client = "0.1.6"
 silicon-apps-package = "0.1.2"
 ```
 
-The CLI release is 0.1.6; package versions are independent. Full generated Rust references are on [docs.rs for the client](https://docs.rs/silicon-apps-client) and [docs.rs for package tooling](https://docs.rs/silicon-apps-package).
+The CLI release is 0.1.7; package versions are independent. Full generated Rust references are on [docs.rs for the client](https://docs.rs/silicon-apps-client) and [docs.rs for package tooling](https://docs.rs/silicon-apps-package).
 
 ## Read the catalog
 
@@ -50,7 +50,7 @@ async fn install_app() -> anyhow::Result<()> {
     let config = Config::default();
     let apps = Client::new(&config.server, None)?;
     let spec = "ring>dev@1.2.3".parse()?;
-    let result = install::install(&apps, &state, &config, &spec, false, false).await?;
+    let result = install::install(&apps, &state, &config, &spec, false).await?;
     println!("{}", result.message);
     Ok(())
 }
@@ -60,7 +60,7 @@ Pass a `LocalState` when an operation needs to save sessions or installation rec
 
 `auth::authenticated_client` uses the official Silicon Accounts client. It saves tokens for their service URLs and coordinates refreshes across processes so a rotating token is not used twice. The CLI reads `APPS_TOKEN`; creating a `Client` does not read it automatically.
 
-During installation, the library checks the metadata and checksum, extracts the archive within its limits and checks that the command is not owned by another app. It prepares the new files before replacing the installation and restores the previous package if installation fails. Optional scripts require consent and a timeout.
+During installation, the library checks the metadata and checksum, extracts the archive within its limits and checks that the command is not owned by another app. It prepares the new files before replacing the installation and restores the previous package if installation fails. Bundled scripts run automatically during installs and updates, with a timeout.
 
 If the server is unavailable when the installation receipt is sent, the library saves it for retry without counting the same installation twice. The installed record also keeps the registry the app came from.
 

@@ -60,13 +60,7 @@ On Windows, a helper replaces the running Apps executable. A message saying the 
 
 Before installing an update, Apps checks the package’s SHA-256 checksum and extracts it within the archive limits. It rejects unsafe paths and links, and checks that the new command will not overwrite another app’s command. It prepares the new installation before replacing the current one. If installation fails, it restores the previous package.
 
-Optional install scripts run locally only after explicit consent:
-
-```sh
-silicon-apps install ring --allow-install-script
-```
-
-Review the script first. Consent is recorded for that app's subsequent updates. The default timeout is 120 seconds. Package rollback cannot undo a script's unrelated external side effects.
+If a package includes an install script, Apps runs it automatically on your machine during installation and updates. The default timeout is 120 seconds. If the script fails or times out, Apps restores the previous package. Package rollback cannot undo a script's unrelated external side effects.
 
 ## Service-scoped sign-in
 

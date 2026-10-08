@@ -12,7 +12,7 @@ related:
 
 # Apps CLI reference
 
-Run the Apps CLI with the `silicon-apps` command. Its package name is `silicon-apps-cli`, and this reference describes version 0.1.6.
+Run the Apps CLI with the `silicon-apps` command. Its package name is `silicon-apps-cli`, and this reference describes version 0.1.7.
 
 Add `--help` to any command to see its options. Run `silicon-apps docs tree` to see every command and flag in your installed version.
 
@@ -36,10 +36,10 @@ Service URLs must be HTTPS, except loopback HTTP for development. Defaults are `
 | `search [QUERY] [--private] [--mine]` | Search IDs, names, tags and descriptions, with fuzzy matching |
 | `list [--private] [--mine]` | List accessible apps; `--mine` includes your drafts |
 | `show APP` | Show details, authors, releases, links, media and ratings |
-| `install APP [--yes] [--allow-install-script]` | Install a channel or exact version for this platform |
+| `install APP [--yes]` | Install a channel or exact version for this platform |
 | `install APP --archive FILE --sha256 HEX` | Bootstrap from local archive bytes with a trusted checksum |
 | `installed` | List local installed versions, channels and checksums |
-| `update [APP] [--allow-install-script]` | Check one or all installed apps now |
+| `update [APP]` | Check one or all installed apps now |
 | `uninstall APP` | Remove the installed command and package |
 | `review APP [--rating 1..5] [--text TEXT] [--remove]` | List reviews, save yours or remove it |
 | `targets` | Supported targets, observed population and runner availability |
