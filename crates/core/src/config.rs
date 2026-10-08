@@ -33,7 +33,7 @@ pub const CONTRACT_ACCESS_TOKEN_TTL_SECONDS: i64 = 1800;
 pub const DEFAULT_DOCS_URL: &str = "https://accounts.teamofsilicons.com/docs";
 
 /// The developer platform in production unless ACCOUNTS_DEVELOPER_URL says otherwise.
-pub const DEFAULT_DEVELOPER_URL: &str = "https://developer.teamofsilicons.com";
+pub const DEFAULT_DEVELOPER_URL: &str = "https://developers.teamofsilicons.com";
 
 /// The developer platform's default outside production: `next dev` in developer/ on port 8600
 /// (scripts/dev.sh sets ACCOUNTS_DEVELOPER_URL for stacks on other ports).
@@ -1211,7 +1211,7 @@ mod tests {
             ("ACCOUNTS_POSTMARK_SERVER_TOKEN", "pm-token"),
         ]))
         .expect("valid production settings");
-        assert_eq!(s.developer_url, "https://developer.teamofsilicons.com");
+        assert_eq!(s.developer_url, "https://developers.teamofsilicons.com");
         assert!(s.cookie_secure);
         assert!(!s.webhook_allow_private);
         assert_eq!(s.encryption_current_version, 2);

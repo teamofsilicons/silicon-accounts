@@ -77,7 +77,7 @@ env('/etc/accounts/api.env',api)
 common={k:s[k] for k in ['ACCOUNTS_API_URL','ACCOUNTS_PUBLIC_URL','ACCOUNTS_DEVELOPER_URL']}
 common.update(NODE_ENV='production',NEXT_TELEMETRY_DISABLED='1',HOSTNAME='127.0.0.1')
 env('/etc/accounts/web.env',dict(common,PORT='8590'))
-env('/etc/accounts/developer.env',dict(common,PORT='8600',DEVELOPER_PUBLIC_URL=s['DEVELOPER_PUBLIC_URL'],DEVELOPER_SESSION_SECRET=s['DEVELOPER_SESSION_SECRET']))
+env('/etc/accounts/developer.env',dict(common,PORT='8600',DEVELOPER_PUBLIC_URL=s['DEVELOPER_PUBLIC_URL'],DEVELOPER_SESSION_SECRET=s['DEVELOPER_SESSION_SECRET'],APPS_API_URL=s.get('APPS_API_URL','https://apps.teamofsilicons.com')))
 if not P('/var/lib/pgsql/data/PG_VERSION').exists():run('postgresql-setup','--initdb')
 hba=P('/var/lib/pgsql/data/pg_hba.conf')
 hba.write_text('local all all peer\nhost all all 127.0.0.1/32 scram-sha-256\nhost all all ::1/128 scram-sha-256\n');hba.chmod(0o600)
@@ -135,7 +135,11 @@ accounts.teamofsilicons.com {
 __DEVELOPER_HOST__ {
     reverse_proxy 127.0.0.1:8600
 }
-'''.replace('__DEVELOPER_HOST__',developer_url.hostname))
+'''.replace('__DEVELOPER_HOST__',developer_url.hostname) + ('''
+developer.accounts.teamofsilicons.com {
+    redir https://developers.teamofsilicons.com{uri} permanent
+}
+''' if developer_url.hostname == 'developers.teamofsilicons.com' else ''))
 # Give Caddy access only to its non-secret configuration, not the API's env files.
 run('install','-d','-m','755','/etc/accounts-caddy')
 shutil.copyfile('/etc/accounts/Caddyfile','/etc/accounts-caddy/Caddyfile');P('/etc/accounts-caddy/Caddyfile').chmod(0o644)
