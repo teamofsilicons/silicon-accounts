@@ -154,3 +154,38 @@ Accounts checks; UUID author/admin rules remain in force. Verified email
 invitation matching uses the existing first-party self-profile contract, while
 Apps-scoped email consent remains unchanged. The Apps registry retains only its
 store OAuth callback, with its credentials and other sign-in settings preserved.
+
+## Verification terminology and managed-app history
+
+Source `d5f40ef37e229ddb471784738be7f0664674420e` is deployed with migration 8.
+Bundle SHA-256 is `529489b2b9c032f1a5f0482279429467478a0b204251b58777318684c7ec9b0b`;
+API SHA-256 is `be842f6d70b6017c757850abe180748fbe214b78a6cefcd96f853b10c51d476f`.
+Installer SSM `b9f741b0-6f54-4139-a55e-0ff381bc01ee` and verification SSM
+`f6b09cd8-69fb-41f8-b390-842f6791f616` confirmed the exact release, both new
+indexes, six active services/timers and database readiness. The genuine account,
+three apps and one membership remain; production had and still has zero proof
+families/events. No test credentials or fixture records were created.
+
+The common developer portal now has `/app-verification`, listing retained records
+for apps the signed-in account currently manages. Filters, cursor pagination,
+issuance/refresh/revocation history and one-time token display are tested. App
+credentials, Apps-scoped tokens and unrelated users cannot read central history.
+Losing author access removes history access; cached rows also disappear when a
+refetch reports an authorization denial. ATA/OBO wire values remain compatible,
+with App verification/User verification labels across both frontends and docs.
+
+The full Rust workspace suite passed (three existing ignored tests); proofs
+all-target Clippy, formatting, both frontend typechecks/lint/builds, 38 portal
+browser tests and 13 portal unit tests passed. Forty-two docs pages passed link
+checks. Account screenshots cover 36 theme/viewport/state combinations and the
+central page was reviewed at desktop/mobile widths in both themes. ARM64 API and
+migrator builds passed. CLI labels/aliases are committed source; no new Accounts
+CLI/client package release was published as part of this portal deployment.
+
+Public HTTPS pages, API readiness and authentication denials pass. Published
+developer and account verification JavaScript matches the tested build exactly.
+A signed-in production central-history browser check is not yet claimed.
+The retained predeployment dump is `backups/predeploy-20261008T153213Z.dump`,
+SHA-256 `7dda2006b0b9d211aea0237c6a16023b32ef28673a0e86a4bc6c1542eee90174`.
+This latest backup was uploaded but not separately restored; earlier isolated
+restore evidence remains above.
