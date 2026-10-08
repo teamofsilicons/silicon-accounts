@@ -23,6 +23,8 @@ accounts_apps::imports::run_pending_jobs(&state)         // process queued impor
 |---|---|---|
 | `GET /v1/apps/{app_id}/public` | public | `{"app_id","name","logo_url","logo_dark_url","homepage_url","methods","branding","copy","allowed_origins"}`. `Access-Control-Allow-Origin: *` (errors too), `Cache-Control: no-cache`. `methods` = enabled methods in order, managed Google/Apple hidden without managed credentials. `allowed_origins` are the origins that may frame the embed and use the SDK: the account site builds the embed page's `frame-ancestors` from them (a CSP is public anyway). |
 | `GET /v1/me/owned-apps` | Carbon session | `users` = live members (active + imported, deleted accounts excluded). Paginated. |
+| `GET /v1/apps/{app_id}/account-verification-request` | first-party account session + current manager | own latest manual account verification request or null; see below |
+| `POST /v1/apps/{app_id}/account-verification-request` | first-party account session + current manager, optional Idempotency-Key | `{reason}`; one pending request per account; two durable email notifications |
 | `GET /v1/apps/{app_id}` | app-or-owner | + `updated_at`. `signin_config` has `google.client_secret_set` / `apple.private_key_set`; `webhook {url, secret_set}`; `stats {users, active_last_30d, imported_unclaimed}` (deleted accounts are never counted). |
 | `PATCH /v1/apps/{app_id}/signin-config` | app-or-owner, Idempotency-Key | see below; returns the GET body. 512 KB body limit. |
 | `GET /v1/apps/{app_id}/signin-config/history` | app-or-owner | `{version, actor, actor_account, changes, at}`, newest first. |
@@ -40,6 +42,56 @@ accounts_apps::imports::run_pending_jobs(&state)         // process queued impor
 | `POST /v1/internal/apps/sync` | `Bearer ACCOUNTS_INTERNAL_TOKEN` | `{"apps":[…]}` or a bare array → `{"apps":[SyncedApp]}`. 5 MB body limit. 403 `internal_api_disabled` when the token isn't configured. |
 
 ## Sign-in setup (PATCH)
+
+### Manual account verification request
+
+The sign-in setup page offers **Request account verification** for an account that wants to
+run an app's sign-in and authorization on its own domain. This workflow requests manual
+review only. It does not mark an account verified, grant domain eligibility, alter sign-in
+configuration, or provision custom-domain hosting. The response may take **up to 48 hours**;
+`response_expected_by` is a response estimate, not an automatic approval or expiry.
+
+`GET` and `POST /v1/apps/{app_id}/account-verification-request` accept only the account-site
+session cookie or live first-party `accounts`/`developer` tokens. The account must currently
+be the app's owner or an accepted author. App Basic credentials and Apps/other-app tokens
+are rejected with 401; a non-manager gets 403 `not_app_owner`. Every read/submission checks
+current permissions, including before an idempotent response is replayed.
+
+`POST` body is `{reason}`: trim whitespace, require 1–5,000 Unicode characters, reject NUL
+and unknown fields. Invalid reasons return 422 `validation_failed`, `details.fields.reason`.
+New requests return 201 `{request,created:true,response_time_hours:48}`. If that account
+already has a pending request, even from another app, return 200 with the existing request
+and `created:false`; its original reason and context stay unchanged and no new mail is queued.
+An optional `Idempotency-Key` replays its exact first response; another body with the same key
+returns 409. The durable pending uniqueness rule also handles a crash after transaction commit
+but before the idempotency response is stored.
+
+`GET` returns `{request:null|Request,response_time_hours:48}` for the requester's own latest
+request, never another author's request on the same app. Both endpoints send `no-store`.
+`Request` is `{request_id,account_uuid,context_app:{app_id,name,logo_url,logo_dark_url,homepage_url},
+reason,status,submitted_at,response_expected_by,reviewed_at}`. A submission is always `pending`
+with `reviewed_at:null`; the schema reserves `approved`/`rejected` for a later manual decision,
+but this feature adds no decision endpoint or verified-account flag.
+
+Migration 0009 adds retained requests and `account_verification_request_notifications`,
+which links each request to both exact `outbound_messages` IDs and recipients. A transaction
+locks the requester account, rechecks its active status and app management, inserts the
+request, queues one notification for **lords@teamofsilicons.com** and one for
+**saket@teamofsilicons.com**, and records `account.verification.requested`. If either enqueue
+fails, all these writes roll back. A partial unique index permits only one pending request
+per immutable account UUID across all apps, including concurrent submissions.
+
+Recipients and purpose are fixed server-side. Plain-text notifications include the request ID,
+immutable requester UUID, current public ID/name, app, reason, submission time, response
+estimate and portal context link. The primary email is included only when currently verified;
+an account without one can still request review. Credentials and STKs are never read into the
+notification. Account/request state and both outbox rows remain durable if delivery fails.
+The existing Postmark worker retries delivery; `sent`/`provider_message_id` means provider
+acceptance, not confirmed inbox delivery. Provider delivery is at least once, so a lost provider
+response may result in a retry; duplicate API requests do not enqueue another pair. Existing
+outbound-message retention keeps the request-to-message foreign keys valid.
+
+### Configuration changes
 
 Body = partial SigninConfig (objects merge, arrays and scalars replace, `null` resets a field) +
 optional `"expected_version": n` (409 `config_version_conflict` with `details.current_version`) +

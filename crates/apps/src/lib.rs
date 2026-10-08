@@ -38,6 +38,7 @@ pub mod sync;
 pub mod users;
 pub mod webhooks;
 
+mod account_verification;
 mod service_mail;
 mod util;
 
@@ -53,6 +54,7 @@ pub fn router() -> Router<AppState> {
         .merge(webhooks::router())
         .merge(sync::router())
         .merge(service_mail::router())
+        .merge(account_verification::router())
 }
 
 /// Background tasks of this crate: the import job worker.

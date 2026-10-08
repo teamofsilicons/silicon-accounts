@@ -27,6 +27,8 @@
 //! change the account itself (ids, emails, Silicons, STKs, sessions, apps signed into).
 //! The two verification-history reads use first-party account authentication and then the
 //! same owner-or-accepted-author check; app credentials and Apps-scoped tokens cannot use them.
+//! `GET/POST /v1/apps/{app_id}/account-verification-request` also accepts first-party developer
+//! tokens, for that account's manual request after the same current app-management check.
 
 use axum::extract::{
     FromRef, FromRequestParts, MatchedPath, OptionalFromRequestParts, RawPathParams,
@@ -110,12 +112,22 @@ pub const DEVELOPER_READ_ROUTES: &[&str] = &[
     "/v1/me/owned-apps",
     "/v1/me/app-verifications",
     "/v1/apps/{app_id}/proofs/{proof_id}/history",
+    "/v1/apps/{app_id}/account-verification-request",
 ];
 
 /// True when an access token issued to the developer platform (`aud = developer`) may act on
 /// this request outside [`AppOrOwner`]: a GET (or HEAD) of one of [`DEVELOPER_READ_ROUTES`],
-/// judged by the route the request matched (axum's `MatchedPath`).
+/// or POST to the exact manual account-verification request route. Judged by the route the
+/// request matched (axum's `MatchedPath`), never a client-controlled path prefix.
 pub fn developer_audience_allowed(parts: &Parts) -> bool {
+    if parts.method == Method::POST
+        && parts
+            .extensions
+            .get::<MatchedPath>()
+            .is_some_and(|p| p.as_str() == "/v1/apps/{app_id}/account-verification-request")
+    {
+        return true;
+    }
     if !matches!(parts.method, Method::GET | Method::HEAD) {
         return false;
     }
