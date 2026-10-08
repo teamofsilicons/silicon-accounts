@@ -118,7 +118,7 @@ async fn ata_requests_are_validated() {
         assert_eq!(r.error_code(), Some("ata_single_app"));
         assert_eq!(
             r.json["error"]["message"],
-            "An ATA proof is for exactly one app; ask for one proof per app."
+            "An App verification is for exactly one app; ask for one proof per app."
         );
         assert!(
             r.json["error"]["hint"]

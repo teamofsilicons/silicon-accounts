@@ -20,10 +20,13 @@
 //! developers.teamofsilicons.com signs Carbons in as the first-party public client `developer`.
 //! Its access tokens act for the Carbon they belong to on exactly these routes
 //! ([`developer_audience_allowed`]): `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps`,
+//! `GET /v1/me/app-verifications`, `GET /v1/apps/{app_id}/proofs/{proof_id}/history`,
 //! and every owner route of an app ([`AppOrOwner`]: `/v1/apps/{app_id}/…` — details, sign-in
 //! setup and its history, user base, imports, webhook and deliveries, proofs). Everywhere else
 //! they are refused with 401 `token_wrong_audience`, so a leaked developer-platform token can't
 //! change the account itself (ids, emails, Silicons, STKs, sessions, apps signed into).
+//! The two verification-history reads use first-party account authentication and then the
+//! same owner-or-accepted-author check; app credentials and Apps-scoped tokens cannot use them.
 
 use axum::extract::{
     FromRef, FromRequestParts, MatchedPath, OptionalFromRequestParts, RawPathParams,
@@ -99,9 +102,15 @@ fn unauthenticated() -> ApiError {
     .hint("Carbons: run `accounts login`. Silicons: run `accounts login --silicon si:<handle> --stk-stdin` (or set ACCOUNTS_SILICON and ACCOUNTS_STK).")
 }
 
-/// Read-only identity routes a developer platform token may use (method GET or HEAD). The
+/// Read-only identity and managed verification routes a developer token may use (GET/HEAD). The
 /// owner routes of apps accept it through [`AppOrOwner`].
-pub const DEVELOPER_READ_ROUTES: &[&str] = &["/v1/me", "/v1/session", "/v1/me/owned-apps"];
+pub const DEVELOPER_READ_ROUTES: &[&str] = &[
+    "/v1/me",
+    "/v1/session",
+    "/v1/me/owned-apps",
+    "/v1/me/app-verifications",
+    "/v1/apps/{app_id}/proofs/{proof_id}/history",
+];
 
 /// True when an access token issued to the developer platform (`aud = developer`) may act on
 /// this request outside [`AppOrOwner`]: a GET (or HEAD) of one of [`DEVELOPER_READ_ROUTES`],
@@ -126,7 +135,7 @@ fn wrong_audience(parts: &Parts, aud: &str, developer_allowed: bool) -> ApiError
         return ApiError::unauthenticated(
             "token_wrong_audience",
             format!(
-                "This access token was issued to the developer platform (aud '{}'), which may only read the signed-in account (GET /v1/me, GET /v1/session), list the apps it owns (GET /v1/me/owned-apps) and manage them (/v1/apps/{{app_id}}/…); it can't be used for {} {route}.",
+                "This access token was issued to the developer platform (aud '{}'), which may only read the signed-in account (GET /v1/me, GET /v1/session), list its managed apps and App verifications (GET /v1/me/owned-apps, GET /v1/me/app-verifications) and manage those apps (/v1/apps/{{app_id}}/…); it can't be used for {} {route}.",
                 crate::DEVELOPER_APP_ID,
                 parts.method
             ),
@@ -156,6 +165,7 @@ async fn resolve(
     state: &AppState,
     optional: bool,
     developer_allowed: bool,
+    apps_owner_allowed: bool,
 ) -> Result<Option<AccountAuth>, ApiError> {
     if let Some(h) = parts.headers.get(AUTHORIZATION) {
         let raw = h
@@ -185,7 +195,7 @@ async fn resolve(
             let v = tokens::verify_access_token(&mut conn, &state.keys, rest, None).await?;
             let aud = v.claims.aud.as_str();
             let apps_owner_route = aud == "apps"
-                && developer_allowed
+                && apps_owner_allowed
                 && parts
                     .extensions
                     .get::<MatchedPath>()
@@ -271,7 +281,7 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let state = AppState::from_ref(state);
         let developer_allowed = developer_audience_allowed(parts);
-        resolve(parts, &state, false, developer_allowed)
+        resolve(parts, &state, false, developer_allowed, false)
             .await?
             .ok_or_else(unauthenticated)
     }
@@ -290,7 +300,7 @@ where
     ) -> Result<Option<Self>, Self::Rejection> {
         let state = AppState::from_ref(state);
         let developer_allowed = developer_audience_allowed(parts);
-        resolve(parts, &state, true, developer_allowed).await
+        resolve(parts, &state, true, developer_allowed, false).await
     }
 }
 
@@ -586,7 +596,7 @@ where
             }
             Ok(None) => {
                 // Every owner route of an app accepts the developer platform's tokens.
-                let auth = resolve(parts, &app_state, false, true).await?.ok_or_else(|| {
+                let auth = resolve(parts, &app_state, false, true, true).await?.ok_or_else(|| {
                     ApiError::unauthenticated(
                         "unauthenticated",
                         format!(

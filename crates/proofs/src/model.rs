@@ -51,11 +51,11 @@ impl ProofKind {
         }
     }
 
-    /// Upper-case name for messages.
+    /// Product name for messages; wire values remain `obo` and `ata`.
     pub const fn label(&self) -> &'static str {
         match self {
-            ProofKind::Obo => "OBO",
-            ProofKind::Ata => "ATA",
+            ProofKind::Obo => "User verification",
+            ProofKind::Ata => "App verification",
         }
     }
 }

@@ -77,7 +77,7 @@ pub async fn verify(
         return Err(ApiError::forbidden(
             "subject_token_wrong_app",
             format!(
-                "subject_token was issued to the app '{}', but '{app_id}' is asking for the proof. An app can only turn access tokens it received itself into OBO proofs.",
+                "subject_token was issued to the app '{}', but '{app_id}' is asking for the proof. An app can only turn access tokens it received itself into User verifications.",
                 claims.aud
             ),
         )
@@ -149,7 +149,7 @@ pub async fn verify(
                 account.status
             ),
         )
-        .hint("Only active Carbons and Silicons can be represented by an OBO proof.")
+        .hint("Only active Carbons and Silicons can be represented by a User verification.")
         .detail("status", account.status.as_str()));
     }
     let membership = memberships::get(conn, app_id, &account.uuid).await?;
@@ -169,7 +169,7 @@ pub async fn verify(
                 ),
             )
             .hint(format!(
-                "The account must sign into '{app_id}' (and keep its access) before '{app_id}' can get OBO proofs for it."
+                "The account must sign into '{app_id}' (and keep its access) before '{app_id}' can get User verifications for it."
             ))
             .detail("membership_id", membership_id));
         }

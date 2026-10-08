@@ -95,7 +95,7 @@ pub async fn refresh(
         return Err(ApiError::gone(
             "proof_expired",
             format!(
-                "Proof {proof_id} expired at {}; proofs last 900 days at most, and an OBO proof never outlives the sign-in it was issued under.",
+                "Proof {proof_id} expired at {}; proofs last 900 days at most, and a User verification never outlives the sign-in it was issued under.",
                 format_rfc3339_ms(family.expires_at)
             ),
         )
@@ -199,6 +199,7 @@ pub async fn refresh(
             details: json!({
                 "kind": kind.as_str(),
                 "access_ttl_seconds": ttl,
+                "token_expires_at": accounts_core::timefmt::format_rfc3339_ms(tokens.access_expires_at),
                 "subject": family.account_uuid,
             }),
             ip,
@@ -253,7 +254,7 @@ fn grant_ended(
     let who = who(grant);
     let mut e = ApiError::gone("proof_revoked", message)
         .hint(format!(
-            "OBO proofs end with the grant they were issued under. Once {who} signs into '{issuing_app}' again, issue a new proof with POST /v1/proofs/obo."
+            "User verifications end with the grant they were issued under. Once {who} signs into '{issuing_app}' again, issue a new proof with POST /v1/proofs/obo."
         ))
         .detail("proof_id", proof_id.to_string())
         .detail("reason", reason);

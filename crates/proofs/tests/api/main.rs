@@ -7,6 +7,7 @@ mod common;
 mod ata;
 mod listings;
 mod obo;
+mod portal;
 mod refresh;
 mod revoke;
 mod sign_in;

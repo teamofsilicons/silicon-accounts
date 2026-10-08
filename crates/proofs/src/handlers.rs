@@ -468,7 +468,7 @@ pub async fn revoke_my_proof(
         Some(f) if f.kind() == ProofKind::Obo && f.account_uuid.as_deref() == Some(me.uuid()) => f,
         _ => {
             return Err(proof_not_found(format!(
-                "No OBO proof with id {id} was issued on behalf of {}.",
+                "No User verification with id {id} was issued on behalf of {}.",
                 me.account.display_id()
             ))
             .hint("List your proofs with GET /v1/me/proofs (or `accounts proofs list`)."));
@@ -555,7 +555,7 @@ pub async fn list_app_proofs(
     Ok(Json(Page::new(items, page.next_cursor)).into_response())
 }
 
-fn app_item(r: store::AppProofRow) -> AppProofItem {
+pub(crate) fn app_item(r: store::AppProofRow) -> AppProofItem {
     let kind = ProofKind::parse(&r.kind).unwrap_or(ProofKind::Obo);
     let user = match (r.account_uuid, r.account_kind, r.account_status) {
         (Some(uuid), Some(account_kind), Some(status)) => Some(AccountSummary {

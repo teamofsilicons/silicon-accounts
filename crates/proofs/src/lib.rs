@@ -36,6 +36,7 @@ pub mod handlers;
 pub mod input;
 pub mod issue;
 pub mod model;
+mod portal;
 pub mod refresh;
 pub mod store;
 pub mod subject;
@@ -66,6 +67,11 @@ pub fn router() -> Router<AppState> {
             delete(handlers::revoke_app_proof),
         )
         .route("/v1/me/proofs", get(handlers::list_my_proofs))
+        .route("/v1/me/app-verifications", get(portal::list))
+        .route(
+            "/v1/apps/{app_id}/proofs/{proof_id}/history",
+            get(portal::history),
+        )
         .route(
             "/v1/me/proofs/{proof_id}",
             delete(handlers::revoke_my_proof),

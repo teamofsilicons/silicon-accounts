@@ -721,6 +721,71 @@ pub async fn list_for_app(
     Ok(query.fetch_all(&mut *conn).await?)
 }
 
+/// A centrally listed verification, with the current public identity of its issuing app.
+#[derive(Debug, sqlx::FromRow)]
+pub struct ManagedProofRow {
+    #[sqlx(flatten)]
+    pub proof: AppProofRow,
+    pub issuing_app: String,
+    pub issuing_name: String,
+    pub issuing_logo: Option<String>,
+    pub issuing_logo_dark: Option<String>,
+    pub issuing_homepage: Option<String>,
+}
+
+/// The same current owner-or-accepted-author boundary as `AppOrOwner`.
+pub async fn manages_app(
+    conn: &mut PgConnection,
+    account_uuid: &str,
+    app_id: &str,
+) -> ApiResult<bool> {
+    Ok(sqlx::query_scalar(
+        "select exists(select 1 from apps a where a.app_id=$2 and \
+         (a.owner_uuid=$1 or exists(select 1 from app_authors aa \
+          where aa.app_id=a.app_id and aa.account_uuid=$1)))",
+    )
+    .bind(account_uuid)
+    .bind(app_id)
+    .fetch_one(conn)
+    .await?)
+}
+
+/// Every retained App verification family issued by apps this account currently manages.
+/// Authorization is part of the page query, including when the caller supplies a cursor.
+pub async fn list_managed(
+    conn: &mut PgConnection,
+    account_uuid: &str,
+    app_id: Option<&str>,
+    filter: &AppProofFilter<'_>,
+) -> ApiResult<Vec<ManagedProofRow>> {
+    Ok(sqlx::query_as::<_, ManagedProofRow>(concat!(
+        "with f as materialized (select f.* from proof_families f join apps issuer \
+         on issuer.app_id=f.issuing_app where f.kind='ata' \
+         and (issuer.owner_uuid=$1 or exists(select 1 from app_authors aa \
+           where aa.app_id=issuer.app_id and aa.account_uuid=$1)) \
+         and ($2::text is null or f.issuing_app=$2) \
+         and ($3::timestamptz is null or (f.created_at,f.id)<($3,$4::uuid)) \
+         and ($5::text is null or (case when f.revoked_at is not null then 'revoked' \
+           when f.expires_at<=now() then 'expired' else 'active' end)=$5) \
+         order by f.created_at desc,f.id desc limit $6) ",
+        app_list_select!(),
+        ", issuer.app_id as issuing_app, issuer.name as issuing_name, \
+         issuer.logo_url as issuing_logo, issuer.logo_dark_url as issuing_logo_dark, \
+         issuer.homepage_url as issuing_homepage from f \
+         join apps issuer on issuer.app_id=f.issuing_app ",
+        grant_joins!(),
+        "order by f.created_at desc,f.id desc"
+    ))
+    .bind(account_uuid)
+    .bind(app_id)
+    .bind(filter.after.0)
+    .bind(filter.after.1)
+    .bind(filter.status)
+    .bind(filter.fetch)
+    .fetch_all(conn)
+    .await?)
+}
+
 /// A row of an account's OBO proof listing.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct MyProofRow {

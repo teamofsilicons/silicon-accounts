@@ -102,6 +102,7 @@ pub async fn obo(
                 "scopes": scopes,
                 "access_ttl_seconds": ttl,
                 "expires_at": accounts_core::timefmt::format_rfc3339_ms(family.expires_at),
+                "token_expires_at": accounts_core::timefmt::format_rfc3339_ms(tokens.access_expires_at),
             }),
             ip: issuer.ip,
             ..AuditEntry::new(issuer.actor_kind, Some(&issuer.actor_id), action::ISSUED)
@@ -109,7 +110,7 @@ pub async fn obo(
     )
     .await?;
     tx.commit().await?;
-    tracing::info!(proof_id = %family.id, issuing_app = %issuer.app.app_id, receiving_app = %audiences[0], "OBO proof issued");
+    tracing::info!(proof_id = %family.id, issuing_app = %issuer.app.app_id, receiving_app = %audiences[0], "User verification issued");
     let user = ProofUser {
         uuid: subject.account.uuid.clone(),
         id: subject.account.handle.clone(),
@@ -183,6 +184,7 @@ pub async fn ata(
                 "scopes": scopes,
                 "access_ttl_seconds": ttl,
                 "expires_at": accounts_core::timefmt::format_rfc3339_ms(family.expires_at),
+                "token_expires_at": accounts_core::timefmt::format_rfc3339_ms(tokens.access_expires_at),
             }),
             ip: issuer.ip,
             ..AuditEntry::new(issuer.actor_kind, Some(&issuer.actor_id), action::ISSUED)
@@ -190,7 +192,7 @@ pub async fn ata(
     )
     .await?;
     tx.commit().await?;
-    tracing::info!(proof_id = %family.id, issuing_app = %issuer.app.app_id, receiving_app = %audiences[0], "ATA proof issued");
+    tracing::info!(proof_id = %family.id, issuing_app = %issuer.app.app_id, receiving_app = %audiences[0], "App verification issued");
     Ok(IssuedProof::new(
         family.id,
         ProofKind::Ata,

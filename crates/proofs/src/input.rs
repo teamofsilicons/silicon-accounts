@@ -88,7 +88,7 @@ pub fn ata_single_app(endpoint: &str, audiences: &Value) -> ApiError {
     let example = apps.first().map_or("remind", String::as_str).to_string();
     let mut e = ApiError::unprocessable(
         "ata_single_app",
-        "An ATA proof is for exactly one app; ask for one proof per app.",
+        "An App verification is for exactly one app; ask for one proof per app.",
     )
     .hint(format!(
         "Send {{\"receiving_app\": \"{example}\"}} to POST {endpoint} instead of \"audiences\", and call it once for every app that should verify a proof from you; each app verifies its own proof."
