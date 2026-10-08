@@ -6,7 +6,7 @@
  */
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { ArrowRight, ArrowUpRight, CircleAlert, Code, KeyRound, ListChecks, Palette, ShieldCheck, Upload, Users, Webhook, Workflow } from "lucide-react";
+import { ArrowRight, CircleAlert, Code, KeyRound, ListChecks, Palette, ShieldCheck, Upload, Users, Webhook, Workflow } from "lucide-react";
 import { Badge } from "@/components/arc/badge/badge";
 import { CopyButton } from "@/components/arc/copy-button/copy-button";
 import { MetricCard } from "@/components/arc/metric-card/metric-card";
@@ -168,8 +168,8 @@ export function OverviewTab() {
 
       <Section
         title="About this app"
-        description="Its name, logo and description come from Silicon Apps; its sign-in setup is stored in Silicon Accounts and set up here."
-        actions={<ButtonLink href={ctx.siliconAppsUrl} external target="_blank" rel="noopener" variant="ghost" size="sm">Silicon Apps<ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" /></ButtonLink>}
+        description="Manage its name, logo, description and releases in Publishing. Configure its sign-in with the Accounts tabs."
+        actions={<ButtonLink href={paths.developerApp(app.app_id, "publishing")} variant="ghost" size="sm">Manage publishing<ArrowRight size={14} strokeWidth={1.75} aria-hidden="true" /></ButtonLink>}
       >
         <Surface>
           <DescriptionList>

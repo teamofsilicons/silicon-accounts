@@ -13,6 +13,11 @@ test("one workspace retains Accounts tabs beside Apps publishing without store e
   await expect(page.getByLabel("App name", {exact: true})).toHaveValue("A useful app");
   await expect(page.getByRole("link", {name: /Explore|Discover/})).toHaveCount(0);
   await expect(page.locator("iframe")).toHaveCount(0);
+  await page.getByRole("tab", {name: "Overview", exact: true}).click();
+  await expect(page.getByRole("link", {name: "Manage publishing"})).toHaveAttribute("href", "/apps/test-app/publishing");
+  await expect(page.locator('a[href="https://apps.teamofsilicons.com"]')).toHaveCount(0);
+  await page.getByRole("link", {name: "Manage publishing"}).click();
+  await expect(page.getByLabel("App name", {exact: true})).toHaveValue("A useful app");
   await page.screenshot({path: "/tmp/silicon-common-portal.png", fullPage: true});
 });
 
