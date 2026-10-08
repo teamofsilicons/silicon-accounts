@@ -167,3 +167,40 @@ async fn developer_tokens_read_identity_and_manage_owned_apps_only() {
     let r = ctx.call(router(), Req::get("/v1/me").bearer(&dev)).await;
     assert_eq!(r.error_code(), Some("token_revoked"));
 }
+
+#[tokio::test]
+async fn developer_portal_coauthors_have_the_same_app_boundary_as_owners() {
+    let ctx = TestContext::new().await;
+    let owner = ctx.carbon().await;
+    let author = ctx.carbon().await;
+    let (app, _) = ctx.app_owned("shared-portal-app", Some(&owner.uuid)).await;
+    let token = ctx
+        .tokens_for(&author, accounts_core::DEVELOPER_APP_ID, &[Scope::Profile])
+        .await
+        .access_token;
+    let path = format!("/v1/apps/{}/thing", app.app_id);
+    let response = ctx.call(router(), Req::post(&path).bearer(&token)).await;
+    assert_eq!(response.status, 403, "{}", response.json);
+    let mut conn = ctx.conn().await;
+    sqlx::query("insert into app_authors(app_id,account_uuid) values($1,$2)")
+        .bind(&app.app_id)
+        .bind(&author.uuid)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    drop(conn);
+    for request in [Req::get(&path), Req::post(&path)] {
+        let response = ctx.call(router(), request.bearer(&token)).await;
+        assert_eq!(response.status, 200, "{}", response.json);
+    }
+    let mut conn = ctx.conn().await;
+    sqlx::query("delete from app_authors where app_id=$1 and account_uuid=$2")
+        .bind(&app.app_id)
+        .bind(&author.uuid)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    drop(conn);
+    let response = ctx.call(router(), Req::get(&path).bearer(&token)).await;
+    assert_eq!(response.status, 403, "{}", response.json);
+}
