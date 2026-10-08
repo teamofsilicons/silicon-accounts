@@ -237,3 +237,44 @@ did not send mail or log message bodies/credentials. Its initial download used a
 unpermitted object prefix and received 403 before verification; moving that same
 checksummed helper under the existing releases prefix succeeded without changing
 IAM permissions or resubmitting the request.
+
+## Shared documentation rollout
+
+The common documentation is live at https://developers.teamofsilicons.com/docs.
+All 42 Accounts pages are preserved under `/docs/accounts`; nine Apps pages live
+under `/docs/apps`, with one shared landing, search and navigation. Markdown,
+`/llms.txt` and `/llms-full.txt` include both products. The account site links to
+the shared docs; legacy Accounts pages retain their paths under the Accounts
+namespace through 308 redirects. The store links and legacy docs route point to
+the Apps namespace. No new CLI or crate release was needed for this move.
+
+Final Accounts source `ace71ff0a39ac7b861d8025000c25d3de4cbfdf0`, bundle SHA-256 `79d8c3d4526d8ae99feef009cdbb14ca87134c3a936e0fdc016a4952b52cea2c`,
+API SHA-256 `d4019457215edcb6fd1565a75851f677cc6b2be82a6f5c8dc401a63569f7f28d`, migration 9. Install SSM `325d61b3-4e54-4c00-8794-e2dde32311f8` and verification
+`bb16fe14-4621-4ca0-8265-2ad3ca1415ad` confirm the exact release, six active services/timers, readiness and
+continued anonymous denials on protected verification APIs. The existing demo
+request and two notification records remain; no request or email was sent by this
+rollout. Backup `backups/predeploy-20261008T162902Z.dump`, SHA-256 `540c6f4ae333ecbb29004300b669ca4d60e388f2a3b7c67aebe78ecd6dd54f8a`, was uploaded;
+previous restore evidence remains separate.
+
+Apps source `0f41edef91d6de61a3770d2f791a4e352a35f2ae` supplies the store links and
+Caddy redirects. Bundle SHA-256 is
+`857a45c0284559835bc63475659b1e0c2b111a831e7dd6cd62e6e6348f0fe454`.
+Its API binary and worker are unchanged. Install `679b906f-4b26-4de3-9079-e66c87e2d7d1` and verification
+`5bcebb0e-9a5e-48b0-a599-0f504540874a` confirm the release, services, catalog and database integrity.
+
+Validation passed: 884 Rust tests (three existing ignored), frontend typechecks,
+lint and builds, 18 developer unit tests, four account-site redirect tests,
+52 developer browser tests and 18 store browser tests. The initial live crawl
+found that Next normalized the standalone listener's 127.0.0.1 origin to localhost,
+causing an internal missing-page rewrite to attempt TLS to the HTTP listener.
+The final release enables the supported `skipProxyUrlNormalize` flag and preserves
+raw origins for rewrites/relative legacy redirects. A new standalone regression
+passes 22 route/header combinations with production Host/forwarded-HTTPS headers,
+including valid pages, unknown-page 404s, Markdown, aliases, CSP and HSTS.
+
+The final live crawl checked all 52 pages, 663 search records,
+5166 rendered internal links, raw Markdown/LLM exports,
+canonical metadata, legacy redirects and metadata/discovery documentation URLs.
+Production IAB verification showed the shared landing and search results from both
+products. Local visual checks covered light/dark at 320/1440 px and mobile theme
+switching; the store's public browser/CSP/assets/installer/API checks also passed.
