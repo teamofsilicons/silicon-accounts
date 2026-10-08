@@ -515,6 +515,42 @@ impl<'a> AppClient<'a> {
         .json()
     }
 
+    /// Gets the current webhook endpoint, secret-present marker and chosen update events.
+    pub async fn webhook_settings(&self) -> Result<Value> {
+        self.get(self.app_url(&["webhook"])).await
+    }
+
+    /// Configures the Accounts-owned webhook with Silicon Apps update choices.
+    /// Returns the new signing secret once; repeating an idempotency key returns the same result.
+    pub async fn set_webhook_events(
+        &self,
+        url: &str,
+        events: &[String],
+        key: Option<&str>,
+    ) -> Result<AppWebhook> {
+        self.send(
+            Method::PUT,
+            self.app_url(&["webhook"]),
+            Some(&json!({"url":url,"events":events,"preserve_secret":true})),
+            key,
+        )
+        .await?
+        .json()
+    }
+
+    /// Generates or replaces the webhook signing secret before or after an endpoint is set.
+    /// `set_webhook_events` preserves it when saving endpoint and event preferences.
+    pub async fn generate_webhook_secret(&self, key: Option<&str>) -> Result<WebhookSecret> {
+        self.send(
+            Method::POST,
+            self.app_url(&["webhook", "generate-secret"]),
+            Some(&json!({})),
+            key,
+        )
+        .await?
+        .json()
+    }
+
     /// `DELETE /v1/apps/{app_id}/webhook`.
     pub async fn remove_webhook(&self) -> Result<()> {
         self.send(Method::DELETE, self.app_url(&["webhook"]), None, None)

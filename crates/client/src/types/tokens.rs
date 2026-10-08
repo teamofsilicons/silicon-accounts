@@ -136,6 +136,10 @@ pub struct AccountForApp {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct UserInfo {
+    /// Silicon Apps-only domain access extension, present with granted email scope.
+    /// Other app audiences retain the primary-email contract.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verified_emails: Option<Vec<String>>,
     /// The account fields.
     #[serde(flatten)]
     pub account: AccountForApp,

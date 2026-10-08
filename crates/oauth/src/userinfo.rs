@@ -12,7 +12,7 @@
 //! them.
 
 use accounts_core::http::parse_form_or_json;
-use accounts_core::models::{AppStatus, MembershipStatus};
+use accounts_core::models::{AccountKind, AppStatus, MembershipStatus, Scope};
 use accounts_core::repo::tokens::{self, VerifiedAccess};
 use accounts_core::timefmt::format_rfc3339_ms;
 use accounts_core::views::load_account_for_app;
@@ -146,7 +146,20 @@ async fn userinfo(state: &AppState, token: &str) -> Result<Value, ApiError> {
         &scopes,
     )
     .await?;
-    Ok(view.userinfo_json())
+    let mut info = view.userinfo_json();
+    // Silicon Apps evaluates private domain grants against any verified email. This
+    // catalog-only extension is still gated by explicit email consent; other apps
+    // retain the existing primary-email contract.
+    if verified.family.app_id == "apps"
+        && verified.account.kind == AccountKind::Carbon
+        && scopes.contains(&Scope::Email)
+    {
+        let emails: Vec<String> = sqlx::query_scalar(
+            "select email from account_emails where account_uuid=$1 and verified_at is not null order by email",
+        ).bind(&verified.account.uuid).fetch_all(&mut *conn).await?;
+        info["verified_emails"] = serde_json::json!(emails);
+    }
+    Ok(info)
 }
 
 /// 401 `invalid_token` for an access token past its `exp`.

@@ -9,7 +9,7 @@
 //!   its webhook (secret masked) and user base statistics.
 
 use accounts_core::http::pagination::paginate;
-use accounts_core::http::{AppOrOwner, CarbonAuth, Path, Query};
+use accounts_core::http::{AccountAuth, AppOrOwner, Path, Query};
 use accounts_core::models::{App, AppSource, AppStatus, SigninConfig};
 use accounts_core::repo::{accounts, apps as apps_repo};
 use accounts_core::views::AccountSummary;
@@ -91,7 +91,7 @@ pub struct OwnedApp {
 
 async fn owned_apps(
     State(state): State<AppState>,
-    me: CarbonAuth,
+    me: AccountAuth,
     Query(q): Query<OwnedQuery>,
 ) -> ApiResult<Response> {
     let page = accounts_core::http::PageParams {
@@ -109,7 +109,7 @@ async fn owned_apps(
         "select a.app_id, a.name, a.logo_url, a.status, a.source, a.created_at, \
            (select count(*) from memberships m join accounts ac on ac.uuid = m.account_uuid \
              where m.app_id = a.app_id and m.status in ('active', 'imported') and ac.status <> 'deleted') as users \
-         from apps a where a.owner_uuid = $1 \
+         from apps a where (a.owner_uuid = $1 or exists(select 1 from app_authors au where au.app_id=a.app_id and au.account_uuid=$1)) \
            and ($2::timestamptz is null or (a.created_at, a.app_id) < ($2, $3)) \
          order by a.created_at desc, a.app_id desc limit $4",
     )

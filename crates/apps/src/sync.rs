@@ -33,8 +33,8 @@ use accounts_core::error::FieldErrors;
 use accounts_core::http::extract::parse_json;
 use accounts_core::ids::{AccountId, validate_app_id};
 use accounts_core::models::{
-    Account, AccountKind, AccountStatus, App, AppSource, AppStatus, ConfigSecretsPresent,
-    SigninConfig, VerifiedVia,
+    Account, AccountStatus, App, AppSource, AppStatus, ConfigSecretsPresent, SigninConfig,
+    VerifiedVia,
 };
 use accounts_core::repo::accounts::{self, NewCarbon, NewContact};
 use accounts_core::repo::audit;
@@ -45,7 +45,7 @@ use axum::extract::rejection::BytesRejection;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -62,10 +62,12 @@ use crate::util::{validate_http_url, validate_logo_url};
 const MAX_SYNC_BYTES: usize = 5 * 1024 * 1024;
 
 pub(crate) fn router() -> Router<AppState> {
-    Router::new().route(
-        "/v1/internal/apps/sync",
-        post(sync_handler).layer(DefaultBodyLimit::max(MAX_SYNC_BYTES)),
-    )
+    Router::new()
+        .route("/v1/internal/apps", get(export_registry))
+        .route(
+            "/v1/internal/apps/sync",
+            post(sync_handler).layer(DefaultBodyLimit::max(MAX_SYNC_BYTES)),
+        )
 }
 
 /// An app as Silicon Apps describes it (plus the testkit's webhook extras).
@@ -84,6 +86,9 @@ pub struct SiliconAppsApp {
     /// uuid of the owning Carbon (preferred: it never changes).
     #[serde(default)]
     pub owner_uuid: Option<String>,
+    /// Complete accepted authorship, mirrored from Silicon Apps. Omission preserves existing authors.
+    #[serde(default)]
+    pub author_uuids: Option<Vec<String>>,
     /// `c:<handle>` of the owning Carbon.
     #[serde(default)]
     pub owner_id: Option<String>,
@@ -317,6 +322,7 @@ struct ValidApp {
     logo_dark_url: Option<String>,
     homepage_url: Option<String>,
     owner: Option<OwnerSpec>,
+    author_uuids: Option<Vec<String>>,
     secret: Option<String>,
     status: Option<AppStatus>,
     created_at: Option<OffsetDateTime>,
@@ -395,7 +401,7 @@ fn validate(state: &AppState, apps: &[SiliconAppsApp]) -> Result<Vec<ValidApp>, 
             None => None,
         };
         let owner_id = match opt(&a.owner_id) {
-            Some(id) => match AccountId::parse_for_kind(&id, AccountKind::Carbon) {
+            Some(id) => match AccountId::parse(&id) {
                 Ok(id) => Some(id),
                 Err(e) => {
                     f.add(at("owner_id"), e.to_string());
@@ -527,6 +533,7 @@ fn validate(state: &AppState, apps: &[SiliconAppsApp]) -> Result<Vec<ValidApp>, 
             logo_dark_url,
             homepage_url,
             owner,
+            author_uuids: a.author_uuids.clone(),
             secret,
             status,
             created_at,
@@ -555,6 +562,51 @@ pub async fn sync_apps(
         let (synced, credentials_changed) = upsert_app(&mut tx, state, app, mode).await?;
         if credentials_changed {
             invalidate.push(app.app_id.clone());
+        }
+        if let Some(authors) = &app.author_uuids {
+            if authors.is_empty() || authors.len() > 1000 {
+                return Err(ApiError::unprocessable(
+                    "invalid_authors",
+                    "An app must have 1 to 1000 accepted authors.",
+                ));
+            }
+            for uuid in authors {
+                if accounts::get(&mut tx, uuid)
+                    .await?
+                    .filter(can_own)
+                    .is_none()
+                {
+                    return Err(ApiError::unprocessable(
+                        "author_not_found",
+                        format!("No active Carbon or Silicon has uuid '{uuid}'."),
+                    ));
+                }
+            }
+            let owner: Option<String> =
+                sqlx::query_scalar("select owner_uuid from apps where app_id = $1")
+                    .bind(&app.app_id)
+                    .fetch_one(&mut *tx)
+                    .await?;
+            if owner.as_ref().is_some_and(|uuid| !authors.contains(uuid)) {
+                return Err(ApiError::unprocessable(
+                    "owner_not_author",
+                    "owner_uuid must be in author_uuids; transfer the legacy owner when they leave.",
+                ));
+            }
+            sqlx::query(
+                "delete from app_authors where app_id = $1 and not(account_uuid = any($2))",
+            )
+            .bind(&app.app_id)
+            .bind(authors)
+            .execute(&mut *tx)
+            .await?;
+            for uuid in authors {
+                sqlx::query("insert into app_authors(app_id,account_uuid) values($1,$2) on conflict do nothing")
+                    .bind(&app.app_id).bind(uuid).execute(&mut *tx).await?;
+            }
+        } else {
+            sqlx::query("insert into app_authors(app_id,account_uuid) select app_id,owner_uuid from apps where app_id=$1 and owner_uuid is not null on conflict do nothing")
+                .bind(&app.app_id).execute(&mut *tx).await?;
         }
         report.push(synced);
     }
@@ -604,7 +656,7 @@ impl ResolvedOwner {
 }
 
 fn can_own(account: &Account) -> bool {
-    account.kind == AccountKind::Carbon && account.status == AccountStatus::Active
+    account.status == AccountStatus::Active
 }
 
 /// The active Carbon whose *verified* email is `email` (an unverified imported address proves
@@ -647,7 +699,7 @@ async fn resolve_owner(
                 ApiError::unprocessable(
                     "owner_not_found",
                     format!(
-                        "{}: no active Carbon account has the uuid '{uuid}', so it can't own the app.",
+                        "{}: no active Carbon or Silicon account has the uuid '{uuid}', so it can't own the app.",
                         at("owner_uuid")
                     ),
                 )
@@ -1185,7 +1237,7 @@ async fn reapply_config(
 }
 
 /// Checks `Authorization: Bearer <ACCOUNTS_INTERNAL_TOKEN>` in constant time.
-fn authorize_internal(state: &AppState, headers: &HeaderMap) -> ApiResult<()> {
+pub(crate) fn authorize_internal(state: &AppState, headers: &HeaderMap) -> ApiResult<()> {
     let Some(expected) = &state.settings.internal_token else {
         return Err(ApiError::forbidden(
             "internal_api_disabled",
@@ -1222,6 +1274,14 @@ fn authorize_internal(state: &AppState, headers: &HeaderMap) -> ApiResult<()> {
         ));
     }
     Ok(())
+}
+
+async fn export_registry(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    authorize_internal(&state, &headers)?;
+    let rows: Vec<Value> = sqlx::query_scalar(
+        "select jsonb_build_object('app_id',a.app_id,'name',a.name,'description',a.description,         'logo_url',a.logo_url,'homepage_url',a.homepage_url,'owner_uuid',a.owner_uuid,         'source',a.source,'created_at',a.created_at,'authors',coalesce((select jsonb_agg(         jsonb_build_object('uuid',ac.uuid,'id',ac.handle,'display_name',ac.display_name,'joined_at',au.joined_at))         from app_authors au join accounts ac on ac.uuid=au.account_uuid where au.app_id=a.app_id),'[]'::jsonb))         from apps a where a.app_id not in ('accounts','developer') order by a.app_id"
+    ).fetch_all(&state.db).await?;
+    Ok(Json(json!({"apps":rows})).into_response())
 }
 
 async fn sync_handler(

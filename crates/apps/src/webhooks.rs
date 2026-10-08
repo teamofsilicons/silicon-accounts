@@ -36,7 +36,7 @@ use axum::Router;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post, put};
+use axum::routing::{get, post};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use time::OffsetDateTime;
@@ -52,11 +52,15 @@ pub(crate) fn router() -> Router<AppState> {
     Router::new()
         .route(
             "/v1/apps/{app_id}/webhook",
-            put(set_webhook).delete(remove_webhook),
+            get(get_webhook).put(set_webhook).delete(remove_webhook),
         )
         .route(
             "/v1/apps/{app_id}/webhook/rotate-secret",
             post(rotate_secret),
+        )
+        .route(
+            "/v1/apps/{app_id}/webhook/generate-secret",
+            post(generate_secret),
         )
         .route("/v1/apps/{app_id}/webhook/test", post(test_webhook))
         .route("/v1/apps/{app_id}/webhook/deliveries", get(list_deliveries))
@@ -71,6 +75,10 @@ pub(crate) fn router() -> Router<AppState> {
 #[serde(deny_unknown_fields)]
 struct SetWebhook {
     url: String,
+    #[serde(default)]
+    events: Option<Vec<String>>,
+    #[serde(default)]
+    preserve_secret: bool,
 }
 
 fn webhook_not_set(app_id: &str) -> ApiError {
@@ -85,6 +93,15 @@ async fn current_webhook(conn: &mut sqlx::PgConnection, app_id: &str) -> ApiResu
     Ok(accounts_core::repo::apps::webhook_target(conn, app_id)
         .await?
         .map(|(url, _)| url))
+}
+
+async fn get_webhook(State(state): State<AppState>, auth: AppOrOwner) -> ApiResult<Response> {
+    let mut conn = state.db.acquire().await?;
+    let row: Option<(Option<String>, bool, Option<Value>)> = sqlx::query_as(
+        "select webhook_url,webhook_secret_enc is not null,webhook_events from app_signin_configs where app_id=$1"
+    ).bind(&auth.app.app_id).fetch_optional(&mut *conn).await?;
+    let (url, secret_set, selected) = row.unwrap_or((None, false, None));
+    Ok(axum::Json(json!({"url":url,"secret_set":secret_set,"events":selected})).into_response())
 }
 
 async fn set_webhook(
@@ -108,22 +125,31 @@ async fn set_webhook(
             f.add("url", m);
             ApiError::validation(f)
         })?;
+        if let Some(selected) = &body.events {
+            if selected.len() > 9 || selected.iter().any(|event| !events::APP_UPDATE_CHOICES.contains(&event.as_str())) {
+                return Err(ApiError::unprocessable("invalid_webhook_events", "events must contain only id_change, display_name_change, pfp_change, timezone_change, email_change, phone_change, custodian_change, access_removed, account_deleted."));
+            }
+        }
         let url = url.to_string();
-        let (secret, enc) = events::new_webhook_secret(&state.keys.keyring)?;
         let mut tx = state.db.begin().await?;
         ensure_config_row(&mut tx, &app_id).await?;
-        let previous: Option<String> = sqlx::query_scalar(
-            "select webhook_url from app_signin_configs where app_id = $1 for update",
+        let (previous, existing): (Option<String>,Option<Vec<u8>>) = sqlx::query_as(
+            "select webhook_url,webhook_secret_enc from app_signin_configs where app_id = $1 for update",
         )
         .bind(&app_id)
         .fetch_one(&mut *tx)
         .await?;
+        let (secret, enc) = match existing.filter(|_|body.preserve_secret) {
+            Some(enc) => (None,enc),
+            None => {let (secret,enc)=events::new_webhook_secret(&state.keys.keyring)?;(Some(secret),enc)},
+        };
         sqlx::query(
-            "update app_signin_configs set webhook_url = $2, webhook_secret_enc = $3, updated_at = now() where app_id = $1",
+            "update app_signin_configs set webhook_url = $2, webhook_secret_enc = $3, webhook_events = $4, updated_at = now() where app_id = $1",
         )
         .bind(&app_id)
         .bind(&url)
         .bind(&enc)
+        .bind(body.events.as_ref().map(|v| json!(v)))
         .execute(&mut *tx)
         .await?;
         let (actor_kind, actor_id) = auth.audit_actor();
@@ -140,7 +166,7 @@ async fn set_webhook(
         )
         .await?;
         tx.commit().await?;
-        Ok((StatusCode::OK, json!({"url": url, "secret": secret})))
+        Ok((StatusCode::OK, json!({"url": url, "secret": secret, "events": body.events})))
     })
     .await?;
     no_store(&mut r);
@@ -212,22 +238,49 @@ async fn rotate_secret(
     meta: ClientMeta,
     key: Option<IdempotencyKey>,
 ) -> ApiResult<Response> {
+    rotate_secret_impl(state, auth, meta, key, false).await
+}
+
+async fn generate_secret(
+    State(state): State<AppState>,
+    auth: AppOrOwner,
+    meta: ClientMeta,
+    key: Option<IdempotencyKey>,
+) -> ApiResult<Response> {
+    rotate_secret_impl(state, auth, meta, key, true).await
+}
+
+async fn rotate_secret_impl(
+    state: AppState,
+    auth: AppOrOwner,
+    meta: ClientMeta,
+    key: Option<IdempotencyKey>,
+    allow_unconfigured: bool,
+) -> ApiResult<Response> {
     let app_id = auth.app.app_id.clone();
     let scope = idempotency::scope(
         &caller_scope(&auth),
         "POST",
-        &format!("/v1/apps/{app_id}/webhook/rotate-secret"),
+        &format!(
+            "/v1/apps/{app_id}/webhook/{}",
+            if allow_unconfigured {
+                "generate-secret"
+            } else {
+                "rotate-secret"
+            }
+        ),
     );
     let mut r = idempotency::run(&state, key.as_deref(), &scope, &json!({}), true, || async {
         let (secret, enc) = events::new_webhook_secret(&state.keys.keyring)?;
         let mut tx = state.db.begin().await?;
+        if allow_unconfigured {ensure_config_row(&mut tx,&app_id).await?;}
         let url: Option<Option<String>> = sqlx::query_scalar(
             "select webhook_url from app_signin_configs where app_id = $1 for update",
         )
         .bind(&app_id)
         .fetch_optional(&mut *tx)
         .await?;
-        if !matches!(url, Some(Some(_))) {
+        if !allow_unconfigured && !matches!(url, Some(Some(_))) {
             return Err(webhook_not_set(&app_id));
         }
         sqlx::query(

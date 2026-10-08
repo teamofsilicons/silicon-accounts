@@ -38,6 +38,7 @@ pub mod sync;
 pub mod users;
 pub mod webhooks;
 
+mod service_mail;
 mod util;
 
 pub use sync::{SeedError, SiliconAppsApp, SyncMode, SyncReport, SyncedApp, seed_fake_apps};
@@ -51,6 +52,7 @@ pub fn router() -> Router<AppState> {
         .merge(imports::router())
         .merge(webhooks::router())
         .merge(sync::router())
+        .merge(service_mail::router())
 }
 
 /// Background tasks of this crate: the import job worker.

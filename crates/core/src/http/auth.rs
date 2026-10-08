@@ -11,8 +11,9 @@
 //!   credential cache.
 //! - [`authenticate_client`]: client authentication for `/v1/oauth/*` (Basic or body fields,
 //!   plus the public first-party clients `accounts` and `developer`), with RFC 6749 errors.
-//! - [`AppOrOwner`]: for `/v1/apps/{app_id}/…` — the app's own credentials or its owner's
-//!   (Carbon) session.
+//! - [`AppOrOwner`]: for `/v1/apps/{app_id}/…` — the app's own credentials or an accepted
+//!   Carbon/Silicon author's session. Silicon Apps access tokens are accepted only on
+//!   these author routes, with a live membership in the Apps application.
 //!
 //! # Developer platform tokens (`aud = developer`)
 //!
@@ -183,7 +184,24 @@ async fn resolve(
             // audiences may act depends on the route (see the module docs).
             let v = tokens::verify_access_token(&mut conn, &state.keys, rest, None).await?;
             let aud = v.claims.aud.as_str();
-            let accepted = aud == crate::FIRST_PARTY_APP_ID
+            let apps_owner_route = aud == "apps"
+                && developer_allowed
+                && parts
+                    .extensions
+                    .get::<MatchedPath>()
+                    .is_some_and(|p| p.as_str().starts_with("/v1/apps/"));
+            if apps_owner_route {
+                let active: bool = sqlx::query_scalar("select exists(select 1 from memberships m join apps a on a.app_id=m.app_id where m.app_id='apps' and m.account_uuid=$1 and m.status='active' and a.status='active')")
+                    .bind(&v.account.uuid).fetch_one(&mut *conn).await?;
+                if !active {
+                    return Err(ApiError::unauthenticated(
+                        "access_removed",
+                        "The account no longer has access to Silicon Apps.",
+                    ));
+                }
+            }
+            let accepted = apps_owner_route
+                || aud == crate::FIRST_PARTY_APP_ID
                 || (aud == crate::DEVELOPER_APP_ID && developer_allowed);
             if !accepted {
                 return Err(wrong_audience(parts, aud, developer_allowed));
@@ -580,9 +598,14 @@ where
                 let app = apps::get(&mut conn, &app_id)
                     .await?
                     .ok_or_else(|| apps::unknown_app(&app_id))?;
-                if auth.kind() != AccountKind::Carbon
-                    || app.owner_uuid.as_deref() != Some(auth.uuid())
-                {
+                let coauthor: bool = sqlx::query_scalar(
+                    "select exists(select 1 from app_authors where app_id=$1 and account_uuid=$2)",
+                )
+                .bind(&app_id)
+                .bind(auth.uuid())
+                .fetch_one(&mut *conn)
+                .await?;
+                if app.owner_uuid.as_deref() != Some(auth.uuid()) && !coauthor {
                     return Err(ApiError::forbidden(
                         "not_app_owner",
                         format!(

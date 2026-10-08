@@ -65,6 +65,58 @@ pub mod declined_reason {
     pub const CUSTODIAN_ACCOUNT_DELETED: &str = "custodian_account_deleted";
 }
 
+/// Update preferences set by Silicon Apps; existing Accounts integrations with NULL keep all events.
+pub const APP_UPDATE_CHOICES: &[&str] = &[
+    "id_change",
+    "display_name_change",
+    "pfp_change",
+    "timezone_change",
+    "email_change",
+    "phone_change",
+    "custodian_change",
+    "access_removed",
+    "account_deleted",
+];
+
+async fn app_subscriptions(
+    conn: &mut PgConnection,
+    app_id: &str,
+) -> ApiResult<Option<Vec<String>>> {
+    let value: Option<Value> =
+        sqlx::query_scalar("select webhook_events from app_signin_configs where app_id=$1")
+            .bind(app_id)
+            .fetch_optional(&mut *conn)
+            .await?
+            .flatten();
+    Ok(value.map(|v| {
+        v.as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|s| s.as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }))
+}
+
+async fn app_wants(conn: &mut PgConnection, app_id: &str, choice: &str) -> ApiResult<bool> {
+    Ok(app_subscriptions(conn, app_id)
+        .await?
+        .is_none_or(|items| items.iter().any(|item| item == choice)))
+}
+
+fn update_choice(field: &AccountField) -> &str {
+    match field {
+        AccountField::DisplayName => "display_name_change",
+        AccountField::PfpUrl => "pfp_change",
+        AccountField::Timezone => "timezone_change",
+        AccountField::Email => "email_change",
+        AccountField::Phone => "phone_change",
+        AccountField::Custodian => "custodian_change",
+        _ => "other",
+    }
+}
+
 /// Delivery request headers.
 pub const HEADER_EVENT_ID: &str = "X-Accounts-Event-Id";
 pub const HEADER_EVENT_TYPE: &str = "X-Accounts-Event-Type";
@@ -180,6 +232,13 @@ pub async fn emit_to_app(
     account_uuid: Option<&str>,
     data: Value,
 ) -> ApiResult<Option<EmittedEvent>> {
+    if matches!(
+        event_type,
+        types::MEMBERSHIP_SIGNED_OUT | types::MEMBERSHIP_ACCESS_REMOVED
+    ) && !app_wants(conn, app_id, "access_removed").await?
+    {
+        return Ok(None);
+    }
     let Some((url, _)) = crate::repo::apps::webhook_target(conn, app_id).await? else {
         return Ok(None);
     };
@@ -235,6 +294,9 @@ pub async fn account_id_changed(
     let targets = memberships::webhook_targets(conn, &account.uuid).await?;
     let mut out = Vec::with_capacity(targets.len());
     for t in targets {
+        if !app_wants(conn, &t.app_id, "id_change").await? {
+            continue;
+        }
         let data = json!({
             "uuid": account.uuid, "membership_id": t.membership_id, "kind": account.kind,
             "old_id": old_id, "new_id": new_id,
@@ -339,10 +401,16 @@ pub async fn account_updated(
     let custodian = custodian_ref(conn, account).await?;
     let mut out = Vec::new();
     for t in targets {
+        let selected = app_subscriptions(conn, &t.app_id).await?;
         let scopes = t.scopes();
         let visible: Vec<AccountField> = changed
             .iter()
             .copied()
+            .filter(|f| {
+                selected
+                    .as_ref()
+                    .is_none_or(|items| items.iter().any(|item| item == update_choice(f)))
+            })
             .filter(|f| f.required_scope().is_none_or(|s| scopes.contains(&s)))
             .filter(|f| {
                 account.kind == AccountKind::Carbon
@@ -428,6 +496,9 @@ pub async fn account_deleted(
     let targets = memberships::webhook_targets(conn, account_uuid).await?;
     let mut out = Vec::with_capacity(targets.len());
     for t in targets {
+        if !app_wants(conn, &t.app_id, "account_deleted").await? {
+            continue;
+        }
         let data = json!({"uuid": account_uuid, "membership_id": t.membership_id});
         out.push(
             insert_event(
@@ -512,6 +583,9 @@ pub async fn silicon_custodian_changed(
     let targets = memberships::webhook_targets(conn, &silicon.uuid).await?;
     let mut out = Vec::with_capacity(targets.len());
     for t in targets {
+        if !app_wants(conn, &t.app_id, "custodian_change").await? {
+            continue;
+        }
         let data =
             json!({"uuid": silicon.uuid, "membership_id": t.membership_id, "from": from, "to": to});
         out.push(

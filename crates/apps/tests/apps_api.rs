@@ -143,12 +143,12 @@ async fn owned_apps_lists_the_carbons_apps_with_user_counts() {
     assert_ne!(r.json["items"][0]["app_id"], r2.json["items"][0]["app_id"]);
     assert_eq!(r2.json["next_cursor"], serde_json::Value::Null);
 
-    // Only Carbons own apps; no session → 401.
+    // Silicons can own apps too; an account with none sees an empty list.
     let (silicon, _) = ctx.silicon(&a.owner.uuid).await;
     let token = ctx.first_party_tokens(&silicon).await.access_token;
     let r = call(&ctx, Req::get("/v1/me/owned-apps").bearer(&token)).await;
-    assert_eq!(r.status, 403);
-    assert_eq!(r.error_code(), Some("carbon_only"));
+    assert_eq!(r.status, 200);
+    assert_eq!(r.json["items"], json!([]));
     let r = call(&ctx, Req::get("/v1/me/owned-apps")).await;
     assert_eq!(r.status, 401);
     let r = call(
@@ -227,7 +227,7 @@ async fn details_require_the_app_or_its_owner_and_mask_secrets() {
     assert_eq!(r.status, 404);
     assert_eq!(r.error_code(), Some("unknown_app"));
 
-    // A Silicon can't own apps, even with a first-party token.
+    // A Silicon that is not an author has no access.
     let (silicon, _) = ctx.silicon(&a.owner.uuid).await;
     let token = ctx.first_party_tokens(&silicon).await.access_token;
     let r = call(&ctx, Req::get(&path).bearer(&token)).await;

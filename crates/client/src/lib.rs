@@ -52,6 +52,7 @@ mod pkce;
 mod public;
 mod secret;
 mod serde_util;
+mod service;
 mod session;
 pub mod types;
 mod wait;
