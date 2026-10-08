@@ -321,3 +321,21 @@ matched the committed source byte for byte. Search and LLM exports contain no em
 dashes. Live browser checks covered the landing, publishing and sign-in guides
 in light and dark themes at 1440 and 390 pixels, with no horizontal overflow,
 page errors or removed source buttons. Screenshots were inspected.
+
+## Silicon Agent builder introduction
+
+Added a paragraph beside the Carbon and Silicon definitions in the Apps overview.
+It explains that a Silicon can be any AI agent and links to the Silicon Agent
+builder at https://www.teamofsilicons.com/ as an option that works natively with
+Silicon Apps and Silicon Accounts. No em dashes were added.
+
+Source `2be1d7566ecd878da7f032924cf1398ec14a4462`, bundle SHA-256 `0ba67913e010158c34011e45956341c6f97eed23fc3d9cb754d254f2afc460e7`.
+Developer typecheck, lint, docs link checks and production build passed. The API
+binary, database schema and account-site build are unchanged. Install SSM
+`1fe45970-0c41-4b29-a021-a18060a55e9e` and verification `395d1698-6799-4828-bb17-ca048328e041` confirmed the release, services and
+readiness. Backup `backups/predeploy-20261008T180018Z.dump`, SHA-256 `51c8c3115fe31491ca134bae673b5af094ed36308f0f30f060a3a68082bcc769`.
+
+Live browser checks at 1440 and 390 pixels confirmed the paragraph and builder
+link, without horizontal overflow or page errors. Screenshots were inspected.
+The deployed Markdown matches the source; search and full LLM exports contain the
+new explanation. The linked public site returned HTTP 200.
