@@ -97,3 +97,10 @@ remains `875a30a`, migration 7. The new preconfiguration backup is
 Post-cutover checks confirm one genuine account, three apps, Apps owner `zQo`
 and the correct stored Developer callback. The earlier isolated restore test
 remains the recovery evidence; this newer backup was uploaded but not restored.
+
+The parent deployment session subsequently confirmed a real Google sign-in and
+completed production account setup for `c:saket`, followed by a legitimate
+Apps CLI login. Google login is therefore verified; this does not establish
+Apple login, SMS, or real-recipient mail delivery. Those independent checks
+remain unverified. The old `developer.teamofsilicons.com` DNS record was then
+moved to the Apps host by the coordinating deployment session.
