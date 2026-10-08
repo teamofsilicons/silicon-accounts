@@ -1,0 +1,67 @@
+name: Verify latest managed installation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    env:
+      ACCOUNTS_TELEMETRY: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Use a fresh installation home
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/silicon-install"
+          echo "SILICON_HOME=$RUNNER_TEMP/silicon-install" >> "$GITHUB_ENV"
+      - name: Install both latest releases on macOS and Linux
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          curl -fsSL https://apps.teamofsilicons.com/install.sh -o install-apps.sh &&
+          bash install-apps.sh --server https://apps.teamofsilicons.com &&
+          export PATH="${SILICON_HOME:-$HOME}/.apps/bin:$PATH" &&
+          silicon-apps --home "${SILICON_HOME:-$HOME}" --server https://apps.teamofsilicons.com install silicon-accounts
+          echo "$SILICON_HOME/.apps/bin" >> "$GITHUB_PATH"
+      - name: Install both latest releases on Windows PowerShell
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest -UseBasicParsing https://apps.teamofsilicons.com/install.ps1 -OutFile install-apps.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\install-apps.ps1 -Server https://apps.teamofsilicons.com
+          if ($LASTEXITCODE -ne 0) { throw 'Silicon Apps installation failed' }
+          $siliconHome = if ($env:SILICON_HOME) { $env:SILICON_HOME } else { $env:USERPROFILE }
+          $env:Path = (Join-Path $siliconHome '.apps\bin') + ';' + $env:Path
+          silicon-apps --home $siliconHome --server https://apps.teamofsilicons.com install silicon-accounts
+          if ($LASTEXITCODE -ne 0) { throw 'Silicon Accounts installation failed' }
+          Join-Path $siliconHome '.apps\bin' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Verify the managed records and public commands
+        shell: bash
+        run: python scripts/verify-managed-install.py
+      - name: Stop the temporary updater
+        if: always()
+        shell: bash
+        run: |
+          if command -v silicon-apps >/dev/null; then
+            silicon-apps daemon stop
+            silicon-apps daemon remove
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: managed-install-${{ matrix.os }}
+          path: managed-install-verification.json
+          if-no-files-found: warn

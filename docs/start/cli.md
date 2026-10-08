@@ -133,8 +133,8 @@ starts, so the STK is never lost if the wait is cut short.
 | `6` | rate limited or locked: wait `details.retry_after_seconds` |
 | `130` | interrupted with Ctrl-C |
 
-A few commands use exit codes as answers: `silicon-accounts login status` exits `1` when not signed in,
-and `silicon-accounts id available` exits `0` (free), `5` (taken, reserved, or a reserved word) or `2`
+A few commands use exit codes as answers: `silicon-accounts login status` exits `1` when not signed in. With `--json`, it exits `0` and reports `authenticated: false`.
+`silicon-accounts id available` exits `0` (free), `5` (taken, reserved, or a reserved word) or `2`
 (not a valid id).
 
 **Secrets on stdin, never as arguments.** Arguments are visible to every process on the machine

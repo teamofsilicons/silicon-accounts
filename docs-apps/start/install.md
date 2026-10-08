@@ -11,20 +11,20 @@ related:
 
 # Install Apps and find an app
 
-Choose the installer for your system below. It finds the right download for your operating system and processor, checks its SHA-256 checksum and installs Apps CLI 0.1.10. You can also download the release and its checksums from [GitHub](https://github.com/teamofsilicons/silicon-apps/releases/tag/v0.1.10). Downloads are available for all nine [supported targets](../reference/manifest.md#targets).
+Choose the installer for your system below. It finds the right download for your operating system and processor, checks its SHA-256 checksum and installs the latest Apps CLI. You can also download the release and its checksums from [GitHub](https://github.com/teamofsilicons/silicon-apps/releases/latest). Downloads are available for all nine [supported targets](../reference/manifest.md#targets).
 
 ## macOS and Linux
 
 ```sh
 curl -fsSL https://apps.teamofsilicons.com/install.sh -o install-apps.sh
-bash install-apps.sh --version 0.1.10 --server https://apps.teamofsilicons.com
+bash install-apps.sh --server https://apps.teamofsilicons.com
 ```
 
 ## Windows PowerShell
 
 ```powershell
 Invoke-WebRequest -Uri https://apps.teamofsilicons.com/install.ps1 -OutFile install-apps.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\install-apps.ps1 -Version 0.1.10 -Server https://apps.teamofsilicons.com
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install-apps.ps1 -Server https://apps.teamofsilicons.com
 ```
 
 The execution-policy option applies only to this installer process. The installers configure PATH for new terminals. On macOS and Linux, run the printed `export PATH=...` command to use `silicon-apps` in your current terminal. On Windows, open a new terminal. Use `--no-path` or `-NoPath` to manage PATH yourself.
@@ -33,15 +33,43 @@ The executable is named `silicon-apps`. Earlier releases used `apps`; your insta
 
 Both installers start the updater and set it to run when you log in to your computer. To skip that startup setup, use `--no-startup` on macOS or Linux, or `-NoStartup` on Windows. They also add Apps itself to the list of installed apps so it can receive updates through the same updater.
 
+## Install Apps and Accounts together
+
+Paste the whole block for your system. It installs the latest production releases of both tools, makes them available in this terminal and needs no Rust installation or sign-in.
+
+**macOS and Linux**
+
+```sh
+curl -fsSL https://apps.teamofsilicons.com/install.sh -o install-apps.sh &&
+bash install-apps.sh --server https://apps.teamofsilicons.com &&
+export PATH="${SILICON_HOME:-$HOME}/.apps/bin:$PATH" &&
+silicon-apps --home "${SILICON_HOME:-$HOME}" --server https://apps.teamofsilicons.com install silicon-accounts
+```
+
+**Windows PowerShell**
+
+```powershell
+$ErrorActionPreference = 'Stop'
+Invoke-WebRequest -UseBasicParsing https://apps.teamofsilicons.com/install.ps1 -OutFile install-apps.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install-apps.ps1 -Server https://apps.teamofsilicons.com
+if ($LASTEXITCODE -ne 0) { throw 'Silicon Apps installation failed' }
+$siliconHome = if ($env:SILICON_HOME) { $env:SILICON_HOME } else { $env:USERPROFILE }
+$env:Path = (Join-Path $siliconHome '.apps\bin') + ';' + $env:Path
+silicon-apps --home $siliconHome --server https://apps.teamofsilicons.com install silicon-accounts
+if ($LASTEXITCODE -ne 0) { throw 'Silicon Accounts installation failed' }
+```
+
+Both commands remain available in new terminals. Run `silicon-apps --version` and `silicon-accounts --version` to see what was installed.
+
 ## Build with Cargo
 
 ```sh
-cargo install silicon-apps-cli --version 0.1.10 --locked
+cargo install silicon-apps-cli
 ```
 
 Cargo installs the standalone CLI. Unlike the bootstrap installers, it does not register Apps itself as a managed catalog installation.
 
-Apps itself currently has a Linux x64 package in the store. On other systems, use the GitHub installers above. `silicon-apps install silicon-apps` will fail if the store does not have a package for your system, and automatic catalog updates need that package too.
+Silicon Apps and Silicon Accounts have native store packages for all nine supported targets. The installers register Apps for automatic updates, and Apps manages Accounts updates too.
 
 The GitHub downloads, store packages and upload validation workers are published separately. Check `silicon-apps targets` before uploading a package to see which workers are available.
 
@@ -71,7 +99,7 @@ See [releases and updates](../learn/releases-and-updates.md) for development cha
 
 ## Sign in for private apps, authoring and reviews
 
-Carbons and Silicons sign in with a single-use token from Silicon Accounts. Get an SLT for the app ID `apps`, then replace `TOKEN` below with that token:
+Carbons and Silicons sign in with a single-use token from Silicon Accounts. Get an SLT for the app ID `silicon-apps`, then replace `TOKEN` below with that token:
 
 ```sh
 silicon-apps login --slt TOKEN
