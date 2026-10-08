@@ -56,14 +56,14 @@ async fn silicon_authors_join_leave_and_existing_users_survive_sync() {
         sqlx::query_scalar("select count(*) from memberships where app_id='joint-app'")
             .fetch_one(&ctx.state.db)
             .await
-            .unwrap();
+            .expect("count preserved memberships");
     assert_eq!(count, 1);
     let exported = call(&ctx, Req::get("/v1/internal/apps").bearer(TOKEN)).await;
     assert_eq!(exported.status, 200);
     assert_eq!(
         exported.json["apps"][0]["authors"]
             .as_array()
-            .unwrap()
+            .expect("export accepted authors")
             .len(),
         1
     );
@@ -103,7 +103,7 @@ async fn selected_webhook_updates_are_stored_and_filter_deliveries() {
     assert!(
         events::account_updated(&mut conn, &member, &[AccountField::Timezone])
             .await
-            .unwrap()
+            .expect("filter unselected timezone event")
             .is_empty()
     );
     assert_eq!(
@@ -113,20 +113,20 @@ async fn selected_webhook_updates_are_stored_and_filter_deliveries() {
             &[AccountField::DisplayName, AccountField::Timezone]
         )
         .await
-        .unwrap()
+        .expect("emit selected display-name event")
         .len(),
         1
     );
     assert!(
         events::account_deleted(&mut conn, &member.uuid)
             .await
-            .unwrap()
+            .expect("filter deletion event")
             .is_empty()
     );
     assert!(
         events::membership_signed_out(&mut conn, &author.app_id, &member.uuid, "user")
             .await
-            .unwrap()
+            .expect("filter sign-out event")
             .is_none()
     );
     let invalid = call(
@@ -165,13 +165,13 @@ async fn apps_mail_resolves_contacts_privately_and_deduplicates() {
         sqlx::query_scalar("select count(*) from outbound_messages where purpose='apps_invite'")
             .fetch_one(&ctx.state.db)
             .await
-            .unwrap();
+            .expect("count one invitation message");
     assert_eq!(count, 1);
     let body: String =
         sqlx::query_scalar("select text_body from outbound_messages where purpose='apps_invite'")
             .fetch_one(&ctx.state.db)
             .await
-            .unwrap();
+            .expect("read invitation body");
     assert!(body.contains("https://developers.example.test/invitations"));
     assert!(!body.contains("https://apps.example.test"));
     let response=call(&ctx,Req::post("/v1/internal/apps/mail").bearer(TOKEN).header("Idempotency-Key","report-mail-one").json(json!({"kind":"mail.report","body":{"message":"Local test report","pr":"https://github.com/teamofsilicons/silicon-apps/pull/1"}}))).await;
@@ -192,7 +192,9 @@ async fn webhook_secret_can_be_prepared_before_endpoint_and_preserved() {
     )
     .await;
     assert_eq!(generated.status, 200, "{}", generated.json);
-    let first = generated.json["secret"].as_str().unwrap();
+    let first = generated.json["secret"]
+        .as_str()
+        .expect("generated webhook secret");
     assert!(first.starts_with("whsec_"));
     let unset = call(&ctx, Req::get(&path).basic(&app.app_id, &app.secret)).await;
     assert!(unset.json["url"].is_null());
@@ -216,9 +218,13 @@ async fn webhook_secret_can_be_prepared_before_endpoint_and_preserved() {
             .bind(&app.app_id)
             .fetch_one(&ctx.state.db)
             .await
-            .unwrap();
+            .expect("read encrypted webhook secret");
     assert_eq!(
-        ctx.state.keys.keyring.decrypt_string(&encrypted).unwrap(),
+        ctx.state
+            .keys
+            .keyring
+            .decrypt_string(&encrypted)
+            .expect("decrypt preserved webhook secret"),
         first
     );
 }
@@ -228,7 +234,7 @@ async fn apps_audience_is_limited_to_author_routes_and_active_memberships() {
     let ctx = TestContext::new().await;
     let app = common::owned_app(&ctx, "audience").await;
     // Register the exact catalog application.
-    sqlx::query("insert into apps(app_id,name,source,status,secret_hash) values('apps','Silicon Apps','silicon_apps','active','test'::bytea) on conflict do nothing").execute(&ctx.state.db).await.unwrap();
+    sqlx::query("insert into apps(app_id,name,source,status,secret_hash) values('apps','Silicon Apps','silicon_apps','active','test'::bytea) on conflict do nothing").execute(&ctx.state.db).await.expect("register Apps fixture");
     ctx.membership("apps", &app.owner.uuid, &[Scope::Profile])
         .await;
     let token = ctx
@@ -259,7 +265,7 @@ async fn apps_audience_is_limited_to_author_routes_and_active_memberships() {
     .bind(&app.owner.uuid)
     .execute(&ctx.state.db)
     .await
-    .unwrap();
+    .expect("revoke Apps fixture membership");
     let removed = call(&ctx, Req::get(&path).bearer(&token)).await;
     assert_eq!(removed.status, 401);
     assert_eq!(removed.error_code(), Some("access_removed"));

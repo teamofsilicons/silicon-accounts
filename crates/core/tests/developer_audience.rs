@@ -187,7 +187,7 @@ async fn developer_portal_coauthors_have_the_same_app_boundary_as_owners() {
         .bind(&author.uuid)
         .execute(&mut *conn)
         .await
-        .unwrap();
+        .expect("add author");
     drop(conn);
     for request in [Req::get(&path), Req::post(&path)] {
         let response = ctx.call(router(), request.bearer(&token)).await;
@@ -199,7 +199,7 @@ async fn developer_portal_coauthors_have_the_same_app_boundary_as_owners() {
         .bind(&author.uuid)
         .execute(&mut *conn)
         .await
-        .unwrap();
+        .expect("remove author");
     drop(conn);
     let response = ctx.call(router(), Req::get(&path).bearer(&token)).await;
     assert_eq!(response.status, 403, "{}", response.json);

@@ -125,10 +125,9 @@ async fn set_webhook(
             f.add("url", m);
             ApiError::validation(f)
         })?;
-        if let Some(selected) = &body.events {
-            if selected.len() > 9 || selected.iter().any(|event| !events::APP_UPDATE_CHOICES.contains(&event.as_str())) {
+        if let Some(selected) = &body.events
+            && (selected.len() > 9 || selected.iter().any(|event| !events::APP_UPDATE_CHOICES.contains(&event.as_str()))) {
                 return Err(ApiError::unprocessable("invalid_webhook_events", "events must contain only id_change, display_name_change, pfp_change, timezone_change, email_change, phone_change, custodian_change, access_removed, account_deleted."));
-            }
         }
         let url = url.to_string();
         let mut tx = state.db.begin().await?;
