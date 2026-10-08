@@ -3,7 +3,7 @@
 /**
  * /sign-in: the account site's own sign-in, both ends of it.
  *
- *   /sign-in?return_to=/silicons        starts the hosted flow for the first-party app `accounts`, whose redirect is
+ *   /sign-in?return_to=/silicons        starts the hosted flow for the first-party app `silicon-accounts`, whose redirect is
  *                                       this page, and remembers return_to against the flow's state
  *   /sign-in?code=…&state=…             the flow came back (the session cookie is already set): go to return_to
  *   /sign-in?error=access_denied&state  it ended without signing in: say so and offer to start again

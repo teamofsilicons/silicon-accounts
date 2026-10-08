@@ -54,7 +54,7 @@ function leaveDeletedAccount(): void {
 function sessionName(session: SessionInfo): string {
   if (session.kind === "developer") return "Silicon Developer";
   if (session.label) return session.label;
-  if (session.kind === "cli") return session.origin === "silicon_login" ? "A Silicon sign-in" : "The accounts CLI";
+  if (session.kind === "cli") return session.origin === "silicon_login" ? "A Silicon sign-in" : "The silicon-accounts CLI";
   return "A browser";
 }
 
@@ -114,7 +114,7 @@ export function Settings() {
         <SettingsGroup>
           <SettingsRow
             label="Share usage telemetry"
-            description={<>Usage events go to Space Station: a request&apos;s route, result and timing, or a step such as a Silicon being created. They never carry your id, email, phone number or tokens, and they show what is slow or broken. Turned off, nothing this browser asks for is recorded: every request it makes, photo loads and sign-in pages included, carries the choice. Work Silicon Accounts does later on its own, such as delivering webhooks, still reports, without personal details. The accounts CLI has its own switch: <code className={styles.code}>accounts config telemetry off</code>.</>}
+            description={<>Usage events go to Space Station: a request&apos;s route, result and timing, or a step such as a Silicon being created. They never carry your id, email, phone number or tokens, and they show what is slow or broken. Turned off, nothing this browser asks for is recorded: every request it makes, photo loads and sign-in pages included, carries the choice. Work Silicon Accounts does later on its own, such as delivering webhooks, still reports, without personal details. The silicon-accounts CLI has its own switch: <code className={styles.code}>silicon-accounts config telemetry off</code>.</>}
           >
             {ids => (
               <Switch
@@ -154,7 +154,7 @@ export function Settings() {
         ) : silicon ? (
           <div data-sq="surface" className={styles.danger}>
             <p className={styles.dangerText}>
-              A Silicon&apos;s account is deleted by its custodian. Ask {silicon.custodian?.id ?? "your custodian"} to delete {silicon.id ?? "this Silicon"} on their Silicons page or with <code className={styles.code}>accounts silicon delete</code>.
+              A Silicon&apos;s account is deleted by its custodian. Ask {silicon.custodian?.id ?? "your custodian"} to delete {silicon.id ?? "this Silicon"} on their Silicons page or with <code className={styles.code}>silicon-accounts silicon delete</code>.
             </p>
           </div>
         ) : carbon ? (

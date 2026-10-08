@@ -397,7 +397,7 @@ export async function startSignIn(b: Browserish, appId: string, options: StartOp
   const state = options.state ?? randomState();
   const pkce = options.pkce === "none" ? null : pkcePair(options.pkce ?? "S256");
   const nonce = options.nonce === undefined ? randomNonce() : options.nonce;
-  const redirectUri = options.redirectUri ?? (appId === "accounts" ? `${b.env.site}/sign-in` : redirectUriOf(b.env, appId));
+  const redirectUri = options.redirectUri ?? (appId === "silicon-accounts" ? `${b.env.site}/sign-in` : redirectUriOf(b.env, appId));
   const reply = await b.createFlow({
     app_id: appId,
     redirect_uri: redirectUri,

@@ -14,7 +14,7 @@ import { FAKE_APPS_PATH } from '../src/credentials.ts';
 const file = loadFakeAppsFile();
 const apps = file.apps;
 const byId = new Map(apps.map((a) => [a.app_id, a]));
-const RESERVED = ['admin', 'administrator', 'root', 'system', 'support', 'help', 'security', 'accounts', 'account', 'silicon', 'silicons', 'carbon', 'carbons', 'api', 'www', 'mail', 'null', 'undefined', 'me', 'owner', 'staff'];
+const RESERVED = ['admin', 'administrator', 'root', 'system', 'support', 'help', 'security', 'accounts', 'silicon-accounts', 'account', 'silicon', 'silicons', 'carbon', 'carbons', 'api', 'www', 'mail', 'null', 'undefined', 'me', 'owner', 'staff'];
 
 function luminance(hex: string): number {
   const channel = (i: number): number => {

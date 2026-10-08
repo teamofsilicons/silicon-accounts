@@ -29,7 +29,7 @@ pnpm -C web e2e [options] [prefix…]    # against a stack that is already runni
 the site built into `web/.next-<base>`, the developer site built into `developer/.next-<base>`), runs `e2e/run.ts`,
 copies the stack's logs into the artifacts, stops everything, drops the database and deletes both builds. Its exit code
 is 0 only when every selected journey passed. `--dev` serves both sites with `next dev` instead of production builds.
-Rust builds go to `CARGO_TARGET_DIR` (the CLI the journeys run is `$CARGO_TARGET_DIR/debug/accounts`).
+Rust builds go to `CARGO_TARGET_DIR` (the CLI the journeys run is `$CARGO_TARGET_DIR/debug/silicon-accounts`).
 
 ## Suites and journeys
 
@@ -97,7 +97,7 @@ data: `results.check(name, ok, detail)` never throws, so a journey keeps going a
 
 - the basics: `newContext` (1440×900, Asia/Kolkata, its own forwarded address), `shot`, `tag`, `sleep`, `json`,
   `postJson`, `api` (a call with the journey's own address, through the site or `direct` to accounts-api), `lastSeq` and
-  `codeFor` (codes from the mock email/SMS server), `cli` and `cliHome` (the real `accounts` CLI), `sql` and
+  `codeFor` (codes from the mock email/SMS server), `cli` and `cliHome` (the real `silicon-accounts` CLI), `sql` and
   `forgetRateLimits` (the stack's database), `randomIp`, `forwardAs`, `withBenchSlot`, `waitForCalm` and `watchStalls`
   (benchmarks, below);
 - the fake apps: `fakeApp(id)` (testkit/fake-apps.json: owner, secret, seeded sign-in setup), `appUrl`, `appAccount`
@@ -135,7 +135,7 @@ The testkit's own helpers (`testkit/lib`) work too, pointed at `ctx.env`.
 | `b-apps` | briefcase: a sign-up and its what's-shared page (email required, timezone optional and unticked); dm: Continue as, its one custom page adds the missing phone with a code and shares the ticked email; provides `brook` |
 | `c-providers` | Google and Apple, managed and the apps' own; the apps' direct buttons: the Opening page (default and custom title, the app's style, Powered by, moving on by itself) and email/phone opening on their empty field; a `login_hint` ignored |
 | `d-cli` | the CLI: device sign-in approved in the browser, silicon create, a self-created Silicon accepted on the site, login --silicon, an SLT |
-| `e-proofs` | User verification dm → briefcase and App verification commit → remind and waveform (one proof per app) with timings; a proof for two apps refused (`app_verification_single_app`), `accounts app proof app-verification --to` once only; revoking a user verification proof on /proofs |
+| `e-proofs` | User verification dm → briefcase and App verification commit → remind and waveform (one proof per app) with timings; a proof for two apps refused (`app_verification_single_app`), `silicon-accounts app proof app-verification --to` once only; revoking a user verification proof on /proofs |
 | `f-import` | dirty.csv into legacy-crm on the developer site (dry run, for real), the CLI's re-import, an imported Carbon finishing setup (a kept stack walked again: the rows match instead, and the Carbon signs straight in) |
 | `g-webhooks` | account changes reaching the fake apps' webhooks, signatures verified |
 | `h-branding` | acme-notes and pixel-studio in their own style on every page at 1440 and 390 px, Sign in / Sign up buttons, the SDK, the embed's framing |
@@ -316,7 +316,7 @@ proofs-perf-latency-verify` with no other stack running). The gate's and the mea
 `scripts/e2e.sh --keep` (or by dev.sh with those ports); without it the defaults are `scripts/dev.sh`'s (site 8590,
 database `silicon_accounts`, the developer site on 8600). One by one: `E2E_SITE`, `E2E_DEVELOPER` (default
 `http://localhost:<base+5>`), `E2E_API`, `E2E_OIDC`, `E2E_MESSAGING`, `E2E_APPS`, `E2E_IRIS`, `E2E_DB`, `E2E_PG_BIN`,
-`E2E_CLI` (default `target/debug/accounts`, or `$CARGO_TARGET_DIR/debug/accounts`),
+`E2E_CLI` (default `target/debug/silicon-accounts`, or `$CARGO_TARGET_DIR/debug/silicon-accounts`),
 `E2E_ENGINE`, `E2E_ARTIFACTS` (default `e2e/.artifacts/<base>`), `E2E_SHOTS`. Benchmarks: `E2E_BENCH_SLOT_WAIT_MS`,
 `E2E_BENCH_CALM_WAIT_MS`, `E2E_LATENCY_GATE=strict` (see above). Options: `--suite`, `--engine`, `--webkit`, `--list`,
 `--list-suites`, and journey prefixes.

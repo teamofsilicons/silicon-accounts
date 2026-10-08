@@ -40,7 +40,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/cli/login/verify" -H 'Content-Type: applicatio
 ```
 
 The answer is a [token response](oauth.md#the-token-response) whose tokens have
-`aud: "accounts"`, ready for every account endpoint.
+`aud: "silicon-accounts"`, ready for every account endpoint.
 
 ## The hosted flow
 
@@ -62,7 +62,7 @@ page with a code) or optional (a checkbox, unticked until the Carbon ticks it). 
 flow of its own gets one page with every detail it asks for. A Carbon sees every page on their
 first sign-in to the app (and with `prompt=consent`); after that only a page with something new
 on it, and a Carbon with nothing new goes straight to `complete`. `review` is shown only when the
-app turned it on. The first-party apps (`accounts`, `developer`) never show these pages.
+app turned it on. The first-party apps (`silicon-accounts`, `developer`) never show these pages.
 
 Rules every flow endpoint follows:
 
@@ -474,7 +474,7 @@ The account site's half of the device flow ([`POST /v1/device/authorize`](oauth.
 ```json
 {
   "user_code": "MVHB-KQAW",
-  "client_label": "accounts CLI on build box",
+  "client_label": "silicon-accounts CLI on build box",
   "created_at": "2026-10-07T02:36:05.176Z",
   "expires_at": "2026-10-07T02:46:05.176Z",
   "status": "pending"
@@ -503,7 +503,7 @@ per address per 10 minutes).
 ### `POST /v1/cli/login/verify`
 
 `{"challenge_id", "code", "client_label"?}` → **200** [token response](oauth.md#the-token-response)
-(`aud: "accounts"`, origin `cli_code` in the sessions list, labelled with `client_label`).
+(`aud: "silicon-accounts"`, origin `cli_code` in the sessions list, labelled with `client_label`).
 Errors: 422 `invalid_code` (`details.remaining_attempts`), 423 `verification_locked`
 (`Retry-After`), 410 `code_expired`, 409 `code_already_used`, 404 `challenge_not_found`.
 

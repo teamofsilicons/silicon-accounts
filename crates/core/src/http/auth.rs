@@ -1,7 +1,7 @@
 //! Authentication extractors.
 //!
 //! - [`AccountAuth`]: the session cookie (`sa_session` / `__Host-sa_session`), or
-//!   `Authorization: Bearer <access JWT>` whose `aud` is `accounts` (or `developer` on the
+//!   `Authorization: Bearer <access JWT>` whose `aud` is `silicon-accounts` (or `developer` on the
 //!   routes listed below) and whose family is active.
 //!   Cookie-authenticated POST/PUT/PATCH/DELETE must pass the origin guard (CSRF).
 //!   `Option<AccountAuth>` = optional auth: no credentials → `None`; an invalid cookie → `None`;
@@ -10,7 +10,7 @@
 //! - [`AppAuth`]: `Authorization: Basic base64(app_id:app_secret)`, verified through the 60 s
 //!   credential cache.
 //! - [`authenticate_client`]: client authentication for `/v1/oauth/*` (Basic or body fields,
-//!   plus the public first-party clients `accounts` and `developer`), with RFC 6749 errors.
+//!   plus the public first-party clients `silicon-accounts` and `developer`), with RFC 6749 errors.
 //! - [`AppOrOwner`]: for `/v1/apps/{app_id}/…` — the app's own credentials or an accepted
 //!   Carbon/Silicon author's session. Silicon Apps access tokens are accepted only on
 //!   these author routes, with a live membership in the Apps application.
@@ -52,7 +52,7 @@ use crate::state::AppState;
 pub enum AuthVia {
     /// Browser session cookie.
     Session { session_id: Uuid },
-    /// First-party access token (aud = accounts): CLI, Silicon login, device flow.
+    /// First-party access token (aud = silicon-accounts): CLI, Silicon login, device flow.
     Bearer {
         family_id: Uuid,
         claims: Box<AccessClaims>,
@@ -99,9 +99,9 @@ impl AccountAuth {
 fn unauthenticated() -> ApiError {
     ApiError::unauthenticated(
         "unauthenticated",
-        "This endpoint needs a signed-in account: send the account site's session cookie, or an Authorization: Bearer access token issued to the accounts app.",
+        "This endpoint needs a signed-in account: send the account site's session cookie, or an Authorization: Bearer access token issued to the silicon-accounts app.",
     )
-    .hint("Carbons: run `accounts login`. Silicons: run `accounts login --silicon si:<handle> --stk-stdin` (or set ACCOUNTS_SILICON and ACCOUNTS_STK).")
+    .hint("Carbons: run `silicon-accounts login`. Silicons: run `silicon-accounts login --silicon si:<handle> --stk-stdin` (or set ACCOUNTS_SILICON and ACCOUNTS_STK).")
 }
 
 /// Read-only identity and managed verification routes a developer token may use (GET/HEAD). The
@@ -152,7 +152,7 @@ fn wrong_audience(parts: &Parts, aud: &str, developer_allowed: bool) -> ApiError
                 parts.method
             ),
         )
-        .hint("Use a token issued to 'accounts' for this: sign in with `accounts login` (Carbons) or `accounts login --silicon si:<handle> --stk-stdin` (Silicons), or use the account site.")
+        .hint("Use a token issued to 'silicon-accounts' for this: sign in with `silicon-accounts login` (Carbons) or `silicon-accounts login --silicon si:<handle> --stk-stdin` (Silicons), or use the account site.")
         .detail("aud", aud.to_string());
     }
     let expected = if developer_allowed {
@@ -168,7 +168,7 @@ fn wrong_audience(parts: &Parts, aud: &str, developer_allowed: bool) -> ApiError
         "token_wrong_audience",
         format!("This access token was issued to the app '{aud}', but this endpoint needs a token issued to {expected}."),
     )
-    .hint("Use a first-party token: sign in with `accounts login` (Carbons) or `accounts login --silicon si:<handle> --stk-stdin` (Silicons).")
+    .hint("Use a first-party token: sign in with `silicon-accounts login` (Carbons) or `silicon-accounts login --silicon si:<handle> --stk-stdin` (Silicons).")
     .detail("aud", aud.to_string())
 }
 
@@ -241,7 +241,7 @@ async fn resolve(
                 "account_auth_required",
                 "This endpoint acts for a signed-in Carbon or Silicon, so app credentials (Basic) can't be used here.",
             )
-            .hint("Use the account's session cookie or an Authorization: Bearer access token issued to the accounts app."));
+            .hint("Use the account's session cookie or an Authorization: Bearer access token issued to the silicon-accounts app."));
         }
         return Err(ApiError::unauthenticated(
             "invalid_authorization",
@@ -459,15 +459,15 @@ where
 #[derive(Debug, Clone)]
 pub struct ClientAuth {
     pub app: App,
-    /// True for a first-party public client sent without a secret: `client_id=accounts` (the
-    /// accounts CLI: device-code and refresh-token grants, revocation) or `client_id=developer`
+    /// True for a first-party public client sent without a secret: `client_id=silicon-accounts` (the
+    /// silicon-accounts CLI: device-code and refresh-token grants, revocation) or `client_id=developer`
     /// (the developer platform: authorization code with PKCE S256, refresh token, revocation).
     /// Each only ever touches its own tokens.
     pub public: bool,
 }
 
 /// Authenticates the client of a token/revoke/introspect request: HTTP Basic, or `client_id` +
-/// `client_secret` in the body, or `client_id=accounts` / `client_id=developer` alone (the
+/// `client_secret` in the body, or `client_id=silicon-accounts` / `client_id=developer` alone (the
 /// first-party public clients; what each may do is decided by the endpoint).
 pub async fn authenticate_client(
     state: &AppState,
@@ -491,7 +491,10 @@ pub async fn authenticate_client(
         }
         (Some((id, secret)), _, None) => (id, secret),
         (None, Some(id), Some(secret)) => (id.to_string(), secret.to_string()),
-        (None, Some(id), None) if crate::is_first_party_app_id(id) => {
+        (None, Some(id), None)
+            if crate::is_first_party_app_id(crate::canonical_first_party_app_id(id)) =>
+        {
+            let id = crate::canonical_first_party_app_id(id);
             let mut conn = state.db.acquire().await?;
             let app = apps::get(&mut conn, id)
                 .await

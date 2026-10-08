@@ -94,15 +94,18 @@ pub async fn whoami(ctx: &Ctx) -> CliResult<Outcome> {
     let mut outcome = Outcome::new(to_json(&me), render_me(&me));
     outcome = match me.kind {
         AccountKind::Silicon => outcome.next(
-            "accounts login --app <app_id>",
+            "silicon-accounts login --app <app_id>",
             "get a short-lived token for an app",
         ),
         AccountKind::Carbon => outcome
             .next(
-                "accounts profile set --display-name <name>",
+                "silicon-accounts profile set --display-name <name>",
                 "change your details",
             )
-            .next("accounts silicon list", "the Silicons you are custodian of"),
+            .next(
+                "silicon-accounts silicon list",
+                "the Silicons you are custodian of",
+            ),
     };
     Ok(outcome)
 }
@@ -130,7 +133,7 @@ pub async fn id(ctx: &Ctx, args: IdArgs) -> CliResult<Outcome> {
             let (text, exit) = if availability.available && availability.reclaimable {
                 (
                     format!(
-                        "{shown} is reserved for {silicon} after its id change: you can take it back for it with `accounts silicon id {silicon} {shown}`."
+                        "{shown} is reserved for {silicon} after its id change: you can take it back for it with `silicon-accounts silicon id {silicon} {shown}`."
                     ),
                     0,
                 )
@@ -209,10 +212,13 @@ pub async fn id(ctx: &Ctx, args: IdArgs) -> CliResult<Outcome> {
             };
             let mut outcome = Outcome::new(to_json(&availability), text).exit(exit);
             if availability.available {
-                outcome = outcome.next(format!("accounts id change {shown}"), "take it as your id");
+                outcome = outcome.next(
+                    format!("silicon-accounts id change {shown}"),
+                    "take it as your id",
+                );
             } else if let Some(first) = availability.suggestions.first() {
                 outcome = outcome.next(
-                    format!("accounts id change {first}"),
+                    format!("silicon-accounts id change {first}"),
                     "take a free id instead",
                 );
             }
@@ -230,7 +236,10 @@ pub async fn id(ctx: &Ctx, args: IdArgs) -> CliResult<Outcome> {
                 "Your id is now {}. {old_id} stays reserved for you for 10 days; apps you signed into were notified (they key on your uuid {}).",
                 me.id, me.uuid
             );
-            Ok(Outcome::new(to_json(&me), text).next("accounts whoami", "see your account"))
+            Ok(
+                Outcome::new(to_json(&me), text)
+                    .next("silicon-accounts whoami", "see your account"),
+            )
         }
     }
 }
@@ -300,7 +309,7 @@ async fn profile_set(ctx: &Ctx, args: ProfileSetArgs) -> CliResult<Outcome> {
     if update.is_empty() && args.photo.is_none() && !args.reset_photo {
         return Err(CliError::invalid(
             "Nothing to change: pass at least one of --display-name, --timezone, --dob, --pfp-url, --photo or --reset-photo.",
-            "See `accounts profile set --help`.",
+            "See `silicon-accounts profile set --help`.",
         ));
     }
     let mut changed = Vec::new();
@@ -425,8 +434,10 @@ pub async fn email(ctx: &Ctx, args: EmailArgs) -> CliResult<Outcome> {
         EmailCommand::List => {
             let emails = with_session!(ctx, |s| s.emails())?;
             Ok(
-                Outcome::new(json!({ "emails": to_json(&emails) }), render(&emails))
-                    .next("accounts email add <email>", "add another email (up to 10)"),
+                Outcome::new(json!({ "emails": to_json(&emails) }), render(&emails)).next(
+                    "silicon-accounts email add <email>",
+                    "add another email (up to 10)",
+                ),
             )
         }
         EmailCommand::Add { email } => {
@@ -443,12 +454,15 @@ pub async fn email(ctx: &Ctx, args: EmailArgs) -> CliResult<Outcome> {
                         format!("Added {email}.\n\n{}", render(&emails)),
                     )
                     .next(
-                        format!("accounts email primary {email}"),
+                        format!("silicon-accounts email primary {email}"),
                         "make it your primary email",
                     ));
                 }
             }
-            let verify = format!("accounts email verify {} <code>", challenge.challenge_id);
+            let verify = format!(
+                "silicon-accounts email verify {} <code>",
+                challenge.challenge_id
+            );
             let text = format!(
                 "A 6-digit code was sent to {email}{}.\nConfirm it with:\n  {verify}",
                 challenge
@@ -516,7 +530,7 @@ pub async fn phone(ctx: &Ctx, args: PhoneArgs) -> CliResult<Outcome> {
             let phones = with_session!(ctx, |s| s.phones())?;
             Ok(
                 Outcome::new(json!({ "phones": to_json(&phones) }), render(&phones)).next(
-                    "accounts phone add <number>",
+                    "silicon-accounts phone add <number>",
                     "add another number (up to 10)",
                 ),
             )
@@ -536,7 +550,10 @@ pub async fn phone(ctx: &Ctx, args: PhoneArgs) -> CliResult<Outcome> {
                     ));
                 }
             }
-            let verify = format!("accounts phone verify {} <code>", challenge.challenge_id);
+            let verify = format!(
+                "silicon-accounts phone verify {} <code>",
+                challenge.challenge_id
+            );
             let text =
                 format!("A 6-digit code was sent by SMS to {phone}.\nConfirm it with:\n  {verify}");
             Ok(Outcome::new(
@@ -632,7 +649,10 @@ pub async fn my_apps(ctx: &Ctx, args: MyAppsArgs) -> CliResult<Outcome> {
                     "You haven't signed into any app yet.",
                 ),
             )
-            .next("accounts apps remove <app_id>", "remove an app's access"))
+            .next(
+                "silicon-accounts apps remove <app_id>",
+                "remove an app's access",
+            ))
         }
         MyAppsCommand::Remove { app_id } => {
             with_session!(ctx, |s| s.remove_app_access(&app_id))?;
@@ -670,7 +690,7 @@ pub async fn my_proofs(ctx: &Ctx, args: MyProofsArgs) -> CliResult<Outcome> {
                     "No User verification proofs were issued on your behalf.",
                 ),
             )
-            .next("accounts proofs revoke <proof_id>", "revoke one"))
+            .next("silicon-accounts proofs revoke <proof_id>", "revoke one"))
         }
         MyProofsCommand::Revoke { proof_id } => {
             with_session!(ctx, |s| s.revoke_proof(&proof_id))?;
@@ -710,7 +730,10 @@ pub async fn sessions(ctx: &Ctx, args: SessionsArgs) -> CliResult<Outcome> {
                     "No sessions.",
                 ),
             )
-            .next("accounts sessions revoke <id>", "sign a session out"))
+            .next(
+                "silicon-accounts sessions revoke <id>",
+                "sign a session out",
+            ))
         }
         SessionsCommand::Revoke { id } => {
             with_session!(ctx, |s| s.revoke_session(&id))?;
@@ -744,13 +767,15 @@ pub async fn history(ctx: &Ctx, args: HistoryArgs) -> CliResult<Outcome> {
     let mut text = table(&["WHEN", "KIND", "WHAT", "APP"], &rows, "No history yet.");
     let mut outcome_next = None;
     if let Some(cursor) = &page.next_cursor {
-        text.push_str(&format!("\nMore: accounts history --cursor {cursor}\n"));
+        text.push_str(&format!(
+            "\nMore: silicon-accounts history --cursor {cursor}\n"
+        ));
         outcome_next = Some(cursor.clone());
     }
     let mut outcome = Outcome::new(to_json(&page), text);
     if let Some(cursor) = outcome_next {
         outcome = outcome.next(
-            format!("accounts history --cursor {cursor}"),
+            format!("silicon-accounts history --cursor {cursor}"),
             "the next page",
         );
     }
@@ -769,7 +794,10 @@ pub async fn delete_account(ctx: &Ctx, args: DeleteAccountArgs) -> CliResult<Out
         None => {
             return Err(CliError::invalid(
                 "Deleting an account needs --confirm <your id>.",
-                format!("Run `accounts delete-account --confirm {}`.", session.who()),
+                format!(
+                    "Run `silicon-accounts delete-account --confirm {}`.",
+                    session.who()
+                ),
             ));
         }
     };
@@ -806,7 +834,7 @@ pub async fn device(ctx: &Ctx, args: DeviceArgs) -> CliResult<Outcome> {
                 ("expires", when(request.expires_at)),
             ]);
             Ok(Outcome::new(to_json(&request), text).next(
-                format!("accounts device approve {}", request.user_code),
+                format!("silicon-accounts device approve {}", request.user_code),
                 "sign that machine in as you",
             ))
         }

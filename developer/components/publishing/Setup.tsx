@@ -271,7 +271,7 @@ function Packages({ app, refresh }: Props) {
             <span>Show the app’s help.</span>
           </div>
           <div data-sq="surface" className="required-command">
-            <code>{app.app_id} accounts --json</code>
+            <code>{app.app_id} silicon-accounts --json</code>
             <span>Return your app_id.</span>
           </div>
           <div data-sq="surface" className="required-command">

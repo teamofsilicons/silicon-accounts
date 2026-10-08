@@ -48,7 +48,7 @@ test("failed package validation exposes command, expectation, and exact error", 
   });
   await page.getByRole("button", { name: "Upload and validate" }).click();
   await expect(
-    page.getByText("accounts --json returned the wrong app_id."),
+    page.getByText("silicon-accounts --json returned the wrong app_id."),
   ).toBeVisible();
   await page.getByText("View exact error details").click();
   await expect(page.getByText(/contract mismatch/)).toBeVisible();

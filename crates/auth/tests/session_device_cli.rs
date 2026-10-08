@@ -283,7 +283,7 @@ async fn carbons_approve_or_deny_cli_device_sign_ins() {
         tokens::create_device(
             &mut conn,
             &ctx.state.keys.pepper,
-            Some("accounts CLI on build-box"),
+            Some("silicon-accounts CLI on build-box"),
         )
         .await
         .expect("device")
@@ -300,7 +300,7 @@ async fn carbons_approve_or_deny_cli_device_sign_ins() {
         .await;
     assert_eq!(r.status, 200, "{}", r.json);
     assert_eq!(r.json["user_code"], start.user_code.as_str());
-    assert_eq!(r.json["client_label"], "accounts CLI on build-box");
+    assert_eq!(r.json["client_label"], "silicon-accounts CLI on build-box");
     assert_eq!(r.json["status"], "pending");
 
     let r = ctx
@@ -448,7 +448,7 @@ async fn cli_code_sign_in_returns_first_party_tokens() {
     let r = ctx
         .call(
             router(),
-            Req::post("/v1/cli/login/verify").json(json!({"challenge_id": challenge_id, "code": code, "client_label": "accounts CLI on mac"})),
+            Req::post("/v1/cli/login/verify").json(json!({"challenge_id": challenge_id, "code": code, "client_label": "silicon-accounts CLI on mac"})),
         )
         .await;
     assert_eq!(r.status, 200, "{}", r.json);
@@ -457,7 +457,7 @@ async fn cli_code_sign_in_returns_first_party_tokens() {
     assert_eq!(r.json["expires_in"], 1800);
     assert_eq!(
         r.json["membership_id"],
-        format!("accounts:{}", carbon.uuid).as_str()
+        format!("silicon-accounts:{}", carbon.uuid).as_str()
     );
     let claims = ctx
         .state
@@ -465,7 +465,7 @@ async fn cli_code_sign_in_returns_first_party_tokens() {
         .jwt
         .verify_access(
             r.json["access_token"].as_str().expect("at"),
-            Some("accounts"),
+            Some("silicon-accounts"),
         )
         .expect("a first-party access token");
     assert_eq!(claims.sub, carbon.uuid);
@@ -477,7 +477,7 @@ async fn cli_code_sign_in_returns_first_party_tokens() {
             .expect("family");
     assert_eq!(
         (origin.as_str(), label.as_str()),
-        ("cli_code", "accounts CLI on mac")
+        ("cli_code", "silicon-accounts CLI on mac")
     );
 
     let r = ctx
@@ -699,6 +699,6 @@ async fn a_cli_code_lockout_shows_in_the_accounts_sign_in_history() {
     .expect("history");
     assert_eq!(
         (app_id.as_str(), method.as_str(), outcome.as_str()),
-        ("accounts", "email", "failed")
+        ("silicon-accounts", "email", "failed")
     );
 }

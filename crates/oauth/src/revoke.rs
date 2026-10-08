@@ -1,8 +1,8 @@
 //! `POST /v1/oauth/revoke` (RFC 7009): ends the sign-in (token family) behind a refresh token
 //! or an access token of the calling client.
 //!
-//! - Apps authenticate as usual; the first-party public clients (`client_id=accounts` or
-//!   `client_id=developer`, no secret) can revoke their own tokens only (`accounts logout`, the
+//! - Apps authenticate as usual; the first-party public clients (`client_id=silicon-accounts` or
+//!   `client_id=developer`, no secret) can revoke their own tokens only (`silicon-accounts logout`, the
 //!   developer platform's sign-out).
 //! - A token of another app is never revoked, and is answered exactly like an unknown one, so
 //!   the endpoint can't be used to probe other apps' tokens.

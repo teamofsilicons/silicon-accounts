@@ -580,7 +580,7 @@ async fn a_sign_in_lock_is_recorded_for_the_owner_of_the_address() {
             wrong,
             &Expect::default(),
             Some(otp::Attempt {
-                app_id: "accounts",
+                app_id: "silicon-accounts",
                 ip: Some("10.0.0.7"),
                 user_agent: None,
             }),

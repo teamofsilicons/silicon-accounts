@@ -63,7 +63,7 @@ pub(crate) struct MyApp {
     active_sessions: i64,
 }
 
-/// Silicon Accounts' own apps: the account site and CLI (`accounts`) and the developer platform
+/// Silicon Accounts' own apps: the account site and CLI (`silicon-accounts`) and the developer platform
 /// (`developer`). They are never apps the account signed into.
 const FIRST_PARTY_APPS: [&str; 2] = [FIRST_PARTY_APP_ID, DEVELOPER_APP_ID];
 
@@ -164,7 +164,7 @@ pub(crate) async fn list(
     )))
 }
 
-/// 400 `first_party_app` for Silicon Accounts' own apps (`accounts`, `developer`): they are not
+/// 400 `first_party_app` for Silicon Accounts' own apps (`silicon-accounts`, `developer`): they are not
 /// apps the account signed into, so there is no access to remove. What they hold are sessions of
 /// Silicon Accounts itself, which `DELETE /v1/me/sessions/{id}` signs out.
 fn first_party_refusal(app_id: &str) -> ApiError {
@@ -177,7 +177,7 @@ fn first_party_refusal(app_id: &str) -> ApiError {
     } else {
         ApiError::bad_request(
             "first_party_app",
-            "Silicon Accounts itself (the account site and the accounts CLI) can't lose access to your account.",
+            "Silicon Accounts itself (the account site and the silicon-accounts CLI) can't lose access to your account.",
         )
         .hint("To sign out a browser or CLI, revoke it with DELETE /v1/me/sessions/{id} (list them with GET /v1/me/sessions).")
     };

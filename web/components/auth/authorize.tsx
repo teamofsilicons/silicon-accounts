@@ -100,7 +100,7 @@ function AuthorizeStart({ query }: AuthorizeProps) {
     );
   }
   if (error) return <AuthorizeProblem error={error} appId={appId} redirectUri={redirectUri} onRetry={retry} />;
-  const firstParty = appId === "accounts";
+  const firstParty = appId === "silicon-accounts";
   return (
     <HostedFrame
       app={look ? { app_id: look.app_id, name: look.name, branding: look.branding } : SILICON_ACCOUNTS}

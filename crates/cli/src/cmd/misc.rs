@@ -1,4 +1,4 @@
-//! `accounts report`, `accounts docs`, `accounts help`.
+//! `silicon-accounts report`, `silicon-accounts docs`, `silicon-accounts help`.
 
 use serde_json::json;
 
@@ -39,7 +39,7 @@ pub async fn report(ctx: &Ctx, args: ReportArgs) -> CliResult<Outcome> {
     let mut diagnostics_included = false;
     if !args.no_diagnostics {
         let diagnostics = format!(
-            "\n\n--\naccounts CLI {} on {} {}",
+            "\n\n--\nsilicon-accounts CLI {} on {} {}",
             env!("CARGO_PKG_VERSION"),
             std::env::consts::OS,
             std::env::consts::ARCH
@@ -127,7 +127,7 @@ pub fn help(topic: &[String]) -> CliResult<Outcome> {
     if let Some(mut text) = tree::command_help(topic) {
         if let Some((name, _)) = docs::find(&joined) {
             text.push_str(&format!(
-                "\nThere is also a guide on this: `accounts docs {name}`.\n"
+                "\nThere is also a guide on this: `silicon-accounts docs {name}`.\n"
             ));
         }
         return Ok(Outcome::new(
@@ -148,6 +148,6 @@ pub fn help(topic: &[String]) -> CliResult<Outcome> {
             "`{}` is neither a command nor a docs topic.",
             topic.join(" ")
         ),
-        "Run `accounts --help` for the command tree and `accounts docs` for the topics.",
+        "Run `silicon-accounts --help` for the command tree and `silicon-accounts docs` for the topics.",
     ))
 }

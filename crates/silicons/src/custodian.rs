@@ -680,7 +680,7 @@ pub async fn transfer(
                 ),
             )
             .hint(format!(
-                "Cancel it first with DELETE /v1/me/silicons/{}/transfer (`accounts silicon cancel-transfer {}`), then send the new one.",
+                "Cancel it first with DELETE /v1/me/silicons/{}/transfer (`silicon-accounts silicon cancel-transfer {}`), then send the new one.",
                 silicon.uuid,
                 silicon.display_id()
             ))

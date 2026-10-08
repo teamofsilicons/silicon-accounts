@@ -145,7 +145,7 @@ export class AccountsClient {
     return new BrowserSession(this, await this.publicUrl(), jar);
   }
 
-  /** A first-party session from an access token with aud=accounts (CLI / Silicon login). */
+  /** A first-party session from an access token with aud=silicon-accounts (CLI / Silicon login). */
   withToken(accessToken: string): AccountSession {
     return new AccountSession(new HttpClient({ baseUrl: this.url, headers: { ...this.headers, Authorization: `Bearer ${accessToken}` } }));
   }
@@ -859,11 +859,11 @@ export async function signInWithProvider(options: SignInOptions & { provider: Pr
   return finish(browser, flow, base);
 }
 
-/** Creates a brand-new Carbon via the account site's own sign-in (app `accounts`) and returns its signed-in browser. */
+/** Creates a brand-new Carbon via the account site's own sign-in (app `silicon-accounts`) and returns its signed-in browser. */
 export async function signUpCarbon(options: { accounts: AccountsClient; messaging: MockMessagingClient; email?: string; phone?: string; country?: string; signup?: SignupFields }): Promise<{ browser: BrowserSession; account: AccountSession; email: string | null; phone: string | null; me: Record<string, unknown> & { uuid: string; id: string } }> {
   const publicUrl = await options.accounts.publicUrl();
   const email = options.phone ? null : (options.email ?? randomEmail());
-  const common = { accounts: options.accounts, messaging: options.messaging, appId: 'accounts', redirectUri: `${publicUrl}/`, ...(options.signup ? { signup: options.signup } : {}) };
+  const common = { accounts: options.accounts, messaging: options.messaging, appId: 'silicon-accounts', redirectUri: `${publicUrl}/`, ...(options.signup ? { signup: options.signup } : {}) };
   const result = email ? await signInWithCode({ ...common, email }) : await signInWithCode({ ...common, phone: options.phone ?? '', ...(options.country ? { country: options.country } : {}) });
   const account = result.browser.account();
   const me = await account.me();

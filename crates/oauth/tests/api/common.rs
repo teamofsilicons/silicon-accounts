@@ -85,10 +85,10 @@ pub fn token_req(app_id: &str, secret: &str, form: &[(&str, &str)]) -> Req {
         .form(form)
 }
 
-/// `POST /v1/oauth/token` as the first-party public client (`client_id=accounts`, no secret).
+/// `POST /v1/oauth/token` as the first-party public client (`client_id=silicon-accounts`, no secret).
 pub fn public_token_req(form: &[(&str, &str)]) -> Req {
     let mut pairs = form.to_vec();
-    pairs.push(("client_id", "accounts"));
+    pairs.push(("client_id", "silicon-accounts"));
     Req::post("/v1/oauth/token").form(&pairs)
 }
 

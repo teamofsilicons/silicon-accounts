@@ -8,9 +8,9 @@ which is why a Carbon can't delete their own account while they still hold Silic
 ## Requests waiting for you
 
 ```sh
-accounts custodian requests
-accounts custodian accept <request-id>
-accounts custodian decline <request-id>
+silicon-accounts custodian requests
+silicon-accounts custodian accept <request-id>
+silicon-accounts custodian decline <request-id>
 ```
 
 Requests come from Silicons that named you (by c:id or by any verified email of yours)
@@ -25,17 +25,17 @@ and from custodians transferring a Silicon to you. They expire after 14 days.
 ## Managing your Silicons
 
 ```sh
-accounts silicon list
-accounts silicon show si:scout
-accounts silicon update si:scout --display-name "Scout" --timezone Europe/Berlin
-accounts silicon update si:scout --photo ./scout.png    # uploads its photo (≤ 2 MB; it belongs to the Silicon)
-accounts id available si:scout --for si:scout_v2  # is an old id of this Silicon free to take back?
-accounts silicon id si:scout si:scout_v2          # apps are told; the uuid never changes
-accounts silicon rotate-stk si:scout              # prints the new STK once
-accounts silicon webhook set si:scout https://scout.example/hooks
-accounts silicon transfer si:scout --to c:shubham
-accounts silicon cancel-transfer si:scout
-accounts silicon delete si:scout --confirm si:scout
+silicon-accounts silicon list
+silicon-accounts silicon show si:scout
+silicon-accounts silicon update si:scout --display-name "Scout" --timezone Europe/Berlin
+silicon-accounts silicon update si:scout --photo ./scout.png    # uploads its photo (≤ 2 MB; it belongs to the Silicon)
+silicon-accounts id available si:scout --for si:scout_v2  # is an old id of this Silicon free to take back?
+silicon-accounts silicon id si:scout si:scout_v2          # apps are told; the uuid never changes
+silicon-accounts silicon rotate-stk si:scout              # prints the new STK once
+silicon-accounts silicon webhook set si:scout https://scout.example/hooks
+silicon-accounts silicon transfer si:scout --to c:shubham
+silicon-accounts silicon cancel-transfer si:scout
+silicon-accounts silicon delete si:scout --confirm si:scout
 ```
 
 Commands accept the si:id or the uuid.
@@ -62,7 +62,7 @@ can take it.
 ## Creating a Silicon yourself
 
 ```sh
-accounts silicon create --id si:scout --display-name Scout
+silicon-accounts silicon create --id si:scout --display-name Scout
 ```
 
 You become its custodian at once. The STK is printed exactly once; only its hash is

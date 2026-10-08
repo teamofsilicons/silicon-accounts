@@ -5,7 +5,7 @@
  *
  * commit (App verification issuer) talks to remind and waveform: one proof each, through POST /v1/proofs/app-verification and the owner route
  * POST /v1/apps/commit/proofs/app-verification (with commit's own credentials, and as commit's owner through the developer site's
- * BFF), the CLI's `accounts app proof app-verification --to <one app>`. Every way of asking for several apps at once is refused with
+ * BFF), the CLI's `silicon-accounts app proof app-verification --to <one app>`. Every way of asking for several apps at once is refused with
  * 422 `app_verification_single_app` (or the CLI's own refusal), each proof verifies only for its own app, listings and refreshes keep
  * the one app, and the store keeps `audiences` = [that app].
  */
@@ -102,7 +102,7 @@ export const journey: Journey = {
     const appFlags = ["--app-id", "commit", "--app-secret-stdin", "--json"];
     const one = await cli(env, home, ["app", "proof", "app_verification", "--to", "remind", ...appFlags], { stdin: secret });
     const cliToken = typeof one.json?.proof_token === "string" ? one.json.proof_token : "";
-    results.check("`accounts app proof app-verification --to remind` → one proof for remind", one.code === 0 && one.json?.receiving_app === "remind" && one.json.kind === "app_verification" && cliToken.startsWith("sap_"), `exit ${one.code} in ${one.ms} ms: ${JSON.stringify({ ...one.json, proof_token: "…", proof_refresh_token: "…" }).slice(0, 200)}`);
+    results.check("`silicon-accounts app proof app-verification --to remind` → one proof for remind", one.code === 0 && one.json?.receiving_app === "remind" && one.json.kind === "app_verification" && cliToken.startsWith("sap_"), `exit ${one.code} in ${one.ms} ms: ${JSON.stringify({ ...one.json, proof_token: "…", proof_refresh_token: "…" }).slice(0, 200)}`);
     results.check("…which remind verifies", (await verifyProof(ctx, "remind", cliToken)).body.valid === true);
     const cliError = (run: typeof one) => {
       const error = (run.json?.error ?? {}) as { message?: string; hint?: string };

@@ -1284,7 +1284,7 @@ pub(crate) fn authorize_internal(state: &AppState, headers: &HeaderMap) -> ApiRe
 async fn export_registry(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     authorize_internal(&state, &headers)?;
     let rows: Vec<Value> = sqlx::query_scalar(
-        "select jsonb_build_object('app_id',a.app_id,'name',a.name,'description',a.description,         'logo_url',a.logo_url,'homepage_url',a.homepage_url,'owner_uuid',a.owner_uuid,         'source',a.source,'created_at',a.created_at,'authors',coalesce((select jsonb_agg(         jsonb_build_object('uuid',ac.uuid,'id',ac.handle,'display_name',ac.display_name,'joined_at',au.joined_at))         from app_authors au join accounts ac on ac.uuid=au.account_uuid where au.app_id=a.app_id),'[]'::jsonb))         from apps a where a.app_id not in ('accounts','developer') order by a.app_id"
+        "select jsonb_build_object('app_id',a.app_id,'name',a.name,'description',a.description,         'logo_url',a.logo_url,'homepage_url',a.homepage_url,'owner_uuid',a.owner_uuid,         'source',a.source,'created_at',a.created_at,'authors',coalesce((select jsonb_agg(         jsonb_build_object('uuid',ac.uuid,'id',ac.handle,'display_name',ac.display_name,'joined_at',au.joined_at))         from app_authors au join accounts ac on ac.uuid=au.account_uuid where au.app_id=a.app_id),'[]'::jsonb))         from apps a where a.app_id not in ('silicon-accounts','developer') order by a.app_id"
     ).fetch_all(&state.db).await?;
     Ok(Json(json!({"apps":rows})).into_response())
 }

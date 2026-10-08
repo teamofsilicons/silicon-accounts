@@ -147,7 +147,7 @@ const codeReuse: Journey = {
       results.check(`grant_type=${grant} → unsupported_grant_type explaining the alternative (${hint})`, reply.status === 400 && reply.body.error === "unsupported_grant_type" && (reply.body.error_description ?? "").includes(hint), brief(reply));
     }
     const publicClient = await (async () => {
-      const response = await fetch(`${env.site}/v1/oauth/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: "accounts", code: s.code, redirect_uri: s.started.redirectUri }).toString() });
+      const response = await fetch(`${env.site}/v1/oauth/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: "silicon-accounts", code: s.code, redirect_uri: s.started.redirectUri }).toString() });
       return { status: response.status, body: (await response.json()) as { error?: string } };
     })();
     results.check("the first-party public client can't redeem codes → unauthorized_client", publicClient.status === 400 && publicClient.body.error === "unauthorized_client", JSON.stringify(publicClient));
@@ -280,7 +280,7 @@ const endpoints: Journey = {
     results.check("no token parameter → 400 invalid_request", noToken.status === 400 && noToken.body.error === "invalid_request", brief(noToken));
     const badClient = await introspect(env, "briefcase", tokens.body.access_token, { secret: "sa_app_wrong" });
     results.check("a wrong app secret → 401 invalid_client", badClient.status === 401 && badClient.body.error === "invalid_client", brief(badClient));
-    const publicIntrospect = await fetch(`${env.site}/v1/oauth/introspect`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token: tokens.body.access_token, client_id: "accounts" }).toString() });
+    const publicIntrospect = await fetch(`${env.site}/v1/oauth/introspect`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token: tokens.body.access_token, client_id: "silicon-accounts" }).toString() });
     results.check("the first-party public client can't introspect → 401 invalid_client", publicIntrospect.status === 401, String(publicIntrospect.status));
 
     // Latency of the reads apps make most.

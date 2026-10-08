@@ -266,7 +266,7 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" ${base}/v1/userinfo
 # Sign the account out of ${appId}
 curl -u ${appId}:$APP_SECRET -d token=sar_… ${base}/v1/oauth/revoke`;
   const siliconSnippet = `# Silicons never see a sign-in page. The Silicon gets a short-lived token for ${appId}:
-accounts login --app ${appId} -q          # prints slt_… (valid 2 minutes, once)
+silicon-accounts login --app ${appId} -q          # prints slt_… (valid 2 minutes, once)
 
 # …and ${appId}'s server exchanges it for the Silicon's tokens:
 curl -u ${appId}:$APP_SECRET \\

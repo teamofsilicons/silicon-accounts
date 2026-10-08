@@ -74,7 +74,7 @@ Every refusal, with its exact description, is listed in
 ## A Silicon's short-lived token
 
 A Silicon signs in to your app by handing you a short-lived token (`slt_…`) that it got with
-`accounts login --app <your app_id>`. It is single use, valid 2 minutes, and only your app can
+`silicon-accounts login --app <your app_id>`. It is single use, valid 2 minutes, and only your app can
 exchange it:
 
 ```sh
@@ -83,11 +83,11 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
 ```
 
 ```sh
-accounts app token slt "$SLT"          # the same from the CLI, in app mode
+silicon-accounts app token slt "$SLT"          # the same from the CLI, in app mode
 ```
 
 ```rust
-//! A Silicon handed your app a short-lived token (`accounts login --app <app_id>` prints it).
+//! A Silicon handed your app a short-lived token (`silicon-accounts login --app <app_id>` prints it).
 //! Run: ACCOUNTS_APP_ID=briefcase ACCOUNTS_APP_SECRET=sa_app_… cargo run --bin slt -- slt_…
 use silicon_accounts_client::Config;
 
@@ -154,7 +154,7 @@ and says which case it is:
 Refresh before the access token's 30 minutes run out (or when your API sees it expire):
 
 ```sh
-accounts app token refresh "$REFRESH_TOKEN" --json
+silicon-accounts app token refresh "$REFRESH_TOKEN" --json
 ```
 
 ```rust
@@ -318,7 +318,7 @@ expired one with `JWTExpired: "exp" claim timestamp check failed`.
 **Locally in Rust**: `app.verify_access_token_locally(&client.jwks().await?, token)` checks the
 signature, `exp`/`nbf` (30 seconds of leeway) and `aud`; see the
 [Rust example](hosted-pages.md#the-same-flow-in-rust). **From the CLI**:
-`accounts app token verify <token>` (exit 0 valid, 2 invalid):
+`silicon-accounts app token verify <token>` (exit 0 valid, 2 invalid):
 
 ```text
 valid: c:lin-docs (nln) for briefcase, expires 2026-10-07T03:08:37Z (in 29m)
@@ -388,7 +388,7 @@ curl -s "$ACCOUNTS_URL/v1/userinfo" -H "Authorization: Bearer $ACCESS_TOKEN"
 
 `POST /v1/userinfo` with a form field `access_token` works too (send the token once, header or
 body). The answer is always current: a renamed account shows its new name at once, unlike the
-claims inside a token. `accounts app userinfo <token>` prints the same. Errors are `401` with
+claims inside a token. `silicon-accounts app userinfo <token>` prints the same. Errors are `401` with
 the API's error object and a `WWW-Authenticate: Bearer …` header OIDC libraries understand:
 
 | `error.code` | Example `message` |
@@ -420,7 +420,7 @@ credentials check out, as RFC 7009 asks; the body says what happened:
 | `{"revoked":false,"message":"Nothing was revoked: this is not a refresh or access token issued to 'briefcase' (it is unknown, malformed, or belongs to another app). RFC 7009 answers 200 either way."}` | Not a token of yours. The answer never says which, so the endpoint can't probe other apps' tokens. |
 | `{"revoked":false,"message":"Nothing was revoked: this is a proof token, and /v1/oauth/revoke only ends sign-ins (refresh tokens sar_... and access tokens). Proofs are revoked by their issuing app with POST /v1/proofs/revoke (or by the account on accounts.teamofsilicons.com)."}` | A credential this endpoint doesn't end; the message says where it is ended. |
 
-`accounts app token revoke <token>` and `app.revoke(token)` in Rust do the same.
+`silicon-accounts app token revoke <token>` and `app.revoke(token)` in Rust do the same.
 
 Revoking ends your app's sign-in only. The Carbon stays signed in to Silicon Accounts in their
 browser, so your next `/authorize` offers "Continue as …" and comes back without a code form;

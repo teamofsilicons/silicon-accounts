@@ -1095,14 +1095,14 @@ const hostedChecks: MockCheck[] = [
   },
 ];
 
-const LONG_LABEL = "accounts CLI on a review laptop with a long hostname (build-agent-17.ci.example.internal, macOS 27, arm64)";
+const LONG_LABEL = "silicon-accounts CLI on a review laptop with a long hostname (build-agent-17.ci.example.internal, macOS 27, arm64)";
 
 const deviceChecks: MockCheck[] = [
   {
     name: "device: only this page's own approval says the terminal is signed in as this Carbon",
     path: "/device?code=WDJB-MJHT",
     as: "carbon",
-    routes: [["GET /v1/device/:code", ({ params }) => ({ json: { user_code: params.code, client_label: "accounts CLI on saket-mbp", created_at: isoIn(-2), expires_at: isoIn(8), status: "approved" } })]],
+    routes: [["GET /v1/device/:code", ({ params }) => ({ json: { user_code: params.code, client_label: "silicon-accounts CLI on saket-mbp", created_at: isoIn(-2), expires_at: isoIn(8), status: "approved" } })]],
     run: async ({ page }) => {
       await expect(heading(page, "This sign-in was already approved")).toBeVisible();
       await expect(page.getByText("Your terminal is signed in")).toHaveCount(0);
@@ -1127,7 +1127,7 @@ const deviceChecks: MockCheck[] = [
     routes: [["GET /v1/device/:code", ({ params }) => ({ json: { user_code: params.code, client_label: LONG_LABEL, created_at: isoIn(-1), expires_at: isoIn(9), status: "pending" } })]],
     run: async ({ page }) => {
       await expect(heading(page, "Approve this sign-in?")).toBeVisible();
-      const label = page.locator("dd").filter({ hasText: "accounts CLI on a review laptop" });
+      const label = page.locator("dd").filter({ hasText: "silicon-accounts CLI on a review laptop" });
       await expect(label).toHaveText(LONG_LABEL);
       // Wrapped, not cut off: nothing hides overflow, no ellipsis, more than one line, and all of it inside the card.
       const shown = await label.evaluate(el => {
@@ -1152,7 +1152,7 @@ const deviceChecks: MockCheck[] = [
     as: "carbon",
     routes: () => {
       const expiresAt = isoIn(0.1);
-      return [["GET /v1/device/:code", ({ params }) => ({ json: { user_code: params.code, client_label: "accounts CLI on saket-mbp", created_at: isoIn(-9.9), expires_at: expiresAt, status: "pending" } })]];
+      return [["GET /v1/device/:code", ({ params }) => ({ json: { user_code: params.code, client_label: "silicon-accounts CLI on saket-mbp", created_at: isoIn(-9.9), expires_at: expiresAt, status: "pending" } })]];
     },
     run: async ({ page }) => {
       await expect(heading(page, "Approve this sign-in?")).toBeVisible();
@@ -1734,16 +1734,16 @@ const liveChecks: LiveCheck[] = [
     name: "device approval: approve, then the terminal gets its token and a reload says the code was used",
     run: async env => {
       const { page } = needCarbon();
-      const started = await fetch(`${env.base}/v1/device/authorize`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client_label: "accounts CLI on live-test" }) });
+      const started = await fetch(`${env.base}/v1/device/authorize`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client_label: "silicon-accounts CLI on live-test" }) });
       const auth = (await started.json()) as { device_code: string; user_code: string };
       await page.goto(`${env.base}/device`);
       await page.getByRole("textbox", { name: "Code from your terminal" }).fill(auth.user_code.replace("-", "").toLowerCase());
       await page.getByRole("button", { name: "Continue", exact: true }).click();
       await expect(heading(page, "Approve this sign-in?")).toBeVisible();
-      await expect(page.getByText("accounts CLI on live-test").first()).toBeVisible();
+      await expect(page.getByText("silicon-accounts CLI on live-test").first()).toBeVisible();
       await page.getByRole("button", { name: "Approve sign-in" }).click();
       await expect(heading(page, "Your terminal is signed in")).toBeVisible();
-      const token = await fetch(`${env.base}/v1/oauth/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: auth.device_code, client_id: "accounts" }) });
+      const token = await fetch(`${env.base}/v1/oauth/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: auth.device_code, client_id: "silicon-accounts" }) });
       expect(((await token.json()) as { access_token?: string }).access_token).toBeTruthy();
       await page.reload();
       await expect(heading(page, "This code was already used")).toBeVisible();
@@ -1752,7 +1752,7 @@ const liveChecks: LiveCheck[] = [
   {
     name: "/device signed out: sign in (a new Carbon), then back on /device with the code to approve",
     run: async env => {
-      const started = await fetch(`${env.base}/v1/device/authorize`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client_label: "accounts CLI on a fresh laptop" }) });
+      const started = await fetch(`${env.base}/v1/device/authorize`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client_label: "silicon-accounts CLI on a fresh laptop" }) });
       const auth = (await started.json()) as { user_code: string };
       const { context, page } = await env.open();
       await page.goto(`${env.base}/device?code=${auth.user_code}`);

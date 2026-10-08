@@ -106,7 +106,7 @@ const redirects: Journey = {
       [`${env.site}.evil.test/sign-in`, false, "an origin that merely starts like the site's"],
       [`${env.site}/sign-in#x`, false, "a fragment"],
     ] as const) {
-      const reply = await attempt(uri, {}, "accounts");
+      const reply = await attempt(uri, {}, "silicon-accounts");
       results.check(`accounts (first-party): ${why} → ${allowed ? "201" : "400"}`, allowed ? reply.status === 201 : reply.status === 400 && errorCode(reply) === "redirect_uri_not_registered", brief(reply));
     }
 
@@ -118,7 +118,7 @@ const redirects: Journey = {
       [`${devCallback}?next=/apps`, false, "its callback with a query"],
       [`${env.developer}/auth/callback/`, false, "a trailing slash"],
       [`${env.developer}/`, false, "another path on the developer site"],
-      [`${env.site}/sign-in`, false, "the account site's /sign-in (the accounts app's, not developer's)"],
+      [`${env.site}/sign-in`, false, "the account site's /sign-in (the silicon-accounts app's, not developer's)"],
       [devCallback.replace("localhost", "127.0.0.1"), false, "127.0.0.1 instead of localhost"],
     ] as const) {
       const reply = await attempt(uri, {}, "developer");

@@ -53,8 +53,18 @@ pub use error::{ApiError, ApiResult, FieldErrors, OAuthError};
 pub use secrecy;
 pub use state::{AppState, Keys};
 
-/// The `app_id` of the first-party app: the account site and the accounts CLI.
-pub const FIRST_PARTY_APP_ID: &str = "accounts";
+/// The `app_id` of the first-party app: the account site and the silicon-accounts CLI.
+pub const FIRST_PARTY_APP_ID: &str = "silicon-accounts";
+
+/// Resolve the former first-party client ID at upgrade boundaries only.
+/// Keep ordinary app identities exact and reserve both spellings.
+pub fn canonical_first_party_app_id(app_id: &str) -> &str {
+    if app_id == "accounts" {
+        FIRST_PARTY_APP_ID
+    } else {
+        app_id
+    }
+}
 
 /// The `app_id` of the developer platform (developers.teamofsilicons.com): a first-party public
 /// client (no secret, PKCE required) whose tokens (`aud = developer`) may only read the
@@ -64,7 +74,7 @@ pub const DEVELOPER_APP_ID: &str = "developer";
 /// Canonical app identity for the Silicon Apps catalog and CLI.
 pub const SILICON_APPS_APP_ID: &str = "silicon-apps";
 
-/// True for Silicon Accounts' own apps (`accounts`, `developer`): no consent screen, no
+/// True for Silicon Accounts' own apps (`silicon-accounts`, `developer`): no consent screen, no
 /// membership, and their sign-ins are never reported to app webhooks.
 pub fn is_first_party_app_id(app_id: &str) -> bool {
     app_id == FIRST_PARTY_APP_ID || app_id == DEVELOPER_APP_ID

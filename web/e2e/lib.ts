@@ -9,7 +9,7 @@
  * developer site base+5, database accounts_e2e_<base>); without it the defaults are scripts/dev.sh's (8590, 8589,
  * 8591…8594, the developer site on 8600, silicon_accounts). Each value can be set on its own:
  *   E2E_SITE   E2E_DEVELOPER   E2E_API   E2E_OIDC   E2E_MESSAGING   E2E_APPS   E2E_IRIS   E2E_DB (postgres URL)
- *   E2E_PG_BIN   E2E_CLI [target/debug/accounts]   E2E_ENGINE [chromium | webkit]
+ *   E2E_PG_BIN   E2E_CLI [target/debug/silicon-accounts]   E2E_ENGINE [chromium | webkit]
  *   E2E_ARTIFACTS [e2e/.artifacts/<base>] (report.json, report.md, shots/)   E2E_SHOTS [<artifacts>/shots]
  */
 import { execFile, spawn } from "node:child_process";
@@ -78,7 +78,7 @@ export function envFromProcess(engineOverride?: Engine): Env {
     iris: trim(process.env.E2E_IRIS ?? `http://127.0.0.1:${port(4)}`),
     db: process.env.E2E_DB ?? `postgres://postgres@127.0.0.1:${pgPort}/${fromBase ? `accounts_e2e_${fromBase}` : "silicon_accounts"}`,
     pgBin: process.env.E2E_PG_BIN ?? process.env.PG_BIN ?? "/opt/homebrew/opt/postgresql@16/bin",
-    cli: process.env.E2E_CLI ?? join(process.env.CARGO_TARGET_DIR ?? join(root, "target"), "debug", "accounts"),
+    cli: process.env.E2E_CLI ?? join(process.env.CARGO_TARGET_DIR ?? join(root, "target"), "debug", "silicon-accounts"),
     engine,
     base,
     artifacts,
@@ -499,7 +499,7 @@ export interface CliRun {
 /** A fresh home for the CLI (its session lives in {home}/.accounts). */
 export const cliHome = () => mkdtempSync(join(tmpdir(), "sa-e2e-cli-"));
 
-/** Runs the `accounts` CLI against the site; `onStderr` sees each stderr line (the device code event comes there). */
+/** Runs the `silicon-accounts` CLI against the site; `onStderr` sees each stderr line (the device code event comes there). */
 export function cli(env: Env, home: string, args: string[], options: { stdin?: string; onStderr?: (line: string) => void } = {}): Promise<CliRun> {
   return new Promise(done => {
     const started = Date.now();

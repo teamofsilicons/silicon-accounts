@@ -88,7 +88,7 @@ async fn the_developer_platform_signs_in_with_pkce_and_no_secret() {
     let next = s(&rotated, "refresh_token").to_string();
     assert_ne!(next, refresh_token);
 
-    // …the accounts CLI's public client can't refresh them (nor the other way round)…
+    // …the silicon-accounts CLI's public client can't refresh them (nor the other way round)…
     let r = ctx
         .call(
             router(),
@@ -233,7 +233,7 @@ async fn the_developer_client_only_has_its_own_grants() {
         &r,
         400,
         "unauthorized_client",
-        "only for the first-party client 'accounts'",
+        "only for the first-party client 'silicon-accounts'",
     );
 
     // A secret never makes it a confidential client; introspection needs one.

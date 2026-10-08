@@ -73,7 +73,7 @@ Every response on this page is real, from a local Silicon Accounts stack. There,
 | field | required | rules |
 |---|---|---|
 | `subject_token` | yes | The account's **access** token issued to your app (it starts with `eyJ`). Not its refresh token, and not a token another app received. |
-| `receiving_app` | yes | The app that will verify the proof: an app id of 2 to 40 characters of `a-z`, `0-9` and `-`, starting with a letter (it is trimmed and lowercased). Not your own app, and not `accounts`. |
+| `receiving_app` | yes | The app that will verify the proof: an app id of 2 to 40 characters of `a-z`, `0-9` and `-`, starting with a letter (it is trimmed and lowercased). Not your own app, and not `silicon-accounts`. |
 | `scopes` | no | Up to 20 distinct strings, each 1 to 100 characters of `A-Z a-z 0-9 _ . : / -`. Duplicates are dropped; the order is kept. |
 | `access_ttl_seconds` | no | How long each proof token lives: 60 to 1800 seconds, default 1800 (30 minutes). |
 
@@ -156,7 +156,7 @@ A User verification proof stands on the account's sign-in at your app, its membe
 | `membership.signed_out` (`reason: stk_rotated`) | the Silicon's custodian rotated its STK, which ends all its sign-ins | end | `410 proof_revoked`, `sign_in_revoked` |
 | `membership.access_removed` | the account removed your app's access | end | `410 proof_revoked`, `access_removed` |
 | `account.deleted` | the account was deleted | end | `410 proof_revoked`, `account_deleted` |
-| nothing | the account revoked one proof on the account site or with `accounts proofs revoke` | that proof ends | `410 proof_revoked`, `revoked_by_account` |
+| nothing | the account revoked one proof on the account site or with `silicon-accounts proofs revoke` | that proof ends | `410 proof_revoked`, `revoked_by_account` |
 
 Stop using those proofs. Once the account signs into your app again, you hold a new access token and can issue a new proof. Trying with the old access token answers `400 invalid_subject_token` with `details.reason: "revoked"` and the time and cause, for example `(access_removed)`. The full list of ends is in [How proofs work](../learn/proofs.md#what-a-user-verification-proof-stands-on).
 
@@ -206,11 +206,11 @@ curl -s -u "dm:$DM_APP_SECRET" \
 The account sees its side with `GET /v1/me/proofs` (User verification proofs issued on its behalf, with both apps' names and logos) and revokes one with `DELETE /v1/me/proofs/{proof_id}`. From the CLI:
 
 ```
-$ accounts proofs list
+$ silicon-accounts proofs list
 PROOF                                 APPS            SCOPES                  STATUS   EXPIRES
 01a1143d-7dc4-71f0-b77d-e0186727b6bb  dm → briefcase  files.write files.read  active   2029-03-25T02:42:16Z
 01a11437-3f76-7734-be53-1472e0c572bd  dm → briefcase  files.write             revoked  2029-03-25T02:35:27Z
-$ accounts proofs revoke 01a1143d-7dc4-71f0-b77d-e0186727b6bb
+$ silicon-accounts proofs revoke 01a1143d-7dc4-71f0-b77d-e0186727b6bb
 Revoked proof 01a1143d-7dc4-71f0-b77d-e0186727b6bb; it no longer verifies.
 ```
 
@@ -328,23 +328,23 @@ proof_revoked (Some(410)): Proof 01a1144b-6e12-72f3-add0-76520b24d57d was revoke
 
 ## With the CLI
 
-App commands take the app's credentials from `--app-id` and `--app-secret-stdin`, from `ACCOUNTS_APP_ID` and `ACCOUNTS_APP_SECRET`, or from `accounts app use <app_id> --secret-stdin`. Pass `-` to read a token from stdin.
+App commands take the app's credentials from `--app-id` and `--app-secret-stdin`, from `ACCOUNTS_APP_ID` and `ACCOUNTS_APP_SECRET`, or from `silicon-accounts app use <app_id> --secret-stdin`. Pass `-` to read a token from stdin.
 
 ```
 $ export ACCOUNTS_APP_ID=dm ACCOUNTS_APP_SECRET=…
-$ printf '%s' "$ACCESS_TOKEN" | accounts app proof user-verification --subject-token - --to briefcase --scope files.write --ttl 600
+$ printf '%s' "$ACCESS_TOKEN" | silicon-accounts app proof user-verification --subject-token - --to briefcase --scope files.write --ttl 600
 User verification proof 01a1143d-7cf0-72cb-a6aa-92936511127a from dm for briefcase on behalf of si:scout_two (8HV).
 proof token    sap_b-W-7LIru72TQVEMyH_9LikGdngf7TdEcGEupmQmI0o
 expires        2026-10-07T02:52:16Z (in 9m)
 refresh token  sapr_LkCj5s0_zZDrJTnHIAQpGAzP0ulTCBcMWzNO2m6B0zc
 refresh until  2029-03-25T02:42:16Z (in 899d)
 scopes         files.write
-$ accounts app proof refresh sapr_LkCj5s0_zZDrJTnHIAQpGAzP0ulTCBcMWzNO2m6B0zc --ttl 900
-$ accounts app proof revoke 01a1143d-7cf0-72cb-a6aa-92936511127a
-$ accounts app proof list --kind user_verification
+$ silicon-accounts app proof refresh sapr_LkCj5s0_zZDrJTnHIAQpGAzP0ulTCBcMWzNO2m6B0zc --ttl 900
+$ silicon-accounts app proof revoke 01a1143d-7cf0-72cb-a6aa-92936511127a
+$ silicon-accounts app proof list --kind user_verification
 ```
 
-`--scope` repeats; `--json` prints the service's answer; `accounts app proof revoke` also takes `--token` or `--refresh-token` instead of the id. `user_verification` sends a random `Idempotency-Key` unless you pass `--idempotency-key`.
+`--scope` repeats; `--json` prints the service's answer; `silicon-accounts app proof revoke` also takes `--token` or `--refresh-token` instead of the id. `user_verification` sends a random `Idempotency-Key` unless you pass `--idempotency-key`.
 
 ## Errors
 
@@ -357,7 +357,7 @@ Every error is `{"error": {"code", "message", "hint", "details"?}}`; the message
 | 403 | `account_not_active` | The account isn't active (`details.status`). | Nothing to do until it is. |
 | 403 | `membership_inactive` | The account has no active membership with your app (`details.membership_id`). | The account must sign into your app again. |
 | 400 | `unknown_receiving_app` | No app has that id (`details.app_ids`). | Check the id. |
-| 400 | `invalid_receiving_app` | The receiving app is your own app, or `accounts` (Silicon Accounts itself). | Name the other app. |
+| 400 | `invalid_receiving_app` | The receiving app is your own app, or `silicon-accounts` (Silicon Accounts itself). | Name the other app. |
 | 403 | `receiving_app_disabled` | The receiving app is disabled (`details.app_ids`). | Try later, or ask its owner. |
 | 422 | `validation_failed` | Field rules, all listed in `details.fields`: e.g. `scopes[1]`, `access_ttl_seconds`, `receiving_app`, or an unknown field. | Fix the named fields. |
 | 409 | `idempotency_key_reused` | The `Idempotency-Key` was used for a different body. | Use a new key. |

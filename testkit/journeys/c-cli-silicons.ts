@@ -1,4 +1,4 @@
-// The real `accounts` CLI: device flow approved with the Carbon's browser session → whoami;
+// The real `silicon-accounts` CLI: device flow approved with the Carbon's browser session → whoami;
 // `silicon create` as custodian (STK once) → `login --silicon` → `login --app remind` → the fake
 // remind app exchanges the SLT; self-create with --custodian --wait while the Carbon accepts;
 // transfer + accept; STK rotation (old STK refused, apps signed out); the Silicon's own webhook
@@ -26,7 +26,7 @@ const carbon = await signUpCarbon({ accounts, messaging });
 const carbonId = carbon.me.id;
 const homeC = newHome('carbon');
 
-section('device flow: `accounts login` approved with /v1/device/{code}/approve');
+section('device flow: `silicon-accounts login` approved with /v1/device/{code}/approve');
 {
   const proc = await cliSpawn(homeC, ['login', '--no-browser', '--json']);
   let userCode: string | null = null;

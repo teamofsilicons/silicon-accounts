@@ -5,7 +5,7 @@ code, phone code, Google, Apple), sign up, the pages people see, and your app's 
 base. You get back an account with a permanent `uuid`; key your records on it (or on
 the membership id `{app_id}:{uuid}`), never on the `c:id`/`si:id`, which can change.
 
-Apps are created in Silicon Apps (`accounts app new` opens it). As soon as an app
+Apps are created in Silicon Apps (`silicon-accounts app new` opens it). As soon as an app
 exists there it can sign people in. You get an `app_id` and an app secret.
 
 Everything about an app's sign-in is set up on the developer platform,
@@ -16,9 +16,9 @@ live in Silicon Accounts, so this CLI reads and changes the same setup.
 ## 1. Configure sign-in
 
 ```sh
-printf '%s' "$APP_SECRET" | accounts app use briefcase --secret-stdin
-accounts app config get
-accounts app config set - <<'JSON'
+printf '%s' "$APP_SECRET" | silicon-accounts app use briefcase --secret-stdin
+silicon-accounts app config get
+silicon-accounts app config set - <<'JSON'
 {
   "methods": {"email": true, "google": true, "apple": false, "phone": false},
   "redirect_uris": ["https://briefcase.example/auth/callback"],
@@ -78,7 +78,7 @@ The browser comes back to `redirect_uri?code=sac_…&state=…`. Exchange the co
 (single use, 2 minutes) from your server:
 
 ```sh
-accounts app token exchange --code sac_… --redirect-uri https://briefcase.example/auth/callback --code-verifier …
+silicon-accounts app token exchange --code sac_… --redirect-uri https://briefcase.example/auth/callback --code-verifier …
 ```
 
 The response holds an access token (JWT, 30 minutes), a refresh token (rotates on
@@ -88,20 +88,20 @@ leaks; always store the new one.
 
 ## Silicons signing into your app
 
-Silicons never see your sign-in page. A Silicon runs `accounts login --app briefcase`
+Silicons never see your sign-in page. A Silicon runs `silicon-accounts login --app briefcase`
 and gives you a short-lived token; exchange it:
 
 ```sh
-accounts app token slt slt_…
+silicon-accounts app token slt slt_…
 ```
 
 ## Checking tokens
 
 * Locally (fast, no network): verify the JWT's EdDSA signature against
   `/.well-known/jwks.json` and check `aud` is your app id
-  (`accounts app token verify <access-token>`, or `AppClient::verify_access_token_locally`).
-* Remotely (sees revocation): `accounts app token introspect <token>`.
-* Profile: `accounts app userinfo <access-token>` (OIDC claims included).
+  (`silicon-accounts app token verify <access-token>`, or `AppClient::verify_access_token_locally`).
+* Remotely (sees revocation): `silicon-accounts app token introspect <token>`.
+* Profile: `silicon-accounts app userinfo <access-token>` (OIDC claims included).
 
 OIDC clients work too: discovery is at `/.well-known/openid-configuration`; add
 `openid` to the scope for an id token.
@@ -109,9 +109,9 @@ OIDC clients work too: discovery is at `/.well-known/openid-configuration`; add
 ## Your user base
 
 ```sh
-accounts app users --q saket
-accounts app user <uuid>
-accounts app import users.csv --wait          # see `accounts docs imports`
+silicon-accounts app users --q saket
+silicon-accounts app user <uuid>
+silicon-accounts app import users.csv --wait          # see `silicon-accounts docs imports`
 ```
 
 Every Carbon and Silicon that signed in is listed with its membership id and the
@@ -119,7 +119,7 @@ details it shared. The columns are fixed; apps can't add their own.
 
 ## Stay in sync
 
-Register a webhook (`accounts app webhook set https://…`) to hear about id changes,
+Register a webhook (`silicon-accounts app webhook set https://…`) to hear about id changes,
 profile changes, sign-outs, removed access and deleted accounts. See
-`accounts docs webhooks`. To act at another app on an account's behalf, use proofs:
-`accounts docs proofs`.
+`silicon-accounts docs webhooks`. To act at another app on an account's behalf, use proofs:
+`silicon-accounts docs proofs`.

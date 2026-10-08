@@ -6,7 +6,7 @@ import { accounts, asCarbon, cliError, freshDir, loginCarbon, loginSilicon, obj,
 
 export const journey: Journey = {
   name: "silicons-cli-login-status",
-  title: "`accounts login status`: signed out it is {\"authenticated\":false} with exit 1 (JSON and text, online and --offline); signed in it says as whom; it follows a session to its end (logout, a revoked session, an expired one) and refreshes an access token about to expire",
+  title: "`silicon-accounts login status`: signed out it is {\"authenticated\":false} with exit 1 (JSON and text, online and --offline); signed in it says as whom; it follows a session to its end (logout, a revoked session, an expired one) and refreshes an access token about to expire",
   // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
   engines: ["chromium"],
   async run(ctx) {
@@ -21,7 +21,7 @@ export const journey: Journey = {
     const offline = await accounts(env, ["login", "status", "--offline", "--json"], { home });
     results.check("…the same with --offline (no network)", offline.code === 1 && JSON.stringify(offline.json) === '{"authenticated":false}', said(offline));
     const text = await accounts(env, ["login", "status"], { home });
-    results.check("in text mode: exit 1, 'Not signed in to <url>.' and how to sign in (stderr)", text.code === 1 && text.stdout.trim() === `Not signed in to ${env.site}.` && text.stderr.includes("accounts login --silicon si:<id> --stk-stdin"), said(text));
+    results.check("in text mode: exit 1, 'Not signed in to <url>.' and how to sign in (stderr)", text.code === 1 && text.stdout.trim() === `Not signed in to ${env.site}.` && text.stderr.includes("silicon-accounts login --silicon si:<id> --stk-stdin"), said(text));
     const quiet = await accounts(env, ["login", "status", "-q"], { home });
     results.check("-q drops the suggestions, keeps the answer and the exit code", quiet.code === 1 && quiet.stderr.trim() === "" && quiet.stdout.includes("Not signed in"), said(quiet));
     const emptyDir = await accounts(env, ["login", "status", "--json"], { home: freshDir() });
@@ -56,7 +56,7 @@ export const journey: Journey = {
 
     // 4. Logout ends it.
     const logout = await accounts(env, ["logout", "--json"], { home });
-    results.check("`accounts logout --json`: signed out, the session revoked at the service", logout.code === 0 && logout.json?.signed_out === true && logout.json?.revoked === true, said(logout));
+    results.check("`silicon-accounts logout --json`: signed out, the session revoked at the service", logout.code === 0 && logout.json?.signed_out === true && logout.json?.revoked === true, said(logout));
     const afterLogout = await accounts(env, ["login", "status", "--json"], { home });
     results.check("…then status: exit 1, {\"authenticated\": false}", afterLogout.code === 1 && afterLogout.json?.authenticated === false, said(afterLogout));
     const revokedFamily = await sql(env, `select count(*) from token_families where account_uuid = '${uuid}' and revoked_at is not null and revoke_reason = 'user_signed_out'`);
@@ -74,14 +74,14 @@ export const journey: Journey = {
     const sessions = (listed.json?.items ?? []) as Json[];
     const mine = sessions.find(item => item.current === true);
     const other = sessions.find(item => item.kind === "cli" && item.current !== true && item.origin === "cli_code");
-    results.check("`accounts sessions list` shows both CLI sign-ins (cli, cli_code), the current one marked", !!mine && !!other, short(sessions.map(item => [item.kind, item.origin, item.current, item.label])));
+    results.check("`silicon-accounts sessions list` shows both CLI sign-ins (cli, cli_code), the current one marked", !!mine && !!other, short(sessions.map(item => [item.kind, item.origin, item.current, item.label])));
     const revoke = await accounts(env, ["sessions", "revoke", str(other?.id), "--json"], { home: homeB });
     const statusA = await accounts(env, ["login", "status", "--json"], { home: homeA });
     results.check("revoking the other one from here: its `login status` then says not authenticated (exit 1, session_ended)", revoke.code === 0 && statusA.code === 1 && statusA.json?.authenticated === false && statusA.json?.reason === "session_ended", `${said(revoke)} | ${said(statusA)}`);
     const statusB = await accounts(env, ["login", "status", "--json"], { home: homeB });
     results.check("…while this one stays signed in", statusB.code === 0 && statusB.json?.authenticated === true, said(statusB));
 
-    // 5b. `accounts login` again in a terminal whose session was revoked meanwhile (nothing ran there since): it must
+    // 5b. `silicon-accounts login` again in a terminal whose session was revoked meanwhile (nothing ran there since): it must
     //     notice the session ended and start a new sign-in, not answer "Already signed in" from the dead session.
     const homeD = freshDir();
     await loginCarbon(env, homeD, carbon);
@@ -100,7 +100,7 @@ export const journey: Journey = {
     const reloggedIn = await relogin;
     const statusD = await accounts(env, ["login", "status", "--json"], { home: homeD });
     results.check(
-      "`accounts login` where the session was revoked meanwhile starts a new sign-in (a device code, approved here) instead of answering \"Already signed in\" from the dead session; `login status` then says authenticated",
+      "`silicon-accounts login` where the session was revoked meanwhile starts a new sign-in (a device code, approved here) instead of answering \"Already signed in\" from the dead session; `login status` then says authenticated",
       revokedD.code === 0 && !!shown && reloggedIn.code === 0 && reloggedIn.json?.authenticated === true && statusD.code === 0 && statusD.json?.authenticated === true,
       `${shown ? "device code shown" : "no device code"} | ${said(reloggedIn)} | then ${said(statusD)}`,
     );
@@ -122,13 +122,13 @@ export const journey: Journey = {
     const history = await asCarbon<Json>(env, carbon, "GET", "/v1/me/history?kind=signin");
     const cliSignins = ((obj(history.body).items ?? []) as Json[]).filter(item => str(obj(item.meta).user_agent).startsWith("accounts-cli/"));
     results.check(
-      "the history names a CLI sign-in's client as the CLI ('from 127.0.0.1 · accounts CLI <version>'), not as 'A browser'",
-      cliSignins.length >= 2 && cliSignins.every(item => /^from \S+ · accounts CLI \d+\.\d+\.\d+$/.test(str(item.detail)) && !/browser/i.test(str(item.detail))),
+      "the history names a CLI sign-in's client as the CLI ('from 127.0.0.1 · silicon-accounts CLI <version>'), not as 'A browser'",
+      cliSignins.length >= 2 && cliSignins.every(item => /^from \S+ · silicon-accounts CLI \d+\.\d+\.\d+$/.test(str(item.detail)) && !/browser/i.test(str(item.detail))),
       short(cliSignins.map(item => [item.title, item.detail, obj(item.meta).user_agent])),
     );
     const security = await asCarbon<Json>(env, carbon, "GET", "/v1/me/history?kind=security");
     const created = ((obj(security.body).items ?? []) as Json[]).filter(item => item.title === "New CLI sign-in");
     results.check("…and each new CLI sign-in is listed with its label and how it signed in ('… · with an email code')", created.filter(item => / · with an email code$/.test(str(item.detail))).length >= 3 && created.every(item => / · with /.test(str(item.detail))), short(created.map(item => item.detail)));
-    results.check("the Silicon's own history names its STK sign-in from the CLI the same way", siliconSignin?.title === "Signed in to Silicon Accounts with the STK" && /^from \S+ · accounts CLI \d+\.\d+\.\d+$/.test(str(siliconSignin?.detail)), short(siliconSignin));
+    results.check("the Silicon's own history names its STK sign-in from the CLI the same way", siliconSignin?.title === "Signed in to Silicon Accounts with the STK" && /^from \S+ · silicon-accounts CLI \d+\.\d+\.\d+$/.test(str(siliconSignin?.detail)), short(siliconSignin));
   },
 };

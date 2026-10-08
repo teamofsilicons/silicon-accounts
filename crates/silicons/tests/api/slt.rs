@@ -170,7 +170,7 @@ async fn app_and_auth_errors() {
     assert_eq!(r.status, 403);
     assert_eq!(r.error_code(), Some("app_disabled"));
 
-    let r = slt(&ctx, &t, "accounts").await;
+    let r = slt(&ctx, &t, "silicon-accounts").await;
     assert_eq!(r.status, 422);
     assert_eq!(r.error_code(), Some("first_party_app"));
 

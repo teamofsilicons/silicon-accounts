@@ -16,7 +16,7 @@ pub async fn call(ctx: &TestContext, req: Req) -> Resp {
     ctx.call(router(), req).await
 }
 
-/// A first-party access token (aud = accounts) for an account.
+/// A first-party access token (aud = silicon-accounts) for an account.
 pub async fn token(ctx: &TestContext, account: &Account) -> String {
     ctx.first_party_tokens(account).await.access_token
 }

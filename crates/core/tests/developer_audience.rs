@@ -92,7 +92,7 @@ async fn developer_tokens_read_identity_and_manage_owned_apps_only() {
         assert!(
             r.json["error"]["hint"]
                 .as_str()
-                .is_some_and(|h| h.contains("accounts login")),
+                .is_some_and(|h| h.contains("silicon-accounts login")),
             "{}",
             r.json
         );
@@ -132,7 +132,7 @@ async fn developer_tokens_read_identity_and_manage_owned_apps_only() {
     assert!(
         r.json["error"]["message"]
             .as_str()
-            .is_some_and(|m| m.contains("'accounts' (or 'developer')")),
+            .is_some_and(|m| m.contains("'silicon-accounts' (or 'developer')")),
         "{}",
         r.json
     );
@@ -142,7 +142,7 @@ async fn developer_tokens_read_identity_and_manage_owned_apps_only() {
     assert!(
         r.json["error"]["message"]
             .as_str()
-            .is_some_and(|m| m.ends_with("issued to 'accounts'.")),
+            .is_some_and(|m| m.ends_with("issued to 'silicon-accounts'.")),
         "{}",
         r.json
     );

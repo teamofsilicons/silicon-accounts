@@ -309,7 +309,7 @@ async function shoot() {
     const ids = (finalSilicons.body.items ?? []).map(item => item.silicon?.id ?? item.id ?? "");
     results.check("…and no Silicon was created by the forged forms (only the one created from the site)", finalSilicons.status === 200 && !ids.some(id => id.startsWith("si:csrf-form-")) && ids.includes(bot.id), `${finalSilicons.status}: ${ids.join(", ")}`);
     const pendingDevice = await call<{ status?: string }>(`${env.site}/v1/device/${userCode}`, { headers: { cookie: `sa_session=${sessionCookie}` }, ip: ctx.ip });
-    const poll = await call<{ error?: string; access_token?: string }>(`${env.site}/v1/oauth/token`, { form: { grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: device.body.device_code ?? "", client_id: "accounts" }, ip: ctx.ip });
+    const poll = await call<{ error?: string; access_token?: string }>(`${env.site}/v1/oauth/token`, { form: { grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: device.body.device_code ?? "", client_id: "silicon-accounts" }, ip: ctx.ip });
     results.check("…and the attacker's device code was never approved: still pending, and the attacker's terminal polling it gets authorization_pending, no token", device.status === 200 && pendingDevice.body.status === "pending" && poll.status === 400 && poll.body.error === "authorization_pending" && !poll.body.access_token, `device ${device.status}; status ${pendingDevice.status} ${pendingDevice.body.status}; poll ${poll.status} ${poll.body.error}`);
     await victimContext.close();
 

@@ -3,7 +3,7 @@
  * forwarded address (and `raw` for byte-exact request targets and Host headers), a cookie jar that keeps every
  * Set-Cookie line, the hosted sign-in flow driven over HTTP (v2: choose_method → verify_code → signup → the app's
  * details pages → review → complete), the developer site's BFF driven over HTTP (its sign-in round trip, its sealed
- * session cookie), the three kinds of account tokens (aud=developer through the `developer` app with PKCE, aud=accounts
+ * session cookie), the three kinds of account tokens (aud=developer through the `developer` app with PKCE, aud=silicon-accounts
  * through the device flow, an app's own), the fake apps' fixed credentials, a recording HTTP server (`serve`), a dump
  * of the stack's database (`dumpDatabase`), and extra accounts-api / developer-site processes (secure cookies,
  * production mode) on the stack's spare ports (base + 6 … base + 8: base − 1 … base + 5 are the stack's own, the
@@ -383,7 +383,7 @@ export function flowStep(target: Target, jar: Jar, flowId: string, step: string,
 
 /** The default redirect URI of an app on this target: the site's /sign-in (accounts), the developer site's callback, a fake app's callback. */
 export function redirectFor(target: Target, appId: string): string {
-  if (appId === "accounts") return `${target.origin}/sign-in`;
+  if (appId === "silicon-accounts") return `${target.origin}/sign-in`;
   if (appId === "developer") return developerCallback(target.env);
   return callbackOf(target.env, appId);
 }
@@ -448,13 +448,13 @@ function fail(what: string, reply: Reply): never {
 /**
  * Signs in (signing up a new Carbon when the email is new) with an email code through the hosted flow, accepting the
  * sign-up prefill and walking the app's details pages and review with the defaults. `appId` defaults to the account
- * site itself (`accounts`).
+ * site itself (`silicon-accounts`).
  */
 export async function signInWithEmail(target: Target, options: { email?: string; appId?: string; jar?: Jar; scope?: string; label?: string; share?: string[]; extra?: Record<string, string> } = {}): Promise<SignedUp> {
   const env = target.env;
   const jar = options.jar ?? new Jar();
   const email = options.email ?? randomEmail(options.label ?? "carbon");
-  const appId = options.appId ?? "accounts";
+  const appId = options.appId ?? "silicon-accounts";
   // The account site's own sign-in returns to the public origin the target serves (another server may have another).
   const redirect = redirectFor(target, appId);
   const { verifier, challenge } = pkcePair();
@@ -479,7 +479,7 @@ export async function signInWithEmail(target: Target, options: { email?: string;
 export async function signInWithPhone(target: Target, options: { phone: string; jar?: Jar }): Promise<{ jar: Jar; uuid: string; id: string; code: string; phone: string }> {
   const env = target.env;
   const jar = options.jar ?? new Jar();
-  const created = await startFlow(target, jar, { app_id: "accounts", redirect_uri: redirectFor(target, "accounts"), state: `ph-${tag()}`, prompt: "login" });
+  const created = await startFlow(target, jar, { app_id: "silicon-accounts", redirect_uri: redirectFor(target, "silicon-accounts"), state: `ph-${tag()}`, prompt: "login" });
   let flow = flowOf(created) ?? fail("POST /v1/flows for a phone sign-in", created);
   const after = await lastSeq(env);
   const sent = await flowStep(target, jar, flow.id, "phone", { phone: options.phone });
@@ -524,7 +524,7 @@ export function token(target: Target, form: Record<string, string>, credentials:
 }
 
 /** POST /v1/oauth/token as a public first-party client (`client_id` in the body, no secret). */
-export function publicToken(target: Target, clientId: "accounts" | "developer", form: Record<string, string>): Promise<TokenReply> {
+export function publicToken(target: Target, clientId: "silicon-accounts" | "developer", form: Record<string, string>): Promise<TokenReply> {
   return call(`${target.url}/v1/oauth/token`, { form: { client_id: clientId, ...form }, ip: target.ip });
 }
 
@@ -550,15 +550,15 @@ export async function developerTokens(target: Target, jar: Jar): Promise<TokenRe
 }
 
 /**
- * First-party tokens (aud=accounts) for the jar's signed-in Carbon, as the CLI gets them without a code: the device
- * flow (POST /v1/device/authorize), approved from the browser session, then polled by the public client `accounts`.
+ * First-party tokens (aud=silicon-accounts) for the jar's signed-in Carbon, as the CLI gets them without a code: the device
+ * flow (POST /v1/device/authorize), approved from the browser session, then polled by the public client `silicon-accounts`.
  */
 export async function deviceTokens(target: Target, jar: Jar, label = "security suite"): Promise<TokenResponse> {
   const device = await call<{ device_code?: string; user_code?: string }>(`${target.url}/v1/device/authorize`, { json: { client_label: label }, ip: target.ip });
   if (device.status !== 200 || !device.body.device_code || !device.body.user_code) fail("POST /v1/device/authorize", device);
   const approved = await call(`${target.url}/v1/device/${encodeURIComponent(device.body.user_code)}/approve`, { method: "POST", body: "", jar, origin: target.origin, ip: target.ip });
   if (approved.status !== 204 && approved.status !== 200) fail("approving the device code", approved);
-  const polled = await publicToken(target, "accounts", { grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: device.body.device_code });
+  const polled = await publicToken(target, "silicon-accounts", { grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: device.body.device_code });
   if (polled.status !== 200) fail("polling the approved device code", polled);
   return polled.body;
 }

@@ -75,7 +75,7 @@ export const journey: Journey = {
     const remindSeq = (await appInbox(env, "remind")).last_seq;
     const rotated = await accounts(env, ["silicon", "rotate-stk", sid, "--json"], { home: homeC });
     const second = str(rotated.json?.stk);
-    results.check("`accounts silicon rotate-stk`: a new STK (stk- + 12 hex), printed once", rotated.code === 0 && /^stk-[0-9a-f]{12}$/.test(second) && second !== first && !!rotated.json?.rotated_at, said(rotated).replace(second, "stk-…"));
+    results.check("`silicon-accounts silicon rotate-stk`: a new STK (stk- + 12 hex), printed once", rotated.code === 0 && /^stk-[0-9a-f]{12}$/.test(second) && second !== first && !!rotated.json?.rotated_at, said(rotated).replace(second, "stk-…"));
     const old = await loginSilicon(env, freshDir(), sid, first);
     results.check("the old STK no longer signs in (exit 3, invalid_credentials)", old.code === 3 && cliError(old).code === "invalid_credentials", said(old));
     const fresh = await loginSilicon(env, freshDir(), sid, second);
@@ -92,13 +92,13 @@ export const journey: Journey = {
     const again = await loginSilicon(env, home3, sid, second);
     const againStatus = await accounts(env, ["login", "status", "--json"], { home: home3 });
     results.check(
-      "`accounts login --silicon … --stk-stdin` with the new STK, where a session from before the rotation is still stored: a real sign-in (verified), and `login status` then says authenticated",
+      "`silicon-accounts login --silicon … --stk-stdin` with the new STK, where a session from before the rotation is still stored: a real sign-in (verified), and `login status` then says authenticated",
       login3.code === 0 && again.code === 0 && again.json?.authenticated === true && again.json?.verified === true && againStatus.code === 0 && againStatus.json?.authenticated === true,
       `${said(again)} | then ${said(againStatus)}`,
     );
     const withApp = await loginSilicon(env, home5, sid, second, ["--app", "remind"]);
     results.check(
-      "…and `accounts login --silicon … --stk-stdin --app remind` with the new STK there: signs in and prints the token (exit 0), not session_ended",
+      "…and `silicon-accounts login --silicon … --stk-stdin --app remind` with the new STK there: signs in and prints the token (exit 0), not session_ended",
       login5.code === 0 && withApp.code === 0 && str(withApp.json?.slt).startsWith("slt_"),
       said(withApp).replace(str(withApp.json?.slt), "slt_…"),
     );

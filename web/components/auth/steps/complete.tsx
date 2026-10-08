@@ -89,7 +89,7 @@ export function Complete({ flow }: CompleteProps) {
     <div className={styles.complete}>
       {who ? <SuccessMark name={who.display_name} photo={who.pfp_url} /> : null}
       <StepHeading
-        title={flow.app.app_id === "accounts" ? `Welcome, ${firstName(who?.display_name ?? "")}` : `Signed in to ${flow.app.name}`}
+        title={flow.app.app_id === "silicon-accounts" ? `Welcome, ${firstName(who?.display_name ?? "")}` : `Signed in to ${flow.app.name}`}
         description={<>{who?.id ? <>As <span className={styles.mono}>{who.id}</span>. </> : null}Taking you to {appName} now.</>}
         noFocus
       />

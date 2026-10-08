@@ -1,4 +1,4 @@
-//! Docs bundled into the binary (`accounts docs [topic]`), so they always match the CLI.
+//! Docs bundled into the binary (`silicon-accounts docs [topic]`), so they always match the CLI.
 
 /// (topic, one-line summary, content)
 pub const TOPICS: &[(&str, &str, &str)] = &[
@@ -80,7 +80,7 @@ pub fn find(topic: &str) -> Option<(&'static str, &'static str)> {
 /// The topic list as text.
 pub fn index() -> String {
     let width = TOPICS.iter().map(|(n, _, _)| n.len()).max().unwrap_or(0);
-    let mut text = String::from("Bundled docs (accounts docs <topic>):\n\n");
+    let mut text = String::from("Bundled docs (silicon-accounts docs <topic>):\n\n");
     for (name, summary, _) in TOPICS {
         text.push_str(&format!("  {name:<width$}  {summary}\n"));
     }

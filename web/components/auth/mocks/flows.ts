@@ -51,7 +51,7 @@ export const SAMPLE_ACCOUNT: AccountSummary = { uuid: "a8K", kind: "carbon", id:
 
 /** The first-party app (the account site and CLI sign in through it). */
 export const FIRST_PARTY: AppPublic = {
-  app_id: "accounts",
+  app_id: "silicon-accounts",
   name: "Silicon Accounts",
   logo_url: null,
   logo_dark_url: null,
@@ -84,7 +84,7 @@ export function sampleFlow(app: AppPublic, scenario: Scenario, extra: Partial<Fl
       homepage_url: app.homepage_url,
       branding: app.branding,
       copy: app.copy,
-      first_party: app.app_id === "accounts",
+      first_party: app.app_id === "silicon-accounts",
     },
     methods: app.methods,
     signed_in_as: null,

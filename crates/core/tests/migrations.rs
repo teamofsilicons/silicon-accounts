@@ -19,13 +19,13 @@ async fn migrations_are_idempotent_and_seed_the_first_party_app() {
     );
 
     let mut conn = ctx.conn().await;
-    let app = apps::get(&mut conn, "accounts")
+    let app = apps::get(&mut conn, "silicon-accounts")
         .await
         .expect("q")
         .expect("first-party app");
     assert_eq!(app.source, AppSource::FirstParty);
     assert_eq!(app.status, AppStatus::Active);
-    let config = apps::effective_config(&mut conn, &ctx.state.settings, "accounts")
+    let config = apps::effective_config(&mut conn, &ctx.state.settings, "silicon-accounts")
         .await
         .expect("config");
     assert_eq!(
@@ -34,10 +34,14 @@ async fn migrations_are_idempotent_and_seed_the_first_party_app() {
     );
     assert!(config.redirect_allowed(
         &ctx.state.settings,
-        "accounts",
+        "silicon-accounts",
         "http://localhost:8590/apps"
     ));
-    assert!(!config.redirect_allowed(&ctx.state.settings, "accounts", "https://evil.test/"));
+    assert!(!config.redirect_allowed(
+        &ctx.state.settings,
+        "silicon-accounts",
+        "https://evil.test/"
+    ));
     accounts_core::db::ping(&ctx.state.db).await.expect("ping");
 }
 
@@ -279,7 +283,7 @@ async fn silicon_apps_id_migration_preserves_credentials_and_relations() {
     let (family,hash,audiences):(String,Vec<u8>,Vec<String>)=sqlx::query_as("select f.app_id,r.token_hash,p.audiences from token_families f join refresh_tokens r on r.family_id=f.id cross join proof_families p").fetch_one(&db.pool).await.unwrap();
     assert_eq!(family, "silicon-apps");
     assert_eq!(hash, b"fixture");
-    assert_eq!(audiences, vec!["silicon-apps", "accounts"]);
+    assert_eq!(audiences, vec!["silicon-apps", "silicon-accounts"]);
     assert!(
         accounts_core::db::migrate(&db.pool)
             .await
@@ -303,5 +307,157 @@ async fn silicon_apps_id_collision_aborts_without_touching_either_app() {
             .fetch_one(&db.pool)
             .await
             .unwrap();
+    assert_eq!(count, 2);
+}
+
+#[tokio::test]
+async fn accounts_rename_preserves_credentials_sessions_and_token_boundaries() {
+    use accounts_core::models::Scope;
+    use accounts_core::repo::tokens;
+    use accounts_core::test_support::{TestDb, test_state};
+    let db = TestDb::empty().await;
+    accounts_core::db::MIGRATOR
+        .run_to(11, &db.pool)
+        .await
+        .unwrap();
+    let ctx = TestContext {
+        state: test_state(db.pool.clone()),
+        db,
+    };
+    let carbon = ctx.carbon().await;
+    let session = ctx.browser_session(&carbon).await;
+    let old = ctx.tokens_for(&carbon, "accounts", &[Scope::Profile]).await;
+    let before: serde_json::Value =
+        sqlx::query_scalar("select to_jsonb(a)-'app_id' from apps a where app_id='accounts'")
+            .fetch_one(&ctx.db.pool)
+            .await
+            .unwrap();
+    let config: serde_json::Value = sqlx::query_scalar(
+        "select to_jsonb(c)-'app_id' from app_signin_configs c where app_id='accounts'",
+    )
+    .fetch_one(&ctx.db.pool)
+    .await
+    .unwrap();
+    accounts_core::db::migrate(&ctx.db.pool).await.unwrap();
+    let after: serde_json::Value = sqlx::query_scalar(
+        "select to_jsonb(a)-'app_id' from apps a where app_id='silicon-accounts'",
+    )
+    .fetch_one(&ctx.db.pool)
+    .await
+    .unwrap();
+    let after_config: serde_json::Value = sqlx::query_scalar(
+        "select to_jsonb(c)-'app_id' from app_signin_configs c where app_id='silicon-accounts'",
+    )
+    .fetch_one(&ctx.db.pool)
+    .await
+    .unwrap();
+    assert_eq!(before, after);
+    assert_eq!(config, after_config);
+    assert!(
+        apps::get(&mut *ctx.conn().await, "accounts")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let verified = tokens::verify_access_token(
+        &mut *ctx.conn().await,
+        &ctx.state.keys,
+        &old.access_token,
+        Some("silicon-accounts"),
+    )
+    .await
+    .unwrap();
+    assert_eq!(verified.claims.aud, "silicon-accounts");
+    assert_eq!(verified.account.uuid, carbon.uuid);
+    assert_eq!(
+        verified.claims.mid,
+        format!("silicon-accounts:{}", carbon.uuid)
+    );
+    assert!(
+        tokens::verify_access_token(
+            &mut *ctx.conn().await,
+            &ctx.state.keys,
+            &old.access_token,
+            Some("developer")
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(
+        ctx.state
+            .keys
+            .jwt
+            .verify_access_ignoring_expiry(&old.access_token)
+            .unwrap()
+            .aud,
+        "silicon-accounts"
+    );
+    let new = tokens::refresh(
+        &ctx.state.db,
+        &ctx.state.keys,
+        &ctx.state.settings,
+        &old.refresh_token,
+        "silicon-accounts",
+    )
+    .await
+    .unwrap();
+    assert_eq!(new.refresh_token_expires_at, old.refresh_token_expires_at);
+    assert_ne!(new.refresh_token, old.refresh_token);
+    assert_eq!(
+        ctx.state
+            .keys
+            .jwt
+            .verify_access(&new.access_token, Some("silicon-accounts"))
+            .unwrap()
+            .aud,
+        "silicon-accounts"
+    );
+    assert!(
+        tokens::refresh(
+            &ctx.state.db,
+            &ctx.state.keys,
+            &ctx.state.settings,
+            &old.refresh_token,
+            "silicon-accounts"
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        tokens::verify_access_token(
+            &mut *ctx.conn().await,
+            &ctx.state.keys,
+            &old.access_token,
+            None
+        )
+        .await
+        .is_err()
+    );
+    let session_count: i64 = sqlx::query_scalar(
+        "select count(*) from browser_sessions where account_uuid=$1 and token_hash=$2",
+    )
+    .bind(&carbon.uuid)
+    .bind(ctx.state.keys.pepper.hash(&session))
+    .fetch_one(&ctx.db.pool)
+    .await
+    .unwrap();
+    assert_eq!(session_count, 1);
+}
+
+#[tokio::test]
+async fn accounts_rename_refuses_to_merge_an_existing_app() {
+    let db = accounts_core::test_support::TestDb::empty().await;
+    accounts_core::db::MIGRATOR
+        .run_to(11, &db.pool)
+        .await
+        .unwrap();
+    sqlx::raw_sql("insert into apps(app_id,name,source,secret_hash) values('silicon-accounts','Someone else','silicon_apps','other'::bytea)").execute(&db.pool).await.unwrap();
+    assert!(accounts_core::db::migrate(&db.pool).await.is_err());
+    let count: i64 = sqlx::query_scalar(
+        "select count(*) from apps where app_id in ('accounts','silicon-accounts')",
+    )
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
     assert_eq!(count, 2);
 }

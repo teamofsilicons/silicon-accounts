@@ -14,7 +14,7 @@ const modeOf = (path: string) => {
 
 export const journey: Journey = {
   name: "silicons-cli-config-home",
-  title: "`accounts config home <dir>`: refuses a file or a missing path with 'not a directory', points the CLI's state at a directory (pointer in SILICON_HOME or ~), which then holds the session; --home and ACCOUNTS_HOME win; a home that disappears or SILICON_HOME/--home/ACCOUNTS_HOME that are not directories say so precisely",
+  title: "`silicon-accounts config home <dir>`: refuses a file or a missing path with 'not a directory', points the CLI's state at a directory (pointer in SILICON_HOME or ~), which then holds the session; --home and ACCOUNTS_HOME win; a home that disappears or SILICON_HOME/--home/ACCOUNTS_HOME that are not directories say so precisely",
   // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
   engines: ["chromium"],
   async run(ctx) {
@@ -28,7 +28,7 @@ export const journey: Journey = {
 
     // 1. The default: SILICON_HOME when set.
     const shown = await run(["config", "home", "--json"]);
-    results.check("`accounts config home --json` with SILICON_HOME set: that directory, from SILICON_HOME", shown.code === 0 && shown.json?.home === base && shown.json?.source === "env:SILICON_HOME" && shown.json?.state_dir === join(base, ".accounts"), said(shown));
+    results.check("`silicon-accounts config home --json` with SILICON_HOME set: that directory, from SILICON_HOME", shown.code === 0 && shown.json?.home === base && shown.json?.source === "env:SILICON_HOME" && shown.json?.state_dir === join(base, ".accounts"), said(shown));
 
     // 2. Not a directory: a file, a missing path.
     const file = join(base, `notes-${t}.txt`);
@@ -48,9 +48,9 @@ export const journey: Journey = {
     const pointer = join(base, ".accounts", "home");
     results.check("a directory: configured, the pointer kept in SILICON_HOME/.accounts/home (mode 600)", set.code === 0 && set.json?.configured === true && set.json?.home === dir && set.json?.pointer === pointer && readFileSync(pointer, "utf8").trim() === dir && modeOf(pointer) === "600", said(set));
     const now = await run(["config", "home", "--json"]);
-    results.check("`accounts config home` now names it, from the config", now.json?.home === dir && now.json?.source === "config", said(now));
+    results.check("`silicon-accounts config home` now names it, from the config", now.json?.home === dir && now.json?.source === "config", said(now));
     const got = await run(["config", "get", "home", "--json"]);
-    results.check("`accounts config get home --json` agrees", got.code === 0 && got.json?.value === dir && got.json?.source === "config", said(got));
+    results.check("`silicon-accounts config get home --json` agrees", got.code === 0 && got.json?.value === dir && got.json?.source === "config", said(got));
     const carbon = await signUpCarbon(env, "homes");
     const stk = `stk-40be${"0".repeat(8)}`;
     await asCarbon<Json>(env, carbon, "POST", "/v1/me/silicons", { id: `si:homed-${t}`, display_name: "Homed", stk });
@@ -72,10 +72,10 @@ export const journey: Journey = {
     // 5. The configured directory disappears: every command says so, and --reset recovers.
     rmSync(dir, { recursive: true, force: true });
     const gone = await run(["login", "status", "--json"]);
-    results.check("the configured home was deleted: commands fail with exit 2, not_a_directory, naming `accounts config home` and --reset", gone.code === 2 && cliError(gone).code === "not_a_directory" && str(cliError(gone).message).includes("does not exist; set by `accounts config home`") && str(cliError(gone).hint).includes("--reset"), said(gone));
+    results.check("the configured home was deleted: commands fail with exit 2, not_a_directory, naming `silicon-accounts config home` and --reset", gone.code === 2 && cliError(gone).code === "not_a_directory" && str(cliError(gone).message).includes("does not exist; set by `silicon-accounts config home`") && str(cliError(gone).hint).includes("--reset"), said(gone));
     const reset = await run(["config", "home", "--reset", "--json"]);
     const back = await run(["config", "home", "--json"]);
-    results.check("`accounts config home --reset`: back to SILICON_HOME", reset.code === 0 && reset.json?.configured === false && back.json?.home === base && back.json?.source === "env:SILICON_HOME" && !existsSync(pointer), `${said(reset)} | ${said(back)}`);
+    results.check("`silicon-accounts config home --reset`: back to SILICON_HOME", reset.code === 0 && reset.json?.configured === false && back.json?.home === base && back.json?.source === "env:SILICON_HOME" && !existsSync(pointer), `${said(reset)} | ${said(back)}`);
 
     // 6. SILICON_HOME, --home and ACCOUNTS_HOME that are not directories.
     const silFile = await accounts(env, ["login", "status", "--json"], { home: null, env: { SILICON_HOME: file } });
@@ -92,6 +92,6 @@ export const journey: Journey = {
     const target = join(user, "agents", "scout");
     mkdirSync(target, { recursive: true });
     const tildeSet = await accounts(env, ["config", "home", target, "--json"], { home: null, env: { HOME: user, SILICON_HOME: undefined } });
-    results.check("…and `accounts config home` keeps its pointer in ~/.accounts/home", tildeSet.code === 0 && readFileSync(join(user, ".accounts", "home"), "utf8").trim() === realpathSync(target), said(tildeSet));
+    results.check("…and `silicon-accounts config home` keeps its pointer in ~/.accounts/home", tildeSet.code === 0 && readFileSync(join(user, ".accounts", "home"), "utf8").trim() === realpathSync(target), said(tildeSet));
   },
 };

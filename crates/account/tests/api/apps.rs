@@ -177,7 +177,7 @@ async fn removing_access_revokes_sign_ins_and_proofs() {
     .expect("membership");
     assert_eq!(status, "access_removed");
     let live: Vec<(String, Option<String>)> = sqlx::query_as(
-        "select app_id, revoke_reason from token_families where account_uuid = $1 and app_id <> 'accounts' order by app_id",
+        "select app_id, revoke_reason from token_families where account_uuid = $1 and app_id <> 'silicon-accounts' order by app_id",
     )
     .bind(&carbon.uuid)
     .fetch_all(&ctx.state.db)
@@ -278,7 +278,11 @@ async fn removing_access_errors() {
     let tok = token(&ctx, &carbon).await;
     let r = call(&ctx, Req::delete("/v1/me/apps/never-used").bearer(&tok)).await;
     assert_error(&r, 404, "membership_not_found");
-    let r = call(&ctx, Req::delete("/v1/me/apps/accounts").bearer(&tok)).await;
+    let r = call(
+        &ctx,
+        Req::delete("/v1/me/apps/silicon-accounts").bearer(&tok),
+    )
+    .await;
     assert_error(&r, 400, "first_party_app");
     let r = call(&ctx, Req::delete("/v1/me/apps/never-used")).await;
     assert_error(&r, 401, "unauthenticated");
@@ -325,7 +329,7 @@ async fn removing_the_developer_platform_is_refused_like_silicon_accounts() {
     // Silicon Accounts itself names itself, not the developer platform.
     let r = call(
         &ctx,
-        Req::delete("/v1/me/apps/accounts").session(&ctx.state.settings, &cookie),
+        Req::delete("/v1/me/apps/silicon-accounts").session(&ctx.state.settings, &cookie),
     )
     .await;
     assert_error(&r, 400, "first_party_app");

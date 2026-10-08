@@ -40,7 +40,7 @@ export const journey: Journey = {
     await shot(env, page, "scli-site-01-stk-revealed");
     results.check("create: the site shows the generated STK (stk- + 12 hex)", /^stk-[0-9a-f]{12}$/.test(stk), stk ? "stk-…" : "nothing revealed");
     const main = await page.locator("main").innerText();
-    results.check("…with the command the Silicon signs in with", main.includes(`accounts login --silicon ${sid} --stk-stdin`), main.includes(sid) ? "the reveal card names the Silicon" : "no reveal card");
+    results.check("…with the command the Silicon signs in with", main.includes(`silicon-accounts login --silicon ${sid} --stk-stdin`), main.includes(sid) ? "the reveal card names the Silicon" : "no reveal card");
 
     // The service keeps only the hash: no read of the Silicon returns the STK.
     const list = await asCarbon<Json>(env, carbon, "GET", "/v1/me/silicons");
@@ -74,9 +74,9 @@ export const journey: Journey = {
     // 3. The STK signs the Silicon in with the CLI; the CLI shows its custodian's c:id.
     const home = freshDir();
     const login = await loginSilicon(env, home, sid, stk);
-    results.check("`accounts login --silicon` with the revealed STK signs it in", login.code === 0 && login.json?.authenticated === true && login.json?.kind === "silicon" && login.json?.id === sid, said(login));
+    results.check("`silicon-accounts login --silicon` with the revealed STK signs it in", login.code === 0 && login.json?.authenticated === true && login.json?.kind === "silicon" && login.json?.id === sid, said(login));
     const whoami = await accounts(env, ["whoami", "--json"], { home });
-    results.check("`accounts whoami` shows its custodian by c:id", whoami.code === 0 && obj(whoami.json?.custodian).id === carbon.id && whoami.json?.kind === "silicon", said(whoami));
+    results.check("`silicon-accounts whoami` shows its custodian by c:id", whoami.code === 0 && obj(whoami.json?.custodian).id === carbon.id && whoami.json?.kind === "silicon", said(whoami));
     const wrong = await loginSilicon(env, freshDir(), sid, `stk-${"0".repeat(12)}`);
     results.check("a wrong STK is refused (exit 3, invalid_credentials)", wrong.code === 3 && obj(wrong.json?.error).code === "invalid_credentials", said(wrong));
     const history = await accounts(env, ["history", "--kind", "custodian", "--json"], { home });

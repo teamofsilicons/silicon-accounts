@@ -355,7 +355,7 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
         id: flow.id,
         step: flow.step,
         expires_at: new Date(Date.now() + 3600_000).toISOString(),
-        app: { app_id: flow.app_id, name: app?.name ?? 'Silicon Accounts', logo_url: null, branding: {}, copy: {}, first_party: flow.app_id === 'accounts' },
+        app: { app_id: flow.app_id, name: app?.name ?? 'Silicon Accounts', logo_url: null, branding: {}, copy: {}, first_party: flow.app_id === 'silicon-accounts' },
         methods: ['email', 'phone', 'google', 'apple'],
         signed_in_as: null,
         challenge: flow.challenge ? { channel: flow.challenge.channel, destination: flow.challenge.destination, expires_at: '', resend_available_at: '' } : null,
@@ -375,7 +375,7 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
     const sid = `sas_${random()}`;
     sessions.set(sid, account);
     ctx.addHeader('Set-Cookie', serializeCookie('sa_session', sid, { path: '/' }));
-    if (flow.app_id === 'accounts') complete(flow);
+    if (flow.app_id === 'silicon-accounts') complete(flow);
     else flow.step = 'details';
   }
 
@@ -394,7 +394,7 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
     const appId = String(body.app_id ?? '');
     const redirectUri = String(body.redirect_uri ?? '');
     const app = apps.get(appId);
-    if (appId !== 'accounts' && !app) throw apiError(400, 'unknown_app', `No app ${appId}.`);
+    if (appId !== 'silicon-accounts' && !app) throw apiError(400, 'unknown_app', `No app ${appId}.`);
     // Spec: loopback redirect URIs match ignoring the port, only when registered with that host.
     const loopback = (u: string): string => {
       try {
@@ -405,7 +405,7 @@ export async function startStubAccounts(options: StubOptions): Promise<StubAccou
         return u;
       }
     };
-    const allowed = appId === 'accounts' ? redirectUri.startsWith(url) : (app?.signin_defaults.redirect_uris ?? []).some((r) => r === redirectUri || loopback(r) === loopback(redirectUri));
+    const allowed = appId === 'silicon-accounts' ? redirectUri.startsWith(url) : (app?.signin_defaults.redirect_uris ?? []).some((r) => r === redirectUri || loopback(r) === loopback(redirectUri));
     if (!allowed) throw apiError(400, 'redirect_uri_not_registered', `${redirectUri} is not registered for ${appId}.`);
     const binding = `saf_${random()}`;
     const flow: FlowRecord = {

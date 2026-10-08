@@ -86,10 +86,10 @@ export async function mock(
       result = {
         error: {
           code: "validation_failed",
-          message: "accounts --json returned the wrong app_id.",
+          message: "silicon-accounts --json returned the wrong app_id.",
           hint: "Return test-app in the app_id field.",
           details: {
-            command: "accounts --json",
+            command: "silicon-accounts --json",
             expected: "test-app",
             actual: "wrong-app",
             stderr: "contract mismatch",

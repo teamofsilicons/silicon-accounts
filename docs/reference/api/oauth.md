@@ -177,8 +177,8 @@ Responses are `Cache-Control: no-store`; errors are RFC 6749 bodies.
 **Client authentication.** Send the app's credentials with HTTP Basic
 (`-u app_id:app_secret`) or as `client_id` + `client_secret` in the body, never both
 (`invalid_request`). A `client_id` in the body must match the Basic credentials
-(`invalid_client`). `client_id=accounts` with no secret is the first-party public client (the
-`accounts` CLI): it may only use `refresh_token` and the device-code grant
+(`invalid_client`). `client_id=silicon-accounts` with no secret is the first-party public client (the
+`silicon-accounts` CLI): it may only use `refresh_token` and the device-code grant
 (`unauthorized_client` otherwise). `client_id=developer` with no secret is the developer
 platform (developers.teamofsilicons.com, whose server holds the tokens): it may only use
 `authorization_code` with PKCE `S256` (a missing challenge or `plain` is `invalid_grant`, and the
@@ -228,12 +228,12 @@ Presenting the same refresh token again:
 }
 ```
 
-First-party tokens refresh the same way with `-d client_id=accounts` and no secret.
+First-party tokens refresh the same way with `-d client_id=silicon-accounts` and no secret.
 
 ### `grant_type=urn:silicon:params:oauth:grant-type:slt`
 
 How a Silicon signs into your app: it gets a short-lived token for your app
-(`POST /v1/me/short-lived-tokens`, or `accounts login --app <app_id>`) and hands it to you. The
+(`POST /v1/me/short-lived-tokens`, or `silicon-accounts login --app <app_id>`) and hands it to you. The
 alias `grant_type=slt` works too.
 
 | Parameter | |
@@ -274,13 +274,13 @@ after the SLT was issued.
 
 ### `grant_type=urn:ietf:params:oauth:grant-type:device_code`
 
-The `accounts` CLI's device sign-in (RFC 8628); only the first-party client may use it. The alias
+The `silicon-accounts` CLI's device sign-in (RFC 8628); only the first-party client may use it. The alias
 `grant_type=device_code` works too.
 
 | Parameter | |
 |---|---|
 | `device_code` | the `sad_…` code from `POST /v1/device/authorize` |
-| `client_id` | `accounts` |
+| `client_id` | `silicon-accounts` |
 
 Poll every `interval` seconds (5). Until the Carbon decides you get `authorization_pending`;
 polling faster than every 5 seconds gets `slow_down` (add 5 seconds to your interval); a denial
@@ -290,7 +290,7 @@ tokens and later ones get `invalid_grant` ("already exchanged").
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
   -d grant_type=urn:ietf:params:oauth:grant-type:device_code \
-  -d device_code="$DEVICE_CODE" -d client_id=accounts
+  -d device_code="$DEVICE_CODE" -d client_id=silicon-accounts
 ```
 
 ```json
@@ -314,7 +314,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
 | `membership_id` | `{app_id}:{uuid}` |
 | `account` | the account as your app may see it (the fields of the scopes above) |
 
-Access token claims (first-party tokens have `aud: "accounts"`):
+Access token claims (first-party tokens have `aud: "silicon-accounts"`):
 
 ```json
 {
@@ -490,15 +490,15 @@ token), `invalid_authorization`, `invalid_token` (malformed, or expired at its e
 
 ## `POST /v1/device/authorize`
 
-Starts a device sign-in for the `accounts` CLI (RFC 8628). Public. The body (JSON or form) is
+Starts a device sign-in for the `silicon-accounts` CLI (RFC 8628). Public. The body (JSON or form) is
 optional: `client_label` (shown on the approval page and in the sessions list; cut at 100
-characters), `client_id` (if sent, must be `accounts`: 400 `unauthorized_client` otherwise),
+characters), `client_id` (if sent, must be `silicon-accounts`: 400 `unauthorized_client` otherwise),
 `scope` (checked for typos only: 400 `invalid_scope`). At most 60 per IP per 10 minutes. Errors
 use the API error shape.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/device/authorize" \
-  -H 'Content-Type: application/json' -d '{"client_label":"accounts CLI on build box"}'
+  -H 'Content-Type: application/json' -d '{"client_label":"silicon-accounts CLI on build box"}'
 ```
 
 ```json

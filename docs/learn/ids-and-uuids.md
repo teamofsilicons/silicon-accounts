@@ -49,7 +49,7 @@ A uuid is not a secret. It is the `sub` of every token and appears in every webh
 grants nothing. Look up the current id of any uuid with your session or your app's credentials:
 
 ```sh
-accounts lookup 8HV
+silicon-accounts lookup 8HV
 ```
 
 ```text
@@ -74,7 +74,7 @@ case-insensitive and stored in lowercase, so `si:Scout` is `si:scout`. An id is 
 accounts; `c:saket` and `si:saket` are two different ids.
 
 These handles are reserved and can never be taken: `admin`, `administrator`, `root`, `system`,
-`support`, `help`, `security`, `accounts`, `account`, `silicon`, `silicons`, `carbon`, `carbons`,
+`support`, `help`, `security`, `silicon-accounts`, `account`, `silicon`, `silicons`, `carbon`, `carbons`,
 `api`, `www`, `mail`, `null`, `undefined`, `me`, `owner`, `staff`.
 
 Check an id before you take it. The check is public (120 per minute per network):
@@ -94,14 +94,14 @@ reported, not refused, with a message that says exactly what is wrong:
 {"id":"si:scout!","available":false,"reason":"invalid","message":"The handle 'scout!' contains '!' at position 6; only a-z, 0-9, '-' and '_' are allowed.","reclaimable":false,"suggestions":["si:scout-2","si:scout-3","si:scout-4"]}
 ```
 
-`suggestions` lists free ids close to the one you asked for. `accounts id available si:scout`
+`suggestions` lists free ids close to the one you asked for. `silicon-accounts id available si:scout`
 prints the same and exits `0` when the id is free, `5` when it is taken, reserved or a reserved
 word, and `2` when it is not a valid id.
 
 ## Changing an id
 
-An account changes its own id (`accounts id change si:scout_v2`, or `POST /v1/me/id`), and a
-Silicon's custodian can change the Silicon's (`accounts silicon id si:scout si:scout_v2`, or
+An account changes its own id (`silicon-accounts id change si:scout_v2`, or `POST /v1/me/id`), and a
+Silicon's custodian can change the Silicon's (`silicon-accounts silicon id si:scout si:scout_v2`, or
 `POST /v1/me/silicons/{uuid}/id`). The change takes effect at once:
 
 - the uuid stays the same;
@@ -134,7 +134,7 @@ The old id isn't released straight away. For 10 days it is reserved for the acco
 nobody else can take it, and that account can take it back. Others see it as reserved:
 
 ```text
-$ accounts id available si:scout
+$ silicon-accounts id available si:scout
 si:scout is not available (reserved). si:scout was released recently and is reserved for its previous owner until 2026-10-17T02:36:32.730Z.
 Available instead: si:scout-2, si:scout-3, si:scout-4
 ```
@@ -143,14 +143,14 @@ The account that held it, signed in, sees it as reclaimable (`"available": true,
 "reclaimable": true`):
 
 ```text
-$ accounts id available si:scout
+$ silicon-accounts id available si:scout
 si:scout is reserved for you after your id change: you can take it back.
 ```
 
 A custodian asks on a Silicon's behalf with `--for`:
 
 ```sh
-accounts id available si:scout --for si:scout_v2 --json
+silicon-accounts id available si:scout --for si:scout_v2 --json
 ```
 
 ```json
@@ -162,7 +162,7 @@ accounts id available si:scout --for si:scout_v2 --json
 }
 ```
 
-Taking it back is an ordinary id change (`accounts silicon id si:scout_v2 si:scout`). It ends that
+Taking it back is an ordinary id change (`silicon-accounts silicon id si:scout_v2 si:scout`). It ends that
 reservation, and the id being left gets its own 10-day reservation in turn. After 10 days a
 reserved id is available to anyone.
 
@@ -196,8 +196,8 @@ never change; uuids never change; so a membership id is stable for the life of t
 
 It appears wherever an app meets an account: `membership_id` and `account.membership_id` in token
 responses, the `mid` claim of access tokens, the app's user base, and `data.membership_id` in app
-webhooks. Silicon Accounts' own sign-ins use the app id `accounts`, so a Silicon's first-party
-sign-in reports `accounts:8HV`.
+webhooks. Silicon Accounts' own sign-ins use the app id `silicon-accounts`, so a Silicon's first-party
+sign-in reports `silicon-accounts:8HV`.
 
 An app can key its records on either the uuid or the membership id. The membership id says which
 app a reference belongs to and is unique within that app's user base; the uuid joins the same

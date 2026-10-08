@@ -17,7 +17,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
         <EmptyState
           icon={<RotateCcw width={24} height={24} strokeWidth={1.5} />}
           title="This page stopped working"
-          description={`Something in the page failed: ${error.message || "an unexpected error"}. Try again; if it keeps happening, report it with \`accounts report\`.`}
+          description={`Something in the page failed: ${error.message || "an unexpected error"}. Try again; if it keeps happening, report it with \`silicon-accounts report\`.`}
           action={<Button variant="secondary" onClick={reset}>Try again</Button>}
         />
         {error.digest ? <p className={styles.details}>Reference {error.digest}</p> : null}

@@ -22,7 +22,7 @@ This page lists what each kind of account holds and the rules for changing it. Y
 account is one command away:
 
 ```sh
-accounts whoami
+silicon-accounts whoami
 ```
 
 ```text
@@ -113,10 +113,10 @@ During sign-up, Accounts fills in the setup page with suggested details. The dis
 ### Emails and phone numbers
 
 ```sh
-accounts email add dora.work@example.com        # sends a 6-digit code (valid 10 minutes)
-accounts email verify <challenge-id> <code>     # proves it; now it signs you in too
-accounts email primary dora.work@example.com    # apps with the email scope are told
-accounts email remove dora@example.com          # any address except the primary
+silicon-accounts email add dora.work@example.com        # sends a 6-digit code (valid 10 minutes)
+silicon-accounts email verify <challenge-id> <code>     # proves it; now it signs you in too
+silicon-accounts email primary dora.work@example.com    # apps with the email scope are told
+silicon-accounts email remove dora@example.com          # any address except the primary
 ```
 
 ```text
@@ -127,8 +127,8 @@ dora@example.com       primary  code          2026-10-07T02:33:50Z
 dora.work@example.com           code          2026-10-07T02:34:05Z
 ```
 
-Phone numbers work exactly the same way under `accounts phone`, in international format or
-with a country: `accounts phone add "(415) 555-0199" --country US` stores `+14155550199`. Over
+Phone numbers work exactly the same way under `silicon-accounts phone`, in international format or
+with a country: `silicon-accounts phone add "(415) 555-0199" --country US` stores `+14155550199`. Over
 HTTP these are `/v1/me/emails` and `/v1/me/phones` (`POST` to add, `POST …/verify`,
 `POST …/{address}/primary`, `DELETE …/{address}`).
 
@@ -175,14 +175,14 @@ Limits that stop address guessing and spam:
 | `email_not_verified`, `phone_not_verified` | 409 | Only a verified address can be primary. |
 | `carbon_only` | 403 | A Silicon called a Carbon-only endpoint. |
 
-Google and Apple identities are unlinked with `accounts identities remove <provider> <subject>`,
+Google and Apple identities are unlinked with `silicon-accounts identities remove <provider> <subject>`,
 except the last way left to sign in: `409 last_sign_in_method` while the account has no email
 or phone.
 
 ## Silicon accounts
 
-A Silicon signed in with its si:id and STK (`accounts login --silicon si:ada_scout --stk-stdin`)
-reads its own account the same way; `accounts whoami --json` prints these fields too, leaving
+A Silicon signed in with its si:id and STK (`silicon-accounts login --silicon si:ada_scout --stk-stdin`)
+reads its own account the same way; `silicon-accounts whoami --json` prints these fields too, leaving
 out the empty ones:
 
 ```sh
@@ -229,11 +229,11 @@ Silicons get an account and how custody works is in
 
 ## The profile
 
-Every account changes its own details with `accounts profile set` (`PATCH /v1/me`); only the
+Every account changes its own details with `silicon-accounts profile set` (`PATCH /v1/me`); only the
 fields you send change:
 
 ```sh
-accounts profile set --display-name "Ada Lovelace" --timezone Europe/Paris --photo ./me.png
+silicon-accounts profile set --display-name "Ada Lovelace" --timezone Europe/Paris --photo ./me.png
 ```
 
 ```text
@@ -262,7 +262,7 @@ timezone with). A Silicon's own webhook gets `silicon.updated`. What each app ma
 ### A Carbon
 
 ```sh
-accounts delete-account --confirm c:dora
+silicon-accounts delete-account --confirm c:dora
 ```
 
 ```text
@@ -287,8 +287,8 @@ Silicon must always have exactly one custodian:
 }
 ```
 
-That is `409`. Transfer each Silicon (`accounts silicon transfer`) or delete it
-(`accounts silicon delete <si:id> --confirm <si:id>`), then delete the account.
+That is `409`. Transfer each Silicon (`silicon-accounts silicon transfer`) or delete it
+(`silicon-accounts silicon delete <si:id> --confirm <si:id>`), then delete the account.
 
 Deleting happens at once, in one step, and can't be undone:
 
@@ -317,7 +317,7 @@ Deleting happens at once, in one step, and can't be undone:
 Only its custodian deletes a Silicon:
 
 ```sh
-accounts silicon delete si:dora_helper --confirm si:dora_helper
+silicon-accounts silicon delete si:dora_helper --confirm si:dora_helper
 ```
 
 ```text
@@ -336,4 +336,4 @@ last notifications still arrive.
 - [Silicons and custodians](silicons-and-custodians.md): how a Silicon gets an account, STKs, transfers.
 - [What apps see](what-apps-see.md): scopes, the what's-shared screen and webhooks about changes.
 - [How imports work](imports.md): unclaimed accounts and how they are finished.
-- [The accounts CLI](../start/cli.md): every command used on this page.
+- [The silicon-accounts CLI](../start/cli.md): every command used on this page.

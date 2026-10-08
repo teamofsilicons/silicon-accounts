@@ -100,7 +100,7 @@ Accounts doesn't show a consent screen for proofs.
 | 403 | `account_not_active` | the account isn't active (`details.status`) |
 | 403 | `membership_inactive` | the account has no active membership with your app (`details.membership_id`) |
 | 400 | `unknown_receiving_app` | no such app (`details.app_ids`) |
-| 400 | `invalid_receiving_app` | your own app, or `accounts` |
+| 400 | `invalid_receiving_app` | your own app, or `silicon-accounts` |
 | 403 | `receiving_app_disabled` | the receiving app is disabled (`details.app_ids`) |
 | 422 | `validation_failed` | `scopes[i]`, `access_ttl_seconds` |
 
@@ -122,7 +122,7 @@ Accounts doesn't show a consent screen for proofs.
 and `waveform`, issue one proof for each. Errors: 422 `app_verification_single_app` (the body has `audiences`,
 of any length: "An app verification is for exactly one app; ask for one proof per app.", with
 `details.field: "audiences"` and `details.apps`), 400 `unknown_receiving_app`, 400
-`invalid_receiving_app` (your own app, or `accounts`/`developer`), 403 `receiving_app_disabled`,
+`invalid_receiving_app` (your own app, or `silicon-accounts`/`developer`), 403 `receiving_app_disabled`,
 422 `validation_failed` (`receiving_app`, `scopes[i]`, `access_ttl_seconds`).
 
 ## `POST /v1/apps/{app_id}/proofs/app-verification`

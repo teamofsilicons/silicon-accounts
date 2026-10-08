@@ -24,7 +24,7 @@ const PR = "https://github.com/teamofsilicons/silicon-accounts/pull/42";
 
 export const journey: Journey = {
   name: "silicons-cli-report",
-  title: "`accounts report`: each report is emailed through Postmark (the mock) to exactly saketdev12@gmail.com, shubhastro2@gmail.com and bugs@teamofsilicons.com, with the PR link when given; signed-in reports name the account; retries don't send twice; invalid input, a message at the edge of the 10,000-character limit (with the CLI's own diagnostics appended) and the 5-per-hour limit are explained",
+  title: "`silicon-accounts report`: each report is emailed through Postmark (the mock) to exactly saketdev12@gmail.com, shubhastro2@gmail.com and bugs@teamofsilicons.com, with the PR link when given; signed-in reports name the account; retries don't send twice; invalid input, a message at the edge of the 10,000-character limit (with the CLI's own diagnostics appended) and the 5-per-hour limit are explained",
   // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
   engines: ["chromium"],
   async run(ctx) {
@@ -35,10 +35,10 @@ export const journey: Journey = {
     // 1. Anonymous, with a PR.
     const marker = `scli-report-${t}`;
     let after = await lastSeq(env);
-    const message = `${marker}: accounts login --app remind answered 500\nSteps: sign in, ask for an SLT.`;
+    const message = `${marker}: silicon-accounts login --app remind answered 500\nSteps: sign in, ask for an SLT.`;
     const anon = await accounts(env, ["report", message, "--pr", PR, "--json"], { home: freshDir() });
     const reportId = str(anon.json?.report_id);
-    results.check("`accounts report <message> --pr <link> --json` (signed out): queued for 3 recipients", anon.code === 0 && anon.json?.status === "queued" && anon.json?.recipients === 3 && anon.json?.pr_url === PR && reportId.length > 0, said(anon));
+    results.check("`silicon-accounts report <message> --pr <link> --json` (signed out): queued for 3 recipients", anon.code === 0 && anon.json?.status === "queued" && anon.json?.recipients === 3 && anon.json?.pr_url === PR && reportId.length > 0, said(anon));
     const mails = await until(async () => {
       const found = await mailsWith(env, marker, after);
       return found.length >= 3 ? found : null;
@@ -49,9 +49,9 @@ export const journey: Journey = {
     results.check("the mock Postmark received exactly 3 emails, to exactly the 3 maintainers, one each", !!mails && all.length === 3 && JSON.stringify(recipients) === JSON.stringify([...REPORT_RECIPIENTS].sort()) && all.every(mail => mail.recipients.length === 1 && mail.provider === "postmark" && mail.channel === "email"), short(all.map(mail => mail.recipients)));
     const first = all[0];
     results.check("…sent from accounts@teamofsilicons.com", all.every(mail => str(mail.from).includes("accounts@teamofsilicons.com")), str(first?.from));
-    results.check("…subject '[Silicon Accounts bug report] <first line>'", all.every(mail => mail.subject === `[Silicon Accounts bug report] ${marker}: accounts login --app remind answered 500`), str(first?.subject));
+    results.check("…subject '[Silicon Accounts bug report] <first line>'", all.every(mail => mail.subject === `[Silicon Accounts bug report] ${marker}: silicon-accounts login --app remind answered 500`), str(first?.subject));
     results.check("…the body: the report id, an anonymous caller, the whole message, the PR link", all.every(mail => str(mail.text).includes(`Bug report ${reportId} from an anonymous caller`) && str(mail.text).includes("Steps: sign in, ask for an SLT.") && str(mail.text).includes(`Pull request: ${PR}`) && str(mail.html).includes(`href="${PR}"`)), short(first?.text, 400));
-    results.check("…with the CLI's version and platform appended", all.every(mail => /accounts CLI \d+\.\d+\.\d+ on \w+ \w+/.test(str(mail.text))), short(str(first?.text).split("\n").slice(-4).join(" ")));
+    results.check("…with the CLI's version and platform appended", all.every(mail => /silicon-accounts CLI \d+\.\d+\.\d+ on \w+ \w+/.test(str(mail.text))), short(str(first?.text).split("\n").slice(-4).join(" ")));
     const stored = await sql(env, `select coalesce(account_uuid, ''), coalesce(pr_url, ''), position('${marker}' in message) > 0 from bug_reports where id = '${reportId}'`);
     results.check("the report is stored (no account, the PR link)", stored[0]?.[0] === "" && stored[0]?.[1] === PR && stored[0]?.[2] === "t", short(stored));
 
@@ -82,7 +82,7 @@ export const journey: Journey = {
       const found = await mailsWith(env, marker3, after);
       return found.length >= 3 ? found : null;
     }, 20_000, 300);
-    results.check("`accounts report - --no-diagnostics` reads stdin and appends nothing", piped.code === 0 && !!pipedMails && pipedMails.every(mail => !/accounts CLI \d/.test(str(mail.text))), said(piped));
+    results.check("`silicon-accounts report - --no-diagnostics` reads stdin and appends nothing", piped.code === 0 && !!pipedMails && pipedMails.every(mail => !/silicon-accounts CLI \d/.test(str(mail.text))), said(piped));
     const history = await accounts(env, ["history", "--kind", "security", "--json"], { home });
     const sentReports = ((history.json?.items ?? []) as Json[]).filter(item => item.title === "Bug report sent");
     results.check(

@@ -190,7 +190,7 @@ export const journeys: Journey[] = [
       // The receiving app.
       const cases: Array<[string, string, number, string]> = [
         ["dm itself (the issuing app)", "dm", 400, "invalid_receiving_app"],
-        ["Silicon Accounts itself", "accounts", 400, "invalid_receiving_app"],
+        ["Silicon Accounts itself", "silicon-accounts", 400, "invalid_receiving_app"],
         ["the developer platform (first-party app developer)", "developer", 400, "invalid_receiving_app"],
         ["an unknown app", `nope-${dm.uuid.toLowerCase()}`, 400, "unknown_receiving_app"],
         ["a malformed app id", "Not An App!", 422, "validation_failed"],

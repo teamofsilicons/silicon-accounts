@@ -6,7 +6,7 @@ import { accounts, asCarbon, cliError, codeEmail, freshDir, freshPhone, loginCar
 
 export const journey: Journey = {
   name: "silicons-cli-email-login",
-  title: "headless `accounts login --email` and `--phone`: the code is sent and the command returns (code_sent), `--code` finishes it (or `--challenge`); wrong, expired and reused codes, an unknown address or number, ten wrong codes lock it for a minute, a local number with --country, and the flags that don't fit together",
+  title: "headless `silicon-accounts login --email` and `--phone`: the code is sent and the command returns (code_sent), `--code` finishes it (or `--challenge`); wrong, expired and reused codes, an unknown address or number, ten wrong codes lock it for a minute, a local number with --country, and the flags that don't fit together",
   // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
   engines: ["chromium"],
   async run(ctx) {
@@ -19,7 +19,7 @@ export const journey: Journey = {
     // 1. Send the code: the command returns at once (no terminal to prompt in).
     let after = await lastSeq(env);
     const start = await accounts(env, ["login", "--email", carbon.email.toUpperCase(), "--json"], { home });
-    results.check("`accounts login --email <e> --json` (no terminal): exit 0, code_sent, not signed in yet, how to finish", start.code === 0 && start.json?.status === "code_sent" && start.json?.authenticated === false && !!start.json?.challenge_id && str(start.json?.next).includes("--code"), said(start));
+    results.check("`silicon-accounts login --email <e> --json` (no terminal): exit 0, code_sent, not signed in yet, how to finish", start.code === 0 && start.json?.status === "code_sent" && start.json?.authenticated === false && !!start.json?.challenge_id && str(start.json?.next).includes("--code"), said(start));
     results.check("…the destination is shown masked", /^s\*+@example\.test$/.test(str(start.json?.destination)) || (str(start.json?.destination).includes("*") && !str(start.json?.destination).includes(carbon.email)), str(start.json?.destination));
     const challengeFile = join(home, ".accounts", "login-challenge.json");
     let mode = "";
@@ -34,7 +34,7 @@ export const journey: Journey = {
     const wrong = await accounts(env, ["login", "--email", carbon.email, "--code", wrongCode, "--json"], { home });
     results.check("a wrong code: exit 2, invalid_code, says how many tries are left", wrong.code === 2 && cliError(wrong).code === "invalid_code" && Number(obj(cliError(wrong).details).remaining_attempts) === 9, said(wrong));
     const finish = await accounts(env, ["login", "--email", carbon.email, "--code", code, "--json"], { home });
-    results.check("`accounts login --email <e> --code <code>`: signed in as the Carbon (exit 0)", finish.code === 0 && finish.json?.authenticated === true && finish.json?.kind === "carbon" && finish.json?.id === carbon.id, said(finish));
+    results.check("`silicon-accounts login --email <e> --code <code>`: signed in as the Carbon (exit 0)", finish.code === 0 && finish.json?.authenticated === true && finish.json?.kind === "carbon" && finish.json?.id === carbon.id, said(finish));
     let gone = false;
     try {
       statSync(challengeFile);
@@ -43,7 +43,7 @@ export const journey: Journey = {
     }
     results.check("…and the pending challenge file is removed", gone);
     const status = await accounts(env, ["login", "status", "--json"], { home });
-    results.check("`accounts login status`: authenticated as the Carbon", status.code === 0 && status.json?.id === carbon.id, said(status));
+    results.check("`silicon-accounts login status`: authenticated as the Carbon", status.code === 0 && status.json?.id === carbon.id, said(status));
     const reused = await accounts(env, ["login", "--challenge", str(start.json?.challenge_id), "--code", code, "--json"], { home: freshDir() });
     results.check("the same code again (--challenge): refused, a code works once (exit 5, code_already_used)", reused.code === 5 && cliError(reused).code === "code_already_used", said(reused));
 
@@ -104,9 +104,9 @@ export const journey: Journey = {
     const lock = security.find(item => str(item.title).startsWith("Too many wrong codes"));
     results.check("the ten wrong codes: 'Too many wrong codes for <masked address>', paused until when", !!lock && /^Too many wrong codes for s\*+@example\.test$/.test(str(lock.title)) && /^After 10 wrong codes in a row, tries were paused until \d{4}-\d\d-\d\dT/.test(str(lock.detail)), short(lock));
     const failed = (await entries("signin")).filter(item => obj(item.meta).outcome === "failed");
-    results.check("…recorded as a failed sign-in from the accounts CLI", failed.length >= 1 && failed.every(item => item.title === "Failed sign-in to Silicon Accounts with an email code" && /· accounts CLI \d+\.\d+\.\d+$/.test(str(item.detail))), short(failed.map(item => [item.title, item.detail])));
+    results.check("…recorded as a failed sign-in from the silicon-accounts CLI", failed.length >= 1 && failed.every(item => item.title === "Failed sign-in to Silicon Accounts with an email code" && /· silicon-accounts CLI \d+\.\d+\.\d+$/.test(str(item.detail))), short(failed.map(item => [item.title, item.detail])));
 
-    // 7. The same by phone (`accounts login --phone`): another Carbon, whose phone was added and verified with the CLI.
+    // 7. The same by phone (`silicon-accounts login --phone`): another Carbon, whose phone was added and verified with the CLI.
     const phoned = await signUpCarbon(env, "headless-phone");
     const homeP = freshDir();
     await loginCarbon(env, homeP, phoned);
@@ -115,11 +115,11 @@ export const journey: Journey = {
     const add = await accounts(env, ["phone", "add", phone, "--json"], { home: homeP });
     const addCode = await codeFor(env, phone, seq).catch(() => "");
     const verified = await accounts(env, ["phone", "verify", str(add.json?.challenge_id), addCode, "--json"], { home: homeP });
-    results.check("setup: another Carbon adds and verifies a phone with the CLI (`accounts phone add` + `accounts phone verify`)", add.code === 0 && verified.code === 0, `${said(add)} | ${said(verified)}`);
+    results.check("setup: another Carbon adds and verifies a phone with the CLI (`silicon-accounts phone add` + `silicon-accounts phone verify`)", add.code === 0 && verified.code === 0, `${said(add)} | ${said(verified)}`);
     const homeQ = freshDir();
     seq = await lastSeq(env);
     const startP = await accounts(env, ["login", "--phone", phone, "--json"], { home: homeQ });
-    results.check("`accounts login --phone <+E.164> --json`: exit 0, code_sent, the number masked, how to finish", startP.code === 0 && startP.json?.status === "code_sent" && startP.json?.authenticated === false && !str(startP.json?.destination).includes(phone) && str(startP.json?.next).includes("--code"), said(startP));
+    results.check("`silicon-accounts login --phone <+E.164> --json`: exit 0, code_sent, the number masked, how to finish", startP.code === 0 && startP.json?.status === "code_sent" && startP.json?.authenticated === false && !str(startP.json?.destination).includes(phone) && str(startP.json?.next).includes("--code"), said(startP));
     const sms = await codeFor(env, phone, seq).catch(() => "");
     const finishP = await accounts(env, ["login", "--phone", phone, "--code", sms, "--json"], { home: homeQ });
     results.check("…the code from the text message (`--code`) signs the Carbon in", !!sms && finishP.code === 0 && finishP.json?.authenticated === true && finishP.json?.id === phoned.id && finishP.json?.kind === "carbon", said(finishP));

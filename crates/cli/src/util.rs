@@ -50,7 +50,7 @@ pub fn read_stdin(what: &str) -> CliResult<String> {
         return Err(CliError::invalid(
             format!("Expected {what} on stdin, but stdin is a terminal."),
             format!(
-                "Pipe it in, e.g. `printf '%s' \"$VALUE\" | accounts …`, or pass {what} another way."
+                "Pipe it in, e.g. `printf '%s' \"$VALUE\" | silicon-accounts …`, or pass {what} another way."
             ),
         ));
     }
@@ -198,11 +198,15 @@ pub fn hostname() -> String {
         .unwrap_or_else(|| "unknown host".to_owned())
 }
 
-/// The label sent with sign-ins: `accounts CLI on <host> (<os>)`.
+/// The label sent with sign-ins: `silicon-accounts CLI on <host> (<os>)`.
 pub fn client_label(custom: Option<&str>) -> String {
     match custom.map(str::trim).filter(|s| !s.is_empty()) {
         Some(label) => label.chars().take(100).collect(),
-        None => format!("accounts CLI on {} ({})", hostname(), std::env::consts::OS),
+        None => format!(
+            "silicon-accounts CLI on {} ({})",
+            hostname(),
+            std::env::consts::OS
+        ),
     }
 }
 

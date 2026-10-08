@@ -32,7 +32,7 @@ let tasks = accounts_auth::spawn_background(state.clone());        // sweep of e
 | `POST /v1/flows/{id}/review` | flow + session | `{"approve": true}` on the review page → code; `{"approve": false}` on any details page or the review page → `error=access_denied`. 409 `requirements_missing` (a required detail went missing: back on its page) |
 | `GET /v1/session`, `POST /v1/session/signout` | session | the browser session; sign-out clears `sa_session` + `sa_signup` (204). Without a live session: 401, and stale cookies are cleared only for the site's own pages (Origin passes the CSRF guard): a cross-site form POST carries no SameSite=Lax cookie, but its browser would apply a clearing Set-Cookie (logout CSRF) |
 | `GET /v1/device/{user_code}`, `POST …/approve`, `POST …/deny` | session (Carbon) | CLI device approval (204) |
-| `POST /v1/cli/login/start`, `POST /v1/cli/login/verify` | public | headless code sign-in → token response (aud = `accounts`) |
+| `POST /v1/cli/login/start`, `POST /v1/cli/login/verify` | public | headless code sign-in → token response (aud = `silicon-accounts`) |
 
 Every flow POST passes the CSRF Origin guard (`origin_not_allowed`); every flow endpoint needs
 the binding cookie (`flow_not_bound`), and so does the provider callback (see Google and Apple).
@@ -59,7 +59,7 @@ prompt=none that can't sign in silently ─────────────�
   not granted yet, a required email/phone the account doesn't have (verified), an optional detail
   the app asks for now that the Carbon was never offered, or a `scope` detail not granted. Optional
   details left unticked before stay quiet. Nothing new: straight to complete. Never shown for the
-  first-party apps `accounts` and `developer` (no membership either).
+  first-party apps `silicon-accounts` and `developer` (no membership either).
 - **The answer record**: finishing the pages writes `consent.granted` to the audit log (actor: the
   Carbon; `details.offered` = every detail the app offered them so far, `details.shared` = what they
   share now). The latest one since the app's access was last removed (`membership.access_removed`)

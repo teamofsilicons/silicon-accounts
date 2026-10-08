@@ -179,10 +179,10 @@ async fn the_developer_app_records_this_deployments_callback() {
             .expect("developer app");
     assert_eq!(row, (None, "first_party".to_string(), "active".to_string()));
     let homepage: Option<String> =
-        sqlx::query_scalar("select homepage_url from apps where app_id = 'accounts'")
+        sqlx::query_scalar("select homepage_url from apps where app_id = 'silicon-accounts'")
             .fetch_one(&ctx.state.db)
             .await
-            .expect("accounts app");
+            .expect("silicon-accounts app");
     assert_eq!(
         homepage.as_deref(),
         Some("https://accounts.teamofsilicons.com")

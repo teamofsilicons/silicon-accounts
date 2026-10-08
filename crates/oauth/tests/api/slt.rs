@@ -243,7 +243,7 @@ async fn a_short_lived_token_minted_before_access_was_removed_is_refused() {
         "{description}"
     );
     assert!(
-        description.contains(&format!("accounts login --app {}", app.app_id)),
+        description.contains(&format!("silicon-accounts login --app {}", app.app_id)),
         "{description}"
     );
     // The account's decision stands, and the attempt is in its history.
@@ -288,7 +288,7 @@ async fn a_short_lived_token_minted_before_an_stk_rotation_is_refused() {
         "{description}"
     );
     assert!(
-        description.contains(&format!("accounts login --app {}", app.app_id)),
+        description.contains(&format!("silicon-accounts login --app {}", app.app_id)),
         "{description}"
     );
     assert_eq!(live_families(&ctx, &silicon.uuid).await, 0);

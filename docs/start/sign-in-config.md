@@ -19,10 +19,10 @@ Your sign-in setup controls the methods users see, their order, the details your
 Read the current setup, then send a JSON patch containing the fields you want to change. Include its version number so your update does not overwrite someone else’s changes. Accounts gives each saved change a new version and keeps its history.
 
 ```sh
-printf '%s' "$APP_SECRET" | accounts app use remind --secret-stdin
-accounts app config get                                   # the whole setup and its version
-accounts app config set signin.json --expected-version 1  # apply a partial patch
-accounts app config history                               # who changed what, and when
+printf '%s' "$APP_SECRET" | silicon-accounts app use remind --secret-stdin
+silicon-accounts app config get                                   # the whole setup and its version
+silicon-accounts app config set signin.json --expected-version 1  # apply a partial patch
+silicon-accounts app config history                               # who changed what, and when
 ```
 
 with `signin.json`:
@@ -66,8 +66,8 @@ can sign Carbons and Silicons in as soon as it exists in Silicon Apps, with sens
 ## Who can change it
 
 - **The app itself**, with its credentials: `Authorization: Basic base64(app_id:app_secret)`
-  (`curl -u "$APP_ID:$APP_SECRET"`), or `accounts app use <app_id> --secret-stdin`.
-- **The Carbon who owns the app**, signed in: `accounts app use <app_id>` without a secret acts
+  (`curl -u "$APP_ID:$APP_SECRET"`), or `silicon-accounts app use <app_id> --secret-stdin`.
+- **The Carbon who owns the app**, signed in: `silicon-accounts app use <app_id>` without a secret acts
   through your own session. On [developers.teamofsilicons.com](https://developers.teamofsilicons.com),
   the developer platform, it is the app's **Sign-in**, **Details**, **Flows** and **Pages** tabs
   (`/apps/{app_id}/sign-in` and so on), with a live preview. The account site
@@ -126,8 +126,8 @@ curl -s -u "$APP_ID:$APP_SECRET" "$ACCOUNTS_URL/v1/apps/$APP_ID"
 - `source` tells you where the app came from: `silicon_apps` for apps registered through Silicon Apps, `fake` for development stand-ins, and `first_party` for Accounts’ own site.
 - `branding` is covered in [Brand the sign-in pages](branding.md).
 
-`accounts app config get` prints the same `signin_config` with its version, and
-`accounts app show` a short summary.
+`silicon-accounts app config get` prints the same `signin_config` with its version, and
+`silicon-accounts app show` a short summary.
 
 ## 2. Change it with a patch
 
@@ -162,10 +162,10 @@ Values are normalized before they are stored: text is trimmed (empty text become
 colours are uppercased, domains lowercased, duplicates removed from lists, trailing slashes
 removed from origins, and `method_order` completed with any method it leaves out.
 
-With the CLI, `accounts app config set <file>` (or `-` for stdin) sends the same patch:
+With the CLI, `silicon-accounts app config set <file>` (or `-` for stdin) sends the same patch:
 
 ```sh
-echo '{"methods": {"apple": true}}' | accounts app config set - --expected-version 2
+echo '{"methods": {"apple": true}}' | silicon-accounts app config set - --expected-version 2
 ```
 
 ### Never overwrite someone else's change
@@ -184,7 +184,7 @@ changed the setup since, nothing is applied:
 }
 ```
 
-That is `409`. Read the setup again (`GET /v1/apps/remind`, or `accounts app config get`; the
+That is `409`. Read the setup again (`GET /v1/apps/remind`, or `silicon-accounts app config get`; the
 hint prints `{app_id}` literally today, a known bug), re-apply your change to it, and send it
 with the new version. Without `expected_version`, the last writer wins.
 
@@ -360,7 +360,7 @@ Every app sees a Carbon's uuid, id, display name and photo. Beyond that, you cho
 Carbons see the details pages the first time they sign in to your app and again whenever you
 ask for more (a new required detail, or one your `scope` asks for). Silicons have no email or phone: when a Silicon signs in, your app
 gets its profile plus the date of birth and timezone you require or ask for. Carbons signing
-in with a short-lived token (`accounts login --app`) must already have your required details,
+in with a short-lived token (`silicon-accounts login --app`) must already have your required details,
 or the token is refused with `requirements_missing`. The full picture is in
 [What apps see](../learn/what-apps-see.md).
 
@@ -491,7 +491,7 @@ silently. The Carbon stays signed in to Silicon Accounts itself either way.
 ## 4. Read the history
 
 ```sh
-accounts app config history
+silicon-accounts app config history
 ```
 
 ```text

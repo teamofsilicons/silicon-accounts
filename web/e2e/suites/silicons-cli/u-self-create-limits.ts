@@ -62,7 +62,7 @@ export const journey: Journey = {
     const freed = await selfCreate(ctx, { id: `si:q22-${t}`, display_name: "Queue 22", custodian: busy.id });
     results.check("…a decision frees a place in the queue", declined.status === 204 && freed.status === 201, `${declined.status} ${freed.status}`);
 
-    // 3. A retried `accounts silicon create` (same --idempotency-key) creates the Silicon once.
+    // 3. A retried `silicon-accounts silicon create` (same --idempotency-key) creates the Silicon once.
     await forgetRateLimits(env, "127.0.0.1");
     const key = `scli-idem-${t}`;
     const args = ["silicon", "create", "--id", `si:idem-${t}`, "--display-name", "Idem", "--custodian", carbon.id, "--idempotency-key", key, "--json"];
@@ -79,9 +79,9 @@ export const journey: Journey = {
     const slow = await accounts(env, ["silicon", "create", "--id", `si:slow-${t}`, "--custodian", carbon.id, "--wait", "--timeout", "3s", "--json"], { home, timeoutMs: 60_000 });
     const timedOut = cliError(slow);
     const details = obj(timedOut.details);
-    results.check("`--wait --timeout 3s` with no decision: exit 1, timed_out, how to resume", slow.code === 1 && timedOut.code === "timed_out" && str(timedOut.hint).includes(`accounts silicon request status ${str(obj(details.request).id)} --wait`), said(slow).replace(str(details.stk), "stk-…"));
+    results.check("`--wait --timeout 3s` with no decision: exit 1, timed_out, how to resume", slow.code === 1 && timedOut.code === "timed_out" && str(timedOut.hint).includes(`silicon-accounts silicon request status ${str(obj(details.request).id)} --wait`), said(slow).replace(str(details.stk), "stk-…"));
     results.check("…its details still carry the new Silicon, the request and the STK (nothing is lost)", /^stk-[0-9a-f]{12}$/.test(str(details.stk)) && obj(details.silicon).id === `si:slow-${t}` && !!str(details.request_token), short(Object.keys(details)));
     const pending = await accounts(env, ["silicon", "request", "status", str(obj(details.request).id), "--json"], { home });
-    results.check("…and the request is still pending (`accounts silicon request status`)", pending.code === 0 && pending.json?.status === "pending", said(pending));
+    results.check("…and the request is still pending (`silicon-accounts silicon request status`)", pending.code === 0 && pending.json?.status === "pending", said(pending));
   },
 };

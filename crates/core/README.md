@@ -134,7 +134,7 @@ async fn change_my_id(
 | `http` | extractors and helpers | `AccountAuth`, `CarbonAuth`, `SiliconAuth`, `AppAuth`, `AppOrOwner`, `authenticate_client`, `ClientMeta`, `IdempotencyKey`, `Json`, `Query`, `Path`, `parse_form_or_json`, `check_origin`, `cookies::*`, `pagination::*`, `request_id::middleware` |
 | `test_support` (feature) | tests | `TestContext`, `TestDb`, `Req`, `call`, factories |
 
-Constants: `FIRST_PARTY_APP_ID = "accounts"`, `DEVELOPER_APP_ID = "developer"` (and
+Constants: `FIRST_PARTY_APP_ID = "silicon-accounts"`, `DEVELOPER_APP_ID = "developer"` (and
 `is_first_party_app_id`), `PRODUCT_NAME`, `PRODUCT_SITE` (`https://accounts.teamofsilicons.com`),
 `VERSION`. Settings: `developer_url` (ACCOUNTS_DEVELOPER_URL), `developer_callback_url()`,
 `developer_redirect_allowed(uri)`.
@@ -431,7 +431,7 @@ use it for you.
 // Any successful sign-in (code exchange, SLT, device, CLI code, Silicon login):
 let resp: TokenResponse = tokens::issue_tokens(&mut tx, &state.keys, &state.settings, tokens::IssueRequest {
     account: &account, app_id, origin: TokenOrigin::Slt, scopes: &scopes,
-    browser_session_id: None, label: Some("accounts CLI on mac"), ip, user_agent, nonce: None,
+    browser_session_id: None, label: Some("silicon-accounts CLI on mac"), ip, user_agent, nonce: None,
     auth_time: None,   // code exchanges pass the code's auth_time (id_token auth_time, kept on refresh)
 }).await?;   // family (900 days) + refresh token + access JWT + id_token if `openid` + scoped account view
 
@@ -560,7 +560,7 @@ Postmark posts to `{ACCOUNTS_POSTMARK_API_URL}/email`; Twilio to
 ## http
 
 - `AccountAuth` — cookie `sa_session` (`__Host-sa_session` when secure) or `Bearer` access token with
-  `aud = accounts` and an active family. A developer platform token (`aud = developer`) is accepted
+  `aud = silicon-accounts` and an active family. A developer platform token (`aud = developer`) is accepted
   only on `GET /v1/me`, `GET /v1/session` and `GET /v1/me/owned-apps` (`DEVELOPER_READ_ROUTES`,
   judged by the matched route) and by `AppOrOwner`; anywhere else it is 401
   `token_wrong_audience` naming the route. Cookie-authenticated POST/PUT/PATCH/DELETE must carry an
@@ -570,11 +570,11 @@ Postmark posts to `{ACCOUNTS_POSTMARK_API_URL}/email`; Twilio to
 - `CarbonAuth` / `SiliconAuth` deref to `AccountAuth` (403 `carbon_only` / `silicon_only`).
 - `AppAuth { app }` — `Authorization: Basic base64(app_id:secret)`.
 - `authenticate_client(&state, &headers, form.client_id, form.client_secret)` → `ClientAuth { app,
-  public }` for `/v1/oauth/*` (Basic or body; `client_id=accounts` or `client_id=developer` alone =
-  a public first-party client: `accounts` only for the device-code and refresh grants, `developer`
+  public }` for `/v1/oauth/*` (Basic or body; `client_id=silicon-accounts` or `client_id=developer` alone =
+  a public first-party client: `silicon-accounts` only for the device-code and refresh grants, `developer`
   only for the code grant with PKCE S256 and refresh; both may revoke their own tokens).
 - `AppOrOwner { app, actor }` on routes with `{app_id}`: the app's credentials (403 `app_mismatch`
-  for another app) or its owner's session — cookie, `aud = accounts` or `aud = developer` Bearer
+  for another app) or its owner's session — cookie, `aud = silicon-accounts` or `aud = developer` Bearer
   (403 `not_app_owner`, 404 `unknown_app`).
   `history_actor()` → `"app"` | owner uuid; `audit_actor()`.
 - `ClientMeta { ip, user_agent, ip_timezone, origin }` — serve with
@@ -604,7 +604,7 @@ async fn my_endpoint() {
     let (app, secret) = ctx.app_owned("briefcase", Some(&carbon.uuid)).await;   // app_id "briefcase-<rand>"
     let whsec = ctx.set_app_webhook(&app.app_id, "http://127.0.0.1:8593/x/webhooks").await;
     ctx.membership(&app.app_id, &carbon.uuid, &[Scope::Profile, Scope::Email]).await;
-    let token = ctx.first_party_tokens(&carbon).await.access_token;              // aud = accounts
+    let token = ctx.first_party_tokens(&carbon).await.access_token;              // aud = silicon-accounts
     let cookie = ctx.browser_session(&carbon).await;
 
     let r = ctx.call(crate::router(), Req::get("/v1/me").bearer(&token)).await;
@@ -635,9 +635,9 @@ cargo run -p silicon-accounts-server --bin accounts-migrate  # applies migration
   (`scope_strings`) and read `Vec<String>` (`scopes_from_strings`).
 - Account uuids are case-sensitive (`text collate "C"`); ids (`c:`/`si:`) are stored lowercase.
 - `c:saket` and `si:saket` are different ids; reserved words apply to both.
-- The first-party apps `accounts` and `developer` (migration 0005) exist after migration; their
+- The first-party apps `silicon-accounts` and `developer` (migration 0005) exist after migration; their
   redirect rules are applied in code (`SigninConfig::effective` + `redirect_allowed`: any URL on
-  the public origin for `accounts`, exactly `{ACCOUNTS_DEVELOPER_URL}/auth/callback` for
+  the public origin for `silicon-accounts`, exactly `{ACCOUNTS_DEVELOPER_URL}/auth/callback` for
   `developer`) and they never show the details pages or record memberships.
 - Contract numbers live in code: OTP 600 s / 60 s lock / 10 tries / 10 sends per 10 min (both per
   address); access token 1800 s; refresh 900 days; codes and SLTs 120 s; device codes 600 s (poll
@@ -650,7 +650,7 @@ cargo run -p silicon-accounts-server --bin accounts-migrate  # applies migration
   (`photos.signup_session_id` with one owner per photo; moves stored sign-in configs off the old
   default dark primary `#5B8FE0` to `#1F5FB8` with a `system` history entry), `0004_dark_danger`
   (the dark default error colour) and `0005_developer_platform` (the first-party app `developer`,
-  the `accounts` app's homepage on accounts.teamofsilicons.com, and `signin_flows.login_hint`
+  the `silicon-accounts` app's homepage on accounts.teamofsilicons.com, and `signin_flows.login_hint`
   dropped: an app's login_hint is ignored). Never edit an applied
   migration. Test a data migration with `TestDb::empty()`, `db::MIGRATOR.run_to(n, &db.pool)`,
   rows, then `db::migrate` (see `tests/migrations.rs`).

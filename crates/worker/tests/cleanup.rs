@@ -18,18 +18,18 @@ async fn deletes_expired_state_and_keeps_live_rows_and_history() {
     // For each table: rows past the retention (deleted) and rows recently expired or live (kept).
     ctx.exec(&format!(
         "insert into signin_flows (id, binding_hash, app_id, redirect_uri, step, expires_at) values \
-           ('flow-old', '\\x01', 'accounts', 'http://localhost:8590/', 'choose_method', now() - interval '2 days'), \
-           ('flow-recent', '\\x02', 'accounts', 'http://localhost:8590/', 'choose_method', now() - interval '1 hour'), \
-           ('flow-live', '\\x03', 'accounts', 'http://localhost:8590/', 'choose_method', now() + interval '1 hour'); \
+           ('flow-old', '\\x01', 'silicon-accounts', 'http://localhost:8590/', 'choose_method', now() - interval '2 days'), \
+           ('flow-recent', '\\x02', 'silicon-accounts', 'http://localhost:8590/', 'choose_method', now() - interval '1 hour'), \
+           ('flow-live', '\\x03', 'silicon-accounts', 'http://localhost:8590/', 'choose_method', now() + interval '1 hour'); \
          insert into otp_challenges (id, purpose, channel, destination, code_hash, expires_at, created_at) values \
            (gen_random_uuid(), 'signin', 'email', 'a@example.test', '\\x01', now() - interval '2 days', now() - interval '2 days'), \
            (gen_random_uuid(), 'signin', 'email', 'b@example.test', '\\x02', now() + interval '5 minutes', now()); \
          insert into authorization_codes (code_hash, flow_id, app_id, account_uuid, redirect_uri, scopes, expires_at) values \
-           ('\\x01', 'f', 'accounts', '{u}', 'http://localhost:8590/', '{{profile}}', now() - interval '8 days'), \
-           ('\\x02', 'f', 'accounts', '{u}', 'http://localhost:8590/', '{{profile}}', now() - interval '2 days'); \
+           ('\\x01', 'f', 'silicon-accounts', '{u}', 'http://localhost:8590/', '{{profile}}', now() - interval '8 days'), \
+           ('\\x02', 'f', 'silicon-accounts', '{u}', 'http://localhost:8590/', '{{profile}}', now() - interval '2 days'); \
          insert into short_lived_tokens (token_hash, account_uuid, app_id, scopes, expires_at) values \
-           ('\\x01', '{u}', 'accounts', '{{profile}}', now() - interval '8 days'), \
-           ('\\x02', '{u}', 'accounts', '{{profile}}', now() - interval '10 minutes'); \
+           ('\\x01', '{u}', 'silicon-accounts', '{{profile}}', now() - interval '8 days'), \
+           ('\\x02', '{u}', 'silicon-accounts', '{{profile}}', now() - interval '10 minutes'); \
          insert into device_authorizations (device_code_hash, user_code, status, expires_at) values \
            ('\\x01', 'AAAA-AAAA', 'pending', now() - interval '8 days'), \
            ('\\x02', 'BBBB-BBBB', 'pending', now() + interval '10 minutes'); \

@@ -783,7 +783,7 @@ export function describeRaw(answer: RawAnswer): string {
 /* ------------------------------------------------------------------------------------------------------------------ */
 
 /**
- * Runs the `accounts` CLI like lib's cli(), but `stdin` may be a Buffer (a file piped in) and `extraEnv` is added to
+ * Runs the `silicon-accounts` CLI like lib's cli(), but `stdin` may be a Buffer (a file piped in) and `extraEnv` is added to
  * its environment (ACCOUNTS_APP_ID / ACCOUNTS_APP_SECRET, so stdin stays free for the file). A CLI that stops reading
  * stdin early (it refused the input) is fine: the broken pipe is ignored.
  */

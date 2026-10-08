@@ -7,8 +7,8 @@
  * so two journeys, one per surface:
  *
  * - webhooks-silicon-replay-cli: the CLI, signed in as the Silicon, lists its failed deliveries and replays one (the
- *   event arrives again with the same event_id); its custodian's `accounts silicon webhook` has the same; the bundled
- *   CLI docs (`accounts docs webhooks`) say how;
+ *   event arrives again with the same event_id); its custodian's `silicon-accounts silicon webhook` has the same; the bundled
+ *   CLI docs (`silicon-accounts docs webhooks`) say how;
  * - webhooks-silicon-replay-docs: the docs site (/docs/…md) tells a Silicon how to do it, and no longer says there is
  *   no listing or replay endpoint.
  */
@@ -60,20 +60,20 @@ const cliJourney: Journey = {
     const replay = await cli(env, home, ["webhook", "replay", row.delivery_id, "--json"]);
     const arrived = replay.code === 0 ? await waitEvent(env, sink, { event_id: row.event_id }, 15_000) : null;
     results.check(
-      "CLI (as the Silicon): `accounts webhook` lists its failed deliveries and replays one, which arrives again with the same event_id",
+      "CLI (as the Silicon): `silicon-accounts webhook` lists its failed deliveries and replays one, which arrives again with the same event_id",
       own.includes("deliveries") && own.includes("replay") && list.code === 0 && listed && replay.code === 0 && !!arrived,
-      `accounts webhook commands: [${own.join(", ")}] | deliveries --status failed: ${said(list)} | replay: ${said(replay)} | arrived: ${!!arrived}`,
+      `silicon-accounts webhook commands: [${own.join(", ")}] | deliveries --status failed: ${said(list)} | replay: ${said(replay)} | arrived: ${!!arrived}`,
     );
 
     // ---- the CLI, as the custodian (its help) --------------------------------------------------------------------------------
     const custodianHelp = await cli(env, home, ["silicon", "webhook", "--help"]);
     const custodian = commandsOf(custodianHelp.stdout);
-    results.check("CLI (as the custodian): `accounts silicon webhook` can list and replay a Silicon's deliveries too", custodian.includes("deliveries") && custodian.includes("replay"), `accounts silicon webhook commands: [${custodian.join(", ")}]`);
+    results.check("CLI (as the custodian): `silicon-accounts silicon webhook` can list and replay a Silicon's deliveries too", custodian.includes("deliveries") && custodian.includes("replay"), `silicon-accounts silicon webhook commands: [${custodian.join(", ")}]`);
 
     // ---- the CLI's bundled docs ---------------------------------------------------------------------------------------------
     const bundled = await cli(env, home, ["docs", "webhooks"]);
     results.check(
-      "CLI docs (`accounts docs webhooks`): say how a Silicon replays its own failed deliveries",
+      "CLI docs (`silicon-accounts docs webhooks`): say how a Silicon replays its own failed deliveries",
       bundled.code === 0 && /accounts webhook replay|\/v1\/me\/webhook\/replay/.test(bundled.stdout),
       `exit ${bundled.code}; replay lines: ${short(bundled.stdout.split("\n").filter(line => /replay/i.test(line)).join(" / "), 500)}`,
     );

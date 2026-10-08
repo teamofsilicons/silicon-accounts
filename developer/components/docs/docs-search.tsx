@@ -237,7 +237,7 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
             ) : !showingSuggestions && index.status === "ready" && !hits.length ? (
               <div className={styles.empty}>
                 <strong>No page mentions “{query.trim()}”</strong>
-                <span>Every word has to appear. Try fewer words, an endpoint such as /v1/oauth/token, an error code such as invalid_grant, or a command such as accounts login.</span>
+                <span>Every word has to appear. Try fewer words, an endpoint such as /v1/oauth/token, an error code such as invalid_grant, or a command such as silicon-accounts login.</span>
               </div>
             ) : (
               <ul ref={listRef} id={`docs-search-${id}-list`} className={styles.results} role="listbox" aria-label={showingSuggestions ? "Suggested pages" : "Search results"}>

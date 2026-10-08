@@ -52,7 +52,7 @@ configuration, or provision custom-domain hosting. The response may take **up to
 `response_expected_by` is a response estimate, not an automatic approval or expiry.
 
 `GET` and `POST /v1/apps/{app_id}/account-verification-request` accept only the account-site
-session cookie or live first-party `accounts`/`developer` tokens. The account must currently
+session cookie or live first-party `silicon-accounts`/`developer` tokens. The account must currently
 be the app's owner or an accepted author. App Basic credentials and Apps/other-app tokens
 are rejected with 401; a non-manager gets 403 `not_app_owner`. Every read/submission checks
 current permissions, including before an idempotent response is replayed.
@@ -120,7 +120,7 @@ is dropped (no steps left → `null`), a newly requested detail joins the last s
 default flow (`{"flow":{"review":true}}` turns the review page on). An app with no details can't
 have a flow (422 `flow.steps`). `copy` also takes `opening_title` (the page before Google/Apple,
 ≤ 80, placeholders `{provider}` and `{app}` only), `signup_title` (≤ 80) and `signup_subtitle`
-(≤ 200) for `intent=signup`. The first-party apps `accounts` and `developer` can't be synced and
+(≤ 200) for `intent=signup`. The first-party apps `silicon-accounts` and `developer` can't be synced and
 never ask for details.
 
 ## User base

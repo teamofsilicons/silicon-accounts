@@ -1,5 +1,5 @@
 //! `POST /v1/reports`: bug reports from Carbons, Silicons and anonymous callers (the CLI's
-//! `accounts report`). Each report is stored in `bug_reports` and mailed (Postmark; recorded
+//! `silicon-accounts report`). Each report is stored in `bug_reports` and mailed (Postmark; recorded
 //! only in local delivery mode) to every address in ACCOUNTS_REPORT_RECIPIENTS — by default
 //! saketdev12@gmail.com, shubhastro2@gmail.com and bugs@teamofsilicons.com.
 //!

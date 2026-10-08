@@ -179,7 +179,7 @@ async fn sync_validates_everything_before_writing() {
     no_secret.as_object_mut().map(|o| o.remove("secret"));
     let r = call(
         &ctx,
-        sync(json!({"apps": [bad_branding, {"app_id": "Bad Id", "name": "x"}, {"app_id": "accounts", "name": "x"}, {"app_id": "developer", "name": "x"}]})),
+        sync(json!({"apps": [bad_branding, {"app_id": "Bad Id", "name": "x"}, {"app_id": "silicon-accounts", "name": "x"}, {"app_id": "developer", "name": "x"}]})),
     )
     .await;
     assert_eq!(r.status, 422, "{}", r.json);

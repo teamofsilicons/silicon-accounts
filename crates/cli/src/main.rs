@@ -1,4 +1,4 @@
-//! `accounts`: the Silicon Accounts command line.
+//! `silicon-accounts`: the Silicon Accounts command line.
 //!
 //! Built only on the `silicon-accounts-client` package. Stateful: it keeps a session and
 //! settings in `{home}/.accounts/`. Results go to stdout (plain text or `--json`), and
@@ -55,7 +55,7 @@ fn run() -> i32 {
                 EXIT_FAILURE,
                 "internal",
                 format!("Could not start the async runtime: {err}."),
-                "Retry; report it with `accounts report` if it persists.",
+                "Retry; report it with `silicon-accounts report` if it persists.",
             ));
             return EXIT_FAILURE;
         }

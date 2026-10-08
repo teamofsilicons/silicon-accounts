@@ -90,7 +90,7 @@ check((await carbon.browser.session()) === null, 'the account-site browser sessi
 await run('history', home, ['history'], (r) => r.code === 0 && (r.json?.items ?? []).length > 0);
 await run('history --kind id_change', home, ['history', '--kind', 'id_change'], (r) => r.code === 0 && JSON.stringify(r.json).includes(newId));
 
-section('the CLI refreshes an expired access token (client_id=accounts) and rotates the refresh token');
+section('the CLI refreshes an expired access token (client_id=silicon-accounts) and rotates the refresh token');
 {
   const file = join(home, '.accounts', 'session.json');
   const stored = JSON.parse(readFileSync(file, 'utf8')) as { refresh_token: string; expires_at: string };

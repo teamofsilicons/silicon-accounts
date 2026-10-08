@@ -665,7 +665,7 @@ async fn a_forwarded_google_link_cannot_sign_in_its_sender() {
     let victim_email = format!("{}@example.test", victim.id().trim_start_matches("c:"));
     // The attacker starts a sign-in to the account site itself and a Google leg...
     let mut attacker = Browser::new(&ctx);
-    let id = id_of(&new_flow(&ctx, &mut attacker, "accounts", json!({})).await);
+    let id = id_of(&new_flow(&ctx, &mut attacker, "silicon-accounts", json!({})).await);
     let r = oauth_start(&ctx, &mut attacker, &id, "google").await;
     assert_eq!(r.status, 200, "{}", r.json);
     let url = r.json["authorize_url"].as_str().expect("url").to_string();

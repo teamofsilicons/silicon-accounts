@@ -19,8 +19,8 @@ A Silicon signs in through the CLI or API. It first uses its `si:id` and STK to 
 The Silicon gives that token to the app. The app exchanges it for access and refresh tokens, much like exchanging the code returned by a Carbon’s browser sign-in. The app never receives the Silicon’s STK.
 
 ```sh
-printf '%s' "$STK" | accounts login --silicon si:scout --stk-stdin   # once; the CLI keeps the session
-SLT=$(accounts login --app remind -q)                                 # slt_…: one app, one use, 2 minutes
+printf '%s' "$STK" | silicon-accounts login --silicon si:scout --stk-stdin   # once; the CLI keeps the session
+SLT=$(silicon-accounts login --app remind -q)                                 # slt_…: one app, one use, 2 minutes
 curl -s -X POST https://remind.example/silicon-login \
   -H 'Content-Type: application/json' -d "{\"slt\":\"$SLT\"}"
 ```
@@ -45,7 +45,7 @@ Give the CLI your si:id and STK. Prefer stdin, so the STK never appears in a pro
 history:
 
 ```sh
-printf '%s' "$STK" | accounts login --silicon si:scout --stk-stdin
+printf '%s' "$STK" | silicon-accounts login --silicon si:scout --stk-stdin
 ```
 
 ```text
@@ -58,21 +58,21 @@ session ends  2029-03-25T02:31:29Z (in 899d)
 
 Other ways to pass the credentials:
 
-- `ACCOUNTS_SILICON=si:scout ACCOUNTS_STK=stk-… accounts login`, for an environment that injects
+- `ACCOUNTS_SILICON=si:scout ACCOUNTS_STK=stk-… silicon-accounts login`, for an environment that injects
   secrets as variables;
-- `accounts login --silicon si:scout` in a terminal prompts for the STK without echoing it;
+- `silicon-accounts login --silicon si:scout` in a terminal prompts for the STK without echoing it;
 - `--stk <value>` works but warns: arguments are visible to every process on the machine.
 
 The session is stored in `{home}/.accounts/session.json` (mode 0600). The access token lasts 30
 minutes and the CLI refreshes it by itself when less than a minute is left; the session ends 900
 days after you signed in, however often it is refreshed. A CLI home holds one session: signing in
-as another account there signs the previous one out, and running `accounts login` again while
+as another account there signs the previous one out, and running `silicon-accounts login` again while
 signed in answers `Already signed in as si:scout` (add `--force` to sign in anyway).
 
 Check the session from a script:
 
 ```sh
-accounts login status --json
+silicon-accounts login status --json
 ```
 
 ```json
@@ -108,10 +108,10 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons/login \
   "refresh_token": "sar_peF7apNSIlunmOgn_5eeR3naY_mVAs1_FBGNSOoAkvU",
   "refresh_token_expires_at": "2029-03-25T02:35:39.401Z",
   "scope": "profile",
-  "membership_id": "accounts:8HV",
+  "membership_id": "silicon-accounts:8HV",
   "account": {
     "uuid": "8HV",
-    "membership_id": "accounts:8HV",
+    "membership_id": "silicon-accounts:8HV",
     "kind": "silicon",
     "id": "si:scout",
     "display_name": "Scout",
@@ -126,14 +126,14 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons/login \
 }
 ```
 
-These are first-party tokens (audience `accounts`): they act on your own account, they are not for
-apps. `client_label` (up to 100 characters) names this sign-in in `accounts sessions list`.
+These are first-party tokens (audience `silicon-accounts`): they act on your own account, they are not for
+apps. `client_label` (up to 100 characters) names this sign-in in `silicon-accounts sessions list`.
 
 Refresh the access token before it expires, and store the new refresh token every time:
 
 ```sh
 curl -s -X POST https://accounts.teamofsilicons.com/v1/oauth/token \
-  -d grant_type=refresh_token -d client_id=accounts -d "refresh_token=$REFRESH_TOKEN"
+  -d grant_type=refresh_token -d client_id=silicon-accounts -d "refresh_token=$REFRESH_TOKEN"
 ```
 
 Refresh tokens rotate on every use. Presenting one that was already used revokes the whole sign-in,
@@ -191,7 +191,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 | `custodian_declined`, `custodian_expired` | 403 | 3 | the account was released and never became active | create it again, naming a Carbon who will accept |
 | `account_deleted` | 403 | 3 | the account was deleted by its custodian | ask your former custodian, or get a new account |
 | `invalid_stk` | 422 | 2 | not `stk-` plus 8 to 32 hex characters | send the STK exactly as it was shown |
-| `invalid_id` | 422 | 2 | not an si:id (a `c:` id, a typo) | Carbons sign in with `accounts login` instead |
+| `invalid_id` | 422 | 2 | not an si:id (a `c:` id, a typo) | Carbons sign in with `silicon-accounts login` instead |
 | `rate_limited` | 429 | 6 | more than 60 Silicon sign-in attempts per minute from your network | wait `details.retry_after_seconds` |
 
 The tenth wrong STK in a row is itself answered with `login_locked`. A correct sign-in resets the
@@ -201,7 +201,7 @@ exit code `2`.
 ## 2. Get a short-lived token
 
 ```sh
-accounts login --app remind
+silicon-accounts login --app remind
 ```
 
 ```text
@@ -209,7 +209,7 @@ Short-lived token for remind as si:scout: single use, valid until 2026-10-07T02:
 slt_vcB-NXP89QQd386p0r0BTGcO6pC5tudXjLNuf6nBIpQ
 ```
 
-The token goes to stdout and the explanation to stderr, so `SLT=$(accounts login --app remind -q)`
+The token goes to stdout and the explanation to stderr, so `SLT=$(silicon-accounts login --app remind -q)`
 captures exactly the token. With `--json`:
 
 ```json
@@ -223,7 +223,7 @@ captures exactly the token. With `--json`:
 Not signed in yet? Do both in one command:
 
 ```sh
-printf '%s' "$STK" | accounts login --silicon si:scout --stk-stdin --app remind -q
+printf '%s' "$STK" | silicon-accounts login --silicon si:scout --stk-stdin --app remind -q
 ```
 
 Over HTTP, with your first-party access token:
@@ -256,7 +256,7 @@ What the token is:
 |---|---|---|
 | `unknown_app` | 404 | no app has this `app_id` |
 | `app_disabled` | 403 | the app exists but is disabled in Silicon Apps |
-| `first_party_app` | 422 | `accounts` is Silicon Accounts itself, which you are already signed in to |
+| `first_party_app` | 422 | `silicon-accounts` is Silicon Accounts itself, which you are already signed in to |
 | `not_signed_in`, `session_ended` | (CLI) | no session in this home, or it ended (signed out, revoked, STK rotated): sign in again |
 
 ## 3. Hand it to the app
@@ -374,7 +374,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 From the command line, for testing:
 
 ```sh
-printf '%s' "$REMIND_APP_SECRET" | accounts app --app-id remind --app-secret-stdin token slt "$SLT"
+printf '%s' "$REMIND_APP_SECRET" | silicon-accounts app --app-id remind --app-secret-stdin token slt "$SLT"
 ```
 
 A successful exchange is a sign-in: the Silicon joins the app's user base (source `slt`), and the
@@ -409,7 +409,7 @@ Local signature checks cannot see that a session has ended. An existing access t
 **The Silicon can see and leave the apps it signed into:**
 
 ```sh
-accounts apps list
+silicon-accounts apps list
 ```
 
 ```text
@@ -417,7 +417,7 @@ APP     NAME    STATUS  SHARED            LAST SIGN-IN
 remind  Remind  active  profile timezone  2026-10-07T02:43:20Z
 ```
 
-`accounts apps remove remind` revokes the app's tokens for you and the User verification proofs it issued about
+`silicon-accounts apps remove remind` revokes the app's tokens for you and the User verification proofs it issued about
 you, marks the membership `access_removed` and tells the app (`membership.access_removed`).
 Exchanging a new SLT later makes it `active` again.
 
@@ -426,17 +426,17 @@ Exchanging a new SLT later makes it `active` again.
 Give each Silicon its own CLI home, so their sessions don't replace each other:
 
 ```sh
-SILICON_HOME=/srv/silicons/scout  accounts login --app remind -q
-SILICON_HOME=/srv/silicons/ledger accounts login --app remind -q
+SILICON_HOME=/srv/silicons/scout  silicon-accounts login --app remind -q
+SILICON_HOME=/srv/silicons/ledger silicon-accounts login --app remind -q
 ```
 
 Many processes can share one home: the CLI refreshes the session under a file lock, so two
 processes never present the same refresh token (which would end the session). Details are in
-[Use the accounts CLI](cli.md#give-every-silicon-its-own-home).
+[Use the silicon-accounts CLI](cli.md#give-every-silicon-its-own-home).
 
 ## Next
 
 - [Get a Silicon account](silicon-account.md), if you don't have one yet.
 - [Exchange codes and refresh tokens](tokens.md) and
   [Tokens and sessions](../learn/tokens-and-sessions.md), for the app side in depth.
-- [CLI reference](../reference/cli.md#accounts-login), for every `accounts login` option.
+- [CLI reference](../reference/cli.md#silicon-accounts-login), for every `silicon-accounts login` option.

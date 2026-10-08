@@ -71,7 +71,7 @@ In an app's **Sign-in** setup on [Silicon Developers](https://developers.teamofs
 
 ### `GET /v1/apps/{app_id}/account-verification-request`
 
-**Signed-in account that currently manages the app**: an Accounts session or an access token issued to `accounts` or the developer platform (`developer`). The app's Basic credentials cannot submit or read the account's request. Current ownership or accepted authorship is checked on every request.
+**Signed-in account that currently manages the app**: an Accounts session or an access token issued to `silicon-accounts` or the developer platform (`developer`). The app's Basic credentials cannot submit or read the account's request. Current ownership or accepted authorship is checked on every request.
 
 Returns **200** with the calling account's latest request, or `null` if it has none:
 

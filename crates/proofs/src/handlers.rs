@@ -477,7 +477,7 @@ pub async fn revoke_my_proof(
                 "No User verification with id {id} was issued on behalf of {}.",
                 me.account.display_id()
             ))
-            .hint("List your proofs with GET /v1/me/proofs (or `accounts proofs list`)."));
+            .hint("List your proofs with GET /v1/me/proofs (or `silicon-accounts proofs list`)."));
         }
     };
     revoke_family(

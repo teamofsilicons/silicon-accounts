@@ -1,5 +1,5 @@
 //! A small stateful mock of the Silicon Accounts API on its own thread, plus helpers to
-//! run the `accounts` binary in an isolated home.
+//! run the `silicon-accounts` binary in an isolated home.
 
 #![allow(dead_code, clippy::unwrap_used)]
 
@@ -122,7 +122,7 @@ impl Mock {
         st.refresh_token = format!("sar_{}", st.generation);
     }
 
-    /// Revokes the Carbon's session (as `accounts sessions revoke` from another terminal).
+    /// Revokes the Carbon's session (as `silicon-accounts sessions revoke` from another terminal).
     pub fn revoke_carbon_session(&self) {
         let mut st = self.state.lock().unwrap();
         st.carbon_token = format!("{CARBON_TOKEN}-{}", st.requests.len());
@@ -156,9 +156,9 @@ fn silicon_tokens(state: &MockState) -> Value {
         "refresh_token": state.refresh_token,
         "refresh_token_expires_at": "2029-03-24T12:00:00.000Z",
         "scope": "profile",
-        "membership_id": format!("accounts:{SILICON_UUID}"),
+        "membership_id": format!("silicon-accounts:{SILICON_UUID}"),
         "account": {
-            "uuid": SILICON_UUID, "membership_id": format!("accounts:{SILICON_UUID}"), "kind": "silicon",
+            "uuid": SILICON_UUID, "membership_id": format!("silicon-accounts:{SILICON_UUID}"), "kind": "silicon",
             "id": SILICON_ID, "display_name": "Scout", "pfp_url": "https://iris.example/pfp/silicon?id=b9Z",
             "custodian": { "uuid": CARBON_UUID, "id": CARBON_ID }, "updated_at": "2026-10-06T12:00:00.000Z", "version": 3
         }
@@ -173,9 +173,9 @@ fn carbon_tokens(state: &MockState) -> Value {
         "refresh_token": "sar_carbon",
         "refresh_token_expires_at": "2029-03-24T12:00:00.000Z",
         "scope": "profile email",
-        "membership_id": format!("accounts:{CARBON_UUID}"),
+        "membership_id": format!("silicon-accounts:{CARBON_UUID}"),
         "account": {
-            "uuid": CARBON_UUID, "membership_id": format!("accounts:{CARBON_UUID}"), "kind": "carbon",
+            "uuid": CARBON_UUID, "membership_id": format!("silicon-accounts:{CARBON_UUID}"), "kind": "carbon",
             "id": CARBON_ID, "display_name": "Saket", "pfp_url": "https://iris.example/pfp/carbon?id=a8K",
             "email": CARBON_EMAIL, "email_verified": true, "updated_at": "2026-10-06T12:00:00.000Z", "version": 5
         }
@@ -406,7 +406,7 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
                         404,
                         "silicon_not_found",
                         &format!("You are not the custodian of a Silicon '{silicon}'."),
-                        "List your Silicons with `accounts silicon list`.",
+                        "List your Silicons with `silicon-accounts silicon list`.",
                     )
                 }
             } else if id == "c:taken" {
@@ -664,7 +664,7 @@ impl Env {
     /// The same isolated command as [`Env::cmd`], as a `std::process::Command` (for a test that
     /// chooses where stdout goes).
     pub fn std_cmd(&self) -> std::process::Command {
-        let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_accounts"));
+        let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_silicon-accounts"));
         for var in [
             "SILICON_HOME",
             "ACCOUNTS_HOME",
@@ -688,7 +688,7 @@ impl Env {
     }
 
     pub fn cmd(&self) -> assert_cmd::Command {
-        let mut cmd = assert_cmd::Command::new(env!("CARGO_BIN_EXE_accounts"));
+        let mut cmd = assert_cmd::Command::new(env!("CARGO_BIN_EXE_silicon-accounts"));
         for var in [
             "SILICON_HOME",
             "ACCOUNTS_HOME",

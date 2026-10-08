@@ -38,7 +38,7 @@ export const journey: Journey = {
     const request = obj(created.json?.request);
     const requestId = str(request.id);
     const stk = str(created.json?.stk);
-    results.check("`accounts silicon create --custodian <email>` (not signed in): created, pending", created.code === 0 && obj(created.json?.silicon).status === "pending_custodian" && /^stk-[0-9a-f]{12}$/.test(stk), said(created));
+    results.check("`silicon-accounts silicon create --custodian <email>` (not signed in): created, pending", created.code === 0 && obj(created.json?.silicon).status === "pending_custodian" && /^stk-[0-9a-f]{12}$/.test(stk), said(created));
     results.check("the request shows the address masked, never in full", request.custodian === "s***@example.test" && !created.stdout.includes(email), str(request.custodian));
     await setSinkSecret(env, key, str(created.json?.webhook_secret));
     const row = await requestRow(env, requestId);
@@ -50,7 +50,7 @@ export const journey: Journey = {
     }, 15_000);
     results.check("the address gets an invitation: sign up with it and the request will be waiting", str(invite?.subject) === `${sid} asked you to be its custodian on Silicon Accounts` && str(invite?.text).includes(`sign up at ${env.site}`) && str(invite?.from).includes("accounts@teamofsilicons.com"), short(invite?.subject));
     const status1 = await accounts(env, ["silicon", "request", "status", requestId, "--json"], { home });
-    results.check("`accounts silicon request status <id>` (saved token): pending", status1.code === 0 && status1.json?.status === "pending" && status1.json?.custodian === "s***@example.test", said(status1));
+    results.check("`silicon-accounts silicon request status <id>` (saved token): pending", status1.code === 0 && status1.json?.status === "pending" && status1.json?.custodian === "s***@example.test", said(status1));
     const elsewhere = await accounts(env, ["silicon", "request", "status", requestId, "--json"], { home: freshDir() });
     results.check("…from another home without --token: exit 2, says the token is missing and where it lives", elsewhere.code === 2 && /No request token/.test(str(obj(elsewhere.json?.error).message)), said(elsewhere));
     const withToken = await accounts(env, ["silicon", "request", "status", requestId, "--token", str(created.json?.request_token), "--json"], { home: freshDir() });
@@ -81,7 +81,7 @@ export const journey: Journey = {
 
     // 4. The Silicon is active, with the new Carbon as custodian.
     const decided = await accounts(env, ["silicon", "request", "status", requestId, "--json"], { home });
-    results.check("`accounts silicon request status`: accepted", decided.json?.status === "accepted" && !!decided.json?.decided_at && obj(decided.json?.silicon).status === "active", said(decided));
+    results.check("`silicon-accounts silicon request status`: accepted", decided.json?.status === "accepted" && !!decided.json?.decided_at && obj(decided.json?.silicon).status === "active", said(decided));
     const waited = await accounts(env, ["silicon", "request", "status", requestId, "--wait", "--json"], { home, timeoutMs: 60_000 });
     results.check("`… --wait` on a decided request returns at once (exit 0)", waited.code === 0 && waited.json?.status === "accepted" && waited.ms < 15_000, said(waited));
     const login = await loginSilicon(env, home, sid, stk);

@@ -3,10 +3,10 @@
 //!
 //! | extractor | gives | fails with |
 //! |---|---|---|
-//! | [`AccountAuth`] | signed-in account (session cookie, or Bearer JWT with aud=accounts; aud=developer only on `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps`) | 401 (`token_wrong_audience`, …) / 403 `origin_not_allowed` |
+//! | [`AccountAuth`] | signed-in account (session cookie, or Bearer JWT with aud=silicon-accounts; aud=developer only on `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps`) | 401 (`token_wrong_audience`, …) / 403 `origin_not_allowed` |
 //! | [`CarbonAuth`] / [`SiliconAuth`] | same, restricted by kind | 403 `carbon_only` / `silicon_only` |
 //! | [`AppAuth`] | app from `Authorization: Basic` | 401 `invalid_app_credentials` / 403 `app_disabled` |
-//! | [`AppOrOwner`] | app of `{app_id}` via its credentials or its owner's session (cookie, or Bearer with aud=accounts or aud=developer) | 403 `app_mismatch` / `not_app_owner`, 404 `unknown_app` |
+//! | [`AppOrOwner`] | app of `{app_id}` via its credentials or its owner's session (cookie, or Bearer with aud=silicon-accounts or aud=developer) | 403 `app_mismatch` / `not_app_owner`, 404 `unknown_app` |
 //! | [`ClientMeta`] | ip, user agent, ip timezone, origin | never |
 //! | [`IdempotencyKey`] | `Idempotency-Key` header | 400 `invalid_idempotency_key` |
 //! | [`Json`], [`Query`], [`Path`] | typed input | 400 / 422 with the field path |

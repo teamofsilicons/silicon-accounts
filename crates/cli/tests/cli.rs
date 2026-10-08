@@ -1,4 +1,4 @@
-//! `accounts` end to end against a mock of the Silicon Accounts API.
+//! `silicon-accounts` end to end against a mock of the Silicon Accounts API.
 
 #![allow(clippy::unwrap_used)]
 
@@ -25,7 +25,7 @@ fn login_status_when_signed_out_is_exit_1_with_json() {
         .assert()
         .code(1)
         .stdout(predicate::str::contains("Not signed in"))
-        .stderr(predicate::str::contains("accounts login"));
+        .stderr(predicate::str::contains("silicon-accounts login"));
 }
 
 #[test]
@@ -175,7 +175,7 @@ fn help_is_a_traversable_tree() {
         .args(["help", "proofs"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("accounts docs proofs"));
+        .stdout(predicate::str::contains("silicon-accounts docs proofs"));
     env.cmd()
         .args(["docs", "silicons"])
         .assert()
@@ -288,7 +288,7 @@ fn silicon_login_whoami_slt_and_logout() {
     assert_eq!(slt["slt"], "slt_test_token");
     assert_eq!(slt["app_id"], "remind");
     assert_eq!(mock.count("POST", "/v1/silicons/login"), logins_before);
-    // Human mode prints just the token on stdout, so `$(accounts login --app remind)` works.
+    // Human mode prints just the token on stdout, so `$(silicon-accounts login --app remind)` works.
     env.cmd()
         .args(["login", "--app", "remind", "-q"])
         .assert()
@@ -613,7 +613,7 @@ fn telemetry_is_sent_unless_opted_out() {
         "telemetry must not carry ids"
     );
 
-    // `accounts config telemetry off` is respected without the env var.
+    // `silicon-accounts config telemetry off` is respected without the env var.
     let env2 = Env::new();
     env2.cmd()
         .env_remove("ACCOUNTS_TELEMETRY")
@@ -782,8 +782,8 @@ fn app_verification_proofs_are_for_exactly_one_app() {
         assert!(message.contains("exactly one app"), "{message}");
         let hint = json["error"]["hint"].as_str().unwrap();
         assert!(
-            hint.contains("accounts app proof app-verification --to remind")
-                && hint.contains("accounts app proof app-verification --to waveform"),
+            hint.contains("silicon-accounts app proof app-verification --to remind")
+                && hint.contains("silicon-accounts app proof app-verification --to waveform"),
             "{hint}"
         );
     }

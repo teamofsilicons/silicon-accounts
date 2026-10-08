@@ -71,7 +71,7 @@ impl Grant {
                 " To act for an account at another app, get a User verification proof (POST /v1/proofs/user-verification) with the account's access token."
             }
             "password" => {
-                " Carbons never hand their credentials to apps: send them through the hosted sign-in (/authorize). Silicons get a short-lived token with `accounts login --app <app_id>` and the app exchanges it with grant_type=urn:silicon:params:oauth:grant-type:slt."
+                " Carbons never hand their credentials to apps: send them through the hosted sign-in (/authorize). Silicons get a short-lived token with `silicon-accounts login --app <app_id>` and the app exchanges it with grant_type=urn:silicon:params:oauth:grant-type:slt."
             }
             "implicit" | "token" => {
                 " The implicit flow is not supported: use the authorization code flow with PKCE."
@@ -176,7 +176,7 @@ async fn handle(
     }
 }
 
-/// The public first-party clients: `accounts` may only refresh and poll device codes,
+/// The public first-party clients: `silicon-accounts` may only refresh and poll device codes,
 /// `developer` may only redeem its codes (PKCE S256) and refresh.
 fn refuse_public_client(client: &ClientAuth, grant: Grant) -> Result<(), OAuthError> {
     if client.public {
@@ -195,11 +195,11 @@ fn refuse_public_client(client: &ClientAuth, grant: Grant) -> Result<(), OAuthEr
     Ok(())
 }
 
-/// Device codes belong to the first-party app (the accounts CLI).
+/// Device codes belong to the first-party app (the silicon-accounts CLI).
 fn require_first_party(client: &ClientAuth) -> Result<(), OAuthError> {
     if client.app.app_id != FIRST_PARTY_APP_ID {
         return Err(OAuthError::unauthorized_client(format!(
-            "grant_type={DEVICE_CODE_GRANT_TYPE} is only for the first-party client '{FIRST_PARTY_APP_ID}' (the accounts CLI: send client_id={FIRST_PARTY_APP_ID} without a client_secret). The app '{}' signs accounts in through /authorize and exchanges the code with grant_type=authorization_code.",
+            "grant_type={DEVICE_CODE_GRANT_TYPE} is only for the first-party client '{FIRST_PARTY_APP_ID}' (the silicon-accounts CLI: send client_id={FIRST_PARTY_APP_ID} without a client_secret). The app '{}' signs accounts in through /authorize and exchanges the code with grant_type=authorization_code.",
             client.app.app_id
         )));
     }

@@ -154,7 +154,7 @@ Every Carbon and Silicon that signed in to your app (or that you imported) is in
 base, with the details it shares with you. The columns are fixed; apps can't add their own.
 
 ```sh
-accounts app users                 # or: curl -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/apps/$ACCOUNTS_APP_ID/users"
+silicon-accounts app users                 # or: curl -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/apps/$ACCOUNTS_APP_ID/users"
 ```
 
 ```text

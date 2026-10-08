@@ -511,7 +511,7 @@ pub async fn touch_refreshed(conn: &mut PgConnection, id: Uuid) -> ApiResult<Off
 // ---- verify ----------------------------------------------------------------------------------
 
 /// Everything `POST /v1/proofs/verify` needs, from one indexed lookup
-/// (`proof_tokens` PK → `proof_families` PK → `apps` PK, plus `accounts`, `memberships` and
+/// (`proof_tokens` PK → `proof_families` PK → `apps` PK, plus `silicon-accounts`, `memberships` and
 /// `token_families` PKs for User verification).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct VerifyRow {

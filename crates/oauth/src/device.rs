@@ -3,7 +3,7 @@
 //! site (`/device`, served by the auth crate's `/v1/device/{user_code}` endpoints), and the CLI
 //! polls `POST /v1/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:device_code`.
 //!
-//! Public (no credentials): only the first-party client `accounts` uses the device flow, so a
+//! Public (no credentials): only the first-party client `silicon-accounts` uses the device flow, so a
 //! `client_id` naming another app is refused. Body: JSON or form, all optional —
 //! `client_label` (shown on the approval page and the sessions list), `client_id`, `scope`.
 //! Errors use the API error shape. Rate-limited per IP ([`DEVICE_AUTHORIZE_PER_IP`]).
@@ -79,7 +79,7 @@ pub(crate) async fn authorize(
             ApiError::invalid_request(format!(
                 "POST /v1/device/authorize could not read its body: {m}."
             ))
-            .hint("Send JSON like {\"client_label\":\"accounts CLI on my-laptop\"}, or the same fields as a form; every field is optional.")
+            .hint("Send JSON like {\"client_label\":\"silicon-accounts CLI on my-laptop\"}, or the same fields as a form; every field is optional.")
         })?
     };
     check_client(&headers, &params)?;
@@ -87,7 +87,7 @@ pub(crate) async fn authorize(
         // First-party tokens always carry `profile`; the scope is only checked for typos.
         Scope::parse_list(scope).map_err(|e| {
             ApiError::bad_request("invalid_scope", format!("The scope parameter has {e}.")).hint(
-                "Omit scope: device sign-ins always get first-party tokens for the accounts app.",
+                "Omit scope: device sign-ins always get first-party tokens for the silicon-accounts app.",
             )
         })?;
     }
@@ -128,14 +128,14 @@ fn check_client(headers: &HeaderMap, params: &AuthorizeParams) -> Result<(), Api
         .into_iter()
         .chain(basic_id);
     for id in named {
-        if id != FIRST_PARTY_APP_ID {
+        if accounts_core::canonical_first_party_app_id(&id) != FIRST_PARTY_APP_ID {
             return Err(ApiError::bad_request(
                 "unauthorized_client",
                 format!(
-                    "The device flow is only for the first-party client '{FIRST_PARTY_APP_ID}' (the accounts CLI), not for the app '{id}'."
+                    "The device flow is only for the first-party client '{FIRST_PARTY_APP_ID}' (the silicon-accounts CLI), not for the app '{id}'."
                 ),
             )
-            .hint("Apps sign accounts in through the hosted pages (/authorize) and exchange the code at POST /v1/oauth/token. Omit client_id, or send client_id=accounts."));
+            .hint("Apps sign accounts in through the hosted pages (/authorize) and exchange the code at POST /v1/oauth/token. Omit client_id, or send client_id=silicon-accounts."));
         }
     }
     Ok(())
@@ -163,8 +163,8 @@ mod tests {
         assert_eq!(clean_label(None), None);
         assert_eq!(clean_label(Some("   ")), None);
         assert_eq!(
-            clean_label(Some("  accounts CLI\non\t my-mac \u{7}")).as_deref(),
-            Some("accounts CLI on my-mac")
+            clean_label(Some("  silicon-accounts CLI\non\t my-mac \u{7}")).as_deref(),
+            Some("silicon-accounts CLI on my-mac")
         );
         let long = "x".repeat(250);
         assert_eq!(

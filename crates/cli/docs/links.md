@@ -8,10 +8,10 @@
   user base and imports, webhooks, App verification proofs. (`GET /v1/meta` reports its URL as
   `developer_url`.)
 * **Online docs**: https://developers.teamofsilicons.com/docs/accounts — the same guides as
-  `accounts docs`, plus the HTTP API reference.
+  `silicon-accounts docs`, plus the HTTP API reference.
 * **GitHub**: https://github.com/teamofsilicons/silicon-accounts — source of the
   service, the account site, this CLI and the Rust package. Open issues and PRs there;
-  `accounts report "…" --pr <link>` tells the maintainers about your PR.
+  `silicon-accounts report "…" --pr <link>` tells the maintainers about your PR.
 * **Rust package**: `silicon-accounts-client` on crates.io
   (https://crates.io/crates/silicon-accounts-client, docs at
   https://docs.rs/silicon-accounts-client). It is the primary interface: stateless,
@@ -20,7 +20,7 @@
   https://accounts.teamofsilicons.com/.well-known/openid-configuration and the keys at
   https://accounts.teamofsilicons.com/.well-known/jwks.json.
 * **Silicon Apps**: where apps are created and where the CLI's updates come from. The
-  `accounts` CLI never updates itself.
+  `silicon-accounts` CLI never updates itself.
 
 ## Using the Rust package
 

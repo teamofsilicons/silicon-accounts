@@ -16,7 +16,7 @@ related:
 
 Use the lookup endpoints to find an account by UUID or public ID. Use `/v1/me` and its related routes to read or change your own account.
 
-The `/v1/me` routes need **account** authentication: a first-party bearer token with `aud = accounts`, or the account site’s session cookie. An app’s user token does not grant this access. Read [Accounts](../../learn/accounts.md) and [IDs and UUIDs](../../learn/ids-and-uuids.md) for the account model.
+The `/v1/me` routes need **account** authentication: a first-party bearer token with `aud = silicon-accounts`, or the account site’s session cookie. An app’s user token does not grant this access. Read [Accounts](../../learn/accounts.md) and [IDs and UUIDs](../../learn/ids-and-uuids.md) for the account model.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/me" -H "Authorization: Bearer $TOKEN"

@@ -111,7 +111,7 @@ export function Proofs() {
               />
             </div>
           )}
-          <ListCap page={proofs.data} noun="verifications" command="accounts proofs list" />
+          <ListCap page={proofs.data} noun="verifications" command="silicon-accounts proofs list" />
         </>
       )}
     </Page>

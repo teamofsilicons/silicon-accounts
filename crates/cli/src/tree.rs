@@ -1,4 +1,4 @@
-//! The clap command, decorated with the full command tree for `accounts --help`.
+//! The clap command, decorated with the full command tree for `silicon-accounts --help`.
 
 use clap::{ArgMatches, Command, CommandFactory};
 use serde_json::{Value, json};
@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use crate::cli::Cli;
 use crate::docs;
 
-const SHORT_AFTER: &str = "Run `accounts --help` for the whole command tree, `accounts <command> --help` for details and examples, and `accounts docs` for the guides.";
+const SHORT_AFTER: &str = "Run `silicon-accounts --help` for the whole command tree, `silicon-accounts <command> --help` for details and examples, and `silicon-accounts docs` for the guides.";
 
 /// The command with the tree, docs, environment and exit codes appended to the root help.
 pub fn command() -> Command {
@@ -26,8 +26,8 @@ pub fn command() -> Command {
         "  ACCOUNTS_URL                    Silicon Accounts URL (default accounts.teamofsilicons.com)",
         "  ACCOUNTS_HOME                   directory holding .accounts/ (beats the configured home)",
         "  SILICON_HOME                    the home when nothing else is set (else ~)",
-        "  ACCOUNTS_SILICON, ACCOUNTS_STK  a Silicon's si:id and STK for `accounts login`",
-        "  ACCOUNTS_APP_ID                 the app for `accounts app …`",
+        "  ACCOUNTS_SILICON, ACCOUNTS_STK  a Silicon's si:id and STK for `silicon-accounts login`",
+        "  ACCOUNTS_APP_ID                 the app for `silicon-accounts app …`",
         "  ACCOUNTS_APP_SECRET             its app secret",
         "  ACCOUNTS_TELEMETRY=0            turn telemetry off",
         "  ACCOUNTS_NO_BROWSER=1           never open a browser",
@@ -50,12 +50,12 @@ pub fn command() -> Command {
     ]
     .join("\n");
     let long = format!(
-        "Command tree (`accounts <command> --help` explains each one, with examples):\n\n{tree}\nDocs bundled in this CLI (`accounts docs <topic>`):\n\n{topics}\n{tail}"
+        "Command tree (`silicon-accounts <command> --help` explains each one, with examples):\n\n{tree}\nDocs bundled in this CLI (`silicon-accounts docs <topic>`):\n\n{topics}\n{tail}"
     );
     help_on_missing_subcommand(base.after_help(SHORT_AFTER).after_long_help(long))
 }
 
-/// Groups like `accounts silicon` print their help instead of a bare usage error.
+/// Groups like `silicon-accounts silicon` print their help instead of a bare usage error.
 fn help_on_missing_subcommand(mut cmd: Command) -> Command {
     let names: Vec<String> = cmd
         .get_subcommands()
@@ -156,18 +156,18 @@ fn wrap(text: &str, width: usize) -> Vec<String> {
     lines
 }
 
-/// `accounts help` without a topic: the root long help.
+/// `silicon-accounts help` without a topic: the root long help.
 pub fn root_long_help() -> String {
     command().render_long_help().to_string()
 }
 
-/// The tree as JSON (for `accounts help --json`).
+/// The tree as JSON (for `silicon-accounts help --json`).
 pub fn json_tree() -> Value {
     let mut list = Vec::new();
     entries(&command(), "", 0, &mut list);
     let commands: Vec<Value> = list
         .into_iter()
-        .map(|(_, path, about)| json!({ "command": format!("accounts {path}"), "about": about }))
+        .map(|(_, path, about)| json!({ "command": format!("silicon-accounts {path}"), "about": about }))
         .collect();
     json!({ "commands": commands })
 }
@@ -220,7 +220,7 @@ mod tests {
     }
 
     /// clap merges an argument into a global one with the same id, so a positional named
-    /// `url` silently became the service URL (`accounts webhook set <URL>` then talked to the
+    /// `url` silently became the service URL (`silicon-accounts webhook set <URL>` then talked to the
     /// webhook endpoint instead of Silicon Accounts).
     #[test]
     fn no_command_reuses_a_global_argument_id() {
@@ -239,14 +239,14 @@ mod tests {
         let clashes: Vec<String> = all
             .iter()
             .filter(|(_, id, global)| !global && globals.contains(id))
-            .map(|(path, id, _)| format!("`accounts {path}` defines `{id}`"))
+            .map(|(path, id, _)| format!("`silicon-accounts {path}` defines `{id}`"))
             .collect();
         assert!(clashes.is_empty(), "{clashes:?}");
     }
 
     fn parse(args: &[&str]) -> crate::cli::Cli {
         let matches = command()
-            .try_get_matches_from(std::iter::once("accounts").chain(args.iter().copied()))
+            .try_get_matches_from(std::iter::once("silicon-accounts").chain(args.iter().copied()))
             .unwrap();
         crate::cli::Cli::from_arg_matches(&matches).unwrap()
     }

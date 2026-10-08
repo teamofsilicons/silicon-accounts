@@ -173,7 +173,7 @@ fn expired(state: &AppState, exp: i64) -> ApiError {
             duration_text(state.settings.access_token_ttl_seconds)
         ),
     )
-    .hint("Refresh it with POST /v1/oauth/token grant_type=refresh_token (the accounts CLI does this automatically).")
+    .hint("Refresh it with POST /v1/oauth/token grant_type=refresh_token (the silicon-accounts CLI does this automatically).")
     .detail("expired_at", at)
 }
 

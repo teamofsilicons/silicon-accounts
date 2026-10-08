@@ -66,11 +66,11 @@ export const journey: Journey = {
     const blocked = await accounts(env, ["delete-account", "--confirm", keeper.id, "--json"], { home: homeK });
     results.check("its custodian can't delete its own account while custodian (exit 5, custodian_of_silicons naming it)", blocked.code === 5 && cliError(blocked).code === "custodian_of_silicons" && JSON.stringify(cliError(blocked).details).includes(sid), said(blocked));
     const noConfirm = await accounts(env, ["silicon", "delete", sid, "--json"], { home: homeK });
-    results.check("`accounts silicon delete` without --confirm (no terminal): exit 2, says what to pass", noConfirm.code === 2 && str(cliError(noConfirm).message).includes(`--confirm ${sid}`), said(noConfirm));
+    results.check("`silicon-accounts silicon delete` without --confirm (no terminal): exit 2, says what to pass", noConfirm.code === 2 && str(cliError(noConfirm).message).includes(`--confirm ${sid}`), said(noConfirm));
     const wrong = await accounts(env, ["silicon", "delete", sid, "--confirm", `si:other-${t}`, "--json"], { home: homeK });
     results.check("…with the wrong id: exit 2, nothing deleted", wrong.code === 2 && (await accounts(env, ["silicon", "show", sid, "--json"], { home: homeK })).code === 0, said(wrong));
     const gone = await accounts(env, ["silicon", "delete", sid, "--confirm", sid, "--json"], { home: homeK });
-    results.check("`accounts silicon delete <si> --confirm <si>`: deleted", gone.code === 0 && gone.json?.deleted === true, said(gone));
+    results.check("`silicon-accounts silicon delete <si> --confirm <si>`: deleted", gone.code === 0 && gone.json?.deleted === true, said(gone));
     for (const app of ["remind", "briefcase"]) {
       const event = await waitApp(env, app, "account.deleted", candidate => dataOf(candidate).uuid === uuid);
       results.check(`${app} got account.deleted (its membership id), signature verified`, dataOf(event).membership_id === `${app}:${uuid}`, short(event?.payload, 200));

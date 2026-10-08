@@ -51,7 +51,7 @@ What this deployment is. Public.
 ```json
 {
   "name": "Silicon Accounts",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "environment": "production",
   "public_url": "https://accounts.teamofsilicons.com",
   "silicon_apps_url": "https://apps.teamofsilicons.com",
@@ -88,7 +88,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/reports" -H 'Content-Type: application/json' \
 
 `message` is 1 to 10,000 characters; `pr_url` must be https. Each report is emailed to every
 maintainer address. Errors: 422 `validation_failed`, 429 `rate_limited`. The CLI's
-`accounts report "…" --pr <link>` calls this endpoint.
+`silicon-accounts report "…" --pr <link>` calls this endpoint.
 
 ## `POST /v1/telemetry/events`
 

@@ -55,7 +55,7 @@ pub(crate) async fn exchange(
         if let Some(info) =
             info.filter(|i| i.app_id == client.app.app_id && i.family_active && !i.used)
         {
-            // Silicon Accounts' own apps (`accounts`, `developer`) have no memberships.
+            // Silicon Accounts' own apps (`silicon-accounts`, `developer`) have no memberships.
             if !is_first_party_app_id(&info.app_id)
                 && info.membership_status != Some(MembershipStatus::Active)
             {

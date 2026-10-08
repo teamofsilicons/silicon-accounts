@@ -1,5 +1,5 @@
 /**
- * The account site's own sign-in (first-party app `accounts`): no consent and no membership ever, return_to honoured
+ * The account site's own sign-in (first-party app `silicon-accounts`): no consent and no membership ever, return_to honoured
  * only on the site, a signed-in browser goes straight through (unless prompt=login), a forged `?code&state` or
  * `?error&error_description` in the address is never taken for a real return, the session cookie is HttpOnly/Lax and
  * signing out kills it on the server.
@@ -21,7 +21,7 @@ const firstParty: Journey = {
 
     // At the API: the first-party flow never asks for consent and makes no membership.
     const api = new Browserish(env, ctx.ip);
-    const s = await startSignIn(api, "accounts", { redirectUri: `${env.site}/sign-in`, pkce: "none", nonce: null });
+    const s = await startSignIn(api, "silicon-accounts", { redirectUri: `${env.site}/sign-in`, pkce: "none", nonce: null });
     const sent = await sendCode(api, s.flow.id, { email });
     const verified = await api.act(s.flow.id, "verify", { code: sent.code ?? "" });
     const params = redirectParams(verified.body.flow ?? { redirect_to: null });
@@ -29,10 +29,10 @@ const firstParty: Journey = {
     results.check("…the first-party app is marked first_party in the flow view", verified.body.flow?.app.first_party === true);
     const setCookie = verified.headers.getSetCookie().find(line => line.startsWith("sa_session=")) ?? "";
     results.check("the code sets sa_session: HttpOnly, SameSite=Lax, Path=/, Max-Age 900 days", /HttpOnly/i.test(setCookie) && /SameSite=Lax/i.test(setCookie) && /Path=\//.test(setCookie) && /Max-Age=77760000/.test(setCookie), setCookie.replace(/sas_[A-Za-z0-9_-]+/, "sas_…"));
-    const memberships = await sql(env, `select count(*) from memberships where app_id = 'accounts' and account_uuid = '${me?.uuid}'`);
+    const memberships = await sql(env, `select count(*) from memberships where app_id = 'silicon-accounts' and account_uuid = '${me?.uuid}'`);
     results.check("…and no membership is ever made for the account site", memberships[0]?.[0] === "0", JSON.stringify(memberships));
     const fresh = new Browserish(env, ctx.ip);
-    const fs = await startSignIn(fresh, "accounts", { redirectUri: `${env.site}/sign-in`, pkce: "none", nonce: null });
+    const fs = await startSignIn(fresh, "silicon-accounts", { redirectUri: `${env.site}/sign-in`, pkce: "none", nonce: null });
     const fsent = await sendCode(fresh, fs.flow.id, { email: `site.new.${t}@example.test` });
     const fverified = await fresh.act(fs.flow.id, "verify", { code: fsent.code ?? "" });
     const fsigned = await fresh.act(fs.flow.id, "signup", {});
@@ -65,7 +65,7 @@ const firstParty: Journey = {
     // Browsers cap a cookie's lifetime at 400 days (RFC 6265bis §5.5; Chromium and WebKit do), whatever Max-Age says.
     results.check("the browser keeps the session cookie HttpOnly, SameSite=Lax, Path=/ (lifetime: Max-Age capped by the browser at 400 days)", !!cookie && cookie.httpOnly && cookie.sameSite === "Lax" && cookie.path === "/" && days > 399, JSON.stringify({ ...cookie, value: "…" }));
     results.metric("session cookie lifetime the browser keeps", days, "days");
-    const history = await sql(env, `select method, outcome from signin_history where account_uuid = '${me?.uuid}' and app_id = 'accounts' order by at desc limit 1`);
+    const history = await sql(env, `select method, outcome from signin_history where account_uuid = '${me?.uuid}' and app_id = 'silicon-accounts' order by at desc limit 1`);
     results.check("the sign-in is in the account's history (accounts, email, success)", JSON.stringify(history) === JSON.stringify([["email", "success"]]), JSON.stringify(history));
 
     // Signed in: /sign-in goes straight to return_to, no flow. A forged return in the address is ignored.

@@ -18,8 +18,8 @@ fn token_body(aud_id: &str) -> serde_json::Value {
     json!({
         "access_token": "eyJ.header.sig", "token_type": "Bearer", "expires_in": 1800,
         "refresh_token": "sar_refresh", "refresh_token_expires_at": "2029-03-24T12:00:00.000Z",
-        "scope": "profile", "membership_id": format!("accounts:{aud_id}"),
-        "account": {"uuid": aud_id, "membership_id": format!("accounts:{aud_id}"), "kind": "silicon",
+        "scope": "profile", "membership_id": format!("silicon-accounts:{aud_id}"),
+        "account": {"uuid": aud_id, "membership_id": format!("silicon-accounts:{aud_id}"), "kind": "silicon",
                     "id": "si:scout", "display_name": "Scout", "pfp_url": "https://iris.example/pfp", "version": 3,
                     "custodian": {"uuid": "a8K", "id": "c:saket"}}
     })
@@ -111,7 +111,10 @@ async fn oauth_errors_and_foreign_bodies_are_typed() {
         form.get("grant_type").map(String::as_str),
         Some("refresh_token")
     );
-    assert_eq!(form.get("client_id").map(String::as_str), Some("accounts"));
+    assert_eq!(
+        form.get("client_id").map(String::as_str),
+        Some("silicon-accounts")
+    );
 
     // A proxy page instead of the API: GETs are retried, then reported precisely.
     mock.on(
@@ -222,7 +225,7 @@ async fn device_poll_maps_every_state() {
             "urn:ietf:params:oauth:grant-type:device_code"
         );
         assert_eq!(form["device_code"], "sad_x");
-        assert_eq!(form["client_id"], "accounts");
+        assert_eq!(form["client_id"], "silicon-accounts");
     }
     mock.on(
         "POST",
@@ -253,7 +256,7 @@ async fn waits_for_device_approval() {
     );
     let client = AccountsClient::new(&mock.url).unwrap();
     let device = client
-        .device_authorize(Some("accounts CLI on test"))
+        .device_authorize(Some("silicon-accounts CLI on test"))
         .await
         .unwrap();
     assert_eq!(device.user_code, "WDJB-MJHT");

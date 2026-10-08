@@ -1,4 +1,4 @@
-// `accounts report` → mock Postmark receives one email per recipient, to exactly the three
+// `silicon-accounts report` → mock Postmark receives one email per recipient, to exactly the three
 // addresses UNDERSTANDING.md names. (POST /v1/reports allows 5 per hour per network.)
 import { check, cli, done, messaging, newHome, rid, section, show, sleep } from './_common.ts';
 
@@ -6,7 +6,7 @@ const RECIPIENTS = ['bugs@teamofsilicons.com', 'saketdev12@gmail.com', 'shubhast
 const home = newHome('report');
 const tag = `journey-report-${rid()}`;
 
-section('accounts report "…" --pr <link>');
+section('silicon-accounts report "…" --pr <link>');
 const after = await messaging.lastSeq();
 const r = await cli(home, ['report', `The ${tag} button does nothing`, '--pr', 'https://github.com/teamofsilicons/silicon-accounts/pull/1', '--json']);
 check(r.code === 0 && r.json?.recipients === 3 && r.json?.status === 'queued', 'the report is queued for 3 recipients', show(r));

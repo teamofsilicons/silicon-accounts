@@ -280,7 +280,7 @@ pub async fn continue_as(
             ),
         )
         .hint(
-            "A Silicon signs in to apps with a short-lived token: `accounts login --app <app_id>`.",
+            "A Silicon signs in to apps with a short-lived token: `silicon-accounts login --app <app_id>`.",
         ));
     }
     if !current.is_active_carbon() {

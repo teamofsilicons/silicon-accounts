@@ -296,15 +296,17 @@ Only above this line is what the Accounts service would hold, below this would b
 
 # Rust Package & CLI
 
+The command and Accounts app ID are both `silicon-accounts`. Use that name in help, examples, installation instructions and new sign-in tokens. Renaming the app must preserve its settings, ownership, sign-in history and active sessions. Existing installations keep their `.accounts` directory so an upgrade does not lose their session or preferences.
+
 The Rust package is the primary interface and is stateless. The CLI is built on top of the Rust package only, is stateful, and has no feature that the package doesn't. Everything should work through the CLI first, and the account site is a subset of it.
 
-If you need a local store for auth or anything else, use `{home_dir}/.accounts/`. The default home dir is `~`; if `SILICON_HOME` is set, use that instead. It can be configured via `accounts config home {location}`, and if it's not a directory give an error, not a directory.
+If you need a local store for auth or anything else, use `{home_dir}/.accounts/`. The default home dir is `~`; if `SILICON_HOME` is set, use that instead. It can be configured via `silicon-accounts config home {location}`, and if it's not a directory give an error, not a directory.
 
 The CLI must have:
-- `accounts --help` - the entire help docs.
-- `accounts login` - signs a Carbon or Silicon in. A Silicon signs in with its si:id and STK. If an app_id is passed, return a short-lived token for that app. If already signed in, directly return the short-lived token.
-- `accounts login status --json` - reports `authenticated: true` and which Carbon or Silicon it's signed in as.
-- `accounts report <report-message> --pr <pr-link>` - reports a bug, with an optional PR if it was also patched. Every report is mailed to [saketdev12@gmail.com, shubhastro2@gmail.com, bugs@teamofsilicons.com].
+- `silicon-accounts --help` - the entire help docs.
+- `silicon-accounts login` - signs a Carbon or Silicon in. A Silicon signs in with its si:id and STK. If an app_id is passed, return a short-lived token for that app. If already signed in, directly return the short-lived token.
+- `silicon-accounts login status --json` - reports `authenticated: true` and which Carbon or Silicon it's signed in as.
+- `silicon-accounts report <report-message> --pr <pr-link>` - reports a bug, with an optional PR if it was also patched. Every report is mailed to [saketdev12@gmail.com, shubhastro2@gmail.com, bugs@teamofsilicons.com].
 
 The CLI and package only expose what an account or app does, never the service's internal actions.
 

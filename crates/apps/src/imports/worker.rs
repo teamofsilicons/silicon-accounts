@@ -45,7 +45,7 @@ const POLL: Duration = Duration::from_secs(2);
 pub const MAX_RESUMES: i64 = 2;
 
 /// What a job says when its worker stopped too often.
-const STOPPED_TOO_OFTEN: &str = "The worker processing this import stopped (the server restarted or crashed) more than twice while it ran, so it was not resumed again. Rows reported with an outcome were imported; re-submit the file to import the rest (rows already imported match their accounts), and report it with `accounts report` if it happens again.";
+const STOPPED_TOO_OFTEN: &str = "The worker processing this import stopped (the server restarted or crashed) more than twice while it ran, so it was not resumed again. Rows reported with an outcome were imported; re-submit the file to import the rest (rows already imported match their accounts), and report it with `silicon-accounts report` if it happens again.";
 
 /// Starts the worker loop.
 pub fn spawn_worker(state: AppState) -> JoinHandle<()> {

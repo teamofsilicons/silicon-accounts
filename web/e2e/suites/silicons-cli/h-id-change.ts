@@ -61,7 +61,7 @@ export const journey: Journey = {
 
     // 1. The change.
     const changed = await accounts(env, ["silicon", "id", oldId, newId, "--json"], { home: homeC });
-    results.check("`accounts silicon id <old> <new>`: the Silicon is now the new id (same uuid)", changed.code === 0 && changed.json?.id === newId && changed.json?.uuid === uuid, said(changed));
+    results.check("`silicon-accounts silicon id <old> <new>`: the Silicon is now the new id (same uuid)", changed.code === 0 && changed.json?.id === newId && changed.json?.uuid === uuid, said(changed));
     for (const app of ["remind", "briefcase"]) {
       const event = await waitApp(env, app, "account.id_changed", candidate => dataOf(candidate).uuid === uuid && dataOf(candidate).new_id === newId);
       const data = dataOf(event);
@@ -92,7 +92,7 @@ export const journey: Journey = {
     const status = await accounts(env, ["login", "status", "--json"], { home: homeS });
     results.check("a CLI session from before the change stays signed in and reports the new id", status.code === 0 && status.json?.id === newId, said(status));
     const lookup = await accounts(env, ["lookup", uuid, "--json"], { home: homeC });
-    results.check("`accounts lookup <uuid>` gives the current id", lookup.code === 0 && lookup.json?.id === newId, said(lookup));
+    results.check("`silicon-accounts lookup <uuid>` gives the current id", lookup.code === 0 && lookup.json?.id === newId, said(lookup));
     const appLookup = await asApp(ctx, "remind", "GET", `/v1/accounts/${uuid}`);
     results.check("an app looking the uuid up gets the current id", appLookup.status === 200 && appLookup.body.id === newId, `${appLookup.status} ${short(appLookup.body)}`);
     const oldLookup = await accounts(env, ["lookup", oldId, "--json"], { home: homeC });
@@ -121,12 +121,12 @@ export const journey: Journey = {
     const waiting = await selfCreate(ctx, { id: `si:waits-${t}`, display_name: "Waits", custodian: carbon.id });
     const carbonNew = `c:renamed-${t}`;
     const renamedCarbon = await accounts(env, ["id", "change", carbonNew, "--json"], { home: homeC });
-    results.check("the custodian changes its own c:id with the CLI (`accounts id change`)", waiting.status === 201 && renamedCarbon.code === 0 && renamedCarbon.json?.id === carbonNew && renamedCarbon.json?.uuid === carbon.uuid, said(renamedCarbon));
+    results.check("the custodian changes its own c:id with the CLI (`silicon-accounts id change`)", waiting.status === 201 && renamedCarbon.code === 0 && renamedCarbon.json?.id === carbonNew && renamedCarbon.json?.uuid === carbon.uuid, said(renamedCarbon));
     const silicon = await accounts(env, ["whoami", "--json"], { home: homeS });
     const listed = ((await accounts(env, ["silicon", "list", "--json"], { home: homeC })).json?.items ?? []) as Json[];
     const mine = listed.find(item => item.uuid === uuid);
     results.check(
-      "the Silicon shows its custodian by the new c:id (`accounts whoami` as the Silicon), and so does the custodian's own list",
+      "the Silicon shows its custodian by the new c:id (`silicon-accounts whoami` as the Silicon), and so does the custodian's own list",
       obj(silicon.json?.custodian).id === carbonNew && obj(silicon.json?.custodian).uuid === carbon.uuid && obj(mine?.custodian).id === carbonNew,
       `whoami ${short(silicon.json?.custodian)}; list ${short(mine?.custodian)}`,
     );

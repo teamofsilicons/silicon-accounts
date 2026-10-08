@@ -117,6 +117,7 @@ pub async fn create_flow(
             .hint("Start the sign-in from the app, e.g. /authorize?app_id=<app_id>&redirect_uri=<url>&state=<random>."));
         }
     };
+    let app_id = accounts_core::canonical_first_party_app_id(&app_id).to_string();
     let mut tx = state.db.begin().await?;
     let fa = match FlowApp::load(&mut tx, &state.settings, &app_id).await {
         Ok(fa) => fa,
@@ -495,7 +496,7 @@ async fn silent_sign_in(
                     "This browser is signed in to Silicon Accounts as {}, a Silicon; Silicons never use the sign-in pages, so prompt=none can't sign a Carbon in silently.",
                     b.account.display_id()
                 ),
-                "Send the browser to /authorize without prompt=none so a Carbon can sign in. A Silicon signs in to apps with `accounts login --app <app_id>`.",
+                "Send the browser to /authorize without prompt=none so a Carbon can sign in. A Silicon signs in to apps with `silicon-accounts login --app <app_id>`.",
             ),
         );
     }

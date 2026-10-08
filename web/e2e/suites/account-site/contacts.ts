@@ -110,7 +110,7 @@ async function startAdd(env: Env, probe: Page, channel: Channel, value: string, 
   return { status: 201, challenge: started.body.challenge_id, code: await codeFor(env, value, after), body: started.body };
 }
 
-/** A headless code sign-in (the accounts CLI's): start + verify. Returns the start status and, when signed in, the account's uuid. */
+/** A headless code sign-in (the silicon-accounts CLI's): start + verify. Returns the start status and, when signed in, the account's uuid. */
 async function codeSignIn(ctx: Ctx, channel: Channel, value: string): Promise<{ start: number; uuid: string | null; code: string }> {
   const after = await lastSeq(ctx.env);
   const start = await api<{ challenge_id?: string; error?: { code?: string } }>(ctx, "/v1/cli/login/start", { method: "POST", json: channel === "email" ? { email: value } : { phone: value } });
@@ -353,7 +353,7 @@ function contactJourney(channel: Channel): Journey {
         await context.close();
       } else {
         const other = await codeSignIn(ctx, channel, values[5]!);
-        results.check("a code to another of the phone numbers signs in to the same account (accounts CLI)", other.start === 200 && other.uuid === uuid, JSON.stringify(other));
+        results.check("a code to another of the phone numbers signs in to the same account (silicon-accounts CLI)", other.start === 200 && other.uuid === uuid, JSON.stringify(other));
       }
       const gone = await codeSignIn(ctx, channel, removed);
       results.check(`the removed ${w.noun} signs nobody in (404 account_not_found)`, gone.start === 404 && gone.code === "account_not_found", JSON.stringify(gone));

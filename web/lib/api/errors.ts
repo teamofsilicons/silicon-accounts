@@ -66,7 +66,7 @@ export class ApiError extends Error {
       status: 0,
       code: "client_error",
       message: `Something in this page failed before the request finished: ${text}`,
-      hint: "Reload the page and try again. If it keeps happening, report it with `accounts report`.",
+      hint: "Reload the page and try again. If it keeps happening, report it with `silicon-accounts report`.",
       cause: error,
     });
   }

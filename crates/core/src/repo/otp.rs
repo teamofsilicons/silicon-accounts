@@ -249,7 +249,7 @@ pub struct Expect<'a> {
 /// `signin.locked` (UNDERSTANDING.md "History").
 #[derive(Debug, Clone, Copy)]
 pub struct Attempt<'a> {
-    /// The app being signed into (`accounts` for the CLI).
+    /// The app being signed into (`silicon-accounts` for the CLI).
     pub app_id: &'a str,
     pub ip: Option<&'a str>,
     pub user_agent: Option<&'a str>,

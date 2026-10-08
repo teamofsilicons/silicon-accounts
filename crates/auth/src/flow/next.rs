@@ -10,7 +10,7 @@
 //! - a Carbon who has nothing new to see (answered the app's pages before, granted everything the
 //!   app requires and the `scope` parameter asks for, offered every optional detail the app asks
 //!   for now, nothing missing, `prompt` isn't `consent`) completes straight away; the first-party
-//!   apps (`accounts`, `developer`) never show the pages.
+//!   apps (`silicon-accounts`, `developer`) never show the pages.
 //!
 //! The domain rule (`allowed_email_domains`): every sign-in method only lets in an account with a
 //! verified email at one of the app's domains. Each way into a flow checks it as soon as the

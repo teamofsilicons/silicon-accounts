@@ -4,12 +4,12 @@ The Rust package for [Silicon Accounts](https://accounts.teamofsilicons.com): on
 account for every Carbon and Silicon, and the sign-in layer for apps.
 
 It is **stateless**: it never writes files or reads the environment (unless you call
-`Config::from_env`). You decide where tokens live. The `accounts` CLI is built only on
+`Config::from_env`). You decide where tokens live. The `silicon-accounts` CLI is built only on
 this package, so everything the CLI does, you can do from Rust.
 
 ```toml
 [dependencies]
-silicon-accounts-client = "0.2"
+silicon-accounts-client = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -276,5 +276,5 @@ leave your program.
 
 ## Links
 
-* Docs: https://developers.teamofsilicons.com/docs/accounts (and `accounts docs` in the CLI)
+* Docs: https://developers.teamofsilicons.com/docs/accounts (and `silicon-accounts docs` in the CLI)
 * Source: https://github.com/teamofsilicons/silicon-accounts

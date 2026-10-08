@@ -1,5 +1,5 @@
 //! End to end over real HTTP with the published Rust package (`silicon-accounts-client`), the
-//! way the `accounts` CLI talks to the service: a Silicon creates its own account and waits;
+//! way the `silicon-accounts` CLI talks to the service: a Silicon creates its own account and waits;
 //! its custodian accepts; the Silicon signs in, gets an SLT and manages its webhook; the
 //! custodian manages the Silicon. Every response must parse into the client's types.
 
@@ -81,7 +81,7 @@ async fn a_silicon_journey_through_the_rust_client() {
     assert_eq!(err.code(), "custodian_pending");
     assert_eq!(err.status(), Some(403));
 
-    // 3. It waits (like `accounts silicon create --wait`) while the custodian accepts.
+    // 3. It waits (like `silicon-accounts silicon create --wait`) while the custodian accepts.
     let waiter_client = client.clone();
     let request_id = created.request.id.clone();
     let request_token = created.request_token.expose().to_string();
@@ -132,7 +132,7 @@ async fn a_silicon_journey_through_the_rust_client() {
     assert_eq!(account.kind, AccountKind::Silicon);
     assert_eq!(
         tokens.membership_id.as_deref(),
-        Some(format!("accounts:{}", created.silicon.uuid).as_str())
+        Some(format!("silicon-accounts:{}", created.silicon.uuid).as_str())
     );
     let silicon = client.with_token(tokens.access_token.expose());
     let slt = silicon

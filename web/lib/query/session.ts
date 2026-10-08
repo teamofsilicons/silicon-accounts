@@ -3,7 +3,7 @@
 /**
  * The browser session of the account site: who is signed in (GET /v1/session), the full Me view shared by every
  * account page, the service meta, signing out, and the first-party sign-in round trip
- * (/sign-in?return_to=… → /authorize?app_id=accounts → back to /sign-in?code&state, which restores the saved path;
+ * (/sign-in?return_to=… → /authorize?app_id=silicon-accounts → back to /sign-in?code&state, which restores the saved path;
  * components/auth/sign-in.tsx). A code or error counts as a return only when this browser saved its state.
  */
 import { useCallback, useState, useSyncExternalStore } from "react";
@@ -20,7 +20,7 @@ import { queryKeys } from "./keys";
 export type SessionStatus = "loading" | "signed_in" | "signed_out" | "error";
 
 /** The first-party app: the account site and the CLI sign in through it. */
-export const FIRST_PARTY_APP_ID = "accounts";
+export const FIRST_PARTY_APP_ID = "silicon-accounts";
 const RETURN_PREFIX = "silicon-accounts:return:";
 
 /** `GET /v1/meta` (cached for the tab's life; the values only change with a deploy). */
@@ -156,7 +156,7 @@ function randomState(): string {
 }
 
 /**
- * The /authorize URL that signs a Carbon into the account site itself (app `accounts`, redirect `{origin}/sign-in`).
+ * The /authorize URL that signs a Carbon into the account site itself (app `silicon-accounts`, redirect `{origin}/sign-in`).
  * `returnTo` (a same-site path) is remembered against the state in this tab, and /sign-in restores it when the flow
  * comes back.
  */

@@ -17,7 +17,7 @@ app.
 ## Issue a User verification proof (app A)
 
 ```sh
-accounts app --app-id dm proof user-verification --subject-token "$ACCOUNT_ACCESS_TOKEN" --to briefcase --scope files.write --ttl 600
+silicon-accounts app --app-id dm proof user-verification --subject-token "$ACCOUNT_ACCESS_TOKEN" --to briefcase --scope files.write --ttl 600
 ```
 
 `--subject-token` is the account's access token issued to app A. The account must
@@ -29,8 +29,8 @@ Send the `proof_token` to app B, for example as `Authorization: Proof sap_…`.
 ## Issue an app verification proof (app A)
 
 ```sh
-accounts app proof app-verification --to remind --ttl 300
-accounts app proof app-verification --to waveform --ttl 300     # a second app gets its own proof
+silicon-accounts app proof app-verification --to remind --ttl 300
+silicon-accounts app proof app-verification --to waveform --ttl 300     # a second app gets its own proof
 ```
 
 `--to` takes exactly one app. Why one app per proof: each receiving app verifies only
@@ -45,7 +45,7 @@ that lists several apps (`audiences`) is refused with `app_verification_single_a
 ## Verify (app B)
 
 ```sh
-accounts app --app-id briefcase proof verify sap_… --json && echo valid
+silicon-accounts app --app-id briefcase proof verify sap_… --json && echo valid
 ```
 
 Exit code 0 means valid, 2 means not valid. A valid answer says until when, who issued
@@ -64,9 +64,9 @@ proof can't be used to learn anything. Only the app a proof names can verify it.
 ## Refresh and revoke (app A)
 
 ```sh
-accounts app proof refresh sapr_… --ttl 900     # new proof token + rotated refresh token
-accounts app proof revoke <proof-id>
-accounts app proof list --kind user_verification
+silicon-accounts app proof refresh sapr_… --ttl 900     # new proof token + rotated refresh token
+silicon-accounts app proof revoke <proof-id>
+silicon-accounts app proof list --kind user_verification
 ```
 
 Presenting an already-used proof refresh token revokes the proof, as with sign-in
@@ -75,8 +75,8 @@ refresh tokens.
 ## What accounts see
 
 A Carbon or Silicon sees every User verification proof issued on its behalf
-(`accounts proofs list`, or the account site) and can revoke any of them
-(`accounts proofs revoke <proof-id>`). Removing an app's access also invalidates the
+(`silicon-accounts proofs list`, or the account site) and can revoke any of them
+(`silicon-accounts proofs revoke <proof-id>`). Removing an app's access also invalidates the
 User verification proofs that app issued.
 
 ## Retained App verification history
@@ -91,6 +91,6 @@ The records and events remain after credentials expire or are removed. Raw proof
 tokens are shown when generated and cannot be recovered from history. Current management
 access is checked on every request; being the receiving app alone grants no history access.
 
-Use `accounts app proof app-verification` and `accounts app proof user-verification` to issue
+Use `silicon-accounts app proof app-verification` and `silicon-accounts app proof user-verification` to issue
 verification tokens. JSON kinds are `app_verification` and `user_verification`.
-`accounts user-verification list` and `revoke` are aliases for `accounts proofs list` and `revoke`.
+`accounts user-verification list` and `revoke` are aliases for `silicon-accounts proofs list` and `revoke`.

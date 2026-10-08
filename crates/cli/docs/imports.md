@@ -9,13 +9,13 @@ email or SMS.
 ## Run an import
 
 ```sh
-accounts app import users.csv --default-country US --dry-run --wait   # check first
-accounts app import users.csv --default-country US --wait
+silicon-accounts app import users.csv --default-country US --dry-run --wait   # check first
+silicon-accounts app import users.csv --default-country US --wait
 ```
 
 `--wait` shows progress, the outcome counts and the first errors. Without it the job
-id is printed; follow it with `accounts app import status <job> --wait` and inspect
-rows with `accounts app import rows <job> --outcome error` (or by message:
+id is printed; follow it with `silicon-accounts app import status <job> --wait` and inspect
+rows with `silicon-accounts app import rows <job> --outcome error` (or by message:
 `--level warning`, `--code id_conflict`). Both `--wait` forms exit 1 when the whole job
 failed, so a script can tell.
 
@@ -72,6 +72,6 @@ account's own data; `--update-existing` only changes what your app stored for it
 
 ## After the import
 
-Imported accounts show as `imported` in `accounts app users --status imported` until
+Imported accounts show as `imported` in `silicon-accounts app users --status imported` until
 they sign into your app, when they become `active`. An unclaimed account is finished
 by its owner the first time they sign in with one of the imported emails or phones.

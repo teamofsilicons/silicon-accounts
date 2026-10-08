@@ -315,7 +315,7 @@ Do: end the account's sessions in your app; its tokens no longer work and User v
 
 ### membership.access_removed
 
-Sent to one app when the account removes its access (on the account site, with `accounts apps remove`, or `DELETE /v1/me/apps/{app_id}`). `data`: `uuid`, `membership_id`.
+Sent to one app when the account removes its access (on the account site, with `silicon-accounts apps remove`, or `DELETE /v1/me/apps/{app_id}`). `data`: `uuid`, `membership_id`.
 
 ```json
 {

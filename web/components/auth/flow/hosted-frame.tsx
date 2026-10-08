@@ -33,7 +33,7 @@ export function AppIdentity({ app, paint, hideName, className }: { app: FrameApp
   const branding = normalizeBranding(app?.branding as Partial<Branding> | undefined);
   const own = app ? brandLogo(branding, { logo_url: app.logo_url ?? null, logo_dark_url: app.logo_dark_url ?? null }, paint) : null;
   // Our own first-party apps (the account site, the developer site) wear the Silicon Accounts mark.
-  const logo = own ?? (app?.app_id === "accounts" || app?.first_party ? SILICON_ACCOUNTS_MARK : null);
+  const logo = own ?? (app?.app_id === "silicon-accounts" || app?.first_party ? SILICON_ACCOUNTS_MARK : null);
   const [broken, setBroken] = useState<string | null>(null);
   if (!app || (!logo && !branding.show_app_name)) return null;
   const showLogo = !!logo && broken !== logo;

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs the testkit journeys (testkit/journeys/: the non-browser walks through every part of
-# Silicon Accounts with the testkit helpers and the real `accounts` CLI) against a fresh,
+# Silicon Accounts with the testkit helpers and the real `silicon-accounts` CLI) against a fresh,
 # isolated stack, then tears it down.
 #
 #   scripts/journeys.sh                 build, start a stack with a new database, run every journey,
@@ -105,6 +105,6 @@ JOURNEYS_FRONT="$MODE" \
 MOCK_OIDC_URL="http://127.0.0.1:$MOCK_OIDC_PORT" \
 MOCK_MESSAGING_URL="http://127.0.0.1:$MOCK_MESSAGING_PORT" \
 FAKE_APPS_URL="http://127.0.0.1:$FAKE_APPS_PORT" \
-ACCOUNTS_CLI="$TARGET_DIR/debug/accounts" \
+ACCOUNTS_CLI="$TARGET_DIR/debug/silicon-accounts" \
 TESTKIT_FORWARDED_FOR="${TESTKIT_FORWARDED_FOR:-random}" \
   "$ROOT/testkit/node_modules/.bin/tsx" "$ROOT/testkit/journeys/run.ts" ${JOURNEYS[@]+"${JOURNEYS[@]}"}

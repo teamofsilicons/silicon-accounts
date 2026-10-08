@@ -91,7 +91,7 @@ IP" means the client address (the right-most `X-Forwarded-For` entry behind the 
 
 | What | Limit |
 |---|---|
-| Handle (after `c:` / `si:`) | 3–30 characters of `a-z 0-9 - _`, case-insensitive (**contract**); reserved words: `admin`, `administrator`, `root`, `system`, `support`, `help`, `security`, `accounts`, `account`, `silicon`, `silicons`, `carbon`, `carbons`, `api`, `www`, `mail`, `null`, `undefined`, `me`, `owner`, `staff` |
+| Handle (after `c:` / `si:`) | 3–30 characters of `a-z 0-9 - _`, case-insensitive (**contract**); reserved words: `admin`, `administrator`, `root`, `system`, `support`, `help`, `security`, `silicon-accounts`, `account`, `silicon`, `silicons`, `carbon`, `carbons`, `api`, `www`, `mail`, `null`, `undefined`, `me`, `owner`, `staff` |
 | uuid | `a-z A-Z 0-9`, case-sensitive; 3 characters, then 4 once every 3-character uuid is used (**contract**); never reused |
 | App id | 2–40 characters of `a-z 0-9 -`, starting with a letter |
 | Emails per Carbon / phones per Carbon | 10 / 10 (**contract**) |

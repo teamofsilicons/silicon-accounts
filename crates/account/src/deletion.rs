@@ -64,7 +64,7 @@ pub(crate) async fn delete_me(
             ),
         )
         .hint(format!(
-            "Ask {custodian} to delete it with DELETE /v1/me/silicons/{} (or `accounts silicon delete {}`).",
+            "Ask {custodian} to delete it with DELETE /v1/me/silicons/{} (or `silicon-accounts silicon delete {}`).",
             me.uuid(),
             me.account.id()
         )));

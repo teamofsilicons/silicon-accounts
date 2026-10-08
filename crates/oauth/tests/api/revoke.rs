@@ -24,7 +24,7 @@ async fn revoke_public(ctx: &TestContext, token: &str, hint: &str) -> Resp {
         Req::post("/v1/oauth/revoke").form(&[
             ("token", token),
             ("token_type_hint", hint),
-            ("client_id", "accounts"),
+            ("client_id", "silicon-accounts"),
         ]),
     )
     .await

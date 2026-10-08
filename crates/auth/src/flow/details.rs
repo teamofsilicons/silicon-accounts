@@ -17,7 +17,7 @@
 //! more, an optional detail the app asks for now that the Carbon was never offered, or a detail
 //! the `scope` parameter asks for that wasn't granted. Optional details the Carbon left unticked
 //! before stay quiet. A Carbon with nothing new goes straight to complete. The first-party apps
-//! (`accounts`, `developer`) never show these pages.
+//! (`silicon-accounts`, `developer`) never show these pages.
 //!
 //! **The answer record.** Every time a Carbon finishes the pages, the audit log gets a
 //! `consent.granted` entry for the app (actor: the Carbon) with the details offered to them so

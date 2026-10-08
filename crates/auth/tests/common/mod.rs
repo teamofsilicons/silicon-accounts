@@ -145,7 +145,7 @@ pub async fn start_flow(
 ) -> Resp {
     let mut body = json!({
         "app_id": app_id,
-        "redirect_uri": if app_id == "accounts" { format!("{}/", ctx.state.settings.public_url) } else { redirect_uri(app_id) },
+        "redirect_uri": if app_id == "silicon-accounts" { format!("{}/", ctx.state.settings.public_url) } else { redirect_uri(app_id) },
         "state": APP_STATE,
         "code_challenge": pkce::s256_challenge(VERIFIER),
         "code_challenge_method": "S256",

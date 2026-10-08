@@ -166,7 +166,7 @@ export function useFlowController(id: string): FlowController {
         try {
           const { authorize_url: url } = await api.flows.oauthStart(id, provider);
           if (!/^https?:\/\//i.test(url)) {
-            return new ApiError({ status: 0, code: "invalid_provider_url", message: `Silicon Accounts answered with an address for ${provider === "google" ? "Google" : "Apple"} that is not a web address.`, hint: "Try again. If it keeps happening, report it with `accounts report`." });
+            return new ApiError({ status: 0, code: "invalid_provider_url", message: `Silicon Accounts answered with an address for ${provider === "google" ? "Google" : "Apple"} that is not a web address.`, hint: "Try again. If it keeps happening, report it with `silicon-accounts report`." });
           }
           window.location.assign(url);
           return null;

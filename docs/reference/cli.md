@@ -1,5 +1,5 @@
 ---
-title: accounts CLI reference
+title: silicon-accounts CLI reference
 description: Look up accounts commands, flags, environment variables and exit codes. Use the examples to read results and handle failures in scripts.
 kind: informative
 order: 69
@@ -12,24 +12,24 @@ related:
   - reference/errors.md
 ---
 
-# accounts CLI reference
+# silicon-accounts CLI reference
 
-This reference lists the commands in `accounts` 0.2.0. The [command sections](#commands) come from the CLI’s `--help` output. Run `accounts <command> --help` to check the options in your installed version.
+This reference lists the commands in `silicon-accounts` 0.3.0. The [command sections](#commands) come from the CLI’s `--help` output. Run `silicon-accounts <command> --help` to check the options in your installed version.
 
-If you are using the CLI for the first time, start with [Use the accounts CLI](../start/cli.md).
+If you are using the CLI for the first time, start with [Use the silicon-accounts CLI](../start/cli.md).
 
 ```sh
-accounts --help                 # everything: the command tree, bundled guides, environment, exit codes
-accounts silicon create --help  # one command: what it does, its options, examples
-accounts --json                 # the command tree as JSON: {"commands":[{"command","about"},…]}
+silicon-accounts --help                 # everything: the command tree, bundled guides, environment, exit codes
+silicon-accounts silicon create --help  # one command: what it does, its options, examples
+silicon-accounts --json                 # the command tree as JSON: {"commands":[{"command","about"},…]}
 ```
 
 ```text
 accounts [OPTIONS] [COMMAND]
 ```
 
-Run without a command, `accounts` prints the full help and exits `0`. A command group without a
-subcommand (`accounts silicon`) prints its help and exits `2`.
+Run without a command, `silicon-accounts` prints the full help and exits `0`. A command group without a
+subcommand (`silicon-accounts silicon`) prints its help and exits `2`.
 
 ## Global options
 
@@ -42,10 +42,10 @@ Every command takes these, before or after the command name.
 | `--home <DIR>` | The directory that holds `.accounts/`. See [Home directory](#home-directory). |
 | `-q`, `--quiet` | No progress, notices or next-step suggestions; results and errors still print. |
 | `-h`, `--help` | Help: `-h` a summary, `--help` the full text with examples. |
-| `-V`, `--version` | Print the version (`accounts 0.2.0`). |
+| `-V`, `--version` | Print the version (`silicon-accounts 0.3.0`). |
 
-`accounts app` commands also take `--app-id <APP_ID>`, `--app-secret <SECRET>` and
-`--app-secret-stdin`; see [`accounts app`](#accounts-app).
+`silicon-accounts app` commands also take `--app-id <APP_ID>`, `--app-secret <SECRET>` and
+`--app-secret-stdin`; see [`silicon-accounts app`](#silicon-accounts-app).
 
 ## Environment variables
 
@@ -53,17 +53,17 @@ Every command takes these, before or after the command name.
 |---|---|
 | `ACCOUNTS_URL` | the Silicon Accounts URL (default `https://accounts.teamofsilicons.com`) |
 | `ACCOUNTS_HOME` | the directory holding `.accounts/`; beats the configured home |
-| `SILICON_HOME` | the home when nothing else sets one (else `~`); also where `accounts config home` keeps its pointer file |
-| `ACCOUNTS_SILICON`, `ACCOUNTS_STK` | a Silicon's si:id and STK for `accounts login` |
-| `ACCOUNTS_APP_ID` | the app for `accounts app …` |
+| `SILICON_HOME` | the home when nothing else sets one (else `~`); also where `silicon-accounts config home` keeps its pointer file |
+| `ACCOUNTS_SILICON`, `ACCOUNTS_STK` | a Silicon's si:id and STK for `silicon-accounts login` |
+| `ACCOUNTS_APP_ID` | the app for `silicon-accounts app …` |
 | `ACCOUNTS_APP_SECRET` | that app's secret |
 | `ACCOUNTS_TELEMETRY` | `0`, `false`, `no` or `off` turns telemetry off; `1`, `true`, `yes` or `on` turns it on; beats the config file |
 | `ACCOUNTS_NO_BROWSER` | any value but `0` or empty: never open a browser (the device sign-in prints its URL instead) |
 | `ACCOUNTS_TIMEOUT_SECONDS` | request timeout in whole seconds (default 30, at least 1) |
 | `ACCOUNTS_ALLOW_INSECURE_HTTP` | `1` allows plain `http://` to hosts other than this machine |
 | `NO_COLOR` | no colours on stderr (colours are only used when stderr is a terminal) |
-| `TZ` | the timezone `accounts silicon create` uses when `--timezone` is not given (else the system's, else UTC) |
-| `HOSTNAME`, `COMPUTERNAME` | the machine name in the default sign-in label `accounts CLI on <host> (<os>)` |
+| `TZ` | the timezone `silicon-accounts silicon create` uses when `--timezone` is not given (else the system's, else UTC) |
+| `HOSTNAME`, `COMPUTERNAME` | the machine name in the default sign-in label `silicon-accounts CLI on <host> (<os>)` |
 
 ## URL resolution
 
@@ -71,16 +71,16 @@ First match wins:
 
 1. `--url`;
 2. `ACCOUNTS_URL`;
-3. `url` in `{home}/.accounts/config.json` (`accounts config set url …`);
+3. `url` in `{home}/.accounts/config.json` (`silicon-accounts config set url …`);
 4. the URL of the stored session;
-5. the URL of a code sign-in waiting for its code (`accounts login --email … --url …`);
+5. the URL of a code sign-in waiting for its code (`silicon-accounts login --email … --url …`);
 6. `https://accounts.teamofsilicons.com`.
 
 Plain `http://` is refused for any host but this machine (`localhost`, `*.localhost`,
 `127.0.0.0/8`, `::1`) unless `ACCOUNTS_ALLOW_INSECURE_HTTP=1`: exit code `2`, error code
-`invalid_input` (`invalid_url` from `accounts config set url`). A session belongs to
+`invalid_input` (`invalid_url` from `silicon-accounts config set url`). A session belongs to
 the URL it was created at; with another URL, account commands answer `not_signed_in`.
-`accounts silicon request status` reads a request at the URL it was created at, unless `--url` or
+`silicon-accounts silicon request status` reads a request at the URL it was created at, unless `--url` or
 `ACCOUNTS_URL` says otherwise.
 
 ## Home directory
@@ -89,7 +89,7 @@ The CLI keeps its state in `{home}/.accounts/`. First match wins:
 
 1. `--home <DIR>`;
 2. `ACCOUNTS_HOME`;
-3. the directory set with `accounts config home <DIR>`, stored as a one-line pointer file in
+3. the directory set with `silicon-accounts config home <DIR>`, stored as a one-line pointer file in
    `{base}/.accounts/home`, where `{base}` is `$SILICON_HOME` if set, else `~`;
 4. `SILICON_HOME`;
 5. `~`.
@@ -97,7 +97,7 @@ The CLI keeps its state in `{home}/.accounts/`. First match wins:
 The chosen home must be an existing directory. Otherwise the command fails before doing anything,
 with exit code `2`, error code `not_a_directory`, and a message that says why and which setting
 chose it: `not a directory: /srv/silicons/nope (it does not exist; set by SILICON_HOME)`.
-`accounts config home` (no argument) shows the home and its source; `--reset` forgets the
+`silicon-accounts config home` (no argument) shows the home and its source; `--reset` forgets the
 configured one.
 
 | file in `{home}/.accounts/` | holds |
@@ -105,10 +105,10 @@ configured one.
 | `session.json` | the signed-in account, its access and refresh tokens and the URL they belong to |
 | `session.lock` | the lock held while a session is refreshed or stored |
 | `config.json` | `url`, `telemetry` and `app` |
-| `apps/<app_id>.json` | an app secret stored by `accounts app use <app_id> --secret-stdin` |
+| `apps/<app_id>.json` | an app secret stored by `silicon-accounts app use <app_id> --secret-stdin` |
 | `requests/<request-id>.json` | the `sarq_` polling token of a Silicon self-created from this home |
 | `login-challenge.json` | a code sign-in waiting for its code |
-| `home` | (only in `{base}/.accounts/`) the pointer written by `accounts config home` |
+| `home` | (only in `{base}/.accounts/`) the pointer written by `silicon-accounts config home` |
 
 Files are written atomically (a temporary file, then a rename) with mode 0600, in a directory with
 mode 0700. Token refreshes happen under `session.lock`, so any number of processes can share a
@@ -124,12 +124,12 @@ session; signing in as another account there signs the previous one out.
 - **Essential events** that must be seen before a command finishes go to stderr even with `-q`; with
   `--json` they are one JSON object per line: `{"event":"device_code","user_code",
   "verification_uri","verification_uri_complete","expires_at","browser_opened"}` from
-  `accounts login`, and `{"event":"silicon_created",…}` (the whole creation, STK included) from
-  `accounts silicon create --wait` before it starts waiting.
+  `silicon-accounts login`, and `{"event":"silicon_created",…}` (the whole creation, STK included) from
+  `silicon-accounts silicon create --wait` before it starts waiting.
 - **Timestamps** in `--json` output are RFC 3339 in UTC. They are meant to match the API's form,
   exactly three fractional digits (`2026-10-07T02:33:45.489Z`), but values the CLI passes through
   the Rust client's types drop trailing zeros today: the API's `2026-10-07T05:17:55.590Z` prints
-  as `2026-10-07T05:17:55.59Z` in `accounts silicon list --json` (a known bug). Parse them as
+  as `2026-10-07T05:17:55.59Z` in `silicon-accounts silicon list --json` (a known bug). Parse them as
   RFC 3339; don't compare them as strings or assume a fixed width.
 
 **Errors** print `error:`, `hint:`, any per-field problems and the request id on stderr. With
@@ -183,12 +183,12 @@ Commands whose exit code is the answer:
 
 | command | exit codes |
 |---|---|
-| `accounts login status` | `0` signed in, `1` not |
-| `accounts id available` | `0` available (or yours to take back), `5` taken, reserved or a reserved word, `2` not a valid id |
-| `accounts app proof verify` | `0` valid, `2` not valid |
-| `accounts app token verify`, `accounts app token introspect` | `0` valid or active, `2` not |
-| `accounts silicon create --wait`, `accounts silicon request status --wait` | `0` accepted; `1` declined (`custodian_declined`), expired (`custodian_request_expired`), cancelled (`custodian_request_cancelled`) or timed out (`timed_out`); `130` interrupted, the request stays open |
-| `accounts app import <FILE> --wait` | `1` when the job ended `failed` (`accounts app import status <JOB> --wait` exits `0` either way; read `status`) |
+| `silicon-accounts login status` | `0` signed in, `1` not |
+| `silicon-accounts id available` | `0` available (or yours to take back), `5` taken, reserved or a reserved word, `2` not a valid id |
+| `silicon-accounts app proof verify` | `0` valid, `2` not valid |
+| `silicon-accounts app token verify`, `silicon-accounts app token introspect` | `0` valid or active, `2` not |
+| `silicon-accounts silicon create --wait`, `silicon-accounts silicon request status --wait` | `0` accepted; `1` declined (`custodian_declined`), expired (`custodian_request_expired`), cancelled (`custodian_request_cancelled`) or timed out (`timed_out`); `130` interrupted, the request stays open |
+| `silicon-accounts app import <FILE> --wait` | `1` when the job ended `failed` (`silicon-accounts app import status <JOB> --wait` exits `0` either way; read `status`) |
 
 ## CLI error codes
 
@@ -199,24 +199,24 @@ for problems it finds without asking the service:
 
 | code | exit | when | what to do |
 |---|---|---|---|
-| `invalid_arguments` | `2` | an unknown flag, a missing argument, or a value a flag can't take (`accounts app users --limit abc`) | run the command with `--help` |
+| `invalid_arguments` | `2` | an unknown flag, a missing argument, or a value a flag can't take (`silicon-accounts app users --limit abc`) | run the command with `--help` |
 | `invalid_input` | `2` | a value the CLI checks before sending: an STK that isn't `stk-` plus 8 to 32 hex characters, a `c:` id where an si:id belongs, `--confirm` not matching, nothing on stdin where a secret was expected, an `http://` URL for another machine | fix what the message names |
-| `file_not_found` | `2` | a file you named doesn't exist (`accounts app config set patch.json`) | check the path |
-| `not_a_directory` | `2` | the home directory (`--home`, `ACCOUNTS_HOME`, `accounts config home`, `SILICON_HOME`) is a file or doesn't exist | point it at an existing directory, or `accounts config home --reset` |
-| `invalid_url` | `2` | `accounts config set url` got a URL the CLI can't use | use `https://…` (or `http://` for this machine) |
+| `file_not_found` | `2` | a file you named doesn't exist (`silicon-accounts app config set patch.json`) | check the path |
+| `not_a_directory` | `2` | the home directory (`--home`, `ACCOUNTS_HOME`, `silicon-accounts config home`, `SILICON_HOME`) is a file or doesn't exist | point it at an existing directory, or `silicon-accounts config home --reset` |
+| `invalid_url` | `2` | `silicon-accounts config set url` got a URL the CLI can't use | use `https://…` (or `http://` for this machine) |
 | `io_error` | `1` | reading a file or stdin, or writing under `{home}/.accounts/`, failed | the message names the file; check it and its permissions |
 | `corrupt_state_file` | `1` | a file under `{home}/.accounts/` isn't valid JSON | delete the file it names (you may have to sign in again) |
-| `internal` | `1` | the CLI couldn't start or couldn't encode its own state | report it with `accounts report` |
-| `not_signed_in` | `3` | no session for this URL, or a session for another URL | Carbons: `accounts login`; Silicons: `accounts login --silicon si:… --stk-stdin` |
+| `internal` | `1` | the CLI couldn't start or couldn't encode its own state | report it with `silicon-accounts report` |
+| `not_signed_in` | `3` | no session for this URL, or a session for another URL | Carbons: `silicon-accounts login`; Silicons: `silicon-accounts login --silicon si:… --stk-stdin` |
 | `session_ended` | `3` | the stored session was revoked, signed out elsewhere, or (a Silicon's) the STK was rotated | sign in again |
 | `session_changed` | `3` | another command signed this home in as someone else while this one ran | run the command again |
-| `wrong_account_kind` | `3` | the command is for the other kind of account (`accounts custodian requests` as a Silicon) | sign in as the kind the message names |
-| `app_credentials_required` | `3` | an `accounts app` command has no app secret and you aren't signed in as a Carbon | `--app-secret-stdin`, `ACCOUNTS_APP_SECRET`, `accounts app use <app_id> --secret-stdin`, or sign in as the app's owner |
-| `not_found` | `4` | `accounts silicon …` names a Silicon you aren't custodian of | `accounts silicon list` shows yours |
-| `unknown_topic` | `4` | `accounts docs <topic>` names no topic | the hint lists the topics |
-| `unknown_help_topic` | `4` | `accounts help <words>` is neither a command nor a topic | `accounts --help`, `accounts docs` |
+| `wrong_account_kind` | `3` | the command is for the other kind of account (`silicon-accounts custodian requests` as a Silicon) | sign in as the kind the message names |
+| `app_credentials_required` | `3` | an `silicon-accounts app` command has no app secret and you aren't signed in as a Carbon | `--app-secret-stdin`, `ACCOUNTS_APP_SECRET`, `silicon-accounts app use <app_id> --secret-stdin`, or sign in as the app's owner |
+| `not_found` | `4` | `silicon-accounts silicon …` names a Silicon you aren't custodian of | `silicon-accounts silicon list` shows yours |
+| `unknown_topic` | `4` | `silicon-accounts docs <topic>` names no topic | the hint lists the topics |
+| `unknown_help_topic` | `4` | `silicon-accounts help <words>` is neither a command nor a topic | `silicon-accounts --help`, `silicon-accounts docs` |
 | `custodian_declined`, `custodian_request_expired`, `custodian_request_cancelled`, `custodian_request_closed` | `1` | `--wait` on a self-created Silicon ended without an acceptance; the account was released | create it again, naming a Carbon who expects the request |
-| `timed_out` | `1` | `--wait` gave up after `--timeout`; the custodian request stays open | resume with `accounts silicon request status <id> --wait` |
+| `timed_out` | `1` | `--wait` gave up after `--timeout`; the custodian request stays open | resume with `silicon-accounts silicon request status <id> --wait` |
 | `interrupted` | `130` | Ctrl-C while waiting (a device sign-in, a custodian's answer, an import) | the work goes on in the service; the message says how to resume |
 
 ```json
@@ -224,7 +224,7 @@ for problems it finds without asking the service:
   "error": {
     "code": "wrong_account_kind",
     "exit_code": 3,
-    "hint": "Sign in as a Carbon with `accounts login` (Silicons don't have this).",
+    "hint": "Sign in as a Carbon with `silicon-accounts login` (Silicons don't have this).",
     "message": "Custodian requests is for Carbon accounts, but you are signed in as Silicon si:scout."
   }
 }
@@ -253,13 +253,13 @@ ids and uuids, and contact details are never sent; the only identifier is the ap
 `login.slt.issued`. Nothing is sent when a command never contacted the service or could not reach
 it.
 
-Telemetry is on by default. `accounts config telemetry off` (or `ACCOUNTS_TELEMETRY=0`) turns it off;
+Telemetry is on by default. `silicon-accounts config telemetry off` (or `ACCOUNTS_TELEMETRY=0`) turns it off;
 then every request to the service also carries `X-Accounts-Telemetry: off`, so the service records
 no telemetry about those requests either.
 
 ## Bug reports
 
-`accounts report "<message>" [--pr <https link>]` sends `POST /v1/reports`; every report is emailed
+`silicon-accounts report "<message>" [--pr <https link>]` sends `POST /v1/reports`; every report is emailed
 to the Silicon Accounts maintainers (3 recipients). The message is 1 to 10,000 characters (`-` reads
 it from stdin); a signed-in report names the account, a signed-out one is anonymous; the CLI
 version, operating system and architecture are appended unless `--no-diagnostics`. Reports are
@@ -268,19 +268,19 @@ request id.
 
 ## Updates
 
-Silicon Apps installs and updates the CLI. `accounts` never updates itself and never checks for
+Silicon Apps installs and updates the CLI. `silicon-accounts` never updates itself and never checks for
 updates.
 
 ## Bundled guides
 
-`accounts docs <topic>` prints a guide that ships inside the CLI. Topic names accept the aliases in
+`silicon-accounts docs <topic>` prints a guide that ships inside the CLI. Topic names accept the aliases in
 brackets.
 
-`accounts help <topic>` prints the same guide only when no command has that name, because a
+`silicon-accounts help <topic>` prints the same guide only when no command has that name, because a
 command name wins. `proofs` and `apps` are also commands, and so are the aliases `login`,
-`silicon`, `custodian`, `app`, `webhook`, `id` and `help`: `accounts help proofs` prints the help
-of `accounts proofs`, not the guide. `accounts help imports` does print the guide. Use
-`accounts docs <topic>` for guides.
+`silicon`, `custodian`, `app`, `webhook`, `id` and `help`: `silicon-accounts help proofs` prints the help
+of `silicon-accounts proofs`, not the guide. `silicon-accounts help imports` does print the guide. Use
+`silicon-accounts docs <topic>` for guides.
 
 | topic | what it covers |
 |---|---|
@@ -297,11 +297,11 @@ of `accounts proofs`, not the guide. `accounts help imports` does print the guid
 
 An unknown topic exits `4` with `unknown_topic` and lists the topics.
 
-Use `accounts app proof app-verification` to verify an app and `accounts app proof user-verification` to act for an account. `accounts proofs` lists proofs issued on your behalf; `accounts user-verification` is an alias for this list and its revoke command. JSON kinds are `app_verification` and `user_verification`.
+Use `silicon-accounts app proof app-verification` to verify an app and `silicon-accounts app proof user-verification` to act for an account. `silicon-accounts proofs` lists proofs issued on your behalf; `accounts user-verification` is an alias for this list and its revoke command. JSON kinds are `app_verification` and `user_verification`.
 
 ## Command tree
 
-As `accounts --help` prints it:
+As `silicon-accounts --help` prints it:
 
 ```text
   login                                     Sign in as a Carbon or a Silicon, or get a short-lived
@@ -321,7 +321,8 @@ As `accounts --help` prints it:
   lookup <TARGET>                           Look up an account by uuid or by c:id / si:id
   profile                                   Show or edit your profile: display name, timezone,
                                             date of birth, photo
-    profile show                            Show your full profile (same as `accounts whoami`)
+    profile show                            Show your full profile (same as `silicon-accounts
+                                            whoami`)
     profile set                             Change profile fields; only the flags you pass change
   email                                     Manage your email addresses (Carbons): list, add +
                                             verify, make primary, remove
@@ -414,8 +415,8 @@ As `accounts --help` prints it:
     device deny <CODE>                      Deny it
   app                                       App mode: an app's sign-in setup, user base, imports,
                                             tokens, webhooks and proofs
-    app use <APP_ID>                        Choose the app for later `accounts app` commands and
-                                            store its secret (0600)
+    app use <APP_ID>                        Choose the app for later `silicon-accounts app`
+                                            commands and store its secret (0600)
     app list                                List the apps you own (signed in as a Carbon)
     app new                                 Make a new app: apps are created in Silicon Apps
                                             (opens it)
@@ -486,35 +487,36 @@ As `accounts --help` prints it:
                                             optionally with the PR that fixes it
   docs [TOPIC]                              Read the bundled docs (guides for Silicons, Carbons
                                             and apps)
-  help [TOPIC]                              Help for a command (`accounts help silicon create`) or
-                                            a docs topic (`accounts help imports`)
+  help [TOPIC]                              Help for a command (`silicon-accounts help silicon
+                                            create`) or a docs topic (`silicon-accounts help
+                                            imports`)
   delete-account                            Delete your account permanently (requires --confirm
                                             <your id>)
 ```
 
 ## Commands
 
-Each section is generated from `accounts <command> --help`. Options marked `[env: …]` also read that
+Each section is generated from `silicon-accounts <command> --help`. Options marked `[env: …]` also read that
 environment variable; `[default: …]` is the value used when the option is left out. A few sections
 add a note written by hand after the generated part, such as what a deleted account looks like in
-[`accounts app users`](#accounts-app-users).
+[`silicon-accounts app users`](#silicon-accounts-app-users).
 
-### `accounts login`
+### `silicon-accounts login`
 
 Sign in as a Carbon or a Silicon, or get a short-lived token for an app.
 
 Carbons sign in with a browser code (device flow) or with a 6-digit code sent to their email or phone. Silicons sign in with their si:id and STK. The session is stored in `{home}/.accounts/session.json` (mode 0600) and refreshed automatically.
 
-With --app, prints a short-lived token (SLT, 2 minutes, single use) for that app; if you are already signed in it is returned directly. Hand the SLT to the app, which exchanges it for your tokens. This is how Silicons sign into apps. Check the session with `accounts login status --json`.
+With --app, prints a short-lived token (SLT, 2 minutes, single use) for that app; if you are already signed in it is returned directly. Hand the SLT to the app, which exchanges it for your tokens. This is how Silicons sign into apps. Check the session with `silicon-accounts login status --json`.
 
 ```text
-accounts login [OPTIONS]
-accounts login <COMMAND>
+silicon-accounts login [OPTIONS]
+silicon-accounts login <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`status`](#accounts-login-status) | Report whether you are signed in and as whom (exit 0 signed in, 1 not) |
+| [`status`](#silicon-accounts-login-status) | Report whether you are signed in and as whom (exit 0 signed in, 1 not) |
 
 | argument or option | meaning |
 |---|---|
@@ -528,34 +530,34 @@ accounts login <COMMAND>
 | `--code <CODE>` | The 6-digit code you received (with --email/--phone/--challenge) |
 | `--app <APP_ID>` | After signing in (or right away if already signed in), print a short-lived token for this app |
 | `--no-browser` | Device flow: don't open a browser, just print the code and URL |
-| `--label <TEXT>` | Label for this sign-in in your session list [default: accounts CLI on `<host>` (`<os>`)] |
+| `--label <TEXT>` | Label for this sign-in in your session list [default: silicon-accounts CLI on `<host>` (`<os>`)] |
 | `--force` | Sign in again even if already signed in |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts login                                   Carbon: browser code (device flow)
-accounts login --no-browser                      print the code and URL only
-accounts login --email saket@example.com         Carbon: code by email (prompts for it)
-accounts login --email saket@example.com --code 123456
+silicon-accounts login                                   Carbon: browser code (device flow)
+silicon-accounts login --no-browser                      print the code and URL only
+silicon-accounts login --email saket@example.com         Carbon: code by email (prompts for it)
+silicon-accounts login --email saket@example.com --code 123456
                                                  finish a code sent by an earlier call
-printf '%s' "$STK" | accounts login --silicon si:scout --stk-stdin
-ACCOUNTS_SILICON=si:scout ACCOUNTS_STK=stk-… accounts login --json
-accounts login --app remind                      print a short-lived token for remind
-accounts login status --json                     {"authenticated":true,"kind":"silicon",…}
+printf '%s' "$STK" | silicon-accounts login --silicon si:scout --stk-stdin
+ACCOUNTS_SILICON=si:scout ACCOUNTS_STK=stk-… silicon-accounts login --json
+silicon-accounts login --app remind                      print a short-lived token for remind
+silicon-accounts login status --json                     {"authenticated":true,"kind":"silicon",…}
 
 Exit codes: 0 ok, 1 failure, 2 invalid input, 3 not signed in or credentials refused,
 6 locked or rate limited.
 ```
 
-#### `accounts login status`
+#### `silicon-accounts login status`
 
 Report whether you are signed in and as whom (exit 0 signed in, 1 not).
 
 Checks the stored session against the service (refreshing it if needed) unless --offline. JSON: `{"authenticated":true,"kind":"silicon","id":"si:scout","uuid":"…","expires_at":"…"}` or `{"authenticated":false}`.
 
 ```text
-accounts login status [OPTIONS]
+silicon-accounts login status [OPTIONS]
 ```
 
 | argument or option | meaning |
@@ -565,76 +567,76 @@ accounts login status [OPTIONS]
 Examples, as `--help` prints them:
 
 ```text
-accounts login status
-accounts login status --json
-accounts login status --offline --json
+silicon-accounts login status
+silicon-accounts login status --json
+silicon-accounts login status --offline --json
 ```
 
-### `accounts logout`
+### `silicon-accounts logout`
 
 Sign out: revoke this CLI session and delete the stored tokens.
 
-Other sessions (the account site, other machines) stay signed in; see `accounts sessions list` to revoke those.
+Other sessions (the account site, other machines) stay signed in; see `silicon-accounts sessions list` to revoke those.
 
 ```text
-accounts logout [OPTIONS]
+silicon-accounts logout [OPTIONS]
 ```
 
 Examples, as `--help` prints them:
 
 ```text
-accounts logout
-accounts logout --json
+silicon-accounts logout
+silicon-accounts logout --json
 ```
 
-### `accounts whoami`
+### `silicon-accounts whoami`
 
 Show the signed-in account (uuid, id, kind, custodian…).
 
-Calls GET /v1/me with the stored session. Use `accounts login status` for a quick check that also works offline.
+Calls GET /v1/me with the stored session. Use `silicon-accounts login status` for a quick check that also works offline.
 
 ```text
-accounts whoami [OPTIONS]
+silicon-accounts whoami [OPTIONS]
 ```
 
 Examples, as `--help` prints them:
 
 ```text
-accounts whoami
-accounts whoami --json | jq -r .uuid
+silicon-accounts whoami
+silicon-accounts whoami --json | jq -r .uuid
 ```
 
-### `accounts id`
+### `silicon-accounts id`
 
 Check whether an id is available, or change your own c:id / si:id.
 
 The uuid never changes; the c:id or si:id can. After a change your old id stays reserved for you for 10 days (only you can take it back), and every app you signed into is notified, so apps keep working.
 
 ```text
-accounts id [OPTIONS] <COMMAND>
+silicon-accounts id [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`available`](#accounts-id-available) | Check whether a c:id or si:id can be taken (exit 0 available, 5 taken/reserved, 2 invalid) |
-| [`change`](#accounts-id-change) | Change your own c:id / si:id (the prefix is added if you omit it) |
+| [`available`](#silicon-accounts-id-available) | Check whether a c:id or si:id can be taken (exit 0 available, 5 taken/reserved, 2 invalid) |
+| [`change`](#silicon-accounts-id-change) | Change your own c:id / si:id (the prefix is added if you omit it) |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts id available c:saket
-accounts id available si:head_of_growth --json
-accounts id change c:saket_dev
+silicon-accounts id available c:saket
+silicon-accounts id available si:head_of_growth --json
+silicon-accounts id change c:saket_dev
 ```
 
-#### `accounts id available`
+#### `silicon-accounts id available`
 
 Check whether a c:id or si:id can be taken (exit 0 available, 5 taken/reserved, 2 invalid).
 
-Ids are c: or si: plus 3 to 30 of a-z, 0-9, - and _ (case-insensitive). When signed in, an id reserved for you after a change shows as reclaimable. A custodian adds --for `<si:…>` to ask for one of its Silicons: an old id of that Silicon shows as reclaimable for it (take it back with `accounts silicon id`).
+Ids are c: or si: plus 3 to 30 of a-z, 0-9, - and _ (case-insensitive). When signed in, an id reserved for you after a change shows as reclaimable. A custodian adds --for `<si:…>` to ask for one of its Silicons: an old id of that Silicon shows as reclaimable for it (take it back with `silicon-accounts silicon id`).
 
 ```text
-accounts id available [OPTIONS] <ID>
+silicon-accounts id available [OPTIONS] <ID>
 ```
 
 | argument or option | meaning |
@@ -645,19 +647,19 @@ accounts id available [OPTIONS] <ID>
 Examples, as `--help` prints them:
 
 ```text
-accounts id available c:saket
-accounts id available si:scout --json
-accounts id available si:scout --for si:scout_v2
+silicon-accounts id available c:saket
+silicon-accounts id available si:scout --json
+silicon-accounts id available si:scout --for si:scout_v2
 ```
 
-#### `accounts id change`
+#### `silicon-accounts id change`
 
 Change your own c:id / si:id (the prefix is added if you omit it).
 
 Your old id stays reserved for you for 10 days. Apps you signed into get account.id_changed; they key on your uuid, so nothing breaks.
 
 ```text
-accounts id change [OPTIONS] <NEW_ID>
+silicon-accounts id change [OPTIONS] <NEW_ID>
 ```
 
 | argument or option | meaning |
@@ -667,18 +669,18 @@ accounts id change [OPTIONS] <NEW_ID>
 Examples, as `--help` prints them:
 
 ```text
-accounts id change c:saket_dev
-accounts id change scout_v2
+silicon-accounts id change c:saket_dev
+silicon-accounts id change scout_v2
 ```
 
-### `accounts lookup`
+### `silicon-accounts lookup`
 
 Look up an account by uuid or by c:id / si:id.
 
 Shows the public identity (uuid, id, kind, display name, status and a Silicon's custodian). Uses your session, or the app credentials when you are not signed in. Only current ids resolve; store uuids, not ids.
 
 ```text
-accounts lookup [OPTIONS] <TARGET>
+silicon-accounts lookup [OPTIONS] <TARGET>
 ```
 
 | argument or option | meaning |
@@ -688,48 +690,48 @@ accounts lookup [OPTIONS] <TARGET>
 Examples, as `--help` prints them:
 
 ```text
-accounts lookup c:saket
-accounts lookup a8K --json
+silicon-accounts lookup c:saket
+silicon-accounts lookup a8K --json
 ```
 
-### `accounts profile`
+### `silicon-accounts profile`
 
 Show or edit your profile: display name, timezone, date of birth, photo.
 
 Apps that can see a changed field are notified with account.updated. A Silicon's date of birth is the day its account was created and can't be changed.
 
 ```text
-accounts profile [OPTIONS] <COMMAND>
+silicon-accounts profile [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`show`](#accounts-profile-show) | Show your full profile (same as `accounts whoami`) |
-| [`set`](#accounts-profile-set) | Change profile fields; only the flags you pass change |
+| [`show`](#silicon-accounts-profile-show) | Show your full profile (same as `silicon-accounts whoami`) |
+| [`set`](#silicon-accounts-profile-set) | Change profile fields; only the flags you pass change |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts profile show
-accounts profile set --display-name "Saket" --timezone Asia/Kolkata
-accounts profile set --photo ./me.png
-accounts profile set --reset-photo
+silicon-accounts profile show
+silicon-accounts profile set --display-name "Saket" --timezone Asia/Kolkata
+silicon-accounts profile set --photo ./me.png
+silicon-accounts profile set --reset-photo
 ```
 
-#### `accounts profile show`
+#### `silicon-accounts profile show`
 
-Show your full profile (same as `accounts whoami`)
+Show your full profile (same as `silicon-accounts whoami`)
 
 ```text
-accounts profile show [OPTIONS]
+silicon-accounts profile show [OPTIONS]
 ```
 
-#### `accounts profile set`
+#### `silicon-accounts profile set`
 
 Change profile fields; only the flags you pass change
 
 ```text
-accounts profile set [OPTIONS]
+silicon-accounts profile set [OPTIONS]
 ```
 
 | argument or option | meaning |
@@ -744,136 +746,136 @@ accounts profile set [OPTIONS]
 Examples, as `--help` prints them:
 
 ```text
-accounts profile set --display-name "Saket"
-accounts profile set --timezone Europe/Berlin --dob 1999-04-01
-accounts profile set --photo ./avatar.png
+silicon-accounts profile set --display-name "Saket"
+silicon-accounts profile set --timezone Europe/Berlin --dob 1999-04-01
+silicon-accounts profile set --photo ./avatar.png
 ```
 
-### `accounts email`
+### `silicon-accounts email`
 
 Manage your email addresses (Carbons): list, add + verify, make primary, remove.
 
-Up to 10 emails; any of them signs you in. Adding sends a 6-digit code (valid 10 minutes) that you confirm with `accounts email verify`. The primary email can't be removed: make another one primary first.
+Up to 10 emails; any of them signs you in. Adding sends a 6-digit code (valid 10 minutes) that you confirm with `silicon-accounts email verify`. The primary email can't be removed: make another one primary first.
 
 ```text
-accounts email [OPTIONS] <COMMAND>
+silicon-accounts email [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`list`](#accounts-email-list) | List your email addresses |
-| [`add`](#accounts-email-add) | Add an email: sends a 6-digit code (asks for it when run in a terminal) |
-| [`verify`](#accounts-email-verify) | Confirm an added email with its code |
-| [`primary`](#accounts-email-primary) | Make an email your primary one (apps with the email scope are told) |
-| [`remove`](#accounts-email-remove) | Remove an email (not the primary one) |
+| [`list`](#silicon-accounts-email-list) | List your email addresses |
+| [`add`](#silicon-accounts-email-add) | Add an email: sends a 6-digit code (asks for it when run in a terminal) |
+| [`verify`](#silicon-accounts-email-verify) | Confirm an added email with its code |
+| [`primary`](#silicon-accounts-email-primary) | Make an email your primary one (apps with the email scope are told) |
+| [`remove`](#silicon-accounts-email-remove) | Remove an email (not the primary one) |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts email list
-accounts email add work@example.com
-accounts email verify 0192f0c2-… 123456
-accounts email primary work@example.com
-accounts email remove old@example.com
+silicon-accounts email list
+silicon-accounts email add work@example.com
+silicon-accounts email verify 0192f0c2-… 123456
+silicon-accounts email primary work@example.com
+silicon-accounts email remove old@example.com
 ```
 
-#### `accounts email list`
+#### `silicon-accounts email list`
 
 List your email addresses
 
 ```text
-accounts email list [OPTIONS]
+silicon-accounts email list [OPTIONS]
 ```
 
-#### `accounts email add`
+#### `silicon-accounts email add`
 
 Add an email: sends a 6-digit code (asks for it when run in a terminal)
 
 ```text
-accounts email add [OPTIONS] <EMAIL>
+silicon-accounts email add [OPTIONS] <EMAIL>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<EMAIL>` | The email address |
 
-#### `accounts email verify`
+#### `silicon-accounts email verify`
 
 Confirm an added email with its code
 
 ```text
-accounts email verify [OPTIONS] <CHALLENGE_ID> <CODE>
+silicon-accounts email verify [OPTIONS] <CHALLENGE_ID> <CODE>
 ```
 
 | argument or option | meaning |
 |---|---|
-| `<CHALLENGE_ID>` | The challenge id printed by `accounts email add` |
+| `<CHALLENGE_ID>` | The challenge id printed by `silicon-accounts email add` |
 | `<CODE>` | The 6-digit code |
 
-#### `accounts email primary`
+#### `silicon-accounts email primary`
 
 Make an email your primary one (apps with the email scope are told)
 
 ```text
-accounts email primary [OPTIONS] <EMAIL>
+silicon-accounts email primary [OPTIONS] <EMAIL>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<EMAIL>` | The email address |
 
-#### `accounts email remove`
+#### `silicon-accounts email remove`
 
 Remove an email (not the primary one)
 
 ```text
-accounts email remove [OPTIONS] <EMAIL>
+silicon-accounts email remove [OPTIONS] <EMAIL>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<EMAIL>` | The email address |
 
-### `accounts phone`
+### `silicon-accounts phone`
 
 Manage your phone numbers (Carbons): list, add + verify, make primary, remove.
 
-Works exactly like `accounts email`. Numbers are stored in E.164 (+919876543210); pass --country for local formats.
+Works exactly like `silicon-accounts email`. Numbers are stored in E.164 (+919876543210); pass --country for local formats.
 
 ```text
-accounts phone [OPTIONS] <COMMAND>
+silicon-accounts phone [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`list`](#accounts-phone-list) | List your phone numbers |
-| [`add`](#accounts-phone-add) | Add a phone number: sends a 6-digit code by SMS |
-| [`verify`](#accounts-phone-verify) | Confirm an added number with its code |
-| [`primary`](#accounts-phone-primary) | Make a number your primary one |
-| [`remove`](#accounts-phone-remove) | Remove a number (not the primary one) |
+| [`list`](#silicon-accounts-phone-list) | List your phone numbers |
+| [`add`](#silicon-accounts-phone-add) | Add a phone number: sends a 6-digit code by SMS |
+| [`verify`](#silicon-accounts-phone-verify) | Confirm an added number with its code |
+| [`primary`](#silicon-accounts-phone-primary) | Make a number your primary one |
+| [`remove`](#silicon-accounts-phone-remove) | Remove a number (not the primary one) |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts phone add +919876543210
-accounts phone add 98765 43210 --country IN
-accounts phone verify 0192f0c2-… 123456
+silicon-accounts phone add +919876543210
+silicon-accounts phone add 98765 43210 --country IN
+silicon-accounts phone verify 0192f0c2-… 123456
 ```
 
-#### `accounts phone list`
+#### `silicon-accounts phone list`
 
 List your phone numbers
 
 ```text
-accounts phone list [OPTIONS]
+silicon-accounts phone list [OPTIONS]
 ```
 
-#### `accounts phone add`
+#### `silicon-accounts phone add`
 
 Add a phone number: sends a 6-digit code by SMS
 
 ```text
-accounts phone add [OPTIONS] <PHONE>
+silicon-accounts phone add [OPTIONS] <PHONE>
 ```
 
 | argument or option | meaning |
@@ -881,212 +883,212 @@ accounts phone add [OPTIONS] <PHONE>
 | `<PHONE>` | The number (E.164 like +919876543210, or local with --country) |
 | `--country <CC>` | Country for a local number (ISO code, e.g. IN) |
 
-#### `accounts phone verify`
+#### `silicon-accounts phone verify`
 
 Confirm an added number with its code
 
 ```text
-accounts phone verify [OPTIONS] <CHALLENGE_ID> <CODE>
+silicon-accounts phone verify [OPTIONS] <CHALLENGE_ID> <CODE>
 ```
 
 | argument or option | meaning |
 |---|---|
-| `<CHALLENGE_ID>` | The challenge id printed by `accounts phone add` |
+| `<CHALLENGE_ID>` | The challenge id printed by `silicon-accounts phone add` |
 | `<CODE>` | The 6-digit code |
 
-#### `accounts phone primary`
+#### `silicon-accounts phone primary`
 
 Make a number your primary one
 
 ```text
-accounts phone primary [OPTIONS] <PHONE>
+silicon-accounts phone primary [OPTIONS] <PHONE>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<PHONE>` | The number |
 
-#### `accounts phone remove`
+#### `silicon-accounts phone remove`
 
 Remove a number (not the primary one)
 
 ```text
-accounts phone remove [OPTIONS] <PHONE>
+silicon-accounts phone remove [OPTIONS] <PHONE>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<PHONE>` | The number |
 
-### `accounts identities`
+### `silicon-accounts identities`
 
 List or unlink the Google / Apple identities linked to your account
 
 ```text
-accounts identities [OPTIONS] <COMMAND>
+silicon-accounts identities [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`list`](#accounts-identities-list) | List linked Google / Apple identities |
-| [`remove`](#accounts-identities-remove) | Unlink an identity |
+| [`list`](#silicon-accounts-identities-list) | List linked Google / Apple identities |
+| [`remove`](#silicon-accounts-identities-remove) | Unlink an identity |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts identities list
-accounts identities remove google 1098765432
+silicon-accounts identities list
+silicon-accounts identities remove google 1098765432
 ```
 
-#### `accounts identities list`
+#### `silicon-accounts identities list`
 
 List linked Google / Apple identities
 
 ```text
-accounts identities list [OPTIONS]
+silicon-accounts identities list [OPTIONS]
 ```
 
-#### `accounts identities remove`
+#### `silicon-accounts identities remove`
 
 Unlink an identity
 
 ```text
-accounts identities remove [OPTIONS] <PROVIDER> <SUBJECT>
+silicon-accounts identities remove [OPTIONS] <PROVIDER> <SUBJECT>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<PROVIDER>` | google or apple |
-| `<SUBJECT>` | The provider's subject id (from `accounts identities list`) |
+| `<SUBJECT>` | The provider's subject id (from `silicon-accounts identities list`) |
 
-### `accounts apps`
+### `silicon-accounts apps`
 
 Apps you signed into: list them, or remove an app's access.
 
 Removing access revokes the app's tokens for you and the User verification proofs it issued about you, and tells the app (membership.access_removed).
 
 ```text
-accounts apps [OPTIONS] <COMMAND>
+silicon-accounts apps [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`list`](#accounts-apps-list) | List the apps you signed into, with what you share with each |
-| [`remove`](#accounts-apps-remove) | Remove an app's access to your account |
+| [`list`](#silicon-accounts-apps-list) | List the apps you signed into, with what you share with each |
+| [`remove`](#silicon-accounts-apps-remove) | Remove an app's access to your account |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts apps list
-accounts apps remove briefcase
+silicon-accounts apps list
+silicon-accounts apps remove briefcase
 ```
 
-#### `accounts apps list`
+#### `silicon-accounts apps list`
 
 List the apps you signed into, with what you share with each
 
 ```text
-accounts apps list [OPTIONS]
+silicon-accounts apps list [OPTIONS]
 ```
 
-#### `accounts apps remove`
+#### `silicon-accounts apps remove`
 
 Remove an app's access to your account
 
 ```text
-accounts apps remove [OPTIONS] <APP_ID>
+silicon-accounts apps remove [OPTIONS] <APP_ID>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<APP_ID>` | The app id, e.g. briefcase |
 
-### `accounts proofs`
+### `silicon-accounts proofs`
 
 User verification proofs apps issued on your behalf: list or revoke them
 
 ```text
-accounts proofs [OPTIONS] <COMMAND>
+silicon-accounts proofs [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`list`](#accounts-proofs-list) | List User verification proofs issued on your behalf |
-| [`revoke`](#accounts-proofs-revoke) | Revoke a User verification proof |
+| [`list`](#silicon-accounts-proofs-list) | List User verification proofs issued on your behalf |
+| [`revoke`](#silicon-accounts-proofs-revoke) | Revoke a User verification proof |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts proofs list
-accounts proofs revoke 0192f0c2-…
+silicon-accounts proofs list
+silicon-accounts proofs revoke 0192f0c2-…
 ```
 
-#### `accounts proofs list`
+#### `silicon-accounts proofs list`
 
 List User verification proofs issued on your behalf
 
 ```text
-accounts proofs list [OPTIONS]
+silicon-accounts proofs list [OPTIONS]
 ```
 
-#### `accounts proofs revoke`
+#### `silicon-accounts proofs revoke`
 
 Revoke a User verification proof
 
 ```text
-accounts proofs revoke [OPTIONS] <PROOF_ID>
+silicon-accounts proofs revoke [OPTIONS] <PROOF_ID>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<PROOF_ID>` | The proof id |
 
-### `accounts sessions`
+### `silicon-accounts sessions`
 
 Your browser sessions and CLI sign-ins: list or revoke them
 
 ```text
-accounts sessions [OPTIONS] <COMMAND>
+silicon-accounts sessions [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`list`](#accounts-sessions-list) | List browser sessions and CLI sign-ins |
-| [`revoke`](#accounts-sessions-revoke) | Revoke a session (it is signed out everywhere it is used) |
+| [`list`](#silicon-accounts-sessions-list) | List browser sessions and CLI sign-ins |
+| [`revoke`](#silicon-accounts-sessions-revoke) | Revoke a session (it is signed out everywhere it is used) |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts sessions list
-accounts sessions revoke 0192f0c2-…
+silicon-accounts sessions list
+silicon-accounts sessions revoke 0192f0c2-…
 ```
 
-#### `accounts sessions list`
+#### `silicon-accounts sessions list`
 
 List browser sessions and CLI sign-ins
 
 ```text
-accounts sessions list [OPTIONS]
+silicon-accounts sessions list [OPTIONS]
 ```
 
-#### `accounts sessions revoke`
+#### `silicon-accounts sessions revoke`
 
 Revoke a session (it is signed out everywhere it is used)
 
 ```text
-accounts sessions revoke [OPTIONS] <ID>
+silicon-accounts sessions revoke [OPTIONS] <ID>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<ID>` | The session id |
 
-### `accounts history`
+### `silicon-accounts history`
 
 Your account history: sign-ins, id changes, custodian changes, proofs, app access
 
 ```text
-accounts history [OPTIONS]
+silicon-accounts history [OPTIONS]
 ```
 
 | argument or option | meaning |
@@ -1098,63 +1100,63 @@ accounts history [OPTIONS]
 Examples, as `--help` prints them:
 
 ```text
-accounts history
-accounts history --kind signin --limit 20
-accounts history --json --cursor <next_cursor>
+silicon-accounts history
+silicon-accounts history --kind signin --limit 20
+silicon-accounts history --json --cursor <next_cursor>
 ```
 
-### `accounts silicon`
+### `silicon-accounts silicon`
 
 Silicons: create one, manage the Silicons you are custodian of, check a request.
 
 A Silicon gets an account in one of two ways: a Carbon creates it (and becomes its custodian), or the Silicon creates its own and names a custodian who must accept within 14 days. Every Silicon always has exactly one custodian, who can rotate its STK, change its details and transfer it to another Carbon.
 
 ```text
-accounts silicon [OPTIONS] <COMMAND>
+silicon-accounts silicon [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`create`](#accounts-silicon-create) | Create a Silicon account |
-| [`list`](#accounts-silicon-list) | List the Silicons you are custodian of |
-| [`show`](#accounts-silicon-show) | Show one of your Silicons (by si:id or uuid) |
-| [`update`](#accounts-silicon-update) | Change one of your Silicons' display name, timezone or photo (a URL, or upload a file) |
-| [`id`](#accounts-silicon-id) | Change one of your Silicons' si:id (apps it signed into are notified) |
-| [`rotate-stk`](#accounts-silicon-rotate-stk) | Rotate a Silicon's STK: the old one stops working and its sessions are revoked |
-| [`webhook`](#accounts-silicon-webhook) | One of your Silicons' webhook: set or remove the endpoint, see and replay its deliveries |
-| [`transfer`](#accounts-silicon-transfer) | Transfer a Silicon to another Carbon (they must accept within 14 days) |
-| [`cancel-transfer`](#accounts-silicon-cancel-transfer) | Cancel a pending transfer |
-| [`delete`](#accounts-silicon-delete) | Delete one of your Silicons permanently |
-| [`request`](#accounts-silicon-request) | A self-created Silicon's custodian request |
+| [`create`](#silicon-accounts-silicon-create) | Create a Silicon account |
+| [`list`](#silicon-accounts-silicon-list) | List the Silicons you are custodian of |
+| [`show`](#silicon-accounts-silicon-show) | Show one of your Silicons (by si:id or uuid) |
+| [`update`](#silicon-accounts-silicon-update) | Change one of your Silicons' display name, timezone or photo (a URL, or upload a file) |
+| [`id`](#silicon-accounts-silicon-id) | Change one of your Silicons' si:id (apps it signed into are notified) |
+| [`rotate-stk`](#silicon-accounts-silicon-rotate-stk) | Rotate a Silicon's STK: the old one stops working and its sessions are revoked |
+| [`webhook`](#silicon-accounts-silicon-webhook) | One of your Silicons' webhook: set or remove the endpoint, see and replay its deliveries |
+| [`transfer`](#silicon-accounts-silicon-transfer) | Transfer a Silicon to another Carbon (they must accept within 14 days) |
+| [`cancel-transfer`](#silicon-accounts-silicon-cancel-transfer) | Cancel a pending transfer |
+| [`delete`](#silicon-accounts-silicon-delete) | Delete one of your Silicons permanently |
+| [`request`](#silicon-accounts-silicon-request) | A self-created Silicon's custodian request |
 
 Examples, as `--help` prints them:
 
 ```text
 As a Carbon (you become the custodian):
-  accounts silicon create --id si:scout --display-name Scout
+  silicon-accounts silicon create --id si:scout --display-name Scout
 As a Silicon (your custodian must accept):
-  accounts silicon create --id si:scout --custodian c:saket --wait
-  accounts silicon create --id si:scout --custodian saket@example.com \
+  silicon-accounts silicon create --id si:scout --custodian c:saket --wait
+  silicon-accounts silicon create --id si:scout --custodian saket@example.com \
       --webhook https://scout.example/hooks
-  accounts silicon request status 0192f0c2-… --wait
+  silicon-accounts silicon request status 0192f0c2-… --wait
 Custodian tasks:
-  accounts silicon list
-  accounts silicon rotate-stk si:scout
-  accounts silicon webhook deliveries si:scout --status failed
-  accounts silicon transfer si:scout --to c:shubham
-  accounts silicon delete si:scout --confirm si:scout
+  silicon-accounts silicon list
+  silicon-accounts silicon rotate-stk si:scout
+  silicon-accounts silicon webhook deliveries si:scout --status failed
+  silicon-accounts silicon transfer si:scout --to c:shubham
+  silicon-accounts silicon delete si:scout --confirm si:scout
 ```
 
-#### `accounts silicon create`
+#### `silicon-accounts silicon create`
 
 Create a Silicon account.
 
-Signed in as a Carbon: you create it and become its custodian; it can sign in right away. Otherwise (or with --self-create) the Silicon creates its own account and names its custodian (--custodian c:id or email), who has 14 days to accept on accounts.teamofsilicons.com or with `accounts custodian accept`. With --wait the command polls until the custodian decides (5 s backing off to 60 s) and then signs the Silicon in; without it, check later with `accounts silicon request status <id>`.
+Signed in as a Carbon: you create it and become its custodian; it can sign in right away. Otherwise (or with --self-create) the Silicon creates its own account and names its custodian (--custodian c:id or email), who has 14 days to accept on accounts.teamofsilicons.com or with `silicon-accounts custodian accept`. With --wait the command polls until the custodian decides (5 s backing off to 60 s) and then signs the Silicon in; without it, check later with `silicon-accounts silicon request status <id>`.
 
 The generated STK is printed exactly once: store it. Choose your own with --stk-stdin (8 to 32 hex characters).
 
 ```text
-accounts silicon create [OPTIONS] --id <SI_ID>
+silicon-accounts silicon create [OPTIONS] --id <SI_ID>
 ```
 
 | argument or option | meaning |
@@ -1176,41 +1178,41 @@ accounts silicon create [OPTIONS] --id <SI_ID>
 Examples, as `--help` prints them:
 
 ```text
-accounts silicon create --id si:scout --display-name Scout
-accounts silicon create --id si:scout --custodian c:saket --wait
-accounts silicon create --id si:scout --custodian saket@example.com \
+silicon-accounts silicon create --id si:scout --display-name Scout
+silicon-accounts silicon create --id si:scout --custodian c:saket --wait
+silicon-accounts silicon create --id si:scout --custodian saket@example.com \
     --webhook https://scout.example/hooks
-openssl rand -hex 16 | accounts silicon create --id si:scout --custodian c:saket --stk-stdin
+openssl rand -hex 16 | silicon-accounts silicon create --id si:scout --custodian c:saket --stk-stdin
 ```
 
-#### `accounts silicon list`
+#### `silicon-accounts silicon list`
 
 List the Silicons you are custodian of
 
 ```text
-accounts silicon list [OPTIONS]
+silicon-accounts silicon list [OPTIONS]
 ```
 
-#### `accounts silicon show`
+#### `silicon-accounts silicon show`
 
 Show one of your Silicons (by si:id or uuid)
 
 ```text
-accounts silicon show [OPTIONS] <SILICON>
+silicon-accounts silicon show [OPTIONS] <SILICON>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<SILICON>` | si:id or uuid |
 
-#### `accounts silicon update`
+#### `silicon-accounts silicon update`
 
 Change one of your Silicons' display name, timezone or photo (a URL, or upload a file).
 
 --photo uploads a PNG, JPEG, WebP or GIF of at most 2 MB (`-` reads stdin); the photo belongs to the Silicon. Apps it signed into and the Silicon's webhook are told what changed.
 
 ```text
-accounts silicon update [OPTIONS] <SILICON>
+silicon-accounts silicon update [OPTIONS] <SILICON>
 ```
 
 | argument or option | meaning |
@@ -1224,18 +1226,18 @@ accounts silicon update [OPTIONS] <SILICON>
 Examples, as `--help` prints them:
 
 ```text
-accounts silicon update si:scout --display-name Scout
-accounts silicon update si:scout --photo ./scout.png
-accounts silicon update si:scout --timezone Europe/Paris --pfp-url
+silicon-accounts silicon update si:scout --display-name Scout
+silicon-accounts silicon update si:scout --photo ./scout.png
+silicon-accounts silicon update si:scout --timezone Europe/Paris --pfp-url
 https://cdn.example.com/scout.png
 ```
 
-#### `accounts silicon id`
+#### `silicon-accounts silicon id`
 
 Change one of your Silicons' si:id (apps it signed into are notified)
 
 ```text
-accounts silicon id [OPTIONS] <SILICON> <NEW_ID>
+silicon-accounts silicon id [OPTIONS] <SILICON> <NEW_ID>
 ```
 
 | argument or option | meaning |
@@ -1243,14 +1245,14 @@ accounts silicon id [OPTIONS] <SILICON> <NEW_ID>
 | `<SILICON>` | Current si:id or uuid |
 | `<NEW_ID>` | The new si:id |
 
-#### `accounts silicon rotate-stk`
+#### `silicon-accounts silicon rotate-stk`
 
 Rotate a Silicon's STK: the old one stops working and its sessions are revoked.
 
 Prints the new STK exactly once (or sets yours with --stk-stdin). Apps it signed into get membership.signed_out; the Silicon gets silicon.stk_rotated.
 
 ```text
-accounts silicon rotate-stk [OPTIONS] <SILICON>
+silicon-accounts silicon rotate-stk [OPTIONS] <SILICON>
 ```
 
 | argument or option | meaning |
@@ -1262,43 +1264,43 @@ accounts silicon rotate-stk [OPTIONS] <SILICON>
 Examples, as `--help` prints them:
 
 ```text
-accounts silicon rotate-stk si:scout
-printf 'stk-%s' "$(openssl rand -hex 16)" | accounts silicon rotate-stk si:scout --stk-stdin
+silicon-accounts silicon rotate-stk si:scout
+printf 'stk-%s' "$(openssl rand -hex 16)" | silicon-accounts silicon rotate-stk si:scout --stk-stdin
 ```
 
-#### `accounts silicon webhook`
+#### `silicon-accounts silicon webhook`
 
 One of your Silicons' webhook: set or remove the endpoint, see and replay its deliveries.
 
-The same webhook the Silicon manages itself with `accounts webhook`. Failed deliveries can be replayed with the same event id, sent to the current URL and signed with the current secret.
+The same webhook the Silicon manages itself with `silicon-accounts webhook`. Failed deliveries can be replayed with the same event id, sent to the current URL and signed with the current secret.
 
 ```text
-accounts silicon webhook [OPTIONS] <COMMAND>
+silicon-accounts silicon webhook [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`set`](#accounts-silicon-webhook-set) | Set the endpoint (prints the signing secret once) |
-| [`remove`](#accounts-silicon-webhook-remove) | Remove the endpoint |
-| [`deliveries`](#accounts-silicon-webhook-deliveries) | List the deliveries of the Silicon's webhook, newest first |
-| [`delivery`](#accounts-silicon-webhook-delivery) | Show one delivery of the Silicon's webhook with its attempts and the exact payload |
-| [`replay`](#accounts-silicon-webhook-replay) | Re-queue deliveries of the Silicon's webhook (same event id, its current URL and secret) |
+| [`set`](#silicon-accounts-silicon-webhook-set) | Set the endpoint (prints the signing secret once) |
+| [`remove`](#silicon-accounts-silicon-webhook-remove) | Remove the endpoint |
+| [`deliveries`](#silicon-accounts-silicon-webhook-deliveries) | List the deliveries of the Silicon's webhook, newest first |
+| [`delivery`](#silicon-accounts-silicon-webhook-delivery) | Show one delivery of the Silicon's webhook with its attempts and the exact payload |
+| [`replay`](#silicon-accounts-silicon-webhook-replay) | Re-queue deliveries of the Silicon's webhook (same event id, its current URL and secret) |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts silicon webhook set si:scout https://scout.example/hooks/accounts
-accounts silicon webhook deliveries si:scout --status failed
-accounts silicon webhook replay si:scout --failed
-accounts silicon webhook remove si:scout
+silicon-accounts silicon webhook set si:scout https://scout.example/hooks/accounts
+silicon-accounts silicon webhook deliveries si:scout --status failed
+silicon-accounts silicon webhook replay si:scout --failed
+silicon-accounts silicon webhook remove si:scout
 ```
 
-##### `accounts silicon webhook set`
+##### `silicon-accounts silicon webhook set`
 
 Set the endpoint (prints the signing secret once)
 
 ```text
-accounts silicon webhook set [OPTIONS] <SILICON> <URL>
+silicon-accounts silicon webhook set [OPTIONS] <SILICON> <URL>
 ```
 
 | argument or option | meaning |
@@ -1306,24 +1308,24 @@ accounts silicon webhook set [OPTIONS] <SILICON> <URL>
 | `<SILICON>` | si:id or uuid |
 | `<URL>` | The https endpoint |
 
-##### `accounts silicon webhook remove`
+##### `silicon-accounts silicon webhook remove`
 
 Remove the endpoint
 
 ```text
-accounts silicon webhook remove [OPTIONS] <SILICON>
+silicon-accounts silicon webhook remove [OPTIONS] <SILICON>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<SILICON>` | si:id or uuid |
 
-##### `accounts silicon webhook deliveries`
+##### `silicon-accounts silicon webhook deliveries`
 
 List the deliveries of the Silicon's webhook, newest first
 
 ```text
-accounts silicon webhook deliveries [OPTIONS] <SILICON>
+silicon-accounts silicon webhook deliveries [OPTIONS] <SILICON>
 ```
 
 | argument or option | meaning |
@@ -1336,16 +1338,16 @@ accounts silicon webhook deliveries [OPTIONS] <SILICON>
 Examples, as `--help` prints them:
 
 ```text
-accounts silicon webhook deliveries si:scout
-accounts silicon webhook deliveries si:scout --status failed --json
+silicon-accounts silicon webhook deliveries si:scout
+silicon-accounts silicon webhook deliveries si:scout --status failed --json
 ```
 
-##### `accounts silicon webhook delivery`
+##### `silicon-accounts silicon webhook delivery`
 
 Show one delivery of the Silicon's webhook with its attempts and the exact payload
 
 ```text
-accounts silicon webhook delivery [OPTIONS] <SILICON> <ID>
+silicon-accounts silicon webhook delivery [OPTIONS] <SILICON> <ID>
 ```
 
 | argument or option | meaning |
@@ -1353,14 +1355,14 @@ accounts silicon webhook delivery [OPTIONS] <SILICON> <ID>
 | `<SILICON>` | si:id or uuid |
 | `<ID>` | The delivery id |
 
-##### `accounts silicon webhook replay`
+##### `silicon-accounts silicon webhook replay`
 
 Re-queue deliveries of the Silicon's webhook (same event id, its current URL and secret).
 
 Name the deliveries by id, or replay every failed one with --failed (at most 100 per call; run it again while `remaining` is above 0). Test pings are never replayed: send a new one.
 
 ```text
-accounts silicon webhook replay [OPTIONS] <SILICON> [IDS]...
+silicon-accounts silicon webhook replay [OPTIONS] <SILICON> [IDS]...
 ```
 
 | argument or option | meaning |
@@ -1374,17 +1376,17 @@ accounts silicon webhook replay [OPTIONS] <SILICON> [IDS]...
 Examples, as `--help` prints them:
 
 ```text
-accounts silicon webhook replay si:scout --failed
-accounts silicon webhook replay si:scout --failed --since 2026-10-01T00:00:00Z
-accounts silicon webhook replay si:scout 0192f0c2-… 0192f0c3-…
+silicon-accounts silicon webhook replay si:scout --failed
+silicon-accounts silicon webhook replay si:scout --failed --since 2026-10-01T00:00:00Z
+silicon-accounts silicon webhook replay si:scout 0192f0c2-… 0192f0c3-…
 ```
 
-#### `accounts silicon transfer`
+#### `silicon-accounts silicon transfer`
 
 Transfer a Silicon to another Carbon (they must accept within 14 days)
 
 ```text
-accounts silicon transfer [OPTIONS] --to <C_ID_OR_EMAIL> <SILICON>
+silicon-accounts silicon transfer [OPTIONS] --to <C_ID_OR_EMAIL> <SILICON>
 ```
 
 | argument or option | meaning |
@@ -1392,24 +1394,24 @@ accounts silicon transfer [OPTIONS] --to <C_ID_OR_EMAIL> <SILICON>
 | `<SILICON>` | si:id or uuid |
 | `--to <C_ID_OR_EMAIL>` | The receiving Carbon: c:id or email |
 
-#### `accounts silicon cancel-transfer`
+#### `silicon-accounts silicon cancel-transfer`
 
 Cancel a pending transfer
 
 ```text
-accounts silicon cancel-transfer [OPTIONS] <SILICON>
+silicon-accounts silicon cancel-transfer [OPTIONS] <SILICON>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<SILICON>` | si:id or uuid |
 
-#### `accounts silicon delete`
+#### `silicon-accounts silicon delete`
 
 Delete one of your Silicons permanently
 
 ```text
-accounts silicon delete [OPTIONS] <SILICON>
+silicon-accounts silicon delete [OPTIONS] <SILICON>
 ```
 
 | argument or option | meaning |
@@ -1417,26 +1419,26 @@ accounts silicon delete [OPTIONS] <SILICON>
 | `<SILICON>` | si:id or uuid |
 | `--confirm <SI_ID>` | The Silicon's si:id, to confirm |
 
-#### `accounts silicon request`
+#### `silicon-accounts silicon request`
 
 A self-created Silicon's custodian request
 
 ```text
-accounts silicon request [OPTIONS] <COMMAND>
+silicon-accounts silicon request [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`status`](#accounts-silicon-request-status) | Check (or wait for) the custodian's decision on a self-created Silicon |
+| [`status`](#silicon-accounts-silicon-request-status) | Check (or wait for) the custodian's decision on a self-created Silicon |
 
-##### `accounts silicon request status`
+##### `silicon-accounts silicon request status`
 
 Check (or wait for) the custodian's decision on a self-created Silicon.
 
-The request token saved by `accounts silicon create` in `{home}/.accounts/requests/` is used automatically; pass --token otherwise.
+The request token saved by `silicon-accounts silicon create` in `{home}/.accounts/requests/` is used automatically; pass --token otherwise.
 
 ```text
-accounts silicon request status [OPTIONS] <REQUEST_ID>
+silicon-accounts silicon request status [OPTIONS] <REQUEST_ID>
 ```
 
 | argument or option | meaning |
@@ -1449,75 +1451,75 @@ accounts silicon request status [OPTIONS] <REQUEST_ID>
 Examples, as `--help` prints them:
 
 ```text
-accounts silicon request status 0192f0c2-…
-accounts silicon request status 0192f0c2-… --wait --timeout 2h
+silicon-accounts silicon request status 0192f0c2-…
+silicon-accounts silicon request status 0192f0c2-… --wait --timeout 2h
 ```
 
-### `accounts webhook`
+### `silicon-accounts webhook`
 
 A Silicon's own webhook: get notified about your account (custodian decisions, STK rotations, changes), and see or replay its deliveries.
 
-Every event has an event_id (dedupe on it) and is signed with your webhook's secret. Deliveries are retried for 72 hours; failed ones can be replayed with the same event id, sent to your current URL and signed with your current secret. Your custodian can do the same with `accounts silicon webhook`.
+Every event has an event_id (dedupe on it) and is signed with your webhook's secret. Deliveries are retried for 72 hours; failed ones can be replayed with the same event id, sent to your current URL and signed with your current secret. Your custodian can do the same with `silicon-accounts silicon webhook`.
 
 ```text
-accounts webhook [OPTIONS] <COMMAND>
+silicon-accounts webhook [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`set`](#accounts-webhook-set) | Set your webhook endpoint (prints the signing secret once) |
-| [`remove`](#accounts-webhook-remove) | Remove your webhook endpoint |
-| [`test`](#accounts-webhook-test) | Send a test `ping` delivery |
-| [`deliveries`](#accounts-webhook-deliveries) | List your webhook's deliveries, newest first (failed ones can be replayed) |
-| [`delivery`](#accounts-webhook-delivery) | Show one delivery with its attempts and the exact payload that was signed |
-| [`replay`](#accounts-webhook-replay) | Re-queue deliveries (same event id, sent to your current URL and signed with your current secret) |
+| [`set`](#silicon-accounts-webhook-set) | Set your webhook endpoint (prints the signing secret once) |
+| [`remove`](#silicon-accounts-webhook-remove) | Remove your webhook endpoint |
+| [`test`](#silicon-accounts-webhook-test) | Send a test `ping` delivery |
+| [`deliveries`](#silicon-accounts-webhook-deliveries) | List your webhook's deliveries, newest first (failed ones can be replayed) |
+| [`delivery`](#silicon-accounts-webhook-delivery) | Show one delivery with its attempts and the exact payload that was signed |
+| [`replay`](#silicon-accounts-webhook-replay) | Re-queue deliveries (same event id, sent to your current URL and signed with your current secret) |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts webhook set https://scout.example/hooks/accounts
-accounts webhook test
-accounts webhook deliveries --status failed
-accounts webhook delivery 0192f0c2-…
-accounts webhook replay --failed
-accounts webhook replay 0192f0c2-… 0192f0c3-…
-accounts webhook remove
+silicon-accounts webhook set https://scout.example/hooks/accounts
+silicon-accounts webhook test
+silicon-accounts webhook deliveries --status failed
+silicon-accounts webhook delivery 0192f0c2-…
+silicon-accounts webhook replay --failed
+silicon-accounts webhook replay 0192f0c2-… 0192f0c3-…
+silicon-accounts webhook remove
 ```
 
-#### `accounts webhook set`
+#### `silicon-accounts webhook set`
 
 Set your webhook endpoint (prints the signing secret once)
 
 ```text
-accounts webhook set [OPTIONS] <URL>
+silicon-accounts webhook set [OPTIONS] <URL>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<URL>` | The https endpoint |
 
-#### `accounts webhook remove`
+#### `silicon-accounts webhook remove`
 
 Remove your webhook endpoint
 
 ```text
-accounts webhook remove [OPTIONS]
+silicon-accounts webhook remove [OPTIONS]
 ```
 
-#### `accounts webhook test`
+#### `silicon-accounts webhook test`
 
 Send a test `ping` delivery
 
 ```text
-accounts webhook test [OPTIONS]
+silicon-accounts webhook test [OPTIONS]
 ```
 
-#### `accounts webhook deliveries`
+#### `silicon-accounts webhook deliveries`
 
 List your webhook's deliveries, newest first (failed ones can be replayed)
 
 ```text
-accounts webhook deliveries [OPTIONS]
+silicon-accounts webhook deliveries [OPTIONS]
 ```
 
 | argument or option | meaning |
@@ -1529,30 +1531,30 @@ accounts webhook deliveries [OPTIONS]
 Examples, as `--help` prints them:
 
 ```text
-accounts webhook deliveries
-accounts webhook deliveries --status failed --json
+silicon-accounts webhook deliveries
+silicon-accounts webhook deliveries --status failed --json
 ```
 
-#### `accounts webhook delivery`
+#### `silicon-accounts webhook delivery`
 
 Show one delivery with its attempts and the exact payload that was signed
 
 ```text
-accounts webhook delivery [OPTIONS] <ID>
+silicon-accounts webhook delivery [OPTIONS] <ID>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<ID>` | The delivery id |
 
-#### `accounts webhook replay`
+#### `silicon-accounts webhook replay`
 
 Re-queue deliveries (same event id, sent to your current URL and signed with your current secret).
 
-Name the deliveries by id, or replay every failed one with --failed (at most 100 per call; run it again while `remaining` is above 0). Test pings are never replayed: send a new one with `accounts webhook test`.
+Name the deliveries by id, or replay every failed one with --failed (at most 100 per call; run it again while `remaining` is above 0). Test pings are never replayed: send a new one with `silicon-accounts webhook test`.
 
 ```text
-accounts webhook replay [OPTIONS] [IDS]...
+silicon-accounts webhook replay [OPTIONS] [IDS]...
 ```
 
 | argument or option | meaning |
@@ -1565,185 +1567,185 @@ accounts webhook replay [OPTIONS] [IDS]...
 Examples, as `--help` prints them:
 
 ```text
-accounts webhook replay --failed
-accounts webhook replay --failed --since 2026-10-01T00:00:00Z
-accounts webhook replay 0192f0c2-… 0192f0c3-…
+silicon-accounts webhook replay --failed
+silicon-accounts webhook replay --failed --since 2026-10-01T00:00:00Z
+silicon-accounts webhook replay 0192f0c2-… 0192f0c3-…
 ```
 
-### `accounts custodian`
+### `silicon-accounts custodian`
 
 Custodian requests addressed to you (Carbons): list, accept, decline.
 
 Requests come from Silicons that named you as custodian, and from custodians transferring a Silicon to you. They expire after 14 days.
 
 ```text
-accounts custodian [OPTIONS] <COMMAND>
+silicon-accounts custodian [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`requests`](#accounts-custodian-requests) | List custodian requests waiting for you |
-| [`accept`](#accounts-custodian-accept) | Accept a request: you become the Silicon's custodian |
-| [`decline`](#accounts-custodian-decline) | Decline a request |
+| [`requests`](#silicon-accounts-custodian-requests) | List custodian requests waiting for you |
+| [`accept`](#silicon-accounts-custodian-accept) | Accept a request: you become the Silicon's custodian |
+| [`decline`](#silicon-accounts-custodian-decline) | Decline a request |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts custodian requests
-accounts custodian accept 0192f0c2-…
-accounts custodian decline 0192f0c2-…
+silicon-accounts custodian requests
+silicon-accounts custodian accept 0192f0c2-…
+silicon-accounts custodian decline 0192f0c2-…
 ```
 
-#### `accounts custodian requests`
+#### `silicon-accounts custodian requests`
 
 List custodian requests waiting for you
 
 ```text
-accounts custodian requests [OPTIONS]
+silicon-accounts custodian requests [OPTIONS]
 ```
 
-#### `accounts custodian accept`
+#### `silicon-accounts custodian accept`
 
 Accept a request: you become the Silicon's custodian
 
 ```text
-accounts custodian accept [OPTIONS] <ID>
+silicon-accounts custodian accept [OPTIONS] <ID>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<ID>` | The request id |
 
-#### `accounts custodian decline`
+#### `silicon-accounts custodian decline`
 
 Decline a request
 
 ```text
-accounts custodian decline [OPTIONS] <ID>
+silicon-accounts custodian decline [OPTIONS] <ID>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<ID>` | The request id |
 
-### `accounts device`
+### `silicon-accounts device`
 
 Approve or deny a CLI sign-in code shown on another machine (Carbons).
 
-Same as approving on accounts.teamofsilicons.com/device: the other machine's `accounts login` gets signed in as you.
+Same as approving on accounts.teamofsilicons.com/device: the other machine's `silicon-accounts login` gets signed in as you.
 
 ```text
-accounts device [OPTIONS] <COMMAND>
+silicon-accounts device [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`show`](#accounts-device-show) | Show a pending CLI sign-in (label, status, expiry) |
-| [`approve`](#accounts-device-approve) | Approve it: the other machine gets signed in as you |
-| [`deny`](#accounts-device-deny) | Deny it |
+| [`show`](#silicon-accounts-device-show) | Show a pending CLI sign-in (label, status, expiry) |
+| [`approve`](#silicon-accounts-device-approve) | Approve it: the other machine gets signed in as you |
+| [`deny`](#silicon-accounts-device-deny) | Deny it |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts device show WDJB-MJHT
-accounts device approve WDJB-MJHT
+silicon-accounts device show WDJB-MJHT
+silicon-accounts device approve WDJB-MJHT
 ```
 
-#### `accounts device show`
+#### `silicon-accounts device show`
 
 Show a pending CLI sign-in (label, status, expiry)
 
 ```text
-accounts device show [OPTIONS] <CODE>
+silicon-accounts device show [OPTIONS] <CODE>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<CODE>` | The code shown by the other machine, e.g. WDJB-MJHT |
 
-#### `accounts device approve`
+#### `silicon-accounts device approve`
 
 Approve it: the other machine gets signed in as you
 
 ```text
-accounts device approve [OPTIONS] <CODE>
+silicon-accounts device approve [OPTIONS] <CODE>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<CODE>` | The code |
 
-#### `accounts device deny`
+#### `silicon-accounts device deny`
 
 Deny it
 
 ```text
-accounts device deny [OPTIONS] <CODE>
+silicon-accounts device deny [OPTIONS] <CODE>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<CODE>` | The code |
 
-### `accounts app`
+### `silicon-accounts app`
 
 App mode: an app's sign-in setup, user base, imports, tokens, webhooks and proofs.
 
-Acts with the app's credentials (--app-id/--app-secret, ACCOUNTS_APP_ID/ACCOUNTS_APP_SECRET, or `accounts app use <app_id> --secret-stdin`), or as the app's owner when you are signed in as the Carbon who owns it. Token calls, User verification proofs, proof verification and refresh need the app's own credentials; an owner can issue App verification proofs (the app's App verification page) and revoke the app's proofs by id. Apps are created in Silicon Apps (`accounts app new`).
+Acts with the app's credentials (--app-id/--app-secret, ACCOUNTS_APP_ID/ACCOUNTS_APP_SECRET, or `silicon-accounts app use <app_id> --secret-stdin`), or as the app's owner when you are signed in as the Carbon who owns it. Token calls, User verification proofs, proof verification and refresh need the app's own credentials; an owner can issue App verification proofs (the app's App verification page) and revoke the app's proofs by id. Apps are created in Silicon Apps (`silicon-accounts app new`).
 
 ```text
-accounts app [OPTIONS] <COMMAND>
+silicon-accounts app [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`use`](#accounts-app-use) | Choose the app for later `accounts app` commands and store its secret (0600) |
-| [`list`](#accounts-app-list) | List the apps you own (signed in as a Carbon) |
-| [`new`](#accounts-app-new) | Make a new app: apps are created in Silicon Apps (opens it) |
-| [`show`](#accounts-app-show) | Show the app, its sign-in setup and user base stats |
-| [`config`](#accounts-app-config) | The app's sign-in setup: methods, Google/Apple, branding, required details, redirect URIs |
-| [`users`](#accounts-app-users) | List the app's user base |
-| [`user`](#accounts-app-user) | Show one account in the user base, with its last sign-ins |
-| [`import`](#accounts-app-import) | Import existing users (CSV or JSON), or inspect import jobs |
-| [`token`](#accounts-app-token) | Token endpoint calls: exchange codes and SLTs, refresh, introspect, revoke, verify |
-| [`userinfo`](#accounts-app-userinfo) | Fetch userinfo with an access token issued to this app |
-| [`proof`](#accounts-app-proof) | User verification and App verification proofs: issue, verify, refresh, revoke, list |
-| [`webhook`](#accounts-app-webhook) | The app's webhook: endpoint, secret, test, deliveries, replay |
-| [`lookup`](#accounts-app-lookup) | Look up an account by uuid or id with the app's credentials |
+| [`use`](#silicon-accounts-app-use) | Choose the app for later `silicon-accounts app` commands and store its secret (0600) |
+| [`list`](#silicon-accounts-app-list) | List the apps you own (signed in as a Carbon) |
+| [`new`](#silicon-accounts-app-new) | Make a new app: apps are created in Silicon Apps (opens it) |
+| [`show`](#silicon-accounts-app-show) | Show the app, its sign-in setup and user base stats |
+| [`config`](#silicon-accounts-app-config) | The app's sign-in setup: methods, Google/Apple, branding, required details, redirect URIs |
+| [`users`](#silicon-accounts-app-users) | List the app's user base |
+| [`user`](#silicon-accounts-app-user) | Show one account in the user base, with its last sign-ins |
+| [`import`](#silicon-accounts-app-import) | Import existing users (CSV or JSON), or inspect import jobs |
+| [`token`](#silicon-accounts-app-token) | Token endpoint calls: exchange codes and SLTs, refresh, introspect, revoke, verify |
+| [`userinfo`](#silicon-accounts-app-userinfo) | Fetch userinfo with an access token issued to this app |
+| [`proof`](#silicon-accounts-app-proof) | User verification and App verification proofs: issue, verify, refresh, revoke, list |
+| [`webhook`](#silicon-accounts-app-webhook) | The app's webhook: endpoint, secret, test, deliveries, replay |
+| [`lookup`](#silicon-accounts-app-lookup) | Look up an account by uuid or id with the app's credentials |
 
-App credentials (accepted by every `accounts app` subcommand):
+App credentials (accepted by every `silicon-accounts app` subcommand):
 
 | option | meaning |
 |---|---|
-| `--app-id <APP_ID>` | The app id [env: ACCOUNTS_APP_ID; default: the app chosen with `accounts app use`] |
+| `--app-id <APP_ID>` | The app id [env: ACCOUNTS_APP_ID; default: the app chosen with `silicon-accounts app use`] |
 | `--app-secret <SECRET>` | The app secret (prefer --app-secret-stdin or ACCOUNTS_APP_SECRET) |
 | `--app-secret-stdin` | Read the app secret from stdin |
 
 Examples, as `--help` prints them:
 
 ```text
-printf '%s' "$SECRET" | accounts app use briefcase --secret-stdin
-accounts app show
-accounts app config set - <<< '{"methods":{"google":true}}'
-accounts app users --q saket
-accounts app import users.csv --default-country US --wait
-accounts app token exchange --code sac_… --code-verifier … \
+printf '%s' "$SECRET" | silicon-accounts app use briefcase --secret-stdin
+silicon-accounts app show
+silicon-accounts app config set - <<< '{"methods":{"google":true}}'
+silicon-accounts app users --q saket
+silicon-accounts app import users.csv --default-country US --wait
+silicon-accounts app token exchange --code sac_… --code-verifier … \
     --redirect-uri https://briefcase.example/callback
-accounts app token slt slt_…
-accounts app proof user-verification --subject-token eyJ… --to briefcase --scope files.write
-accounts app proof verify sap_… && echo valid
-accounts app webhook set https://briefcase.example/webhooks
-accounts app webhook replay --failed
+silicon-accounts app token slt slt_…
+silicon-accounts app proof user-verification --subject-token eyJ… --to briefcase --scope files.write
+silicon-accounts app proof verify sap_… && echo valid
+silicon-accounts app webhook set https://briefcase.example/webhooks
+silicon-accounts app webhook replay --failed
 ```
 
-#### `accounts app use`
+#### `silicon-accounts app use`
 
-Choose the app for later `accounts app` commands and store its secret (0600).
+Choose the app for later `silicon-accounts app` commands and store its secret (0600).
 
 Without a secret, later commands act as the app's owner through your session (you must be signed in as the Carbon who owns it).
 
 ```text
-accounts app use [OPTIONS] <APP_ID>
+silicon-accounts app use [OPTIONS] <APP_ID>
 ```
 
 | argument or option | meaning |
@@ -1752,83 +1754,83 @@ accounts app use [OPTIONS] <APP_ID>
 | `--secret-stdin` | Read the app secret from stdin |
 | `--secret <SECRET>` | The app secret (prefer --secret-stdin) |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
 Examples, as `--help` prints them:
 
 ```text
-printf '%s' "$SECRET" | accounts app use briefcase --secret-stdin
-accounts app use briefcase          (as its owner)
+printf '%s' "$SECRET" | silicon-accounts app use briefcase --secret-stdin
+silicon-accounts app use briefcase          (as its owner)
 ```
 
-#### `accounts app list`
+#### `silicon-accounts app list`
 
 List the apps you own (signed in as a Carbon)
 
 ```text
-accounts app list [OPTIONS]
+silicon-accounts app list [OPTIONS]
 ```
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-#### `accounts app new`
+#### `silicon-accounts app new`
 
 Make a new app: apps are created in Silicon Apps (opens it)
 
 ```text
-accounts app new [OPTIONS]
+silicon-accounts app new [OPTIONS]
 ```
 
 | argument or option | meaning |
 |---|---|
 | `--no-browser` | Only print the link |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-#### `accounts app show`
+#### `silicon-accounts app show`
 
 Show the app, its sign-in setup and user base stats
 
 ```text
-accounts app show [OPTIONS]
+silicon-accounts app show [OPTIONS]
 ```
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-#### `accounts app config`
+#### `silicon-accounts app config`
 
 The app's sign-in setup: methods, Google/Apple, branding, required details, redirect URIs
 
 ```text
-accounts app config [OPTIONS] <COMMAND>
+silicon-accounts app config [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`get`](#accounts-app-config-get) | Print the sign-in setup as JSON (secrets masked) |
-| [`set`](#accounts-app-config-set) | Apply a JSON patch (deep merge, arrays replace) from a file or stdin (-) |
-| [`history`](#accounts-app-config-history) | Show the history of sign-in setup changes |
+| [`get`](#silicon-accounts-app-config-get) | Print the sign-in setup as JSON (secrets masked) |
+| [`set`](#silicon-accounts-app-config-set) | Apply a JSON patch (deep merge, arrays replace) from a file or stdin (-) |
+| [`history`](#silicon-accounts-app-config-history) | Show the history of sign-in setup changes |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app config get`
+##### `silicon-accounts app config get`
 
 Print the sign-in setup as JSON (secrets masked)
 
 ```text
-accounts app config get [OPTIONS]
+silicon-accounts app config get [OPTIONS]
 ```
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app config set`
+##### `silicon-accounts app config set`
 
 Apply a JSON patch (deep merge, arrays replace) from a file or stdin (-).
 
 Validation errors list every bad field. Pass --expected-version (from `config get`) to refuse overwriting someone else's change.
 
 ```text
-accounts app config set [OPTIONS] <FILE>
+silicon-accounts app config set [OPTIONS] <FILE>
 ```
 
 | argument or option | meaning |
@@ -1837,21 +1839,21 @@ accounts app config set [OPTIONS] <FILE>
 | `--expected-version <N>` | Fail if the setup changed since this version |
 | `--idempotency-key <KEY>` | Idempotency key [default: random] |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
 Examples, as `--help` prints them:
 
 ```text
-accounts app config set patch.json --expected-version 7
-echo '{"required_fields":["email"],"branding":{"radius":12}}' | accounts app config set -
+silicon-accounts app config set patch.json --expected-version 7
+echo '{"required_fields":["email"],"branding":{"radius":12}}' | silicon-accounts app config set -
 ```
 
-##### `accounts app config history`
+##### `silicon-accounts app config history`
 
 Show the history of sign-in setup changes
 
 ```text
-accounts app config history [OPTIONS]
+silicon-accounts app config history [OPTIONS]
 ```
 
 | argument or option | meaning |
@@ -1859,14 +1861,14 @@ accounts app config history [OPTIONS]
 | `--limit <N>` | Entries per page |
 | `--cursor <CURSOR>` | Continue from next_cursor |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-#### `accounts app users`
+#### `silicon-accounts app users`
 
 List the app's user base
 
 ```text
-accounts app users [OPTIONS]
+silicon-accounts app users [OPTIONS]
 ```
 
 | argument or option | meaning |
@@ -1878,46 +1880,46 @@ accounts app users [OPTIONS]
 | `--limit <N>` | Rows per page (max 200) |
 | `--cursor <CURSOR>` | Continue from next_cursor |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
 Deleted accounts stay in the user base as history, with their uuid, membership id, external id and
 dates but none of their details (the name reads "Deleted account"); `--status deleted` lists only
 them, and the other statuses leave them out ([What apps see](../learn/what-apps-see.md)).
 
 ```text
-$ accounts app users --status deleted
+$ silicon-accounts app users --status deleted
 UUID  ID  NAME             STATUS   SOURCE  CONTACT  LAST SIGN-IN
 K1E       Deleted account  deleted  slt              2026-10-07T05:22:30Z
 ```
 
-#### `accounts app user`
+#### `silicon-accounts app user`
 
 Show one account in the user base, with its last sign-ins
 
 ```text
-accounts app user [OPTIONS] <UUID>
+silicon-accounts app user [OPTIONS] <UUID>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<UUID>` | The account uuid |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-#### `accounts app import`
+#### `silicon-accounts app import`
 
 Import existing users (CSV or JSON), or inspect import jobs
 
 ```text
-accounts app import [OPTIONS] [FILE]
-accounts app import <COMMAND>
+silicon-accounts app import [OPTIONS] [FILE]
+silicon-accounts app import <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`status`](#accounts-app-import-status) | Show an import job (add --wait to follow it) |
-| [`rows`](#accounts-app-import-rows) | Show per-row outcomes of an import job |
-| [`list`](#accounts-app-import-list) | List import jobs |
+| [`status`](#silicon-accounts-app-import-status) | Show an import job (add --wait to follow it) |
+| [`rows`](#silicon-accounts-app-import-rows) | Show per-row outcomes of an import job |
+| [`list`](#silicon-accounts-app-import-list) | List import jobs |
 
 | argument or option | meaning |
 |---|---|
@@ -1930,14 +1932,14 @@ accounts app import <COMMAND>
 | `--wait` | Wait for the job to finish, showing progress and the first errors |
 | `--idempotency-key <KEY>` | Idempotency key; reuse it when retrying an upload [default: random] |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app import status`
+##### `silicon-accounts app import status`
 
 Show an import job (add --wait to follow it)
 
 ```text
-accounts app import status [OPTIONS] <JOB>
+silicon-accounts app import status [OPTIONS] <JOB>
 ```
 
 | argument or option | meaning |
@@ -1945,14 +1947,14 @@ accounts app import status [OPTIONS] <JOB>
 | `<JOB>` | The job id |
 | `--wait` | Wait until it finishes |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app import rows`
+##### `silicon-accounts app import rows`
 
 Show per-row outcomes of an import job
 
 ```text
-accounts app import rows [OPTIONS] <JOB>
+silicon-accounts app import rows [OPTIONS] <JOB>
 ```
 
 | argument or option | meaning |
@@ -1964,43 +1966,43 @@ accounts app import rows [OPTIONS] <JOB>
 | `--limit <N>` | Rows per page (max 200) |
 | `--cursor <CURSOR>` | Continue from next_cursor |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app import list`
+##### `silicon-accounts app import list`
 
 List import jobs
 
 ```text
-accounts app import list [OPTIONS]
+silicon-accounts app import list [OPTIONS]
 ```
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-#### `accounts app token`
+#### `silicon-accounts app token`
 
 Token endpoint calls: exchange codes and SLTs, refresh, introspect, revoke, verify
 
 ```text
-accounts app token [OPTIONS] <COMMAND>
+silicon-accounts app token [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`exchange`](#accounts-app-token-exchange) | Exchange an authorization code from your redirect URI |
-| [`slt`](#accounts-app-token-slt) | Exchange a Silicon's short-lived token (slt_…) |
-| [`refresh`](#accounts-app-token-refresh) | Rotate a refresh token (store the new one) |
-| [`introspect`](#accounts-app-token-introspect) | Ask whether a token of this app is active |
-| [`revoke`](#accounts-app-token-revoke) | Revoke a token's family (signs the account out of the app) |
-| [`verify`](#accounts-app-token-verify) | Verify an access token locally with the JWKS (exit 0 valid, 2 invalid) |
+| [`exchange`](#silicon-accounts-app-token-exchange) | Exchange an authorization code from your redirect URI |
+| [`slt`](#silicon-accounts-app-token-slt) | Exchange a Silicon's short-lived token (slt_…) |
+| [`refresh`](#silicon-accounts-app-token-refresh) | Rotate a refresh token (store the new one) |
+| [`introspect`](#silicon-accounts-app-token-introspect) | Ask whether a token of this app is active |
+| [`revoke`](#silicon-accounts-app-token-revoke) | Revoke a token's family (signs the account out of the app) |
+| [`verify`](#silicon-accounts-app-token-verify) | Verify an access token locally with the JWKS (exit 0 valid, 2 invalid) |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app token exchange`
+##### `silicon-accounts app token exchange`
 
 Exchange an authorization code from your redirect URI
 
 ```text
-accounts app token exchange [OPTIONS] --code <CODE> --redirect-uri <URI>
+silicon-accounts app token exchange [OPTIONS] --code <CODE> --redirect-uri <URI>
 ```
 
 | argument or option | meaning |
@@ -2009,117 +2011,117 @@ accounts app token exchange [OPTIONS] --code <CODE> --redirect-uri <URI>
 | `--redirect-uri <URI>` | The redirect URI used for /authorize (must match exactly) |
 | `--code-verifier <VERIFIER>` | The PKCE verifier, if you sent a challenge |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app token slt`
+##### `silicon-accounts app token slt`
 
 Exchange a Silicon's short-lived token (slt_…)
 
 ```text
-accounts app token slt [OPTIONS] <SLT>
+silicon-accounts app token slt [OPTIONS] <SLT>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<SLT>` | The SLT (or - for stdin) |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app token refresh`
+##### `silicon-accounts app token refresh`
 
 Rotate a refresh token (store the new one)
 
 ```text
-accounts app token refresh [OPTIONS] <REFRESH_TOKEN>
+silicon-accounts app token refresh [OPTIONS] <REFRESH_TOKEN>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<REFRESH_TOKEN>` | The refresh token (or - for stdin) |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app token introspect`
+##### `silicon-accounts app token introspect`
 
 Ask whether a token of this app is active
 
 ```text
-accounts app token introspect [OPTIONS] <TOKEN>
+silicon-accounts app token introspect [OPTIONS] <TOKEN>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<TOKEN>` | The token (or - for stdin) |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app token revoke`
+##### `silicon-accounts app token revoke`
 
 Revoke a token's family (signs the account out of the app)
 
 ```text
-accounts app token revoke [OPTIONS] <TOKEN>
+silicon-accounts app token revoke [OPTIONS] <TOKEN>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<TOKEN>` | The token (or - for stdin) |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app token verify`
+##### `silicon-accounts app token verify`
 
 Verify an access token locally with the JWKS (exit 0 valid, 2 invalid)
 
 ```text
-accounts app token verify [OPTIONS] <ACCESS_TOKEN>
+silicon-accounts app token verify [OPTIONS] <ACCESS_TOKEN>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<ACCESS_TOKEN>` | The access token (or - for stdin) |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-#### `accounts app userinfo`
+#### `silicon-accounts app userinfo`
 
 Fetch userinfo with an access token issued to this app
 
 ```text
-accounts app userinfo [OPTIONS] <ACCESS_TOKEN>
+silicon-accounts app userinfo [OPTIONS] <ACCESS_TOKEN>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<ACCESS_TOKEN>` | The access token (or - to read it from stdin) |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-#### `accounts app proof`
+#### `silicon-accounts app proof`
 
 User verification and App verification proofs: issue, verify, refresh, revoke, list
 
 ```text
-accounts app proof [OPTIONS] <COMMAND>
+silicon-accounts app proof [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`user-verification`](#accounts-app-proof-user-verification) | Issue a User verification proof: act at another app on behalf of an account that consented in your app |
-| [`app-verification`](#accounts-app-proof-app-verification) | Issue an app verification proof that one other app can verify (one proof per app) |
-| [`verify`](#accounts-app-proof-verify) | Verify a proof token as this app: exit 0 when valid, 2 when not |
-| [`refresh`](#accounts-app-proof-refresh) | Get a new proof token with the proof refresh token (it rotates) |
-| [`revoke`](#accounts-app-proof-revoke) | Revoke a proof this app issued (by id, proof token or refresh token) |
-| [`list`](#accounts-app-proof-list) | List proofs this app issued |
+| [`user-verification`](#silicon-accounts-app-proof-user-verification) | Issue a User verification proof: act at another app on behalf of an account that consented in your app |
+| [`app-verification`](#silicon-accounts-app-proof-app-verification) | Issue an app verification proof that one other app can verify (one proof per app) |
+| [`verify`](#silicon-accounts-app-proof-verify) | Verify a proof token as this app: exit 0 when valid, 2 when not |
+| [`refresh`](#silicon-accounts-app-proof-refresh) | Get a new proof token with the proof refresh token (it rotates) |
+| [`revoke`](#silicon-accounts-app-proof-revoke) | Revoke a proof this app issued (by id, proof token or refresh token) |
+| [`list`](#silicon-accounts-app-proof-list) | List proofs this app issued |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app proof user-verification`
+##### `silicon-accounts app proof user-verification`
 
 Issue a User verification proof: act at another app on behalf of an account that consented in your app
 
 ```text
-accounts app proof user-verification [OPTIONS] --subject-token <TOKEN> --to <APP_ID>
+silicon-accounts app proof user-verification [OPTIONS] --subject-token <TOKEN> --to <APP_ID>
 ```
 
 | argument or option | meaning |
@@ -2130,21 +2132,21 @@ accounts app proof user-verification [OPTIONS] --subject-token <TOKEN> --to <APP
 | `--ttl <SECONDS>` | Proof token lifetime in seconds (60..=1800) |
 | `--idempotency-key <KEY>` | Idempotency key [default: random] |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
 Examples, as `--help` prints them:
 
 ```text
-accounts app proof user-verification --subject-token "$ACCESS_TOKEN" --to briefcase \
+silicon-accounts app proof user-verification --subject-token "$ACCESS_TOKEN" --to briefcase \
     --scope files.write --ttl 600
 ```
 
-##### `accounts app proof app-verification`
+##### `silicon-accounts app proof app-verification`
 
-Issue an app verification proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An app verification proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Managers can also make, see and revoke these proofs in the developer portal. The central history at developers.teamofsilicons.com/app-verification retains records and token events for apps you manage; raw token values are shown only when generated.
+Issue an app verification proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `silicon-accounts app proof verify` (or POST /v1/proofs/verify). An app verification proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Managers can also make, see and revoke these proofs in the developer portal. The central history at developers.teamofsilicons.com/app-verification retains records and token events for apps you manage; raw token values are shown only when generated.
 
 ```text
-accounts app proof app-verification [OPTIONS] --to <APP_ID>
+silicon-accounts app proof app-verification [OPTIONS] --to <APP_ID>
 ```
 
 A list in `--to` (`remind,waveform`) exits 2 before anything is sent, with one command per app in
@@ -2157,43 +2159,43 @@ the hint.
 | `--ttl <SECONDS>` | Proof token lifetime in seconds (60..=1800) |
 | `--idempotency-key <KEY>` | Idempotency key [default: random] |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
 Examples, as `--help` prints them:
 
 ```text
-accounts app proof app-verification --to remind --ttl 300
-accounts app proof app-verification --to waveform --scope notifications.send
-accounts app proof list --kind app_verification
+silicon-accounts app proof app-verification --to remind --ttl 300
+silicon-accounts app proof app-verification --to waveform --scope notifications.send
+silicon-accounts app proof list --kind app_verification
 ```
 
-##### `accounts app proof verify`
+##### `silicon-accounts app proof verify`
 
 Verify a proof token as this app: exit 0 when valid, 2 when not
 
 ```text
-accounts app proof verify [OPTIONS] <TOKEN>
+silicon-accounts app proof verify [OPTIONS] <TOKEN>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<TOKEN>` | The proof token (or - for stdin) |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
 Examples, as `--help` prints them:
 
 ```text
-accounts app proof verify sap_… --json
-accounts app proof verify - < token.txt && echo valid
+silicon-accounts app proof verify sap_… --json
+silicon-accounts app proof verify - < token.txt && echo valid
 ```
 
-##### `accounts app proof refresh`
+##### `silicon-accounts app proof refresh`
 
 Get a new proof token with the proof refresh token (it rotates)
 
 ```text
-accounts app proof refresh [OPTIONS] <REFRESH_TOKEN>
+silicon-accounts app proof refresh [OPTIONS] <REFRESH_TOKEN>
 ```
 
 | argument or option | meaning |
@@ -2201,14 +2203,14 @@ accounts app proof refresh [OPTIONS] <REFRESH_TOKEN>
 | `<REFRESH_TOKEN>` | The proof refresh token sapr_… (or - for stdin) |
 | `--ttl <SECONDS>` | New proof token lifetime in seconds (60..=1800) |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app proof revoke`
+##### `silicon-accounts app proof revoke`
 
 Revoke a proof this app issued (by id, proof token or refresh token)
 
 ```text
-accounts app proof revoke [OPTIONS] [PROOF_ID]
+silicon-accounts app proof revoke [OPTIONS] [PROOF_ID]
 ```
 
 | argument or option | meaning |
@@ -2217,14 +2219,14 @@ accounts app proof revoke [OPTIONS] [PROOF_ID]
 | `--token <TOKEN>` | Revoke by proof token instead |
 | `--refresh-token <TOKEN>` | Revoke by proof refresh token instead |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app proof list`
+##### `silicon-accounts app proof list`
 
 List proofs this app issued
 
 ```text
-accounts app proof list [OPTIONS]
+silicon-accounts app proof list [OPTIONS]
 ```
 
 | argument or option | meaning |
@@ -2234,36 +2236,36 @@ accounts app proof list [OPTIONS]
 | `--limit <N>` | Rows per page |
 | `--cursor <CURSOR>` | Continue from next_cursor |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-#### `accounts app webhook`
+#### `silicon-accounts app webhook`
 
 The app's webhook: endpoint, secret, test, deliveries, replay
 
 ```text
-accounts app webhook [OPTIONS] <COMMAND>
+silicon-accounts app webhook [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`set`](#accounts-app-webhook-set) | Set the endpoint (a new signing secret is printed once) |
-| [`remove`](#accounts-app-webhook-remove) | Remove the endpoint |
-| [`rotate`](#accounts-app-webhook-rotate) | Rotate the signing secret (printed once; the old one stops immediately) |
-| [`test`](#accounts-app-webhook-test) | Queue a test `ping` delivery (a retry with the same --idempotency-key queues no second ping) |
-| [`deliveries`](#accounts-app-webhook-deliveries) | List deliveries |
-| [`delivery`](#accounts-app-webhook-delivery) | Show one delivery with its attempts and payload |
-| [`replay`](#accounts-app-webhook-replay) | Re-queue deliveries (same event id, current URL and secret) |
+| [`set`](#silicon-accounts-app-webhook-set) | Set the endpoint (a new signing secret is printed once) |
+| [`remove`](#silicon-accounts-app-webhook-remove) | Remove the endpoint |
+| [`rotate`](#silicon-accounts-app-webhook-rotate) | Rotate the signing secret (printed once; the old one stops immediately) |
+| [`test`](#silicon-accounts-app-webhook-test) | Queue a test `ping` delivery (a retry with the same --idempotency-key queues no second ping) |
+| [`deliveries`](#silicon-accounts-app-webhook-deliveries) | List deliveries |
+| [`delivery`](#silicon-accounts-app-webhook-delivery) | Show one delivery with its attempts and payload |
+| [`replay`](#silicon-accounts-app-webhook-replay) | Re-queue deliveries (same event id, current URL and secret) |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app webhook set`
+##### `silicon-accounts app webhook set`
 
 Set the endpoint (a new signing secret is printed once).
 
 A retry with the same --idempotency-key (within 10 minutes) prints the same secret instead of generating another.
 
 ```text
-accounts app webhook set [OPTIONS] <URL>
+silicon-accounts app webhook set [OPTIONS] <URL>
 ```
 
 | argument or option | meaning |
@@ -2271,54 +2273,54 @@ accounts app webhook set [OPTIONS] <URL>
 | `<URL>` | The endpoint URL |
 | `--idempotency-key <KEY>` | Idempotency key [default: random] |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app webhook remove`
+##### `silicon-accounts app webhook remove`
 
 Remove the endpoint
 
 ```text
-accounts app webhook remove [OPTIONS]
+silicon-accounts app webhook remove [OPTIONS]
 ```
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app webhook rotate`
+##### `silicon-accounts app webhook rotate`
 
 Rotate the signing secret (printed once; the old one stops immediately).
 
 A retry with the same --idempotency-key (within 10 minutes) prints the same new secret instead of rotating again.
 
 ```text
-accounts app webhook rotate [OPTIONS]
+silicon-accounts app webhook rotate [OPTIONS]
 ```
 
 | argument or option | meaning |
 |---|---|
 | `--idempotency-key <KEY>` | Idempotency key [default: random] |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app webhook test`
+##### `silicon-accounts app webhook test`
 
 Queue a test `ping` delivery (a retry with the same --idempotency-key queues no second ping)
 
 ```text
-accounts app webhook test [OPTIONS]
+silicon-accounts app webhook test [OPTIONS]
 ```
 
 | argument or option | meaning |
 |---|---|
 | `--idempotency-key <KEY>` | Idempotency key [default: random] |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app webhook deliveries`
+##### `silicon-accounts app webhook deliveries`
 
 List deliveries
 
 ```text
-accounts app webhook deliveries [OPTIONS]
+silicon-accounts app webhook deliveries [OPTIONS]
 ```
 
 | argument or option | meaning |
@@ -2327,28 +2329,28 @@ accounts app webhook deliveries [OPTIONS]
 | `--limit <N>` | Rows per page |
 | `--cursor <CURSOR>` | Continue from next_cursor |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app webhook delivery`
+##### `silicon-accounts app webhook delivery`
 
 Show one delivery with its attempts and payload
 
 ```text
-accounts app webhook delivery [OPTIONS] <ID>
+silicon-accounts app webhook delivery [OPTIONS] <ID>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<ID>` | The delivery id |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-##### `accounts app webhook replay`
+##### `silicon-accounts app webhook replay`
 
 Re-queue deliveries (same event id, current URL and secret)
 
 ```text
-accounts app webhook replay [OPTIONS] [IDS]...
+silicon-accounts app webhook replay [OPTIONS] [IDS]...
 ```
 
 | argument or option | meaning |
@@ -2358,64 +2360,64 @@ accounts app webhook replay [OPTIONS] [IDS]...
 | `--since <TIME>` | With --failed: only deliveries created since this RFC 3339 time |
 | `--idempotency-key <KEY>` | Idempotency key [default: random] |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
 Examples, as `--help` prints them:
 
 ```text
-accounts app webhook replay 0192f0c2-… 0192f0c3-…
-accounts app webhook replay --failed --since 2026-10-01T00:00:00Z
+silicon-accounts app webhook replay 0192f0c2-… 0192f0c3-…
+silicon-accounts app webhook replay --failed --since 2026-10-01T00:00:00Z
 ```
 
-#### `accounts app lookup`
+#### `silicon-accounts app lookup`
 
 Look up an account by uuid or id with the app's credentials
 
 ```text
-accounts app lookup [OPTIONS] <TARGET>
+silicon-accounts app lookup [OPTIONS] <TARGET>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<TARGET>` | uuid, c:id or si:id |
 
-Also takes the [app credentials options](#accounts-app) and the [global options](#global-options).
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
-### `accounts config`
+### `silicon-accounts config`
 
 CLI settings: home directory, URL, telemetry.
 
 Settings live in `{home}/.accounts/config.json`. Highly configurable with sensible defaults: flags win over environment variables, which win over the config file.
 
 ```text
-accounts config [OPTIONS] <COMMAND>
+silicon-accounts config [OPTIONS] <COMMAND>
 ```
 
 | subcommand | what it does |
 |---|---|
-| [`home`](#accounts-config-home) | Show or set the home directory that holds .accounts/ (errors if it is not a directory) |
-| [`get`](#accounts-config-get) | Show settings and where each value comes from |
-| [`set`](#accounts-config-set) | Set a setting in config.json: url `<URL>` or telemetry on\|off |
-| [`unset`](#accounts-config-unset) | Remove a setting from config.json: url, telemetry or app |
-| [`telemetry`](#accounts-config-telemetry) | Turn telemetry on or off (it is on by default) |
+| [`home`](#silicon-accounts-config-home) | Show or set the home directory that holds .accounts/ (errors if it is not a directory) |
+| [`get`](#silicon-accounts-config-get) | Show settings and where each value comes from |
+| [`set`](#silicon-accounts-config-set) | Set a setting in config.json: url `<URL>` or telemetry on\|off |
+| [`unset`](#silicon-accounts-config-unset) | Remove a setting from config.json: url, telemetry or app |
+| [`telemetry`](#silicon-accounts-config-telemetry) | Turn telemetry on or off (it is on by default) |
 
 Examples, as `--help` prints them:
 
 ```text
-accounts config get
-accounts config home /srv/scout
-accounts config set url http://127.0.0.1:8590
-accounts config telemetry off
+silicon-accounts config get
+silicon-accounts config home /srv/scout
+silicon-accounts config set url http://127.0.0.1:8590
+silicon-accounts config telemetry off
 ```
 
-#### `accounts config home`
+#### `silicon-accounts config home`
 
 Show or set the home directory that holds .accounts/ (errors if it is not a directory).
 
 The setting is a pointer file in $SILICON_HOME/.accounts/home (or ~/.accounts/home). --home and ACCOUNTS_HOME still take precedence.
 
 ```text
-accounts config home [OPTIONS] [DIR]
+silicon-accounts config home [OPTIONS] [DIR]
 ```
 
 | argument or option | meaning |
@@ -2426,29 +2428,29 @@ accounts config home [OPTIONS] [DIR]
 Examples, as `--help` prints them:
 
 ```text
-accounts config home
-accounts config home /srv/silicons/scout
-accounts config home --reset
+silicon-accounts config home
+silicon-accounts config home /srv/silicons/scout
+silicon-accounts config home --reset
 ```
 
-#### `accounts config get`
+#### `silicon-accounts config get`
 
 Show settings and where each value comes from
 
 ```text
-accounts config get [OPTIONS] [KEY]
+silicon-accounts config get [OPTIONS] [KEY]
 ```
 
 | argument or option | meaning |
 |---|---|
 | `[KEY]` | One key: url, telemetry, home, app |
 
-#### `accounts config set`
+#### `silicon-accounts config set`
 
 Set a setting in config.json: url `<URL>` or telemetry on|off
 
 ```text
-accounts config set [OPTIONS] <KEY> <VALUE>
+silicon-accounts config set [OPTIONS] <KEY> <VALUE>
 ```
 
 | argument or option | meaning |
@@ -2456,40 +2458,40 @@ accounts config set [OPTIONS] <KEY> <VALUE>
 | `<KEY>` | url or telemetry |
 | `<VALUE>` | The value |
 
-#### `accounts config unset`
+#### `silicon-accounts config unset`
 
 Remove a setting from config.json: url, telemetry or app
 
 ```text
-accounts config unset [OPTIONS] <KEY>
+silicon-accounts config unset [OPTIONS] <KEY>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<KEY>` | url, telemetry or app |
 
-#### `accounts config telemetry`
+#### `silicon-accounts config telemetry`
 
 Turn telemetry on or off (it is on by default).
 
 Telemetry sends self-contained events about CLI steps (command, outcome, timing; never tokens, ids or contact details). ACCOUNTS_TELEMETRY=0 also turns it off.
 
 ```text
-accounts config telemetry [OPTIONS] <STATE>
+silicon-accounts config telemetry [OPTIONS] <STATE>
 ```
 
 | argument or option | meaning |
 |---|---|
 | `<STATE>` | on or off [possible values: on, off] |
 
-### `accounts report`
+### `silicon-accounts report`
 
 Report a bug to the Silicon Accounts maintainers, optionally with the PR that fixes it.
 
 Every report is emailed to the maintainers. Include what you ran, what you expected and what happened (the request id from the error helps). Signed-in reports carry your account; anonymous ones are allowed.
 
 ```text
-accounts report [OPTIONS] <MESSAGE>
+silicon-accounts report [OPTIONS] <MESSAGE>
 ```
 
 | argument or option | meaning |
@@ -2502,19 +2504,19 @@ accounts report [OPTIONS] <MESSAGE>
 Examples, as `--help` prints them:
 
 ```text
-accounts report "login --app remind returns 500 (request id 0192…)"
-accounts report "wrong hint for login_locked" \
+silicon-accounts report "login --app remind returns 500 (request id 0192…)"
+silicon-accounts report "wrong hint for login_locked" \
     --pr https://github.com/teamofsilicons/silicon-accounts/pull/42
 ```
 
-### `accounts docs`
+### `silicon-accounts docs`
 
 Read the bundled docs (guides for Silicons, Carbons and apps).
 
 Run without a topic to list them. Docs ship inside the CLI, so they always match this version.
 
 ```text
-accounts docs [OPTIONS] [TOPIC]
+silicon-accounts docs [OPTIONS] [TOPIC]
 ```
 
 | argument or option | meaning |
@@ -2524,19 +2526,19 @@ accounts docs [OPTIONS] [TOPIC]
 Examples, as `--help` prints them:
 
 ```text
-accounts docs
-accounts docs silicons
-accounts docs proofs
+silicon-accounts docs
+silicon-accounts docs silicons
+silicon-accounts docs proofs
 ```
 
-### `accounts help`
+### `silicon-accounts help`
 
-Help for a command (`accounts help silicon create`) or a docs topic (`accounts help imports`).
+Help for a command (`silicon-accounts help silicon create`) or a docs topic (`silicon-accounts help imports`).
 
-A command's help wins when a docs topic has the same name (`accounts help proofs` is the `accounts proofs` command); read that guide with `accounts docs proofs`.
+A command's help wins when a docs topic has the same name (`silicon-accounts help proofs` is the `silicon-accounts proofs` command); read that guide with `silicon-accounts docs proofs`.
 
 ```text
-accounts help [OPTIONS] [TOPIC]...
+silicon-accounts help [OPTIONS] [TOPIC]...
 ```
 
 | argument or option | meaning |
@@ -2545,14 +2547,14 @@ accounts help [OPTIONS] [TOPIC]...
 
 [Bundled guides](#bundled-guides) lists which topic names are also commands.
 
-### `accounts delete-account`
+### `silicon-accounts delete-account`
 
 Delete your account permanently (requires `--confirm <your id>`).
 
-Apps you signed into are told (account.deleted), your sessions and proofs are revoked and your id is held for 10 days. A Carbon who is custodian of any Silicon must transfer them first (`accounts silicon transfer`).
+Apps you signed into are told (account.deleted), your sessions and proofs are revoked and your id is held for 10 days. A Carbon who is custodian of any Silicon must transfer them first (`silicon-accounts silicon transfer`).
 
 ```text
-accounts delete-account [OPTIONS]
+silicon-accounts delete-account [OPTIONS]
 ```
 
 | argument or option | meaning |
@@ -2562,5 +2564,5 @@ accounts delete-account [OPTIONS]
 Examples, as `--help` prints them:
 
 ```text
-accounts delete-account --confirm c:saket
+silicon-accounts delete-account --confirm c:saket
 ```

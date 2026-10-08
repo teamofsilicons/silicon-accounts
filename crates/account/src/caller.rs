@@ -56,9 +56,9 @@ where
         if !has_credentials {
             return Err(ApiError::unauthenticated(
                 "unauthenticated",
-                "Looking up an account needs credentials: an app sends Authorization: Basic base64(app_id:app_secret); a Carbon or Silicon sends its session cookie or an Authorization: Bearer access token issued to the accounts app.",
+                "Looking up an account needs credentials: an app sends Authorization: Basic base64(app_id:app_secret); a Carbon or Silicon sends its session cookie or an Authorization: Bearer access token issued to the silicon-accounts app.",
             )
-            .hint("Apps: use the app_id and secret from Silicon Apps. Carbons and Silicons: sign in with `accounts login` first."));
+            .hint("Apps: use the app_id and secret from Silicon Apps. Carbons and Silicons: sign in with `silicon-accounts login` first."));
         }
         let auth = <AccountAuth as FromRequestParts<S>>::from_request_parts(parts, state).await?;
         Ok(Caller::Account(Box::new(auth)))

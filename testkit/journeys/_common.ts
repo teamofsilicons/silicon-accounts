@@ -1,12 +1,12 @@
 // Shared helpers for the journeys: non-browser walks through a running Silicon Accounts stack
-// (scripts/dev.sh or scripts/journeys.sh) with the testkit helpers and the real `accounts` CLI.
+// (scripts/dev.sh or scripts/journeys.sh) with the testkit helpers and the real `silicon-accounts` CLI.
 //
 // Environment (defaults = scripts/dev.sh's ports):
 //   ACCOUNTS_URL         where these calls go: accounts-api   (http://127.0.0.1:8589), or the public
 //                        site/proxy in front of it (scripts/journeys.sh --proxy / --next)
 //   ACCOUNTS_PUBLIC_URL  browser-facing URL (CLI --url)       (/v1/meta public_url)
 //   MOCK_OIDC_URL / MOCK_MESSAGING_URL / FAKE_APPS_URL       (127.0.0.1:8591 / 8592 / 8593)
-//   ACCOUNTS_CLI         the `accounts` binary                ($CARGO_TARGET_DIR or target)/debug/accounts
+//   ACCOUNTS_CLI         the `silicon-accounts` binary                ($CARGO_TARGET_DIR or target)/debug/silicon-accounts
 //   TESTKIT_FORWARDED_FOR=random  per-process X-Forwarded-For (needs ACCOUNTS_TRUST_FORWARDED_FOR=true)
 
 import { spawn } from 'node:child_process';
@@ -120,12 +120,12 @@ const REPO = fileURLToPath(new URL('../../', import.meta.url));
 function cliBinary(): string {
   if (process.env.ACCOUNTS_CLI) return process.env.ACCOUNTS_CLI;
   const target = process.env.CARGO_TARGET_DIR ? (process.env.CARGO_TARGET_DIR.startsWith('/') ? process.env.CARGO_TARGET_DIR : join(REPO, process.env.CARGO_TARGET_DIR)) : join(REPO, 'target');
-  return join(target, 'debug', 'accounts');
+  return join(target, 'debug', 'silicon-accounts');
 }
 
 export const CLI = cliBinary();
 if (!existsSync(CLI)) {
-  console.error(`error: the accounts CLI is not at ${CLI}\nhint: build it (cargo build -p silicon-accounts-cli) or set ACCOUNTS_CLI`);
+  console.error(`error: the silicon-accounts CLI is not at ${CLI}\nhint: build it (cargo build -p silicon-accounts-cli) or set ACCOUNTS_CLI`);
   process.exit(2);
 }
 
@@ -158,7 +158,7 @@ export interface CliResult {
   ms: number;
 }
 
-/** Starts `accounts --url <public> --home <home> …args` and returns the child and its result. */
+/** Starts `silicon-accounts --url <public> --home <home> …args` and returns the child and its result. */
 export async function cliSpawn(home: string, args: string[], opts: { stdin?: string; env?: Record<string, string> } = {}) {
   const url = await publicUrl();
   const child = spawn(CLI, ['--url', url, '--home', home, ...args], {

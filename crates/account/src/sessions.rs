@@ -1,5 +1,5 @@
 //! Where the account is signed in to Silicon Accounts itself: browser sessions (the account site
-//! and hosted pages), first-party sign-ins (`aud = accounts` token families: the CLI, the
+//! and hosted pages), first-party sign-ins (`aud = silicon-accounts` token families: the CLI, the
 //! package, Silicon logins) and sign-ins to the developer platform (`aud = developer` token
 //! families: developers.teamofsilicons.com). Apps' own sign-ins are managed per app at
 //! `/v1/me/apps`.
@@ -65,7 +65,7 @@ pub(crate) struct SessionView {
     current: bool,
 }
 
-/// The product token of the accounts CLI's user agent (`accounts-cli/<v> silicon-accounts-client/<v>`).
+/// The product token of the silicon-accounts CLI's user agent (`accounts-cli/<v> silicon-accounts-client/<v>`).
 const CLI_PRODUCT: &str = "accounts-cli";
 /// The product token the Rust package adds to every user agent, after the program's own when it
 /// names one (`<program> silicon-accounts-client/<v>`).
@@ -124,7 +124,7 @@ fn products(ua: &str) -> Vec<Product<'_>> {
 /// | user agent | described as |
 /// |---|---|
 /// | a browser's (`Mozilla/5.0 (Macintosh; …) … Version/17.0 Safari/605.1.15`) | `Safari on macOS` |
-/// | the accounts CLI's (`accounts-cli/0.1.0 silicon-accounts-client/0.1.0`) | `accounts CLI 0.1.0` |
+/// | the silicon-accounts CLI's (`accounts-cli/0.1.0 silicon-accounts-client/0.1.0`) | `silicon-accounts CLI 0.1.0` |
 /// | the Rust package's (`silicon-accounts-client/0.1.0`) | `Silicon Accounts Rust package 0.1.0` |
 /// | a program using the package (`dm/2.0 silicon-accounts-client/0.1.0`) | `dm 2.0 (Silicon Accounts Rust package 0.1.0)` |
 /// | any other program's (`curl/8.4.0`, `python-requests/2.31.0`) | its product: `curl 8.4.0` |
@@ -148,7 +148,7 @@ pub(crate) fn describe_user_agent(ua: &str) -> Option<String> {
         None => what.to_string(),
     };
     if let Some(i) = find(CLI_PRODUCT) {
-        return Some(named("accounts CLI", &products[i]));
+        return Some(named("silicon-accounts CLI", &products[i]));
     }
     if let Some(i) = find(PACKAGE_PRODUCT) {
         let package = named("Silicon Accounts Rust package", &products[i]);
@@ -208,8 +208,8 @@ fn family_label(kind: &str, origin: Option<&str>) -> &'static str {
         return DEVELOPER_SITE;
     }
     match origin {
-        Some("device") => "accounts CLI (approved in the browser)",
-        Some("cli_code") => "accounts CLI (email or phone code)",
+        Some("device") => "silicon-accounts CLI (approved in the browser)",
+        Some("cli_code") => "silicon-accounts CLI (email or phone code)",
         Some("silicon_login") => "Silicon sign-in with its STK",
         Some("authorization_code") => "Silicon Accounts sign-in",
         _ => "First-party sign-in",
@@ -405,17 +405,17 @@ mod tests {
         assert_eq!(describe_user_agent("   "), None);
     }
 
-    /// The accounts CLI and the Rust package sign in too, and they are not browsers: their
+    /// The silicon-accounts CLI and the Rust package sign in too, and they are not browsers: their
     /// sign-ins once read "from 127.0.0.1 · A browser" in the account's history.
     #[test]
     fn the_cli_and_the_package_are_named_not_called_browsers() {
         assert_eq!(
             describe_user_agent("accounts-cli/0.1.0 silicon-accounts-client/0.1.0").as_deref(),
-            Some("accounts CLI 0.1.0")
+            Some("silicon-accounts CLI 0.1.0")
         );
         assert_eq!(
             describe_user_agent("accounts-cli/2.3.4").as_deref(),
-            Some("accounts CLI 2.3.4")
+            Some("silicon-accounts CLI 2.3.4")
         );
         assert_eq!(
             describe_user_agent("silicon-accounts-client/0.1.0").as_deref(),

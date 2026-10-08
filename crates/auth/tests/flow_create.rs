@@ -261,14 +261,14 @@ async fn first_party_redirects_stay_on_the_site() {
     let ctx = TestContext::new().await;
     let mut b = Browser::new(&ctx);
     let public = ctx.state.settings.public_url.clone();
-    let r = start_flow(&ctx, &mut b, "accounts", json!({})).await;
+    let r = start_flow(&ctx, &mut b, "silicon-accounts", json!({})).await;
     assert_eq!(r.status, 201, "{}", r.json);
     assert_eq!(r.json["flow"]["app"]["first_party"], true);
     assert_eq!(r.json["flow"]["methods"], json!(["email", "phone"]));
     let r = start_flow(
         &ctx,
         &mut b,
-        "accounts",
+        "silicon-accounts",
         json!({"redirect_uri": format!("{public}/device?code=WDJB-MJHT")}),
     )
     .await;
@@ -278,7 +278,13 @@ async fn first_party_redirects_stay_on_the_site() {
         "http://localhost:8590.evil.test/",
         "https://evil.test/http://localhost:8590/",
     ] {
-        let r = start_flow(&ctx, &mut b, "accounts", json!({"redirect_uri": bad})).await;
+        let r = start_flow(
+            &ctx,
+            &mut b,
+            "silicon-accounts",
+            json!({"redirect_uri": bad}),
+        )
+        .await;
         assert_eq!(r.error_code(), Some("redirect_uri_not_registered"), "{bad}");
     }
 }

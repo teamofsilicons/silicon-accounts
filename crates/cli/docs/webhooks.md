@@ -6,12 +6,12 @@ into it, and tells a Silicon about its own account. Both kinds follow the same r
 ## Set one up
 
 ```sh
-accounts app webhook set https://briefcase.example/webhooks   # app; prints whsec_… once
-accounts webhook set https://scout.example/hooks              # a Silicon's own
-accounts app webhook test                                     # sends a `ping`
+silicon-accounts app webhook set https://briefcase.example/webhooks   # app; prints whsec_… once
+silicon-accounts webhook set https://scout.example/hooks              # a Silicon's own
+silicon-accounts app webhook test                                     # sends a `ping`
 ```
 
-A new signing secret is generated every time you set the URL; `accounts app webhook
+A new signing secret is generated every time you set the URL; `silicon-accounts app webhook
 rotate` makes a new one without changing the URL. Store it where your receiver can
 read it. `set`, `rotate` and `test` send an idempotency key (random, or yours with
 `--idempotency-key`): a retried request returns the same secret, or queues no second ping,
@@ -76,10 +76,10 @@ A delivery that doesn't get a 2xx within 10 s is retried after 10 s, 30 s, 1 m, 
 replayed:
 
 ```sh
-accounts app webhook deliveries --status failed
-accounts app webhook delivery <delivery-id>          # attempts and the exact payload
-accounts app webhook replay <delivery-id>…
-accounts app webhook replay --failed --since 2026-10-01T00:00:00Z
+silicon-accounts app webhook deliveries --status failed
+silicon-accounts app webhook delivery <delivery-id>          # attempts and the exact payload
+silicon-accounts app webhook replay <delivery-id>…
+silicon-accounts app webhook replay --failed --since 2026-10-01T00:00:00Z
 ```
 
 A replay keeps the event id (so your dedupe works), goes to the current URL, is
@@ -98,18 +98,18 @@ replays its own deliveries, and its custodian can do the same for it.
 
 ```sh
 # as the Silicon
-accounts webhook deliveries --status failed
-accounts webhook delivery <delivery-id>              # attempts and the exact payload
-accounts webhook replay --failed                     # or: accounts webhook replay <delivery-id>…
+silicon-accounts webhook deliveries --status failed
+silicon-accounts webhook delivery <delivery-id>              # attempts and the exact payload
+silicon-accounts webhook replay --failed                     # or: silicon-accounts webhook replay <delivery-id>…
 # as its custodian
-accounts silicon webhook deliveries si:scout --status failed
-accounts silicon webhook replay si:scout --failed --since 2026-10-01T00:00:00Z
+silicon-accounts silicon webhook deliveries si:scout --status failed
+silicon-accounts silicon webhook replay si:scout --failed --since 2026-10-01T00:00:00Z
 ```
 
 Every event of a Silicon's webhook is about the Silicon itself, so nothing is withheld
 from it or its custodian. Test pings are never replayed (a replay would get around the
-limit of 10 pings an hour): send a new one with `accounts webhook test`. A replay with no
-webhook set fails with `webhook_not_set`: set one first with `accounts webhook set`.
+limit of 10 pings an hour): send a new one with `silicon-accounts webhook test`. A replay with no
+webhook set fails with `webhook_not_set`: set one first with `silicon-accounts webhook set`.
 
 In Rust: `AccountSession::my_webhook_deliveries`, `my_webhook_delivery` and
 `replay_my_webhook` for the Silicon; `silicon_webhook_deliveries`,

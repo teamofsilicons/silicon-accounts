@@ -18,11 +18,11 @@ Start with a CSV or JSON file of your app’s users. Run a dry run to see what A
 For each user, Accounts looks for a Carbon with the same email or phone number. If it finds one, it adds that Carbon to your app’s user list. Otherwise, it creates an account that the Carbon finishes setting up when they first sign in to your app. The import does not send emails or SMS messages.
 
 ```sh
-printf '%s' "$APP_SECRET" | accounts app use legacy-crm --secret-stdin
+printf '%s' "$APP_SECRET" | silicon-accounts app use legacy-crm --secret-stdin
 
-accounts app import users.csv --default-country US --dry-run --wait   # every decision, nothing written
-accounts app import users.csv --default-country US --wait             # the real import
-accounts app import rows <job-id> --outcome error                     # the rows to fix
+silicon-accounts app import users.csv --default-country US --dry-run --wait   # every decision, nothing written
+silicon-accounts app import users.csv --default-country US --wait             # the real import
+silicon-accounts app import rows <job-id> --outcome error                     # the rows to fix
 ```
 
 The examples on this page import into an app called `legacy-crm`. Replace it with your own
@@ -56,7 +56,7 @@ First errors:
   row 4: invalid_email: 'not-an-email' is not a valid email address: it has no '@'. It was left out.; missing_identifier: The row has no valid email or phone number left (see the warnings above), so it can't be matched to an account or create one.
 ```
 
-and `accounts app import rows 01a11440-1ce8-70a3-beeb-58e994801a5e` shows every row:
+and `silicon-accounts app import rows 01a11440-1ce8-70a3-beeb-58e994801a5e` shows every row:
 
 ```text
 ROW  OUTCOME  ACCOUNT       MESSAGES
@@ -88,8 +88,8 @@ The dry run applies the same rules as the real import, but it saves no accounts 
 - **Credentials.** Imports are run with the app's own credentials (`app_id` and app secret,
   from Silicon Apps) or by the Carbon who owns the app, signed in. Over HTTP the credentials
   are `Authorization: Basic base64(app_id:app_secret)`, which is what `curl -u` sends. With
-  the CLI, `accounts app use legacy-crm --secret-stdin` stores the secret (mode 0600); run
-  `accounts app use legacy-crm` without a secret to act as the owner through your own session.
+  the CLI, `silicon-accounts app use legacy-crm --secret-stdin` stores the secret (mode 0600); run
+  `silicon-accounts app use legacy-crm` without a secret to act as the owner through your own session.
 - **Where.** The CLI talks to `https://accounts.teamofsilicons.com` unless `--url` or
   `ACCOUNTS_URL` says otherwise. The curl examples assume:
 
@@ -186,7 +186,7 @@ addresses for them stay in your imported data until they add and verify them the
 ## 2. Check it with a dry run
 
 ```sh
-accounts app import users.csv --default-country US --dry-run --wait
+silicon-accounts app import users.csv --default-country US --dry-run --wait
 ```
 
 or over HTTP:
@@ -277,8 +277,8 @@ curl -s -u "$APP_ID:$APP_SECRET" "$ACCOUNTS_URL/v1/apps/$APP_ID/imports/01a11440
 | `created_by` | `app` (the app's credentials) or the uuid of the owner who ran it. |
 | `options`, `dry_run`, `format` | What the job runs with. |
 
-`accounts app import status <job-id> --wait` follows a job from the CLI, and
-`accounts app import list` (or `GET /v1/apps/{app_id}/imports`, newest first) lists them.
+`silicon-accounts app import status <job-id> --wait` follows a job from the CLI, and
+`silicon-accounts app import list` (or `GET /v1/apps/{app_id}/imports`, newest first) lists them.
 
 **Send an `Idempotency-Key` with every import.** If the connection drops before you see the
 `202`, send the same request again with the same key: you get the original answer back
@@ -350,7 +350,7 @@ Rows come back in file order. Filter them with any of:
 | `messages` | `{level, code, message, field?}` in the order they arose. |
 | `input` | The row as you sent it (only import columns), plus `_ignored_columns`, `_ignored_count` and `_extra_cells` when the row had them. |
 
-From the CLI: `accounts app import rows <job-id> --outcome error` (the CLI and the Rust client
+From the CLI: `silicon-accounts app import rows <job-id> --outcome error` (the CLI and the Rust client
 filter by `outcome`; use the HTTP API for `level` and `code`).
 
 ### Fix the errors and import again
@@ -428,7 +428,7 @@ Things to know:
   `allow_signup: false` that sign-up is refused (`signup_not_allowed`). Finishing an imported
   account is always allowed, even with `allow_signup: false`.
 - Imported Carbons finish in a browser, through an app's sign-in or the account site. The
-  CLI's code sign-in (`accounts login --email`) only signs in accounts that are already
+  CLI's code sign-in (`silicon-accounts login --email`) only signs in accounts that are already
   active, and says so.
 - If someone finishes their account through another app first, they are already active; your
   membership stays `imported` until they sign in to your app, then turns `active`.
@@ -438,8 +438,8 @@ Things to know:
 Follow the progress in your user base:
 
 ```sh
-accounts app users --status imported        # members from your import that haven't signed in to your app yet
-accounts app show                           # includes: users  10 (1 active in 30 days, 7 imported and unclaimed)
+silicon-accounts app users --status imported        # members from your import that haven't signed in to your app yet
+silicon-accounts app show                           # includes: users  10 (1 active in 30 days, 7 imported and unclaimed)
 ```
 
 `GET /v1/apps/{app_id}` has the same numbers in `stats`: `users` (live members),

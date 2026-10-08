@@ -98,7 +98,7 @@ export const journey: Journey = {
       await call(`${env.site}/v1/apps/spacestation/signin-config`, { method: "PATCH", json: { redirect_uris: original }, basic: appCredentials("spacestation"), ip: ctx.ip, headers: { "idempotency-key": `sec-${tag()}` } });
     }
 
-    // The account site's own sign-in (app `accounts`): only the site's origin.
+    // The account site's own sign-in (app `silicon-accounts`): only the site's origin.
     const firstParty: Array<[string, string]> = [
       ["a look-alike host", `${env.site}.evil.example/`],
       ["userinfo", `http://${site.host}@evil.example/`],
@@ -110,10 +110,10 @@ export const journey: Journey = {
     ];
     const fpAccepted: string[] = [];
     for (const [label, uri] of firstParty) {
-      const reply = await call(`${env.site}/v1/flows`, { json: { app_id: "accounts", redirect_uri: uri, state: "s" }, jar: new Jar(), origin: env.site, ip: ctx.ip });
+      const reply = await call(`${env.site}/v1/flows`, { json: { app_id: "silicon-accounts", redirect_uri: uri, state: "s" }, jar: new Jar(), origin: env.site, ip: ctx.ip });
       if (reply.status !== 400 || errorOf(reply).code !== "redirect_uri_not_registered") fpAccepted.push(`${label}: ${brief(reply)}`);
     }
-    const own = await call(`${env.site}/v1/flows`, { json: { app_id: "accounts", redirect_uri: `${env.site}/sign-in`, state: "s" }, jar: new Jar(), origin: env.site, ip: ctx.ip });
+    const own = await call(`${env.site}/v1/flows`, { json: { app_id: "silicon-accounts", redirect_uri: `${env.site}/sign-in`, state: "s" }, jar: new Jar(), origin: env.site, ip: ctx.ip });
     results.check(`the account site's own sign-in redirects only to its origin: ${firstParty.length} others refused (look-alike host, userinfo, other site/port, fragment, //, javascript:), its /sign-in accepted`, fpAccepted.length === 0 && own.status === 201, fpAccepted.join(" | ") || `own ${own.status}`);
 
     // The developer site's app (`developer`, a public client): only {ACCOUNTS_DEVELOPER_URL}/auth/callback, exactly. Its

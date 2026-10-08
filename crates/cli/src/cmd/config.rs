@@ -1,4 +1,4 @@
-//! `accounts config …`.
+//! `silicon-accounts config …`.
 
 use serde_json::{Value, json};
 
@@ -63,7 +63,7 @@ fn home_command(ctx: &Ctx, dir: Option<std::path::PathBuf>, reset: bool) -> CliR
             json!({ "home": home.dir.display().to_string(), "source": home.source.key(), "state_dir": home.state_dir().display().to_string() }),
             text,
         )
-        .next("accounts config home <dir>", "keep the CLI's files somewhere else"));
+        .next("silicon-accounts config home <dir>", "keep the CLI's files somewhere else"));
     };
     if let Err(why) = home::check_dir(&dir) {
         let hint = if why == "it does not exist" {
@@ -182,7 +182,7 @@ fn set(ctx: &Ctx, key: &str, value: &str) -> CliResult<Outcome> {
                 && session.url.trim_end_matches('/') != url
             {
                 ctx.out.notice(&format!(
-                    "Note: you are signed in at {}; sign in at {url} with `accounts login`.",
+                    "Note: you are signed in at {}; sign in at {url} with `silicon-accounts login`.",
                     session.url
                 ));
             }
@@ -192,7 +192,7 @@ fn set(ctx: &Ctx, key: &str, value: &str) -> CliResult<Outcome> {
             let on = silicon_accounts_client::parse_flag(value).ok_or_else(|| {
                 CliError::invalid(
                     format!("`{value}` is not on or off."),
-                    "Use `accounts config set telemetry on` or `off`.",
+                    "Use `silicon-accounts config set telemetry on` or `off`.",
                 )
             })?;
             config.telemetry = Some(on);
@@ -211,7 +211,7 @@ fn set(ctx: &Ctx, key: &str, value: &str) -> CliResult<Outcome> {
         "home" => {
             return Err(CliError::invalid(
                 "The home is not stored in config.json (config.json lives inside it).",
-                "Use `accounts config home <dir>`.",
+                "Use `silicon-accounts config home <dir>`.",
             ));
         }
         other => {
@@ -237,7 +237,7 @@ fn unset(ctx: &Ctx, key: &str) -> CliResult<Outcome> {
         "app" => config.app = None,
         "home" => {
             return Err(CliError::invalid(
-                "The home is reset with `accounts config home --reset`.",
+                "The home is reset with `silicon-accounts config home --reset`.",
                 "Run that instead.",
             ));
         }

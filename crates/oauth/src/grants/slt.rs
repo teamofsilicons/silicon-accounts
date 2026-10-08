@@ -40,7 +40,7 @@ pub(crate) async fn exchange(
 ) -> Result<TokenResponse, OAuthError> {
     let slt = opt(params.slt.as_deref()).ok_or_else(|| {
         OAuthError::invalid_request(format!(
-            "slt is required for grant_type={SLT_GRANT_TYPE}: send the short-lived token (slt_...) the Silicon handed you; it gets one with `accounts login --app <app_id>`."
+            "slt is required for grant_type={SLT_GRANT_TYPE}: send the short-lived token (slt_...) the Silicon handed you; it gets one with `silicon-accounts login --app <app_id>`."
         ))
     })?;
     let app_id = client.app.app_id.as_str();
@@ -139,7 +139,7 @@ async fn admit(
         token.created_at,
         "this short-lived token",
         &format!(
-            "the account has to sign in to the app again with a new short-lived token (`accounts login --app {app_id}`)."
+            "the account has to sign in to the app again with a new short-lived token (`silicon-accounts login --app {app_id}`)."
         ),
     ) {
         return Ok(Err(refused));
@@ -155,7 +155,7 @@ fn minted_before_rotation(
     rotated_at: OffsetDateTime,
 ) -> OAuthError {
     OAuthError::invalid_grant(format!(
-        "The short-lived token was issued at {} by a sign-in of {} that ended when its custodian rotated its STK at {}; rotating the STK ends every sign-in of the Silicon, including the short-lived tokens issued before it. The Silicon has to sign in with its new STK and get a new short-lived token (`accounts login --app {app_id}`).",
+        "The short-lived token was issued at {} by a sign-in of {} that ended when its custodian rotated its STK at {}; rotating the STK ends every sign-in of the Silicon, including the short-lived tokens issued before it. The Silicon has to sign in with its new STK and get a new short-lived token (`silicon-accounts login --app {app_id}`).",
         format_rfc3339_ms(issued_at),
         account.display_id(),
         format_rfc3339_ms(rotated_at),

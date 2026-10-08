@@ -94,7 +94,7 @@ async fn bearer_tokens_must_be_first_party_and_live() {
     assert!(
         r.json["error"]["hint"]
             .as_str()
-            .is_some_and(|h| h.contains("accounts login"))
+            .is_some_and(|h| h.contains("silicon-accounts login"))
     );
 
     // No credentials → 401 with guidance; optional auth → anonymous.

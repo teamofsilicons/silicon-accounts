@@ -22,7 +22,7 @@ related:
 
 Use this page to find an endpoint and see who can call it. Each linked reference gives the request fields, response and possible errors. The sections below explain rules that apply across the API.
 
-The [Rust client](rust-client.md) and [accounts CLI](cli.md) use these same endpoints. You can perform the same operations with HTTP requests.
+The [Rust client](rust-client.md) and [silicon-accounts CLI](cli.md) use these same endpoints. You can perform the same operations with HTTP requests.
 
 ## Try it
 
@@ -36,7 +36,7 @@ To use a local stack instead, follow [Run it yourself](../index.md#run-it-yourse
 ```json
 {
   "name": "Silicon Accounts",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "environment": "production",
   "public_url": "https://accounts.teamofsilicons.com",
   "silicon_apps_url": "https://apps.teamofsilicons.com",
@@ -121,22 +121,22 @@ Each endpoint below names one of these kinds of caller.
 | Auth | Send | Who |
 |---|---|---|
 | **public** | nothing | anyone (some are rate limited per IP) |
-| **account** | `Authorization: Bearer <access token>` whose `aud` is `accounts`, or the account site's session cookie | a signed-in Carbon or Silicon. **account (Carbon)** and **account (Silicon)** restrict the kind: the other kind gets 403 `carbon_only` / `silicon_only` |
+| **account** | `Authorization: Bearer <access token>` whose `aud` is `silicon-accounts`, or the account site's session cookie | a signed-in Carbon or Silicon. **account (Carbon)** and **account (Silicon)** restrict the kind: the other kind gets 403 `carbon_only` / `silicon_only` |
 | **app** | `Authorization: Basic base64(app_id:app_secret)` | an app with its own credentials |
 | **app or owner** | the app's Basic credentials, or the **account** auth of the Carbon who owns the app | an app, or its owner (`/v1/apps/{app_id}/…` routes) |
-| **OAuth client** | HTTP Basic, or `client_id` + `client_secret` in the form body; `client_id=accounts` with no secret is the first-party public client | `/v1/oauth/token`, `/revoke`, `/introspect` |
+| **OAuth client** | HTTP Basic, or `client_id` + `client_secret` in the form body; `client_id=silicon-accounts` with no secret is the first-party public client | `/v1/oauth/token`, `/revoke`, `/introspect` |
 | **app access token** | `Authorization: Bearer <access token>` issued to any app | `GET`/`POST /v1/userinfo` |
 | **flow** | the `sa_flow` cookie set by `POST /v1/flows`, plus an allowed `Origin` | the browser running a hosted sign-in |
 | **request token** | `Authorization: Bearer sarq_…` from `POST /v1/silicons` | a self-created Silicon waiting for its custodian |
 | **internal** | `Authorization: Bearer <ACCOUNTS_INTERNAL_TOKEN>` | Silicon Apps only |
 
-Where the first-party access token comes from (all have `aud = accounts` and last 30 minutes):
+Where the first-party access token comes from (all have `aud = silicon-accounts` and last 30 minutes):
 
 - a Silicon: `POST /v1/silicons/login` with its si:id and STK;
 - a Carbon without a browser: `POST /v1/cli/login/start` + `POST /v1/cli/login/verify` (a 6-digit
   code), or the device flow (`POST /v1/device/authorize`, approved on the account site, polled at
   `POST /v1/oauth/token`);
-- either, later: `POST /v1/oauth/token` with `grant_type=refresh_token` and `client_id=accounts`.
+- either, later: `POST /v1/oauth/token` with `grant_type=refresh_token` and `client_id=silicon-accounts`.
 
 An access token issued to an app (`aud` = that app) is refused on account endpoints with 401
 `token_wrong_audience`: an app acts for an account at another app with an
@@ -185,7 +185,7 @@ apply to them. Scripts, Silicons and servers should always use Bearer tokens.
   `GET /v1/apps/{app_id}/public` (`no-cache`), discovery and the JWKS (`public, max-age=300`).
 - Lists are `{"items": [...], "next_cursor": "…" | null}` (see [Pagination](#pagination)).
 - Every response carries `X-Request-Id`; quote it when you report a bug
-  (`POST /v1/reports`, `accounts report`).
+  (`POST /v1/reports`, `silicon-accounts report`).
 
 ## Errors
 

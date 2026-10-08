@@ -400,7 +400,7 @@ async fn refuses_bad_receiving_apps() {
             .is_some_and(|m| m.contains("itself"))
     );
 
-    let r = w.user_verification(body("accounts")).await;
+    let r = w.user_verification(body("silicon-accounts")).await;
     assert_eq!(r.status, 400);
     assert_eq!(r.error_code(), Some("invalid_receiving_app"));
 

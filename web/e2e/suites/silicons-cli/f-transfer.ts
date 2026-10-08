@@ -27,7 +27,7 @@ import {
 
 export const journey: Journey = {
   name: "silicons-cli-transfer",
-  title: "a custodian transfers a Silicon with the CLI: refusals (self, a Silicon, unknown, not yours, one at a time), cancel, decline, then accept on the site: custody moves, apps and the Silicon are told, every step is in the histories; transfers expire after 14 days; a transfer accepted with `accounts custodian accept` moves it back",
+  title: "a custodian transfers a Silicon with the CLI: refusals (self, a Silicon, unknown, not yours, one at a time), cancel, decline, then accept on the site: custody moves, apps and the Silicon are told, every step is in the histories; transfers expire after 14 days; a transfer accepted with `silicon-accounts custodian accept` moves it back",
   async run(ctx) {
     const { env, results, browser } = ctx;
     await forgetRateLimits(env, "127.0.0.1");
@@ -44,7 +44,7 @@ export const journey: Journey = {
     const created = await accounts(env, ["silicon", "create", "--id", sid, "--display-name", `Moving ${t}`, "--webhook", sinkUrl(env, key), "--json"], { home: homeFrom });
     const uuid = str(obj(created.json?.silicon).uuid);
     const stk = str(created.json?.stk);
-    results.check("`accounts silicon create` as a Carbon: active at once, custodian = the Carbon, STK printed once", created.code === 0 && obj(created.json?.silicon).status === "active" && obj(obj(created.json?.silicon).custodian).id === from.id && /^stk-[0-9a-f]{12}$/.test(stk), said(created));
+    results.check("`silicon-accounts silicon create` as a Carbon: active at once, custodian = the Carbon, STK printed once", created.code === 0 && obj(created.json?.silicon).status === "active" && obj(obj(created.json?.silicon).custodian).id === from.id && /^stk-[0-9a-f]{12}$/.test(stk), said(created));
     await setSinkSecret(env, key, str(created.json?.webhook_secret));
     const homeS = freshDir();
     const remindSlt = await loginSilicon(env, homeS, sid, stk, ["--app", "remind"]);
@@ -70,20 +70,20 @@ export const journey: Journey = {
     // 1. Transfer, then cancel.
     const first = await accounts(env, ["silicon", "transfer", sid, "--to", to.id, "--json"], { home: homeFrom });
     const firstId = str(first.json?.id);
-    results.check("`accounts silicon transfer --to c:…`: a pending transfer request, 14 days", first.code === 0 && first.json?.kind === "transfer" && first.json?.status === "pending" && obj(first.json?.to).id === to.id && obj(first.json?.from).id === from.id, said(first));
+    results.check("`silicon-accounts silicon transfer --to c:…`: a pending transfer request, 14 days", first.code === 0 && first.json?.kind === "transfer" && first.json?.status === "pending" && obj(first.json?.to).id === to.id && obj(first.json?.from).id === from.id, said(first));
     const mail = await until(async () => {
       const box = await json<{ items?: Json[] }>(`${env.messaging}/_messages?to=${encodeURIComponent(to.email)}&limit=10`);
       return (box.body.items ?? []).find(message => str(message.subject) === `${from.id} wants to transfer ${sid} to you`) ?? null;
     }, 15_000);
     results.check("the receiving Carbon is emailed ('<c:id> wants to transfer <si:id> to you')", !!mail && str(mail.text).includes(`${env.site}/silicons`), short(mail?.subject));
     const shown = await accounts(env, ["silicon", "show", sid, "--json"], { home: homeFrom });
-    results.check("`accounts silicon show`: pending_transfer to the Carbon", obj(obj(shown.json?.pending_transfer).to).id === to.id && obj(shown.json?.pending_transfer).id === firstId, said(shown));
+    results.check("`silicon-accounts silicon show`: pending_transfer to the Carbon", obj(obj(shown.json?.pending_transfer).to).id === to.id && obj(shown.json?.pending_transfer).id === firstId, said(shown));
     const offered = await accounts(env, ["custodian", "requests", "--json"], { home: homeTo });
-    results.check("the receiving Carbon sees it (`accounts custodian requests`: transfer, from the custodian)", ((offered.json?.items ?? []) as Json[]).some(item => item.id === firstId && item.kind === "transfer" && obj(item.from).id === from.id), said(offered));
+    results.check("the receiving Carbon sees it (`silicon-accounts custodian requests`: transfer, from the custodian)", ((offered.json?.items ?? []) as Json[]).some(item => item.id === firstId && item.kind === "transfer" && obj(item.from).id === from.id), said(offered));
     const twice = await accounts(env, ["silicon", "transfer", sid, "--to", to.id, "--json"], { home: homeFrom });
     results.check("one transfer at a time: exit 5, transfer_pending naming the pending request", twice.code === 5 && cliError(twice).code === "transfer_pending" && obj(cliError(twice).details).request_id === firstId, said(twice));
     const cancel = await accounts(env, ["silicon", "cancel-transfer", sid, "--json"], { home: homeFrom });
-    results.check("`accounts silicon cancel-transfer`: cancelled", cancel.code === 0 && cancel.json?.cancelled === true, said(cancel));
+    results.check("`silicon-accounts silicon cancel-transfer`: cancelled", cancel.code === 0 && cancel.json?.cancelled === true, said(cancel));
     const gone = await accounts(env, ["custodian", "requests", "--json"], { home: homeTo });
     results.check("…it is gone from the receiving Carbon's requests", !((gone.json?.items ?? []) as Json[]).some(item => item.id === firstId), said(gone));
     const lateAccept = await accounts(env, ["custodian", "accept", firstId, "--json"], { home: homeTo });
@@ -96,7 +96,7 @@ export const journey: Journey = {
     const secondId = str(second.json?.id);
     results.check("a transfer named by the Carbon's email", second.code === 0 && obj(second.json?.to).email === to.email, said(second));
     const declined = await accounts(env, ["custodian", "decline", secondId, "--json"], { home: homeTo });
-    results.check("`accounts custodian decline`: declined", declined.code === 0 && declined.json?.declined === true, said(declined));
+    results.check("`silicon-accounts custodian decline`: declined", declined.code === 0 && declined.json?.declined === true, said(declined));
     const stillFrom = await accounts(env, ["whoami", "--json"], { home: homeS });
     results.check("after a declined transfer nothing changed: the custodian is still the first Carbon", obj(stillFrom.json?.custodian).id === from.id, said(stillFrom));
     const quiet = [...(await appInbox(env, "remind")).items, ...(await appInbox(env, "briefcase")).items].filter(event => event.type === "silicon.custodian_changed" && dataOf(event).uuid === uuid);
@@ -173,11 +173,11 @@ export const journey: Journey = {
     const alive = await asCarbon<Json>(env, to, "GET", "/v1/me");
     results.check("…the account is still there", alive.status === 200 && obj(alive.body).status === "active");
 
-    // 5. This time the receiving Carbon accepts with the CLI (`accounts custodian accept`): custody moves back.
+    // 5. This time the receiving Carbon accepts with the CLI (`silicon-accounts custodian accept`): custody moves back.
     const backAt = Date.now();
     const acceptedCli = await accounts(env, ["custodian", "accept", anewId, "--json"], { home: homeFrom });
     const backTo = await accounts(env, ["whoami", "--json"], { home: homeS });
-    results.check("`accounts custodian accept <transfer id>`: accepted, and the Silicon's custodian is the first Carbon again", acceptedCli.code === 0 && obj(backTo.json?.custodian).id === from.id, `${said(acceptedCli)} | custodian ${short(backTo.json?.custodian)}`);
+    results.check("`silicon-accounts custodian accept <transfer id>`: accepted, and the Silicon's custodian is the first Carbon again", acceptedCli.code === 0 && obj(backTo.json?.custodian).id === from.id, `${said(acceptedCli)} | custodian ${short(backTo.json?.custodian)}`);
     const backHook = await waitSink(env, key, "silicon.custodian.changed", event => dataOf(event).uuid === uuid && obj(dataOf(event).to).id === from.id);
     results.check("…the Silicon's webhook got silicon.custodian.changed (to → from)", obj(dataOf(backHook).from).id === to.id, short(backHook?.payload, 240));
     for (const app of ["remind", "briefcase"]) {

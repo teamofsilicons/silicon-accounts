@@ -1,5 +1,5 @@
 /**
- * Helpers of the silicons-cli suite (Silicons, custodians and the `accounts` CLI). Kept in the suite (README: a helper
+ * Helpers of the silicons-cli suite (Silicons, custodians and the `silicon-accounts` CLI). Kept in the suite (README: a helper
  * that lib.ts lacks lives in the suite until the harness owner moves it):
  *
  * - Carbons signed up through the account site's own API flow (`/v1/flows`, about a second each instead of a browser
@@ -23,7 +23,7 @@ import { E2E_DIR, json, lastSeq, newContext, randomIp, sleep, sql, type Env, typ
 
 export const ROOT = resolve(E2E_DIR, "../..");
 
-/** The report recipients UNDERSTANDING.md names (accounts report). */
+/** The report recipients UNDERSTANDING.md names (silicon-accounts report). */
 export const REPORT_RECIPIENTS = ["saketdev12@gmail.com", "shubhastro2@gmail.com", "bugs@teamofsilicons.com"];
 
 export type Json = Record<string, unknown>;
@@ -130,7 +130,7 @@ async function siteCall(env: Env, jar: Jar, ip: string, method: string, path: st
 }
 
 /**
- * Signs a new Carbon up through the account site's own sign-in (app `accounts`): email, the code from the mock
+ * Signs a new Carbon up through the account site's own sign-in (app `silicon-accounts`): email, the code from the mock
  * mailbox, then the prefilled sign-up details (the handle can be chosen). Throws with the step that failed.
  */
 export async function signUpCarbon(env: Env, label: string, options: { email?: string; handle?: string } = {}): Promise<Carbon> {
@@ -143,7 +143,7 @@ export async function signUpCarbon(env: Env, label: string, options: { email?: s
     if (answer.status >= 300) throw new Error(`signing up ${email}: ${what} answered ${answer.status} ${short(answer.body)}`);
     return answer;
   };
-  const created = await step("POST /v1/flows", "POST", "/v1/flows", { app_id: "accounts", redirect_uri: `${env.site}/`, state: `scli-${t}`, timezone: "Asia/Kolkata" });
+  const created = await step("POST /v1/flows", "POST", "/v1/flows", { app_id: "silicon-accounts", redirect_uri: `${env.site}/`, state: `scli-${t}`, timezone: "Asia/Kolkata" });
   const flowId = str(obj(obj(created.body).flow).id);
   const after = await lastSeq(env);
   await step("the email step", "POST", `/v1/flows/${flowId}/email`, { email });
@@ -318,7 +318,7 @@ function cliEnv(extra: Record<string, string | undefined> = {}): NodeJS.ProcessE
 /** The CLI's arguments with the stack's --url and the run's --home in front. */
 const cliArgs = (env: Env, args: string[], options: RunOptions) => [...(options.url === null ? [] : ["--url", options.url ?? env.site]), ...(options.home ? ["--home", options.home] : []), ...args];
 
-/** Runs the real `accounts` CLI. */
+/** Runs the real `silicon-accounts` CLI. */
 export function accounts(env: Env, args: string[], options: RunOptions = {}): Promise<Run> {
   const base = cliEnv(options.env);
   const full = cliArgs(env, args, options);
@@ -376,7 +376,7 @@ export const said = (run: Run) => `exit ${run.code}${run.timedOut ? " (killed: t
 /** The `{"error":{…}}` a --json run printed, or {}. */
 export const cliError = (run: Run): Json => obj(run.json?.error);
 
-/** `accounts login --silicon <id> --stk-stdin --json` in `home`. */
+/** `silicon-accounts login --silicon <id> --stk-stdin --json` in `home`. */
 export function loginSilicon(env: Env, home: string, id: string, stk: string, extra: string[] = []): Promise<Run> {
   return accounts(env, ["login", "--silicon", id, "--stk-stdin", "--json", ...extra], { home, stdin: `${stk}\n` });
 }

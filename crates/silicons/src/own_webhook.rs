@@ -168,5 +168,5 @@ fn webhook_not_set(me: &SiliconAuth) -> ApiError {
         "webhook_not_set",
         format!("{} has no webhook to test.", me.account.display_id()),
     )
-    .hint("Set one first with PUT /v1/me/webhook {\"url\": \"https://…\"} (`accounts webhook set <url>`).")
+    .hint("Set one first with PUT /v1/me/webhook {\"url\": \"https://…\"} (`silicon-accounts webhook set <url>`).")
 }

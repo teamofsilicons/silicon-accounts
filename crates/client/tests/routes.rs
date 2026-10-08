@@ -182,7 +182,7 @@ async fn public_calls() {
         Reply::empty(200),
         c.revoke_first_party("sar_x")
     );
-    assert_eq!(r.form()["client_id"], "accounts");
+    assert_eq!(r.form()["client_id"], "silicon-accounts");
     // The developer platform's public client: PKCE code exchange, refresh and revoke without
     // a secret (and nothing for other client ids).
     let r = check!(

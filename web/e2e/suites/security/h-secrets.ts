@@ -109,7 +109,7 @@ export const journey: Journey = {
     const unknownSlt = rand("slt_");
     probe("token: an unknown SLT", await token(t, { grant_type: "urn:silicon:params:oauth:grant-type:slt", slt: unknownSlt }, creds), unknownSlt);
     const unknownDevice = rand("sad_");
-    probe("token: an unknown device code", await call(`${env.site}/v1/oauth/token`, { form: { grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: unknownDevice, client_id: "accounts" }, ip: ctx.ip }), unknownDevice);
+    probe("token: an unknown device code", await call(`${env.site}/v1/oauth/token`, { form: { grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: unknownDevice, client_id: "silicon-accounts" }, ip: ctx.ip }), unknownDevice);
     const wrongSecret = `sa_app_briefcase_${base64url(randomBytes(30))}`;
     probe("token: a wrong app secret (Basic)", await token(t, { grant_type: "refresh_token", refresh_token: unknownRefresh }, ["briefcase", wrongSecret]), wrongSecret, creds[1]);
     probe("token: a wrong app secret (body)", await call(`${env.site}/v1/oauth/token`, { form: { grant_type: "refresh_token", refresh_token: unknownRefresh, client_id: "briefcase", client_secret: wrongSecret }, ip: ctx.ip }), wrongSecret, creds[1]);
@@ -125,7 +125,7 @@ export const journey: Journey = {
     results.check("verifying an unknown proof token answers exactly {valid:false, expires_at:null} (nothing echoed)", verified.status === 200 && !verified.text.includes(garbageProof) && JSON.stringify(Object.entries(verified.body as object).sort()) === JSON.stringify([["expires_at", null], ["valid", false]]), verified.text.slice(0, 100));
     const unknownProofRefresh = rand("sapr_");
     probe("proof refresh with an unknown refresh token", await call(`${env.site}/v1/proofs/refresh`, { json: { proof_refresh_token: unknownProofRefresh }, basic: appCredentials("commit"), ip: ctx.ip }), unknownProofRefresh);
-    const fakeJwt = `eyJhbGciOiJFZERTQSJ9.${base64url(Buffer.from(JSON.stringify({ sub: "x", aud: "accounts" })))}.${base64url(randomBytes(64))}`;
+    const fakeJwt = `eyJhbGciOiJFZERTQSJ9.${base64url(Buffer.from(JSON.stringify({ sub: "x", aud: "silicon-accounts" })))}.${base64url(randomBytes(64))}`;
     probe("Bearer: a made-up JWT", await call(`${env.site}/v1/me`, { bearer: fakeJwt, ip: ctx.ip }), fakeJwt);
     probe("Bearer: briefcase's refresh token on /v1/me", await call(`${env.site}/v1/me`, { bearer: rotated.body.refresh_token ?? unknownRefresh, ip: ctx.ip }), rotated.body.refresh_token);
     const madeUpSession = rand("sas_");

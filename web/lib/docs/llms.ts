@@ -66,7 +66,7 @@ export function llmsIndex(origin: string): string {
     "",
     "How to read these docs: Start pages are instructions and begin with a working example; Learn pages explain why each rule exists, so you can make your own judgement; Reference pages list every endpoint, error, limit, Rust client method and CLI command. Store an account's uuid, never its c:id or si:id (those can change). Errors say exactly what went wrong: `{\"error\": {\"code\", \"message\", \"hint\"}}`, except the OAuth token, revoke and introspect endpoints, which answer RFC 6749 `error` and `error_description`.",
     "",
-    `Each page below is plain Markdown at its link (the HTML page is the same address without \`.md\`). All pages in one file: ${origin}/llms-full.txt. The accounts CLI carries offline guides too: \`accounts docs\`.`,
+    `Each page below is plain Markdown at its link (the HTML page is the same address without \`.md\`). All pages in one file: ${origin}/llms-full.txt. The silicon-accounts CLI carries offline guides too: \`silicon-accounts docs\`.`,
   ];
   for (const group of groupsOf(pages)) {
     lines.push("", `## ${group.label}`, "");

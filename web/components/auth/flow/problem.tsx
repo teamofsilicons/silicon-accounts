@@ -55,7 +55,7 @@ export function Problem({ title, message, hint, error, details, actions, app }: 
   if (error?.requestId && error.requestId !== "mock") rows.push(["request", error.requestId]);
   const frameApp = app ?? SILICON_ACCOUNTS;
   return (
-    <HostedFrame app={frameApp} site={!app || app.app_id === "accounts"} title={title}>
+    <HostedFrame app={frameApp} site={!app || app.app_id === "silicon-accounts"} title={title}>
       <div className={styles.problem} data-problem={error?.code ?? "problem"} role="alert">
         <StepHeading title={title} description={message} noFocus />
         {hint && !forDevelopers ? <p className={styles.description}>{hint}</p> : null}

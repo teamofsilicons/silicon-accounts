@@ -83,7 +83,7 @@ impl CliError {
     pub fn io(action: &str, path: &Path, err: &std::io::Error) -> Self {
         let hint = match err.kind() {
             std::io::ErrorKind::PermissionDenied => format!(
-                "Check the permissions of {} (the CLI needs to read and write its files there), or choose another home with `accounts config home <dir>`.",
+                "Check the permissions of {} (the CLI needs to read and write its files there), or choose another home with `silicon-accounts config home <dir>`.",
                 path.display()
             ),
             std::io::ErrorKind::NotFound => format!("Check that {} exists.", path.display()),
@@ -310,7 +310,7 @@ mod tests {
     use super::*;
 
     fn command() -> Command {
-        Command::new("accounts")
+        Command::new("silicon-accounts")
             .subcommand(
                 Command::new("app_verification")
                     .arg(
@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn json_argument_errors_name_the_missing_argument() {
         let err = command()
-            .try_get_matches_from(["accounts", "app_verification", "--scope", "x"])
+            .try_get_matches_from(["silicon-accounts", "app_verification", "--scope", "x"])
             .unwrap_err();
         let cli = CliError::from(&err);
         assert_eq!(cli.code, "invalid_arguments");
@@ -343,7 +343,7 @@ mod tests {
         );
         let hint = cli.hint.clone().unwrap_or_default();
         assert!(
-            hint.contains("Usage: accounts app_verification --to <APP_ID>"),
+            hint.contains("Usage: silicon-accounts app_verification --to <APP_ID>"),
             "{hint}"
         );
         let details = cli.details.clone().unwrap_or_default();
@@ -352,7 +352,7 @@ mod tests {
 
         // Several missing arguments are all named.
         let err = command()
-            .try_get_matches_from(["accounts", "app_verification"])
+            .try_get_matches_from(["silicon-accounts", "app_verification"])
             .unwrap_err();
         let cli = CliError::from(&err);
         assert_eq!(
@@ -362,7 +362,7 @@ mod tests {
 
         // An unknown subcommand keeps its tip.
         let err = command()
-            .try_get_matches_from(["accounts", "webhook", "deliveries"])
+            .try_get_matches_from(["silicon-accounts", "webhook", "deliveries"])
             .unwrap_err();
         let cli = CliError::from(&err);
         assert_eq!(cli.message, "unrecognized subcommand 'deliveries'");

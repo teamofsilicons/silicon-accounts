@@ -96,7 +96,7 @@ impl<'a> Actor<'a> {
         .await
     }
 
-    /// Writes the same audit entry into the history of every account in `accounts` (deduplicated,
+    /// Writes the same audit entry into the history of every account in `silicon-accounts` (deduplicated,
     /// `None`s skipped).
     pub async fn record_for(
         &self,

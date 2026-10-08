@@ -177,7 +177,7 @@ impl Output {
 }
 
 /// Writes `text` and a newline to stdout, never panicking (`println!` panics when the write
-/// fails). A reader that went away (a closed pipe: `accounts help --json | head -1`, or a
+/// fails). A reader that went away (a closed pipe: `silicon-accounts help --json | head -1`, or a
 /// consumer that exits early) is not the command's failure: the rest of the output is dropped
 /// quietly and the command keeps its own exit code. Any other write error (a full disk, a closed
 /// descriptor) is reported on stderr and returns false so the command can exit non-zero.

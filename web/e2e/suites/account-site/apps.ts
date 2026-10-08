@@ -153,7 +153,7 @@ const apps: Journey = {
     // Removing again changes nothing; the site itself, the developer platform and unknown apps are refused.
     const again = await call(probe, "/v1/me/apps/briefcase", { method: "DELETE" });
     results.check("removing it again answers 204 and tells Briefcase nothing more", again.status === 204 && (await queuedEvents(env, "briefcase", uuid, "membership.access_removed")) === 1, `${again.status}`);
-    const self = await call(probe, "/v1/me/apps/accounts", { method: "DELETE" });
+    const self = await call(probe, "/v1/me/apps/silicon-accounts", { method: "DELETE" });
     results.check("Silicon Accounts itself can't lose access (400 first_party_app)", self.status === 400 && codeOf(self.body) === "first_party_app", `${self.status} ${codeOf(self.body)}`);
     const unknown = await call(probe, "/v1/me/apps/no-such-app", { method: "DELETE" });
     results.check("an app never signed into is refused (404 membership_not_found)", unknown.status === 404 && codeOf(unknown.body) === "membership_not_found", `${unknown.status} ${codeOf(unknown.body)}`);

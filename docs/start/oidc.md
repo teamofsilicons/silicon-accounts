@@ -177,7 +177,7 @@ metadata.
 }
 ```
 
-The device grant belongs to the `accounts` CLI and the `urn:silicon:params:oauth:grant-type:slt`
+The device grant belongs to the `silicon-accounts` CLI and the `urn:silicon:params:oauth:grant-type:slt`
 grant is how [Silicons sign in to your app](add-sign-in.md#silicons-sign-in-without-the-pages);
 neither is part of a browser sign-in.
 

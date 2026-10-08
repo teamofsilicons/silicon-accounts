@@ -31,9 +31,9 @@ The hosted service is available at [accounts.teamofsilicons.com](https://account
 For a local development stack, follow [Run it yourself](#run-it-yourself) and set
 `ACCOUNTS_URL=http://localhost:8590` instead.
 
-You can use the `accounts` CLI, the `silicon-accounts-client` Rust package or the HTTP API at `$ACCOUNTS_URL/v1/`. The CLI uses that same Rust package.
+You can use the `silicon-accounts` CLI, the `silicon-accounts-client` Rust package or the HTTP API at `$ACCOUNTS_URL/v1/`. The CLI uses that same Rust package.
 
-Run `accounts --help` to see the available commands, or add `--help` to a command for its options. The CLI includes guides you can read offline. `accounts docs` lists them, and `accounts docs imports` opens the import guide.
+Run `silicon-accounts --help` to see the available commands, or add `--help` to a command for its options. The CLI includes guides you can read offline. `silicon-accounts docs` lists them, and `silicon-accounts docs imports` opens the import guide.
 
 ## Start here
 
@@ -127,13 +127,13 @@ production. From a checkout of the repository:
 ```sh
 scripts/dev.sh --detach                     # builds, migrates, seeds and starts; prints every URL
 export ACCOUNTS_URL=http://localhost:8590   # the account site; it forwards /v1/* and /.well-known/*
-accounts id available si:head_of_growth     # the CLI reads ACCOUNTS_URL too (or pass --url)
+silicon-accounts id available si:head_of_growth     # the CLI reads ACCOUNTS_URL too (or pass --url)
 scripts/stop.sh                             # stops the stack; Postgres keeps running (--db stops it)
 ```
 
 It needs Rust 1.98, Node 24 or later with pnpm, and Postgres 16 (`PG_BIN` names the directory
 with `pg_ctl` when it isn't Homebrew's `postgresql@16`). The stack builds the CLI as
-`target/debug/accounts`; [Use the accounts CLI](start/cli.md#install) puts it on your `PATH`.
+`target/debug/silicon-accounts`; [Use the silicon-accounts CLI](start/cli.md#install) puts it on your `PATH`.
 Email and SMS codes go to the mock sender; read them from the development outbox:
 `curl -s "$ACCOUNTS_URL/v1/dev/outbox?to=ada@example.test&limit=1"`
 ([service endpoints](reference/api/service.md#get-v1devoutbox)). `scripts/dev.sh --help` lists
@@ -154,5 +154,5 @@ every option, including the ports and database of a second stack.
   `silicon-accounts` repository. Its public home,
   [github.com/teamofsilicons/silicon-accounts](https://github.com/teamofsilicons/silicon-accounts),
   includes the service, both frontends, client, CLI and documentation.
-- Found a bug? `accounts report "what you ran, what you expected, what happened"`, with
+- Found a bug? `silicon-accounts report "what you ran, what you expected, what happened"`, with
   `--pr <link>` if you also fixed it.

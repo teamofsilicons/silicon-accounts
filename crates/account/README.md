@@ -6,7 +6,7 @@ and starts `accounts_account::spawn_background(state)` (an hourly sweep of id re
 ended over a day ago).
 
 Auth: **session** = the `sa_session` cookie (mutations need an allowed `Origin`) or
-`Authorization: Bearer <access token with aud=accounts>`. **app** = `Authorization: Basic
+`Authorization: Bearer <access token with aud=silicon-accounts>`. **app** = `Authorization: Basic
 base64(app_id:app_secret)`. Errors use the standard body `{"error":{"code","message","hint","details"}}`.
 Timestamps are RFC 3339 UTC with milliseconds. Lists are `{"items":[…],"next_cursor":…}`
 (`?limit=1..200&cursor=`).
@@ -99,19 +99,19 @@ primary that gets verified (apps see `email_verified` / `phone_verified` change)
   `identity_not_found`, 409 `last_sign_in_method` (no email or phone left to sign in with).
 - `GET /v1/me/apps?status=active|access_removed|imported&limit&cursor` → items
   `{"app":{"app_id","name","logo_url","logo_dark_url","homepage_url"},"membership_id","status","source","granted_scopes","first_signed_in_at","last_signed_in_at","access_removed_at","active_sessions"}`,
-  most recently used first; the first-party apps (`accounts`: the account site and CLI;
+  most recently used first; the first-party apps (`silicon-accounts`: the account site and CLI;
   `developer`: the developer platform) are not listed.
 - `DELETE /v1/me/apps/{app_id}` → 204: the app's token families for the account and the User verification
   proofs it issued about the account are revoked, the membership becomes `access_removed`, the
   app gets `membership.access_removed`. Repeating it does nothing (no second webhook). 404
-  `membership_not_found`, 400 `first_party_app` for `accounts` and `developer` (Silicon
+  `membership_not_found`, 400 `first_party_app` for `silicon-accounts` and `developer` (Silicon
   Accounts' own apps hold sessions, not access: the hint points to `DELETE /v1/me/sessions/{id}`).
 - `GET /v1/me/sessions?limit&cursor` → items `{"id","kind":"browser"|"cli"|"developer","label","origin","ip","user_agent","created_at","last_seen_at","expires_at","current"}`
-  (browser sessions, live `aud=accounts` token families as `cli` and live `aud=developer` ones
+  (browser sessions, live `aud=silicon-accounts` token families as `cli` and live `aud=developer` ones
   as `developer`, labelled "Silicon Developer (developers.teamofsilicons.com)"), newest first. A browser session's
   `label` describes its user agent the way sign-in history does (`sessions::describe_user_agent`):
   "Safari on macOS" for a browser (only a `Mozilla/…` or `Opera/…` agent is ever called one, "A
-  browser" when it isn't recognized), "accounts CLI 0.1.0" for the CLI
+  browser" when it isn't recognized), "silicon-accounts CLI 0.1.0" for the CLI
   (`accounts-cli/<v> silicon-accounts-client/<v>`), "Silicon Accounts Rust package 0.1.0" for
   the package (after the program's own product when it names one: "dm 2.0 (Silicon Accounts Rust
   package 0.1.0)"), any other program by its product ("curl 8.4.0"), else "An unknown client".

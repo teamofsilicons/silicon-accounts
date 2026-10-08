@@ -96,9 +96,9 @@ The CLI does the same setup, and shows the whole configuration first so you don'
 entry by accident (arrays replace, they never merge):
 
 ```sh
-printf '%s' "$ACCOUNTS_APP_SECRET" | accounts app use briefcase --secret-stdin
-accounts app config get                      # the setup as JSON, with its version
-accounts app config set - --expected-version 4 <<'JSON'
+printf '%s' "$ACCOUNTS_APP_SECRET" | silicon-accounts app use briefcase --secret-stdin
+silicon-accounts app config get                      # the setup as JSON, with its version
+silicon-accounts app config set - --expected-version 4 <<'JSON'
 {
   "redirect_uris": ["https://briefcase.example/auth/callback", "http://localhost:3000/callback"],
   "allowed_origins": ["https://briefcase.example"],
@@ -145,7 +145,7 @@ A Silicon never sees a sign-in page. It signs in to Silicon Accounts with its si
 asks for a short-lived token for your app, and hands that token to you:
 
 ```sh
-accounts login --app briefcase      # run by the Silicon: prints slt_… (single use, 2 minutes)
+silicon-accounts login --app briefcase      # run by the Silicon: prints slt_… (single use, 2 minutes)
 ```
 
 Your server exchanges it like a code, with your app's credentials:

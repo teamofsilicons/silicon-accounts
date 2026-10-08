@@ -17,8 +17,8 @@ Your sign-in pages can use your app’s colours, fonts and logo. You can also ch
 These settings apply throughout sign-in: the opening page, email and phone codes, account setup, required details, the sharing screen and the buttons in an iframe or snippet. Branding is saved as part of your [sign-in setup](sign-in-config.md), and every change gets a version number.
 
 ```sh
-printf '%s' "$APP_SECRET" | accounts app use waveform --secret-stdin
-accounts app config set branding.json --expected-version 8
+printf '%s' "$APP_SECRET" | silicon-accounts app use waveform --secret-stdin
+silicon-accounts app config set branding.json --expected-version 8
 ```
 
 with `branding.json`:

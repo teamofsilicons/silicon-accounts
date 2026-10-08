@@ -1,4 +1,4 @@
-//! `accounts login`, `accounts login status`, `accounts logout`.
+//! `silicon-accounts login`, `silicon-accounts login status`, `silicon-accounts logout`.
 
 use serde_json::{Value, json};
 use silicon_accounts_client::{
@@ -58,18 +58,18 @@ fn next_after_login(outcome: Outcome, kind: AccountKind) -> Outcome {
     match kind {
         AccountKind::Silicon => outcome
             .next(
-                "accounts login --app <app_id>",
+                "silicon-accounts login --app <app_id>",
                 "get a short-lived token to sign into an app",
             )
-            .next("accounts whoami", "see your account and custodian"),
+            .next("silicon-accounts whoami", "see your account and custodian"),
         AccountKind::Carbon => outcome
-            .next("accounts whoami", "see your account")
+            .next("silicon-accounts whoami", "see your account")
             .next(
-                "accounts silicon create --id si:<name>",
+                "silicon-accounts silicon create --id si:<name>",
                 "create a Silicon you are custodian of",
             )
             .next(
-                "accounts custodian requests",
+                "silicon-accounts custodian requests",
                 "requests from Silicons that named you",
             ),
     }
@@ -99,7 +99,7 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
     if args.code.is_some() && !code_mode {
         return Err(CliError::invalid(
             "--code finishes a code sign-in, but no --email, --phone or --challenge was given.",
-            "Run `accounts login --email you@example.com` to send a code, then `accounts login --email you@example.com --code <code>`.",
+            "Run `silicon-accounts login --email you@example.com` to send a code, then `silicon-accounts login --email you@example.com --code <code>`.",
         ));
     }
     if args.no_browser && (silicon.is_some() || code_mode) {
@@ -109,7 +109,7 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
     }
 
     // Already signed in as the requested account: reuse the session, but only once the service
-    // confirmed it is still alive. A session revoked elsewhere (`accounts sessions revoke`, an STK
+    // confirmed it is still alive. A session revoked elsewhere (`silicon-accounts sessions revoke`, an STK
     // rotation, a sign-out on another machine) is not "signed in": it falls through to a real
     // sign-in with the credentials given (or the browser or code flow).
     let explicit = silicon.is_some() || code_mode;
@@ -198,7 +198,7 @@ async fn reuse_session(ctx: &Ctx, app: Option<&str>) -> CliResult<Outcome> {
                     stored.as_ref().map_or("this account", StoredSession::who),
                     err.message
                 ),
-                "Sign in again with `accounts login`.",
+                "Sign in again with `silicon-accounts login`.",
             ));
         }
         Err(err) => return Err(err),
@@ -210,7 +210,7 @@ async fn reuse_session(ctx: &Ctx, app: Option<&str>) -> CliResult<Outcome> {
         ctx.save_session(&session)?;
     }
     let text = format!(
-        "Already signed in as {} ({}); the session is active. Use `accounts login --force` to sign in again, or `accounts logout` first.",
+        "Already signed in as {} ({}); the session is active. Use `silicon-accounts login --force` to sign in again, or `silicon-accounts logout` first.",
         session.who(),
         session.kind.title()
     );
@@ -226,7 +226,7 @@ async fn retire_previous(ctx: &Ctx, previous: &StoredSession, current: &StoredSe
     };
     if previous.url != current.url {
         ctx.out.notice(&format!(
-            "Replaced your session at {} ({}); it stays valid there until it is revoked from `accounts sessions list`.",
+            "Replaced your session at {} ({}); it stays valid there until it is revoked from `silicon-accounts sessions list`.",
             previous.url,
             previous.who()
         ));
@@ -235,7 +235,7 @@ async fn retire_previous(ctx: &Ctx, previous: &StoredSession, current: &StoredSe
     if let Ok(client) = ctx.client() {
         if client.revoke_first_party(refresh).await.is_err() {
             ctx.out.warn(&format!(
-                "Could not revoke your previous session as {}; revoke it with `accounts sessions list` / `accounts sessions revoke`.",
+                "Could not revoke your previous session as {}; revoke it with `silicon-accounts sessions list` / `silicon-accounts sessions revoke`.",
                 previous.who()
             ));
         } else if previous.account.uuid != current.account.uuid {
@@ -257,7 +257,7 @@ async fn silicon_login(
     if !id.starts_with("si:") {
         return Err(CliError::invalid(
             format!("`{id}` is not a Silicon id: Silicon ids start with si: (e.g. si:scout)."),
-            "Carbons sign in with `accounts login` (browser) or `--email` / `--phone`.",
+            "Carbons sign in with `silicon-accounts login` (browser) or `--email` / `--phone`.",
         ));
     }
     let stk = if let Some(stk) = &args.stk {
@@ -307,7 +307,7 @@ async fn code_login(ctx: &Ctx, args: &LoginArgs, label: &str) -> CliResult<CodeL
                 return Err(CliError::invalid(
                     "--challenge needs the code too.",
                     format!(
-                        "Run `accounts login --challenge {challenge_id} --code <6-digit code>`."
+                        "Run `silicon-accounts login --challenge {challenge_id} --code <6-digit code>`."
                     ),
                 ));
             }
@@ -327,7 +327,7 @@ async fn code_login(ctx: &Ctx, args: &LoginArgs, label: &str) -> CliResult<CodeL
         (None, None) => {
             return Err(CliError::invalid(
                 "A code sign-in needs --email, --phone or --challenge.",
-                "Run `accounts login --email you@example.com`.",
+                "Run `silicon-accounts login --email you@example.com`.",
             ));
         }
     };
@@ -343,12 +343,12 @@ async fn code_login(ctx: &Ctx, args: &LoginArgs, label: &str) -> CliResult<CodeL
         let Some(saved) = saved.filter(|s| s.contact == key && s.url == url) else {
             return Err(CliError::invalid(
                 format!(
-                    "No sign-in code is waiting for {}: --code finishes a sign-in that `accounts login {flag} {}` started.",
+                    "No sign-in code is waiting for {}: --code finishes a sign-in that `silicon-accounts login {flag} {}` started.",
                     contact.value(),
                     contact.value()
                 ),
                 format!(
-                    "Run `accounts login {flag} {}` first to send a code, then rerun with --code.",
+                    "Run `silicon-accounts login {flag} {}` first to send a code, then rerun with --code.",
                     contact.value()
                 ),
             ));
@@ -398,7 +398,10 @@ async fn code_login(ctx: &Ctx, args: &LoginArgs, label: &str) -> CliResult<CodeL
         }
     }
 
-    let finish = format!("accounts login {flag} {} --code <code>", contact.value());
+    let finish = format!(
+        "silicon-accounts login {flag} {} --code <code>",
+        contact.value()
+    );
     let text = format!(
         "A 6-digit code was sent to {} (valid {}).\nFinish signing in with:\n  {finish}",
         challenge.destination,
@@ -478,7 +481,7 @@ async fn device_login(ctx: &Ctx, args: &LoginArgs, label: &str) -> CliResult<Tok
                 EXIT_INTERRUPTED,
                 "interrupted",
                 format!("Stopped waiting for approval of code {}.", device.user_code),
-                "Run `accounts login` again to get a new code.",
+                "Run `silicon-accounts login` again to get a new code.",
             ));
         }
     };
@@ -510,9 +513,12 @@ async fn status(ctx: &Ctx, args: &LoginStatusArgs) -> CliResult<Outcome> {
     let (url, _) = ctx.url()?;
     let not_signed_in = |json: Value, text: String| {
         Outcome::new(json, text)
-            .next("accounts login", "sign in as a Carbon (browser code)")
             .next(
-                "accounts login --silicon si:<id> --stk-stdin",
+                "silicon-accounts login",
+                "sign in as a Carbon (browser code)",
+            )
+            .next(
+                "silicon-accounts login --silicon si:<id> --stk-stdin",
                 "sign in as a Silicon",
             )
             .exit(1)
@@ -563,7 +569,10 @@ async fn status(ctx: &Ctx, args: &LoginStatusArgs) -> CliResult<Outcome> {
         }
         Err(err) if err.code == "session_ended" => Ok(not_signed_in(
             json!({ "authenticated": false, "reason": "session_ended", "message": err.message }),
-            format!("{} Sign in again with `accounts login`.", err.message),
+            format!(
+                "{} Sign in again with `silicon-accounts login`.",
+                err.message
+            ),
         )),
         Err(err) if err.transport => {
             ctx.out.warn(&format!(
@@ -589,7 +598,10 @@ pub async fn logout(ctx: &Ctx) -> CliResult<Outcome> {
     if let Some(refresh) = stored.refresh_token.as_deref() {
         let client = AccountsClient::builder()
             .base_url(&stored.url)
-            .user_agent(format!("accounts-cli/{}", env!("CARGO_PKG_VERSION")))
+            .user_agent(format!(
+                "silicon-accounts-cli/{}",
+                env!("CARGO_PKG_VERSION")
+            ))
             .telemetry(ctx.telemetry_setting().0)
             .allow_insecure_http(true)
             .build();
@@ -597,7 +609,7 @@ pub async fn logout(ctx: &Ctx) -> CliResult<Outcome> {
             Ok(client) => match client.revoke_first_party(refresh).await {
                 Ok(()) => revoked = true,
                 Err(err) => ctx.out.warn(&format!(
-                    "Could not revoke the session at {}: {} The local session is deleted anyway; revoke it later from `accounts sessions list` on another device.",
+                    "Could not revoke the session at {}: {} The local session is deleted anyway; revoke it later from `silicon-accounts sessions list` on another device.",
                     stored.url,
                     err.message()
                 )),
@@ -611,5 +623,5 @@ pub async fn logout(ctx: &Ctx) -> CliResult<Outcome> {
         json!({ "signed_out": true, "id": stored.account.id, "uuid": stored.account.uuid, "revoked": revoked }),
         text,
     )
-    .next("accounts login", "sign in again"))
+    .next("silicon-accounts login", "sign in again"))
 }

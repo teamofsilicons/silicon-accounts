@@ -292,7 +292,14 @@ async fn a_new_flow_resumes_a_verified_sign_up_in_the_same_browser() {
 async fn the_first_party_app_completes_without_consent_or_membership() {
     let ctx = TestContext::new().await;
     let mut b = Browser::new(&ctx);
-    let flow = email_signup(&ctx, &mut b, "accounts", &random_email("site"), json!({})).await;
+    let flow = email_signup(
+        &ctx,
+        &mut b,
+        "silicon-accounts",
+        &random_email("site"),
+        json!({}),
+    )
+    .await;
     assert_eq!(flow["step"], "complete", "{flow}");
     let to = flow["redirect_to"].as_str().expect("redirect");
     assert!(

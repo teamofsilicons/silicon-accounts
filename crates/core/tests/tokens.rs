@@ -93,7 +93,7 @@ async fn access_tokens_verify_audience_family_and_account() {
     assert_eq!(v.claims.mid, format!("{}:{}", app.app_id, c.uuid));
     assert_eq!(v.claims.id, c.handle.clone().expect("handle"));
 
-    let err = tokens::verify_access_token(&mut conn, k, &t.access_token, Some("accounts"))
+    let err = tokens::verify_access_token(&mut conn, k, &t.access_token, Some("silicon-accounts"))
         .await
         .expect_err("audience");
     assert_eq!(err.code, "token_wrong_audience");
@@ -445,7 +445,7 @@ async fn device_flow_states() {
     let c = ctx.carbon().await;
     let pepper = &ctx.state.keys.pepper;
     let mut conn = ctx.conn().await;
-    let start = tokens::create_device(&mut conn, pepper, Some("accounts CLI on mac"))
+    let start = tokens::create_device(&mut conn, pepper, Some("silicon-accounts CLI on mac"))
         .await
         .expect("start");
     assert!(start.device_code.starts_with("sad_"));
@@ -463,7 +463,10 @@ async fn device_flow_states() {
         tokens::device_by_user_code(&mut conn, &start.user_code.to_lowercase().replace('-', ""))
             .await
             .expect("lookup");
-    assert_eq!(d.client_label.as_deref(), Some("accounts CLI on mac"));
+    assert_eq!(
+        d.client_label.as_deref(),
+        Some("silicon-accounts CLI on mac")
+    );
     tokens::decide_device(&mut conn, &start.user_code, &c.uuid, true)
         .await
         .expect("approve");

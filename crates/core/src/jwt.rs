@@ -69,7 +69,7 @@ pub struct AccessClaims {
     pub iss: String,
     /// Account uuid.
     pub sub: String,
-    /// app_id (`accounts` for first-party tokens).
+    /// app_id (`silicon-accounts` for first-party tokens).
     pub aud: String,
     pub exp: i64,
     pub iat: i64,
@@ -311,7 +311,18 @@ impl JwtKeys {
         token: &str,
         audience: Option<&str>,
     ) -> Result<AccessClaims, JwtError> {
-        self.verify(token, audience)
+        let mut claims: AccessClaims = self.verify(token, None)?;
+        canonicalize_first_party_claims(&mut claims);
+        if let Some(expected) = audience {
+            let expected = crate::canonical_first_party_app_id(expected);
+            if claims.aud != expected {
+                return Err(JwtError::WrongAudience {
+                    expected: expected.to_string(),
+                    got: claims.aud,
+                });
+            }
+        }
+        Ok(claims)
     }
 
     /// Verifies an access token's signature, `kid` and issuer, but **not** its expiry, `nbf` or
@@ -349,13 +360,23 @@ impl JwtKeys {
                 got: iss.to_string(),
             });
         }
-        serde_json::from_value(claims)
-            .map_err(|e| JwtError::Malformed(format!("unexpected claims: {e}")))
+        let mut claims: AccessClaims = serde_json::from_value(claims)
+            .map_err(|e| JwtError::Malformed(format!("unexpected claims: {e}")))?;
+        canonicalize_first_party_claims(&mut claims);
+        Ok(claims)
     }
 
     /// Signs an id_token (the caller fills `iss`, `aud`, times and contact claims).
     pub fn sign_id_token(&self, claims: &IdTokenClaims) -> Result<String, JwtError> {
         self.sign(claims)
+    }
+}
+
+// Called only after signature, issuer and relevant time checks have passed.
+fn canonicalize_first_party_claims(claims: &mut AccessClaims) {
+    if claims.aud == "accounts" {
+        claims.aud = crate::FIRST_PARTY_APP_ID.to_string();
+        claims.mid = crate::ids::membership_id(crate::FIRST_PARTY_APP_ID, &claims.sub);
     }
 }
 
@@ -406,9 +427,9 @@ mod tests {
         assert_eq!(back.family_id(), Some(fid));
         assert_eq!(back.exp - back.iat, 1800);
         assert_eq!(
-            k.verify_access(&jwt, Some("accounts")),
+            k.verify_access(&jwt, Some("silicon-accounts")),
             Err(JwtError::WrongAudience {
-                expected: "accounts".into(),
+                expected: "silicon-accounts".into(),
                 got: "briefcase".into()
             })
         );

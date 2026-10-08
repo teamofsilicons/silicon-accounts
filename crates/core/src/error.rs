@@ -166,7 +166,7 @@ impl ApiError {
             "internal",
             "Silicon Accounts failed while handling this request; this is a fault on our side, not in your input.",
         )
-        .hint("Retry in a moment. If it keeps failing, report it with `accounts report \"<what you did>\"` and include details.request_id.")
+        .hint("Retry in a moment. If it keeps failing, report it with `silicon-accounts report \"<what you did>\"` and include details.request_id.")
     }
 
     /// True for 5xx.

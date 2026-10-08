@@ -1,5 +1,5 @@
 /**
- * Token confusion. Three audiences act for a Carbon: `accounts` (the account site's own tokens: the CLI, Silicons,
+ * Token confusion. Three audiences act for a Carbon: `silicon-accounts` (the account site's own tokens: the CLI, Silicons,
  * the device flow) works everywhere an account acts; `developer` (developers.teamofsilicons.com's tokens) only reads
  * the account (GET /v1/me, /v1/session, /v1/me/owned-apps) and manages the apps the Carbon owns (/v1/apps/{app_id}/…),
  * and is refused with 401 `token_wrong_audience` everywhere else (it can never mint an SLT, approve a device code, touch
@@ -113,7 +113,7 @@ export const journey: Journey = {
     const jwks = await call<{ keys: Array<{ kid: string; x: string }> }>(`${env.site}/.well-known/jwks.json`);
     const kid = jwks.body.keys[0]?.kid ?? "dev-1";
     const now = Math.floor(Date.now() / 1000);
-    const forgedClaims = { iss: env.site, sub: carbon.uuid, aud: "accounts", exp: now + 900, iat: now, nbf: now, jti: randomUUID(), kind: "carbon", id: carbon.id, mid: `accounts:${carbon.uuid}`, fid: randomUUID(), scope: "profile" };
+    const forgedClaims = { iss: env.site, sub: carbon.uuid, aud: "silicon-accounts", exp: now + 900, iat: now, nbf: now, jti: randomUUID(), kind: "carbon", id: carbon.id, mid: `accounts:${carbon.uuid}`, fid: randomUUID(), scope: "profile" };
     const none = `${b64json({ alg: "none", typ: "JWT", kid })}.${b64json(forgedClaims)}.`;
     const noneDeveloper = `${b64json({ alg: "none", typ: "JWT", kid })}.${b64json({ ...forgedClaims, aud: "developer", mid: `developer:${carbon.uuid}` })}.`;
     const hsHeader = `${b64json({ alg: "HS256", typ: "JWT", kid })}.${b64json(forgedClaims)}`;
@@ -123,7 +123,7 @@ export const journey: Journey = {
     const edHeader = `${b64json({ alg: "EdDSA", typ: "JWT", kid })}.${b64json(forgedClaims)}`;
     const foreignKey = `${edHeader}.${base64url(sign(null, Buffer.from(edHeader), privateKey))}`;
     const [h, , s] = bc.access_token.split(".");
-    const audSwapped = `${h}.${b64json({ ...claims, aud: "accounts" })}.${s}`;
+    const audSwapped = `${h}.${b64json({ ...claims, aud: "silicon-accounts" })}.${s}`;
     const audDeveloper = `${h}.${b64json({ ...claims, aud: "developer" })}.${s}`;
     const subSwapped = `${h}.${b64json({ ...claims, sub: "AAA" })}.${s}`;
     // Tokens that bring their own key: the header names the attacker's key (embedded jwk, a jku URL) or a kid that
@@ -195,7 +195,7 @@ export const journey: Journey = {
       if (!exactly(reply, { active: false })) leaks.push(`${app} on ${label}: ${reply.status} ${reply.text.slice(0, 120)}`);
     }
     results.check(`another app's tokens introspect as exactly {"active":false} (${crossIntrospection.length} cases: access, refresh, id_token, first-party and developer-platform access/refresh, proof, unknown)`, leaks.length === 0, leaks.join(" | ") || "all exactly {active:false}");
-    const publicClient = await call<{ error?: string }>(`${env.site}/v1/oauth/introspect`, { form: { token: bc.access_token, client_id: "accounts" }, ip: ctx.ip });
+    const publicClient = await call<{ error?: string }>(`${env.site}/v1/oauth/introspect`, { form: { token: bc.access_token, client_id: "silicon-accounts" }, ip: ctx.ip });
     const developerClient = await call<{ error?: string }>(`${env.site}/v1/oauth/introspect`, { form: { token: dev.access_token, client_id: "developer" }, ip: ctx.ip });
     const wrongSecret = `sa_app_briefcase_${"W".repeat(40)}`;
     const badSecret = await introspect("briefcase", bc.access_token, ["briefcase", wrongSecret]);
@@ -269,7 +269,7 @@ export const journey: Journey = {
     }
     const sample = await asDeveloper("GET", "/v1/me/silicons");
     results.check(`a developer-platform token is refused with 401 token_wrong_audience on ${refusedRoutes.length} other routes (the account's details, id, deletion, Silicons and their STKs, apps signed into, sessions, emails, phones, identities, proofs, history, custodian requests, short-lived tokens, device approval, sign-out, its webhook, account lookups)`, escaped.length === 0, escaped.join(" | ") || `${errorOf(sample).message} | hint: ${errorOf(sample).hint ?? ""}`.slice(0, 400));
-    const poll = await publicToken(t, "accounts", { grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: device.body.device_code ?? "" });
+    const poll = await publicToken(t, "silicon-accounts", { grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: device.body.device_code ?? "" });
     const meAfter = await call<{ display_name?: string; status?: string }>(`${env.site}/v1/me`, { jar: carbon.jar, ip: ctx.ip });
     results.check("…so a stolen developer-platform token can't be turned into an accounts token (the device code it tried to approve still polls authorization_pending) and changed nothing on the account", poll.status === 400 && poll.body.error === "authorization_pending" && meAfter.body.display_name !== "Developer was here" && meAfter.body.status === "active", `poll ${poll.status} ${poll.body.error}; account ${meAfter.body.status}, name ${meAfter.body.display_name}`);
     const notOwned: Array<[string, string, unknown]> = [
@@ -322,7 +322,7 @@ export const journey: Journey = {
     const cliDetails = await call(`${env.site}/v1/apps/briefcase`, { bearer: saketCli.access_token, ip: ctx.ip });
     const cliSilicons = await call(`${env.site}/v1/me/silicons`, { bearer: saketCli.access_token, ip: ctx.ip });
     const cliDm = await call(`${env.site}/v1/apps/dm`, { bearer: saketCli.access_token, ip: ctx.ip });
-    results.check("an accounts token (aud=accounts, from the device flow) works on the owner's routes (briefcase's details) and on account routes (/v1/me/silicons), and is still refused on another Carbon's app (403)", jwtClaims(saketCli.access_token).aud === "accounts" && cliDetails.status === 200 && cliSilicons.status === 200 && cliDm.status === 403, `aud ${jwtClaims(saketCli.access_token).aud}; briefcase ${cliDetails.status}; silicons ${cliSilicons.status}; dm ${brief(cliDm)}`);
+    results.check("an accounts token (aud=silicon-accounts, from the device flow) works on the owner's routes (briefcase's details) and on account routes (/v1/me/silicons), and is still refused on another Carbon's app (403)", jwtClaims(saketCli.access_token).aud === "silicon-accounts" && cliDetails.status === 200 && cliSilicons.status === 200 && cliDm.status === 403, `aud ${jwtClaims(saketCli.access_token).aud}; briefcase ${cliDetails.status}; silicons ${cliSilicons.status}; dm ${brief(cliDm)}`);
     const developerUserinfo = await call<Record<string, unknown>>(`${env.site}/v1/userinfo`, { bearer: dev.access_token, ip: ctx.ip });
     results.check("(note) /v1/userinfo with a developer-platform token", true, `${developerUserinfo.status} keys ${Object.keys(developerUserinfo.body ?? {}).join(",")}`);
 
@@ -368,7 +368,7 @@ export const journey: Journey = {
     const wrongVerifier = await devCode("S256");
     const wrongExchange = await publicToken(t, "developer", { grant_type: "authorization_code", code: wrongVerifier.code, redirect_uri: developerCallback(env), code_verifier: pkcePair().verifier });
     const byAccounts = await devCode("S256");
-    const accountsExchange = await publicToken(t, "accounts", { grant_type: "authorization_code", code: byAccounts.code, redirect_uri: developerCallback(env), code_verifier: byAccounts.verifier });
+    const accountsExchange = await publicToken(t, "silicon-accounts", { grant_type: "authorization_code", code: byAccounts.code, redirect_uri: developerCallback(env), code_verifier: byAccounts.verifier });
     const byBriefcase = await devCode("S256");
     const briefcaseExchange = await token(t, { grant_type: "authorization_code", code: byBriefcase.code, redirect_uri: developerCallback(env), code_verifier: byBriefcase.verifier }, appCredentials("briefcase"));
     const devExchanges = [
@@ -432,7 +432,7 @@ export const journey: Journey = {
 
     // 9. Sign-out kills the first-party access token at once (its sign-in is checked on every request), and the same
     //    for the developer platform's sign-out (its access token dies with the revoked refresh token).
-    const out = await call(`${env.site}/v1/oauth/revoke`, { form: { token: firstParty.body.refresh_token, client_id: "accounts" }, ip: ctx.ip });
+    const out = await call(`${env.site}/v1/oauth/revoke`, { form: { token: firstParty.body.refresh_token, client_id: "silicon-accounts" }, ip: ctx.ip });
     const after = await call(`${env.site}/v1/me`, { bearer: firstParty.body.access_token, ip: ctx.ip });
     results.check("after the Silicon signs out (revoking its first-party refresh token) its still-unexpired access token is refused at once (401 token_revoked)", out.status === 200 && after.status === 401 && errorOf(after).code === "token_revoked", `${out.status} ${out.text.slice(0, 60)} / ${brief(after)}`);
     const devOut = await call<{ revoked?: boolean }>(`${env.site}/v1/oauth/revoke`, { form: { token: saketDev.refresh_token, client_id: "developer" }, ip: ctx.ip });

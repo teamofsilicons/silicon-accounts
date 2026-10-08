@@ -234,7 +234,7 @@ export async function newCarbon(ctx: Ctx, label: string, options: { email?: stri
   const visitor = options.visitor ?? new Visitor(ctx.env);
   const t = uid();
   const email = options.email ?? `wh.${label}+${t}@example.test`;
-  const created = must("create the account site's flow", await visitor.call<{ flow: FlowView }>("POST", "/v1/flows", { json: { app_id: "accounts", redirect_uri: `${ctx.env.site}/`, state: b64url(randomBytes(12)), timezone: "Asia/Kolkata" } }));
+  const created = must("create the account site's flow", await visitor.call<{ flow: FlowView }>("POST", "/v1/flows", { json: { app_id: "silicon-accounts", redirect_uri: `${ctx.env.site}/`, state: b64url(randomBytes(12)), timezone: "Asia/Kolkata" } }));
   const flowId = created.body.flow.id;
   const after = await lastSeq(ctx.env);
   await flowStep(visitor, "send the sign-up code", `/v1/flows/${flowId}/email`, { email });
@@ -252,7 +252,7 @@ export async function newCarbon(ctx: Ctx, label: string, options: { email?: stri
 /** An existing Carbon signs in on the account site with an email code (e.g. a fake app's seeded owner). */
 export async function signInCarbon(ctx: Ctx, email: string): Promise<Visitor> {
   const visitor = new Visitor(ctx.env);
-  const created = must("create the account site's flow", await visitor.call<{ flow: FlowView }>("POST", "/v1/flows", { json: { app_id: "accounts", redirect_uri: `${ctx.env.site}/`, state: b64url(randomBytes(12)), timezone: "Asia/Kolkata" } }));
+  const created = must("create the account site's flow", await visitor.call<{ flow: FlowView }>("POST", "/v1/flows", { json: { app_id: "silicon-accounts", redirect_uri: `${ctx.env.site}/`, state: b64url(randomBytes(12)), timezone: "Asia/Kolkata" } }));
   const after = await lastSeq(ctx.env);
   await flowStep(visitor, "send the sign-in code", `/v1/flows/${created.body.flow.id}/email`, { email });
   const code = await codeFor(ctx.env, email, after);
@@ -449,7 +449,7 @@ export async function createSilicon(custodian: Carbon, label: string, options: {
   return { uuid: created.silicon.uuid, id: created.silicon.id, stk: created.stk, webhookSecret: created.webhook_secret };
 }
 
-/** A Silicon signs in with its si:id and STK: a first-party access token (aud=accounts). */
+/** A Silicon signs in with its si:id and STK: a first-party access token (aud=silicon-accounts). */
 export async function siliconLogin(env: Env, id: string, stk: string): Promise<string> {
   return must(`${id} signs in`, await publicCall<{ access_token: string }>(env, "POST", "/v1/silicons/login", { json: { id, stk, client_label: "webhooks suite" }, ip: randomIp() }), 200).body.access_token;
 }

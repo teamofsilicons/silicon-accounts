@@ -8,7 +8,7 @@ interface DeviceStart {
   event: Json | null;
 }
 
-/** Starts `accounts login --no-browser --json` and waits for its device_code event (stderr). */
+/** Starts `silicon-accounts login --no-browser --json` and waits for its device_code event (stderr). */
 async function startDeviceLogin(env: Parameters<typeof accounts>[0], home: string, label: string): Promise<DeviceStart> {
   const state: DeviceStart = { run: Promise.resolve({} as Run), event: null };
   state.run = accounts(env, ["login", "--no-browser", "--json", "--label", label], {
@@ -26,7 +26,7 @@ const heading = async (page: Page) => (await page.locator("main").innerText().ca
 
 export const journey: Journey = {
   name: "silicons-cli-device-flow",
-  title: "`accounts login` (device flow) approved in the browser: the terminal shows a code and link, the site shows the request with its label, approving signs the CLI in as that Carbon; deny, a used code, typing the code by hand, approving from another CLI, and an expired code",
+  title: "`silicon-accounts login` (device flow) approved in the browser: the terminal shows a code and link, the site shows the request with its label, approving signs the CLI in as that Carbon; deny, a used code, typing the code by hand, approving from another CLI, and an expired code",
   async run(ctx) {
     const { env, results, browser } = ctx;
     await forgetRateLimits(env, "127.0.0.1");
@@ -62,7 +62,7 @@ export const journey: Journey = {
     await shot(env, page, "scli-device-02-approved");
     results.check("the page says the terminal is signed in, as whom", (await heading(page)).includes("Your terminal is signed in") && (await heading(page)).includes(carbon.id));
     const status = await accounts(env, ["login", "status", "--json"], { home });
-    results.check("`accounts login status --json`: authenticated as the Carbon", status.code === 0 && status.json?.id === carbon.id, said(status));
+    results.check("`silicon-accounts login status --json`: authenticated as the Carbon", status.code === 0 && status.json?.id === carbon.id, said(status));
     const sessions = await accounts(env, ["sessions", "list", "--json"], { home });
     const mine = ((sessions.json?.items ?? []) as Json[]).find(item => item.current === true);
     results.check("its session carries the terminal's label and how it signed in (device)", mine?.label === label && mine.origin === "device", short(mine));
@@ -98,15 +98,15 @@ export const journey: Journey = {
     const typedIn = await typed.run;
     results.check("typing the code (lower case, no dash) on /device and approving signs that terminal in", typedIn.code === 0 && typedIn.json?.id === carbon.id, said(typedIn));
 
-    // 4. Approved from another terminal (`accounts device approve`).
+    // 4. Approved from another terminal (`silicon-accounts device approve`).
     const homeOther = freshDir();
     const other = await startDeviceLogin(env, homeOther, `${label} (cli)`);
     const otherCode = str(other.event?.user_code);
     const shown = await accounts(env, ["device", "show", otherCode, "--json"], { home });
-    results.check("`accounts device show <code>` (signed in as the Carbon): pending, with its label", shown.code === 0 && shown.json?.status === "pending" && shown.json?.client_label === `${label} (cli)`, said(shown));
+    results.check("`silicon-accounts device show <code>` (signed in as the Carbon): pending, with its label", shown.code === 0 && shown.json?.status === "pending" && shown.json?.client_label === `${label} (cli)`, said(shown));
     const approved = await accounts(env, ["device", "approve", otherCode, "--json"], { home });
     const otherIn = await other.run;
-    results.check("`accounts device approve <code>` signs the other terminal in as the Carbon", approved.code === 0 && otherIn.code === 0 && otherIn.json?.id === carbon.id, `${said(approved)} | ${said(otherIn)}`);
+    results.check("`silicon-accounts device approve <code>` signs the other terminal in as the Carbon", approved.code === 0 && otherIn.code === 0 && otherIn.json?.id === carbon.id, `${said(approved)} | ${said(otherIn)}`);
 
     // 5. A code nobody approves expires (time travel).
     const homeLate = freshDir();
@@ -125,9 +125,9 @@ export const journey: Journey = {
     // 6. The Carbon's history: every decision, with the terminal's label, and the sign-ins it led to.
     const security = ((obj((await asCarbon<Json>(env, carbon, "GET", "/v1/me/history?kind=security&limit=100")).body).items ?? []) as Json[]).map(item => `${str(item.title)} | ${str(item.detail)}`);
     const expected = [`Approved a terminal sign-in | ${label}`, `Denied a terminal sign-in | ${label} (deny)`, `Approved a terminal sign-in | ${label} (typed)`, `Approved a terminal sign-in | ${label} (cli)`];
-    results.check("the history lists each approval and denial (site and `accounts device approve`) with the terminal's label", expected.every(entry => security.includes(entry)), short(security.filter(entry => entry.includes("terminal sign-in"))));
+    results.check("the history lists each approval and denial (site and `silicon-accounts device approve`) with the terminal's label", expected.every(entry => security.includes(entry)), short(security.filter(entry => entry.includes("terminal sign-in"))));
     const signins = ((obj((await asCarbon<Json>(env, carbon, "GET", "/v1/me/history?kind=signin&limit=100")).body).items ?? []) as Json[]).filter(item => obj(item.meta).method === "device");
-    results.check("…and the three device sign-ins, from the accounts CLI", signins.length === 3 && signins.every(item => item.title === "Signed in to Silicon Accounts with the accounts CLI (device code)" && /· accounts CLI \d+\.\d+\.\d+$/.test(str(item.detail))), short(signins.map(item => [item.title, item.detail])));
+    results.check("…and the three device sign-ins, from the silicon-accounts CLI", signins.length === 3 && signins.every(item => item.title === "Signed in to Silicon Accounts with the silicon-accounts CLI (device code)" && /· silicon-accounts CLI \d+\.\d+\.\d+$/.test(str(item.detail))), short(signins.map(item => [item.title, item.detail])));
     await context.close();
   },
 };

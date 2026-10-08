@@ -222,7 +222,7 @@ async fn introspection_needs_the_apps_credentials_and_a_token() {
             router(),
             Req::post("/v1/oauth/introspect").form(&[
                 ("token", first_party.access_token.as_str()),
-                ("client_id", "accounts"),
+                ("client_id", "silicon-accounts"),
             ]),
         )
         .await;

@@ -121,7 +121,7 @@ export function AppVerificationTab() {
 
   // Apps this Carbon owns are the likely receivers; their chips render without a lookup.
   const known = useMemo<KnownApp[]>(() => (owned.data?.items ?? []).map(app => ({ app_id: app.app_id, name: app.name, logo_url: app.logo_url })), [owned.data]);
-  const suggestions = known.map(app => app.app_id).filter(id => id !== appId && id !== "accounts" && id !== "developer" && id !== receiver).slice(0, 12);
+  const suggestions = known.map(app => app.app_id).filter(id => id !== appId && id !== "silicon-accounts" && id !== "developer" && id !== receiver).slice(0, 12);
 
   const list = useProofList(appId, { kind: kind === "all" ? undefined : kind, status: status === "all" ? undefined : status });
   const proofs = useMemo(() => list.data?.pages.flatMap(page => page.items) ?? [], [list.data]);

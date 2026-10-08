@@ -1,4 +1,4 @@
-// Imports fixtures/imports/dirty.csv into legacy-crm with `accounts app import … --wait` (app
+// Imports fixtures/imports/dirty.csv into legacy-crm with `silicon-accounts app import … --wait` (app
 // credentials), compares every row with expected.json, then an imported Carbon signs into
 // legacy-crm with a code → signup prefilled (finishing_import) → membership active.
 // expected.json assumes a database where dirty.csv was never imported (scripts/journeys.sh
@@ -34,7 +34,7 @@ if (!(await accounts.idAvailable('c:ada_byron')).available) {
 section('precondition for row 40: another account owns +12025550142');
 await signUpCarbon({ accounts, messaging, phone: '+12025550142' });
 
-section('accounts app import dirty.csv --default-country US --wait');
+section('silicon-accounts app import dirty.csv --default-country US --wait');
 const before = await messaging.lastSeq();
 const imp = await cli(home, ['app', 'import', importFixturePath('dirty.csv'), '--default-country', 'US', '--wait', '--json'], { env: appEnv });
 const job = imp.json?.job ?? imp.json;

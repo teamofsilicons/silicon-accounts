@@ -8,10 +8,10 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::util::duration_arg;
 
-/// The `accounts` command line.
+/// The `silicon-accounts` command line.
 #[derive(Debug, Parser)]
 #[command(
-    name = "accounts",
+    name = "silicon-accounts",
     version,
     about = "Silicon Accounts: one account for every Carbon and Silicon, and sign-in for apps.",
     long_about = "Silicon Accounts is the account for every Carbon and Silicon, and the sign-in layer for apps. This CLI is built only on the silicon-accounts-client Rust package and can do everything that package can: sign in, manage your account and the Silicons you are custodian of, and run an app's sign-in (tokens, user base, imports, webhooks, proofs).\n\nEvery command explains itself with --help, prints machine-readable output with --json, and says exactly what went wrong and what to do next when it fails.",
@@ -33,7 +33,7 @@ pub struct GlobalArgs {
     #[arg(long, global = true, help_heading = "Global options")]
     pub json: bool,
 
-    /// Silicon Accounts URL [default: ACCOUNTS_URL, then `accounts config set url`, then https://accounts.teamofsilicons.com].
+    /// Silicon Accounts URL [default: ACCOUNTS_URL, then `silicon-accounts config set url`, then https://accounts.teamofsilicons.com].
     #[arg(
         long,
         global = true,
@@ -42,7 +42,7 @@ pub struct GlobalArgs {
     )]
     pub url: Option<String>,
 
-    /// Directory that holds .accounts/ [default: ACCOUNTS_HOME, then `accounts config home`, then SILICON_HOME, then ~].
+    /// Directory that holds .accounts/ [default: ACCOUNTS_HOME, then `silicon-accounts config home`, then SILICON_HOME, then ~].
     #[arg(
         long,
         global = true,
@@ -62,21 +62,23 @@ pub enum Commands {
     ///
     /// Carbons sign in with a browser code (device flow) or with a 6-digit code sent to their email or phone. Silicons sign in with their si:id and STK. The session is stored in {home}/.accounts/session.json (mode 0600) and refreshed automatically.
     ///
-    /// With --app, prints a short-lived token (SLT, 2 minutes, single use) for that app; if you are already signed in it is returned directly. Hand the SLT to the app, which exchanges it for your tokens. This is how Silicons sign into apps. Check the session with `accounts login status --json`.
+    /// With --app, prints a short-lived token (SLT, 2 minutes, single use) for that app; if you are already signed in it is returned directly. Hand the SLT to the app, which exchanges it for your tokens. This is how Silicons sign into apps. Check the session with `silicon-accounts login status --json`.
     #[command(after_long_help = LOGIN_EXAMPLES)]
     Login(LoginArgs),
 
     /// Sign out: revoke this CLI session and delete the stored tokens.
     ///
-    /// Other sessions (the account site, other machines) stay signed in; see `accounts sessions list` to revoke those.
-    #[command(after_long_help = "Examples:\n  accounts logout\n  accounts logout --json")]
+    /// Other sessions (the account site, other machines) stay signed in; see `silicon-accounts sessions list` to revoke those.
+    #[command(
+        after_long_help = "Examples:\n  silicon-accounts logout\n  silicon-accounts logout --json"
+    )]
     Logout,
 
     /// Show the signed-in account (uuid, id, kind, custodian…).
     ///
-    /// Calls GET /v1/me with the stored session. Use `accounts login status` for a quick check that also works offline.
+    /// Calls GET /v1/me with the stored session. Use `silicon-accounts login status` for a quick check that also works offline.
     #[command(
-        after_long_help = "Examples:\n  accounts whoami\n  accounts whoami --json | jq -r .uuid"
+        after_long_help = "Examples:\n  silicon-accounts whoami\n  silicon-accounts whoami --json | jq -r .uuid"
     )]
     Whoami,
 
@@ -84,7 +86,7 @@ pub enum Commands {
     ///
     /// The uuid never changes; the c:id or si:id can. After a change your old id stays reserved for you for 10 days (only you can take it back), and every app you signed into is notified, so apps keep working.
     #[command(
-        after_long_help = "Examples:\n  accounts id available c:saket\n  accounts id available si:head_of_growth --json\n  accounts id change c:saket_dev"
+        after_long_help = "Examples:\n  silicon-accounts id available c:saket\n  silicon-accounts id available si:head_of_growth --json\n  silicon-accounts id change c:saket_dev"
     )]
     Id(IdArgs),
 
@@ -92,7 +94,7 @@ pub enum Commands {
     ///
     /// Shows the public identity (uuid, id, kind, display name, status and a Silicon's custodian). Uses your session, or the app credentials when you are not signed in. Only current ids resolve; store uuids, not ids.
     #[command(
-        after_long_help = "Examples:\n  accounts lookup c:saket\n  accounts lookup a8K --json"
+        after_long_help = "Examples:\n  silicon-accounts lookup c:saket\n  silicon-accounts lookup a8K --json"
     )]
     Lookup(LookupArgs),
 
@@ -100,29 +102,29 @@ pub enum Commands {
     ///
     /// Apps that can see a changed field are notified with account.updated. A Silicon's date of birth is the day its account was created and can't be changed.
     #[command(
-        after_long_help = "Examples:\n  accounts profile show\n  accounts profile set --display-name \"Saket\" --timezone Asia/Kolkata\n  accounts profile set --photo ./me.png\n  accounts profile set --reset-photo"
+        after_long_help = "Examples:\n  silicon-accounts profile show\n  silicon-accounts profile set --display-name \"Saket\" --timezone Asia/Kolkata\n  silicon-accounts profile set --photo ./me.png\n  silicon-accounts profile set --reset-photo"
     )]
     Profile(ProfileArgs),
 
     /// Manage your email addresses (Carbons): list, add + verify, make primary, remove.
     ///
-    /// Up to 10 emails; any of them signs you in. Adding sends a 6-digit code (valid 10 minutes) that you confirm with `accounts email verify`. The primary email can't be removed: make another one primary first.
+    /// Up to 10 emails; any of them signs you in. Adding sends a 6-digit code (valid 10 minutes) that you confirm with `silicon-accounts email verify`. The primary email can't be removed: make another one primary first.
     #[command(
-        after_long_help = "Examples:\n  accounts email list\n  accounts email add work@example.com\n  accounts email verify 0192f0c2-… 123456\n  accounts email primary work@example.com\n  accounts email remove old@example.com"
+        after_long_help = "Examples:\n  silicon-accounts email list\n  silicon-accounts email add work@example.com\n  silicon-accounts email verify 0192f0c2-… 123456\n  silicon-accounts email primary work@example.com\n  silicon-accounts email remove old@example.com"
     )]
     Email(EmailArgs),
 
     /// Manage your phone numbers (Carbons): list, add + verify, make primary, remove.
     ///
-    /// Works exactly like `accounts email`. Numbers are stored in E.164 (+919876543210); pass --country for local formats.
+    /// Works exactly like `silicon-accounts email`. Numbers are stored in E.164 (+919876543210); pass --country for local formats.
     #[command(
-        after_long_help = "Examples:\n  accounts phone add +919876543210\n  accounts phone add 98765 43210 --country IN\n  accounts phone verify 0192f0c2-… 123456"
+        after_long_help = "Examples:\n  silicon-accounts phone add +919876543210\n  silicon-accounts phone add 98765 43210 --country IN\n  silicon-accounts phone verify 0192f0c2-… 123456"
     )]
     Phone(PhoneArgs),
 
     /// List or unlink the Google / Apple identities linked to your account.
     #[command(
-        after_long_help = "Examples:\n  accounts identities list\n  accounts identities remove google 1098765432"
+        after_long_help = "Examples:\n  silicon-accounts identities list\n  silicon-accounts identities remove google 1098765432"
     )]
     Identities(IdentitiesArgs),
 
@@ -130,26 +132,26 @@ pub enum Commands {
     ///
     /// Removing access revokes the app's tokens for you and the User verification proofs it issued about you, and tells the app (membership.access_removed).
     #[command(
-        after_long_help = "Examples:\n  accounts apps list\n  accounts apps remove briefcase"
+        after_long_help = "Examples:\n  silicon-accounts apps list\n  silicon-accounts apps remove briefcase"
     )]
     Apps(MyAppsArgs),
 
     /// User verification proofs apps issued on your behalf: list or revoke them.
     #[command(
-        after_long_help = "Examples:\n  accounts proofs list\n  accounts proofs revoke 0192f0c2-…"
+        after_long_help = "Examples:\n  silicon-accounts proofs list\n  silicon-accounts proofs revoke 0192f0c2-…"
     )]
     #[command(visible_alias = "user-verification")]
     Proofs(MyProofsArgs),
 
     /// Your browser sessions and CLI sign-ins: list or revoke them.
     #[command(
-        after_long_help = "Examples:\n  accounts sessions list\n  accounts sessions revoke 0192f0c2-…"
+        after_long_help = "Examples:\n  silicon-accounts sessions list\n  silicon-accounts sessions revoke 0192f0c2-…"
     )]
     Sessions(SessionsArgs),
 
     /// Your account history: sign-ins, id changes, custodian changes, proofs, app access.
     #[command(
-        after_long_help = "Examples:\n  accounts history\n  accounts history --kind signin --limit 20\n  accounts history --json --cursor <next_cursor>"
+        after_long_help = "Examples:\n  silicon-accounts history\n  silicon-accounts history --kind signin --limit 20\n  silicon-accounts history --json --cursor <next_cursor>"
     )]
     History(HistoryArgs),
 
@@ -161,9 +163,9 @@ pub enum Commands {
 
     /// A Silicon's own webhook: get notified about your account (custodian decisions, STK rotations, changes), and see or replay its deliveries.
     ///
-    /// Every event has an event_id (dedupe on it) and is signed with your webhook's secret. Deliveries are retried for 72 hours; failed ones can be replayed with the same event id, sent to your current URL and signed with your current secret. Your custodian can do the same with `accounts silicon webhook`.
+    /// Every event has an event_id (dedupe on it) and is signed with your webhook's secret. Deliveries are retried for 72 hours; failed ones can be replayed with the same event id, sent to your current URL and signed with your current secret. Your custodian can do the same with `silicon-accounts silicon webhook`.
     #[command(
-        after_long_help = "Examples:\n  accounts webhook set https://scout.example/hooks/accounts\n  accounts webhook test\n  accounts webhook deliveries --status failed\n  accounts webhook delivery 0192f0c2-…\n  accounts webhook replay --failed\n  accounts webhook replay 0192f0c2-… 0192f0c3-…\n  accounts webhook remove"
+        after_long_help = "Examples:\n  silicon-accounts webhook set https://scout.example/hooks/accounts\n  silicon-accounts webhook test\n  silicon-accounts webhook deliveries --status failed\n  silicon-accounts webhook delivery 0192f0c2-…\n  silicon-accounts webhook replay --failed\n  silicon-accounts webhook replay 0192f0c2-… 0192f0c3-…\n  silicon-accounts webhook remove"
     )]
     Webhook(OwnWebhookArgs),
 
@@ -171,21 +173,21 @@ pub enum Commands {
     ///
     /// Requests come from Silicons that named you as custodian, and from custodians transferring a Silicon to you. They expire after 14 days.
     #[command(
-        after_long_help = "Examples:\n  accounts custodian requests\n  accounts custodian accept 0192f0c2-…\n  accounts custodian decline 0192f0c2-…"
+        after_long_help = "Examples:\n  silicon-accounts custodian requests\n  silicon-accounts custodian accept 0192f0c2-…\n  silicon-accounts custodian decline 0192f0c2-…"
     )]
     Custodian(CustodianArgs),
 
     /// Approve or deny a CLI sign-in code shown on another machine (Carbons).
     ///
-    /// Same as approving on accounts.teamofsilicons.com/device: the other machine's `accounts login` gets signed in as you.
+    /// Same as approving on accounts.teamofsilicons.com/device: the other machine's `silicon-accounts login` gets signed in as you.
     #[command(
-        after_long_help = "Examples:\n  accounts device show WDJB-MJHT\n  accounts device approve WDJB-MJHT"
+        after_long_help = "Examples:\n  silicon-accounts device show WDJB-MJHT\n  silicon-accounts device approve WDJB-MJHT"
     )]
     Device(DeviceArgs),
 
     /// App mode: an app's sign-in setup, user base, imports, tokens, webhooks and proofs.
     ///
-    /// Acts with the app's credentials (--app-id/--app-secret, ACCOUNTS_APP_ID/ACCOUNTS_APP_SECRET, or `accounts app use <app_id> --secret-stdin`), or as the app's owner when you are signed in as the Carbon who owns it. Token calls, User verification proofs, proof verification and refresh need the app's own credentials; an owner can issue App verification proofs (the app's App verification page) and revoke the app's proofs by id. Apps are created in Silicon Apps (`accounts app new`).
+    /// Acts with the app's credentials (--app-id/--app-secret, ACCOUNTS_APP_ID/ACCOUNTS_APP_SECRET, or `silicon-accounts app use <app_id> --secret-stdin`), or as the app's owner when you are signed in as the Carbon who owns it. Token calls, User verification proofs, proof verification and refresh need the app's own credentials; an owner can issue App verification proofs (the app's App verification page) and revoke the app's proofs by id. Apps are created in Silicon Apps (`silicon-accounts app new`).
     #[command(after_long_help = APP_EXAMPLES)]
     App(AppArgs),
 
@@ -193,7 +195,7 @@ pub enum Commands {
     ///
     /// Settings live in {home}/.accounts/config.json. Highly configurable with sensible defaults: flags win over environment variables, which win over the config file.
     #[command(
-        after_long_help = "Examples:\n  accounts config get\n  accounts config home /srv/scout\n  accounts config set url http://127.0.0.1:8590\n  accounts config telemetry off"
+        after_long_help = "Examples:\n  silicon-accounts config get\n  silicon-accounts config home /srv/scout\n  silicon-accounts config set url http://127.0.0.1:8590\n  silicon-accounts config telemetry off"
     )]
     Config(ConfigArgs),
 
@@ -201,7 +203,7 @@ pub enum Commands {
     ///
     /// Every report is emailed to the maintainers. Include what you ran, what you expected and what happened (the request id from the error helps). Signed-in reports carry your account; anonymous ones are allowed.
     #[command(
-        after_long_help = "Examples:\n  accounts report \"login --app remind returns 500 (request id 0192…)\"\n  accounts report \"wrong hint for login_locked\" \\\n      --pr https://github.com/teamofsilicons/silicon-accounts/pull/42"
+        after_long_help = "Examples:\n  silicon-accounts report \"login --app remind returns 500 (request id 0192…)\"\n  silicon-accounts report \"wrong hint for login_locked\" \\\n      --pr https://github.com/teamofsilicons/silicon-accounts/pull/42"
     )]
     Report(ReportArgs),
 
@@ -209,64 +211,64 @@ pub enum Commands {
     ///
     /// Run without a topic to list them. Docs ship inside the CLI, so they always match this version.
     #[command(
-        after_long_help = "Examples:\n  accounts docs\n  accounts docs silicons\n  accounts docs proofs"
+        after_long_help = "Examples:\n  silicon-accounts docs\n  silicon-accounts docs silicons\n  silicon-accounts docs proofs"
     )]
     Docs(DocsArgs),
 
-    /// Help for a command (`accounts help silicon create`) or a docs topic (`accounts help imports`).
+    /// Help for a command (`silicon-accounts help silicon create`) or a docs topic (`silicon-accounts help imports`).
     ///
-    /// A command's help wins when a docs topic has the same name (`accounts help proofs` is the `accounts proofs` command); read that guide with `accounts docs proofs`.
+    /// A command's help wins when a docs topic has the same name (`silicon-accounts help proofs` is the `silicon-accounts proofs` command); read that guide with `silicon-accounts docs proofs`.
     Help(HelpArgs),
 
     /// Delete your account permanently (requires --confirm <your id>).
     ///
-    /// Apps you signed into are told (account.deleted), your sessions and proofs are revoked and your id is held for 10 days. A Carbon who is custodian of any Silicon must transfer them first (`accounts silicon transfer`).
-    #[command(after_long_help = "Examples:\n  accounts delete-account --confirm c:saket")]
+    /// Apps you signed into are told (account.deleted), your sessions and proofs are revoked and your id is held for 10 days. A Carbon who is custodian of any Silicon must transfer them first (`silicon-accounts silicon transfer`).
+    #[command(after_long_help = "Examples:\n  silicon-accounts delete-account --confirm c:saket")]
     DeleteAccount(DeleteAccountArgs),
 }
 
 const LOGIN_EXAMPLES: &str = "Examples:
-  accounts login                                   Carbon: browser code (device flow)
-  accounts login --no-browser                      print the code and URL only
-  accounts login --email saket@example.com         Carbon: code by email (prompts for it)
-  accounts login --email saket@example.com --code 123456
+  silicon-accounts login                                   Carbon: browser code (device flow)
+  silicon-accounts login --no-browser                      print the code and URL only
+  silicon-accounts login --email saket@example.com         Carbon: code by email (prompts for it)
+  silicon-accounts login --email saket@example.com --code 123456
                                                    finish a code sent by an earlier call
-  printf '%s' \"$STK\" | accounts login --silicon si:scout --stk-stdin
-  ACCOUNTS_SILICON=si:scout ACCOUNTS_STK=stk-… accounts login --json
-  accounts login --app remind                      print a short-lived token for remind
-  accounts login status --json                     {\"authenticated\":true,\"kind\":\"silicon\",…}
+  printf '%s' \"$STK\" | silicon-accounts login --silicon si:scout --stk-stdin
+  ACCOUNTS_SILICON=si:scout ACCOUNTS_STK=stk-… silicon-accounts login --json
+  silicon-accounts login --app remind                      print a short-lived token for remind
+  silicon-accounts login status --json                     {\"authenticated\":true,\"kind\":\"silicon\",…}
 
 Exit codes: 0 ok, 1 failure, 2 invalid input, 3 not signed in or credentials refused,
 6 locked or rate limited.";
 
 const SILICON_EXAMPLES: &str = "Examples:
   As a Carbon (you become the custodian):
-    accounts silicon create --id si:scout --display-name Scout
+    silicon-accounts silicon create --id si:scout --display-name Scout
   As a Silicon (your custodian must accept):
-    accounts silicon create --id si:scout --custodian c:saket --wait
-    accounts silicon create --id si:scout --custodian saket@example.com \\
+    silicon-accounts silicon create --id si:scout --custodian c:saket --wait
+    silicon-accounts silicon create --id si:scout --custodian saket@example.com \\
         --webhook https://scout.example/hooks
-    accounts silicon request status 0192f0c2-… --wait
+    silicon-accounts silicon request status 0192f0c2-… --wait
   Custodian tasks:
-    accounts silicon list
-    accounts silicon rotate-stk si:scout
-    accounts silicon webhook deliveries si:scout --status failed
-    accounts silicon transfer si:scout --to c:shubham
-    accounts silicon delete si:scout --confirm si:scout";
+    silicon-accounts silicon list
+    silicon-accounts silicon rotate-stk si:scout
+    silicon-accounts silicon webhook deliveries si:scout --status failed
+    silicon-accounts silicon transfer si:scout --to c:shubham
+    silicon-accounts silicon delete si:scout --confirm si:scout";
 
 const APP_EXAMPLES: &str = "Examples:
-  printf '%s' \"$SECRET\" | accounts app use briefcase --secret-stdin
-  accounts app show
-  accounts app config set - <<< '{\"methods\":{\"google\":true}}'
-  accounts app users --q saket
-  accounts app import users.csv --default-country US --wait
-  accounts app token exchange --code sac_… --code-verifier … \\
+  printf '%s' \"$SECRET\" | silicon-accounts app use briefcase --secret-stdin
+  silicon-accounts app show
+  silicon-accounts app config set - <<< '{\"methods\":{\"google\":true}}'
+  silicon-accounts app users --q saket
+  silicon-accounts app import users.csv --default-country US --wait
+  silicon-accounts app token exchange --code sac_… --code-verifier … \\
       --redirect-uri https://briefcase.example/callback
-  accounts app token slt slt_…
-  accounts app proof user-verification --subject-token eyJ… --to briefcase --scope files.write
-  accounts app proof verify sap_… && echo valid
-  accounts app webhook set https://briefcase.example/webhooks
-  accounts app webhook replay --failed";
+  silicon-accounts app token slt slt_…
+  silicon-accounts app proof user-verification --subject-token eyJ… --to briefcase --scope files.write
+  silicon-accounts app proof verify sap_… && echo valid
+  silicon-accounts app webhook set https://briefcase.example/webhooks
+  silicon-accounts app webhook replay --failed";
 
 // ---- login --------------------------------------------------------------------------------
 
@@ -316,7 +318,7 @@ pub struct LoginArgs {
     #[arg(long)]
     pub no_browser: bool,
 
-    /// Label for this sign-in in your session list [default: accounts CLI on <host> (<os>)].
+    /// Label for this sign-in in your session list [default: silicon-accounts CLI on <host> (<os>)].
     #[arg(long, value_name = "TEXT")]
     pub label: Option<String>,
 
@@ -331,7 +333,7 @@ pub enum LoginCommand {
     ///
     /// Checks the stored session against the service (refreshing it if needed) unless --offline. JSON: {"authenticated":true,"kind":"silicon","id":"si:scout","uuid":"…","expires_at":"…"} or {"authenticated":false}.
     #[command(
-        after_long_help = "Examples:\n  accounts login status\n  accounts login status --json\n  accounts login status --offline --json"
+        after_long_help = "Examples:\n  silicon-accounts login status\n  silicon-accounts login status --json\n  silicon-accounts login status --offline --json"
     )]
     Status(LoginStatusArgs),
 }
@@ -355,9 +357,9 @@ pub struct IdArgs {
 pub enum IdCommand {
     /// Check whether a c:id or si:id can be taken (exit 0 available, 5 taken/reserved, 2 invalid).
     ///
-    /// Ids are c: or si: plus 3 to 30 of a-z, 0-9, - and _ (case-insensitive). When signed in, an id reserved for you after a change shows as reclaimable. A custodian adds --for <si:…> to ask for one of its Silicons: an old id of that Silicon shows as reclaimable for it (take it back with `accounts silicon id`).
+    /// Ids are c: or si: plus 3 to 30 of a-z, 0-9, - and _ (case-insensitive). When signed in, an id reserved for you after a change shows as reclaimable. A custodian adds --for <si:…> to ask for one of its Silicons: an old id of that Silicon shows as reclaimable for it (take it back with `silicon-accounts silicon id`).
     #[command(
-        after_long_help = "Examples:\n  accounts id available c:saket\n  accounts id available si:scout --json\n  accounts id available si:scout --for si:scout_v2"
+        after_long_help = "Examples:\n  silicon-accounts id available c:saket\n  silicon-accounts id available si:scout --json\n  silicon-accounts id available si:scout --for si:scout_v2"
     )]
     Available {
         /// The id, e.g. c:saket or si:scout.
@@ -370,7 +372,7 @@ pub enum IdCommand {
     ///
     /// Your old id stays reserved for you for 10 days. Apps you signed into get account.id_changed; they key on your uuid, so nothing breaks.
     #[command(
-        after_long_help = "Examples:\n  accounts id change c:saket_dev\n  accounts id change scout_v2"
+        after_long_help = "Examples:\n  silicon-accounts id change c:saket_dev\n  silicon-accounts id change scout_v2"
     )]
     Change {
         /// The new id.
@@ -392,11 +394,11 @@ pub struct ProfileArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum ProfileCommand {
-    /// Show your full profile (same as `accounts whoami`).
+    /// Show your full profile (same as `silicon-accounts whoami`).
     Show,
     /// Change profile fields; only the flags you pass change.
     #[command(
-        after_long_help = "Examples:\n  accounts profile set --display-name \"Saket\"\n  accounts profile set --timezone Europe/Berlin --dob 1999-04-01\n  accounts profile set --photo ./avatar.png"
+        after_long_help = "Examples:\n  silicon-accounts profile set --display-name \"Saket\"\n  silicon-accounts profile set --timezone Europe/Berlin --dob 1999-04-01\n  silicon-accounts profile set --photo ./avatar.png"
     )]
     Set(ProfileSetArgs),
 }
@@ -442,7 +444,7 @@ pub enum EmailCommand {
     },
     /// Confirm an added email with its code.
     Verify {
-        /// The challenge id printed by `accounts email add`.
+        /// The challenge id printed by `silicon-accounts email add`.
         challenge_id: String,
         /// The 6-digit code.
         code: String,
@@ -479,7 +481,7 @@ pub enum PhoneCommand {
     },
     /// Confirm an added number with its code.
     Verify {
-        /// The challenge id printed by `accounts phone add`.
+        /// The challenge id printed by `silicon-accounts phone add`.
         challenge_id: String,
         /// The 6-digit code.
         code: String,
@@ -510,7 +512,7 @@ pub enum IdentitiesCommand {
     Remove {
         /// google or apple.
         provider: String,
-        /// The provider's subject id (from `accounts identities list`).
+        /// The provider's subject id (from `silicon-accounts identities list`).
         subject: String,
     },
 }
@@ -647,11 +649,11 @@ pub struct SiliconArgs {
 pub enum SiliconCommand {
     /// Create a Silicon account.
     ///
-    /// Signed in as a Carbon: you create it and become its custodian; it can sign in right away. Otherwise (or with --self-create) the Silicon creates its own account and names its custodian (--custodian c:id or email), who has 14 days to accept on accounts.teamofsilicons.com or with `accounts custodian accept`. With --wait the command polls until the custodian decides (5 s backing off to 60 s) and then signs the Silicon in; without it, check later with `accounts silicon request status <id>`.
+    /// Signed in as a Carbon: you create it and become its custodian; it can sign in right away. Otherwise (or with --self-create) the Silicon creates its own account and names its custodian (--custodian c:id or email), who has 14 days to accept on accounts.teamofsilicons.com or with `silicon-accounts custodian accept`. With --wait the command polls until the custodian decides (5 s backing off to 60 s) and then signs the Silicon in; without it, check later with `silicon-accounts silicon request status <id>`.
     ///
     /// The generated STK is printed exactly once: store it. Choose your own with --stk-stdin (8 to 32 hex characters).
     #[command(
-        after_long_help = "Examples:\n  accounts silicon create --id si:scout --display-name Scout\n  accounts silicon create --id si:scout --custodian c:saket --wait\n  accounts silicon create --id si:scout --custodian saket@example.com \\\n      --webhook https://scout.example/hooks\n  openssl rand -hex 16 | accounts silicon create --id si:scout --custodian c:saket --stk-stdin"
+        after_long_help = "Examples:\n  silicon-accounts silicon create --id si:scout --display-name Scout\n  silicon-accounts silicon create --id si:scout --custodian c:saket --wait\n  silicon-accounts silicon create --id si:scout --custodian saket@example.com \\\n      --webhook https://scout.example/hooks\n  openssl rand -hex 16 | silicon-accounts silicon create --id si:scout --custodian c:saket --stk-stdin"
     )]
     Create(SiliconCreateArgs),
 
@@ -668,7 +670,7 @@ pub enum SiliconCommand {
     ///
     /// --photo uploads a PNG, JPEG, WebP or GIF of at most 2 MB (`-` reads stdin); the photo belongs to the Silicon. Apps it signed into and the Silicon's webhook are told what changed.
     #[command(
-        after_long_help = "Examples:\n  accounts silicon update si:scout --display-name Scout\n  accounts silicon update si:scout --photo ./scout.png\n  accounts silicon update si:scout --timezone Europe/Paris --pfp-url https://cdn.example.com/scout.png"
+        after_long_help = "Examples:\n  silicon-accounts silicon update si:scout --display-name Scout\n  silicon-accounts silicon update si:scout --photo ./scout.png\n  silicon-accounts silicon update si:scout --timezone Europe/Paris --pfp-url https://cdn.example.com/scout.png"
     )]
     Update {
         /// si:id or uuid.
@@ -699,7 +701,7 @@ pub enum SiliconCommand {
     ///
     /// Prints the new STK exactly once (or sets yours with --stk-stdin). Apps it signed into get membership.signed_out; the Silicon gets silicon.stk_rotated.
     #[command(
-        after_long_help = "Examples:\n  accounts silicon rotate-stk si:scout\n  printf 'stk-%s' \"$(openssl rand -hex 16)\" | accounts silicon rotate-stk si:scout --stk-stdin"
+        after_long_help = "Examples:\n  silicon-accounts silicon rotate-stk si:scout\n  printf 'stk-%s' \"$(openssl rand -hex 16)\" | silicon-accounts silicon rotate-stk si:scout --stk-stdin"
     )]
     RotateStk {
         /// si:id or uuid.
@@ -714,9 +716,9 @@ pub enum SiliconCommand {
 
     /// One of your Silicons' webhook: set or remove the endpoint, see and replay its deliveries.
     ///
-    /// The same webhook the Silicon manages itself with `accounts webhook`. Failed deliveries can be replayed with the same event id, sent to the current URL and signed with the current secret.
+    /// The same webhook the Silicon manages itself with `silicon-accounts webhook`. Failed deliveries can be replayed with the same event id, sent to the current URL and signed with the current secret.
     #[command(
-        after_long_help = "Examples:\n  accounts silicon webhook set si:scout https://scout.example/hooks/accounts\n  accounts silicon webhook deliveries si:scout --status failed\n  accounts silicon webhook replay si:scout --failed\n  accounts silicon webhook remove si:scout"
+        after_long_help = "Examples:\n  silicon-accounts silicon webhook set si:scout https://scout.example/hooks/accounts\n  silicon-accounts silicon webhook deliveries si:scout --status failed\n  silicon-accounts silicon webhook replay si:scout --failed\n  silicon-accounts silicon webhook remove si:scout"
     )]
     Webhook(SiliconWebhookArgs),
 
@@ -816,7 +818,7 @@ pub enum SiliconWebhookCommand {
     },
     /// List the deliveries of the Silicon's webhook, newest first.
     #[command(
-        after_long_help = "Examples:\n  accounts silicon webhook deliveries si:scout\n  accounts silicon webhook deliveries si:scout --status failed --json"
+        after_long_help = "Examples:\n  silicon-accounts silicon webhook deliveries si:scout\n  silicon-accounts silicon webhook deliveries si:scout --status failed --json"
     )]
     Deliveries {
         /// si:id or uuid.
@@ -835,7 +837,7 @@ pub enum SiliconWebhookCommand {
     ///
     /// Name the deliveries by id, or replay every failed one with --failed (at most 100 per call; run it again while `remaining` is above 0). Test pings are never replayed: send a new one.
     #[command(
-        after_long_help = "Examples:\n  accounts silicon webhook replay si:scout --failed\n  accounts silicon webhook replay si:scout --failed --since 2026-10-01T00:00:00Z\n  accounts silicon webhook replay si:scout 0192f0c2-… 0192f0c3-…"
+        after_long_help = "Examples:\n  silicon-accounts silicon webhook replay si:scout --failed\n  silicon-accounts silicon webhook replay si:scout --failed --since 2026-10-01T00:00:00Z\n  silicon-accounts silicon webhook replay si:scout 0192f0c2-… 0192f0c3-…"
     )]
     Replay {
         /// si:id or uuid.
@@ -886,9 +888,9 @@ pub struct RequestArgs {
 pub enum RequestCommand {
     /// Check (or wait for) the custodian's decision on a self-created Silicon.
     ///
-    /// The request token saved by `accounts silicon create` in {home}/.accounts/requests/ is used automatically; pass --token otherwise.
+    /// The request token saved by `silicon-accounts silicon create` in {home}/.accounts/requests/ is used automatically; pass --token otherwise.
     #[command(
-        after_long_help = "Examples:\n  accounts silicon request status 0192f0c2-…\n  accounts silicon request status 0192f0c2-… --wait --timeout 2h"
+        after_long_help = "Examples:\n  silicon-accounts silicon request status 0192f0c2-…\n  silicon-accounts silicon request status 0192f0c2-… --wait --timeout 2h"
     )]
     Status {
         /// The request id.
@@ -926,7 +928,7 @@ pub enum OwnWebhookCommand {
     Test,
     /// List your webhook's deliveries, newest first (failed ones can be replayed).
     #[command(
-        after_long_help = "Examples:\n  accounts webhook deliveries\n  accounts webhook deliveries --status failed --json"
+        after_long_help = "Examples:\n  silicon-accounts webhook deliveries\n  silicon-accounts webhook deliveries --status failed --json"
     )]
     Deliveries {
         #[command(flatten)]
@@ -939,9 +941,9 @@ pub enum OwnWebhookCommand {
     },
     /// Re-queue deliveries (same event id, sent to your current URL and signed with your current secret).
     ///
-    /// Name the deliveries by id, or replay every failed one with --failed (at most 100 per call; run it again while `remaining` is above 0). Test pings are never replayed: send a new one with `accounts webhook test`.
+    /// Name the deliveries by id, or replay every failed one with --failed (at most 100 per call; run it again while `remaining` is above 0). Test pings are never replayed: send a new one with `silicon-accounts webhook test`.
     #[command(
-        after_long_help = "Examples:\n  accounts webhook replay --failed\n  accounts webhook replay --failed --since 2026-10-01T00:00:00Z\n  accounts webhook replay 0192f0c2-… 0192f0c3-…"
+        after_long_help = "Examples:\n  silicon-accounts webhook replay --failed\n  silicon-accounts webhook replay --failed --since 2026-10-01T00:00:00Z\n  silicon-accounts webhook replay 0192f0c2-… 0192f0c3-…"
     )]
     Replay {
         #[command(flatten)]
@@ -975,7 +977,7 @@ pub enum CustodianCommand {
 
 #[derive(Debug, Args)]
 pub struct AppArgs {
-    /// The app id [env: ACCOUNTS_APP_ID; default: the app chosen with `accounts app use`].
+    /// The app id [env: ACCOUNTS_APP_ID; default: the app chosen with `silicon-accounts app use`].
     #[arg(
         long,
         global = true,
@@ -1003,11 +1005,11 @@ pub struct AppArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum AppCommand {
-    /// Choose the app for later `accounts app` commands and store its secret (0600).
+    /// Choose the app for later `silicon-accounts app` commands and store its secret (0600).
     ///
     /// Without a secret, later commands act as the app's owner through your session (you must be signed in as the Carbon who owns it).
     #[command(
-        after_long_help = "Examples:\n  printf '%s' \"$SECRET\" | accounts app use briefcase --secret-stdin\n  accounts app use briefcase          (as its owner)"
+        after_long_help = "Examples:\n  printf '%s' \"$SECRET\" | silicon-accounts app use briefcase --secret-stdin\n  silicon-accounts app use briefcase          (as its owner)"
     )]
     Use {
         /// The app id.
@@ -1072,7 +1074,7 @@ pub enum AppConfigCommand {
     ///
     /// Validation errors list every bad field. Pass --expected-version (from `config get`) to refuse overwriting someone else's change.
     #[command(
-        after_long_help = "Examples:\n  accounts app config set patch.json --expected-version 7\n  echo '{\"required_fields\":[\"email\"],\"branding\":{\"radius\":12}}' | accounts app config set -"
+        after_long_help = "Examples:\n  silicon-accounts app config set patch.json --expected-version 7\n  echo '{\"required_fields\":[\"email\"],\"branding\":{\"radius\":12}}' | silicon-accounts app config set -"
     )]
     Set {
         /// JSON file with the patch, or - for stdin.
@@ -1254,7 +1256,7 @@ pub struct ProofArgs {
 pub enum ProofCommand {
     /// Issue a User verification proof: act at another app on behalf of an account that consented in your app.
     #[command(
-        after_long_help = "Examples:\n  accounts app proof user-verification --subject-token \"$ACCESS_TOKEN\" --to briefcase \\\n      --scope files.write --ttl 600"
+        after_long_help = "Examples:\n  silicon-accounts app proof user-verification --subject-token \"$ACCESS_TOKEN\" --to briefcase \\\n      --scope files.write --ttl 600"
     )]
     UserVerification {
         /// The account's access token issued to this app (or - for stdin).
@@ -1275,8 +1277,8 @@ pub enum ProofCommand {
     },
     /// Issue an app verification proof that one other app can verify (one proof per app).
     #[command(
-        long_about = "Issue an app verification proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An app verification proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Managers can also make, see and revoke these proofs in the developer portal. The central history at developers.teamofsilicons.com/app-verification retains records and token events for apps you manage; raw token values are shown only when generated.",
-        after_long_help = "Examples:\n  accounts app proof app-verification --to remind --ttl 300\n  accounts app proof app-verification --to waveform --scope notifications.send\n  accounts app proof list --kind app_verification"
+        long_about = "Issue an app verification proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `silicon-accounts app proof verify` (or POST /v1/proofs/verify). An app verification proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Managers can also make, see and revoke these proofs in the developer portal. The central history at developers.teamofsilicons.com/app-verification retains records and token events for apps you manage; raw token values are shown only when generated.",
+        after_long_help = "Examples:\n  silicon-accounts app proof app-verification --to remind --ttl 300\n  silicon-accounts app proof app-verification --to waveform --scope notifications.send\n  silicon-accounts app proof list --kind app_verification"
     )]
     AppVerification {
         /// The one receiving app id (issue one proof per app).
@@ -1294,7 +1296,7 @@ pub enum ProofCommand {
     },
     /// Verify a proof token as this app: exit 0 when valid, 2 when not.
     #[command(
-        after_long_help = "Examples:\n  accounts app proof verify sap_… --json\n  accounts app proof verify - < token.txt && echo valid"
+        after_long_help = "Examples:\n  silicon-accounts app proof verify sap_… --json\n  silicon-accounts app proof verify - < token.txt && echo valid"
     )]
     Verify {
         /// The proof token (or - for stdin).
@@ -1392,7 +1394,7 @@ pub enum AppWebhookCommand {
     },
     /// Re-queue deliveries (same event id, current URL and secret).
     #[command(
-        after_long_help = "Examples:\n  accounts app webhook replay 0192f0c2-… 0192f0c3-…\n  accounts app webhook replay --failed --since 2026-10-01T00:00:00Z"
+        after_long_help = "Examples:\n  silicon-accounts app webhook replay 0192f0c2-… 0192f0c3-…\n  silicon-accounts app webhook replay --failed --since 2026-10-01T00:00:00Z"
     )]
     Replay {
         /// Delivery ids (max 100).
@@ -1424,7 +1426,7 @@ pub enum ConfigCommand {
     ///
     /// The setting is a pointer file in $SILICON_HOME/.accounts/home (or ~/.accounts/home). --home and ACCOUNTS_HOME still take precedence.
     #[command(
-        after_long_help = "Examples:\n  accounts config home\n  accounts config home /srv/silicons/scout\n  accounts config home --reset"
+        after_long_help = "Examples:\n  silicon-accounts config home\n  silicon-accounts config home /srv/silicons/scout\n  silicon-accounts config home --reset"
     )]
     Home {
         /// The directory (must exist).

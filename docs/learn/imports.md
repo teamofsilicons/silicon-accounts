@@ -32,7 +32,7 @@ curl -s -u "$APP_ID:$APP_SECRET" -H 'Content-Type: application/json' -d '{
 }' "$ACCOUNTS_URL/v1/apps/$APP_ID/imports"
 ```
 
-`accounts app import rows <job-id>` then shows:
+`silicon-accounts app import rows <job-id>` then shows:
 
 ```text
 ROW  OUTCOME  ACCOUNT  MESSAGES

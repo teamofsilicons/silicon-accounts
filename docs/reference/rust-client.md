@@ -15,7 +15,7 @@ related:
 
 # Rust client
 
-Use `silicon-accounts-client` to call Silicon Accounts from Rust. The `accounts` CLI uses this package too, so the same operations are available to your code. Each method calls an endpoint in the [HTTP API](api.md).
+Use `silicon-accounts-client` to call Silicon Accounts from Rust. The `silicon-accounts` CLI uses this package too, so the same operations are available to your code. Each method calls an endpoint in the [HTTP API](api.md).
 
 You control where credentials are stored. The client does not write files or persist tokens, and it reads environment variables only if you call `Config::from_env`.
 
@@ -52,7 +52,7 @@ hand slt_f_92poub5NdUOgmXcmMSPdMIhg3HvS18a1v147ycz3M to briefcase
 
 ```toml
 [dependencies]
-silicon-accounts-client = "0.2"
+silicon-accounts-client = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -66,7 +66,7 @@ Rust 1.98 or newer (edition 2024). Every call is `async` and returns
 | Handle | Made with | Acts as | Auth sent |
 |---|---|---|---|
 | `AccountsClient` | `AccountsClient::new(url)` or `::builder()` | nobody: public calls, sign-ins | none |
-| `AccountSession<'_>` | `client.with_token(access_token)` | a signed-in Carbon or Silicon | `Authorization: Bearer` (a first-party token, `aud = accounts`) |
+| `AccountSession<'_>` | `client.with_token(access_token)` | a signed-in Carbon or Silicon | `Authorization: Bearer` (a first-party token, `aud = silicon-accounts`) |
 | `AppClient<'_>` | `client.as_app(app_id, app_secret)`, or `session.app(app_id)` for an app you own | an app | HTTP Basic, or the owner's Bearer token |
 
 `AccountsClient` holds only configuration and a connection pool: cheap to clone, share one per
@@ -130,10 +130,10 @@ let client = AccountsClient::builder()
 | `wait_for_device_tokens(&DeviceAuthorization, on_event)` | polls at `interval`, honouring `slow_down` | `TokenResponse` (`access_denied` / `expired_token` as `Error::OAuth`) |
 | `cli_login_start(&Contact)` | `POST /v1/cli/login/start` | `CliLoginChallenge` |
 | `cli_login_verify(challenge_id, code, client_label)` | `POST /v1/cli/login/verify` | `TokenResponse` |
-| `refresh_first_party(refresh_token)` | `POST /v1/oauth/token` (`client_id=accounts`) | `TokenResponse` with a new refresh token |
-| `revoke_first_party(token)` | `POST /v1/oauth/revoke` (`client_id=accounts`) | `()` |
+| `refresh_first_party(refresh_token)` | `POST /v1/oauth/token` (`client_id=silicon-accounts`) | `TokenResponse` with a new refresh token |
+| `revoke_first_party(token)` | `POST /v1/oauth/revoke` (`client_id=silicon-accounts`) | `()` |
 | `exchange_developer_code(code, redirect_uri, code_verifier)` | `POST /v1/oauth/token` (`client_id=developer`, PKCE S256, no secret) | `TokenResponse` with `aud = developer` tokens (the developer platform's server side) |
-| `refresh_public_client(client_id, refresh_token)`, `revoke_public_client(client_id, token)` | `POST /v1/oauth/token` / `revoke` for `accounts` or `developer` | `TokenResponse` / `()` |
+| `refresh_public_client(client_id, refresh_token)`, `revoke_public_client(client_id, token)` | `POST /v1/oauth/token` / `revoke` for `silicon-accounts` or `developer` | `TokenResponse` / `()` |
 | `report(message, pr_url, access_token, idempotency_key)` | `POST /v1/reports` | `ReportReceipt` |
 | `send_telemetry(&[TelemetryEvent])` | `POST /v1/telemetry/events` (3-second timeout) | `()`; nothing when telemetry is off |
 | `with_token(access_token)` | No request | `AccountSession` |
@@ -278,7 +278,7 @@ match client.silicon_login("si:scout", "stk-000000000000", None).await {
 printed:
 
 ```text
-Sign-in failed: no Silicon has this si:id, or the STK is wrong. Both cases get this same answer, so ids can't be probed. Hint: Check the si:id (use the current one; ids can change) and the STK (stk- followed by the hex characters shown once at creation or rotation). 10 wrong STKs in a row lock sign-in for 1 minute. A lost STK can be replaced by the Silicon's custodian (`accounts silicon rotate-stk`).
+Sign-in failed: no Silicon has this si:id, or the STK is wrong. Both cases get this same answer, so ids can't be probed. Hint: Check the si:id (use the current one; ids can change) and the STK (stk- followed by the hex characters shown once at creation or rotation). 10 wrong STKs in a row lock sign-in for 1 minute. A lost STK can be replaced by the Silicon's custodian (`silicon-accounts silicon rotate-stk`).
 ```
 
 ## Examples
@@ -515,7 +515,7 @@ Local verification can't see revocation (a sign-out, removed access); access tok
 
 ## Constants
 
-`DEFAULT_BASE_URL` (`https://accounts.teamofsilicons.com`), `FIRST_PARTY_APP_ID` (`accounts`),
+`DEFAULT_BASE_URL` (`https://accounts.teamofsilicons.com`), `FIRST_PARTY_APP_ID` (`silicon-accounts`),
 `DEVELOPER_APP_ID` (`developer`),
 `VERSION`, `SLT_GRANT_TYPE` (`urn:silicon:params:oauth:grant-type:slt`),
 `DEVICE_CODE_GRANT_TYPE` (`urn:ietf:params:oauth:grant-type:device_code`), `TELEMETRY_HEADER`,

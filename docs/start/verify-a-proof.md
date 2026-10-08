@@ -144,14 +144,14 @@ async fn main() -> Result<(), BoxError> {
 
 ```bash
 ACCOUNTS_APP_ID=briefcase ACCOUNTS_APP_SECRET="$BRIEFCASE_APP_SECRET" \
-  accounts app proof verify sap__tiKwGp_1rNr-6XGJJmGj1YPf7SsUVNNmxvPqBDaVa0
+  silicon-accounts app proof verify sap__tiKwGp_1rNr-6XGJJmGj1YPf7SsUVNNmxvPqBDaVa0
 ```
 
 ```
 valid: User verification proof from dm for briefcase, on behalf of si:scout_two (8HV), scopes files.write files.read, until 2026-10-07T03:12:16Z (in 29m)
 ```
 
-The exit code is `0` when the proof is valid and `2` when it is not, so `accounts app proof verify "$TOKEN" && …` works in scripts and fails closed. Other exit codes mean the check itself didn't happen: `3` when your app's credentials were refused (wrong secret, disabled app), `1` when Silicon Accounts couldn't be reached. A command-line mistake also exits `2`, including running it as the app's owner without the app secret (verifying needs the app's own credentials); add `--json` to tell them apart: a checked proof prints the service's answer (`{"valid": …}`), a failure prints `{"error": {…}}`. Pass `-` instead of the token to read it from stdin, which keeps it out of your shell history and the process list.
+The exit code is `0` when the proof is valid and `2` when it is not, so `silicon-accounts app proof verify "$TOKEN" && …` works in scripts and fails closed. Other exit codes mean the check itself didn't happen: `3` when your app's credentials were refused (wrong secret, disabled app), `1` when Silicon Accounts couldn't be reached. A command-line mistake also exits `2`, including running it as the app's owner without the app secret (verifying needs the app's own credentials); add `--json` to tell them apart: a checked proof prints the service's answer (`{"valid": …}`), a failure prints `{"error": {…}}`. Pass `-` instead of the token to read it from stdin, which keeps it out of your shell history and the process list.
 
 ## What the answers mean
 

@@ -533,7 +533,7 @@ impl TestContext {
         .unwrap_or_else(|e| panic!("membership: {e}"))
     }
 
-    /// First-party tokens (aud = accounts) for an account, as after `accounts login`.
+    /// First-party tokens (aud = silicon-accounts) for an account, as after `silicon-accounts login`.
     pub async fn first_party_tokens(&self, account: &Account) -> TokenResponse {
         self.tokens_for(account, crate::FIRST_PARTY_APP_ID, &[Scope::Profile])
             .await

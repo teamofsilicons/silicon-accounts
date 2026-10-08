@@ -160,7 +160,7 @@ export const journey: Journey = {
       const home = cliHome();
       const status = await cli(env, home, ["app", "import", "status", fail.job.id, "--wait", "--json", "--app-id", crm.app_id, "--app-secret-stdin"], { stdin: `${crm.secret}\n` });
       const statusJob = status.json as { status?: string; error?: string } | null;
-      results.check("`accounts app import status <job> --wait` reports the failed job with its reason and exits 1 (as `accounts app import <file> --wait` does for a failed job)", status.code === 1 && statusJob?.status === "failed" && statusJob.error === failed.error, `exit ${status.code}; ${status.stdout.slice(0, 300)} ${status.stderr.slice(0, 200)}`);
+      results.check("`silicon-accounts app import status <job> --wait` reports the failed job with its reason and exits 1 (as `silicon-accounts app import <file> --wait` does for a failed job)", status.code === 1 && statusJob?.status === "failed" && statusJob.error === failed.error, `exit ${status.code}; ${status.stdout.slice(0, 300)} ${status.stderr.slice(0, 200)}`);
       const statusText = await cli(env, home, ["app", "import", "status", fail.job.id, "--app-id", crm.app_id, "--app-secret-stdin"], { stdin: `${crm.secret}\n` });
       results.check("…and in text mode it says the job failed and why", statusText.stdout.includes(`Import ${fail.job.id}: failed (${failed.processed_rows}/${N2} rows).`) && statusText.stdout.includes("stopped (the server restarted or crashed) more than twice"), `exit ${statusText.code}; ${statusText.stdout.replace(/\s+/g, " ").slice(0, 400)}`);
       const again = await submitTo(ctx, env.site, crm, csv2);

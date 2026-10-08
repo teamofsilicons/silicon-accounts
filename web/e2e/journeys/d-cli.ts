@@ -18,7 +18,7 @@ export const journey: Journey = {
     results.watch(page, "d");
     const t = tag();
 
-    // 1. `accounts login` (device flow), approved on /device in the signed-in browser.
+    // 1. `silicon-accounts login` (device flow), approved on /device in the signed-in browser.
     const homeA = cliHome();
     let device: DeviceEvent | null = null;
     const login = cli(env, homeA, ["login", "--no-browser", "--json", "--label", "e2e walk"], {
@@ -44,11 +44,11 @@ export const journey: Journey = {
     const signedIn = await login;
     results.check("the CLI is signed in as the Carbon who approved", signedIn.code === 0 && signedIn.json?.id === ada.id, `exit ${signedIn.code} in ${signedIn.ms} ms`);
 
-    // 2. `accounts silicon create` as that Carbon: the STK is printed once.
+    // 2. `silicon-accounts silicon create` as that Carbon: the STK is printed once.
     const sid = `si:walker-${t}`;
     const created = await cli(env, homeA, ["silicon", "create", "--id", sid, "--display-name", `Walker ${t}`, "--json"]);
     const stk = typeof created.json?.stk === "string" ? created.json.stk : "";
-    results.check("`accounts silicon create` prints the generated STK once", created.code === 0 && /^stk-[0-9a-f]{12}$/.test(stk), created.stderr.slice(-200));
+    results.check("`silicon-accounts silicon create` prints the generated STK once", created.code === 0 && /^stk-[0-9a-f]{12}$/.test(stk), created.stderr.slice(-200));
     await page.goto(`${env.site}/silicons`);
     await page.waitForLoadState("networkidle");
     await sleep(800);
@@ -70,13 +70,13 @@ export const journey: Journey = {
     const status = await cli(env, homeB, ["login", "status", "--json"]);
     results.check("…and it is signed in as itself", status.json?.authenticated === true && status.json?.id === selfId);
 
-    // 4. `accounts login --silicon` with the STK, then `--app remind` (an SLT) that the fake remind app exchanges.
+    // 4. `silicon-accounts login --silicon` with the STK, then `--app remind` (an SLT) that the fake remind app exchanges.
     const homeC = cliHome();
     const silicon = await cli(env, homeC, ["login", "--silicon", sid, "--stk-stdin", "--json"], { stdin: `${stk}\n` });
-    results.check("`accounts login --silicon` with the STK", silicon.code === 0 && silicon.json?.id === sid, silicon.stderr.slice(-200));
+    results.check("`silicon-accounts login --silicon` with the STK", silicon.code === 0 && silicon.json?.id === sid, silicon.stderr.slice(-200));
     const slt = silicon.code === 0 ? await cli(env, homeC, ["login", "--app", "remind", "--json"]) : null;
     const token = typeof slt?.json?.slt === "string" ? slt.json.slt : "";
-    results.check("`accounts login --app remind` prints a short-lived token", token.startsWith("slt_"), `${slt?.ms ?? 0} ms`);
+    results.check("`silicon-accounts login --app remind` prints a short-lived token", token.startsWith("slt_"), `${slt?.ms ?? 0} ms`);
     const exchanged = await postJson<{ ok?: boolean; id?: string; exchange_ms?: number }>(`${env.apps}/remind/slt-login`, { slt: token });
     results.check("the fake remind app exchanges the SLT for the Silicon's tokens", exchanged.status === 200 && exchanged.body.ok === true && exchanged.body.id === sid, JSON.stringify(exchanged.body).slice(0, 160));
     const again = await postJson(`${env.apps}/remind/slt-login`, { slt: token });

@@ -1,9 +1,9 @@
-//! `grant_type=urn:ietf:params:oauth:grant-type:device_code` (RFC 8628 §3.4): the accounts CLI
+//! `grant_type=urn:ietf:params:oauth:grant-type:device_code` (RFC 8628 §3.4): the silicon-accounts CLI
 //! polls with the device code until the Carbon approves it on the account site.
 //!
 //! Answers while waiting: `authorization_pending`, `slow_down` (polled within 5 s), then
 //! `access_denied` or `expired_token` (10 minutes), all from core's `repo::tokens::poll_device`.
-//! Approval yields first-party tokens (`aud = accounts`, origin `device`) labelled with the
+//! Approval yields first-party tokens (`aud = silicon-accounts`, origin `device`) labelled with the
 //! CLI's `client_label`, and a sign-in history entry.
 
 use accounts_core::crypto::{describe_token, prefix};
@@ -19,9 +19,9 @@ use crate::params::opt;
 use crate::token::{DEVICE_CODE_GRANT_TYPE, TokenParams};
 
 /// Label of a device sign-in whose CLI sent no `client_label`.
-const DEFAULT_LABEL: &str = "accounts CLI";
+const DEFAULT_LABEL: &str = "silicon-accounts CLI";
 
-/// Polls a device code (the caller already checked the client is `accounts`).
+/// Polls a device code (the caller already checked the client is `silicon-accounts`).
 pub(crate) async fn exchange(
     state: &AppState,
     params: &TokenParams,

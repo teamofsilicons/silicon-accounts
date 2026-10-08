@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /device: approve a CLI sign-in (the device flow). `accounts login` prints a code and this address; a signed-in
+ * /device: approve a CLI sign-in (the device flow). `silicon-accounts login` prints a code and this address; a signed-in
  * Carbon opens it, checks that the code matches the terminal, and approves or denies. Signed out, the page first
  * sends the visitor to sign in and comes back here with the code.
  *
@@ -173,7 +173,7 @@ function DeviceApproval() {
       case "enter":
         return (
           <>
-            <StepHeading title="Connect your terminal" description={<>Enter the code that <code className={flow.mono}>accounts login</code> shows in your terminal. It looks like WDJB-MJHT.</>} />
+            <StepHeading title="Connect your terminal" description={<>Enter the code that <code className={flow.mono}>silicon-accounts login</code> shows in your terminal. It looks like WDJB-MJHT.</>} />
             <form className={flow.form} noValidate onSubmit={submitCode}>
               <Input
                 label="Code from your terminal"
@@ -200,14 +200,14 @@ function DeviceApproval() {
           <>
             <StepHeading
               title="Approve this sign-in?"
-              description={<>A terminal is asking to sign in to Silicon Accounts as you. Approve it only if you just ran <code className={flow.mono}>accounts login</code> yourself.</>}
+              description={<>A terminal is asking to sign in to Silicon Accounts as you. Approve it only if you just ran <code className={flow.mono}>silicon-accounts login</code> yourself.</>}
             />
             <div data-sq="surface" className={styles.codeCard}>
               <span className={styles.codeLabel}>Check that your terminal shows</span>
               <span className={styles.code} aria-label={`Code ${req.user_code.split("").join(" ")}`}>{req.user_code}</span>
             </div>
             <dl className={styles.facts}>
-              <div><dt>Asking</dt><dd>{req.client_label ?? "The accounts CLI"}</dd></div>
+              <div><dt>Asking</dt><dd>{req.client_label ?? "The silicon-accounts CLI"}</dd></div>
               <div><dt>Started</dt><dd>{now ? formatRelative(req.created_at, now) : "just now"}</dd></div>
               <div><dt>Code expires</dt><dd>{expiresText}</dd></div>
             </dl>
@@ -235,7 +235,7 @@ function DeviceApproval() {
           <>
             <StepHeading
               title="This sign-in was already approved"
-              description={<>Someone approved this code before this page loaded (perhaps you, in another tab), so the terminal signs in as the account that approved it. If you did not expect that, run <code className={flow.mono}>accounts login</code> again in your terminal for a new code.</>}
+              description={<>Someone approved this code before this page loaded (perhaps you, in another tab), so the terminal signs in as the account that approved it. If you did not expect that, run <code className={flow.mono}>silicon-accounts login</code> again in your terminal for a new code.</>}
             />
             <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter another code</Button>
           </>
@@ -250,14 +250,14 @@ function DeviceApproval() {
       case "expired":
         return (
           <>
-            <StepHeading title="This code expired" description={<>Codes work for 10 minutes. Run <code className={flow.mono}>accounts login</code> again in your terminal for a new one.</>} />
+            <StepHeading title="This code expired" description={<>Codes work for 10 minutes. Run <code className={flow.mono}>silicon-accounts login</code> again in your terminal for a new one.</>} />
             <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter another code</Button>
           </>
         );
       case "used":
         return (
           <>
-            <StepHeading title="This code was already used" description={<>A terminal already signed in with it, and each code works once. Run <code className={flow.mono}>accounts login</code> again in your terminal if you need a new sign-in.</>} />
+            <StepHeading title="This code was already used" description={<>A terminal already signed in with it, and each code works once. Run <code className={flow.mono}>silicon-accounts login</code> again in your terminal if you need a new sign-in.</>} />
             <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter another code</Button>
           </>
         );
@@ -269,7 +269,7 @@ function DeviceApproval() {
           </>
         );
       case "silicon":
-        return <StepHeading title="Only Carbons approve terminal sign-ins" description={<>This browser is signed in as a Silicon. Silicons sign in to the CLI with their si:id and STK: <code className={flow.mono}>accounts login --silicon si:your-id</code>.</>} />;
+        return <StepHeading title="Only Carbons approve terminal sign-ins" description={<>This browser is signed in as a Silicon. Silicons sign in to the CLI with their si:id and STK: <code className={flow.mono}>silicon-accounts login --silicon si:your-id</code>.</>} />;
       case "offline":
       case "failed": {
         const problem = current === "offline" ? sessionError : failure;

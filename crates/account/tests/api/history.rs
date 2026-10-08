@@ -557,7 +557,7 @@ async fn sign_ins_name_the_cli_and_the_package_not_a_browser() {
     };
     assert_eq!(
         detail_for("accounts-cli/0.1.0 silicon-accounts-client/0.1.0"),
-        "from 127.0.0.1 · accounts CLI 0.1.0"
+        "from 127.0.0.1 · silicon-accounts CLI 0.1.0"
     );
     assert_eq!(
         detail_for("silicon-accounts-client/0.1.0"),
@@ -818,9 +818,9 @@ async fn entries_from_sign_in_flows_read_as_sentences() {
             "session.created",
             account,
             Some(me),
-            Some("accounts"),
+            Some("silicon-accounts"),
             "session",
-            json!({"kind": "cli", "label": "accounts CLI on studio (macos)", "via": "email"}),
+            json!({"kind": "cli", "label": "silicon-accounts CLI on studio (macos)", "via": "email"}),
         ),
         (
             "session.signed_out",
@@ -834,9 +834,9 @@ async fn entries_from_sign_in_flows_read_as_sentences() {
             "device.approved",
             account,
             Some(me),
-            Some("accounts"),
+            Some("silicon-accounts"),
             "device",
-            json!({"client_label": "accounts CLI on studio (macos)"}),
+            json!({"client_label": "silicon-accounts CLI on studio (macos)"}),
         ),
         (
             "signin.locked",
@@ -874,9 +874,9 @@ async fn entries_from_sign_in_flows_read_as_sentences() {
             "oauth.token_revoked",
             account,
             Some(me),
-            Some("accounts"),
+            Some("silicon-accounts"),
             "token_family",
-            json!({"reason": "user_signed_out", "token_type": "refresh_token", "label": "accounts CLI on studio (macos)"}),
+            json!({"reason": "user_signed_out", "token_type": "refresh_token", "label": "silicon-accounts CLI on studio (macos)"}),
         ),
         // A first-party family made by the authorization_code grant: its label is an internal
         // marker (`code:<hash>`), never shown.
@@ -884,7 +884,7 @@ async fn entries_from_sign_in_flows_read_as_sentences() {
             "oauth.token_revoked",
             account,
             Some(me),
-            Some("accounts"),
+            Some("silicon-accounts"),
             "token_family",
             json!({"reason": "user_signed_out", "token_type": "refresh_token", "label": "code:0123456789abcdef"}),
         ),
@@ -965,12 +965,12 @@ async fn entries_from_sign_in_flows_read_as_sentences() {
         ),
         (
             "New CLI sign-in",
-            Some("accounts CLI on studio (macos) · with an email code"),
+            Some("silicon-accounts CLI on studio (macos) · with an email code"),
         ),
         ("Signed out of a browser session", None),
         (
             "Approved a terminal sign-in",
-            Some("accounts CLI on studio (macos)"),
+            Some("silicon-accounts CLI on studio (macos)"),
         ),
         (
             "Too many wrong codes for a***@example.test",
@@ -989,7 +989,7 @@ async fn entries_from_sign_in_flows_read_as_sentences() {
         ("Test app dm signed you out", None),
         (
             "Signed out of a CLI sign-in",
-            Some("accounts CLI on studio (macos)"),
+            Some("silicon-accounts CLI on studio (macos)"),
         ),
         ("Signed out of a CLI sign-in", None),
         (

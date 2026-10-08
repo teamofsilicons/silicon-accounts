@@ -98,7 +98,7 @@ mkdir -p "$ARTIFACTS/runs"
 
 # --- once for every run: the Rust binaries and Postgres -----------------------------------------------------------
 if [ "$BUILD" = 1 ]; then
-  say "building accounts-api, accounts-migrate, accounts-seed and the accounts CLI into $TARGET_DIR"
+  say "building accounts-api, accounts-migrate, accounts-seed and the silicon-accounts CLI into $TARGET_DIR"
   mkdir -p "$ROOT/.dev/logs"
   cargo build -p silicon-accounts-server -p silicon-accounts-cli >"$ROOT/.dev/logs/e2e-all-build.log" 2>&1 \
     || { tail -n 40 "$ROOT/.dev/logs/e2e-all-build.log" >&2; fail "cargo build failed (log: .dev/logs/e2e-all-build.log)"; }

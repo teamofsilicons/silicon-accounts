@@ -40,7 +40,7 @@ export const journey: Journey = {
     const lure = `Visit lure-${t}.example now`;
     const home = freshDir();
 
-    // 1. `accounts silicon create --custodian c:… --wait`: the STK and the request are printed at once (stderr, JSON).
+    // 1. `silicon-accounts silicon create --custodian c:… --wait`: the STK and the request are printed at once (stderr, JSON).
     let created: Json | null = null;
     const startedAt = Date.now();
     const running = accounts(env, ["silicon", "create", "--id", sid, "--display-name", lure, "--custodian", carbon.id, "--webhook", sinkUrl(env, key), "--wait", "--timeout", "3m", "--json"], {
@@ -112,9 +112,9 @@ export const journey: Journey = {
     results.check("--wait returns once the Carbon accepts: exit 0, final_status accepted, signed in", done.code === 0 && done.json?.final_status === "accepted" && done.json?.signed_in === true, said(done));
     results.check("…its JSON shows the request and the Silicon as they are now", obj(done.json?.request).status === "accepted" && obj(done.json?.silicon).status === "active", short({ request: done.json?.request, silicon: obj(done.json?.silicon).status }));
     const status1 = await accounts(env, ["login", "status", "--json"], { home });
-    results.check("`accounts login status --json`: signed in as the Silicon", status1.code === 0 && status1.json?.authenticated === true && status1.json?.id === sid && status1.json?.kind === "silicon", said(status1));
+    results.check("`silicon-accounts login status --json`: signed in as the Silicon", status1.code === 0 && status1.json?.authenticated === true && status1.json?.id === sid && status1.json?.kind === "silicon", said(status1));
     const whoami = await accounts(env, ["whoami", "--json"], { home });
-    results.check("`accounts whoami`: active, custodian shown by its c:id", whoami.json?.status === "active" && obj(whoami.json?.custodian).id === carbon.id, said(whoami));
+    results.check("`silicon-accounts whoami`: active, custodian shown by its c:id", whoami.json?.status === "active" && obj(whoami.json?.custodian).id === carbon.id, said(whoami));
     const acceptedHook = await waitSink(env, key, "silicon.custodian.accepted", candidate => dataOf(candidate).request_id === requestId);
     results.check("its webhook got silicon.custodian.accepted naming the custodian", obj(dataOf(acceptedHook).custodian).id === carbon.id && obj(dataOf(acceptedHook).silicon).status === "active", short(acceptedHook?.payload, 200));
     await sleep(1200);

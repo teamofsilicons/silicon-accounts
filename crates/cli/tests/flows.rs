@@ -248,7 +248,7 @@ fn silicon_self_create_saves_the_request_and_waits_for_the_custodian() {
         .success()
         .stdout(predicate::str::contains("accepted"))
         .stderr(predicate::str::contains(
-            "accounts login --silicon si:scout",
+            "silicon-accounts login --silicon si:scout",
         ));
 }
 
@@ -615,7 +615,7 @@ fn a_custodian_checks_an_id_for_its_silicon() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "accounts silicon id si:scout si:old",
+            "silicon-accounts silicon id si:scout si:old",
         ));
     // Someone else's Silicon: not found (exit 4).
     env.cmd()

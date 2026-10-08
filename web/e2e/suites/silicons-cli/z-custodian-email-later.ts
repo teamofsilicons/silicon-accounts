@@ -22,7 +22,7 @@ import {
   type Run,
 } from "./_helpers";
 
-/** `accounts email add <address>` + the code from the mailbox + `accounts email verify`. */
+/** `silicon-accounts email add <address>` + the code from the mailbox + `silicon-accounts email verify`. */
 async function addEmail(env: Parameters<typeof accounts>[0], home: string, address: string): Promise<{ add: Run; verify: Run }> {
   const after = await lastSeq(env);
   const add = await accounts(env, ["email", "add", address, "--json"], { home });
@@ -35,7 +35,7 @@ const requestsOf = async (env: Parameters<typeof accounts>[0], home: string) => 
 
 export const journey: Journey = {
   name: "silicons-cli-custodian-email-later",
-  title: "a Silicon names its custodian by an address that later becomes a Carbon's second email (`accounts email add` + verify): the request appears for that Carbon, goes away when the address is removed (accepting then fails), comes back when it is added again, and is accepted with the CLI; the Silicon's --wait returns signed in; the request records who answered",
+  title: "a Silicon names its custodian by an address that later becomes a Carbon's second email (`silicon-accounts email add` + verify): the request appears for that Carbon, goes away when the address is removed (accepting then fails), comes back when it is added again, and is accepted with the CLI; the Silicon's --wait returns signed in; the request records who answered",
   // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
   engines: ["chromium"],
   async run(ctx) {
@@ -69,14 +69,14 @@ export const journey: Journey = {
     // 2. The Carbon adds the address to its account: the request is now addressed to it.
     const first = await addEmail(env, homeC, address);
     const emails = ((first.verify.json?.emails ?? []) as Json[]).map(entry => `${str(entry.email)}${entry.is_primary ? " (primary)" : ""}`);
-    results.check("`accounts email add` + `accounts email verify`: the address is the Carbon's second, verified email (the primary unchanged)", first.add.code === 0 && first.verify.code === 0 && emails.includes(address) && emails.includes(`${carbon.email} (primary)`), `${said(first.add)} | ${said(first.verify)}`);
+    results.check("`silicon-accounts email add` + `silicon-accounts email verify`: the address is the Carbon's second, verified email (the primary unchanged)", first.add.code === 0 && first.verify.code === 0 && emails.includes(address) && emails.includes(`${carbon.email} (primary)`), `${said(first.add)} | ${said(first.verify)}`);
     const offered = (await requestsOf(env, homeC)).find(item => item.id === requestId);
-    results.check("`accounts custodian requests`: the request is there now (initial, from the Silicon)", offered?.kind === "initial" && obj(offered.silicon).id === sid, short(offered));
+    results.check("`silicon-accounts custodian requests`: the request is there now (initial, from the Silicon)", offered?.kind === "initial" && obj(offered.silicon).id === sid, short(offered));
 
     // 3. The address leaves the account: the request leaves with it, and can't be accepted.
     const removed = await accounts(env, ["email", "remove", address, "--json"], { home: homeC });
     const afterRemoval = await requestsOf(env, homeC);
-    results.check("`accounts email remove <address>`: the request is no longer offered to the Carbon", removed.code === 0 && !afterRemoval.some(item => item.id === requestId), `${said(removed)} | ${afterRemoval.length} requests`);
+    results.check("`silicon-accounts email remove <address>`: the request is no longer offered to the Carbon", removed.code === 0 && !afterRemoval.some(item => item.id === requestId), `${said(removed)} | ${afterRemoval.length} requests`);
     const refused = await accounts(env, ["custodian", "accept", requestId, "--json"], { home: homeC });
     results.check("…accepting it then: exit 4, custodian_request_not_found (it isn't addressed to this Carbon any more)", refused.code === 4 && cliError(refused).code === "custodian_request_not_found", said(refused));
     const stillPending = await sql(env, `select status from custodian_requests where id = '${requestId}'`);
@@ -86,7 +86,7 @@ export const journey: Journey = {
     const second = await addEmail(env, homeC, address);
     const acceptedAt = Date.now();
     const accepted = await accounts(env, ["custodian", "accept", requestId, "--json"], { home: homeC });
-    results.check("added back and verified, `accounts custodian accept <id>` accepts it", second.verify.code === 0 && accepted.code === 0, `${said(second.verify)} | ${said(accepted)}`);
+    results.check("added back and verified, `silicon-accounts custodian accept <id>` accepts it", second.verify.code === 0 && accepted.code === 0, `${said(second.verify)} | ${said(accepted)}`);
     const done = await waiting;
     results.metric("accept (CLI) → --wait returned", Date.now() - acceptedAt, "ms");
     results.check("the Silicon's --wait returns: accepted, signed in", done.code === 0 && done.json?.final_status === "accepted" && done.json?.signed_in === true, said(done));

@@ -281,9 +281,9 @@ export const journey: Journey = {
     const commands = ((tree.json?.commands ?? []) as Json[]).map(entry => str(entry.command));
     const has = (prefix: string, verb: RegExp) => commands.some(command => command.startsWith(prefix) && verb.test(command.slice(prefix.length)));
     results.check(
-      "the CLI lists and replays a Silicon's webhook deliveries, for the Silicon (accounts webhook …) and its custodian (accounts silicon webhook …), as it does an app's",
-      has("accounts webhook ", /^deliver/) && has("accounts webhook ", /^replay/) && has("accounts silicon webhook ", /^deliver/) && has("accounts silicon webhook ", /^replay/),
-      `Silicon: ${short(commands.filter(command => command.startsWith("accounts webhook ")))}; custodian: ${short(commands.filter(command => command.startsWith("accounts silicon webhook ")))}; app: ${short(commands.filter(command => command.startsWith("accounts app webhook ")))}`,
+      "the CLI lists and replays a Silicon's webhook deliveries, for the Silicon (silicon-accounts webhook …) and its custodian (silicon-accounts silicon webhook …), as it does an app's",
+      has("silicon-accounts webhook ", /^deliver/) && has("silicon-accounts webhook ", /^replay/) && has("silicon-accounts silicon webhook ", /^deliver/) && has("silicon-accounts silicon webhook ", /^replay/),
+      `Silicon: ${short(commands.filter(command => command.startsWith("silicon-accounts webhook ")))}; custodian: ${short(commands.filter(command => command.startsWith("silicon-accounts silicon webhook ")))}; app: ${short(commands.filter(command => command.startsWith("silicon-accounts app webhook ")))}`,
     );
   },
 };

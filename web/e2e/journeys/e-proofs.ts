@@ -74,12 +74,12 @@ export const journey: Journey = {
     });
     results.check("a proof for two apps at once is refused: 422 app_verification_single_app, naming the one-proof-per-app way", several.status === 422 && several.body.error?.code === "app_verification_single_app" && /receiving_app/.test(several.body.error?.hint ?? ""), `${several.status} ${JSON.stringify(several.body).slice(0, 300)}`);
 
-    // The CLI the same way: `accounts app proof app-verification --to <app>` names exactly one app.
+    // The CLI the same way: `silicon-accounts app proof app-verification --to <app>` names exactly one app.
     const home = cliHome();
     const secret = `${fakeApp("commit").secret}\n`;
     const viaCli = await cli(env, home, ["app", "proof", "app-verification", "--to", "waveform", "--scope", "notifications.send", "--app-id", "commit", "--app-secret-stdin", "--json"], { stdin: secret });
     const cliToken = typeof viaCli.json?.proof_token === "string" ? viaCli.json.proof_token : "";
-    results.check("`accounts app proof app-verification --to waveform` issues commit's proof for waveform", viaCli.code === 0 && viaCli.json?.receiving_app === "waveform" && viaCli.json.kind === "app_verification" && cliToken.startsWith("sap_"), `exit ${viaCli.code} in ${viaCli.ms} ms: ${JSON.stringify(viaCli.json).slice(0, 160)}`);
+    results.check("`silicon-accounts app proof app-verification --to waveform` issues commit's proof for waveform", viaCli.code === 0 && viaCli.json?.receiving_app === "waveform" && viaCli.json.kind === "app_verification" && cliToken.startsWith("sap_"), `exit ${viaCli.code} in ${viaCli.ms} ms: ${JSON.stringify(viaCli.json).slice(0, 160)}`);
     results.check("…which waveform verifies", (await verifyProof(ctx, "waveform", cliToken)).body.valid === true);
     const twice = await cli(env, home, ["app", "proof", "app-verification", "--to", "remind", "--to", "waveform", "--app-id", "commit", "--app-secret-stdin", "--json"], { stdin: secret });
     const twiceError = (twice.json?.error ?? {}) as { message?: string };

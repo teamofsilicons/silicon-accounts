@@ -4,7 +4,7 @@
 //!
 //! # Locks on account rows
 //!
-//! The changes that end an account's ability to act update-lock its `accounts` row before they
+//! The changes that end an account's ability to act update-lock its `silicon-accounts` row before they
 //! look at anything else: `DELETE /v1/me` (the account crate) locks the Carbon before it checks
 //! custody and deletes, and an STK rotation locks the Silicon before it revokes its sessions.
 //! Everything here that relies on an account staying usable until it commits share-locks the
@@ -77,7 +77,7 @@ pub fn silicon_not_found(key: &str) -> ApiError {
         format!("You are not the custodian of a Silicon '{key}'."),
     )
     .hint(
-        "List the Silicons you are custodian of with GET /v1/me/silicons (`accounts silicon list`). Only a \
+        "List the Silicons you are custodian of with GET /v1/me/silicons (`silicon-accounts silicon list`). Only a \
          Silicon's custodian can manage it, and a self-created Silicon becomes yours only after you accept its \
          request (GET /v1/me/custodian-requests).",
     )
@@ -138,7 +138,7 @@ pub fn request_not_found(raw: &str) -> ApiError {
         "custodian_request_not_found",
         format!("No pending custodian request '{}' is addressed to you.", raw.trim()),
     )
-    .hint("List the requests waiting for you with GET /v1/me/custodian-requests (`accounts custodian requests`). Requests named by email show up once that email is verified on your account.")
+    .hint("List the requests waiting for you with GET /v1/me/custodian-requests (`silicon-accounts custodian requests`). Requests named by email show up once that email is verified on your account.")
     .detail("request_id", raw.trim())
 }
 

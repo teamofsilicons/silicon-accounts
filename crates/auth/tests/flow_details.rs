@@ -943,7 +943,7 @@ async fn a_silicons_session_is_never_offered_or_continued() {
         r.json["error"]["hint"]
             .as_str()
             .expect("hint")
-            .contains("accounts login --app")
+            .contains("silicon-accounts login --app")
     );
     // prompt=none says it's a Silicon, not that nobody is signed in.
     let f = new_flow(&ctx, &mut b, &app.app_id, json!({"prompt": "none"})).await;
@@ -1065,7 +1065,7 @@ async fn returning_carbons_are_offered_what_the_app_asks_for_since() {
     );
 }
 
-/// An active membership made by exchanging a short-lived token (`accounts login --app …`): the
+/// An active membership made by exchanging a short-lived token (`silicon-accounts login --app …`): the
 /// Carbon never saw the app's pages.
 async fn slt_membership(ctx: &TestContext, app_id: &str, uuid: &str) {
     use accounts_core::models::{MembershipSource, Scope};

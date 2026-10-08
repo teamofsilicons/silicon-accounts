@@ -47,10 +47,10 @@ export function openingTitle(app: { name: string; copy?: Partial<SigninCopy> | n
 }
 
 /**
- * Where the Carbon goes after signing in, in a sentence: "your account" for the account site itself (app `accounts`),
+ * Where the Carbon goes after signing in, in a sentence: "your account" for the account site itself (app `silicon-accounts`),
  * else the app's name (also for our other first-party app, the developer site, "Silicon Developer").
  */
-export const destinationName = (app: Pick<HostedFlow["app"], "app_id" | "name">): string => (app.app_id === "accounts" ? "your account" : app.name);
+export const destinationName = (app: Pick<HostedFlow["app"], "app_id" | "name">): string => (app.app_id === "silicon-accounts" ? "your account" : app.name);
 
 /** Google and Apple are providers; email and phone are contact methods with a code. */
 export const isProvider = (method: SigninMethod): method is "google" | "apple" => method === "google" || method === "apple";
@@ -92,7 +92,7 @@ export interface FrameApp {
 }
 
 /** Silicon Accounts itself, for its own pages (device approval, the account site's sign-in, problems with no app). */
-export const SILICON_ACCOUNTS: FrameApp = { app_id: "accounts", name: "Silicon Accounts", first_party: true };
+export const SILICON_ACCOUNTS: FrameApp = { app_id: "silicon-accounts", name: "Silicon Accounts", first_party: true };
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Browser memory                                                                                                      */

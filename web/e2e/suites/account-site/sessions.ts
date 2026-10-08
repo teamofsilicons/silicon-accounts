@@ -1,5 +1,5 @@
 /**
- * Settings → "Where you are signed in": every browser session, first-party (accounts CLI) sign-in and developer
+ * Settings → "Where you are signed in": every browser session, first-party (silicon-accounts CLI) sign-in and developer
  * platform sign-in (developers.teamofsilicons.com, the first-party app `developer`, 06-v2 §2) of the Carbon, with how
  * and from where; signing one out ends it at once (the other browser lands signed out, the CLI's tokens stop working
  * also after a refresh rotated them, the developer site is signed out at its next call); signing out here ends this
@@ -20,7 +20,7 @@ interface SessionInfo {
 
 const sessions: Journey = {
   name: "account-site-sessions",
-  title: "sessions on Settings: this browser, another browser, an accounts CLI sign-in and a developer-site sign-in listed with how and from where; signing the other browser, the CLI and the developer site out ends each at once (refresh included); signing out here",
+  title: "sessions on Settings: this browser, another browser, an silicon-accounts CLI sign-in and a developer-site sign-in listed with how and from where; signing the other browser, the CLI and the developer site out ends each at once (refresh included); signing out here",
   async run(ctx) {
     const { env, results } = ctx;
     const t = tag();
@@ -30,7 +30,7 @@ const sessions: Journey = {
     // This browser's session is signed out from the first one, so its next page finds no session there (401).
     const second = await signInAgain(ctx, carbon.email, "acct-sessions-2", [/status of 401 \(Unauthorized\) @ \S+\/v1\/session$/]);
 
-    // The accounts CLI's headless code sign-in (aud=accounts tokens), labelled.
+    // The silicon-accounts CLI's headless code sign-in (aud=silicon-accounts tokens), labelled.
     const label = `e2e terminal ${t}`;
     const after = await lastSeq(env);
     const start = await api<{ challenge_id?: string }>(ctx, "/v1/cli/login/start", { method: "POST", json: { email: carbon.email } });
@@ -39,7 +39,7 @@ const sessions: Journey = {
     const bearer = { authorization: `Bearer ${signed.body.access_token ?? ""}` };
     const cliMe = await api<{ uuid?: string }>(ctx, "/v1/me", { headers: bearer });
     results.check("setup: the CLI is signed in as the Carbon", cliMe.status === 200 && cliMe.body.uuid === carbon.uuid, `${start.status} ${signed.status} ${cliMe.status}`);
-    const refresh = (token: string) => api<{ refresh_token?: string; error?: string }>(ctx, "/v1/oauth/token", { method: "POST", body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: token, client_id: "accounts" }), headers: { "content-type": "application/x-www-form-urlencoded" } });
+    const refresh = (token: string) => api<{ refresh_token?: string; error?: string }>(ctx, "/v1/oauth/token", { method: "POST", body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: token, client_id: "silicon-accounts" }), headers: { "content-type": "application/x-www-form-urlencoded" } });
     const rotated = await refresh(signed.body.refresh_token ?? "");
     results.check("setup: the CLI's refresh token rotates", rotated.status === 200 && !!rotated.body.refresh_token && rotated.body.refresh_token !== signed.body.refresh_token, String(rotated.status));
 
@@ -63,7 +63,7 @@ const sessions: Journey = {
     const fromSecond = (await call<{ items: SessionInfo[] }>(second.probe, "/v1/me/sessions")).body.items.find(item => item.current);
     results.check("the other browser sees its own session as the current one", fromSecond?.id === other?.id, `${fromSecond?.id} vs ${other?.id}`);
     const myApps = (await call<{ items: Array<{ app: { app_id: string } }> }>(probe, "/v1/me/apps")).body.items.map(item => item.app.app_id);
-    results.check("the developer site is a session of Silicon Accounts, not an app signed into (not on /v1/me/apps)", !myApps.includes("developer") && !myApps.includes("accounts"), JSON.stringify(myApps));
+    results.check("the developer site is a session of Silicon Accounts, not an app signed into (not on /v1/me/apps)", !myApps.includes("developer") && !myApps.includes("silicon-accounts"), JSON.stringify(myApps));
     // Like Silicon Accounts itself, the developer platform is first-party: it is signed out as a session, and asking to
     // remove it as an app says so (rather than claiming the Carbon never signed into it).
     const asApp = await call<{ error?: { message?: string; hint?: string } }>(probe, "/v1/me/apps/developer", { method: "DELETE" });

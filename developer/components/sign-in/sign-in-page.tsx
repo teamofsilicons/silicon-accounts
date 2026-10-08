@@ -19,14 +19,14 @@ const ERRORS: Record<string, string> = {
   access_denied: "You cancelled the sign-in, so you are not signed in to the developer site.",
   state_mismatch: "That sign-in was started in another tab, or took longer than 10 minutes. Start it again from here.",
   missing_code: "The sign-in came back without a code. Start it again.",
-  exchange_failed: "Silicon Accounts did not accept the sign-in's code. Start again; if it keeps happening, report it with `accounts report`.",
+  exchange_failed: "Silicon Accounts did not accept the sign-in's code. Start again; if it keeps happening, report it with `silicon-accounts report`.",
   api_unreachable: "Silicon Accounts could not be reached to finish the sign-in. Check your connection, then try again.",
   login_required: "Silicon Accounts needs you to sign in again.",
   interaction_required: "Silicon Accounts needs you to sign in again.",
   server_error: "Silicon Accounts had a problem finishing the sign-in. Try again in a moment.",
   temporarily_unavailable: "Silicon Accounts is busy for a moment. Try again shortly.",
   unauthorized_client: "This deployment of the developer site is not set up as a Silicon Accounts app yet (its sign-in was refused). Its maintainers need to register the `developer` app.",
-  invalid_request: "The sign-in request was refused by Silicon Accounts. Start again; if it keeps happening, report it with `accounts report`.",
+  invalid_request: "The sign-in request was refused by Silicon Accounts. Start again; if it keeps happening, report it with `silicon-accounts report`.",
 };
 
 export function SignInPage({ error, returnTo, signedOut }: { error: string | null; returnTo: string | null; signedOut: boolean }) {

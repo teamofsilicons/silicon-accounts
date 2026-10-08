@@ -148,7 +148,7 @@ export const device = {
 export const cliLogin = {
   /** `POST /v1/cli/login/start`: existing active Carbons only (404 account_not_found otherwise). */
   start: (contact: { email: string } | { phone: string; country?: string }) => request<CliLoginChallenge>("/v1/cli/login/start", { method: "POST", body: contact }),
-  /** `POST /v1/cli/login/verify`: first-party token response (aud=accounts). */
+  /** `POST /v1/cli/login/verify`: first-party token response (aud=silicon-accounts). */
   verify: (challengeId: string, code: string, clientLabel?: string) =>
     request<TokenResponse>("/v1/cli/login/verify", { method: "POST", body: { challenge_id: challengeId, code, client_label: clientLabel } }),
 };
@@ -201,7 +201,7 @@ export const me = {
   },
 
   apps: {
-    /** Apps I have signed into (the first-party `accounts` is never listed). */
+    /** Apps I have signed into (the first-party `silicon-accounts` is never listed). */
     list: (query?: PageQuery) => request<Page<MyApp>>("/v1/me/apps", { query: pageQuery(query) }),
     /** Removes an app's access (204): its sessions and User verification proofs about me are revoked and it is told. */
     removeAccess: (appId: string) => request<null>(`/v1/me/apps/${seg(appId)}`, { method: "DELETE" }),

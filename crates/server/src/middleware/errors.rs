@@ -63,7 +63,7 @@ pub fn to_oauth(path: &str, error: &ApiError) -> OAuthError {
             None => "the X-Request-Id header of this response".to_string(),
         };
         format!(
-            "Silicon Accounts failed while handling this request; this is a fault on our side, not in your request. Retry in a moment; if it keeps failing, report it with `accounts report \"<what you did>\"` and include {include}."
+            "Silicon Accounts failed while handling this request; this is a fault on our side, not in your request. Retry in a moment; if it keeps failing, report it with `silicon-accounts report \"<what you did>\"` and include {include}."
         )
     } else {
         match &error.hint {

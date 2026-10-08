@@ -215,7 +215,7 @@ async fn the_public_client_refreshes_first_party_tokens_only() {
     let rotated = assert_tokens(&r).clone();
     assert_eq!(
         rotated["membership_id"],
-        format!("accounts:{}", carbon.uuid)
+        format!("silicon-accounts:{}", carbon.uuid)
     );
     let jwks = ctx
         .call(router(), Req::get("/.well-known/jwks.json"))
@@ -224,7 +224,7 @@ async fn the_public_client_refreshes_first_party_tokens_only() {
     let claims = verify_with_jwks(
         &jwks,
         ctx.state.settings.issuer(),
-        "accounts",
+        "silicon-accounts",
         s(&rotated, "access_token"),
     );
     assert_eq!(claims["sub"], carbon.uuid.as_str());
@@ -323,4 +323,45 @@ async fn missing_or_wrong_kinds_of_refresh_tokens() {
     assert_oauth_error(&r, 400, "invalid_grant", "an authorization code");
     let r = refresh(&ctx, &app.app_id, &secret, "sar_unknown").await;
     assert_oauth_error(&r, 400, "invalid_grant", "not known");
+}
+
+#[tokio::test]
+async fn previous_cli_client_id_refreshes_to_the_canonical_identity() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let token = ctx
+        .tokens_for(&carbon, "silicon-accounts", &[Scope::Profile])
+        .await;
+    let r = ctx
+        .call(
+            router(),
+            Req::post("/v1/oauth/token").form(&[
+                ("grant_type", "refresh_token"),
+                ("client_id", "accounts"),
+                ("refresh_token", &token.refresh_token),
+            ]),
+        )
+        .await;
+    let result = assert_tokens(&r);
+    assert_eq!(
+        result["membership_id"],
+        format!("silicon-accounts:{}", carbon.uuid)
+    );
+    let claims = ctx
+        .state
+        .keys
+        .jwt
+        .verify_access(s(result, "access_token"), Some("silicon-accounts"))
+        .unwrap();
+    assert_eq!(claims.aud, "silicon-accounts");
+    let revoked = ctx
+        .call(
+            router(),
+            Req::post("/v1/oauth/revoke").form(&[
+                ("client_id", "accounts"),
+                ("token", s(result, "refresh_token")),
+            ]),
+        )
+        .await;
+    assert_eq!(revoked.json["revoked"], true);
 }

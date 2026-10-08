@@ -146,6 +146,7 @@ pub const RESERVED_HANDLES: &[&str] = &[
     "help",
     "security",
     "accounts",
+    "silicon-accounts",
     "account",
     "silicon",
     "silicons",

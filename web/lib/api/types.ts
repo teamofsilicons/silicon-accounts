@@ -254,7 +254,7 @@ export interface ContactChallenge {
   resend_available_at: Timestamp;
 }
 
-/** An app the account has signed into (`GET /v1/me/apps`). The first-party app `accounts` is never listed. */
+/** An app the account has signed into (`GET /v1/me/apps`). The first-party app `silicon-accounts` is never listed. */
 export interface MyApp {
   app: AppSummary;
   membership_id: string;
@@ -1096,7 +1096,7 @@ export type TokenRequest =
   | { grant_type: "authorization_code"; code: string; redirect_uri: string; code_verifier?: string; client_id?: string; client_secret?: string }
   | { grant_type: "refresh_token"; refresh_token: string; client_id?: string; client_secret?: string }
   | { grant_type: "urn:silicon:params:oauth:grant-type:slt" | "slt"; slt: string; client_id?: string; client_secret?: string }
-  | { grant_type: "urn:ietf:params:oauth:grant-type:device_code"; device_code: string; client_id: "accounts" };
+  | { grant_type: "urn:ietf:params:oauth:grant-type:device_code"; device_code: string; client_id: "silicon-accounts" };
 
 export interface Introspection {
   active: boolean;

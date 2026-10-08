@@ -1,5 +1,5 @@
 /**
- * The `accounts` CLI imports with the app's credentials: `accounts app import <file> --wait` follows the job to the
+ * The `silicon-accounts` CLI imports with the app's credentials: `silicon-accounts app import <file> --wait` follows the job to the
  * end and lists the first errors, `status`, `rows` and `list` read jobs back, --dry-run, --ignore-unknown-columns and
  * --idempotency-key do what they say, and every failure is precise (exit code, error code, hint).
  */
@@ -45,7 +45,7 @@ const show = (run: CliRun) => `exit ${run.code} in ${run.ms} ms; stdout ${run.st
 
 export const journey: Journey = {
   name: "imports-cli",
-  title: "the CLI: `accounts app import <csv|json> --wait` (counts, first errors), --dry-run, --ignore-unknown-columns, --idempotency-key, `import status|rows|list`, and precise failures (unknown columns, missing file, no or wrong secret)",
+  title: "the CLI: `silicon-accounts app import <csv|json> --wait` (counts, first errors), --dry-run, --ignore-unknown-columns, --idempotency-key, `import status|rows|list`, and precise failures (unknown columns, missing file, no or wrong secret)",
   // Only the API and the CLI are under test here: the engine makes no difference, so WebKit runs skip it.
   engines: ["chromium"],
   async run(ctx) {
@@ -82,7 +82,7 @@ async function walk(ctx: Parameters<Journey["run"]>[0], dir: string): Promise<vo
   writeFileSync(jsonFile, JSON.stringify({ rows: tagJsonRows((JSON.parse(readFileSync(join(FIXTURES, "dirty.json"), "utf8")) as { rows: Array<Record<string, unknown>> }).rows, `${t}j`, jsonExchange, row => row.external_id === "json-011").rows }));
 
   const help = await cli(env, home, ["app", "import", "--help"]);
-  results.check("`accounts app import --help` explains the file and every option", help.code === 0 && ["--default-country", "--dry-run", "--ignore-unknown-columns", "--update-existing", "--wait", "--idempotency-key", "status", "rows", "list"].every(word => help.stdout.includes(word)), show(help));
+  results.check("`silicon-accounts app import --help` explains the file and every option", help.code === 0 && ["--default-country", "--dry-run", "--ignore-unknown-columns", "--update-existing", "--wait", "--idempotency-key", "status", "rows", "list"].every(word => help.stdout.includes(word)), show(help));
 
   const seq = await lastSeq(env);
   const cleanRun = await run(["app", "import", clean, "--default-country", "US", "--wait", "--json"]);
@@ -180,7 +180,7 @@ async function walk(ctx: Parameters<Journey["run"]>[0], dir: string): Promise<vo
   // The same file piped in (stdin carries no size): refused once more than the limit has come through.
   const piped = await cliRaw(env, home, ["app", "import", "-", "--dry-run", "--json"], { stdin: huge, extraEnv: { ACCOUNTS_APP_ID: crm.app_id, ACCOUNTS_APP_SECRET: crm.secret } });
   const pipedError = (piped.json as CliJob | null)?.error;
-  results.check("the same 51 MB piped to `accounts app import -`: exit 2 payload_too_large (\"the CSV on stdin carries more than the 52428800 bytes one import accepts\")", piped.code === 2 && pipedError?.code === "payload_too_large" && /stdin carries more than the 52428800 bytes/.test(pipedError.message ?? ""), show(piped));
+  results.check("the same 51 MB piped to `silicon-accounts app import -`: exit 2 payload_too_large (\"the CSV on stdin carries more than the 52428800 bytes one import accepts\")", piped.code === 2 && pipedError?.code === "payload_too_large" && /stdin carries more than the 52428800 bytes/.test(pipedError.message ?? ""), show(piped));
   // A JSON file is re-encoded before it is sent, so the CLI checks the request body it would send.
   const bigJson = join(dir, `oversized-${t}.json`);
   const jsonRows = Array.from({ length: 6_600 }, (_, i) => ({ email: `big${i}.${t}@legacy-crm.test`, display_name: "J".repeat(8_000) }));

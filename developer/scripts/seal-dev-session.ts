@@ -1,7 +1,7 @@
 /**
  * Development only: seals a token pair into the developer site's session cookie, for checking pages against a local
  * stack without going through the hosted sign-in (for example before the `developer` app exists on that stack, with a
- * first-party token from `accounts login`).
+ * first-party token from `silicon-accounts login`).
  *
  *   ACCESS_TOKEN=eyJ… REFRESH_TOKEN=sar_… [EXPIRES_IN=1800] [SUB=a8K] pnpm seal-dev-session
  *

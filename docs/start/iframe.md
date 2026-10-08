@@ -22,11 +22,11 @@ of just `["http://localhost:3000"]` would delete every origin and redirect URI y
 have, and sign-in on those sites would stop. Add to what is there instead (with `jq`):
 
 ```sh
-CONFIG=$(accounts app config get --json)
+CONFIG=$(silicon-accounts app config get --json)
 echo "$CONFIG" | jq '.signin_config | {
   allowed_origins: (.allowed_origins + ["http://localhost:3000"]),
   redirect_uris: (.redirect_uris + ["http://localhost:3000/callback"])
-}' | accounts app config set - --expected-version "$(echo "$CONFIG" | jq .config_version)"
+}' | silicon-accounts app config set - --expected-version "$(echo "$CONFIG" | jq .config_version)"
 ```
 
 ```text

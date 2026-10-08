@@ -27,7 +27,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/silicons/login" -H 'Content-Type: application/
   "error": {
     "code": "invalid_credentials",
     "message": "Sign-in failed: no Silicon has this si:id, or the STK is wrong. Both cases get this same answer, so ids can't be probed.",
-    "hint": "Check the si:id (use the current one; ids can change) and the STK (stk- followed by the hex characters shown once at creation or rotation). 10 wrong STKs in a row lock sign-in for 1 minute. A lost STK can be replaced by the Silicon's custodian (`accounts silicon rotate-stk`)."
+    "hint": "Check the si:id (use the current one; ids can change) and the STK (stk- followed by the hex characters shown once at creation or rotation). 10 wrong STKs in a row lock sign-in for 1 minute. A lost STK can be replaced by the Silicon's custodian (`silicon-accounts silicon rotate-stk`)."
   }
 }
 ```
@@ -54,7 +54,7 @@ Everything except the three OAuth endpoints:
 ([OAuth errors](#oauth-errors)).
 
 Always log the `X-Request-Id` response header with an error; it identifies the request in the
-service's logs (`accounts report` and `POST /v1/reports` take it in the message).
+service's logs (`silicon-accounts report` and `POST /v1/reports` take it in the message).
 
 ## How to react, by status
 
@@ -104,11 +104,11 @@ service's logs (`accounts report` and `POST /v1/reports` take it in the message)
 
 | Code | Status | Cause and fix |
 |---|---|---|
-| `unauthenticated` | 401 | no credentials; sign in (`accounts login`) or send the app's Basic credentials |
+| `unauthenticated` | 401 | no credentials; sign in (`silicon-accounts login`) or send the app's Basic credentials |
 | `account_auth_required` | 401 | app credentials (Basic) were sent to an endpoint that acts for an account |
 | `invalid_authorization` | 401 | the `Authorization` header is unreadable or uses an unsupported scheme |
 | `invalid_token` | 401 | not an access token, a bad signature, or expired (access tokens last 30 minutes: refresh) |
-| `token_wrong_audience` | 401 | an app's token was used where a first-party (`aud = accounts`) token is needed, or a developer-platform token (`aud = developer`, `details.aud`) outside the routes it may use (`GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and the owner routes under `/v1/apps/{app_id}/…`); the message names the method and route |
+| `token_wrong_audience` | 401 | an app's token was used where a first-party (`aud = silicon-accounts`) token is needed, or a developer-platform token (`aud = developer`, `details.aud`) outside the routes it may use (`GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and the owner routes under `/v1/apps/{app_id}/…`); the message names the method and route |
 | `token_revoked` | 401 | the sign-in behind the token ended (signed out, STK rotated, account deleted, refresh token reuse); the message says when and why; sign in again |
 | `session_expired` | 401 | the session cookie was signed out, revoked or expired |
 | `account_deleted` | 401 / 403 / 404 / 409 | the account was deleted: 401 for its own tokens, 403 at Silicon sign-in, 404 at lookups, 409 when it happened during the request |
@@ -201,7 +201,7 @@ service's logs (`accounts report` and `POST /v1/reports` take it in the message)
 | Code | Status | Cause and fix |
 |---|---|---|
 | `membership_not_found` | 404 | you never signed into that app |
-| `first_party_app` | 400 / 422 | the account site (`accounts`) can't lose access (400) or get a short-lived token (422) |
+| `first_party_app` | 400 / 422 | the account site (`silicon-accounts`) can't lose access (400) or get a short-lived token (422) |
 | `session_not_found` | 404 | not a session of yours (an app's sign-in is removed with `DELETE /v1/me/apps/{app_id}`) |
 | `invalid_history_kind` | 400 | `kind` isn't `signin`, `id_change`, `custodian`, `proof`, `app_access` or `security` |
 | `requirements_missing` | 409 | the app requires a detail the account lacks (`details.missing`); add it, then retry |
@@ -249,7 +249,7 @@ outside the app's `google.hosted_domain`), `signup_expired`, `session_changed` (
 |---|---|---|
 | `device_code_not_found` | 404 | no device sign-in waits for this user code |
 | `device_code_used` | 409 | already approved or denied |
-| `device_code_expired` | 410 | user codes last 10 minutes; run `accounts login` again |
+| `device_code_expired` | 410 | user codes last 10 minutes; run `silicon-accounts login` again |
 
 ## Silicons and custodians
 
@@ -304,7 +304,7 @@ Import rows carry their own message codes (`missing_identifier`, `ambiguous_matc
 | `subject_token_wrong_app` | 403 | the subject token belongs to another app (`details.token_app`) |
 | `app_verification_single_app` | 422 | an app verification request named apps in `audiences`: an app verification proof is for exactly one app; send `{"receiving_app": "…"}` once per app (`details.field`, `details.apps`) |
 | `unknown_receiving_app` | 400 | the receiving app doesn't exist (`details.app_ids`) |
-| `invalid_receiving_app` | 400 | the issuer itself, or Silicon Accounts itself (`accounts`, `developer`) |
+| `invalid_receiving_app` | 400 | the issuer itself, or Silicon Accounts itself (`silicon-accounts`, `developer`) |
 | `receiving_app_disabled` | 403 | the receiving app is disabled |
 | `invalid_proof_refresh_token` | 400 | not a `sapr_` token, or unknown (mistyped, another environment, or its proof ended over 30 days ago) |
 | `not_issuing_app` | 403 | only the issuing app refreshes or revokes a proof |
@@ -372,7 +372,7 @@ Webhook verification (`WebhookError`): `EmptySecret`, `MissingHeader`, `InvalidT
 `SignatureMismatch`, `InvalidBody`. Reject the delivery (answer 400 or 401) in every case.
 Details: [Rust client](rust-client.md#errors).
 
-The `accounts` CLI prints these same codes (with `--json`:
+The `silicon-accounts` CLI prints these same codes (with `--json`:
 `{"error":{"code","message","hint","exit_code","status","request_id","details"}}`) and maps them
 to exit codes ([Exit codes](cli.md#exit-codes)). It also has codes of its own, for problems it
 finds without asking the service (`not_signed_in`, `wrong_account_kind`, `invalid_arguments`,

@@ -30,7 +30,7 @@ const EXTRA_SCENARIOS: Scenario[] = [
   "details_missing", "details_added", "details_profile", "details_step1", "declined", "failed",
 ];
 
-export const appOf = (appId: string): AppPublic => (appId === "accounts" ? FIRST_PARTY : appPublic(appId) ?? FIRST_PARTY);
+export const appOf = (appId: string): AppPublic => (appId === "silicon-accounts" ? FIRST_PARTY : appPublic(appId) ?? FIRST_PARTY);
 export const apiError = (status: number, code: string, message: string, hint?: string, details?: Record<string, unknown>) => ({ status, json: { error: { code, message, hint, details } } });
 export const flowJson = (flow: unknown) => ({ json: { flow } });
 const parse = (id: string): { app: AppPublic; scenario: Scenario } => {
@@ -72,7 +72,7 @@ export const flowRoutes: MockRoute[] = [
     }
     const method = typeof input.method === "string" ? input.method : null;
     const scenario: Scenario = method === "google" ? "opening_google" : method === "apple" ? "opening_apple" : method === "email" ? "email_direct" : input.intent === "signup" ? "signup_intent" : "choose_method";
-    return { status: 201, json: { flow: sampleFlow(appOf(appId || "accounts"), scenario) } };
+    return { status: 201, json: { flow: sampleFlow(appOf(appId || "silicon-accounts"), scenario) } };
   }],
   ["POST /v1/flows/:id/email", ({ params }) => advance(params.id ?? "", "email")],
   ["POST /v1/flows/:id/phone", ({ params }) => advance(params.id ?? "", "phone")],
@@ -111,7 +111,7 @@ export const deviceRoutes: MockRoute[] = [
   ["GET /v1/device/:code", ({ params }) => {
     const code = params.code ?? "";
     const status = code.startsWith("EXPD") ? "expired" : code.startsWith("USED") ? "consumed" : "pending";
-    return { json: { user_code: code, client_label: "accounts CLI on saket-mbp", created_at: minutesFromNow(-1), expires_at: minutesFromNow(status === "expired" ? -2 : 9), status } };
+    return { json: { user_code: code, client_label: "silicon-accounts CLI on saket-mbp", created_at: minutesFromNow(-1), expires_at: minutesFromNow(status === "expired" ? -2 : 9), status } };
   }],
   ["POST /v1/device/:code/approve", () => ({ status: 204 })],
   ["POST /v1/device/:code/deny", () => ({ status: 204 })],
@@ -213,7 +213,7 @@ const interactionScreens: ScreenSpec[] = [
       await page.waitForTimeout(900);
     },
   },
-  { name: "auth-first-party", path: flowPath("accounts", "choose_method"), as: "signed-out", routes: flowRoutes, waitFor: READY },
+  { name: "auth-first-party", path: flowPath("silicon-accounts", "choose_method"), as: "signed-out", routes: flowRoutes, waitFor: READY },
   {
     // No fake app uses a background image: briefcase with one (and a logo-only header), to see the image treatment.
     name: "auth-branding-image",

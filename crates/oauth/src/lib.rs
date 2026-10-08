@@ -1,6 +1,6 @@
 //! # silicon-accounts-oauth (`accounts_oauth`)
 //!
-//! The OAuth 2.0 and OIDC surface of Silicon Accounts: how apps (and the accounts CLI)
+//! The OAuth 2.0 and OIDC surface of Silicon Accounts: how apps (and the silicon-accounts CLI)
 //! turn a finished sign-in into tokens, keep them fresh, check them and end them.
 //!
 //! | route | what |
@@ -11,7 +11,7 @@
 //! | `GET`/`POST /v1/userinfo` | the account as the token's app may see it, plus the OIDC claim names |
 //! | `GET /.well-known/openid-configuration` | OIDC discovery |
 //! | `GET /.well-known/jwks.json` | the Ed25519 key that signs access tokens and `id_tokens` |
-//! | `POST /v1/device/authorize` | RFC 8628: starts a device sign-in for the accounts CLI |
+//! | `POST /v1/device/authorize` | RFC 8628: starts a device sign-in for the silicon-accounts CLI |
 //!
 //! Rules that hold across the crate:
 //! - `/v1/oauth/*` answer errors as RFC 6749 bodies (`{"error","error_description"}`) because
@@ -19,7 +19,7 @@
 //!   Token, revocation and introspection responses are never cacheable (`Cache-Control: no-store`).
 //! - Clients authenticate with HTTP Basic or `client_id` + `client_secret` in the body. Two
 //!   first-party public clients need no secret, and each only ever touches its own tokens:
-//!   `client_id=accounts` (the accounts CLI: the `refresh_token` and device-code grants, and
+//!   `client_id=silicon-accounts` (the silicon-accounts CLI: the `refresh_token` and device-code grants, and
 //!   revocation) and `client_id=developer` (the developer platform: `authorization_code` with
 //!   PKCE S256 required, `refresh_token`, and revocation).
 //! - An authorization code is consumed and its tokens issued in one transaction that holds the

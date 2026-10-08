@@ -28,7 +28,7 @@ const rowsOf = (page: Json | undefined) => ((Array.isArray(page?.fields) ? page.
 
 export const journey: Journey = {
   name: "silicons-cli-slt",
-  title: "a Silicon signs into remind and briefcase with `accounts login --app`: one command signs in and prints a 2-minute single-use token bound to the app; signed in, it is returned directly; the apps exchange it (and only once, only for themselves); a Carbon's token carries the app's required details and only the optional ones it ticked on the app's pages (v2), a missing required phone is asked for, and the first-party apps get none",
+  title: "a Silicon signs into remind and briefcase with `silicon-accounts login --app`: one command signs in and prints a 2-minute single-use token bound to the app; signed in, it is returned directly; the apps exchange it (and only once, only for themselves); a Carbon's token carries the app's required details and only the optional ones it ticked on the app's pages (v2), a missing required phone is asked for, and the first-party apps get none",
   // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
   engines: ["chromium"],
   async run(ctx) {
@@ -47,7 +47,7 @@ export const journey: Journey = {
     const first = await loginSilicon(env, home, sid, stk, ["--app", "remind"]);
     const slt = str(first.json?.slt);
     const ttl = (Date.parse(str(first.json?.expires_at)) - Date.now()) / 1000;
-    results.check("`accounts login --silicon … --app remind --json`: {slt, app_id, expires_at}", first.code === 0 && slt.startsWith("slt_") && first.json?.app_id === "remind" && Object.keys(first.json ?? {}).sort().join(",") === "app_id,expires_at,slt", said(first).replace(slt, "slt_…"));
+    results.check("`silicon-accounts login --silicon … --app remind --json`: {slt, app_id, expires_at}", first.code === 0 && slt.startsWith("slt_") && first.json?.app_id === "remind" && Object.keys(first.json ?? {}).sort().join(",") === "app_id,expires_at,slt", said(first).replace(slt, "slt_…"));
     results.check("…valid for 2 minutes", ttl > 100 && ttl <= 121, `${ttl.toFixed(1)} s`);
     const status = await accounts(env, ["login", "status", "--json"], { home });
     results.check("…and the CLI stays signed in as the Silicon", status.json?.authenticated === true && status.json?.id === sid, said(status));
@@ -55,10 +55,10 @@ export const journey: Journey = {
     // 2. Already signed in: the SLT comes directly, no STK needed.
     const direct = await accounts(env, ["login", "--app", "briefcase", "--json"], { home });
     const sltB = str(direct.json?.slt);
-    results.check("signed in already, `accounts login --app briefcase` returns an SLT directly", direct.code === 0 && sltB.startsWith("slt_") && direct.json?.app_id === "briefcase", said(direct).replace(sltB, "slt_…"));
+    results.check("signed in already, `silicon-accounts login --app briefcase` returns an SLT directly", direct.code === 0 && sltB.startsWith("slt_") && direct.json?.app_id === "briefcase", said(direct).replace(sltB, "slt_…"));
     const plain = await accounts(env, ["login", "--app", "remind"], { home });
     const lines = plain.stdout.trim().split("\n");
-    results.check("in text mode stdout is only the token (ready for $(accounts login --app …))", plain.code === 0 && lines.length === 1 && /^slt_[A-Za-z0-9_-]+$/.test(lines[0] ?? ""), `${lines.length} line(s)`);
+    results.check("in text mode stdout is only the token (ready for $(silicon-accounts login --app …))", plain.code === 0 && lines.length === 1 && /^slt_[A-Za-z0-9_-]+$/.test(lines[0] ?? ""), `${lines.length} line(s)`);
 
     // 3. The apps exchange them.
     const remind = await appSltLogin(env, "remind", slt);
@@ -95,16 +95,16 @@ export const journey: Journey = {
     const expired = await appSltLogin(env, "remind", str(late?.slt));
     results.check("an SLT past its 2 minutes is refused (invalid_grant)", expired.body.ok !== true && str(obj(expired.body.error).error) === "invalid_grant", short(expired.body));
 
-    // 5. The app's side with the CLI: `accounts app token slt` exchanges an SLT with the app's credentials.
+    // 5. The app's side with the CLI: `silicon-accounts app token slt` exchanges an SLT with the app's credentials.
     const forCli = (await accounts(env, ["login", "--app", "remind", "--json"], { home })).json;
     const exchanged = await accounts(env, ["app", "token", "slt", str(forCli?.slt), "--app-id", "remind", "--app-secret-stdin", "--json"], { home: freshDir(), stdin: `${appSecret("remind")}\n` });
-    results.check("`accounts app token slt <slt>` (app mode) exchanges it for the Silicon's tokens", exchanged.code === 0 && str(exchanged.json?.access_token).length > 20 && str(exchanged.json?.membership_id) === `remind:${uuid}`, said(exchanged).replace(/"(access|refresh)_token":\s*"[^"]+"/g, '"$1_token":"…"'));
+    results.check("`silicon-accounts app token slt <slt>` (app mode) exchanges it for the Silicon's tokens", exchanged.code === 0 && str(exchanged.json?.access_token).length > 20 && str(exchanged.json?.membership_id) === `remind:${uuid}`, said(exchanged).replace(/"(access|refresh)_token":\s*"[^"]+"/g, '"$1_token":"…"'));
 
     // 6. Refusals for the token itself.
     const unknownApp = await accounts(env, ["login", "--app", `nosuch-${t}`, "--json"], { home });
     results.check("an app that doesn't exist: exit 4", unknownApp.code === 4, said(unknownApp));
-    const firstParty = await accounts(env, ["login", "--app", "accounts", "--json"], { home });
-    results.check("'accounts' itself: exit 2, first_party_app", firstParty.code === 2 && cliError(firstParty).code === "first_party_app", said(firstParty));
+    const firstParty = await accounts(env, ["login", "--app", "silicon-accounts", "--json"], { home });
+    results.check("'silicon-accounts' itself: exit 2, first_party_app", firstParty.code === 2 && cliError(firstParty).code === "first_party_app", said(firstParty));
     // The developer site is Silicon Accounts' other first-party app (build spec 06-v2 §2: a public client with no secret).
     // The token endpoint refuses it the SLT grant, so a token minted for it could never be exchanged by anyone.
     const developer = await accounts(env, ["login", "--app", "developer", "--json"], { home });
@@ -112,7 +112,7 @@ export const journey: Journey = {
       ? await json<Json>(`${env.site}/v1/oauth/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": ctx.ip }, body: new URLSearchParams({ grant_type: "slt", slt: str(developer.json?.slt), client_id: "developer" }).toString() })
       : null;
     results.check(
-      "'developer' (the developer site, first-party like 'accounts'): refused the same way (exit 2, first_party_app), not handed a token nobody can exchange",
+      "'developer' (the developer site, first-party like 'silicon-accounts'): refused the same way (exit 2, first_party_app), not handed a token nobody can exchange",
       developer.code === 2 && cliError(developer).code === "first_party_app",
       `${said(developer).replace(str(developer.json?.slt), "slt_…")}${developerExchange ? ` | exchanging that token as the client 'developer': ${developerExchange.status} ${short(developerExchange.body, 260)}` : ""}`,
     );
@@ -121,7 +121,7 @@ export const journey: Journey = {
     const apps = await accounts(env, ["apps", "list", "--json"], { home });
     const items = (apps.json?.items ?? []) as Json[];
     const of = (app: string) => items.find(item => obj(item.app).app_id === app);
-    results.check("`accounts apps list` (as the Silicon): remind and briefcase, active, through SLTs", of("remind")?.status === "active" && of("briefcase")?.status === "active" && of("remind")?.source === "slt", short(items.map(item => [obj(item.app).app_id, item.status, item.source])));
+    results.check("`silicon-accounts apps list` (as the Silicon): remind and briefcase, active, through SLTs", of("remind")?.status === "active" && of("briefcase")?.status === "active" && of("remind")?.source === "slt", short(items.map(item => [obj(item.app).app_id, item.status, item.source])));
     const users = await asApp<Json>(ctx, "remind", "GET", `/v1/apps/remind/users?q=${encodeURIComponent(sid)}`);
     const user = ((users.body.items ?? []) as Json[]).find(item => obj(item.account).uuid === uuid || item.uuid === uuid);
     results.check("remind's user base has the Silicon (kind silicon, source slt)", !!user && JSON.stringify(user).includes('"silicon"') && JSON.stringify(user).includes('"slt"'), `${users.status} ${short(user ?? users.body)}`);
@@ -135,7 +135,7 @@ export const journey: Journey = {
     await loginCarbon(env, carbonHome, carbon);
     const carbonSlt = await accounts(env, ["login", "--app", "briefcase", "--json"], { home: carbonHome });
     const carbonIn = await appSltLogin(env, "briefcase", str(carbonSlt.json?.slt));
-    results.check("a Carbon's `accounts login --app briefcase` works too (its email is shared, briefcase requires it)", carbonIn.body.ok === true && carbonIn.body.kind === "carbon" && obj(carbonIn.body.account).email === carbon.email, short(carbonIn.body.error ?? carbonIn.body.account));
+    results.check("a Carbon's `silicon-accounts login --app briefcase` works too (its email is shared, briefcase requires it)", carbonIn.body.ok === true && carbonIn.body.kind === "carbon" && obj(carbonIn.body.account).email === carbon.email, short(carbonIn.body.error ?? carbonIn.body.account));
     results.check(
       "…and only what briefcase requires: profile + email, not the optional timezone the Carbon never ticked",
       JSON.stringify(scopesOf(carbonIn)) === JSON.stringify(["email", "profile"]) && !obj(carbonIn.body.account).timezone,
@@ -145,7 +145,7 @@ export const journey: Journey = {
     // shows nothing of it), nor offered its optional timezone.
     const firstOnPages = await signInToApp(env, carbon, "briefcase", { share: ["timezone"] });
     results.check(
-      "the Carbon's first sign-in on briefcase's own pages, after only `accounts login --app briefcase`, shows briefcase's what's-shared page (email required, timezone optional and unticked)",
+      "the Carbon's first sign-in on briefcase's own pages, after only `silicon-accounts login --app briefcase`, shows briefcase's what's-shared page (email required, timezone optional and unticked)",
       firstOnPages.pages.length === 1 && JSON.stringify(rowsOf(firstOnPages.pages[0])) === JSON.stringify(["email:required:shared", "timezone:optional:not shared"]),
       firstOnPages.pages.length ? `pages ${short(firstOnPages.pages.map(rowsOf))}` : "no details page: the hosted sign-in went straight back to briefcase (the SLT's membership counts as having seen it), so the Carbon was never shown what briefcase gets nor offered the timezone",
     );
@@ -163,7 +163,7 @@ export const journey: Journey = {
     );
     const withTimezone = await appSltLogin(env, "briefcase", str((await accounts(env, ["login", "--app", "briefcase", "--json"], { home: secondHome })).json?.slt));
     results.check(
-      "…then its `accounts login --app briefcase` token carries the ticked timezone too (profile + email + timezone)",
+      "…then its `silicon-accounts login --app briefcase` token carries the ticked timezone too (profile + email + timezone)",
       JSON.stringify(scopesOf(withTimezone)) === JSON.stringify(["email", "profile", "timezone"]) && obj(withTimezone.body.account).timezone === "Asia/Kolkata",
       `scope ${scopesOf(withTimezone).join(" ")}; ${short(withTimezone.body.account, 200)}`,
     );
@@ -184,8 +184,8 @@ export const journey: Journey = {
     //     and not the email (optional there, never ticked).
     const noPhone = await accounts(env, ["login", "--app", "dm", "--json"], { home: secondHome });
     results.check(
-      "`accounts login --app dm` without a phone: exit 5, requirements_missing naming the phone, and how to add it (`accounts phone add`) or let dm's pages ask for it",
-      noPhone.code === 5 && cliError(noPhone).code === "requirements_missing" && JSON.stringify(obj(cliError(noPhone).details).missing) === '["phone"]' && str(cliError(noPhone).hint).includes("accounts phone add") && /phone number/.test(str(cliError(noPhone).message)),
+      "`silicon-accounts login --app dm` without a phone: exit 5, requirements_missing naming the phone, and how to add it (`silicon-accounts phone add`) or let dm's pages ask for it",
+      noPhone.code === 5 && cliError(noPhone).code === "requirements_missing" && JSON.stringify(obj(cliError(noPhone).details).missing) === '["phone"]' && str(cliError(noPhone).hint).includes("silicon-accounts phone add") && /phone number/.test(str(cliError(noPhone).message)),
       said(noPhone),
     );
     const phone = await freshPhone(env);
@@ -195,7 +195,7 @@ export const journey: Journey = {
     const verified = await accounts(env, ["phone", "verify", str(added.json?.challenge_id), code, "--json"], { home: secondHome });
     const dmIn = await appSltLogin(env, "dm", str((await accounts(env, ["login", "--app", "dm", "--json"], { home: secondHome })).json?.slt));
     results.check(
-      "after `accounts phone add` + `accounts phone verify`, the token works: dm gets the phone (required), not the email (optional, never ticked)",
+      "after `silicon-accounts phone add` + `silicon-accounts phone verify`, the token works: dm gets the phone (required), not the email (optional, never ticked)",
       added.code === 0 && verified.code === 0 && dmIn.body.ok === true && JSON.stringify(scopesOf(dmIn)) === JSON.stringify(["phone", "profile"]) && obj(dmIn.body.account).phone === phone && !obj(dmIn.body.account).email,
       `${said(added)} | ${said(verified)} | scope ${scopesOf(dmIn).join(" ")} ${short(dmIn.body.error ?? dmIn.body.account, 200)}`,
     );

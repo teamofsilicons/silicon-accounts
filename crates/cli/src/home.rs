@@ -3,7 +3,7 @@
 //! State lives in `{home}/.accounts/`. The home is, first match wins:
 //! 1. `--home <dir>`
 //! 2. `ACCOUNTS_HOME`
-//! 3. the directory set with `accounts config home <dir>` (stored as a one-line pointer
+//! 3. the directory set with `silicon-accounts config home <dir>` (stored as a one-line pointer
 //!    file in `{base}/.accounts/home`, where base is `$SILICON_HOME` or `~`)
 //! 4. `$SILICON_HOME`
 //! 5. `~`
@@ -22,10 +22,10 @@ use crate::error::{CliError, CliResult, EXIT_INVALID};
 
 /// Name of the state directory inside the home.
 pub const STATE_DIR: &str = ".accounts";
-/// Pointer file written by `accounts config home`.
+/// Pointer file written by `silicon-accounts config home`.
 pub const POINTER_FILE: &str = "home";
 
-/// Where the home came from (shown by `accounts config home` / `config get`).
+/// Where the home came from (shown by `silicon-accounts config home` / `config get`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HomeSource {
     Flag,
@@ -40,7 +40,10 @@ impl HomeSource {
         match self {
             Self::Flag => "--home".to_owned(),
             Self::AccountsHomeEnv => "ACCOUNTS_HOME".to_owned(),
-            Self::Pointer(path) => format!("`accounts config home`, stored in {}", path.display()),
+            Self::Pointer(path) => format!(
+                "`silicon-accounts config home`, stored in {}",
+                path.display()
+            ),
             Self::SiliconHome => "SILICON_HOME".to_owned(),
             Self::UserHome => "default (~)".to_owned(),
         }
@@ -123,7 +126,7 @@ fn not_a_directory(dir: &Path, why: &str, source: &str) -> CliError {
             "not a directory: {} ({why}; set by {source})",
             dir.display()
         ),
-        "Point it at an existing directory (create it first with mkdir -p), or reset it: `accounts config home --reset` for the configured home, or unset the variable.",
+        "Point it at an existing directory (create it first with mkdir -p), or reset it: `silicon-accounts config home --reset` for the configured home, or unset the variable.",
     )
 }
 
@@ -148,7 +151,10 @@ pub fn resolve(flag: Option<&Path>) -> CliResult<Home> {
     if let Some(configured) = read_pointer(&pointer)? {
         require_dir(
             &configured,
-            &format!("`accounts config home`, stored in {}", pointer.display()),
+            &format!(
+                "`silicon-accounts config home`, stored in {}",
+                pointer.display()
+            ),
         )?;
         return Ok(Home {
             dir: configured,
@@ -235,7 +241,7 @@ pub fn write_json<T: Serialize>(path: &Path, value: &T) -> CliResult<()> {
             1,
             "internal",
             format!("Could not encode {} as JSON: {e}.", path.display()),
-            "Report this with `accounts report`.",
+            "Report this with `silicon-accounts report`.",
         )
     })?;
     bytes.push(b'\n');

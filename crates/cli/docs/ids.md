@@ -14,7 +14,7 @@ Every Carbon and Silicon gets a uuid when the account is created. It is made of
 `a-z`, `A-Z` and `0-9` (case-sensitive), starts at 3 characters and grows to 4 once
 every 3-character uuid is used, and so on. It never changes and is never reused, even
 after the account is deleted. Apps must store the uuid: it is the only thing that
-stays the same. `accounts lookup <uuid>` always returns the current id.
+stays the same. `silicon-accounts lookup <uuid>` always returns the current id.
 
 ## c:id and si:id
 
@@ -23,18 +23,18 @@ case-insensitive (stored lowercase); the prefix doesn't count. `c:saket` and
 `si:saket` are different ids. A few words are reserved (admin, root, support, …).
 
 ```sh
-accounts id available c:saket        # exit 0 available, 5 taken or reserved, 2 invalid
-accounts id change c:saket_dev
+silicon-accounts id available c:saket        # exit 0 available, 5 taken or reserved, 2 invalid
+silicon-accounts id change c:saket_dev
 ```
 
-When an id can't be taken, `accounts id available` lists free ids close to it
+When an id can't be taken, `silicon-accounts id available` lists free ids close to it
 (`suggestions` in `--json`), and the next-step hint offers the first one.
 
 When an id changes, the old one stays reserved for **10 days**: nobody else can take
-it, and its previous owner can take it back (`accounts id available` shows
+it, and its previous owner can take it back (`silicon-accounts id available` shows
 `reclaimable: true` to them). A custodian asks for one of its Silicons with
-`accounts id available si:scout --for si:scout_v2`: an old id of that Silicon shows as
-reclaimable for it, and `accounts silicon id si:scout_v2 si:scout` takes it back. After the
+`silicon-accounts id available si:scout --for si:scout_v2`: an old id of that Silicon shows as
+reclaimable for it, and `silicon-accounts silicon id si:scout_v2 si:scout` takes it back. After the
 10 days it becomes available again. Every app the
 account signed into gets `account.id_changed`, which is why apps key on the uuid.
 An account's id can change at most 5 times in any 24 hours (a Silicon's custodian's

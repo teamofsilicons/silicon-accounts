@@ -186,7 +186,7 @@ export function Silicons() {
                 {item => <Tile silicon={item} now={now} fresh={fresh === item.uuid} onOpen={() => open(item.uuid)} />}
               </AnimatedRows>
             )}
-            <ListCap page={silicons.data} noun="Silicons" command="accounts silicon list" />
+            <ListCap page={silicons.data} noun="Silicons" command="silicon-accounts silicon list" />
           </Section>
 
           <SiliconDrawer

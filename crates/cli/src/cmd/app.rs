@@ -1,4 +1,4 @@
-//! App mode: `accounts app …`.
+//! App mode: `silicon-accounts app …`.
 
 use std::io::Read;
 use std::path::Path;
@@ -81,8 +81,11 @@ async fn run_selected(
                 json,
                 format!("{}acting as     {acting}\n", render_app(&details)),
             )
-            .next("accounts app config get", "the full sign-in setup as JSON")
-            .next("accounts app users", "the user base"))
+            .next(
+                "silicon-accounts app config get",
+                "the full sign-in setup as JSON",
+            )
+            .next("silicon-accounts app users", "the user base"))
         }
         AppCommand::Config(config) => match config.command {
             AppConfigCommand::Get => {
@@ -99,7 +102,7 @@ async fn run_selected(
                 )
                 .next(
                     format!(
-                        "accounts app config set <patch.json> --expected-version {}",
+                        "silicon-accounts app config set <patch.json> --expected-version {}",
                         details.config_version
                     ),
                     "change it",
@@ -144,7 +147,7 @@ async fn run_selected(
                             details.app_id, details.config_version
                         ),
                     )
-                    .next("accounts app config get", "the full sign-in setup"));
+                    .next("silicon-accounts app config get", "the full sign-in setup"));
                 }
                 // What changed: the history entry of this version (the paths that differ, not
                 // every key of the patch).
@@ -176,7 +179,7 @@ async fn run_selected(
                         details.app_id, details.config_version
                     ),
                 )
-                .next("accounts app config history", "see every change"))
+                .next("silicon-accounts app config history", "see every change"))
             }
             AppConfigCommand::History { limit, cursor } => {
                 let page = app
@@ -259,7 +262,7 @@ async fn run_selected(
                 ),
             )
             .next(
-                "accounts app user <uuid>",
+                "silicon-accounts app user <uuid>",
                 "one account with its last sign-ins",
             ))
         }
@@ -426,7 +429,7 @@ async fn use_app(
     };
     let selection = AppSelection {
         app_id: app_id.clone(),
-        id_source: "accounts app use",
+        id_source: "silicon-accounts app use",
         secret: secret.clone(),
         secret_source: secret.as_ref().map(|_| "--secret-stdin"),
     };
@@ -459,8 +462,8 @@ async fn use_app(
         json!({ "app_id": app_id, "name": details.name, "mode": if secret.is_some() { "app_credentials" } else { "owner_session" }, "secret_file": secret.as_ref().map(|_| path.display().to_string()) }),
         format!("Using {} ({}) {how}.", details.app_id, details.name),
     )
-    .next("accounts app show", "the app and its sign-in setup")
-    .next("accounts app users", "its user base"))
+    .next("silicon-accounts app show", "the app and its sign-in setup")
+    .next("silicon-accounts app users", "its user base"))
 }
 
 async fn list_owned(ctx: &Ctx) -> CliResult<Outcome> {
@@ -490,8 +493,11 @@ async fn list_owned(ctx: &Ctx) -> CliResult<Outcome> {
             "You don't own any app yet.",
         ),
     )
-    .next("accounts app use <app_id>", "manage one")
-    .next("accounts app new", "make a new app (in Silicon Apps)"))
+    .next("silicon-accounts app use <app_id>", "manage one")
+    .next(
+        "silicon-accounts app new",
+        "make a new app (in Silicon Apps)",
+    ))
 }
 
 async fn new_app(ctx: &Ctx, no_browser: bool) -> CliResult<Outcome> {
@@ -508,7 +514,7 @@ async fn new_app(ctx: &Ctx, no_browser: bool) -> CliResult<Outcome> {
         .unwrap_or_else(|| "https://developers.teamofsilicons.com".to_owned());
     let opened = !no_browser && util::open_browser(&url);
     let text = format!(
-        "Apps are created in Silicon Apps: {url}{}\nAs soon as it exists there, it can sign people in. Set up its sign-in on the developer platform ({developer_url}), or here with `accounts app use <app_id> --secret-stdin` and `accounts app config set`.",
+        "Apps are created in Silicon Apps: {url}{}\nAs soon as it exists there, it can sign people in. Set up its sign-in on the developer platform ({developer_url}), or here with `silicon-accounts app use <app_id> --secret-stdin` and `silicon-accounts app config set`.",
         if opened {
             " (opened in your browser)"
         } else {
@@ -532,16 +538,19 @@ async fn run_import(ctx: &Ctx, app: &AppClient<'_>, args: ImportArgs) -> CliResu
                 app.import_job(&job).await?
             };
             let mut outcome = Outcome::new(to_json(&job), render_job(&job)).next(
-                format!("accounts app import rows {} --outcome error", job.id),
+                format!(
+                    "silicon-accounts app import rows {} --outcome error",
+                    job.id
+                ),
                 "rows with errors",
             );
             if job.dry_run && job.status == "completed" {
                 outcome = outcome.next(
-                    "accounts app import <file> --wait",
+                    "silicon-accounts app import <file> --wait",
                     "import the same file for real (without --dry-run)",
                 );
             }
-            // A failed job is a failure, as for `accounts app import <file> --wait`, so a script
+            // A failed job is a failure, as for `silicon-accounts app import <file> --wait`, so a script
             // following a job learns it from the exit code.
             Ok(outcome.exit(import_exit(&job)))
         }
@@ -622,7 +631,7 @@ async fn run_import(ctx: &Ctx, app: &AppClient<'_>, args: ImportArgs) -> CliResu
             let Some(file) = args.file.clone() else {
                 return Err(CliError::invalid(
                     "Nothing to import: pass a CSV or JSON file (or - for stdin), or a subcommand (status, rows, list).",
-                    "Example: accounts app import users.csv --default-country US --wait",
+                    "Example: silicon-accounts app import users.csv --default-country US --wait",
                 ));
             };
             let format = match args.format {
@@ -717,11 +726,14 @@ async fn run_import(ctx: &Ctx, app: &AppClient<'_>, args: ImportArgs) -> CliResu
                     format!("Started import job {} ({}){dry}.", job.id, job.status),
                 )
                 .next(
-                    format!("accounts app import status {} --wait", job.id),
+                    format!("silicon-accounts app import status {} --wait", job.id),
                     "follow it",
                 )
                 .next(
-                    format!("accounts app import rows {} --outcome error", job.id),
+                    format!(
+                        "silicon-accounts app import rows {} --outcome error",
+                        job.id
+                    ),
                     "rows with errors",
                 ));
             }
@@ -754,7 +766,10 @@ async fn run_import(ctx: &Ctx, app: &AppClient<'_>, args: ImportArgs) -> CliResu
             let mut json = to_json(&job);
             json["first_errors"] = to_json(&errors);
             let mut outcome = Outcome::new(json, text).next(
-                format!("accounts app import rows {} --outcome error", job.id),
+                format!(
+                    "silicon-accounts app import rows {} --outcome error",
+                    job.id
+                ),
                 "every row with an error",
             );
             if job.dry_run && job.status == "completed" {
@@ -800,7 +815,7 @@ async fn wait_import(ctx: &Ctx, app: &AppClient<'_>, job_id: &str) -> CliResult<
             crate::error::EXIT_INTERRUPTED,
             "interrupted",
             format!("Stopped following import {job_id}; it keeps running."),
-            format!("Follow it again with `accounts app import status {job_id} --wait`."),
+            format!("Follow it again with `silicon-accounts app import status {job_id} --wait`."),
         )),
     }
 }
@@ -880,9 +895,9 @@ fn import_exit(job: &ImportJob) -> i32 {
     }
 }
 
-/// `accounts app import <file> …` with the flags of a dry run, minus --dry-run.
+/// `silicon-accounts app import <file> …` with the flags of a dry run, minus --dry-run.
 fn real_import_command(file: &Path, args: &ImportArgs) -> String {
-    let mut command = format!("accounts app import {}", file.display());
+    let mut command = format!("silicon-accounts app import {}", file.display());
     if let Some(format) = args.format {
         command.push_str(match format {
             ImportFormat::Csv => " --format csv",
@@ -1088,7 +1103,7 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
             ])
         );
         Outcome::new(to_json(&proof), text).next(
-            "accounts app proof verify <proof_token>",
+            "silicon-accounts app proof verify <proof_token>",
             "how the receiving app checks it",
         )
     };
@@ -1127,7 +1142,7 @@ async fn run_proof(app: &AppClient<'_>, app_id: &str, command: ProofCommand) -> 
             if several.len() > 1 {
                 let commands: Vec<String> = several
                     .iter()
-                    .map(|a| format!("accounts app proof app-verification --to {a}"))
+                    .map(|a| format!("silicon-accounts app proof app-verification --to {a}"))
                     .collect();
                 return Err(CliError::invalid(
                     format!(
@@ -1278,7 +1293,7 @@ async fn run_webhook(
                 to_json(&hook),
                 format!("Webhook of {app_id} set to {}.{secret}", hook.url),
             )
-            .next("accounts app webhook test", "send a test ping"))
+            .next("silicon-accounts app webhook test", "send a test ping"))
         }
         AppWebhookCommand::Remove => {
             app.remove_webhook().await?;
@@ -1311,7 +1326,10 @@ async fn run_webhook(
                         .unwrap_or_default()
                 ),
             )
-            .next("accounts app webhook deliveries", "see whether it arrived"))
+            .next(
+                "silicon-accounts app webhook deliveries",
+                "see whether it arrived",
+            ))
         }
         AppWebhookCommand::Deliveries {
             status,
@@ -1327,7 +1345,7 @@ async fn run_webhook(
                 .await?;
             Ok(deliveries_outcome(
                 &page,
-                "accounts app webhook replay --failed",
+                "silicon-accounts app webhook replay --failed",
             ))
         }
         AppWebhookCommand::Delivery { id } => Ok(delivery_outcome(&app.delivery(&id).await?)),
@@ -1343,8 +1361,8 @@ async fn run_webhook(
             Ok(replay_outcome(
                 &result,
                 &format!("Webhook of {app_id}"),
-                "accounts app webhook replay --failed",
-                "accounts app webhook deliveries --status pending",
+                "silicon-accounts app webhook replay --failed",
+                "silicon-accounts app webhook deliveries --status pending",
             ))
         }
     }

@@ -90,9 +90,9 @@ export const journey: Journey = {
     results.check("the Carbon signs in to the CLI with an email code", signedIn.finish.code === 0 && signedIn.finish.json?.id === carbon.id, said(signedIn.finish));
     const listed = await accounts(env, ["custodian", "requests", "--json"], { home: carbonHome });
     const items = (listed.json?.items ?? []) as Json[];
-    results.check("`accounts custodian requests --json` lists the new request", listed.code === 0 && items.some(item => item.id === second.requestId && obj(item.silicon).id === sid), said(listed));
+    results.check("`silicon-accounts custodian requests --json` lists the new request", listed.code === 0 && items.some(item => item.id === second.requestId && obj(item.silicon).id === sid), said(listed));
     const declineCli = await accounts(env, ["custodian", "decline", second.requestId, "--json"], { home: carbonHome });
-    results.check("`accounts custodian decline <id>`: declined", declineCli.code === 0 && declineCli.json?.declined === true, said(declineCli));
+    results.check("`silicon-accounts custodian decline <id>`: declined", declineCli.code === 0 && declineCli.json?.declined === true, said(declineCli));
     const twice = await accounts(env, ["custodian", "decline", second.requestId, "--json"], { home: carbonHome });
     results.check("declining it twice: exit 5, custodian_request_not_pending", twice.code === 5 && cliError(twice).code === "custodian_request_not_pending", said(twice));
     const after = await requestStatus(ctx, second.requestId, second.requestToken);

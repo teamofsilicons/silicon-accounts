@@ -1,5 +1,5 @@
 //! `POST /v1/silicons/login`: a Silicon signs in with its si:id and STK and gets first-party
-//! tokens (`aud = accounts`, token family origin `silicon_login`).
+//! tokens (`aud = silicon-accounts`, token family origin `silicon_login`).
 //!
 //! - Unknown si:id and wrong STK get the same 401 `invalid_credentials`, after the same Argon2id
 //!   work, so ids can't be probed.
@@ -59,7 +59,7 @@ fn invalid_credentials() -> ApiError {
         "invalid_credentials",
         "Sign-in failed: no Silicon has this si:id, or the STK is wrong. Both cases get this same answer, so ids can't be probed.",
     )
-    .hint("Check the si:id (use the current one; ids can change) and the STK (stk- followed by the hex characters shown once at creation or rotation). 10 wrong STKs in a row lock sign-in for 1 minute. A lost STK can be replaced by the Silicon's custodian (`accounts silicon rotate-stk`).")
+    .hint("Check the si:id (use the current one; ids can change) and the STK (stk- followed by the hex characters shown once at creation or rotation). 10 wrong STKs in a row lock sign-in for 1 minute. A lost STK can be replaced by the Silicon's custodian (`silicon-accounts silicon rotate-stk`).")
 }
 
 fn login_locked(full_id: &str, seconds: u64) -> ApiError {
@@ -70,14 +70,14 @@ fn login_locked(full_id: &str, seconds: u64) -> ApiError {
         ),
         seconds,
     )
-    .hint("Wait until the lock ends (details.retry_after_seconds), then sign in with the correct STK. If the STK is lost, the Silicon's custodian can rotate it (`accounts silicon rotate-stk`).")
+    .hint("Wait until the lock ends (details.retry_after_seconds), then sign in with the correct STK. If the STK is lost, the Silicon's custodian can rotate it (`silicon-accounts silicon rotate-stk`).")
 }
 
 fn parse_login_id(input: &str) -> ApiResult<AccountId> {
     match AccountId::parse_for_kind(input, AccountKind::Silicon) {
         Ok(id) => Ok(id),
         Err(e @ IdError::WrongKind { .. }) => Err(ApiError::unprocessable("invalid_id", e.to_string())
-            .hint("Carbons sign in with `accounts login` (a code by email or phone, or the browser device flow); this endpoint signs Silicons in with their si:id and STK.")
+            .hint("Carbons sign in with `silicon-accounts login` (a code by email or phone, or the browser device flow); this endpoint signs Silicons in with their si:id and STK.")
             .detail("reason", e.reason())),
         Err(e) => Err(accounts::invalid_id_error(&e)),
     }
@@ -309,7 +309,7 @@ async fn not_yet_active(
         ),
     )
     .hint(format!(
-        "Wait for {label} to accept on {site}, or poll GET /v1/silicons/requests/{} with the request token (`accounts silicon request status {} --wait`).",
+        "Wait for {label} to accept on {site}, or poll GET /v1/silicons/requests/{} with the request token (`silicon-accounts silicon request status {} --wait`).",
         request.id,
         request.id
     ))
@@ -325,7 +325,7 @@ fn custodian_gone(full: &str) -> ApiError {
             "{full} can't sign in: the Carbon it named as custodian deleted their account before accepting, so the account was never activated and the id was released."
         ),
     )
-    .hint("Create the account again with POST /v1/silicons (`accounts silicon create`), naming a Carbon who will accept.")
+    .hint("Create the account again with POST /v1/silicons (`silicon-accounts silicon create`), naming a Carbon who will accept.")
 }
 
 fn custodian_expired(full: &str, expired_at: OffsetDateTime) -> ApiError {
@@ -336,7 +336,7 @@ fn custodian_expired(full: &str, expired_at: OffsetDateTime) -> ApiError {
             format_rfc3339_ms(expired_at)
         ),
     )
-    .hint("Create the account again with POST /v1/silicons (`accounts silicon create`), naming a Carbon who will accept.")
+    .hint("Create the account again with POST /v1/silicons (`silicon-accounts silicon create`), naming a Carbon who will accept.")
 }
 
 /// The account that last held an id (from `handle_history`).
@@ -395,7 +395,7 @@ async fn released_error(
                     .unwrap_or_default()
             ),
         )
-        .hint("Create the account again with POST /v1/silicons (`accounts silicon create`), naming a Carbon who will accept."),
+        .hint("Create the account again with POST /v1/silicons (`silicon-accounts silicon create`), naming a Carbon who will accept."),
         Some(r) if r.status == status::EXPIRED => custodian_expired(full, r.expires_at),
         Some(r) if r.status == status::CANCELLED => custodian_gone(full),
         _ => ApiError::forbidden(

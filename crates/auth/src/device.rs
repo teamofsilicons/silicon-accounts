@@ -1,5 +1,5 @@
 //! The browser half of the CLI device flow: a signed-in Carbon looks at a pending
-//! `accounts login` request and approves or denies it. (`POST /v1/device/authorize` and the
+//! `silicon-accounts login` request and approves or denies it. (`POST /v1/device/authorize` and the
 //! polling token grant live in the oauth crate; both share `device_authorizations`.)
 
 use accounts_core::http::{CarbonAuth, ClientMeta, Path};

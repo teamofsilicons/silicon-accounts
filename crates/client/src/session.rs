@@ -22,7 +22,7 @@ use crate::types::{
 };
 
 /// A signed-in Carbon or Silicon, authenticated with a first-party access token
-/// (`aud = accounts`). Created with [`AccountsClient::with_token`]. Holds no state
+/// (`aud = silicon-accounts`). Created with [`AccountsClient::with_token`]. Holds no state
 /// besides the token: refreshing it is up to the caller
 /// ([`AccountsClient::refresh_first_party`]).
 pub struct AccountSession<'a> {

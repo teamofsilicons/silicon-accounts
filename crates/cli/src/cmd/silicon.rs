@@ -30,7 +30,7 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
             let managed = resolve(ctx, &silicon).await?;
             Ok(
                 Outcome::new(to_json(&managed), render_managed(&managed)).next(
-                    format!("accounts silicon rotate-stk {}", managed.silicon.id),
+                    format!("silicon-accounts silicon rotate-stk {}", managed.silicon.id),
                     "issue a new STK",
                 ),
             )
@@ -50,7 +50,7 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
             if update.is_empty() && photo.is_none() {
                 return Err(CliError::invalid(
                     "Nothing to change: pass at least one of --display-name, --timezone, --pfp-url or --photo.",
-                    "See `accounts silicon update --help`.",
+                    "See `silicon-accounts silicon update --help`.",
                 ));
             }
             let managed = resolve(ctx, &silicon).await?;
@@ -117,7 +117,7 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
                 json!({ "silicon": managed.silicon.id, "uuid": uuid, "stk": rotated.stk.as_ref().map(|s| s.expose()), "rotated_at": json_time(rotated.rotated_at) }),
                 text,
             )
-            .next(format!("accounts login --silicon {} --stk-stdin", managed.silicon.id), "the Silicon signs in with the new STK"))
+            .next(format!("silicon-accounts login --silicon {} --stk-stdin", managed.silicon.id), "the Silicon signs in with the new STK"))
         }
         SiliconCommand::Webhook(webhook) => match webhook.command {
             SiliconWebhookCommand::Set { silicon, endpoint } => {
@@ -146,7 +146,7 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
                 Ok(deliveries_outcome(
                     &page,
                     &format!(
-                        "accounts silicon webhook replay {} --failed",
+                        "silicon-accounts silicon webhook replay {} --failed",
                         managed.silicon.id
                     ),
                 ))
@@ -174,8 +174,8 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
                 Ok(replay_outcome(
                     &result,
                     &format!("Webhook of {id}"),
-                    &format!("accounts silicon webhook replay {id} --failed"),
-                    &format!("accounts silicon webhook deliveries {id} --status pending"),
+                    &format!("silicon-accounts silicon webhook replay {id} --failed"),
+                    &format!("silicon-accounts silicon webhook deliveries {id} --status pending"),
                 ))
             }
         },
@@ -193,7 +193,10 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
                     .unwrap_or_default()
             );
             Ok(Outcome::new(to_json(&request), text).next(
-                format!("accounts silicon cancel-transfer {}", managed.silicon.id),
+                format!(
+                    "silicon-accounts silicon cancel-transfer {}",
+                    managed.silicon.id
+                ),
                 "withdraw the request",
             ))
         }
@@ -217,7 +220,7 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
                 None => {
                     return Err(CliError::invalid(
                         format!("Deleting {id} needs --confirm {id}."),
-                        format!("Run `accounts silicon delete {id} --confirm {id}`."),
+                        format!("Run `silicon-accounts silicon delete {id} --confirm {id}`."),
                     ));
                 }
             };
@@ -257,7 +260,7 @@ fn webhook_text(id: &str, hook: &silicon_accounts_client::SiliconWebhook) -> Str
         })
         .unwrap_or_default();
     format!(
-        "Webhook of {id} set to {}.{secret}Verify every delivery's X-Accounts-Signature with it (`accounts docs webhooks`).",
+        "Webhook of {id} set to {}.{secret}Verify every delivery's X-Accounts-Signature with it (`silicon-accounts docs webhooks`).",
         hook.webhook_url
     )
 }
@@ -301,7 +304,7 @@ async fn resolve(ctx: &Ctx, target: &str) -> CliResult<ManagedSilicon> {
         EXIT_NOT_FOUND,
         "not_found",
         format!("{target} is not one of your Silicons (you are custodian of: {listing})."),
-        "Only a Silicon's custodian can manage it. Check the id with `accounts silicon list`, or ask its custodian.",
+        "Only a Silicon's custodian can manage it. Check the id with `silicon-accounts silicon list`, or ask its custodian.",
     ))
 }
 
@@ -354,9 +357,12 @@ async fn list(ctx: &Ctx) -> CliResult<Outcome> {
             "You are not custodian of any Silicon yet.",
         ),
     )
-    .next("accounts silicon create --id si:<name>", "create one")
     .next(
-        "accounts custodian requests",
+        "silicon-accounts silicon create --id si:<name>",
+        "create one",
+    )
+    .next(
+        "silicon-accounts custodian requests",
         "Silicons asking you to be their custodian",
     ))
 }
@@ -447,13 +453,13 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
         return Ok(Outcome::new(to_json(&created), text)
             .next(
                 format!(
-                    "accounts login --silicon {} --stk-stdin",
+                    "silicon-accounts login --silicon {} --stk-stdin",
                     created.silicon.id
                 ),
                 "how the Silicon signs in",
             )
             .next(
-                format!("accounts silicon show {}", created.silicon.id),
+                format!("silicon-accounts silicon show {}", created.silicon.id),
                 "see it",
             ));
     }
@@ -461,7 +467,7 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
     let Some(custodian) = args.custodian.clone() else {
         return Err(CliError::invalid(
             "A Silicon creating its own account must name its custodian.",
-            "Pass --custodian c:<id> or --custodian <email>. If you are a Carbon creating it for yourself, sign in first with `accounts login`.",
+            "Pass --custodian c:<id> or --custodian <email>. If you are a Carbon creating it for yourself, sign in first with `silicon-accounts login`.",
         ));
     };
     let request = SiliconSelfCreate {
@@ -521,7 +527,10 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
         ));
     }
 
-    let status_cmd = format!("accounts silicon request status {}", created.request.id);
+    let status_cmd = format!(
+        "silicon-accounts silicon request status {}",
+        created.request.id
+    );
     if !args.wait {
         summary.push_str(&format!(
             "\nThe request token is saved in {}.\n",
@@ -534,7 +543,7 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
             )
             .next(
                 format!(
-                    "accounts login --silicon {} --stk-stdin",
+                    "silicon-accounts login --silicon {} --stk-stdin",
                     created.silicon.id
                 ),
                 "sign in once accepted",
@@ -584,7 +593,7 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
             .is_some_and(|s| s.account.uuid != stored.silicon_uuid);
         if other_account {
             text.push_str(&format!(
-                "Not signing in as {} because this home is signed in as {}; run `accounts login --silicon {} --stk-stdin` where the Silicon runs.\n",
+                "Not signing in as {} because this home is signed in as {}; run `silicon-accounts login --silicon {} --stk-stdin` where the Silicon runs.\n",
                 stored.silicon_id,
                 existing.as_ref().map_or("", |s| s.who()),
                 stored.silicon_id
@@ -606,7 +615,7 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
         json!({ "signed_in": signed_in }),
     );
     Ok(Outcome::new(result, text).next(
-        "accounts login --app <app_id>",
+        "silicon-accounts login --app <app_id>",
         "get a short-lived token for an app",
     ))
 }
@@ -619,7 +628,7 @@ fn request_file(ctx: &Ctx, request_id: &str) -> CliResult<std::path::PathBuf> {
     {
         return Err(CliError::invalid(
             format!("`{request_id}` is not a request id."),
-            "Use the id printed by `accounts silicon create` (a UUID).",
+            "Use the id printed by `silicon-accounts silicon create` (a UUID).",
         ));
     }
     Ok(ctx
@@ -658,7 +667,7 @@ async fn wait_for_decision(
         },
     );
     let resume = format!(
-        "accounts silicon request status {} --wait",
+        "silicon-accounts silicon request status {} --wait",
         stored.request_id
     );
     tokio::select! {
@@ -712,7 +721,7 @@ fn decision_error(status: &CustodianRequestStatus, stored: &StoredRequest) -> Cl
             ),
         ),
     };
-    CliError::new(EXIT_FAILURE, code, message, "Create the account again (`accounts silicon create`), naming a custodian who expects the request.")
+    CliError::new(EXIT_FAILURE, code, message, "Create the account again (`silicon-accounts silicon create`), naming a custodian who expects the request.")
         .with_details(to_json(status))
 }
 
@@ -747,7 +756,10 @@ async fn request_status(
         {
             own_client = AccountsClient::builder()
                 .base_url(&stored.url)
-                .user_agent(format!("accounts-cli/{}", env!("CARGO_PKG_VERSION")))
+                .user_agent(format!(
+                    "silicon-accounts-cli/{}",
+                    env!("CARGO_PKG_VERSION")
+                ))
                 .telemetry(ctx.telemetry_setting().0)
                 .allow_insecure_http(true)
                 .build()?;
@@ -807,15 +819,15 @@ async fn request_status(
     let mut outcome = Outcome::new(to_json(&status), text);
     outcome = match status.status.as_str() {
         "accepted" => outcome.next(
-            format!("accounts login --silicon {silicon_id} --stk-stdin"),
+            format!("silicon-accounts login --silicon {silicon_id} --stk-stdin"),
             "sign in",
         ),
         "pending" => outcome.next(
-            format!("accounts silicon request status {request_id} --wait"),
+            format!("silicon-accounts silicon request status {request_id} --wait"),
             "wait for the decision",
         ),
         _ => outcome.next(
-            "accounts silicon create --id si:<name> --custodian <c:id>",
+            "silicon-accounts silicon create --id si:<name> --custodian <c:id>",
             "start over with another custodian",
         ),
     };
@@ -833,7 +845,7 @@ pub async fn own_webhook(ctx: &Ctx, args: OwnWebhookArgs) -> CliResult<Outcome> 
             let hook = with_session!(ctx, |s| s.set_my_webhook(&endpoint))?;
             Ok(
                 Outcome::new(to_json(&hook), webhook_text(session.who(), &hook))
-                    .next("accounts webhook test", "send a test ping"),
+                    .next("silicon-accounts webhook test", "send a test ping"),
             )
         }
         OwnWebhookCommand::Remove => {
@@ -855,14 +867,17 @@ pub async fn own_webhook(ctx: &Ctx, args: OwnWebhookArgs) -> CliResult<Outcome> 
                         .unwrap_or_default()
                 ),
             )
-            .next("accounts webhook deliveries", "see whether it arrived"))
+            .next(
+                "silicon-accounts webhook deliveries",
+                "see whether it arrived",
+            ))
         }
         OwnWebhookCommand::Deliveries { filter } => {
             let query = deliveries_query(filter);
             let page = with_session!(ctx, |s| s.my_webhook_deliveries(&query))?;
             Ok(deliveries_outcome(
                 &page,
-                "accounts webhook replay --failed",
+                "silicon-accounts webhook replay --failed",
             ))
         }
         OwnWebhookCommand::Delivery { id } => {
@@ -879,8 +894,8 @@ pub async fn own_webhook(ctx: &Ctx, args: OwnWebhookArgs) -> CliResult<Outcome> 
             Ok(replay_outcome(
                 &result,
                 &format!("Webhook of {}", session.who()),
-                "accounts webhook replay --failed",
-                "accounts webhook deliveries --status pending",
+                "silicon-accounts webhook replay --failed",
+                "silicon-accounts webhook deliveries --status pending",
             ))
         }
     }
@@ -923,10 +938,10 @@ pub async fn custodian(ctx: &Ctx, args: CustodianArgs) -> CliResult<Outcome> {
                 ),
             )
             .next(
-                "accounts custodian accept <request-id>",
+                "silicon-accounts custodian accept <request-id>",
                 "become the custodian",
             )
-            .next("accounts custodian decline <request-id>", "decline"))
+            .next("silicon-accounts custodian decline <request-id>", "decline"))
         }
         CustodianCommand::Accept { id } => {
             with_session!(ctx, |s| s.accept_custodian_request(&id))?;
@@ -934,7 +949,10 @@ pub async fn custodian(ctx: &Ctx, args: CustodianArgs) -> CliResult<Outcome> {
                 json!({ "accepted": true, "request_id": id }),
                 format!("Accepted request {id}: you are now the custodian."),
             )
-            .next("accounts silicon list", "the Silicons you are custodian of"))
+            .next(
+                "silicon-accounts silicon list",
+                "the Silicons you are custodian of",
+            ))
         }
         CustodianCommand::Decline { id } => {
             with_session!(ctx, |s| s.decline_custodian_request(&id))?;

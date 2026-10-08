@@ -35,6 +35,8 @@ breaking changes (`proxy.ts` instead of `middleware.ts`, async `params`/`searchP
 
 ## Topology
 
+The account site uses `silicon-accounts` as its first-party app ID. Existing browser cookies and saved return paths remain valid through the rename.
+
 Next serves the whole public origin and proxies the API, so the browser only ever talks to one origin (cookies, the
 API's Origin check):
 

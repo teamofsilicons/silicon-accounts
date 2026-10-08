@@ -235,7 +235,7 @@ export const journeys: Journey[] = [
       // The receiving-app rules, one app at a time.
       const cases: Array<[string, string, number, string]> = [
         ["Commit itself", "commit", 400, "invalid_receiving_app"],
-        ["Silicon Accounts itself", "accounts", 400, "invalid_receiving_app"],
+        ["Silicon Accounts itself", "silicon-accounts", 400, "invalid_receiving_app"],
         ["the developer platform (first-party app developer)", "developer", 400, "invalid_receiving_app"],
         ["an unknown app", "nope-pp-app", 400, "unknown_receiving_app"],
         ["a malformed app id", "Not An App!", 422, "validation_failed"],

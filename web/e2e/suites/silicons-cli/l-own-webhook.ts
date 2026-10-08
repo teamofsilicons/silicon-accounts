@@ -50,17 +50,17 @@ export const journey: Journey = {
     results.check("a non-http(s) URL is refused: exit 2, validation_failed on url", invalid.code === 2 && cliError(invalid).code === "validation_failed" && !!obj(obj(cliError(invalid).details).fields).url, said(invalid));
     const set = await accounts(env, ["webhook", "set", sinkUrl(env, keyA), "--json"], { home: homeS });
     const secretA = str(set.json?.webhook_secret);
-    results.check("`accounts webhook set <url>` (as the Silicon): the URL and a signing secret, printed once", set.code === 0 && set.json?.webhook_url === sinkUrl(env, keyA) && secretA.startsWith("whsec_"), said(set).replace(secretA, "whsec_…"));
+    results.check("`silicon-accounts webhook set <url>` (as the Silicon): the URL and a signing secret, printed once", set.code === 0 && set.json?.webhook_url === sinkUrl(env, keyA) && secretA.startsWith("whsec_"), said(set).replace(secretA, "whsec_…"));
     await setSinkSecret(env, keyA, secretA);
     const ping = await accounts(env, ["webhook", "test", "--json"], { home: homeS });
     const pinged = await waitSink(env, keyA, "ping", event => event.event_id === ping.json?.event_id);
-    results.check("`accounts webhook test`: a ping is queued (its event id printed) and arrives, signed with that secret", ping.code === 0 && str(ping.json?.event_id).length > 0 && pinged?.type === "ping", said(ping));
+    results.check("`silicon-accounts webhook test`: a ping is queued (its event id printed) and arrives, signed with that secret", ping.code === 0 && str(ping.json?.event_id).length > 0 && pinged?.type === "ping", said(ping));
     results.check("the body names the Silicon and no app", pinged?.payload.silicon === uuid && pinged?.payload.app_id === null && !!pinged?.payload.occurred_at, short(pinged?.payload, 200));
 
     // 2. Its details change: silicon.updated.
     const renamed = await accounts(env, ["silicon", "update", sid, "--display-name", `Hooked renamed ${t}`, "--json"], { home: homeC });
     const updated = await waitSink(env, keyA, "silicon.updated", event => obj(dataOf(event).silicon).display_name === `Hooked renamed ${t}`);
-    results.check("the custodian renames it (`accounts silicon update`): silicon.updated, changed [display_name], with the new view", renamed.code === 0 && JSON.stringify(dataOf(updated).changed) === '["display_name"]' && dataOf(updated).uuid === uuid, short(updated?.payload, 240));
+    results.check("the custodian renames it (`silicon-accounts silicon update`): silicon.updated, changed [display_name], with the new view", renamed.code === 0 && JSON.stringify(dataOf(updated).changed) === '["display_name"]' && dataOf(updated).uuid === uuid, short(updated?.payload, 240));
     await accounts(env, ["silicon", "update", sid, "--timezone", "America/New_York", "--json"], { home: homeC });
     const tz = await waitSink(env, keyA, "silicon.updated", event => obj(dataOf(event).silicon).timezone === "America/New_York");
     results.check("…a timezone change too: changed [timezone]", JSON.stringify(dataOf(tz).changed) === '["timezone"]', short(dataOf(tz).changed));
@@ -79,14 +79,14 @@ export const journey: Journey = {
     results.check("…a new photo (`--pfp-url`): changed [pfp_url]", photoSet.code === 0 && JSON.stringify(dataOf(photoHook).changed) === '["pfp_url"]', `${said(photoSet).slice(0, 120)} | ${short(dataOf(photoHook).changed)}`);
     const selfRenamed = await accounts(env, ["profile", "set", "--display-name", `Hooked by itself ${t}`, "--json"], { home: homeS });
     const selfHook = await waitSink(env, keyA, "silicon.updated", event => obj(dataOf(event).silicon).display_name === `Hooked by itself ${t}`);
-    results.check("the Silicon renaming itself (`accounts profile set`) is a change to its account too: silicon.updated", selfRenamed.code === 0 && JSON.stringify(dataOf(selfHook).changed) === '["display_name"]', `${said(selfRenamed).slice(0, 120)} | ${short(dataOf(selfHook).changed)}`);
+    results.check("the Silicon renaming itself (`silicon-accounts profile set`) is a change to its account too: silicon.updated", selfRenamed.code === 0 && JSON.stringify(dataOf(selfHook).changed) === '["display_name"]', `${said(selfRenamed).slice(0, 120)} | ${short(dataOf(selfHook).changed)}`);
     // A Silicon's date of birth is the day its account was created (UNDERSTANDING.md "Silicon account").
     const quietBeforeDob = (await sinkInbox(env, keyA)).deliveries;
     const dobByCustodian = await asCarbon<Json>(env, carbon, "PATCH", `/v1/me/silicons/${uuid}`, { dob: "2000-01-01" });
     const dobBySilicon = await accounts(env, ["profile", "set", "--dob", "2000-01-01", "--json"], { home: homeS });
     await sleep(1500);
     results.check(
-      "its date of birth can't change: the custodian (422) and the Silicon itself (`accounts profile set --dob`: exit 2) get dob_immutable naming its creation day, and nothing is sent",
+      "its date of birth can't change: the custodian (422) and the Silicon itself (`silicon-accounts profile set --dob`: exit 2) get dob_immutable naming its creation day, and nothing is sent",
       dobByCustodian.status === 422 && str(obj(obj(dobByCustodian.body).error).code) === "dob_immutable" && dobBySilicon.code === 2 && cliError(dobBySilicon).code === "dob_immutable" && /day its account was created \(\d{4}-\d\d-\d\d\)/.test(str(cliError(dobBySilicon).message)) && (await sinkInbox(env, keyA)).deliveries === quietBeforeDob,
       `${dobByCustodian.status} ${short(dobByCustodian.body, 160)} | ${said(dobBySilicon)}`,
     );
@@ -94,7 +94,7 @@ export const journey: Journey = {
     // 3. The custodian points it elsewhere: a new secret; events follow the new URL.
     const moved = await accounts(env, ["silicon", "webhook", "set", sid, sinkUrl(env, keyB), "--json"], { home: homeC });
     const secretB = str(moved.json?.webhook_secret);
-    results.check("the custodian sets another URL (`accounts silicon webhook set`): a new, different secret", moved.code === 0 && secretB.startsWith("whsec_") && secretB !== secretA, said(moved).replace(secretB, "whsec_…"));
+    results.check("the custodian sets another URL (`silicon-accounts silicon webhook set`): a new, different secret", moved.code === 0 && secretB.startsWith("whsec_") && secretB !== secretA, said(moved).replace(secretB, "whsec_…"));
     await setSinkSecret(env, keyB, secretB);
     const beforeA = (await sinkInbox(env, keyA)).deliveries;
     await accounts(env, ["silicon", "update", sid, "--display-name", `Hooked moved ${t}`, "--json"], { home: homeC });
@@ -120,7 +120,7 @@ export const journey: Journey = {
 
     // 5. The Silicon removes it: nothing more is sent; a test says there is none.
     const removed = await accounts(env, ["webhook", "remove", "--json"], { home: homeS });
-    results.check("`accounts webhook remove` (as the Silicon)", removed.code === 0 && removed.json?.removed === true, said(removed));
+    results.check("`silicon-accounts webhook remove` (as the Silicon)", removed.code === 0 && removed.json?.removed === true, said(removed));
     const quietBefore = (await sinkInbox(env, keyB)).deliveries;
     const queuedBefore = Number((await sql(env, `select count(*) from webhook_deliveries where target_kind = 'silicon' and target_id = '${uuid}'`))[0]?.[0] ?? -1);
     await accounts(env, ["silicon", "update", sid, "--display-name", `Hooked silent ${t}`, "--json"], { home: homeC });
@@ -128,7 +128,7 @@ export const journey: Journey = {
     const queuedAfter = Number((await sql(env, `select count(*) from webhook_deliveries where target_kind = 'silicon' and target_id = '${uuid}'`))[0]?.[0] ?? -1);
     results.check("…after which a change sends nothing (no delivery queued for the Silicon, nothing arrives)", (await sinkInbox(env, keyB)).deliveries === quietBefore && queuedAfter === queuedBefore, `arrived ${quietBefore} → ${(await sinkInbox(env, keyB)).deliveries}; queued ${queuedBefore} → ${queuedAfter}`);
     const noHook = await accounts(env, ["webhook", "test", "--json"], { home: homeS });
-    results.check("`accounts webhook test` without a webhook: exit 5, webhook_not_set", noHook.code === 5 && cliError(noHook).code === "webhook_not_set", said(noHook));
+    results.check("`silicon-accounts webhook test` without a webhook: exit 5, webhook_not_set", noHook.code === 5 && cliError(noHook).code === "webhook_not_set", said(noHook));
     const shown = await accounts(env, ["silicon", "show", sid, "--json"], { home: homeC });
     results.check("the custodian sees it has no webhook", shown.code === 0 && !shown.json?.webhook_url, said(shown));
 
@@ -142,7 +142,7 @@ export const journey: Journey = {
     const superseded = await sql(env, `select count(*) filter (where d.status = 'pending'), count(*) from webhook_deliveries d join webhook_events e on e.event_id = d.event_id where e.type = 'ping' and d.target_kind = 'silicon' and d.target_id = '${uuid}'`);
     results.check("…and at most one test ping is ever waiting for a retry", Number(superseded[0]?.[0]) <= 1 && Number(superseded[0]?.[1]) === 10, short(superseded));
     const custodianRemove = await accounts(env, ["silicon", "webhook", "remove", sid, "--json"], { home: homeC });
-    results.check("the custodian can remove it too (`accounts silicon webhook remove`)", custodianRemove.code === 0 && custodianRemove.json?.removed === true, said(custodianRemove));
+    results.check("the custodian can remove it too (`silicon-accounts silicon webhook remove`)", custodianRemove.code === 0 && custodianRemove.json?.removed === true, said(custodianRemove));
     const rejected = await until(async () => {
       const box = await sinkInbox(env, keyB);
       return box.rejected.filter(entry => entry.reason !== "fault_injected" && entry.recovered !== true).length === 0 ? box : null;

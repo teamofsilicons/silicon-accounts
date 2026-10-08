@@ -59,7 +59,7 @@ impl FlowApp {
         Ok(FlowApp { app, config })
     }
 
-    /// A first-party app (`accounts`, `developer`): no details pages, no membership.
+    /// A first-party app (`silicon-accounts`, `developer`): no details pages, no membership.
     pub fn first_party(&self) -> bool {
         self.app.is_first_party()
     }

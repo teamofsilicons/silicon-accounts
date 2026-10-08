@@ -113,7 +113,7 @@ export const myApps: MyApp[] = ["briefcase", "dm", "commit", "remind", "interfac
 
 export const sessions: SessionInfo[] = [
   { id: session.session.id, kind: "browser", origin: "browser", label: "Safari on macOS", ip: "103.48.12.9", user_agent: "Mozilla/5.0 (Macintosh)", created_at: iso(-60 * 24 * 3), last_seen_at: iso(-2), expires_at: "2029-03-25T09:41:00.000Z", current: true },
-  { id: "0192a6f0-0000-7000-8000-000000000002", kind: "cli", origin: "device", label: "accounts CLI on build-box", ip: "103.48.12.11", user_agent: "silicon-accounts-cli/0.2.0", created_at: iso(-60 * 24 * 9), last_seen_at: iso(-60 * 5), expires_at: iso(60 * 24 * 80), current: false },
+  { id: "0192a6f0-0000-7000-8000-000000000002", kind: "cli", origin: "device", label: "silicon-accounts CLI on build-box", ip: "103.48.12.11", user_agent: "silicon-accounts-cli/0.2.0", created_at: iso(-60 * 24 * 9), last_seen_at: iso(-60 * 5), expires_at: iso(60 * 24 * 80), current: false },
 ];
 
 const siliconBase = { kind: "silicon" as const, custodian: carbonSummary };
@@ -242,7 +242,7 @@ export function flowView(appId: string, step: FlowView["step"] = "choose_method"
     id: `flow_${appId}`,
     step,
     expires_at: iso(60),
-    app: { app_id: pub.app_id, name: pub.name, logo_url: pub.logo_url, logo_dark_url: pub.logo_dark_url, homepage_url: pub.homepage_url, branding: pub.branding, copy: pub.copy, first_party: appId === "accounts" },
+    app: { app_id: pub.app_id, name: pub.name, logo_url: pub.logo_url, logo_dark_url: pub.logo_dark_url, homepage_url: pub.homepage_url, branding: pub.branding, copy: pub.copy, first_party: appId === "silicon-accounts" },
     methods: pub.methods,
     signed_in_as: null,
     challenge: step === "verify_code" ? { channel: "email", destination: "s***@gmail.com", expires_at: iso(10), resend_available_at: iso(0.5) } : null,

@@ -5,7 +5,7 @@
 //!   accept. The response carries the STK (when generated), the request and its `sarq_` polling
 //!   token, and the webhook secret (when a webhook was given) — each shown exactly once.
 //! - `GET /v1/silicons/requests/{id}` (`Authorization: Bearer sarq_…`): the request's status, so
-//!   a Silicon (or `accounts silicon create --wait`) can wait for the custodian's decision.
+//!   a Silicon (or `silicon-accounts silicon create --wait`) can wait for the custodian's decision.
 //!
 //! Limits, per network (client IP):
 //! - 10 successful self-creations per hour (the contract number; failed attempts don't use it up);
@@ -344,7 +344,7 @@ async fn ensure_custodian_has_room(
         retry_after,
     )
     .hint(format!(
-        "Ask {who} to accept or decline the waiting requests on {site} (or `accounts custodian requests`), name another custodian, or retry after the oldest request expires in {retry_after} seconds."
+        "Ask {who} to accept or decline the waiting requests on {site} (or `silicon-accounts custodian requests`), name another custodian, or retry after the oldest request expires in {retry_after} seconds."
     ))
     .detail("pending_requests", pending)
     .detail("limit", MAX_PENDING_PER_CUSTODIAN))

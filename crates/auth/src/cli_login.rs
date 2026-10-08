@@ -1,6 +1,6 @@
-//! Headless code sign-in for the accounts CLI (Carbons): `POST /v1/cli/login/start` sends a
+//! Headless code sign-in for the silicon-accounts CLI (Carbons): `POST /v1/cli/login/start` sends a
 //! code to a verified email or phone of an existing active Carbon; `POST /v1/cli/login/verify`
-//! returns first-party tokens (aud = accounts). Only a verified address of an active Carbon
+//! returns first-party tokens (aud = silicon-accounts). Only a verified address of an active Carbon
 //! signs in (core's `contacts::lookup`); the 10-tries lockout counts every code sent to the
 //! address (core's `otp::verify`).
 
@@ -40,7 +40,7 @@ fn account_not_found(destination: &str, settings: &accounts_core::Settings) -> A
         format!("No active Carbon account signs in with {destination}."),
     )
     .hint(format!(
-        "Sign up (or finish setting up an imported account) at {} first, then run `accounts login` again.",
+        "Sign up (or finish setting up an imported account) at {} first, then run `silicon-accounts login` again.",
         settings.public_url
     ))
 }
@@ -146,7 +146,7 @@ pub struct VerifyBody {
     pub client_label: Option<String>,
 }
 
-/// `POST /v1/cli/login/verify` (public) → token response (aud = accounts, origin cli_code).
+/// `POST /v1/cli/login/verify` (public) → token response (aud = silicon-accounts, origin cli_code).
 /// Errors: 422 `invalid_code` (`details.remaining_attempts`), 423 `verification_locked`,
 /// 410 `code_expired`, 409 `code_already_used`, 404 `challenge_not_found`, 404
 /// `account_not_found` (the address no longer signs in to that account).
@@ -200,7 +200,7 @@ pub async fn verify(
                     challenge.masked_destination()
                 ),
             )
-            .hint("Run `accounts login` again with an email or phone that is on your account."));
+            .hint("Run `silicon-accounts login` again with an email or phone that is on your account."));
         }
     };
     let label = body
@@ -208,7 +208,7 @@ pub async fn verify(
         .as_deref()
         .map(str::trim)
         .filter(|l| !l.is_empty())
-        .unwrap_or("accounts CLI");
+        .unwrap_or("silicon-accounts CLI");
     let tokens = tokens::issue_tokens(
         &mut tx,
         &state.keys,

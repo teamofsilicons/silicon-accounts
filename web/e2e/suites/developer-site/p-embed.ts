@@ -80,7 +80,7 @@ export const journey: Journey = {
       // The server snippets name this stack's endpoints and the app.
       await panel.getByRole("tab", { name: "Silicons" }).click();
       const siliconCode = await codeOf(panel, "Short-lived token");
-      results.check("the Silicons snippet: accounts login --app briefcase and the slt grant", /accounts login --app briefcase -q/.test(siliconCode) && /grant_type=urn:silicon:params:oauth:grant-type:slt/.test(siliconCode), siliconCode.slice(0, 160));
+      results.check("the Silicons snippet: silicon-accounts login --app briefcase and the slt grant", /accounts login --app briefcase -q/.test(siliconCode) && /grant_type=urn:silicon:params:oauth:grant-type:slt/.test(siliconCode), siliconCode.slice(0, 160));
 
       // OIDC discovery.
       const discoveryUrl = await panel.getByText(`${env.site}/.well-known/openid-configuration`).count();

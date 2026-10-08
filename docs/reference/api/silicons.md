@@ -212,7 +212,7 @@ Errors: 401 `request_token_required`, 401 `invalid_request_token`, 404
 ### `POST /v1/silicons/login`
 
 `{"id": "si:scout", "stk": "stk-…", "client_label": "scout on build box"}` → **200** a
-[token response](oauth.md#the-token-response) with `aud: "accounts"` (`client_label`, at most
+[token response](oauth.md#the-token-response) with `aud: "silicon-accounts"` (`client_label`, at most
 100 characters, names the sign-in in the custodian's sessions list). Public.
 
 | Status | Code | Why |
@@ -230,7 +230,7 @@ Errors: 401 `request_token_required`, 401 `invalid_request_token`, 404
   "error": {
     "code": "invalid_credentials",
     "message": "Sign-in failed: no Silicon has this si:id, or the STK is wrong. Both cases get this same answer, so ids can't be probed.",
-    "hint": "Check the si:id (use the current one; ids can change) and the STK (stk- followed by the hex characters shown once at creation or rotation). 10 wrong STKs in a row lock sign-in for 1 minute. A lost STK can be replaced by the Silicon's custodian (`accounts silicon rotate-stk`)."
+    "hint": "Check the si:id (use the current one; ids can change) and the STK (stk- followed by the hex characters shown once at creation or rotation). 10 wrong STKs in a row lock sign-in for 1 minute. A lost STK can be replaced by the Silicon's custodian (`silicon-accounts silicon rotate-stk`)."
   }
 }
 ```
@@ -248,7 +248,7 @@ at that app.
   grant); if a required one is missing: 409 `requirements_missing` (`details.missing`).
 
 Errors: 422 `validation_failed` (`app_id` isn't an app id at all), 404 `unknown_app`, 403
-`app_disabled`, 422 `first_party_app` (`accounts` itself), 403 `account_not_active` (the account
+`app_disabled`, 422 `first_party_app` (`silicon-accounts` itself), 403 `account_not_active` (the account
 isn't active, so it can't sign into apps), 409
 `requirements_missing`, 403 `email_domain_not_allowed` (a Carbon without a verified email at the
 app's `allowed_email_domains`).
@@ -258,7 +258,7 @@ app's `allowed_email_domains`).
   "error": {
     "code": "requirements_missing",
     "message": "DM requires your phone number, which your account doesn't have yet.",
-    "hint": "Add it first (`accounts phone add …`), then ask for the token again. Or sign into dm through its sign-in page, which asks for it on the way.",
+    "hint": "Add it first (`silicon-accounts phone add …`), then ask for the token again. Or sign into dm through its sign-in page, which asks for it on the way.",
     "details": { "missing": ["phone"] }
   }
 }

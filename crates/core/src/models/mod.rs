@@ -432,7 +432,7 @@ text_enum! {
     }
 }
 
-/// An account row (`accounts`). `Debug` never prints the STK hash or the webhook secret.
+/// An account row (`silicon-accounts`). `Debug` never prints the STK hash or the webhook secret.
 #[derive(Clone, sqlx::FromRow)]
 pub struct Account {
     pub uuid: String,
@@ -511,7 +511,7 @@ impl std::fmt::Debug for Account {
     }
 }
 
-/// Columns of `accounts` in [`Account`] field order as a string literal, usable in `concat!`:
+/// Columns of `silicon-accounts` in [`Account`] field order as a string literal, usable in `concat!`:
 /// `sqlx::query_as::<_, Account>(concat!("select ", accounts_core::account_columns!(), " from accounts where uuid = $1"))`.
 #[macro_export]
 macro_rules! account_columns {
@@ -522,7 +522,7 @@ macro_rules! account_columns {
     };
 }
 
-/// Columns of `accounts` in [`Account`] field order.
+/// Columns of `silicon-accounts` in [`Account`] field order.
 pub const ACCOUNT_COLUMNS: &str = crate::account_columns!();
 
 /// An email on a Carbon account (`account_emails`).
@@ -590,7 +590,7 @@ impl App {
         self.status == AppStatus::Active
     }
 
-    /// Silicon Accounts' own apps (`accounts`, `developer`): no what's-shared pages, no
+    /// Silicon Accounts' own apps (`silicon-accounts`, `developer`): no what's-shared pages, no
     /// membership.
     pub fn is_first_party(&self) -> bool {
         self.source == AppSource::FirstParty || crate::is_first_party_app_id(&self.app_id)

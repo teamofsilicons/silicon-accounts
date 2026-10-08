@@ -143,7 +143,7 @@ If any link ends, the proof ends with it, at once, everywhere. The proof also ne
 |---|---|---|---|
 | the issuing app revoked the proof (`POST /v1/proofs/revoke`, or `DELETE /v1/apps/{app_id}/proofs/{id}`) | `valid: false` | `410 proof_revoked`, reason `revoked_by_app` | `revoked`, `revoked_by_app` |
 | the issuing app's owner revoked it (`DELETE /v1/apps/{app_id}/proofs/{id}` with their session) | `valid: false` | `410 proof_revoked`, `revoked_by_owner` | `revoked`, `revoked_by_owner` |
-| the account revoked it (`DELETE /v1/me/proofs/{id}`, `accounts proofs revoke`, the account site) | `valid: false` | `410 proof_revoked`, `revoked_by_account` | `revoked`, `revoked_by_account` |
+| the account revoked it (`DELETE /v1/me/proofs/{id}`, `silicon-accounts proofs revoke`, the account site) | `valid: false` | `410 proof_revoked`, `revoked_by_account` | `revoked`, `revoked_by_account` |
 | a used proof refresh token was presented again | `valid: false` | `400 proof_refresh_token_reused`, then `410 proof_revoked`, `refresh_token_reuse` | `revoked`, `refresh_token_reuse` |
 | the sign-in behind it was revoked: the issuing app revoked the account's token (`membership.signed_out`, `app_revoked`), a custodian rotated the Silicon's STK (`stk_rotated`), the app reused a sign-in refresh token or an authorization code | `valid: false` | `410 proof_revoked`, `sign_in_revoked` (with when and why) | `revoked`, `sign_in_revoked` |
 | the account removed the issuing app's access (`membership.access_removed`) | `valid: false` | `410 proof_revoked`, `access_removed` | `revoked`, `access_removed` |
@@ -169,7 +169,7 @@ App verification proofs stand only on themselves and the issuing app: they end w
 
 A receiving app can't revoke a proof. If it no longer trusts one, it simply stops accepting it; the issuing app is the one that revokes.
 
-The account's view matters most for User verification. Every Carbon and Silicon sees each User verification proof issued on its behalf (`GET /v1/me/proofs`, `accounts proofs list`, the account site) and can revoke any of them. Issued and revoked proofs also appear in the account's history (`GET /v1/me/history?kind=proof`), for example "DM got a proof to act for you at Briefcase". Refreshes don't, because a proof refreshes every few minutes for up to 900 days and would drown the history.
+The account's view matters most for User verification. Every Carbon and Silicon sees each User verification proof issued on its behalf (`GET /v1/me/proofs`, `silicon-accounts proofs list`, the account site) and can revoke any of them. Issued and revoked proofs also appear in the account's history (`GET /v1/me/history?kind=proof`), for example "DM got a proof to act for you at Briefcase". Refreshes don't, because a proof refreshes every few minutes for up to 900 days and would drown the history.
 
 ## Scopes are yours
 
@@ -199,4 +199,4 @@ Silicon Accounts stores only an HMAC of each proof token and proof refresh token
 
 History never reveals raw proof or refresh tokens. Copy those only when they are generated. Each history request checks current management access; receiving a proof does not grant access to the issuing app's history. Accounts see and revoke their own User verifications at the account site's existing `/proofs` route.
 
-The product names are App verification and User verification. API kinds are `app_verification` and `user_verification`. The CLI commands are `accounts app proof app-verification` and `accounts app proof user-verification`.
+The product names are App verification and User verification. API kinds are `app_verification` and `user_verification`. The CLI commands are `silicon-accounts app proof app-verification` and `silicon-accounts app proof user-verification`.

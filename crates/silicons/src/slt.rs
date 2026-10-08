@@ -103,7 +103,7 @@ pub async fn create(
     ))
 }
 
-/// 422 `first_party_app` for Silicon Accounts' own apps (`accounts`, `developer`). Both are
+/// 422 `first_party_app` for Silicon Accounts' own apps (`silicon-accounts`, `developer`). Both are
 /// public clients, and only an app with its own client secret can exchange a short-lived token,
 /// so a token minted for either could never be used.
 fn first_party_app(app_id: &str, developer_url: &str) -> ApiError {
@@ -112,7 +112,7 @@ fn first_party_app(app_id: &str, developer_url: &str) -> ApiError {
             "Short-lived tokens are for signing into other apps; 'developer' is the Silicon Accounts developer platform, which signs Carbons in on its own site ({developer_url}) and takes no short-lived tokens."
         )
     } else {
-        "Short-lived tokens are for signing into other apps; 'accounts' is Silicon Accounts itself, which you are already signed into.".to_string()
+        "Short-lived tokens are for signing into other apps; 'silicon-accounts' is Silicon Accounts itself, which you are already signed into.".to_string()
     };
     ApiError::unprocessable("first_party_app", message)
         .hint("Pass the app_id of the app you want to sign into, e.g. briefcase.")
@@ -147,7 +147,7 @@ async fn carbon_scopes(
                     carbon.display_id()
                 ),
             )
-            .hint("Add and verify an email at one of those domains (`accounts email add <email>`), then ask for the token again.")
+            .hint("Add and verify an email at one of those domains (`silicon-accounts email add <email>`), then ask for the token again.")
             .detail("allowed_email_domains", config.allowed_email_domains.clone()));
         }
     }
@@ -187,7 +187,7 @@ async fn carbon_scopes(
             "Add it first ({}), then ask for the token again. Or sign into {app_id} through its sign-in page, which asks for it on the way.",
             missing
                 .iter()
-                .map(|m| format!("`accounts {m} add …`"))
+                .map(|m| format!("`silicon-accounts {m} add …`"))
                 .collect::<Vec<_>>()
                 .join(", ")
         ))
@@ -221,11 +221,11 @@ mod tests {
             "{}",
             developer.message
         );
-        let accounts = first_party_app("accounts", "https://developer.example");
+        let accounts = first_party_app("silicon-accounts", "https://developer.example");
         assert!(
             accounts
                 .message
-                .contains("'accounts' is Silicon Accounts itself"),
+                .contains("'silicon-accounts' is Silicon Accounts itself"),
             "{}",
             accounts.message
         );

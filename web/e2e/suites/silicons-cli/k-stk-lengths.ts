@@ -79,17 +79,17 @@ export const journey: Journey = {
     await loginCarbon(env, home, carbon);
     for (const length of [7, 33]) {
       const create = await accounts(env, ["silicon", "create", "--id", `si:cli${length}-${t}`, "--stk-stdin", "--json"], { home, stdin: `stk-${hex(length, t)}\n` });
-      results.check(`\`accounts silicon create --stk-stdin\` with ${length} hex digits: exit 2, says it got ${length}`, create.code === 2 && cliError(create).code === "invalid_input" && str(cliError(create).message).includes(`got ${length} characters`), said(create));
+      results.check(`\`silicon-accounts silicon create --stk-stdin\` with ${length} hex digits: exit 2, says it got ${length}`, create.code === 2 && cliError(create).code === "invalid_input" && str(cliError(create).message).includes(`got ${length} characters`), said(create));
       const rotate = await accounts(env, ["silicon", "rotate-stk", target, "--stk-stdin", "--json"], { home, stdin: `stk-${hex(length, t)}\n` });
-      results.check(`\`accounts silicon rotate-stk --stk-stdin\` with ${length}: exit 2`, rotate.code === 2 && cliError(rotate).code === "invalid_input", said(rotate));
+      results.check(`\`silicon-accounts silicon rotate-stk --stk-stdin\` with ${length}: exit 2`, rotate.code === 2 && cliError(rotate).code === "invalid_input", said(rotate));
       const login = await accounts(env, ["login", "--silicon", target, "--stk-stdin", "--json"], { home: freshDir(), stdin: `stk-${hex(length, t)}\n` });
-      results.check(`\`accounts login --silicon --stk-stdin\` with ${length}: exit 2 before any request`, login.code === 2 && cliError(login).code === "invalid_input", said(login));
+      results.check(`\`silicon-accounts login --silicon --stk-stdin\` with ${length}: exit 2 before any request`, login.code === 2 && cliError(login).code === "invalid_input", said(login));
     }
     for (const length of [8, 32]) {
       const stk = `stk-${hex(length, `cli${length}`)}`;
       const create = await accounts(env, ["silicon", "create", "--id", `si:cli${length}-${t}`, "--stk-stdin", "--json"], { home, stdin: `${stk.toUpperCase().replace("STK-", "")}\n` });
       const login = await accounts(env, ["login", "--silicon", `si:cli${length}-${t}`, "--stk-stdin", "--json"], { home: freshDir(), stdin: `${stk}\n` });
-      results.check(`\`accounts silicon create --stk-stdin\` with ${length} hex digits (bare, upper case): created, not echoed, signs in`, create.code === 0 && !create.json?.stk && !create.stdout.toLowerCase().includes(stk.slice(4)) && login.code === 0, `${said(create)} | ${said(login)}`);
+      results.check(`\`silicon-accounts silicon create --stk-stdin\` with ${length} hex digits (bare, upper case): created, not echoed, signs in`, create.code === 0 && !create.json?.stk && !create.stdout.toLowerCase().includes(stk.slice(4)) && login.code === 0, `${said(create)} | ${said(login)}`);
     }
     const metrics = made.map(entry => entry.length);
     results.metric("chosen-STK Silicons created and signed in", metrics.length, "count");

@@ -1,5 +1,5 @@
 /**
- * /sign-in: the account site's own sign-in (first-party flow, app `accounts`), and where that flow comes back
+ * /sign-in: the account site's own sign-in (first-party flow, app `silicon-accounts`), and where that flow comes back
  * (?code&state or ?error&state) before returning to the page the visitor asked for (web-auth area).
  */
 import type { Metadata } from "next";

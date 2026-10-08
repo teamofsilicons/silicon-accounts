@@ -104,7 +104,7 @@ fn login_where_the_session_was_revoked_elsewhere_starts_a_new_sign_in() {
     let env = Env::new();
     carbon_login(&env, &mock);
 
-    // Still alive: `accounts login` says so without a new sign-in.
+    // Still alive: `silicon-accounts login` says so without a new sign-in.
     let output = env
         .cmd()
         .args(["login", "--no-browser", "--json"])
@@ -327,7 +327,7 @@ fn json_argument_errors_name_the_missing_argument() {
         error["hint"]
             .as_str()
             .unwrap()
-            .contains("Usage: accounts silicon create --id <SI_ID>"),
+            .contains("Usage: silicon-accounts silicon create --id <SI_ID>"),
         "{error}"
     );
 
@@ -383,7 +383,7 @@ fn report_diagnostics_never_make_a_message_too_long() {
         sent["message"]
             .as_str()
             .unwrap()
-            .contains("\n\n--\naccounts CLI "),
+            .contains("\n\n--\nsilicon-accounts CLI "),
         "{sent}"
     );
 
@@ -517,7 +517,12 @@ fn help_points_at_a_docs_topic_that_is_not_a_command() {
         .args(["help", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("accounts help imports"));
+        .stdout(predicate::function(|text: &str| {
+            text.split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .contains("silicon-accounts help imports")
+        }));
     env.cmd()
         .args(["help", "imports"])
         .assert()

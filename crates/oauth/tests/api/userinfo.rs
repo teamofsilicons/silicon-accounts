@@ -162,7 +162,10 @@ async fn first_party_tokens_work_too() {
     let tokens = ctx.first_party_tokens(&carbon).await;
     let r = userinfo(&ctx, &tokens.access_token).await;
     assert_eq!(r.status, 200, "{}", r.json);
-    assert_eq!(r.json["membership_id"], format!("accounts:{}", carbon.uuid));
+    assert_eq!(
+        r.json["membership_id"],
+        format!("silicon-accounts:{}", carbon.uuid)
+    );
 }
 
 #[tokio::test]

@@ -36,7 +36,7 @@ export interface SectionInfo {
 export const SECTIONS: readonly SectionInfo[] = [
   { key: "start", label: "Start", summary: "Instructions. Each page does one job, starting with what you'll do and a working example." },
   { key: "learn", label: "Learn", summary: "Explanations of why Silicon Accounts works the way it does, so you can make your own judgement calls." },
-  { key: "reference", label: "Reference", summary: "Everything, exhaustively: the HTTP API, errors, limits, the Rust client and the accounts CLI." },
+  { key: "reference", label: "Reference", summary: "Everything, exhaustively: the HTTP API, errors, limits, the Rust client and the silicon-accounts CLI." },
 ];
 
 export function sectionInfo(key: string | null | undefined): SectionInfo | undefined {

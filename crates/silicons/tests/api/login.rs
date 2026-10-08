@@ -56,7 +56,7 @@ async fn an_active_silicon_signs_in_and_gets_first_party_tokens() {
     );
     assert_eq!(
         r.json["membership_id"],
-        format!("accounts:{}", silicon.uuid)
+        format!("silicon-accounts:{}", silicon.uuid)
     );
     assert_eq!(r.json["account"]["kind"], "silicon");
     assert_eq!(r.json["account"]["id"], id);
@@ -68,14 +68,14 @@ async fn an_active_silicon_signs_in_and_gets_first_party_tokens() {
         .jwt
         .verify_access(
             r.json["access_token"].as_str().expect("jwt"),
-            Some("accounts"),
+            Some("silicon-accounts"),
         )
         .expect("valid first-party JWT");
     assert_eq!(claims.sub, silicon.uuid);
     assert_eq!(
         family_rows(&ctx, &silicon.uuid).await,
         vec![(
-            "accounts".to_string(),
+            "silicon-accounts".to_string(),
             "silicon_login".to_string(),
             Some("scout on mac".to_string())
         )]
@@ -294,7 +294,7 @@ async fn malformed_input_is_rejected_precisely() {
         r.json["error"]["hint"]
             .as_str()
             .expect("h")
-            .contains("accounts login")
+            .contains("silicon-accounts login")
     );
 
     let r = login(&ctx, "si:scout", "stk-xyz").await;

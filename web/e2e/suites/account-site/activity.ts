@@ -33,7 +33,7 @@ const activity: Journey = {
     const { page, probe, uuid } = carbon;
     await signIntoApp(env, page, "briefcase");
     await signIntoApp(env, page, "commit");
-    // Someone else types ten wrong codes for the Carbon's email (the accounts CLI's code sign-in, from another
+    // Someone else types ten wrong codes for the Carbon's email (the silicon-accounts CLI's code sign-in, from another
     // address): the lock that follows is a failed sign-in in the Carbon's activity.
     const sentAfter = await lastSeq(env);
     const attempt = await api<{ challenge_id?: string }>(ctx, "/v1/cli/login/start", { method: "POST", json: { email: carbon.email } });

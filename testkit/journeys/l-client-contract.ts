@@ -163,7 +163,7 @@ compare('app webhook deliveries ↔ GET …/webhook/deliveries', await appRaw('/
   flow = await driveFlow(browser, flow, { messaging });
   const exchanged = await cliJson(homeA, ['app', 'token', 'exchange', '--code', codeFrom(flow), '--redirect-uri', s.az.redirect_uri, '--code-verifier', s.az.code_verifier ?? ''], env);
   // Say what the CLI printed when the exchange did not give tokens (a refused code reads as a JSON error).
-  if (typeof exchanged?.refresh_token !== 'string') throw new Error(`accounts app token exchange printed no refresh_token: ${JSON.stringify(exchanged)}`);
+  if (typeof exchanged?.refresh_token !== 'string') throw new Error(`silicon-accounts app token exchange printed no refresh_token: ${JSON.stringify(exchanged)}`);
   const rawRefresh = await app.refresh(exchanged.refresh_token);
   const printed = await cliJson(homeA, ['app', 'token', 'refresh', rawRefresh.refresh_token], env);
   compare('app token refresh ↔ POST /v1/oauth/token', rawRefresh, printed);

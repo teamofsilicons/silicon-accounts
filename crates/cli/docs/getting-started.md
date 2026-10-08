@@ -1,4 +1,4 @@
-# Getting started with the accounts CLI
+# Getting started with the silicon-accounts CLI
 
 Silicon Accounts gives every Carbon and every Silicon one personal account that it
 carries into every app it signs into. This CLI is how you use that account from a
@@ -11,19 +11,19 @@ Pick the line that matches you:
 
 ```sh
 # A Carbon, with a browser: prints a code, opens accounts.teamofsilicons.com/device
-accounts login
+silicon-accounts login
 
 # A Carbon, without a browser: a 6-digit code goes to your email (or --phone)
-accounts login --email you@example.com
+silicon-accounts login --email you@example.com
 # …non-interactive? finish it with a second call:
-accounts login --email you@example.com --code 123456
+silicon-accounts login --email you@example.com --code 123456
 
 # A Silicon: your si:id and STK (read from stdin so it never shows in `ps`)
-printf '%s' "$STK" | accounts login --silicon si:scout --stk-stdin
+printf '%s' "$STK" | silicon-accounts login --silicon si:scout --stk-stdin
 ```
 
 Silicons can also export `ACCOUNTS_SILICON=si:scout` and `ACCOUNTS_STK=stk-…` and run
-`accounts login`.
+`silicon-accounts login`.
 
 Why these choices: a Carbon proves who they are with something they hold (a browser
 session, an inbox, a phone). A Silicon has no inbox; its STK is its password, set once
@@ -32,9 +32,9 @@ and rotated by its custodian.
 ## 2. Check who you are
 
 ```sh
-accounts login status --json
+silicon-accounts login status --json
 # {"authenticated":true,"kind":"silicon","id":"si:scout","uuid":"b9Z","expires_at":"…"}
-accounts whoami
+silicon-accounts whoami
 ```
 
 `login status` exits 0 when signed in and 1 when not, so scripts can branch on it.
@@ -44,7 +44,7 @@ The session lives in `{home}/.accounts/session.json` (mode 0600). Access tokens 
 ## 3. Sign into an app
 
 ```sh
-accounts login --app remind
+silicon-accounts login --app remind
 ```
 
 prints a short-lived token (`slt_…`, single use, 2 minutes). Hand it to the app; the
@@ -55,20 +55,20 @@ directly.
 ## 4. Everything else
 
 ```sh
-accounts --help                 # the whole command tree
-accounts <command> --help       # what it does, how it combines with others, examples
-accounts docs                   # these guides
+silicon-accounts --help                 # the whole command tree
+silicon-accounts <command> --help       # what it does, how it combines with others, examples
+silicon-accounts docs                   # these guides
 ```
 
-Useful next stops: `accounts docs silicons` (getting a Silicon an account),
-`accounts docs apps` (adding sign-in to an app), `accounts docs troubleshooting`.
+Useful next stops: `silicon-accounts docs silicons` (getting a Silicon an account),
+`silicon-accounts docs apps` (adding sign-in to an app), `silicon-accounts docs troubleshooting`.
 
 ## Where the CLI keeps things
 
 State goes in `{home}/.accounts/`. The home is `--home`, else `ACCOUNTS_HOME`, else the
-directory set with `accounts config home <dir>`, else `$SILICON_HOME`, else `~`.
-`accounts config get` shows every setting and where it came from. Use `--url` (or
-`ACCOUNTS_URL`, or `accounts config set url …`) to talk to another Silicon Accounts
+directory set with `silicon-accounts config home <dir>`, else `$SILICON_HOME`, else `~`.
+`silicon-accounts config get` shows every setting and where it came from. Use `--url` (or
+`ACCOUNTS_URL`, or `silicon-accounts config set url …`) to talk to another Silicon Accounts
 instance, e.g. a local one at `http://localhost:8590` (the account site, which forwards the API;
 `http://127.0.0.1:8589` reaches accounts-api directly).
 
@@ -80,8 +80,8 @@ instance, e.g. a local one at `http://localhost:8590` (the account site, which f
   suggestions on stderr; `-q` silences the extras.
 * Exit codes: 0 ok, 1 failure, 2 invalid input (or an invalid proof/token being
   checked), 3 sign-in required or refused, 4 not found, 5 conflict, 6 rate limited or
-  locked. See `accounts docs troubleshooting`.
+  locked. See `silicon-accounts docs troubleshooting`.
 
 Telemetry (command, outcome, timing; never tokens, ids or contact details) is on by
-default; turn it off with `accounts config telemetry off` or `ACCOUNTS_TELEMETRY=0`.
+default; turn it off with `silicon-accounts config telemetry off` or `ACCOUNTS_TELEMETRY=0`.
 Updates are handled by Silicon Apps; the CLI never updates itself.

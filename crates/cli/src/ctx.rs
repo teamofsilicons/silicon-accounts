@@ -28,7 +28,7 @@ pub struct FileConfig {
     pub url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub telemetry: Option<bool>,
-    /// The app chosen with `accounts app use`.
+    /// The app chosen with `silicon-accounts app use`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub app: Option<String>,
 }
@@ -90,7 +90,7 @@ pub struct StoredApp {
     pub saved_at: OffsetDateTime,
 }
 
-/// `{home}/.accounts/requests/<id>.json`: lets `accounts silicon request status` poll later.
+/// `{home}/.accounts/requests/<id>.json`: lets `silicon-accounts silicon request status` poll later.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredRequest {
     pub request_id: String,
@@ -309,7 +309,10 @@ impl Ctx {
         let (url, _) = self.url()?;
         let mut builder = AccountsClient::builder()
             .base_url(&url)
-            .user_agent(format!("accounts-cli/{}", env!("CARGO_PKG_VERSION")))
+            .user_agent(format!(
+                "silicon-accounts-cli/{}",
+                env!("CARGO_PKG_VERSION")
+            ))
             .telemetry(self.telemetry_setting().0);
         if let Ok(value) = std::env::var("ACCOUNTS_ALLOW_INSECURE_HTTP") {
             builder = builder.allow_insecure_http(parse_flag(&value).unwrap_or(false));
@@ -371,7 +374,7 @@ impl Ctx {
                     session.who()
                 ),
                 format!(
-                    "Sign in there with `accounts login --url {url}`, or drop --url / ACCOUNTS_URL to use {}.",
+                    "Sign in there with `silicon-accounts login --url {url}`, or drop --url / ACCOUNTS_URL to use {}.",
                     session.url
                 ),
             ));
@@ -388,10 +391,10 @@ impl Ctx {
         if session.kind != kind {
             let hint = match kind {
                 AccountKind::Carbon => {
-                    "Sign in as a Carbon with `accounts login` (Silicons don't have this)."
+                    "Sign in as a Carbon with `silicon-accounts login` (Silicons don't have this)."
                 }
                 AccountKind::Silicon => {
-                    "Sign in as the Silicon with `accounts login --silicon si:… --stk-stdin`."
+                    "Sign in as the Silicon with `silicon-accounts login --silicon si:… --stk-stdin`."
                 }
             };
             return Err(CliError::new(
@@ -508,7 +511,7 @@ impl Ctx {
                     1,
                     "unexpected_response",
                     "The sign-in succeeded but neither the token response nor GET /v1/me said which account it is.",
-                    "Retry; if it persists, report it with `accounts report`.",
+                    "Retry; if it persists, report it with `silicon-accounts report`.",
                 ));
             }
         };
@@ -530,8 +533,8 @@ impl Ctx {
 
     // ---- apps ---------------------------------------------------------------------------
 
-    /// Resolves which app and which credentials `accounts app …` uses: --app-id >
-    /// ACCOUNTS_APP_ID > `accounts app use`; secret from --app-secret / --app-secret-stdin >
+    /// Resolves which app and which credentials `silicon-accounts app …` uses: --app-id >
+    /// ACCOUNTS_APP_ID > `silicon-accounts app use`; secret from --app-secret / --app-secret-stdin >
     /// ACCOUNTS_APP_SECRET > the stored apps/<app_id>.json.
     pub fn app_selection(
         &self,
@@ -550,11 +553,11 @@ impl Ctx {
         } else if let Some(id) = env("ACCOUNTS_APP_ID") {
             (id, "ACCOUNTS_APP_ID")
         } else if let Some(id) = self.config()?.app.clone() {
-            (id, "accounts app use")
+            (id, "silicon-accounts app use")
         } else {
             return Err(CliError::invalid(
                 "No app selected for this command.",
-                "Pass --app-id <app_id>, set ACCOUNTS_APP_ID, or run `accounts app use <app_id> --secret-stdin` once.",
+                "Pass --app-id <app_id>, set ACCOUNTS_APP_ID, or run `silicon-accounts app use <app_id> --secret-stdin` once.",
             ));
         };
         let secret = if let Some(secret) = app_secret {
@@ -569,7 +572,7 @@ impl Ctx {
         } else {
             self.load_app(&app_id)?
                 .and_then(|stored| stored.app_secret)
-                .map(|secret| (secret, "stored by accounts app use"))
+                .map(|secret| (secret, "stored by silicon-accounts app use"))
         };
         Ok(AppSelection {
             app_id,
@@ -603,7 +606,7 @@ impl Ctx {
                     selection.app_id
                 ),
                 format!(
-                    "Pass the secret (--app-secret-stdin or ACCOUNTS_APP_SECRET), store it with `accounts app use {} --secret-stdin`, or sign in as the app's owner with `accounts login`.",
+                    "Pass the secret (--app-secret-stdin or ACCOUNTS_APP_SECRET), store it with `silicon-accounts app use {} --secret-stdin`, or sign in as the app's owner with `silicon-accounts login`.",
                     selection.app_id
                 ),
             )),
@@ -620,7 +623,7 @@ impl Ctx {
                 format!(
                     "`{app_id}` is not an app id: app ids are lowercase letters, digits and dashes (e.g. briefcase)."
                 ),
-                "Check the app id in Silicon Apps or with `accounts app list`.",
+                "Check the app id in Silicon Apps or with `silicon-accounts app list`.",
             ));
         }
         Ok(self
@@ -673,7 +676,7 @@ impl Ctx {
     }
 }
 
-/// Which app `accounts app` acts for.
+/// Which app `silicon-accounts app` acts for.
 #[derive(Debug, Clone)]
 pub struct AppSelection {
     pub app_id: String,
@@ -687,7 +690,7 @@ pub fn not_signed_in(url: &str) -> CliError {
         EXIT_AUTH,
         "not_signed_in",
         format!("You are not signed in to {url}."),
-        "Carbons: run `accounts login`. Silicons: run `accounts login --silicon si:<id> --stk-stdin` (or set ACCOUNTS_SILICON and ACCOUNTS_STK).",
+        "Carbons: run `silicon-accounts login`. Silicons: run `silicon-accounts login --silicon si:<id> --stk-stdin` (or set ACCOUNTS_SILICON and ACCOUNTS_STK).",
     )
 }
 
@@ -696,11 +699,11 @@ fn session_ended(session: &StoredSession, why: &str) -> CliError {
         EXIT_AUTH,
         "session_ended",
         format!("Your session as {} has ended: {why}", session.who()),
-        "It was signed out elsewhere, revoked, or (for a Silicon) the STK was rotated. Sign in again with `accounts login`.",
+        "It was signed out elsewhere, revoked, or (for a Silicon) the STK was rotated. Sign in again with `silicon-accounts login`.",
     )
 }
 
-/// Validates a value given for `accounts config set url`.
+/// Validates a value given for `silicon-accounts config set url`.
 pub fn validate_url(url: &str) -> CliResult<String> {
     let url = normalize_url(url);
     let allow_http = std::env::var("ACCOUNTS_ALLOW_INSECURE_HTTP")

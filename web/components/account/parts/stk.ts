@@ -23,7 +23,7 @@ export const stkSecret = (id: string, value: string): RevealedSecret => ({
   label: "STK",
   value,
   note: `${id} signs in with it (put the STK in $STK first):`,
-  command: `printf '%s' "$STK" | accounts login --silicon ${id} --stk-stdin`,
+  command: `printf '%s' "$STK" | silicon-accounts login --silicon ${id} --stk-stdin`,
 });
 
 /** The STK as the service stores it: lowercase, with the stk- prefix. */

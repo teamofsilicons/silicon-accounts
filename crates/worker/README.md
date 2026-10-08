@@ -21,7 +21,7 @@ run out and another node retries them: delivery is at-least-once, and webhook re
 ## Webhook delivery (`webhooks`)
 
 - Each attempt uses the target's **current** URL and **current** secret (app webhook in
-  `app_signin_configs`, or a Silicon's own webhook in `accounts`) and POSTs the stored
+  `app_signin_configs`, or a Silicon's own webhook in `silicon-accounts`) and POSTs the stored
   `webhook_events.payload` as-is with `Content-Type: application/json`,
   `User-Agent: SiliconAccounts-Webhooks/1`, `X-Accounts-Event-Id`, `X-Accounts-Event-Type`,
   `X-Accounts-Delivery-Id`, `X-Accounts-Timestamp` (unix seconds) and

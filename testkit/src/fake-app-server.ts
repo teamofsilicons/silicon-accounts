@@ -995,7 +995,7 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     const rt = runtime(ctx.params.app);
     const params = ctx.contentType() === 'application/x-www-form-urlencoded' ? Object.fromEntries(await ctx.form()) : await jsonObject(ctx);
     const slt = str(params.slt);
-    if (!slt) throw apiError(422, 'missing_slt', 'Send {"slt":"slt_…"} — the short-lived token from `accounts login --app <app_id>`.');
+    if (!slt) throw apiError(422, 'missing_slt', 'Send {"slt":"slt_…"} — the short-lived token from `silicon-accounts login --app <app_id>`.');
     const res = await callAccounts('/v1/oauth/token', { app: rt.app, form: { grant_type: 'urn:silicon:params:oauth:grant-type:slt', slt } });
     if (!res.ok) {
       ctx.sendJson(res.status === 0 ? 502 : res.status, { ok: false, status: res.status, error: res.body ?? res.error });

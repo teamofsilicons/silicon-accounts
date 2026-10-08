@@ -27,6 +27,8 @@ instead of `middleware.ts`, async `params`, `PageProps`/`LayoutProps` from `next
 
 ## Topology: a BFF
 
+The shared docs use the `silicon-accounts` CLI and first-party Accounts app ID. Verification receiver suggestions exclude that internal app.
+
 The browser only ever talks to this site. The Next server holds the Carbon's Silicon Accounts tokens and calls the
 Silicon Accounts and Apps APIs, server to server:
 

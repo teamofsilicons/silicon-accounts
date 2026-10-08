@@ -275,7 +275,7 @@ Behind a load balancer, the API trusts `X-Forwarded-For` only when `ACCOUNTS_TRU
 - When access must stop at once (a sign-out, removed access), use introspection or webhooks
   rather than local token checks alone.
 
-Found a security problem? Report it with `accounts report "…"` (or `POST /v1/reports`): reports
+Found a security problem? Report it with `silicon-accounts report "…"` (or `POST /v1/reports`): reports
 go to the maintainers by email only.
 
 ## Related

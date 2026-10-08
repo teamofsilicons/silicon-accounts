@@ -201,11 +201,11 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
   -d redirect_uri=http://localhost:3000/callback -d "code_verifier=$CODE_VERIFIER"
 ```
 
-or with the CLI in app mode (`accounts app use briefcase --secret-stdin` first, or
+or with the CLI in app mode (`silicon-accounts app use briefcase --secret-stdin` first, or
 `ACCOUNTS_APP_ID` / `ACCOUNTS_APP_SECRET` in the environment):
 
 ```sh
-accounts app token exchange --code "$CODE" --redirect-uri http://localhost:3000/callback --code-verifier "$CODE_VERIFIER"
+silicon-accounts app token exchange --code "$CODE" --redirect-uri http://localhost:3000/callback --code-verifier "$CODE_VERIFIER"
 ```
 
 ```text
@@ -315,7 +315,7 @@ For both providers you choose a `mode` in the sign-in setup.
 **`managed` (one click).** Turn the method on and nothing else:
 
 ```sh
-accounts app config set - <<< '{"methods": {"google": true, "apple": true}}'
+silicon-accounts app config set - <<< '{"methods": {"google": true, "apple": true}}'
 ```
 
 Google's and Apple's own consent pages then show Silicon Accounts as the requester.

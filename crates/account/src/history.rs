@@ -120,7 +120,7 @@ const MEMBERSHIP_FIRST: &str = concat!(
     "(select 'app_access'::text as kind, 'm'::text collate \"C\" as src, (m.app_id || ':first') collate \"C\" as row_key, ",
     "m.first_signed_in_at as at, m.app_id as app_id, m.source as c1, m.membership_id as c2, null::text as c3, ",
     "null::text as c4, null::text as c5, null::text as c6, null::jsonb as extra, null::timestamptz as t1 ",
-    "from memberships m where m.account_uuid = $1 and m.app_id <> 'accounts' and m.first_signed_in_at is not null",
+    "from memberships m where m.account_uuid = $1 and m.app_id <> 'silicon-accounts' and m.first_signed_in_at is not null",
     keyset!(
         "m.first_signed_in_at",
         "m",
@@ -492,7 +492,7 @@ fn method_phrase(method: &str) -> String {
         "apple" => "Apple".into(),
         "silicon_stk" => "the STK".into(),
         "slt" => "a short-lived token".into(),
-        "device" => "the accounts CLI (device code)".into(),
+        "device" => "the silicon-accounts CLI (device code)".into(),
         "session" => "the browser session".into(),
         other => other.replace('_', " "),
     }

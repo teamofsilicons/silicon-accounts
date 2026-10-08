@@ -117,7 +117,7 @@ impl<'a> AppClient<'a> {
                     "{what} needs app {}'s own credentials (app_id + app secret); the owner's session can't do it on the app's behalf.",
                     self.app_id
                 ),
-                "Pass the app secret (accounts: --app-secret, ACCOUNTS_APP_SECRET, or `accounts app use <app_id> --secret-stdin`). App secrets come from Silicon Apps.",
+                "Pass the app secret (silicon-accounts: --app-secret, ACCOUNTS_APP_SECRET, or `silicon-accounts app use <app_id> --secret-stdin`). App secrets come from Silicon Apps.",
             )),
         }
     }
@@ -485,7 +485,7 @@ impl<'a> AppClient<'a> {
                         started.elapsed().as_secs()
                     ),
                     hint: format!(
-                        "It keeps running on the service; check it with `accounts app import status {job_id}`."
+                        "It keeps running on the service; check it with `silicon-accounts app import status {job_id}`."
                     ),
                 });
             }

@@ -7,7 +7,7 @@
 //!   replace, `null` resets a field to its default), rejects unknown keys, reports type errors
 //!   with their path, normalizes and validates — returning [`FieldErrors`] keyed by path such as
 //!   `branding.light.primary`.
-//! - [`SigninConfig::effective`] applies the first-party rules for apps `accounts` and
+//! - [`SigninConfig::effective`] applies the first-party rules for apps `silicon-accounts` and
 //!   `developer`.
 //!
 //! ## Details and flows
@@ -982,10 +982,10 @@ impl SigninConfig {
         e.into_ok()
     }
 
-    /// Applies the first-party rules for apps `accounts` (the account site and the CLI) and
+    /// Applies the first-party rules for apps `silicon-accounts` (the account site and the CLI) and
     /// `developer` (developers.teamofsilicons.com): email + phone always on, Google/Apple only
     /// when managed credentials exist, no details asked (so no flow), signup allowed, and their
-    /// fixed redirect URIs (any URL on the public origin for `accounts`; exactly
+    /// fixed redirect URIs (any URL on the public origin for `silicon-accounts`; exactly
     /// `{developer_url}/auth/callback` for `developer`).
     pub fn effective(mut self, settings: &Settings, app_id: &str) -> SigninConfig {
         if crate::is_first_party_app_id(app_id) {
@@ -1038,7 +1038,7 @@ impl SigninConfig {
     }
 
     /// True when `uri` may receive the authorization result for this app.
-    /// First-party `accounts`: any URL on the public origin or an extra allowed origin.
+    /// First-party `silicon-accounts`: any URL on the public origin or an extra allowed origin.
     /// First-party `developer`: exactly `{developer_url}/auth/callback`.
     pub fn redirect_allowed(&self, settings: &Settings, app_id: &str, uri: &str) -> bool {
         if app_id == crate::FIRST_PARTY_APP_ID {
@@ -2216,7 +2216,7 @@ mod tests {
     #[test]
     fn first_party_effective_config() {
         let mut settings = Settings::for_tests();
-        let c = SigninConfig::default().effective(&settings, "accounts");
+        let c = SigninConfig::default().effective(&settings, "silicon-accounts");
         assert!(c.methods.email && c.methods.phone && !c.methods.google && !c.methods.apple);
         assert_eq!(
             c.available_methods(&settings),
@@ -2224,7 +2224,7 @@ mod tests {
         );
         settings.google.client_id = Some("id".into());
         settings.google.client_secret = Some(secrecy::SecretString::from("secret"));
-        let c = SigninConfig::default().effective(&settings, "accounts");
+        let c = SigninConfig::default().effective(&settings, "silicon-accounts");
         assert_eq!(
             c.available_methods(&settings),
             vec![Method::Google, Method::Email, Method::Phone]

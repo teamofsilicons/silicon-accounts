@@ -98,7 +98,7 @@ about User verification grants, live:
 | 403 | `account_not_active` | the subject account is not active (`details.status`) |
 | 403 | `membership_inactive` | the account has no active membership with the issuing app (`details.membership_id`) |
 | 400 | `unknown_receiving_app` | receiving app(s) don't exist (`details.app_ids`) |
-| 400 | `invalid_receiving_app` | the issuer itself, or the first-party app `accounts` |
+| 400 | `invalid_receiving_app` | the issuer itself, or the first-party app `silicon-accounts` |
 | 403 | `receiving_app_disabled` | receiving app(s) disabled (`details.app_ids`) |
 | 403 | `app_disabled` | the issuing app is disabled (App verification page) |
 | 400 | `invalid_proof_refresh_token` | not a `sapr_…` token (a wrapped one, `Bearer sapr_…`, is named as such), or unknown: mistyped, another environment, or its proof ended more than 30 days ago (its tokens were deleted) |
@@ -135,7 +135,7 @@ account crate) reads revocations from `proof_families`, so it shows every one of
 
 The verifying app's credentials are checked through the core's 60 s in-memory credential
 cache; then one query: `proof_tokens` (PK) → `proof_families` (PK) → `apps` (PK), plus
-`accounts`, `memberships` and `token_families` by primary key for User verification (checked with `EXPLAIN
+`silicon-accounts`, `memberships` and `token_families` by primary key for User verification (checked with `EXPLAIN
 ANALYZE` on 50k proofs: only primary-key index scans, 0.03 ms execution). Measured in-process
 (`tests/perf.rs`, debug build, local Postgres 16): 2,000 sequential verifies p50 ≈ 0.16 ms,
 p95 ≈ 0.18–0.20 ms; 2,000 more from 100 concurrent callers (pool of 32) p50 ≈ 2.2–2.6 ms,
@@ -186,7 +186,7 @@ The signed-in developer's `/app-verification` portal uses two first-party read e
 
 Both return `{items, next_cursor}`, newest first with stable timestamp/ID keyset pagination;
 `limit` defaults to 50 and clamps to 1–200. Both send `Cache-Control: no-store`.
-Only Accounts session cookies and live first-party `accounts`/`developer` access tokens are
+Only Accounts session cookies and live first-party `silicon-accounts`/`developer` access tokens are
 accepted. Authorization matches the existing `AppOrOwner` policy: current owner or accepted
 `app_authors` membership of the **issuing** app. Each page reevaluates that permission. An
 unmanaged/unknown app filter or record answers 404 `verification_not_found`; receiving-app

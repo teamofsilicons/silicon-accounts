@@ -269,14 +269,14 @@ done
 
 # --- 1. binaries ------------------------------------------------------------------------------------
 if [ "$BUILD" = 1 ]; then
-  say "building accounts-api, accounts-migrate, accounts-seed and the accounts CLI ($PROFILE) into $TARGET_DIR"
+  say "building accounts-api, accounts-migrate, accounts-seed and the silicon-accounts CLI ($PROFILE) into $TARGET_DIR"
   release_flag=()
   [ "$PROFILE" = release ] && release_flag=(--release)
   CARGO_TARGET_DIR="$TARGET_DIR" cargo build ${release_flag[@]+"${release_flag[@]}"} \
     -p silicon-accounts-server -p silicon-accounts-cli >"$LOG_DIR/build.log" 2>&1 \
     || { tail -n 40 "$LOG_DIR/build.log" >&2; fail "cargo build failed (full log: $LOG_DIR/build.log)"; }
 fi
-for b in accounts-api accounts-migrate accounts-seed accounts; do
+for b in accounts-api accounts-migrate accounts-seed silicon-accounts; do
   [ -x "$BIN/$b" ] || fail "$BIN/$b does not exist" "run without --no-build, or set CARGO_TARGET_DIR to the target dir you built into"
 done
 
@@ -645,7 +645,7 @@ Silicon Accounts dev stack is up
   profile photos       $IRIS_URL   ($( [ "$IRIS_URL" = "http://127.0.0.1:$MOCK_IRIS_PORT" ] && echo 'mock Iris' || echo 'ACCOUNTS_IRIS_BASE_URL'))
   database             $DB_URL
   logs                 $(rel "$LOG_DIR")/ (accounts-api.log, testkit.log$( [ -n "$FRONT_NAME" ] && echo ", $FRONT_NAME.log")$( [ "$START_DEVELOPER" = 1 ] && echo ", developer.log"), migrate.log, seed.log)$( [ "$WEB_MODE" = next ] && printf '\n  site build           %s/%s' "$(rel "$WEB_DIR")" "$DIST_DIR")
-  CLI                  $(rel "$BIN")/accounts --url $PUBLIC_URL --help
+  CLI                  $(rel "$BIN")/silicon-accounts --url $PUBLIC_URL --help
 EOF
 
 if [ "$DETACH" = 1 ]; then

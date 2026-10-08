@@ -12,7 +12,7 @@ tested end to end on one machine, without real Google, Apple, Postmark, Twilio, 
 | **fake-apps.json** | — | the 15 fake apps "as Silicon Apps would deliver them": fixed app ids and secrets, owners, logos, sign-in setups |
 | **fixtures/imports/** | — | CSV/JSON files for the user import flow, with the expected outcome of every row |
 | **lib/** | — | a TypeScript helper library for the e2e suites (sign-in flows over HTTP, OTP codes, webhooks, PKCE, signatures) |
-| **journeys/** | — | non-browser walks through the whole product against a running stack, with the helpers and the real `accounts` CLI (`scripts/journeys.sh`) |
+| **journeys/** | — | non-browser walks through the whole product against a running stack, with the helpers and the real `silicon-accounts` CLI (`scripts/journeys.sh`) |
 
 Everything is TypeScript run with `tsx` on Node ≥ 24, state is in memory, and nothing needs Docker.
 
@@ -330,7 +330,7 @@ accountsUrl, accountsPublicUrl, host})` starts all three wired to the dev creden
 
 Scripts that walk through the product the way apps, Carbons and Silicons do, without a browser:
 the hosted-flow API (`BrowserSession`), the fake app server's own callbacks and proof demos, and
-the real `accounts` CLI binary (`ACCOUNTS_CLI`, default `target/debug/accounts`). Each file is one
+the real `silicon-accounts` CLI binary (`ACCOUNTS_CLI`, default `target/debug/silicon-accounts`). Each file is one
 journey with numbered checks (`ok` / `FAIL`), runnable on its own (`tsx journeys/c-cli-silicons.ts`)
 or all together (`pnpm -C testkit journeys`, which exits 1 when any check failed).
 
@@ -340,9 +340,9 @@ or all together (`pnpm -C testkit journeys`, which exits 1 when any check failed
 | `b-providers` | managed Google (interface), bring-your-own Google (acme-notes: mock saw acme's client_id), Apple form_post bring-your-own (orbit-games, cookieless POST → 303 → GET) and managed (waveform), `allowed_email_domains`, `allow_signup: false` |
 | `c-cli-silicons` | device flow approved with the browser session, `silicon create` (STK once), `login --silicon`, `login --app remind` + SLT exchange, self-create `--wait` accepted meanwhile, transfer + accept, STK rotation (old STK refused, apps signed out), Silicon webhook events on `/hooks/<key>` |
 | `d-proofs` | User verification dm → briefcase and App verification commit → remind and → waveform (one proof per app) through the fake apps (timings), a multi-app App verification request refused (`app_verification_single_app`), non-audience verification `{valid:false, expires_at:null}`, verify latency |
-| `e-import` | `accounts app import dirty.csv --wait` compared row by row with `expected.json`, then an imported Carbon finishes setup (`finishing_import`) and the membership turns active (needs a database dirty.csv was never imported into) |
+| `e-import` | `silicon-accounts app import dirty.csv --wait` compared row by row with `expected.json`, then an imported Carbon finishes setup (`finishing_import`) and the membership turns active (needs a database dirty.csv was never imported into) |
 | `f-app-webhooks` | signed app webhooks: id change, scope-limited `account.updated`, primary email change, revoke → `membership.signed_out`, access removal |
-| `g-report` | `accounts report` → mock Postmark gets exactly the three recipients |
+| `g-report` | `silicon-accounts report` → mock Postmark gets exactly the three recipients |
 | `h-protocol` | OIDC id_token, `prompt=none/login`, refused redirect URIs, PKCE, code reuse, refresh rotation + reuse detection, code send limit + verify lockout, CSRF Origin guard, audience confusion, an app's `allowed_origins` in its public config (and, behind the Next.js site, the embed page's `frame-ancestors` and the SDK's CORS), CORS, `docs_url` in `/v1/meta` |
 | `i-cli-account`, `j-cli-custodian`, `k-cli-app` | every CLI command family against the real service (account, Silicons and custodian requests — including `silicon update --photo` and `id available --for` — device, config, deletion, app mode with credentials and as the owner) |
 | `l-client-contract` | the Rust client's typed values (CLI `--json`) against the raw API: no field dropped or invented |

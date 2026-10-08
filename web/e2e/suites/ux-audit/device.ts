@@ -1,5 +1,5 @@
 /**
- * ux-audit: /device, where a Carbon approves a terminal's sign-in (`accounts login`), in light and dark at 1440 and
+ * ux-audit: /device, where a Carbon approves a terminal's sign-in (`silicon-accounts login`), in light and dark at 1440 and
  * 390 px: entering a code, reviewing a request, approved, denied, an unknown code and an expired one. Requests are made
  * the way the CLI makes them (POST /v1/device/authorize); the Carbon is new.
  */

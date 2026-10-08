@@ -648,7 +648,7 @@ async fn signed_in_reports_are_idempotent_and_audited() {
 async fn telemetry_accepts_cli_events_and_rejects_bad_ones() {
     let ctx = TestContext::new().await;
     let batch = json!({"events": [
-        {"source": "cli", "step": "accounts login status", "name": "cli.command", "progress": 1.0,
+        {"source": "cli", "step": "silicon-accounts login status", "name": "cli.command", "progress": 1.0,
          "data": {"outcome": "ok", "exit_code": 0}},
         {"source": "cli", "step": "login.device.approved", "name": "cli.step", "progress": 0.9, "data": {}},
         {"source": "cli", "step": "login.code.sent", "name": "cli.step"}

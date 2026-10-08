@@ -52,8 +52,8 @@ const METHODS: Record<string, string> = {
   google: "Google",
   apple: "Apple",
   silicon_stk: "si:id and STK",
-  slt: "Short-lived token from the accounts CLI",
-  device: "accounts CLI (device code)",
+  slt: "Short-lived token from the silicon-accounts CLI",
+  device: "silicon-accounts CLI (device code)",
   session: "This site's session",
 };
 
@@ -103,7 +103,7 @@ function proofReason(reason: string, issuing: string): string {
 
 /** Words for the codes found in audit `details`, per key. */
 const VALUES: Record<string, Record<string, string>> = {
-  kind: { browser: "Browser", cli: "Terminal (accounts CLI)", initial: "A Silicon asking for a custodian", transfer: "A transfer between custodians", email: "Email", phone: "Phone number" },
+  kind: { browser: "Browser", cli: "Terminal (silicon-accounts CLI)", initial: "A Silicon asking for a custodian", transfer: "A transfer between custodians", email: "Email", phone: "Phone number" },
   by: { custodian: "Its custodian", silicon: "The Silicon itself" },
   stk: { generated: "Generated and shown once", chosen: "Chosen by hand" },
   via: { requirement: "While signing in to an app that needs it", code: "With a code", google: "Google", apple: "Apple" },

@@ -160,7 +160,7 @@ async fn app_verification_requests_are_validated() {
     assert_eq!(r.error_code(), Some("invalid_receiving_app"));
 
     // Silicon Accounts' own apps never receive proofs.
-    for own in ["accounts", "developer"] {
+    for own in ["silicon-accounts", "developer"] {
         let r = app_verification(json!({"receiving_app": own})).await;
         assert_eq!(r.status, 400, "{own}: {}", r.json);
         assert_eq!(r.error_code(), Some("invalid_receiving_app"));

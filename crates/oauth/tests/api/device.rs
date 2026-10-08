@@ -49,7 +49,11 @@ fn assert_user_code(code: &str) {
 async fn a_device_sign_in_from_start_to_tokens() {
     let ctx = TestContext::new().await;
     let carbon = ctx.carbon().await;
-    let r = authorize(&ctx, json!({"client_label": "accounts CLI on test-mac"})).await;
+    let r = authorize(
+        &ctx,
+        json!({"client_label": "silicon-accounts CLI on test-mac"}),
+    )
+    .await;
     assert_eq!(r.status, 200, "{}", r.json);
     assert_eq!(header(&r, "cache-control"), "no-store");
     let device_code = s(&r.json, "device_code").to_string();
@@ -80,7 +84,10 @@ async fn a_device_sign_in_from_start_to_tokens() {
     wait_interval(&ctx).await;
     let r = poll(&ctx, &device_code).await;
     let body = assert_tokens(&r).clone();
-    assert_eq!(body["membership_id"], format!("accounts:{}", carbon.uuid));
+    assert_eq!(
+        body["membership_id"],
+        format!("silicon-accounts:{}", carbon.uuid)
+    );
     assert_eq!(body["account"]["uuid"], carbon.uuid.as_str());
     let jwks = ctx
         .call(router(), Req::get("/.well-known/jwks.json"))
@@ -89,7 +96,7 @@ async fn a_device_sign_in_from_start_to_tokens() {
     let claims = verify_with_jwks(
         &jwks,
         ctx.state.settings.issuer(),
-        "accounts",
+        "silicon-accounts",
         s(&body, "access_token"),
     );
     assert_eq!(claims["sub"], carbon.uuid.as_str());
@@ -99,14 +106,14 @@ async fn a_device_sign_in_from_start_to_tokens() {
         &carbon.uuid,
     )
     .await;
-    assert_eq!(family, "device|accounts CLI on test-mac");
+    assert_eq!(family, "device|silicon-accounts CLI on test-mac");
     let history: String = scalar(
         &ctx,
         "select method || ':' || outcome || ':' || app_id from signin_history where account_uuid = $1",
         &carbon.uuid,
     )
     .await;
-    assert_eq!(history, "device:success:accounts");
+    assert_eq!(history, "device:success:silicon-accounts");
 
     // A device code gives tokens once.
     wait_interval(&ctx).await;
@@ -166,7 +173,7 @@ async fn an_unlabelled_device_sign_in_gets_the_default_label() {
         .call(
             router(),
             Req::post("/v1/device/authorize")
-                .form(&[("client_id", "accounts"), ("scope", "profile")]),
+                .form(&[("client_id", "silicon-accounts"), ("scope", "profile")]),
         )
         .await;
     assert_eq!(r2.status, 200, "{}", r2.json);
@@ -179,7 +186,7 @@ async fn an_unlabelled_device_sign_in_gets_the_default_label() {
         &carbon.uuid,
     )
     .await;
-    assert_eq!(label, "accounts CLI");
+    assert_eq!(label, "silicon-accounts CLI");
 }
 
 #[tokio::test]

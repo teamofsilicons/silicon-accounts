@@ -139,7 +139,7 @@ async fn the_request_token_is_required_and_checked() {
     assert_eq!(r.status, 404);
 }
 
-/// What `accounts silicon create --wait` does: poll until the custodian decides.
+/// What `silicon-accounts silicon create --wait` does: poll until the custodian decides.
 #[tokio::test]
 async fn waiting_silicon_sees_the_acceptance() {
     let ctx = TestContext::new().await;

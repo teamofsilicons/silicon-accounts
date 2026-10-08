@@ -171,7 +171,7 @@ pub struct NewFamily<'a> {
     pub origin: TokenOrigin,
     pub scopes: &'a [Scope],
     pub browser_session_id: Option<Uuid>,
-    /// Shown on the sessions page for first-party sign-ins (e.g. "accounts CLI on mac").
+    /// Shown on the sessions page for first-party sign-ins (e.g. "silicon-accounts CLI on mac").
     pub label: Option<&'a str>,
     pub ip: Option<&'a str>,
     pub user_agent: Option<&'a str>,
@@ -597,7 +597,7 @@ pub async fn verify_access_token(
             format!("This access token was issued to the app '{got}', but this endpoint needs a token issued to '{expected}'."),
         )
         .hint(if expected == crate::FIRST_PARTY_APP_ID {
-            "Use a first-party token: sign in with `accounts login` (Carbons) or `accounts login --silicon si:<handle> --stk-stdin` (Silicons)."
+            "Use a first-party token: sign in with `silicon-accounts login` (Carbons) or `silicon-accounts login --silicon si:<handle> --stk-stdin` (Silicons)."
                 .to_string()
         } else {
             format!("Use a token that '{expected}' obtained for itself.")
@@ -606,7 +606,7 @@ pub async fn verify_access_token(
             "invalid_token",
             "The access token expired (access tokens last 30 minutes).",
         )
-        .hint("Refresh it with POST /v1/oauth/token grant_type=refresh_token; the accounts CLI does this automatically."),
+        .hint("Refresh it with POST /v1/oauth/token grant_type=refresh_token; the silicon-accounts CLI does this automatically."),
         other => ApiError::unauthenticated("invalid_token", format!("The access token is not valid: {other}."))
             .hint("Sign in again to get a fresh token."),
     })?;
@@ -970,13 +970,13 @@ pub async fn consume_slt(
     }
     let failure = if expired {
         Some(format!(
-            "The short-lived token expired at {} (they last {SLT_TTL_SECONDS} seconds); get a new one with `accounts login --app {}`.",
+            "The short-lived token expired at {} (they last {SLT_TTL_SECONDS} seconds); get a new one with `silicon-accounts login --app {}`.",
             crate::timefmt::format_rfc3339_ms(t.expires_at),
             t.app_id
         ))
     } else if t.app_id != app_id {
         Some(format!(
-            "The short-lived token was issued for the app '{}', not for '{app_id}'; get one for '{app_id}' with `accounts login --app {app_id}`.",
+            "The short-lived token was issued for the app '{}', not for '{app_id}'; get one for '{app_id}' with `silicon-accounts login --app {app_id}`.",
             t.app_id
         ))
     } else {
@@ -1067,7 +1067,7 @@ pub async fn create_device(
         let user_code = crate::crypto::generate_user_code();
         let res: Result<OffsetDateTime, sqlx::Error> = sqlx::query_scalar(
             "insert into device_authorizations (device_code_hash, user_code, app_id, status, client_label, expires_at) \
-             values ($1, $2, 'accounts', 'pending', $3, now() + make_interval(secs => $4)) returning expires_at",
+             values ($1, $2, 'silicon-accounts', 'pending', $3, now() + make_interval(secs => $4)) returning expires_at",
         )
         .bind(pepper.hash(&device_code))
         .bind(&user_code)
@@ -1125,7 +1125,9 @@ pub async fn device_by_user_code(
             "device_code_not_found",
             format!("No device sign-in is waiting for the code {code}."),
         )
-        .hint("Check the code the CLI printed, or run `accounts login` again for a new one.")
+        .hint(
+            "Check the code the CLI printed, or run `silicon-accounts login` again for a new one.",
+        )
     })
 }
 
@@ -1166,7 +1168,7 @@ pub async fn decide_device(
                 DEVICE_CODE_TTL_SECONDS / 60
             ),
         )
-        .hint("Run `accounts login` again for a new code."));
+        .hint("Run `silicon-accounts login` again for a new code."));
     }
     if current.status != "pending" {
         tx.rollback().await?;
@@ -1177,7 +1179,7 @@ pub async fn decide_device(
                 current.user_code, current.status
             ),
         )
-        .hint("Run `accounts login` again if you need a new sign-in."));
+        .hint("Run `silicon-accounts login` again if you need a new sign-in."));
     }
     let updated = sqlx::query_as::<_, DeviceAuthorization>(concat!(
         "update device_authorizations set status = $2, account_uuid = $3, approved_at = case when $2 = 'approved' then now() else null end \
@@ -1194,7 +1196,7 @@ pub async fn decide_device(
 }
 
 /// Polls a device code. Approved → marks it consumed and returns it (issue tokens for
-/// `account_uuid` with origin `device`, app `accounts`). Otherwise `AuthorizationPending`,
+/// `account_uuid` with origin `device`, app `silicon-accounts`). Otherwise `AuthorizationPending`,
 /// `SlowDown` (polled within 5 s), `AccessDenied`, `ExpiredToken` or `Invalid`.
 pub async fn poll_device(
     pool: &PgPool,
@@ -1225,7 +1227,7 @@ pub async fn poll_device(
     };
     if expired && d.status != "consumed" {
         return Err(GrantError::ExpiredToken(format!(
-            "The device code expired at {}; run `accounts login` again.",
+            "The device code expired at {}; run `silicon-accounts login` again.",
             crate::timefmt::format_rfc3339_ms(d.expires_at)
         )));
     }

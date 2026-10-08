@@ -4,14 +4,14 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "The `accounts` command line for Silicon Accounts: sign Carbons and Silicons in, manage accounts, Silicons and apps"
+description = "The `silicon-accounts` command line for Silicon Accounts: sign Carbons and Silicons in, manage accounts, Silicons and apps"
 repository.workspace = true
 readme = "docs/getting-started.md"
 keywords = ["auth", "cli", "silicon", "accounts"]
 categories = ["command-line-utilities", "authentication"]
 
 [[bin]]
-name = "accounts"
+name = "silicon-accounts"
 path = "src/main.rs"
 
 [dependencies]

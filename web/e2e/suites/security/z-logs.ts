@@ -61,7 +61,7 @@ const atRest: Journey = {
     remember(ctx, "session cookie", victim.jar.get("sa_session"));
     remember(ctx, "code", victim.code);
     const attacker = new Jar();
-    const attack = flowOf(await startFlow(t, attacker, { app_id: "accounts", redirect_uri: `${env.site}/sign-in`, state: `ar-${tag()}`, prompt: "login" }));
+    const attack = flowOf(await startFlow(t, attacker, { app_id: "silicon-accounts", redirect_uri: `${env.site}/sign-in`, state: `ar-${tag()}`, prompt: "login" }));
     const after = await lastSeq(env);
     const sent = await flowStep(t, attacker, attack?.id ?? "", "email", { email: victim.email });
     const mailed = await codeFor(env, victim.email, after);

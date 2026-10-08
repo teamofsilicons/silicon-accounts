@@ -147,7 +147,7 @@ export function Apps() {
               />
             </div>
           )}
-          <ListCap page={apps.data} noun="apps" command="accounts apps list" />
+          <ListCap page={apps.data} noun="apps" command="silicon-accounts apps list" />
           <p className={styles.footnote}>
             Making an app? Apps are created in{" "}
             {/* The link and its comma stay on one line: the link is an inline-flex box, so a phone could otherwise

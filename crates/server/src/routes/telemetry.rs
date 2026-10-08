@@ -36,7 +36,7 @@ pub struct TelemetryBatch {
 pub struct IncomingEvent {
     /// Where it comes from: `cli`, `web`, …
     pub source: String,
-    /// Which step of a flow (`login.device.approved`) or command (`accounts login status`).
+    /// Which step of a flow (`login.device.approved`) or command (`silicon-accounts login status`).
     pub step: String,
     /// Event name, `^[a-z0-9_.]{1,64}$` (`cli.command`, `cli.step`).
     pub name: String,
@@ -188,7 +188,7 @@ mod tests {
     fn event(name: &str) -> IncomingEvent {
         IncomingEvent {
             source: "cli".into(),
-            step: "accounts login status".into(),
+            step: "silicon-accounts login status".into(),
             name: name.into(),
             progress: Some(1.0),
             data: json!({"outcome": "ok"}),
