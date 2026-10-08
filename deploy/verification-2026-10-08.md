@@ -184,7 +184,8 @@ CLI/client package release was published as part of this portal deployment.
 
 Public HTTPS pages, API readiness and authentication denials pass. Published
 developer and account verification JavaScript matches the tested build exactly.
-A signed-in production central-history browser check is not yet claimed.
+A genuine signed-in Chrome session for Saket Gupta also verified the central
+page, issuing-app/status filters and empty state against zero production proofs.
 The retained predeployment dump is `backups/predeploy-20261008T153213Z.dump`,
 SHA-256 `7dda2006b0b9d211aea0237c6a16023b32ef28673a0e86a4bc6c1542eee90174`.
 This latest backup was uploaded but not separately restored; earlier isolated

@@ -41,5 +41,6 @@
   "AppVerificationHistoryUrl": "https://developers.teamofsilicons.com/app-verification",
   "AppVerificationHistoryBrowserTests": 13,
   "CommonPortalBrowserTests": 38,
-  "AppVerificationHistoryProductionAuthenticatedBrowserVerified": false
+  "AppVerificationHistoryProductionAuthenticatedBrowserVerified": true,
+  "AppVerificationHistoryProductionBrowserScope": "Genuine signed-in Saket Gupta session; central page, issuing-app/status filters and empty state matched zero production proof records."
 }
