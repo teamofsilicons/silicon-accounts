@@ -12,9 +12,9 @@ related:
 
 # Apps CLI reference
 
-Run the Apps CLI with the `apps` command. Its package name is `silicon-apps-cli`, and this reference describes version 0.1.4.
+Run the Apps CLI with the `silicon-apps` command. Its package name is `silicon-apps-cli`, and this reference describes version 0.1.5.
 
-Add `--help` to any command to see its options. Run `apps docs tree` to see every command and flag in your installed version.
+Add `--help` to any command to see its options. Run `silicon-apps docs tree` to see every command and flag in your installed version.
 
 ## Global options
 
@@ -97,13 +97,13 @@ The `daemon` commands are `start`, `stop`, `status`, `install`, `remove`, `defin
 ## Configuration
 
 ```sh
-apps config show
-apps config home /existing/home
-apps config server https://apps.teamofsilicons.com
-apps config accounts https://accounts.teamofsilicons.com
-apps config telemetry off
-apps config set install_script_timeout_seconds 120
-apps config set update_interval_seconds 60
+silicon-apps config show
+silicon-apps config home /existing/home
+silicon-apps config server https://apps.teamofsilicons.com
+silicon-apps config accounts https://accounts.teamofsilicons.com
+silicon-apps config telemetry off
+silicon-apps config set install_script_timeout_seconds 120
+silicon-apps config set update_interval_seconds 60
 ```
 
 Apps chooses its home from `--home` first, then `SILICON_HOME`, then the saved home, then your normal home directory. It stores configuration, sessions, installations and updater state inside `.apps` in that directory. Each saved session belongs to its service URL. Changing the home setting does not move existing files. See [where state lives](../start/install.md#choose-where-state-lives).
@@ -121,15 +121,15 @@ If a request may have changed the catalog before the connection failed, retry it
 ## Offline docs and reports
 
 ```sh
-apps docs start
-apps docs publish
-apps docs manifest
-apps docs install
-apps docs auth
-apps docs why
-apps docs tree
-apps docs links
-apps report 'Describe what happened and what you expected.'
+silicon-apps docs start
+silicon-apps docs publish
+silicon-apps docs manifest
+silicon-apps docs install
+silicon-apps docs auth
+silicon-apps docs why
+silicon-apps docs tree
+silicon-apps docs links
+silicon-apps report 'Describe what happened and what you expected.'
 ```
 
 `report` accepts `--pr URL` for a proposed fix. Reports require the server's delivery transport. Keep tokens, STKs, app secrets and personal payloads out of reports.

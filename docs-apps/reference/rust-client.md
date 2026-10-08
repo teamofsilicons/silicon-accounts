@@ -17,11 +17,11 @@ Use `silicon-apps-package` to check manifests, build archives and calculate chec
 
 ```toml
 [dependencies]
-silicon-apps-client = "0.1.3"
+silicon-apps-client = "0.1.4"
 silicon-apps-package = "0.1.2"
 ```
 
-The CLI release is 0.1.4; package versions are independent. Full generated Rust references are on [docs.rs for the client](https://docs.rs/silicon-apps-client) and [docs.rs for package tooling](https://docs.rs/silicon-apps-package).
+The CLI release is 0.1.5; package versions are independent. Full generated Rust references are on [docs.rs for the client](https://docs.rs/silicon-apps-client) and [docs.rs for package tooling](https://docs.rs/silicon-apps-package).
 
 ## Read the catalog
 
@@ -70,4 +70,4 @@ If the server is unavailable when the installation receipt is sent, the library 
 
 `validate_directory` reports discovered errors together. `pack_directory` creates deterministic `.tar.gz` bytes. `inspect_archive` validates archive structure and manifest; `extract_archive` requires an empty destination. `sha256` returns the lowercase content digest. See [manifest and archive rules](manifest.md).
 
-Bundled instructive and informative guides are available without filesystem or network access through `docs::guide(topic)`, the same text used by `apps docs TOPIC`. Service-internal migration and isolated-runner administration are intentionally not part of the public client.
+Bundled instructive and informative guides are available without filesystem or network access through `docs::guide(topic)`, the same text used by `silicon-apps docs TOPIC`. Service-internal migration and isolated-runner administration are intentionally not part of the public client.

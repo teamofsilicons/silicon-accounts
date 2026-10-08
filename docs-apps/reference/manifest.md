@@ -59,7 +59,7 @@ Only the listed manifest fields are accepted. Use separate development and produ
 
 Choose the targets your app supports. You do not need to support every target, but each release needs at least one.
 
-Run `apps targets` to see which validation workers are available and how many registered accounts use each target. The counts include observed, authenticated accounts. Total reach counts an account once even if it uses several selected targets. A target can be recognised by the manifest before its validation worker is available.
+Run `silicon-apps targets` to see which validation workers are available and how many registered accounts use each target. The counts include observed, authenticated accounts. Total reach counts an account once even if it uses several selected targets. A target can be recognised by the manifest before its validation worker is available.
 
 ## Executable contract
 
@@ -68,8 +68,8 @@ Every target executable must support `--help`, `accounts --json` with its `app_i
 ## Validate, pack and extract
 
 ```sh
-apps validate ./package
-apps pack ./package --output ./ring.tar.gz
+silicon-apps validate ./package
+silicon-apps pack ./package --output ./ring.tar.gz
 ```
 
 Validation reports the manifest, missing-file and safety errors it finds together. Fix those before packing. Packing uses consistent timestamps, ownership and file modes so the same input produces the same archive. Write the output outside the package directory.

@@ -24,10 +24,10 @@ Every new release starts in the development channel. When it is ready for genera
 | `ring>dev@0.1.0` | Development version 0.1.0 |
 
 ```sh
-apps install 'ring>dev'
-apps install 'ring@1.2.3'
-apps install 'ring>dev@0.1.0'
-apps update ring
+silicon-apps install 'ring>dev'
+silicon-apps install 'ring@1.2.3'
+silicon-apps install 'ring>dev@0.1.0'
+silicon-apps update ring
 ```
 
 Quote references containing `>` so your shell does not interpret them as redirection. An exact version selects the initial release; it is not a permanent pin. Later updates follow that channel's latest release.
@@ -41,13 +41,13 @@ Each installed app remembers its registry. Changing the default server does not 
 Apps is the sole updater for installed apps, including Apps itself when registered as an installation. Other apps must not run their own updater. Installation starts the updater; bootstrap installation also configures its login service. The default interval is one minute.
 
 ```sh
-apps daemon status
-apps update
-apps daemon install
-apps daemon run --once
-apps daemon stop
-apps daemon start
-apps daemon remove
+silicon-apps daemon status
+silicon-apps update
+silicon-apps daemon install
+silicon-apps daemon run --once
+silicon-apps daemon stop
+silicon-apps daemon start
+silicon-apps daemon remove
 ```
 
 `daemon install` registers launchd on macOS, a user systemd service on Linux, or Task Scheduler on Windows. `daemon remove` stops the updater and removes startup registration. `daemon definition` shows the generated service configuration. Use the same configured home for all these commands.
@@ -63,7 +63,7 @@ Before installing an update, Apps checks the package’s SHA-256 checksum and ex
 Optional install scripts run locally only after explicit consent:
 
 ```sh
-apps install ring --allow-install-script
+silicon-apps install ring --allow-install-script
 ```
 
 Review the script first. Consent is recorded for that app's subsequent updates. The default timeout is 120 seconds. Package rollback cannot undo a script's unrelated external side effects.

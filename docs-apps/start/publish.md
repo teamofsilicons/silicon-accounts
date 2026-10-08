@@ -19,9 +19,9 @@ You can also follow these steps in the [developer portal](https://developers.tea
 ## Create the app
 
 ```sh
-apps login
-apps availability ring
-apps create ring --name Ring
+silicon-apps login
+silicon-apps availability ring
+silicon-apps create ring --name Ring
 ```
 
 Save the `app_secret` when it appears. You will only see it once.
@@ -37,16 +37,16 @@ Keep the same key when recovering a response that contained a secret. Starting a
 Write a 200–600 character introduction in `description.txt`, then save it:
 
 ```sh
-apps setup ring details --description-file description.txt --tags tools,productivity
-apps setup ring access --visibility public
-apps setup ring show
+silicon-apps setup ring details --description-file description.txt --tags tools,productivity
+silicon-apps setup ring access --visibility public
+silicon-apps setup ring show
 ```
 
 You can save a draft before everything is ready. To publish, you need the description and at least one package that has passed validation and belongs to a release. You can add up to 20 tags.
 
 Only the app’s administrator can switch it between public and private. [Sharing an app and inviting an author](share.md) give people different kinds of access.
 
-The setup steps are Details, Access, Packages, Links, Media, Updates from Silicon Accounts, and Review and publish. Details, Access and Packages are required. Move between steps freely; `apps setup ring step 3` saves your resume position.
+The setup steps are Details, Access, Packages, Links, Media, Updates from Silicon Accounts, and Review and publish. Details, Access and Packages are required. Move between steps freely; `silicon-apps setup ring step 3` saves your resume position.
 
 ## Implement the three discovery commands
 
@@ -80,41 +80,41 @@ targets:
     binary: bin/ring
 ```
 
-This example targets Linux x64. Use the target and native binary you actually built. `apps targets` lists all nine target names and current runner availability; an unavailable worker cannot validate an upload.
+This example targets Linux x64. Use the target and native binary you actually built. `silicon-apps targets` lists all nine target names and current runner availability; an unavailable worker cannot validate an upload.
 
 ```sh
-apps validate ./package
-apps pack ./package --output ./ring.tar.gz
+silicon-apps validate ./package
+silicon-apps pack ./package --output ./ring.tar.gz
 ```
 
-`apps validate` checks your package files and reports all the structural errors it finds together. Fix those errors, then run `apps pack` to create the `.tar.gz`. Packing the same files produces the same archive. Save that archive outside the package directory so it does not become part of its own input.
+`silicon-apps validate` checks your package files and reports all the structural errors it finds together. Fix those errors, then run `silicon-apps pack` to create the `.tar.gz`. Packing the same files produces the same archive. Save that archive outside the package directory so it does not become part of its own input.
 
 The [manifest reference](../reference/manifest.md) explains how to include multiple targets and optional scripts.
 
 ## Upload, release and promote
 
 ```sh
-apps upload ring --target linux-x86_64 ./ring.tar.gz
-apps packages ring
-apps release ring --version 0.1.0 --package PACKAGE_ID
-apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0
+silicon-apps upload ring --target linux-x86_64 ./ring.tar.gz
+silicon-apps packages ring
+silicon-apps release ring --version 0.1.0 --package PACKAGE_ID
+silicon-apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0
 ```
 
 Copy the accepted package ID into the release command, then its development release ID into the promotion command. Repeat `--package PACKAGE_ID` when a release has multiple targets. All targets are optional, but a release needs at least one.
 
 After you upload a package, Apps runs the three required commands in a separate, isolated environment for its target. If a command fails, you get its output, the expected result and the reason it failed.
 
-The earlier `apps validate` step checks the package structure. This upload check runs the app itself. Both checks must pass. The API server does not run uploaded packages.
+The earlier `silicon-apps validate` step checks the package structure. This upload check runs the app itself. Both checks must pass. The API server does not run uploaded packages.
 
 Every new release starts as a development release. When you promote it, Apps creates a production release from the same accepted packages. You give it a production version in `x.y.z` form, which is separate from its development version.
 
-`apps install ring` installs a production release by default, so promote one before asking people to use that command. You cannot replace an existing version or change its packages. Upload new packages and create another release when you have an update.
+`silicon-apps install ring` installs a production release by default, so promote one before asking people to use that command. You cannot replace an existing version or change its packages. Upload new packages and create another release when you have an update.
 
 ## Add optional links, media and webhooks
 
 ```sh
-apps setup ring links links.json
-apps setup ring media media.json
+silicon-apps setup ring links links.json
+silicon-apps setup ring media media.json
 ```
 
 Example `links.json`:
@@ -130,12 +130,12 @@ For account changes, [configure Accounts webhooks](share.md#account-update-webho
 ## Publish
 
 ```sh
-apps readiness ring
-apps publish ring
+silicon-apps readiness ring
+silicon-apps publish ring
 ```
 
-`apps readiness ring` lists anything still missing. Once the required setup is complete, `apps publish ring` makes the app available immediately. Public apps are available to everyone. Private apps are available to the accounts you have allowed. There is no manual review.
+`silicon-apps readiness ring` lists anything still missing. Once the required setup is complete, `silicon-apps publish ring` makes the app available immediately. Public apps are available to everyone. Private apps are available to the accounts you have allowed. There is no manual review.
 
-You can publish an app that has only development releases. In that case, users must select the development channel. The default `apps install ring` command needs a production release.
+You can publish an app that has only development releases. In that case, users must select the development channel. The default `silicon-apps install ring` command needs a production release.
 
-App details and access carry over to later releases. Inspect changes with `apps history ring`, or continue with [sharing](share.md) and [updates](../learn/releases-and-updates.md).
+App details and access carry over to later releases. Inspect changes with `silicon-apps history ring`, or continue with [sharing](share.md) and [updates](../learn/releases-and-updates.md).
