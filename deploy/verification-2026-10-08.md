@@ -38,3 +38,29 @@ or Apple sign-in, email delivery, or SMS delivery is made by this deployment che
 
 This is a single-host deployment with hourly backups, not high availability.
 Operational references and rollback guidance are in `README.md`.
+
+## Silicon Apps integration upgrade
+
+Source `875a30af17a49a8e694e830e7e3ab7107566f0f9` was deployed on the same
+instance on 2026-10-08. The additive seventh migration adds app authors while
+preserving Accounts users, registry IDs, ownership, and sign-in settings. This
+release includes the official Apps catalog sync, private mail delivery, coauthor
+webhook management, and scoped verified-email integration. All 874 Rust tests
+passed (3 ignored); the ARM64 native release built successfully.
+
+The predeployment dump `backups/predeploy-20261008T124704Z.dump` was uploaded
+before migration. Its SHA-256 is
+`2c6cbaba7b55b61afdf68dccbd68958e7452d88c587b8b81f677c4a96e3a483b`.
+Restoring it to a separate temporary database verified migration 6, zero accounts,
+and two built-in apps; that temporary database was then removed. Production now
+has migration 7 and the same zero accounts and two apps. The authenticated Apps
+registry listing succeeds and is empty, as expected before a genuine production
+owner signs up. No local fixture identities were copied and no mail was sent.
+
+Public readiness and all service readiness checks pass. The existing Postmark
+provider is configured, but actual mail delivery remains untested. The old
+Developer origin is retained until the coordinated DNS cutover. Apps registration
+and credential provisioning require a real production owner; they are not
+represented as complete by this upgrade. Caddy's Developer hostname now derives
+from the matching runtime Developer URLs so that cutover can preserve this
+management site at a dedicated hostname.
