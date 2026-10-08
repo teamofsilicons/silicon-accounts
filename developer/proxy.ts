@@ -27,6 +27,7 @@ function contentSecurityPolicy(nonce: string): string {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${extra(accounts)}${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' https: data: blob:${extra(accounts)}${extra(localIrisImageSource())}`,
+    "media-src 'self' https: blob:",
     "font-src 'self' data:",
     `connect-src 'self'${extra(accounts)}`,
     "object-src 'none'",

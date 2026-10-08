@@ -6,7 +6,7 @@
  *   ACCOUNTS_PUBLIC_URL       the browser-facing accounts site (hosted sign-in, SDK)      [dev http://localhost:8590,
  *                                                                                          prod https://accounts.teamofsilicons.com]
  *   DEVELOPER_PUBLIC_URL      this site's own origin (also read as ACCOUNTS_DEVELOPER_URL) [dev http://localhost:$PORT (8600),
- *                                                                                          prod https://developer.teamofsilicons.com]
+ *                                                                                          prod https://developers.teamofsilicons.com]
  *   DEVELOPER_SESSION_SECRET  seals the session cookies, at least 32 characters; production refuses to run without it
  *   DEVELOPER_EXTRA_ORIGINS   more origins the same-origin guard accepts (comma separated)
  *   ACCOUNTS_IRIS_BASE_URL    a loopback mock Iris is added to the CSP's img-src (local stacks), like web/proxy.ts
@@ -42,7 +42,7 @@ export function accountsPublicUrl(): string {
 export function developerPublicUrl(): string {
   const value = process.env.DEVELOPER_PUBLIC_URL || process.env.ACCOUNTS_DEVELOPER_URL;
   if (value?.trim()) return trimSlash(value);
-  return isProduction() ? "https://developer.teamofsilicons.com" : `http://localhost:${process.env.PORT || "8600"}`;
+  return isProduction() ? "https://developers.teamofsilicons.com" : `http://localhost:${process.env.PORT || "8600"}`;
 }
 
 /** The redirect URI registered for the `developer` app: exactly `{DEVELOPER_PUBLIC_URL}/auth/callback`. */
@@ -108,4 +108,9 @@ export function localIrisImageSource(): string | null {
   } catch {
     return null;
   }
+}
+
+/** Server-to-server publishing API; browser requests use the sealed-session BFF. */
+export function appsApiUrl(): string {
+  return trimSlash(process.env.APPS_API_URL || (isProduction() ? "https://apps.teamofsilicons.com" : "http://127.0.0.1:4310"));
 }

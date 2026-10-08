@@ -1,5 +1,5 @@
 /**
- * The root layout of developer.teamofsilicons.com: <html> and <body>, the three site fonts, the brand tokens over Arc's
+ * The root layout of developers.teamofsilicons.com: <html> and <body>, the three site fonts, the brand tokens over Arc's
  * foundation, the no-flash theme boot script (inline, with the request's CSP nonce) and the shared providers. Every
  * page renders per request (the nonce changes each time).
  */
@@ -17,7 +17,7 @@ import { fontVariables } from "./fonts";
 
 export const metadata: Metadata = {
   title: { default: "Silicon Developer", template: "%s · Silicon Developer" },
-  description: "Set up how your apps sign Carbons and Silicons in with Silicon Accounts: methods, Google and Apple, details, flows, pages, users, webhooks and ATA proofs.",
+  description: "Publish through Silicon Apps and configure Silicon Accounts: methods, Google and Apple, details, flows, pages, users, webhooks and ATA proofs.",
   applicationName: "Silicon Developer",
   referrer: "strict-origin-when-cross-origin",
   robots: { index: false, follow: false },

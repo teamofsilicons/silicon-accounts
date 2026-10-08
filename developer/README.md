@@ -1,10 +1,10 @@
-# Silicon Developer: developer.teamofsilicons.com
+# Silicon Developer: developers.teamofsilicons.com
 
 The developer platform: one place where developers maintain everything they build with us. Each of our services keeps
-its own backend; this site is one frontend on top of them. Today it holds Silicon Accounts: everything about creating
+its own backend; this site is one frontend on top of them. It combines Silicon Apps publishing with Silicon Accounts: everything about creating
 and setting up an app's authentication (its sign-in methods, Google and Apple, the details it asks for, its flows and
 pages, redirect URIs and allowed origins, its user base and imports, its webhook and deliveries, its ATA proofs, and the
-snippets to embed sign-in). The settings themselves are stored in Silicon Accounts.
+snippets to embed sign-in). The same app workspace also creates apps, saves seven setup steps, uploads and validates packages, manages releases and authors, and publishes through Silicon Apps. Each service retains its own backend. The portal contains no store catalog; discovery and installation live at apps.teamofsilicons.com.
 
 Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Arc UI, TanStack Query. The
 product contract is `../understanding/UNDERSTANDING.md` (never edited here); nothing in this app overrides it. Built to
@@ -17,7 +17,9 @@ pnpm typecheck      # next typegen + tsc --noEmit
 pnpm lint           # eslint, zero warnings
 pnpm build          # next build (output: standalone)
 pnpm start          # the production build on $PORT (8600)
-pnpm test           # unit tests (node:test via tsx): sealing, return paths, the proxy allowlist, flows
+pnpm test           # unit tests: sealing, return paths, both proxy allowlists, flows
+pnpm exec playwright install chromium
+pnpm test:e2e       # common portal and publishing behavior, mocked service contracts
 ```
 
 Node 24 or newer. Read the bundled Next docs in `node_modules/next/dist/docs/` before relying on memory (`proxy.ts`
@@ -26,7 +28,7 @@ instead of `middleware.ts`, async `params`, `PageProps`/`LayoutProps` from `next
 ## Topology: a BFF
 
 The browser only ever talks to this site. The Next server holds the Carbon's Silicon Accounts tokens and calls the
-Silicon Accounts API itself, server to server:
+Silicon Accounts and Apps APIs, server to server:
 
 | Path | What it does |
 | --- | --- |
@@ -35,6 +37,7 @@ Silicon Accounts API itself, server to server:
 | `/auth/sign-out` (POST) | Revokes the refresh token (`/v1/oauth/revoke`, `client_id=developer`) and clears the cookie. The account site's own sign-in is untouched. |
 | `/auth/session` | `{"signed_in": bool}` from the sealed cookie alone (no API call). The pages ask it before `/api/accounts/me`, so a signed-out visit never logs a 401. |
 | `/api/accounts/*` | The proxy: `{ACCOUNTS_API_URL}/v1/*` with `Authorization: Bearer <access token>`. Public reads (`meta`, `apps/{id}/public`, `.well-known/openid-configuration`, `.well-known/jwks.json`) go without a token. Account reads: `me`, `me/owned-apps`. Everything under `apps/{app_id}/…` (the owner routes). Anything else answers 404 `not_proxied`. |
+| `/api/apps/*` | Restricted publishing proxy to `{APPS_API_URL}/v1/*`, using the same server-held `aud=developer` access token. Own-app listing requires `mine=true`. Store reviews, install receipts, package resolution, reports and platform registration are not proxied. Media paths use this proxy too, preserving private visibility checks. |
 | everything else | the pages |
 
 **Session cookie** (`sa_dev_session`, `__Host-sa_dev_session` over https): httpOnly, SameSite=Lax, Secure over https,
@@ -48,7 +51,7 @@ is single-flight per refresh token in the process, and the result is remembered 
 with the old cookie before the new one arrived get the same new tokens instead of presenting the used refresh token.
 A refused refresh (`invalid_grant`) clears the cookie and answers 401 `signed_out`.
 
-**CSRF**: every state-changing request (`POST/PUT/PATCH/DELETE` to `/api/accounts/*` and `/auth/sign-out`) must carry an
+**CSRF**: every state-changing request (`POST/PUT/PATCH/DELETE` to `/api/accounts/*`, `/api/apps/*` and `/auth/sign-out`) must carry an
 `Origin` of this site (`DEVELOPER_PUBLIC_URL`, `DEVELOPER_EXTRA_ORIGINS`, and in development the same port on
 `localhost`/`127.0.0.1`) and, when the browser sends it, `Sec-Fetch-Site: same-origin`; otherwise 403
 `cross_site_request`.
@@ -72,9 +75,10 @@ Read at request time (`lib/server/config.ts`), never baked into the build:
 
 | Variable | Default | What |
 | --- | --- | --- |
+| `APPS_API_URL` | dev: `http://127.0.0.1:4310`; prod: `https://apps.teamofsilicons.com` | Silicon Apps upstream, server to server. |
 | `ACCOUNTS_API_URL` | `http://127.0.0.1:8589` | The Silicon Accounts API, server to server. |
 | `ACCOUNTS_PUBLIC_URL` | dev `http://localhost:8590`, prod `https://accounts.teamofsilicons.com` | The accounts site: hosted sign-in, the SDK. |
-| `DEVELOPER_PUBLIC_URL` (or `ACCOUNTS_DEVELOPER_URL`) | dev `http://localhost:$PORT` (8600), prod `https://developer.teamofsilicons.com` | This site's origin; the redirect URI is exactly `{it}/auth/callback`, as the API's `ACCOUNTS_DEVELOPER_URL` says. |
+| `DEVELOPER_PUBLIC_URL` (or `ACCOUNTS_DEVELOPER_URL`) | dev `http://localhost:$PORT` (8600), prod `https://developers.teamofsilicons.com` | This site's origin; the redirect URI is exactly `{it}/auth/callback`, as the API's `ACCOUNTS_DEVELOPER_URL` says. |
 | `DEVELOPER_SESSION_SECRET` | dev: a public development secret (with a warning) | Seals the cookies; at least 32 characters. Production refuses to run without it. |
 | `DEVELOPER_EXTRA_ORIGINS` | | More origins the same-origin guard accepts (comma separated). |
 | `ACCOUNTS_IRIS_BASE_URL` | | A loopback mock Iris joins the CSP's `img-src` (local stacks). |
@@ -103,8 +107,9 @@ checking pages with curl or a browser without the hosted sign-in.
 | BFF | `/auth/*`, `/api/accounts/*` | `app/auth/`, `app/api/`, `lib/server/` (config, seal, session) |
 | Shell | every signed-in page: the top bar (brand, Apps, Docs, ⌘K, theme, account menu), the sign-in gate, page transitions | `app/(shell)/layout.tsx`, `components/foundation/shell/` |
 | Sign-in | `/sign-in` (the front door and where failed sign-ins land) | `app/sign-in/`, `components/sign-in/` |
-| Apps home | `/` (owned apps; "New app" explains Silicon Apps and lists the stand-in apps) | `components/developer/home/` |
-| An app | `/apps/[appId]/[[...tab]]`: Overview, Sign-in, Details, Flows, Pages, Users, Import, Webhooks, ATA, Embed | `components/developer/app/` (scope, tab frame), `components/developer/tabs/`, `lib/app-tabs.ts` |
+| Apps home | `/` (owned and authored apps; “New app” registers it through Apps and shows the secret once) | `components/developer/home/` |
+| An app | `/apps/[appId]/[[...tab]]`: Overview, Publishing, Releases, Authors, History, Sign-in, Details, Flows, Pages, Users, Import, Webhooks, ATA, Embed | `components/developer/app/` (scope, tab frame), `components/developer/tabs/`, `lib/app-tabs.ts` |
+| Invitations, docs and preferences | `/invitations`, public `/docs`, `/settings` | `components/publishing/`, native shell pages |
 | Copied from `web/` and adapted | Arc UI, the foundation (layout, branding runtime, squircles, theme, providers), the API client and hooks | `components/arc/`, `components/foundation/`, `lib/` |
 
 The copied parts started as `web/`'s and are now this app's own: change them here, with the same rules (squircles,
@@ -112,6 +117,9 @@ tokens, Carbons/Silicons vocabulary, errors in the server's words). `lib/api/htt
 (`/v1/x` → `/api/accounts/x`), so `lib/api/endpoints.ts` keeps the API's own paths.
 
 ## The app's tabs
+
+- **Publishing** (`components/publishing/`): seven freely traversable setup steps. Autosaves flush before the portal navigates; a failed save blocks links and tabs. Browser Back/Forward keeps a failed draft in memory and offers a return action. Reloading or closing still requires the browser’s unsaved-work warning. Secrets remain component-local and are never written to storage. Releases, author administration, invitations and history share the same app and shell.
+- **Shared identity**: the Apps API validates the first-party developer token’s signature, issuer, expiry and live Accounts token family on every call, then enforces its UUID author/admin policy. The browser never receives or reuses a token directly.
 
 - **Tabs switch in the browser** (`app/app-scope.tsx`, `app/tab-page.tsx`): a switch only pushes the new address, each
   tab is its own chunk, preloaded once the app is on screen; Back and Forward move between tabs.

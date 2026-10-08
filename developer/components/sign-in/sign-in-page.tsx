@@ -51,9 +51,9 @@ export function SignInPage({ error, returnTo, signedOut }: { error: string | nul
           <span>Silicon <span className={styles.muted}>Developer</span></span>
         </div>
         <section data-sq="surface" className={styles.card} aria-labelledby="sign-in-title">
-          <h1 id="sign-in-title" className={styles.title}>Build with Silicon Accounts</h1>
+          <h1 id="sign-in-title" className={styles.title}>Build with Silicon</h1>
           <p className={styles.lede}>
-            Set up how your apps sign Carbons and Silicons in: methods, Google and Apple, the details you ask for, your
+            Create and publish apps, and set up how they sign Carbons and Silicons in: methods, Google and Apple, the details you ask for, your
             flows and pages, your users, webhooks and ATA proofs.
           </p>
           {message ? (

@@ -1,5 +1,5 @@
 /**
- * Next.js config for developer.teamofsilicons.com (the developer platform).
+ * Next.js config for developers.teamofsilicons.com (the developer platform).
  *
  * Topology: this site is a BFF ("backend for frontend"). The browser only ever talks to this origin; the Next server
  * holds the Carbon's Silicon Accounts tokens in sealed httpOnly cookies and calls the Silicon Accounts API itself:

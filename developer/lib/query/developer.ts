@@ -18,8 +18,8 @@ import { useSession } from "./session";
 
 /** Every app this Carbon owns (the whole list). */
 export function useOwnedApps() {
-  const { status, me } = useSession();
-  return useWholeList(queryKeys.me.ownedApps, query => api.me.ownedApps(query), status === "signed_in" && me?.kind === "carbon");
+  const { status } = useSession();
+  return useWholeList(queryKeys.me.ownedApps, query => api.me.ownedApps(query), status === "signed_in");
 }
 
 /** An app with its sign-in setup (secrets masked), webhook and stats. 403 not_app_owner, 404 unknown_app. */

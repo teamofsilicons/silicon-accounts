@@ -26,6 +26,10 @@ function TabSkeleton() {
 }
 
 const LOADERS: Record<DeveloperTab, () => Promise<ComponentType>> = {
+  publishing: () => import("../../publishing/workspace").then(module => module.PublishingTab),
+  releases: () => import("../../publishing/workspace").then(module => module.ReleasesTab),
+  authors: () => import("../../publishing/workspace").then(module => module.AuthorsTab),
+  history: () => import("../../publishing/workspace").then(module => module.HistoryTab),
   overview: () => import("../tabs/overview").then(module => module.OverviewTab),
   "sign-in": () => import("../tabs/sign-in").then(module => module.SignInTab),
   details: () => import("../tabs/details").then(module => module.DetailsTab),

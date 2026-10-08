@@ -22,7 +22,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowUpRight, Braces, CircleSlash, Code, KeyRound, LayoutDashboard, ListChecks, Palette, ShieldCheck, Upload, Users, Webhook, Workflow } from "lucide-react";
+import { Package, History, Rocket, ArrowLeft, ArrowUpRight, Braces, CircleSlash, Code, KeyRound, LayoutDashboard, ListChecks, Palette, ShieldCheck, Upload, Users, Webhook, Workflow } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
@@ -37,7 +37,7 @@ import type { ApiError } from "@/lib/api/errors";
 import type { AppDetail, Meta } from "@/lib/api/types";
 import { useRegisterCommands } from "@/lib/commands";
 import { DEVELOPER_TABS, DEVELOPER_TAB_LABELS, navigationType, paths, type DeveloperTab } from "@/lib/navigation";
-import { useNavigationGuard, type LeaveRequest } from "@/lib/navigation-guard";
+import { confirmNavigation, useNavigationGuard, type LeaveRequest } from "@/lib/navigation-guard";
 import { useApp } from "@/lib/query/developer";
 import { queryKeys } from "@/lib/query/keys";
 import { useMeta } from "@/lib/query/session";
@@ -52,6 +52,10 @@ import { developerDocumentTitle } from "./titles";
 import styles from "./app.module.css";
 
 const TAB_ICONS: Record<DeveloperTab, ReactNode> = {
+  publishing: <Package size={16} strokeWidth={1.75} />,
+  releases: <Rocket size={16} strokeWidth={1.75} />,
+  authors: <Users size={16} strokeWidth={1.75} />,
+  history: <History size={16} strokeWidth={1.75} />,
   overview: <LayoutDashboard size={16} strokeWidth={1.75} />,
   "sign-in": <KeyRound size={16} strokeWidth={1.75} />,
   details: <ListChecks size={16} strokeWidth={1.75} />,
@@ -119,7 +123,7 @@ function Problem({ appId, error, retry }: { appId: string; error: ApiError; retr
   } else if (error.status === 403) {
     body = (
       <Surface padding="none">
-        <EmptyState icon={<Braces size={24} strokeWidth={1.5} />} title={`You don't own ${appId}`} description={`${error.message} Only the Carbon who owns an app manages its sign-in here.`} action={back} />
+        <EmptyState icon={<Braces size={24} strokeWidth={1.5} />} title={`You don't own ${appId}`} description={`${error.message} Only this app’s owner and authors can manage it here.`} action={back} />
       </Surface>
     );
   } else {
@@ -202,11 +206,14 @@ function Loaded({ appId, app, meta }: { appId: string; app: AppDetail; meta: Met
   }, [tab, appId]);
 
   const openTab = useCallback((next: DeveloperTab) => {
+    void (async () => {
     const href = paths.developerApp(appId, next);
+    if (!(await confirmNavigation(href))) return;
     if (window.location.pathname !== href) window.history.pushState(null, "", href);
     // Keep the tab list in view when the switch happens far down a long tab.
     const frame = tabsRef.current;
     if (frame && frame.getBoundingClientRect().top < 0) frame.scrollIntoView({ block: "start", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    })();
   }, [appId]);
 
   const reload = useCallback(async () => {

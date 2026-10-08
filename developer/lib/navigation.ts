@@ -9,6 +9,9 @@ import { APP_TABS, appTabFrom, type AppTab } from "./app-tabs";
 export const paths = {
   home: "/",
   signIn: "/sign-in",
+  docs: "/docs",
+  settings: "/settings",
+  invitations: "/invitations",
   /** The apps home. */
   developer: "/",
   developerApp: (appId: string, tab?: AppTab) => `/apps/${encodeURIComponent(appId)}${tab && tab !== "overview" ? `/${tab}` : ""}`,
@@ -25,6 +28,10 @@ export { APP_TABS as DEVELOPER_TABS, appTabFrom as developerTabFrom, type AppTab
 
 export const DEVELOPER_TAB_LABELS: Record<AppTab, string> = {
   overview: "Overview",
+  publishing: "Publishing",
+  releases: "Releases",
+  authors: "Authors",
+  history: "History",
   "sign-in": "Sign-in",
   details: "Details",
   flows: "Flows",

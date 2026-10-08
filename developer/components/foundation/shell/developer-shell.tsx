@@ -12,7 +12,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ViewTransition, useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
-import { ArrowUpRight, BookOpen, Boxes, CircleUserRound, LogOut, Monitor, Moon, Search, Sun } from "lucide-react";
+import { Settings, Mail, BookOpen, Boxes, CircleUserRound, LogOut, Monitor, Moon, Search, Sun } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
 import { Button } from "@/components/arc/button/button";
 import { ThemeSwitch } from "@/components/arc/theme-switch/theme-switch";
@@ -25,6 +25,7 @@ import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedL
 import { notifyError } from "@/lib/notify";
 import { beginSignIn, useMeta, useSession, useSignOut } from "@/lib/query/session";
 import { changeTheme } from "@/lib/theme";
+import { PublishingGuard } from "@/components/publishing/guard";
 import { BrandMark } from "./brand-mark";
 import { CommandMenu } from "./command-menu";
 import { LeaveQuestionHost } from "./leave-question";
@@ -68,13 +69,13 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
   const paletteOpen = useCommandPaletteOpen();
   const isApple = useSyncExternalStore(subscribeNothing, detectApple, () => false);
   const accountsUrl = accountsUrlOf(meta.data?.public_url);
-  const docsUrl = meta.data?.docs_url?.replace(/\/+$/, "") || `${accountsUrl}/docs`;
+  const docsUrl = paths.docs;
   const onApps = pathname === paths.home || pathname.startsWith("/apps/");
 
   // Every page needs a session.
   useEffect(() => {
-    if (status === "signed_out") beginSignIn(window.location.pathname + window.location.search);
-  }, [status]);
+    if (status === "signed_out" && pathname !== paths.docs) beginSignIn(window.location.pathname + window.location.search);
+  }, [status, pathname]);
 
   /** Navigates inside a page transition (no guard asked: the caller did). */
   const push = useCallback((href: string) => {
@@ -112,7 +113,9 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
 
   useRegisterCommands(() => [
     { id: "go.apps", label: "Your apps", description: "Every app you own", group: "Go to", icon: <Boxes size={16} strokeWidth={1.75} />, keywords: ["apps", "home"], run: () => void go(paths.home) },
-    { id: "go.docs", label: "Silicon Accounts docs", description: "Opens the docs in a new tab", group: "Go to", icon: <BookOpen size={16} strokeWidth={1.75} />, keywords: ["docs", "help", "guide"], run: () => openExternal(docsUrl) },
+    { id: "go.invitations", label: "Author invitations", group: "Go to", icon: <Mail size={16} />, keywords: ["invite", "author"], run: () => void go(paths.invitations) },
+    { id: "go.settings", label: "Developer settings", group: "Go to", icon: <Settings size={16} />, keywords: ["telemetry", "preferences"], run: () => void go(paths.settings) },
+    { id: "go.docs", label: "Developer docs", description: "Accounts and Apps guides", group: "Go to", icon: <BookOpen size={16} strokeWidth={1.75} />, keywords: ["docs", "help", "guide"], run: () => void go(docsUrl) },
     { id: "go.account", label: "Your account", description: "Opens accounts.teamofsilicons.com in a new tab", group: "Go to", icon: <CircleUserRound size={16} strokeWidth={1.75} />, keywords: ["account", "profile"], run: () => openExternal(accountsUrl) },
     { id: "theme.light", label: "Use the light theme", group: "Appearance", icon: <Sun size={16} strokeWidth={1.75} />, keywords: ["theme", "light"], run: () => changeTheme("light", null) },
     { id: "theme.dark", label: "Use the dark theme", group: "Appearance", icon: <Moon size={16} strokeWidth={1.75} />, keywords: ["theme", "dark", "night"], run: () => changeTheme("dark", null) },
@@ -153,7 +156,8 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
               event.preventDefault();
               void go(paths.home, event.currentTarget);
             }}>Apps</Link>
-            <a href={docsUrl} target="_blank" rel="noopener" data-sq="surface" className={styles.navLink}>Docs<ArrowUpRight size={13} strokeWidth={1.75} aria-hidden="true" /></a>
+            <Link href={paths.invitations} data-sq="surface" className={styles.navLink}>Invitations</Link>
+            <Link href={docsUrl} data-sq="surface" className={styles.navLink}>Docs</Link>
           </nav>
         </div>
         <div className={styles.topEnd}>
@@ -174,20 +178,22 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
               align="end"
               items={[
                 { label: "Your account", icon: <CircleUserRound size={16} strokeWidth={1.75} />, onSelect: () => openExternal(accountsUrl) },
-                { label: "Docs", icon: <BookOpen size={16} strokeWidth={1.75} />, onSelect: () => openExternal(docsUrl) },
+                { label: "Author invitations", icon: <Mail size={16} />, onSelect: () => void go(paths.invitations) },
+                { label: "Developer settings", icon: <Settings size={16} />, onSelect: () => void go(paths.settings) },
+                { label: "Docs", icon: <BookOpen size={16} strokeWidth={1.75} />, onSelect: () => void go(docsUrl) },
                 { label: "Search and jump", icon: <Search size={16} strokeWidth={1.75} />, keys: isApple ? ["⌘", "K"] : ["Ctrl", "K"], onSelect: openCommandPalette },
               ]}
             />
           ) : null}
         </div>
       </header>
-      <main id="main" className={styles.main} tabIndex={-1}>{content}</main>
+      <main id="main" className={styles.main} tabIndex={-1}><PublishingGuard />{content}</main>
       <CommandMenu />
       <LeaveQuestionHost />
     </div>
   );
 
-  if (status === "signed_in") {
+  if (status === "signed_in" || pathname === paths.docs) {
     return chrome(
       <ViewTransition key={pathname.split("/").slice(0, 3).join("/") || "/"} enter={PAGE_CLASSES} exit={PAGE_CLASSES} default="none">
         <div className={styles.page}>{children}</div>

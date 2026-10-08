@@ -2,7 +2,7 @@
   "name": "@silicon-accounts/developer",
   "version": "0.1.0",
   "private": true,
-  "description": "developer.teamofsilicons.com (Next.js): the developer platform. Sets up how apps sign people in with Silicon Accounts; a BFF in front of the Silicon Accounts API.",
+  "description": "Common developer platform for Silicon Apps publishing and Silicon Accounts configuration.",
   "scripts": {
     "dev": "next dev --port ${PORT:-8600}",
     "build": "next build",
@@ -10,7 +10,8 @@
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.json",
     "lint": "eslint --max-warnings=0 .",
     "seal-dev-session": "tsx scripts/seal-dev-session.ts",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "5.3.0",
@@ -36,6 +37,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@types/node": "24.19.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

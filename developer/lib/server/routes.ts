@@ -6,7 +6,7 @@
  *   GET  me, me/owned-apps                                                                (the signed-in Carbon)
  *   ANY  apps/{id}, apps/{id}/…                                                            (the app's owner routes)
  */
-const APP = "[a-z][a-z0-9-]{1,39}";
+const APP = "[a-z0-9_-]{2,40}";
 const PUBLIC_GET = [/^v1\/meta$/, new RegExp(`^v1/apps/${APP}/public$`), /^\.well-known\/(openid-configuration|jwks\.json)$/];
 const ACCOUNT_GET = [/^v1\/me$/, /^v1\/me\/owned-apps$/];
 const OWNER = new RegExp(`^v1/apps/${APP}(/[A-Za-z0-9._~%:@-]+)*$`);

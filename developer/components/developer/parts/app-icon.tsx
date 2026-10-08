@@ -1,6 +1,7 @@
 "use client";
 
 /** An app's logo as a squircle (Arc's Avatar), with its initials while the logo loads or when it has none. */
+import { publishingMediaUrl } from "@/lib/apps-media";
 import { Avatar } from "@/components/arc/avatar/avatar";
 import styles from "./parts.module.css";
 
@@ -19,7 +20,7 @@ export function AppIcon({ name, src, size = 40, className, decorative }: AppIcon
   return (
     <Avatar
       name={name}
-      src={src ?? undefined}
+      src={publishingMediaUrl(src)}
       size="md"
       aria-hidden={decorative || undefined}
       className={[styles.appIcon, styles[`icon${size}`], className].filter(Boolean).join(" ")}

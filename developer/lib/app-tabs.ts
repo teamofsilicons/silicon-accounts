@@ -2,7 +2,7 @@
  * The tabs of an app (`/apps/[appId]/[[...tab]]`; no tab = overview). Framework-free and free of icons, so proxy.ts can
  * answer an unknown tab with a real 404 before anything renders; lib/navigation.ts re-exports these for the pages.
  */
-export const APP_TABS = ["overview", "sign-in", "details", "flows", "pages", "users", "import", "webhooks", "ata", "embed"] as const;
+export const APP_TABS = ["overview", "publishing", "releases", "authors", "history", "sign-in", "details", "flows", "pages", "users", "import", "webhooks", "ata", "embed"] as const;
 export type AppTab = (typeof APP_TABS)[number];
 
 /** The tab a `[[...tab]]` segment list names, or null when it names none (that address is not a page: 404). */
