@@ -359,3 +359,22 @@ link, without horizontal overflow or page errors. Screenshots were inspected.
 The deployed Markdown matches the source; search and full LLM exports contain the
 new recommendation, with the former builder name absent. The removed
 custom-domain verification note is absent from the overview.
+
+## Silicon Apps CLI 0.1.8 and SLT-first guides
+
+Renamed Apps command examples to `silicon-apps`, documented PATH setup, and made
+`silicon-apps login --slt TOKEN` the primary sign-in example for Carbons and
+Silicons. The starter guide explains `accounts login --app apps` and no longer
+shows STK setup. Bundled setup scripts run automatically; the permission option
+was removed from the docs. CLI and client references are 0.1.8 and 0.1.6.
+
+Source `56b9c9307988120fad382ec5ef488cb3e2f8fca5`, archive SHA-256 `ab4f8a9a5cc211da542c4cb253af882328ce8755d351ce07905d6a36e2dee228`.
+Developer typecheck, lint, link checks and production build passed. The API binary,
+account-site build and migration 9 are unchanged. Install SSM `6f162930-9ea4-4921-895d-f903f0d9812e` and
+postcheck `a7b46f13-6fb9-499a-9983-46c36e4772f7` confirmed the active revision, services, readiness and
+protected endpoints. Backup `backups/predeploy-20261008T190129Z.dump`, SHA-256 `6a39c05b2c1c07be6bbf55ce699d95bdfc6788c087ed992f739b78541f1a7e43`.
+
+Live browser checks at 390 and 1440 pixels confirmed the command, version and SLT
+guide, without STK setup in the starter section, horizontal overflow or page errors.
+Screenshots were inspected. Public Markdown matched source, including automatic
+setup-script behavior. No em dashes were added.
