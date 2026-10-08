@@ -1,0 +1,141 @@
+name: Build native Accounts CLI packages
+
+# Archives stay reviewable workflow artifacts until the release is explicitly published.
+on:
+  workflow_dispatch:
+    inputs:
+      reuse_run:
+        description: Optional completed build run ID whose exact archives should be reverified
+        required: false
+        type: string
+      reuse_commit:
+        description: Exact source commit of reused archives (required with reuse_run)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    name: Package ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x86_64
+            rust_target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04
+            target: linux-i686
+            rust_target: i686-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: linux-aarch64
+            rust_target: aarch64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: linux-armv7hf
+            rust_target: armv7-unknown-linux-gnueabihf
+          - os: macos-15-intel
+            target: macos-x86_64
+            rust_target: x86_64-apple-darwin
+          - os: macos-15
+            target: macos-aarch64
+            rust_target: aarch64-apple-darwin
+          - os: windows-2022
+            target: windows-x86_64
+            rust_target: x86_64-pc-windows-msvc
+          - os: windows-2022
+            target: windows-i686
+            rust_target: i686-pc-windows-msvc
+          - os: windows-11-arm
+            target: windows-aarch64
+            rust_target: aarch64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reuse_commit || github.sha }}
+      - name: Load the current verifier without changing the release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tools
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.98.0"
+          targets: ${{ matrix.rust_target }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install 32-bit Linux build support
+        if: matrix.target == 'linux-i686'
+        run: sudo apt-get update && sudo apt-get install -y gcc-multilib
+      - name: Install ARMv7 cross compiler and emulator
+        if: matrix.target == 'linux-armv7hf'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf qemu-user
+          echo 'CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc' >> "$GITHUB_ENV"
+          echo 'CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc' >> "$GITHUB_ENV"
+          echo 'AR_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-ar' >> "$GITHUB_ENV"
+          echo 'APPS_VERIFY_RUNNER=["qemu-arm","-L","/usr/arm-linux-gnueabihf"]' >> "$GITHUB_ENV"
+      - name: Make python3 available to the portable build helper on Windows
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p "$RUNNER_TEMP/apps-python"
+          cat > "$RUNNER_TEMP/apps-python/python3" <<'WRAPPER'
+          #!/usr/bin/env bash
+          exec python "$@"
+          WRAPPER
+          chmod +x "$RUNNER_TEMP/apps-python/python3"
+          echo "$RUNNER_TEMP/apps-python" >> "$GITHUB_PATH"
+      - name: Download exact archives from the original build
+        id: download
+        if: inputs.reuse_run != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.reuse_run }}
+          name: accounts-${{ matrix.target }}-${{ inputs.reuse_commit }}
+          path: dist
+      - name: Install the Windows x86 assembler when a package must be built
+        if: runner.os == 'Windows' && matrix.target != 'windows-aarch64' && (inputs.reuse_run == '' || steps.download.outcome == 'failure')
+        shell: pwsh
+        run: |
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            choco install nasm --yes --no-progress
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -eq 3) { throw "NASM installation failed after three attempts" }
+            Start-Sleep -Seconds 15
+          }
+          & "C:\Program Files\NASM\nasm.exe" -v
+          if ($LASTEXITCODE -ne 0) { throw "NASM executable verification failed" }
+          "C:\Program Files\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Build package
+        if: inputs.reuse_run == '' || steps.download.outcome == 'failure'
+        env:
+          PACKAGE_TARGET: ${{ matrix.target }}
+        run: bash scripts/build-release.sh --target "$PACKAGE_TARGET" --output dist
+      - name: Verify required discovery commands and retain their complete output
+        env:
+          PACKAGE_TARGET: ${{ matrix.target }}
+          APPS_SOURCE_COMMIT: ${{ inputs.reuse_commit || github.sha }}
+        run: python3 .release-tools/scripts/verify-release.py --target "$PACKAGE_TARGET" --directory dist
+      - name: Retain verified archive, checksum and verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: accounts-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            dist/silicon-accounts-*.tar.gz
+            dist/silicon-accounts-*.tar.gz.sha256
+            dist/silicon-accounts-*.verification.json
+          if-no-files-found: error
+          retention-days: 30

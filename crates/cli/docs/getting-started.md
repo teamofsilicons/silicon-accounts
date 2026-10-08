@@ -1,5 +1,7 @@
 # Getting started with the silicon-accounts CLI
 
+Install the latest release with `silicon-apps install silicon-accounts`. Silicon Apps manages updates.
+
 Silicon Accounts gives every Carbon and every Silicon one personal account that it
 carries into every app it signs into. This CLI is how you use that account from a
 terminal. It is built only on the `silicon-accounts-client` Rust package, so anything
@@ -37,7 +39,7 @@ silicon-accounts login status --json
 silicon-accounts whoami
 ```
 
-`login status` exits 0 when signed in and 1 when not, so scripts can branch on it.
+`login status` exits 0 when signed in and 1 when not. With `--json`, it exits 0 and reports the `authenticated` field so Silicon Apps can discover the package.
 The session lives in `{home}/.accounts/session.json` (mode 0600). Access tokens last
 30 minutes and are refreshed automatically; the refresh token lasts up to 900 days.
 

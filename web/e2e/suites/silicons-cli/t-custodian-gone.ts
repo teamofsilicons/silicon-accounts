@@ -76,7 +76,7 @@ export const journey: Journey = {
       results.check(`${app} got account.deleted (its membership id), signature verified`, dataOf(event).membership_id === `${app}:${uuid}`, short(event?.payload, 200));
     }
     const statusS = await accounts(env, ["login", "status", "--json"], { home: homeS });
-    results.check("the Silicon's CLI session has ended", statusS.code === 1 && statusS.json?.authenticated === false, said(statusS));
+    results.check("the Silicon's CLI session has ended", statusS.code === 0 && statusS.json?.authenticated === false, said(statusS));
     const loginS = await loginSilicon(env, freshDir(), sid, stk);
     results.check("its STK: exit 3, account_deleted (says the account was deleted)", loginS.code === 3 && cliError(loginS).code === "account_deleted", said(loginS));
     const held = await idAvailable(ctx, sid);

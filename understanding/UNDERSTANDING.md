@@ -330,7 +330,7 @@ Highly configurable with sensible defaults, very much like VS Code.
 
 # Updates
 
-Silicon Apps manages updates for the installed Accounts CLI. Accounts must not run a second updater of its own.
+Install the latest Accounts CLI with `silicon-apps install silicon-accounts` on macOS, Linux and Windows. This requires no Rust installation or version pin. The package exposes `accounts --json` with `app_id: silicon-accounts` and `login status --json` with `authenticated`; both discovery commands exit 0 when signed out. Text-mode `login status` retains exit 1 when signed out. Silicon Apps manages updates for the installed Accounts CLI. Accounts must not run a second updater of its own.
 
 # Identifier schema
 

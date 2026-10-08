@@ -121,7 +121,7 @@ section('rotate STK: the old STK is refused, apps are signed out');
   const so: any = await fake.waitForEvent('remind', { type: 'membership.signed_out', uuid: siliconUuid, timeoutMs: 15_000 }).catch((e) => ({ error: String(e) }));
   check(so?.payload?.data?.reason === 'stk_rotated', 'remind got membership.signed_out (stk_rotated)', so);
   const st = await cli(homeS, ['login', 'status', '--json']);
-  check(st.code === 1 && st.json?.authenticated === false, 'the CLI session from before the rotation has ended', show(st));
+  check(st.code === 0 && st.json?.authenticated === false, 'the CLI session from before the rotation has ended', show(st));
 }
 
 done();

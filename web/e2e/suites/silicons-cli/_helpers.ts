@@ -405,12 +405,12 @@ export interface PipedRun {
 }
 
 /**
- * Runs the CLI the way `accounts … | head -c 1` does once head has what it wants, through bash so the pipe is a real
+ * Runs the CLI the way `silicon-accounts … | head -c 1` does once head has what it wants, through bash so the pipe is a real
  * one and the exit code is the CLI's own (PIPESTATUS):
  * - `reader: "gone"` (default): `{ sleep 0.3; accounts …; } | true`: the reading end is closed (true has exited) well
  *   before the CLI starts, so its first write to stdout fails with EPIPE (Rust ignores SIGPIPE, so it is an error the
  *   CLI must handle, not a signal that ends it);
- * - `reader: "head"`: `accounts … | head -c 1`: a reader that takes one byte and goes;
+ * - `reader: "head"`: `silicon-accounts … | head -c 1`: a reader that takes one byte and goes;
  * - `stderr: "gone"`: stderr goes into the closed pipe too, stdout to /dev/null.
  */
 export function accountsIntoClosedPipe(env: Env, args: string[], options: RunOptions & { reader?: "gone" | "head"; stderr?: "kept" | "gone" } = {}): Promise<PipedRun> {

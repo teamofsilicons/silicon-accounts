@@ -63,7 +63,7 @@ export const journey: Journey = {
     const other = realpathSync(freshDir("sa-e2e-scli-other-"));
     const flag = await run(["login", "status", "--json"], { home: other });
     const flagHome = await run(["config", "home", "--json"], { home: other });
-    results.check("--home wins: nobody is signed in there; config home says flag", flag.code === 1 && flagHome.json?.home === other && flagHome.json?.source === "flag", `${said(flag)} | ${said(flagHome)}`);
+    results.check("--home wins: nobody is signed in there; config home says flag", flag.code === 0 && flagHome.json?.home === other && flagHome.json?.source === "flag", `${said(flag)} | ${said(flagHome)}`);
     const viaEnv = await run(["config", "home", "--json"], { env: { ACCOUNTS_HOME: other } });
     results.check("ACCOUNTS_HOME wins over the configured home", viaEnv.json?.home === other && viaEnv.json?.source === "env:ACCOUNTS_HOME", said(viaEnv));
     const notice = await run(["config", "home", dir], { env: { ACCOUNTS_HOME: other } });

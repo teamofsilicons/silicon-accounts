@@ -22,7 +22,7 @@ The CLI uses the [`silicon-accounts-client`](../reference/rust-client.md) Rust p
 ```sh
 silicon-accounts --help                                                      # the whole command tree
 printf '%s' "$STK" | silicon-accounts login --silicon si:scout --stk-stdin   # sign a Silicon in
-silicon-accounts login status --json                                         # exit 0 signed in, 1 not
+silicon-accounts login status --json                                         # read the authenticated field
 ```
 
 ```json
@@ -41,24 +41,16 @@ silicon-accounts login status --json                                         # e
 
 ## Install
 
-Install the published CLI with Rust 1.98 or later:
+Install Silicon Apps first using the [installer for your system](/docs/apps/start/install), then run:
 
 ```sh
-cargo install silicon-accounts-cli --version 0.3.0 --locked
+silicon-apps install silicon-accounts
 silicon-accounts --version
 ```
 
-Make sure `~/.cargo/bin` is on your `PATH`. Running the install command again upgrades an older Cargo installation. Cargo replaces the old `accounts` executable with `silicon-accounts`; your session and settings stay in `.accounts`. The CLI does not run its own updater.
+This installs the latest production release for your system. Silicon Apps keeps it up to date. Rust is not required, and Accounts does not run a separate updater. Existing settings and sessions stay in `.accounts`.
 
-To build it from source, with Rust 1.98 or later, from a checkout of the repository:
-
-```sh
-cd /path/to/silicon-accounts               # your checkout
-cargo install --path crates/cli --locked   # installs the `silicon-accounts` binary into ~/.cargo/bin
-silicon-accounts --version                         # silicon-accounts 0.3.0
-```
-
-Get the source from the [Silicon Accounts repository](https://github.com/teamofsilicons/silicon-accounts), then run the commands above from your checkout. A [local stack](../index.md#run-it-yourself) also builds the CLI at `target/debug/silicon-accounts`.
+To build from source instead, install Rust 1.98 or later and run `cargo install silicon-accounts-cli`. The package installs the `silicon-accounts` command in `~/.cargo/bin`.
 
 ## Point it at a Silicon Accounts instance
 
@@ -220,7 +212,7 @@ home       /srv/silicons/scout  (from SILICON_HOME)
 state dir  /srv/silicons/scout/.accounts
 app        none
 signed in  si:scout at https://accounts.teamofsilicons.com
-version    0.3.0
+version    0.3.1
 ```
 
 | command | does |

@@ -9,14 +9,14 @@ use serde_json::{Value, json};
 use support::{APP_ID, APP_SECRET, Env, Mock, STK, stdout_json};
 
 #[test]
-fn login_status_when_signed_out_is_exit_1_with_json() {
+fn login_status_json_is_successful_discovery_while_text_retains_exit_1() {
     let env = Env::new();
     let output = env
         .cmd()
         .args(["login", "status", "--json"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(0));
     assert_eq!(stdout_json(&output), json!({ "authenticated": false }));
 
     // Human mode says so on stdout and suggests how to sign in.
@@ -305,7 +305,7 @@ fn silicon_login_whoami_slt_and_logout() {
     env.cmd()
         .args(["--url", &mock.url, "login", "status", "--json"])
         .assert()
-        .code(1);
+        .success();
 }
 
 #[test]
@@ -798,4 +798,23 @@ fn app_verification_proofs_are_for_exactly_one_app() {
         .stdout(predicate::str::contains(
             "App verification proof p-app_verification from briefcase for remind",
         ));
+}
+
+#[test]
+fn package_discovery_is_offline_and_names_the_canonical_app() {
+    let env = Env::new();
+    let out = env
+        .cmd()
+        .args(["--url", "http://127.0.0.1:9", "accounts", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(stdout_json(&out)["app_id"], "silicon-accounts");
+    let out = env
+        .cmd()
+        .args(["--url", "http://127.0.0.1:9", "login", "status", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(stdout_json(&out)["authenticated"], false);
 }

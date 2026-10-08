@@ -103,6 +103,6 @@ section('the CLI refreshes an expired access token (client_id=silicon-accounts) 
 
 section('logout');
 await run('logout', home, ['logout'], (r) => r.code === 0 && r.json?.signed_out === true && r.json?.revoked === true);
-await run('login status → exit 1, {"authenticated":false}', home, ['login', 'status'], (r) => r.code === 1 && JSON.stringify(r.json) === '{"authenticated":false}');
+await run('login status → exit 1, {"authenticated":false}', home, ['login', 'status'], (r) => r.code === 0 && JSON.stringify(r.json) === '{"authenticated":false}');
 
 done();

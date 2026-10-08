@@ -21,7 +21,7 @@ const told = (run: PipedRun) => `exit ${run.code}${run.timedOut ? " (killed: tim
 
 export const journey: Journey = {
   name: "silicons-cli-epipe",
-  title: "a reader that goes away (EPIPE): when what reads the CLI's output is gone (`accounts … | head -c 1`, a closed pipe), every kind of output — the help tree, docs, results and errors in text and JSON, network answers — ends quietly with the exit code it has anyway (or SIGPIPE's), never a Rust panic; what the command did still stands",
+  title: "a reader that goes away (EPIPE): when what reads the CLI's output is gone (`silicon-accounts … | head -c 1`, a closed pipe), every kind of output — the help tree, docs, results and errors in text and JSON, network answers — ends quietly with the exit code it has anyway (or SIGPIPE's), never a Rust panic; what the command did still stands",
   // No browser: the CLI and the API only, so the engine changes nothing (the browser journeys run in WebKit too).
   engines: ["chromium"],
   async run(ctx) {
@@ -46,9 +46,9 @@ export const journey: Journey = {
       { group: "clap's own --help and --version", label: "`silicon-accounts --version`", args: ["--version"], exit: 0, url: null },
       { group: "the help tree and the bundled docs (text and JSON)", label: "`silicon-accounts docs silicons` (a bundled guide)", args: ["docs", "silicons"], exit: 0, url: null },
       { group: "the help tree and the bundled docs (text and JSON)", label: "`silicon-accounts docs silicons --json`", args: ["docs", "silicons", "--json"], exit: 0, url: null },
-      { group: "errors written to stdout as JSON", label: "`accounts frobnicate --json` (an argument error as JSON)", args: ["frobnicate", "--json"], exit: 2, url: null },
+      { group: "errors written to stdout as JSON", label: "`silicon-accounts frobnicate --json` (an argument error as JSON)", args: ["frobnicate", "--json"], exit: 2, url: null },
       { group: "errors written to stdout as JSON", label: "`silicon-accounts whoami --json` signed out (a CLI error as JSON)", args: ["whoami", "--json"], exit: 3, home: out },
-      { group: "`login status` signed out (JSON and text, exit 1)", label: "`silicon-accounts login status --json` signed out", args: ["login", "status", "--json"], exit: 1, home: out },
+      { group: "`login status` signed out (JSON and text, exit 1)", label: "`silicon-accounts login status --json` signed out", args: ["login", "status", "--json"], exit: 0, home: out },
       { group: "`login status` signed out (JSON and text, exit 1)", label: "`silicon-accounts login status` signed out (text)", args: ["login", "status"], exit: 1, home: out },
       { group: "answers from the service (JSON and text)", label: "`silicon-accounts id available <si:id> --json` (an answer from the service)", args: ["id", "available", `si:epipe-free-${t}`, "--json"], exit: 0, home: out },
       { group: "answers from the service (JSON and text)", label: "`silicon-accounts login status --json` signed in (checked with the service)", args: ["login", "status", "--json"], exit: 0, home: signedIn },

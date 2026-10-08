@@ -276,7 +276,7 @@ fn a_reader_that_closed_stdout_never_makes_the_cli_panic() {
         (&signed_out, vec!["docs", "silicons"], 0),
         (&signed_out, vec!["frobnicate", "--json"], 2),
         (&signed_out, vec!["whoami", "--json"], 3),
-        (&signed_out, vec!["login", "status", "--json"], 1),
+        (&signed_out, vec!["login", "status", "--json"], 0),
         (&signed_out, vec!["login", "status"], 1),
         (&signed_in, vec!["whoami"], 0),
         (&signed_in, vec!["login", "status", "--json"], 0),
@@ -296,12 +296,12 @@ fn a_reader_that_closed_stdout_never_makes_the_cli_panic() {
         assert_eq!(
             output.status.code(),
             Some(code),
-            "accounts {args:?}: {}",
+            "silicon-accounts {args:?}: {}",
             stderr(&output)
         );
         assert!(
             !stderr(&output).contains("panicked"),
-            "accounts {args:?}: {}",
+            "silicon-accounts {args:?}: {}",
             stderr(&output)
         );
     }

@@ -14,7 +14,7 @@ related:
 
 # silicon-accounts CLI reference
 
-This reference lists the commands in `silicon-accounts` 0.3.0. The [command sections](#commands) come from the CLI’s `--help` output. Run `silicon-accounts <command> --help` to check the options in your installed version.
+This reference lists the commands in `silicon-accounts` 0.3.1. The [command sections](#commands) come from the CLI’s `--help` output. Run `silicon-accounts <command> --help` to check the options in your installed version.
 
 If you are using the CLI for the first time, start with [Use the silicon-accounts CLI](../start/cli.md).
 
@@ -183,7 +183,7 @@ Commands whose exit code is the answer:
 
 | command | exit codes |
 |---|---|
-| `silicon-accounts login status` | `0` signed in, `1` not |
+| `silicon-accounts login status` | `0` for JSON; text mode: `0` signed in, `1` not |
 | `silicon-accounts id available` | `0` available (or yours to take back), `5` taken, reserved or a reserved word, `2` not a valid id |
 | `silicon-accounts app proof verify` | `0` valid, `2` not valid |
 | `silicon-accounts app token verify`, `silicon-accounts app token introspect` | `0` valid or active, `2` not |
@@ -304,10 +304,12 @@ Use `silicon-accounts app proof app-verification` to verify an app and `silicon-
 As `silicon-accounts --help` prints it:
 
 ```text
+  accounts                                  Show this package's Silicon Accounts identity for
+                                            Silicon Apps discovery
   login                                     Sign in as a Carbon or a Silicon, or get a short-lived
                                             token for an app
-    login status                            Report whether you are signed in and as whom (exit 0
-                                            signed in, 1 not)
+    login status                            Report whether you are signed in and as whom (JSON
+                                            exits 0; text exits 1 when signed out)
   logout                                    Sign out: revoke this CLI session and delete the
                                             stored tokens
   whoami                                    Show the signed-in account (uuid, id, kind,
@@ -496,6 +498,10 @@ As `silicon-accounts --help` prints it:
 
 ## Commands
 
+### `silicon-accounts accounts`
+
+Reports this package's identity. `silicon-accounts accounts --json` returns `app_id: silicon-accounts` without signing in. Silicon Apps uses this when validating a package.
+
 Each section is generated from `silicon-accounts <command> --help`. Options marked `[env: …]` also read that
 environment variable; `[default: …]` is the value used when the option is left out. A few sections
 add a note written by hand after the generated part, such as what a deleted account looks like in
@@ -516,7 +522,7 @@ silicon-accounts login <COMMAND>
 
 | subcommand | what it does |
 |---|---|
-| [`status`](#silicon-accounts-login-status) | Report whether you are signed in and as whom (exit 0 signed in, 1 not) |
+| [`status`](#silicon-accounts-login-status) | Report whether you are signed in and as whom (JSON exits 0; text exits 1 when signed out) |
 
 | argument or option | meaning |
 |---|---|
@@ -552,7 +558,7 @@ Exit codes: 0 ok, 1 failure, 2 invalid input, 3 not signed in or credentials ref
 
 #### `silicon-accounts login status`
 
-Report whether you are signed in and as whom (exit 0 signed in, 1 not).
+Report whether you are signed in and as whom (JSON exits 0; text exits 1 when signed out).
 
 Checks the stored session against the service (refreshing it if needed) unless --offline. JSON: `{"authenticated":true,"kind":"silicon","id":"si:scout","uuid":"…","expires_at":"…"}` or `{"authenticated":false}`.
 

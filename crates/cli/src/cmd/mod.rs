@@ -15,6 +15,13 @@ use crate::output::Outcome;
 
 pub async fn run(ctx: &Ctx, command: Commands) -> CliResult<Outcome> {
     match command {
+        Commands::Accounts => Ok(Outcome::new(
+            serde_json::json!({"app_id": silicon_accounts_client::FIRST_PARTY_APP_ID, "accounts_url": ctx.url()?.0}),
+            format!(
+                "Silicon Accounts ({})",
+                silicon_accounts_client::FIRST_PARTY_APP_ID
+            ),
+        )),
         Commands::Login(args) => login::login(ctx, args).await,
         Commands::Logout => login::logout(ctx).await,
         Commands::Whoami => account::whoami(ctx).await,

@@ -120,7 +120,7 @@ section('delete-account');
   await cliLoginEmail(homeDel, c.email!);
   await run('delete-account without --confirm → exit 2', homeDel, ['delete-account'], (r) => r.code === 2);
   await run('delete-account --confirm', homeDel, ['delete-account', '--confirm', c.me.id]);
-  await run('signed out afterwards', homeDel, ['login', 'status'], (r) => r.code === 1);
+  await run('signed out afterwards', homeDel, ['login', 'status'], (r) => r.code === 0);
   await run('silicon create (so a is a custodian)', homeA, ['silicon', 'create', '--id', `cj-keep-${rid()}`]);
   await run('a custodian cannot delete their account → exit 5 custodian_of_silicons', homeA, ['delete-account', '--confirm', a.me.id], (r) => r.code === 5 && r.json?.error?.code === 'custodian_of_silicons');
 }

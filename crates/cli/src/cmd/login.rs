@@ -521,7 +521,7 @@ async fn status(ctx: &Ctx, args: &LoginStatusArgs) -> CliResult<Outcome> {
                 "silicon-accounts login --silicon si:<id> --stk-stdin",
                 "sign in as a Silicon",
             )
-            .exit(1)
+            .exit(if ctx.out.json { 0 } else { 1 })
     };
     let Some(stored) = ctx.load_session()? else {
         return Ok(not_signed_in(

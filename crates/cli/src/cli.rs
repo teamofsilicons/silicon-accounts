@@ -58,6 +58,10 @@ pub struct GlobalArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+    /// Show this package's Silicon Accounts identity for Silicon Apps discovery.
+    #[command(after_long_help = "Example:\n  silicon-accounts accounts --json")]
+    Accounts,
+
     /// Sign in as a Carbon or a Silicon, or get a short-lived token for an app.
     ///
     /// Carbons sign in with a browser code (device flow) or with a 6-digit code sent to their email or phone. Silicons sign in with their si:id and STK. The session is stored in {home}/.accounts/session.json (mode 0600) and refreshed automatically.
@@ -329,7 +333,7 @@ pub struct LoginArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum LoginCommand {
-    /// Report whether you are signed in and as whom (exit 0 signed in, 1 not).
+    /// Report whether you are signed in and as whom (JSON exits 0; text exits 1 when signed out).
     ///
     /// Checks the stored session against the service (refreshing it if needed) unless --offline. JSON: {"authenticated":true,"kind":"silicon","id":"si:scout","uuid":"…","expires_at":"…"} or {"authenticated":false}.
     #[command(

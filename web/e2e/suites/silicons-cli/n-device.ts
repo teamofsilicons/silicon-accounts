@@ -84,7 +84,7 @@ export const journey: Journey = {
     await shot(env, page, "scli-device-03-denied");
     results.check("…the page says it was denied", (await heading(page)).includes("Sign-in denied"));
     const deniedStatus = await accounts(env, ["login", "status", "--json"], { home: homeDeny });
-    results.check("…and that terminal is not signed in", deniedStatus.code === 1 && deniedStatus.json?.authenticated === false, said(deniedStatus));
+    results.check("…and that terminal is not signed in", deniedStatus.code === 0 && deniedStatus.json?.authenticated === false, said(deniedStatus));
 
     // 3. Typing the code by hand on /device.
     const homeTyped = freshDir();

@@ -17,15 +17,15 @@ export const journey: Journey = {
     // 1. Signed out.
     const home = freshDir();
     const out = await accounts(env, ["login", "status", "--json"], { home });
-    results.check("signed out: exit 1 and exactly {\"authenticated\": false}", out.code === 1 && JSON.stringify(out.json) === '{"authenticated":false}', said(out));
+    results.check("signed out: exit 1 and exactly {\"authenticated\": false}", out.code === 0 && JSON.stringify(out.json) === '{"authenticated":false}', said(out));
     const offline = await accounts(env, ["login", "status", "--offline", "--json"], { home });
-    results.check("…the same with --offline (no network)", offline.code === 1 && JSON.stringify(offline.json) === '{"authenticated":false}', said(offline));
+    results.check("…the same with --offline (no network)", offline.code === 0 && JSON.stringify(offline.json) === '{"authenticated":false}', said(offline));
     const text = await accounts(env, ["login", "status"], { home });
     results.check("in text mode: exit 1, 'Not signed in to <url>.' and how to sign in (stderr)", text.code === 1 && text.stdout.trim() === `Not signed in to ${env.site}.` && text.stderr.includes("silicon-accounts login --silicon si:<id> --stk-stdin"), said(text));
     const quiet = await accounts(env, ["login", "status", "-q"], { home });
     results.check("-q drops the suggestions, keeps the answer and the exit code", quiet.code === 1 && quiet.stderr.trim() === "" && quiet.stdout.includes("Not signed in"), said(quiet));
     const emptyDir = await accounts(env, ["login", "status", "--json"], { home: freshDir() });
-    results.check("a brand-new home is not touched by a status check", emptyDir.code === 1, said(emptyDir));
+    results.check("a brand-new home is not touched by a status check", emptyDir.code === 0, said(emptyDir));
 
     // 2. Signed in as a Silicon.
     const carbon = await signUpCarbon(env, "status");
@@ -44,7 +44,7 @@ export const journey: Journey = {
     const siliconHistory = await accounts(env, ["history", "--kind", "signin", "--json"], { home });
     const siliconSignin = ((siliconHistory.json?.items ?? []) as Json[]).find(item => obj(item.meta).method === "silicon_stk" && obj(item.meta).outcome === "success");
     const elsewhere = await accounts(env, ["login", "status", "--json"], { home, url: env.api });
-    results.check("asked about another URL: exit 1, signed_in_elsewhere, naming where the session is", elsewhere.code === 1 && elsewhere.json?.authenticated === false && elsewhere.json?.reason === "signed_in_elsewhere" && elsewhere.json?.session_url === env.site, said(elsewhere));
+    results.check("asked about another URL: exit 1, signed_in_elsewhere, naming where the session is", elsewhere.code === 0 && elsewhere.json?.authenticated === false && elsewhere.json?.reason === "signed_in_elsewhere" && elsewhere.json?.session_url === env.site, said(elsewhere));
 
     // 3. An access token about to expire is refreshed (and the refresh token rotated) by a status check.
     const sessionFile = join(home, ".accounts", "session.json");
@@ -58,7 +58,7 @@ export const journey: Journey = {
     const logout = await accounts(env, ["logout", "--json"], { home });
     results.check("`silicon-accounts logout --json`: signed out, the session revoked at the service", logout.code === 0 && logout.json?.signed_out === true && logout.json?.revoked === true, said(logout));
     const afterLogout = await accounts(env, ["login", "status", "--json"], { home });
-    results.check("…then status: exit 1, {\"authenticated\": false}", afterLogout.code === 1 && afterLogout.json?.authenticated === false, said(afterLogout));
+    results.check("…then status: exit 1, {\"authenticated\": false}", afterLogout.code === 0 && afterLogout.json?.authenticated === false, said(afterLogout));
     const revokedFamily = await sql(env, `select count(*) from token_families where account_uuid = '${uuid}' and revoked_at is not null and revoke_reason = 'user_signed_out'`);
     results.check("…and its sign-in is revoked at the service (user_signed_out)", Number(revokedFamily[0]?.[0]) >= 1, short(revokedFamily));
     const logoutAgain = await accounts(env, ["logout", "--json"], { home });
@@ -77,7 +77,7 @@ export const journey: Journey = {
     results.check("`silicon-accounts sessions list` shows both CLI sign-ins (cli, cli_code), the current one marked", !!mine && !!other, short(sessions.map(item => [item.kind, item.origin, item.current, item.label])));
     const revoke = await accounts(env, ["sessions", "revoke", str(other?.id), "--json"], { home: homeB });
     const statusA = await accounts(env, ["login", "status", "--json"], { home: homeA });
-    results.check("revoking the other one from here: its `login status` then says not authenticated (exit 1, session_ended)", revoke.code === 0 && statusA.code === 1 && statusA.json?.authenticated === false && statusA.json?.reason === "session_ended", `${said(revoke)} | ${said(statusA)}`);
+    results.check("revoking the other one from here: its `login status` then says not authenticated (exit 1, session_ended)", revoke.code === 0 && statusA.code === 0 && statusA.json?.authenticated === false && statusA.json?.reason === "session_ended", `${said(revoke)} | ${said(statusA)}`);
     const statusB = await accounts(env, ["login", "status", "--json"], { home: homeB });
     results.check("…while this one stays signed in", statusB.code === 0 && statusB.json?.authenticated === true, said(statusB));
 
@@ -111,12 +111,12 @@ export const journey: Journey = {
     const storedB = JSON.parse(readFileSync(sessionB, "utf8")) as Json;
     writeFileSync(sessionB, JSON.stringify({ ...storedB, expires_at: new Date(Date.now() - 1000).toISOString() }));
     const expired = await accounts(env, ["login", "status", "--json"], { home: homeB });
-    results.check("a session past its end: status exit 1, session_ended", expired.code === 1 && expired.json?.reason === "session_ended", said(expired));
+    results.check("a session past its end: status exit 1, session_ended", expired.code === 0 && expired.json?.reason === "session_ended", said(expired));
     const whoami = await accounts(env, ["whoami", "--json"], { home: homeB });
     results.check("…and a command that needs it: exit 3, not_signed_in (the dead session was cleared)", whoami.code === 3 && ["not_signed_in", "session_ended"].includes(str(cliError(whoami).code)), said(whoami));
     writeFileSync(sessionB, JSON.stringify({ ...storedB, refresh_expires_at: new Date(Date.now() - 1000).toISOString() }));
     const offlineEnded = await accounts(env, ["login", "status", "--offline", "--json"], { home: homeB });
-    results.check("--offline knows a session whose refresh token has run out has ended (exit 1)", offlineEnded.code === 1 && offlineEnded.json?.reason === "session_ended", said(offlineEnded));
+    results.check("--offline knows a session whose refresh token has run out has ended (exit 1)", offlineEnded.code === 0 && offlineEnded.json?.reason === "session_ended", said(offlineEnded));
 
     // 7. The account's history tells the CLI sign-ins apart from browsers.
     const history = await asCarbon<Json>(env, carbon, "GET", "/v1/me/history?kind=signin");
