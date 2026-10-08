@@ -2,7 +2,7 @@
   "name": "@silicon-accounts/web",
   "version": "0.2.0",
   "private": true,
-  "description": "Silicon Accounts web (Next.js): the account site, hosted sign-in pages, the docs, the embed page and sdk/v1.js",
+  "description": "Silicon Accounts web (Next.js): the account site, hosted sign-in pages, documentation redirects, the embed page and sdk/v1.js",
   "scripts": {
     "dev": "pnpm build:sdk && pnpm build:docs && next dev --port ${PORT:-8590}",
     "build": "pnpm build:sdk && pnpm build:docs && next build",
@@ -11,6 +11,7 @@
     "lint": "eslint --max-warnings=0 .",
     "build:sdk": "node sdk/build.mjs",
     "build:docs": "tsx lib/docs/build.ts",
+    "test:redirects": "tsx --test tests/docs-redirects.test.ts",
     "screens": "tsx scripts/screens.ts",
     "checks:account": "tsx components/account/checks.ts",
     "checks:auth": "tsx components/auth/checks.ts",

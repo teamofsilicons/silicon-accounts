@@ -57,7 +57,7 @@ What this deployment is. Public.
   "environment": "production",
   "public_url": "https://accounts.teamofsilicons.com",
   "silicon_apps_url": "https://apps.teamofsilicons.com",
-  "docs_url": "https://accounts.teamofsilicons.com/docs",
+  "docs_url": "https://developers.teamofsilicons.com/docs/accounts",
   "developer_url": "https://developers.teamofsilicons.com",
   "providers": { "google": true, "apple": true },
   "delivery": "providers"
@@ -149,7 +149,7 @@ forwards), and on `accounts-api`'s own address any unknown path at all:
   "error": {
     "code": "route_not_found",
     "message": "There is no endpoint GET /v1/nope in Silicon Accounts.",
-    "hint": "Check the method and the path: the API lives under /v1 (plus /.well-known, /healthz and /readyz). GET /v1/meta describes this server; the API reference is at https://accounts.teamofsilicons.com/docs."
+    "hint": "Check the method and the path: the API lives under /v1 (plus /.well-known, /healthz and /readyz). GET /v1/meta describes this server; the API reference is at https://developers.teamofsilicons.com/docs/accounts."
   }
 }
 ```

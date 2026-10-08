@@ -30,7 +30,7 @@ pub const CONTRACT_OTP_LOCK_SECONDS: i64 = 60;
 pub const CONTRACT_ACCESS_TOKEN_TTL_SECONDS: i64 = 1800;
 
 /// Where the published docs live unless ACCOUNTS_DOCS_URL says otherwise.
-pub const DEFAULT_DOCS_URL: &str = "https://accounts.teamofsilicons.com/docs";
+pub const DEFAULT_DOCS_URL: &str = "https://developers.teamofsilicons.com/docs/accounts";
 
 /// The developer platform in production unless ACCOUNTS_DEVELOPER_URL says otherwise.
 pub const DEFAULT_DEVELOPER_URL: &str = "https://developers.teamofsilicons.com";
@@ -1060,7 +1060,10 @@ mod tests {
         assert_eq!(s.environment, Environment::Development);
         // The API listens on 8589 behind the account site, which serves the public 8590.
         assert_eq!(s.bind_addr, SocketAddr::from(([127, 0, 0, 1], 8589)));
-        assert_eq!(s.docs_url, "https://accounts.teamofsilicons.com/docs");
+        assert_eq!(
+            s.docs_url,
+            "https://developers.teamofsilicons.com/docs/accounts"
+        );
         assert_eq!(s.developer_url, "http://localhost:8600");
         assert_eq!(
             s.developer_callback_url(),

@@ -7,8 +7,7 @@ pages, redirect URIs and allowed origins, its user base and imports, its webhook
 snippets to embed sign-in). The same app workspace also creates apps, saves seven setup steps, uploads and validates packages, manages releases and authors, and publishes through Silicon Apps. Each service retains its own backend. The portal contains no store catalog; discovery and installation live at apps.teamofsilicons.com.
 
 Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Arc UI, TanStack Query. The
-product contract is `../understanding/UNDERSTANDING.md` (never edited here); nothing in this app overrides it. Built to
-move to its own repository later: it imports nothing from the rest of this repository.
+product contract is `../understanding/UNDERSTANDING.md` (never edited here); nothing in this app overrides it. Runtime-independent from the rest of this repository: documentation sources are bundled at build time.
 
 ```
 pnpm install
@@ -110,12 +109,23 @@ checking pages with curl or a browser without the hosted sign-in.
 | Apps home | `/` (owned and authored apps; “New app” registers it through Apps and shows the secret once) | `components/developer/home/` |
 | An app | `/apps/[appId]/[[...tab]]`: Overview, Publishing, Releases, Authors, History, Sign-in, Details, Flows, Pages, Users, Import, Webhooks, App verification, Embed | `components/developer/app/` (scope, tab frame), `components/developer/tabs/`, `lib/app-tabs.ts` |
 | Verification history | `/app-verification` | `components/developer/verification/` |
-| Invitations, docs and preferences | `/invitations`, public `/docs`, `/settings` | `components/publishing/`, native shell pages |
+| Invitations and preferences | `/invitations`, `/settings` | `components/publishing/`, native shell pages |
+| Unified docs | public `/docs`, `/docs/apps/**`, `/docs/accounts/**` | `components/docs/`, `lib/docs/`, `app/(shell)/docs/` |
 | Copied from `web/` and adapted | Arc UI, the foundation (layout, branding runtime, squircles, theme, providers), the API client and hooks | `components/arc/`, `components/foundation/`, `lib/` |
 
 The copied parts started as `web/`'s and are now this app's own: change them here, with the same rules (squircles,
 tokens, Carbons/Silicons vocabulary, errors in the server's words). `lib/api/http.ts` maps the API's paths onto the BFF
 (`/v1/x` → `/api/accounts/x`), so `lib/api/endpoints.ts` keeps the API's own paths.
+
+## Unified documentation
+
+`/docs` is public and combines Silicon Apps and Silicon Accounts in the portal's native shell. The documentation engine was copied from `web/` and adapted here: the repository's `docs/` maps to `/docs/accounts`, `docs-apps/` maps to `/docs/apps`, and `lib/docs/landing.md` is the common landing page. Existing page bodies and heading anchors are preserved. Each product has its own navigation, related pages, and previous/next sequence; one search covers both and labels every result by product. Docs keyboard search owns ⌘K/Ctrl-K and `/`, while the portal's command palette remains available elsewhere. Theme switching and the docs menu stay available on small screens.
+
+`pnpm build:docs` bundles all content and emits the original Markdown into `public/docs/<product>/…`; `pnpm dev`, `pnpm typecheck`, and `pnpm build` run it first. `pnpm build:docs --check` validates front matter, page links and anchors. Override source directories with `ACCOUNTS_DOCS_DIR` and `APPS_DOCS_DIR`. `pnpm build:docs --watch` updates the bundle while authoring. The standalone deployment needs generated `public/` and `.next/static` beside its server, as the deployment installer already supplies; it never needs source Markdown at runtime.
+
+`/docs.md` and `/docs/index.md` export the common landing page. `/docs/accounts/index.md`, `/docs/apps/index.md`, and every namespaced `*.md` export their exact source. `/llms.txt` indexes both products; `/llms-full.txt` contains both full texts. These use `DEVELOPER_PUBLIC_URL` (or the canonical production origin), never the Accounts service origin. Public docs override the private portal's no-index metadata and declare canonical developer URLs. Unknown docs addresses are checked before streaming and return a real 404.
+
+See `lib/docs/README.md` for the Markdown authoring format. Accounts' former docs routes and the Apps store's former docs routes redirect to this portal; those redirects live in their respective apps.
 
 ## The app's tabs
 

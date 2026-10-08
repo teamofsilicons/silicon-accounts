@@ -1,0 +1,165 @@
+/* The header's search button, the shell's "Search and jump" pill. */
+.trigger {
+  --sq-r: var(--radius-pill);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  display: inline-flex;
+  height: 38px;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+@media (hover: hover) and (pointer: fine) { .trigger:hover { --sq-fill: var(--surface-muted); color: var(--foreground); } }
+.trigger:focus-visible { outline: none; --sq-fill: var(--surface-muted); --sq-stroke: var(--border-strong); color: var(--foreground); }
+.triggerLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.triggerKey {
+  --sq-r: 8px;
+  --sq-fill: var(--surface-muted);
+  --sq-stroke: var(--border);
+  display: inline-flex;
+  height: 24px;
+  min-width: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+}
+@media (min-width: 1024px) { .trigger { width: 240px; } .triggerLabel { flex: 1; text-align: left; } }
+/* Phones: the icon alone, as a square-ish button. The label stays in the page, visually hidden, so the button keeps
+   its name ("Search the docs"); the key hint goes. */
+@media (max-width: 639px) {
+  .trigger { --sq-r: 12px; width: 38px; justify-content: center; padding: 0; }
+  .triggerLabel { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .triggerKey { display: none; }
+}
+
+.overlay { position: fixed; inset: 0; z-index: 70; background: var(--overlay); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.overlay[data-state="open"] { animation: fade-in var(--duration-standard) var(--ease-enter) both; }
+.overlay[data-state="closed"] { animation: fade-out var(--duration-fast) var(--ease-standard) both; }
+.positioner { position: fixed; inset: 0; z-index: 71; display: flex; justify-content: center; padding: min(12vh, 110px) var(--space-4) var(--space-4); pointer-events: none; }
+
+.panel {
+  --sq-r: var(--radius-panel);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  display: flex;
+  width: min(100%, 680px);
+  max-height: min(640px, calc(100dvh - min(12vh, 110px) - var(--space-4)));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  box-shadow: var(--shadow-floating);
+  outline: none;
+  pointer-events: auto;
+}
+.panel[data-state="open"] { animation: rise-in var(--duration-standard) var(--ease-enter) both; }
+.panel[data-state="closed"] { animation: fade-out var(--duration-fast) var(--ease-standard) both; }
+
+.searchRow { display: flex; min-height: 56px; flex: none; align-items: center; gap: 10px; padding: 8px 12px 8px 16px; border-bottom: 1px solid var(--border-subtle); }
+.searchIcon { flex: none; color: var(--text-muted); }
+.input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-base); -webkit-appearance: none; appearance: none; }
+.input::placeholder { color: var(--text-muted); }
+.input::-webkit-search-cancel-button { display: none; }
+/* Clear (×) and Esc: squircles like the trigger's key, painted through --sq-fill / --sq-stroke so the fallback follows
+   hover and focus. */
+.clear, .close {
+  --sq-r: 8px;
+  --sq-fill: transparent;
+  --sq-stroke: transparent;
+  display: grid;
+  height: 26px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  background: var(--sq-fill);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+}
+.clear { width: 26px; }
+.close { --sq-stroke: var(--border-subtle); min-width: 34px; padding: 0 7px; border: 1px solid var(--sq-stroke); }
+.clear:focus-visible, .close:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
+@media (hover: hover) and (pointer: fine) { .clear:hover, .close:hover { --sq-fill: var(--surface-muted); color: var(--foreground); } }
+
+.status { flex: none; padding: 10px 18px 4px; color: var(--text-muted); font-size: var(--text-xs); font-weight: 500; }
+
+.results { min-height: 0; flex: 1 1 auto; margin: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 8px; list-style: none; }
+/* A row is a squircle (the same radius as the docs navigation's rows); only the highlighted one is filled. */
+.result {
+  --sq-r: 10px;
+  --sq-fill: transparent;
+  --sq-stroke: transparent;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 2px 12px;
+  padding: 9px 10px;
+  background: var(--sq-fill);
+  color: var(--foreground);
+  cursor: pointer;
+}
+.result[data-active] { --sq-fill: var(--surface-muted); }
+.resultIcon { display: grid; height: 20px; place-items: center; color: var(--text-muted); }
+.result[data-active] .resultIcon { color: var(--accent-ink); }
+.resultText { display: grid; min-width: 0; gap: 2px; }
+.resultTitle { overflow: hidden; font-size: var(--text-sm); font-weight: 500; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
+.resultSnippet { display: -webkit-box; overflow: hidden; color: var(--text-secondary); font-size: .8125rem; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.resultSnippet mark { --sq-r: 3px; background: color-mix(in oklab, var(--accent) 20%, transparent); color: var(--foreground); }
+.resultPage { color: var(--text-muted); }
+.resultGroup { padding-top: 2px; color: var(--text-muted); font-size: var(--text-xs); line-height: 18px; white-space: nowrap; }
+
+.empty { display: grid; justify-items: start; gap: 6px; padding: 14px 18px 22px; font-size: var(--text-sm); }
+.empty strong { font-weight: 500; }
+.empty span { max-width: 56ch; color: var(--text-secondary); line-height: 1.5; }
+.retry {
+  --sq-r: var(--radius-control);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  margin-top: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.retry:hover, .retry:focus-visible { outline: none; --sq-fill: var(--surface-muted); }
+
+.footer { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 10px 16px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: var(--text-xs); }
+.footer span { display: inline-flex; align-items: center; gap: 4px; }
+.footer kbd { --sq-r: 6px; --sq-fill: var(--surface-muted); --sq-stroke: var(--border); display: inline-grid; min-width: 20px; height: 20px; place-items: center; padding: 0 4px; border: 1px solid var(--sq-stroke); background: var(--sq-fill); font-family: var(--font-body); font-size: 11px; }
+.footerNote { margin-left: auto; }
+
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(6px) scale(.985); } }
+
+@media (max-width: 639px) {
+  .positioner { padding: var(--space-3) var(--space-3) var(--space-3); }
+  .panel { max-height: calc(100dvh - 2 * var(--space-3)); }
+  .footer { display: none; }
+  .resultGroup { display: none; }
+  .result { grid-template-columns: 18px minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trigger { transition: none; }
+  .overlay[data-state], .panel[data-state] { animation-duration: 1ms; }
+}

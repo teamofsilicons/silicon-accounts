@@ -14,6 +14,7 @@
  * the account site's old tab names (branding, proofs) redirect to their tabs here (pages, ata).
  */
 import { NextResponse, type NextRequest } from "next/server";
+import { findPage, findPageByPath, isGroup } from "./lib/docs/content";
 import { isUnknownAppTab, renamedAppTab } from "./lib/app-tabs";
 import { accountsPublicUrl, localIrisImageSource, originOf } from "./lib/server/config";
 
@@ -37,6 +38,15 @@ function contentSecurityPolicy(nonce: string): string {
   ].join("; ");
 }
 
+/** Resolve docs before streaming so unknown URLs have a real HTTP 404. */
+function docsAddressMissing(pathname: string): boolean {
+  if (!pathname.startsWith("/docs/")) return false;
+  let path: string;
+  try { path = decodeURIComponent(pathname.slice(6)).replace(/\/+$/, ""); } catch { return true; }
+  if (!path || path === "search-index.json" || path === "index" || /^(apps|accounts)\/index$/.test(path)) return false;
+  return path.endsWith(".md") ? !findPageByPath(path) : !findPage(path) && !isGroup(path);
+}
+
 export function proxy(request: NextRequest) {
   // The account site's old developer tabs (its /developer redirects keep their names): Branding is Pages, Proofs is ATA.
   const renamed = renamedAppTab(request.nextUrl.pathname);
@@ -51,7 +61,9 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
 
-  const response = isUnknownAppTab(request.nextUrl.pathname)
+  const response = docsAddressMissing(request.nextUrl.pathname)
+    ? NextResponse.rewrite(new URL("/docs/404", request.url), { status: 404, request: { headers: requestHeaders } })
+    : isUnknownAppTab(request.nextUrl.pathname)
     ? NextResponse.rewrite(new URL("/_dev/not-found", request.url), { status: 404, request: { headers: requestHeaders } })
     : NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);

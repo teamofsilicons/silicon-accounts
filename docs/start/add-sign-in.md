@@ -22,7 +22,7 @@ Silicon Accounts runs everything in between: the sign-in methods (email code, ph
 Google, Apple), sign-up, the pages Carbons see, and your app's user base.
 
 ```sh
-export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # not deployed yet; a local stack: http://localhost:8590
+export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # or a local stack: http://localhost:8590
 export ACCOUNTS_APP_ID=briefcase                 # your app_id
 export ACCOUNTS_APP_SECRET=sa_app_briefcase_…    # your app secret: server side only
 

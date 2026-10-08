@@ -19,11 +19,11 @@
  * GET /v1/meta names as `developer_url` (cached briefly; ACCOUNTS_DEVELOPER_URL, then the production address, when the
  * API cannot say). /developer → its home, /developer/{app_id}[/{tab}] → /apps/{app_id}[/{tab}] there, query kept.
  *
- * /docs/<path> that is no page of the docs and no group's page: the page load is rewritten to /docs/404 with status
- * 404, so the docs' "No page here" renders on the server (see docsAddressMissing).
+ * Documentation moved to the same developer site: permanent 308 redirects preserve deep paths and queries.
+ * Old Accounts articles and Markdown live under /docs/accounts; /docs and the llms indexes are shared.
  */
 import { NextResponse, type NextRequest } from "next/server";
-import { findPage, isGroup } from "@/lib/docs/content";
+import { developerDocsPath } from "@/lib/docs-redirects";
 
 /** Where the Rust API listens (server side). Read at request time, so it can differ from the build's. */
 const apiUrl = () => (process.env.ACCOUNTS_API_URL ?? "http://127.0.0.1:8589").replace(/\/+$/, "");
@@ -135,32 +135,6 @@ function localIrisImageSource(): string {
   }
 }
 
-/** Where an address under /docs with no page renders (app/(docs)/docs/404): the docs' "No page here". */
-const DOCS_MISSING_PATH = "/docs/404";
-
-/**
- * True for a page load of /docs/<path> that is neither a page of the docs nor a group's page (the same lookups as the
- * /docs/[...slug] route: lib/docs/content findPage and isGroup). A notFound() below the root layout renders only in
- * the browser in this Next: the HTML is an empty `<html id="__next_error__">` and the words come with the script. So
- * the proxy answers those page loads itself, rewritten to DOCS_MISSING_PATH with status 404. The Markdown files
- * (/docs/<path>.md), the search index and client-side navigations (RSC requests, where the route's notFound() renders
- * as it always did) pass through.
- */
-function docsAddressMissing(pathname: string, rsc: boolean): boolean {
-  if (rsc || !pathname.startsWith("/docs/")) return false;
-  const rest = pathname.slice("/docs/".length).replace(/\/+$/, "");
-  if (!rest || rest.endsWith(".md") || rest === "search-index.json") return false;
-  const path = rest.split("/").map(part => {
-    try {
-      return decodeURIComponent(part);
-    } catch {
-      return part;
-    }
-  }).join("/");
-  // docs/index.md is the landing page itself (the route redirects /docs/index to /docs).
-  return path !== "index" && !findPage(path) && !isGroup(path);
-}
-
 function contentSecurityPolicy(nonce: string, frameAncestorsValue: string): string {
   return [
     "default-src 'self'",
@@ -179,6 +153,14 @@ function contentSecurityPolicy(nonce: string, frameAncestorsValue: string): stri
 export async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   if (pathname === "/developer" || pathname.startsWith("/developer/")) return developerRedirect(request);
+  const docsPath = developerDocsPath(pathname);
+  if (docsPath) {
+    const target = new URL(`${await developerUrl()}/`);
+    target.pathname = `${target.pathname.replace(/\/+$/, "")}${docsPath}`;
+    target.search = request.nextUrl.search;
+    // Fragments are never sent in HTTP requests. Omitting a fragment in Location lets the browser inherit it.
+    return NextResponse.redirect(target, 308);
+  }
   const nonce = btoa(crypto.randomUUID());
   const embed = pathname === "/embed/v1/buttons" || pathname.startsWith("/embed/");
   const ancestors = embed ? await frameAncestors(searchParams.get("app_id") ?? searchParams.get("client_id")) : [];
@@ -190,10 +172,7 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-sa-surface", embed ? "embed" : "site");
   requestHeaders.set("x-sa-embed-framing", embed && ancestors.length ? "allowed" : "none");
 
-  const read = request.method === "GET" || request.method === "HEAD";
-  const response = read && docsAddressMissing(pathname, request.headers.has("rsc"))
-    ? NextResponse.rewrite(new URL(DOCS_MISSING_PATH, request.url), { status: 404, request: { headers: requestHeaders } })
-    : NextResponse.next({ request: { headers: requestHeaders } });
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
   if (!ancestors.length) response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
@@ -205,6 +184,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // Documentation must redirect even for prefetch/RSC requests and generated static Markdown files.
+    "/docs/:path*", "/docs.md", "/llms.txt", "/llms-full.txt",
     {
       // Everything except the API (rewritten to the Rust service), Next's static assets, the SDK and public files.
       source: "/((?!v1/|v1$|\\.well-known/|_next/static|_next/image|sdk/|favicon\\.ico|icon\\.svg|robots\\.txt).*)",

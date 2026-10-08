@@ -40,7 +40,7 @@ pub fn command() -> Command {
         "  130 interrupted",
         "",
         "Links:",
-        "  Docs       https://accounts.teamofsilicons.com/docs",
+        "  Docs       https://developers.teamofsilicons.com/docs/accounts",
         "  Account    https://accounts.teamofsilicons.com (your own account)",
         "  Developer  https://developers.teamofsilicons.com (your apps' sign-in setup)",
         "  GitHub     https://github.com/teamofsilicons/silicon-accounts",

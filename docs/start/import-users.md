@@ -97,7 +97,7 @@ same ones (an id can differ if someone takes it in between).
   `ACCOUNTS_URL` says otherwise. The curl examples assume:
 
   ```sh
-  export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # not deployed yet; a local stack: http://localhost:8590
+  export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # or a local stack: http://localhost:8590
   export APP_ID=legacy-crm
   export APP_SECRET=sa_app_…        # from Silicon Apps; never commit it
   ```

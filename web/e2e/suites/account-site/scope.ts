@@ -10,7 +10,7 @@ import { DEVELOPER_SIGNED_OUT, api, hostedTitle, newContext, shot, sleep } from 
 import { newCarbon, signIntoApp, until } from "./_helpers";
 
 /** The account site's own sections, as its dock names them (every one a page of this site). */
-const OWN = ["Identity", "Sign-in", "Apps", "Silicons", "Proofs", "Activity"];
+const OWN = ["Identity", "Sign-in", "Apps", "Silicons", "User verification", "Activity"];
 
 /** GET <site><path> without following redirects: the status and where it points. */
 async function redirectOf(site: string, path: string): Promise<{ status: number; location: string }> {
@@ -48,8 +48,9 @@ const scope: Journey = {
       sections.map(section => `${section.name} ${section.href}${section.external ? " (external)" : ""}`).join(", "),
     );
     results.check(
-      "…and one more item, \"Developer site\", a link out to the developer site (developer_url), never a page here",
-      external.length === 1 && external[0]?.name === "Developer site" && external[0]?.href === env.developer,
+      "Developer site and Docs site lead to app management and shared documentation on developer_url",
+      external.length === 2 && external.some(section => section.name === "Developer site" && section.href === env.developer)
+        && external.some(section => section.name === "Docs site" && section.href === `${env.developer}/docs`),
       JSON.stringify(external),
     );
 
@@ -103,8 +104,9 @@ const scope: Journey = {
     await sleep(700);
     await shot(env, page, "acct-scope-03b-phone-sheet");
     const sheetLinks = await sheet.getByRole("link").evaluateAll(links => links.map(link => ({ text: (link.textContent ?? "").replace(/\s+/g, " ").trim(), href: link.getAttribute("href") ?? "", external: link.hasAttribute("data-external") })));
-    const sheetDeveloper = sheetLinks.find(link => link.external);
-    results.check("on a phone, the Go to sheet lists the six sections and \"Developer site\" leading to developer_url", sheetLinks.length === 7 && !!sheetDeveloper && sheetDeveloper.text.startsWith("Developer site") && sheetDeveloper.href === env.developer, JSON.stringify(sheetLinks.map(link => `${link.text.slice(0, 24)} ${link.href}`)));
+    const sheetDeveloper = sheetLinks.find(link => link.external && link.text.startsWith("Developer site"));
+    const sheetDocs = sheetLinks.find(link => link.external && link.text.startsWith("Docs site"));
+    results.check("on a phone, the Go to sheet lists the six account sections, Developer site and shared Docs site", sheetLinks.length === 8 && sheetDeveloper?.href === env.developer && sheetDocs?.href === `${env.developer}/docs`, JSON.stringify(sheetLinks.map(link => `${link.text.slice(0, 24)} ${link.href}`)));
     await page.keyboard.press("Escape");
     await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -118,6 +120,7 @@ const scope: Journey = {
     // The link starts at the production address and follows GET /v1/meta once it has loaded.
     const footerLink = await until(async () => footer.getByRole("link", { name: "Developer site", exact: true }).getAttribute("href", { timeout: 2_000 }).catch(() => null), href => href === env.developer, 10_000);
     results.check("the signed-out landing page's footer links to the developer site (developer_url)", footerLink === env.developer, String(footerLink));
+    results.check("the landing page links directly to shared developer documentation", await footer.getByRole("link", { name: "Docs", exact: true }).getAttribute("href") === `${env.developer}/docs`);
     const create = visitor.getByRole("link", { name: "Create your account", exact: true });
     const createHref = await create.getAttribute("href", { timeout: 10_000 }).catch(() => null);
     await shot(env, visitor, "acct-scope-04-landing");

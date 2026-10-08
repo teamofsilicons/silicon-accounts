@@ -1,4 +1,11 @@
-# The docs on the site (/docs)
+# Legacy Accounts docs renderer
+
+The public documentation now lives in `developer/`, together with Silicon Apps documentation at
+`https://developers.teamofsilicons.com/docs`. This renderer is retained as source during the migration, but
+`web/proxy.ts` permanently redirects its public routes before rendering. See `web/README.md` for the exact
+redirect mapping and runtime developer-origin configuration. New public docs behavior belongs in `developer/`.
+
+The following describes the retained renderer, not routes still served by the Accounts site.
 
 The site renders every Markdown file under the repository's `docs/` at `/docs`, serves each one as it is at
 `/docs/<path>.md`, and lists them for language models at `/llms.txt` (the index) and `/llms-full.txt` (everything).

@@ -100,14 +100,14 @@ async fn public_calls() {
         "/v1/meta",
         Reply::json(
             200,
-            json!({"name": "Silicon Accounts", "docs_url": "https://accounts.teamofsilicons.com/docs",
+            json!({"name": "Silicon Accounts", "docs_url": "https://developers.teamofsilicons.com/docs/accounts",
                 "developer_url": "https://developers.teamofsilicons.com"}),
         ),
     );
     let meta = c.meta().await.unwrap();
     assert_eq!(
         meta.docs_url.as_deref(),
-        Some("https://accounts.teamofsilicons.com/docs")
+        Some("https://developers.teamofsilicons.com/docs/accounts")
     );
     assert_eq!(
         meta.developer_url.as_deref(),

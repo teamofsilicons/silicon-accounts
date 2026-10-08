@@ -1,7 +1,8 @@
 # Silicon Accounts: the account site
 
 The public site of Silicon Accounts (accounts.teamofsilicons.com): the account pages Carbons and Silicons use, the
-hosted sign-in pages apps send people to, the docs, the embeddable sign-in buttons and the SDK script.
+hosted sign-in pages apps send people to, the embeddable sign-in buttons and the SDK script. Documentation for
+Silicon Accounts and Silicon Apps is shared at `https://developers.teamofsilicons.com/docs`.
 
 Building apps is not done here. Everything about an app's sign-in (its methods, Google and Apple, details and flows,
 page styling, redirect URLs, user base and imports, webhooks, App verification proofs, embed snippets) lives on the developer site,
@@ -23,6 +24,7 @@ pnpm dev            # http://localhost:8590 (builds the SDK first; PORT=… to c
 pnpm typecheck      # next typegen + tsc --noEmit
 pnpm lint           # eslint, zero warnings
 pnpm build          # builds the SDK, then next build (output: standalone)
+pnpm test:redirects # docs redirects, proxy matchers and configured navigation
 pnpm start          # the production build on $PORT (8590)
 pnpm screens        # Playwright screenshots into .screens/ (see "Screens")
 ```
@@ -40,6 +42,7 @@ API's Origin check):
 | --- | --- |
 | `/v1/*`, `/.well-known/*` | rewritten to `ACCOUNTS_API_URL` (default `http://127.0.0.1:8589`), unchanged: method, body, cookies, `Set-Cookie`, `Location` |
 | `/sdk/v1.js` | `public/sdk/v1.js`, built from `sdk/v1.ts` by `pnpm build:sdk` (runs before `dev` and `build`); `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=300` |
+| `/docs`, `/docs/*`, `/docs.md`, `/llms.txt`, `/llms-full.txt` | permanent redirects to the configured developer site (mapping below) |
 | everything else | the pages below |
 
 The rewrite proxy accepts bodies up to 52 MB and waits up to 5 minutes (`experimental.proxyClientMaxBodySize`,
@@ -59,6 +62,15 @@ script; Next adds it to its own scripts. It skips `/v1`, `/.well-known`, `/_next
 `/developer/{app_id}[/{tab}]` to `/apps/{app_id}[/{tab}]` there, query kept. The site's address is `developer_url` from
 `GET /v1/meta` (cached for a minute; `ACCOUNTS_DEVELOPER_URL`, then https://developers.teamofsilicons.com, when the API
 cannot say).
+
+Documentation redirects use that same runtime developer-site configuration and HTTP **308**, including prefetch,
+RSC, `HEAD` and static Markdown requests. `/docs` goes to the shared `/docs` landing; `/docs/<path>` goes to
+`/docs/accounts/<path>`; `/docs.md` goes to `/docs/accounts/index.md`. The old `/docs/search-index.json`, `/llms.txt`
+and `/llms-full.txt` go to the shared endpoints at the same paths. Queries are preserved, and browsers inherit the
+original fragment because `Location` does not replace it. Unknown deep paths reach the developer site's docs 404.
+The account dock, phone sheet, command palette and signed-out landing link directly to its `/docs`, using
+`developer_url` rather than an obsolete account-site docs address. Account pages, API rewrites, hosted sign-in and
+the embed remain on the Accounts origin.
 
 The embed page `/embed/v1/buttons` is the one page other sites may frame: `proxy.ts` reads the app's
 `GET /v1/apps/{app_id}/public` and answers `frame-ancestors 'self' <allowed_origins>` (none listed, unknown app or API
@@ -95,7 +107,7 @@ shared parts and a first version of each route; each area's builder owns its rou
 | --- | --- | --- |
 | web-account | `/` (landing when signed out, identity home when signed in), `/sign-in-methods`, `/apps`, `/silicons`, `/proofs`, `/activity`, `/settings` | `app/(shell)/(account)/`, `components/account/` |
 | web-auth | `/sign-in`, `/authorize`, `/authorize/flow/[id]`, `/device`, `/embed/v1/buttons` (polish) | `app/(auth)/`, `components/auth/` |
-| web-docs | `/docs`, `/docs/[...slug]` (and the static `/docs/<path>.md`, `/docs.md`), `/docs/search-index.json`, `/llms.txt`, `/llms-full.txt`: the repository's `docs/`, bundled by `pnpm build:docs` (run by dev, build and typecheck) into the git-ignored `lib/docs/generated/` and `public/docs/` | `app/(docs)/`, `components/docs/`, `lib/docs/` (guide: `lib/docs/README.md`) |
+| legacy web-docs | former docs routes redirect through `proxy.ts`; the old renderer and generated build remain temporarily as source, while `developer/` owns the public docs | `app/(docs)/`, `components/docs/`, `lib/docs/` (guide: `lib/docs/README.md`), `lib/docs-redirects.ts` |
 | foundation | root layout, providers, shell, dock, command palette, theme, squircles, branding runtime, API client and hooks, SDK, `proxy.ts`, `/__kitchen`, screens | `app/layout.tsx`, `components/foundation/`, `components/kitchen/`, `lib/`, `styles/`, `sdk/`, `scripts/` |
 | Arc UI | the installed components (local edits below) | `components/arc/` |
 
@@ -489,4 +501,4 @@ What changed on this site for UNDERSTANDING.md v2 (build spec 06-v2.md):
 
 ### Verification terminology (2026-10-08)
 
-The shared account navigation, phone sheet and command palette call `/proofs` **User verification**. Page metadata, cards, activity filters and related copy use the same name; the route, query keys, API values and revoke behavior remain unchanged. Root `docs/` supplies the updated App verification and User verification titles to the docs navigation and search. The central managed-app history lives at `https://developers.teamofsilicons.com/app-verification`; it retains events, never raw token values.
+The shared account navigation, phone sheet and command palette call `/proofs` **User verification**. Page metadata, cards, activity filters and related copy use the same name; the route, query keys, API values and revoke behavior remain unchanged. Root `docs/` supplies the updated App verification and User verification titles to the developer site's docs navigation and search. The central managed-app history lives at `https://developers.teamofsilicons.com/app-verification`; it retains events, never raw token values.

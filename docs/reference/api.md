@@ -47,7 +47,7 @@ curl -s "$ACCOUNTS_URL/v1/meta"
   "environment": "production",
   "public_url": "https://accounts.teamofsilicons.com",
   "silicon_apps_url": "https://apps.teamofsilicons.com",
-  "docs_url": "https://accounts.teamofsilicons.com/docs",
+  "docs_url": "https://developers.teamofsilicons.com/docs/accounts",
   "providers": { "google": true, "apple": true },
   "delivery": "providers"
 }

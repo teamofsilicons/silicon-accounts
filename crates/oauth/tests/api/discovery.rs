@@ -16,6 +16,7 @@ async fn the_discovery_document_describes_every_endpoint() {
     let d = &r.json;
     let base = ctx.state.settings.public_url.clone();
     assert_eq!(d["issuer"], base.as_str());
+    assert_eq!(d["service_documentation"], ctx.state.settings.docs_url);
     for (field, path) in [
         ("authorization_endpoint", "/authorize"),
         ("token_endpoint", "/v1/oauth/token"),

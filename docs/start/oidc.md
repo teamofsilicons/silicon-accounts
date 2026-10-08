@@ -170,7 +170,7 @@ metadata.
   "revocation_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/revoke",
   "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
   "scopes_supported": ["profile", "email", "phone", "dob", "timezone", "openid", "offline_access"],
-  "service_documentation": "https://accounts.teamofsilicons.com/docs",
+  "service_documentation": "https://developers.teamofsilicons.com/docs/accounts",
   "subject_types_supported": ["public"],
   "token_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/token",
   "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],

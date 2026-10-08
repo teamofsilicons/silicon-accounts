@@ -14,7 +14,7 @@ pub fn route_not_found(method: &Method, path: &str) -> ApiError {
         "route_not_found",
         format!("There is no endpoint {method} {path} in Silicon Accounts."),
     )
-    .hint("Check the method and the path: the API lives under /v1 and /.well-known (the API server itself also answers /healthz and /readyz). GET /v1/meta describes this server; the API reference is at https://accounts.teamofsilicons.com/docs.")
+    .hint("Check the method and the path: the API lives under /v1 and /.well-known (the API server itself also answers /healthz and /readyz). GET /v1/meta describes this server; the API reference is at https://developers.teamofsilicons.com/docs/accounts.")
 }
 
 /// The router's fallback.

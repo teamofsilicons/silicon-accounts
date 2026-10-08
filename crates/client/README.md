@@ -276,5 +276,5 @@ leave your program.
 
 ## Links
 
-* Docs: https://accounts.teamofsilicons.com/docs (and `accounts docs` in the CLI)
+* Docs: https://developers.teamofsilicons.com/docs/accounts (and `accounts docs` in the CLI)
 * Source: https://github.com/teamofsilicons/silicon-accounts

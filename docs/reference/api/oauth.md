@@ -130,7 +130,7 @@ curl -s "$ACCOUNTS_URL/.well-known/openid-configuration"
   "revocation_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/revoke",
   "introspection_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/introspect",
   "device_authorization_endpoint": "https://accounts.teamofsilicons.com/v1/device/authorize",
-  "service_documentation": "https://accounts.teamofsilicons.com/docs",
+  "service_documentation": "https://developers.teamofsilicons.com/docs/accounts",
   "response_types_supported": ["code"],
   "response_modes_supported": ["query"],
   "grant_types_supported": [

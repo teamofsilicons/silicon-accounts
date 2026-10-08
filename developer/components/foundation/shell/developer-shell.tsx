@@ -70,12 +70,13 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
   const isApple = useSyncExternalStore(subscribeNothing, detectApple, () => false);
   const accountsUrl = accountsUrlOf(meta.data?.public_url);
   const docsUrl = paths.docs;
+  const onDocs = pathname === paths.docs || pathname.startsWith(`${paths.docs}/`);
   const onApps = pathname === paths.home || pathname.startsWith("/apps/");
 
   // Every page needs a session.
   useEffect(() => {
-    if (status === "signed_out" && pathname !== paths.docs) beginSignIn(window.location.pathname + window.location.search);
-  }, [status, pathname]);
+    if (status === "signed_out" && !onDocs) beginSignIn(window.location.pathname + window.location.search);
+  }, [status, pathname, onDocs]);
 
   /** Navigates inside a page transition (no guard asked: the caller did). */
   const push = useCallback((href: string) => {
@@ -127,6 +128,7 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
   // ⌘K toggles the palette.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (onDocs) return;
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
         event.preventDefault();
         toggleCommandPalette();
@@ -134,7 +136,7 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [paletteOpen]);
+  }, [paletteOpen, onDocs]);
 
   const user = useMemo<UserMenuUser | null>(() => (me ? { name: me.display_name, email: me.id ?? me.uuid, avatarSrc: me.pfp_url } : null), [me]);
 
@@ -159,18 +161,18 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
             }}>Apps</Link>
             <Link href={paths.appVerification()} data-sq="surface" className={styles.navLink} aria-current={pathname === paths.appVerification() ? "page" : undefined}>App verification</Link>
             <Link href={paths.invitations} data-sq="surface" className={styles.navLink}>Invitations</Link>
-            <Link href={docsUrl} data-sq="surface" className={styles.navLink}>Docs</Link>
+            <Link href={docsUrl} data-sq="surface" className={styles.navLink} aria-current={onDocs ? "page" : undefined}>Docs</Link>
           </nav>
         </div>
         <div className={styles.topEnd}>
-          <button data-sq="surface" type="button" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}>
+          {!onDocs ? <button data-sq="surface" type="button" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}>
             <Search size={16} strokeWidth={1.75} aria-hidden="true" />
             <span className={styles.searchLabel}>Search and jump</span>
             <kbd data-sq="surface">{isApple ? "⌘ K" : "Ctrl K"}</kbd>
-          </button>
-          <span className={styles.tool}>
+          </button> : null}
+          {!onDocs ? <span className={styles.tool}>
             <ThemeSwitch theme={theme} variant="eclipse" iconOnly onThemeChange={(next, _variant, trigger) => change(next, trigger)} />
-          </span>
+          </span> : null}
           {user ? (
             <UserMenu
               user={user}
@@ -196,7 +198,7 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
     </div>
   );
 
-  if (status === "signed_in" || pathname === paths.docs) {
+  if (status === "signed_in" || onDocs) {
     return chrome(
       <ViewTransition key={pathname.split("/").slice(0, 3).join("/") || "/"} enter={PAGE_CLASSES} exit={PAGE_CLASSES} default="none">
         <div className={styles.page}>{children}</div>

@@ -491,28 +491,13 @@ test("webhook retrieval failure never exposes editable defaults that could overw
   ).toBeVisible();
 });
 
-test("online docs include a concrete publishing path and explain state and update behavior", async ({
-  page,
-}) => {
+test("online docs include a concrete publishing path and explain state and update behavior", async ({ page }) => {
   await mock(page);
-  await page.goto("/docs");
-  for (const command of [
-    "apps availability ring",
-    "apps create ring --name Ring",
-    "apps validate ./package",
-    "apps pack ./package --output ./ring.tar.gz",
-    "apps upload ring --target macos-aarch64 ./ring.tar.gz",
-    "apps release ring --version 0.1.0 --package PACKAGE_ID",
-    "apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0",
-    "apps publish ring",
-  ])
-    await expect(
-      page.locator("code").filter({ hasText: command }).first(),
-    ).toBeVisible();
-  await expect(
-    page.getByText(/An exact version selects the initial release/),
-  ).toBeVisible();
-  await expect(
-    page.getByText(/Saving a home does not migrate files/),
-  ).toBeVisible();
+  await page.goto("/docs/apps/start/publish");
+  for (const command of ["apps availability ring", "apps create ring --name Ring", "apps validate ./package", "apps pack ./package --output ./ring.tar.gz", "apps upload ring --target linux-x86_64 ./ring.tar.gz", "apps release ring --version 0.1.0 --package PACKAGE_ID", "apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0", "apps publish ring"])
+    await expect(page.locator("code").filter({ hasText: command }).first()).toBeVisible();
+  await page.goto("/docs/apps/learn/releases-and-updates");
+  await expect(page.getByText(/An exact version selects the initial release/)).toBeVisible();
+  await page.goto("/docs/apps/start/install");
+  await expect(page.getByText(/Saving a home does not migrate files/)).toBeVisible();
 });

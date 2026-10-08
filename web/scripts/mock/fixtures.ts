@@ -60,7 +60,7 @@ export const meta: Meta = {
   public_url: "http://localhost:8590",
   silicon_apps_url: "https://apps.teamofsilicons.com",
   developer_url: "http://localhost:8600",
-  docs_url: "http://localhost:8590/docs",
+  docs_url: "http://localhost:8600/docs/accounts",
   providers: { google: true, apple: true },
   delivery: "local",
 };

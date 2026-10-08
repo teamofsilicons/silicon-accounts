@@ -39,7 +39,7 @@ fn document(state: &AppState) -> Value {
         "revocation_endpoint": s.url("/v1/oauth/revoke"),
         "introspection_endpoint": s.url("/v1/oauth/introspect"),
         "device_authorization_endpoint": s.url("/v1/device/authorize"),
-        "service_documentation": s.url("/docs"),
+        "service_documentation": s.docs_url,
         "response_types_supported": ["code"],
         "response_modes_supported": ["query"],
         "grant_types_supported": [

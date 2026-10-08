@@ -23,3 +23,8 @@ npm-debug.log*
 # Browser verification
 /test-results/
 /playwright-report/
+
+# Documentation generated from the repository Markdown
+/lib/docs/generated/
+/public/docs/
+/public/docs.md

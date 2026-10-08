@@ -6,7 +6,7 @@
  * (developers.teamofsilicons.com, `developer_url` in GET /v1/meta), and /developer[/*] here redirects there (proxy.ts).
  */
 import type { LucideIcon } from "lucide-react";
-import { Braces, Cpu, History, IdCard, KeyRound, LayoutGrid, ShieldCheck } from "lucide-react";
+import { BookOpen, Braces, Cpu, History, IdCard, KeyRound, LayoutGrid, ShieldCheck } from "lucide-react";
 
 /** The developer site when GET /v1/meta does not name one (servers before it existed). */
 export const DEFAULT_DEVELOPER_URL = "https://developers.teamofsilicons.com";
@@ -27,6 +27,11 @@ export function developerSiteUrl(value: unknown): string {
   return DEFAULT_DEVELOPER_URL;
 }
 
+/** Shared public documentation, on the same configured origin as app management. */
+export function developerDocsUrl(developerUrl: string = DEFAULT_DEVELOPER_URL): string {
+  return `${developerUrl.replace(/\/+$/, "")}/docs`;
+}
+
 /** Every route of the web app. */
 export const paths = {
   home: "/",
@@ -45,7 +50,7 @@ export const paths = {
   kitchen: "/__kitchen",
 } as const;
 
-export type SectionKey = "identity" | "sign-in" | "apps" | "silicons" | "proofs" | "activity" | "developer";
+export type SectionKey = "identity" | "sign-in" | "apps" | "silicons" | "proofs" | "activity" | "developer" | "docs";
 
 export interface Section {
   key: SectionKey;
@@ -69,11 +74,12 @@ export const SECTIONS: readonly Section[] = [
   { key: "proofs", label: "User verification", description: "Apps acting on your behalf", href: paths.proofs, icon: ShieldCheck, shortcut: "5" },
   { key: "activity", label: "Activity", description: "Sign-ins and changes, by day", href: paths.activity, icon: History, shortcut: "6" },
   { key: "developer", label: "Developer", description: "Set up sign-in for the apps you build", href: DEFAULT_DEVELOPER_URL, icon: Braces, shortcut: "7", external: true },
+  { key: "docs", label: "Docs", description: "Build with Silicon Apps and Silicon Accounts", href: developerDocsUrl(), icon: BookOpen, shortcut: "8", external: true },
 ];
 
 /** Where a section leads: its path, or for the developer site the address the service names (developerSiteUrl). */
 export function sectionHref(section: Section, developerUrl: string = DEFAULT_DEVELOPER_URL): string {
-  return section.key === "developer" ? developerUrl : section.href;
+  return section.key === "developer" ? developerUrl : section.key === "docs" ? developerDocsUrl(developerUrl) : section.href;
 }
 
 /** The section a path belongs to (Settings belongs to none: the dock shows no active section there). */

@@ -7,7 +7,7 @@
   apps' sign-in: methods, Google and Apple, details and flows, page styling, redirect URLs,
   user base and imports, webhooks, App verification proofs. (`GET /v1/meta` reports its URL as
   `developer_url`.)
-* **Online docs**: https://accounts.teamofsilicons.com/docs — the same guides as
+* **Online docs**: https://developers.teamofsilicons.com/docs/accounts — the same guides as
   `accounts docs`, plus the HTTP API reference.
 * **GitHub**: https://github.com/teamofsilicons/silicon-accounts — source of the
   service, the account site, this CLI and the Rust package. Open issues and PRs there;

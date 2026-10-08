@@ -66,7 +66,9 @@ export const journeys: Journey[] = [
       await openAccountPage(ctx, carbon.page, "/", /./);
       await carbon.page.setViewportSize({ width: 1440, height: 900 });
       const dockLink = await carbon.page.locator("nav[aria-label='Account sections'] a[data-external]").evaluateAll(links => links.map(link => ({ href: (link as HTMLAnchorElement).href, name: link.getAttribute("aria-label") ?? "", text: (link.textContent ?? "").trim() })));
-      results.check("account-empty: the dock's Developer item is a link to the developer site (developer_url), named \"Developer site\"", dockLink.length === 1 && dockLink[0]!.href.replace(/\/+$/, "") === developerUrl && /Developer/.test(dockLink[0]!.name) && dockLink[0]!.name.includes(dockLink[0]!.text), JSON.stringify(dockLink));
+      const developerLink = dockLink.find(link => link.name === "Developer site");
+      const docsLink = dockLink.find(link => link.name === "Docs site");
+      results.check("account-empty: Developer site and Docs site lead to the configured developer portal", dockLink.length === 2 && developerLink?.href.replace(/\/+$/, "") === developerUrl && developerLink.name.includes(developerLink.text) && docsLink?.href === `${developerUrl}/docs`, JSON.stringify(dockLink));
       await openAccountPage(ctx, carbon.page, "/apps", /App|app/);
       const appsLinks = await carbon.page.locator("main a[href]").evaluateAll((links, developer) => links.filter(link => (link as HTMLAnchorElement).href.replace(/\/+$/, "") === developer).map(link => (link.textContent ?? "").trim()), developerUrl);
       results.check("account-empty: the apps page points app builders to the developer site", appsLinks.length > 0, appsLinks.join(" | ") || "no link to the developer site on /apps");

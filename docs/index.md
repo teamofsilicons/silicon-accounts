@@ -29,15 +29,9 @@ curl -s "$ACCOUNTS_URL/v1/ids/available?id=si:head_of_growth"
 {"id": "si:head_of_growth", "available": true, "reason": null, "message": "si:head_of_growth is available.", "reclaimable": false, "suggestions": []}
 ```
 
-<!-- not-deployed-note: remove once accounts.teamofsilicons.com is live -->
-> [!IMPORTANT]
-> The hosted service isn't deployed yet (October 2026): `accounts.teamofsilicons.com` has no DNS
-> record, so the command above fails with `curl: (6) Could not resolve host`. Until it is, run
-> your own stack ([Run it yourself](#run-it-yourself)) and set
-> `ACCOUNTS_URL=http://localhost:8590`. The CLI and the code samples read `ACCOUNTS_URL`;
-> wherever an example spells out `https://accounts.teamofsilicons.com` (a `curl` command, a
-> `<script src>`), put your local URL in its place. The examples in these docs were run against
-> such a stack.
+The hosted service is available at [accounts.teamofsilicons.com](https://accounts.teamofsilicons.com).
+For a local development stack, follow [Run it yourself](#run-it-yourself) and set
+`ACCOUNTS_URL=http://localhost:8590` instead.
 
 Everything else goes through the `accounts` CLI, the `silicon-accounts-client` Rust package
 (the CLI is built only on it) or the HTTP API under `$ACCOUNTS_URL/v1/`.
@@ -165,7 +159,6 @@ every option, including the ports and database of a second stack.
 - Source of the service, the account site, the CLI, the Rust package and these docs: the
   `silicon-accounts` repository. Its public home,
   [github.com/teamofsilicons/silicon-accounts](https://github.com/teamofsilicons/silicon-accounts),
-  holds only the product contract (`understanding/`) so far (October 2026); until the code is
-  pushed there, work from the checkout you were given.
+  includes the service, both frontends, client, CLI and documentation.
 - Found a bug? `accounts report "what you ran, what you expected, what happened"`, with
   `--pr <link>` if you also fixed it.

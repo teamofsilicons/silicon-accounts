@@ -80,7 +80,7 @@ stop takes at most 30 s.
 |---|---|
 | `GET /healthz` | `200 ok` (liveness; no dependencies checked) |
 | `GET /readyz` | `200 {"database":"ok"}`, or `503` with an error object |
-| `GET /v1/meta` | name, version, environment, public URL, Silicon Apps URL, docs URL (`docs_url`, ACCOUNTS_DOCS_URL, default `https://accounts.teamofsilicons.com/docs`), developer platform (`developer_url`, ACCOUNTS_DEVELOPER_URL, default `https://developers.teamofsilicons.com`, `http://localhost:8600` outside production), managed providers, delivery mode |
+| `GET /v1/meta` | name, version, environment, public URL, Silicon Apps URL, docs URL (`docs_url`, ACCOUNTS_DOCS_URL, default `https://developers.teamofsilicons.com/docs/accounts`), developer platform (`developer_url`, ACCOUNTS_DEVELOPER_URL, default `https://developers.teamofsilicons.com`, `http://localhost:8600` outside production), managed providers, delivery mode |
 | `POST /v1/reports` | bug report (optional session; 5/hour per IP; message 1..10000 chars; `pr_url` https; `Idempotency-Key`) mailed to every `ACCOUNTS_REPORT_RECIPIENTS` address → `201 {"report_id","status":"queued","recipients":3}` |
 | `POST /v1/telemetry/events` | ≤ 50 events named `^[a-z0-9_.]{1,64}$` (the CLI sends `cli.command` / `cli.step`), forwarded to Space Station unless the caller opted out (`X-Accounts-Telemetry: off` or the cookie `sa_telemetry=off`) → `202 {"accepted","forwarded"}` |
 | `GET /v1/dev/outbox?to=&purpose=&limit=` | recorded messages with the parsed OTP `code`; only with `ACCOUNTS_EXPOSE_DEV_OUTBOX=true` outside production (production answers like an unknown route) |

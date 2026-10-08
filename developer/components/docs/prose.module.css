@@ -1,0 +1,167 @@
+/*
+ * The docs' reading typography: Geist for text, Instrument Serif for section headings (the site's display face),
+ * JetBrains Mono for code. Everything is spaced from the element above it, so any order of blocks reads evenly.
+ */
+.prose {
+  --prose-gap: 1.125rem;
+  min-width: 0;
+  color: var(--foreground);
+  font-size: 1rem;
+  line-height: 1.7;
+  letter-spacing: -.006em;
+  overflow-wrap: break-word;
+}
+.prose > *, .calloutBody > *, .quote > *, .list li > * { margin: 0; }
+.prose > * + *, .calloutBody > * + *, .quote > * + * { margin-top: var(--prose-gap); }
+.prose p { text-wrap: pretty; }
+.prose strong { font-weight: 600; }
+.prose del { color: var(--text-muted); }
+
+/* Headings: sections in the serif, smaller levels in Geist. The sticky docs header never covers a heading jumped to. */
+.h2, .h3, .h4, .h5, .h6 { position: relative; color: var(--foreground); scroll-margin-top: calc(var(--docs-top, 64px) + 24px); text-wrap: balance; }
+.prose > .h2 { margin-top: 3rem; }
+.prose > .h3 { margin-top: 2.25rem; }
+.prose > .h4, .prose > .h5, .prose > .h6 { margin-top: 1.75rem; }
+.prose > :is(.h2, .h3, .h4, .h5, .h6) + * { margin-top: .75rem; }
+.prose > .h2:first-child, .prose > .h3:first-child { margin-top: 0; }
+.h2 { font-family: var(--font-serif); font-size: clamp(1.75rem, 1.45rem + 1vw, 2.125rem); font-weight: 400; letter-spacing: -.012em; line-height: 1.12; }
+.h3 { font-size: 1.1875rem; font-weight: 500; letter-spacing: -.012em; line-height: 1.35; }
+.h4 { font-size: 1rem; font-weight: 500; line-height: 1.45; }
+.h5, .h6 { color: var(--text-secondary); font-size: .9375rem; font-weight: 500; line-height: 1.45; }
+.h2 .inlineCode { font-size: .72em; vertical-align: .12em; }
+.h3 .inlineCode, .h4 .inlineCode { font-size: .86em; }
+
+/* The # after a heading: shown on hover or keyboard focus, so a section's address is one click away. */
+.anchor {
+  --sq-r: 6px;
+  display: inline-grid;
+  width: 1.15em;
+  height: 1.15em;
+  margin-left: .3em;
+  place-items: center;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: .8em;
+  font-weight: 400;
+  line-height: 1;
+  text-decoration: none;
+  vertical-align: .08em;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.h2 .anchor { font-size: .62em; vertical-align: .2em; }
+:is(.h2, .h3, .h4, .h5, .h6):hover .anchor { opacity: 1; }
+.anchor:hover { color: var(--accent-ink); }
+.anchor:focus-visible { outline: none; opacity: 1; background: var(--surface-muted); color: var(--accent-ink); }
+@media (hover: none) { .anchor { display: none; } }
+
+/* Links and inline code. */
+.prose a:not(.anchor) { color: var(--accent-ink); text-decoration-line: underline; text-decoration-color: color-mix(in oklab, currentColor 38%, transparent); text-decoration-thickness: 1px; text-underline-offset: .22em; transition: text-decoration-color var(--duration-fast) var(--ease-standard); }
+.prose a:not(.anchor):hover { text-decoration-color: currentColor; }
+/* Code inside a link sits on the code chip (--surface-muted), where the link ink is too faint in dark mode (#82ACEE on
+   #464441 is 4.2:1). The chip's text keeps the link's hue, moved towards the foreground: 5.0:1 dark, 6.4:1 light. The
+   link's underline still runs under it. */
+.prose a:not(.anchor) .inlineCode { color: color-mix(in oklab, var(--accent-ink) 80%, var(--foreground)); }
+.external { white-space: normal; }
+.externalIcon { display: inline-block; margin-left: 1px; vertical-align: .05em; opacity: .7; }
+.missing { text-decoration: underline dashed color-mix(in oklab, var(--text-muted) 60%, transparent); text-underline-offset: .22em; cursor: help; }
+
+.inlineCode {
+  --sq-r: 6px;
+  padding: .1em .36em;
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: .845em;
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* Lists. */
+.list { padding-left: 1.375rem; }
+.list li { padding-left: .25rem; }
+.list li::marker { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tight li + li { margin-top: .4rem; }
+.loose li + li { margin-top: .85rem; }
+.loose li > * + * { margin-top: .75rem; }
+.tight li > :is(ul, ol, figure, div, aside, blockquote) { margin-top: .4rem; }
+.list .list { margin-top: .4rem; }
+.tasks { padding-left: .25rem; list-style: none; }
+.task { display: flex; align-items: baseline; gap: .55rem; padding-left: 0 !important; }
+.checkbox {
+  --sq-r: 5px;
+  position: relative;
+  top: .18em;
+  display: inline-grid;
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--primary-foreground);
+}
+.checkbox[data-checked] { border-color: var(--primary); background: var(--primary); }
+.checkbox svg { width: .75rem; height: .75rem; }
+
+/* Quotes and callouts. */
+.quote { padding-left: 1rem; border-left: 2px solid var(--border-strong); color: var(--text-secondary); }
+
+.callout {
+  --callout: var(--accent);
+  --callout-ink: var(--accent-ink);
+  --sq-r: var(--radius-control);
+  --sq-fill: color-mix(in oklab, var(--callout) 7%, var(--surface));
+  --sq-stroke: color-mix(in oklab, var(--callout) 28%, var(--border));
+  padding: .875rem 1.125rem 1rem;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  font-size: .9375rem;
+  line-height: 1.65;
+}
+.callout[data-kind="tip"] { --callout: var(--success); --callout-ink: var(--success); }
+/* --series-2 is a chart colour: as text on the callout's tint it is 4.1:1 in dark mode. The title mixes in the
+   foreground, darker in light mode and lighter in dark: 5.8:1 and 5.2:1. */
+.callout[data-kind="important"] { --callout: var(--series-2); --callout-ink: color-mix(in oklab, var(--series-2) 80%, var(--foreground)); }
+.callout[data-kind="warning"] { --callout: var(--warning); --callout-ink: var(--warning); }
+.callout[data-kind="caution"] { --callout: var(--danger); --callout-ink: var(--danger); }
+.calloutTitle { display: flex; align-items: center; gap: .45rem; margin: 0 0 .35rem; color: var(--callout-ink); font-size: var(--text-sm); font-weight: 600; letter-spacing: -.005em; }
+.calloutIcon { display: grid; place-items: center; }
+.calloutBody { min-width: 0; }
+
+/* Tables: a squircle frame that scrolls sideways when the table is wider than the column. */
+.tableFrame {
+  --sq-r: var(--radius-control);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  outline: none;
+  overscroll-behavior-x: contain;
+}
+.tableFrame:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 28%, transparent); }
+.table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--text-sm); line-height: 1.55; font-variant-numeric: tabular-nums; }
+.table th, .table td { padding: .6rem .875rem; text-align: left; vertical-align: top; }
+.table th { background: var(--surface-muted); color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
+.table td { border-top: 1px solid var(--border-subtle); }
+.table tbody tr:first-child td { border-top: 0; }
+.table td:first-child, .table th:first-child { padding-left: 1rem; }
+.table td:last-child, .table th:last-child { padding-right: 1rem; }
+/* Tokens in a table never break mid-word: the table grows and its frame scrolls instead. */
+.table .inlineCode { overflow-wrap: normal; white-space: nowrap; }
+.table td { min-width: 6rem; }
+
+.rule { height: 1px; margin-block: 2.5rem !important; border: 0; background: var(--border); }
+.image { max-width: 100%; height: auto; }
+
+@media (max-width: 640px) {
+  .prose { --prose-gap: 1rem; font-size: .96875rem; }
+  .prose > .h2 { margin-top: 2.5rem; }
+  .table th, .table td { padding: .55rem .75rem; }
+}
+@media (prefers-reduced-motion: reduce) { .anchor, .prose a { transition: none; } }

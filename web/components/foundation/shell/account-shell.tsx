@@ -150,7 +150,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
     { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={1.75} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
   ], [go, doSignOut, developerUrl]);
 
-  // ⌘K toggles the palette; 1 to 7 jump to sections (never while typing or with a layer open).
+  // ⌘K toggles the palette; 1 to 8 jump to sections (never while typing or with a layer open).
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {

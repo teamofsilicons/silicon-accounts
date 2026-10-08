@@ -9,10 +9,7 @@
  * focus (it still tilts toward the pointer). It turns over twice (to its back, then home again) and then rests;
  * pointing at it holds it still, and any key press or touch stops it for good.
  *
- * The docs links show only where there are docs to read. The service always names a docs URL (`docs_url` in GET
- * /v1/meta), by default this site's /docs (https://accounts.teamofsilicons.com/docs): a docs URL on this site (or on
- * accounts.teamofsilicons.com, which is this site) gets a link for a path in SITE_DOCS_PATHS, as a local link, so
- * development never sends visitors to production. Docs on another host are linked as they are.
+ * Documentation for Silicon Apps and Silicon Accounts lives together at the configured developer site's /docs.
  *
  * Building an app is not done here: a quiet line points developers to the developer site (`developer_url`).
  */
@@ -26,7 +23,7 @@ import { ButtonLink } from "@/components/foundation/button-link";
 import { IdentityCard, IdentityField, LiveClock, StampRow } from "@/components/foundation/identity/identity-card";
 import { BrandMark } from "@/components/foundation/shell/brand-mark";
 import { useTheme } from "@/components/foundation/theme/use-theme";
-import { developerSiteUrl, paths } from "@/lib/navigation";
+import { developerDocsUrl, developerSiteUrl, paths } from "@/lib/navigation";
 import { useMeta } from "@/lib/query/session";
 import styles from "./landing.module.css";
 
@@ -49,36 +46,12 @@ const FIRST_TURN_MS = 3200;
 const TURN_EVERY_MS = 5600;
 const TURNS = 2;
 
-/** The account site's public host: a docs URL there names a page of this very site. */
-const SITE_HOSTS = new Set(["accounts.teamofsilicons.com"]);
-
-/** Paths of this site that serve docs (app/(docs)): a docs URL on this site under one of them is linked locally. */
-const SITE_DOCS_PATHS: readonly string[] = ["/docs"];
-
-/**
- * The docs link to show, or null. A docs URL on another site is linked as it is; one on this site only when its path is
- * a docs page this site serves, as a local link. A missing or unusable value gets none.
- */
-function docsLink(value: unknown): string | null {
-  if (typeof value !== "string" || !value || typeof window === "undefined") return null;
-  let url: URL;
-  try {
-    url = new URL(value, window.location.origin);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  if (url.host !== window.location.host && !SITE_HOSTS.has(url.host)) return url.href;
-  const served = SITE_DOCS_PATHS.some(path => url.pathname === path || url.pathname.startsWith(`${path}/`));
-  return served ? `${url.pathname}${url.search}${url.hash}` : null;
-}
-
 export function Landing() {
   const { theme, change } = useTheme();
   const reduced = useReducedMotion() ?? false;
   const meta = useMeta();
-  const docs = docsLink(meta.data?.docs_url);
   const developerUrl = developerSiteUrl(meta.data?.developer_url);
+  const docs = developerDocsUrl(developerUrl);
   const [flipped, setFlipped] = useState(false);
   const art = useRef<HTMLDivElement>(null);
 

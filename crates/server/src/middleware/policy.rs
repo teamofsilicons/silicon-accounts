@@ -195,7 +195,7 @@ fn code_for(status: StatusCode) -> &'static str {
     }
 }
 
-const DOCS_HINT: &str = "Check the method, path and body against the API reference at https://accounts.teamofsilicons.com/docs.";
+const DOCS_HINT: &str = "Check the method, path and body against the API reference at https://developers.teamofsilicons.com/docs/accounts.";
 
 /// Rewrites a non-JSON error response into the API error shape.
 async fn json_errors(response: Response, method: &Method, path: &str) -> Response {
