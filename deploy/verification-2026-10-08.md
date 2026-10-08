@@ -278,3 +278,18 @@ canonical metadata, legacy redirects and metadata/discovery documentation URLs.
 Production IAB verification showed the shared landing and search results from both
 products. Local visual checks covered light/dark at 320/1440 px and mobile theme
 switching; the store's public browser/CSP/assets/installer/API checks also passed.
+
+## Documentation source buttons removed
+
+Removed Edit on GitHub and View as Markdown from the shared article header and
+sidebar, including the empty landing-page metadata row and unused styles. Updated
+the landing copy to stop referring to the removed button; raw Markdown remains
+available. Developer typecheck, lint, 18 unit tests and production build passed.
+
+Source `7213a42e6e63499fa23748f9296b74876522b3ac`, bundle SHA-256 `e80d9713076d81dc5f6cf13ad62aa5e9ffc56dab1352d656df5086ccc63cb761`.
+The API and account-site build are unchanged. Install SSM `1102475d-4ac3-445c-a2db-10e8a62768c5` and
+verification `01c3d529-55ff-40cd-ad25-91dc8b484c43` confirmed the release, services and readiness. The live
+browser checked the landing, an Apps guide and an Accounts guide at 1440 and
+390 pixels: both controls absent, titles visible, no horizontal overflow or browser
+errors, and Markdown still served successfully. Screenshots were inspected.
+Backup `backups/predeploy-20261008T163809Z.dump`, SHA-256 `820b71427cc20d1812c7dd7b619bc635f019353f173a63c91c3cbc91a8fdce77`.
