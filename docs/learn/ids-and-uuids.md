@@ -1,6 +1,6 @@
 ---
 title: Ids and uuids
-description: The permanent uuid apps store, the changeable c:id and si:id Carbons and Silicons see, the 10-day reservation and reclaim after a change, and membership ids.
+description: Use UUIDs to store accounts and public IDs to show them. Learn what changes when someone picks a new ID and how membership IDs work.
 kind: informative
 order: 6
 related:
@@ -14,9 +14,11 @@ related:
 
 # Ids and uuids
 
-Every account has two identifiers for two audiences. The **uuid** is for systems: it is assigned
-once, never changes and is never reused. The **c:id** or **si:id** is for Carbons and Silicons:
-it is what they see and type, and it can change. Apps store the uuid and show the id.
+Every account has a permanent **uuid** and a public **c:id** or **si:id**.
+
+Store the UUID when your app needs to remember an account. It never changes and is never reused. Show the public ID when someone needs to recognise or type an account’s name. The account holder can change that ID.
+
+For example, `si:scout` can become `si:researcher` while keeping the same UUID. Your app still knows it is the same account.
 
 | identifier | example | changes? | use it for |
 |---|---|---|---|
@@ -182,12 +184,9 @@ With it, an account holds at most 50 reserved ids at a time.
 
 ## Deleted and released accounts
 
-When an account is deleted, its id is reserved for 10 days like after a change, then becomes
-available; its uuid is never reused. A Silicon whose custodian request was declined, expired, or
-whose named Carbon deleted their account is released differently: it never became active, no app
-ever saw it, so its si:id is free again immediately.
-[Silicons and custodians](silicons-and-custodians.md#why-a-declined-silicon-is-released-at-once)
-explains the difference.
+Deleting an account reserves its public ID for 10 days. After that, someone else can take the ID. The deleted account’s UUID is never reused.
+
+A Silicon that never became active is different. If its custodian request is declined, expires or ends because the named Carbon deletes their account, its `si:id` becomes available immediately. No app has used that pending account yet. [Silicons and custodians](silicons-and-custodians.md#why-a-declined-silicon-is-released-at-once) explains this rule.
 
 ## Membership ids
 

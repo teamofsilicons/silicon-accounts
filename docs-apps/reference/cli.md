@@ -1,6 +1,6 @@
 ---
 title: Apps CLI reference
-description: Discover every Apps command, authentication flow, configuration option, JSON behavior and bundled help topic.
+description: Look up Apps commands, flags, sign-in options and settings. Find the output formats and exit codes to use in scripts.
 kind: informative
 order: 60
 related:
@@ -12,7 +12,9 @@ related:
 
 # Apps CLI reference
 
-The CLI binary is `apps`, published as `silicon-apps-cli`. This guide describes 0.1.4. Every command has `--help`; `apps docs tree` prints every subcommand and flag from your installed version.
+Run the Apps CLI with the `apps` command. Its package name is `silicon-apps-cli`, and this reference describes version 0.1.4.
+
+Add `--help` to any command to see its options. Run `apps docs tree` to see every command and flag in your installed version.
 
 ## Global options
 
@@ -104,7 +106,7 @@ apps config set install_script_timeout_seconds 120
 apps config set update_interval_seconds 60
 ```
 
-Home precedence is `--home`, `SILICON_HOME`, saved home, normal home. `.apps` contains configuration, service-scoped sessions, installations and updater state. Changing home does not move files. See [local state](../start/install.md#choose-where-state-lives).
+Apps chooses its home from `--home` first, then `SILICON_HOME`, then the saved home, then your normal home directory. It stores configuration, sessions, installations and updater state inside `.apps` in that directory. Each saved session belongs to its service URL. Changing the home setting does not move existing files. See [where state lives](../start/install.md#choose-where-state-lives).
 
 `APPS_TOKEN` supplies an externally managed Apps bearer token. `SILICON_STK` is the default STK variable for Silicon login. The optional `APPS_TELEMETRY_TABLE_KEY` configures direct Space Station recording; `APPS_TELEMETRY_KEY` is a legacy alias. No recording key is required to use the CLI. Telemetry opt-out also sends `X-Apps-Telemetry: off` to the registry.
 
@@ -112,7 +114,9 @@ Home precedence is `--home`, `SILICON_HOME`, saved home, normal home. `.apps` co
 
 With `--json`, results go to stdout and errors go to stderr. Successful commands exit 0; operation failures and per-app update failures exit 1; invalid CLI arguments exit 2. An unauthenticated `login status --json` is a successful status query reporting `authenticated: false`.
 
-CLI operation errors use `{"error":{"message":"…"}}`; invalid arguments also provide `code: "invalid_arguments"`. Service errors are described in the [HTTP reference](api.md). Preserve the generated mutation key printed in failure context or set one explicitly before retrying an uncertain catalog mutation. Never automatically replay consumed one-use login tokens or rotating refresh tokens.
+CLI errors use `{"error":{"message":"…"}}`. Invalid arguments also include `code: "invalid_arguments"`. The [HTTP reference](api.md) describes errors returned by the service.
+
+If a request may have changed the catalog before the connection failed, retry it with the same idempotency key. The CLI includes its generated key in the error details, or you can set one yourself. Login and refresh tokens follow different rules: a used one-time token or a rotated refresh token must not be sent again automatically.
 
 ## Offline docs and reports
 

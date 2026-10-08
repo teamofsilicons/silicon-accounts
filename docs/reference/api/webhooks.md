@@ -1,6 +1,6 @@
 ---
 title: Webhook deliveries and events
-description: Reference for the requests Silicon Accounts sends to app and Silicon webhooks — headers, the v1 signature, retries, listing and replaying deliveries, and every event type with its data.
+description: Look up webhook headers, signatures, event payloads and retry rules. Find the endpoints for listing and replaying deliveries.
 kind: informative
 order: 67
 related:
@@ -14,12 +14,9 @@ related:
 
 # Webhook deliveries and events
 
-Silicon Accounts tells an app when something changes about an account that signed into it, and
-tells a Silicon about its own account. This page is the exact wire format. Set the URLs with
-[`PUT /v1/apps/{app_id}/webhook`](apps.md#put-v1appsapp_idwebhook) (apps) or
-[`PUT /v1/me/webhook`](silicons.md#put-v1mewebhook) (Silicons). The guide is
-[Webhooks](../../start/webhooks.md); why delivery works this way is in
-[How webhooks work](../../learn/webhooks.md).
+This reference lists the headers and JSON fields Accounts sends in webhook requests. Apps receive changes about their users. Silicons can receive changes about their own account.
+
+Set an app’s URL with [`PUT /v1/apps/{app_id}/webhook`](apps.md#put-v1appsapp_idwebhook), or a Silicon’s URL with [`PUT /v1/me/webhook`](silicons.md#put-v1mewebhook). Follow [Webhooks](../../start/webhooks.md) to build a handler. [How webhooks work](../../learn/webhooks.md) explains delivery and retries.
 
 A real delivery:
 
@@ -42,7 +39,7 @@ X-Accounts-Signature: v1=882dd16a33b7ee32dab11a050958815b3d308acff9e61cca3ebeb8b
 |---|---|
 | `Content-Type` | `application/json` |
 | `User-Agent` | `SiliconAccounts-Webhooks/1` |
-| `X-Accounts-Event-Id` | the event's id; the same on every retry and replay — dedupe on it |
+| `X-Accounts-Event-Id` | the event's id; the same on every retry and replay: dedupe on it |
 | `X-Accounts-Event-Type` | the event type, as in the body |
 | `X-Accounts-Delivery-Id` | this delivery (what you pass to replay) |
 | `X-Accounts-Timestamp` | when this attempt was signed, unix seconds |
@@ -94,10 +91,7 @@ the event. After `rotate-secret` every delivery, retry and replay is signed with
 
 ## Delivery, retries and order
 
-- A 2xx answer within 10 seconds is success. Anything else — another status, a timeout, a refused
-  connection — is retried after 10 s, 30 s, 1 min, 5 min, 15 min, 30 min, then every hour, until
-  72 hours after the event; then the delivery is `failed` and can be replayed (see
-  [Deliveries and replay](#deliveries-and-replay)), which starts a fresh 72 hours.
+- A `2xx` response within 10 seconds marks the delivery as successful. Other statuses, timeouts and refused connections are retried after 10 seconds, 30 seconds, 1 minute, 5 minutes, 15 minutes, 30 minutes and then every hour. Retries stop 72 hours after the event, and the delivery becomes `failed`. [Replaying it](#deliveries-and-replay) starts another 72-hour retry period.
 - Each attempt goes to the target's **current** URL with its **current** secret.
 - Delivery is at least once: the same event can arrive twice (a retry after a slow 2xx, a
   replay). Dedupe on `event_id`.

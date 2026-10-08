@@ -1,6 +1,6 @@
 ---
 title: Security
-description: How Silicon Accounts protects accounts and why — what every credential is and how it is stored, the cookies and the Origin check, sign-in binding and lockouts, token rotation, the headers and CSP, the webhook SSRF guard, and what is never logged.
+description: Understand how Accounts protects credentials, sign-in sessions and webhook delivery, and what your app needs to check itself.
 kind: informative
 order: 90
 related:
@@ -15,11 +15,9 @@ related:
 
 # Security
 
-This page explains the protections built into Silicon Accounts and the reason for each, so you can
-build on them correctly and judge for yourself what your app still has to do. The short version
-for an app: keep your app secret and every token server-side, call the API with Bearer tokens or
-your app's Basic credentials (never a browser cookie), store the account uuid, verify webhook
-signatures over the raw body, and treat an access token as valid for at most 30 minutes.
+Silicon Accounts protects sign-in and credentials, and your app has a part in that too. Keep your app secret and tokens on your server. Call the API with bearer tokens or the app’s Basic credentials. Store accounts by UUID, check webhook signatures against the original request body and treat an access token as valid for at most 30 minutes.
+
+This page explains these rules and the protections behind them, so you can decide what your own app needs to check.
 
 You can see two of these protections from a terminal. A cookie-authenticated change without the
 account site's `Origin` is refused, even with a valid session:
@@ -77,7 +75,7 @@ messages) what kind of credential it is.
 | App secret | `sa_app_…` | until changed in Silicon Apps | HMAC |
 | STK (a Silicon's password) | `stk-` + 12 hex (or 8–32 chosen) | until rotated | Argon2id |
 | Webhook signing secret | `whsec_…` | until set again or rotated | AES-256-GCM, encrypted |
-| Bring-your-own Google secret, Apple key | — | until replaced | AES-256-GCM, encrypted |
+| Bring-your-own Google secret, Apple key | Provider-specific | until replaced | AES-256-GCM, encrypted |
 
 Why it is done this way:
 
@@ -118,12 +116,9 @@ authenticate with HTTP Basic (app secret) or Bearer tokens.
 
 ## The Origin check
 
-`SameSite=Lax` alone still lets another site navigate a signed-in browser to the account site. So
-every request authenticated by the session cookie that changes something — POST, PUT, PATCH,
-DELETE — must carry an `Origin` header equal to the public origin (or a configured extra
-origin), or it is refused with 403 `origin_not_allowed`. Browsers set `Origin` themselves and a
-page can't forge it, so a request from any other site fails. Creating a hosted sign-in flow
-(`POST /v1/flows`) is checked the same way.
+`SameSite=Lax` still allows another site to navigate a signed-in browser to Accounts. Accounts therefore checks the `Origin` header on cookie-authenticated requests that change data: POST, PUT, PATCH and DELETE. The origin must match the public site or a configured extra origin. Otherwise, the request returns `403 origin_not_allowed`.
+
+The browser sets this header, so a page cannot substitute another site’s origin. Creating a hosted sign-in flow with `POST /v1/flows` uses the same check.
 
 Bearer tokens are not cookies: a browser never attaches them by itself, so they aren't subject to
 the check. That's why scripts, Silicons and servers should always use Bearer tokens.
@@ -198,9 +193,9 @@ Answers are shaped so they don't reveal more than the caller already knows:
 
 API responses (JSON):
 
-- `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` — nothing in a JSON
+- `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`: nothing in a JSON
   response may load or be framed;
-- `Cache-Control: no-store` under `/v1` — tokens, codes and personal data never sit in a cache;
+- `Cache-Control: no-store` under `/v1`: tokens, codes and personal data never sit in a cache;
 - `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and HSTS
   (`max-age=63072000; includeSubDomains`) wherever cookies are secure.
 
@@ -220,9 +215,7 @@ Uploaded photos are served with `Content-Security-Policy: default-src 'none'; sa
 `nosniff`, after their bytes were checked to really be PNG, JPEG, WebP or GIF of bounded size: an
 upload can't become a script on the account site's origin.
 
-CORS: only public resources answer `Access-Control-Allow-Origin: *` — an app's public sign-in
-config, discovery, the JWKS and the SDK. Every other response leaves without any CORS header, even
-if a handler set one, so no other website can read an API response with a visitor's credentials.
+Only public resources send `Access-Control-Allow-Origin: *`: public sign-in configuration, discovery, the JWKS and the SDK. Other responses have CORS headers removed, even if a handler added one. This prevents another website from reading an API response with a visitor’s credentials.
 
 ## Webhooks never reach private networks
 
@@ -255,7 +248,7 @@ timestamp lets it reject a replayed capture: see
   records. Types that carry them print redacted (`Secret(sar_…)`), in the service and in the Rust
   client.
 - Request logs and telemetry record the **route template** (`/v1/flows/{id}/verify`), method,
-  status and duration — never the raw path or query string, which can carry ids and OAuth codes.
+  status and duration. It leaves out the raw path and query string, which can contain IDs and OAuth codes.
 - Telemetry is opt-out per request: `X-Accounts-Telemetry: off` (or the cookie
   `sa_telemetry=off`) drops every event the request would cause. The CLI's telemetry never
   includes tokens, ids or contact details.
@@ -266,14 +259,9 @@ timestamp lets it reject a replayed capture: see
 
 ## Running it safely
 
-`accounts-api` refuses to start in production with a development or missing token pepper,
-encryption keyring or signing key; with local (unsent) email delivery or no Postmark token; with
-the development outbox on; with the webhook SSRF guard off; with a non-https public URL or
-insecure cookies; or with token and code lifetimes other than the contract's (codes 600 s, lock
-60 s, access tokens 1800 s). Behind a load balancer it trusts only the **right-most**
-`X-Forwarded-For` entry (the one the balancer appended), and only when
-`ACCOUNTS_TRUST_FORWARDED_FOR=true`; earlier entries can be forged by the client. Rate limits and
-history use that address.
+`accounts-api` checks its production configuration before starting. It refuses to start with missing or development-only credential keys, unsent local email delivery, no Postmark token, the development outbox enabled or webhook SSRF protection disabled. It also requires an HTTPS public URL, secure cookies and the defined lifetimes: 600 seconds for codes, 60 seconds for the lock and 1800 seconds for access tokens.
+
+Behind a load balancer, the API trusts `X-Forwarded-For` only when `ACCOUNTS_TRUST_FORWARDED_FOR=true`. It uses the **right-most** entry, which the balancer appended, for rate limits and history. Earlier entries may have been supplied by the caller.
 
 ## What your app should do
 
@@ -292,8 +280,8 @@ go to the maintainers by email only.
 
 ## Related
 
-- [Errors](../reference/errors.md) — every refusal described here, with its code.
-- [Limits](../reference/limits.md) — every rate limit and lockout number.
-- [Tokens and sessions](tokens-and-sessions.md) — lifetimes and rotation in depth.
-- [The sign-in flow](sign-in-flow.md) — the steps the browser binding protects.
-- [How webhooks work](webhooks.md) — delivery and verification.
+- [Errors](../reference/errors.md): every refusal described here, with its code.
+- [Limits](../reference/limits.md): every rate limit and lockout number.
+- [Tokens and sessions](tokens-and-sessions.md): lifetimes and rotation in depth.
+- [The sign-in flow](sign-in-flow.md): the steps the browser binding protects.
+- [How webhooks work](webhooks.md): delivery and verification.

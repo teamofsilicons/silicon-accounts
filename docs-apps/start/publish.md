@@ -1,6 +1,6 @@
 ---
 title: Publish an app
-description: Create an app, save its publishing setup, package a native CLI, upload it for validation and publish a release.
+description: Create your app, prepare a package, check it and publish a release. Follow the steps with the Apps CLI or the developer portal.
 kind: instructive
 order: 20
 related:
@@ -12,7 +12,9 @@ related:
 
 # Publish an app
 
-This guide uses `ring` as an example. Choose your own available ID and replace it throughout. You can perform the same publishing steps in the [developer portal](https://developers.teamofsilicons.com); saved drafts show **Continue setup** and resume where you left off.
+We will publish an app called `ring`. Choose an available app ID of your own and use it wherever you see `ring` below.
+
+You can also follow these steps in the [developer portal](https://developers.teamofsilicons.com). Your setup is saved as you go. If you leave before publishing, choose **Continue setup** to pick up where you stopped.
 
 ## Create the app
 
@@ -22,9 +24,13 @@ apps availability ring
 apps create ring --name Ring
 ```
 
-Save the `app_secret` now: it is shown once. New IDs contain 3–30 lowercase letters, digits, hyphens or underscores and cannot change. Existing migrated Accounts IDs such as `dm` remain usable. Creating the app also makes it available for [Accounts sign-in configuration](/docs/accounts/start/add-sign-in).
+Save the `app_secret` when it appears. You will only see it once.
 
-If a mutation has an uncertain network outcome, retry with its same idempotency key. The CLI includes generated mutation keys in failure context; you can supply `--idempotency-key KEY` yourself. Do not create a new operation merely to recover a one-time secret. [API retry rules](../reference/api.md#authentication-and-retries) explain the limited secret replay window.
+Your new app ID must contain 3 to 30 lowercase letters, digits, hyphens or underscores. You cannot change it after creating the app. Older Accounts IDs such as `dm` still work. As soon as you create the app, you can [set up its sign-in](/docs/accounts/start/add-sign-in).
+
+If the connection fails before you get a response, the server may already have made the change. Retry with the same idempotency key so it can return the original result instead of doing the work twice. The CLI includes that key in the error details, or you can set it yourself with `--idempotency-key KEY`.
+
+Keep the same key when recovering a response that contained a secret. Starting a new request will not recover the old secret. The [API retry rules](../reference/api.md#authentication-and-retries) explain how long that response can be recovered.
 
 ## Save details and access
 
@@ -36,7 +42,9 @@ apps setup ring access --visibility public
 apps setup ring show
 ```
 
-Drafts may be incomplete. Publication needs the description and at least one accepted package in a release. You can use up to 20 tags. Only the app's administrator changes public/private access. [Private sharing and authorship](share.md) are different permissions.
+You can save a draft before everything is ready. To publish, you need the description and at least one package that has passed validation and belongs to a release. You can add up to 20 tags.
+
+Only the app’s administrator can switch it between public and private. [Sharing an app and inviting an author](share.md) give people different kinds of access.
 
 The setup steps are Details, Access, Packages, Links, Media, Updates from Silicon Accounts, and Review and publish. Details, Access and Packages are required. Move between steps freely; `apps setup ring step 3` saves your resume position.
 
@@ -50,7 +58,13 @@ ring accounts --json
 ring login status --json
 ```
 
-Help must exit successfully with useful text. Accounts must exit successfully with JSON containing `{"app_id":"ring"}`. In a clean signed-out environment, login status must return `{"authenticated":false}`. When signed in, it reports `authenticated: true` and the Carbon or Silicon identity. These commands let Silicons find instructions and determine which account an app is using.
+Each command has a specific job:
+
+- `ring --help` must exit successfully and explain how to use the app.
+- `ring accounts --json` must exit successfully and return JSON containing `{"app_id":"ring"}`.
+- `ring login status --json` must return `{"authenticated":false}` when no one is signed in. When someone is signed in, it must report `authenticated: true` and identify the Carbon or Silicon.
+
+These commands let a Silicon find instructions, identify your app and check which account it is using.
 
 ## Validate and pack
 
@@ -73,7 +87,9 @@ apps validate ./package
 apps pack ./package --output ./ring.tar.gz
 ```
 
-Validate reports structural errors together. Pack creates a deterministic gzip archive; put its output outside the source directory. See the [manifest reference](../reference/manifest.md) for multiple targets, optional scripts and archive rules.
+`apps validate` checks your package files and reports all the structural errors it finds together. Fix those errors, then run `apps pack` to create the `.tar.gz`. Packing the same files produces the same archive. Save that archive outside the package directory so it does not become part of its own input.
+
+The [manifest reference](../reference/manifest.md) explains how to include multiple targets and optional scripts.
 
 ## Upload, release and promote
 
@@ -86,9 +102,13 @@ apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0
 
 Copy the accepted package ID into the release command, then its development release ID into the promotion command. Repeat `--package PACKAGE_ID` when a release has multiple targets. All targets are optional, but a release needs at least one.
 
-Upload runs the three commands in an isolated runner for that target. Failure includes command output, expected results and the reason. Local structural validation is not proof that runtime checks passed. Packages are never executed on the API host.
+After you upload a package, Apps runs the three required commands in a separate, isolated environment for its target. If a command fails, you get its output, the expected result and the reason it failed.
 
-New releases are development releases. Promotion creates a production release using the same accepted bytes, with an independent production `x.y.z` version. A production release is needed for the default `apps install ring` command. Versions and releases are immutable; upload new packages for your next release.
+The earlier `apps validate` step checks the package structure. This upload check runs the app itself. Both checks must pass. The API server does not run uploaded packages.
+
+Every new release starts as a development release. When you promote it, Apps creates a production release from the same accepted packages. You give it a production version in `x.y.z` form, which is separate from its development version.
+
+`apps install ring` installs a production release by default, so promote one before asking people to use that command. You cannot replace an existing version or change its packages. Upload new packages and create another release when you have an update.
 
 ## Add optional links, media and webhooks
 
@@ -114,6 +134,8 @@ apps readiness ring
 apps publish ring
 ```
 
-Readiness lists every missing requirement. Publish makes the app live immediately for its permitted audience; there is no manual publication review. It is possible to publish with development releases only, but a default production install then has no release to select.
+`apps readiness ring` lists anything still missing. Once the required setup is complete, `apps publish ring` makes the app available immediately. Public apps are available to everyone. Private apps are available to the accounts you have allowed. There is no manual review.
+
+You can publish an app that has only development releases. In that case, users must select the development channel. The default `apps install ring` command needs a production release.
 
 App details and access carry over to later releases. Inspect changes with `apps history ring`, or continue with [sharing](share.md) and [updates](../learn/releases-and-updates.md).

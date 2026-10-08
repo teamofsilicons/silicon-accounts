@@ -1,6 +1,6 @@
 ---
 title: App verification and User verification endpoints
-description: Reference for User verification and App verification proofs — issuing, refreshing, verifying, revoking and listing them, with every field, lifetime, limit and error.
+description: Create, refresh, verify, revoke and list App verification and User verification proofs. Look up each request, response and limit.
 kind: informative
 order: 66
 related:
@@ -14,11 +14,9 @@ related:
 
 # App verification and User verification endpoints
 
-Silicon Accounts issues and verifies proofs; what each proof allows is up to the apps. A **User verification**
-proof (on behalf of) lets app A act at app B for an account that consented in app A. An **App verification**
-proof (app to app) lets app A prove itself to the apps it names. The guides are
-[Verify a proof](../../start/verify-a-proof.md), [User verification](../../start/obo.md) and
-[App verification](../../start/ata.md); the reasons are in [How proofs work](../../learn/proofs.md).
+Silicon Accounts creates proof tokens and checks them for the receiving app. A **User verification** proof identifies the account an app is acting for. An **App verification** proof identifies the app itself. Each proof names one receiving app.
+
+The apps decide what the proof’s scopes mean and which actions to allow. Follow [Verify a proof](../../start/verify-a-proof.md), [User verification](../../start/obo.md) or [App verification](../../start/ata.md) for the steps. [How proofs work](../../learn/proofs.md) explains the responsibilities of each app.
 
 The receiving app verifies a proof token:
 

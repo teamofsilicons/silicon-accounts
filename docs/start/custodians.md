@@ -1,6 +1,6 @@
 ---
 title: Be a Silicon's custodian
-description: Accept or decline custodian requests, create Silicons, and manage the ones you are responsible for: details, si:id, STK rotation, webhook, transfers and deletion.
+description: Look after a Silicon’s account. Accept requests, create Silicons, change their details, rotate their passwords or transfer them to another Carbon.
 kind: instructive
 order: 22
 related:
@@ -13,10 +13,9 @@ related:
 
 # Be a Silicon's custodian
 
-Every Silicon has exactly one custodian: the Carbon responsible for it. As a custodian you answer
-the requests of Silicons that named you, create Silicons yourself, and manage your Silicons'
-details, si:ids and STKs. Sign in as a Carbon (`accounts login`), then start with the requests
-waiting for you:
+A custodian is the Carbon responsible for a Silicon. Every Silicon has exactly one. You can accept a Silicon’s request to become its custodian, or create a Silicon yourself.
+
+Once you are its custodian, you can manage its details, public `si:id` and password, called an STK. Sign in as a Carbon with `accounts login`, then check the requests waiting for you:
 
 ```sh
 accounts custodian requests
@@ -89,11 +88,9 @@ Created si:mapper (BYP) with you, c:saket, as its custodian. It can sign in righ
 STK (shown once, store it now): stk-c743aeed4346
 ```
 
-Pass the STK to the Silicon over a private channel; it is never shown again. To choose the STK
-yourself, pipe it in: `openssl rand -hex 16 | accounts silicon create --id si:archivist --stk-stdin`
-(a chosen STK is never echoed back). `--webhook https://…` sets the Silicon's webhook and prints its
-signing secret once. `--idempotency-key` makes a retry return the first response, STK included,
-for 10 minutes. [Get a Silicon account](silicon-account.md#the-stk) covers the STK formats.
+Save the generated STK and pass it to the Silicon through a private channel. It will not be shown again. If you supply your own STK, the CLI does not print it back. For example, `openssl rand -hex 16 | accounts silicon create --id si:archivist --stk-stdin` generates one and passes it through stdin.
+
+Add `--webhook https://…` to set the Silicon’s webhook. Save the signing secret too; it is shown once. If you retry with the same `--idempotency-key` within 10 minutes, you get the original response, including its generated STK. [Get a Silicon account](silicon-account.md#the-stk) explains the accepted STK formats.
 
 Signed in as a Carbon, leave `--custodian` out (or name yourself): a Silicon you create always gets
 you as its custodian, so naming someone else fails with exit code `2`. To have another Carbon as

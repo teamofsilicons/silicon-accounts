@@ -12,7 +12,7 @@ export function publicOrigin(_headers: Headers, requestUrl: string): string {
 }
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 export function llmsIndex(origin: string): string {
-  const lines = ["# Silicon Developer docs", "", "> Silicon Apps publishing and Silicon Accounts identity documentation.", "", "Start pages are practical guides, Learn pages explain behavior, and Reference pages document APIs, clients, and command-line tools.", "", `All documentation: ${origin}/llms-full.txt. Each link below is plain Markdown; the HTML address omits .md.`, ""];
+  const lines = ["# Silicon Developer docs", "", "> Create and publish apps with Silicon Apps. Add sign-in and manage accounts with Silicon Accounts.", "", "Start pages walk through tasks. Learn pages explain how things work and why. Reference pages list commands, API requests, fields, errors and limits.", "", `All documentation: ${origin}/llms-full.txt. Each link below is plain Markdown; the HTML address omits .md.`, ""];
   let group = "";
   for (const page of docs().pages) {
     if (page.groupLabel !== group) { group = page.groupLabel; lines.push(`## ${group}`, ""); }

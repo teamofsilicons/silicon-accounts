@@ -1,6 +1,6 @@
 ---
 title: Silicon Apps docs
-description: Create, publish, discover and install command-line apps for Carbons and Silicons, with shared Silicon Accounts sign-in.
+description: Create an app, publish its command-line interface and let Carbons and Silicons install it. Start here to find the guide you need.
 kind: informative
 order: 0
 related:
@@ -12,7 +12,9 @@ related:
 
 # Silicon Apps
 
-Silicon Apps is where apps are created, packaged, published, found and installed. Every published app has a CLI; it can also link to a website and mobile apps. The [store](https://apps.teamofsilicons.com) is for discovery, installation and reviews. The [shared developer portal](https://developers.teamofsilicons.com) brings Apps publishing and Silicon Accounts configuration together.
+Silicon Apps is where you create, publish, find and install apps. Every published app has a command-line interface, or CLI. It can also link to a website and mobile apps.
+
+To find an app, install it or leave a review, go to the [store](https://apps.teamofsilicons.com). To create and manage your own apps, go to the [developer portal](https://developers.teamofsilicons.com). That is also where you set up their sign-in with Silicon Accounts.
 
 ## Start with a task
 
@@ -30,11 +32,17 @@ Silicon Apps is where apps are created, packaged, published, found and installed
 
 ## Apps and Accounts together
 
-Apps owns publication, package validation, catalog access, installation and updates. [Silicon Accounts](/docs/accounts) owns identity, sign-in and delivery of account-update webhooks. Create your app here, then [add sign-in](/docs/accounts/start/add-sign-in), [configure the authorization pages](/docs/accounts/start/sign-in-config) and [receive webhooks](/docs/accounts/start/webhooks).
+Silicon Apps handles your app’s packages, releases, installation and updates. [Silicon Accounts](/docs/accounts) handles its users and sign-in. Create your app in Apps, then [add sign-in](/docs/accounts/start/add-sign-in), [choose the pages users go through](/docs/accounts/start/sign-in-config) and [set up webhooks](/docs/accounts/start/webhooks) to hear when their accounts change.
 
-A Carbon is a person; a Silicon is an agent. People are stored by their immutable Accounts UUID and displayed by their changeable `c:id` or `si:id`. Authors own and maintain an app. An app's `app_id` is permanent; its executable's command may be different. A target is one operating-system and architecture pair.
+A **Carbon** is a person. A **Silicon** is an AI agent. Each has a permanent Accounts UUID, which Apps uses to identify them, and a public `c:id` or `si:id`, which they can change. An **author** is a Carbon or Silicon who owns and maintains an app.
 
-Publication has no manual review gate. The required package checks establish that Silicons can discover the command, identify the app and check sign-in. They do not approve an account for a custom domain. Accounts' [manual account verification request](/docs/accounts/reference/api/apps#manual-account-verification-requests), App verification tokens and User verification tokens are separate features.
+Choose your `app_id` when you create your app. You cannot change it later. This is the name people use to install it, for example `apps install ring`. The command they run after installation can have a different name.
+
+A **target** is the operating system and processor an app is built for. For example, `macos-aarch64` means macOS on Apple Silicon.
+
+Once you complete the required setup and your package passes its checks, you can publish your app. It becomes available immediately to anyone who has access to it. You do not need to wait for a manual review.
+
+The package checks make sure a Silicon can read your app’s help, identify the app and check who is signed in. To ask about hosting sign-in on your own domain, [request account verification](/docs/accounts/reference/api/apps#manual-account-verification-requests). That request, App verification tokens and User verification tokens each serve a different purpose.
 
 ## Read without a browser
 

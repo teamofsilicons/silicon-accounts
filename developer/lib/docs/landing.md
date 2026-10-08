@@ -1,26 +1,26 @@
 ---
 title: Developer docs
-description: Build with Silicon Apps and Silicon Accounts. Guides, explanations, API references, and tools in one place.
+description: Create and publish your app with Silicon Apps. Use Silicon Accounts to sign in your users and manage their accounts.
 kind: informative
 order: 0
 related:
 ---
 # Developer docs
 
-Choose the service you are building with. Search finds instructions and reference material across both products.
+These docs explain how to build with Silicon Apps and Silicon Accounts. Start with the task you want to do. You can search both products from any page.
 
 ## Silicon Apps
 
-Package a command-line app, validate it for your target platforms, manage authors and releases, and publish it to the store.
+Silicon Apps is where you create, publish, find and install apps. Every app has a command-line interface. If you are publishing one, we will walk you through creating it, preparing its package and making it available in the store.
 
 [Open Silicon Apps docs](apps/index.md) · [Install the CLI](apps/start/install.md) · [Publish an app](apps/start/publish.md)
 
 ## Silicon Accounts
 
-Add sign-in to your app, configure the hosted pages, manage users and webhooks, and verify requests between apps.
+Silicon Accounts handles sign-in for your app. You choose how users sign in, which details they share and what the sign-in pages look like. Accounts also keeps your app’s user list and tells you when an account changes.
 
 [Open Silicon Accounts docs](accounts/index.md) · [Add sign-in](accounts/start/add-sign-in.md) · [API reference](accounts/reference/api.md)
 
 ## Read in your tools
 
-Every page is also available as Markdown. [llms.txt](/llms.txt) lists both products, and [llms-full.txt](/llms-full.txt) contains their complete documentation.
+You can read these docs as Markdown too. [llms.txt](/llms.txt) lists the pages for both products. [llms-full.txt](/llms-full.txt) puts all of them in one file, so a Silicon or another tool can read them together.

@@ -1,6 +1,6 @@
 ---
 title: Receive webhooks
-description: Set a webhook endpoint for your app or your Silicon, verify the v1 signature of every delivery, answer fast, skip duplicates by event_id, apply events in order, and replay what failed.
+description: Receive account changes at your webhook URL. Check each request’s signature, handle retries and apply each event once.
 kind: instructive
 order: 50
 related:
@@ -12,7 +12,9 @@ related:
 
 # Receive webhooks
 
-Silicon Accounts tells your app when something changes about an account that signed into it: its `c:` or `si:` id, the details your app may see, a sign-out, removed access, a deletion, a Silicon's new custodian. It tells a Silicon about its own account the same way. You give it an `https` URL; it POSTs signed JSON there. You verify the signature, answer `2xx` within 10 seconds, skip events you already handled, and update your copy.
+Webhooks tell your app when one of its users changes their account. For example, Accounts can tell you when their public ID changes, they sign out, they remove your app’s access or their account is deleted. A Silicon can receive updates about its own account too.
+
+Give Accounts an HTTPS URL and it will send signed JSON requests there. Your handler checks the signature, accepts the request with a `2xx` response within 10 seconds and updates your copy of the account. Use the event ID to avoid applying the same event twice when a delivery is retried.
 
 Set your app's endpoint (the signing secret is returned once, store it now):
 

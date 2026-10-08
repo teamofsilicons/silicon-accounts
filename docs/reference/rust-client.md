@@ -1,6 +1,6 @@
 ---
 title: Rust client
-description: Reference for the silicon-accounts-client crate — the stateless Rust package the accounts CLI is built on — with every type, method, error and helper, and runnable examples for Silicons, Carbons, custodians and apps.
+description: Use silicon-accounts-client from Rust. Look up its types, methods and helpers, with examples for accounts, apps and custodians.
 kind: informative
 order: 72
 related:
@@ -15,11 +15,9 @@ related:
 
 # Rust client
 
-`silicon-accounts-client` is the Rust package for Silicon Accounts. It is stateless: it never
-writes files, never reads the environment unless you call `Config::from_env`, and never stores a
-token; you decide where tokens live. The `accounts` CLI is built only on this package, so anything
-the CLI does, you can do from Rust. Every call maps to one endpoint of the
-[HTTP API](api.md).
+Use `silicon-accounts-client` to call Silicon Accounts from Rust. The `accounts` CLI uses this package too, so the same operations are available to your code. Each method calls an endpoint in the [HTTP API](api.md).
+
+You control where credentials are stored. The client does not write files or persist tokens, and it reads environment variables only if you call `Config::from_env`.
 
 A Silicon signs in, then signs into an app:
 
@@ -58,12 +56,7 @@ silicon-accounts-client = { path = "/path/to/silicon-accounts/crates/client" }  
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-<!-- not-published-note: switch to `silicon-accounts-client = "0.1"` once the crate is on crates.io -->
-The crate isn't on crates.io yet (October 2026), and its repository on GitHub,
-`github.com/teamofsilicons/silicon-accounts`, holds only the product contract so far, so neither
-`silicon-accounts-client = "0.1"` nor a `git` dependency resolves. Depend on it by path, from a
-checkout of the repository: Cargo builds it with the checkout's own workspace settings. Once it
-is published, `silicon-accounts-client = "0.1"` replaces the `path`.
+This example uses a local checkout of the [Silicon Accounts repository](https://github.com/teamofsilicons/silicon-accounts). Replace `/path/to/silicon-accounts/crates/client` with its location on your machine. Cargo builds the package with that checkout’s workspace settings.
 
 Rust 1.98 or newer (edition 2024). Every call is `async` and returns
 `silicon_accounts_client::Result<T>`.
@@ -82,9 +75,7 @@ up to you (`refresh_first_party`, `AppClient::refresh`).
 
 In owner mode (`session.app("briefcase")`) everything that manages the app works without its
 secret, including issuing App verification proofs (through the App verification page route) and revoking proofs by id.
-Calls that need the app's own credentials — code, SLT and refresh-token exchange, `revoke`,
-`introspect`, `issue_obo`, `refresh_proof`, `verify_proof`, revoking a proof by token — fail
-before sending with `Error::InvalidInput` (code `invalid_input`), whose message is:
+Some calls always need the app’s credentials: code, SLT and refresh-token exchange, `revoke`, `introspect`, `issue_obo`, `refresh_proof`, `verify_proof` and revoking a proof by token. Calling them in owner mode fails before sending a request, with `Error::InvalidInput` and code `invalid_input`. For example:
 
 ```text
 Exchanging a short-lived token needs app briefcase's own credentials (app_id + app secret); the owner's session can't do it on the app's behalf.
@@ -99,7 +90,7 @@ Exchanging a short-lived token needs app briefcase's own credentials (app_id + a
 | `.base_url(url)` | `https://accounts.teamofsilicons.com` (`DEFAULT_BASE_URL`) | an origin with an optional path prefix; no query, fragment or credentials |
 | `.timeout(d)` | 30 s | whole request |
 | `.connect_timeout(d)` | 10 s | |
-| `.user_agent("my-app/1.2")` | — | prepended to `silicon-accounts-client/<version>` |
+| `.user_agent("my-app/1.2")` | No custom prefix | prepended to `silicon-accounts-client/<version>` |
 | `.telemetry(false)` | `true` | sends `X-Accounts-Telemetry: off` on every request; `send_telemetry` sends nothing |
 | `.allow_insecure_http(true)` | `false` | plain `http://` is refused for any host but this machine (`localhost`, `*.localhost`, loopback IPs): STKs and tokens would travel unencrypted |
 | `.max_retries(n)` | 2 | retries, with backoff, after a 502/503/504 or a timeout only for GET requests and requests carrying an idempotency key (safe to repeat); any request is retried when the connection never opened |
@@ -145,8 +136,8 @@ let client = AccountsClient::builder()
 | `refresh_public_client(client_id, refresh_token)`, `revoke_public_client(client_id, token)` | `POST /v1/oauth/token` / `revoke` for `accounts` or `developer` | `TokenResponse` / `()` |
 | `report(message, pr_url, access_token, idempotency_key)` | `POST /v1/reports` | `ReportReceipt` |
 | `send_telemetry(&[TelemetryEvent])` | `POST /v1/telemetry/events` (3-second timeout) | `()`; nothing when telemetry is off |
-| `with_token(access_token)` | — | `AccountSession` |
-| `as_app(app_id, app_secret)` | — | `AppClient` |
+| `with_token(access_token)` | No request | `AccountSession` |
+| `as_app(app_id, app_secret)` | No request | `AppClient` |
 
 `Contact` is `Contact::Email(String)` or `Contact::Phone { phone, country: Option<String> }`.
 Inputs are checked before sending where the rule is local (an empty STK, a code that isn't 6
@@ -192,7 +183,7 @@ where the method returns a `Vec`.
 | `delete_silicon(uuid, confirm)` | `DELETE /v1/me/silicons/{uuid}` | `()` |
 | `custodian_requests()`, `accept_custodian_request(id)`, `decline_custodian_request(id)` | `/v1/me/custodian-requests…` | `Vec<CustodianRequest>` / `()` |
 | `owned_apps()` | `GET /v1/me/owned-apps` | `Vec<OwnedApp>` |
-| `app(app_id)` | — | an owner-mode `AppClient` |
+| `app(app_id)` | No request | an owner-mode `AppClient` |
 | `device_request(user_code)`, `approve_device(user_code)`, `deny_device(user_code)` | `/v1/device/{user_code}…` (user codes are normalized: `wdjb mjht` → `WDJB-MJHT`) | `DeviceRequest` / `()` |
 | `lookup(uuid)`, `lookup_by_id(id)`, `resolve(uuid_or_id)` | `/v1/accounts/…` | `AccountSummary` |
 

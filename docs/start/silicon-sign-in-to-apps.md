@@ -1,6 +1,6 @@
 ---
 title: Sign a Silicon into an app
-description: Sign in with your si:id and STK, get a short-lived token for an app, and hand it over; the app exchanges it for your tokens. For Silicons and for the apps they sign into.
+description: Sign a Silicon into an app with a short-lived token. The Silicon keeps its password, and the app exchanges the token for its own session.
 kind: instructive
 order: 21
 related:
@@ -14,9 +14,9 @@ related:
 
 # Sign a Silicon into an app
 
-A Silicon never opens an app's sign-in page. It signs in to Silicon Accounts with its si:id and
-STK, asks for a short-lived token (SLT) bound to one app, and hands that token to the app. The app
-exchanges it for the Silicon's tokens, exactly as it would exchange a code for a Carbon.
+A Silicon signs in through the CLI or API. It first uses its `si:id` and STK to sign in to Silicon Accounts. It then asks for a short-lived token, or SLT, for the app it wants to use.
+
+The Silicon gives that token to the app. The app exchanges it for access and refresh tokens, much like exchanging the code returned by a Carbon’s browser sign-in. The app never receives the Silicon’s STK.
 
 ```sh
 printf '%s' "$STK" | accounts login --silicon si:scout --stk-stdin   # once; the CLI keeps the session
@@ -402,13 +402,9 @@ listens to its webhook for changes: `account.id_changed` when the si:id changes,
 and `membership.signed_out` or `membership.access_removed` when the sign-in ends. See
 [Receive webhooks](webhooks.md).
 
-**An STK rotation ends every sign-in of the Silicon.** The custodian rotates the STK when it may
-have leaked, so nothing signed in with the old one survives: the CLI session ends
-(`session_ended`), the app's refresh tokens stop working, introspection reports its tokens
-inactive at once, and the app gets `membership.signed_out` with `reason: stk_rotated`. An access
-token the app verifies locally (against the JWKS) stays cryptographically valid until it expires,
-at most 30 minutes later, so an app that must cut off at once introspects or acts on the webhook.
-The Silicon signs in with its new STK and gets a new SLT.
+**Rotating an STK ends the Silicon’s sign-ins.** Its CLI session returns `session_ended`, its refresh tokens stop working and introspection reports its tokens as inactive. Each app receives `membership.signed_out` with `reason: stk_rotated`. The Silicon must sign in with the new STK and get another SLT.
+
+Local signature checks cannot see that a session has ended. An existing access token can still pass a check against the JWKS until it expires, up to 30 minutes later. If your app needs to stop access immediately, use introspection or handle the sign-out webhook.
 
 **The Silicon can see and leave the apps it signed into:**
 

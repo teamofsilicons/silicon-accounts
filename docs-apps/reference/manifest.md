@@ -1,6 +1,6 @@
 ---
 title: Package manifest and targets
-description: The apps.yaml schema, supported platforms, required executable commands and safe archive rules.
+description: Describe your package in apps.yaml. Choose its command and supported systems, then check the file and archive requirements.
 kind: informative
 order: 50
 related:
@@ -11,7 +11,9 @@ related:
 
 # Package manifest and targets
 
-Place `apps.yaml` at the root of a `.tar.gz` package:
+The `apps.yaml` file tells Apps which app this package belongs to, which version it contains and which command to install. It also lists the executable for each operating system and processor you support.
+
+Place it at the root of your `.tar.gz` package. Here is an example:
 
 ```yaml
 schema_version: 1
@@ -37,7 +39,9 @@ targets:
 | `targets.TARGET.binary` | Existing regular file, relative to the package root |
 | `targets.TARGET.install_script` | Optional existing regular file, relative to the package root |
 
-Legacy existing IDs of 1–2 characters, such as `dm`, remain valid in manifests. That does not permit new short IDs. Unknown manifest fields are rejected. Development and production versions are separate histories, not prerelease suffixes.
+Existing apps with one- or two-character IDs, such as `dm`, can keep using those IDs in their manifests. New app IDs must meet the current length rules.
+
+Only the listed manifest fields are accepted. Use separate development and production releases for those channels; do not encode the channel as a prerelease suffix in `version`.
 
 ## Targets
 
@@ -53,7 +57,9 @@ Legacy existing IDs of 1–2 characters, such as `dm`, remain valid in manifests
 | `macos-x86_64` | macOS, Intel 64-bit |
 | `macos-aarch64` | macOS, Apple Silicon |
 
-Every target is optional; at least one is required per release. `apps targets` reports observed account populations and runner availability. Counts come from registered authenticated accounts; they are not an estimate of all unknown users. Total reach deduplicates accounts across selected targets. A supported target name does not imply a deployed native runner.
+Choose the targets your app supports. You do not need to support every target, but each release needs at least one.
+
+Run `apps targets` to see which validation workers are available and how many registered accounts use each target. The counts include observed, authenticated accounts. Total reach counts an account once even if it uses several selected targets. A target can be recognised by the manifest before its validation worker is available.
 
 ## Executable contract
 
@@ -66,7 +72,7 @@ apps validate ./package
 apps pack ./package --output ./ring.tar.gz
 ```
 
-Validation aggregates discoverable manifest, missing-file and safety errors. Packing normalizes timestamps, ownership and modes for deterministic bytes. Keep output outside the package directory.
+Validation reports the manifest, missing-file and safety errors it finds together. Fix those before packing. Packing uses consistent timestamps, ownership and file modes so the same input produces the same archive. Write the output outside the package directory.
 
 Paths must be relative, without parent traversal, backslashes, drive prefixes or absolute roots. Archives cannot contain duplicate entries, symbolic links, hard links or special files. Extraction requires an empty destination. The package library bounds archives to 512 MiB compressed, 1 GiB extracted and 20,000 entries; a hosted server or proxy may set a lower upload limit.
 

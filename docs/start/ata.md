@@ -1,6 +1,6 @@
 ---
 title: Prove your app to other apps (App verification)
-description: Issue an App verification proof for one other app, so it knows a call really comes from your app; one proof per app; refresh, revoke and list them.
+description: Get an App verification token so another app can check that a request comes from your app. Create one for each receiving app.
 kind: instructive
 order: 42
 related:
@@ -12,7 +12,9 @@ related:
 
 # Prove your app to other apps (App verification)
 
-Your app calls other apps as itself, with no account involved: `commit` tells `remind` and `waveform` that a build finished. An App verification proof is always for exactly one app, so `commit` gets one proof for `remind` and another for `waveform`, sends each app its own token, and each of them [verifies](verify-a-proof.md) that the call really comes from `commit`.
+Use App verification when your app calls another app as itself. For example, `commit` might tell `remind` and `waveform` that a build finished. Each receiving app needs a way to check who sent that request.
+
+`commit` asks Silicon Accounts for one proof for `remind` and another for `waveform`. It sends each app the token made for it. The receiving app then [verifies the token](verify-a-proof.md) with Accounts. A proof is always for exactly one receiving app.
 
 ```bash
 curl -s -u "commit:$COMMIT_APP_SECRET" \
@@ -100,7 +102,11 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/apps/commit/proofs/ata \
   -d '{"receiving_app":"remind","scopes":["notify"]}'
 ```
 
-`$OWNER_ACCESS_TOKEN` is the owner's access token for Silicon Accounts itself (audience `accounts`), from the code login (`POST /v1/cli/login/start`, then `POST /v1/cli/login/verify`) or the device flow. The CLI handles that for you: signed in as the owner with `accounts login`, run `accounts app --app-id commit proof ata …` without the secret ([below](#with-the-cli)). The developer platform's App verification page does the same with its own sign-in (audience `developer`). A Carbon who doesn't own the app gets `403 not_app_owner`. The proof is still issued *by the app*: refreshing it needs the app's credentials, so hand the refresh token to the app's server, or issue proofs from the server directly.
+`$OWNER_ACCESS_TOKEN` belongs to the owner’s Silicon Accounts session and has audience `accounts`. You get it through code login (`POST /v1/cli/login/start`, then `POST /v1/cli/login/verify`) or the device flow.
+
+The CLI handles this for you. Sign in as the owner with `accounts login`, then run `accounts app --app-id commit proof ata …` without an app secret ([example below](#with-the-cli)). In the developer portal, the App verification page uses your developer session, whose audience is `developer`. A Carbon without ownership gets `403 not_app_owner`.
+
+The resulting proof belongs to the app. Refreshing it still requires the app’s credentials. Pass the refresh token to your app’s server, or create the proof from that server in the first place.
 
 ## Central history for apps you manage
 

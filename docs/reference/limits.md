@@ -1,6 +1,6 @@
 ---
 title: Limits
-description: Every number Silicon Accounts enforces — rate limits, lockouts, token and code lifetimes, sizes, counts and retention — with what happens when you reach each one.
+description: Look up request limits, token lifetimes, file sizes and retention periods. Learn which response to expect when you reach a limit.
 kind: informative
 order: 71
 related:
@@ -12,11 +12,9 @@ related:
 
 # Limits
 
-Every limit, lifetime and size the service enforces, in one place. Numbers marked **contract**
-come from the product contract and hold on every deployment; the rest protect the service and may
-be tuned. Plan retries around the answers: over a rate limit you get 429 `rate_limited`, after
-too many wrong codes or STKs 423, both with `Retry-After` (seconds) and
-`details.retry_after_seconds`.
+This page lists the limits Accounts enforces. Values marked **contract** are part of the product’s rules and apply to every deployment. Other limits protect the service and can be configured.
+
+Too many requests return `429 rate_limited`. Too many incorrect codes or STKs return `423`. Both responses include `Retry-After` and `details.retry_after_seconds`, in seconds. Wait that long before trying again.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/ids/available?id=c:probe"   # the 121st check in one minute from one IP:

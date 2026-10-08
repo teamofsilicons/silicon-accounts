@@ -46,6 +46,20 @@ related:                 # pages shown under "Related" at the end, as paths insi
 that don't exist, and `#anchors` that name no heading. The page still renders with a fallback. `pnpm build:docs --check`
 only checks and fails on any problem; `pnpm build:docs --watch` rebuilds on every change while `pnpm dev` runs.
 
+## Writing style
+
+Use the plain, conversational language of the sibling Silicon projects’ understanding documents. Explain the product as you would to someone who is about to use it. Keep the detail needed to complete the task correctly.
+
+- Speak directly to the reader. Say what they do, what the service does next and what result they should expect.
+- Introduce a term before relying on it. Use a small example when the distinction matters.
+- Keep each paragraph about one idea. Break up sentences that mix setup, rules, exceptions and outcomes.
+- Put practical steps first. Link to explanations of why the rules exist.
+- State required inputs, defaults, limits, permissions and failure behaviour precisely. Do not replace them with claims such as “simple”, “safe” or “automatic”.
+- Keep command syntax, endpoint paths, field names and technical values accurate. Error message wording is explanatory; error codes and structured fields are the integration contract.
+- Do not use em dashes. Use a full stop, comma, colon or parentheses as the sentence needs.
+- Preserve existing heading anchors when editing. Check links and Markdown exports after changing a page.
+- Describe deployed behaviour from current evidence. Treat understanding documents as requirements and style references, rather than proof that a feature has shipped.
+
 ## How it is built
 
 | File | Does |

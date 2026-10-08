@@ -1,6 +1,6 @@
 ---
 title: Why branding works this way
-description: The sign-in pages belong to Silicon Accounts but should look like your app. Why branding is a set of variables rather than your own pages or CSS, why contrast is enforced, why fonts are a fixed list, and why "Powered by Silicon Accounts" is always there.
+description: Understand which parts of sign-in you can customise, why colours must stay readable and why every page keeps the Silicon Accounts attribution.
 kind: informative
 order: 17
 related:
@@ -12,10 +12,7 @@ related:
 
 # Why branding works this way
 
-Every page a Carbon sees while signing in to your app is a Silicon Accounts page, and it
-should still look like your app. This page explains where that line is drawn and why, so you
-can decide what to brand and what to build yourself. The steps are in
-[Brand the sign-in pages](../start/branding.md).
+Silicon Accounts serves the sign-in pages, and your app chooses how they look. You can set colours, fonts, logos and layout through the branding settings. This page explains what you can change and why some rules apply. For the steps, see [Brand the sign-in pages](../start/branding.md).
 
 The line in one example: you can make the button green, but not so pale that its text
 disappears.
@@ -36,7 +33,7 @@ curl -s -X PATCH -u "$APP_ID:$APP_SECRET" -H 'Content-Type: application/json' \
       }
     },
     "hint": "Fix the fields listed in details.fields and send the request again.",
-    "message": "Invalid fields — branding.light.primary_foreground: contrast between …"
+    "message": "Invalid fields: branding.light.primary_foreground: contrast between …"
   }
 }
 ```
@@ -118,12 +115,9 @@ Fraunces, Instrument Serif, JetBrains Mono, and System (the visitor's own interf
 
 ## Why logos are https (or small and inline)
 
-A logo is an `https` URL or a `data:image/…` URI of at most 128 KB. Plain `http` would make a
-secure page load insecure content. The pages load your logo without sending the page address
-as a referrer, so your logo host doesn't learn which sign-in step someone was on. Inline logos
-are capped so a sign-in setup stays small (the whole patch is at most 512 KB). When a logo
-fails to load, your app's name is shown instead, which is also why `show_app_name: false`
-only hides the name while a logo is actually visible.
+Use an HTTPS URL for your logo, or an inline `data:image/…` URI of at most 128 KB. HTTPS keeps the logo secure when it loads on a sign-in page. Accounts does not send the page address as a referrer, so the logo host cannot see which sign-in step the user is on.
+
+The inline size limit keeps the sign-in configuration small. The whole patch can be at most 512 KB. If the logo fails to load, Accounts shows your app’s name instead. That fallback still works with `show_app_name: false`; the name is hidden only while a logo is visible.
 
 When you don't set a logo, the one your app has in Silicon Apps is used: most apps never need
 to set one here.

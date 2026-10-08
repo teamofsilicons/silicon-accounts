@@ -1,6 +1,6 @@
 ---
 title: Account endpoints
-description: Reference for id availability, account lookups and everything a signed-in Carbon or Silicon does with its own account — profile, id changes, photos, emails, phones, linked identities, apps, sessions, history and deletion.
+description: Look up accounts and public IDs, or manage your own profile, contact details, linked identities, sessions and account deletion.
 kind: informative
 order: 63
 related:
@@ -14,10 +14,9 @@ related:
 
 # Account endpoints
 
-These endpoints read and change one account: the caller's own (`/v1/me…`), or, for lookups, any
-account by uuid or id. Everything under `/v1/me` needs **account** auth: a first-party Bearer
-token (`aud = accounts`) or the account site's cookie. Why accounts work this way is in
-[Accounts](../../learn/accounts.md) and [uuids and ids](../../learn/ids-and-uuids.md).
+Use the lookup endpoints to find an account by UUID or public ID. Use `/v1/me` and its related routes to read or change your own account.
+
+The `/v1/me` routes need **account** authentication: a first-party bearer token with `aud = accounts`, or the account site’s session cookie. An app’s user token does not grant this access. Read [Accounts](../../learn/accounts.md) and [IDs and UUIDs](../../learn/ids-and-uuids.md) for the account model.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/me" -H "Authorization: Bearer $TOKEN"
@@ -167,7 +166,7 @@ with just those fields, and a Silicon's own webhook gets `silicon.updated`.
 {
   "error": {
     "code": "validation_failed",
-    "message": "Invalid fields — display_name: The display name is empty; it must be 1 to 100 characters.; dob: The date of birth 1800-01-01 is before 1900-01-01.; email: emails are managed with POST /v1/me/emails (add, then verify the code), POST /v1/me/emails/{email}/primary and DELETE /v1/me/emails/{email}; and 1 more.",
+    "message": "Invalid fields: display_name: The display name is empty; it must be 1 to 100 characters.; dob: The date of birth 1800-01-01 is before 1900-01-01.; email: emails are managed with POST /v1/me/emails (add, then verify the code), POST /v1/me/emails/{email}/primary and DELETE /v1/me/emails/{email}; and 1 more.",
     "hint": "Fix the fields listed in details.fields and send the request again.",
     "details": {
       "fields": {
@@ -489,7 +488,7 @@ it signed into gets `account.deleted`. Self-created Silicons still waiting for y
 released and told (`silicon.custodian.declined`, reason `custodian_account_deleted`).
 
 Errors: 409 `custodian_of_silicons` while you are custodian of any Silicon (`details.silicons`
-lists them: transfer or delete each first — every Silicon must always have a custodian), 422
+lists them; transfer or delete each first, because every Silicon must have a custodian), 422
 `confirmation_required` / `confirmation_mismatch`, 403 `custodian_required` for a Silicon (its
 custodian deletes it with `DELETE /v1/me/silicons/{uuid}`).
 

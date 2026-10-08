@@ -1,6 +1,6 @@
 ---
 title: Sign in with the hosted pages
-description: Redirect the browser to /authorize with state and PKCE, check the state when it comes back, and exchange the code on your server. Every parameter, prompt value, error and Google/Apple setting.
+description: Send users to our sign-in pages and bring them back to your app. Set up the callback, check state and exchange the code on your server.
 kind: instructive
 order: 11
 related:
@@ -13,10 +13,11 @@ related:
 
 # Sign in with the hosted pages
 
-You'll send the browser to `/authorize` with a `state` and a PKCE challenge, check the `state`
-when the browser comes back to your redirect URI, and exchange the code on your server. This
-is the request every other way builds (the [iframe](iframe.md), the [SDK](sdk.md) and
-[OIDC libraries](oidc.md)), so this page is also the reference for its parameters and errors.
+Your app starts sign-in by sending the user’s browser to `/authorize`. Accounts handles sign-in and sends the browser back to your registered redirect URI with a code. Your server exchanges that code for tokens.
+
+Use `state` to check that the returning request belongs to a sign-in you started. Use PKCE to tie the code exchange to the same request. The example below does both.
+
+The [iframe](iframe.md), [SDK](sdk.md) and [OIDC libraries](oidc.md) all build this same authorize request. This page explains its parameters and errors too.
 
 This complete app has no dependencies. It assumes `http://localhost:3000/callback` is in your
 app's `redirect_uris` ([how to register it](add-sign-in.md#before-you-start)).
@@ -356,7 +357,7 @@ Switching to `byo` without them is refused, with every missing field named:
       }
     },
     "hint": "Fix the fields listed in details.fields and send the request again.",
-    "message": "Invalid fields — …"
+    "message": "Invalid fields: …"
   }
 }
 ```

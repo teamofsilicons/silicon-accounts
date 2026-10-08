@@ -1,6 +1,6 @@
 ---
 title: Tokens and sessions
-description: Why access tokens are short JWTs, why refresh tokens rotate and punish reuse, what ends a sign-in and how your app hears about it, and how Silicon Accounts' browser session, your app's sign-in and your own session relate.
+description: Understand what access and refresh tokens do, why refresh tokens change after use and what ends a signed-in session.
 kind: informative
 order: 11
 related:
@@ -13,11 +13,9 @@ related:
 
 # Tokens and sessions
 
-A sign-in gives your app two tokens with very different jobs: a short access token that proves
-who is calling, and a long refresh token that renews it. This page explains the reasoning
-behind their lifetimes and rules, what ends a sign-in, and how it relates to the sessions
-around it. The calls themselves are in
-[Exchange, refresh, check and revoke tokens](../start/tokens.md).
+When someone signs into your app, Accounts returns two tokens. The **access token** identifies the account and has a short lifetime. The **refresh token** lets your app get a new access token without asking the user to sign in again.
+
+This page explains their lifetimes, why refresh tokens change after use and what ends a session. For the API calls, see [Exchange, refresh, check and revoke tokens](../start/tokens.md).
 
 ## Three sessions, three owners
 
@@ -123,12 +121,9 @@ without a nonce, and `auth_time` stays the time of the original proof.
 
 ## Scopes over time
 
-What an account has granted your app accumulates across sign-ins: a later sign-in that asks
-for less still returns everything granted so far, so `scope` in a token response is the
-current grant, not the current request. Two things reduce it: the Carbon switching optional
-details off on the what's-shared screen (shown again when you ask for more, or with
-`prompt=consent`), and removing your access altogether. A refresh can narrow its request but
-never widen the grant: new details always go through the what's-shared screen.
+Accounts remembers which details a user has agreed to share with your app across sign-ins. Asking for fewer details during a later sign-in does not remove the earlier agreement. The `scope` in the token response describes what is currently granted.
+
+A Carbon can reduce that grant by turning off optional details on the sharing screen or removing your app’s access. Show the sharing screen again by asking for more details or using `prompt=consent`. Refresh requests can ask for less, but they cannot add a new grant. New details always need the sharing screen.
 
 ## Keep tokens on your server
 

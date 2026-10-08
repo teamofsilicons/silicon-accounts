@@ -1,6 +1,6 @@
 ---
 title: Install Apps and find an app
-description: Install the Apps CLI, choose a local home, sign in when needed, and install or review a catalog app.
+description: Install the Apps CLI, find an app and run it. Sign in when you want to use private apps, publish your own or leave a review.
 kind: instructive
 order: 10
 related:
@@ -11,7 +11,7 @@ related:
 
 # Install Apps and find an app
 
-Download the installer for your system, review it, then run it. It selects your platform and checks the release archive's SHA-256 before installing Apps CLI 0.1.4. [Downloads, checksums and native command evidence](https://github.com/teamofsilicons/silicon-apps/releases/tag/v0.1.4) are available for all nine [supported targets](../reference/manifest.md#targets).
+Choose the installer for your system below. It finds the right download for your operating system and processor, checks its SHA-256 checksum and installs Apps CLI 0.1.4. You can also download the release and its checksums from [GitHub](https://github.com/teamofsilicons/silicon-apps/releases/tag/v0.1.4). Downloads are available for all nine [supported targets](../reference/manifest.md#targets).
 
 ## macOS and Linux
 
@@ -29,7 +29,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\install-apps.ps1 -Version 
 
 The execution-policy option applies only to this installer process. Add the directory printed by the installer to `PATH` before using `apps`.
 
-Both installers start the updater and register it to run after login. Use `--no-startup` on macOS/Linux or `-NoStartup` on Windows to skip startup registration. Installers also register Apps itself in the installation state so it can use the same update mechanism.
+Both installers start the updater and set it to run when you log in to your computer. To skip that startup setup, use `--no-startup` on macOS or Linux, or `-NoStartup` on Windows. They also add Apps itself to the list of installed apps so it can receive updates through the same updater.
 
 ## Build with Cargo
 
@@ -39,7 +39,9 @@ cargo install silicon-apps-cli --version 0.1.4 --locked
 
 Cargo installs the standalone CLI. Unlike the bootstrap installers, it does not register Apps itself as a managed catalog installation.
 
-The Apps catalog release for Apps itself currently has a Linux x64 package. On other platforms, use the GitHub installers above: `apps install apps` cannot yet find a matching catalog package, and the installed CLI cannot receive catalog updates until a package for its target is published. Nine GitHub downloads do not mean nine hosted validation workers or catalog packages.
+Apps itself currently has a Linux x64 package in the store. On other systems, use the GitHub installers above. `apps install apps` will fail if the store does not have a package for your system, and automatic catalog updates need that package too.
+
+The GitHub downloads, store packages and upload validation workers are published separately. Check `apps targets` before uploading a package to see which workers are available.
 
 ## Find and install an app
 
@@ -91,9 +93,11 @@ apps --home /existing/home installed
 apps config telemetry off
 ```
 
-The directory must already exist. Home selection is `--home`, then `SILICON_HOME`, then the saved home, then the normal user home. Configuration, sessions and installed records live inside that home's `.apps` directory. Use the same home for sign-in, installation and the updater. Saving a home does not migrate files.
+Create the directory before selecting it. Apps chooses its home in this order: `--home`, `SILICON_HOME`, your saved home, then your normal user home. It stores configuration, sign-in sessions and installation records in a `.apps` directory inside that home.
 
-Sessions are bound to the complete Apps and Accounts service URLs. Changing either requires a fresh sign-in. Installed apps also retain their registry URL; another registry cannot silently replace them. See the [CLI configuration reference](../reference/cli.md#configuration).
+Use the same home when signing in, installing apps and running the updater. Changing the saved home does not move your existing files.
+
+Your saved sign-in belongs to the exact Apps and Accounts service URLs you used. If you change either URL, sign in again. Each installed app also remembers which registry it came from, so changing the server setting will not switch its update source. See the [CLI configuration reference](../reference/cli.md#configuration).
 
 Telemetry is enabled by default when a Space Station destination is configured. Browser and CLI settings each control their own client. Signed-in platform registration supplies observed target population independently of diagnostic telemetry.
 

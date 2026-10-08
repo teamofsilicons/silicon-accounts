@@ -1,6 +1,6 @@
 ---
 title: How App verification and User verification work
-description: Why User verification and App verification proofs exist, what a proof stands on, why verification is a live call that says only valid or not valid, and what ends a proof.
+description: Understand how App verification and User verification identify calls between apps, how tokens are checked and when a proof stops working.
 kind: informative
 order: 40
 related:
@@ -13,12 +13,14 @@ related:
 
 # How App verification and User verification work
 
-A proof is a statement that Silicon Accounts makes about a call between two apps. There are two kinds:
+A proof lets one app ask Silicon Accounts to confirm who is making a request. It names the issuing app and the receiving app. A User verification proof also names the account the issuing app is acting for. There are two kinds:
 
 - **User verification (on behalf of):** "app A may act at app B for this account." The account signed into app A and agreed, in app A's own screens, to what app A will do at app B.
 - **App verification (app to app):** "this call comes from app A, to app B." Each App verification proof is for exactly one app: to talk to app B and app C, app A gets one proof for each, so a token one app received can never be replayed to another, and each proof can be revoked on its own.
 
-Silicon Accounts only issues proofs and verifies them. It never sees the call between the apps, never runs either app's endpoints and never shows a consent screen for a proof. What a scope means, what the receiving app allows, and how the issuing app asks for consent all stay with the apps. This page explains why the pieces are shaped the way they are, so you can decide well when the instructions don't cover your case.
+The apps send requests directly to each other. Accounts issues and checks the proofs; it does not run the request or show a consent screen for it.
+
+The issuing app asks for the user’s consent. The receiving app decides which actions to allow. Both apps must agree on what the scopes mean. This page explains those responsibilities and how proof tokens behave.
 
 To do the work, read the instructive pages: [Verify a proof](../start/verify-a-proof.md), [Act for an account at another app (User verification)](../start/obo.md) and [Prove your app to other apps (App verification)](../start/ata.md).
 
@@ -113,7 +115,9 @@ Anything else is exactly this, with HTTP 200:
 {"valid": false, "expires_at": null}
 ```
 
-That covers an unknown token, an expired token, a revoked proof, a proof past its lifetime, a proof that names other apps, a disabled issuing app, and (User verification) an account that is no longer active, a membership that is no longer active, or a sign-in that was revoked or expired. The receiving app is a third party to the proof, so the answer deliberately tells it nothing more: "revoked" versus "unknown" would reveal that a token exists, "not for you" would reveal what other apps do, and "account inactive" would reveal that an account was deleted. Treat every `valid: false` the same way: refuse the call.
+The same answer covers tokens that are unknown, expired, revoked, past the proof’s lifetime or intended for other apps. It also covers a disabled issuing app. For User verification, it covers an inactive account or membership, or a sign-in that has ended.
+
+Accounts keeps these reasons private. A more specific answer could reveal that a token exists, which other apps it connects or whether an account was deleted. Whenever you get `valid: false`, refuse the call.
 
 When the *input* is malformed (a refresh token, a JWT, an empty string, or a token with a label such as `Proof sap_…` around it) the body is the same, and an `x-accounts-hint` header describes the input, never the proof:
 

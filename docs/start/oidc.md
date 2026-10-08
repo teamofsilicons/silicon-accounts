@@ -1,6 +1,6 @@
 ---
 title: Use any OpenID Connect library
-description: Point a stock OpenID Connect library at the discovery document, use your app id and secret as client credentials, and get a verified EdDSA id_token; what is supported, what isn't, and what to use instead.
+description: Connect an OpenID Connect library to Silicon Accounts. Configure your app’s credentials, run sign-in and read the verified account details.
 kind: instructive
 order: 14
 related:
@@ -12,12 +12,11 @@ related:
 
 # Use any OpenID Connect library
 
-You'll give your OpenID Connect library the issuer `https://accounts.teamofsilicons.com`, your
-app id as `client_id` and your app secret as `client_secret`, and let it run the
-authorization code flow with PKCE and a nonce. Silicon Accounts is an OIDC provider: the
-library discovers every endpoint, validates the `id_token` (signed with EdDSA, Ed25519) and
-fetches userinfo. This example uses [openid-client](https://github.com/panva/openid-client)
-v6 for Node:
+Silicon Accounts supports OpenID Connect, or OIDC. An OIDC library can find the sign-in endpoints, run the authorization code flow, check the returned `id_token` and fetch the account’s details.
+
+Set the issuer to `https://accounts.teamofsilicons.com`. Use your app ID as `client_id` and its secret as `client_secret`. Enable PKCE and a nonce for sign-in. The ID token uses EdDSA with Ed25519, so your library must support that algorithm.
+
+This example uses [openid-client](https://github.com/panva/openid-client) v6 for Node:
 
 ```sh
 npm init -y && npm pkg set type=module && npm install openid-client

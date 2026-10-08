@@ -30,9 +30,9 @@ export interface SectionInfo {
 
 /** The three groups of the navigation, in reading order. A page belongs to the group named by its folder. */
 export const SECTIONS: readonly SectionInfo[] = [
-  { key: "start", label: "Start", summary: "Instructions. Each page does one job, starting with what you'll do and a working example." },
-  { key: "learn", label: "Learn", summary: "Explanations of why each service works the way it does, so you can make your own judgement calls." },
-  { key: "reference", label: "Reference", summary: "Everything, exhaustively: the HTTP API, errors, limits, Rust clients and command-line tools." },
+  { key: "start", label: "Start", summary: "Follow a guide to complete a task, with the commands to run and the results to expect." },
+  { key: "learn", label: "Learn", summary: "Understand how each part works, why its rules exist and how to choose the right approach." },
+  { key: "reference", label: "Reference", summary: "Look up commands, API requests, fields, errors and limits when you need an exact detail." },
 ];
 
 export function sectionInfo(key: string | null | undefined): SectionInfo | undefined {

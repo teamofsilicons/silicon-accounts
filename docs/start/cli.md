@@ -1,6 +1,6 @@
 ---
 title: Use the accounts CLI
-description: Install the accounts CLI, sign in, script it with --json and exit codes, give every Silicon its own home, configure it, and report bugs.
+description: Install the accounts CLI, sign in and use it from your terminal or scripts. Learn where it saves your session and how to read errors.
 kind: instructive
 order: 23
 related:
@@ -13,11 +13,11 @@ related:
 
 # Use the accounts CLI
 
-`accounts` is the command line for Silicon Accounts, for Silicons and Carbons alike. It is built
-only on the [`silicon-accounts-client`](../reference/rust-client.md) Rust package, so anything it
-does, your own Rust code can do too. Every command explains itself with `--help`, prints
-machine-readable output with `--json`, and says exactly what went wrong and what to do next when
-it fails.
+The `accounts` CLI lets Carbons and Silicons use Silicon Accounts from a terminal. Use it to sign in, manage an account and configure your apps.
+
+Add `--help` to a command to see how it works. Add `--json` when a script needs to read its output. If a command fails, the error explains the problem and what to try next.
+
+The CLI uses the [`silicon-accounts-client`](../reference/rust-client.md) Rust package for every operation. You can use that same package in your own Rust code.
 
 ```sh
 accounts --help                                                      # the whole command tree
@@ -52,11 +52,7 @@ cargo install --path crates/cli --locked   # installs the `accounts` binary into
 accounts --version                         # accounts 0.1.0
 ```
 
-<!-- not-published-note: restore the git clone once the code is pushed -->
-The repository's public home, `github.com/teamofsilicons/silicon-accounts`, holds only the
-product contract (`understanding/`) so far (October 2026), so `git clone` gives you no `crates/`
-to build: use the checkout you were given. A local stack ([Run it
-yourself](../index.md#run-it-yourself)) also builds the CLI, as `target/debug/accounts`.
+Get the source from the [Silicon Accounts repository](https://github.com/teamofsilicons/silicon-accounts), then run the commands above from your checkout. A [local stack](../index.md#run-it-yourself) also builds the CLI at `target/debug/accounts`.
 
 ## Point it at a Silicon Accounts instance
 
@@ -68,10 +64,7 @@ The CLI talks to `https://accounts.teamofsilicons.com` unless told otherwise. Fi
 4. the URL of the stored session, or of a code sign-in waiting for its code;
 5. `https://accounts.teamofsilicons.com`.
 
-<!-- not-deployed-note: remove once accounts.teamofsilicons.com is live -->
-That default isn't deployed yet (October 2026), so with nothing set every command fails to
-connect (`connection_failed`). Until it is, run your own stack ([Run it
-yourself](../index.md#run-it-yourself)) and `export ACCOUNTS_URL=http://localhost:8590`.
+For local development, follow [Run it yourself](../index.md#run-it-yourself) and set `ACCOUNTS_URL=http://localhost:8590`. Leave the URL unset to use the hosted service.
 
 Plain `http://` is accepted only for this machine (`localhost`, `*.localhost`, `127.0.0.0/8`,
 `::1`), so tokens and STKs never cross a network unencrypted; `ACCOUNTS_ALLOW_INSECURE_HTTP=1`
@@ -236,14 +229,9 @@ Flags win over environment variables, which win over `config.json`.
 
 ## Telemetry
 
-The CLI sends Space Station a few self-contained events about each command: one per step of a
-multi-step flow (for example `login.silicon.started`, `login.slt.issued`,
-`silicon.create.requested`) and a final `cli.command` event with the outcome, exit code, error code,
-duration, CLI version, operating system and architecture, whether `--json` was used and whether a
-Carbon or a Silicon ran it. Tokens, STKs, secrets, account ids and uuids, and contact details are
-never part of them; the only identifier sent is an app id (the app a short-lived token was for).
-Nothing is sent when the command never contacted the service, and the CLI waits at most 1.5
-seconds for it.
+The CLI reports command activity to Space Station. For a flow with several steps, it sends an event for each step, such as `login.silicon.started`, `login.slt.issued` or `silicon.create.requested`. A final `cli.command` event records the result, exit and error codes, duration, CLI version, operating system and architecture. It also records whether you used `--json` and whether the caller was a Carbon or Silicon.
+
+These events do not include tokens, STKs, secrets, account IDs, UUIDs or contact details. The only identifier they can include is the app ID that a short-lived token was requested for. Commands that never contact the service send no events. The CLI waits at most 1.5 seconds to send them.
 
 It is on by default. Turn it off with `accounts config telemetry off`, or for one process with
 `ACCOUNTS_TELEMETRY=0`.

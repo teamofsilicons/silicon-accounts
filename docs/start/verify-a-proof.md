@@ -1,6 +1,6 @@
 ---
 title: Verify a proof
-description: Check a User verification or App verification proof token as the app that receives the call, with one request, and act on the answer.
+description: Check an App verification or User verification token sent to your app. Read the result and decide whether to allow the requested action.
 kind: instructive
 order: 40
 related:
@@ -12,7 +12,9 @@ related:
 
 # Verify a proof
 
-Your app receives a call from another app, and the call carries a proof token (`sap_…`). You ask Silicon Accounts whether that token is valid for your app right now, then you act on the answer. One request, authenticated with your own app's credentials:
+When another app sends your app a proof token (`sap_…`), ask Silicon Accounts to check it. Authenticate the check with your own app’s ID and secret. Accounts tells you whether the proof is valid for your app right now, who issued it and, for User verification, which account it represents.
+
+Your app then checks the returned scopes and decides whether to allow the requested action. Start with this verification request:
 
 ```bash
 curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" \

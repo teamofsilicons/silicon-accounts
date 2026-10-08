@@ -1,6 +1,6 @@
 ---
 title: Share and maintain an app
-description: Invite authors, control private discovery and installs, configure account-update webhooks and inspect changes.
+description: Invite people to help manage your app, choose who can install it and receive updates when its users’ accounts change.
 kind: instructive
 order: 30
 related:
@@ -22,7 +22,9 @@ apps invites list
 apps invites accept INVITE_ID
 ```
 
-An invitee becomes an equal author only after accepting. Pending invitations do not appear as authors on the app page. Accounts resolves identities to immutable UUIDs; a changed `c:id` or `si:id` does not change ownership. Email invitations must match the recipient's verified email.
+The person you invite becomes an author after they accept. Until then, they do not appear in the app’s author list. Invite them by their `c:id`, `si:id` or a verified email address on their account.
+
+Apps stores authors by their permanent Accounts UUID. If an author changes their public ID, they keep their access to the app.
 
 ```sh
 apps invites decline INVITE_ID
@@ -48,7 +50,9 @@ When the administrator leaves, administration passes to the oldest remaining aut
 apps setup ring access --visibility private --account c:alice --account si:assistant --domain teamofsilicons.com
 ```
 
-This replaces the saved sharing list. A private app is discoverable and installable only by permitted accounts, matching verified-email domains and its authors. Sharing grants discovery and installation, not authorship. Users must sign in to see shared private apps. Public apps need no sign-in to discover or install.
+This command replaces the app’s current sharing list. Include everyone who should keep access.
+
+A private app is visible to its authors, the accounts you list and anyone with a verified email at a domain you allow. They must sign in before they can find or install it. Sharing lets them use the app; invite them as authors if they should also manage it. Anyone can find and install a public app without signing in.
 
 ```sh
 apps setup ring access --visibility public
@@ -64,7 +68,9 @@ apps webhook ring show
 apps webhook ring rotate
 ```
 
-Accounts owns webhook delivery. The default subscriptions are `id_change`, `display_name_change`, `pfp_change`, `access_removed` and `account_deleted`; repeat `--event EVENT` to select others. A generated `whsec_` secret is shown once. Save it promptly; rotation replaces the old secret. Setting the endpoint preserves an existing secret.
+Silicon Accounts sends these webhook requests. By default, your app receives `id_change`, `display_name_change`, `pfp_change`, `access_removed` and `account_deleted`. Repeat `--event EVENT` to choose the events you want.
+
+Save the `whsec_` signing secret when it is generated. You will only see it once. Changing the webhook URL keeps the existing secret. Rotating the secret replaces it, so update your webhook handler too.
 
 Use the [Accounts webhook guide](/docs/accounts/start/webhooks) to verify signatures, deduplicate deliveries and handle retries. Configure sign-in methods and branding in the app's Accounts tabs in the shared portal.
 
@@ -77,4 +83,6 @@ apps report 'Describe what happened and what you expected.'
 apps report 'Describe the fixed problem.' --pr https://github.com/teamofsilicons/silicon-apps/pull/123
 ```
 
-History records author-visible changes and failed package validation. App-secret rotation shows a replacement once and invalidates the old secret. Reports are queued for the maintainers when the service has a delivery transport; an unavailable transport returns an error. Include relevant commands and safe error context, not tokens or secrets.
+History shows changes that authors can see, including failed package checks. If you rotate the app secret, save the new value when it appears and replace the old one wherever your app uses it. The old secret stops working immediately.
+
+Use `apps report` to report a problem to the maintainers. Include the command you ran and the error you received, but leave out tokens and secrets. The service queues the report for delivery. If report delivery is not configured, it returns an error.

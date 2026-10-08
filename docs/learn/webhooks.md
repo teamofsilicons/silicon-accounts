@@ -1,6 +1,6 @@
 ---
 title: How webhooks work
-description: Who receives which event and why, how deliveries are signed and retried for 72 hours, the replay rules, why events can arrive out of order, and every app and Silicon event with a real payload.
+description: Understand which account changes your app receives, how delivery and retries work and when an old event can be replayed.
 kind: informative
 order: 50
 related:
@@ -12,7 +12,9 @@ related:
 
 # How webhooks work
 
-An app keeps its own copy of what it knows about the Carbons and Silicons that signed into it: the id it shows, a display name, an email, the fact that it may still act for them. That copy goes stale the moment something changes at Silicon Accounts. Webhooks are how Silicon Accounts tells the app, so the app never has to poll. A Silicon gets the same service for its own account.
+Your app may keep a user’s public ID, display name, email or access status. When that information changes in Silicon Accounts, your copy needs to change too.
+
+Webhooks tell your app about those changes, so it does not need to keep asking Accounts whether anything has changed. A Silicon can also receive webhooks about its own account.
 
 This page explains the model and lists every event with a real payload. To set up a receiver, follow [Receive webhooks](../start/webhooks.md).
 
@@ -154,7 +156,11 @@ A failed delivery isn't lost: the app (or its owner) replays it with `POST /v1/a
 - goes to the receiver's **current** URL, signed with its **current** secret (a moved endpoint or rotated secret is no obstacle);
 - gets a fresh 72 hours of retries from the moment of the replay, and adds one to `manual_replays`.
 
-For an app, one rule overrides the request: **account data is never replayed to an app that lost access to the account.** If the account removed the app's access, no longer has a membership with it, or was deleted, deliveries that carry account data (`account.updated`, `account.id_changed`, `silicon.custodian_changed`) are skipped with `reason: "membership_inactive"` or `"account_deleted"`, and their detail shows only who they were about (`payload_redacted: true`). The app lost the right to that data when the account left; a replay must not hand it back. Notices that the relationship ended (`membership.signed_out`, `membership.access_removed`, `account.deleted`) and `ping` carry no account data and always replay. In the local run, replaying every failed delivery of `briefcase` after a Carbon removed its access answered `"replayed": ["…access_removed delivery…"], "not_replayable": 1`: the earlier `account.updated` about that Carbon stayed withheld.
+**An app cannot replay account data after it loses access to that account.** This applies if the account removed access, no longer has a membership with the app or was deleted. Accounts skips data events such as `account.updated`, `account.id_changed` and `silicon.custodian_changed`, with reason `membership_inactive` or `account_deleted`. Their details identify the account but hide the payload with `payload_redacted: true`.
+
+Events that tell the app the relationship ended can still be replayed: `membership.signed_out`, `membership.access_removed` and `account.deleted`. The `ping` event can be replayed too.
+
+For example, a local test replayed Briefcase’s failed deliveries after a Carbon removed its access. The response included the access-removal delivery and `"not_replayable": 1`. The earlier account-update payload stayed hidden.
 
 A Silicon's webhook has no such rule: every event on it is about the Silicon itself, so nothing is withheld from the Silicon or its custodian, and a delivery's detail always shows its whole `payload`. It has another one instead: **test pings are never replayed**. A Silicon may queue 10 test pings an hour, and only its newest one is retried, so that the test can't be used to aim signed traffic at someone else's server; replaying old pings would get around both limits. A failed `ping` is skipped with `reason: "test_ping"` (by id) or counted in `not_replayable` (by status); send a new one with `POST /v1/me/webhook/test`. In the local run, after a `silicon.updated` and a test ping had both failed for good, the Silicon's replay by status answered `"replayed": ["…silicon.updated delivery…"], "not_replayable": 1`, and the `silicon.updated` arrived again 0.8 seconds later with its original `event_id`.
 

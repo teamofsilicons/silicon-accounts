@@ -1,6 +1,6 @@
 ---
 title: Hosted sign-in, sessions and CLI sign-in endpoints
-description: Reference for the hosted sign-in flow behind /authorize (/v1/flows/*), Google and Apple legs and callbacks, connecting Google or Apple to an account, browser sessions, device approval and the CLI's code sign-in.
+description: Look up the hosted sign-in, browser session and CLI sign-in endpoints, including Google, Apple, verification codes and device approval.
 kind: informative
 order: 62
 related:
@@ -15,12 +15,9 @@ related:
 
 # Hosted sign-in, sessions and CLI sign-in endpoints
 
-This page covers how a Carbon proves who they are. The hosted flow (`/v1/flows/*`) is the API
-the account site's `/authorize` page drives in the browser; apps never call it, they send the
-browser to `/authorize` ([OAuth and OIDC](oauth.md)). The CLI code sign-in and the device flow
-(approved here in a signed-in browser) are how a Carbon signs a terminal in. The guide is
-[Hosted pages](../../start/hosted-pages.md); the reasons behind each step are in
-[The sign-in flow](../../learn/sign-in-flow.md).
+These endpoints handle a Carbon’s sign-in. The account site uses `/v1/flows/*` to run its hosted pages. Apps start that flow by sending the browser to `/authorize`; they do not collect credentials and call the flow endpoints themselves. See [OAuth and OIDC](oauth.md).
+
+A Carbon can sign a terminal in with a verification code or approve a device request from a signed-in browser. Both flows are listed here. For the browser walkthrough, read [Hosted pages](../../start/hosted-pages.md). [The sign-in flow](../../learn/sign-in-flow.md) explains each step.
 
 A Carbon signs in from a terminal with a 6-digit code:
 

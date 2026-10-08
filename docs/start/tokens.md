@@ -1,6 +1,6 @@
 ---
 title: Exchange, refresh, check and revoke tokens
-description: What a token response holds, how a Silicon's short-lived token is exchanged, how to refresh safely (rotation, reuse detection, one refresh at a time), how to check an access token locally or by introspection, read userinfo, and sign an account out of your app.
+description: Exchange sign-in credentials for tokens, refresh a session, check who a token belongs to and end the session when the user signs out.
 kind: instructive
 order: 15
 related:
@@ -13,9 +13,9 @@ related:
 
 # Exchange, refresh, check and revoke tokens
 
-You'll keep a sign-in alive with its refresh token, check the access tokens your API receives,
-read the account behind a token, and end a sign-in when the account signs out of your app.
-Every call is a form post with your app's credentials:
+After sign-in, your app receives an access token and a refresh token. Use the access token to identify the signed-in account. When it expires, use the refresh token to get a new pair. Revoke the session when the user signs out.
+
+This guide covers each step, including how to check a token and read the account details it allows. To refresh a session, send a form POST with your app’s credentials:
 
 ```sh
 curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/token" \
@@ -36,9 +36,7 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
 }
 ```
 
-Store the new `refresh_token` before you use anything else from the answer: the one you sent
-is now spent, and sending it again ends the whole sign-in. Why it works this way is in
-[Tokens and sessions](../learn/tokens-and-sessions.md).
+Save the new `refresh_token` as soon as the response arrives. The token you just sent has been used and will not work again. Reusing it ends the whole session. [Tokens and sessions](../learn/tokens-and-sessions.md) explains why refresh tokens work this way.
 
 ## The token response
 

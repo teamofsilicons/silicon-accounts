@@ -1,6 +1,6 @@
 ---
 title: Brand the sign-in pages
-description: Make the sign-in pages, the iframe and the snippet look like your app — colours for light and dark, fonts, corners, layout, background and logo — with one patch, within the contrast rules that keep them readable.
+description: Choose your app’s colours, fonts, logo and page layout. Apply them to the sign-in pages, iframe and sign-in buttons.
 kind: instructive
 order: 17
 related:
@@ -12,13 +12,9 @@ related:
 
 # Brand the sign-in pages
 
-You'll set your app's branding variables: two colour palettes (light and dark), fonts, corner
-shape and radius, button style, layout, background, density and logos. They restyle every
-page a Carbon sees while signing in to your app: the sign-in page, the email and phone code
-pages, the set-up page, the page that asks for a detail you require, the what's-shared page,
-and the buttons in your iframe or snippet.
-Branding is part of your [sign-in setup](sign-in-config.md), so it is one patch, versioned
-like every other change.
+Your sign-in pages can use your app’s colours, fonts and logo. You can also choose the corner shape, button style, layout, background and spacing. Set separate colours for light and dark mode.
+
+These settings apply throughout sign-in: the opening page, email and phone codes, account setup, required details, the sharing screen and the buttons in an iframe or snippet. Branding is saved as part of your [sign-in setup](sign-in-config.md), and every change gets a version number.
 
 ```sh
 printf '%s' "$APP_SECRET" | accounts app use waveform --secret-stdin
@@ -103,12 +99,11 @@ curl -s "$ACCOUNTS_URL/v1/apps/waveform/public"
 }
 ```
 
-On [developers.teamofsilicons.com](https://developers.teamofsilicons.com), the app's **Pages** tab
-(`/apps/{app_id}/pages`) edits the same variables and every page's words with a live preview of
-every page (sign-in and sign-up, the Opening page for Google and Apple, the code pages, setting up
-an account, each page of the app's flow, the review page and the embed buttons), in light and
-dark, desktop and phone. The app's own credentials or its owner's session can change branding; see
-[who can change the setup](sign-in-config.md#who-can-change-it).
+You can make the same changes in your app’s **Pages** tab (`/apps/{app_id}/pages`) on [developers.teamofsilicons.com](https://developers.teamofsilicons.com). It lets you edit the wording too.
+
+The live preview shows each step, including sign-in and sign-up, opening Google or Apple, code entry, account setup, your custom flow, the sharing screen and embedded buttons. Switch between light and dark mode, or desktop and phone, to check each layout.
+
+You can change branding with the app’s credentials or its owner’s session. See [who can change the setup](sign-in-config.md#who-can-change-it).
 
 ## The variables
 
@@ -180,7 +175,7 @@ curl -s -X PATCH -u "$APP_ID:$APP_SECRET" -H 'Content-Type: application/json' \
       }
     },
     "hint": "Fix the fields listed in details.fields and send the request again.",
-    "message": "Invalid fields — branding.light.primary_foreground: contrast between …"
+    "message": "Invalid fields: branding.light.primary_foreground: contrast between …"
   }
 }
 ```

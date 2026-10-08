@@ -1,6 +1,6 @@
 ---
 title: Silicons and custodians
-description: Why every Silicon has exactly one custodian who must accept, why the STK is shown once and rotation ends every sign-in, and why Silicons sign into apps with short-lived tokens.
+description: Understand why a Silicon has a custodian, how its password is managed and why it uses short-lived tokens to sign into apps.
 kind: informative
 order: 20
 related:
@@ -15,10 +15,9 @@ related:
 
 # Silicons and custodians
 
-This page explains why Silicon accounts work the way they do, so you can make your own judgement
-when something doesn't fit the usual path. To do things instead of reading about them, go to
-[Get a Silicon account](../start/silicon-account.md), [Be a Silicon's custodian](../start/custodians.md)
-and [Sign a Silicon into an app](../start/silicon-sign-in-to-apps.md).
+A Silicon has its own account and password, and a Carbon who looks after that account. That Carbon is its custodian. This page explains how that responsibility starts, how it can be transferred and what happens when a password changes.
+
+For the steps, see [Get a Silicon account](../start/silicon-account.md), [Be a Silicon’s custodian](../start/custodians.md) and [Sign a Silicon into an app](../start/silicon-sign-in-to-apps.md).
 
 ## A Silicon is a personal account, like a Carbon's
 
@@ -131,14 +130,9 @@ are counted before the STK is checked, so firing many guesses in parallel gets n
 checks. On top of that, a network can make 60 Silicon sign-in attempts per minute. Online guessing
 of 48 random bits is hopeless at these rates.
 
-**Rotation ends every sign-in.** A custodian rotates an STK because it may have leaked, so nothing
-that may have come from the old STK can survive the rotation: the old STK is refused at once, every
-session of the Silicon is revoked (the CLI's, the browser's, the refresh tokens apps hold), apps are
-told `membership.signed_out` with `reason: stk_rotated`, and short-lived tokens issued before the
-rotation are refused when an app presents them, because otherwise they would start fresh sign-ins
-for whoever held the old STK. One limit is inherent to signed tokens: an access token an app
-verifies locally stays cryptographically valid until it expires, at most 30 minutes after it was
-issued. Apps that need to cut off at once introspect the token or act on the webhook.
+**Rotation ends every sign-in.** If an STK may have leaked, the custodian can rotate it. The old STK stops working immediately. Accounts revokes the Silicon’s sessions and refresh tokens, rejects its previously issued short-lived tokens and sends apps `membership.signed_out` with `reason: stk_rotated`. This prevents someone with an old SLT from starting another session.
+
+An access token can still pass a local signature check until it expires, up to 30 minutes after it was issued. That check cannot see the revocation. An app that needs to stop access immediately must introspect the token or handle the sign-out webhook.
 
 **Only the custodian rotates.** A Silicon can change its own display name, timezone, photo and
 si:id, but not its STK, because a Silicon that needs a new STK is either compromised or has lost the

@@ -1,6 +1,6 @@
 ---
 title: Embed the sign-in buttons in an iframe
-description: Put your app's sign-in buttons on your own page with an iframe of /embed/v1/buttons, allow your origin, size the frame, and finish on your redirect URI exactly like the hosted pages.
+description: Show your app’s sign-in buttons inside an iframe. Allow your website’s origin, add the frame and handle the return to your app.
 kind: instructive
 order: 12
 related:
@@ -12,11 +12,9 @@ related:
 
 # Embed the sign-in buttons in an iframe
 
-You'll list your page's origin in your app's `allowed_origins`, put an iframe of
-`/embed/v1/buttons` on the page with the same parameters as an [authorize request](hosted-pages.md#the-authorize-request),
-and handle the callback like the hosted pages. The frame shows one button per sign-in method
-you enabled, in your app's branding, with "Powered by Silicon Accounts" under them. A click
-takes the whole window to the hosted sign-in, which comes back to your redirect URI.
+An iframe lets you put the sign-in buttons on your own page. It shows one button for each method your app has enabled, using your colours and logo, with "Powered by Silicon Accounts" below.
+
+First, add your website’s origin to `allowed_origins`. Then embed `/embed/v1/buttons` with the same parameters as an [authorize request](hosted-pages.md#the-authorize-request). When someone clicks a button, the whole window opens the hosted sign-in pages. After sign-in, the browser returns to your redirect URI. Handle that callback just as you would for the hosted pages.
 
 First allow the origin that will frame the buttons (scheme, host and port, no path), and
 register the redirect URI. Lists in a sign-in setup patch replace the whole list, so a patch

@@ -1,6 +1,6 @@
 ---
 title: Import existing users
-description: Bring every user of an existing app into Silicon Accounts from a CSV or JSON file — check it with a dry run, import it, and read what happened to every row.
+description: Move your existing users into Silicon Accounts with a CSV or JSON file. Preview the result, run the import and fix any rows that failed.
 kind: instructive
 order: 18
 related:
@@ -13,11 +13,9 @@ related:
 
 # Import existing users
 
-You'll upload your app's existing users as CSV or JSON, check the file with a dry run that
-writes nothing, run the import, and read the outcome of every row. Each row lands in your
-app's user base: it is matched to the Carbon who already has that email or phone, or it
-becomes a new Carbon account that its owner finishes the first time they sign in to your app.
-Nobody gets an email or SMS.
+Start with a CSV or JSON file of your app’s users. Run a dry run to see what Accounts would do with each row, then run the import when you are ready. The dry run does not change any accounts.
+
+For each user, Accounts looks for a Carbon with the same email or phone number. If it finds one, it adds that Carbon to your app’s user list. Otherwise, it creates an account that the Carbon finishes setting up when they first sign in to your app. The import does not send emails or SMS messages.
 
 ```sh
 printf '%s' "$APP_SECRET" | accounts app use legacy-crm --secret-stdin
@@ -83,8 +81,7 @@ Reading it row by row:
 | 6 | matched | Priya already has a Silicon Accounts account with `priya@example.com`. She joins your user base; her own name, id and details stay hers. |
 | 7 | new account `c:priya-2` | The wanted id `c:priya` is taken, so the next free one is assigned and the row says so. An unknown timezone falls back to UTC. |
 
-A dry run makes every one of these decisions and writes nothing. The real import makes the
-same ones (an id can differ if someone takes it in between).
+The dry run applies the same rules as the real import, but it saves no accounts or memberships. Results can change if the underlying data changes before you import. For example, an ID shown as available might be taken in the meantime.
 
 ## Before you start
 

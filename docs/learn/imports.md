@@ -1,6 +1,6 @@
 ---
 title: How imports work
-description: Why an import matches, creates, skips or refuses each row the way it does — one account per Carbon, one address per new account, the app never overriding the Carbon — and what each rule costs you.
+description: Understand how Accounts matches imported users, creates new accounts and handles conflicting or incomplete rows.
 kind: informative
 order: 18
 related:
@@ -13,11 +13,9 @@ related:
 
 # How imports work
 
-An import brings the Carbons an app already knows into Silicon Accounts without speaking for them:
-it links them to the account they already have, or prepares one they finish themselves. This
-page explains every rule an import follows and what each one costs, so you can prepare your
-data and judge the edge cases yourself. The steps are in
-[Import existing users](../start/import-users.md).
+An import connects your app’s existing users to Silicon Accounts. If a Carbon already has an account, the import links to it. Otherwise, it prepares an account for that Carbon to finish setting up when they sign in.
+
+The import must keep each Carbon in control of their own details. This page explains how matching works, why some fields are left out and what happens when rows conflict. Follow [Import existing users](../start/import-users.md) when you are ready to run an import.
 
 Three rows show most of it. This dry run went to an app whose user base already had Kofi
 (`kofi@example.com`, a finished account) and Ravi (imported earlier with `+14155550163`, not
@@ -176,13 +174,11 @@ import assigns the closest free id and tells you what happened:
 - a reserved word (`admin`, `support`, `root`, `api`, …) → `reserved_username`;
 - not a valid handle (3–30 of `a-z 0-9 - _`), or a Silicon id → `invalid_username`.
 
-A valid username that is taken gets a number: `c:priya` becomes `c:priya-2` (then `-3`, …
-`-20`, then a random 4-digit suffix). Otherwise the candidates come, in order, from the
-username cleaned up (`John Smith!` → `c:john-smith`), the email's local part
-(`admin.user@…` → `c:admin-user`) and the display name (`Ravi Kumar` → `c:ravi-kumar`), then
-numbered and random suffixes, so every new account gets an id. An unfinished account holds
-its id from the moment it is created. The Carbon can keep it or pick another when they finish
-setting up, or change it any time later (the old id stays reserved for them for 10 days).
+If a valid requested username is taken, Accounts tries numbered alternatives. For `c:priya`, it tries `c:priya-2` through `c:priya-20`, then a random four-digit suffix.
+
+When it needs to build an ID from the imported details, it tries the cleaned-up username first (`John Smith!` becomes `c:john-smith`), then the email’s local part (`admin.user@…` becomes `c:admin-user`), then the display name (`Ravi Kumar` becomes `c:ravi-kumar`). Numbered and random suffixes help it find an available ID.
+
+The new account holds that ID even before setup is finished. The Carbon can keep it or choose another during setup. They can also change it later, with the old ID reserved for them for 10 days.
 
 Ids change; uuids don't. Store the `account_uuid` each row reports, and treat the `c:id` as a
 display name ([uuids and ids](ids-and-uuids.md)).

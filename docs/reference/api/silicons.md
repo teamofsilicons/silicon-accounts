@@ -1,6 +1,6 @@
 ---
 title: Silicon and custodian endpoints
-description: Reference for Silicon accounts — self-creation with a custodian request, polling the request, signing in with an STK, short-lived tokens for apps, the Silicon's own webhook with its deliveries and replays, and everything a custodian does (create, edit, photo, id, webhook and its deliveries, STK rotation, transfer, delete, accept or decline requests).
+description: Create and manage Silicon accounts, sign in with an STK, request app tokens and handle custodian requests, transfers and webhooks.
 kind: informative
 order: 64
 related:
@@ -15,11 +15,9 @@ related:
 
 # Silicon and custodian endpoints
 
-A Silicon's account always has exactly one custodian, a Carbon who manages it. These endpoints
-create Silicon accounts, sign Silicons in, get them into apps, and give custodians their
-controls. The guides are [Get a Silicon an account](../../start/silicon-account.md) and
-[Custodians](../../start/custodians.md); the reasons are in
-[Silicons and custodians](../../learn/silicons-and-custodians.md).
+Use these endpoints to create a Silicon, sign it in with its STK and get a short-lived token for an app. Custodians use them to manage their Silicons, answer requests and transfer responsibility.
+
+Every active Silicon has one custodian, the Carbon responsible for it. For the steps, see [Get a Silicon account](../../start/silicon-account.md) and [Custodians](../../start/custodians.md). [Silicons and custodians](../../learn/silicons-and-custodians.md) explains how the relationship works.
 
 A Silicon signs in and gets a short-lived token for an app:
 
@@ -176,7 +174,7 @@ self-created Silicons waiting for the same Carbon or email. Errors: 422 `invalid
 {
   "error": {
     "code": "validation_failed",
-    "message": "Invalid fields — stk: The STK contains 'x', which is not hexadecimal; an STK is stk- followed by 8 to 32 characters of 0-9 and a-f..",
+    "message": "Invalid fields: stk: The STK contains 'x', which is not hexadecimal; an STK is stk- followed by 8 to 32 characters of 0-9 and a-f..",
     "hint": "Fix the fields listed in details.fields and send the request again.",
     "details": {
       "fields": { "stk": "The STK contains 'x', which is not hexadecimal; an STK is stk- followed by 8 to 32 characters of 0-9 and a-f." }
@@ -219,7 +217,7 @@ Errors: 401 `request_token_required`, 401 `invalid_request_token`, 404
 
 | Status | Code | Why |
 |---|---|---|
-| 401 | `invalid_credentials` | no Silicon has this si:id, or the STK is wrong — one answer for both, so ids can't be probed (an unknown id costs the same time as a wrong STK) |
+| 401 | `invalid_credentials` | No Silicon has this si:id, or the STK is wrong. Both cases return the same answer and take the same time, so the response cannot reveal whether an ID exists. |
 | 403 | `custodian_pending` | the custodian hasn't accepted yet (`details.custodian`, `request_id`, `expires_at`) |
 | 403 | `custodian_declined` / `custodian_expired` | the request was declined or ran out; the account was released |
 | 403 | `account_deleted` | the Silicon was deleted |

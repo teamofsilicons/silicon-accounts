@@ -1,6 +1,6 @@
 ---
 title: Silicon Accounts docs
-description: One personal account for every Carbon and Silicon, and the whole sign-in for any app. What Silicon Accounts is, who it is for, and which page to read first.
+description: Add sign-in to your app, manage Carbon and Silicon accounts and verify requests between apps. Find the guide for your next step.
 kind: informative
 order: 0
 related:
@@ -12,13 +12,11 @@ related:
 
 # Silicon Accounts
 
-Silicon Accounts is the account system for every Carbon and Silicon, and the sign-in layer
-for any app that wants one. Every **Carbon** (a person) and every **Silicon** (an agent) has
-one personal account that they carry into every app they sign in to. For apps, Silicon
-Accounts handles the whole sign-in: the methods (email and phone codes, Google, Apple), sign
-up, the pages Carbons see, and the app's own user base.
+Silicon Accounts gives every **Carbon** (a person) and **Silicon** (an AI agent) one personal account. They use that account in every app they sign in to.
 
-You can talk to it without an account:
+If you are building an app, Accounts handles sign-in for you. You choose the methods, the pages users see and the details they share. Accounts handles account creation, email and phone codes, Google and Apple sign-in, and your app’s user list.
+
+Some requests are public. For example, you can check whether a public ID is available without signing in:
 
 ```sh
 export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # or a local stack: http://localhost:8590
@@ -33,10 +31,9 @@ The hosted service is available at [accounts.teamofsilicons.com](https://account
 For a local development stack, follow [Run it yourself](#run-it-yourself) and set
 `ACCOUNTS_URL=http://localhost:8590` instead.
 
-Everything else goes through the `accounts` CLI, the `silicon-accounts-client` Rust package
-(the CLI is built only on it) or the HTTP API under `$ACCOUNTS_URL/v1/`.
-The CLI explains itself with `accounts --help` at every level, and carries short guides of its
-own for reading offline: `accounts docs` lists them, `accounts docs imports` opens one.
+You can use the `accounts` CLI, the `silicon-accounts-client` Rust package or the HTTP API at `$ACCOUNTS_URL/v1/`. The CLI uses that same Rust package.
+
+Run `accounts --help` to see the available commands, or add `--help` to a command for its options. The CLI includes guides you can read offline. `accounts docs` lists them, and `accounts docs imports` opens the import guide.
 
 ## Start here
 
@@ -101,10 +98,7 @@ holds and what deleting it does.
 - **Errors say exactly what went wrong and why.** Every error is
   `{"error": {"code", "message", "hint"?, "details"?}}`: a stable `code` to branch on, a
   `message` that names the problem, and usually a `hint` with the next step.
-- **Retries are safe.** Requests that create something or start work (an import, a Silicon,
-  a proof, a webhook secret, a sign-in setup change) accept an `Idempotency-Key` header: the
-  same key and body get the first answer back instead of doing it twice. Removals are safe to
-  repeat as they are.
+- **Keep the same key when retrying a change.** Requests that create a Silicon, import, proof, webhook secret or sign-in configuration change accept an `Idempotency-Key` header. Within the replay window, the same key and body return the original response. Removals can be repeated. See the [retry rules](reference/api.md#idempotency) before retrying other operations.
 - **Personal accounts only.** Accounts are never shared and never belong to a group. A
   Carbon's account belongs to that Carbon, a Silicon's to that Silicon; apps get only what the
   Carbon shares with them.

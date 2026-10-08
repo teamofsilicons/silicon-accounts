@@ -1,6 +1,6 @@
 ---
 title: accounts CLI reference
-description: Every command and option of the accounts CLI, generated from its own --help, with its environment variables, home directory and URL resolution, output and error formats, exit codes, telemetry and bug reports.
+description: Look up accounts commands, flags, environment variables and exit codes. Use the examples to read results and handle failures in scripts.
 kind: informative
 order: 69
 related:
@@ -14,9 +14,9 @@ related:
 
 # accounts CLI reference
 
-Every command of `accounts` 0.1.0. The [command sections](#commands) are generated from the CLI's
-own `--help`, so `accounts <command> --help` shows the same text in your terminal. For a guided
-introduction, read [Use the accounts CLI](../start/cli.md).
+This reference lists the commands in `accounts` 0.1.0. The [command sections](#commands) come from the CLI’s `--help` output. Run `accounts <command> --help` to check the options in your installed version.
+
+If you are using the CLI for the first time, start with [Use the accounts CLI](../start/cli.md).
 
 ```sh
 accounts --help                 # everything: the command tree, bundled guides, environment, exit codes

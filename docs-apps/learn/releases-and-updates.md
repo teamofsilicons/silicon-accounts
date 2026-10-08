@@ -1,6 +1,6 @@
 ---
 title: Releases and automatic updates
-description: How production and development channels, exact versions, registry sources and the sole updater work.
+description: Choose production or development releases, install a specific version and control how Apps updates your installed apps.
 kind: informative
 order: 40
 related:
@@ -14,7 +14,7 @@ related:
 
 ## Choose a channel
 
-Production and development have independent `x.y.z` versions. New releases enter development; promotion creates an immutable production release using the same package bytes.
+Every new release starts in the development channel. When it is ready for general use, its authors can promote it to production. Promotion keeps the same packages and gives them a production version. Both channels use `x.y.z` versions, and each keeps its own version history.
 
 | Install reference | Initial selection |
 |---|---|
@@ -32,7 +32,9 @@ apps update ring
 
 Quote references containing `>` so your shell does not interpret them as redirection. An exact version selects the initial release; it is not a permanent pin. Later updates follow that channel's latest release.
 
-The CLI asks before changing an installed app's channel or registry. `--yes` confirms an intentional noninteractive switch. Saved installation records retain their registry; changing the global server cannot silently replace an app with the same ID from another service. Use the matching `--server URL update APP`, or explicitly reinstall to change sources.
+Apps asks before switching an installed app to another channel or registry. If you are scripting an intentional switch, add `--yes`.
+
+Each installed app remembers its registry. Changing the default server does not make existing apps get updates from that server. Use `--server URL update APP` with the original registry, or reinstall the app to choose a new source.
 
 ## The updater
 
@@ -50,11 +52,13 @@ apps daemon remove
 
 `daemon install` registers launchd on macOS, a user systemd service on Linux, or Task Scheduler on Windows. `daemon remove` stops the updater and removes startup registration. `daemon definition` shows the generated service configuration. Use the same configured home for all these commands.
 
-Only one updater holds the home lock. Status includes the latest run and per-app failures. Registry mismatch, lost private access, unavailable packages or network errors do not authorize a different source or target. Fix the reported problem and retry. On Windows, self-update uses a helper so the running executable can be replaced; the scheduled receipt is not the final result, which is recorded in `.apps/self-update.log`.
+Only one updater can run for a given home at a time. Its status shows the latest run and any app that failed to update. If a registry does not match, you lose access to a private app, a package is missing or the network fails, the updater reports the problem. It does not choose another registry or target. Fix the reported problem, then retry.
+
+On Windows, a helper replaces the running Apps executable. A message saying the update was scheduled does not mean it has finished. Check `.apps/self-update.log` for the final result.
 
 ## Installation and scripts
 
-Apps verifies the selected package's SHA-256 before bounded extraction. It rejects unsafe paths and links, checks command ownership, then stages and atomically replaces the installation. A failure restores the previous package.
+Before installing an update, Apps checks the package’s SHA-256 checksum and extracts it within the archive limits. It rejects unsafe paths and links, and checks that the new command will not overwrite another app’s command. It prepares the new installation before replacing the current one. If installation fails, it restores the previous package.
 
 Optional install scripts run locally only after explicit consent:
 
@@ -66,6 +70,8 @@ Review the script first. Consent is recorded for that app's subsequent updates. 
 
 ## Service-scoped sign-in
 
-Access and refresh tokens are bound to the complete Apps and Accounts URLs, including tenant paths. Changing either service requires a new login; saved credentials are never silently forwarded to the new service. `APPS_TOKEN` is an explicitly supplied externally managed bearer token and remains the caller's responsibility.
+Saved access and refresh tokens belong to the complete Apps and Accounts URLs you signed in through, including any tenant path. If you change either service URL, sign in again. Apps will not send those saved tokens to the new service.
+
+If you set `APPS_TOKEN` yourself, you are choosing which bearer token to send. Make sure it belongs to the service you are calling.
 
 Older unscoped sessions require a fresh login. Unscoped installation records require an explicit reinstall with `--yes` before automatic updates resume.

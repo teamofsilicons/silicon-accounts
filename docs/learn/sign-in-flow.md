@@ -1,6 +1,6 @@
 ---
 title: How the hosted sign-in works
-description: What happens between /authorize and your redirect URI, step by step, and why each rule exists, from exact redirect URIs, state and PKCE to codes, sign-up, "Continue as", prompt, and Google and Apple.
+description: Follow a browser sign-in from your app to Accounts and back. Learn why redirect URLs, state, PKCE, consent and provider settings matter.
 kind: informative
 order: 10
 related:
@@ -13,10 +13,9 @@ related:
 
 # How the hosted sign-in works
 
-Your app only sees two moments of a sign-in: it sends a browser to `/authorize`, and the
-browser comes back to your redirect URI. This page explains what Silicon Accounts does in
-between and why, so you can predict how a sign-in behaves and judge the edge cases yourself.
-To build one, start at [Sign in with the hosted pages](../start/hosted-pages.md).
+Your app sends the browser to `/authorize` to start sign-in. Accounts checks who the user is, asks for any missing details and gets their agreement to share information with your app. It then sends the browser back to your redirect URI.
+
+This page walks through those steps and the rules behind them. To build the flow, start with [Sign in with the hosted pages](../start/hosted-pages.md).
 
 ## The steps
 
@@ -179,16 +178,11 @@ doesn't end your app's sign-in. See [Tokens and sessions](tokens-and-sessions.md
 
 ## Google and Apple
 
-**Managed or your own.** With `managed`, Silicon Accounts' own Google and Apple clients do the
-work and the providers' consent screens name Silicon Accounts. With `byo`, your Google OAuth
-client or Apple Services ID is used, so the providers show your app's name and logo, and their
-quotas and reviews are yours. In both modes Silicon Accounts is the medium: the provider sends
-the Carbon back to Silicon Accounts' callback (`/v1/oauth/callback/google` or `/apple`), which
-finishes the sign-in and sends the browser on to your redirect URI. That's why the address
-you register with Google or Apple is Silicon Accounts', and why sign-up, linking and the
-details pages behave the same for every method. A direct "Continue with Google" button on your
-own site first shows the Opening page in your app's style, so the Carbon sees who is asking
-before the provider's page appears.
+**Managed or your own.** With `managed`, sign-in uses Silicon Accounts’ Google and Apple setup. Their consent screens show Silicon Accounts. With `byo`, you supply your Google OAuth client or Apple Services ID. Their screens show your app’s name and logo, and you manage their quotas and reviews.
+
+In both cases, Google or Apple sends the Carbon back to the Accounts callback (`/v1/oauth/callback/google` or `/apple`). Accounts finishes sign-in and returns the browser to your app. Register the Accounts callback with the provider, and your app’s redirect URI with Accounts.
+
+Account creation, linking and the details pages work the same way in either mode. Even a direct "Continue with Google" button first opens an Accounts page in your app’s style, so the Carbon can see which app is asking before they reach Google.
 
 **What is checked.** The provider's `id_token` is verified against the provider's keys:
 signature, issuer, audience (the client that was used), expiry, the nonce Silicon Accounts

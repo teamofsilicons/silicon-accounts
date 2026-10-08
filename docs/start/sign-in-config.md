@@ -1,6 +1,6 @@
 ---
 title: Configure sign-in
-description: Choose your app's sign-in methods and their order, register redirect URIs and origins, decide which details Carbons share, restrict domains or sign-up, set the texts, and change all of it safely with versions and history.
+description: Choose how users sign in, which details they share and where they return to your app. Save changes with version checks and review their history.
 kind: instructive
 order: 16
 related:
@@ -14,11 +14,9 @@ related:
 
 # Configure sign-in
 
-You'll read your app's sign-in setup, change it with one partial JSON patch, and keep it safe
-from lost updates with its version number. The setup decides which sign-in methods your app
-offers and in which order, where Silicon Accounts may send Carbons back, which sites may embed
-the sign-in, which details Carbons share with you, who may sign in at all, and the texts on the
-pages. Every change is versioned and kept in a history.
+Your sign-in setup controls the methods users see, their order, the details your app asks for and the words on each page. It also sets who can sign in, which sites can embed the buttons and where users return after signing in.
+
+Read the current setup, then send a JSON patch containing the fields you want to change. Include its version number so your update does not overwrite someone else’s changes. Accounts gives each saved change a new version and keeps its history.
 
 ```sh
 printf '%s' "$APP_SECRET" | accounts app use remind --secret-stdin
@@ -125,9 +123,7 @@ curl -s -u "$APP_ID:$APP_SECRET" "$ACCOUNTS_URL/v1/apps/$APP_ID"
   is stored.
 - `updated_at` is the last change to the app itself (from Silicon Apps); changes to the
   sign-in setup show in `config_version` and the history.
-- `source` is `silicon_apps` for an app created in Silicon Apps, `fake` for the stand-in apps
-  that exist until Silicon Apps ships (they behave exactly like real ones and keep their
-  `app_id` and users), and `first_party` for Silicon Accounts' own site.
+- `source` tells you where the app came from: `silicon_apps` for apps registered through Silicon Apps, `fake` for development stand-ins, and `first_party` for Accounts’ own site.
 - `branding` is covered in [Brand the sign-in pages](branding.md).
 
 `accounts app config get` prints the same `signin_config` with its version, and
@@ -224,7 +220,7 @@ problem in `details.fields`, keyed by its path:
       }
     },
     "hint": "Fix the fields listed in details.fields and send the request again.",
-    "message": "Invalid fields — allowed_email_domains[0]: 'not a domain' is not a domain name like example.com; …"
+    "message": "Invalid fields: allowed_email_domains[0]: 'not a domain' is not a domain name like example.com; …"
   }
 }
 ```

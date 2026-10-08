@@ -1,6 +1,6 @@
 ---
 title: Apps HTTP API
-description: Authentication, retries and the complete public Apps v1 contract for discovery, authoring, packages, releases and access.
+description: Look up Apps endpoints for creating apps, publishing packages, finding apps and managing access. Includes authentication, retries and errors.
 kind: informative
 order: 70
 related:
@@ -12,14 +12,24 @@ related:
 
 # Apps HTTP API
 
-Production base URL: `https://apps.teamofsilicons.com` (local development: `http://127.0.0.1:4310`). Every endpoint below has a `/v1` prefix except `/health`.
+Send production requests to `https://apps.teamofsilicons.com`. For local development, the default address is `http://127.0.0.1:4310`. Add `/v1` before each endpoint listed below, except `/health`.
 
 ## Authentication and retries
-Authorization: `Bearer <Silicon Accounts token for apps>`. Production verifies issuer, signature, audience and current account via official Accounts client. Public browsing/downloads need no token. Local-only mode `APPS_DEV_AUTH=1` accepts `Bearer dev:<uuid>:<c:id or si:id>` (example `dev:alice:c:alice`); no verified email domains are inferred from this string.
+Authenticate with `Authorization: Bearer <Silicon Accounts token for apps>`. Apps uses the official Accounts client to check who issued the token, its signature, its audience and the current account. You can browse and download public apps without a token.
 
-The common developer portal may send its sealed first-party `aud=developer` token through its server-side `/api/apps/*` proxy. Apps verifies that exact audience, signature, issuer and expiry, then checks live Accounts userinfo for account and token-family revocation on every request. This authoring-only bridge accepts the identity/session, targets, app list/availability/detail, authoring metadata/history, package download/media, invitations, and app authoring mutations documented below, plus sanitized telemetry. It does not create an Apps membership or accept developer tokens for reviews, install receipts, package resolution, platform registration, reports, or Apps OAuth token exchange. All existing UUID author/admin and private visibility rules still apply. The developer BFF enforces its sealed session and same-origin CSRF checks before forwarding a Bearer token; tokens and app credentials must never reach browser JavaScript.
-For developer tokens, invitation matching uses currently verified contacts from the existing first-party `GET /v1/me` self-profile contract; its UUID must match both the signed token and userinfo. Apps-scoped tokens continue to receive verified emails only under their granted Email scope.
-Every mutation requires `Idempotency-Key` (8–200 printable characters). Keys are scoped to account, method/path and request digest; conflicting reuse is HTTP 409. Replays have `Idempotent-Replayed: true`. JSON response always directly contains the object described. Errors: `{ "error": {"code":"…", "message":"…", "hint":"…", "details":null} }`.
+For local development only, `APPS_DEV_AUTH=1` accepts `Bearer dev:<uuid>:<c:id or si:id>`, such as `dev:alice:c:alice`. That value supplies a local identity; it does not prove ownership of an email domain.
+
+The shared developer portal calls Apps through its server-side `/api/apps/*` proxy. It can use a first-party token with `aud=developer` for app management. Apps checks the token’s audience, signature, issuer and expiry, then calls Accounts userinfo on every request to check that the account and token family are still active.
+
+Developer tokens can read identity and session information, targets, app lists, availability, app details, management metadata and history. They can also handle package downloads, media, invitations, the app-management changes listed below and sanitised telemetry.
+
+They do not create an Apps membership and cannot be used for reviews, install receipts, package resolution, platform registration, reports or Apps OAuth token exchange. The usual author, administrator and private-app access rules still apply.
+
+The portal checks its session and same-origin CSRF rules before forwarding a token. Keep tokens and app credentials on the server; browser JavaScript must never receive them.
+For a developer token, Apps matches invitations using the verified contact details returned by first-party `GET /v1/me`. That profile’s UUID must match the token and userinfo. A token for the Apps audience receives verified emails only when the account has granted the Email scope.
+Every request that changes data requires an `Idempotency-Key` of 8 to 200 printable characters. Keep the same key and body when retrying a request whose result you did not receive. Apps checks the account, HTTP method, path and request content. Reusing a key with conflicting content returns HTTP 409. A replayed response includes `Idempotent-Replayed: true`.
+
+Successful JSON responses contain the object described for that endpoint directly. Errors use `{ "error": {"code":"…", "message":"…", "hint":"…", "details":null} }`.
 
 ## Accounts / discovery
 - `GET /health` → `{status:"ok",service:"silicon-apps",version:"0.1.2"}`.

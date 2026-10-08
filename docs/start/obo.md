@@ -1,6 +1,6 @@
 ---
 title: Act for an account at another app (User verification)
-description: Trade an account's access token for a User verification proof so your app can act at another app on its behalf, then refresh it, revoke it and react when the account's grant ends.
+description: Get a User verification token when your app needs to act at another app for a signed-in user. Ask for consent, create the proof and send it with the request.
 kind: instructive
 order: 41
 related:
@@ -13,7 +13,11 @@ related:
 
 # Act for an account at another app (User verification)
 
-Your app (the *issuing app*) wants to do something at another app (the *receiving app*) for an account that signed into your app: `dm` saves a file to the account's `briefcase`. You ask the account in your own screens, trade the account's access token for a proof that names `briefcase`, and send the proof token with your call. `briefcase` [verifies it](verify-a-proof.md).
+Use User verification when your app needs to do something at another app for a user. Say someone asks `dm` to save a file in their `briefcase`. DM needs to show Briefcase which account it is acting for.
+
+DM first gets the user’s agreement through its own flow. It then uses that user’s access token to ask Silicon Accounts for a proof addressed to `briefcase`. DM sends the proof with its request, and Briefcase [verifies it](verify-a-proof.md).
+
+In this example, DM is the **issuing app** and Briefcase is the **receiving app**. The user’s agreement and the permissions Briefcase allows remain the apps’ responsibility.
 
 ```bash
 curl -s -u "dm:$DM_APP_SECRET" \

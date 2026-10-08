@@ -1,6 +1,6 @@
 ---
 title: App endpoints
-description: Reference for everything an app (or its owner) manages — the public sign-in config, app details, the sign-in setup and its history, the user base, user imports, the app webhook with its deliveries and replays, manual account verification requests, and the Silicon Apps sync.
+description: Manage your app’s sign-in settings, users, imports and webhooks. Includes configuration history and manual account verification requests.
 kind: informative
 order: 65
 related:
@@ -17,13 +17,11 @@ related:
 
 # App endpoints
 
-An app manages its sign-in setup, its user base, imports and its webhook here. Apps are created in
-Silicon Apps; their sign-in setup lives in Silicon Accounts. Every `/v1/apps/{app_id}/…` route
-except `/public`, `/account-verification-request`, and the [verification history](proofs.md#get-v1appsapp_idproofsproof_idhistory)
-route `/proofs/{proof_id}/history` takes **app or owner** auth: the app's own credentials
-(`-u app_id:app_secret`), or the session of the Carbon who owns the app. Another app's
-credentials get 403 `app_mismatch`; another Carbon gets 403 `not_app_owner`; an unknown app is 404
-`unknown_app`; a disabled app's credentials get 403 `app_disabled` (its owner can still manage it).
+Create your app in Silicon Apps, then use these Accounts endpoints to configure its sign-in, manage its users, import existing users and set up webhooks.
+
+Most `/v1/apps/{app_id}/…` routes accept **app or owner** authentication. Use the app’s credentials (`-u app_id:app_secret`) or its owner’s session. The exceptions are `/public`, `/account-verification-request` and [verification history](proofs.md#get-v1appsapp_idproofsproof_idhistory) at `/proofs/{proof_id}/history`. Their sections describe the required access.
+
+Credentials for a different app return `403 app_mismatch`. A Carbon without ownership gets `403 not_app_owner`. An unknown app returns `404 unknown_app`. A disabled app’s credentials return `403 app_disabled`, although its owner can still manage it.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/apps/$APP_ID" -u "$APP_ID:$APP_SECRET"
@@ -202,7 +200,7 @@ The page footer always says "Powered by Silicon Accounts"; no setting removes it
 {
   "error": {
     "code": "validation_failed",
-    "message": "Invalid fields — branding.light.primary: 'blue' must be a #RRGGBB colour; branding.radius: is 99 but must be between 0 and 40 (pixels); redirect_uris[0]: 'http://example.com/cb' uses http; only https is allowed, except http://localhost and http://127.0.0.1 for local development.",
+    "message": "Invalid fields: branding.light.primary: 'blue' must be a #RRGGBB colour; branding.radius: is 99 but must be between 0 and 40 (pixels); redirect_uris[0]: 'http://example.com/cb' uses http; only https is allowed, except http://localhost and http://127.0.0.1 for local development.",
     "hint": "Fix the fields listed in details.fields and send the request again.",
     "details": {
       "fields": {

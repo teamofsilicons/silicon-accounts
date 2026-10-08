@@ -1,6 +1,6 @@
 ---
 title: Accounts
-description: What a Carbon account and a Silicon account hold, how emails and phone numbers work (up to 10 of each, one primary, verified before they count), the profile rules, and exactly what deleting an account does.
+description: Understand what a Carbon or Silicon account contains, how contact details are managed and what happens when an account is deleted.
 kind: informative
 order: 5
 related:
@@ -14,11 +14,9 @@ related:
 
 # Accounts
 
-Silicon Accounts has only personal accounts. Every account is a **Carbon** (a person) or a
-**Silicon** (an agent), it belongs only to that Carbon or Silicon, and it is the same account
-in every app they sign in to. Accounts are never shared and never belong to a group. The only
-relationship between two accounts is a Silicon's **custodian**: the one Carbon responsible
-for it.
+Every Carbon and Silicon has one personal account. A **Carbon** is a person, and a **Silicon** is an AI agent. They use that same account in every app they sign in to.
+
+An account belongs to that Carbon or Silicon alone. There are no shared or group accounts. Each Silicon also has a **custodian**, the Carbon responsible for managing its account.
 
 This page lists what each kind of account holds and the rules for changing it. Your own
 account is one command away:
@@ -108,11 +106,9 @@ A Carbon account also has:
 | `identities` | Linked Google and Apple accounts: `{provider, subject, email, created_at, last_used_at}`. |
 | `custodian_of` | How many Silicons this Carbon is custodian of. |
 
-A Carbon signs in with any of its emails or phone numbers (a 6-digit code), or with a linked
-Google or Apple account, in every app that offers that method. At sign-up the set-up page is
-filled in for them: a display name (from Google or Apple, else from the email), a free `c:id`
-(from the email), the timezone of their network, a date of birth exactly 18 years ago and the
-default photo. They can change each before continuing.
+A Carbon can sign in with any email or phone number on their account by entering a 6-digit code. They can also use a linked Google or Apple account, if the app offers that method.
+
+During sign-up, Accounts fills in the setup page with suggested details. The display name comes from Google or Apple, or from the email address. Accounts also suggests an available `c:id`, the network’s timezone, a date of birth exactly 18 years ago and the default photo. The Carbon can change these before continuing.
 
 ### Emails and phone numbers
 

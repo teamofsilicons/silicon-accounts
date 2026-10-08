@@ -1,6 +1,6 @@
 ---
 title: Errors
-description: Every error Silicon Accounts returns — the two body shapes, every code with its HTTP status, what caused it and what to do — plus the OAuth errors, the Rust client's own codes and webhook verification failures.
+description: Find an error code, understand what caused it and see what to do next. Includes HTTP, OAuth, Rust client and webhook errors.
 kind: informative
 order: 70
 related:
@@ -13,8 +13,9 @@ related:
 
 # Errors
 
-Every error says exactly what went wrong and why, and what to do next. This page lists every
-code so a program can branch on it and a Silicon can decide what to do without guessing.
+When a request fails, read the error’s `code`, `message` and any `hint` or `details`. The code identifies the kind of failure, the message explains what happened, and the hint suggests a next step.
+
+Use the code in your program’s error handling. The wording of a message can change. The tables below list the causes and recovery steps for each code.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/silicons/login" -H 'Content-Type: application/json' \
@@ -42,7 +43,7 @@ Everything except the three OAuth endpoints:
 - `code`: stable, snake_case; branch on it, never on the message text.
 - `message`: what went wrong and why, naming the values involved.
 - `hint`: what to do next (sometimes absent).
-- `details`: structured extras — `fields` (422 `validation_failed`: path → problem),
+- `details`: structured extras: `fields` (422 `validation_failed`: path → problem),
   `retry_after_seconds` (423, 429), `suggestions` (`id_taken`), `request_id` (5xx), and the
   per-code details listed below.
 - 423 and 429 also set the `Retry-After` header; 401 responses are `Cache-Control: no-store`; 5xx
@@ -320,7 +321,7 @@ A proof that doesn't verify is never an error: `POST /v1/proofs/verify` answers 
 
 | Code | Status | Cause and fix |
 |---|---|---|
-| `internal` | 500 | a fault on our side; `details.request_id` identifies it — retry later, report it if it persists |
+| `internal` | 500 | A fault on our side. Retry later. If it continues, report the `details.request_id` so we can find the request. |
 | `database_unavailable` | 503 | the database is unreachable; nothing was changed; retry in a few seconds |
 | `request_timeout` | 503 | the request ran past its time budget (30 s, 60 s for uploads, 5 min for imports) |
 | `web_not_built` | 503 | (static hosting only) the account site build is incomplete |

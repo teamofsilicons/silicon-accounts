@@ -1,6 +1,6 @@
 ---
 title: Rust packages
-description: Use the stateless silicon-apps-client library for catalog operations and explicit local adapters for installation, authentication and updates.
+description: Use the Apps Rust libraries to manage apps, create packages and install updates. Choose explicitly where local sessions and installation records are stored.
 kind: informative
 order: 80
 related:
@@ -11,7 +11,9 @@ related:
 
 # Rust packages
 
-`silicon-apps-client` is the primary interface used by the CLI. Its HTTP client holds an explicit service URL and optional bearer token; constructing it does not load environment variables, persist sessions or initialize local state. `silicon-apps-package` handles manifests, deterministic archives and checksums without executing package content.
+Use `silicon-apps-client` to call Apps from Rust. The CLI uses this same library. Create the HTTP client with a service URL and, when needed, a bearer token. Creating it does not read environment variables, save a session or set up local files.
+
+Use `silicon-apps-package` to check manifests, build archives and calculate checksums. It reads and writes package files without running their contents.
 
 ```toml
 [dependencies]
@@ -54,9 +56,13 @@ async fn install_app() -> anyhow::Result<()> {
 }
 ```
 
-The library provides persistence adapters through an explicit `LocalState`. `auth::authenticated_client` uses the official Silicon Accounts client, binds saved tokens to service URLs and serializes rotating refresh use across processes. `APPS_TOKEN` is interpreted by the CLI, not implicitly by `Client`.
+Pass a `LocalState` when an operation needs to save sessions or installation records. You choose its home directory.
 
-Installation verifies metadata and content digest, safely extracts bounded archives, checks command ownership and stages replacements with rollback. Optional scripts require consent and a timeout. The durable idempotent install-receipt outbox handles temporary server unavailability. Each installed record retains its registry source.
+`auth::authenticated_client` uses the official Silicon Accounts client. It saves tokens for their service URLs and coordinates refreshes across processes so a rotating token is not used twice. The CLI reads `APPS_TOKEN`; creating a `Client` does not read it automatically.
+
+During installation, the library checks the metadata and checksum, extracts the archive within its limits and checks that the command is not owned by another app. It prepares the new files before replacing the installation and restores the previous package if installation fails. Optional scripts require consent and a timeout.
+
+If the server is unavailable when the installation receipt is sent, the library saves it for retry without counting the same installation twice. The installed record also keeps the registry the app came from.
 
 `updater::run` checks the installed channels, including Apps, using explicit state. `service_definition` builds launchd, systemd or Task Scheduler configuration; `install_service` activates it when requested. Windows self-update uses a helper and runtime copy to allow replacement of installed executables.
 

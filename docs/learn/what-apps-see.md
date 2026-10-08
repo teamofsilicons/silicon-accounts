@@ -1,6 +1,6 @@
 ---
 title: What your app sees about an account
-description: The identifiers to store, which details each scope shares, how the details pages (required and optional details, flows) decide the grant, what your user base holds, and which webhooks keep your copy in sync.
+description: Learn which account details your app receives, how users agree to share them and how webhooks keep your copy up to date.
 kind: informative
 order: 12
 related:
@@ -14,10 +14,9 @@ related:
 
 # What your app sees about an account
 
-Silicon Accounts shares with your app only what the account agreed to share, and keeps your
-copy of it current. This page explains what that is, how the agreement is made, and how to stay
-in sync. The same view of an account appears in the token response (`account`), in
-`/v1/userinfo`, in your user base and in your webhooks.
+Your app receives the account details the user has agreed to share. Accounts uses that same view in the token response’s `account` field, `/v1/userinfo`, your app’s user list and its webhooks.
+
+This page explains which fields you receive, how required and optional details are shared and how to update your copy when they change.
 
 ## Store the uuid
 
@@ -198,13 +197,11 @@ One entry of `GET /v1/apps/{app_id}/users/{uuid}`:
 | `access_removed` | The account removed your app's access on the account site. | None. `granted_scopes` still lists what was granted before. |
 | `deleted` | The account was deleted. Listed only with `status=deleted`. | None; `display_name` is "Deleted account" and `id` is `null`. Your `external_id` stays. |
 
-`source` says how the membership began: `signin` (the hosted pages), `slt` (a Silicon's
-short-lived token) or `import`. Filter with `q` (uuid, id, display name, `external_id`, your
-imported emails and phones, and the primary email or phone only where that scope is granted,
-so search can't probe details you were never given), `status`, `kind` and `source`; page with
-`limit` (up to 200) and `cursor`. `history` lists the last 20 sign-ins to your app: time,
-method (`email`, `phone`, `google`, `apple`, `session`, `slt`) and outcome, never an IP
-address. Imports are in [Import existing users](../start/import-users.md).
+The `source` field tells you how the membership started: `signin` for the hosted pages, `slt` for a short-lived token or `import`.
+
+Use `q` to search the UUID, public ID, display name, `external_id` and imported emails or phone numbers. Searching a primary email or phone number requires the corresponding scope. You cannot use search to find details the account has not shared. You can also filter by `status`, `kind` and `source`, then page through results with `limit` (up to 200) and `cursor`.
+
+The `history` field lists the last 20 sign-ins to your app with their time, method and outcome. Methods are `email`, `phone`, `google`, `apple`, `session` and `slt`. It does not include IP addresses. See [Import existing users](../start/import-users.md) for imports.
 
 ## Stay in sync: webhooks
 

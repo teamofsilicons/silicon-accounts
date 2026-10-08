@@ -1,6 +1,6 @@
 ---
 title: Drop in the SDK snippet
-description: One script tag renders your app's sign-in buttons on your page; data-* attributes configure it, and window.SiliconAccounts gives you authorizeUrl, signIn, renderButtons, mountFrame and handleCallback.
+description: Add the SDK script to show sign-in buttons on your page. Configure the buttons and finish sign-in through your server’s callback.
 kind: instructive
 order: 13
 related:
@@ -12,11 +12,9 @@ related:
 
 # Drop in the SDK snippet
 
-You'll add one `<script>` tag that renders your app's sign-in buttons (the methods you enabled,
-in your branding) where you want them, pass it a `state` and PKCE challenge made by your
-server, and finish on your redirect URI exactly like the [hosted pages](hosted-pages.md). The
-script is `https://accounts.teamofsilicons.com/sdk/v1.js`: about 20 KB, no dependencies,
-served with `Access-Control-Allow-Origin: *` and cached for 5 minutes.
+Add the SDK with one `<script>` tag to show sign-in buttons on your page. It uses the methods, colours and logo configured for your app. Your server creates the `state` and PKCE challenge, and handles the callback just as it does for the [hosted pages](hosted-pages.md).
+
+Load the script from `https://accounts.teamofsilicons.com/sdk/v1.js`. It is about 20 KB, has no dependencies and is cached for 5 minutes. It allows cross-origin loading with `Access-Control-Allow-Origin: *`.
 
 ```ts
 // sdk-app.ts: the SDK snippet renders the buttons; state + PKCE are made on your server.
@@ -103,14 +101,11 @@ https://accounts.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=http
 
 and the callback answered `Signed in as c:grace-hopper (briefcase:ptO)`.
 
-The SDK renders into a Shadow DOM, so your page's CSS can't break the buttons and theirs can't
-leak into your page. Its styles are a constructed stylesheet, so a page with a strict
-`style-src` keeps them. The buttons need no `allowed_origins`: they are your page's own
-elements, and a click is a plain navigation to `/authorize`. Only an iframe
-(`mountFrame`, or the [iframe](iframe.md) you write yourself) needs your origin listed. If
-your page has a Content-Security-Policy, allow the SDK and its one request:
-`script-src https://accounts.teamofsilicons.com; connect-src https://accounts.teamofsilicons.com`
-(add `frame-src https://accounts.teamofsilicons.com` if you use `mountFrame`).
+The SDK puts its buttons in a Shadow DOM so their styles stay separate from your page. It uses a constructed stylesheet, which keeps the button styles working with a strict `style-src`.
+
+The buttons do not need an `allowed_origins` entry. They belong to your page, and clicking one navigates to `/authorize`. An iframe does need an allowed origin, whether you use `mountFrame` or [write the iframe yourself](iframe.md).
+
+If your page sets a Content-Security-Policy, allow the script and its request with `script-src https://accounts.teamofsilicons.com; connect-src https://accounts.teamofsilicons.com`. Add `frame-src https://accounts.teamofsilicons.com` when using `mountFrame`.
 
 ## Script attributes
 

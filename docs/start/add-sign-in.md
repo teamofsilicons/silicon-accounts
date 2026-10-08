@@ -1,6 +1,6 @@
 ---
 title: Add sign-in to your app
-description: Register where Silicon Accounts may send Carbons back, send them to sign in (redirect, iframe, script tag or any OpenID Connect library), and exchange the code for the account and its tokens.
+description: Send users to Silicon Accounts to sign in, bring them back to your app and exchange the returned code for their tokens.
 kind: instructive
 order: 10
 related:
@@ -16,10 +16,9 @@ related:
 
 # Add sign-in to your app
 
-You'll register the address Silicon Accounts sends Carbons back to, send a browser to the
-hosted sign-in pages, and exchange the code that comes back for the account and its tokens.
-Silicon Accounts runs everything in between: the sign-in methods (email code, phone code,
-Google, Apple), sign-up, the pages Carbons see, and your app's user base.
+Adding sign-in has three parts. First, register the URL where users should return to your app. Then send them to Silicon Accounts to sign in. When they return, your server exchanges the code in the URL for their account details and tokens.
+
+Silicon Accounts handles the pages in between, including email codes, phone codes, Google, Apple and first-time account setup. It also keeps the list of users who have signed into your app.
 
 ```sh
 export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # or a local stack: http://localhost:8590
@@ -115,7 +114,7 @@ JSON
 invalid field is reported at once, for example:
 
 ```text
-error: Invalid fields — allowed_origins[0]: 'https://briefcase.example/app' must be just scheme://host[:port], without a path; redirect_uris[0]: 'http://briefcase.example/callback' uses http; only https is allowed, except http://localhost and http://127.0.0.1 for local development.
+error: Invalid fields: allowed_origins[0]: 'https://briefcase.example/app' must be just scheme://host[:port], without a path; redirect_uris[0]: 'http://briefcase.example/callback' uses http; only https is allowed, except http://localhost and http://127.0.0.1 for local development.
 ```
 
 Everything else about sign-in (methods and their order, Google and Apple, required and
@@ -181,11 +180,9 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
 }
 ```
 
-So give Silicons a place to paste the token (a field, an API endpoint, a CLI flag). The
-short alias `grant_type=slt` works too. A token used twice, older than 2 minutes or minted for
-another app is refused with `invalid_grant` and a message that says which. The Silicon's side
-is in [Sign a Silicon in to an app](silicon-sign-in-to-apps.md); the token details are in
-[Exchange, refresh, check and revoke tokens](tokens.md#a-silicons-short-lived-token).
+Give Silicons a way to hand your app that token, such as an input field, an API endpoint or a CLI flag. Your server can use the shorter `grant_type=slt` alias for the exchange.
+
+Each token works once, for one app, for 2 minutes. If it has already been used, has expired or belongs to another app, Accounts returns `invalid_grant` with the reason. [Sign a Silicon in to an app](silicon-sign-in-to-apps.md) explains the Silicon’s steps. [Exchange, refresh, check and revoke tokens](tokens.md#a-silicons-short-lived-token) explains the exchange.
 
 ## What comes next
 

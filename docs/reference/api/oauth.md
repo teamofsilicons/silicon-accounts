@@ -1,6 +1,6 @@
 ---
 title: OAuth and OIDC endpoints
-description: Reference for /authorize, discovery, the JWKS, the token endpoint and its four grants, revocation, introspection, userinfo and the device authorization — every parameter, response field, claim and error.
+description: Look up sign-in, token exchange, refresh, revocation, introspection and userinfo endpoints, with their parameters and responses.
 kind: informative
 order: 61
 related:
@@ -15,11 +15,9 @@ related:
 
 # OAuth and OIDC endpoints
 
-These endpoints turn a finished sign-in into tokens, keep the tokens fresh, check them and end
-them. They follow OAuth 2.0 and OpenID Connect, so any standard library works against them
-(start from the discovery document). For the step-by-step guide see
-[Add sign-in to your app](../../start/add-sign-in.md) and [Tokens](../../start/tokens.md); for
-why tokens behave this way, [Tokens and sessions](../../learn/tokens-and-sessions.md).
+Use these endpoints to start sign-in, exchange a code for tokens, refresh a session, check a token or revoke it. They implement OAuth 2.0 and OpenID Connect. An OIDC library can read the discovery document to find the endpoints and supported options.
+
+For a walkthrough, see [Add sign-in to your app](../../start/add-sign-in.md) and [Tokens](../../start/tokens.md). [Tokens and sessions](../../learn/tokens-and-sessions.md) explains their lifetimes and behaviour.
 
 Exchange the code your redirect URI received:
 
@@ -86,7 +84,7 @@ email or phone; the Carbon always types it on the hosted pages.
 
 Back on your `redirect_uri`:
 
-- success: `?code=sac_…&state=…` — exchange the code within 2 minutes;
+- success: `?code=sac_…&state=…`: exchange the code within 2 minutes;
 - refusal: `?error=…&error_description=…&state=…` with `error` = `access_denied` (the Carbon
   cancelled on a details or review page), `login_required`, `consent_required` or `interaction_required`
   (`prompt=none` couldn't finish silently), `invalid_scope`, `invalid_request` or
@@ -439,8 +437,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/introspect" -u "$APP_ID:$APP_SECRET" -d 
 }
 ```
 
-A refresh token reports `token_type: "refresh_token"` and its sign-in's end as `exp`. Anything
-else — expired, revoked, another app's, unknown — is exactly `{"active": false}`.
+An active refresh token reports `token_type: "refresh_token"` and the session’s end as `exp`. An expired, revoked, unknown token or a token for another app returns exactly `{"active": false}`.
 
 ## `GET` / `POST /v1/userinfo`
 
@@ -477,7 +474,7 @@ With the `phone` and `dob` scopes it adds `phone_number`, `phone_number_verified
 
 Errors use the API error shape plus `WWW-Authenticate: Bearer realm="Silicon Accounts",
 error="invalid_token", …` so OIDC libraries understand them; all are 401: `unauthenticated` (no
-token), `invalid_authorization`, `invalid_token` (malformed or expired — strictly at its `exp`),
+token), `invalid_authorization`, `invalid_token` (malformed, or expired at its exact `exp` time),
 `token_revoked` (signed out, STK rotated, account deleted…), `account_deleted`,
 `access_removed` (the account removed your app's access), `membership_inactive`, `app_disabled`.
 

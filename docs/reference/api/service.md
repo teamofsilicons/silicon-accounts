@@ -1,6 +1,6 @@
 ---
 title: Service endpoints
-description: Reference for health and readiness probes, deployment metadata, bug reports, telemetry, the development outbox, the embed and SDK files, and what unknown paths answer.
+description: Check service health and configuration, submit a bug report and look up the SDK, embed, telemetry and development endpoints.
 kind: informative
 order: 68
 related:
@@ -11,7 +11,7 @@ related:
 
 # Service endpoints
 
-These endpoints describe and watch the service itself, and take bug reports and telemetry.
+Use these endpoints to check whether the service is running, read its configuration metadata or submit a bug report. This page also lists the SDK and embed resources, telemetry endpoint and development outbox.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/meta"          # which deployment answered (public origin)
@@ -19,11 +19,9 @@ curl -s "$ACCOUNTS_API_URL/healthz"      # ok                  (accounts-api's o
 curl -s "$ACCOUNTS_API_URL/readyz"       # {"database":"ok"}
 ```
 
-`ACCOUNTS_API_URL` is `accounts-api`'s own address, not the public origin: locally
-`http://127.0.0.1:8589`; in production, the address of the `accounts-api` process behind the
-account site. The account site at the public origin forwards only `/v1/*` and `/.well-known/*`
-to `accounts-api`, so `$ACCOUNTS_URL/healthz` and `$ACCOUNTS_URL/readyz` get the site's HTML 404
-page, not a probe.
+Send health and readiness probes directly to `accounts-api`. For a local stack, set `ACCOUNTS_API_URL=http://127.0.0.1:8589`. In production, use the internal address of the API process.
+
+The public account site forwards `/v1/*` and `/.well-known/*` to that process. It does not forward `/healthz` or `/readyz`. Calling those paths through `$ACCOUNTS_URL` returns the site’s HTML 404 page.
 
 ## `GET /healthz`
 
