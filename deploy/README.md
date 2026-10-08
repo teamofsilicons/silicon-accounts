@@ -11,9 +11,14 @@ public. Caddy overwrites incoming X-Forwarded-For with the actual peer address.
 Production secrets reside in Secrets Manager and root-only environment files.
 The Accounts site uses `accounts.teamofsilicons.com`. The management portal host is
 derived from the matching `ACCOUNTS_DEVELOPER_URL` and `DEVELOPER_PUBLIC_URL` secret
-fields, allowing it to move to `developer.accounts.teamofsilicons.com` while Silicon
-Apps takes over `developer.teamofsilicons.com`. Provision the destination DNS before
-changing these fields; the runtime validates the first-party callback at that origin.
+fields, both set to `https://developers.teamofsilicons.com`. This common Next portal
+preserves Accounts settings and adds Apps publishing in the same app workspace.
+Its server-side Apps proxy uses `APPS_API_URL=https://apps.teamofsilicons.com` and
+the sealed first-party developer session. The former nested developer hostname
+redirects to the canonical portal; Silicon Apps hosts the store separately.
+Provision destination DNS before changing origins; the runtime validates the
+first-party callback at exactly `/auth/callback` on that origin. An OAuth flow
+started on a former hostname must restart; host-only cookies are never copied.
 Preserve all unrelated DNS records.
 
 ## Release

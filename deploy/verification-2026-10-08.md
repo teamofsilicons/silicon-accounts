@@ -104,3 +104,49 @@ Apps CLI login. Google login is therefore verified; this does not establish
 Apple login, SMS, or real-recipient mail delivery. Those independent checks
 remain unverified. The old `developer.teamofsilicons.com` DNS record was then
 moved to the Apps host by the coordinating deployment session.
+
+## Common developer portal correction and final deployment
+
+The user's subsequent correction keeps the existing Accounts Next developer
+frontend and adds Apps authoring there, on
+`https://developers.teamofsilicons.com`. The temporary nested hostname above is
+historical and now redirects to this common portal. Accounts configuration,
+users, imports, proofs and other existing tabs remain alongside publishing,
+packages, releases, authors and history. The store has a separate host.
+
+Final deployed source is `6e828d99d449369754bcc63ff32b5d2bbd19b79a`, archive
+SHA-256 `4e2ffa0367b4693063ace2a2739f1aa86499e20055d02056741560da0d9b057b`.
+The rebuilt ARM64 API SHA-256 is
+`77c4bee655eff6c9e37ae90664b2771bd7ae0dfd880a884bb500160f82520f35`.
+SSM `aba69391-30bc-4ef7-8a0f-af32bda450f8` applied it; postcheck
+`75b6abc3-4f94-4c50-8ba2-c6f36042125c` verified the exact active release and binary,
+all four services and the backup timer, migration 7, one genuine account, three
+apps and one membership. Apps owner UUID, authors and app secret remain unchanged.
+No fixture identity, fake grant or production email was created for these checks.
+
+The pre-cutover backup `backups/predeploy-20261008T142732Z.dump`, SHA-256
+`e891291f36b1804cadc6f963b2907fb7a1dd2f637c1b79518490f7ff2efeaa5c`, was restored
+into an isolated PostgreSQL database and verified against those counts, schema
+version and owner, then dropped (SSM `19755b15-7de8-4e7c-8919-e6ee3d95dced`).
+The final documentation reapply also retained a newer backup at
+`backups/predeploy-20261008T143304Z.dump`; that redundant newer copy was not restored.
+
+Public TLS, the anonymous session endpoint, Accounts metadata, the exact plural
+developer callback and PKCE S256 were verified. The former nested host redirects
+to the same path on the plural host. The public common-portal Docs JavaScript,
+including CLI 0.1.4 links, matches the local build byte-for-byte (SHA-256
+`bc2de8280965451f7f058bf418a06fe06985cd39a55ebc1e4796eb0ea78905fc`). Checks used
+the verified destination IP with the correct hostname/SNI while a local resolver
+retained a negative DNS cache. A fresh authenticated browser session on the plural
+host remains a separate verification item; prior real Google/Apps CLI login
+evidence above does not establish that new-host browser flow.
+
+Local validation includes 25 common-portal browser cases, 13 frontend unit tests,
+typechecking, zero-warning lint and production builds; 71 Accounts account API
+tests, two composed developer-platform tests, and focused coauthor, invitation,
+webhook and audience-boundary regressions pass. Apps accepts developer tokens
+only on its explicit authoring routes after signature, issuer, expiry and live
+Accounts checks; UUID author/admin rules remain in force. Verified email
+invitation matching uses the existing first-party self-profile contract, while
+Apps-scoped email consent remains unchanged. The Apps registry retains only its
+store OAuth callback, with its credentials and other sign-in settings preserved.
