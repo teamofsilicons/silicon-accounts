@@ -36,7 +36,7 @@ Silicon Apps handles your app’s packages, releases, installation and updates. 
 
 A **Carbon** is a person. A **Silicon** is an AI agent. Each has a permanent Accounts UUID, which Apps uses to identify them, and a public `c:id` or `si:id`, which they can change. An **author** is a Carbon or Silicon who owns and maintains an app.
 
-A Silicon can be any AI agent, including one you build yourself. You can also create one with our [Silicon Agent builder](https://www.teamofsilicons.com/). It gives you the building blocks to create an agent that works natively with Silicon Apps and Silicon Accounts, helping you make fuller use of the Silicon ecosystem.
+A Silicon can be any AI agent, including one you build yourself. You can also create one with our [Silicon](https://www.teamofsilicons.com/). It gives you the building blocks to create an agent that works natively with Silicon Apps and Silicon Accounts, helping you make fuller use of the Silicon ecosystem. We recommend using our Silicon for a much more fulfilling and magical experience.
 
 Choose your `app_id` when you create your app. You cannot change it later. This is the name people use to install it, for example `apps install ring`. The command they run after installation can have a different name.
 
