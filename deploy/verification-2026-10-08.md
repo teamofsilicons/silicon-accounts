@@ -64,3 +64,36 @@ and credential provisioning require a real production owner; they are not
 represented as complete by this upgrade. Caddy's Developer hostname now derives
 from the matching runtime Developer URLs so that cutover can preserve this
 management site at a dedicated hostname.
+
+## Apps registration and Developer hostname cutover
+
+After the user completed a real production signup and chose `c:saket`, the
+existing active Carbon's immutable UUID was resolved to `zQo`. The `apps` entry
+was registered with that owner and accepted author. Its generated app secret
+was verified against the app-authenticated API, then merged with the service
+token into the dedicated Apps runtime secret, preserving runner and telemetry
+configuration. No account was fabricated or contact verified by the deployment.
+Registry export now contains only `apps`; Accounts' two ownerless first-party
+entries remain unchanged and are intentionally excluded from export.
+
+The Developer portal moved to
+`https://developer.accounts.teamofsilicons.com`. Both authoritative nameservers
+and a public resolver confirmed its A record before changing the matching
+Accounts/Developer runtime origins. The new site has valid public TLS;
+`/auth/session` returns 200 and sign-in returns a PKCE S256 authorization URL with
+exact callback `https://developer.accounts.teamofsilicons.com/auth/callback`.
+The hosted authorization page returns 200, and `/v1/meta` reports the new origin.
+These HTTP checks do not represent a completed new-portal authenticated session.
+
+An initial configuration reapply encountered Linux's `ETXTBSY` protection while
+attempting to extract over the running executable, before any service/runtime
+file change. Installer revision `6e39cbc0106bc836fec85e84d5f353c31f1f87dd` fixes
+that retry path: it verifies every existing bundled file and link and reuses the
+immutable release. Its focused preservation/tamper test passes. The checksummed
+fixed installer completed the reapply with no pending migrations; the API source
+remains `875a30a`, migration 7. The new preconfiguration backup is
+`backups/predeploy-20261008T134728Z.dump`, SHA-256
+`7dd8d3ac1ecdd6e8d19e7709ac2bf3d6ec5e0863fa0a4ef4b19be25f21bfc894`.
+Post-cutover checks confirm one genuine account, three apps, Apps owner `zQo`
+and the correct stored Developer callback. The earlier isolated restore test
+remains the recovery evidence; this newer backup was uploaded but not restored.
