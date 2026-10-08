@@ -137,9 +137,13 @@ to the same path on the plural host. The public common-portal Docs JavaScript,
 including CLI 0.1.4 links, matches the local build byte-for-byte (SHA-256
 `bc2de8280965451f7f058bf418a06fe06985cd39a55ebc1e4796eb0ea78905fc`). Checks used
 the verified destination IP with the correct hostname/SNI while a local resolver
-retained a negative DNS cache. A fresh authenticated browser session on the plural
-host remains a separate verification item; prior real Google/Apps CLI login
-evidence above does not establish that new-host browser flow.
+retained a negative DNS cache. After the user reloaded local Unbound, DNS resolved
+correctly and the live Chrome accessibility view verified a genuine signed-in
+session on `developers.teamofsilicons.com`: the "Your apps" dashboard, account
+menu "Saket Gupta", the Silicon Apps entry (`apps`, one user), and "New app" were
+visible, with no Explore navigation. This verifies the authenticated common-portal
+dashboard on its canonical host. App-specific tabs have not yet been checked in
+that production browser session; their local browser tests are separate evidence.
 
 Local validation includes 25 common-portal browser cases, 13 frontend unit tests,
 typechecking, zero-warning lint and production builds; 71 Accounts account API

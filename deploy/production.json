@@ -31,7 +31,9 @@
   "ConfigurationBackupRestoreVerified": true,
   "LatestBackupKey": "backups/predeploy-20261008T143304Z.dump",
   "CommonDeveloperPortal": true,
-  "CommonPortalAuthenticatedBrowserVerified": false,
+  "CommonPortalAuthenticatedBrowserVerified": true,
+  "CommonPortalAuthenticatedBrowserScope": "Canonical-host signed-in Your apps dashboard; Saket Gupta account menu and apps entry visible; no Explore navigation",
+  "CommonPortalAppTabsProductionBrowserVerified": false,
   "CommonPortalCliDocsVersion": "0.1.4",
   "InstallCommandId": "aba69391-30bc-4ef7-8a0f-af32bda450f8",
   "VerificationCommandId": "75b6abc3-4f94-4c50-8ba2-c6f36042125c"
