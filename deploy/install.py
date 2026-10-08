@@ -25,15 +25,41 @@ def healthy(url):
         time.sleep(2)
     raise RuntimeError('Readiness failed: '+url)
 
+def prepare_release(archive, release):
+    # A configuration-only reapply must never rewrite a running executable.
+    # Verify every bundled file/link before reusing the immutable release.
+    existing=release.exists() and any(release.iterdir())
+    with tarfile.open(archive) as bundle:
+        if existing:
+            for member in bundle.getmembers():
+                destination=release/member.name
+                if member.isdir():
+                    valid=destination.is_dir() and not destination.is_symlink()
+                elif member.issym():
+                    valid=destination.is_symlink() and os.readlink(destination)==member.linkname
+                elif member.isfile():
+                    valid=destination.is_file() and not destination.is_symlink()
+                    if valid:
+                        with bundle.extractfile(member) as source, destination.open('rb') as target:
+                            def digest(stream):
+                                h=hashlib.sha256()
+                                for block in iter(lambda:stream.read(1024*1024),b''):h.update(block)
+                                return h.digest()
+                            valid=digest(source)==digest(target)
+                else:
+                    valid=False
+                if not valid:raise ValueError('Existing release differs from verified archive: '+member.name)
+        else:
+            release.mkdir(parents=True,exist_ok=True)
+            bundle.extractall(release,filter='data')
+
 a=argparse.ArgumentParser();a.add_argument('--archive',required=True);a.add_argument('--sha256',required=True);a.add_argument('--revision',required=True);a.add_argument('--secret',required=True);a.add_argument('--bucket',required=True);a.add_argument('--region',default='us-east-2');a=a.parse_args()
 assert os.geteuid()==0
 os.umask(0o077)
 assert hashlib.sha256(P(a.archive).read_bytes()).hexdigest()==a.sha256
 run('cloud-init','status','--wait')
 release=P('/opt/accounts/releases')/a.revision
-release.mkdir(parents=True,exist_ok=True)
-with tarfile.open(a.archive) as t:
-    t.extractall(release,filter='data')
+prepare_release(a.archive,release)
 run('chmod','-R','a+rX',str(release))
 run('chmod','755','/opt/accounts','/opt/accounts/releases')
 for user in ['accounts','accounts-web','accounts-developer','accounts-caddy']:
