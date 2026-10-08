@@ -339,3 +339,23 @@ Live browser checks at 1440 and 390 pixels confirmed the paragraph and builder
 link, without horizontal overflow or page errors. Screenshots were inspected.
 The deployed Markdown matches the source; search and full LLM exports contain the
 new explanation. The linked public site returned HTTP 200.
+
+## Silicon naming and overview copy
+
+Changed the linked product name to Silicon in the Apps overview and added the
+requested recommendation for a more fulfilling and magical experience. The
+explanation that any AI agent can be a Silicon remains. Removed the overview
+sentence directing readers to custom-domain verification and the following
+sentence that referred back to it. No em dashes were added.
+
+Source `61f9175ff34d67326f7a5e9240f3ab795c1d5178`, bundle SHA-256 `b7f0dc3e283dc977b5fb923f9ab2e915991ebc5f58e4495585bb484d59464be9`.
+Developer typecheck, lint, docs link checks and production build passed. The API
+binary, database schema and account-site build are unchanged. Install SSM
+`d17853fc-07fd-40c3-b1c1-8ade905238b0` and verification `d2fe859b-92f5-4603-bb1a-87e17b33b9fb` confirmed the release, services and
+readiness. Backup `backups/predeploy-20261008T180715Z.dump`, SHA-256 `735e83033c61b1f65aa85dfde379663e917deef89fab51fbbd3c42e84e647e0a`.
+
+Live browser checks at 1440 and 390 pixels confirmed the recommendation and Silicon
+link, without horizontal overflow or page errors. Screenshots were inspected.
+The deployed Markdown matches the source; search and full LLM exports contain the
+new recommendation, with the former builder name absent. The removed
+custom-domain verification note is absent from the overview.
