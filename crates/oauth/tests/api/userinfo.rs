@@ -391,11 +391,14 @@ async fn a_disabled_apps_tokens_stop_reading_accounts() {
 async fn silicon_apps_verified_emails_need_email_scope_and_exclude_unverified() {
     let ctx = TestContext::new().await;
     let carbon = ctx.carbon().await;
-    sqlx::query("insert into apps(app_id,name,source,status,secret_hash) values('apps','Silicon Apps','silicon_apps','active','test'::bytea)").execute(&ctx.state.db).await.unwrap();
+    sqlx::query("insert into apps(app_id,name,source,status,secret_hash) values('silicon-apps','Silicon Apps','silicon_apps','active','test'::bytea)").execute(&ctx.state.db).await.unwrap();
     sqlx::query("insert into account_emails(account_uuid,email,is_primary,verified_at) values($1,'secondary@company.test',false,now()),($1,'unverified@company.test',false,null)").bind(&carbon.uuid).execute(&ctx.state.db).await.unwrap();
     for scopes in [vec![Scope::Profile], vec![Scope::Profile, Scope::Email]] {
-        ctx.membership("apps", &carbon.uuid, &scopes).await;
-        let token = ctx.tokens_for(&carbon, "apps", &scopes).await.access_token;
+        ctx.membership("silicon-apps", &carbon.uuid, &scopes).await;
+        let token = ctx
+            .tokens_for(&carbon, "silicon-apps", &scopes)
+            .await
+            .access_token;
         let response = userinfo(&ctx, &token).await;
         assert_eq!(response.status, 200, "{}", response.json);
         if scopes.contains(&Scope::Email) {

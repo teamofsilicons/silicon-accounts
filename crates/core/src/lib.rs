@@ -61,6 +61,9 @@ pub const FIRST_PARTY_APP_ID: &str = "accounts";
 /// signed-in Carbon's identity and manage the apps they own (see `http::auth`).
 pub const DEVELOPER_APP_ID: &str = "developer";
 
+/// Canonical app identity for the Silicon Apps catalog and CLI.
+pub const SILICON_APPS_APP_ID: &str = "silicon-apps";
+
 /// True for Silicon Accounts' own apps (`accounts`, `developer`): no consent screen, no
 /// membership, and their sign-ins are never reported to app webhooks.
 pub fn is_first_party_app_id(app_id: &str) -> bool {

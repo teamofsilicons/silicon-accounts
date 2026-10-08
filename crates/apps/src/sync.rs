@@ -351,6 +351,11 @@ fn validate(state: &AppState, apps: &[SiliconAppsApp]) -> Result<Vec<ValidApp>, 
                 at("app_id"),
                 format!("'{app_id}' is one of Silicon Accounts' own apps and can't be synced"),
             );
+        } else if app_id == "apps" {
+            f.add(
+                at("app_id"),
+                "The legacy Silicon Apps ID is reserved; use silicon-apps.",
+            );
         } else if seen.contains(&app_id) {
             f.add(
                 at("app_id"),

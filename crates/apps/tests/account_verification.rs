@@ -139,12 +139,12 @@ async fn first_party_current_management_and_requester_isolation_are_enforced() {
         .await
         .access_token;
     // A real Apps audience with a live membership is still not first-party.
-    sqlx::query("insert into apps(app_id,name,secret_hash,status,source) select 'apps',name,secret_hash,status,source from apps where app_id=$1")
+    sqlx::query("insert into apps(app_id,name,secret_hash,status,source) select 'silicon-apps',name,secret_hash,status,source from apps where app_id=$1")
         .bind(&app.app_id).execute(&ctx.state.db).await.expect("Apps fixture");
-    ctx.membership("apps", &app.owner.uuid, &[Scope::Profile])
+    ctx.membership("silicon-apps", &app.owner.uuid, &[Scope::Profile])
         .await;
     let apps_token = ctx
-        .tokens_for(&app.owner, "apps", &[Scope::Profile])
+        .tokens_for(&app.owner, "silicon-apps", &[Scope::Profile])
         .await
         .access_token;
     let path = format!("/v1/apps/{}/account-verification-request", app.app_id);

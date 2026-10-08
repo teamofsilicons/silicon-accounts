@@ -48,6 +48,11 @@ function docsAddressMissing(pathname: string): boolean {
 }
 
 export function proxy(request: NextRequest) {
+  if (/^\/apps\/apps(?:\/|$)/.test(request.nextUrl.pathname)) {
+    const target = new URL(request.url);
+    target.pathname = target.pathname.replace(/^\/apps\/apps(?=\/|$)/, "/apps/silicon-apps");
+    return NextResponse.redirect(target, 308);
+  }
   // The account site's old developer tabs (its /developer redirects keep their names): Branding is Pages, Proofs is ATA.
   const renamed = renamedAppTab(request.nextUrl.pathname);
   if (renamed) {

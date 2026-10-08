@@ -234,11 +234,11 @@ async fn apps_audience_is_limited_to_author_routes_and_active_memberships() {
     let ctx = TestContext::new().await;
     let app = common::owned_app(&ctx, "audience").await;
     // Register the exact catalog application.
-    sqlx::query("insert into apps(app_id,name,source,status,secret_hash) values('apps','Silicon Apps','silicon_apps','active','test'::bytea) on conflict do nothing").execute(&ctx.state.db).await.expect("register Apps fixture");
-    ctx.membership("apps", &app.owner.uuid, &[Scope::Profile])
+    sqlx::query("insert into apps(app_id,name,source,status,secret_hash) values('silicon-apps','Silicon Apps','silicon_apps','active','test'::bytea) on conflict do nothing").execute(&ctx.state.db).await.expect("register Apps fixture");
+    ctx.membership("silicon-apps", &app.owner.uuid, &[Scope::Profile])
         .await;
     let token = ctx
-        .tokens_for(&app.owner, "apps", &[Scope::Profile])
+        .tokens_for(&app.owner, "silicon-apps", &[Scope::Profile])
         .await
         .access_token;
     let path = format!("/v1/apps/{}", app.app_id);
@@ -247,10 +247,10 @@ async fn apps_audience_is_limited_to_author_routes_and_active_memberships() {
     assert_eq!(denied.status, 401);
     assert_eq!(denied.error_code(), Some("token_wrong_audience"));
     let stranger = ctx.carbon().await;
-    ctx.membership("apps", &stranger.uuid, &[Scope::Profile])
+    ctx.membership("silicon-apps", &stranger.uuid, &[Scope::Profile])
         .await;
     let stranger_token = ctx
-        .tokens_for(&stranger, "apps", &[Scope::Profile])
+        .tokens_for(&stranger, "silicon-apps", &[Scope::Profile])
         .await
         .access_token;
     assert_eq!(
@@ -260,7 +260,7 @@ async fn apps_audience_is_limited_to_author_routes_and_active_memberships() {
         403
     );
     sqlx::query(
-        "update memberships set status='access_removed' where app_id='apps' and account_uuid=$1",
+        "update memberships set status='access_removed' where app_id='silicon-apps' and account_uuid=$1",
     )
     .bind(&app.owner.uuid)
     .execute(&ctx.state.db)

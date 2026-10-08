@@ -206,14 +206,14 @@ async fn resolve(
             // audiences may act depends on the route (see the module docs).
             let v = tokens::verify_access_token(&mut conn, &state.keys, rest, None).await?;
             let aud = v.claims.aud.as_str();
-            let apps_owner_route = aud == "apps"
+            let apps_owner_route = aud == crate::SILICON_APPS_APP_ID
                 && apps_owner_allowed
                 && parts
                     .extensions
                     .get::<MatchedPath>()
                     .is_some_and(|p| p.as_str().starts_with("/v1/apps/"));
             if apps_owner_route {
-                let active: bool = sqlx::query_scalar("select exists(select 1 from memberships m join apps a on a.app_id=m.app_id where m.app_id='apps' and m.account_uuid=$1 and m.status='active' and a.status='active')")
+                let active: bool = sqlx::query_scalar("select exists(select 1 from memberships m join apps a on a.app_id=m.app_id where m.app_id='silicon-apps' and m.account_uuid=$1 and m.status='active' and a.status='active')")
                     .bind(&v.account.uuid).fetch_one(&mut *conn).await?;
                 if !active {
                     return Err(ApiError::unauthenticated(

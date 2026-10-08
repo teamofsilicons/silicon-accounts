@@ -231,3 +231,77 @@ async fn migration_0004_moves_the_old_dark_error_colour_off_the_default_card() {
     assert_eq!(row("own-surface").await, (7, "#F97066".to_string()));
     assert_eq!(row("own-danger").await, (7, "#FF6B6B".to_string()));
 }
+
+#[tokio::test]
+async fn silicon_apps_id_migration_preserves_credentials_and_relations() {
+    let db = accounts_core::test_support::TestDb::empty().await;
+    accounts_core::db::MIGRATOR
+        .run_to(9, &db.pool)
+        .await
+        .unwrap();
+    sqlx::raw_sql(r#"
+        insert into accounts(uuid,number,kind,handle,status,display_name,pfp_url,dob,timezone)
+        values('renameowner',999,'carbon','c:renameowner','active','Owner','https://example.test/me.png','2000-01-01','UTC');
+        insert into apps select (jsonb_populate_record(null::apps, to_jsonb(a) ||
+          '{"app_id":"apps","name":"Silicon Apps","source":"silicon_apps","owner_uuid":"renameowner"}'::jsonb)).*
+          from apps a where app_id='accounts';
+        insert into app_signin_configs(app_id,config,version) values('apps','{"branding":{"title":"Preserve"}}',7);
+        insert into app_config_history(app_id,version,actor,changes) values('apps',7,'renameowner','[]');
+        insert into app_authors(app_id,account_uuid) values('apps','renameowner');
+        insert into memberships(app_id,account_uuid,status,source) values('apps','renameowner','active','slt');
+        insert into token_families(id,app_id,account_uuid,origin,expires_at) values('00000000-0000-0000-0000-000000000001','apps','renameowner','slt',now()+interval '1 day');
+        insert into refresh_tokens(token_hash,family_id,generation) values('fixture'::bytea,'00000000-0000-0000-0000-000000000001',0);
+        insert into short_lived_tokens(token_hash,account_uuid,app_id,scopes,expires_at) values('slt'::bytea,'renameowner','apps','{profile}',now()+interval '2 minutes');
+        insert into proof_families(id,kind,issuing_app,audiences,access_ttl_seconds,expires_at) values(gen_random_uuid(),'ata','apps','{apps,accounts}',120,now()+interval '1 day');
+        insert into account_verification_requests(id,account_uuid,context_app_id,reason) values('00000000-0000-0000-0000-000000000002','renameowner','apps','Keep my request');
+        insert into outbound_messages(id,channel,to_address,text_body,purpose,status)
+            values('00000000-0000-0000-0000-000000000003','email','saket@teamofsilicons.com','Keep my notification','account_verification','sent');
+        insert into account_verification_request_notifications(request_id,recipient,message_id)
+            values('00000000-0000-0000-0000-000000000002','saket@teamofsilicons.com','00000000-0000-0000-0000-000000000003');
+    "#).execute(&db.pool).await.unwrap();
+    let before: serde_json::Value =
+        sqlx::query_scalar("select to_jsonb(a)-'app_id' from apps a where app_id='apps'")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    accounts_core::db::migrate(&db.pool).await.unwrap();
+    let after: serde_json::Value =
+        sqlx::query_scalar("select to_jsonb(a)-'app_id' from apps a where app_id='silicon-apps'")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(before, after);
+    let (id,version,reason,status):(String,i64,String,String)=sqlx::query_as("select m.membership_id,c.version,r.reason,o.status from memberships m join app_signin_configs c using(app_id) join account_verification_requests r on r.context_app_id=m.app_id cross join outbound_messages o where m.app_id='silicon-apps'").fetch_one(&db.pool).await.unwrap();
+    assert_eq!(
+        (id.as_str(), version, reason.as_str(), status.as_str()),
+        ("silicon-apps:renameowner", 7, "Keep my request", "sent")
+    );
+    let (family,hash,audiences):(String,Vec<u8>,Vec<String>)=sqlx::query_as("select f.app_id,r.token_hash,p.audiences from token_families f join refresh_tokens r on r.family_id=f.id cross join proof_families p").fetch_one(&db.pool).await.unwrap();
+    assert_eq!(family, "silicon-apps");
+    assert_eq!(hash, b"fixture");
+    assert_eq!(audiences, vec!["silicon-apps", "accounts"]);
+    assert!(
+        accounts_core::db::migrate(&db.pool)
+            .await
+            .unwrap()
+            .applied_now
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn silicon_apps_id_collision_aborts_without_touching_either_app() {
+    let db = accounts_core::test_support::TestDb::empty().await;
+    accounts_core::db::MIGRATOR
+        .run_to(9, &db.pool)
+        .await
+        .unwrap();
+    sqlx::raw_sql("insert into apps(app_id,name,source,secret_hash) values('apps','Silicon Apps','silicon_apps','old'::bytea),('silicon-apps','Someone else','silicon_apps','other'::bytea)").execute(&db.pool).await.unwrap();
+    assert!(accounts_core::db::migrate(&db.pool).await.is_err());
+    let count: i64 =
+        sqlx::query_scalar("select count(*) from apps where app_id in ('apps','silicon-apps')")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(count, 2);
+}

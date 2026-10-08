@@ -150,7 +150,7 @@ async fn userinfo(state: &AppState, token: &str) -> Result<Value, ApiError> {
     // Silicon Apps evaluates private domain grants against any verified email. This
     // catalog-only extension is still gated by explicit email consent; other apps
     // retain the existing primary-email contract.
-    if verified.family.app_id == "apps"
+    if verified.family.app_id == accounts_core::SILICON_APPS_APP_ID
         && verified.account.kind == AccountKind::Carbon
         && scopes.contains(&Scope::Email)
     {

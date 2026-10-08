@@ -17,11 +17,11 @@ Use `silicon-apps-package` to check manifests, build archives and calculate chec
 
 ```toml
 [dependencies]
-silicon-apps-client = "0.1.6"
+silicon-apps-client = "0.1.7"
 silicon-apps-package = "0.1.2"
 ```
 
-The CLI release is 0.1.8; package versions are independent. Full generated Rust references are on [docs.rs for the client](https://docs.rs/silicon-apps-client) and [docs.rs for package tooling](https://docs.rs/silicon-apps-package).
+The CLI release is 0.1.9; package versions are independent. Full generated Rust references are on [docs.rs for the client](https://docs.rs/silicon-apps-client) and [docs.rs for package tooling](https://docs.rs/silicon-apps-package).
 
 ## Read the catalog
 
@@ -32,7 +32,7 @@ async fn browse() -> anyhow::Result<()> {
     let apps = Client::new("https://apps.teamofsilicons.com", None)?
         .with_telemetry(false);
     let matches = apps.search("terminal", false, false).await?;
-    let details = apps.app("apps").await?;
+    let details = apps.app("silicon-apps").await?;
     println!("{matches}\n{details}");
     Ok(())
 }

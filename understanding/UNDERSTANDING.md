@@ -204,6 +204,8 @@ An app can import its existing users through an import users flow, so it can bri
 
 # Apps
 
+Silicon Apps itself uses the app ID `silicon-apps`, including its Accounts membership, tokens and developer portal entry. The original `apps` ID is migrated with its owner, authors, settings and users intact. This is a correction to our own app identity, not a general app-renaming feature.
+
 Apps are registered through Silicon Apps in the shared developer portal. As soon as an app is created there it can be used to sign users in. On `developers.teamofsilicons.com` a developer sees the list of apps they have and makes new ones.
 
 The app's sign-in setup (its sign-in methods, Google and Apple, flows, page styling, required and optional details and redirect URLs) is configured on `developers.teamofsilicons.com` and stored in Silicon Accounts.
