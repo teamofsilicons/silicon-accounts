@@ -9,8 +9,12 @@ Accounts API, account site, developer portal, and Caddy run as separate systemd
 users. PostgreSQL and application ports bind to loopback; only HTTP/HTTPS are
 public. Caddy overwrites incoming X-Forwarded-For with the actual peer address.
 Production secrets reside in Secrets Manager and root-only environment files.
-The DNS names are `accounts.teamofsilicons.com` and `developer.teamofsilicons.com`,
-managed using Namecheap CLI. Preserve other records.
+The Accounts site uses `accounts.teamofsilicons.com`. The management portal host is
+derived from the matching `ACCOUNTS_DEVELOPER_URL` and `DEVELOPER_PUBLIC_URL` secret
+fields, allowing it to move to `developer.accounts.teamofsilicons.com` while Silicon
+Apps takes over `developer.teamofsilicons.com`. Provision the destination DNS before
+changing these fields; the runtime validates the first-party callback at that origin.
+Preserve all unrelated DNS records.
 
 ## Release
 

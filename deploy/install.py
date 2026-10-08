@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Install a checksummed Accounts release on its dedicated AL2023 host (root via SSM)."""
-import argparse, hashlib, json, os, pathlib, pwd, shutil, subprocess, tarfile, time, urllib.request, urllib.parse
+import argparse, hashlib, json, os, pathlib, pwd, re, shutil, subprocess, tarfile, time, urllib.request, urllib.parse
 P=pathlib.Path
 
 def run(*cmd, **kw):
@@ -41,6 +41,10 @@ for user in ['accounts','accounts-web','accounts-developer','accounts-caddy']:
     except KeyError:run('useradd','--system','--home-dir','/var/lib/'+user,'--create-home','--shell','/sbin/nologin',user)
 # Secret retrieval output stays private; never place credentials in SSM command text or logs.
 s=json.loads(json.loads(subprocess.check_output(['aws','secretsmanager','get-secret-value','--region',a.region,'--secret-id',a.secret]))['SecretString'])
+developer_url=urllib.parse.urlsplit(s['DEVELOPER_PUBLIC_URL'])
+assert developer_url.scheme=='https' and developer_url.path in ('','/') and not developer_url.query and not developer_url.fragment
+assert developer_url.hostname and re.fullmatch(r'[a-z0-9.-]+',developer_url.hostname)
+assert s['ACCOUNTS_DEVELOPER_URL'].rstrip('/')==s['DEVELOPER_PUBLIC_URL'].rstrip('/')
 run('install','-d','-m','700','/etc/accounts')
 api={k:v for k,v in s.items() if k.startswith('ACCOUNTS_')}
 env('/etc/accounts/api.env',api)
@@ -102,10 +106,10 @@ accounts.teamofsilicons.com {
         }
     }
 }
-developer.teamofsilicons.com {
+__DEVELOPER_HOST__ {
     reverse_proxy 127.0.0.1:8600
 }
-''')
+'''.replace('__DEVELOPER_HOST__',developer_url.hostname))
 # Give Caddy access only to its non-secret configuration, not the API's env files.
 run('install','-d','-m','755','/etc/accounts-caddy')
 shutil.copyfile('/etc/accounts/Caddyfile','/etc/accounts-caddy/Caddyfile');P('/etc/accounts-caddy/Caddyfile').chmod(0o644)
