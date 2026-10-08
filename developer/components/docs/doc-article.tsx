@@ -1,13 +1,12 @@
 /**
- * One docs page (server): its header (where it sits, title, lede, kind, and links to its source on GitHub, once the
- * repository is published there, and to its Markdown),
+ * One docs page (server): its header (where it sits, title, lede, and kind),
  * "On this page", the body, the related pages from its front matter (instructions link to explanations and back),
  * and the previous and next page. The landing page (docs/index.md) adds every page, grouped, at the end.
  */
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, ChevronRight, FileText, SquarePen } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight } from "lucide-react";
 import { docs, findPageByPath, groupPages, neighbours, parsedPage, type DocPage } from "@/lib/docs/content";
-import { DOCS_BASE, GITHUB_PUBLISHED, sectionInfo, productOf, productLabel } from "@/lib/docs/site";
+import { DOCS_BASE, sectionInfo, productOf, productLabel } from "@/lib/docs/site";
 import { DocsTocDisclosure, DocsTocRail } from "./docs-toc";
 import { Markdown } from "./markdown";
 import styles from "./doc-article.module.css";
@@ -41,23 +40,6 @@ function Crumbs({ page }: { page: DocPage }) {
         ) : null}
       </ol>
     </nav>
-  );
-}
-
-function SourceLinks({ page, className }: { page: DocPage; className?: string }) {
-  return (
-    <span className={className}>
-      {GITHUB_PUBLISHED ? (
-        <a href={page.editHref} className={styles.sourceLink}>
-          <SquarePen size={14} strokeWidth={1.75} aria-hidden="true" />
-          Edit on GitHub
-        </a>
-      ) : null}
-      <a href={page.rawHref} type="text/markdown" className={styles.sourceLink}>
-        <FileText size={14} strokeWidth={1.75} aria-hidden="true" />
-        View as Markdown
-      </a>
-    </span>
   );
 }
 
@@ -125,10 +107,11 @@ export function DocArticle({ page }: { page: DocPage }) {
           {landing ? <p className={styles.eyebrow}>Documentation</p> : <Crumbs page={page} />}
           <h1 className={landing ? `${styles.title} ${styles.landingTitle}` : styles.title}>{page.title}</h1>
           {page.description ? <p className={styles.lede}>{page.description}</p> : null}
-          <div className={styles.meta}>
-            {landing ? null : <span className={styles.kind} data-sq="surface" data-kind={page.group.endsWith("reference") ? "reference" : page.kind}>{kindLabel(page)}</span>}
-            <SourceLinks page={page} className={styles.metaLinks} />
-          </div>
+          {landing ? null : (
+            <div className={styles.meta}>
+              <span className={styles.kind} data-sq="surface" data-kind={page.group.endsWith("reference") ? "reference" : page.kind}>{kindLabel(page)}</span>
+            </div>
+          )}
         </header>
 
         <div className={styles.tocInline}>
@@ -151,9 +134,7 @@ export function DocArticle({ page }: { page: DocPage }) {
         <Pager page={page} />
       </article>
       <aside className={styles.rail} aria-label="Page tools">
-        <DocsTocRail items={parsed.toc}>
-          <SourceLinks page={page} className={styles.railLinks} />
-        </DocsTocRail>
+        <DocsTocRail items={parsed.toc} />
       </aside>
     </div>
   );

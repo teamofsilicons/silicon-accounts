@@ -23,4 +23,4 @@ Add sign-in to your app, configure the hosted pages, manage users and webhooks, 
 
 ## Read in your tools
 
-Every page is available as Markdown through **View as Markdown**. [llms.txt](/llms.txt) lists both products, and [llms-full.txt](/llms-full.txt) contains their complete documentation.
+Every page is also available as Markdown. [llms.txt](/llms.txt) lists both products, and [llms-full.txt](/llms-full.txt) contains their complete documentation.

@@ -9,7 +9,7 @@
 /** Where the site serves the docs. */
 export const DOCS_BASE = "/docs";
 
-/** The repository, for "Edit on GitHub" and links to files outside docs/. */
+/** The repository, for source metadata and links to files outside docs/. */
 export const GITHUB_REPO = "https://github.com/teamofsilicons/silicon-accounts";
 export const GITHUB_BRANCH = "main";
 
