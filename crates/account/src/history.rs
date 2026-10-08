@@ -1263,7 +1263,10 @@ mod tests {
         let both = json!({"shared": ["email", "timezone"], "offered": ["email", "timezone"]});
         assert_eq!(
             consent_title(Some(&both), "Commit"),
-            ("Shared your email and timezone with Commit".to_string(), None)
+            (
+                "Shared your email and timezone with Commit".to_string(),
+                None
+            )
         );
         let partly = json!({"shared": ["email"], "offered": ["email", "phone", "dob"]});
         assert_eq!(
