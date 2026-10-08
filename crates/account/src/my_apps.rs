@@ -171,7 +171,7 @@ fn first_party_refusal(app_id: &str) -> ApiError {
     let refusal = if app_id == DEVELOPER_APP_ID {
         ApiError::bad_request(
             "first_party_app",
-            "The developer platform (developer.teamofsilicons.com, app_id 'developer') is part of Silicon Accounts, not an app you signed into, so it has no access to your account to remove.",
+            "The developer platform (developers.teamofsilicons.com, app_id 'developer') is part of Silicon Accounts, not an app you signed into, so it has no access to your account to remove.",
         )
         .hint("To sign the developer site out, revoke its sign-in with DELETE /v1/me/sessions/{id} (GET /v1/me/sessions lists it with kind developer).")
     } else {

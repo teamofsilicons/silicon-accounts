@@ -38,7 +38,7 @@ the proofs made for it, so revoking or refreshing the proof for one app never af
 the others, and a proof leaked by one app can't be replayed at another.
 
 Owners can also make, see and revoke ATA proofs through their session: the app's ATA
-page on developer.teamofsilicons.com calls the same endpoint
+page on developers.teamofsilicons.com calls the same endpoint
 (`POST /v1/apps/{app_id}/proofs/ata` with `{"receiving_app": "remind"}`). A request
 that lists several apps (`audiences`) is refused with `ata_single_app`.
 

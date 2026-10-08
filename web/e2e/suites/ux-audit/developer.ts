@@ -1,6 +1,6 @@
 /**
- * ux-audit: the developer site (developer.teamofsilicons.com, `developer/`, base + 5), where everything about building
- * an app's sign-in lives in v2 (UNDERSTANDING.md "developer.teamofsilicons.com"), in light and dark at 1440 and 390 px:
+ * ux-audit: the developer site (developers.teamofsilicons.com, `developer/`, base + 5), where everything about building
+ * an app's sign-in lives in v2 (UNDERSTANDING.md "developers.teamofsilicons.com"), in light and dark at 1440 and 390 px:
  *
  *   signin     signed out: its /sign-in card, a failed sign-in's words, the hosted sign-in it sends to (the account
  *              site's page for the first-party app `developer`), the not-found page, an app the Carbon does not own,

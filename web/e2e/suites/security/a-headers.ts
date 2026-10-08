@@ -3,7 +3,7 @@
  *
  * - the account site's HTML (nonce CSP, frame-ancestors 'none', X-Frame-Options, nosniff, referrer policy, no caching
  *   of nonce pages); its old /developer addresses are 307s to the developer site and never anywhere else;
- * - the developer site's HTML (developer.teamofsilicons.com: the same nonce CSP rules, frame-ancestors 'none' + DENY,
+ * - the developer site's HTML (developers.teamofsilicons.com: the same nonce CSP rules, frame-ancestors 'none' + DENY,
  *   its connect-src limited to itself and the account site) and its BFF answers (JSON, nosniff, no-store, no CORS);
  * - the embed page's frame-ancestors, per app: each app's own allowed origins, none for an app without any (and a
  *   change of an app's origins reaches the embed within the site's 30-second cache), CSP syntax never accepted;

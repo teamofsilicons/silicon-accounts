@@ -42,8 +42,8 @@ export const journey: Journey = {
     // UNDERSTANDING.md "Where things live": a Carbon's own account at accounts.…, building apps at developer.….
     const links = root.stdout.slice(root.stdout.indexOf("Links:"));
     results.check(
-      "its links name both sites: the account (https://accounts.teamofsilicons.com) and the developer platform (https://developer.teamofsilicons.com, the apps' sign-in setup)",
-      /Account\s+https:\/\/accounts\.teamofsilicons\.com\b/.test(links) && /Developer\s+https:\/\/developer\.teamofsilicons\.com\b/.test(links),
+      "its links name both sites: the account (https://accounts.teamofsilicons.com) and the developer platform (https://developers.teamofsilicons.com, the apps' sign-in setup)",
+      /Account\s+https:\/\/accounts\.teamofsilicons\.com\b/.test(links) && /Developer\s+https:\/\/developers\.teamofsilicons\.com\b/.test(links),
       short(links.split("\n").slice(0, 7).join(" | "), 400),
     );
     // `accounts app new` points at where apps are made and set up, the developer site's address coming from the service.

@@ -17,7 +17,7 @@
 //!
 //! # Developer platform tokens (`aud = developer`)
 //!
-//! developer.teamofsilicons.com signs Carbons in as the first-party public client `developer`.
+//! developers.teamofsilicons.com signs Carbons in as the first-party public client `developer`.
 //! Its access tokens act for the Carbon they belong to on exactly these routes
 //! ([`developer_audience_allowed`]): `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps`,
 //! and every owner route of an app ([`AppOrOwner`]: `/v1/apps/{app_id}/…` — details, sign-in

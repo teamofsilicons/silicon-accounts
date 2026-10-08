@@ -108,7 +108,7 @@ primary that gets verified (apps see `email_verified` / `phone_verified` change)
   Accounts' own apps hold sessions, not access: the hint points to `DELETE /v1/me/sessions/{id}`).
 - `GET /v1/me/sessions?limit&cursor` → items `{"id","kind":"browser"|"cli"|"developer","label","origin","ip","user_agent","created_at","last_seen_at","expires_at","current"}`
   (browser sessions, live `aud=accounts` token families as `cli` and live `aud=developer` ones
-  as `developer`, labelled "Silicon Developer (developer.teamofsilicons.com)"), newest first. A browser session's
+  as `developer`, labelled "Silicon Developer (developers.teamofsilicons.com)"), newest first. A browser session's
   `label` describes its user agent the way sign-in history does (`sessions::describe_user_agent`):
   "Safari on macOS" for a browser (only a `Mozilla/…` or `Opera/…` agent is ever called one, "A
   browser" when it isn't recognized), "accounts CLI 0.1.0" for the CLI
@@ -152,7 +152,7 @@ the address when the entry records it as `details.email` / `details.phone`), `id
 `oauth.refresh_reuse_detected` → "Sign-in at DM ended"; an action nobody mapped yet shows its
 code in words. Sign-outs are named as what was signed out: `account.session.revoked` (Settings)
 → "A browser session was signed out", "A CLI sign-in was signed out" or "A developer site
-sign-in was signed out" (detail "Silicon Developer (developer.teamofsilicons.com)"), and
+sign-in was signed out" (detail "Silicon Developer (developers.teamofsilicons.com)"), and
 `oauth.token_revoked` of a first-party sign-in → "Signed out of a CLI sign-in" (the family's
 label as detail, never the internal `code:…` marker) or "Signed out of the developer site".
 

@@ -272,7 +272,7 @@ export interface MyApp {
 
 /**
  * A browser session, a first-party (CLI / Silicon) sign-in, or a sign-in to the developer platform
- * (developer.teamofsilicons.com) (`GET /v1/me/sessions`).
+ * (developers.teamofsilicons.com) (`GET /v1/me/sessions`).
  */
 export interface SessionInfo {
   id: string;
@@ -333,7 +333,7 @@ export interface Meta {
    */
   docs_url?: string | null;
   /**
-   * The developer site (ACCOUNTS_DEVELOPER_URL; https://developer.teamofsilicons.com, http://localhost:8600 in
+   * The developer site (ACCOUNTS_DEVELOPER_URL; https://developers.teamofsilicons.com, http://localhost:8600 in
    * development), where apps' sign-in is set up. The dock's Developer item and /developer[/*] lead there. Optional for
    * servers before it existed (the site then uses the production address).
    */

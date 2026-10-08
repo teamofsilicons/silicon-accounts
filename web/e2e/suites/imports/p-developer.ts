@@ -1,6 +1,6 @@
 /**
  * Imports through the developer site (UNDERSTANDING.md: an app's user base and imports are set up on
- * developer.teamofsilicons.com; the browser only talks to that site, whose server holds the Carbon's tokens and calls
+ * developers.teamofsilicons.com; the browser only talks to that site, whose server holds the Carbon's tokens and calls
  * the API with them, 06-v2 §2). As legacy-crm's owner, through the developer site's BFF: list, a CSV dry run and a
  * JSON import (the job says the owner started it), a retry with the same Idempotency-Key, a 51 MB file refused with
  * the API's own 413 (nothing imported); refused there: writes from another origin or without one (CSRF), another

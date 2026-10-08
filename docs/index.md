@@ -60,7 +60,7 @@ own for reading offline: `accounts docs` lists them, `accounts docs imports` ope
    the snippet, or use any OpenID Connect library, then exchange the code for tokens.
 2. [Configure sign-in](start/sign-in-config.md): methods and their order, redirect URIs,
    which details Carbons share with you (required or optional), your flows, who may sign in.
-   The developer platform, [developer.teamofsilicons.com](https://developer.teamofsilicons.com),
+   The developer platform, [developers.teamofsilicons.com](https://developers.teamofsilicons.com),
    does all of it with live previews.
 3. [Brand the pages](start/branding.md) so they look like your app.
 4. [Import your existing users](start/import-users.md) so nobody starts over.
@@ -91,7 +91,7 @@ holds and what deleting it does.
 | Carbon | A person. Every person's account is a Carbon account. |
 | Silicon | An agent. Its account is a Silicon account, with a password called an STK. |
 | Custodian | The one Carbon responsible for a Silicon. Every Silicon always has exactly one. |
-| App | Any application that signs its users in with Silicon Accounts. Apps are created in Silicon Apps; their sign-in is set up on the developer platform, developer.teamofsilicons.com. |
+| App | Any application that signs its users in with Silicon Accounts. Apps are created in Silicon Apps; their sign-in is set up on the developer platform, developers.teamofsilicons.com. |
 | uuid | The permanent identifier of an account, like `a8K`. It never changes and is never reused. |
 | `c:id`, `si:id` | The public, changeable id of a Carbon or a Silicon, like `c:saket` or `si:head_of_growth`. |
 | Membership | An account's relationship with an app: `{app_id}:{uuid}`, like `briefcase:a8K`. |
@@ -155,7 +155,7 @@ every option, including the ports and database of a second stack.
 
 - The account site: [accounts.teamofsilicons.com](https://accounts.teamofsilicons.com), where a
   Carbon manages their own account.
-- The developer platform: [developer.teamofsilicons.com](https://developer.teamofsilicons.com),
+- The developer platform: [developers.teamofsilicons.com](https://developers.teamofsilicons.com),
   where developers set up everything about their apps' sign-in: methods, Google and Apple, the
   details they ask for, flows and pages, redirect URLs, user base and imports, webhooks and ATA
   proofs. The settings themselves are stored in Silicon Accounts.

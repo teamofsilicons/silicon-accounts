@@ -414,7 +414,7 @@ export interface DeveloperTokens {
 }
 
 /**
- * Signs in to the first-party app `developer` the way developer.teamofsilicons.com's server does (06-v2 §2): an
+ * Signs in to the first-party app `developer` the way developers.teamofsilicons.com's server does (06-v2 §2): an
  * authorization-code flow with PKCE S256 and no client secret, redirect URI `{developer}/auth/callback`, the code
  * exchanged at POST /v1/oauth/token with `client_id=developer`. A session already signed in continues as its Carbon;
  * otherwise `email` gets a code. Returns the developer-audience tokens (what the developer site keeps sealed).

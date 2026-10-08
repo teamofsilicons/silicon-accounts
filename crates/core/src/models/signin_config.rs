@@ -983,7 +983,7 @@ impl SigninConfig {
     }
 
     /// Applies the first-party rules for apps `accounts` (the account site and the CLI) and
-    /// `developer` (developer.teamofsilicons.com): email + phone always on, Google/Apple only
+    /// `developer` (developers.teamofsilicons.com): email + phone always on, Google/Apple only
     /// when managed credentials exist, no details asked (so no flow), signup allowed, and their
     /// fixed redirect URIs (any URL on the public origin for `accounts`; exactly
     /// `{developer_url}/auth/callback` for `developer`).

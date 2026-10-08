@@ -2139,7 +2139,7 @@ accounts app proof obo --subject-token "$ACCESS_TOKEN" --to briefcase \
 
 ##### `accounts app proof ata`
 
-Issue an ATA (app to app) proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An ATA proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Owners can also make, see and revoke ATA proofs on the app's ATA page at developer.teamofsilicons.com.
+Issue an ATA (app to app) proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An ATA proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Owners can also make, see and revoke ATA proofs on the app's ATA page at developers.teamofsilicons.com.
 
 ```text
 accounts app proof ata [OPTIONS] --to <APP_ID>

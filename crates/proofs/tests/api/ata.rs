@@ -221,7 +221,7 @@ async fn the_ata_page_works_for_the_app_and_its_owner() {
         .await;
     assert_eq!(r.status, 201, "{}", r.json);
 
-    // The owner on the app's ATA page at developer.teamofsilicons.com (a developer platform
+    // The owner on the app's ATA page at developers.teamofsilicons.com (a developer platform
     // token), where several apps are refused with a hint naming this page's endpoint.
     let dev = w
         .ctx

@@ -1,5 +1,5 @@
 /**
- * The import wizard on the developer site (developer.teamofsilicons.com: an app's user base and imports live there,
+ * The import wizard on the developer site (developers.teamofsilicons.com: an app's user base and imports live there,
  * UNDERSTANDING.md), as legacy-crm's owner signed in through its BFF: upload → check columns (the browser names the
  * columns and shows the first rows before anything is sent) → options → a dry run → "Import for real" → the report
  * (totals, filters, a row's detail) → Recent imports; columns Silicon Accounts doesn't keep must be acknowledged; dirty

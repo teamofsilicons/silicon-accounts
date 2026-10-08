@@ -178,7 +178,7 @@ minute per IP).
   "error": {
     "code": "redirect_uri_not_registered",
     "message": "redirect_uri 'https://evil.example/cb' is not registered for the app 'commit': it must equal one of the app's registered redirect_uris exactly (http://localhost and http://127.0.0.1 match on any port when registered with that host).",
-    "hint": "Register it in the app's sign-in setup (on developer.teamofsilicons.com, or PATCH /v1/apps/commit/signin-config with redirect_uris), or use a registered URI.",
+    "hint": "Register it in the app's sign-in setup (on developers.teamofsilicons.com, or PATCH /v1/apps/commit/signin-config with redirect_uris), or use a registered URI.",
     "details": { "app_id": "commit" }
   }
 }

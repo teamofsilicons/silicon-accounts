@@ -182,7 +182,7 @@ Responses are `Cache-Control: no-store`; errors are RFC 6749 bodies.
 (`invalid_client`). `client_id=accounts` with no secret is the first-party public client (the
 `accounts` CLI): it may only use `refresh_token` and the device-code grant
 (`unauthorized_client` otherwise). `client_id=developer` with no secret is the developer
-platform (developer.teamofsilicons.com, whose server holds the tokens): it may only use
+platform (developers.teamofsilicons.com, whose server holds the tokens): it may only use
 `authorization_code` with PKCE `S256` (a missing challenge or `plain` is `invalid_grant`, and the
 code is burnt), `refresh_token` for its own tokens, and `/v1/oauth/revoke`; other grants are
 `unauthorized_client` and introspection is `invalid_client`. Its tokens have `aud: "developer"`

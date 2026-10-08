@@ -3,13 +3,13 @@
  * read this list) and the route paths every page links to. Link with `paths`, never string literals.
  *
  * Building apps is not part of the account site: the Developer section leads to the developer site
- * (developer.teamofsilicons.com, `developer_url` in GET /v1/meta), and /developer[/*] here redirects there (proxy.ts).
+ * (developers.teamofsilicons.com, `developer_url` in GET /v1/meta), and /developer[/*] here redirects there (proxy.ts).
  */
 import type { LucideIcon } from "lucide-react";
 import { Braces, Cpu, History, IdCard, KeyRound, LayoutGrid, ShieldCheck } from "lucide-react";
 
 /** The developer site when GET /v1/meta does not name one (servers before it existed). */
-export const DEFAULT_DEVELOPER_URL = "https://developer.teamofsilicons.com";
+export const DEFAULT_DEVELOPER_URL = "https://developers.teamofsilicons.com";
 
 /**
  * The developer site's address from GET /v1/meta `developer_url`, when it is a usable http(s) address; else the

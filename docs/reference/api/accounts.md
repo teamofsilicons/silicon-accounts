@@ -396,7 +396,7 @@ can't lose access; revoke its sessions instead).
 ### `GET /v1/me/sessions`
 
 Browser sessions, live first-party sign-ins (CLI, Silicon login, device flow) and sign-ins to the
-developer platform (developer.teamofsilicons.com), newest first.
+developer platform (developers.teamofsilicons.com), newest first.
 
 ```json
 {
@@ -431,7 +431,7 @@ developer platform (developer.teamofsilicons.com), newest first.
 ```
 
 `kind` is `browser`, `cli` or `developer` (a developer-platform sign-in, labelled "Silicon
-Developer (developer.teamofsilicons.com)"). `origin` for CLI sign-ins is `cli_code`, `device` or
+Developer (developers.teamofsilicons.com)"). `origin` for CLI sign-ins is `cli_code`, `device` or
 `silicon_login`; `current` marks the session making the request.
 
 ### `DELETE /v1/me/sessions/{id}`

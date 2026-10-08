@@ -1274,7 +1274,7 @@ pub enum ProofCommand {
     },
     /// Issue an ATA proof that one other app can verify (one proof per app).
     #[command(
-        long_about = "Issue an ATA (app to app) proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An ATA proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Owners can also make, see and revoke ATA proofs on the app's ATA page at developer.teamofsilicons.com.",
+        long_about = "Issue an ATA (app to app) proof: a token that proves to exactly one other app that a request really comes from this app. The receiving app checks it with `accounts app proof verify` (or POST /v1/proofs/verify). An ATA proof is always for one app: to talk to several apps, issue one proof per app, and each app verifies its own. Owners can also make, see and revoke ATA proofs on the app's ATA page at developers.teamofsilicons.com.",
         after_long_help = "Examples:\n  accounts app proof ata --to remind --ttl 300\n  accounts app proof ata --to waveform --scope notifications.send\n  accounts app proof list --kind ata"
     )]
     Ata {

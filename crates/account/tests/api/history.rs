@@ -656,7 +656,7 @@ async fn sign_outs_from_settings_name_what_was_signed_out() {
             ("A browser session was signed out".to_string(), None),
             (
                 "A developer site sign-in was signed out".to_string(),
-                Some("Silicon Developer (developer.teamofsilicons.com)".to_string()),
+                Some("Silicon Developer (developers.teamofsilicons.com)".to_string()),
             ),
         ],
         "{}",
@@ -994,7 +994,7 @@ async fn entries_from_sign_in_flows_read_as_sentences() {
         ("Signed out of a CLI sign-in", None),
         (
             "Signed out of the developer site",
-            Some("Silicon Developer (developer.teamofsilicons.com)"),
+            Some("Silicon Developer (developers.teamofsilicons.com)"),
         ),
         (
             "Sign-in at Test app dm ended",

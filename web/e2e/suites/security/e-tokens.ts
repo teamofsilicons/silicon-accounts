@@ -1,6 +1,6 @@
 /**
  * Token confusion. Three audiences act for a Carbon: `accounts` (the account site's own tokens: the CLI, Silicons,
- * the device flow) works everywhere an account acts; `developer` (developer.teamofsilicons.com's tokens) only reads
+ * the device flow) works everywhere an account acts; `developer` (developers.teamofsilicons.com's tokens) only reads
  * the account (GET /v1/me, /v1/session, /v1/me/owned-apps) and manages the apps the Carbon owns (/v1/apps/{app_id}/…),
  * and is refused with 401 `token_wrong_audience` everywhere else (it can never mint an SLT, approve a device code, touch
  * Silicons, emails or sessions); an app's own token (aud = the app) never opens an account endpoint or an owner route.

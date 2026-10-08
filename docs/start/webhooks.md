@@ -53,7 +53,7 @@ printf '%s' '1791340349.{"app_id":"dm","data":{},"event_id":"01a11434-82ea-71e3-
 
 ## Steps
 
-1. **Set the endpoint and keep the secret.** For an app: `PUT /v1/apps/{app_id}/webhook` (above), `accounts app webhook set <url>`, or the app's Webhooks tab on developer.teamofsilicons.com. For a Silicon: see [Silicon webhooks](#silicon-webhooks). Every time you set the URL, a new `whsec_…` secret is generated and shown once; a retry with the same `Idempotency-Key` within 10 minutes returns the same secret instead of making another. In production the URL must be `https` and reach a public address.
+1. **Set the endpoint and keep the secret.** For an app: `PUT /v1/apps/{app_id}/webhook` (above), `accounts app webhook set <url>`, or the app's Webhooks tab on developers.teamofsilicons.com. For a Silicon: see [Silicon webhooks](#silicon-webhooks). Every time you set the URL, a new `whsec_…` secret is generated and shown once; a retry with the same `Idempotency-Key` within 10 minutes returns the same secret instead of making another. In production the URL must be `https` and reach a public address.
 2. **Verify every delivery before you trust it:**
    1. Read the raw request body as bytes. Verify those bytes, never JSON you re-serialized.
    2. Read `X-Accounts-Timestamp` (unix seconds). Refuse it if it is more than 5 minutes from your clock. Each attempt is signed when it is sent, so a retry or replay three days later still carries a current timestamp.

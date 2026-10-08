@@ -58,7 +58,7 @@ What this deployment is. Public.
   "public_url": "https://accounts.teamofsilicons.com",
   "silicon_apps_url": "https://apps.teamofsilicons.com",
   "docs_url": "https://accounts.teamofsilicons.com/docs",
-  "developer_url": "https://developer.teamofsilicons.com",
+  "developer_url": "https://developers.teamofsilicons.com",
   "providers": { "google": true, "apple": true },
   "delivery": "providers"
 }

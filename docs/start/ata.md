@@ -90,7 +90,7 @@ Send an `Idempotency-Key`: a retry with the same key and body within 10 minutes 
 
 The answer has the same fields as an OBO proof, with `user: null`. `refresh_expires_at` is 900 days after issuing. Keep `proof_refresh_token` on your side; send `proof_token` to the apps.
 
-**As the app's owner.** Every app has an ATA page on [developer.teamofsilicons.com](https://developer.teamofsilicons.com) (`/apps/<app_id>/ata`) where its owner makes, sees and revokes ATA proofs, one app at a time. Behind it is the owner endpoint, which takes the owner's session instead of the app secret, with the same body and the same answer:
+**As the app's owner.** Every app has an ATA page on [developers.teamofsilicons.com](https://developers.teamofsilicons.com) (`/apps/<app_id>/ata`) where its owner makes, sees and revokes ATA proofs, one app at a time. Behind it is the owner endpoint, which takes the owner's session instead of the app secret, with the same body and the same answer:
 
 ```bash
 curl -s -X POST https://accounts.teamofsilicons.com/v1/apps/commit/proofs/ata \

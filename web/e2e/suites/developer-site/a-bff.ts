@@ -1,5 +1,5 @@
 /**
- * developer.teamofsilicons.com is a BFF (06-v2 §2): its Next server signs a Carbon in through the account site's hosted
+ * developers.teamofsilicons.com is a BFF (06-v2 §2): its Next server signs a Carbon in through the account site's hosted
  * pages as the first-party public client `developer` (PKCE S256), keeps the tokens in a sealed httpOnly cookie, and
  * proxies /api/accounts/* to accounts-api. This journey signs an app's owner in from a deep link and checks that no
  * token ever reaches the browser, what the developer audience's token may do at accounts-api (and what it may not),

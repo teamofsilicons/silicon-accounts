@@ -1,5 +1,5 @@
 /**
- * The owner's Webhooks tab on the developer site, the endpoint side (developer.teamofsilicons.com
+ * The owner's Webhooks tab on the developer site, the endpoint side (developers.teamofsilicons.com
  * /apps/campus-connect/webhooks, owner it@university.test signed in through the developer site's BFF), in the browser: Change URL refuses a bad URL in place (the page's own check, and a 422 only the server can give, shown under
  * the field), Cancel keeps the URL, saving a new URL shows its new signing secret once and the next ping is signed with
  * it; Remove webhook fails what is pending at once and disables "Replay all failed"; setting a URL again, the failed

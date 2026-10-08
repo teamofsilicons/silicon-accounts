@@ -39,7 +39,15 @@ pub async fn sync_developer_app(state: &AppState) -> Result<DeveloperSync, sqlx:
     let Some(before) = before else {
         return Ok(DeveloperSync::Missing);
     };
+    // Existing installations retain the historical migration's hostname. Keep
+    // the first-party app's public link aligned with the configured portal too.
+    sqlx::query("update apps set homepage_url=$2, updated_at=now() where app_id=$1 and homepage_url is distinct from $2")
+        .bind(DEVELOPER_APP_ID)
+        .bind(&state.settings.developer_url)
+        .execute(&mut *tx)
+        .await?;
     if before == wanted {
+        tx.commit().await?;
         return Ok(DeveloperSync::Unchanged);
     }
     let version: i64 = sqlx::query_scalar(

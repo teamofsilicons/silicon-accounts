@@ -9,7 +9,7 @@ Apps are created in Silicon Apps (`accounts app new` opens it). As soon as an ap
 exists there it can sign people in. You get an `app_id` and an app secret.
 
 Everything about an app's sign-in is set up on the developer platform,
-https://developer.teamofsilicons.com (its methods, Google and Apple, details and flows,
+https://developers.teamofsilicons.com (its methods, Google and Apple, details and flows,
 page styling, redirect URLs, user base and imports, webhooks, ATA proofs). The settings
 live in Silicon Accounts, so this CLI reads and changes the same setup.
 

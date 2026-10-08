@@ -1,5 +1,5 @@
 /**
- * The app owner's Webhooks tab on the developer site (developer.teamofsilicons.com: /apps/<app>/webhooks, UNDERSTANDING.md
+ * The app owner's Webhooks tab on the developer site (developers.teamofsilicons.com: /apps/<app>/webhooks, UNDERSTANDING.md
  * v2: "set up the app's webhook, and see and replay its deliveries"), in the browser: the owner signs in through the
  * developer site's BFF (the account site's hosted sign-in as the first-party app `developer`); the account site's old
  * address of the tab (/developer/<app>/webhooks) lands there; the endpoint and the event list, "Send test ping" (the fake

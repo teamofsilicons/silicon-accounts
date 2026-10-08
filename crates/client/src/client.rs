@@ -21,7 +21,7 @@ pub const DEFAULT_BASE_URL: &str = "https://accounts.teamofsilicons.com";
 /// tokens (Carbon CLI sign-in, Silicon login) are issued with `aud = "accounts"`.
 pub const FIRST_PARTY_APP_ID: &str = "accounts";
 
-/// The developer platform's app id (developer.teamofsilicons.com): a public client (no
+/// The developer platform's app id (developers.teamofsilicons.com): a public client (no
 /// secret, PKCE S256 required). Its tokens (`aud = developer`) only read the signed-in Carbon
 /// and manage the apps they own; anything else answers 401 `token_wrong_audience`.
 pub const DEVELOPER_APP_ID: &str = "developer";

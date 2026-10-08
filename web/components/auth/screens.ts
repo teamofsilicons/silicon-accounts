@@ -68,7 +68,7 @@ export const flowRoutes: MockRoute[] = [
     const appId = String(input.app_id ?? input.client_id ?? "");
     if (appId === "nope") return apiError(400, "unknown_app", "No app with app_id 'nope' exists in Silicon Accounts.", "Check the app_id in the sign-in link; apps are created in Silicon Apps.");
     if (String(input.redirect_uri ?? "").includes("evil")) {
-      return apiError(400, "redirect_uri_not_registered", `redirect_uri 'https://evil.example/steal' is not registered for the app '${appId}': it must equal one of the app's registered redirect_uris exactly (http://localhost and http://127.0.0.1 match on any port when registered with that host).`, `Register it in the app's sign-in setup (on developer.teamofsilicons.com, or PATCH /v1/apps/${appId}/signin-config with redirect_uris), or use a registered URI.`, { app_id: appId });
+      return apiError(400, "redirect_uri_not_registered", `redirect_uri 'https://evil.example/steal' is not registered for the app '${appId}': it must equal one of the app's registered redirect_uris exactly (http://localhost and http://127.0.0.1 match on any port when registered with that host).`, `Register it in the app's sign-in setup (on developers.teamofsilicons.com, or PATCH /v1/apps/${appId}/signin-config with redirect_uris), or use a registered URI.`, { app_id: appId });
     }
     const method = typeof input.method === "string" ? input.method : null;
     const scenario: Scenario = method === "google" ? "opening_google" : method === "apple" ? "opening_apple" : method === "email" ? "email_direct" : input.intent === "signup" ? "signup_intent" : "choose_method";

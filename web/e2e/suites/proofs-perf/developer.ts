@@ -1,5 +1,5 @@
 /**
- * ATA proofs from the developer platform (UNDERSTANDING.md: on developer.teamofsilicons.com a developer can "make, see
+ * ATA proofs from the developer platform (UNDERSTANDING.md: on developers.teamofsilicons.com a developer can "make, see
  * and revoke the app's ATA proofs, one app at a time"), and what a developer-platform sign-in can and cannot do with
  * proofs.
  *

@@ -8,7 +8,7 @@
  * text spilling out of its box) goes to the journey's findings file: e2e/.artifacts/<base>/ux-audit/<journey>.json.
  *
  * UNDERSTANDING.md v2: two sites. The account site (accounts.teamofsilicons.com, env.site) holds a Carbon's own account,
- * the hosted sign-in pages, the device page and the docs; the developer site (developer.teamofsilicons.com, env.developer,
+ * the hosted sign-in pages, the device page and the docs; the developer site (developers.teamofsilicons.com, env.developer,
  * base + 5) holds everything about building apps, signed in through its BFF (lib.ts signInOnDeveloper). Both are audited
  * with the same checks; "Powered by Silicon Accounts" links to https://accounts.teamofsilicons.com (POWERED_HREF).
  *

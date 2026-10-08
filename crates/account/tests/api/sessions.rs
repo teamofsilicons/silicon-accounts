@@ -194,7 +194,7 @@ async fn only_your_own_first_party_sessions_can_be_revoked() {
     assert_error(&r, 404, "session_not_found");
 }
 
-/// Sign-ins to the developer platform (developer.teamofsilicons.com, aud = developer) are
+/// Sign-ins to the developer platform (developers.teamofsilicons.com, aud = developer) are
 /// sessions of Silicon Accounts too: listed, named, and ended from the account site.
 #[tokio::test]
 async fn developer_platform_sign_ins_are_listed_and_can_be_signed_out() {
@@ -218,7 +218,7 @@ async fn developer_platform_sign_ins_are_listed_and_can_be_signed_out() {
         .find(|s| s["kind"] == "developer")
         .expect("developer platform session");
     assert_eq!(
-        dev["label"], "Silicon Developer (developer.teamofsilicons.com)",
+        dev["label"], "Silicon Developer (developers.teamofsilicons.com)",
         "{dev}"
     );
     assert_eq!(dev["current"], false);

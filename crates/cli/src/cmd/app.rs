@@ -505,7 +505,7 @@ async fn new_app(ctx: &Ctx, no_browser: bool) -> CliResult<Outcome> {
         .developer_url
         .clone()
         .filter(|u| !u.is_empty())
-        .unwrap_or_else(|| "https://developer.teamofsilicons.com".to_owned());
+        .unwrap_or_else(|| "https://developers.teamofsilicons.com".to_owned());
     let opened = !no_browser && util::open_browser(&url);
     let text = format!(
         "Apps are created in Silicon Apps: {url}{}\nAs soon as it exists there, it can sign people in. Set up its sign-in on the developer platform ({developer_url}), or here with `accounts app use <app_id> --secret-stdin` and `accounts app config set`.",

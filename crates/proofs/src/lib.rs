@@ -24,7 +24,7 @@
 //! | `POST /v1/proofs/verify` | receiving app | `{"valid":true,…}` or exactly `{"valid":false,"expires_at":null}` |
 //! | `POST /v1/proofs/revoke` | issuing app | by `proof_id`, `proof_token` or `proof_refresh_token` |
 //! | `GET /v1/apps/{app_id}/proofs` | app or owner | proofs the app issued |
-//! | `POST /v1/apps/{app_id}/proofs/ata` | app or owner | the app's ATA page on developer.teamofsilicons.com (IDEMPOTENT) |
+//! | `POST /v1/apps/{app_id}/proofs/ata` | app or owner | the app's ATA page on developers.teamofsilicons.com (IDEMPOTENT) |
 //! | `DELETE /v1/apps/{app_id}/proofs/{proof_id}` | app or owner | revoke |
 //! | `GET /v1/me/proofs` | session | OBO proofs issued on my behalf |
 //! | `DELETE /v1/me/proofs/{proof_id}` | session | revoke one |

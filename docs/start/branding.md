@@ -103,7 +103,7 @@ curl -s "$ACCOUNTS_URL/v1/apps/waveform/public"
 }
 ```
 
-On [developer.teamofsilicons.com](https://developer.teamofsilicons.com), the app's **Pages** tab
+On [developers.teamofsilicons.com](https://developers.teamofsilicons.com), the app's **Pages** tab
 (`/apps/{app_id}/pages`) edits the same variables and every page's words with a live preview of
 every page (sign-in and sign-up, the Opening page for Google and Apple, the code pages, setting up
 an account, each page of the app's flow, the review page and the embed buttons), in light and

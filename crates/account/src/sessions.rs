@@ -1,7 +1,7 @@
 //! Where the account is signed in to Silicon Accounts itself: browser sessions (the account site
 //! and hosted pages), first-party sign-ins (`aud = accounts` token families: the CLI, the
 //! package, Silicon logins) and sign-ins to the developer platform (`aud = developer` token
-//! families: developer.teamofsilicons.com). Apps' own sign-ins are managed per app at
+//! families: developers.teamofsilicons.com). Apps' own sign-ins are managed per app at
 //! `/v1/me/apps`.
 
 use accounts_core::http::cookies::{SESSION_COOKIE, append_cookie, clear_cookie};
@@ -47,7 +47,7 @@ const SESSION_APPS: [&str; 2] = [FIRST_PARTY_APP_ID, DEVELOPER_APP_ID];
 pub(crate) struct SessionView {
     id: String,
     /// `browser` (cookie session), `cli` (first-party sign-in: CLI, package, Silicon login) or
-    /// `developer` (a sign-in to the developer platform, developer.teamofsilicons.com).
+    /// `developer` (a sign-in to the developer platform, developers.teamofsilicons.com).
     kind: String,
     label: Option<String>,
     /// For `cli` sessions: how they signed in (`device`, `cli_code`, `silicon_login`,
@@ -201,7 +201,7 @@ pub(crate) fn describe_user_agent(ua: &str) -> Option<String> {
 }
 
 /// How a sign-in to the developer platform is named, in the session list and in history.
-pub(crate) const DEVELOPER_SITE: &str = "Silicon Developer (developer.teamofsilicons.com)";
+pub(crate) const DEVELOPER_SITE: &str = "Silicon Developer (developers.teamofsilicons.com)";
 
 fn family_label(kind: &str, origin: Option<&str>) -> &'static str {
     if kind == "developer" {

@@ -56,7 +56,7 @@ pub use state::{AppState, Keys};
 /// The `app_id` of the first-party app: the account site and the accounts CLI.
 pub const FIRST_PARTY_APP_ID: &str = "accounts";
 
-/// The `app_id` of the developer platform (developer.teamofsilicons.com): a first-party public
+/// The `app_id` of the developer platform (developers.teamofsilicons.com): a first-party public
 /// client (no secret, PKCE required) whose tokens (`aud = developer`) may only read the
 /// signed-in Carbon's identity and manage the apps they own (see `http::auth`).
 pub const DEVELOPER_APP_ID: &str = "developer";

@@ -190,7 +190,7 @@ pub async fn create_flow(
             )
         } else {
             format!(
-                "Register it in the app's sign-in setup (on developer.teamofsilicons.com, or PATCH /v1/apps/{app_id}/signin-config with redirect_uris), or use a registered URI."
+                "Register it in the app's sign-in setup (on developers.teamofsilicons.com, or PATCH /v1/apps/{app_id}/signin-config with redirect_uris), or use a registered URI."
             )
         };
         return Err(ApiError::bad_request(

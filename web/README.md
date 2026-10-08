@@ -5,7 +5,7 @@ hosted sign-in pages apps send people to, the docs, the embeddable sign-in butto
 
 Building apps is not done here. Everything about an app's sign-in (its methods, Google and Apple, details and flows,
 page styling, redirect URLs, user base and imports, webhooks, ATA proofs, embed snippets) lives on the developer site,
-developer.teamofsilicons.com (`developer/` in this repository, its own Next.js app). This site only links there: the
+developers.teamofsilicons.com (`developer/` in this repository, its own Next.js app). This site only links there: the
 dock's Developer item, the landing page's footer and the apps page lead to `developer_url` from `GET /v1/meta`, and
 `/developer[/*]` redirects there (see Topology).
 
@@ -57,7 +57,7 @@ script; Next adds it to its own scripts. It skips `/v1`, `/.well-known`, `/_next
 
 `proxy.ts` also sends every old developer address to the developer site with a `307`: `/developer` to its home and
 `/developer/{app_id}[/{tab}]` to `/apps/{app_id}[/{tab}]` there, query kept. The site's address is `developer_url` from
-`GET /v1/meta` (cached for a minute; `ACCOUNTS_DEVELOPER_URL`, then https://developer.teamofsilicons.com, when the API
+`GET /v1/meta` (cached for a minute; `ACCOUNTS_DEVELOPER_URL`, then https://developers.teamofsilicons.com, when the API
 cannot say).
 
 The embed page `/embed/v1/buttons` is the one page other sites may frame: `proxy.ts` reads the app's

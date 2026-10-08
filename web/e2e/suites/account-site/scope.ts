@@ -1,7 +1,7 @@
 /**
  * What the account site is for (UNDERSTANDING.md "Where things live" and "accounts.teamofsilicons.com"): a Carbon
  * manages their own account there (details, emails and phone numbers, the apps they signed into, proofs, Silicons).
- * "Anything about building apps lives on developer.teamofsilicons.com, not here." In v2 (06-v2 §1) the dock's Developer
+ * "Anything about building apps lives on developers.teamofsilicons.com, not here." In v2 (06-v2 §1) the dock's Developer
  * item, the landing page's footer and /apps lead to the developer site (`developer_url` from GET /v1/meta), and every
  * old /developer[/*] address of the account site answers 307 there.
  */

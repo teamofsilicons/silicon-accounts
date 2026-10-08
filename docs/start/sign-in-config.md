@@ -70,7 +70,7 @@ can sign Carbons and Silicons in as soon as it exists in Silicon Apps, with sens
 - **The app itself**, with its credentials: `Authorization: Basic base64(app_id:app_secret)`
   (`curl -u "$APP_ID:$APP_SECRET"`), or `accounts app use <app_id> --secret-stdin`.
 - **The Carbon who owns the app**, signed in: `accounts app use <app_id>` without a secret acts
-  through your own session. On [developer.teamofsilicons.com](https://developer.teamofsilicons.com),
+  through your own session. On [developers.teamofsilicons.com](https://developers.teamofsilicons.com),
   the developer platform, it is the app's **Sign-in**, **Details**, **Flows** and **Pages** tabs
   (`/apps/{app_id}/sign-in` and so on), with a live preview. The account site
   (accounts.teamofsilicons.com) is only for a Carbon's own account; its old `/developer` pages
@@ -405,7 +405,7 @@ exactly as sent; errors are keyed by path, such as `flow.steps[1].fields[0]`.
 Carbons see every page on their first sign-in to your app. A returning Carbon sees only a page
 with something new for them (a required detail you weren't granted yet, or one they no longer
 have); one with nothing new goes straight back to your app. On
-[developer.teamofsilicons.com](https://developer.teamofsilicons.com), the app's **Details** tab picks
+[developers.teamofsilicons.com](https://developers.teamofsilicons.com), the app's **Details** tab picks
 the details (ticking one makes it required) and the **Flows** tab builds the pages by dragging
 details between them, with a live preview.
 

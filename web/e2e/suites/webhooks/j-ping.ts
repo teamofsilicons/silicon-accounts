@@ -1,7 +1,7 @@
 /**
  * The test ping and who may touch an app's webhook (orbit-games): the app itself, its owner signed in on the account
  * site (with the site's Origin: the CSRF guard), or its owner through the developer platform (a token with
- * aud=developer, what developer.teamofsilicons.com's BFF sends), never another app, another Carbon or nobody. An Idempotency-Key makes
+ * aud=developer, what developers.teamofsilicons.com's BFF sends), never another app, another Carbon or nobody. An Idempotency-Key makes
  * a retried ping a no-op. Deliveries list newest first with cursors and a status filter, and only the app's own. A
  * burst of pings measures delivery latency through the worker (16 at a time).
  */

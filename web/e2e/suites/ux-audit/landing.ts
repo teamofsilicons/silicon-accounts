@@ -2,7 +2,7 @@
  * ux-audit: the signed-out surfaces of the account site in light and dark at 1440 and 390 px: the landing page (and
  * its link to the developer site, GET /v1/meta developer_url), every step of the site's own sign-in (email, code, a
  * wrong code, setting up), the not-found page, a hosted link that cannot start, and the old /developer addresses, which
- * now lead to the developer site (UNDERSTANDING.md v2: "Anything about building apps lives on developer.teamofsilicons.com").
+ * now lead to the developer site (UNDERSTANDING.md v2: "Anything about building apps lives on developers.teamofsilicons.com").
  * Each page: theme, no sideways scroll, axe, squircles, console, broken images, vocabulary, screenshots.
  */
 import type { Journey } from "../../context";

@@ -15,7 +15,7 @@
  *
  * Request headers handed to the render: x-nonce, x-sa-surface (site | embed), x-sa-embed-framing (allowed | none).
  *
- * /developer and everything under it moved to the developer site (developer.teamofsilicons.com): a 307 to the address
+ * /developer and everything under it moved to the developer site (developers.teamofsilicons.com): a 307 to the address
  * GET /v1/meta names as `developer_url` (cached briefly; ACCOUNTS_DEVELOPER_URL, then the production address, when the
  * API cannot say). /developer → its home, /developer/{app_id}[/{tab}] → /apps/{app_id}[/{tab}] there, query kept.
  *
@@ -102,7 +102,7 @@ async function developerUrl(): Promise<string> {
   } catch {
     url = null;
   }
-  const resolved = url ?? siteUrl(process.env.ACCOUNTS_DEVELOPER_URL) ?? "https://developer.teamofsilicons.com";
+  const resolved = url ?? siteUrl(process.env.ACCOUNTS_DEVELOPER_URL) ?? "https://developers.teamofsilicons.com";
   // An answer from the API is kept for a minute; a fallback only briefly, so the real one is picked up soon.
   developerCache = { url: resolved, until: Date.now() + (url ? DEVELOPER_TTL_MS : 5_000) };
   return resolved;

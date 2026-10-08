@@ -101,7 +101,7 @@ async fn public_calls() {
         Reply::json(
             200,
             json!({"name": "Silicon Accounts", "docs_url": "https://accounts.teamofsilicons.com/docs",
-                "developer_url": "https://developer.teamofsilicons.com"}),
+                "developer_url": "https://developers.teamofsilicons.com"}),
         ),
     );
     let meta = c.meta().await.unwrap();
@@ -111,7 +111,7 @@ async fn public_calls() {
     );
     assert_eq!(
         meta.developer_url.as_deref(),
-        Some("https://developer.teamofsilicons.com")
+        Some("https://developers.teamofsilicons.com")
     );
     mock.on(
         "GET",

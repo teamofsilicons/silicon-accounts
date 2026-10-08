@@ -106,7 +106,7 @@ same ones (an id can differ if someone takes it in between).
   It counts like an import toward your budgets (60 requests per hour, 2,000,000 rows per 24
   hours), so dry-run the whole file once rather than piece by piece.
 
-On [developer.teamofsilicons.com](https://developer.teamofsilicons.com) the same flow is the app's
+On [developers.teamofsilicons.com](https://developers.teamofsilicons.com) the same flow is the app's
 **Import** tab (`/apps/{app_id}/import`): pick the file, read the dry-run report, then import it
 for real.
 

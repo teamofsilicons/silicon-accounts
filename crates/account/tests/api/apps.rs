@@ -284,7 +284,7 @@ async fn removing_access_errors() {
     assert_error(&r, 401, "unauthenticated");
 }
 
-/// The developer platform (developer.teamofsilicons.com) is first-party like Silicon Accounts
+/// The developer platform (developers.teamofsilicons.com) is first-party like Silicon Accounts
 /// itself: while the Carbon is signed in to it, removing it as an app is refused and points at
 /// the session to sign out. It once answered 404 "has never signed into an app with the app_id
 /// 'developer'", which was false.
@@ -305,7 +305,7 @@ async fn removing_the_developer_platform_is_refused_like_silicon_accounts() {
     assert_error(&r, 400, "first_party_app");
     let message = r.json["error"]["message"].as_str().unwrap_or_default();
     assert!(
-        message.contains("developer.teamofsilicons.com") && message.contains("Silicon Accounts"),
+        message.contains("developers.teamofsilicons.com") && message.contains("Silicon Accounts"),
         "{}",
         r.json
     );

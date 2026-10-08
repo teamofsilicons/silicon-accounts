@@ -45,7 +45,7 @@ export const journey: Journey = {
       return ((await answer.json()) as { items?: SessionInfo[] }).items ?? [];
     };
     const listed = (await list()).filter(item => item.kind === "developer");
-    results.check("GET /v1/me/sessions lists one developer sign-in, named Silicon Developer (developer.teamofsilicons.com)", listed.length === 1 && listed[0]?.label === "Silicon Developer (developer.teamofsilicons.com)" && listed[0].current === false, JSON.stringify(listed.map(item => ({ kind: item.kind, label: item.label, origin: item.origin }))));
+    results.check("GET /v1/me/sessions lists one developer sign-in, named Silicon Developer (developers.teamofsilicons.com)", listed.length === 1 && listed[0]?.label === "Silicon Developer (developers.teamofsilicons.com)" && listed[0].current === false, JSON.stringify(listed.map(item => ({ kind: item.kind, label: item.label, origin: item.origin }))));
     results.check("…and it is the very sign-in behind the developer site's cookie (the token's family)", typeof family === "string" && listed[0]?.id === family, `${listed[0]?.id} vs fid ${String(family)}`);
     await account.goto(`${env.site}/settings`);
     const rows = account.getByRole("list", { name: "Signed-in sessions" });
@@ -55,7 +55,7 @@ export const journey: Journey = {
     await sleep(500);
     await shot(env, account, "ds-c-02-settings-sessions");
     const rowText = (await row.first().innerText()).replace(/\s+/g, " ");
-    results.check("Settings shows it under \"Where you are signed in\": Silicon Developer, developer.teamofsilicons.com", (await row.count()) === 1 && /developer\.teamofsilicons\.com/.test(rowText) && !/This browser/.test(rowText), rowText);
+    results.check("Settings shows it under \"Where you are signed in\": Silicon Developer, developers.teamofsilicons.com", (await row.count()) === 1 && /developers\.teamofsilicons\.com/.test(rowText) && !/This browser/.test(rowText), rowText);
     const thisBrowser = rows.getByRole("listitem").filter({ hasText: "This browser" });
     results.check("…next to this browser's own session", (await thisBrowser.count()) === 1, await thisBrowser.first().innerText().catch(() => ""));
 

@@ -135,7 +135,7 @@ export const journey: Journey = {
       ["userinfo", `http://${dev.host}@evil.example/auth/callback`],
       ["another site", "https://evil.example/auth/callback"],
       ["a fragment", `${devCb}#frag`],
-      ["the production developer site", "https://developer.teamofsilicons.com/auth/callback"],
+      ["the production developer site", "https://developers.teamofsilicons.com/auth/callback"],
       ["a fake app's callback", callbackOf(env, "briefcase")],
     ];
     const devAccepted: string[] = [];

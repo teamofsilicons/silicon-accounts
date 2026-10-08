@@ -89,7 +89,7 @@ pub async fn issue_ata(
 }
 
 /// `POST /v1/apps/{app_id}/proofs/ata` (app-or-owner, IDEMPOTENT): the app's ATA page (on
-/// developer.teamofsilicons.com, through the owner's session). Same body and response as
+/// developers.teamofsilicons.com, through the owner's session). Same body and response as
 /// `POST /v1/proofs/ata`.
 pub async fn issue_ata_for_app(
     State(state): State<AppState>,

@@ -33,7 +33,7 @@ stored.
 | `POST /v1/proofs/verify` | the verifying app | 200 valid / exactly `{"valid":false,"expires_at":null}` |
 | `POST /v1/proofs/revoke` | the issuing app | 204 (`{"proof_id"}` or `{"proof_token"}` or `{"proof_refresh_token"}`) |
 | `GET /v1/apps/{app_id}/proofs` | app or owner | 200 page (`?kind=obo\|ata&status=active\|revoked\|expired&limit&cursor`) |
-| `POST /v1/apps/{app_id}/proofs/ata` | app or owner (IDEMPOTENT; the owner's session, CLI token or developer platform token) | 201 issued proof (the app's ATA page on developer.teamofsilicons.com) |
+| `POST /v1/apps/{app_id}/proofs/ata` | app or owner (IDEMPOTENT; the owner's session, CLI token or developer platform token) | 201 issued proof (the app's ATA page on developers.teamofsilicons.com) |
 | `DELETE /v1/apps/{app_id}/proofs/{proof_id}` | app or owner | 204 |
 | `GET /v1/me/proofs` | session (Carbon or Silicon) | 200 page of OBO proofs about me (`?status&limit&cursor`) |
 | `DELETE /v1/me/proofs/{proof_id}` | session | 204 |

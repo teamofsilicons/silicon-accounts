@@ -1,5 +1,5 @@
 /**
- * Helpers of the developer-site suite: developer.teamofsilicons.com (developer/, base + 5 on a stack) walked end to end
+ * Helpers of the developer-site suite: developers.teamofsilicons.com (developer/, base + 5 on a stack) walked end to end
  * through its BFF. A helper file (its name starts with "_"), so run.ts never takes it for journeys; everything here is
  * built on e2e/lib.ts and nothing in it belongs to one journey.
  *

@@ -42,7 +42,7 @@ pub fn command() -> Command {
         "Links:",
         "  Docs       https://accounts.teamofsilicons.com/docs",
         "  Account    https://accounts.teamofsilicons.com (your own account)",
-        "  Developer  https://developer.teamofsilicons.com (your apps' sign-in setup)",
+        "  Developer  https://developers.teamofsilicons.com (your apps' sign-in setup)",
         "  GitHub     https://github.com/teamofsilicons/silicon-accounts",
         "  Package    silicon-accounts-client on crates.io (this CLI is built on it)",
         "",

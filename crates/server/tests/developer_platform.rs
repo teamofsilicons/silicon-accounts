@@ -1,4 +1,4 @@
-//! The developer platform (developer.teamofsilicons.com) against the composed service router:
+//! The developer platform (developers.teamofsilicons.com) against the composed service router:
 //! what its tokens (`aud = developer`) may do on the real routes, and the start-up upkeep of its
 //! first-party app.
 
@@ -135,6 +135,7 @@ async fn the_developer_app_records_this_deployments_callback() {
     let (uris, version) = stored(&ctx).await;
     assert_eq!(
         uris,
+        // The immutable historical migration starts with the former hostname.
         json!(["https://developer.teamofsilicons.com/auth/callback"])
     );
     assert_eq!(version, 1);
@@ -163,6 +164,12 @@ async fn the_developer_app_records_this_deployments_callback() {
         DeveloperSync::Unchanged
     );
     assert_eq!(stored(&ctx).await.1, 2);
+    let homepage: String =
+        sqlx::query_scalar("select homepage_url from apps where app_id='developer'")
+            .fetch_one(&ctx.state.db)
+            .await
+            .expect("developer homepage");
+    assert_eq!(homepage, "http://localhost:8600");
 
     // The app is Silicon Accounts' own: no owner, no usable secret, first-party.
     let row: (Option<String>, String, String) =

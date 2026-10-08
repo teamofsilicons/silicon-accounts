@@ -161,7 +161,7 @@ email or phone (`login_hint` is ignored by the service): they always type it on 
 
 ### The developer platform's public client
 
-developer.teamofsilicons.com signs Carbons in as the first-party public client `developer`
+developers.teamofsilicons.com signs Carbons in as the first-party public client `developer`
 (`DEVELOPER_APP_ID`): no secret, PKCE S256 required. `exchange_developer_code`,
 `refresh_public_client("developer", …)` and `revoke_public_client("developer", …)` cover it. Its
 tokens (`aud = developer`) only read the signed-in Carbon (`GET /v1/me`, `GET /v1/session`) and

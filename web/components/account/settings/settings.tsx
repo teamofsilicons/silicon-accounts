@@ -169,7 +169,7 @@ export function Settings() {
 
 function SessionRow({ session, now, signingOut, onSignOutHere, onRevoke }: { session: SessionInfo; now: number; signingOut: boolean; onSignOutHere: () => void; onRevoke: () => Promise<unknown> }) {
   const [error, setError] = useState<string | null>(null);
-  const how = session.kind === "cli" ? SESSION_ORIGINS[session.origin] : session.kind === "developer" ? "developer.teamofsilicons.com" : null;
+  const how = session.kind === "cli" ? SESSION_ORIGINS[session.origin] : session.kind === "developer" ? "developers.teamofsilicons.com" : null;
   const facts = [
     session.current ? "Active now" : session.last_seen_at ? `Active ${formatRelative(session.last_seen_at, now)}` : null,
     `signed in ${formatDate(session.created_at)}`,

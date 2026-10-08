@@ -130,7 +130,7 @@ of any length: "An ATA proof is for exactly one app; ask for one proof per app."
 ## `POST /v1/apps/{app_id}/proofs/ata`
 
 The same for **app or owner**: the app's owner can issue ATA proofs from the app's ATA page on
-developer.teamofsilicons.com without the app secret. Same body and response (and the same 422
+developers.teamofsilicons.com without the app secret. Same body and response (and the same 422
 `ata_single_app` for `audiences`); 403 `app_disabled` for a disabled app.
 
 ## `POST /v1/proofs/refresh`

@@ -1,6 +1,6 @@
 /**
  * Settings → "Where you are signed in": every browser session, first-party (accounts CLI) sign-in and developer
- * platform sign-in (developer.teamofsilicons.com, the first-party app `developer`, 06-v2 §2) of the Carbon, with how
+ * platform sign-in (developers.teamofsilicons.com, the first-party app `developer`, 06-v2 §2) of the Carbon, with how
  * and from where; signing one out ends it at once (the other browser lands signed out, the CLI's tokens stop working
  * also after a refresh rotated them, the developer site is signed out at its next call); signing out here ends this
  * browser's own session and nothing else.
@@ -59,7 +59,7 @@ const sessions: Journey = {
     const terminal = listed.find(item => item.kind === "cli");
     const platform = listed.find(item => item.kind === "developer");
     results.check("/v1/me/sessions: this browser (current), the other browser, the CLI", mine?.kind === "browser" && mine.ip === carbon.ip && other?.ip === second.ip && terminal?.label === label && terminal.origin === "cli_code" && terminal.ip === ctx.ip, JSON.stringify(listed.map(item => ({ kind: item.kind, ip: item.ip, current: item.current, label: item.label, origin: item.origin }))));
-    results.check("…and the developer site: kind developer, named \"Silicon Developer (developer.teamofsilicons.com)\", not current", listed.length === 4 && platform?.label === "Silicon Developer (developer.teamofsilicons.com)" && platform.current === false, JSON.stringify(platform ?? listed.map(item => item.kind)));
+    results.check("…and the developer site: kind developer, named \"Silicon Developer (developers.teamofsilicons.com)\", not current", listed.length === 4 && platform?.label === "Silicon Developer (developers.teamofsilicons.com)" && platform.current === false, JSON.stringify(platform ?? listed.map(item => item.kind)));
     const fromSecond = (await call<{ items: SessionInfo[] }>(second.probe, "/v1/me/sessions")).body.items.find(item => item.current);
     results.check("the other browser sees its own session as the current one", fromSecond?.id === other?.id, `${fromSecond?.id} vs ${other?.id}`);
     const myApps = (await call<{ items: Array<{ app: { app_id: string } }> }>(probe, "/v1/me/apps")).body.items.map(item => item.app.app_id);
@@ -87,7 +87,7 @@ const sessions: Journey = {
     results.check("the CLI's row: its label, how it signed in and its address", cliText.includes(label) && cliText.includes("CLI sign-in with a code") && cliText.includes(`IP ${ctx.ip}`), cliText);
     const devRow = rowByKey(page, "Signed-in sessions", platform?.id ?? "");
     const devText = (await devRow.innerText().catch(() => "")).replace(/\s+/g, " ");
-    results.check("the developer site's row: \"Silicon Developer\", on developer.teamofsilicons.com, never \"This browser\"", devText.startsWith("Silicon Developer") && devText.includes("developer.teamofsilicons.com") && !/This browser/.test(devText), devText);
+    results.check("the developer site's row: \"Silicon Developer\", on developers.teamofsilicons.com, never \"This browser\"", devText.startsWith("Silicon Developer") && devText.includes("developers.teamofsilicons.com") && !/This browser/.test(devText), devText);
     results.check("this browser's row signs out at once; the others ask first", (await rowByKey(page, "Signed-in sessions", mine?.id ?? "").getByRole("button", { name: "Sign out" }).count()) === 1);
 
     // Sign the other browser out from here.

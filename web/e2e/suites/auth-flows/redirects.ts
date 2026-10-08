@@ -110,7 +110,7 @@ const redirects: Journey = {
       results.check(`accounts (first-party): ${why} → ${allowed ? "201" : "400"}`, allowed ? reply.status === 201 : reply.status === 400 && errorCode(reply) === "redirect_uri_not_registered", brief(reply));
     }
 
-    // The first-party app developer (developer.teamofsilicons.com): exactly {ACCOUNTS_DEVELOPER_URL}/auth/callback.
+    // The first-party app developer (developers.teamofsilicons.com): exactly {ACCOUNTS_DEVELOPER_URL}/auth/callback.
     const devCallback = `${env.developer}/auth/callback`;
     for (const [uri, allowed, why] of [
       [devCallback, true, "the developer site's /auth/callback"],

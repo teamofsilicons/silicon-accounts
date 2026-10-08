@@ -136,7 +136,7 @@ https://accounts.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=http
 ```
 
 and after the sign-in, the callback answered `Signed in as c:grace-hopper (briefcase:ptO)`.
-The app's Embed tab on developer.teamofsilicons.com prints this iframe for your own app id and
+The app's Embed tab on developers.teamofsilicons.com prints this iframe for your own app id and
 redirect URIs, with a live preview.
 
 ## Allow your origin

@@ -1011,7 +1011,7 @@ export async function signInWithEmailCode(env: Env, page: Page, email: string): 
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
-/* The developer site (developer.teamofsilicons.com: a BFF in front of the API)                                        */
+/* The developer site (developers.teamofsilicons.com: a BFF in front of the API)                                        */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
 /**

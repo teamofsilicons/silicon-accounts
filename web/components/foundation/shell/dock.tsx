@@ -5,7 +5,7 @@
  * opens the same sections in a bottom sheet. One highlight glides between sections on the morph spring while the
  * active section's label opens and the previous one closes, all on the same spring so they stay in step.
  *
- * Developer is another site (developer.teamofsilicons.com, from GET /v1/meta): a plain link that leaves the account
+ * Developer is another site (developers.teamofsilicons.com, from GET /v1/meta): a plain link that leaves the account
  * site (after the page's navigation guards), marked with an arrow, and never the active section.
  */
 import Link from "next/link";

@@ -1,5 +1,5 @@
 /**
- * The developer site (developer.teamofsilicons.com) is a BFF: its Next server holds a Carbon's developer-platform
+ * The developer site (developers.teamofsilicons.com) is a BFF: its Next server holds a Carbon's developer-platform
  * tokens in one sealed, httpOnly cookie and calls accounts-api with them; the browser never sees a token.
  *
  * - security-developer-bff (HTTP): the sign-in round trip as a browser makes it (state + PKCE sealed in sa_dev_signin,
