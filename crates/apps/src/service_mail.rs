@@ -47,7 +47,7 @@ async fn send(
                 accounts_core::ids::validate_app_id(app_id).map_err(ApiError::invalid_request)?;
                 let exists:bool=sqlx::query_scalar("select exists(select 1 from apps where app_id=$1)").bind(app_id).fetch_one(&state.db).await?;
                 if !exists {return Err(ApiError::unprocessable("unknown_app","The invitation's app does not exist in Accounts."));}
-                (vec![to],format!("Invitation to author {app_id} on Silicon Apps"),format!("You have been invited to become an author of {app_id}.\n\nSign in to Silicon Apps to accept or decline: {}/developer/invitations\n\nYou are not an author until you accept.",state.settings.silicon_apps_url.trim_end_matches('/')),"apps_invite")
+                (vec![to],format!("Invitation to author {app_id} on Silicon Apps"),format!("You have been invited to become an author of {app_id}.\n\nSign in to Silicon Developers to accept or decline: {}/invitations\n\nYou are not an author until you accept.",state.settings.developer_url.trim_end_matches('/')),"apps_invite")
             },
             "mail.report" => {
                 let message=input.body["message"].as_str().filter(|m|!m.trim().is_empty() && m.len()<=20000).ok_or_else(||ApiError::invalid_request("Report message must contain 1–20,000 bytes."))?;
