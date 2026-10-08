@@ -25,7 +25,7 @@ def healthy(url):
         time.sleep(2)
     raise RuntimeError('Readiness failed: '+url)
 
-a=argparse.ArgumentParser();a.add_argument('--archive',required=True);a.add_argument('--sha256',required=True);a.add_argument('--revision',required=True);a.add_argument('--secret',required=True);a.add_argument('--bucket',required=True);a=a.parse_args()
+a=argparse.ArgumentParser();a.add_argument('--archive',required=True);a.add_argument('--sha256',required=True);a.add_argument('--revision',required=True);a.add_argument('--secret',required=True);a.add_argument('--bucket',required=True);a.add_argument('--region',default='us-east-2');a=a.parse_args()
 assert os.geteuid()==0
 os.umask(0o077)
 assert hashlib.sha256(P(a.archive).read_bytes()).hexdigest()==a.sha256
@@ -40,7 +40,7 @@ for user in ['accounts','accounts-web','accounts-developer','accounts-caddy']:
     try:pwd.getpwnam(user)
     except KeyError:run('useradd','--system','--home-dir','/var/lib/'+user,'--create-home','--shell','/sbin/nologin',user)
 # Secret retrieval output stays private; never place credentials in SSM command text or logs.
-s=json.loads(json.loads(subprocess.check_output(['aws','secretsmanager','get-secret-value','--region','us-east-1','--secret-id',a.secret]))['SecretString'])
+s=json.loads(json.loads(subprocess.check_output(['aws','secretsmanager','get-secret-value','--region',a.region,'--secret-id',a.secret]))['SecretString'])
 run('install','-d','-m','700','/etc/accounts')
 api={k:v for k,v in s.items() if k.startswith('ACCOUNTS_')}
 env('/etc/accounts/api.env',api)

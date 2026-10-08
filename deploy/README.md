@@ -1,6 +1,6 @@
 # Silicon Accounts production
 
-AWS profile `silicon-production`, account `234951665042`, region `us-east-1`.
+AWS profile `silicon-production`, account `234951665042`, region `us-east-2`.
 `stack.json` provisions a dedicated ARM64 EC2 host, encrypted retained disk,
 fixed public IP, SSM administration (no SSH ingress), private release/backup
 bucket, and an instance role scoped to the Accounts secret and bucket.
@@ -24,7 +24,7 @@ managed using Namecheap CLI. Preserve other records.
 3. Commit source and run `python3 deploy/package.py`. Upload the archive under
    `releases/` in the stack bucket. Record SHA-256 and source revision.
 4. Via SSM fetch the archive, verify SHA-256 before extracting `install.py`,
-   then invoke it with `--archive`, `--sha256`, `--revision`, `--secret`, `--bucket`.
+   then invoke it with `--archive`, `--sha256`, `--revision`, `--secret`, `--bucket`, `--region`.
    The installer retains a database dump before migration, migrates, switches the
    release symlink, starts services, and checks local readiness. Secrets must never
    appear in SSM commands or output.
