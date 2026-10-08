@@ -53,6 +53,9 @@ const nextConfig: NextConfig = {
   ...(distDir === ".next" ? {} : { typescript: isolatedBuild(distDir) }),
   reactStrictMode: true,
   poweredByHeader: false,
+  // Keep the standalone listener's exact origin for internal proxy rewrites. NextURL otherwise
+  // normalizes 127.0.0.1 to localhost, making a Caddy-forwarded HTTPS rewrite look external.
+  skipProxyUrlNormalize: true,
   devIndicators: false,
   // AGENTS.md is kept by hand; `next dev` must not rewrite it.
   agentRules: false,

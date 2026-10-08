@@ -51,7 +51,7 @@ export function proxy(request: NextRequest) {
   // The account site's old developer tabs (its /developer redirects keep their names): Branding is Pages, Proofs is ATA.
   const renamed = renamedAppTab(request.nextUrl.pathname);
   if (renamed) {
-    const target = request.nextUrl.clone();
+    const target = new URL(request.url);
     target.pathname = renamed;
     return NextResponse.redirect(target, 308);
   }

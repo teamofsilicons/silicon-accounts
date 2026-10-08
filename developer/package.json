@@ -12,7 +12,8 @@
     "seal-dev-session": "tsx scripts/seal-dev-session.ts",
     "test": "pnpm build:docs --quiet && tsx --test tests/*.test.ts",
     "test:e2e": "pnpm build:docs --quiet && playwright test",
-    "build:docs": "tsx lib/docs/build.ts"
+    "build:docs": "tsx lib/docs/build.ts",
+    "test:production-routing": "tsx --test tests-production/routing.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "5.3.0",

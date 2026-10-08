@@ -19,6 +19,7 @@ pnpm start          # the production build on $PORT (8600)
 pnpm test           # unit tests: sealing, return paths, both proxy allowlists, flows
 pnpm exec playwright install chromium
 pnpm test:e2e       # common portal and publishing behavior, mocked service contracts
+pnpm test:production-routing # after pnpm build: standalone routing with Caddy HTTPS headers
 ```
 
 Node 24 or newer. Read the bundled Next docs in `node_modules/next/dist/docs/` before relying on memory (`proxy.ts`
@@ -69,6 +70,8 @@ data: blob: <accounts site> <local mock Iris>`, `frame-ancestors 'none'`), `X-Fr
 referrer policy, HSTS in production. An address under an app that names no tab answers the not-found page with a 404.
 
 ## Environment
+
+`skipProxyUrlNormalize` keeps the exact standalone listener origin in internal rewrites. Otherwise Next normalizes `127.0.0.1` to `localhost`; behind HTTPS termination it can then attempt an external TLS request to the plain HTTP listener. Rewrite and legacy-alias targets use the raw request URL so Next reduces them to internal, relative paths. `pnpm test:production-routing` boots the actual standalone server bound to `127.0.0.1` and verifies missing docs/app routes, legacy redirects, valid docs, CSP, and HSTS both directly and with Caddy's public Host/forwarded-HTTPS headers. It generates an ephemeral session secret and stops its own server afterward.
 
 Read at request time (`lib/server/config.ts`), never baked into the build:
 
