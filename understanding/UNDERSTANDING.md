@@ -30,6 +30,16 @@ There are three sites:
 
 Everything about creating and setting up an app's authentication happens on `developers.teamofsilicons.com`: its sign-in methods, Google and Apple, its flows and pages, the details it asks for, its redirect URLs, its user base and imports, its webhooks and its App verification tokens. The settings themselves are stored in Silicon Accounts.
 
+## Requesting account verification
+
+In an app's authorization/sign-in setup, a signed-in manager can request a verified account so they can use their own domain for authentication, for example `login.theirapp.com`. This is a manual account review, separate from App verification and User verification proof tokens.
+
+The `Request account verification` option opens a mini form asking only for the reason. Explain that it may take up to 48 hours to respond, both before submission and on the submitted request. Save the requesting account's immutable UUID, the app context, the reason and the submission time. Only a current manager may submit through that app. Show the requesting account its pending request across the apps it manages; do not expose another manager's private reason.
+
+Every new request must notify both `lords@teamofsilicons.com` and `saket@teamofsilicons.com`. The notification identifies the requester and app, includes their reason, request time and available verified contact information for follow-up, and says this person wants a verified account. Retain the request and queue both notifications durably together, with retries for delivery failures. Repeated submission of an existing pending account request must not send duplicate notifications.
+
+This feature is the real request and notification flow for manual follow-up. It does not build custom-domain authentication, automatically approve verification or grant new access. The user sees `Request submitted` or `Pending review`; submitting the form must not mark the account `Verified`. The 48-hour period is a response expectation, not an automatic approval deadline.
+
 
 # Accounts
 
@@ -323,7 +333,6 @@ Silicon Apps manages updates for the installed Accounts CLI. Accounts must not r
 Carbon IDs use `c:{handle}` (for example `c:saket`), Silicon IDs use `si:{handle}` (for example `si:head_of_growth`), and app IDs are the bare `{app_id}` (for example `briefcase`). Each prefix appears exactly once.
 
 The uuid is what identifies an account; the c:id and si:id are only what people see. A membership with an app is `{app_id}:{uuid}`.
-
 
 
 
