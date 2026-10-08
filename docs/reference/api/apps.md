@@ -1,6 +1,6 @@
 ---
 title: App endpoints
-description: Reference for everything an app (or its owner) manages — the public sign-in config, app details, the sign-in setup and its history, the user base, user imports, the app webhook with its deliveries and replays, and the Silicon Apps sync.
+description: Reference for everything an app (or its owner) manages — the public sign-in config, app details, the sign-in setup and its history, the user base, user imports, the app webhook with its deliveries and replays, manual account verification requests, and the Silicon Apps sync.
 kind: informative
 order: 65
 related:
@@ -19,7 +19,8 @@ related:
 
 An app manages its sign-in setup, its user base, imports and its webhook here. Apps are created in
 Silicon Apps; their sign-in setup lives in Silicon Accounts. Every `/v1/apps/{app_id}/…` route
-except `/public` takes **app or owner** auth: the app's own credentials
+except `/public`, `/account-verification-request`, and the [verification history](proofs.md#get-v1appsapp_idproofsproof_idhistory)
+route `/proofs/{proof_id}/history` takes **app or owner** auth: the app's own credentials
 (`-u app_id:app_secret`), or the session of the Carbon who owns the app. Another app's
 credentials get 403 `app_mismatch`; another Carbon gets 403 `not_app_owner`; an unknown app is 404
 `unknown_app`; a disabled app's credentials get 403 `app_disabled` (its owner can still manage it).
@@ -65,6 +66,51 @@ curl -s "$ACCOUNTS_URL/v1/apps/$APP_ID" -u "$APP_ID:$APP_SECRET"
 `source` is `silicon_apps`, `fake` (a development stand-in) or `first_party`. `stats.users`
 counts live members (active or imported, accounts not deleted); `imported_unclaimed` counts
 imported Carbons who haven't finished their account yet.
+
+## Manual account verification requests
+
+In an app's **Sign-in** setup on [Silicon Developers](https://developers.teamofsilicons.com), **Request account verification** opens a small form asking why verification is needed. This starts a manual review of the account's eligibility to run app authorization on its own domain. A reply can take up to 48 hours. Submitting the form does not verify the account, approve a domain, or provision custom-domain hosting; the team handles review and any domain configuration manually.
+
+### `GET /v1/apps/{app_id}/account-verification-request`
+
+**Signed-in account that currently manages the app**: an Accounts session or an access token issued to `accounts` or the developer platform (`developer`). The app's Basic credentials cannot submit or read the account's request. Current ownership or accepted authorship is checked on every request.
+
+Returns **200** with the calling account's latest request, or `null` if it has none:
+
+```json
+{"request": null, "response_time_hours": 48}
+```
+
+The request belongs to the account, not separately to every app. A request submitted from another managed app can therefore appear here. Another manager does not see the requester's reason or request record. Responses have `Cache-Control: no-store`.
+
+### `POST /v1/apps/{app_id}/account-verification-request`
+
+Same signed-in manager authentication. Body: `{"reason":"Why I need account verification"}`. The reason is trimmed, must contain 1–5,000 characters without NUL, and is treated as plain text. Unknown fields are refused; callers cannot choose email recipients or approval state. An optional `Idempotency-Key` replays the same submission, including its original status; reusing it with a different body conflicts.
+
+A new request returns **201**:
+
+```json
+{
+  "request": {
+    "request_id": "01928c7e-3b7a-7c4e-9a51-2f3d4c5b6a79",
+    "account_uuid": "zQo",
+    "context_app": {"app_id": "briefcase", "name": "Briefcase", "logo_url": null},
+    "reason": "I need authorization on my own domain for my app.",
+    "status": "pending",
+    "submitted_at": "2026-10-08T12:00:00.000Z",
+    "response_expected_by": "2026-10-10T12:00:00.000Z",
+    "reviewed_at": null
+  },
+  "created": true,
+  "response_time_hours": 48
+}
+```
+
+There is at most **one pending request per immutable account**, across all its apps. A repeat submission with a new or omitted idempotency key while one is pending returns **200**, `created: false`, and the original request without replacing the reason or sending more notifications. The guard also applies to concurrent submissions. `response_expected_by` is a reply estimate, not an automatic approval deadline or request expiry.
+
+The request and two independent email notifications are saved in one transaction. The fixed recipients are `lords@teamofsilicons.com` and `saket@teamofsilicons.com`. Each email contains the request ID, reason, requesting account, available verified primary email, and context app. Delivery uses the existing retrying outbox; **201 means the request and notifications were saved, not that either email has reached its recipient**. There is no public approve/reject endpoint or automatic domain change. Review status may later be `approved` or `rejected` with `reviewed_at`, as part of manual handling.
+
+Validation failures are **422** `validation_failed`; missing or unsuitable sign-in is **401**; a caller who does not currently manage the app gets **403** `not_app_owner`. Removing management access also prevents replaying an earlier submission through that app.
 
 ## `GET /v1/apps/{app_id}/public`
 

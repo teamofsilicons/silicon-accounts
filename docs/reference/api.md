@@ -433,6 +433,8 @@ pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)
 | Method and path | Auth | Idem. | Success |
 |---|---|---|---|
 | `GET /v1/apps/{app_id}/public` | public (CORS `*`) | | 200 public config |
+| `GET /v1/apps/{app_id}/account-verification-request` | signed-in manager | | 200 latest own request or null |
+| `POST /v1/apps/{app_id}/account-verification-request` | signed-in manager | optional | 201 queued request, or 200 existing pending request |
 | `GET /v1/me/owned-apps` | account (Carbon) | | 200 list |
 | `GET /v1/apps/{app_id}` | app or owner | | 200 app |
 | `PATCH /v1/apps/{app_id}/signin-config` | app or owner | yes | 200 app |
