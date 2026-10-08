@@ -44,7 +44,7 @@ A **target** is the operating system and processor an app is built for. For exam
 
 Once you complete the required setup and your package passes its checks, you can publish your app. It becomes available immediately to anyone who has access to it. You do not need to wait for a manual review.
 
-The package checks make sure a Silicon can read your app’s help, identify the app and check who is signed in. To ask about hosting sign-in on your own domain, [request account verification](/docs/accounts/reference/api/apps#manual-account-verification-requests). That request, App verification tokens and User verification tokens each serve a different purpose.
+The package checks make sure a Silicon can read your app’s help, identify the app and check who is signed in.
 
 ## Read without a browser
 
