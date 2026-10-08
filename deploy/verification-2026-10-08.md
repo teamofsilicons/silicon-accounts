@@ -190,3 +190,50 @@ The retained predeployment dump is `backups/predeploy-20261008T153213Z.dump`,
 SHA-256 `7dda2006b0b9d211aea0237c6a16023b32ef28673a0e86a4bc6c1542eee90174`.
 This latest backup was uploaded but not separately restored; earlier isolated
 restore evidence remains above.
+
+## Manual account verification request and real demo delivery
+
+Source `9b6a701479d7c4912ff1c8be9210861fa2d721b6` is deployed with migration 9.
+Bundle SHA-256 is `94c00500345d0cf9f9420f3e8668ce481c65c810a72d4edf36af6f3f1ee92c97`;
+API SHA-256 is `bd85e07ded69d47802f3bada4c4de1a4f88c379c16c349168f9bac0abf34de67`.
+Installer SSM `44bea589-01e5-4568-941b-4597279110bb` and postcheck
+`deb3afa4-fbf2-468f-980b-86214a8c43af` confirmed the exact source/binary, migration,
+six active services/timers and readiness. Before the demo, production retained one
+account, three apps, one membership and zero proof families; the new request and
+notification tables were empty. The predeployment backup is
+`backups/predeploy-20261008T154514Z.dump`, SHA-256
+`7ef15d66accd51d2c1fadd57bf56e7a0797383f97fe49757994d2eaefdfd3bda`.
+It was uploaded; the earlier restore tests remain the separate recovery evidence.
+
+The Sign-in tab now offers a reason-only request for manual account verification
+to use the developer's own domain. It explains an up-to-48-hour response estimate
+and shows pending review. This release does not implement domain provisioning,
+an approval API or an account-verification grant. Only first-party signed-in
+current app managers can submit or view their own account-wide request. The
+pending uniqueness rule and transaction save one request and two fixed-recipient
+outbox rows together; duplicate or concurrent submissions do not enqueue again.
+Existing provider delivery remains at-least-once.
+
+The full Rust workspace passed 884 tests (three existing ignored); five new
+request API integrations, strict Apps Clippy and formatting passed. The developer
+portal passed 46 browser tests, 15 unit tests, typecheck, lint and production build.
+The docs check passed all 42 pages and the account web production build passed.
+Both themes were visually checked at desktop and mobile widths. Public HTTPS,
+API/BFF authentication denials and byte-identical deployed component assets pass.
+
+The user explicitly authorized a demo notification. The existing genuine Chrome
+session for Saket Gupta submitted it through the production Sign-in form for
+Silicon Apps; the reason starts `DEMO REQUEST` and explicitly asks for no approval
+or domain changes. The visible receipt showed Request submitted, Pending review,
+the stored reason and a response estimate of October 10 at 21:16 Asia/Kolkata.
+The request ID is `01a11c31-8eb1-7368-8c13-375632f0af5d` and remains pending.
+
+Read-only SSM `d980721d-909d-40a2-b54d-adb8fb4ea405` verified the request's exact
+two linked outbox records: both sent once, without errors. Postmark returned
+non-sandboxed per-recipient Delivered events at `2026-10-08T15:46:13Z` for
+`lords@teamofsilicons.com` and `saket@teamofsilicons.com`. This establishes
+destination mail-server acceptance, not inbox placement or reading. The verifier
+did not send mail or log message bodies/credentials. Its initial download used an
+unpermitted object prefix and received 403 before verification; moving that same
+checksummed helper under the existing releases prefix succeeded without changing
+IAM permissions or resubmitting the request.
