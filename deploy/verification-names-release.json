@@ -1,0 +1,93 @@
+{
+  "version": "0.2.0",
+  "source_revision": "c6c8bbfaddc93a49d7ff4648fa3914adc50e82ce",
+  "archive_sha256": "835e6b325eb19fdd22bd1e3634ec092ed761e0fecb4e36886b5f0d8a9659fb23",
+  "api_sha256": "adaf8d38bd48552cd051746ab1c90c74c5ca87b162e95251b3037fc571d89977",
+  "migration": 11,
+  "install_command": "a3f58ddf-3483-4d43-8578-2187086bd3b9",
+  "verification_command": "2be7231c-7eab-4f50-b018-a09337cbaaea",
+  "backup": {
+    "backup_key": "backups/predeploy-20261008T225612Z.dump",
+    "backup_sha256": "8092e86aad526aac52af6c40d1caf7942e28be1d02db117de7affd290c8fcae6",
+    "backup_size": 216873,
+    "s3_size": 216873
+  },
+  "data_preservation": {
+    "before": {
+      "app": "a1433dcc68f5921f4ec074cb02b51bc1",
+      "config": "b568372d929158880938f0a3dcf13baa",
+      "membership": "fc0370aea20a846bf13d93ad13d52525",
+      "authors": "1cab22f7c576d0a6892c389982f2416b",
+      "requests": "d4251f449b5deb6a6d219670218d56c1",
+      "notifications": "3cfefad21041dc7f7236d77df8bb2193",
+      "active_apps_sessions": 1
+    },
+    "after": {
+      "app": "a1433dcc68f5921f4ec074cb02b51bc1",
+      "config": "b568372d929158880938f0a3dcf13baa",
+      "membership": "fc0370aea20a846bf13d93ad13d52525",
+      "authors": "1cab22f7c576d0a6892c389982f2416b",
+      "requests": "d4251f449b5deb6a6d219670218d56c1",
+      "notifications": "3cfefad21041dc7f7236d77df8bb2193",
+      "active_apps_sessions": 1
+    },
+    "equal": true
+  },
+  "tests": {
+    "rust_passed": 887,
+    "rust_ignored": 3,
+    "testkit": 98,
+    "browser": 52,
+    "frontend_typecheck_lint_build": true,
+    "production_routing": true,
+    "account_screens": {
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "widths": [
+        390,
+        1440
+      ]
+    }
+  },
+  "published_cli": "0.2.0",
+  "published_client": "0.2.0",
+  "registry_cli_install_verified": true,
+  "public_checks": [
+    {
+      "meta_version": "0.2.0"
+    },
+    {
+      "path": "/v1/proofs/app-verification",
+      "status": 401
+    },
+    {
+      "path": "/v1/proofs/user-verification",
+      "status": 401
+    },
+    {
+      "retired_routes": 404
+    },
+    {
+      "path": "/v1/apps/silicon-apps/proofs?kind=app_verification",
+      "status": 200,
+      "records": 0
+    },
+    {
+      "path": "/v1/apps/silicon-apps/proofs?kind=user_verification",
+      "status": 200,
+      "records": 0
+    },
+    {
+      "path": "/v1/apps/silicon-apps/proofs/app-verification",
+      "authenticated_validation": 422
+    },
+    {
+      "public_markdown_pages_matching_source": 42
+    }
+  ],
+  "public_docs_browser_checked": true,
+  "production_proofs_before_and_after": 0,
+  "verified_at": "2026-10-08T22:58:37.499916+00:00"
+}
