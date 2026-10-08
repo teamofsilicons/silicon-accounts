@@ -26,6 +26,8 @@ export const queryKeys = {
     history: (kind?: HistoryKind | null) => ["me", "history", kind ?? "all"] as const,
     proofs: ["me", "proofs"] as const,
     appProofsRoot: ["me", "app-proofs"] as const,
+    accountVerificationRoot: ["me", "account-verification-request"] as const,
+    accountVerification: (appId: string) => ["me", "account-verification-request", appId] as const,
     appProofs: (query: Omit<ManagedAppProofsQuery, "cursor" | "limit"> = {}) => ["me", "app-proofs", query] as const,
     silicons: ["me", "silicons"] as const,
     silicon: (uuid: string) => ["me", "silicons", uuid] as const,

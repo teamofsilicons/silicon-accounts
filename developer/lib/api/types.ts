@@ -571,6 +571,26 @@ export interface OwnedApp {
   created_at: Timestamp;
 }
 
+/** Manual account review request; it does not provision a sign-in domain. */
+export interface AccountVerificationRequest {
+  request_id: string;
+  account_uuid: string;
+  context_app: AppSummary;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  submitted_at: Timestamp;
+  response_expected_by: Timestamp;
+  reviewed_at: Timestamp | null;
+}
+export interface AccountVerificationRequestState {
+  request: AccountVerificationRequest | null;
+  response_time_hours: number;
+}
+export interface AccountVerificationRequestResult extends AccountVerificationRequestState {
+  request: AccountVerificationRequest;
+  created: boolean;
+}
+
 /** `GET /v1/apps/{app_id}` (app or its owner). */
 export interface AppDetail {
   app_id: string;

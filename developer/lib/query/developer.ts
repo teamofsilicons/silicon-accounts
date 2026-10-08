@@ -27,6 +27,21 @@ export function useApp(appId: string | null) {
   return useQuery({ queryKey: queryKeys.app.detail(appId ?? ""), queryFn: () => api.apps.get(appId ?? ""), enabled: !!appId });
 }
 
+export function useAccountVerificationRequest(appId: string) {
+  return useQuery({ queryKey: queryKeys.me.accountVerification(appId), queryFn: () => api.apps.accountVerification.get(appId) });
+}
+
+export function useRequestAccountVerification(appId: string) {
+  const client = useQueryClient();
+  return useIdempotentMutation((reason: string, idempotencyKey) => api.apps.accountVerification.submit(appId, reason, { idempotencyKey }), {
+    onSuccess: async result => {
+      client.setQueryData(queryKeys.me.accountVerification(appId), result);
+      await client.invalidateQueries({ queryKey: queryKeys.me.accountVerificationRoot });
+    },
+    meta: { toast: false },
+  });
+}
+
 /** The public config the hosted pages, the iframe and the SDK read (CORS *). */
 export function useAppPublic(appId: string | null) {
   return useQuery({ queryKey: queryKeys.app.public(appId ?? ""), queryFn: ({ signal }) => api.apps.public(appId ?? "", signal), enabled: !!appId });

@@ -23,6 +23,7 @@ import { under } from "../lib/json";
 import { METHOD_LABEL } from "../lib/labels";
 import { MAX_ALLOWED_ORIGINS, MAX_EMAIL_DOMAINS, MAX_REDIRECT_URIS, domainProblem, normalizeDomain, normalizeOrigin, originProblem, redirectUriProblem } from "../lib/validate";
 import { CopyField } from "../parts/copy-field";
+import { AccountVerificationRequestSection } from "../parts/account-verification-request";
 import { EditorAlerts } from "../parts/editor-alerts";
 import { HistoryDrawer } from "../parts/history-drawer";
 import { SaveBar } from "../parts/save-bar";
@@ -33,6 +34,7 @@ import styles from "./sign-in.module.css";
 
 const ANCHORS = [
   { id: "signin-methods", label: "Methods", paths: ["methods", "method_order"] },
+  { id: "signin-account-verification", label: "Account verification", paths: [] },
   { id: "signin-google", label: "Google", paths: ["google"] },
   { id: "signin-apple", label: "Apple", paths: ["apple"] },
   { id: "signin-redirects", label: "Redirect URIs", paths: ["redirect_uris"] },
@@ -128,6 +130,8 @@ export function SignInTab() {
           />,
           <Button variant="ghost" size="sm" className={styles.historyButton} onClick={() => setHistoryOpen(true)} aria-label={`History: version ${view.version} is stored`}><History size={14} strokeWidth={1.75} aria-hidden="true" />{`Version ${view.version}`}</Button>,
         )}
+
+        <AccountVerificationRequestSection appId={ctx.appId} />
 
         {section("signin-google", "Google", `How Continue with Google works${draft.methods.google ? "" : ". Google is off; you can still set it up before turning it on"}.`, (
           <Surface className={styles.provider}>

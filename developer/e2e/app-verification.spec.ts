@@ -168,6 +168,7 @@ test("per-app verification keeps the old URL, clear kind labels and one-time cre
 test("empty history states, command navigation and protected BFF stay scoped", async ({ page, request }) => {
   await setup(page);
   await page.goto("/app-verification?status=expired");
+  await expect(page).toHaveTitle("App verification · Silicon Developer");
   await expect(page.getByText("No app verifications match")).toBeVisible();
   await page.getByRole("button", { name: "Clear filters" }).click();
   await expect(page.getByText("No app verifications yet")).toBeVisible();

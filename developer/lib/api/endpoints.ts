@@ -9,7 +9,7 @@
  */
 import { request, seg, formBody, type RequestOptions } from "./http";
 import type {
-  AccountSummary, AppDetail, AppProof, AppProofHistoryEvent, AppProofsQuery, AppPublic, AppUser, AppUserDetail, AppUsersQuery, AtaRequest,
+  AccountSummary, AccountVerificationRequestResult, AccountVerificationRequestState, AppDetail, AppProof, AppProofHistoryEvent, AppProofsQuery, AppPublic, AppUser, AppUserDetail, AppUsersQuery, AtaRequest,
   BrowserSession, CliLoginChallenge, ConfigHistoryItem, ConsentSubmit, ContactChallenge, CreateSilicon,
   CustodianRequest, CustodianRequestStatus, DeliveriesQuery, DeviceAuthorization, DeviceRequest, EmailView, FlowCreate,
   FlowEnvelope, FlowView, HistoryItem, HistoryQuery, IdAvailability, IdentityView, ImportJob, ImportOptions, ImportRow,
@@ -299,6 +299,10 @@ export const apps = {
   public: (appId: string, signal?: AbortSignal) => request<AppPublic>(`/v1/apps/${seg(appId)}/public`, { signal }),
   /** `GET /v1/apps/{app_id}`: config with secrets masked, webhook, stats. 403 not_app_owner / app_mismatch. */
   get: (appId: string, credentials?: Owner) => request<AppDetail>(`/v1/apps/${seg(appId)}`, { auth: ownerAuth(credentials) }),
+  accountVerification: {
+    get: (appId: string) => request<AccountVerificationRequestState>(`/v1/apps/${seg(appId)}/account-verification-request`),
+    submit: (appId: string, reason: string, options?: CallOptions) => request<AccountVerificationRequestResult>(`/v1/apps/${seg(appId)}/account-verification-request`, { method: "POST", body: { reason }, idempotencyKey: options?.idempotencyKey }),
+  },
   /** `PATCH /v1/apps/{app_id}/signin-config`: deep merge; 422 with details.fields; 409 config_version_conflict. */
   updateSigninConfig: (appId: string, patch: SigninConfigPatch, options?: OwnerCall) =>
     request<AppDetail>(`/v1/apps/${seg(appId)}/signin-config`, { method: "PATCH", body: patch, idempotencyKey: options?.idempotencyKey, auth: ownerAuth(options?.credentials), signal: options?.signal }),
