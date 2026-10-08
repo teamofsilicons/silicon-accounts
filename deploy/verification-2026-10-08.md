@@ -293,3 +293,31 @@ browser checked the landing, an Apps guide and an Accounts guide at 1440 and
 390 pixels: both controls absent, titles visible, no horizontal overflow or browser
 errors, and Markdown still served successfully. Screenshots were inspected.
 Backup `backups/predeploy-20261008T163809Z.dump`, SHA-256 `820b71427cc20d1812c7dd7b619bc635f019353f173a63c91c3cbc91a8fdce77`.
+
+## Documentation readability pass
+
+Revised all 52 public pages using the plain language of the sibling Silicon
+understanding documents, with precise inputs, limits and outcomes retained.
+Updated shared landing copy, navigation summaries, exports and authoring guidance.
+Removed em dashes from public documentation and corrected outdated deployment
+and publication notes. Requirements documents were not changed.
+
+Source `d99cce8364d01dacbf511dc1cd470e02ba1ea6ff`, bundle SHA-256 `69cf43eb966b6b15339dd00555bdc64d091b6ca02beace85a05a5097b67643f3`.
+Both frontends were rebuilt. The API binary and migration 9 remain unchanged.
+Install SSM `2cf60c5e-e623-431c-95dd-2623d2054824` and verification `387fb013-6eaa-4025-b320-9bb1b0af4bd0` confirmed the release,
+services, readiness and protected-route authentication. Backup
+`backups/predeploy-20261008T170144Z.dump`, SHA-256 `558888940edcb18365ac5800c7a805b02b8f76ed61d8a7154f935c6ad14aac99`.
+
+Developer typecheck, lint, 18 unit tests, production build and 6 documentation
+browser tests passed. Accounts web typecheck, lint, 4 redirect tests and production
+build passed. The structural audit retained all 758 existing heading anchors and
+703 fenced code blocks, allowing punctuation-only changes to 8 sample error
+messages. Documentation link checks and git diff checks passed.
+
+The live crawl checked all 52 pages, 663 search records,
+5167 internal links, legacy redirects, metadata,
+unknown-page 404s and machine-readable exports. All 52 raw Markdown exports
+matched the committed source byte for byte. Search and LLM exports contain no em
+dashes. Live browser checks covered the landing, publishing and sign-in guides
+in light and dark themes at 1440 and 390 pixels, with no horizontal overflow,
+page errors or removed source buttons. Screenshots were inspected.
