@@ -21,7 +21,7 @@ silicon-apps-client = "0.1.6"
 silicon-apps-package = "0.1.2"
 ```
 
-The CLI release is 0.1.7; package versions are independent. Full generated Rust references are on [docs.rs for the client](https://docs.rs/silicon-apps-client) and [docs.rs for package tooling](https://docs.rs/silicon-apps-package).
+The CLI release is 0.1.8; package versions are independent. Full generated Rust references are on [docs.rs for the client](https://docs.rs/silicon-apps-client) and [docs.rs for package tooling](https://docs.rs/silicon-apps-package).
 
 ## Read the catalog
 

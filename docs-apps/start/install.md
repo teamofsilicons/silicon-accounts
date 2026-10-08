@@ -11,20 +11,20 @@ related:
 
 # Install Apps and find an app
 
-Choose the installer for your system below. It finds the right download for your operating system and processor, checks its SHA-256 checksum and installs Apps CLI 0.1.7. You can also download the release and its checksums from [GitHub](https://github.com/teamofsilicons/silicon-apps/releases/tag/v0.1.7). Downloads are available for all nine [supported targets](../reference/manifest.md#targets).
+Choose the installer for your system below. It finds the right download for your operating system and processor, checks its SHA-256 checksum and installs Apps CLI 0.1.8. You can also download the release and its checksums from [GitHub](https://github.com/teamofsilicons/silicon-apps/releases/tag/v0.1.8). Downloads are available for all nine [supported targets](../reference/manifest.md#targets).
 
 ## macOS and Linux
 
 ```sh
 curl -fsSL https://apps.teamofsilicons.com/install.sh -o install-apps.sh
-bash install-apps.sh --version 0.1.7 --server https://apps.teamofsilicons.com
+bash install-apps.sh --version 0.1.8 --server https://apps.teamofsilicons.com
 ```
 
 ## Windows PowerShell
 
 ```powershell
 Invoke-WebRequest -Uri https://apps.teamofsilicons.com/install.ps1 -OutFile install-apps.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\install-apps.ps1 -Version 0.1.7 -Server https://apps.teamofsilicons.com
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install-apps.ps1 -Version 0.1.8 -Server https://apps.teamofsilicons.com
 ```
 
 The execution-policy option applies only to this installer process. The installers configure PATH for new terminals. On macOS and Linux, run the printed `export PATH=...` command to use `silicon-apps` in your current terminal. On Windows, open a new terminal. Use `--no-path` or `-NoPath` to manage PATH yourself.
@@ -36,7 +36,7 @@ Both installers start the updater and set it to run when you log in to your comp
 ## Build with Cargo
 
 ```sh
-cargo install silicon-apps-cli --version 0.1.7 --locked
+cargo install silicon-apps-cli --version 0.1.8 --locked
 ```
 
 Cargo installs the standalone CLI. Unlike the bootstrap installers, it does not register Apps itself as a managed catalog installation.
