@@ -1,6 +1,6 @@
 ---
 title: HTTP API reference
-description: Find an Accounts endpoint and the authentication it needs. Read the shared rules for errors, retries, pagination and request limits.
+description: Find any Accounts endpoint and who can call it, plus the rules every endpoint shares for errors, retries, pagination and limits.
 kind: informative
 order: 60
 related:
@@ -20,9 +20,9 @@ related:
 
 # HTTP API reference
 
-Use this page to find an endpoint and see who can call it. Each linked reference gives the request fields, response and possible errors. The sections below explain rules that apply across the API.
+This page is the map of the Accounts API. Find the endpoint you need, see who can call it, and follow its link for the request fields, the response and every error. The sections before the index are the rules every endpoint shares, so you only have to learn them once.
 
-The [Rust client](rust-client.md) and [silicon-accounts CLI](cli.md) use these same endpoints. You can perform the same operations with HTTP requests.
+The [Rust client](rust-client.md) and the [silicon-accounts CLI](cli.md) call these same endpoints, so anything they do, you can also do with plain HTTP.
 
 ## Try it
 
@@ -31,7 +31,7 @@ export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # a local stack: http:
 curl -s "$ACCOUNTS_URL/v1/meta"
 ```
 
-To use a local stack instead, follow [Run it yourself](../index.md#run-it-yourself) and set `ACCOUNTS_URL=http://localhost:8590`. Account IDs, timestamps and other generated values in the examples will differ on your instance.
+Running your own stack? Follow [Run it yourself](../index.md#run-it-yourself) and set `ACCOUNTS_URL=http://localhost:8590`. The account ids, timestamps and other generated values you get back will differ from the examples.
 
 ```json
 {
@@ -46,7 +46,7 @@ To use a local stack instead, follow [Run it yourself](../index.md#run-it-yourse
 }
 ```
 
-An authenticated call: a Silicon signs in with its si:id and STK, then reads its own account.
+Now a signed-in call. A Silicon signs in with its si:id and STK, then reads its own account:
 
 ```sh
 TOKEN=$(curl -s -X POST "$ACCOUNTS_URL/v1/silicons/login" \
@@ -82,11 +82,11 @@ curl -s "$ACCOUNTS_URL/v1/me" -H "Authorization: Bearer $TOKEN"
 }
 ```
 
-Every example response in this reference is a real response from a local stack
-(`scripts/dev.sh`), with what differs per deployment (the Accounts and Iris hosts, `environment`)
-written as production's and long values cut with `…`. On a local stack the fake apps of
-`testkit/fake-apps.json` (`briefcase`, `dm`, `commit`, `remind`, `waveform`, …) exist with fixed
-development secrets, so the examples run as written:
+Every example response in this reference is real. We ran each one against a local stack
+(`scripts/dev.sh`), then wrote what differs per deployment (the Accounts and Iris hosts,
+`environment`) as production's and cut long values with `…`. A local stack also has the fake apps
+of `testkit/fake-apps.json` (`briefcase`, `dm`, `commit`, `remind`, `waveform`, …) with fixed
+development secrets, so you can run the examples as written:
 
 ```sh
 export ACCOUNTS_URL=http://localhost:8590
@@ -104,19 +104,22 @@ export APP_SECRET=sa_app_briefcase_AMVzlxdzf7qyZky8KlQdEekYO2kKkq7QhPhqWvWK   # 
 
 `accounts-api` serves `/v1/*`, `/.well-known/*` and the probes `/healthz` and `/readyz`. The
 account site serves the public origin and forwards only `/v1/*` and `/.well-known/*` to the API,
-unchanged, so browsers, apps and the CLI all use one origin. That keeps cookies, the CSRF
-`Origin` check, the Google and Apple callbacks and every redirect on the same host. The probes
-are not forwarded: they answer only on `accounts-api`'s own address (locally
-`http://127.0.0.1:8589`), where whatever runs the service checks them; on the public origin
-`/healthz` is the site's HTML "not found" page. Server-to-server callers may call either origin
-for `/v1/*`. The token issuer (`iss`) is the public URL.
+unchanged. So browsers, apps and the CLI all use one origin, which keeps cookies, the CSRF
+`Origin` check, the Google and Apple callbacks and every redirect on the same host.
 
-`GET /v1/meta` tells you which deployment you reached; check it first when something answers
-unexpectedly.
+The probes are not forwarded. They answer only on `accounts-api`'s own address (locally
+`http://127.0.0.1:8589`), where whatever runs the service checks them. On the public origin,
+`/healthz` is the site's HTML "not found" page.
+
+If you call from a server, either origin works for `/v1/*`. The token issuer (`iss`) is the
+public URL.
+
+`GET /v1/meta` tells you which deployment you reached. When something answers in a way you don't
+expect, check it first.
 
 ## Who can call what
 
-Each endpoint below names one of these kinds of caller.
+Every endpoint in the index names one of these callers. Send what the second column says.
 
 | Auth | Send | Who |
 |---|---|---|
@@ -130,7 +133,8 @@ Each endpoint below names one of these kinds of caller.
 | **request token** | `Authorization: Bearer sarq_…` from `POST /v1/silicons` | a self-created Silicon waiting for its custodian |
 | **internal** | `Authorization: Bearer <ACCOUNTS_INTERNAL_TOKEN>` | Silicon Apps only |
 
-Where the first-party access token comes from (all have `aud = silicon-accounts` and last 30 minutes):
+**account** needs a first-party access token. Every one has `aud = silicon-accounts` and lasts 30
+minutes, and this is where you get one:
 
 - a Silicon: `POST /v1/silicons/login` with its si:id and STK;
 - a Carbon without a browser: `POST /v1/cli/login/start` + `POST /v1/cli/login/verify` (a 6-digit
@@ -138,58 +142,59 @@ Where the first-party access token comes from (all have `aud = silicon-accounts`
   `POST /v1/oauth/token`);
 - either, later: `POST /v1/oauth/token` with `grant_type=refresh_token` and `client_id=silicon-accounts`.
 
-An access token issued to an app (`aud` = that app) is refused on account endpoints with 401
-`token_wrong_audience`: an app acts for an account at another app with an
-[User verification proof](api/proofs.md), never with the account's token.
+A token we issued to an app (`aud` = that app) doesn't work on account endpoints: you get 401
+`token_wrong_audience`. When your app needs to act for an account at another app, it uses a
+[User verification proof](api/proofs.md), never the account's token.
 
-**Cookies are for the account site.** A request authenticated by the session cookie that changes
-something (POST, PUT, PATCH, DELETE) must carry an `Origin` header equal to the public origin, or
-it is refused with 403 `origin_not_allowed`. Bearer tokens are not cookies, so the check doesn't
-apply to them. Scripts, Silicons and servers should always use Bearer tokens.
+**Cookies are for the account site.** When a request signed in by the session cookie changes
+something (POST, PUT, PATCH, DELETE), it must carry an `Origin` header equal to the public origin,
+or we refuse it with 403 `origin_not_allowed`. Bearer tokens aren't cookies, so the check doesn't
+apply to them. If you are a script, a Silicon or a server, always use a Bearer token.
 [Security](../learn/security.md) explains why.
 
 ## Requests
 
 - **JSON bodies** need `Content-Type: application/json` (any `application/*+json` works too). An
-  empty body counts as `{}`. Malformed JSON is 400 `invalid_json` (with the line and column); a
-  body that isn't JSON is 400 `invalid_content_type`; a missing or mistyped field is 422
-  `validation_failed` with `details.fields` keyed by the field's path (`branding.light.primary`,
+  empty body counts as `{}`. Malformed JSON is 400 `invalid_json`, with the line and column. A
+  body that isn't JSON is 400 `invalid_content_type`. A missing or mistyped field is 422
+  `validation_failed`, with `details.fields` keyed by the field's path (`branding.light.primary`,
   `scopes[3]`).
 - **Unknown fields.** The Silicon, proof, report, webhook-replay and identity-link bodies refuse
-  unknown fields (422 `validation_failed` naming the field), so a typo never silently does
-  nothing. `PATCH /v1/me` and `PATCH /v1/apps/{app_id}/signin-config` also refuse them and say
-  which endpoint owns a field that lives elsewhere (`email`, `id`). `POST /v1/flows` ignores
-  unknown fields (it receives a whole authorize query). The OAuth endpoints ignore unknown
+  unknown fields (422 `validation_failed` naming the field), so a typo never quietly does
+  nothing. `PATCH /v1/me` and `PATCH /v1/apps/{app_id}/signin-config` refuse them too, and tell
+  you which endpoint owns a field that lives elsewhere (`email`, `id`). `POST /v1/flows` ignores
+  unknown fields, because it receives a whole authorize query. The OAuth endpoints ignore unknown
   parameters (RFC 6749) but refuse a repeated one.
 - **OAuth endpoints** (`/v1/oauth/token`, `/revoke`, `/introspect`) take
-  `application/x-www-form-urlencoded` like every OAuth library sends, or a JSON object of strings.
-- **Raw bodies**: photo uploads take the image bytes with its image `Content-Type`; CSV imports
+  `application/x-www-form-urlencoded`, the way every OAuth library sends it, or a JSON object of
+  strings.
+- **Raw bodies.** Photo uploads take the image bytes with the image's `Content-Type`. CSV imports
   take `text/csv`.
-- **Path segments** are percent-encoded as usual; `:`, `@` and `+` may be sent as they are
+- **Path segments** are percent-encoded as usual. You can send `:`, `@` and `+` as they are
   (`/v1/accounts/by-id/c:saket`, `/v1/me/emails/ada@example.com`).
-- **Query strings**: an unknown value or a wrong type is 400 `invalid_query` naming the
-  parameter; a bad path parameter is 400 `invalid_path`.
-- **`X-Request-Id`** (optional): a value of 1–128 characters from `A-Z a-z 0-9 - _ . :` is used as
-  the request id; anything else is replaced by a generated UUIDv7. Every response echoes it.
+- **Query strings.** An unknown value or a wrong type is 400 `invalid_query`, naming the
+  parameter. A bad path parameter is 400 `invalid_path`.
+- **`X-Request-Id`** (optional). Send 1 to 128 characters from `A-Z a-z 0-9 - _ . :` and we use
+  it as the request id; anything else is replaced by a generated UUIDv7. Every response echoes it.
 - **`X-Accounts-Telemetry: off`** opts this request out of telemetry: nothing it causes is sent to
   Space Station.
 
 ## Responses
 
 - Bodies are JSON. Timestamps are RFC 3339 in UTC with milliseconds
-  (`2026-10-07T02:32:20.053Z`); dates are `YYYY-MM-DD`.
+  (`2026-10-07T02:32:20.053Z`). Dates are `YYYY-MM-DD`.
 - Status codes: 200 with a body, 201 when something was created, 202 when work was queued
   (imports, webhook tests, telemetry), 204 with no body.
-- Every response under `/v1` is `Cache-Control: no-store` (tokens, codes and personal data must
-  never sit in a cache), except: photos (`public, max-age=31536000, immutable`),
-  `GET /v1/apps/{app_id}/public` (`no-cache`), discovery and the JWKS (`public, max-age=300`).
+- Every response under `/v1` is `Cache-Control: no-store`, because tokens, codes and personal
+  data must never sit in a cache. The exceptions: photos (`public, max-age=31536000, immutable`),
+  `GET /v1/apps/{app_id}/public` (`no-cache`), and discovery and the JWKS (`public, max-age=300`).
 - Lists are `{"items": [...], "next_cursor": "…" | null}` (see [Pagination](#pagination)).
-- Every response carries `X-Request-Id`; quote it when you report a bug
+- Every response carries `X-Request-Id`. Quote it when you report a bug
   (`POST /v1/reports`, `silicon-accounts report`).
 
 ## Errors
 
-Every endpoint except the three OAuth endpoints answers errors in one shape:
+Every endpoint answers errors in one shape, except the three OAuth endpoints further down:
 
 ```json
 {
@@ -202,14 +207,14 @@ Every endpoint except the three OAuth endpoints answers errors in one shape:
 }
 ```
 
-`code` is stable and machine-readable; branch on it. `message` says exactly what was wrong and
-why; `hint` says what to do next; `details` (optional) carries structured data such as
-`fields`, `retry_after_seconds` or `suggestions`. A 5xx never explains internals and carries
-`details.request_id`. 423 and 429 responses set `Retry-After` (seconds) and
+`code` is stable and machine-readable, so branch on it. `message` says exactly what was wrong and
+why, and `hint` says what to do next. `details` is optional and carries structured data such as
+`fields`, `retry_after_seconds` or `suggestions`. A 5xx never explains our internals, but it
+carries `details.request_id`. 423 and 429 responses set `Retry-After` (in seconds) and
 `details.retry_after_seconds`.
 
-`/v1/oauth/token`, `/v1/oauth/revoke` and `/v1/oauth/introspect` answer RFC 6749 bodies, because
-OAuth libraries read `error` as a string:
+`/v1/oauth/token`, `/v1/oauth/revoke` and `/v1/oauth/introspect` answer RFC 6749 bodies instead,
+because OAuth libraries read `error` as a string:
 
 ```json
 {
@@ -218,15 +223,16 @@ OAuth libraries read `error` as a string:
 }
 ```
 
-Every code, its status and its fix: [Errors](errors.md).
+[Errors](errors.md) lists every code, its status and its fix.
 
 ## Versions
 
-The API has dated versions. Pin one with the request header `Accounts-Version: 2026-10-01`;
-without it the current version answers, so nothing changes for clients written before versions
-existed. Every answer under `/v1`, `/.well-known` and `/openapi.json` names the version that
-served it in its own `Accounts-Version` header (and `Vary: Accounts-Version`). A version this
-deployment doesn't serve is refused before anything runs:
+The API has dated versions. Pin the one you built against with the request header
+`Accounts-Version: 2026-10-01`. Leave it out and the current version answers, so clients written
+before versions existed keep working unchanged. Every answer under `/v1`, `/.well-known` and
+`/openapi.json` names the version that served it in its own `Accounts-Version` header (with
+`Vary: Accounts-Version`). Ask for a version this deployment doesn't serve and we refuse before
+anything runs:
 
 ```json
 {
@@ -239,28 +245,32 @@ deployment doesn't serve is refused before anything runs:
 }
 ```
 
-`GET /v1/capabilities` lists the versions and everything else this deployment supports, and
-answers whether it supports what you need (`?require=sse,subscriptions`):
-[Service endpoints](api/service.md#get-v1capabilities). The whole API is described by the
-OpenAPI document at [`/openapi.json`](api/service.md#get-openapijson-and-get-v1openapijson).
+`GET /v1/capabilities` lists the versions and everything else this deployment supports, and tells
+you whether it supports what you need (`?require=sse,subscriptions`). See
+[Service endpoints](api/service.md#get-v1capabilities). The OpenAPI document at
+[`/openapi.json`](api/service.md#get-openapijson-and-get-v1openapijson) describes the whole API.
 
 ## Idempotency
 
-Endpoints marked **idempotent** below accept an `Idempotency-Key` header: 1 to 200 visible ASCII
-characters (no spaces; a UUID works well). Use a fresh key per operation and the same key only to
-retry that operation.
+Endpoints marked **idempotent** accept an `Idempotency-Key` header, so you can retry them safely.
+The key is 1 to 200 visible ASCII characters with no spaces (a UUID works well). Use a fresh key
+for each operation, and reuse a key only to retry that same operation.
 
 - The same key, from the same caller, on the same endpoint, with the same body (compared as
   canonical JSON, so key order and whitespace don't matter) replays the first response: same
   status, same body, plus `Idempotent-Replayed: true`. Nothing runs twice.
 - The same key with a different body: 409 `idempotency_key_reused`.
-- The same key while the first request is still running: 409 `idempotency_in_progress` (retry in
-  a few seconds; a crashed request frees its key after 120 seconds).
+- The same key while the first request is still running: 409 `idempotency_in_progress`. Retry in
+  a few seconds; a crashed request frees its key after 120 seconds.
 - Failed requests are not stored, so retrying a failure runs it again.
-- Responses are kept for **24 hours**. A response that contains a newly generated secret is encrypted and kept for **10 minutes** instead. This includes STKs, webhook signing secrets, `sarq_` request tokens and proof tokens. If the stored response cannot be decrypted, a retry returns `409 idempotency_result_unavailable`. It does not run the operation again.
-- "Same caller" is the account, the app (or the author acting for it), or for anonymous calls the client IP.
+- We keep responses for **24 hours**. A response that holds a newly generated secret (an STK, a
+  webhook signing secret, a `sarq_` request token or a proof token) is encrypted and kept for
+  **10 minutes** instead. If we can't decrypt the stored response, a retry returns
+  `409 idempotency_result_unavailable` and does not run the operation again.
+- "Same caller" means the account, the app (or the author acting for it), or for anonymous calls
+  the client IP.
 
-A Carbon creates a Silicon (`$CARBON_TOKEN` is a Carbon's first-party access token):
+Here a Carbon creates a Silicon (`$CARBON_TOKEN` is the Carbon's first-party access token):
 
 ```sh
 curl -s -i -X POST "$ACCOUNTS_URL/v1/me/silicons" \
@@ -272,7 +282,7 @@ curl -s -i -X POST "$ACCOUNTS_URL/v1/me/silicons" \
 # and with another body under the same key: 409 idempotency_key_reused
 ```
 
-The endpoints that accept a key, with how long their result is kept:
+Every endpoint that accepts a key, and how long we keep its result:
 
 | Endpoint | Kept |
 |---|---|
@@ -292,9 +302,9 @@ The endpoints that accept a key, with how long their result is kept:
 
 ## Pagination
 
-List endpoints take `?limit=` (1 to 200, default 50; values outside are clamped) and `?cursor=`
-(the `next_cursor` of the previous page, unchanged). Cursors are keyset positions, so pages
-neither skip nor repeat items while new ones arrive. The last page has `"next_cursor": null`. A
+List endpoints take `?limit=` (1 to 200, default 50; values outside that are clamped) and
+`?cursor=` (the previous page's `next_cursor`, unchanged). Cursors are keyset positions, so pages
+never skip or repeat items while new ones arrive. The last page has `"next_cursor": null`. A
 cursor that isn't one of ours is 400 `invalid_cursor`.
 
 ```sh
@@ -305,9 +315,9 @@ curl -s "$ACCOUNTS_URL/v1/me/history?limit=2&cursor=WzE3OTEzNDA1MjY1Mzk2MzcsImEi
 
 ## Rate limits and locks
 
-Over a limit the answer is 429 `rate_limited` with `Retry-After` and
-`details.retry_after_seconds`; wait that long. Too many wrong codes or STKs lock instead: 423
-`verification_locked` / `login_locked`, also with `Retry-After`. Every number is in
+Go over a limit and you get 429 `rate_limited` with `Retry-After` and
+`details.retry_after_seconds`. Wait that long, then try again. Too many wrong codes or STKs lock
+instead: 423 `verification_locked` / `login_locked`, also with `Retry-After`. Every number is in
 [Limits](limits.md).
 
 ## Body limits and time budgets
@@ -320,23 +330,26 @@ Over a limit the answer is 429 `rate_limited` with `Retry-After` and
 | `POST /v1/apps/{app_id}/imports` | 50 MB | 5 min |
 | `POST /v1/internal/apps/sync` | 5 MB | 60 s |
 
-A larger body is refused before it is read: 413 `payload_too_large` with `details.limit_bytes`
-(on the OAuth endpoints: 413 with `error: invalid_request`). A request that runs past its budget
-ends with 503 `request_timeout`.
+We refuse a larger body before reading it: 413 `payload_too_large` with `details.limit_bytes` (on
+the OAuth endpoints, 413 with `error: invalid_request`). A request that runs past its budget ends
+with 503 `request_timeout`.
 
 ## CORS
 
-Only public resources are readable from other origins: `GET /v1/apps/{app_id}/public`,
-`/.well-known/*` and `/sdk/*` answer `Access-Control-Allow-Origin: *` (and their preflights).
-So do the discovery documents `/openapi.json`, `/v1/openapi.json` and `/v1/capabilities`; their
-`X-Request-Id`, `Accounts-Version` and `Retry-After` headers are readable too.
+Only public resources can be read from other origins. `GET /v1/apps/{app_id}/public`,
+`/.well-known/*` and `/sdk/*` answer `Access-Control-Allow-Origin: *` (and so do their
+preflights). So do the discovery documents `/openapi.json`, `/v1/openapi.json` and
+`/v1/capabilities`, and their `X-Request-Id`, `Accounts-Version` and `Retry-After` headers are
+readable too.
+
 Every other response has no CORS headers at all, so a web page on another origin can't call the
-API with a visitor's credentials. Call the API from your server; in the browser use the hosted
+API with a visitor's credentials. Call the API from your server. In the browser, use the hosted
 pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)).
 
 ## Endpoint index
 
-**Idem.** marks endpoints that accept an `Idempotency-Key`.
+Every endpoint, grouped like the pages that describe it. **Idem.** marks the ones that accept an
+`Idempotency-Key`.
 
 ### OAuth and OIDC · [oauth.md](api/oauth.md)
 
@@ -498,9 +511,9 @@ pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)
 
 ### Webhooks · [webhooks.md](api/webhooks.md)
 
-Webhooks are requests Silicon Accounts sends to you: the delivery format, the signature and every
-event type are on that page. The endpoints that set a webhook and list or replay its deliveries
-are under [Apps](#apps--appsmd) (an app's) and
+Webhooks are requests we send to you. That page has the delivery format, the signature and every
+event type. The endpoints that set a webhook and list or replay its deliveries are under
+[Apps](#apps--appsmd) (an app's webhook) and
 [Silicons and custodians](#silicons-and-custodians--siliconsmd) (a Silicon's).
 
 ### Events · [webhooks.md](api/webhooks.md#event-stream)
@@ -525,9 +538,9 @@ are under [Apps](#apps--appsmd) (an app's) and
 | `GET /embed/v1/buttons`, `GET /sdk/v1.js` | public, served by the account site | | the embed page and the SDK |
 
 On the public origin, any other path under `/v1` or `/.well-known` is 404 `route_not_found`
-(JSON); every other unknown path there, under `/embed`, `/sdk` or `/healthz` too, is the account
-site's HTML 404 page. On `accounts-api`'s own address every unknown path is 404
-`route_not_found`. A known path with the wrong method is 405 `method_not_allowed` with an
+(JSON). Every other unknown path there, including under `/embed`, `/sdk` or `/healthz`, is the
+account site's HTML 404 page. On `accounts-api`'s own address, every unknown path is 404
+`route_not_found`. A known path with the wrong method is 405 `method_not_allowed`, with an
 `Allow` header.
 
 ## Related

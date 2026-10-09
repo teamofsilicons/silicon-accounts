@@ -1,6 +1,6 @@
 ---
 title: OAuth and OIDC endpoints
-description: Look up sign-in, token exchange, refresh, revocation, introspection and userinfo endpoints, with their parameters and responses.
+description: The endpoints your app signs people in with, from authorize and token exchange to refresh, revocation, introspection and userinfo, with every parameter and response.
 kind: informative
 order: 61
 related:
@@ -15,11 +15,11 @@ related:
 
 # OAuth and OIDC endpoints
 
-Use these endpoints to start sign-in, exchange a code for tokens, refresh a session, check a token or revoke it. They implement OAuth 2.0 and OpenID Connect. An OIDC library can read the discovery document to find the endpoints and supported options.
+These are the endpoints your app uses to sign someone in and keep them signed in: start the sign-in, exchange the code for tokens, refresh, check a token and revoke it. They are standard OAuth 2.0 and OpenID Connect, so any OIDC library can read the discovery document and find the endpoints and supported options on its own.
 
-For a walkthrough, see [Add sign-in to your app](../../start/add-sign-in.md) and [Tokens](../../start/tokens.md). [Tokens and sessions](../../learn/tokens-and-sessions.md) explains their lifetimes and behaviour.
+For a walkthrough, start with [Add sign-in to your app](../../start/add-sign-in.md) and [Tokens](../../start/tokens.md). [Tokens and sessions](../../learn/tokens-and-sessions.md) explains how long each token lives and how it behaves.
 
-Exchange the code your redirect URI received:
+Here your server exchanges the code that came back to your redirect URI:
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" -u "$APP_ID:$APP_SECRET" \
@@ -56,12 +56,12 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" -u "$APP_ID:$APP_SECRET" \
 ```
 
 Store `account.uuid` (or `membership_id`) as the account's key in your app. The `id` (`c:ada`)
-is for display and can change.
+is for showing, and it can change.
 
 ## `GET /authorize`
 
-The hosted sign-in page on the account site. Send the browser here; it comes back to your
-`redirect_uri`. This is a page, not a JSON endpoint: the page validates the request with
+Our hosted sign-in page, on the account site. Send the browser here and it comes back to your
+`redirect_uri`. This is a page, not a JSON endpoint: the page checks your request with
 `POST /v1/flows` ([Hosted sign-in](sign-in.md)).
 
 | Parameter | Required | Meaning |
@@ -78,20 +78,20 @@ The hosted sign-in page on the account site. Send the browser here; it comes bac
 | `method` | no | the app's own direct button: `google` or `apple` first show the Opening page ("Opening Google to sign you in to {app}…") and move on to the provider by themselves; `email` or `phone` open on that empty field. Must be enabled for the app |
 | `response_type` | no | only `code` is supported |
 
-`login_hint` is accepted without an error and ignored: it is not prefilled, not stored, not
-echoed and not forwarded to Google or Apple. An app can never hand Silicon Accounts a Carbon's
-email or phone; the Carbon always types it on the hosted pages.
+`login_hint` is accepted without an error and ignored. We don't prefill it, store it, echo it or
+forward it to Google or Apple. An app can never hand us a Carbon's email or phone: the Carbon
+always types it on the hosted pages.
 
-Back on your `redirect_uri`:
+What comes back to your `redirect_uri`:
 
-- success: `?code=sac_…&state=…`: exchange the code within 2 minutes;
-- refusal: `?error=…&error_description=…&state=…` with `error` = `access_denied` (the Carbon
-  cancelled on a details or review page), `login_required`, `consent_required` or `interaction_required`
-  (`prompt=none` couldn't finish silently), `invalid_scope`, `invalid_request` or
-  `unsupported_response_type`.
+- Success: `?code=sac_…&state=…`. Exchange the code within 2 minutes.
+- Refusal: `?error=…&error_description=…&state=…` with `error` = `access_denied` (the Carbon
+  cancelled on a details or review page), `login_required`, `consent_required` or
+  `interaction_required` (`prompt=none` couldn't finish silently), `invalid_scope`,
+  `invalid_request` or `unsupported_response_type`.
 
-An unknown app, a disabled app or an unregistered `redirect_uri` is shown as an error page and is
-never redirected to, so the page can't be used to send codes to someone else's URL.
+An unknown app, a disabled app or an unregistered `redirect_uri` gets an error page, never a
+redirect, so nobody can use the page to send codes to someone else's URL.
 
 | Scope | What the app gets in `account` |
 |---|---|
@@ -102,17 +102,21 @@ never redirected to, so the page can't be used to send codes to someone else's U
 | `timezone` | `timezone` (IANA, like `Asia/Kolkata`) |
 | `openid` | an `id_token` in the token response |
 
-Besides `scope`, the app's sign-in setup decides what is shared: its `required_fields` are always
-shared (and must exist on the account before the code is issued: a missing email or phone is
-added on the page, with a code), its `optional_fields` are checkboxes on the details pages,
-unticked until the Carbon ticks them. Details `scope` asks for that the app doesn't configure are
-optional checkboxes on the last page. Silicons never have an email or a phone: those scopes are
-simply left out for them and never block a Silicon.
-[What apps see](../../learn/what-apps-see.md) explains the rules.
+Besides `scope`, your app's sign-in setup decides what is shared:
+
+- `required_fields` are always shared, and must exist on the account before we issue the code. A
+  missing email or phone is added on the page, with a code.
+- `optional_fields` are checkboxes on the details pages, unticked until the Carbon ticks them.
+- Details that `scope` asks for but your app doesn't configure become optional checkboxes on the
+  last page.
+
+Silicons never have an email or a phone. Those scopes are simply left out for them and never
+block a Silicon. [What apps see](../../learn/what-apps-see.md) explains the rules.
 
 ## `GET /.well-known/openid-configuration`
 
-Public, `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=300`.
+The discovery document your OIDC library reads. Public, with `Access-Control-Allow-Origin: *` and
+`Cache-Control: public, max-age=300`.
 
 ```sh
 curl -s "$ACCOUNTS_URL/.well-known/openid-configuration"
@@ -159,7 +163,7 @@ curl -s "$ACCOUNTS_URL/.well-known/openid-configuration"
 ## `GET /.well-known/jwks.json`
 
 The public keys that sign access tokens and `id_token`s. Public, CORS `*`, cacheable for 5
-minutes. Cache it and fetch it again when a token names a `kid` you don't have.
+minutes. Cache it, and fetch it again when a token names a `kid` you don't have.
 
 ```json
 {
@@ -171,22 +175,25 @@ minutes. Cache it and fetch it again when a token names a `kid` you don't have.
 
 ## `POST /v1/oauth/token`
 
-Every grant. The body is `application/x-www-form-urlencoded` (or a JSON object of strings).
-Responses are `Cache-Control: no-store`; errors are RFC 6749 bodies.
+One endpoint for every grant. Send the body as `application/x-www-form-urlencoded` (or a JSON
+object of strings). Responses are `Cache-Control: no-store`, and errors come as RFC 6749 bodies.
 
-**Client authentication.** Send the app's credentials with HTTP Basic
+**Client authentication.** Send your app's credentials with HTTP Basic
 (`-u app_id:app_secret`) or as `client_id` + `client_secret` in the body, never both
 (`invalid_request`). A `client_id` in the body must match the Basic credentials
-(`invalid_client`). `client_id=silicon-accounts` with no secret is the first-party public client (the
-`silicon-accounts` CLI): it may only use `refresh_token` and the device-code grant
-(`unauthorized_client` otherwise). `client_id=developer` with no secret is the developer
-platform (developers.teamofsilicons.com, whose server holds the tokens): it may only use
-`authorization_code` with PKCE `S256` (a missing challenge or `plain` is `invalid_grant`, and the
-code is burnt), `refresh_token` for its own tokens, and `/v1/oauth/revoke`; other grants are
-`unauthorized_client` and introspection is `invalid_client`. Its tokens have `aud: "developer"`
-and act for their Carbon only on `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and
-the author routes under `/v1/apps/{app_id}/…`; anywhere else they get 401
-`token_wrong_audience`.
+(`invalid_client`).
+
+Two first-party clients send no secret:
+
+- `client_id=silicon-accounts` is the first-party public client (the `silicon-accounts` CLI). It
+  may only use `refresh_token` and the device-code grant (`unauthorized_client` otherwise).
+- `client_id=developer` is the developer platform (developers.teamofsilicons.com, whose server
+  holds the tokens). It may only use `authorization_code` with PKCE `S256` (a missing challenge
+  or `plain` is `invalid_grant`, and the code is burnt), `refresh_token` for its own tokens, and
+  `/v1/oauth/revoke`. Other grants are `unauthorized_client`, and introspection is
+  `invalid_client`. Its tokens have `aud: "developer"` and act for their Carbon only on
+  `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and the author routes under
+  `/v1/apps/{app_id}/…`. Anywhere else they get 401 `token_wrong_audience`.
 
 ### `grant_type=authorization_code`
 
@@ -194,12 +201,12 @@ the author routes under `/v1/apps/{app_id}/…`; anywhere else they get 401
 |---|---|
 | `code` | the `sac_…` code from your redirect URI |
 | `redirect_uri` | exactly the `redirect_uri` sent to `/authorize` |
-| `code_verifier` | the PKCE verifier (43–128 characters of `A-Z a-z 0-9 - . _ ~`); required when a challenge was sent, refused when none was |
+| `code_verifier` | the PKCE verifier (43 to 128 characters of `A-Z a-z 0-9 - . _ ~`); required when a challenge was sent, refused when none was |
 
-Codes are single-use and live 120 seconds. Any refused redemption burns the code. Presenting a
-code that was already exchanged also revokes the tokens issued from it, and the app gets
-`membership.signed_out` with reason `authorization_code_reuse`: a code seen twice means
-someone else may have it.
+A code works once and lives 120 seconds. Any refused redemption burns it. If a code that was
+already exchanged is presented again, we also revoke the tokens issued from it, and your app gets
+`membership.signed_out` with reason `authorization_code_reuse`. A code seen twice means someone
+else may have it.
 
 ### `grant_type=refresh_token`
 
@@ -208,18 +215,18 @@ someone else may have it.
 | `refresh_token` | the newest `sar_…` refresh token you received |
 | `scope` | optional; may only repeat or narrow the granted scopes (`invalid_scope` if it adds one) |
 
-Every refresh returns a new refresh token and kills the old one. Presenting a used refresh token
-revokes the whole sign-in (the token family): every access and refresh token of it stops working
-and the app gets `membership.signed_out` with reason `refresh_token_reuse`. Always store the new
-token before using it. `refresh_token_expires_at` doesn't move: a sign-in lasts at most 900 days
-from when it started.
+Every refresh returns a new refresh token and kills the old one. If a used refresh token is
+presented, we revoke the whole sign-in (the token family): every access and refresh token in it
+stops working, and your app gets `membership.signed_out` with reason `refresh_token_reuse`. So
+always store the new token before you use it. `refresh_token_expires_at` doesn't move: a sign-in
+lasts at most 900 days from when it started.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" -u "$APP_ID:$APP_SECRET" \
   -d grant_type=refresh_token -d refresh_token="$REFRESH_TOKEN"
 ```
 
-Presenting the same refresh token again:
+Present the same refresh token again and you get:
 
 ```json
 {
@@ -228,13 +235,13 @@ Presenting the same refresh token again:
 }
 ```
 
-First-party tokens refresh the same way with `-d client_id=silicon-accounts` and no secret.
+First-party tokens refresh the same way, with `-d client_id=silicon-accounts` and no secret.
 
 ### `grant_type=urn:silicon:params:oauth:grant-type:slt`
 
-How a Silicon signs into your app: it gets a short-lived token for your app
-(`POST /v1/me/short-lived-tokens`, or `silicon-accounts login --app <app_id>`) and hands it to you. The
-alias `grant_type=slt` works too.
+This is how a Silicon signs into your app. It asks us for a short-lived token for your app
+(`POST /v1/me/short-lived-tokens`, or `silicon-accounts login --app <app_id>`), hands it to you,
+and you exchange it here. The alias `grant_type=slt` works too.
 
 | Parameter | |
 |---|---|
@@ -269,27 +276,31 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" -u "$APP_ID:$APP_SECRET" \
 }
 ```
 
-An SLT is refused when the Silicon's STK was rotated, or the account removed your app's access,
-after the SLT was issued.
+We refuse an SLT if, after it was issued, the Silicon's STK was rotated or the account removed
+your app's access.
 
 ### `grant_type=urn:ietf:params:oauth:grant-type:device_code`
 
-The device sign-in (RFC 8628) of the `silicon-accounts` CLI and of apps' own tools (apps that turn
-on `device_flow`). The alias `grant_type=device_code` works too.
+The device sign-in (RFC 8628), used by the `silicon-accounts` CLI and by apps' own tools (apps
+that turn on `device_flow`). The alias `grant_type=device_code` works too.
 
 | Parameter | |
 |---|---|
 | `device_code` | the `sad_…` code from `POST /v1/device/authorize` |
 | `client_id` | `silicon-accounts`, or your `app_id` (your secret is optional: HTTP Basic works too) |
 
-Poll every `interval` seconds (5). Until the Carbon decides you get `authorization_pending`;
-polling faster than every 5 seconds gets `slow_down` (add 5 seconds to your interval); a denial
-is `access_denied`; after 600 seconds `expired_token`. Once approved, the first poll returns the
-tokens and later ones get `invalid_grant` ("already exchanged").
+Poll every `interval` seconds (5). What you get back:
 
-An app's tool gets tokens for the app, with the scopes the Carbon approved, and the sign-in
-counts like any other: the account becomes an active member and the sign-in is recorded
-(method `device`). A code started by another app is `invalid_grant` and stays usable by its own
+- `authorization_pending` until the Carbon decides;
+- `slow_down` if you poll faster than every 5 seconds (add 5 seconds to your interval);
+- `access_denied` if they deny it;
+- `expired_token` after 600 seconds;
+- the tokens on the first poll after they approve, and `invalid_grant` ("already exchanged") on
+  every poll after that.
+
+Your app's tool gets tokens for your app, with the scopes the Carbon approved, and the sign-in
+counts like any other: the account becomes an active member and we record the sign-in (method
+`device`). A code started by another app is `invalid_grant` for you, and stays usable by its own
 app. A code whose Carbon removed your app's access after approving is `invalid_grant`. An app
 that hasn't turned on `device_flow` gets `unauthorized_client`.
 
@@ -308,10 +319,10 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
 
 ### `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`
 
-A Silicon's key sign-in (RFC 7523): `assertion` is a JWT signed with one of its
-[registered keys](silicons.md#silicon-keys), `client_id=silicon-accounts`. The answer is the same
-first-party token response as `POST /v1/silicons/login`. Another client gets
-`unauthorized_client`; a bad assertion is `invalid_grant` with the reason.
+A Silicon signing in with a key (RFC 7523). `assertion` is a JWT signed with one of its
+[registered keys](silicons.md#silicon-keys), and `client_id` is `silicon-accounts`. The answer is
+the same first-party token response as `POST /v1/silicons/login`. Any other client gets
+`unauthorized_client`, and a bad assertion is `invalid_grant` with the reason.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
@@ -333,7 +344,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
 | `membership_id` | `{app_id}:{uuid}` |
 | `account` | the account as your app may see it (the fields of the scopes above) |
 
-Access token claims (first-party tokens have `aud: "silicon-accounts"`):
+The access token's claims (first-party tokens have `aud: "silicon-accounts"`):
 
 ```json
 {
@@ -352,12 +363,13 @@ Access token claims (first-party tokens have `aud: "silicon-accounts"`):
 }
 ```
 
-`sub` is the account uuid, `id` the c:id or si:id when the token was issued, `mid` the membership
-id, `fid` the token family (the sign-in). Verify the signature with the JWKS, `exp`/`nbf`, and
-`aud` equal to your app id. A local check can't see revocation; call
-[introspection](#post-v1oauthintrospect) when you must know about a sign-out at once.
+`sub` is the account uuid, `id` the c:id or si:id at the time the token was issued, `mid` the
+membership id and `fid` the token family (the sign-in). To check a token yourself, verify the
+signature against the JWKS, check `exp` and `nbf`, and check that `aud` equals your app id. A
+local check can't see a revocation, so call [introspection](#post-v1oauthintrospect) when you
+need to know about a sign-out at once.
 
-`id_token` claims (header `{"alg":"EdDSA","kid":"…"}`):
+The `id_token`'s claims (header `{"alg":"EdDSA","kid":"…"}`):
 
 ```json
 {
@@ -401,10 +413,10 @@ lists them all.
 
 ## `POST /v1/oauth/revoke`
 
-Ends the sign-in behind a refresh token or an access token (RFC 7009): the whole token family is
-revoked. Same client authentication as the token endpoint; the first-party public client may
+Ends the sign-in behind a refresh token or an access token (RFC 7009): we revoke the whole token
+family. Authenticate the same way as at the token endpoint; the first-party public client can
 revoke first-party tokens only. An access token is accepted even after it expired.
-`token_type_hint` is accepted and ignored (the token's own form says what it is).
+`token_type_hint` is accepted and ignored, because the token's own form says what it is.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/revoke" -u "$APP_ID:$APP_SECRET" -d token="$REFRESH_TOKEN"
@@ -414,9 +426,8 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/revoke" -u "$APP_ID:$APP_SECRET" -d toke
 { "revoked": true }
 ```
 
-Once the client is authenticated the answer is always 200. A token that isn't one of the
-caller's (unknown, malformed, another app's) is answered the same way, so the endpoint can't be
-used to probe tokens:
+Once your client is authenticated, the answer is always 200. A token that isn't yours (unknown,
+malformed or another app's) gets a 200 too, so nobody can use the endpoint to probe tokens:
 
 ```json
 {
@@ -429,8 +440,9 @@ Revoking an app's sign-in sends that app `membership.signed_out` with reason `ap
 
 ## `POST /v1/oauth/introspect`
 
-Is this token of yours live right now (RFC 7662)? Needs the app's own credentials (the public
-client gets 401 `invalid_client`). Only the calling app's tokens are ever reported active.
+Is this token of yours live right now (RFC 7662)? This needs your app's own credentials; the
+public client gets 401 `invalid_client`. We only ever report the calling app's own tokens as
+active.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/introspect" -u "$APP_ID:$APP_SECRET" -d token="$ACCESS_TOKEN"
@@ -456,13 +468,14 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/introspect" -u "$APP_ID:$APP_SECRET" -d 
 }
 ```
 
-An active refresh token reports `token_type: "refresh_token"` and the session’s end as `exp`. An expired, revoked, unknown token or a token for another app returns exactly `{"active": false}`.
+An active refresh token reports `token_type: "refresh_token"`, with the session's end as `exp`. A
+token that is expired, revoked, unknown or another app's returns exactly `{"active": false}`.
 
 ## `GET` / `POST /v1/userinfo`
 
 The account behind an access token, as the token's app may see it, plus the OIDC claim names.
-Send `Authorization: Bearer <access token>`; with POST you may instead send a form field
-`access_token` (never both). Any audience works, first-party tokens included.
+Send `Authorization: Bearer <access token>`. With POST you can send a form field `access_token`
+instead, never both. Any audience works, first-party tokens included.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/userinfo" -H "Authorization: Bearer $ACCESS_TOKEN"
@@ -491,11 +504,12 @@ curl -s "$ACCOUNTS_URL/v1/userinfo" -H "Authorization: Bearer $ACCESS_TOKEN"
 With the `phone` and `dob` scopes it adds `phone_number`, `phone_number_verified` and
 `birthdate`. A Silicon's answer carries `custodian`.
 
-Errors use the API error shape plus `WWW-Authenticate: Bearer realm="Silicon Accounts",
-error="invalid_token", …` so OIDC libraries understand them; all are 401: `unauthenticated` (no
-token), `invalid_authorization`, `invalid_token` (malformed, or expired at its exact `exp` time),
-`token_revoked` (signed out, STK rotated, account deleted…), `account_deleted`,
-`access_removed` (the account removed your app's access), `membership_inactive`, `app_disabled`.
+Errors use the API error shape, plus
+`WWW-Authenticate: Bearer realm="Silicon Accounts", error="invalid_token", …` so OIDC libraries
+understand them. All of them are 401: `unauthenticated` (no token), `invalid_authorization`,
+`invalid_token` (malformed, or expired at its exact `exp` time), `token_revoked` (signed out, STK
+rotated, account deleted…), `account_deleted`, `access_removed` (the account removed your app's
+access), `membership_inactive`, `app_disabled`.
 
 ```json
 {
@@ -509,9 +523,13 @@ token), `invalid_authorization`, `invalid_token` (malformed, or expired at its e
 
 ## `POST /v1/device/authorize`
 
-Starts a device sign-in (RFC 8628) for the `silicon-accounts` CLI, or for an app's own tool. Public.
-The body (JSON or form) is optional: `client_label` (shown on the approval page and in the
-sessions list; cut at 100 characters), `client_id` (`silicon-accounts` when left out), `scope`.
+Starts a device sign-in (RFC 8628) for the `silicon-accounts` CLI, or for your app's own tool.
+Public. The body (JSON or form) is optional:
+
+- `client_label`: shown on the approval page and in the sessions list, cut at 100 characters;
+- `client_id`: `silicon-accounts` when left out;
+- `scope`.
+
 At most 60 per IP per 10 minutes. Errors use the API error shape.
 
 ```sh
@@ -531,26 +549,28 @@ curl -s -X POST "$ACCOUNTS_URL/v1/device/authorize" \
 }
 ```
 
-Show `user_code` and `verification_uri` to the Carbon, who approves on the account site
-(`/v1/device/{user_code}/approve`, see [Hosted sign-in](sign-in.md#device-approval)); poll the
-token endpoint with the device-code grant. User codes use `A-Z` without `I`, `L` and `O`, plus
-`2-9`; typed codes are matched without spaces, dashes or case.
+Show the Carbon `user_code` and `verification_uri`. They approve on the account site
+(`/v1/device/{user_code}/approve`, see [Hosted sign-in](sign-in.md#device-approval)) while you
+poll the token endpoint with the device-code grant. User codes use `A-Z` without `I`, `L` and
+`O`, plus `2-9`, and we match typed codes ignoring spaces, dashes and case.
 
 ### For an app's tool
 
-`client_id=<your app_id>` (or HTTP Basic with your secret, which is then checked) starts a
-device sign-in for your app once it turned on `device_flow` in its sign-in setup; until then 400
-`unauthorized_client`. `scope` (space-separated) asks for details your app requests (`email`,
-`phone`, `dob`, `timezone`); your required details and `profile` are always included, and a
-detail your app doesn't ask for is 400 `invalid_scope`. At most 600 per app per 10 minutes.
-Other errors: 400 `invalid_client` (no such app), 401 `invalid_app_credentials` (a wrong
-secret), 403 `app_disabled`. The guide: [Sign people into your CLI](../../start/add-sign-in.md#sign-people-into-your-cli).
+Send `client_id=<your app_id>` (or HTTP Basic with your secret, which we then check) to start a
+device sign-in for your app. It works once your app has turned on `device_flow` in its sign-in
+setup; until then you get 400 `unauthorized_client`.
+
+`scope` (space-separated) asks for details your app requests (`email`, `phone`, `dob`,
+`timezone`). Your required details and `profile` are always included, and a detail your app
+doesn't ask for is 400 `invalid_scope`. At most 600 per app per 10 minutes. Other errors: 400
+`invalid_client` (no such app), 401 `invalid_app_credentials` (a wrong secret), 403
+`app_disabled`. For the steps, see [Sign people into your CLI](../../start/add-sign-in.md#sign-people-into-your-cli).
 
 ## Public clients
 
-An app's command-line and desktop tools can't keep a secret. With `public_client` (or
-`device_flow`) on in its sign-in setup, the token endpoint accepts the app's `client_id` alone
-(`token_endpoint_auth_method` `none`) for:
+Your app's command-line and desktop tools can't keep a secret, because a secret shipped inside a
+tool isn't secret. Turn on `public_client` (or `device_flow`) in your sign-in setup, and the token
+endpoint accepts your app's `client_id` alone (`token_endpoint_auth_method` `none`) for:
 
 | Grant | With |
 |---|---|
@@ -558,7 +578,7 @@ An app's command-line and desktop tools can't keep a secret. With `public_client
 | `urn:ietf:params:oauth:grant-type:device_code` | `device_flow` |
 | `refresh_token` | either; only the app's own sign-ins |
 
-`POST /v1/oauth/revoke` accepts it for the app's own tokens. Short-lived tokens and introspection
-always need the secret (`unauthorized_client`, `invalid_client`). Loopback redirect URIs
-(`http://127.0.0.1/…`, `http://[::1]/…`, `http://localhost/…`) match on any port, as RFC 8252
+`POST /v1/oauth/revoke` accepts it too, for the app's own tokens. Short-lived tokens and
+introspection always need the secret (`unauthorized_client`, `invalid_client`). Loopback redirect
+URIs (`http://127.0.0.1/…`, `http://[::1]/…`, `http://localhost/…`) match on any port, as RFC 8252
 asks.

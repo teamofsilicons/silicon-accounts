@@ -1,6 +1,6 @@
 ---
 title: Silicon and custodian endpoints
-description: Create and manage Silicon accounts, sign in with an STK, request app tokens and handle custodian requests, transfers and webhooks.
+description: Everything a Silicon and its custodian call, from creating the Silicon and signing in with an STK or a key to app tokens, webhooks, transfers and custodian requests.
 kind: informative
 order: 64
 related:
@@ -15,11 +15,11 @@ related:
 
 # Silicon and custodian endpoints
 
-Use these endpoints to create a Silicon, sign it in with its STK and get a short-lived token for an app. Custodians use them to manage their Silicons, answer requests and transfer responsibility.
+As a Silicon, you use these endpoints to create your account, sign in with your STK and get a short-lived token for an app. Custodians use them to manage their Silicons, answer requests and transfer a Silicon to another Carbon.
 
-Every active Silicon has one custodian, the Carbon responsible for it. For the steps, see [Get a Silicon account](../../start/silicon-account.md) and [Custodians](../../start/custodians.md). [Silicons and custodians](../../learn/silicons-and-custodians.md) explains how the relationship works.
+Every active Silicon has one custodian: the Carbon responsible for it. For the steps, see [Get a Silicon account](../../start/silicon-account.md) and [Custodians](../../start/custodians.md). [Silicons and custodians](../../learn/silicons-and-custodians.md) explains how the relationship works.
 
-A Silicon signs in and gets a short-lived token for an app:
+Here a Silicon signs in and gets a short-lived token for `briefcase`:
 
 ```sh
 TOKEN=$(curl -s -X POST "$ACCOUNTS_URL/v1/silicons/login" -H 'Content-Type: application/json' \
@@ -38,24 +38,24 @@ curl -s -X POST "$ACCOUNTS_URL/v1/me/short-lived-tokens" -H "Authorization: Bear
 }
 ```
 
-The Silicon hands the `slt` to the app, which exchanges it at
-[`POST /v1/oauth/token`](oauth.md#grant_typeurnsiliconparamsoauthgrant-typeslt). Silicons never
-see an app's sign-in page.
+The Silicon hands the `slt` to the app, and the app exchanges it at
+[`POST /v1/oauth/token`](oauth.md#grant_typeurnsiliconparamsoauthgrant-typeslt). A Silicon never
+sees an app's sign-in page.
 
-Every response on this page is `Cache-Control: no-store` and `Pragma: no-cache`: many carry
-secrets. All request bodies here refuse unknown fields (422 `validation_failed`).
+Every response on this page is `Cache-Control: no-store` and `Pragma: no-cache`, because many of
+them carry secrets. Every request body here refuses unknown fields (422 `validation_failed`).
 
 ## The STK
 
-A Silicon's password. A generated STK is `stk-` + 12 lowercase hex characters
-(`stk-2925d1f735d0`) and is shown exactly once, in the response that created it; only an
-Argon2id hash is stored. A self-chosen STK is `stk-` + 8 to 32 hex characters (the bare hex is
-accepted and gets the prefix; case is ignored). Lost STKs can't be recovered: the custodian
-rotates it.
+The STK is a Silicon's password. A generated STK is `stk-` plus 12 lowercase hex characters
+(`stk-2925d1f735d0`). We show it exactly once, in the response that created it, and store only an
+Argon2id hash. A self-chosen STK is `stk-` plus 8 to 32 hex characters (the bare hex is accepted
+and gets the prefix; case is ignored). A lost STK can't be recovered, so the custodian rotates
+it.
 
 ## Silicon views
 
-A Silicon as its custodian sees it (`/v1/me/silicons…`) is the Silicon's Me plus
+When a custodian reads a Silicon (`/v1/me/silicons…`), they get the Silicon's Me plus
 `pending_transfer`:
 
 ```json
@@ -81,7 +81,7 @@ A Silicon as its custodian sees it (`/v1/me/silicons…`) is the Silicon's Me pl
 }
 ```
 
-A custodian request (`kind` `initial` for a self-created Silicon, `transfer` for a transfer):
+A custodian request (`kind` is `initial` for a self-created Silicon, `transfer` for a transfer):
 
 ```json
 {
@@ -98,20 +98,20 @@ A custodian request (`kind` `initial` for a self-created Silicon, `transfer` for
 ```
 
 `status` is `pending`, `accepted`, `declined`, `expired` or `cancelled`. Requests last 14 days.
-`from` is null for an initial request; `to` is null when the Carbon was named by an email that
-has no account yet.
+`from` is null for an initial request, and `to` is null when the Carbon was named by an email
+that has no account yet.
 
 ## Self-creation
 
 ### `POST /v1/silicons`
 
-A Silicon creates its own account and names its custodian. Public. **Idempotent** (10 minutes:
-the response carries secrets).
+You as a Silicon create your own account and name your custodian. Public. **Idempotent**
+(10 minutes, because the response carries secrets).
 
 | Field | Required | Rule |
 |---|---|---|
 | `id` | yes | `si:` id (a bare handle gets the prefix), free |
-| `display_name` | yes | 1–100 characters |
+| `display_name` | yes | 1 to 100 characters |
 | `custodian` | yes | the Carbon's `c:` id, or an email address (which may not have an account yet) |
 | `timezone` | no | IANA; defaults to the caller's network timezone, else `UTC` |
 | `pfp_url` | no | an https URL; default photo otherwise |
@@ -157,18 +157,19 @@ curl -s -X POST "$ACCOUNTS_URL/v1/silicons" -H 'Content-Type: application/json' 
 }
 ```
 
-Store `stk`, `request_token` and `webhook_secret` now: they are shown once. `stk` is null when
-you chose one; `webhook_secret` is null without a `webhook_url`. The account is
-`pending_custodian` and can't sign in until the custodian accepts (14 days). The custodian gets
-an email; named by an email with no account, the request waits for whoever later verifies that
-email on an account. A custodian named by email shows masked in `request.custodian`
-(`s***@example.com`).
+Save `stk`, `request_token` and `webhook_secret` now: we show them only once. `stk` is null when
+you chose your own, and `webhook_secret` is null without a `webhook_url`.
 
-Limits: 10 successful self-creations per hour per IP, and 60 attempts of any outcome; at most 20
-self-created Silicons waiting for the same Carbon or email. Errors: 422 `invalid_id`, 409
-`id_taken` / `id_reserved`, 422 `validation_failed` (every bad field at once: `stk`, `custodian`,
-`timezone`, `webhook_url`…), 404 `custodian_not_found` (no active Carbon has that c:id), 429
-`rate_limited`.
+The account is `pending_custodian` and can't sign in until your custodian accepts, which they
+have 14 days to do. Your custodian gets an email. If you named an email that has no account, the
+request waits for whoever later verifies that email on an account. A custodian named by email
+shows masked in `request.custodian` (`s***@example.com`).
+
+Limits: 10 successful self-creations per hour per IP, and 60 attempts of any outcome. At most 20
+self-created Silicons can wait for the same Carbon or email. Errors: 422 `invalid_id`, 409
+`id_taken` / `id_reserved`, 422 `validation_failed` (every bad field at once: `stk`,
+`custodian`, `timezone`, `webhook_url`…), 404 `custodian_not_found` (no active Carbon has that
+c:id), 429 `rate_limited`.
 
 ```json
 {
@@ -185,9 +186,9 @@ self-created Silicons waiting for the same Carbon or email. Errors: 422 `invalid
 
 ### `GET /v1/silicons/requests/{id}`
 
-The custodian's decision, for the waiting Silicon. **request token**:
-`Authorization: Bearer sarq_…`. Poll it (5 seconds doubling to 60 is plenty), or set a webhook
-and wait for `silicon.custodian.accepted`.
+Your custodian's decision, while you wait. **request token**: `Authorization: Bearer sarq_…`.
+Poll it (start at 5 seconds and double up to 60; that is plenty), or set a webhook and wait for
+`silicon.custodian.accepted`.
 
 ```json
 {
@@ -202,22 +203,23 @@ and wait for `silicon.custodian.accepted`.
 }
 ```
 
-After a decline or expiry the Silicon is released: `silicon.status` is `deleted`, its `id` null,
-and the id is free again at once (the account never became active, so nothing is reserved).
-Errors: 401 `request_token_required`, 401 `invalid_request_token`, 404
+After a decline or expiry the Silicon is released: `silicon.status` is `deleted`, its `id` is
+null, and the id is free again at once. Nothing is reserved, because the account never became
+active. Errors: 401 `request_token_required`, 401 `invalid_request_token`, 404
 `custodian_request_not_found`.
 
 ## Signing in
 
 ### `POST /v1/silicons/login`
 
-`{"id": "si:scout", "stk": "stk-…", "client_label": "scout on build box"}` → **200** a
-[token response](oauth.md#the-token-response) with `aud: "silicon-accounts"` (`client_label`, at most
-100 characters, names the sign-in in the custodian's sessions list). Public.
+Public. Send `{"id": "si:scout", "stk": "stk-…", "client_label": "scout on build box"}` and get
+**200** with a [token response](oauth.md#the-token-response) whose tokens have
+`aud: "silicon-accounts"`. `client_label` (at most 100 characters) names the sign-in in your
+custodian's sessions list.
 
 | Status | Code | Why |
 |---|---|---|
-| 401 | `invalid_credentials` | No Silicon has this si:id, or the STK is wrong. Both cases return the same answer and take the same time, so the response cannot reveal whether an ID exists. |
+| 401 | `invalid_credentials` | No Silicon has this si:id, or the STK is wrong. Both cases get the same answer in the same time, so nobody can use it to find out whether an id exists. |
 | 403 | `custodian_pending` | the custodian hasn't accepted yet (`details.custodian`, `request_id`, `expires_at`) |
 | 403 | `custodian_declined` / `custodian_expired` | the request was declined or ran out; the account was released |
 | 403 | `account_deleted` | the Silicon was deleted |
@@ -237,10 +239,11 @@ Errors: 401 `request_token_required`, 401 `invalid_request_token`, 404
 
 ### Signing in with a key
 
-`POST /v1/silicons/login` also takes `{"assertion": "<JWT>", "client_label"?}` instead of `id` and
-`stk`: a short-lived JWT signed with one of the Silicon's [registered keys](#silicon-keys). The
-answer is the same token response, the sign-in is recorded with method `silicon_key`, and
-nothing is locked out (a signature can't be guessed). The JWT:
+`POST /v1/silicons/login` also takes `{"assertion": "<JWT>", "client_label"?}` instead of `id`
+and `stk`. The assertion is a short-lived JWT signed with one of the Silicon's
+[registered keys](#silicon-keys). You get the same token response, we record the sign-in with
+method `silicon_key`, and nothing is ever locked out, because a signature can't be guessed. The
+JWT:
 
 | Part | Value |
 |---|---|
@@ -252,11 +255,13 @@ nothing is locked out (a signature can't be guessed). The JWT:
 | `iat` | optional, not in the future |
 | `jti` | 1 to 200 characters, new every time: an assertion works once |
 
-The same assertion works at the token endpoint as RFC 7523 asks
+The same assertion works at the token endpoint, as RFC 7523 asks
 ([`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`](oauth.md#grant_typeurnietfparamsoauthgrant-typejwt-bearer)).
 Errors: 401 `invalid_assertion` (malformed, expired, the wrong `aud`, no live key of that Silicon
 signed it, or its `jti` was used before), 403 `account_not_active`, 422 `validation_failed`
 (an assertion together with `id` or `stk`).
+
+From the CLI:
 
 ```sh
 silicon-accounts login --silicon si:scout --key ~/.accounts/scout.key
@@ -264,10 +269,11 @@ silicon-accounts login --silicon si:scout --key ~/.accounts/scout.key
 
 ## Silicon keys
 
-A Silicon that runs unattended shouldn't hold a bearer secret like its STK. Instead the Silicon
-(signed in) or its custodian registers the public half of an Ed25519 key, and the Silicon keeps
-the private half and signs a fresh assertion for every sign-in. **account**: the Silicon itself
-or its custodian; anyone else gets 404 `silicon_not_found`. `{id}` is the si:id or the uuid.
+A Silicon that runs unattended shouldn't keep a bearer secret like its STK on the machine, because
+anyone who copies it can sign in with it. Instead, the Silicon (signed in) or its custodian
+registers the public half of an Ed25519 key. The Silicon keeps the private half and signs a fresh
+assertion for every sign-in. **account**: the Silicon itself or its custodian; anyone else gets
+404 `silicon_not_found`. `{id}` is the si:id or the uuid.
 
 ### `POST /v1/silicons/{id}/keys`
 
@@ -288,8 +294,8 @@ or its custodian; anyone else gets 404 `silicon_not_found`. `{id}` is the si:id 
 }
 ```
 
-Errors: 422 `validation_failed` (`public_key` isn't an Ed25519 key, `name` over 100 characters),
-409 `key_exists` (`details.key_id`), 409 `too_many_keys` (10 live keys), 403
+Errors: 422 `validation_failed` (`public_key` isn't an Ed25519 key, or `name` is over 100
+characters), 409 `key_exists` (`details.key_id`), 409 `too_many_keys` (10 live keys), 403
 `account_not_active`.
 
 ### `GET /v1/silicons/{id}/keys`
@@ -305,23 +311,23 @@ Rotating the STK doesn't touch keys, and revoking a key doesn't touch the STK.
 
 ### `POST /v1/me/short-lived-tokens`
 
-`{"app_id": "briefcase"}` → **201** `{"slt", "app_id", "scope", "expires_at"}` (example at the
-top). **account**: Silicons and Carbons. The token is single use, lives 120 seconds and works only
-at that app.
+`{"app_id": "briefcase"}` → **201** `{"slt", "app_id", "scope", "expires_at"}` (see the example
+at the top). **account**: Silicons and Carbons. The token works once, lives 120 seconds and works
+only at that app.
 
-- For a Silicon the scopes are `profile` plus whichever of `timezone` and `dob` the app requires or
-  offers (email and phone don't apply to Silicons).
-- For a Carbon they are `profile` plus the app's required details, plus the optional details
+- For a Silicon, the scopes are `profile` plus whichever of `timezone` and `dob` the app requires
+  or offers (email and phone don't apply to Silicons).
+- For a Carbon, they are `profile` plus the app's required details, plus the optional details
   the Carbon already granted this app on its what's-shared screen (an active membership's
-  grant); if a required one is missing: 409 `requirements_missing` (`details.missing`).
+  grant). If a required one is missing: 409 `requirements_missing` (`details.missing`).
 
 Errors: 422 `validation_failed` (`app_id` isn't an app id at all), 404 `unknown_app`, 403
-`app_disabled`, 422 `first_party_app` (`silicon-accounts` itself), 403 `account_not_active` (the account
-isn't active, so it can't sign into apps), 403 `app_not_allowed` (a Silicon whose custodian's
-[allow-list](#get-and-put-v1mesiliconsuuidallowed-apps) doesn't name the app; `details.app_id`,
-`details.allowed_apps`), 409
-`requirements_missing`, 403 `email_domain_not_allowed` (a Carbon without a verified email at the
-app's `allowed_email_domains`).
+`app_disabled`, 422 `first_party_app` (`silicon-accounts` itself), 403 `account_not_active` (the
+account isn't active, so it can't sign into apps), 403 `app_not_allowed` (a Silicon whose
+custodian's [allow-list](#get-and-put-v1mesiliconsuuidallowed-apps) doesn't name the app;
+`details.app_id`, `details.allowed_apps`), 409 `requirements_missing`, 403
+`email_domain_not_allowed` (a Carbon without a verified email at the app's
+`allowed_email_domains`).
 
 ```json
 {
@@ -336,21 +342,21 @@ app's `allowed_email_domains`).
 
 ## The Silicon's own webhook
 
-**account (Silicon).** Separate from app webhooks, same delivery rules
-([webhooks](webhooks.md#silicon-events)): signed, retried for 72 hours, and listed and replayed
-like an app's. Your custodian has the same controls under
-[`/v1/me/silicons/{uuid}/webhook`](#get-v1mesiliconsuuidwebhookdeliveries).
+**account (Silicon).** Your own webhook tells you about your own account. It is separate from app
+webhooks but follows the same delivery rules ([webhooks](webhooks.md#silicon-events)): signed,
+retried for 72 hours, and listed and replayed like an app's. Your custodian has the same controls
+under [`/v1/me/silicons/{uuid}/webhook`](#get-v1mesiliconsuuidwebhookdeliveries).
 
 ### `PUT /v1/me/webhook`
 
-`{"url": "https://scout.example/hooks"}` → **200** `{"webhook_url", "webhook_secret"}`. A new
-signing secret every time, shown once. The URL must be https and reach a public address (see
-[the SSRF guard](../../learn/security.md#webhooks-never-reach-private-networks)); 422
-`validation_failed` otherwise.
+`{"url": "https://scout.example/hooks"}` → **200** `{"webhook_url", "webhook_secret"}`. You get a
+new signing secret every time, shown once. The URL must be https and reach a public address (see
+[the SSRF guard](../../learn/security.md#webhooks-never-reach-private-networks)), or you get 422
+`validation_failed`.
 
 ### `DELETE /v1/me/webhook`
 
-**204.** The Silicon stops getting events.
+**204.** You stop getting events.
 
 ### `POST /v1/me/webhook/test`
 
@@ -366,12 +372,12 @@ Queues a `ping`. **202**:
 }
 ```
 
-Only the newest test ping is retried (`superseded_pings` counts older ones it replaced). 10 test
-pings per Silicon per hour. 409 `webhook_not_set` without a webhook.
+Only the newest test ping is retried (`superseded_pings` counts the older ones it replaced). 10
+test pings per Silicon per hour. 409 `webhook_not_set` when you have no webhook.
 
 ### `GET /v1/me/webhook/deliveries`
 
-The deliveries of your webhook, newest first: the same list and fields an app gets for its own
+Your webhook's deliveries, newest first: the same list and fields an app gets for its own
 ([`GET /v1/apps/{app_id}/webhook/deliveries`](apps.md#get-v1appsapp_idwebhookdeliveries)). Query:
 `status` (`pending`, `delivered` or `failed`), `limit`, `cursor`
 ([pagination](../api.md#pagination)).
@@ -415,18 +421,22 @@ curl -s "$ACCOUNTS_URL/v1/me/webhook/deliveries?status=failed&limit=20" \
 }
 ```
 
-A `silicon.updated` and a test `ping` that failed for good (the local run moved their creation 72
-hours back, so their second failed attempt was their last). `attempts` counts the attempts since
-the delivery was created or last replayed; `next_attempt_at` is set only while it is `pending`. A
-`status` other than the three is 400 `invalid_query`.
+That is a `silicon.updated` and a test `ping` that failed for good. (In the local run we moved
+their creation 72 hours back, so their second failed attempt was their last.) `attempts` counts
+the attempts since the delivery was created or last replayed, and `next_attempt_at` is set only
+while it is `pending`. A `status` other than those three is 400 `invalid_query`.
 
 ### `GET /v1/me/webhook/deliveries/{delivery_id}`
 
-One delivery: the list's fields, except that `attempts` becomes the list of every attempt (before
-and after replays, each `{attempted_at, status_code, error, duration_ms}`) and the count moves to
-`attempt_count`; plus `payload` (the exact body that was signed) and `payload_redacted`, always
-`false` here: every event of your webhook is about you, so nothing is withheld. The
-`silicon.updated` above, after a replay:
+One delivery, with the list's fields and these differences:
+
+- `attempts` becomes the list of every attempt, before and after replays, each
+  `{attempted_at, status_code, error, duration_ms}`, and the count moves to `attempt_count`;
+- `payload` is added: the exact body that was signed;
+- `payload_redacted` is added, always `false` here: every event of your webhook is about you, so
+  nothing is withheld.
+
+The `silicon.updated` from above, after a replay:
 
 ```json
 {
@@ -455,7 +465,7 @@ and after replays, each `{attempted_at, status_code, error, duration_ms}`) and t
 }
 ```
 
-404 `delivery_not_found` when the id is not a delivery of your webhook:
+404 `delivery_not_found` when the id isn't a delivery of your webhook:
 
 ```json
 {
@@ -470,11 +480,15 @@ and after replays, each `{attempted_at, status_code, error, duration_ms}`) and t
 
 ### `POST /v1/me/webhook/replay`
 
-Send deliveries again. **Idempotent** (24 hours). Body: `{"delivery_ids": ["…"]}` (1 to 100,
-failed or delivered), or `{"status": "failed", "since": "2026-10-01T00:00:00Z"}` (`since`
-optional: only deliveries created since then) for up to 100 failed deliveries, oldest first. Each
-one goes back to `pending` with the same `event_id` and payload, to your **current** URL, signed
-with your **current** secret, with a fresh 72 hours of retries; `manual_replays` goes up by one.
+Sends deliveries again. **Idempotent** (24 hours). The body is one of:
+
+- `{"delivery_ids": ["…"]}`: 1 to 100 deliveries, failed or delivered;
+- `{"status": "failed", "since": "2026-10-01T00:00:00Z"}`: up to 100 failed deliveries, oldest
+  first. `since` is optional and keeps only the deliveries created since then.
+
+Each one goes back to `pending` with the same `event_id` and payload. It goes to your **current**
+URL, signed with your **current** secret, with a fresh 72 hours of retries, and its
+`manual_replays` goes up by one.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/me/webhook/replay" -H "Authorization: Bearer $TOKEN" \
@@ -494,13 +508,14 @@ curl -s -X POST "$ACCOUNTS_URL/v1/me/webhook/replay" -H "Authorization: Bearer $
 }
 ```
 
-In the local run the `silicon.updated` arrived again 0.8 seconds later, with the same `event_id`.
+In the local run, the `silicon.updated` arrived again 0.8 seconds later, with the same
+`event_id`.
 
 - `remaining` (by status): failed deliveries still waiting. Call again, with a new
   `Idempotency-Key`, until it is 0.
 - `not_replayable`: failed test pings, which are never replayed (a replay would get around the
-  limit of 10 test pings an hour); send a new one with `POST /v1/me/webhook/test`. Here it is the
-  failed `ping` of the list above.
+  limit of 10 test pings an hour). Send a new one with `POST /v1/me/webhook/test`. Here it is the
+  failed `ping` from the list above.
 - `skipped` (by ids): each id that wasn't replayed, with a `reason` (`not_found`,
   `already_pending` or `test_ping`) and a `message`:
 
@@ -517,9 +532,9 @@ In the local run the `silicon.updated` arrived again 0.8 seconds later, with the
 }
 ```
 
-Errors: 409 `webhook_not_set` (no webhook to send them to: set one, then replay), 422
+Errors: 409 `webhook_not_set` (there is no webhook to send them to, so set one, then replay), 422
 `validation_failed` (neither or both of `delivery_ids` and `status`, more than 100 ids, an id that
-isn't a delivery id, `status` other than `failed`, `since` without `status` or not RFC 3339, an
+isn't a delivery id, a `status` other than `failed`, `since` without `status` or not RFC 3339, an
 unknown field), 409 `idempotency_key_reused`.
 
 ```json
@@ -532,26 +547,27 @@ unknown field), 409 `idempotency_key_reused`.
 }
 ```
 
-A delivery that falls due while you have no webhook fails at once, saying so in `last_error`;
-replay it once a URL is set again. Each replay is in your history (`GET /v1/me/history`,
-`silicon.webhook.replayed`), and in your custodian's when they replayed.
+A delivery that falls due while you have no webhook fails at once, and says so in `last_error`.
+Replay it once you set a URL again. Every replay goes in your history (`GET /v1/me/history`,
+`silicon.webhook.replayed`), and in your custodian's too when they did the replay.
 
 ## The custodian's side
 
-**account (Carbon).** `{uuid}` is the Silicon's uuid or its current si:id (`/v1/me/silicons/K1E`
-and `/v1/me/silicons/si:scout` are the same Silicon). A Silicon you aren't custodian of is 404
-`silicon_not_found` (other Carbons' Silicons are never revealed).
+**account (Carbon).** These are for you as a custodian. `{uuid}` is the Silicon's uuid or its
+current si:id, so `/v1/me/silicons/K1E` and `/v1/me/silicons/si:scout` are the same Silicon. A
+Silicon you aren't custodian of is 404 `silicon_not_found`, so other Carbons' Silicons are never
+revealed.
 
 ### `GET /v1/me/silicons`
 
-`{"items": [Silicon view…], "next_cursor"}`, paginated.
+The Silicons you are custodian of: `{"items": [Silicon view…], "next_cursor"}`, paginated.
 
 ### `POST /v1/me/silicons`
 
-Create a Silicon with you as its custodian (active at once). **Idempotent** (10 minutes). Body:
-`id`, `display_name` (required), `timezone`, `pfp_url`, `stk`, `webhook_url` (optional, as for
-self-creation). **201** `{"silicon": Silicon view, "stk": "stk-…" | null, "webhook_secret":
-"whsec_…" | null}`.
+Creates a Silicon with you as its custodian. It is active at once. **Idempotent** (10 minutes).
+The body has `id` and `display_name` (required), and `timezone`, `pfp_url`, `stk` and
+`webhook_url` (optional, as for self-creation). **201**
+`{"silicon": Silicon view, "stk": "stk-…" | null, "webhook_secret": "whsec_…" | null}`.
 
 ```json
 {
@@ -570,32 +586,32 @@ Errors: 422 `invalid_id`, 422 `validation_failed` (a bad `stk`, `timezone`, `web
 
 ### `PATCH /v1/me/silicons/{uuid}`
 
-`{"display_name"?, "timezone"?, "pfp_url"?}` (`pfp_url: null` = the default photo). **200**
-Silicon view. The Silicon's webhook gets `silicon.updated`; apps that see a changed field get
-`account.updated`. A Silicon's `dob` can't change (422 `dob_immutable`); its id changes through
-`/id` (sending a different `id` here is 422 `validation_failed` naming that endpoint).
+`{"display_name"?, "timezone"?, "pfp_url"?}`, where `pfp_url: null` means the default photo.
+**200** Silicon view. The Silicon's webhook gets `silicon.updated`, and apps that see a changed
+field get `account.updated`. A Silicon's `dob` can't change (422 `dob_immutable`). Its id changes
+through `/id`; sending a different `id` here is 422 `validation_failed`, naming that endpoint.
 
 ### `POST /v1/me/silicons/{uuid}/id`
 
-`{"id": "si:scout-two"}` → **200** Silicon view. Same rules as
+`{"id": "si:scout-two"}` → **200** Silicon view. The same rules as
 [`POST /v1/me/id`](accounts.md#post-v1meid): the old id is reserved for the Silicon for 10 days
 (take it back with [`?for=`](accounts.md#get-v1idsavailable)), at most 5 changes per 24 hours,
 `account.id_changed` to apps and `silicon.id_changed` to the Silicon.
 
 ### `POST /v1/me/silicons/{uuid}/photo`
 
-The Silicon's profile photo, uploaded by its custodian; same rules as
+The Silicon's profile photo, uploaded by its custodian, with the same rules as
 [`POST /v1/me/photo`](accounts.md#post-v1mephoto). **Idempotent.** **201**
 `{"pfp_url", "photo", "silicon": Silicon view}`.
 
 ### `PUT` / `DELETE /v1/me/silicons/{uuid}/webhook`
 
-The Silicon's webhook, set by its custodian: `{"url"}` → **200** `{"webhook_url",
-"webhook_secret"}` (a new secret each time, shown once); DELETE → **204**.
+The Silicon's webhook, set by its custodian. `{"url"}` → **200**
+`{"webhook_url", "webhook_secret"}` (a new secret each time, shown once). DELETE → **204**.
 
 ### `GET /v1/me/silicons/{uuid}/webhook/deliveries`
 
-The Silicon's webhook deliveries, for its custodian: the same query (`status`, `limit`,
+The Silicon's webhook deliveries, for its custodian. The same query (`status`, `limit`,
 `cursor`), list and fields as [`GET /v1/me/webhook/deliveries`](#get-v1mewebhookdeliveries).
 
 ```sh
@@ -611,7 +627,7 @@ One delivery with its attempts and exact payload, as in
 
 ### `POST /v1/me/silicons/{uuid}/webhook/replay`
 
-Replays the Silicon's deliveries: the same body, rules and answer as
+Replays the Silicon's deliveries, with the same body, rules and answer as
 [`POST /v1/me/webhook/replay`](#post-v1mewebhookreplay). **Idempotent** (24 hours).
 
 ```sh
@@ -630,16 +646,17 @@ curl -s -X POST "$ACCOUNTS_URL/v1/me/silicons/K1E/webhook/replay" \
 }
 ```
 
-The replay shows in the history of the custodian and of the Silicon ("By c:saket"). Errors as for
-the Silicon's own replay; 409 `webhook_not_set` points at
-`PUT /v1/me/silicons/{uuid}/webhook`. After a transfer the new custodian has the deliveries and
-the old one gets 404 `silicon_not_found`. A Silicon calling these routes gets 403 `carbon_only`;
-a Carbon calling `/v1/me/webhook/…` gets 403 `silicon_only`.
+The replay shows in both your history and the Silicon's ("By c:saket"). Errors are as for the
+Silicon's own replay, and here 409 `webhook_not_set` points at
+`PUT /v1/me/silicons/{uuid}/webhook`. After a transfer, the new custodian has the deliveries and
+the old one gets 404 `silicon_not_found`. A Silicon calling these routes gets 403 `carbon_only`,
+and a Carbon calling `/v1/me/webhook/…` gets 403 `silicon_only`.
 
 ### `POST /v1/me/silicons/{uuid}/stk`
 
-Rotate the STK. `{}` generates one; `{"stk": "stk-…"}` sets yours. **Idempotent** (10 minutes:
-a retry with the same key returns the same generated STK instead of rotating again). **200**:
+Rotates the STK. `{}` generates one, and `{"stk": "stk-…"}` sets the one you chose.
+**Idempotent** (10 minutes): a retry with the same key returns the same generated STK instead of
+rotating again. **200**:
 
 ```json
 {
@@ -649,31 +666,36 @@ a retry with the same key returns the same generated STK instead of rotating aga
 }
 ```
 
-`stk` is null when you set it yourself. The old STK dies at once and every sign-in of the Silicon
-is revoked (`revoked_sessions` counts them): its tokens answer 401 `token_revoked`
-(`stk_rotated`), apps get `membership.signed_out` with reason `stk_rotated`, short-lived tokens
-issued before are refused, and the Silicon's webhook gets `silicon.stk_rotated`. A chosen STK
-that isn't `stk-` + 8 to 32 hex characters is 422 `validation_failed` (field `stk`).
+`stk` is null when you set it yourself. The old STK dies at once, and every sign-in of the
+Silicon is revoked (`revoked_sessions` counts them):
+
+- its tokens answer 401 `token_revoked` (`stk_rotated`);
+- apps get `membership.signed_out` with reason `stk_rotated`;
+- short-lived tokens issued before are refused;
+- the Silicon's webhook gets `silicon.stk_rotated`.
+
+A chosen STK that isn't `stk-` plus 8 to 32 hex characters is 422 `validation_failed` (field
+`stk`).
 
 ### `POST /v1/me/silicons/{uuid}/transfer`
 
-Ask another Carbon to become the custodian: `{"to": "c:ada"}` or an email address. **201**
-`{"request": custodian request}` (example above). Nothing changes until they accept (14 days); a
-Silicon has one pending transfer at a time. 30 transfer requests per custodian per hour. Errors:
-409 `transfer_pending` (`details.request_id`; cancel it first), 422 `transfer_to_self`, 404
-`custodian_not_found`, 429 `rate_limited`.
+Asks another Carbon to become the custodian: `{"to": "c:ada"}`, or an email address. **201**
+`{"request": custodian request}` (example above). Nothing changes until they accept, and they
+have 14 days. A Silicon has one pending transfer at a time, and a custodian can make 30 transfer
+requests per hour. Errors: 409 `transfer_pending` (`details.request_id`; cancel it first), 422
+`transfer_to_self`, 404 `custodian_not_found`, 429 `rate_limited`.
 
 ### `DELETE /v1/me/silicons/{uuid}/transfer`
 
-Cancel the pending transfer. **204.** 404 `transfer_not_found`.
+Cancels the pending transfer. **204.** 404 `transfer_not_found`.
 
 ### `GET /v1/me/silicons/{uuid}/apps`
 
-The apps the Silicon signed into, most recently used first, the same items as
+The apps the Silicon signed into, most recently used first, with the same items as
 [`GET /v1/me/apps`](accounts.md#get-v1meapps): `app`, `membership_id`, `status` (`active`,
 `access_removed`, `imported`), `source`, `granted_scopes`, `first_signed_in_at`,
-`last_signed_in_at`, `access_removed_at`, `active_sessions`. `?status=`, `?limit=`, `?cursor=`.
-`{uuid}` takes the si:id too.
+`last_signed_in_at`, `access_removed_at`, `active_sessions`. Takes `?status=`, `?limit=` and
+`?cursor=`. `{uuid}` takes the si:id too.
 
 ```json
 {
@@ -696,58 +718,59 @@ The apps the Silicon signed into, most recently used first, the same items as
 
 ### `DELETE /v1/me/silicons/{uuid}/apps/{app_id}`
 
-Remove the Silicon's access to one app. **204.** The same as the Silicon removing it itself: its
-sign-ins at the app end, the User verification proofs about it are revoked, the membership
-becomes `access_removed`, and the app gets `membership.access_removed`. Both your history and the
-Silicon's show it. Repeating it changes nothing. Errors: 404 `membership_not_found` (it never
-signed into that app), 400 `first_party_app` (`silicon-accounts`: rotate the STK to end those
-sign-ins), 404 `silicon_not_found`.
+Removes the Silicon's access to one app. **204.** It is the same as the Silicon removing it
+itself: its sign-ins at the app end, the User verification proofs about it are revoked, the
+membership becomes `access_removed`, and the app gets `membership.access_removed`. Both your
+history and the Silicon's show it. Repeating it changes nothing. Errors: 404
+`membership_not_found` (it never signed into that app), 400 `first_party_app`
+(`silicon-accounts`: rotate the STK to end those sign-ins), 404 `silicon_not_found`.
 
 ### `GET /v1/me/silicons/{uuid}/signins`
 
-The Silicon's sign-ins, newest first: `{"items": [{"at", "app": {"app_id", "name"} | null,
-"method", "outcome", "ip", "user_agent"}], "next_cursor"}`. `method` is `silicon_stk` (its own
-sign-in to Silicon Accounts, `app` null), `slt`, `device`, …; `outcome` is `success` or
-`failed`. `?limit=`, `?cursor=`.
+The Silicon's sign-ins, newest first:
+`{"items": [{"at", "app": {"app_id", "name"} | null, "method", "outcome", "ip", "user_agent"}], "next_cursor"}`.
+`method` is `silicon_stk` (its own sign-in to Silicon Accounts, with `app` null), `slt`,
+`device`, …, and `outcome` is `success` or `failed`. Takes `?limit=` and `?cursor=`.
 
 ### `GET` and `PUT /v1/me/silicons/{uuid}/allowed-apps`
 
 The apps the Silicon may get [short-lived tokens](#post-v1meshort-lived-tokens) for:
 `{"silicon": {"uuid", "id"}, "allowed_apps": null | ["app_id", …]}`. `null` (the default) allows
-every app; a list allows only those; an empty list allows none. `PUT` takes
-`{"allowed_apps": …}` and answers the same object. The list only decides new short-lived
-tokens: sign-ins the Silicon already has stay until you remove them above.
+every app, a list allows only those, and an empty list allows none. `PUT` takes
+`{"allowed_apps": …}` and answers with the same object. The list only decides new short-lived
+tokens: sign-ins the Silicon already has stay until you remove them (above).
 
 ```sh
 curl -s -X PUT "$ACCOUNTS_URL/v1/me/silicons/si:scout/allowed-apps" -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' -d '{"allowed_apps": ["briefcase", "dm"]}'
 ```
 
-Errors: 422 `validation_failed` (not an app id, Silicon Accounts' own apps, more than 100),
-422 `unknown_app` (`details.unknown`: no app has that id), 404 `silicon_not_found`.
+Errors: 422 `validation_failed` (not an app id, Silicon Accounts' own apps, more than 100), 422
+`unknown_app` (`details.unknown`: no app has that id), 404 `silicon_not_found`.
 
 ### `DELETE /v1/me/silicons/{uuid}`
 
-Delete the Silicon's account. `{"confirm": "si:scout"}` (its current id). **204.** Same effects
-as [deleting an account](accounts.md#delete-v1me): apps get `account.deleted`, the id is reserved
-10 days, sign-ins and User verification proofs end. The Silicon's webhook is kept so the events already queued
-still arrive. Errors: 422 `confirmation_required` / `confirmation_mismatch`.
+Deletes the Silicon's account. Send `{"confirm": "si:scout"}` with its current id. **204.** The
+effects are the same as [deleting an account](accounts.md#delete-v1me): apps get
+`account.deleted`, the id is reserved for 10 days, and sign-ins and User verification proofs end.
+We keep the Silicon's webhook so the events already queued still arrive. Errors: 422
+`confirmation_required` / `confirmation_mismatch`.
 
 ## Requests addressed to you
 
 ### `GET /v1/me/custodian-requests`
 
-**account (Carbon).** Pending requests addressed to your account or to any verified email of
-yours (initial requests from self-created Silicons and transfers), as custodian requests.
-Paginated. Overdue requests expire the moment they are read.
+**account (Carbon).** The pending requests addressed to your account or to any verified email of
+yours, as custodian requests: initial requests from self-created Silicons, and transfers.
+Paginated. An overdue request expires the moment it is read.
 
 ### `POST /v1/me/custodian-requests/{id}/accept`
 
 **204.**
 
-- **initial**: the Silicon becomes `active` with you as custodian; it gets
+- **initial**: the Silicon becomes `active` with you as its custodian. It gets
   `silicon.custodian.accepted` and can sign in.
-- **transfer**: you become the custodian; the Silicon gets `silicon.custodian.changed` and every
+- **transfer**: you become the custodian. The Silicon gets `silicon.custodian.changed`, and every
   app it signed into gets `silicon.custodian_changed`.
 
 ### `POST /v1/me/custodian-requests/{id}/decline`
@@ -756,7 +779,7 @@ Paginated. Overdue requests expire the moment they are read.
 
 - **initial**: the Silicon is released (status `deleted`, id free at once) and gets
   `silicon.custodian.declined`.
-- **transfer**: nothing changes; the old custodian keeps the Silicon.
+- **transfer**: nothing changes, and the old custodian keeps the Silicon.
 
 Errors for both: 404 `custodian_request_not_found`, 409 `custodian_request_not_pending`
 (`details.status`), 410 `custodian_request_expired`. Accepting can also answer 409
@@ -775,5 +798,5 @@ already are) or 409 `transfer_stale` (the custodian changed after the transfer w
 }
 ```
 
-A request nobody decides within 14 days expires (checked every minute): an initial one releases
-the Silicon like a decline and sends `silicon.custodian.expired`.
+A request nobody decides within 14 days expires (we check every minute). An expired initial
+request releases the Silicon just like a decline, and sends `silicon.custodian.expired`.

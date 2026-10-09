@@ -1,6 +1,6 @@
 ---
 title: Accounts
-description: Understand what a Carbon or Silicon account contains, how contact details are managed and what happens when an account is deleted.
+description: What a Carbon or Silicon account holds, how you manage its emails and phone numbers, and what happens when it is deleted.
 kind: informative
 order: 5
 related:
@@ -14,12 +14,11 @@ related:
 
 # Accounts
 
-Every Carbon and Silicon has one personal account. A **Carbon** is a person, and a **Silicon** is an AI agent. They use that same account in every app they sign in to.
+Every Carbon and every Silicon has one personal account. A **Carbon** is a person and a **Silicon** is an agent. They take that same account into every app they sign in to.
 
-An account belongs to that Carbon or Silicon alone. There are no shared or group accounts. Each Silicon also has a **custodian**, the Carbon responsible for managing its account.
+An account belongs to its Carbon or Silicon alone; there are no shared or group accounts. Every Silicon also has a **custodian**, the Carbon responsible for its account.
 
-This page lists what each kind of account holds and the rules for changing it. Your own
-account is one command away:
+This page covers what each kind of account holds and the rules for changing it. You can see your own account with one command:
 
 ```sh
 silicon-accounts whoami
@@ -37,8 +36,7 @@ emails        ada@example.com (primary)
 custodian of  1 Silicon
 ```
 
-The same account over HTTP, with the access token of a signed-in session
-(`Authorization: Bearer …`):
+Or over HTTP, with the access token of a signed-in session (`Authorization: Bearer …`):
 
 ```sh
 curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$ACCOUNTS_URL/v1/me"
@@ -81,10 +79,7 @@ curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$ACCOUNTS_URL/v1/me"
 | `created_at`, `updated_at` | RFC 3339 UTC timestamps with milliseconds. |
 | `version` | Goes up with every change to the account, so anyone holding a copy can tell which one is newer. |
 
-How ids work (the 10-day reservation after a change, reclaiming an old id, at most 5 changes
-in 24 hours, reserved words) is in [uuids and ids](ids-and-uuids.md). The membership of an
-account with an app is `{app_id}:{uuid}`, for example `briefcase:8HV`, for Carbons and
-Silicons alike.
+Ids have rules of their own (the 10-day hold after a change, reclaiming an old id, at most 5 changes in 24 hours, reserved words), all in [uuids and ids](ids-and-uuids.md). An account's membership with an app is written `{app_id}:{uuid}`, for example `briefcase:8HV`, for Carbons and Silicons alike.
 
 ### Statuses
 
@@ -106,9 +101,9 @@ A Carbon account also has:
 | `identities` | Linked Google and Apple accounts: `{provider, subject, email, created_at, last_used_at}`. |
 | `custodian_of` | How many Silicons this Carbon is custodian of. |
 
-A Carbon can sign in with any email or phone number on their account by entering a 6-digit code. They can also use a linked Google or Apple account, if the app offers that method.
+A Carbon signs in with a 6-digit code sent to any email or phone number on their account. They can also use a linked Google or Apple account, if the app offers that method.
 
-During sign-up, Accounts fills in the setup page with suggested details. The display name comes from Google or Apple, or from the email address. Accounts also suggests an available `c:id`, the network’s timezone, a date of birth exactly 18 years ago and the default photo. The Carbon can change these before continuing.
+When a Carbon signs up, we fill in the setup page with suggestions: a display name from Google or Apple (or from the email address), an available `c:id`, the timezone of their network, a date of birth exactly 18 years ago and the default photo. They can change any of these before continuing.
 
 ### Emails and phone numbers
 
@@ -127,32 +122,17 @@ dora@example.com       primary  code          2026-10-07T02:33:50Z
 dora.work@example.com           code          2026-10-07T02:34:05Z
 ```
 
-Phone numbers work exactly the same way under `silicon-accounts phone`, in international format or
-with a country: `silicon-accounts phone add "(415) 555-0199" --country US` stores `+14155550199`. Over
-HTTP these are `/v1/me/emails` and `/v1/me/phones` (`POST` to add, `POST …/verify`,
-`POST …/{address}/primary`, `DELETE …/{address}`).
+Phone numbers work exactly the same way under `silicon-accounts phone`. Give the number in international format, or with a country: `silicon-accounts phone add "(415) 555-0199" --country US` stores `+14155550199`. Over HTTP these are `/v1/me/emails` and `/v1/me/phones` (`POST` to add, `POST …/verify`, `POST …/{address}/primary`, `DELETE …/{address}`).
 
 The rules, and why:
 
-- **Every address is verified before it counts.** A code goes to the address, and only a
-  correct code adds it. An address Google or Apple vouches for (when the Carbon signs in with
-  them, or connects them on the account site) is added without a code. An address nobody has
-  proven never signs anyone in; the only unverified addresses that exist are the ones an
-  import attached to an account nobody has finished.
-- **One address, one account.** An address that belongs to another account can't be added:
-  `409 email_in_use` ("priya@example.com already belongs to another account."). Because
-  any address signs in, two accounts sharing one would make sign-in ambiguous.
-- **Exactly one primary of each kind.** The first address added becomes primary. Any other
-  verified address can be made primary. Apps that may see email or phone see the primary one,
-  and are told when it changes (`account.updated`).
-- **The primary can't be removed.** Make another one primary first:
-  `409 cannot_remove_primary` ("dora@example.com is your primary email and the primary can't
-  be removed."). This keeps every Carbon with a way to sign in and every app with a current
-  address.
-- **At most 10 of each.** The 11th gets `422 email_limit_reached` ("Your account already has
-  10 emails, the most it can have.").
+- **Every address is verified before it counts.** We send a code to the address, and only the right code adds it. An address Google or Apple vouches for (when the Carbon signs in with them, or connects them on the account site) is added without a code. An address nobody has proven never signs anyone in. The only unverified addresses that exist are the ones an import attached to an account nobody has finished yet.
+- **One address, one account.** You can't add an address that belongs to another account: `409 email_in_use` ("priya@example.com already belongs to another account."). Any address signs you in, so two accounts sharing one would make sign-in ambiguous.
+- **Exactly one primary of each kind.** The first address you add becomes the primary, and you can make any other verified address primary. Apps that may see email or phone see the primary one, and we tell them when it changes (`account.updated`).
+- **The primary can't be removed.** Make another one primary first: `409 cannot_remove_primary` ("dora@example.com is your primary email and the primary can't be removed."). This way every Carbon keeps a way to sign in and every app keeps a current address.
+- **At most 10 of each.** The 11th gets `422 email_limit_reached` ("Your account already has 10 emails, the most it can have.").
 
-Limits that stop address guessing and spam:
+These limits stop anyone guessing addresses or sending spam:
 
 | limit | value |
 |---|---|
@@ -175,15 +155,11 @@ Limits that stop address guessing and spam:
 | `email_not_verified`, `phone_not_verified` | 409 | Only a verified address can be primary. |
 | `carbon_only` | 403 | A Silicon called a Carbon-only endpoint. |
 
-Google and Apple identities are unlinked with `silicon-accounts identities remove <provider> <subject>`,
-except the last way left to sign in: `409 last_sign_in_method` while the account has no email
-or phone.
+You unlink a Google or Apple identity with `silicon-accounts identities remove <provider> <subject>`, unless it's the last way left to sign in: while the account has no email or phone, that gets `409 last_sign_in_method`.
 
 ## Silicon accounts
 
-A Silicon signed in with its si:id and STK (`silicon-accounts login --silicon si:ada_scout --stk-stdin`)
-reads its own account the same way; `silicon-accounts whoami --json` prints these fields too, leaving
-out the empty ones:
+A Silicon signed in with its si:id and STK (`silicon-accounts login --silicon si:ada_scout --stk-stdin`) reads its own account the same way. `silicon-accounts whoami --json` prints these fields too, leaving out the empty ones:
 
 ```sh
 curl -s -H "Authorization: Bearer $SILICON_ACCESS_TOKEN" "$ACCOUNTS_URL/v1/me"
@@ -214,23 +190,15 @@ A Silicon account also has:
 |---|---|
 | `custodian` | The Carbon responsible for it, stored by uuid and shown with its current `c:id`. Always exactly one (only `null` while a self-created Silicon waits for its custodian to accept). |
 | STK | The Silicon's password: `stk-` and 12 hexadecimal digits when generated (shown exactly once), or one the Silicon chooses, `stk-` and 8 to 32 hexadecimal digits. Only a hash is stored. The custodian can rotate it any time, which ends the old one and signs the Silicon out everywhere. Never returned by any endpoint; `stk_rotated_at` says when it last changed. |
-| `webhook_url` | Optional. Where Silicon Accounts tells the Silicon about its own account: created, custodian decisions, changes, STK rotations, a new custodian. |
+| `webhook_url` | Optional. Where we tell the Silicon about its own account: created, custodian decisions, changes, STK rotations, a new custodian. |
 
-And no emails or phone numbers: a Silicon signs in with its si:id and STK, and signs in to apps
-with a short-lived token ([Silicons signing in to apps](../start/silicon-sign-in-to-apps.md)).
-Its date of birth is the day it was created and can't change
-(`422 dob_immutable`: "A Silicon's date of birth is the day its account was created (2026-10-07)
-and can't change.").
+It has no emails or phone numbers. A Silicon signs in with its si:id and STK, and signs in to apps with a short-lived token ([Silicons signing in to apps](../start/silicon-sign-in-to-apps.md)). Its date of birth is the day it was created and never changes (`422 dob_immutable`: "A Silicon's date of birth is the day its account was created (2026-10-07) and can't change.").
 
-A Silicon manages its own display name, photo, timezone, si:id and webhook. Its custodian can
-change all of those for it, rotate its STK, transfer it to another Carbon, or delete it. How
-Silicons get an account and how custody works is in
-[Silicons and custodians](silicons-and-custodians.md).
+You as a silicon manage your own display name, photo, timezone, si:id and webhook. Your custodian can change all of those for you, and can also rotate your STK, transfer you to another Carbon or delete your account. How a Silicon gets its account and how custody works is in [Silicons and custodians](silicons-and-custodians.md).
 
 ## The profile
 
-Every account changes its own details with `silicon-accounts profile set` (`PATCH /v1/me`); only the
-fields you send change:
+Every account changes its own details with `silicon-accounts profile set` (`PATCH /v1/me`). Only the fields you send change:
 
 ```sh
 silicon-accounts profile set --display-name "Ada Lovelace" --timezone Europe/Paris --photo ./me.png
@@ -248,14 +216,9 @@ Apps that can see these fields were notified.
 | `dob` | Carbons: on or after 1900-01-01 and before today. Silicons: fixed. |
 | `pfp_url` | An `https` URL, or a photo uploaded with `--photo` (`POST /v1/me/photo`: PNG, JPEG, WebP or GIF, at most 2 MB and 8192 px a side, 20 uploads per hour). `null` (`--reset-photo`) goes back to the default photo. |
 
-Every bad field is reported at once (`422 validation_failed`, `details.fields`), and fields that
-live elsewhere say where: `"email": "emails are managed with POST /v1/me/emails …"`,
-`"id": "the id can't be changed with PATCH /v1/me; use POST /v1/me/id …"`.
+We report every bad field at once (`422 validation_failed`, `details.fields`), and a field that lives elsewhere tells you where: `"email": "emails are managed with POST /v1/me/emails …"`, `"id": "the id can't be changed with PATCH /v1/me; use POST /v1/me/id …"`.
 
-A change raises `version`. Apps the account signed in to are told with `account.updated`, but
-only about fields they may see (a timezone change reaches only apps the Carbon shared their
-timezone with). A Silicon's own webhook gets `silicon.updated`. What each app may see is in
-[What apps see](what-apps-see.md).
+Every change raises `version`. Apps the account signed in to get `account.updated`, but only about fields they may see: a timezone change reaches only the apps the Carbon shared their timezone with. A Silicon's own webhook gets `silicon.updated`. What each app may see is in [What apps see](what-apps-see.md).
 
 ## Deleting an account
 
@@ -269,12 +232,9 @@ silicon-accounts delete-account --confirm c:dora
 Deleted c:dora. Apps you signed into were told; your id is held for 10 days.
 ```
 
-Over HTTP: `DELETE /v1/me` with `{"confirm": "c:dora"}` (the bare handle works too) answers
-`204`. The confirmation must be the account's current id: a wrong one is
-`422 confirmation_mismatch`, a missing one `422 confirmation_required`.
+Over HTTP it's `DELETE /v1/me` with `{"confirm": "c:dora"}` (the bare handle works too), which answers `204`. The confirmation must be the account's current id: a wrong one gets `422 confirmation_mismatch` and a missing one gets `422 confirmation_required`.
 
-**A custodian can't delete their account while they still have a Silicon**, because every
-Silicon must always have exactly one custodian:
+**A custodian can't delete their account while they still have a Silicon**, because every Silicon must always have exactly one custodian:
 
 ```json
 {
@@ -287,34 +247,22 @@ Silicon must always have exactly one custodian:
 }
 ```
 
-That is `409`. Transfer each Silicon (`silicon-accounts silicon transfer`) or delete it
-(`silicon-accounts silicon delete <si:id> --confirm <si:id>`), then delete the account.
+That's a `409`. Transfer each Silicon (`silicon-accounts silicon transfer`) or delete it (`silicon-accounts silicon delete <si:id> --confirm <si:id>`), then delete the account.
 
 Deleting happens at once, in one step, and can't be undone:
 
 - The status becomes `deleted` and the account can never sign in again.
-- **The id is held for 10 days**, so nobody can take `c:dora` and pass as Dora to the Carbons,
-  Silicons and apps that still know the old id; then anyone may take it.
-- **The uuid is never reused.** Looking it up answers `404 account_deleted`; looking up the
-  old id answers `404 account_not_found`, with a hint that it was released recently.
-- **Every email, phone number and Google or Apple link is removed**, so those addresses are
-  free again (for a new account, or to add to another).
-- Every session, every app sign-in (tokens) and every User verification proof issued about the account is
-  revoked.
-- The photo goes back to the default, and uploaded photos no other account still shows are
-  deleted.
-- Every app the account belongs to receives `account.deleted`
-  (`{"type": "account.deleted", "data": {"membership_id": "briefcase:WKE", "uuid": "WKE"}, …}`)
-  and keeps the membership as history: `status: "deleted"`, display name "Deleted account", no
-  id, email, phone, date of birth or timezone. Data the app had imported about the account is
-  dropped; its `external_id` stays, so the app can find its own record.
-- Custodian requests waiting on this Carbon are cancelled. Silicons that created their own
-  account and named this Carbon, and are still waiting for them, are released (their ids are
-  free at once) and told (`silicon.custodian.declined`, reason `custodian_account_deleted`).
+- **The id is held for 10 days**, so nobody can take `c:dora` and pass as Dora to the Carbons, Silicons and apps that still know the old id. After that anyone may take it.
+- **The uuid is never reused.** Looking it up answers `404 account_deleted`. Looking up the old id answers `404 account_not_found`, with a hint that it was released recently.
+- **Every email, phone number and Google or Apple link is removed**, so those addresses are free again, for a new account or to add to another one.
+- We revoke every session, every app sign-in (tokens) and every User verification proof issued about the account.
+- The photo goes back to the default, and we delete uploaded photos that no other account still shows.
+- Every app the account belongs to receives `account.deleted` (`{"type": "account.deleted", "data": {"membership_id": "briefcase:WKE", "uuid": "WKE"}, …}`) and keeps the membership as history: `status: "deleted"`, display name "Deleted account", and no id, email, phone, date of birth or timezone. Data the app imported about the account is dropped, but its `external_id` stays, so the app can still find its own record.
+- Custodian requests waiting on this Carbon are cancelled. Silicons that created their own account, named this Carbon and are still waiting on them are released (their ids are free at once) and told (`silicon.custodian.declined`, reason `custodian_account_deleted`).
 
 ### A Silicon
 
-Only its custodian deletes a Silicon:
+Only its custodian can delete a Silicon:
 
 ```sh
 silicon-accounts silicon delete si:dora_helper --confirm si:dora_helper
@@ -324,11 +272,7 @@ silicon-accounts silicon delete si:dora_helper --confirm si:dora_helper
 Deleted si:dora_helper. Apps it signed into were told; its id is held for 10 days.
 ```
 
-A Silicon that tries to delete itself gets `403 custodian_required` ("A Silicon can't delete
-its own account: si:ada_scout is deleted by its custodian c:ada."): its custodian is
-responsible for it. The rest is the same as for a Carbon: apps receive `account.deleted`, the
-id is held for 10 days, the uuid is never reused. The Silicon's own webhook is kept, so its
-last notifications still arrive.
+A Silicon that tries to delete itself gets `403 custodian_required` ("A Silicon can't delete its own account: si:ada_scout is deleted by its custodian c:ada."), because its custodian is the one responsible for it. Everything else works as it does for a Carbon: apps receive `account.deleted`, the id is held for 10 days and the uuid is never reused. The Silicon's own webhook is kept, so its last notifications still arrive.
 
 ## Related
 

@@ -1,6 +1,6 @@
 ---
 title: App verification and User verification endpoints
-description: Create, refresh, verify, revoke and list App verification and User verification proofs. Look up each request, response and limit.
+description: Issue, refresh, verify, revoke and list App verification and User verification proofs, with every request, response and limit.
 kind: informative
 order: 66
 related:
@@ -14,11 +14,11 @@ related:
 
 # App verification and User verification endpoints
 
-Silicon Accounts creates proof tokens and checks them for the receiving app. A **User verification** proof identifies the account an app is acting for. An **App verification** proof identifies the app itself. Each proof names one receiving app.
+We make proof tokens, and we check them for the app that receives them. A **User verification** proof says which account an app is acting for. An **App verification** proof says which app is calling. Every proof names exactly one receiving app.
 
-The apps decide what the proof’s scopes mean and which actions to allow. Follow [Verify a proof](../../start/verify-a-proof.md), [User verification](../../start/user-verification.md) or [App verification](../../start/app-verification.md) for the steps. [How proofs work](../../learn/proofs.md) explains the responsibilities of each app.
+What a proof's scopes mean, and which actions they allow, is up to the apps. For the steps, follow [Verify a proof](../../start/verify-a-proof.md), [User verification](../../start/user-verification.md) or [App verification](../../start/app-verification.md). [How proofs work](../../learn/proofs.md) explains what each app is responsible for.
 
-The receiving app verifies a proof token:
+Here the receiving app verifies a proof token:
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/proofs/verify" -u "briefcase:$BRIEFCASE_SECRET" \
@@ -38,21 +38,21 @@ curl -s -X POST "$ACCOUNTS_URL/v1/proofs/verify" -u "briefcase:$BRIEFCASE_SECRET
 }
 ```
 
-Anything else is exactly `{"valid": false, "expires_at": null}`.
+Anything else gets exactly `{"valid": false, "expires_at": null}`.
 
-Every endpoint takes **app** auth (`-u app_id:app_secret`) unless noted. Request bodies refuse
-unknown fields. Proof responses are `Cache-Control: no-store`.
+Every endpoint takes **app** auth (`-u app_id:app_secret`) unless its section says otherwise.
+Request bodies refuse unknown fields, and proof responses are `Cache-Control: no-store`.
 
 | Number | Value |
 |---|---|
 | proof token (`sap_…`) lifetime | `access_ttl_seconds`, 60 to 1800, default 1800 |
 | proof lifetime (its `sapr_…` refresh token) | 900 days; a User verification proof never outlives the sign-in it stands on |
-| scopes | at most 20 distinct strings, each 1–100 characters of `A-Z a-z 0-9 _ . : / -`, defined by the apps |
+| scopes | at most 20 distinct strings, each 1 to 100 characters of `A-Z a-z 0-9 _ . : / -`, defined by the apps |
 | App verification receiving apps | exactly 1 per proof (`receiving_app`); one proof per app |
 
 ## The issued proof
 
-`POST /v1/proofs/user-verification`, `/app-verification`, `/refresh` and `POST /v1/apps/{app_id}/proofs/app-verification` answer:
+`POST /v1/proofs/user-verification`, `/app-verification`, `/refresh` and `POST /v1/apps/{app_id}/proofs/app-verification` all answer with:
 
 ```json
 {
@@ -69,9 +69,10 @@ unknown fields. Proof responses are `Cache-Control: no-store`.
 }
 ```
 
-An app verification proof has `"kind": "app_verification"`, its one `receiving_app`, and `"user": null`. Give the `proof_token` to the receiving app; keep the
-`proof_refresh_token` yourself. Lifetimes are absolute timestamps (no `expires_in`), so a replayed
-idempotent response still tells the truth about what is left.
+An App verification proof has `"kind": "app_verification"`, its one `receiving_app`, and
+`"user": null`. Give the `proof_token` to the receiving app and keep the `proof_refresh_token`
+yourself. Lifetimes are absolute timestamps (there's no `expires_in`), so a replayed idempotent
+response still tells the truth about how much time is left.
 
 ## `POST /v1/proofs/user-verification`
 
@@ -82,7 +83,7 @@ idempotent response still tells the truth about what is left.
 | `subject_token` | an access token **your app** received for the account (its `aud` is your app) |
 | `receiving_app` | the app that will verify the proof |
 | `scopes` | optional list of app-defined strings |
-| `access_ttl_seconds` | optional, 60–1800 |
+| `access_ttl_seconds` | optional, 60 to 1800 |
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/proofs/user-verification" -u "dm:$DM_SECRET" \
@@ -90,8 +91,8 @@ curl -s -X POST "$ACCOUNTS_URL/v1/proofs/user-verification" -u "dm:$DM_SECRET" \
   -d '{"subject_token":"'"$ACCOUNT_ACCESS_TOKEN"'","receiving_app":"briefcase","scopes":["files.write"],"access_ttl_seconds":600}'
 ```
 
-**201** the issued proof. Get the account's consent in your own interface first: Silicon
-Accounts doesn't show a consent screen for proofs.
+Answers **201** with the issued proof. Get the account's consent in your own interface first,
+because we don't show a consent screen for proofs.
 
 | Status | Code | Why |
 |---|---|---|
@@ -117,28 +118,35 @@ Accounts doesn't show a consent screen for proofs.
 
 ## `POST /v1/proofs/app-verification`
 
-**Idempotent** (10 minutes). `{"receiving_app": "remind", "scopes"?, "access_ttl_seconds"?}`
-→ **201** the issued App verification proof. An app verification proof is always for exactly one app: to talk to `remind`
-and `waveform`, issue one proof for each. Errors: 422 `app_verification_single_app` (the body has `audiences`,
-of any length: "An app verification is for exactly one app; ask for one proof per app.", with
-`details.field: "audiences"` and `details.apps`), 400 `unknown_receiving_app`, 400
-`invalid_receiving_app` (your own app, or `silicon-accounts`/`developer`), 403 `receiving_app_disabled`,
-422 `validation_failed` (`receiving_app`, `scopes[i]`, `access_ttl_seconds`).
+**Idempotent** (10 minutes). Send `{"receiving_app": "remind", "scopes"?, "access_ttl_seconds"?}`
+and get **201** with the issued App verification proof. An App verification proof is always for
+exactly one app, so to talk to `remind` and `waveform` you issue one proof for each.
+
+Errors:
+
+- 422 `app_verification_single_app`: the body has `audiences`, of any length ("An app verification
+  is for exactly one app; ask for one proof per app.", with `details.field: "audiences"` and
+  `details.apps`);
+- 400 `unknown_receiving_app`;
+- 400 `invalid_receiving_app`: your own app, or `silicon-accounts`/`developer`;
+- 403 `receiving_app_disabled`;
+- 422 `validation_failed`: `receiving_app`, `scopes[i]`, `access_ttl_seconds`.
 
 ## `POST /v1/apps/{app_id}/proofs/app-verification`
 
-The same for **app or author**: the app's authors can issue App verification proofs from the app's App verification page on
-developers.teamofsilicons.com without the app secret. Same body and response (and the same 422
-`app_verification_single_app` for `audiences`); 403 `app_disabled` for a disabled app.
+The same, for **app or author**: an app's authors can issue App verification proofs from the
+app's App verification page on developers.teamofsilicons.com without the app secret. The body
+and response are the same (including the 422 `app_verification_single_app` for `audiences`), and
+a disabled app gets 403 `app_disabled`.
 
 ## `POST /v1/proofs/refresh`
 
-The issuing app only. `{"proof_refresh_token": "sapr_…", "access_ttl_seconds"?}` → **200** the
-issued proof with the same `proof_id`, a new `proof_token` and a **rotated**
-`proof_refresh_token`. An `Idempotency-Key` makes a retried refresh return the same new tokens.
+Only the issuing app can refresh. Send `{"proof_refresh_token": "sapr_…", "access_ttl_seconds"?}`
+and get **200** with the issued proof: the same `proof_id`, a new `proof_token` and a **rotated**
+`proof_refresh_token`. With an `Idempotency-Key`, a retried refresh returns the same new tokens.
 
-Presenting a refresh token that was already used revokes the whole proof (400
-`proof_refresh_token_reused`); later refreshes get 410 `proof_revoked`:
+If a refresh token that was already used is presented again, we revoke the whole proof (400
+`proof_refresh_token_reused`), and later refreshes get 410 `proof_revoked`:
 
 ```json
 {
@@ -152,43 +160,52 @@ Presenting a refresh token that was already used revokes the whole proof (400
 ```
 
 Other errors: 400 `invalid_proof_refresh_token` (not a `sapr_` token, or unknown), 403
-`not_issuing_app`, 410 `proof_expired`, 410 `proof_revoked` (revoked, or a User verification proof whose
-sign-in ended).
+`not_issuing_app`, 410 `proof_expired`, and 410 `proof_revoked` (revoked, or a User verification
+proof whose sign-in ended).
 
 ## `POST /v1/proofs/verify`
 
-`{"proof_token": "sap_…"}`, called by the app that received the token. **200** always: valid
-(example at the top) or exactly:
+The app that received the token sends `{"proof_token": "sap_…"}`. The answer is always **200**:
+valid (the example at the top) or exactly:
 
 ```json
 { "valid": false, "expires_at": null }
 ```
 
-A proof is valid only when the token is a known, unexpired proof token; the proof is not revoked;
-the calling app is its receiving app; the issuing app is active; and, for User verification, the account is
-active, its membership with the issuing app is active and the sign-in behind the subject token is
-still live. Every other case gets the same body, so a caller learns nothing about proofs that
-aren't theirs. A malformed input (a refresh token, a JWT, an empty string) adds an
-`x-accounts-hint` header describing the input:
+A proof is valid only when all of these hold:
+
+- the token is a known, unexpired proof token;
+- the proof isn't revoked;
+- the calling app is its receiving app;
+- the issuing app is active;
+- for User verification, the account is active, its membership with the issuing app is active,
+  and the sign-in behind the subject token is still live.
+
+Every other case gets the same body, so a caller learns nothing about proofs that aren't theirs.
+A malformed input (a refresh token, a JWT, an empty string) adds an `x-accounts-hint` header that
+describes it:
 
 ```text
 x-accounts-hint: proof_token must be a proof token (it starts with sap_), but this is a proof refresh token.
 ```
 
 `user.membership_id` is the account's membership with the **issuing** app (the grant the proof
-stands on); `user.id` is the account's current id. Verification is one indexed lookup (well under
-a millisecond of database time); the app's credentials are checked through a 60-second cache.
+stands on), and `user.id` is the account's current id. Verifying is one indexed lookup (well under
+a millisecond of database time), and the app's credentials are checked through a 60-second cache,
+so verify on every call that needs the proof.
 
 ## `POST /v1/proofs/revoke`
 
-The issuing app only. One of `{"proof_id"}`, `{"proof_token"}` or `{"proof_refresh_token"}`.
-**204.** Revoking a revoked proof is a no-op. Errors: 404 `proof_not_found` (not a proof of
-yours; another app's proof id looks unknown), 400 `invalid_proof_id`, 403 `not_issuing_app`.
+Only the issuing app can revoke. Send one of `{"proof_id"}`, `{"proof_token"}` or
+`{"proof_refresh_token"}` and get **204**. Revoking a revoked proof does nothing. Errors: 404
+`proof_not_found` (not one of your proofs; another app's proof id looks unknown to you), 400
+`invalid_proof_id`, 403 `not_issuing_app`.
 
 ## `GET /v1/apps/{app_id}/proofs`
 
-**app or author**: proofs the app issued, newest first. Query: `kind` (`user_verification`, `app_verification`), `status`
-(`active`, `revoked`, `expired`), `limit`, `cursor`.
+**app or author**: the proofs your app issued, newest first. Filter with `kind`
+(`user_verification`, `app_verification`), `status` (`active`, `revoked`, `expired`), `limit` and
+`cursor`.
 
 ```json
 {
@@ -213,39 +230,39 @@ yours; another app's proof id looks unknown), 400 `invalid_proof_id`, 403 `not_i
 }
 ```
 
-`expires_at` is the proof's end, `token_expires_at` its newest token's. `status` is live for User verification
-grants: a proof whose sign-in was revoked shows `revoked` with `revoke_reason` `sign_in_revoked`.
-Reasons: `revoked_by_app`, `revoked_by_owner`, `revoked_by_account`, `refresh_token_reuse`,
-`sign_in_revoked`, `access_removed`, `account_deleted`, `membership_inactive`,
-`account_inactive`.
+`expires_at` is when the proof ends, and `token_expires_at` is when its newest token does. For
+User verification, `status` is live: a proof whose sign-in was revoked shows `revoked` with
+`revoke_reason` `sign_in_revoked`. The reasons are `revoked_by_app`, `revoked_by_owner`,
+`revoked_by_account`, `refresh_token_reuse`, `sign_in_revoked`, `access_removed`,
+`account_deleted`, `membership_inactive` and `account_inactive`.
 
 ## `DELETE /v1/apps/{app_id}/proofs/{proof_id}`
 
-**app or author**: revoke one of the app's proofs. **204.** 404 `proof_not_found`, 400
+**app or author**: revokes one of your app's proofs. **204.** Errors: 404 `proof_not_found`, 400
 `invalid_proof_id`.
 
 ## `GET /v1/me/app-verifications`
 
-**signed-in manager**: retained App verification records issued by the apps you currently manage, including records generated through the portal, CLI or API. This is the central developer portal history. Filter with `app_id` or `status=active|revoked|expired`; use `limit` and the returned `next_cursor` for pagination. Results are newest first. Being a receiving app alone grants no access to another app's records.
+**signed-in manager**: the App verification records we keep for every app you currently manage, whether they were made in the portal, the CLI or the API. This is the central history the developer portal shows. Filter with `app_id` or `status=active|revoked|expired`, and page with `limit` and the `next_cursor` we return. Results are newest first. Being the receiving app of a proof doesn't give you access to another app's records.
 
 ## `GET /v1/apps/{app_id}/proofs/{proof_id}/history`
 
-**signed-in manager**: retained issuance, refresh and revocation history for one App verification record. The request checks current management access to the issuing app. Historical expiry values distinguish explicitly recorded information from derived legacy information; missing values are not reconstructed as facts. No raw proof or refresh token values are returned.
+**signed-in manager**: the kept history of one App verification record, meaning when it was issued, refreshed and revoked. We check that you currently manage the issuing app. Historical expiry values show whether they were recorded at the time or derived for older (legacy) records, and missing values stay missing rather than being filled in as facts. No raw proof or refresh token values are returned.
 
-Records and their history remain after credential material expires or is removed. See [central history](../../start/app-verification.md#central-history-for-apps-you-manage) for the portal flow. The API uses `app_verification` and `user_verification` as JSON kinds. Issuance routes use `/app-verification` and `/user-verification`.
+Records and their history stay after the credentials expire or are removed. See [central history](../../start/app-verification.md#central-history-for-apps-you-manage) for the portal flow. In JSON the kinds are `app_verification` and `user_verification`, and the issuing routes are `/app-verification` and `/user-verification`.
 
 ## `GET /v1/me/proofs`
 
-**account**: the User verification proofs apps issued about you, newest first (`?status=active|revoked|expired`,
-`limit`, `cursor`; unknown query parameters are refused).
-Items: `proof_id`, `issuing_app` and `receiving_app` (app summaries), `scopes`, `status`,
-`created_at`, `expires_at`, `token_expires_at`, `last_refreshed_at`, `revoked_at`,
+**account**: the User verification proofs apps issued about you, newest first. Filter with
+`?status=active|revoked|expired`, `limit` and `cursor`; unknown query parameters are refused.
+Each item has `proof_id`, `issuing_app` and `receiving_app` (app summaries), `scopes`, `status`,
+`created_at`, `expires_at`, `token_expires_at`, `last_refreshed_at`, `revoked_at` and
 `revoke_reason`.
 
 ## `DELETE /v1/me/proofs/{proof_id}`
 
-**account**: revoke a proof about you; the receiving app's next verification answers
-`valid: false`. **204.** 404 `proof_not_found`, 400 `invalid_proof_id`.
+**account**: revokes a proof about you, and the receiving app's next verification answers
+`valid: false`. **204.** Errors: 404 `proof_not_found`, 400 `invalid_proof_id`.
 
 ```json
 {
@@ -259,7 +276,7 @@ Items: `proof_id`, `issuing_app` and `receiving_app` (app summaries), `scopes`, 
 
 ## What ends a proof
 
-Besides revocation and expiry, a User verification proof ends with the grant it stands on: the account signing
-out of the issuing app or removing its access, the sign-in being revoked (STK rotation, refresh
-token reuse), or the account being deleted. Verification checks all of it live, so no webhook has
-to arrive first.
+Besides revocation and expiry, a User verification proof ends when the grant it stands on ends:
+the account signs out of the issuing app or removes its access, the sign-in is revoked (an STK
+rotation, a reused refresh token), or the account is deleted. Verification checks all of this
+live, so no webhook has to arrive first.

@@ -1,6 +1,6 @@
 ---
 title: silicon-accounts CLI reference
-description: Look up accounts commands, flags, environment variables and exit codes. Use the examples to read results and handle failures in scripts.
+description: Every silicon-accounts command, flag, environment variable and exit code, with examples for reading results and handling failures in scripts.
 kind: informative
 order: 69
 related:
@@ -14,9 +14,9 @@ related:
 
 # silicon-accounts CLI reference
 
-This reference lists the commands in `silicon-accounts` 0.3.1. The [command sections](#commands) come from the CLI’s `--help` output. Run `silicon-accounts <command> --help` to check the options in your installed version.
+This is every command in `silicon-accounts` 0.3.1. The [command sections](#commands) are taken from the CLI's own `--help`, so run `silicon-accounts <command> --help` to check the options in the version you have installed.
 
-If you are using the CLI for the first time, start with [Use the silicon-accounts CLI](../start/cli.md).
+If this is your first time with the CLI, start with [Use the silicon-accounts CLI](../start/cli.md).
 
 ```sh
 silicon-accounts --help                 # everything: the command tree, bundled guides, environment, exit codes
@@ -28,7 +28,7 @@ silicon-accounts --json                 # the command tree as JSON: {"commands":
 accounts [OPTIONS] [COMMAND]
 ```
 
-Run without a command, `silicon-accounts` prints the full help and exits `0`. A command group without a
+Run with no command, `silicon-accounts` prints the full help and exits `0`. A command group with no
 subcommand (`silicon-accounts silicon`) prints its help and exits `2`.
 
 ## Global options
@@ -68,7 +68,7 @@ Every command takes these, before or after the command name.
 
 ## URL resolution
 
-First match wins:
+The first match wins:
 
 1. `--url`;
 2. `ACCOUNTS_URL`;
@@ -78,15 +78,15 @@ First match wins:
 6. `https://accounts.teamofsilicons.com`.
 
 Plain `http://` is refused for any host but this machine (`localhost`, `*.localhost`,
-`127.0.0.0/8`, `::1`) unless `ACCOUNTS_ALLOW_INSECURE_HTTP=1`: exit code `2`, error code
-`invalid_input` (`invalid_url` from `silicon-accounts config set url`). A session belongs to
-the URL it was created at; with another URL, account commands answer `not_signed_in`.
-`silicon-accounts silicon request status` reads a request at the URL it was created at, unless `--url` or
-`ACCOUNTS_URL` says otherwise.
+`127.0.0.0/8`, `::1`) unless `ACCOUNTS_ALLOW_INSECURE_HTTP=1`, because STKs and tokens would
+travel unencrypted. You get exit code `2` and error code `invalid_input` (`invalid_url` from
+`silicon-accounts config set url`). A session belongs to the URL it was created at, so with
+another URL, account commands answer `not_signed_in`. `silicon-accounts silicon request status`
+reads a request at the URL it was created at, unless `--url` or `ACCOUNTS_URL` says otherwise.
 
 ## Home directory
 
-The CLI keeps its state in `{home}/.accounts/`. First match wins:
+The CLI keeps its state in `{home}/.accounts/`. The first match wins:
 
 1. `--home <DIR>`;
 2. `ACCOUNTS_HOME`;
@@ -95,11 +95,11 @@ The CLI keeps its state in `{home}/.accounts/`. First match wins:
 4. `SILICON_HOME`;
 5. `~`.
 
-The chosen home must be an existing directory. Otherwise the command fails before doing anything,
-with exit code `2`, error code `not_a_directory`, and a message that says why and which setting
-chose it: `not a directory: /srv/silicons/nope (it does not exist; set by SILICON_HOME)`.
-`silicon-accounts config home` (no argument) shows the home and its source; `--reset` forgets the
-configured one.
+The chosen home must be an existing directory. If it isn't, the command fails before doing
+anything, with exit code `2`, error code `not_a_directory`, and a message saying why and which
+setting chose it: `not a directory: /srv/silicons/nope (it does not exist; set by SILICON_HOME)`.
+`silicon-accounts config home` with no argument shows the home and where it came from; `--reset`
+forgets the configured one.
 
 | file in `{home}/.accounts/` | holds |
 |---|---|
@@ -112,26 +112,27 @@ configured one.
 | `home` | (only in `{base}/.accounts/`) the pointer written by `silicon-accounts config home` |
 
 Files are written atomically (a temporary file, then a rename) with mode 0600, in a directory with
-mode 0700. Token refreshes happen under `session.lock`, so any number of processes can share a
-home: refresh tokens rotate, and presenting one twice would end the session. One home holds one
-session; signing in as another account there signs the previous one out.
+mode 0700. Token refreshes happen under `session.lock`, so any number of processes can share one
+home. That lock matters: refresh tokens rotate, and presenting one twice would end the session.
+One home holds one session, so signing in as another account there signs the previous one out.
 
 ## Output
 
-- **Results** go to stdout: text, or with `--json` one JSON document.
+- **Results** go to stdout: text, or with `--json`, one JSON document.
 - **Progress, notices, warnings and next steps** go to stderr. Next steps are a `Next:` block of
-  commands with what each is for. `-q` suppresses all of these; `--json` suppresses all but
-  warnings, which become one-line JSON objects (`{"warning":"…"}`).
-- **Essential events** that must be seen before a command finishes go to stderr even with `-q`; with
-  `--json` they are one JSON object per line: `{"event":"device_code","user_code",
+  commands, each with what it's for. `-q` hides all of these; `--json` hides all but warnings,
+  which become one-line JSON objects (`{"warning":"…"}`).
+- **Essential events**, the ones you must see before a command finishes, go to stderr even with
+  `-q`. With `--json` each is one JSON object per line: `{"event":"device_code","user_code",
   "verification_uri","verification_uri_complete","expires_at","browser_opened"}` from
   `silicon-accounts login`, and `{"event":"silicon_created",…}` (the whole creation, STK included) from
   `silicon-accounts silicon create --wait` before it starts waiting.
-- **Timestamps** in `--json` output are RFC 3339 in UTC. They are meant to match the API's form,
-  exactly three fractional digits (`2026-10-07T02:33:45.489Z`), but values the CLI passes through
-  the Rust client's types drop trailing zeros today: the API's `2026-10-07T05:17:55.590Z` prints
-  as `2026-10-07T05:17:55.59Z` in `silicon-accounts silicon list --json` (a known bug). Parse them as
-  RFC 3339; don't compare them as strings or assume a fixed width.
+- **Timestamps** in `--json` output are RFC 3339 in UTC. They're meant to match the API's form,
+  with exactly three fractional digits (`2026-10-07T02:33:45.489Z`), but today the values the CLI
+  passes through the Rust client's types drop trailing zeros: the API's
+  `2026-10-07T05:17:55.590Z` prints as `2026-10-07T05:17:55.59Z` in
+  `silicon-accounts silicon list --json` (a known bug). Parse them as RFC 3339, and don't compare
+  them as strings or assume a fixed width.
 
 **Errors** print `error:`, `hint:`, any per-field problems and the request id on stderr. With
 `--json` they print on stdout instead:
@@ -175,12 +176,12 @@ Argument errors (an unknown flag, a missing argument) exit `2` with code `invali
 | `130` | interrupted with Ctrl-C |
 
 Errors from the service map to exit codes by HTTP status: 400, 410, 413, 415 and 422 give `2`; 401
-and 403 give `3`; 404 gives `4`; 409 gives `5`; 423 and 429 give `6`; anything else `1`. OAuth
-errors map by name: `invalid_client`, `invalid_grant`, `access_denied`, `expired_token` and
+and 403 give `3`; 404 gives `4`; 409 gives `5`; 423 and 429 give `6`; anything else gives `1`.
+OAuth errors map by name: `invalid_client`, `invalid_grant`, `access_denied`, `expired_token` and
 `unauthorized_client` give `3`; `invalid_request`, `unsupported_grant_type` and `invalid_scope` give
 `2`; `slow_down` gives `6`.
 
-Commands whose exit code is the answer:
+Some commands answer with their exit code, so a script can branch on it directly:
 
 | command | exit codes |
 |---|---|
@@ -195,8 +196,8 @@ Commands whose exit code is the answer:
 
 Most errors carry the service's code ([Errors](errors.md)) or the Rust client's
 (`connection_failed`, `request_timeout`, `unexpected_response`, `invalid_input`, `timed_out`,
-`token_*`: [Rust client codes](errors.md#rust-client-codes)). These come from the CLI itself,
-for problems it finds without asking the service:
+`token_*`: [Rust client codes](errors.md#rust-client-codes)). The codes below come from the CLI
+itself, for problems it finds without asking the service:
 
 | code | exit | when | what to do |
 |---|---|---|---|
@@ -238,9 +239,10 @@ for problems it finds without asking the service:
 
 ## Telemetry
 
-The CLI buffers a few events while a command runs and sends them to `POST /v1/telemetry/events` when
-it ends, waiting at most 1.5 seconds; the service forwards them to Space Station. Each event has
-`source: "cli"`, a `step`, a `progress` from 0 to 1, a `name` and a `data` object:
+While a command runs, the CLI buffers a few events. When the command ends, it sends them to
+`POST /v1/telemetry/events`, waiting at most 1.5 seconds, and the service forwards them to Space
+Station. Each event has `source: "cli"`, a `step`, a `progress` from 0 to 1, a `name` and a
+`data` object:
 
 - `cli.step` events for steps of multi-step flows: `login.silicon.started`, `login.code.sent`,
   `login.device.code_shown`, `login.device.approved`, `login.done`, `login.slt.issued`,
@@ -249,39 +251,40 @@ it ends, waiting at most 1.5 seconds; the service forwards them to Space Station
 - one `cli.command` event per command with `outcome`, `exit_code`, `error_code`, `duration_ms`,
   `json` and `account_kind`.
 
-Every `data` also carries `command`, `cli_version`, `os` and `arch`. Tokens, STKs, secrets, account
-ids and uuids, and contact details are never sent; the only identifier is the app id in
-`login.slt.issued`. Nothing is sent when a command never contacted the service or could not reach
+Every `data` also carries `command`, `cli_version`, `os` and `arch`. Tokens, STKs, secrets,
+account ids and uuids, and contact details are never sent; the only identifier is the app id in
+`login.slt.issued`. Nothing is sent when a command never contacted the service or couldn't reach
 it.
 
-Telemetry is on by default. `silicon-accounts config telemetry off` (or `ACCOUNTS_TELEMETRY=0`) turns it off;
-then every request to the service also carries `X-Accounts-Telemetry: off`, so the service records
-no telemetry about those requests either.
+Telemetry is on by default. `silicon-accounts config telemetry off` (or `ACCOUNTS_TELEMETRY=0`)
+turns it off, and then every request to the service also carries `X-Accounts-Telemetry: off`, so
+the service records no telemetry about those requests either.
 
 ## Bug reports
 
-`silicon-accounts report "<message>" [--pr <https link>]` sends `POST /v1/reports`; every report is emailed
-to the Silicon Accounts maintainers (3 recipients). The message is 1 to 10,000 characters (`-` reads
-it from stdin); a signed-in report names the account, a signed-out one is anonymous; the CLI
-version, operating system and architecture are appended unless `--no-diagnostics`. Reports are
-limited to 5 per hour per network. Include what you ran, what you expected, what happened and the
-request id.
+`silicon-accounts report "<message>" [--pr <https link>]` sends `POST /v1/reports`, and every
+report is emailed to the Silicon Accounts maintainers (3 recipients). The message is 1 to 10,000
+characters (`-` reads it from stdin). A signed-in report names your account; a signed-out one is
+anonymous. The CLI version, operating system and architecture are added unless you pass
+`--no-diagnostics`. Reports are limited to 5 per hour per network. Say what you ran, what you
+expected, what happened, and the request id. If you've already patched it, add the pull request
+with `--pr` (we'd be grateful).
 
 ## Updates
 
-Silicon Apps installs and updates the CLI. `silicon-accounts` never updates itself and never checks for
-updates.
+Silicon Apps installs and updates the CLI. `silicon-accounts` never updates itself and never
+checks for updates, because a second updater would only fight with Silicon Apps.
 
 ## Bundled guides
 
-`silicon-accounts docs <topic>` prints a guide that ships inside the CLI. Topic names accept the aliases in
-brackets.
+`silicon-accounts docs <topic>` prints a guide that ships inside the CLI. Topic names also accept
+the aliases in brackets.
 
 `silicon-accounts help <topic>` prints the same guide only when no command has that name, because a
 command name wins. `proofs` and `apps` are also commands, and so are the aliases `login`,
-`silicon`, `custodian`, `app`, `webhook`, `id` and `help`: `silicon-accounts help proofs` prints the help
-of `silicon-accounts proofs`, not the guide. `silicon-accounts help imports` does print the guide. Use
-`silicon-accounts docs <topic>` for guides.
+`silicon`, `custodian`, `app`, `webhook`, `id` and `help`. So `silicon-accounts help proofs` prints
+the help of `silicon-accounts proofs`, not the guide, while `silicon-accounts help imports` does
+print the guide. To be sure you get a guide, use `silicon-accounts docs <topic>`.
 
 | topic | what it covers |
 |---|---|
@@ -298,7 +301,7 @@ of `silicon-accounts proofs`, not the guide. `silicon-accounts help imports` doe
 
 An unknown topic exits `4` with `unknown_topic` and lists the topics.
 
-Use `silicon-accounts app proof app-verification` to verify an app and `silicon-accounts app proof user-verification` to act for an account. `silicon-accounts proofs` lists proofs issued on your behalf; `accounts user-verification` is an alias for this list and its revoke command. JSON kinds are `app_verification` and `user_verification`.
+To prove your app to another app, use `silicon-accounts app proof app-verification`; to act for an account, use `silicon-accounts app proof user-verification`. `silicon-accounts proofs` lists the proofs issued on your behalf, and `accounts user-verification` is an alias for that list and its revoke command. The JSON kinds are `app_verification` and `user_verification`.
 
 ## Command tree
 
@@ -534,14 +537,14 @@ As `silicon-accounts --help` prints it:
 
 ## Commands
 
+Each section below comes from `silicon-accounts <command> --help`. Options marked `[env: …]` also
+read that environment variable, and `[default: …]` is the value used when you leave the option
+out. A few sections add a hand-written note after the generated part, such as what a deleted
+account looks like in [`silicon-accounts app users`](#silicon-accounts-app-users).
+
 ### `silicon-accounts accounts`
 
-Reports this package's identity. `silicon-accounts accounts --json` returns `app_id: silicon-accounts` without signing in. Silicon Apps uses this when validating a package.
-
-Each section is generated from `silicon-accounts <command> --help`. Options marked `[env: …]` also read that
-environment variable; `[default: …]` is the value used when the option is left out. A few sections
-add a note written by hand after the generated part, such as what a deleted account looks like in
-[`silicon-accounts app users`](#silicon-accounts-app-users).
+Reports this package's identity. `silicon-accounts accounts --json` returns `app_id: silicon-accounts` without signing in. Silicon Apps uses it when validating the package, since every package in the store has to answer `accounts --json`.
 
 ### `silicon-accounts login`
 
@@ -2091,7 +2094,7 @@ silicon-accounts app users [OPTIONS]
 Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
 Deleted accounts stay in the user base as history, with their uuid, membership id, external id and
-dates but none of their details (the name reads "Deleted account"); `--status deleted` lists only
+dates but none of their details (the name reads "Deleted account"). `--status deleted` lists only
 them, and the other statuses leave them out ([What apps see](../learn/what-apps-see.md)).
 
 ```text
@@ -2357,8 +2360,8 @@ Issue an app verification proof: a token that proves to exactly one other app th
 silicon-accounts app proof app-verification [OPTIONS] --to <APP_ID>
 ```
 
-A list in `--to` (`remind,waveform`) exits 2 before anything is sent, with one command per app in
-the hint.
+A list in `--to` (`remind,waveform`) exits 2 before anything is sent, and the hint gives you one
+command per app.
 
 | argument or option | meaning |
 |---|---|

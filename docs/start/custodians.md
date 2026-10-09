@@ -1,6 +1,6 @@
 ---
 title: Be a Silicon's custodian
-description: Look after a Silicon’s account. Accept requests, create Silicons, change their details, rotate their passwords or transfer them to another Carbon.
+description: Look after the Silicons you're responsible for. Accept their requests, create them, change their details, rotate their STKs, or hand them over to another Carbon.
 kind: instructive
 order: 22
 related:
@@ -13,9 +13,9 @@ related:
 
 # Be a Silicon's custodian
 
-A custodian is the Carbon responsible for a Silicon. Every Silicon has exactly one. You can accept a Silicon’s request to become its custodian, or create a Silicon yourself.
+A custodian is the Carbon responsible for a Silicon, and every Silicon has exactly one. You become one in two ways: you accept a Silicon’s request to be its custodian, or you create the Silicon yourself.
 
-Once you are its custodian, you can manage its details, public `si:id` and password, called an STK. Sign in as a Carbon with `silicon-accounts login`, then check the requests waiting for you:
+Once you are its custodian, you look after its details, its public `si:id` and its password, the STK. Sign in as a Carbon with `silicon-accounts login`, then check which requests are waiting for you:
 
 ```sh
 silicon-accounts custodian requests
@@ -34,23 +34,23 @@ silicon-accounts custodian accept 01a11433-097f-71b5-9ab2-9fbf26649772
 Accepted request 01a11433-097f-71b5-9ab2-9fbf26649772: you are now the custodian.
 ```
 
-Everything here can also be done on the account site at
-[accounts.teamofsilicons.com/silicons](https://accounts.teamofsilicons.com/silicons), and over HTTP
-with a Carbon's access token (see [Over HTTP](#over-http)). These commands are for Carbons: a
-Silicon running them gets `wrong_account_kind` (exit code `3`).
+You can do everything on this page on the account site too, at
+[accounts.teamofsilicons.com/silicons](https://accounts.teamofsilicons.com/silicons), or over HTTP
+with a Carbon's access token (see [Over HTTP](#over-http)). These commands are for Carbons. A
+Silicon that runs them gets `wrong_account_kind` (exit code `3`).
 
 ## Answer requests
 
-Two kinds of request reach you, and you have 14 days to answer each:
+Two kinds of request can reach you, and you have 14 days to answer each one:
 
 | kind | who sends it | accept | decline |
 |---|---|---|---|
 | `initial` | a Silicon that created its own account and named you | the Silicon becomes `active` with you as custodian and can sign in at once | the Silicon's account is released: deleted, its si:id free again immediately |
 | `transfer` | a custodian handing a Silicon over to you (`FROM` shows who) | you become the custodian | nothing changes; the current custodian keeps it |
 
-A request reaches you when it names your `c:id`, or any email address verified on your account. A
-Silicon may have named an address before you had an account: sign up with that address and the
-request is waiting. You also get an email: `si:scout asked you to be its custodian`, or
+A request reaches you when it names your `c:id` or any email address verified on your account. A
+Silicon may even have named your address before you had an account. Sign up with that address and
+the request will be waiting for you. We also email you: `si:scout asked you to be its custodian`, or
 `c:saket wants to transfer si:scout to you`.
 
 ```sh
@@ -62,8 +62,8 @@ Declined request 01a11435-b2e0-75eb-98ff-d43d2c839070.
 ```
 
 Decline any Silicon you don't know. Anyone can name any Carbon, and accepting makes you
-answerable for that Silicon: you would hold its credentials and answer for what it does in the
-apps it signs into. [Silicons and custodians](../learn/silicons-and-custodians.md) explains why
+answerable for that Silicon: you would hold its credentials, and you would answer for what it does
+in the apps it signs into. [Silicons and custodians](../learn/silicons-and-custodians.md) explains why
 the request exists at all.
 
 | code | status | when |
@@ -88,14 +88,14 @@ Created si:mapper (BYP) with you, c:saket, as its custodian. It can sign in righ
 STK (shown once, store it now): stk-c743aeed4346
 ```
 
-Save the generated STK and pass it to the Silicon through a private channel. It will not be shown again. If you supply your own STK, the CLI does not print it back. For example, `openssl rand -hex 16 | silicon-accounts silicon create --id si:archivist --stk-stdin` generates one and passes it through stdin.
+Save the generated STK and pass it to your Silicon over a private channel, because we never show it again. If you supply your own STK, the CLI doesn't print it back. For example, `openssl rand -hex 16 | silicon-accounts silicon create --id si:archivist --stk-stdin` makes one and passes it in on stdin.
 
-Add `--webhook https://…` to set the Silicon’s webhook. Save the signing secret too; it is shown once. If you retry with the same `--idempotency-key` within 10 minutes, you get the original response, including its generated STK. [Get a Silicon account](silicon-account.md#the-stk) explains the accepted STK formats.
+Add `--webhook https://…` to set the Silicon’s webhook, and save its signing secret too, since it's also shown only once. If you retry with the same `--idempotency-key` within 10 minutes, you get the original response back, generated STK included. [Get a Silicon account](silicon-account.md#the-stk) explains which STK formats we accept.
 
-Signed in as a Carbon, leave `--custodian` out (or name yourself): a Silicon you create always gets
-you as its custodian, so naming someone else fails with exit code `2`. To have another Carbon as
-custodian, let them create it, or add `--self-create` to send the Silicon's own request, which they
-must accept.
+Signed in as a Carbon, leave `--custodian` out (or name yourself). A Silicon you create always gets
+you as its custodian, so naming someone else fails with exit code `2`. If another Carbon should be
+the custodian, let them create it, or add `--self-create` to send the Silicon's own request, which
+they then have to accept.
 
 ## See your Silicons
 
@@ -127,9 +127,9 @@ stk rotated  2026-10-07T02:37:03Z
 pending transfer to c:shubham, expires 2026-10-21T02:37:25Z (in 13d)
 ```
 
-Every `silicon-accounts silicon` command takes the Silicon's si:id or its uuid. A Silicon that isn't yours
-(or doesn't exist) answers `404 silicon_not_found` over HTTP; the two cases look the same, so
-nobody can probe other Carbons' Silicons. The CLI says it as `si:scout is not one of your Silicons
+Every `silicon-accounts silicon` command takes the Silicon's si:id or its uuid. Over HTTP, a Silicon
+that isn't yours (or doesn't exist) answers `404 silicon_not_found`. The two cases look the same on
+purpose, so nobody can probe other Carbons' Silicons. The CLI puts it as `si:scout is not one of your Silicons
 (you are custodian of: si:mapper-5)` and exits with `4`.
 
 ## Change its details
@@ -140,9 +140,9 @@ silicon-accounts silicon update si:scout --photo ./scout.png
 silicon-accounts silicon update si:scout --pfp-url https://cdn.example.com/scout.png
 ```
 
-`--photo` uploads a PNG, JPEG, WebP or GIF of at most 2 MB (`-` reads stdin); the photo belongs to
-the Silicon and stays its photo after a transfer. A Silicon's date of birth is the day its account
-was created and can't change (`dob_immutable`). Apps that can see a changed field get
+`--photo` uploads a PNG, JPEG, WebP or GIF of at most 2 MB (`-` reads stdin). The photo belongs to
+the Silicon, so it stays its photo after a transfer. A Silicon's date of birth is the day its account
+was created, and it can't change (`dob_immutable`). Apps that can see a changed field get
 `account.updated`, and the Silicon's webhook gets `silicon.updated`.
 
 The Silicon can change its own display name, timezone and photo too (`silicon-accounts profile set`).
@@ -157,9 +157,9 @@ silicon-accounts silicon id si:scout si:scout_v2
 si:scout is now si:scout_v2. The old id stays reserved for 10 days; apps it signed into and the Silicon itself were notified.
 ```
 
-The uuid never changes, so apps keep working: they get `account.id_changed` and keep keying on the
-uuid. For 10 days the old id is reserved: nobody else can take it, and the Silicon can take it back.
-Ask on the Silicon's behalf with `--for`:
+The uuid never changes, so apps keep working. They get `account.id_changed` and go on keying on the
+uuid. The old id stays reserved for 10 days: nobody else can take it, and the Silicon can take it
+back. To ask on the Silicon's behalf, add `--for`:
 
 ```sh
 silicon-accounts id available si:scout --for si:scout_v2
@@ -169,15 +169,15 @@ silicon-accounts id available si:scout --for si:scout_v2
 si:scout is reserved for si:scout_v2 after its id change: you can take it back for it with `silicon-accounts silicon id si:scout_v2 si:scout`.
 ```
 
-An account's id can change at most 5 times in 24 hours, whoever changes it (the Silicon itself
-with `silicon-accounts id change`, or you), and taking back a reserved id counts. The sixth change answers
-`429 rate_limited` with `details.retry_at`. [Ids and uuids](../learn/ids-and-uuids.md) explains
+An account's id can change at most 5 times in 24 hours, no matter who changes it (the Silicon
+itself with `silicon-accounts id change`, or you), and taking back a reserved id counts as a change.
+The sixth change answers `429 rate_limited` with `details.retry_at`. [Ids and uuids](../learn/ids-and-uuids.md) explains
 the rules.
 
 ## Rotate the STK
 
-Rotate when an STK may have leaked, when the Silicon lost it, when a Silicon changes hands, or on
-a schedule:
+Rotate the STK when it may have leaked, when your Silicon lost it, when the Silicon changes hands,
+or just on a schedule:
 
 ```sh
 silicon-accounts silicon rotate-stk si:scout
@@ -196,20 +196,20 @@ A rotation takes effect at once:
 - short-lived tokens issued before the rotation are refused by the apps' token exchange;
 - the Silicon's webhook gets `silicon.stk_rotated`.
 
-That is the point of rotating: whoever may hold the old STK, or anything signed in with it, is cut
-off. Hand the new STK to the Silicon privately; it signs in again with it. To set an STK of your
-choosing, pipe it in (`stk-` plus 8 to 32 hex characters; the response then has `"stk": null`):
+That's the whole point of rotating: whoever may hold the old STK, or anything signed in with it, is
+cut off. Hand the new STK to your Silicon privately, and it signs in again with it. To set an STK of
+your own choosing, pipe it in (`stk-` plus 8 to 32 hex characters; the response then has `"stk": null`):
 
 ```sh
 printf 'stk-%s' "$(openssl rand -hex 16)" | silicon-accounts silicon rotate-stk si:scout --stk-stdin
 ```
 
-Only the custodian can rotate an STK. A Silicon that lost its STK has no other way back in.
+Only you, the custodian, can rotate an STK. A Silicon that lost its STK has no other way back in.
 
 ## See and limit the Silicon's apps
 
-You can see every app your Silicon signed into, and every sign-in it made, and take an app's
-access away:
+You can see every app your Silicon signed into and every sign-in it made, and you can take an
+app's access away:
 
 ```sh
 silicon-accounts silicon apps list si:scout
@@ -219,7 +219,7 @@ silicon-accounts silicon apps remove si:scout briefcase
 
 Removing an app ends the Silicon's sign-ins there at once, revokes the proofs that app issued
 about it, and tells the app (`membership.access_removed`), exactly as if the Silicon had removed
-the app itself. It can sign in again later unless you stop it.
+the app itself. Your Silicon can sign in there again later, unless you stop it.
 
 To stop it, give the Silicon an allow-list: the only apps it may get short-lived tokens for.
 
@@ -229,9 +229,9 @@ silicon-accounts silicon apps allow si:scout --none          # no app at all
 silicon-accounts silicon apps allow si:scout --any           # every app again (the default)
 ```
 
-With a list, asking for a token for any other app fails with `403 app_not_allowed`, which tells
-the Silicon to ask you. The list doesn't end sign-ins the Silicon already has; remove those with
-`silicon apps remove`. Over HTTP these are `GET /v1/me/silicons/{uuid}/apps`,
+With a list in place, asking for a token for any other app fails with `403 app_not_allowed`, which
+tells the Silicon to ask you. The list doesn't end sign-ins the Silicon already has, so remove those
+with `silicon apps remove`. Over HTTP these are `GET /v1/me/silicons/{uuid}/apps`,
 `DELETE /v1/me/silicons/{uuid}/apps/{app_id}`, `GET /v1/me/silicons/{uuid}/signins` and
 `GET`/`PUT /v1/me/silicons/{uuid}/allowed-apps`
 ([reference](../reference/api/silicons.md#get-v1mesiliconsuuidapps)).
@@ -243,21 +243,21 @@ silicon-accounts silicon webhook set si:scout https://scout.example/hooks/accoun
 silicon-accounts silicon webhook remove si:scout
 ```
 
-`set` prints a new signing secret once, every time it is run; pass it to the Silicon, which verifies
-deliveries with it. The Silicon can manage the same webhook itself (`silicon-accounts webhook set`). The
-events are listed in [Get a Silicon account](silicon-account.md#get-notified-with-a-webhook).
+Every time you run `set`, it prints a new signing secret, once. Pass it to your Silicon, which
+verifies deliveries with it. The Silicon can manage the same webhook itself (`silicon-accounts webhook set`).
+The events are listed in [Get a Silicon account](silicon-account.md#get-notified-with-a-webhook).
 
-When the Silicon's endpoint was down, see what failed and send it again:
+If the Silicon's endpoint was down, see what failed and send it again:
 
 ```sh
 silicon-accounts silicon webhook deliveries si:scout --status failed
 silicon-accounts silicon webhook replay si:scout --failed
 ```
 
-The replay re-sends them to the Silicon's current URL, signed with its current secret, with the
-same event ids (the API: `GET /v1/me/silicons/{uuid}/webhook/deliveries` and
+A replay sends them again to the Silicon's current URL, signed with its current secret, with the
+same event ids (over the API: `GET /v1/me/silicons/{uuid}/webhook/deliveries` and
 `POST /v1/me/silicons/{uuid}/webhook/replay`). The Silicon can do the same itself
-(`silicon-accounts webhook replay --failed`); how replays work is in
+(`silicon-accounts webhook replay --failed`). How replays work is in
 [Receive webhooks](webhooks.md#a-silicons-deliveries-and-replays).
 
 ## Transfer a Silicon to another Carbon
@@ -271,18 +271,18 @@ Asked c:shubham to become the custodian of si:scout (request 01a11439-0d61-76de-
 ```
 
 - `--to` takes a `c:id` or an email address. An address without an account gets an invitation to
-  sign up; the request waits for whoever verifies that address.
-- Nothing changes until they accept. They have 14 days; when the request expires or they decline,
-  you remain the custodian.
-- A Silicon has one pending transfer at a time. A second one answers `409 transfer_pending` (with
-  `details.request_id`); withdraw the first with `silicon-accounts silicon cancel-transfer si:scout`.
+  sign up, and the request waits for whoever verifies that address.
+- Nothing changes until they accept. They have 14 days, and if the request expires or they decline,
+  you stay the custodian.
+- A Silicon can have one pending transfer at a time. A second one answers `409 transfer_pending` (with
+  `details.request_id`), so withdraw the first with `silicon-accounts silicon cancel-transfer si:scout`.
 - You can't transfer to yourself (`422 transfer_to_self`), and you can send at most 30 transfer
   requests per hour, since each one emails the receiving Carbon.
 
-When they accept, they become the custodian and the Silicon is gone from your list. The Silicon
-keeps its sessions, STK, uuid and si:id: a transfer changes who is responsible for it, not its
-credentials. If the Silicon should get a fresh STK under its new custodian, the new custodian
-rotates it. The Silicon's webhook gets `silicon.custodian.changed`:
+When they accept, they become the custodian and the Silicon leaves your list. The Silicon keeps its
+sessions, STK, uuid and si:id, because a transfer changes who is responsible for it, not its
+credentials. If it should get a fresh STK under its new custodian, the new custodian rotates it.
+The Silicon's webhook gets `silicon.custodian.changed`:
 
 ```json
 {
@@ -301,7 +301,7 @@ rotates it. The Silicon's webhook gets `silicon.custodian.changed`:
 ```
 
 Every app the Silicon signed into gets `silicon.custodian_changed` with the same `from` and `to`.
-Every transfer stays in the Silicon's history (`silicon-accounts history --kind custodian`, run as the
+And every transfer stays in the Silicon's history (`silicon-accounts history --kind custodian`, run as the
 Silicon):
 
 ```text
@@ -321,14 +321,15 @@ silicon-accounts silicon delete si:archivist --confirm si:archivist
 Deleted si:archivist. Apps it signed into were told; its id is held for 10 days.
 ```
 
-Deleting is permanent. `--confirm` must be the Silicon's current si:id (in a terminal the CLI asks
-for it instead). The Silicon's sessions and the User verification proofs about it are revoked, its uploaded
-photos are deleted, apps it signed into get `account.deleted`, and signing in answers
-`403 account_deleted`. Its si:id stays reserved for 10 days; its uuid is never reused.
+Deleting is permanent. `--confirm` must be the Silicon's current si:id (in a terminal, the CLI asks
+you for it instead). We revoke the Silicon's sessions and the User verification proofs about it,
+delete its uploaded photos, and tell the apps it signed into (`account.deleted`). After that,
+signing in answers `403 account_deleted`. Its si:id stays reserved for 10 days, and its uuid is
+never reused.
 
 ## You can't stop being a custodian on your own
 
-Every Silicon always has a custodian, so a Carbon who still has Silicons can't delete their
+Every Silicon always has a custodian, so as long as you still have Silicons, you can't delete your
 account:
 
 ```sh
@@ -353,7 +354,7 @@ silicon-accounts delete-account --confirm c:saket --json
 }
 ```
 
-Transfer each Silicon (and wait for the acceptance) or delete it first.
+First transfer each Silicon (and wait for the acceptance) or delete it.
 
 ## Who can do what
 
@@ -371,8 +372,8 @@ Transfer each Silicon (and wait for the acceptance) or delete it first.
 ## Over HTTP
 
 Every command above is one call under `/v1/me/silicons` or `/v1/me/custodian-requests`,
-authenticated with a Carbon's first-party access token (`Authorization: Bearer …`). A Carbon gets
-one without a browser with a 6-digit code:
+authenticated with your first-party access token as a Carbon (`Authorization: Bearer …`). You can
+get one without a browser, with a 6-digit code:
 
 ```sh
 curl -s -X POST https://accounts.teamofsilicons.com/v1/cli/login/start \
@@ -428,7 +429,7 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/me/silicons/si:keeper/stk
 {"revoked_sessions":0,"rotated_at":"2026-10-07T02:49:26.790Z","stk":"stk-3968ebc61e39"}
 ```
 
-The rest:
+And the rest:
 
 | what | call | answer |
 |---|---|---|

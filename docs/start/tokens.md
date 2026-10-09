@@ -1,6 +1,6 @@
 ---
 title: Exchange, refresh, check and revoke tokens
-description: Exchange sign-in credentials for tokens, refresh a session, check who a token belongs to and end the session when the user signs out.
+description: Turn a sign-in into tokens, keep the session going, check who a token belongs to and end it when the account signs out.
 kind: instructive
 order: 15
 related:
@@ -13,9 +13,9 @@ related:
 
 # Exchange, refresh, check and revoke tokens
 
-After sign-in, your app receives an access token and a refresh token. Use the access token to identify the signed-in account. When it expires, use the refresh token to get a new pair. Revoke the session when the user signs out.
+Once an account signs in, your app gets two tokens. The access token tells you who is signed in. The refresh token gets you a new pair when the access token expires. When the account signs out, you revoke the session.
 
-This guide covers each step, including how to check a token and read the account details it allows. To refresh a session, send a form POST with your app’s credentials:
+This page walks through each step, including how to check a token and read the account details it lets you see. Refreshing is a form POST with your app's credentials:
 
 ```sh
 curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/token" \
@@ -36,11 +36,11 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
 }
 ```
 
-Save the new `refresh_token` as soon as the response arrives. The token you just sent has been used and will not work again. Reusing it ends the whole session. [Tokens and sessions](../learn/tokens-and-sessions.md) explains why refresh tokens work this way.
+Save the new `refresh_token` the moment the answer arrives. The one you sent is now spent and won't work again, and sending it again ends the whole session. [Tokens and sessions](../learn/tokens-and-sessions.md) explains why refresh tokens work this way.
 
 ## The token response
 
-Every grant (a code, a Silicon's short-lived token, a refresh) answers with the same shape,
+Every grant (a code, a Silicon's short-lived token or a refresh) gets the same answer, sent with
 `Cache-Control: no-store`:
 
 | Field | Meaning |
@@ -54,13 +54,13 @@ Every grant (a code, a Silicon's short-lived token, a refresh) answers with the 
 | `membership_id` | `{app_id}:{uuid}`, the account's membership with your app. |
 | `account` | The account as your app may see it (the same object as userinfo, without the OIDC aliases). See [What your app sees](../learn/what-apps-see.md). |
 
-Errors are RFC 6749 bodies, `{"error": "invalid_grant", "error_description": "…"}`, with a
-description that says exactly what was wrong.
+Errors come back as RFC 6749 bodies, `{"error": "invalid_grant", "error_description": "…"}`, and
+the description says exactly what went wrong.
 
 ## Exchange an authorization code
 
-The browser comes back to your redirect URI with `?code=sac_…`. Exchange it within 2 minutes,
-once, with the same `redirect_uri` and the PKCE verifier:
+The browser comes back to your redirect URI with `?code=sac_…`. Exchange it once, within 2
+minutes, with the same `redirect_uri` and the PKCE verifier:
 
 ```sh
 curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/token" \
@@ -68,14 +68,14 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
   -d redirect_uri=http://localhost:3000/callback -d "code_verifier=$CODE_VERIFIER"
 ```
 
-Every refusal, with its exact description, is listed in
-[Sign in with the hosted pages](hosted-pages.md#exchange-the-code).
+[Sign in with the hosted pages](hosted-pages.md#exchange-the-code) lists every refusal with its
+exact description.
 
 ## A Silicon's short-lived token
 
-A Silicon signs in to your app by handing you a short-lived token (`slt_…`) that it got with
-`silicon-accounts login --app <your app_id>`. It is single use, valid 2 minutes, and only your app can
-exchange it:
+A Silicon signs in to your app by handing you a short-lived token (`slt_…`), which it gets with
+`silicon-accounts login --app <your app_id>`. The token works once, lasts 2 minutes, and only your
+app can exchange it:
 
 ```sh
 curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/token" \
@@ -120,25 +120,26 @@ si:scout (Silicon) signed in, membership briefcase:1Nx
 custodian: c:grace-hopper (ptO)
 ```
 
-and the same token a second time:
+The same token a second time:
 
 ```text
 refused: The short-lived token was already used; each one works once. Get a new one. Hint: Start a new sign-in. …
 ```
 
-What the token grants:
+What the token grants depends on who signed in:
 
-- **A Silicon**: `profile`, plus `dob` and `timezone` when your app requires or optionally asks
-  for them. Silicons have no email or phone; those are simply left out and never block a
-  Silicon. There is no what's-shared screen, and your `allowed_email_domains` don't apply.
+- **A Silicon**: `profile`, plus `dob` and `timezone` when your app requires them or asks for them
+  as optional. A Silicon has no email or phone, so those are left out and never block it. There
+  is no what's-shared screen, and your `allowed_email_domains` don't apply.
 - **A Carbon** using the CLI: `profile`, your required details, and the optional details the
-  Carbon already granted you. The token isn't even minted when the Carbon lacks a required
-  detail (`409 requirements_missing`; the hosted pages would ask for it) or, with
-  `allowed_email_domains`, has no verified email at one of them (`403 email_domain_not_allowed`).
+  Carbon already granted you. We don't even mint the token when the Carbon is missing a required
+  detail (`409 requirements_missing`; the hosted pages would ask for it), or when you set
+  `allowed_email_domains` and the Carbon has no verified email at one of them
+  (`403 email_domain_not_allowed`).
 
-The exchange is a sign-in: the account becomes a member of your app (source `slt`) and it is
-listed in your user base and the account's sign-in history. Every refusal is `invalid_grant`
-and says which case it is:
+The exchange counts as a sign-in: the account becomes a member of your app (source `slt`), and
+it shows up in your user base and in the account's sign-in history. Every refusal is
+`invalid_grant`, and it says which case it is:
 
 | Case | `error_description` starts with |
 |---|---|
@@ -151,7 +152,7 @@ and says which case it is:
 
 ## Refresh
 
-Refresh before the access token's 30 minutes run out (or when your API sees it expire):
+Refresh before the access token's 30 minutes run out, or when your API sees it expire:
 
 ```sh
 silicon-accounts app token refresh "$REFRESH_TOKEN" --json
@@ -161,11 +162,11 @@ silicon-accounts app token refresh "$REFRESH_TOKEN" --json
 let tokens = app.refresh(refresh_token).await?;   // store tokens.refresh_token right away
 ```
 
-**Rotation.** Every refresh returns a new refresh token and spends the one you sent. The new
-one keeps the sign-in's original `refresh_token_expires_at`: a sign-in lasts at most 900 days
+**Rotation.** Every refresh gives you a new refresh token and spends the one you sent. The new
+one keeps the sign-in's original `refresh_token_expires_at`, so a sign-in lasts at most 900 days
 from the moment the account signed in, however often you refresh.
 
-**Reuse detection.** Presenting a spent refresh token is treated as theft: the whole sign-in
+**Reuse detection.** We treat a spent refresh token coming back as theft. The whole sign-in
 (every token issued from it, including the newest) is revoked at once, and your webhook gets
 `membership.signed_out` with reason `refresh_token_reuse`:
 
@@ -173,17 +174,17 @@ from the moment the account signed in, however often you refresh.
 {"error": "invalid_grant", "error_description": "This refresh token was already used once. Presenting a used refresh token revokes the whole sign-in to protect the account, so this sign-in is now revoked; sign in again."}
 ```
 
-and the newest refresh token then answers:
+After that, even the newest refresh token answers:
 
 ```json
 {"error": "invalid_grant", "error_description": "The sign-in this refresh token belongs to was revoked at 2026-10-07T02:35:29.652Z (refresh_token_reuse); sign in again."}
 ```
 
-**One refresh at a time per sign-in.** Two requests that refresh the same token in parallel
-(two tabs, two workers, a retry after a timeout) are indistinguishable from theft: one wins,
-the other is reuse, and the winner's new tokens die with the sign-in. Tested: two parallel
-refreshes gave one `200` and one `invalid_grant`, and the winner's new refresh token was
-already revoked. Share one request between callers:
+**One refresh at a time per sign-in.** Two requests refreshing the same token in parallel (two
+tabs, two workers, a retry after a timeout) look exactly like theft to us. One wins, the other
+counts as reuse, and the winner's new tokens die with the sign-in. We tested it: two parallel
+refreshes gave one `200` and one `invalid_grant`, and the winner's new refresh token was already
+revoked. So share one request between callers:
 
 ```ts
 // refresh.ts: one refresh per sign-in at a time. Two parallel refreshes with the same token
@@ -229,19 +230,19 @@ true profile email
 1800
 ```
 
-The answer stays shared for a minute, so a late caller that still holds the old token gets
-the new tokens instead of tripping reuse detection. With several server processes, put the
-same rule in your session store: lock the sign-in's row while refreshing, and write the new
-refresh token in the same transaction.
+The answer stays shared for a minute, so a late caller still holding the old token gets the new
+tokens instead of tripping reuse detection. If you run several server processes, put the same
+rule in your session store: lock the sign-in's row while you refresh, and write the new refresh
+token in the same transaction.
 
-**Scope.** A refresh may send `scope` to repeat or narrow what was granted (the answer still
-lists the whole grant) but never to add to it:
+**Scope.** A refresh can send `scope` to repeat or narrow what was granted (the answer still
+lists the whole grant), but never to add to it:
 
 ```json
 {"error": "invalid_scope", "error_description": "A refresh can't add scopes: 'phone' was not granted when the account signed in (granted: 'profile email openid'). Ask for more by sending the account through /authorize again."}
 ```
 
-**When a refresh fails**, the sign-in is over; send the account through sign-in again. Every
+**When a refresh fails**, the sign-in is over, so send the account through sign-in again. Every
 answer is `invalid_grant` with the reason:
 
 | `error_description` | Why |
@@ -255,7 +256,8 @@ answer is `invalid_grant` with the reason:
 
 ## Check an access token
 
-Your API receives access tokens from your own pages, apps and clients. Two ways to check them:
+Your API gets access tokens from your own pages, apps and clients. There are two ways to check
+them:
 
 | | Locally, with the JWKS | Introspection |
 |---|---|---|
@@ -264,7 +266,7 @@ Your API receives access tokens from your own pages, apps and clients. Two ways 
 | Sees revocation | No: a revoked token stays valid until its `exp`, at most 30 minutes | Yes, at once |
 | Use for | Most requests | Sensitive actions, or right after `membership.signed_out` |
 
-An access token's claims:
+An access token carries these claims:
 
 ```json
 {
@@ -283,10 +285,10 @@ An access token's claims:
 }
 ```
 
-`sub` is the account uuid, `aud` your app id (refuse any other), `kind` `carbon` or `silicon`,
-`id` the `c:`/`si:` id when the token was issued (it may have changed since), `mid` the
-membership id, `fid` the sign-in (token family) it belongs to, `scope` what was granted. The
-header names the key: `{"typ": "JWT", "alg": "EdDSA", "kid": "…"}`.
+`sub` is the account's uuid, `aud` is your app id (refuse any other), `kind` is `carbon` or
+`silicon`, `id` is the `c:`/`si:` id at the time the token was issued (it may have changed
+since), `mid` is the membership id, `fid` is the sign-in (token family) it belongs to, and
+`scope` is what was granted. The header names the key: `{"typ": "JWT", "alg": "EdDSA", "kid": "…"}`.
 
 **Locally in Node** with [`jose`](https://github.com/panva/jose):
 
@@ -312,19 +314,20 @@ export async function verifyAccessToken(token: string) {
 console.log(await verifyAccessToken(process.argv[2]));
 ```
 
-A token of another app fails with `JWTClaimValidationFailed: unexpected "aud" claim value`, an
-expired one with `JWTExpired: "exp" claim timestamp check failed`.
+A token for another app fails with `JWTClaimValidationFailed: unexpected "aud" claim value`, and
+an expired one with `JWTExpired: "exp" claim timestamp check failed`.
 
-**Locally in Rust**: `app.verify_access_token_locally(&client.jwks().await?, token)` checks the
-signature, `exp`/`nbf` (30 seconds of leeway) and `aud`; see the
-[Rust example](hosted-pages.md#the-same-flow-in-rust). **From the CLI**:
-`silicon-accounts app token verify <token>` (exit 0 valid, 2 invalid):
+**Locally in Rust**, `app.verify_access_token_locally(&client.jwks().await?, token)` checks the
+signature, `exp`/`nbf` (with 30 seconds of leeway) and `aud`. See the
+[Rust example](hosted-pages.md#the-same-flow-in-rust). **From the CLI**, run
+`silicon-accounts app token verify <token>`. It exits 0 when the token is valid and 2 when it
+isn't:
 
 ```text
 valid: c:lin-docs (nln) for briefcase, expires 2026-10-07T03:08:37Z (in 29m)
 ```
 
-**Introspection** asks Silicon Accounts whether a token of your app is live right now:
+**Introspection** asks us whether a token of your app is live right now:
 
 ```sh
 curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/introspect" -d "token=$ACCESS_TOKEN"
@@ -350,17 +353,17 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/i
 }
 ```
 
-A refresh token can be introspected too: `token_type` is `refresh_token`, `exp` is the end of
-the sign-in (900 days) and `iat` when that refresh token was issued. Anything that isn't live
-is exactly `{"active":false}`: unknown, malformed, expired (from `exp` on, no leeway), revoked,
-spent, a token of another app, an account that isn't active, or a membership that isn't
-active (the account removed your app's access). `id` and `username` are the account's current
-`c:`/`si:` id. Introspection needs your app's own credentials (`invalid_client` otherwise);
-`token_type_hint` is accepted and ignored.
+You can introspect a refresh token too: `token_type` is `refresh_token`, `exp` is the end of the
+sign-in (900 days) and `iat` is when that refresh token was issued. Anything that isn't live gets
+exactly `{"active":false}`: a token that is unknown, malformed, expired (from `exp` on, with no
+leeway), revoked or spent, a token of another app, an account that isn't active, or a membership
+that isn't active (the account removed your app's access). `id` and `username` are the account's
+current `c:`/`si:` id. Introspection needs your app's own credentials (otherwise you get
+`invalid_client`). We accept `token_type_hint` and ignore it.
 
 ## Read the account (userinfo)
 
-`GET /v1/userinfo` with the access token returns the account as your app may see it, with the
+`GET /v1/userinfo` with the access token gives you the account as your app may see it, with the
 OpenID Connect names added (`sub`, `name`, `picture`, `phone_number`,
 `phone_number_verified`, `zoneinfo`, `birthdate`):
 
@@ -386,10 +389,11 @@ curl -s "$ACCOUNTS_URL/v1/userinfo" -H "Authorization: Bearer $ACCESS_TOKEN"
 }
 ```
 
-`POST /v1/userinfo` with a form field `access_token` works too (send the token once, header or
-body). The answer is always current: a renamed account shows its new name at once, unlike the
-claims inside a token. `silicon-accounts app userinfo <token>` prints the same. Errors are `401` with
-the API's error object and a `WWW-Authenticate: Bearer …` header OIDC libraries understand:
+`POST /v1/userinfo` with a form field `access_token` works too. Send the token once, in the
+header or the body. The answer is always current: a renamed account shows its new name right
+away, unlike the claims inside a token. `silicon-accounts app userinfo <token>` prints the same
+thing. Errors are `401`, with the API's error object and a `WWW-Authenticate: Bearer …` header
+that OIDC libraries understand:
 
 | `error.code` | Example `message` |
 |---|---|
@@ -409,10 +413,10 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/r
 # {"revoked":true}
 ```
 
-`token` is the refresh token or any access token of the sign-in, even an expired one: either
-ends the whole sign-in (every access and refresh token of it). Your webhook gets
-`membership.signed_out` with reason `app_revoked`. The answer is always `200` once your
-credentials check out, as RFC 7009 asks; the body says what happened:
+`token` is the refresh token or any access token of the sign-in, even an expired one. Either one
+ends the whole sign-in (every access and refresh token in it), and your webhook gets
+`membership.signed_out` with reason `app_revoked`. Once your credentials check out, the answer is
+always `200`, as RFC 7009 asks, and the body says what happened:
 
 | Body | Meaning |
 |---|---|
@@ -422,8 +426,8 @@ credentials check out, as RFC 7009 asks; the body says what happened:
 
 `silicon-accounts app token revoke <token>` and `app.revoke(token)` in Rust do the same.
 
-Revoking ends your app's sign-in only. The Carbon stays signed in to Silicon Accounts in their
-browser, so your next `/authorize` offers "Continue as …" and comes back without a code form;
-send `prompt=login` when signing out must mean "prove who you are again". To remove your
-app from the account altogether, the account itself removes your access on the account site,
-and you hear `membership.access_removed`.
+Revoking only ends your app's sign-in. The Carbon stays signed in to Silicon Accounts in their
+browser, so your next `/authorize` offers "Continue as …" and comes back without a code form. If
+signing out should mean "prove who you are again", send `prompt=login`. Only the account itself
+can remove your app altogether, from the account site, and when it does you hear
+`membership.access_removed`.

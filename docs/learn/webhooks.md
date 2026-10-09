@@ -1,6 +1,6 @@
 ---
 title: How webhooks work
-description: Understand which account changes your app receives, how delivery and retries work and when an old event can be replayed.
+description: Which account changes reach your app, how we deliver and retry them, when an old event can be replayed, and every event with a real payload.
 kind: informative
 order: 50
 related:
@@ -12,13 +12,13 @@ related:
 
 # How webhooks work
 
-Your app may keep a user’s public ID, display name, email or access status. When that information changes in Silicon Accounts, your copy needs to change too.
+Your app may keep a copy of a user's public id, display name, email or access status. When that changes on our side, your copy needs to change too.
 
-Webhooks tell your app about those changes, so it does not need to keep asking Accounts whether anything has changed. A Silicon can also receive webhooks about its own account.
+Webhooks tell your app about those changes, so you don't have to keep asking us whether anything changed. You as a Silicon can also get webhooks about your own account.
 
-This page explains the model and lists every event with a real payload. To set up a receiver, follow [Receive webhooks](../start/webhooks.md).
+This page explains how it all works and lists every event with a real payload. To set up a receiver, follow [Receive webhooks](../start/webhooks.md).
 
-Here is what reached `dm`'s endpoint, 0.7 seconds after the Silicon `si:scout`, a member of `dm`, changed its id (captured from a local stack):
+Here is what reached `dm`'s endpoint 0.7 seconds after the Silicon `si:scout`, a member of `dm`, changed its id (captured from a local stack):
 
 ```http
 POST /hooks/dm HTTP/1.1
@@ -33,13 +33,13 @@ x-accounts-signature: v1=b2ae037f974d81abd33f904c91b5048cecc14016b4e3b6277c2ef92
 {"app_id":"dm","data":{"kind":"silicon","membership_id":"dm:8HV","new_id":"si:scout_two","old_id":"si:scout","uuid":"8HV"},"event_id":"01a11437-7425-7016-b4cf-b336b9779be8","occurred_at":"2026-10-07T02:35:40.965Z","silicon":null,"type":"account.id_changed"}
 ```
 
-The receiver checked the signature with `dm`'s secret and answered `200`; from then on `dm` shows `si:scout_two` for the account it keeps under the uuid `8HV`. Everything below explains why each part is the way it is.
+The receiver checked the signature with `dm`'s secret and answered `200`. From then on, `dm` shows `si:scout_two` for the account it keeps under the uuid `8HV`. The rest of this page explains why each part works the way it does.
 
 ## Why an app needs them
 
-- **Ids change.** A Carbon's `c:` id and a Silicon's `si:` id can be changed at any time; the old one stays reserved for its owner for 10 days, then anyone can take it. An app that keyed its data on the id would hand one account's data to another. Key on the `uuid`, which never changes, and use `account.id_changed` to update the id you show.
-- **Details change.** Display names, photos, time zones, primary emails and phones change; `account.updated` carries the new values your app may see.
-- **Permission ends.** A sign-out, a removed access or a deleted account means the app may no longer act for the account. These events arrive as soon as it happens, and the tokens and User verification proofs involved have already stopped working ([How proofs work](proofs.md#what-a-user-verification-proof-stands-on)).
+- **Ids change.** A Carbon's `c:` id and a Silicon's `si:` id can be changed at any time. The old one stays reserved for its owner for 10 days, then anyone can take it. An app that keyed its data on the id would hand one account's data to another. Key on the `uuid`, which never changes, and use `account.id_changed` to update the id you show.
+- **Details change.** Display names, photos, time zones, primary emails and phones change, and `account.updated` carries the new values your app may see.
+- **Permission ends.** A sign-out, a removed access or a deleted account means your app may no longer act for the account. These events arrive as soon as it happens, and the tokens and User verification proofs involved have already stopped working ([How proofs work](proofs.md#what-a-user-verification-proof-stands-on)).
 - **A Silicon's custodian changes.** Apps that show who is responsible for a Silicon learn about transfers.
 
 ## Two kinds of webhook
@@ -56,16 +56,16 @@ Both are signed the same way, follow the same retry rules and are listed and rep
 
 ## Who receives an app event
 
-An app event goes to an app when both of these hold:
+An app event goes to an app when both of these are true:
 
 - the account has a **live** membership with the app: `active` (it signed in) or `imported` (the app imported it and it hasn't signed in yet). Once an account removes the app's access, the app gets `membership.access_removed` and then nothing more about that account, until it signs into the app again;
 - the app has a webhook URL.
 
-While an app is disabled, its deliveries are held: they keep being retried and go out if the app is re-enabled within 72 hours of the event (see [Retries](#retries-and-the-72-hour-window)).
+While an app is disabled, its deliveries are held. We keep retrying them, and they go out if the app is re-enabled within 72 hours of the event (see [Retries](#retries-and-the-72-hour-window)).
 
-`account.updated` is narrower still: an app gets it only if it may see at least one of the changed fields. `display_name` and `pfp_url` are always visible; `timezone`, `dob`, `email` and `phone` only with the scope of that name, and `email` and `phone` only for Carbons. `changed` lists only the fields the app may see, and `account` is the account as that app sees it. Scopes belong to each Carbon's membership, not to the app: `timezone` is optional at `briefcase`, so one Carbon may have granted it and another not. In the local test runs, when a Carbon who hadn't granted `briefcase` the `timezone` scope changed their display name and time zone, `briefcase` received `"changed": ["display_name"]`.
+`account.updated` is narrower still: an app gets it only if it may see at least one of the changed fields. `display_name` and `pfp_url` are always visible. `timezone`, `dob`, `email` and `phone` are visible only with the scope of the same name, and `email` and `phone` only for Carbons. `changed` lists only the fields the app may see, and `account` is the account as that app sees it. Scopes belong to each Carbon's membership, not to the app: `timezone` is optional at `briefcase`, so one Carbon may have granted it and another not. In the local test runs, a Carbon who hadn't granted `briefcase` the `timezone` scope changed their display name and time zone, and `briefcase` received `"changed": ["display_name"]`.
 
-A sign-out (`membership.signed_out`) doesn't end the membership: the account is still a member, events about it keep coming, and it can sign in again.
+A sign-out (`membership.signed_out`) doesn't end the membership. The account is still a member, events about it keep coming, and it can sign in again.
 
 ## The event body
 
@@ -89,7 +89,7 @@ A sign-out (`membership.signed_out`) doesn't end the membership: the account is 
 | `silicon` | The receiving Silicon's uuid, for Silicon webhooks; `null` for app webhooks. |
 | `data` | The event's data, below. |
 
-Don't depend on the order of keys (the body above arrives with sorted keys today), and ignore fields you don't know: new ones can be added. Each delivery is a `POST` with `Content-Type: application/json`, `User-Agent: SiliconAccounts-Webhooks/1` and these headers:
+Don't depend on the order of keys (the body above arrives with sorted keys today), and ignore fields you don't know, because we can add new ones. Each delivery is a `POST` with `Content-Type: application/json`, `User-Agent: SiliconAccounts-Webhooks/1` and these headers:
 
 | header | |
 |---|---|
@@ -103,29 +103,29 @@ Don't depend on the order of keys (the body above arrives with sorted keys today
 
 Every attempt is signed with `HMAC-SHA256`, keyed with the receiver's whole `whsec_…` secret, over `"{timestamp}.{raw body}"`. That gives the receiver three things:
 
-- **Origin:** only Silicon Accounts and the receiver know the secret.
-- **Integrity:** any change to the body breaks the signature, which is why the receiver must verify the bytes it received, not JSON it parsed and serialized again.
-- **Freshness:** the timestamp is inside the signed message, so an attacker can't take an old captured delivery and give it a new timestamp. Receivers refuse timestamps more than 5 minutes from their clock. Because each attempt is signed when it is sent, a genuine retry or replay days later still passes.
+- **Origin:** only we and the receiver know the secret.
+- **Integrity:** any change to the body breaks the signature. That is why the receiver must verify the bytes it received, not JSON it parsed and serialized again.
+- **Freshness:** the timestamp is inside the signed message, so an attacker can't take an old captured delivery and give it a new timestamp. Receivers refuse timestamps more than 5 minutes off their clock. Since each attempt is signed when it is sent, a genuine retry or replay days later still passes.
 
-The signature header is a comma-separated list of `v1=…` entries; today it carries one. Accept a delivery when any `v1` entry matches, so that receivers keep working if Silicon Accounts ever signs with two secrets or a second scheme at once.
+The signature header is a comma-separated list of `v1=…` entries, and today it carries one. Accept a delivery when any `v1` entry matches, so your receiver keeps working if we ever sign with two secrets or a second scheme at once.
 
-The secret is generated by Silicon Accounts, shown once when the webhook is set (or rotated) and stored encrypted. Setting the URL again makes a new secret; `rotate-secret` makes a new one without changing the URL. Either way the new secret signs everything from that moment, including retries and replays of older events, and the old one stops at once.
+We generate the secret, show it once when the webhook is set (or rotated) and store it encrypted. Setting the URL again makes a new secret; `rotate-secret` makes a new one without changing the URL. Either way the new secret signs everything from that moment, including retries and replays of older events, and the old one stops at once.
 
 ## Delivery
 
-When something changes, the event is written in the same database transaction as the change. A change that rolls back leaves no event, and a committed change always has its event. A worker then sends pending deliveries: it looks for due ones about once a second and sends up to 16 at a time, and the service may run several workers. Consequences:
+When something changes, we write the event in the same database transaction as the change. A change that rolls back leaves no event, and a committed change always has its event. A worker then sends the pending deliveries: it looks for due ones about once a second and sends up to 16 at a time, and we may run several workers. What that means for you:
 
 - **Latency:** in the local runs a delivery arrived 0.5 to 1 second after the change.
 - **No ordering:** deliveries are sent in parallel, so two events can arrive in either order. See [Ordering](#ordering).
 - **At least once:** if a worker stops in the middle of a send, its claim on the delivery expires after 60 seconds and another worker sends it again. Your receiver may see an event twice; skip it by `event_id`.
 
-A delivery succeeds when the receiver answers any `2xx` within 10 seconds. Everything else is a failed attempt: another status, a timeout, a refused connection, and also a redirect (`3xx`), because redirects are not followed. The attempt is recorded with an exact message, for example:
+A delivery succeeds when the receiver answers any `2xx` within 10 seconds. Everything else is a failed attempt: another status, a timeout, a refused connection, and also a redirect (`3xx`), because we don't follow redirects. Each attempt is recorded with an exact message, for example:
 
 ```
 HTTP 500 Internal Server Error: the endpoint must answer with a 2xx status within 10 seconds. Response body: {"error":"injected fault"}
 ```
 
-In production, deliveries go only to `https` URLs on public addresses: local host names (`localhost`, `*.localhost`, `*.internal`) and private or reserved IP addresses are refused when the URL is set and again for every address the host name resolves to when sending, and no proxy is used. A refusal stored for the app owner never names the addresses a host resolved to.
+In production we deliver only to `https` URLs on public addresses. Local host names (`localhost`, `*.localhost`, `*.internal`) and private or reserved IP addresses are refused when the URL is set, and again for every address the host name resolves to when sending, and no proxy is used. A refusal stored for the app owner never names the addresses a host resolved to.
 
 ## Retries and the 72-hour window
 
@@ -136,7 +136,7 @@ After a failed attempt, the next one waits:
 | wait | 10 s | 30 s | 1 min | 5 min | 15 min | 30 min | 1 hour |
 | time since the first attempt | 10 s | 40 s | 1 min 40 s | 6 min 40 s | 21 min 40 s | 51 min 40 s | +1 hour each |
 
-Attempts continue until 72 hours after the event, about 78 attempts in all; then the delivery is `failed`. This is what a local run recorded for a `ping` whose receiver answered `500` (the delivery's creation time was then moved 72 hours back, so the fourth failure ended it):
+Attempts continue until 72 hours after the event, about 78 attempts in all, and then the delivery is `failed`. Here is what a local run recorded for a `ping` whose receiver answered `500` (we then moved the delivery's creation time 72 hours back, so the fourth failure ended it):
 
 | attempt | at | result |
 |---|---|---|
@@ -146,25 +146,25 @@ Attempts continue until 72 hours after the event, about 78 attempts in all; then
 | 4 | 02:39:29.351 | 500, past 72 hours: `failed` |
 | replay | 02:39:34.377 | 200, `delivered`, `manual_replays: 1` |
 
-Some deliveries fail at once, because no retry could succeed: the app removed its webhook URL after the event (removing the URL also fails every pending delivery immediately, so they show up as replayable instead of waiting out 72 hours), or there is no signing secret. A disabled app's deliveries are held instead: they keep being retried and go out if the app is re-enabled within the 72 hours.
+Some deliveries fail at once, because no retry could succeed: the app removed its webhook URL after the event, or there is no signing secret. (Removing the URL also fails every pending delivery right away, so they show up as replayable instead of waiting out 72 hours.) A disabled app's deliveries are held instead: we keep retrying them, and they go out if the app is re-enabled within the 72 hours.
 
 ## Replay
 
-A failed delivery isn't lost: the app (or one of its authors) replays it with `POST /v1/apps/{app_id}/webhook/replay`, and a Silicon with `POST /v1/me/webhook/replay` (its custodian with `POST /v1/me/silicons/{uuid}/webhook/replay`). Either names delivery ids (up to 100, failed or already delivered) or a status (`{"status": "failed", "since": …}`: the oldest 100 per call, queued oldest first; they are still sent in parallel, so keep applying them by version or `occurred_at`). The deliveries to choose from are listed by `GET …/webhook/deliveries` on the same paths. A replay:
+A failed delivery isn't lost. The app (or one of its authors) replays it with `POST /v1/apps/{app_id}/webhook/replay`, and a Silicon with `POST /v1/me/webhook/replay` (its custodian with `POST /v1/me/silicons/{uuid}/webhook/replay`). You name either delivery ids (up to 100, failed or already delivered) or a status (`{"status": "failed", "since": …}`: the oldest 100 per call, queued oldest first). They are still sent in parallel, so keep applying them by version or `occurred_at`. `GET …/webhook/deliveries` on the same paths lists the deliveries to choose from. A replay:
 
 - keeps the `event_id` and the exact payload, so the receiver's duplicate check works;
-- goes to the receiver's **current** URL, signed with its **current** secret (a moved endpoint or rotated secret is no obstacle);
+- goes to the receiver's **current** URL, signed with its **current** secret, so a moved endpoint or a rotated secret is no obstacle;
 - gets a fresh 72 hours of retries from the moment of the replay, and adds one to `manual_replays`.
 
-**An app cannot replay account data after it loses access to that account.** This applies if the account removed access, no longer has a membership with the app or was deleted. Accounts skips data events such as `account.updated`, `account.id_changed` and `silicon.custodian_changed`, with reason `membership_inactive` or `account_deleted`. Their details identify the account but hide the payload with `payload_redacted: true`.
+**An app can't replay account data after it loses access to that account.** That covers an account that removed access, no longer has a membership with the app, or was deleted. We skip data events such as `account.updated`, `account.id_changed` and `silicon.custodian_changed`, with the reason `membership_inactive` or `account_deleted`. Their details identify the account but hide the payload with `payload_redacted: true`.
 
-Events that tell the app the relationship ended can still be replayed: `membership.signed_out`, `membership.access_removed` and `account.deleted`. The `ping` event can be replayed too.
+Events that tell the app the relationship ended can still be replayed: `membership.signed_out`, `membership.access_removed` and `account.deleted`. So can `ping`.
 
-For example, a local test replayed Briefcase’s failed deliveries after a Carbon removed its access. The response included the access-removal delivery and `"not_replayable": 1`. The earlier account-update payload stayed hidden.
+For example, in a local test we replayed Briefcase's failed deliveries after a Carbon removed its access. The response included the access-removal delivery and `"not_replayable": 1`, and the earlier account-update payload stayed hidden.
 
-A Silicon's webhook has no such rule: every event on it is about the Silicon itself, so nothing is withheld from the Silicon or its custodian, and a delivery's detail always shows its whole `payload`. It has another one instead: **test pings are never replayed**. A Silicon may queue 10 test pings an hour, and only its newest one is retried, so that the test can't be used to aim signed traffic at someone else's server; replaying old pings would get around both limits. A failed `ping` is skipped with `reason: "test_ping"` (by id) or counted in `not_replayable` (by status); send a new one with `POST /v1/me/webhook/test`. In the local run, after a `silicon.updated` and a test ping had both failed for good, the Silicon's replay by status answered `"replayed": ["…silicon.updated delivery…"], "not_replayable": 1`, and the `silicon.updated` arrived again 0.8 seconds later with its original `event_id`.
+A Silicon's webhook has no such rule. Every event on it is about the Silicon itself, so nothing is withheld from the Silicon or its custodian, and a delivery's detail always shows its whole `payload`. It has a different rule instead: **test pings are never replayed**. A Silicon may queue 10 test pings an hour, and only its newest one is retried, so the test can't be used to aim signed traffic at someone else's server. Replaying old pings would get around both limits. A failed `ping` is skipped with `reason: "test_ping"` (by id) or counted in `not_replayable` (by status); send a new one with `POST /v1/me/webhook/test`. In the local run, after a `silicon.updated` and a test ping had both failed for good, the Silicon's replay by status answered `"replayed": ["…silicon.updated delivery…"], "not_replayable": 1`, and the `silicon.updated` arrived again 0.8 seconds later with its original `event_id`.
 
-A replay needs somewhere to go: without a webhook URL it answers `409 webhook_not_set`. Deliveries that fall due while there is no URL fail at once, saying why in `last_error`, so they are ready to replay once a URL is set again.
+A replay needs somewhere to go: without a webhook URL it answers `409 webhook_not_set`. Deliveries that fall due while there is no URL fail at once and say why in `last_error`, so they are ready to replay once a URL is set again.
 
 ## Ordering
 
@@ -173,19 +173,19 @@ Nothing guarantees that events arrive in the order they happened. Two real examp
 - A Silicon changed its display name, then its id, 18 ms apart. Its own webhook received `silicon.id_changed` (occurred 02:35:40.965) 11 ms **before** `silicon.updated` (occurred 02:35:40.947).
 - A Carbon did the same at `briefcase`, and `account.id_changed` (occurred 02:37:49.326) arrived before `account.updated` (occurred 02:37:49.316).
 
-In both cases the later-arriving update still carries the **old** id (`data.account.id`, or `data.silicon.id` in the Silicon's own event), because it describes the account as it was at its own moment. A receiver that blindly copies it would undo the id change. Ways to stay correct, from simplest to cheapest:
+In both cases the update that arrived later still carries the **old** id (`data.account.id`, or `data.silicon.id` in the Silicon's own event), because it describes the account as it was at its own moment. A receiver that copies it blindly would undo the id change. Ways to stay correct, from simplest to cheapest:
 
-1. **Re-read on change.** Treat `account.id_changed` and `account.updated` as "this account changed" and read the current state: `GET /v1/apps/{app_id}/users/{uuid}` returns what your app may see now (`id`, `display_name`, scoped fields, membership `status`), and `GET /v1/accounts/{uuid}` returns the public identity. Order no longer matters. It costs one call per event.
-2. **Use the version.** `data.account.version` in `account.updated` increases with every change to the account: its details, its id, its primary email or phone, its custodian. Store it with the account and ignore an `account.updated` whose version is not higher than the stored one.
-3. **Use `occurred_at` for events without a version** (`account.id_changed`, `silicon.custodian_changed`): apply one only if it is newer than the last change you applied for that account. Silicon Accounts applies the changes to one account one after another, so their `occurred_at` values follow that order.
+1. **Re-read on change.** Treat `account.id_changed` and `account.updated` as "this account changed" and read the current state: `GET /v1/apps/{app_id}/users/{uuid}` returns what your app may see now (`id`, `display_name`, scoped fields, membership `status`), and `GET /v1/accounts/{uuid}` returns the public identity. Order no longer matters, and it costs one call per event.
+2. **Use the version.** `data.account.version` in `account.updated` goes up with every change to the account: its details, its id, its primary email or phone, its custodian. Store it with the account and ignore an `account.updated` whose version isn't higher than the one you stored.
+3. **Use `occurred_at` for events without a version** (`account.id_changed`, `silicon.custodian_changed`): apply one only if it is newer than the last change you applied for that account. We apply the changes to one account one after another, so their `occurred_at` values follow that order.
 
-`account.deleted` is final: a deleted account never comes back and its uuid is never reused. `membership.signed_out` and `membership.access_removed` are not: the account can sign into your app again, and a notice delayed by retries can arrive after that new sign-in. Compare the notice's `occurred_at` with when you handled the account's latest sign-in, and ignore a notice older than that sign-in.
+`account.deleted` is final: a deleted account never comes back and its uuid is never reused. `membership.signed_out` and `membership.access_removed` are not final. The account can sign into your app again, and a notice delayed by retries can arrive after that new sign-in. Compare the notice's `occurred_at` with when you handled the account's latest sign-in, and ignore a notice older than that sign-in.
 
 ## Subscriptions
 
 Your app doesn't have to hear about everything. A subscription says where its updates go, which
-updates it wants, and whether it is active or paused. Your webhook is one subscription; the event
-stream is the other. Pick updates in Silicon Apps, with the
+updates it wants, and whether it is active or paused. Your webhook is one subscription and the event
+stream is the other. Pick your updates in Silicon Apps, with the
 [subscription endpoints](../reference/api/apps.md#event-subscriptions), or with
 `silicon-accounts app subscription`.
 
@@ -202,14 +202,14 @@ stream is the other. Pick updates in Silicon Apps, with the
 | `account_deleted` | yes | `account.deleted` |
 
 Each subscription gets its own copy of an event, with its own `event_id`, cut down to what it
-picked: when a Carbon changes their display name and time zone together, a subscription that
+picked. When a Carbon changes their display name and time zone together, a subscription that
 picked only `display_name_change` gets `"changed": ["display_name"]`, and one that picked only
 `timezone_change` gets `"changed": ["timezone"]`. Scopes still apply on top. A webhook set up
-before subscriptions existed receives every update, as it always did, until you pick.
+before subscriptions existed keeps receiving every update, as it always did, until you pick.
 
 Pausing a subscription stops recording for it: changes made while it is paused never reach it,
-even after you resume. Deliveries already queued still go out. If you need to catch up after a
-pause, read the current state with `GET /v1/apps/{app_id}/users`.
+even after you resume. Deliveries already queued still go out. To catch up after a pause, read
+the current state with `GET /v1/apps/{app_id}/users`.
 
 ```sh
 silicon-accounts app subscription create webhook https://briefcase.example/webhooks \
@@ -220,7 +220,7 @@ silicon-accounts app subscription update <id> --pause
 ## Streaming events
 
 Webhooks need a public URL that answers within 10 seconds. A Silicon on a laptop, a script, or
-an app that would rather pull than be pushed can open the event stream instead:
+an app that would rather pull than be pushed can open the event stream instead.
 `GET /v1/events/stream` keeps one HTTP response open and writes each event as it happens, as
 [Server-Sent Events](../reference/api/webhooks.md#event-stream).
 
@@ -249,8 +249,8 @@ data: {"app_id":null,"data":{"changed":["display_name"],"id":"si:streamer","sili
 
 How the stream fits with webhooks:
 
-- **Same events, same bodies.** `data` is exactly what the webhook would POST; parse it with the
-  same code. There is no signature, because the stream comes over your own authenticated
+- **Same events, same bodies.** `data` is exactly what the webhook would POST, so parse it with
+  the same code. There is no signature, because the stream comes over your own authenticated
   connection.
 - **Who gets what.** An app gets its stream subscription's events. A Silicon gets its own events,
   without needing a webhook: its custodian's decision, changes to its account, an STK rotation.
@@ -258,13 +258,13 @@ How the stream fits with webhooks:
   account and is still waiting for its custodian can listen with its `sarq_` request token and
   hear the decision the moment it is made.
 - **Resume, never miss.** Every event carries its `event_id` as the SSE `id`. Reconnect with
-  `Last-Event-ID` (browsers do this for you) and you get everything after it. Like webhooks,
-  delivery is at least once: dedupe on `event_id`.
+  `Last-Event-ID` (browsers do this for you) and you get everything after it. As with webhooks,
+  delivery is at least once, so dedupe on `event_id`.
 - **Order.** Within one stream, events arrive in the order their changes were saved, which
   webhooks can't promise. An event waits until every change saved before it has finished, so a
   long-running change elsewhere can delay the stream by its own length.
 - **Liveness.** A `: heartbeat` comment comes after 15 seconds of quiet. Before we close a stream
-  you get `event: stream.closed` with a `reason`: refresh your token for `token_expired`, and
+  you get `event: stream.closed` with a `reason`. Refresh your token for `token_expired`, and
   reconnect with `Last-Event-ID` after `max_duration` (streams last an hour) or
   `server_restarting`.
 - **Limits.** 5 open streams per app or account. One stream carries the whole feed, so one is
@@ -272,11 +272,11 @@ How the stream fits with webhooks:
 
 ## App events
 
-The payloads below were captured from a local stack. Only photo URLs (`https://iris.teamofsilicons.com/…`, served by a stand-in locally) and webhook URLs are shown as their production form. `AccountSummary` objects (`from`, `to`, `custodian`, `rotated_by`) are `{uuid, kind, id, display_name, pfp_url, status}`.
+We captured the payloads below from a local stack. Only photo URLs (`https://iris.teamofsilicons.com/…`, served by a stand-in locally) and webhook URLs are shown in their production form. `AccountSummary` objects (`from`, `to`, `custodian`, `rotated_by`) are `{uuid, kind, id, display_name, pfp_url, status}`.
 
 ### account.id_changed
 
-Sent when an account's `c:` or `si:` id changes (by itself, or by its custodian for a Silicon), to every app with a live membership. `data`: `uuid`, `membership_id`, `kind`, `old_id`, `new_id`.
+Sent to every app with a live membership when an account's `c:` or `si:` id changes (by the account itself, or by its custodian for a Silicon). `data`: `uuid`, `membership_id`, `kind`, `old_id`, `new_id`.
 
 ```json
 {
@@ -301,7 +301,7 @@ Do: show `new_id`. The old id stays reserved for this account for 10 days and ma
 
 Sent when the display name, photo, time zone, date of birth, primary email or primary phone changes, to member apps that may see at least one changed field. `data`: `uuid`, `membership_id`, `changed` (the visible fields among `display_name`, `pfp_url`, `dob`, `timezone`, `email`, `phone`), `account` (the account as this app sees it, with `updated_at` and `version`).
 
-A Carbon at `briefcase`, which has the `email` scope but not `timezone` (the Carbon also changed its time zone; `briefcase` isn't told):
+A Carbon at `briefcase`, which has the `email` scope but not `timezone` (the Carbon also changed its time zone, and `briefcase` isn't told):
 
 ```json
 {
@@ -363,7 +363,7 @@ Do: replace the fields you store with `account` when `account.version` is higher
 
 ### account.deleted
 
-Sent when an account is deleted (a Carbon deleting itself, or a custodian deleting a Silicon), to every app with a live membership. `data`: `uuid`, `membership_id`.
+Sent to every app with a live membership when an account is deleted (a Carbon deleting itself, or a custodian deleting a Silicon). `data`: `uuid`, `membership_id`.
 
 ```json
 {
@@ -380,7 +380,7 @@ Do: delete or anonymise the account's data. Its tokens are revoked, your User ve
 
 ### membership.signed_out
 
-Sent to one app when the account's sign-in there ends without the account leaving. `data`: `uuid`, `membership_id`, `reason`:
+Sent to one app when the account's sign-in there ends but the account doesn't leave. `data`: `uuid`, `membership_id`, `reason`:
 
 | reason | what happened |
 |---|---|
@@ -400,11 +400,11 @@ Sent to one app when the account's sign-in there ends without the account leavin
 }
 ```
 
-Do: end the account's sessions in your app; its tokens no longer work and User verification proofs issued from them have ended (`sign_in_revoked`). The membership stays, so later events about the account keep arriving.
+Do: end the account's sessions in your app. Its tokens no longer work, and User verification proofs issued from them have ended (`sign_in_revoked`). The membership stays, so later events about the account keep arriving.
 
 ### membership.access_removed
 
-Sent to one app when the account removes its access (on the account site, with `silicon-accounts apps remove`, or `DELETE /v1/me/apps/{app_id}`). `data`: `uuid`, `membership_id`.
+Sent to one app when the account removes its access (on the account site, with `silicon-accounts apps remove`, or with `DELETE /v1/me/apps/{app_id}`). `data`: `uuid`, `membership_id`.
 
 ```json
 {
@@ -421,7 +421,7 @@ Do: stop using the account's data. Its tokens are revoked, your User verificatio
 
 ### silicon.custodian_changed
 
-Sent when a transfer of a Silicon to a new custodian is accepted, to every app with a live membership with that Silicon. `data`: `uuid`, `membership_id`, `from`, `to`.
+Sent to every app with a live membership with a Silicon when a transfer of that Silicon to a new custodian is accepted. `data`: `uuid`, `membership_id`, `from`, `to`.
 
 ```json
 {
@@ -461,11 +461,11 @@ Sent when the app asks for a test (`POST /v1/apps/{app_id}/webhook/test`). `data
 
 ## Silicon events
 
-Sent to a Silicon's own webhook about its own account. The same Silicon (`si:scout`, uuid `8HV`) appears in most examples; `silicon` is the Silicon's own view of its account, as `GET /v1/me` returns it.
+Sent to a Silicon's own webhook about its own account. The same Silicon (`si:scout`, uuid `8HV`) shows up in most examples, and `silicon` is the Silicon's own view of its account, as `GET /v1/me` returns it.
 
 ### silicon.created
 
-Sent when the account is created with a webhook URL. `data`: `uuid`, `id`, `status`, `silicon`, `request`. Created by a Carbon, it is `active` and `request` is `null`:
+Sent when the account is created with a webhook URL. `data`: `uuid`, `id`, `status`, `silicon`, `request`. When a Carbon creates it, it is `active` and `request` is `null`:
 
 ```json
 {
@@ -508,11 +508,11 @@ Sent when the account is created with a webhook URL. `data`: `uuid`, `id`, `stat
 
 Self-created, it is `pending_custodian` and `request` is the custodian request: `{"custodian": "c:shubham", "expires_at": "2026-10-21T02:36:25.876Z", "id": "01a11438-2397-7648-b87c-3175d45ea79b", "kind": "initial", "status": "pending"}` (`custodian` is the c:id, or the masked email the Carbon was named by), with `"custodian": null` inside `silicon`.
 
-This event can reach your endpoint before you have stored the `webhook_secret` from the create response. Your receiver then refuses it, and the retry 10 seconds later succeeds; that is exactly what happened in the local run (`401` at 02:32:39.088, `200` at 02:32:49.111, same `event_id`).
+This event can reach your endpoint before you have stored the `webhook_secret` from the create response. Your receiver refuses it then, and the retry 10 seconds later succeeds. That is exactly what happened in the local run (`401` at 02:32:39.088, `200` at 02:32:49.111, same `event_id`).
 
 ### silicon.custodian.accepted
 
-The Carbon accepted the custodian request; the Silicon is `active` and can sign in. `data`: `uuid`, `id`, `request_id`, `custodian` (an `AccountSummary`), `silicon`.
+The Carbon accepted the custodian request, so the Silicon is `active` and can sign in. `data`: `uuid`, `id`, `request_id`, `custodian` (an `AccountSummary`), `silicon`.
 
 ```json
 {
@@ -563,7 +563,7 @@ The Carbon declined (`reason: "declined"`), or deleted their account before answ
 
 ### silicon.custodian.expired
 
-Nobody accepted within 14 days; the account is released as for a decline. `data`: `uuid`, `id`, `request_id`, `custodian`, `expired_at`, `released: true`.
+Nobody accepted within 14 days, so the account is released as for a decline. `data`: `uuid`, `id`, `request_id`, `custodian`, `expired_at`, `released: true`.
 
 ```json
 {
@@ -583,7 +583,7 @@ Nobody accepted within 14 days; the account is released as for a decline. `data`
 }
 ```
 
-(The local run moved the request's expiry into the past; the minute sweep sent this 21 seconds later.)
+(The local run moved the request's expiry into the past, and the minute sweep sent this 21 seconds later.)
 
 ### silicon.updated
 
@@ -620,7 +620,7 @@ The Silicon's si:id changed. `data`: `uuid`, `old_id`, `new_id`.
 }
 ```
 
-Sign in with the new id from now on; the old one stays reserved for you for 10 days.
+Sign in with the new id from now on. The old one stays reserved for you for 10 days.
 
 ### silicon.stk_rotated
 
@@ -649,11 +649,11 @@ The custodian rotated the STK. The old STK stopped working, and every session of
 }
 ```
 
-Get the new STK from your custodian and sign in again. Apps you were signed into got `membership.signed_out` with `reason: "stk_rotated"`.
+Get the new STK from your custodian and sign in again. The apps you were signed into got `membership.signed_out` with `reason: "stk_rotated"`.
 
 ### silicon.custodian.changed
 
-A transfer was accepted: the Silicon has a new custodian. `data`: `uuid`, `id`, `from`, `to`.
+A transfer was accepted, so the Silicon has a new custodian. `data`: `uuid`, `id`, `from`, `to`.
 
 ```json
 {

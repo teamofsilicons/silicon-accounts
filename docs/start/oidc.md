@@ -1,6 +1,6 @@
 ---
 title: Use any OpenID Connect library
-description: Connect an OpenID Connect library to Silicon Accounts. Configure your app’s credentials, run sign-in and read the verified account details.
+description: Point any OpenID Connect library at us. Give it your app's credentials, run the sign-in and read the verified account details.
 kind: instructive
 order: 14
 related:
@@ -12,9 +12,9 @@ related:
 
 # Use any OpenID Connect library
 
-Silicon Accounts supports OpenID Connect, or OIDC. An OIDC library can find the sign-in endpoints, run the authorization code flow, check the returned `id_token` and fetch the account’s details.
+Silicon Accounts is a standard OpenID Connect (OIDC) provider. Any OIDC library can find our sign-in endpoints, run the authorization code flow, check the `id_token` we return and fetch the account's details.
 
-Set the issuer to `https://accounts.teamofsilicons.com`. Use your app ID as `client_id` and its secret as `client_secret`. Enable PKCE and a nonce for sign-in. The ID token uses EdDSA with Ed25519, so your library must support that algorithm.
+Set the issuer to `https://accounts.teamofsilicons.com`, use your app id as `client_id` and its secret as `client_secret`, and turn on PKCE and a nonce for sign-in. The ID token is signed with EdDSA (Ed25519), so your library must support that algorithm.
 
 This example uses [openid-client](https://github.com/panva/openid-client) v6 for Node:
 
@@ -126,10 +126,10 @@ After a sign-in, the callback shows the validated claims and the userinfo:
 }
 ```
 
-A declined what's-shared screen reaches the `catch` as openid-client's
+If the Carbon declines the what's-shared screen, the refusal reaches the `catch` as openid-client's
 `AuthorizationResponseError` (`error=access_denied`).
 `oidc.refreshTokenGrant(config, refresh_token)` rotates the refresh token and, with `openid`
-granted, returns a new `id_token` (without a nonce). The library's defaults work as shown; a
+granted, returns a new `id_token` (without a nonce). The library's defaults work as shown. A
 library that assumes RS256 needs `id_token_signed_response_alg: "EdDSA"` in its client
 metadata.
 
@@ -177,9 +177,9 @@ metadata.
 }
 ```
 
-The device grant belongs to the `silicon-accounts` CLI and the `urn:silicon:params:oauth:grant-type:slt`
-grant is how [Silicons sign in to your app](add-sign-in.md#silicons-sign-in-without-the-pages);
-neither is part of a browser sign-in.
+The device grant belongs to the `silicon-accounts` CLI, and the `urn:silicon:params:oauth:grant-type:slt`
+grant is how [Silicons sign in to your app](add-sign-in.md#silicons-sign-in-without-the-pages).
+Neither is part of a browser sign-in.
 
 ## The id_token
 
@@ -200,17 +200,17 @@ again with every refresh of that sign-in.
 | `birthdate` | `YYYY-MM-DD`, with scope `dob`. |
 | `zoneinfo` | An IANA time zone, with scope `timezone`. |
 
-A Silicon signed in with a short-lived token gets no `id_token` (there is no browser sign-in to
-describe); its token response carries the same account view as everyone else's.
+A Silicon signed in with a short-lived token gets no `id_token`, because there's no browser
+sign-in to describe. Its token response carries the same account view as everyone else's.
 
 ## Userinfo
 
 `GET /v1/userinfo` with `Authorization: Bearer <access token>` (or `POST` with the token as a
 form field `access_token`) returns the standard claims (`sub`, `name`, `picture`, `email`,
 `email_verified`, `phone_number`, `phone_number_verified`, `zoneinfo`, `birthdate`) next to
-Silicon Accounts' own view of the account (`uuid`, `membership_id`, `kind`, `id`,
-`display_name`, `pfp_url`, `version`, `updated_at`, and `custodian` for a Silicon), limited
-to what the account granted your app. Libraries ignore the fields they don't know. Errors and
+our own view of the account (`uuid`, `membership_id`, `kind`, `id`, `display_name`,
+`pfp_url`, `version`, `updated_at`, and `custodian` for a Silicon), limited to what the
+account granted your app. Libraries simply ignore the fields they don't know. Errors and
 details are in [tokens](tokens.md#read-the-account-userinfo).
 
 ## What isn't supported, and what to use instead
@@ -228,5 +228,5 @@ details are in [tokens](tokens.md#read-the-account-userinfo).
 | Public clients (no secret) | Every app is confidential | Exchange the code on a server you control; native and single-page apps send the code there. |
 | `offline_access` to get a refresh token | Accepted, ignored | Every sign-in returns a refresh token. |
 
-To check access tokens your API receives without a library, see
+To check the access tokens your API receives without a library, see
 [Check an access token](tokens.md#check-an-access-token).

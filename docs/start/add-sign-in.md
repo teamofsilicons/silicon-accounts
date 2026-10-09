@@ -1,6 +1,6 @@
 ---
 title: Add sign-in to your app
-description: Send users to Silicon Accounts to sign in, bring them back to your app and exchange the returned code for their tokens.
+description: Send your users to us to sign in, bring them back to your app, and exchange the code they return with for their tokens.
 kind: instructive
 order: 10
 related:
@@ -16,9 +16,9 @@ related:
 
 # Add sign-in to your app
 
-Adding sign-in has three parts. First, register the URL where users should return to your app. Then send them to Silicon Accounts to sign in. When they return, your server exchanges the code in the URL for their account details and tokens.
+Adding sign-in to your app takes three steps. You register the address your users come back to, you send them to us to sign in, and when they come back, your server exchanges the code in the URL for their account and tokens.
 
-Silicon Accounts handles the pages in between, including email codes, phone codes, Google, Apple and first-time account setup. It also keeps the list of users who have signed into your app.
+We handle every page in between: email codes, phone codes, Google, Apple and first-time account setup. We also keep the list of everyone who has signed in to your app.
 
 ```sh
 export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # or a local stack: http://localhost:8590
@@ -44,7 +44,7 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
   -d redirect_uri=http://localhost:3000/callback -d "code_verifier=$CODE_VERIFIER"
 ```
 
-The exchange answers with the account as your app may see it:
+The exchange gives you back the account, as your app is allowed to see it:
 
 ```json
 {
@@ -72,27 +72,27 @@ The exchange answers with the account as your app may see it:
 
 Key your user record on `account.uuid` (or `membership_id`, which is `{app_id}:{uuid}`).
 Never key it on `account.id`: a Carbon or Silicon can change its `c:`/`si:` id, and your
-webhook hears `account.id_changed` when it does. See
-[What your app sees about an account](../learn/what-apps-see.md) for why.
+webhook hears `account.id_changed` when it does.
+[What your app sees about an account](../learn/what-apps-see.md) explains why.
 
 ## Before you start
 
 You need three things.
 
-1. **An `app_id` and an app secret.** Apps are created in Silicon Apps, and an app can sign
+1. **An `app_id` and an app secret.** Apps are created in Silicon Apps, and your app can sign
    Carbons and Silicons in as soon as it exists there. The secret (`sa_app_…`) proves your
-   server is the app: keep it on the server, never in a page, a mobile app or a repository.
-   Every app is a confidential client, so the code exchange always needs it, which is why
-   single-page and native apps exchange the code through a server they control.
-2. **Registered redirect URIs.** Silicon Accounts only ever sends a browser back to an address
-   in your `redirect_uris`, compared character for character. `https` is required, except
+   server is the app, so keep it on the server and never put it in a page, a mobile app or a
+   repository. Every app is a confidential client and the code exchange always needs the
+   secret. That's why single-page and native apps exchange the code through a server they control.
+2. **Registered redirect URIs.** We only ever send a browser back to an address in your
+   `redirect_uris`, compared character for character. `https` is required, except
    `http://localhost`, `http://127.0.0.1` and `http://[::1]` for development, which match on
    any port when registered with that host. Native apps can use a reverse-domain scheme such
-   as `com.example.app:/callback`. At most 50, no `#fragment`.
+   as `com.example.app:/callback`. You can register at most 50, with no `#fragment`.
 3. **Allowed origins, for the iframe only.** If you frame the sign-in buttons, list your
    page's origin (`https://app.example.com`, no path) in `allowed_origins`.
 
-The CLI does the same setup, and shows the whole configuration first so you don't drop an
+The CLI does the same setup. It shows you the whole configuration first, so you don't drop an
 entry by accident (arrays replace, they never merge):
 
 ```sh
@@ -118,13 +118,13 @@ error: Invalid fields: allowed_origins[0]: 'https://briefcase.example/app' must 
 ```
 
 Everything else about sign-in (methods and their order, Google and Apple, required and
-optional details, allowed email domains, sign-up, the look of the pages) is in
+optional details, allowed email domains, sign-up and the look of the pages) is in
 [Configure sign-in](sign-in-config.md) and [Make the pages your own](branding.md).
 
 ## Choose how Carbons reach the sign-in pages
 
 Every way ends the same: the browser lands on your `redirect_uri` with `?code=…&state=…`, and
-your server exchanges the code. They differ only in how the browser gets to `/authorize`.
+your server exchanges the code. The only difference is how the browser gets to `/authorize`.
 
 | Way | You add | Pick it when | Page |
 |---|---|---|---|
@@ -133,16 +133,16 @@ your server exchanges the code. They differ only in how the browser gets to `/au
 | SDK snippet | one `<script>` tag | you want the buttons rendered in your page (no iframe), or a JavaScript API (`signIn`, `handleCallback`) | [Drop in the SDK snippet](sdk.md) |
 | Any OIDC library | discovery URL, client id and secret | you already use an OpenID Connect library, or want a verified `id_token` | [Use any OpenID Connect library](oidc.md) |
 
-Why the buttons in the iframe and the snippet never sign anyone in inside your page: a click
-always takes the whole window to `/authorize`. The Carbon then sees
+The buttons in the iframe and the snippet never sign anyone in inside your page. A click
+always takes the whole window to `/authorize`. That way the Carbon sees
 `accounts.teamofsilicons.com` in the address bar, the Silicon Accounts session cookie works
-without third-party cookies, and no page of yours can draw over or read the code form. The
-reasons are in [How the hosted sign-in works](../learn/sign-in-flow.md).
+without third-party cookies, and no page of yours can draw over or read the code form.
+[How the hosted sign-in works](../learn/sign-in-flow.md) has the reasons.
 
 ## Silicons sign in without the pages
 
 A Silicon never sees a sign-in page. It signs in to Silicon Accounts with its si:id and STK,
-asks for a short-lived token for your app, and hands that token to you:
+asks us for a short-lived token for your app, and hands that token to you:
 
 ```sh
 silicon-accounts login --app briefcase      # run by the Silicon: prints slt_… (single use, 2 minutes)
@@ -180,19 +180,23 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
 }
 ```
 
-Give Silicons a way to hand your app that token, such as an input field, an API endpoint or a CLI flag. Your server can use the shorter `grant_type=slt` alias for the exchange.
+Give Silicons a way to hand your app that token, such as an input field, an API endpoint or a
+CLI flag. For the exchange, your server can also use the shorter alias `grant_type=slt`.
 
-Each token works once, for one app, for 2 minutes. If it has already been used, has expired or belongs to another app, Accounts returns `invalid_grant` with the reason. [Sign a Silicon in to an app](silicon-sign-in-to-apps.md) explains the Silicon’s steps. [Exchange, refresh, check and revoke tokens](tokens.md#a-silicons-short-lived-token) explains the exchange.
+Each token works once, for one app, for 2 minutes. If it was already used, has expired or
+belongs to another app, we answer `invalid_grant` with the reason.
+[Sign a Silicon in to an app](silicon-sign-in-to-apps.md) covers the Silicon's side, and
+[Exchange, refresh, check and revoke tokens](tokens.md#a-silicons-short-lived-token) covers the exchange.
 
 ## Sign people into your CLI
 
-Your app's own command-line tool often runs where no browser is, on a server or over SSH. It
-can still sign a Carbon in: it shows a short code, the Carbon opens the account site on any
-device, checks it is your app asking, and approves. This is the OAuth device authorization
-grant (RFC 8628), the same one `silicon-accounts login` uses. Your tool needs no secret, because
-a secret shipped inside a CLI isn't secret.
+Your app's own command-line tool often runs where there's no browser, on a server or over SSH.
+It can still sign a Carbon in. Your tool shows a short code, and the Carbon opens the account
+site on any device, checks it's your app asking, and approves. This is the OAuth device
+authorization grant (RFC 8628), the same one `silicon-accounts login` uses. Your tool needs no
+secret, because a secret shipped inside a CLI isn't secret.
 
-Turn it on once (as the app or one of its authors):
+Turn it on once, as the app or one of its authors:
 
 ```sh
 curl -s -X PATCH "$ACCOUNTS_URL/v1/apps/$APP_ID/signin-config" -u "$APP_ID:$APP_SECRET" \
@@ -217,8 +221,8 @@ curl -s -X POST "$ACCOUNTS_URL/v1/device/authorize" \
 }
 ```
 
-Print something like "Open https://accounts.teamofsilicons.com/device and enter MVHB-KQAW", and
-poll every `interval` seconds until the Carbon decides:
+Print something like "Open https://accounts.teamofsilicons.com/device and enter MVHB-KQAW",
+then poll every `interval` seconds until the Carbon decides:
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
@@ -226,20 +230,21 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
   -d device_code="$DEVICE_CODE" -d client_id="$APP_ID"
 ```
 
-You get `authorization_pending` while the Carbon looks, `slow_down` if you poll faster than
-every 5 seconds, `access_denied` if they say no and `expired_token` after 10 minutes. Once they
-approve, the next poll returns your app's tokens, exactly like a code exchange, and the account
-joins your user base. Refresh with `grant_type=refresh_token` and your `client_id` alone.
+While the Carbon looks, you get `authorization_pending`. You get `slow_down` if you poll faster
+than every 5 seconds, `access_denied` if they say no, and `expired_token` after 10 minutes.
+Once they approve, the next poll returns your app's tokens, exactly like a code exchange, and
+the account joins your user base. To refresh, send `grant_type=refresh_token` with your
+`client_id` alone.
 
 What the Carbon sees and what you get:
 
-- **Your app, not ours.** The approval page names your app with its logo and branding, the
+- **Your app, not ours.** The approval page names your app, with its logo and branding, the
   label your tool sent, and what it will share: `profile`, the details you require, and the
   optional ones you asked for in `scope`.
-- **Your rules.** Your `allowed_email_domains` and required details apply: a Carbon without a
-  verified email at your domains gets `email_domain_not_allowed`, one missing a required email or
-  phone gets `requirements_missing`, and neither is signed in.
-- **Limits.** 60 device sign-ins started per network and 600 per app every 10 minutes; a Carbon
+- **Your rules.** Your `allowed_email_domains` and required details apply. A Carbon without a
+  verified email at your domains gets `email_domain_not_allowed`, one missing a required email
+  or phone gets `requirements_missing`, and neither is signed in.
+- **Limits.** 60 device sign-ins started per network and 600 per app every 10 minutes. A Carbon
   can look up 60 codes per 10 minutes.
 
 A Silicon doesn't need any of this: it signs into your tool with a
@@ -247,21 +252,20 @@ A Silicon doesn't need any of this: it signs into your tool with a
 
 ### Desktop and native apps
 
-A desktop app or a CLI that can open a browser can use the normal hosted pages as a public
-client (RFC 8252) instead: turn on `public_client` in the same sign-in setup, send the
-Carbon's browser to `/authorize` with PKCE (`code_challenge` with
-`code_challenge_method=S256`), and exchange the code with your `client_id` and the
-`code_verifier`, no secret. Register a loopback redirect URI such as
-`http://127.0.0.1/callback`: any port works at sign-in time, so your app can listen on whatever
-port is free. A code without PKCE is refused to a public client.
+A desktop app, or a CLI that can open a browser, can use the normal hosted pages as a public
+client (RFC 8252) instead. Turn on `public_client` in the same sign-in setup, send the Carbon's
+browser to `/authorize` with PKCE (`code_challenge` with `code_challenge_method=S256`), and
+exchange the code with your `client_id` and the `code_verifier`, with no secret. Register a
+loopback redirect URI such as `http://127.0.0.1/callback`. Any port works at sign-in time, so
+your app can listen on whatever port is free. For a public client, a code without PKCE is refused.
 
 ## What comes next
 
-- **Keep the sign-in alive.** The access token lasts 30 minutes; refresh it with the refresh
+- **Keep the sign-in alive.** The access token lasts 30 minutes. Refresh it with the refresh
   token, which rotates on every use. Refresh one sign-in at a time: two refreshes with the same
   token count as theft and end the sign-in. See [tokens](tokens.md).
-- **Know what you may read.** `profile` is always shared; email, phone, date of birth and
-  timezone only when the Carbon agreed on the what's-shared screen. See
+- **Know what you may read.** `profile` is always shared. Email, phone, date of birth and
+  timezone are shared only when the Carbon agreed to them on the what's-shared screen. See
   [What your app sees about an account](../learn/what-apps-see.md).
 - **Stay in sync.** Register a webhook to hear about id changes, profile changes, sign-outs,
   removed access and deleted accounts: [Receive webhooks](webhooks.md).
@@ -273,9 +277,9 @@ port is free. A code without PKCE is refused to a public client.
 | Check | Why |
 |---|---|
 | Every redirect URI is `https` (or a native app scheme) | A code sent over plain http can be read on the way. |
-| You send `state` and compare it on the callback with a value bound to the browser (a cookie) | Without it, someone can make your user's browser finish *their* sign-in (login CSRF). Silicon Accounts doesn't require `state`; your app must. |
+| You send `state` and compare it on the callback with a value bound to the browser (a cookie) | Without it, someone can make your user's browser finish *their* sign-in (login CSRF). We don't require `state`, but your app must. |
 | You send `code_challenge` (S256) and the verifier on exchange | A stolen code is useless without the verifier. Once you send a challenge, the verifier is required. |
 | The app secret lives only on your server | It is the only thing that lets someone exchange codes as your app. |
 | Refresh tokens are stored server side and refreshed one at a time per sign-in | A refresh token works once; a second use revokes the whole sign-in. |
-| You key users on `uuid` and handle `account.id_changed` | Ids can change; the old id becomes free for someone else 10 days later. |
+| You key users on `uuid` and handle `account.id_changed` | Ids can change, and the old id becomes free for someone else 10 days later. |
 | You handle `error=access_denied` on the callback | The Carbon can decline the what's-shared screen. |

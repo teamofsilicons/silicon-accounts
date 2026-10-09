@@ -1,6 +1,6 @@
 ---
 title: Limits
-description: Look up request limits, token lifetimes, file sizes and retention periods. Learn which response to expect when you reach a limit.
+description: Every limit we enforce, from request rates and lockouts to lifetimes, sizes and retention, and what you get back when you reach one.
 kind: informative
 order: 71
 related:
@@ -12,9 +12,9 @@ related:
 
 # Limits
 
-This page lists the limits Accounts enforces. Values marked **contract** are part of the product’s rules and apply to every deployment. Other limits protect the service and can be configured.
+These are the limits we enforce. Values marked **contract** are part of the product's rules and hold on every deployment. The others protect the service and can be configured.
 
-Too many requests return `429 rate_limited`. Too many incorrect codes or STKs return `423`. Both responses include `Retry-After` and `details.retry_after_seconds`, in seconds. Wait that long before trying again.
+Too many requests get `429 rate_limited`. Too many wrong codes or STKs get `423`. Both come with `Retry-After` and `details.retry_after_seconds`, in seconds: wait that long, then try again.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/ids/available?id=c:probe"   # the 121st check in one minute from one IP:
@@ -32,7 +32,9 @@ curl -s "$ACCOUNTS_URL/v1/ids/available?id=c:probe"   # the 121st check in one m
 ```
 
 Rate limits are fixed windows counted in the database, so they hold across every server. "Per
-IP" means the client address (the right-most `X-Forwarded-For` entry behind the load balancer).
+IP" means the client's address (the right-most `X-Forwarded-For` entry behind the load balancer).
+Everything behind one address shares one budget, so a fleet of runners behind one address should
+sign in once per job and reuse the session, not sign in once per command.
 
 ## Rate limits
 
@@ -81,7 +83,7 @@ IP" means the client address (the right-most `X-Forwarded-For` entry behind the 
 | Device code | 600 seconds; poll every 5 seconds (`slow_down` if faster) |
 | Silicon custodian request (initial or transfer) | 14 days (**contract**: 2 weeks) |
 | Id reservation after a change | 10 days (**contract**); the previous owner may take it back meanwhile |
-| Proof token (`sap_…`) | 60–1800 seconds, default 1800 |
+| Proof token (`sap_…`) | 60 to 1800 seconds, default 1800 |
 | Proof (its refresh token, `sapr_…`) | 900 days; a User verification proof ends with its sign-in |
 | Idempotency results | 24 hours; 10 minutes for responses carrying a new secret; an unfinished request holds its key for at most 120 seconds |
 | Webhook deliveries | retried for 72 hours after the event (or after a replay) |
@@ -92,11 +94,11 @@ IP" means the client address (the right-most `X-Forwarded-For` entry behind the 
 
 | What | Limit |
 |---|---|
-| Handle (after `c:` / `si:`) | 3–30 characters of `a-z 0-9 - _`, case-insensitive (**contract**); reserved words: `admin`, `administrator`, `root`, `system`, `support`, `help`, `security`, `silicon-accounts`, `account`, `silicon`, `silicons`, `carbon`, `carbons`, `api`, `www`, `mail`, `null`, `undefined`, `me`, `owner`, `staff` |
+| Handle (after `c:` / `si:`) | 3 to 30 characters of `a-z 0-9 - _`, case-insensitive (**contract**); reserved words: `admin`, `administrator`, `root`, `system`, `support`, `help`, `security`, `silicon-accounts`, `account`, `silicon`, `silicons`, `carbon`, `carbons`, `api`, `www`, `mail`, `null`, `undefined`, `me`, `owner`, `staff` |
 | uuid | `a-z A-Z 0-9`, case-sensitive; 3 characters, then 4 once every 3-character uuid is used (**contract**); never reused |
 | App id | 3 to 30 characters of `a-z 0-9 - _`, as Silicon Apps creates them (`my_app`, `2fa-tool`); older ids of 2 to 40 characters of `a-z 0-9 -` starting with a letter (`dm`) keep working |
 | Emails per Carbon / phones per Carbon | 10 / 10 (**contract**) |
-| Display name | 1–100 characters, no control characters |
+| Display name | 1 to 100 characters, no control characters |
 | Date of birth | in the past, not before 1900-01-01; a Silicon's is its creation date |
 | STK | generated: `stk-` + 12 hex characters; chosen: `stk-` + 8 to 32 hex characters (**contract**) |
 | URLs (photos, webhooks, …) | 2048 characters |
@@ -104,17 +106,17 @@ IP" means the client address (the right-most `X-Forwarded-For` entry behind the 
 | Profile photo | 2 MB (2,097,152 bytes); PNG, JPEG, WebP or GIF; 8192 px a side; 50 megapixels |
 | Request body | 64 KB; photos 2 MB; `PATCH …/signin-config` 512 KB; imports 50 MB; Silicon Apps sync 5 MB |
 | Time budget per request | 30 seconds; photo uploads and sync 60 seconds; imports 5 minutes (then 503 `request_timeout`) |
-| Page size | 1–200, default 50 |
-| `Idempotency-Key` | 1–200 visible ASCII characters |
-| `X-Request-Id` kept from the client | 1–128 characters of `A-Z a-z 0-9 - _ . :` |
+| Page size | 1 to 200, default 50 |
+| `Idempotency-Key` | 1 to 200 visible ASCII characters |
+| `X-Request-Id` kept from the client | 1 to 128 characters of `A-Z a-z 0-9 - _ . :` |
 | Redirect URIs / allowed origins / allowed email domains per app | 50 / 50 / 100 |
-| Branding | `logo_height` 16–96 px, `radius` 0–40 px, inline logos 128 KB each, text contrast at least 4.5:1, `copy.title` 80 and `copy.subtitle` 200 characters |
+| Branding | `logo_height` 16 to 96 px, `radius` 0 to 40 px, inline logos 128 KB each, text contrast at least 4.5:1, `copy.title` 80 and `copy.subtitle` 200 characters |
 | Import | 100,000 rows; 200 columns; column names 200 bytes; values 8 KB; lists 50 items; 10 emails and 10 phones per row; `external_id` 255 characters; display names cut at 100 characters |
 | Concurrent import parses | 2 per server; a request waits up to 30 seconds for a slot, then 503 `imports_busy` (`Retry-After: 15`) |
 | Webhook replay | 100 deliveries per request |
-| Proof scopes | 20 per proof, each 1–100 characters of `A-Z a-z 0-9 _ . : / -` |
+| Proof scopes | 20 per proof, each 1 to 100 characters of `A-Z a-z 0-9 _ . : / -` |
 | App verification receiving apps | exactly 1 per proof |
-| Report message | 1–10,000 characters; `pr_url` https |
+| Report message | 1 to 10,000 characters; `pr_url` https |
 | Telemetry batch | 50 events; `name` `^[a-z0-9_.]{1,64}$`; `source` 64 characters; `step` 200 characters; `data` 8 KB |
 | Sign-in history shown to an app per member | the last 20 |
 
@@ -153,10 +155,18 @@ IP" means the client address (the right-most `X-Forwarded-For` entry behind the 
 
 ## Retention
 
-A sweep every 10 minutes deletes, in batches: sign-in flows 1 day after they expired;
-authorization codes, short-lived tokens and device codes 7 days after; verification codes 1 day
-after; expired idempotency results; id reservations 1 day after they ended; sign-up sessions 7
-days after they expired or were used; rate-limit windows older than a day. Proof tokens are
-deleted 1 day after they expire, and every token of a proof 30 days after the proof ended.
-History (sign-ins, id changes, custodian transfers, proofs, sign-in setup versions, the audit
-log) is never deleted.
+Every 10 minutes a sweep deletes, in batches:
+
+- sign-in flows, 1 day after they expired;
+- authorization codes, short-lived tokens and device codes, 7 days after they expired;
+- verification codes, 1 day after they expired;
+- expired idempotency results;
+- id reservations, 1 day after they ended;
+- sign-up sessions, 7 days after they expired or were used;
+- rate-limit windows older than a day.
+
+Proof tokens are deleted 1 day after they expire, and every token of a proof 30 days after the
+proof ended.
+
+History is never deleted: sign-ins, id changes, custodian transfers, proofs, sign-in setup
+versions and the audit log stay for good.

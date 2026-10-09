@@ -1,6 +1,6 @@
 ---
 title: Account endpoints
-description: Look up accounts and public IDs, or manage your own profile, contact details, linked identities, sessions and account deletion.
+description: Look up any account by uuid or id, and manage your own profile, id, photo, emails and phones, linked identities, apps, sessions, history and deletion.
 kind: informative
 order: 63
 related:
@@ -14,9 +14,11 @@ related:
 
 # Account endpoints
 
-Use the lookup endpoints to find an account by UUID or public ID. Use `/v1/me` and its related routes to read or change your own account.
+Two kinds of endpoint live here. The lookups find any account by its uuid or its public id. `/v1/me` and the routes under it read and change your own account.
 
-The `/v1/me` routes need **account** authentication: a first-party bearer token with `aud = silicon-accounts`, or the account site’s session cookie. An app’s user token does not grant this access. Read [Accounts](../../learn/accounts.md) and [IDs and UUIDs](../../learn/ids-and-uuids.md) for the account model.
+The `/v1/me` routes need **account** authentication: a first-party Bearer token with `aud = silicon-accounts`, or the account site's session cookie. A token your app got for a user doesn't work here. [Accounts](../../learn/accounts.md) and [IDs and UUIDs](../../learn/ids-and-uuids.md) explain the account model.
+
+Here you read your own account:
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/me" -H "Authorization: Bearer $TOKEN"
@@ -48,23 +50,23 @@ curl -s "$ACCOUNTS_URL/v1/me" -H "Authorization: Bearer $TOKEN"
 
 **Me** (`GET /v1/me`): `uuid` (permanent), `kind` (`carbon` | `silicon`), `id` (`c:…` / `si:…`,
 null once deleted), `display_name`, `pfp_url`, `dob`, `timezone`, `status` (`active`,
-`unclaimed`, `pending_custodian`, `deleted`), `created_at`, `updated_at`, `version` (bumps on
-every change apps can see).
+`unclaimed`, `pending_custodian`, `deleted`), `created_at`, `updated_at` and `version` (it bumps
+on every change apps can see).
 
 - Carbons add `emails` (`email`, `is_primary`, `verified_at`, `verified_via`: `code`, `google`
-  or `apple`), `phones` (`phone`, `is_primary`, `verified_at`: a phone is only ever verified by
-  code; `GET /v1/me/phones` also lists `verified_via` and `created_at`), `identities` (linked
+  or `apple`), `phones` (`phone`, `is_primary`, `verified_at`; a phone is only ever verified by
+  code, and `GET /v1/me/phones` also lists `verified_via` and `created_at`), `identities` (linked
   Google/Apple accounts) and `custodian_of` (how many Silicons they are custodian of).
 - Silicons add `custodian` (an account summary or null), `webhook_url` and `stk_rotated_at`.
 
 **Account summary** (lookups, custodians, lists): `uuid`, `kind`, `id`, `display_name`,
-`pfp_url`, `status`; a looked-up Silicon adds `custodian`.
+`pfp_url`, `status`. A looked-up Silicon adds `custodian`.
 
 ## `GET /v1/ids/available`
 
-Can this id be taken? Public; 120 requests per minute per IP. `?id=` is the full id with its
-prefix. An invalid id is a normal 200 answer with `reason: "invalid"` and a message saying
-exactly why.
+Can this id be taken? Public, 120 requests per minute per IP. `?id=` is the full id with its
+prefix. An invalid id isn't an error: you get a normal 200 with `reason: "invalid"` and a message
+saying exactly why.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/ids/available?id=c:saket"
@@ -89,11 +91,13 @@ curl -s "$ACCOUNTS_URL/v1/ids/available?id=c:saket"
 | `reserved_word` | a word nobody may use (`admin`, …) |
 | `invalid` | not a valid id: no prefix, too short or long, a character outside `a-z 0-9 - _` |
 
-`suggestions` holds up to three free ids close to the one asked for (empty when it is available,
-or when it has no prefix). Signed in, an id reserved for **you** is `available: true,
-reclaimable: true`. A custodian adds `&for=<uuid or si:id>` to ask for one of its Silicons
-(here the Silicon `K1E` was renamed from `si:scout` to `si:scout-two`, and its custodian asks
-whether it can take `si:scout` back):
+`suggestions` holds up to three free ids close to the one you asked for. It is empty when the id
+is available, or when it has no prefix. When you are signed in, an id reserved for **you** is
+`available: true, reclaimable: true`.
+
+A custodian adds `&for=<uuid or si:id>` to ask for one of its Silicons. Here the Silicon `K1E`
+was renamed from `si:scout` to `si:scout-two`, and its custodian asks whether it can take
+`si:scout` back:
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/ids/available?id=si:scout&for=K1E" -H "Authorization: Bearer $CARBON_TOKEN"
@@ -115,10 +119,10 @@ Errors: 400 `invalid_query` (no `id`), 401 `unauthenticated` (`for` without a se
 
 ## `GET /v1/accounts/{uuid}` and `GET /v1/accounts/by-id/{id}`
 
-The current public identity of an account. **app or account**; both routes together allow 600
-lookups per minute per app or per account (uuids are short and densely allocated, 238,328
-three-character values used before any 4-character one, so without a limit one caller could walk
-every account). `by-id` matches current ids only.
+The current public identity of an account. **app or account**. Both routes together allow 600
+lookups per minute per app or per account. The limit is there because uuids are short and densely
+allocated (238,328 three-character values are used before any 4-character one), so without it one
+caller could walk every account. `by-id` matches current ids only.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/accounts/K1E" -u "$APP_ID:$APP_SECRET"
@@ -149,18 +153,18 @@ The full account (Me, above). Works for Carbons and Silicons.
 
 ## `PATCH /v1/me`
 
-Change `display_name`, `timezone`, `dob` (Carbons only) or `pfp_url`. **Idempotent.** Only real
-changes are written; `version` bumps; apps that can see a changed field get `account.updated`
-with just those fields, and a Silicon's own webhook gets `silicon.updated`.
+Change your `display_name`, `timezone`, `dob` (Carbons only) or `pfp_url`. **Idempotent.** Only
+real changes are written, and they bump `version`. Apps that can see a changed field get
+`account.updated` with just those fields, and a Silicon's own webhook gets `silicon.updated`.
 
 | Field | Rule |
 |---|---|
-| `display_name` | 1–100 characters after trimming, no control characters |
+| `display_name` | 1 to 100 characters after trimming, no control characters |
 | `timezone` | an IANA timezone (`Asia/Kolkata`); case is normalized |
 | `dob` | `YYYY-MM-DD`, in the past, not before 1900-01-01. A Silicon's dob is the day it was created: 422 `dob_immutable` (sending the current value is fine) |
 | `pfp_url` | an https URL (at most 2048 characters), your own upload written exactly as `POST /v1/me/photo` returned it, or `null` for the default photo |
 
-**200** Me. Every bad field is reported at once:
+**200** Me. Every bad field is reported at once, so you can fix them all in one go:
 
 ```json
 {
@@ -182,15 +186,15 @@ with just those fields, and a Silicon's own webhook gets `silicon.updated`.
 
 ## `POST /v1/me/id`
 
-Change your own id. `{"id": "c:ada-king"}` (a bare handle gets your prefix). **Idempotent.**
-**200** Me.
+Change your own id. Send `{"id": "c:ada-king"}` (a bare handle gets your prefix).
+**Idempotent.** **200** Me.
 
-- The old id is reserved for you for 10 days (nobody else can take it; you can take it back,
-  which ends the reservation).
-- Every app you signed into gets `account.id_changed`; a Silicon's own webhook gets
+- Your old id is reserved for you for 10 days. Nobody else can take it, and you can take it
+  back, which ends the reservation.
+- Every app you signed into gets `account.id_changed`, and a Silicon's own webhook gets
   `silicon.id_changed`. Apps key on the uuid, so nothing breaks.
-- At most 5 id changes per account in any 24 hours (reclaims and a custodian's changes count;
-  asking for the current id again is a free no-op). Over it: 429 `rate_limited` with
+- At most 5 id changes per account in any 24 hours. Reclaims and a custodian's changes count;
+  asking for the current id again is a free no-op. Over it you get 429 `rate_limited` with
   `details.limit`, `details.window_seconds` and `details.retry_at`.
 
 Errors: 422 `invalid_id` (`details.reason`), 409 `id_taken` (`details.suggestions`), 409
@@ -212,7 +216,7 @@ Errors: 422 `invalid_id` (`details.reason`), 409 `id_taken` (`details.suggestion
 Upload a profile photo. The body is the raw image with its `Content-Type`: `image/png`,
 `image/jpeg` (also `image/jpg`), `image/webp` or `image/gif`. **Idempotent.**
 
-- At most 2 MB (2,097,152 bytes), 8192 px a side, 50 megapixels; the bytes must really be the
+- At most 2 MB (2,097,152 bytes), 8192 px a side and 50 megapixels. The bytes must really be the
   format the `Content-Type` names.
 - 20 uploads per account per hour.
 
@@ -237,8 +241,8 @@ curl -s -X POST "$ACCOUNTS_URL/v1/me/photo" -H "Authorization: Bearer $TOKEN" \
 }
 ```
 
-Apps that see `profile` get `account.updated` (`pfp_url`). Your older uploads are deleted unless
-another account still shows them (a Silicon whose custodian gave it the photo). Errors: 415
+Apps that see `profile` get `account.updated` (`pfp_url`). We delete your older uploads, unless
+another account still shows one (a Silicon whose custodian gave it the photo). Errors: 415
 `unsupported_media_type`, 413 `photo_too_large`, 422 `empty_photo`, `invalid_image`,
 `photo_type_mismatch` (`details.detected_content_type`), `photo_dimensions_too_large`, 429
 `rate_limited`.
@@ -256,20 +260,20 @@ another account still shows them (a Silicon whose custodian gave it the photo). 
 
 ## `DELETE /v1/me/photo`
 
-Back to the default photo (drawn by Iris from the uuid). **200** Me.
+Goes back to the default photo, which Iris draws from the uuid. **200** Me.
 
 ## `GET /v1/photos/{id}`
 
-Public: the uploaded image, `Cache-Control: public, max-age=31536000, immutable`, an `ETag`
+Public. The uploaded image, with `Cache-Control: public, max-age=31536000, immutable`, an `ETag`
 (304 on `If-None-Match`), `Content-Security-Policy: default-src 'none'; sandbox`,
-`Cross-Origin-Resource-Policy: cross-origin`, `X-Content-Type-Options: nosniff`. 404
+`Cross-Origin-Resource-Policy: cross-origin` and `X-Content-Type-Options: nosniff`. 404
 `photo_not_found`.
 
 ## Emails and phones
 
-**account (Carbon)**; Silicons have no email or phone (403 `carbon_only`). A Carbon has at most 10
-emails and 10 phone numbers; any of them signs in to the account; exactly one of each kind is
-primary; an address belongs to one account only.
+**account (Carbon)**. Silicons have no email or phone (403 `carbon_only`). A Carbon has at most 10
+emails and 10 phone numbers, and any of them signs in to the account. Exactly one of each kind is
+primary, and an address belongs to one account only.
 
 ### `GET /v1/me/emails` and `GET /v1/me/phones`
 
@@ -283,12 +287,12 @@ primary; an address belongs to one account only.
 }
 ```
 
-Primary first. Phones have `phone` (E.164) instead of `email`.
+The primary comes first. Phones have `phone` (E.164) instead of `email`.
 
 ### `POST /v1/me/emails` and `POST /v1/me/phones`
 
-`{"email": "ada.work@example.test"}` or `{"phone": "98765 43210", "country": "IN"}`. Sends a
-6-digit code (purpose `add_email` / `add_phone`). **Idempotent.** **201**:
+Send `{"email": "ada.work@example.test"}` or `{"phone": "98765 43210", "country": "IN"}`, and we
+send a 6-digit code (purpose `add_email` / `add_phone`). **Idempotent.** **201**:
 
 ```json
 {
@@ -302,28 +306,29 @@ Primary first. Phones have `phone` (E.164) instead of `email`.
 
 Errors: 409 `email_in_use` / `phone_in_use` (another account has it), 409 `email_already_added`
 / `phone_already_added`, 422 `email_limit_reached` / `phone_limit_reached` (10 already), 422
-`invalid_email`, `invalid_phone`, `invalid_country`, 429 `rate_limited`. Every add attempt
-counts before any 409 or 422 (20 per account and 30 per IP per 10 minutes), so the endpoint
-can't be used to test which addresses have accounts.
+`invalid_email`, `invalid_phone`, `invalid_country`, 429 `rate_limited`. Every add attempt counts
+toward the limit (20 per account and 30 per IP per 10 minutes) before any 409 or 422, so nobody
+can use this endpoint to test which addresses have accounts.
 
 ### `POST /v1/me/emails/verify` and `POST /v1/me/phones/verify`
 
-`{"challenge_id": "…", "code": "123456"}`. **Idempotent.** **200** the updated list. A new primary
-(the first address of its kind becomes primary) bumps `version` and sends `account.updated`
-(`email` / `phone`) to apps with that scope. Errors: 422 `invalid_code`
-(`details.remaining_attempts`), 423 `verification_locked`, 410 `code_expired`, 409
-`code_already_used`, 404 `challenge_not_found`, 409 `email_in_use` / `phone_in_use` (someone
-proved it first), 409 `account_deleted`. Wrong codes count per address together with every
-sign-in code to it: 10 in a row lock the address for 60 seconds.
+`{"challenge_id": "…", "code": "123456"}`. **Idempotent.** **200** the updated list. The first
+address of its kind becomes the primary, and a new primary bumps `version` and sends
+`account.updated` (`email` / `phone`) to apps with that scope.
+
+Errors: 422 `invalid_code` (`details.remaining_attempts`), 423 `verification_locked`, 410
+`code_expired`, 409 `code_already_used`, 404 `challenge_not_found`, 409 `email_in_use` /
+`phone_in_use` (someone proved it first), 409 `account_deleted`. Wrong codes count per address,
+together with every sign-in code sent to it: 10 in a row lock the address for 60 seconds.
 
 ### `POST /v1/me/emails/{email}/primary` and `POST /v1/me/phones/{phone}/primary`
 
-Make a verified address the primary. **200** the updated list. Errors: 404 `email_not_found` /
+Makes a verified address the primary. **200** the updated list. Errors: 404 `email_not_found` /
 `phone_not_found`, 409 `email_not_verified` / `phone_not_verified`.
 
 ### `DELETE /v1/me/emails/{email}` and `DELETE /v1/me/phones/{phone}`
 
-**200** the updated list. The primary can't be removed: make another one primary first (409
+**200** the updated list. You can't remove the primary, so make another one primary first (409
 `cannot_remove_primary`). 404 `email_not_found` / `phone_not_found`.
 
 ## Linked identities
@@ -358,8 +363,8 @@ Linking happens in the browser: [`POST /v1/me/identities/{provider}`](sign-in.md
 
 ### `GET /v1/me/apps`
 
-`?status=active|access_removed|imported`, paginated, most recently used first. The account site
-itself is not listed.
+The apps you signed into, most recently used first. Filter with
+`?status=active|access_removed|imported`; paginated. The account site itself isn't listed.
 
 ```json
 {
@@ -384,8 +389,8 @@ itself is not listed.
 
 ### `DELETE /v1/me/apps/{app_id}`
 
-Remove an app's access. **204.** The app's tokens for you and the User verification proofs it issued about you
-are revoked, the membership becomes `access_removed`, and the app gets
+Removes an app's access. **204.** We revoke the app's tokens for you and the User verification
+proofs it issued about you, the membership becomes `access_removed`, and the app gets
 `membership.access_removed`. Repeating it does nothing more. Signing into the app again restores
 the membership. Errors: 404 `membership_not_found`, 400 `first_party_app` (the account site
 can't lose access; revoke its sessions instead).
@@ -394,8 +399,9 @@ can't lose access; revoke its sessions instead).
 
 ### `GET /v1/me/sessions`
 
-Browser sessions, live first-party sign-ins (CLI, Silicon login, device flow) and sign-ins to the
-developer platform (developers.teamofsilicons.com), newest first.
+Everywhere you are signed in: browser sessions, live first-party sign-ins (CLI, Silicon login,
+device flow) and sign-ins to the developer platform (developers.teamofsilicons.com), newest
+first.
 
 ```json
 {
@@ -431,20 +437,19 @@ developer platform (developers.teamofsilicons.com), newest first.
 
 `kind` is `browser`, `cli` or `developer` (a developer-platform sign-in, labelled "Silicon
 Developer (developers.teamofsilicons.com)"). `origin` for CLI sign-ins is `cli_code`, `device` or
-`silicon_login`; `current` marks the session making the request.
+`silicon_login`. `current` marks the session making the request.
 
 ### `DELETE /v1/me/sessions/{id}`
 
-**204.** That browser, CLI or developer-platform sign-in is signed out at once (a revoked cookie
-answers 401 `session_expired`, a revoked token 401 `token_revoked`); revoking the calling cookie
-session also clears the cookie. 404
-`session_not_found` (unknown, another account's, or an app's sign-in: apps are removed with
-`DELETE /v1/me/apps/{app_id}`).
+**204.** That browser, CLI or developer-platform sign-in is signed out at once: a revoked cookie
+answers 401 `session_expired`, and a revoked token 401 `token_revoked`. Revoking the session whose
+cookie made the call also clears the cookie. 404 `session_not_found` for an unknown session,
+another account's, or an app's sign-in (you remove apps with `DELETE /v1/me/apps/{app_id}`).
 
 ## `GET /v1/me/history`
 
-Everything that happened to the account, newest first: `?kind=signin|id_change|custodian|proof|app_access|security`,
-paginated.
+Everything that happened to the account, newest first. Filter with
+`?kind=signin|id_change|custodian|proof|app_access|security`; paginated.
 
 ```json
 {
@@ -471,26 +476,32 @@ paginated.
 }
 ```
 
-Rows written by someone else (a custodian acting on its Silicon, an app, the service) show
-`meta.ip: null`, mask email addresses and phone numbers, and add `By c:…` to `detail`. Rows about
-a Silicon name it by its current si:id and carry it in `meta.silicon`. Errors: 400
+Rows written by someone else (a custodian acting on its Silicon, an app, or the service itself)
+show `meta.ip: null`, mask email addresses and phone numbers, and add `By c:…` to `detail`. Rows
+about a Silicon name it by its current si:id and carry it in `meta.silicon`. Errors: 400
 `invalid_history_kind`, 400 `invalid_cursor`.
 
 ## `DELETE /v1/me`
 
-Delete your account. **account (Carbon).** `{"confirm": "c:ada"}` (your current id; case and the
-prefix don't matter). **204** (a cookie session's cookie is cleared).
+Deletes your account. **account (Carbon).** Send `{"confirm": "c:ada"}` with your current id
+(case and the prefix don't matter). **204**, and a cookie session's cookie is cleared.
 
-In one step: the account becomes `deleted`, its id is reserved for 10 days, emails, phones and
-linked identities are removed, every session, sign-in and User verification proof about it is revoked, the
-photo goes back to the default, apps lose the personal data they imported about it, and every app
-it signed into gets `account.deleted`. Self-created Silicons still waiting for you to accept are
-released and told (`silicon.custodian.declined`, reason `custodian_account_deleted`).
+It all happens in one step:
+
+- the account becomes `deleted`, and its id is reserved for 10 days;
+- emails, phones and linked identities are removed;
+- every session, sign-in and User verification proof about it is revoked;
+- the photo goes back to the default;
+- apps lose the personal data they imported about it;
+- every app it signed into gets `account.deleted`.
+
+Self-created Silicons still waiting for you to accept are released and told
+(`silicon.custodian.declined`, reason `custodian_account_deleted`).
 
 Errors: 409 `custodian_of_silicons` while you are custodian of any Silicon (`details.silicons`
-lists them; transfer or delete each first, because every Silicon must have a custodian), 422
-`confirmation_required` / `confirmation_mismatch`, 403 `custodian_required` for a Silicon (its
-custodian deletes it with `DELETE /v1/me/silicons/{uuid}`).
+lists them). Every Silicon must have a custodian, so transfer or delete each one first. Also 422
+`confirmation_required` / `confirmation_mismatch`, and 403 `custodian_required` for a Silicon
+(its custodian deletes it with `DELETE /v1/me/silicons/{uuid}`).
 
 ```json
 {
@@ -508,4 +519,4 @@ custodian deletes it with `DELETE /v1/me/silicons/{uuid}`).
 }
 ```
 
-After deletion every token of the account answers 401 `token_revoked` (`account_deleted`).
+After deletion, every token of the account answers 401 `token_revoked` (`account_deleted`).

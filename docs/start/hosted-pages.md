@@ -1,6 +1,6 @@
 ---
 title: Sign in with the hosted pages
-description: Send users to our sign-in pages and bring them back to your app. Set up the callback, check state and exchange the code on your server.
+description: Send your users to our sign-in pages and bring them back to your app. Set up the callback, check the state and exchange the code on your server.
 kind: instructive
 order: 11
 related:
@@ -13,11 +13,11 @@ related:
 
 # Sign in with the hosted pages
 
-Your app starts sign-in by sending the user’s browser to `/authorize`. Accounts handles sign-in and sends the browser back to your registered redirect URI with a code. Your server exchanges that code for tokens.
+Your app starts a sign-in by sending your user's browser to `/authorize`. We take care of the sign-in and send the browser back to your registered redirect URI with a code. Your server then exchanges that code for tokens.
 
-Use `state` to check that the returning request belongs to a sign-in you started. Use PKCE to tie the code exchange to the same request. The example below does both.
+Use `state` to check that the request coming back belongs to a sign-in you started, and PKCE to tie the code exchange to that same request. The example below does both.
 
-The [iframe](iframe.md), [SDK](sdk.md) and [OIDC libraries](oidc.md) all build this same authorize request. This page explains its parameters and errors too.
+The [iframe](iframe.md), the [SDK](sdk.md) and [OIDC libraries](oidc.md) all build this same authorize request, so this page also explains its parameters and errors for them.
 
 This complete app has no dependencies. It assumes `http://localhost:3000/callback` is in your
 app's `redirect_uris` ([how to register it](add-sign-in.md#before-you-start)).
@@ -99,8 +99,8 @@ createServer(async (req, res) => {
 }).listen(PORT, () => console.log(`Open http://localhost:${PORT}`));
 ```
 
-Run it, open `http://localhost:3000`, and sign in. A first-time Carbon goes through email code,
-sign-up and the details page (what's shared with your app); the callback then shows:
+Run it, open `http://localhost:3000` and sign in. A first-time Carbon goes through the email
+code, sign-up and the details page (what's shared with your app), and then the callback shows:
 
 ```text
 Signed in as c:grace-hopper (briefcase:ptO)
@@ -121,18 +121,18 @@ Signed in as c:grace-hopper (briefcase:ptO)
 What each step protects against:
 
 - **A fresh `state` per sign-in, bound to the browser by a cookie.** The callback only accepts
-  a state this server issued to this browser, once. Otherwise anyone could send your user a
-  link that finishes *their* sign-in in your user's browser (login CSRF).
+  a state this server gave to this browser, and only once. Otherwise anyone could send your
+  user a link that finishes *their* sign-in in your user's browser (login CSRF).
 - **PKCE (`code_challenge` now, `code_verifier` at the exchange).** Someone who reads the code
   from a log, a referrer or a proxy still can't exchange it without the verifier.
 - **The exchange on your server.** It needs your app secret, which never leaves the server.
-- **The 60-minute window.** A hosted flow lives 60 minutes (a first-time Carbon may sign up
-  and add a phone on the way), so the example keeps a sign-in's state for that long and
+- **The 60-minute window.** A hosted flow lives for 60 minutes, since a first-time Carbon may
+  sign up and add a phone on the way. So the example keeps a sign-in's state for that long and
   refuses anything older. The code itself must then be exchanged within 2 minutes.
 
 ## The authorize request
 
-`GET https://accounts.teamofsilicons.com/authorize?…` is a page, not an API: the browser opens
+`GET https://accounts.teamofsilicons.com/authorize?…` is a page, not an API. The browser opens
 it, and the hosted pages create a sign-in flow bound to that browser.
 
 | Parameter | Required | Rules |
@@ -140,7 +140,7 @@ it, and the hosted pages create a sign-in flow bound to that browser.
 | `app_id` | yes | Your app id. `client_id` is accepted as an alias (OAuth libraries send it); if both are sent they must agree. |
 | `redirect_uri` | yes | Exactly one of your registered `redirect_uris` (loopback hosts match on any port, see [registering](add-sign-in.md#before-you-start)). |
 | `response_type` | no | `code`, or leave it out. Anything else is `unsupported_response_type`: only authorization codes are issued (no implicit or hybrid flows). |
-| `state` | for you, yes | Up to 1,024 printable characters, returned byte for byte. Silicon Accounts doesn't require it; your app must. |
+| `state` | for you, yes | Up to 1,024 printable characters, returned byte for byte. We don't require it, but your app must. |
 | `code_challenge` | recommended | 43 to 128 characters of `A-Z a-z 0-9 - . _ ~`. For S256: base64url(SHA-256(verifier)) without padding (43 characters). |
 | `code_challenge_method` | with a challenge | `S256` (use this) or `plain`. A challenge without a method is treated as `S256`, not `plain`. A method without a challenge is refused. |
 | `scope` | no | Space-separated: `profile` (always granted), `email`, `phone`, `dob`, `timezone`, `openid` (adds an `id_token`), `offline_access` (accepted, ignored: refresh tokens are always issued). Unknown scopes are `invalid_scope`. Without `scope` the request asks for `profile`. |
@@ -149,22 +149,22 @@ it, and the hosted pages create a sign-in flow bound to that browser.
 | `intent` | no | `signin` (default) or `signup`: the sign-in or the sign-up version of the pages ("Sign in to Briefcase" or "Create your Briefcase account"). Anything else is `invalid_request`. |
 | `method` | no | `google`, `apple`, `email` or `phone`: open that method directly. It must be one of the app's enabled methods, else `method_not_enabled`. |
 
-`login_hint` is accepted and ignored: your app can never hand Silicon Accounts a Carbon's email or
-phone number; the Carbon always types it on the hosted pages.
+`login_hint` is accepted and ignored. Your app can never hand us a Carbon's email or phone
+number: the Carbon always types it on the hosted pages.
 
-Other parameters (`max_age`, `ui_locales`, `request`, `claims`, …) are ignored. Repeated
-parameters use their first value.
+Other parameters (`max_age`, `ui_locales`, `request`, `claims`, …) are ignored. If a parameter
+is repeated, we use its first value.
 
-What you ask for in `scope` is on top of what your sign-in setup already demands: your
+What you ask for in `scope` comes on top of what your sign-in setup already asks for: your
 `required_fields` are always required and your `optional_fields` are always offered. A detail
 you ask for in `scope` that isn't required is offered as optional (an unticked checkbox on the
-last page); the Carbon can leave it unticked.
+last page), and the Carbon can leave it unticked.
 [What your app sees](../learn/what-apps-see.md#the-whats-shared-screen) explains which details
 end up granted.
 
 ## When the browser comes back
 
-Success:
+When the sign-in succeeds:
 
 ```text
 http://localhost:3000/callback?code=sac_KjpuMF137oQt0PoSfQ_fhS7IdoE64Cs600N9PcasFhc&state=EChNem4VPMzmIxr8frLfQf-CTjKqg8KzfPGVICgiu_U
@@ -178,22 +178,22 @@ http://localhost:3000/callback?error=access_denied&error_description=The+Carbon+
 
 | `error` | When | What to do |
 |---|---|---|
-| `access_denied` | The Carbon cancelled on a details or review page. | Show your signed-out page; offer to try again. Nothing was shared. |
+| `access_denied` | The Carbon cancelled on a details or review page. | Show your signed-out page and offer to try again. Nothing was shared. |
 | `login_required` | `prompt=none`, and the browser isn't signed in to Silicon Accounts (or your app has `remember_browser` off, so the browser's account can't be reused). | Send the browser to `/authorize` without `prompt=none`. |
 | `consent_required` | `prompt=none`, and the account hasn't granted everything you now ask for. | Same: without `prompt=none`, so the Carbon sees the details pages. |
 | `interaction_required` | `prompt=none`, and the account misses a detail you require (a verified email or phone), or has no verified email at your `allowed_email_domains`. | Same: the pages ask for the missing detail or another account. |
-| `invalid_request`, `invalid_scope`, `unsupported_response_type` | Your authorize URL has a mistake (bad `prompt`, PKCE, `method`, scope, response type). The hosted page says so and offers "Back to the app", which lands here. | Read `error_description`, fix the URL. |
+| `invalid_request`, `invalid_scope`, `unsupported_response_type` | Your authorize URL has a mistake (bad `prompt`, PKCE, `method`, scope, response type). The hosted page says so and offers "Back to the app", which lands here. | Read `error_description` and fix the URL. |
 
-Some mistakes never come back to you, because sending the browser to an address the app
-never registered would make Silicon Accounts an open redirect. The hosted page explains the
-problem and stops: an unknown `app_id` (`unknown_app`), a disabled app (`app_disabled`), a
+Some mistakes never come back to you, because sending the browser to an address your app never
+registered would make us an open redirect. For those, the hosted page explains the problem and
+stops there: an unknown `app_id` (`unknown_app`), a disabled app (`app_disabled`), a
 `redirect_uri` that isn't registered (`redirect_uri_not_registered`), a missing `app_id` or
 `redirect_uri`, and more than 300 sign-ins started from one network in a minute
 (`rate_limited`).
 
 ## Exchange the code
 
-From your server, within 2 minutes, once:
+From your server, once, within 2 minutes:
 
 ```sh
 curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/token" \
@@ -201,8 +201,8 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
   -d redirect_uri=http://localhost:3000/callback -d "code_verifier=$CODE_VERIFIER"
 ```
 
-or with the CLI in app mode (`silicon-accounts app use briefcase --secret-stdin` first, or
-`ACCOUNTS_APP_ID` / `ACCOUNTS_APP_SECRET` in the environment):
+Or with the CLI in app mode (run `silicon-accounts app use briefcase --secret-stdin` first, or
+set `ACCOUNTS_APP_ID` / `ACCOUNTS_APP_SECRET` in the environment):
 
 ```sh
 silicon-accounts app token exchange --code "$CODE" --redirect-uri http://localhost:3000/callback --code-verifier "$CODE_VERIFIER"
@@ -217,29 +217,28 @@ scope          profile email
 membership     briefcase:ptO
 ```
 
-Add `--json` for the full token response on stdout.
+Add `--json` to get the full token response on stdout.
 
-The client authenticates with HTTP Basic (`client_secret_basic`) or with `client_id` and
+Your app authenticates with HTTP Basic (`client_secret_basic`) or with `client_id` and
 `client_secret` in the form body (`client_secret_post`), never both. The body may also be
-JSON. The response and every token field are explained in
-[Exchange, refresh, check and revoke tokens](tokens.md). Refusals are RFC 6749 errors with an
-exact description:
+JSON. [Exchange, refresh, check and revoke tokens](tokens.md) explains the response and every
+token field. Refusals are RFC 6749 errors with an exact description:
 
 | Status, `error` | `error_description` (real examples) | Cause |
 |---|---|---|
 | 401 `invalid_client` | `The client_secret sent for 'briefcase' is wrong.` | Wrong or missing credentials (also `WWW-Authenticate: Basic realm="Silicon Accounts"`). |
 | 400 `invalid_grant` | `The authorization code is not known: it is mistyped, it was never issued, or it comes from another Silicon Accounts environment.` | A typo, or a code from another environment. |
-| 400 `invalid_grant` | `The authorization code was already used. Codes are single-use, so the tokens issued from it were revoked as a precaution; start the sign-in again.` | The code was exchanged before. The first exchange's tokens are revoked and your webhook gets `membership.signed_out` with reason `authorization_code_reuse`: someone else may hold the code. |
+| 400 `invalid_grant` | `The authorization code was already used. Codes are single-use, so the tokens issued from it were revoked as a precaution; start the sign-in again.` | The code was exchanged before. The first exchange's tokens are revoked and your webhook gets `membership.signed_out` with reason `authorization_code_reuse`, because someone else may hold the code. |
 | 400 `invalid_grant` | `The authorization code expired at 2026-10-07T02:35:19.274Z (codes are valid for 120 seconds after the sign-in); start the sign-in again.` | Exchanged too late. |
 | 400 `invalid_grant` | `redirect_uri 'http://localhost:3000/other' does not match the redirect_uri of the authorization request ('http://localhost:3000/callback'); the two must be exactly equal.` | Send the same `redirect_uri` as in the authorize URL. |
-| 400 `invalid_grant` | `code_verifier is required: the authorization request sent a code_challenge (PKCE, method S256).` | You sent a challenge; send its verifier. |
+| 400 `invalid_grant` | `code_verifier is required: the authorization request sent a code_challenge (PKCE, method S256).` | You sent a challenge, so send its verifier. |
 | 400 `invalid_grant` | `PKCE verification failed: the code_verifier does not match the code_challenge sent to /authorize (method S256: BASE64URL(SHA256(code_verifier)) must equal the code_challenge).` | Wrong verifier (often the verifier of another sign-in). |
 | 400 `invalid_grant` | `code_verifier was sent, but the authorization request had no code_challenge. …` | Refused to stop PKCE downgrade attacks: send the challenge to `/authorize`, or no verifier. |
 | 400 `invalid_grant` | `The authorization code was issued to a different app, not to 'dm'; …` | Each app exchanges only its own codes. |
 | 400 `unsupported_grant_type` | `grant_type 'password' is not supported; …` | Only `authorization_code`, `refresh_token`, the SLT grant and the device grant exist. |
 
-Any refused exchange uses the code up, so a retry with the same code always fails: start a
-new sign-in.
+Any refused exchange uses the code up, so a retry with the same code always fails. Start a
+new sign-in instead.
 
 ## prompt
 
@@ -251,52 +250,54 @@ new sign-in.
 | `select_account` | Show the account chooser. The hosted pages already show it whenever the browser is signed in, so this changes nothing today; it is accepted for OIDC libraries that send it. |
 | `none` | Show nothing: complete at once with the browser's account, or come back with `login_required`, `consent_required` or `interaction_required`. It can't be combined with other values (`invalid_request`). |
 
-`prompt=none` is the way to check silently whether someone is already signed in, for example
-when your page loads. It never shows a page: a Carbon who hasn't granted what you ask for gets
-`consent_required` instead of the details pages, so send them through a normal sign-in next. `max_age` is not supported: use `prompt=login` and compare `auth_time` instead.
+`prompt=none` is how you check quietly whether someone is already signed in, for example when
+your page loads. It never shows a page. A Carbon who hasn't granted what you ask for gets
+`consent_required` instead of the details pages, so send them through a normal sign-in next.
+`max_age` is not supported: use `prompt=login` and compare `auth_time` instead.
 
 ## Direct buttons and Sign in / Sign up
 
 Your own site can carry direct buttons: "Continue with Google", "Continue with Apple",
-"Continue with email", "Continue with phone number". Each is a link to `/authorize` with
-`method=…`:
+"Continue with email" and "Continue with phone number". Each one is a link to `/authorize`
+with `method=…`:
 
-- `method=email` or `method=phone` opens the hosted page straight on that empty field;
+- `method=email` or `method=phone` opens the hosted page straight on that empty field.
 - `method=google` or `method=apple` first opens our Opening page, "Opening Google to sign you in
-  to {app name}…" in your app's style (with "Powered by Silicon Accounts" at the bottom), then
-  moves on to Google or Apple by itself after a moment. A "Continue to Google" button is there in
+  to {app name}…", in your app's style (with "Powered by Silicon Accounts" at the bottom). After
+  a moment it moves on to Google or Apple by itself. A "Continue to Google" button is there in
   case it doesn't, and "Other ways to sign in" goes back to your other methods. Change its words
   with `copy.opening_title`.
 
-Or just a "Sign in" and a "Sign up" button: send `intent=signup` from your sign-up button, and
-the hosted pages show the sign-up version (`copy.signup_title`, default "Create your {app name}
-account"); the sign-in button sends nothing extra. The account logic is the same either way: a
-first visit with an email, phone, Google or Apple is a sign-up. `intent` and `method` combine,
-and the [SDK](sdk.md) and [iframe](iframe.md) render either set of buttons for you.
+Or keep it to a "Sign in" and a "Sign up" button. Send `intent=signup` from your sign-up
+button, and the hosted pages show the sign-up version (`copy.signup_title`, default "Create
+your {app name} account"). The sign-in button sends nothing extra. The account logic is the
+same either way: a first visit with an email, phone, Google or Apple is a sign-up. `intent` and
+`method` combine, and the [SDK](sdk.md) and [iframe](iframe.md) render either set of buttons
+for you.
 
-Every one of these only saves the Carbon a step: they can still go back and pick another method.
-Your app never passes their email or phone: the Carbon types it on our pages.
+Each of these only saves the Carbon a step: they can still go back and pick another method.
+Your app never passes their email or phone; the Carbon types it on our pages.
 
 ## What the Carbon is asked on the way
 
-After proving who they are, the hosted pages show your app's details pages before coming back:
-one page with everything you ask for, or the pages of your own [flow](sign-in-config.md#flows),
-with an optional review page at the end.
+After the Carbon proves who they are, the hosted pages show your app's details pages before
+sending them back. That is one page with everything you ask for, or the pages of your own
+[flow](sign-in-config.md#flows), with an optional review page at the end.
 
 - **Required details** are listed as shared (with a lock). If your `required_fields` include
-  `phone` (or `email`) and the account has no verified one, the Carbon adds it with a 6-digit
-  code right there, on that page. Date of birth and timezone are never missing: every account
-  has them.
+  `phone` (or `email`) and the account has no verified one, the Carbon adds it right there on
+  that page, with a 6-digit code. Date of birth and timezone are never missing, because every
+  account has them.
 - **Optional details** are checkboxes, unticked until the Carbon ticks them.
-- **When.** Every page the first time an account signs in to your app (and with
-  `prompt=consent`); after that only a page with something new, such as a detail you now
-  require. A Carbon with nothing new comes straight back.
+- **When.** Every page shows the first time an account signs in to your app (and with
+  `prompt=consent`). After that, only a page with something new shows, such as a detail you
+  now require. A Carbon with nothing new comes straight back.
 
 The exact rules are in [What your app sees about an account](../learn/what-apps-see.md).
 
 ## Who may sign in
 
-Three settings of your [sign-in setup](sign-in-config.md) decide who gets through:
+Three settings in your [sign-in setup](sign-in-config.md) decide who gets through:
 
 | Setting | Default | Effect |
 |---|---|---|
@@ -305,26 +306,25 @@ Three settings of your [sign-in setup](sign-in-config.md) decide who gets throug
 | `remember_browser` | `true` | `false`: never offer "Continue as …"; every sign-in proves the Carbon again. `POST …/continue` answers `403 continue_not_allowed`, and `prompt=none` always ends with `login_required` (its message says no Carbon is signed in in this browser even when one is: a known bug; the code is the part to trust). |
 
 A Silicon never meets these pages. When it signs in with a short-lived token, your
-`allowed_email_domains` are not applied to it (Silicons have no email); a Carbon getting a
+`allowed_email_domains` don't apply to it (Silicons have no email). A Carbon getting a
 short-lived token through the CLI does need a verified email at your domains.
 
 ## Google and Apple: one click or your own
 
-For both providers you choose a `mode` in the sign-in setup.
+For both providers, you choose a `mode` in the sign-in setup.
 
-**`managed` (one click).** Turn the method on and nothing else:
+**`managed` (one click).** Turn the method on and you're done:
 
 ```sh
 silicon-accounts app config set - <<< '{"methods": {"google": true, "apple": true}}'
 ```
 
-Google's and Apple's own consent pages then show Silicon Accounts as the requester.
+Google's and Apple's own consent pages then show Silicon Accounts as the one asking.
 
 **`byo` (bring your own).** Google's and Apple's consent pages show your app's name and logo,
-and the provider's quotas and review are yours. Silicon Accounts stays the medium: the
-provider sends the Carbon back to Silicon Accounts, which finishes the sign-in and then sends
-them to your redirect URI. So the address you register *at the provider* is Silicon Accounts'
-callback, never your own:
+and the provider's quotas and review are yours. We still sit in the middle: the provider sends
+the Carbon back to us, we finish the sign-in, and then we send them on to your redirect URI.
+So the address you register *at the provider* is our callback, never your own:
 
 | Provider | Register at the provider | Then send |
 |---|---|---|
@@ -338,7 +338,7 @@ curl -s -X PATCH -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" \
        "google": {"mode": "byo", "client_id": "525053125706-….apps.googleusercontent.com", "client_secret": "GOCSPX-…"}}'
 ```
 
-The secret and the `.p8` key are stored encrypted and never returned: reading the setup shows
+We store the secret and the `.p8` key encrypted and never return them: reading the setup shows
 `"client_secret_set": true` and `"private_key_set": true` instead. Sending `null` removes one.
 Switching to `byo` without them is refused, with every missing field named:
 
@@ -364,20 +364,20 @@ Switching to `byo` without them is refused, with every missing field named:
 
 Two more Google settings shape the provider's own page: `google.prompt` (`select_account` by
 default, or `consent`, `none`, `consent select_account`) and `google.hosted_domain`, a Google
-Workspace domain. With `hosted_domain` set, Google is asked (with its `hd` hint) to offer only
-accounts of that domain, and Silicon Accounts refuses any Google account from another domain
+Workspace domain. With `hosted_domain` set, we ask Google (with its `hd` hint) to offer only
+accounts of that domain, and we refuse any Google account from another domain
 (`hosted_domain_mismatch`), because a hint alone can be edited out of the URL.
 
-Whichever mode: an email that Google or Apple vouch for counts as verified, so it needs no
-code, and if that email already belongs to an account, the Carbon signs in to that account
-instead of creating a new one. Why the provider's answer can only be delivered by the browser
-that started the sign-in is in [How the hosted sign-in works](../learn/sign-in-flow.md#google-and-apple).
+In either mode, an email that Google or Apple vouches for counts as verified, so it needs no
+code. If that email already belongs to an account, the Carbon signs in to that account instead
+of creating a new one. Why the provider's answer can only be delivered by the browser that
+started the sign-in is in [How the hosted sign-in works](../learn/sign-in-flow.md#google-and-apple).
 
 ## The same flow in Rust
 
 The Rust package builds the authorize URL and makes every token call. This program prints the
 URL, reads back the address the browser lands on, then exchanges, checks, refreshes and
-revokes. The crate isn't on crates.io yet, so it is a `path` dependency on a checkout of the
+revokes. The crate isn't on crates.io yet, so it's a `path` dependency on a checkout of the
 repository ([Install](../reference/rust-client.md#install) says why):
 
 ```toml
@@ -474,6 +474,6 @@ the service's message and a hint. The whole package is in the
 | The hosted page says "This sign-in link is not set up right" | `redirect_uri` isn't one of your `redirect_uris` (`redirect_uri_not_registered`): a trailing slash, another host (`127.0.0.1` vs `localhost`) or `http` in production all count as different. | Register the exact URI, or send the registered one. |
 | "This app is not on Silicon Accounts" | Unknown `app_id`. | Check the app id in the link. |
 | The callback gets `error=invalid_request` | A bad `prompt`, `method`, PKCE parameter or `state` (over 1,024 characters or with control characters). | `error_description` names the parameter. |
-| `invalid_grant` "already used" right after a successful sign-in | Your callback ran twice (a double request, a browser prefetch, a retry), so the second exchange revoked the first one's tokens. | Exchange each code once; make the callback idempotent per `state`. |
+| `invalid_grant` "already used" right after a successful sign-in | Your callback ran twice (a double request, a browser prefetch, a retry), so the second exchange revoked the first one's tokens. | Exchange each code once, and make the callback idempotent per `state`. |
 | The Carbon lands on your callback with a `state` you don't know | The sign-in was started in another browser, or your state store forgot it. | Refuse it and start a new sign-in. Never exchange a code whose state you can't match. |
 | Every sign-in shows the details pages | You send `prompt=consent`, or ask in `scope` for details the account declined. | Ask in `scope` only for what you need. |

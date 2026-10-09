@@ -1,6 +1,6 @@
 ---
 title: Embed the sign-in buttons in an iframe
-description: Show your app’s sign-in buttons inside an iframe. Allow your website’s origin, add the frame and handle the return to your app.
+description: Put your app's sign-in buttons on your own page in an iframe. Allow your site's origin, add the frame and handle the return like any other sign-in.
 kind: instructive
 order: 12
 related:
@@ -12,14 +12,14 @@ related:
 
 # Embed the sign-in buttons in an iframe
 
-An iframe lets you put the sign-in buttons on your own page. It shows one button for each method your app has enabled, using your colours and logo, with "Powered by Silicon Accounts" below.
+The iframe puts your app's sign-in buttons on your own page. It shows one button for each method your app has turned on, in your colours and with your logo, with "Powered by Silicon Accounts" below them.
 
-First, add your website’s origin to `allowed_origins`. Then embed `/embed/v1/buttons` with the same parameters as an [authorize request](hosted-pages.md#the-authorize-request). When someone clicks a button, the whole window opens the hosted sign-in pages. After sign-in, the browser returns to your redirect URI. Handle that callback just as you would for the hosted pages.
+You add your site's origin to `allowed_origins`, then embed `/embed/v1/buttons` with the same parameters as an [authorize request](hosted-pages.md#the-authorize-request). When someone clicks a button, the whole window opens our hosted sign-in pages, and after the sign-in the browser comes back to your redirect URI. You handle that callback exactly as you would for the hosted pages.
 
-First allow the origin that will frame the buttons (scheme, host and port, no path), and
+Start by allowing the origin that will frame the buttons (scheme, host and port, no path), and
 register the redirect URI. Lists in a sign-in setup patch replace the whole list, so a patch
 of just `["http://localhost:3000"]` would delete every origin and redirect URI you already
-have, and sign-in on those sites would stop. Add to what is there instead (with `jq`):
+have, and sign-in on those sites would stop. Add to what's there instead (with `jq`):
 
 ```sh
 CONFIG=$(silicon-accounts app config get --json)
@@ -35,10 +35,10 @@ Updated briefcase (allowed_origins, redirect_uris); the sign-in setup is now ver
 
 Duplicates are dropped, so running it twice changes nothing. `--expected-version` refuses the
 patch (`409 config_version_conflict`) if someone changed the setup between your read and your
-write, instead of overwriting their change; read and patch again.
+write, instead of overwriting their change. If that happens, read and patch again.
 
-Then serve the page. State and PKCE are made on your server for every page view, exactly as
-for the hosted pages, so the callback is the same:
+Then serve the page. Your server makes the state and PKCE for every page view, exactly as for
+the hosted pages, so the callback is the same:
 
 ```ts
 // iframe-app.ts: the sign-in buttons in an iframe, with state + PKCE made on your server.
@@ -134,13 +134,13 @@ https://accounts.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=http
 ```
 
 and after the sign-in, the callback answered `Signed in as c:grace-hopper (briefcase:ptO)`.
-The app's Embed tab on developers.teamofsilicons.com prints this iframe for your own app id and
-redirect URIs, with a live preview.
+Your app's Embed tab on developers.teamofsilicons.com prints this iframe for your own app id
+and redirect URIs, with a live preview.
 
 ## Allow your origin
 
-Browsers only show the frame on pages whose origin is in your `allowed_origins`: the embed
-page answers with `Content-Security-Policy: frame-ancestors 'self' <your allowed_origins>`.
+Browsers only show the frame on pages whose origin is in your `allowed_origins`, because the
+embed page answers with `Content-Security-Policy: frame-ancestors 'self' <your allowed_origins>`.
 
 ```sh
 curl -sI "https://accounts.teamofsilicons.com/embed/v1/buttons?app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback" \
@@ -150,30 +150,31 @@ curl -sI "https://accounts.teamofsilicons.com/embed/v1/buttons?app_id=briefcase&
 
 - An origin is `scheme://host[:port]` with no path: `https://app.example.com`, not
   `https://app.example.com/login`. `https` is required except for `localhost`, `127.0.0.1`
-  and `[::1]`. Up to 50.
+  and `[::1]`. You can list up to 50.
 - `http://localhost:3000` and `http://127.0.0.1:3000` are different origins, and ports count.
 - With no allowed origins (or an unknown or disabled app), the page answers
   `frame-ancestors 'none'` and `X-Frame-Options: DENY`.
 - A change takes up to 30 seconds to reach the embed page.
 
-On an origin that isn't listed, the frame stays empty and the browser's console says why,
-for example in Chromium:
+On an origin that isn't listed, the frame stays empty and the browser's console says why. In
+Chromium, for example:
 
 ```text
 Framing 'https://accounts.teamofsilicons.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' http://localhost:3000". The request has been blocked.
 ```
 
-Why a list at all: a page that can frame the buttons can also dress them up (overlays,
-opacity tricks) to trick a click. Only you decide which of your pages may do that. Every
-other page of Silicon Accounts refuses to be framed by anyone.
+Why a list at all? A page that can frame the buttons can also dress them up (overlays,
+opacity tricks) to trick someone into a click. Only you decide which of your pages may do
+that. Every other page of Silicon Accounts refuses to be framed by anyone.
 
 ## Parameters of the frame
 
-The iframe's `src` takes the parameters of the [authorize request](hosted-pages.md#the-authorize-request):
-`app_id` (or `client_id`) and `redirect_uri` are required; `state`, `code_challenge`,
+The iframe's `src` takes the parameters of the [authorize request](hosted-pages.md#the-authorize-request).
+`app_id` (or `client_id`) and `redirect_uri` are required. `state`, `code_challenge`,
 `code_challenge_method`, `scope`, `nonce`, `prompt`, `intent` and `response_type` are passed on
-to `/authorize` unchanged when a button is clicked. `login_hint`, `email` and `phone` are dropped:
-your app never hands Silicon Accounts a Carbon's email or phone. These shape the frame itself:
+to `/authorize` unchanged when a button is clicked. `login_hint`, `email` and `phone` are
+dropped, because your app never hands Silicon Accounts a Carbon's email or phone. These shape
+the frame itself:
 
 | Parameter | Effect |
 |---|---|
@@ -183,7 +184,7 @@ your app never hands Silicon Accounts a Carbon's email or phone. These shape the
 | `theme` | Your page's theme: `light`, `dark` or `auto`. It sets the frame's color scheme so its background stays transparent on your page. The buttons paint in `light` or `dark` when you give one; otherwise in your branding's forced theme, else (with `auto`) the device's theme, else light. Not passed to `/authorize`. |
 
 The buttons follow your app's [branding](branding.md) (colours, corner style, button style,
-font, density) and its method order. Email (else phone) is the one filled button; Google and
+font, density) and its method order. Email (else phone) is the one filled button. Google and
 Apple stay neutral, as their own guidelines ask.
 
 ## Size the frame
@@ -195,18 +196,18 @@ The page inside the frame posts its height to your page whenever it changes:
 ```
 
 Follow it as the example does, checking `event.origin` first. Or load the [SDK](sdk.md) on
-your page: it resizes every `/embed/v1/buttons` frame on the page, including frames you wrote
-in HTML yourself, and `SiliconAccounts.mountFrame("#target", {...})` builds the iframe for you
-(it makes the state, and the PKCE pair with `pkce: "S256"`, and keeps them in `sessionStorage`
-for `handleCallback`).
+your page. It resizes every `/embed/v1/buttons` frame on the page, including frames you wrote
+in HTML yourself, and `SiliconAccounts.mountFrame("#target", {...})` builds the iframe for you.
+It makes the state (and the PKCE pair with `pkce: "S256"`) and keeps them in `sessionStorage`
+for `handleCallback`.
 
 ## Why the click leaves your page
 
-The buttons are links with `target="_top"`: the sign-in itself always runs in the whole
+The buttons are links with `target="_top"`, so the sign-in itself always runs in the whole
 window at `accounts.teamofsilicons.com`, never inside the frame. The Carbon sees the real
-address before typing a code, the Silicon Accounts session works without third-party
-cookies (which browsers block in frames), and Google and Apple, which refuse to be framed,
-work the same way. Your page gets the result on the redirect URI, like every other way.
+address before typing a code, the Silicon Accounts session works without third-party cookies
+(which browsers block in frames), and Google and Apple, which refuse to be framed, work the
+same way. Your page gets the result on the redirect URI, like every other way.
 
 ## When the frame shows an error
 
@@ -224,6 +225,6 @@ correctly"), logs the same text to the console, and marks it with `data-error-co
 | `network_error` | Silicon Accounts could not be reached (after two quiet retries). |
 | `no_allowed_origins` | Shown when the embed page is opened on its own and the app lists no allowed origins: other sites can't frame it yet. |
 
-The frame doesn't check `redirect_uri` against your registered list: that happens when a
+The frame doesn't check `redirect_uri` against your registered list. That happens when a
 button is clicked, and an unregistered one stops at the hosted page with "This sign-in link
 is not set up right". Test a click before you ship.

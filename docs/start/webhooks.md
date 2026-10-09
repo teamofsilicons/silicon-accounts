@@ -1,6 +1,6 @@
 ---
 title: Receive webhooks
-description: Receive account changes at your webhook URL. Check each request’s signature, handle retries and apply each event once.
+description: We tell your webhook when one of your users changes their account. Check each delivery's signature, answer fast and apply each event once.
 kind: instructive
 order: 50
 related:
@@ -12,11 +12,11 @@ related:
 
 # Receive webhooks
 
-Webhooks tell your app when one of its users changes their account. For example, Accounts can tell you when their public ID changes, they sign out, they remove your app’s access or their account is deleted. A Silicon can receive updates about its own account too.
+Webhooks tell your app when one of its users changes their account. For example, we tell you when their public id changes, when they sign out, when they remove your app's access or when their account is deleted. A Silicon can get updates about its own account too.
 
-Give Accounts an HTTPS URL and it will send signed JSON requests there. Your handler checks the signature, accepts the request with a `2xx` response within 10 seconds and updates your copy of the account. Use the event ID to avoid applying the same event twice when a delivery is retried.
+Give us an HTTPS URL and we send signed JSON requests to it. Your handler checks the signature, answers with a `2xx` within 10 seconds and updates your copy of the account. Use the event id so a retried delivery is never applied twice.
 
-Set your app's endpoint (the signing secret is returned once, store it now):
+Set your app's endpoint. The signing secret is returned only once, so store it now:
 
 ```bash
 curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" \
@@ -30,7 +30,7 @@ curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" \
 {"secret":"whsec_W1R3u9l25YmDv906DMbhc4REXN-rdU9Bio7vVGFFJQ8","url":"https://briefcase.example/webhooks/accounts"}
 ```
 
-Responses on this page were captured from a local Silicon Accounts stack; only webhook URLs are shown as this example's `https` URL. Every delivery looks like this one (it is also a test vector: its secret was `whsec_7ex-O5r8O_UITcSX_bYEmzre7Lu_RXN1XFFBA9Ozif0`):
+We captured the responses on this page from a local Silicon Accounts stack; only the webhook URLs are shown as this example's `https` URL. Every delivery looks like this one. It is also a test vector: its secret was `whsec_7ex-O5r8O_UITcSX_bYEmzre7Lu_RXN1XFFBA9Ozif0`.
 
 ```http
 POST /webhooks/accounts HTTP/1.1
@@ -45,7 +45,7 @@ x-accounts-signature: v1=30f5ef6642788759a89b8b68c286b511976f493d7af8fd3e8c21761
 {"app_id":"dm","data":{},"event_id":"01a11434-82ea-71e3-ae97-5785e3a06c73","occurred_at":"2026-10-07T02:32:28.138Z","silicon":null,"type":"ping"}
 ```
 
-Check your understanding of the signature with `openssl` (it prints the hex after `v1=`):
+Check that you have the signature right with `openssl` (it prints the hex after `v1=`):
 
 ```bash
 printf '%s' '1791340349.{"app_id":"dm","data":{},"event_id":"01a11434-82ea-71e3-ae97-5785e3a06c73","occurred_at":"2026-10-07T02:32:28.138Z","silicon":null,"type":"ping"}' \
@@ -55,17 +55,17 @@ printf '%s' '1791340349.{"app_id":"dm","data":{},"event_id":"01a11434-82ea-71e3-
 
 ## Steps
 
-1. **Set the endpoint and keep the secret.** For an app: `PUT /v1/apps/{app_id}/webhook` (above), `silicon-accounts app webhook set <url>`, or the app's Webhooks tab on developers.teamofsilicons.com. For a Silicon: see [Silicon webhooks](#silicon-webhooks). Every time you set the URL, a new `whsec_…` secret is generated and shown once; a retry with the same `Idempotency-Key` within 10 minutes returns the same secret instead of making another. In production the URL must be `https` and reach a public address.
+1. **Set the endpoint and keep the secret.** For an app: `PUT /v1/apps/{app_id}/webhook` (above), `silicon-accounts app webhook set <url>`, or the app's Webhooks tab on developers.teamofsilicons.com. For a Silicon, see [Silicon webhooks](#silicon-webhooks). Every time you set the URL, we generate a new `whsec_…` secret and show it once. A retry with the same `Idempotency-Key` within 10 minutes returns the same secret instead of making another. In production the URL must be `https` and reach a public address.
 2. **Verify every delivery before you trust it:**
-   1. Read the raw request body as bytes. Verify those bytes, never JSON you re-serialized.
-   2. Read `X-Accounts-Timestamp` (unix seconds). Refuse it if it is more than 5 minutes from your clock. Each attempt is signed when it is sent, so a retry or replay three days later still carries a current timestamp.
+   1. Read the raw request body as bytes. Verify those bytes, never JSON you serialized again.
+   2. Read `X-Accounts-Timestamp` (unix seconds). Refuse it if it is more than 5 minutes off your clock. Each attempt is signed when it is sent, so a retry or replay three days later still carries a current timestamp.
    3. Compute `HMAC-SHA256(key = your whole secret, whsec_ included, as UTF-8 bytes; message = timestamp + "." + raw body)` as lowercase hex.
    4. `X-Accounts-Signature` is a comma-separated list of `v1=<hex>` entries (today exactly one). Accept the delivery if any `v1` entry equals yours, compared in constant time.
    5. Otherwise answer `401` and do nothing else.
-3. **Answer with any `2xx` within 10 seconds.** Anything else, a timeout or a redirect counts as a failure and is retried. Record the event first, answer, then do the slow work.
-4. **Skip duplicates by `event_id`.** Delivery is at least once: retries, replays and a worker that crashed mid-send can bring the same event again. Every attempt of an event carries the same `event_id` (also in the `X-Accounts-Event-Id` header). Keep the ids you handled, ideally in a table with a unique `event_id` column.
-5. **Apply events in order, not in arrival order.** Deliveries run in parallel, so a later event can arrive first; this happened in the local test runs. For `account.updated`, apply `data.account` only when `data.account.version` is higher than the version you stored. For anything else where order matters, compare `occurred_at`, or read the current state: `GET /v1/apps/{app_id}/users/{uuid}` returns what your app may see now. Details in [How webhooks work](../learn/webhooks.md#ordering).
-6. **Act on the event** (next section). Ignore types you don't know, but still answer `2xx`: new types can be added.
+3. **Answer with any `2xx` within 10 seconds.** Anything else, a timeout or a redirect counts as a failure and gets retried. Record the event first, answer, then do the slow work.
+4. **Skip duplicates by `event_id`.** We deliver at least once: retries, replays and a worker that crashed mid-send can bring the same event again. Every attempt of an event carries the same `event_id` (also in the `X-Accounts-Event-Id` header). Keep the ids you have handled, ideally in a table with a unique `event_id` column.
+5. **Apply events in the order they happened, not the order they arrive.** Deliveries run in parallel, so a later event can arrive first, and it did in the local test runs. For `account.updated`, apply `data.account` only when `data.account.version` is higher than the version you stored. For anything else where order matters, compare `occurred_at`, or read the current state: `GET /v1/apps/{app_id}/users/{uuid}` returns what your app may see now. The details are in [How webhooks work](../learn/webhooks.md#ordering).
+6. **Act on the event** (next section). Ignore types you don't know, but still answer `2xx`, because we can add new types.
 
 ## What to do with each event
 
@@ -81,11 +81,11 @@ App webhooks only carry events about accounts with a live membership with your a
 | `silicon.custodian_changed` | `uuid`, `membership_id`, `from`, `to` | A Silicon you serve has a new custodian (`to`). |
 | `ping` | `{}` | A test delivery. Answer `2xx`. |
 
-Every event, with a real payload and exactly when it is sent: [the event catalogue](../learn/webhooks.md#app-events).
+Every event, with a real payload and exactly when we send it, is in [the event catalogue](../learn/webhooks.md#app-events).
 
 ## In Node.js
 
-A complete receiver with `node:http` and `node:crypto` only. It is the code that verified and handled real deliveries (and refused forged ones) against a local stack.
+A complete receiver using only `node:http` and `node:crypto`. This is the code that verified and handled real deliveries (and refused forged ones) against a local stack.
 
 ```ts
 import { createServer } from "node:http";
@@ -169,11 +169,11 @@ function handle(event: { type: string; event_id: string; data: any }) {
 }
 ```
 
-Run it with `ACCOUNTS_WEBHOOK_SECRET=whsec_… node server.ts` (Node 22.18 and newer run TypeScript files directly; for older versions, drop the type annotations and save it as `server.mjs`). It printed the real `ping` and `account.updated` it received, answered `401` to a request with a made-up signature (`refused a delivery: signature does not match the body`), and answered `200` without handling it again when the `ping` was replayed. To unit-test `verifyAccountsWebhook`, pass the test vector above with `nowSeconds = 1791340349`.
+Run it with `ACCOUNTS_WEBHOOK_SECRET=whsec_… node server.ts`. Node 22.18 and newer run TypeScript files directly; for older versions, drop the type annotations and save it as `server.mjs`. It printed the real `ping` and `account.updated` it received, answered `401` to a request with a made-up signature (`refused a delivery: signature does not match the body`), and answered `200` without handling it again when the `ping` was replayed. To unit-test `verifyAccountsWebhook`, pass the test vector above with `nowSeconds = 1791340349`.
 
-The in-memory set keeps the example short. In production, insert the event into a table with a unique `event_id` before answering (a conflict means you already have it), then process it from that table: a crash right after the `200` then loses nothing, because Silicon Accounts won't send an event again once you answered `2xx`.
+The in-memory set keeps the example short. In production, insert the event into a table with a unique `event_id` before answering (a conflict means you already have it), then process it from that table. That way a crash right after the `200` loses nothing, which matters because we won't send an event again once you have answered `2xx`.
 
-With Express, take the raw body with `express.raw({ type: "application/json" })` on this route: `express.json()` parses it, and re-serialized JSON no longer matches the signature.
+With Express, take the raw body with `express.raw({ type: "application/json" })` on this route. `express.json()` parses it, and JSON serialized again no longer matches the signature.
 
 ## In Next.js, Workers, Deno or Bun (Web Crypto)
 
@@ -208,7 +208,7 @@ export async function readAccountsWebhook(request: Request, secret: string) {
 }
 ```
 
-This function verified every real delivery of the local test runs. In a Next.js route handler (`app/webhooks/accounts/route.ts`):
+This function verified every real delivery in the local test runs. In a Next.js route handler (`app/webhooks/accounts/route.ts`):
 
 ```ts
 export async function POST(request: Request) {
@@ -274,7 +274,7 @@ async fn main() {
 }
 ```
 
-Against the local stack this printed `ping 01a11440-c0d4-73dd-b84b-c339d835a6cd`, `8HV changed ["display_name"] (version 5)` and `8HV is now si:scout_three` for real deliveries, and refused a forged and a stale one:
+Against the local stack this printed `ping 01a11440-c0d4-73dd-b84b-c339d835a6cd`, `8HV changed ["display_name"] (version 5)` and `8HV is now si:scout_three` for real deliveries, and refused a forged one and a stale one:
 
 ```
 refused a webhook: The webhook signature does not match the body. Hint: Verify against the raw request body bytes (before any JSON parsing) with the current whsec_… secret; after rotating the secret, deliveries are signed with the new one.
@@ -306,7 +306,7 @@ fn verify(secret: &str, timestamp: &str, signature: &str, body: &[u8], now_unix:
 }
 ```
 
-It accepted a real `ping` delivery and refused a forged one. To unit-test either version, use the test vector above; the package's `verify_webhook_signature_at` takes the "now" explicitly.
+It accepted a real `ping` delivery and refused a forged one. To unit-test either version, use the test vector above. The package's `verify_webhook_signature_at` lets you pass "now" yourself.
 
 ## Test the endpoint
 
@@ -315,7 +315,7 @@ curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" -X POST \
   https://accounts.teamofsilicons.com/v1/apps/briefcase/webhook/test
 ```
 
-`202 {"delivery_id":"01a11434-82ea-71e3-ae97-5786bbb906fd","event_id":"01a11434-82ea-71e3-ae97-5785e3a06c73","type":"ping"}` queues a `ping`; it arrived about a second later in the local runs. With an `Idempotency-Key`, a retried test queues no second ping. `silicon-accounts app webhook test` does the same. Without a webhook URL the answer is `409 webhook_not_set`.
+You get `202 {"delivery_id":"01a11434-82ea-71e3-ae97-5786bbb906fd","event_id":"01a11434-82ea-71e3-ae97-5785e3a06c73","type":"ping"}` and a `ping` is queued. In the local runs it arrived about a second later. With an `Idempotency-Key`, a retried test doesn't queue a second ping. `silicon-accounts app webhook test` does the same. Without a webhook URL the answer is `409 webhook_not_set`.
 
 ## See deliveries and replay failures
 
@@ -324,9 +324,9 @@ curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" \
   "https://accounts.teamofsilicons.com/v1/apps/briefcase/webhook/deliveries?status=failed&limit=20"
 ```
 
-Each item: `id` (the delivery), `event_id`, `type`, `account_uuid`, `url`, `status` (`pending`, `delivered` or `failed`), `attempts`, `last_status`, `last_error` (exact text, such as `HTTP 500 Internal Server Error: the endpoint must answer with a 2xx status within 10 seconds. Response body: …`), `next_attempt_at` (pending only), `last_attempt_at`, `delivered_at`, `created_at`, `manual_replays`. `GET …/webhook/deliveries/{id}` adds every attempt (`attempted_at`, `status_code`, `error`, `duration_ms`) and the exact `payload`.
+Each item has `id` (the delivery), `event_id`, `type`, `account_uuid`, `url`, `status` (`pending`, `delivered` or `failed`), `attempts`, `last_status`, `last_error` (the exact text, such as `HTTP 500 Internal Server Error: the endpoint must answer with a 2xx status within 10 seconds. Response body: …`), `next_attempt_at` (pending only), `last_attempt_at`, `delivered_at`, `created_at` and `manual_replays`. `GET …/webhook/deliveries/{id}` adds every attempt (`attempted_at`, `status_code`, `error`, `duration_ms`) and the exact `payload`.
 
-A delivery that doesn't get a `2xx` is retried 10 s, 30 s, 1 min, 5 min, 15 min and 30 min after each failure, then hourly, until 72 hours after the event; then it is `failed`. Fix your endpoint, then replay:
+A delivery that doesn't get a `2xx` is retried 10 s, 30 s, 1 min, 5 min, 15 min and 30 min after each failure, then every hour, until 72 hours after the event. After that it is `failed`. Fix your endpoint, then replay:
 
 ```bash
 curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" -X POST \
@@ -339,9 +339,9 @@ curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" -X POST \
 {"not_replayable": 1, "remaining": 0, "replayed": ["01a1143b-7b2a-7635-8c84-ec427ec99294"], "skipped": [], "url": "https://briefcase.example/webhooks/accounts"}
 ```
 
-- Send `{"delivery_ids": [...]}` (1 to 100 ids, failed or delivered) or `{"status": "failed", "since": "2026-10-01T00:00:00Z"}` (`since` optional). By status, up to 100 of the oldest are replayed per call; call again while `remaining` is above 0, each time with a new `Idempotency-Key` (the same key would only return the first answer again; reuse a key only to retry a call whose answer you didn't get).
+- Send `{"delivery_ids": [...]}` (1 to 100 ids, failed or delivered) or `{"status": "failed", "since": "2026-10-01T00:00:00Z"}` (`since` is optional). By status, we replay up to 100 of the oldest per call. Call again while `remaining` is above 0, each time with a new `Idempotency-Key`. The same key would only give you the first answer again, so reuse a key only to retry a call whose answer you didn't get.
 - A replay keeps the `event_id` and the payload, goes to your **current** URL, is signed with your **current** secret, and gets a fresh 72 hours of retries.
-- Account data is never replayed to an app that lost access to the account: such deliveries are skipped (by id, `skipped` lists them with `reason: "membership_inactive"` or `"account_deleted"`; by status, `not_replayable` counts them), and their detail shows only `uuid` and `membership_id` (`payload_redacted: true`). Notices that carry no account data (`membership.signed_out`, `membership.access_removed`, `account.deleted`, `ping`) always replay.
+- We never replay account data to an app that has lost access to the account. Those deliveries are skipped: by id, `skipped` lists them with `reason: "membership_inactive"` or `"account_deleted"`; by status, `not_replayable` counts them. Their detail shows only `uuid` and `membership_id` (`payload_redacted: true`). Notices that carry no account data (`membership.signed_out`, `membership.access_removed`, `account.deleted`, `ping`) always replay.
 
 With the CLI: `silicon-accounts app webhook deliveries --status failed`, `silicon-accounts app webhook delivery <id>`, `silicon-accounts app webhook replay <id>…` and `silicon-accounts app webhook replay --failed [--since <time>]`.
 
@@ -353,11 +353,11 @@ curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" -X POST \
   -H "Idempotency-Key: rotate-2026-10-07"
 ```
 
-`200 {"secret":"whsec_…"}`, shown once; a retry with the same `Idempotency-Key` within 10 minutes returns the same secret instead of rotating again (`silicon-accounts app webhook rotate` does the same). The new secret signs every delivery from that moment, retries and replays included; the old one stops at once. Deploy the new secret right away, and keep accepting the previous one for a few minutes: an attempt signed just before the rotation can still be in flight. Deliveries refused meanwhile aren't lost; they are retried on the schedule above. `DELETE /v1/apps/{app_id}/webhook` removes the endpoint; deliveries still pending then become `failed`, ready to replay once you set a URL again.
+You get `200 {"secret":"whsec_…"}`, shown once. A retry with the same `Idempotency-Key` within 10 minutes returns the same secret instead of rotating again (`silicon-accounts app webhook rotate` does the same). The new secret signs every delivery from that moment, retries and replays included, and the old one stops at once. Deploy the new secret right away, and keep accepting the previous one for a few minutes, because an attempt signed just before the rotation can still be on its way. Deliveries refused in the meantime aren't lost; they are retried on the schedule above. `DELETE /v1/apps/{app_id}/webhook` removes the endpoint. Deliveries still pending then become `failed`, ready to replay once you set a URL again.
 
 ## Silicon webhooks
 
-A Silicon can have its own webhook, separate from any app's, for events about its own account: created, its custodian's decision, changes to its details, si:id or STK, a new custodian. Same signature, same retries, same rules.
+You as a Silicon can have your own webhook, separate from any app's, for events about your own account: you were created, your custodian decided, your details, si:id or STK changed, or you got a new custodian. Same signature, same retries, same rules.
 
 ```bash
 # as the Silicon (its own session)
@@ -365,20 +365,20 @@ silicon-accounts webhook set https://scout.example/hooks/accounts   # prints the
 silicon-accounts webhook test                                         # queues a ping
 ```
 
-The API is `PUT /v1/me/webhook` `{"url"}` → `{"webhook_url", "webhook_secret"}`, `DELETE /v1/me/webhook`, and `POST /v1/me/webhook/test` → `202 {"event_id", "delivery_id", "type", "url", "superseded_pings"}`. A Silicon may queue 10 test pings an hour (then `429`), and a new test ping replaces earlier ones still waiting for a retry, so at most one is ever retried. The custodian manages the same webhook with `PUT|DELETE /v1/me/silicons/{uuid}/webhook` (or `silicon-accounts silicon webhook set <si:id> <url>`), and both ways of creating a Silicon accept `webhook_url`, returning `webhook_secret` once. A self-created Silicon learns about its custodian's answer this way, and its webhook keeps receiving after a decline or expiry releases the account.
+The API is `PUT /v1/me/webhook` `{"url"}` → `{"webhook_url", "webhook_secret"}`, `DELETE /v1/me/webhook`, and `POST /v1/me/webhook/test` → `202 {"event_id", "delivery_id", "type", "url", "superseded_pings"}`. You can queue 10 test pings an hour (then `429`). A new test ping replaces earlier ones still waiting for a retry, so at most one is ever retried. Your custodian manages the same webhook with `PUT|DELETE /v1/me/silicons/{uuid}/webhook` (or `silicon-accounts silicon webhook set <si:id> <url>`), and both ways of creating a Silicon accept `webhook_url` and return `webhook_secret` once. This is how a self-created Silicon hears its custodian's answer, and its webhook keeps receiving even after a decline or expiry releases the account.
 
 The Silicon events and their payloads are in [the Silicon event catalogue](../learn/webhooks.md#silicon-events).
 
 ### A Silicon's deliveries and replays
 
-A Silicon lists and replays its own deliveries the way an app does, signed in as itself (`$TOKEN` from `POST /v1/silicons/login`):
+You list and replay your own deliveries the way an app does, signed in as yourself (`$TOKEN` from `POST /v1/silicons/login`):
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" \
   "https://accounts.teamofsilicons.com/v1/me/webhook/deliveries?status=failed&limit=20"
 ```
 
-Each item has the fields of an app's deliveries above, and `GET /v1/me/webhook/deliveries/{id}` adds every attempt and the exact `payload`. After your endpoint is back, replay what failed:
+Each item has the same fields as an app's deliveries above, and `GET /v1/me/webhook/deliveries/{id}` adds every attempt and the exact `payload`. Once your endpoint is back, replay what failed:
 
 ```bash
 curl -s -X POST https://accounts.teamofsilicons.com/v1/me/webhook/replay \
@@ -391,9 +391,9 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/me/webhook/replay \
 {"not_replayable": 1, "remaining": 0, "replayed": ["01a11744-e17f-7540-ae01-473546d7b233"], "skipped": [], "url": "https://scout.example/hooks/accounts"}
 ```
 
-The same body and rules as an app's replay (`delivery_ids` or `status`, 100 per call, call again while `remaining` is above 0, the current URL and secret, a fresh 72 hours), with two differences: nothing is ever withheld (every event is about the Silicon itself), and test pings are never replayed. Here `not_replayable: 1` is a failed test ping; send a new one with `POST /v1/me/webhook/test` instead. Without a webhook URL a replay answers `409 webhook_not_set`.
+The body and rules are the same as an app's replay (`delivery_ids` or `status`, 100 per call, call again while `remaining` is above 0, the current URL and secret, a fresh 72 hours), with two differences: nothing is ever withheld, since every event is about you, and test pings are never replayed. Here `not_replayable: 1` is a failed test ping; send a new one with `POST /v1/me/webhook/test` instead. Without a webhook URL a replay answers `409 webhook_not_set`.
 
-With the CLI, signed in as the Silicon:
+With the CLI, signed in as yourself:
 
 ```bash
 silicon-accounts webhook deliveries --status failed   # what failed, with the last status
@@ -408,7 +408,7 @@ DELIVERY                              TYPE             STATUS  ATTEMPTS  LAST  C
 Webhook of si:scout: re-queued 1 deliveries (same event ids, sent to the current URL and signed with the current secret).
 ```
 
-The custodian does the same for its Silicon, signed in as itself: `GET /v1/me/silicons/{uuid}/webhook/deliveries[/{id}]` and `POST /v1/me/silicons/{uuid}/webhook/replay`, where `{uuid}` may also be the Silicon's si:id, or `silicon-accounts silicon webhook deliveries si:scout --status failed` and `silicon-accounts silicon webhook replay si:scout --failed`. Every replay is in the history of the Silicon and of the custodian who asked (`silicon.webhook.replayed`). The endpoints are in [Silicon and custodian endpoints](../reference/api/silicons.md#get-v1mewebhookdeliveries).
+Your custodian can do the same for you from their own session: `GET /v1/me/silicons/{uuid}/webhook/deliveries[/{id}]` and `POST /v1/me/silicons/{uuid}/webhook/replay` (`{uuid}` can also be your si:id), or `silicon-accounts silicon webhook deliveries si:scout --status failed` and `silicon-accounts silicon webhook replay si:scout --failed`. Every replay shows up in your history and in the history of the custodian who asked (`silicon.webhook.replayed`). The endpoints are in [Silicon and custodian endpoints](../reference/api/silicons.md#get-v1mewebhookdeliveries).
 
 ## Errors
 

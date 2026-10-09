@@ -1,6 +1,6 @@
 ---
 title: Import existing users
-description: Move your existing users into Silicon Accounts with a CSV or JSON file. Preview the result, run the import and fix any rows that failed.
+description: Bring the users you already have into Silicon Accounts from a CSV or JSON file. Dry run it first, import it, then fix the rows that failed.
 kind: instructive
 order: 18
 related:
@@ -13,9 +13,9 @@ related:
 
 # Import existing users
 
-Start with a CSV or JSON file of your app’s users. Run a dry run to see what Accounts would do with each row, then run the import when you are ready. The dry run does not change any accounts.
+Already have users? You don't lose them. Start with a CSV or JSON file of your app's users and do a dry run first: it shows what we would do with each row and changes no accounts. Then run the real import when you're ready.
 
-For each user, Accounts looks for a Carbon with the same email or phone number. If it finds one, it adds that Carbon to your app’s user list. Otherwise, it creates an account that the Carbon finishes setting up when they first sign in to your app. The import does not send emails or SMS messages.
+For each user, we look for a Carbon with the same email or phone number. If we find one, that Carbon joins your app's user base. If not, we create an account that the Carbon finishes setting up the first time they sign in to your app. The import never sends an email or an SMS.
 
 ```sh
 printf '%s' "$APP_SECRET" | silicon-accounts app use legacy-crm --secret-stdin
@@ -25,8 +25,8 @@ silicon-accounts app import users.csv --default-country US --wait             # 
 silicon-accounts app import rows <job-id> --outcome error                     # the rows to fix
 ```
 
-The examples on this page import into an app called `legacy-crm`. Replace it with your own
-`app_id`. This is the file they use, `users.csv`:
+The examples on this page import into an app called `legacy-crm`; use your own `app_id`
+instead. This is the file they use, `users.csv`:
 
 ```csv
 external_id,email,phone,display_name,username,dob,timezone
@@ -56,7 +56,7 @@ First errors:
   row 4: invalid_email: 'not-an-email' is not a valid email address: it has no '@'. It was left out.; missing_identifier: The row has no valid email or phone number left (see the warnings above), so it can't be matched to an account or create one.
 ```
 
-and `silicon-accounts app import rows 01a11440-1ce8-70a3-beeb-58e994801a5e` shows every row:
+Then `silicon-accounts app import rows 01a11440-1ce8-70a3-beeb-58e994801a5e` shows every row:
 
 ```text
 ROW  OUTCOME  ACCOUNT       MESSAGES
@@ -81,15 +81,16 @@ Reading it row by row:
 | 6 | matched | Priya already has a Silicon Accounts account with `priya@example.com`. She joins your user base; her own name, id and details stay hers. |
 | 7 | new account `c:priya-2` | The wanted id `c:priya` is taken, so the next free one is assigned and the row says so. An unknown timezone falls back to UTC. |
 
-The dry run applies the same rules as the real import, but it saves no accounts or memberships. Results can change if the underlying data changes before you import. For example, an ID shown as available might be taken in the meantime.
+The dry run follows the same rules as the real import, but it saves no accounts or memberships. Its results can change if things change before you import: an id it showed as free might be taken in the meantime, for example.
 
 ## Before you start
 
-- **Credentials.** Imports are run with the app's own credentials (`app_id` and app secret,
-  from Silicon Apps) or by one of its authors (its owner or an accepted co-author), signed in. Over HTTP the credentials
-  are `Authorization: Basic base64(app_id:app_secret)`, which is what `curl -u` sends. With
-  the CLI, `silicon-accounts app use legacy-crm --secret-stdin` stores the secret (mode 0600); run
-  `silicon-accounts app use legacy-crm` without a secret to act as one of the app's authors through your own session.
+- **Credentials.** You run an import with the app's own credentials (`app_id` and app secret,
+  from Silicon Apps), or as one of its authors (its owner or an accepted co-author), signed in.
+  Over HTTP the credentials are `Authorization: Basic base64(app_id:app_secret)`, which is what
+  `curl -u` sends. With the CLI, `silicon-accounts app use legacy-crm --secret-stdin` stores the
+  secret (mode 0600). Run `silicon-accounts app use legacy-crm` without a secret to act as one of
+  the app's authors through your own session.
 - **Where.** The CLI talks to `https://accounts.teamofsilicons.com` unless `--url` or
   `ACCOUNTS_URL` says otherwise. The curl examples assume:
 
@@ -103,16 +104,16 @@ The dry run applies the same rules as the real import, but it saves no accounts 
   It counts like an import toward your budgets (60 requests per hour, 2,000,000 rows per 24
   hours), so dry-run the whole file once rather than piece by piece.
 
-On [developers.teamofsilicons.com](https://developers.teamofsilicons.com) the same flow is the app's
-**Import** tab (`/apps/{app_id}/import`): pick the file, read the dry-run report, then import it
-for real.
+On [developers.teamofsilicons.com](https://developers.teamofsilicons.com), the same flow is the
+app's **Import** tab (`/apps/{app_id}/import`): pick the file, read the dry-run report, then
+import it for real.
 
 ## 1. Prepare the file
 
 ### The columns
 
-These are the only columns an import accepts. An app's user base has the columns Silicon
-Accounts gives it, and nothing else, so there is nowhere to keep any other column.
+An import accepts only these columns. Your app's user base has the columns we give it and
+nothing else, so there's nowhere to keep any other column.
 
 | column | holds | rules |
 |---|---|---|
@@ -129,23 +130,24 @@ Accounts gives it, and nothing else, so there is nowhere to keep any other colum
 | `email_verified` | `true`/`false` | Kept in your imported data only. Imported addresses are never trusted as verified: the Carbon proves the address when they sign in. |
 
 Every row needs at least one **usable email or phone number**. A row without one is an error,
-because there is nothing to match it with and nothing its owner could sign in with.
+because there's nothing to match it with and nothing its owner could sign in with.
 
 **Put the address Carbons sign in with first.** A new account carries exactly one address: the
-first valid email of the row (`email`, then `emails`), or, when the row has no valid email, the
-first valid phone. That is the address the Carbon must use to finish the account. Your other
-addresses for them stay in your imported data until they add and verify them themselves.
+first valid email of the row (`email`, then `emails`), or the first valid phone when the row has
+no valid email. That's the address the Carbon must use to finish the account. Any other
+addresses you have for them stay in your imported data until they add and verify them
+themselves.
 
 ### Rules for every file
 
-- Column names are case-insensitive (`Email` is `email`) and surrounding spaces are ignored.
-  `name` is the same column as `display_name`; a file with both is refused, like any column
+- Column names are case-insensitive (`Email` is `email`), and surrounding spaces are ignored.
+  `name` is the same column as `display_name`, so a file with both is refused, like any column
   given twice.
 - Every value is trimmed. Blank cells, `null` and empty lists count as "not given".
 - A file with any other column is refused as a whole with `unknown_columns`, which lists them
-  and the allowed ones. Remove them, or send `ignore_unknown_columns=true` to import the rest:
-  each row that had a value in an ignored column gets an `unknown_columns` warning. Only the
-  names of ignored columns are kept, never their values.
+  along with the allowed ones. Remove them, or send `ignore_unknown_columns=true` to import the
+  rest; then each row that had a value in an ignored column gets an `unknown_columns` warning.
+  We keep only the names of ignored columns, never their values.
 - One file holds at most 100,000 rows and 50 MB. Split bigger exports (see
   [Big imports](#big-imports)).
 
@@ -154,7 +156,7 @@ addresses for them stay in your imported data until they add and verify them the
 - UTF-8 with a header line. A UTF-8 byte order mark (Excel's "CSV UTF-8") is stripped.
 - `Content-Type: text/csv` (also `application/csv`, `text/comma-separated-values`,
   `application/vnd.ms-excel`). Options go in the query string.
-- Quoted cells may hold commas, quotes (`""`) and newlines; a quoted newline does not start a
+- Quoted cells may hold commas, quotes (`""`) and newlines; a quoted newline doesn't start a
   new row.
 - Rows are read flexibly: cells past the header are ignored (warning `extra_fields`), missing
   trailing cells read as empty (warning `missing_fields`), and a line of only whitespace is
@@ -176,12 +178,12 @@ addresses for them stay in your imported data until they add and verify them the
 ```
 
 - `rows` is required and must be an array of objects; `options` is optional. Any other key in
-  the body is refused, so a misspelt option can't be silently ignored.
-- Options may also be query parameters. The same option given in both places with different
-  values is refused (`validation_failed`): a dry run must never turn into a real import by
-  accident.
-- The CLI and the developer platform's Import tab also accept a file that is just the array (`[{…}, {…}]`) and wrap
-  it for you; the HTTP API needs `{"rows": […]}`.
+  the body is refused, so a misspelt option is never silently ignored.
+- Options can also be query parameters. The same option given in both places with different
+  values is refused (`validation_failed`), because a dry run must never turn into a real import
+  by accident.
+- The CLI and the developer platform's Import tab also accept a file that is just the array
+  (`[{…}, {…}]`) and wrap it for you. The HTTP API needs `{"rows": […]}`.
 
 ## 2. Check it with a dry run
 
@@ -198,15 +200,16 @@ curl -s -u "$APP_ID:$APP_SECRET" \
   "$ACCOUNTS_URL/v1/apps/$APP_ID/imports?default_country=US&dry_run=true"
 ```
 
-A dry run is a normal job with `"dry_run": true`: it reads every row, matches, picks ids and
-reports the same outcomes and messages the real import would, and writes no account, no
+A dry run is a normal job with `"dry_run": true`. It reads every row, matches, picks ids and
+reports the same outcomes and messages the real import would, but it writes no account, no
 membership and nothing a Carbon could see. Two things differ in its report:
 
 - `account_uuid` is always `null`, and matched rows don't name the account (`id` is `null`
-  too). A dry run must not work as a way to look up who owns an email address.
+  too). A dry run must never work as a way to look up who owns an email address.
 - The ids shown for new accounts are the ones free at that moment.
 
-Dry runs count toward the hourly request limit and the daily row budget like real imports.
+Dry runs count toward the hourly request limit and the daily row budget, just like real
+imports.
 
 ## 3. Import it
 
@@ -218,8 +221,8 @@ curl -s -u "$APP_ID:$APP_SECRET" \
   "$ACCOUNTS_URL/v1/apps/$APP_ID/imports?default_country=US"
 ```
 
-The request only reads and checks the file; the rows are processed in the background. It
-answers `202 Accepted` with the job:
+The request only reads and checks the file; we process the rows in the background. It answers
+`202 Accepted` with the job:
 
 ```json
 {
@@ -278,15 +281,16 @@ curl -s -u "$APP_ID:$APP_SECRET" "$ACCOUNTS_URL/v1/apps/$APP_ID/imports/01a11440
 | `options`, `dry_run`, `format` | What the job runs with. |
 
 `silicon-accounts app import status <job-id> --wait` follows a job from the CLI, and
-`silicon-accounts app import list` (or `GET /v1/apps/{app_id}/imports`, newest first) lists them.
+`silicon-accounts app import list` (or `GET /v1/apps/{app_id}/imports`, newest first) lists your
+jobs.
 
 **Send an `Idempotency-Key` with every import.** If the connection drops before you see the
-`202`, send the same request again with the same key: you get the original answer back
-(header `Idempotent-Replayed: true`) instead of a second job. The replay is the answer as it
-was first given (`"status": "queued"`); read the job to see where it is now. A key is
-remembered for 24 hours, and reusing it for a different file or different options is refused
-with `409 idempotency_key_reused`. The CLI sends a random key on every run; pass
-`--idempotency-key` to retry an upload safely.
+`202`, send the same request again with the same key. You get the original answer back (header
+`Idempotent-Replayed: true`) instead of a second job. The replay is the answer exactly as it was
+first given (`"status": "queued"`), so read the job to see where it is now. We remember a key for
+24 hours, and reusing it for a different file or different options is refused with
+`409 idempotency_key_reused`. The CLI sends a random key on every run; pass `--idempotency-key`
+to retry an upload safely.
 
 ## 4. Read what happened to each row
 
@@ -350,14 +354,14 @@ Rows come back in file order. Filter them with any of:
 | `messages` | `{level, code, message, field?}` in the order they arose. |
 | `input` | The row as you sent it (only import columns), plus `_ignored_columns`, `_ignored_count` and `_extra_cells` when the row had them. |
 
-From the CLI: `silicon-accounts app import rows <job-id> --outcome error` (the CLI and the Rust client
-filter by `outcome`; use the HTTP API for `level` and `code`).
+From the CLI, run `silicon-accounts app import rows <job-id> --outcome error`. The CLI and the
+Rust client filter by `outcome`; use the HTTP API for `level` and `code`.
 
 ### Fix the errors and import again
 
-Correct the rows that failed and import the file again, whole or only those rows. Importing a
-row twice is safe: a row that was already imported matches the account it created, so nothing
-is duplicated. Re-importing the example file after its first import:
+Correct the rows that failed and import the file again, whole or just those rows. Importing a
+row twice is safe: a row that was already imported matches the account it created, so nothing is
+duplicated. Here is the example file imported a second time:
 
 ```text
 ROW  OUTCOME  ACCOUNT       MESSAGES
@@ -371,32 +375,31 @@ ROW  OUTCOME  ACCOUNT       MESSAGES
 ```
 
 A second import never changes what you stored the first time unless you ask for it with
-`update_existing=true` (outcome `updated`): then your imported details and your `external_id`
-for that account are replaced by the new row. The account's own data is never changed by an
-import.
+`update_existing=true` (outcome `updated`). Then your imported details and your `external_id`
+for that account are replaced by the new row. An import never changes the account's own data.
 
 ## 5. Your imported users sign in
 
-Nothing reaches your users when you import them. When you are ready, tell them yourself and
-send them to your normal sign-in (hosted pages, the iframe or the snippet; see
+Importing your users doesn't tell them anything. When you're ready, tell them yourself and send
+them to your normal sign-in (the hosted pages, the iframe or the snippet; see
 [Add sign-in to your app](add-sign-in.md)). Then, for a new (unfinished) account:
 
 1. They sign in with **the address the account carries**: a 6-digit code sent to it, or Google
    or Apple when that is their Google or Apple account's email (if your app offers them).
    Proving the address is what lets them claim the account.
 2. Instead of a new sign-up they see **Finish setting up your account**: "Legacy CRM added you
-   to Silicon Accounts. Check the details it gave us, then continue." Every field is filled
-   from your row: display name, `c:id`, timezone, date of birth and photo (your values win
-   over the name Google or Apple suggests). They can change any of them, then press
+   to Silicon Accounts. Check the details it gave us, then continue." Every field is filled in
+   from your row: display name, `c:id`, timezone, date of birth and photo (your values win over
+   the name Google or Apple suggests). They can change any of them, then press
    **Finish setup**. If they first sign in to another app with that address, they finish the
    same account there, and the page still names your app ("Legacy CRM added you to Silicon
    Accounts. Check the details it gave us, then continue to Briefcase."; the flow's
    `signup.imported_by`).
-3. They continue, and the account is theirs: status `active`, the proven address verified, the
-   **same uuid** your import reported. Your app receives that uuid in the token response, and
-   their membership turns from `imported` to `active`.
+3. They continue, and the account is theirs: status `active`, the proven address verified, and
+   the **same uuid** your import reported. Your app receives that uuid in the token response,
+   and their membership turns from `imported` to `active`.
 
-What the flow returned for row 1 in the walkthrough above (`signup` in the hosted flow):
+Here is what the flow returned for row 1 of the walkthrough above (`signup` in the hosted flow):
 
 ```json
 {
@@ -415,7 +418,7 @@ What the flow returned for row 1 in the walkthrough above (`signup` in the hoste
 }
 ```
 
-and the account your app got back after the code exchange:
+And the account your app got back after the code exchange:
 
 ```json
 {"uuid": "p1y", "membership_id": "legacy-crm:p1y", "kind": "carbon", "id": "c:kofi", "display_name": "Kofi Mensah", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=p1y", "email": "kofi@example.com", "email_verified": true, "updated_at": "2026-10-07T02:45:33.959Z", "version": 2}
@@ -424,16 +427,16 @@ and the account your app got back after the code exchange:
 Things to know:
 
 - A Carbon who signs in with **another** address (one that stayed in your imported data, like
-  Kofi's phone) has not proven the imported one, so they start a separate new account. With
+  Kofi's phone) hasn't proven the imported one, so they start a separate new account. With
   `allow_signup: false` that sign-up is refused (`signup_not_allowed`). Finishing an imported
   account is always allowed, even with `allow_signup: false`.
-- Imported Carbons finish in a browser, through an app's sign-in or the account site. The
-  CLI's code sign-in (`silicon-accounts login --email`) only signs in accounts that are already
-  active, and says so.
-- If someone finishes their account through another app first, they are already active; your
-  membership stays `imported` until they sign in to your app, then turns `active`.
-- When they finish, every address the import attached that they didn't prove is removed from
-  the account. Unproven addresses never sign anyone in.
+- Imported Carbons finish in a browser, through an app's sign-in or the account site. The CLI's
+  code sign-in (`silicon-accounts login --email`) only signs in accounts that are already active,
+  and says so.
+- If someone finishes their account through another app first, they are already active. Your
+  membership stays `imported` until they sign in to your app, and then turns `active`.
+- When they finish, every address the import attached that they didn't prove is removed from the
+  account. Unproven addresses never sign anyone in.
 
 Follow the progress in your user base:
 
@@ -454,8 +457,8 @@ silicon-accounts app show                           # includes: users  10 (1 act
 | `update_existing` | `--update-existing` | `false` | For rows matching an account that is already a member of your app: replace your imported details and `external_id` for it (outcome `updated`). Never changes the account's own data. |
 | `ignore_unknown_columns` | `--ignore-unknown-columns` | `false` | Import a file that has columns outside the list; their values are dropped and each affected row gets a warning. |
 
-Flags take `true`/`false` (also `1`/`0`, `yes`/`no`, `on`/`off`). Unknown options are refused
-with `invalid_query` (query string) or `validation_failed` (JSON body), never ignored.
+Flags take `true`/`false` (also `1`/`0`, `yes`/`no`, `on`/`off`). We refuse unknown options with
+`invalid_query` (query string) or `validation_failed` (JSON body), and never ignore them.
 
 ## Row outcomes
 
@@ -468,14 +471,14 @@ with `invalid_query` (query string) or `validation_failed` (JSON body), never ig
 | `error` | Not imported: the row can't be used as it is. The `error` message says what to fix. |
 | `pending` | Only while the job runs: not reached yet. |
 
-Only addresses that identify someone count when matching: a verified address on an account,
-or the address an earlier import (yours or another app's) gave an account nobody has finished
-yet. The Carbon is the same, so both imports point to the same unfinished account.
+When matching, only addresses that identify someone count: a verified address on an account, or
+the address an earlier import (yours or another app's) gave to an account nobody has finished
+yet. It's the same Carbon, so both imports point to the same unfinished account.
 
 ## Row messages
 
-Every message has a stable `code`. Errors stop the row; warnings say what was dropped or
-changed while the row went on; info explains a decision.
+Every message has a stable `code`. Errors stop the row, warnings say what was dropped or changed
+while the row went on, and info explains a decision.
 
 | code | level | outcome | when | what to do |
 |---|---|---|---|---|
@@ -487,7 +490,7 @@ changed while the row went on; info explains a decision.
 | `duplicate_in_file` | info | skipped | An address of this row appeared in an earlier row, or the row matches the same account as an earlier row through another address. The message names the earlier row; only that one was imported. | Merge the rows if they are one Carbon. |
 | `access_removed` | warning | skipped | The Carbon removed your app's access. An import never adds it back. | Nothing: they return to your user base when they sign in to your app again. |
 | `id_conflict` | warning | created | The `username` is taken by another account, reserved after an id change, or taken by an earlier row: "Wanted c:priya, assigned c:priya-2: c:priya is already taken by another account." | Nothing; tell the Carbon their id, or let them change it when they finish. |
-| `invalid_username` | warning | created | The `username` is not a valid handle (3–30 of `a-z 0-9 - _`), or is a Silicon id (`si:…`). Another id is assigned. | Fix it if the id matters. |
+| `invalid_username` | warning | created | The `username` is not a valid handle (3 to 30 of `a-z 0-9 - _`), or is a Silicon id (`si:…`). Another id is assigned. | Fix it if the id matters. |
 | `reserved_username` | warning | created | The `username` is a reserved word (`admin`, `support`, `root`, …). Another id is assigned. | Pick another username. |
 | `identifiers_not_attached` | info | created | The new account carries only the row's first address; the others stay in your imported data. | Nothing; the Carbon can add them later. |
 | `external_id_differs` | warning | matched | The account is already your member with another `external_id`; yours was kept. | Import with `update_existing=true` to replace it. |
@@ -518,26 +521,26 @@ characters, so one bad cell can't make a report unreadable.
 
 How a big job runs:
 
-- Rows are processed in file order, 500 per database transaction. Jobs of one app run one
-  after another; a second file waits in `queued`.
+- We process rows in file order, 500 per database transaction. One app's jobs run one after
+  another, so a second file waits in `queued`.
 - If the server restarts during a job, another worker resumes it after the last committed
   chunk. A job whose worker stops more than twice is marked `failed` rather than retried
-  forever; its `error` says so. Rows that already have an outcome were imported; submit the
+  forever, and its `error` says so. Rows that already have an outcome were imported; submit the
   file again to import the rest (rows already imported match their accounts).
-- An internal error on one chunk is retried twice; after that the job fails with "Silicon
-  Accounts hit an internal error while importing rows 1001–1500 … Rows before 1001 were
-  imported; re-submit the file".
-- Speed: in a local test on a laptop, a 100,000-row file of new Carbons (10 MB) was processed
-  in 58 seconds, and a dry run of the same file once it had been imported (every row matched)
-  took about half a minute from upload to report.
+- An internal error on one chunk is retried twice. After that the job fails, and its `error`
+  names the rows it stopped at (for example rows 1001 to 1500), says the rows before 1001 were
+  imported, and asks you to re-submit the file.
+- Speed: in a local test on a laptop, a 100,000-row file of new Carbons (10 MB) was processed in
+  58 seconds, and a dry run of the same file once it had been imported (every row matched) took
+  about half a minute from upload to report.
 
-For a large migration: split the export into files of at most 100,000 rows, dry-run each, then
-import them one after another with one idempotency key per file. Don't send many small files:
-each request counts toward the 60 per hour.
+For a large migration, split the export into files of at most 100,000 rows, dry-run each one,
+then import them one after another with one idempotency key per file. Don't send lots of small
+files, because each request counts toward the 60 per hour.
 
 ## When the whole request is refused
 
-These answers come back before a job exists: nothing was imported. Errors have the shape
+These answers come back before a job exists, so nothing was imported. Errors have the shape
 `{"error": {"code", "message", "hint", "details"?}}`.
 
 | status | code | why | fix |
@@ -632,7 +635,8 @@ completed {
 3 created c:li1 info identifiers_not_attached
 ```
 
-(`li` is too short for an id, which needs 3 characters, so `c:li1` was suggested instead.)
+(`li` is too short for an id, which needs at least 3 characters, so `c:li1` was suggested
+instead.)
 
 Rust, with the [`silicon-accounts-client`](../reference/rust-client.md) package:
 
@@ -670,8 +674,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-`ImportInput::Json(Vec<serde_json::Value>)` sends JSON rows as they are (so the service
-reports unknown columns itself), and `ImportInput::Rows(Vec<ImportRow>)` sends typed rows.
+`ImportInput::Json(Vec<serde_json::Value>)` sends JSON rows as they are (so we report unknown
+columns ourselves), and `ImportInput::Rows(Vec<ImportRow>)` sends typed rows.
 
 ## Why it works this way
 

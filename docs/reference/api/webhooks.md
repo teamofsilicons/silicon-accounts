@@ -1,6 +1,6 @@
 ---
 title: Webhook deliveries and events
-description: Look up webhook headers, signatures, event payloads and retry rules. Find the endpoints for listing and replaying deliveries.
+description: Every header, signature, event payload and retry rule of our webhooks and the event stream, and where to list and replay deliveries.
 kind: informative
 order: 67
 related:
@@ -14,9 +14,9 @@ related:
 
 # Webhook deliveries and events
 
-This reference lists the headers and JSON fields Accounts sends in webhook requests. Apps receive changes about their users. Silicons can receive changes about their own account.
+These are the headers and JSON fields we send in a webhook request. Apps hear about changes to their users, and a Silicon can hear about changes to its own account.
 
-Set an app’s URL with [`PUT /v1/apps/{app_id}/webhook`](apps.md#put-v1appsapp_idwebhook), or a Silicon’s URL with [`PUT /v1/me/webhook`](silicons.md#put-v1mewebhook). Follow [Webhooks](../../start/webhooks.md) to build a handler. [How webhooks work](../../learn/webhooks.md) explains delivery and retries.
+Set an app's URL with [`PUT /v1/apps/{app_id}/webhook`](apps.md#put-v1appsapp_idwebhook), or a Silicon's with [`PUT /v1/me/webhook`](silicons.md#put-v1mewebhook). To build a handler, follow [Webhooks](../../start/webhooks.md); [How webhooks work](../../learn/webhooks.md) explains delivery and retries.
 
 A real delivery:
 
@@ -62,11 +62,11 @@ The body:
 `HMAC-SHA256(key = the whole secret string including "whsec_", message = "{X-Accounts-Timestamp}.{raw body}")`.
 To accept a delivery:
 
-1. Compute the HMAC over the **raw body bytes** as received (before any JSON parsing), with the
-   timestamp header and a `.` in front.
+1. Compute the HMAC over the **raw body bytes** as you received them (before any JSON parsing),
+   with the timestamp header and a `.` in front.
 2. Compare it in constant time with every `v1=` value in the header (split on commas and spaces).
-3. Refuse a timestamp more than 5 minutes from your clock (a replayed capture); genuine retries
-   are signed again with a fresh timestamp.
+3. Refuse a timestamp more than 5 minutes from your clock, because that's a replayed capture.
+   Genuine retries are signed again with a fresh timestamp.
 4. Answer any 2xx within 10 seconds, then do the work. Dedupe on `event_id`.
 
 ```js
@@ -86,31 +86,36 @@ export function verifyWebhook(secret, timestamp, signatureHeader, rawBody, toler
 }
 ```
 
-Rust: [`verify_and_parse_webhook`](../rust-client.md#webhooks) does all four checks and parses
-the event. After `rotate-secret` every delivery, retry and replay is signed with the new secret.
+In Rust, [`verify_and_parse_webhook`](../rust-client.md#webhooks) does all four checks and
+parses the event. After `rotate-secret`, every delivery, retry and replay is signed with the new
+secret.
 
 ## Delivery, retries and order
 
-- A `2xx` response within 10 seconds marks the delivery as successful. Other statuses, timeouts and refused connections are retried after 10 seconds, 30 seconds, 1 minute, 5 minutes, 15 minutes, 30 minutes and then every hour. Retries stop 72 hours after the event, and the delivery becomes `failed`. [Replaying it](#deliveries-and-replay) starts another 72-hour retry period.
+- A `2xx` within 10 seconds marks the delivery as successful. Any other status, a timeout or a refused connection is retried after 10 seconds, 30 seconds, 1 minute, 5 minutes, 15 minutes, 30 minutes and then every hour. Retries stop 72 hours after the event, and the delivery becomes `failed`. [Replaying it](#deliveries-and-replay) starts another 72 hours of retries.
 - Each attempt goes to the target's **current** URL with its **current** secret.
-- Delivery is at least once: the same event can arrive twice (a retry after a slow 2xx, a
+- Delivery is at least once: the same event can arrive twice (a retry after a slow 2xx, or a
   replay). Dedupe on `event_id`.
-- **Order is not guaranteed.** Deliveries are sent in parallel and retried independently; a later
-  event can arrive first (`silicon.custodian.declined` before `silicon.created` happens). Use
-  `occurred_at`, and for account changes the `version` in `account`, to keep the newest state.
+- **Order is not guaranteed.** Deliveries go out in parallel and are retried independently, so a
+  later event can arrive first (`silicon.custodian.declined` before `silicon.created` does
+  happen). Use `occurred_at`, and for account changes the `version` in `account`, to keep the
+  newest state.
 - Redirects are not followed. In production a webhook URL must be https and resolve only to
   public addresses ([Security](../../learn/security.md#webhooks-never-reach-private-networks)).
-- Every attempt is recorded with its status and a precise `last_error`; the target lists them
-  ([Deliveries and replay](#deliveries-and-replay)).
+- Every attempt is recorded with its status and a precise `last_error`, and the target can list
+  them ([Deliveries and replay](#deliveries-and-replay)).
 
 ## Deliveries and replay
 
-Apps and Silicons list their deliveries and replay them the same way: a list newest first
-(`?status=pending|delivered|failed`, `limit`, `cursor`), one delivery with every attempt and the
-exact `payload`, and a replay by `{"delivery_ids": […]}` (1 to 100) or
-`{"status": "failed", "since"?}` (the oldest 100 failed per call). A replay keeps the `event_id`
-and the payload, goes to the **current** URL signed with the **current** secret, and starts a
-fresh 72 hours of retries.
+Apps and Silicons list and replay their deliveries the same way:
+
+- a list, newest first (`?status=pending|delivered|failed`, `limit`, `cursor`);
+- one delivery, with every attempt and the exact `payload`;
+- a replay, by `{"delivery_ids": […]}` (1 to 100) or `{"status": "failed", "since"?}` (the oldest
+  100 failed per call).
+
+A replay keeps the `event_id` and the payload, goes to the **current** URL signed with the
+**current** secret, and starts a fresh 72 hours of retries.
 
 | Who | List | One delivery | Replay |
 |---|---|---|---|
@@ -118,12 +123,12 @@ fresh 72 hours of retries.
 | a Silicon | [`GET /v1/me/webhook/deliveries`](silicons.md#get-v1mewebhookdeliveries) | `GET /v1/me/webhook/deliveries/{delivery_id}` | [`POST /v1/me/webhook/replay`](silicons.md#post-v1mewebhookreplay) |
 | its custodian | [`GET /v1/me/silicons/{uuid}/webhook/deliveries`](silicons.md#get-v1mesiliconsuuidwebhookdeliveries) | `GET /v1/me/silicons/{uuid}/webhook/deliveries/{delivery_id}` | [`POST /v1/me/silicons/{uuid}/webhook/replay`](silicons.md#post-v1mesiliconsuuidwebhookreplay) |
 
-Two differences. A replay never sends an app the data of an account that removed its access or
-was deleted (skipped `membership_inactive` / `account_deleted`, its detail
-`payload_redacted: true`), while a Silicon's events are all about the Silicon, so nothing is ever
-withheld from it or its custodian. And a Silicon's test pings are never replayed (skipped
-`test_ping`, counted in `not_replayable`): a replay would get around its limit of 10 test pings an
-hour; an app's `ping` replays like any event.
+There are two differences. First, a replay never sends an app the data of an account that
+removed its access or was deleted: it's skipped as `membership_inactive` or `account_deleted`,
+and its detail shows `payload_redacted: true`. A Silicon's events are all about the Silicon
+itself, so nothing is ever held back from it or its custodian. Second, a Silicon's test pings are
+never replayed (skipped as `test_ping`, counted in `not_replayable`), because a replay would get
+around its limit of 10 test pings an hour. An app's `ping` replays like any other event.
 
 ## Event stream
 
@@ -146,7 +151,8 @@ need a public URL to hear about changes. Each event's `data` is exactly the body
 | `after` (query) | the same, for clients that can't set headers; `Last-Event-ID` wins when both are sent |
 | `types` (query) | comma-separated event types to keep, like `account.updated,account.deleted` |
 
-Without a cursor the stream starts with new events. A real stream (an app's, through `curl -N`):
+Without a cursor, the stream starts with new events. Here is a real one, an app's, read with
+`curl -N`:
 
 ```http
 HTTP/1.1 200 OK
@@ -173,21 +179,24 @@ data: {"message":"The app's stream subscription was deleted, so nothing more is 
 
 - Every event has `id:` (its `event_id`), `event:` (its type) and `data:` (the webhook body).
 - `: heartbeat` comes after 15 seconds without events, so proxies keep the connection open.
-- `stream.closed` (no `id`) comes right before we end a stream. `reason` is `token_expired` (refresh
-  your token and reconnect), `access_removed` (the credentials stopped working: signed out,
-  revoked, an STK rotation, a rotated app secret, a disabled app), `subscription_deleted`,
-  `request_decided` (a waiting Silicon's custodian answered), `max_duration` (a stream lasts at most
-  an hour) or `server_restarting`. Reconnect with `Last-Event-ID` for anything but
-  `subscription_deleted` and `request_decided`.
-- Delivery is at least once, like webhooks: a resumed stream can repeat an event. Dedupe on
+- `stream.closed` (with no `id`) comes right before we end a stream. Its `reason` is
+  `token_expired` (refresh your token and reconnect), `access_removed` (the credentials stopped
+  working: signed out, revoked, an STK rotation, a rotated app secret, a disabled app),
+  `subscription_deleted`, `request_decided` (a waiting Silicon's custodian answered),
+  `max_duration` (a stream lasts at most an hour) or `server_restarting`. Reconnect with
+  `Last-Event-ID` for anything except `subscription_deleted` and `request_decided`.
+- Delivery is at least once, like webhooks: a resumed stream can repeat an event, so dedupe on
   `event_id`. Within one stream, events arrive in the order their changes were saved.
-- Credentials are checked again every 30 seconds while the stream is open.
+- We check the credentials again every 30 seconds while the stream is open.
 
-Errors: 401 (no or bad credentials; `invalid_request_token` for an unknown `sarq_` token), 409
-`stream_subscription_required` (an app without a stream subscription), 400 `unknown_event_id`
-(the cursor isn't an event of this feed), 400 `invalid_query` (a type this feed never carries),
-429 `too_many_streams` (5 open streams per app or account, with `Retry-After`), 503
-`stream_capacity_reached` (the server is full or restarting, with `Retry-After`).
+Errors:
+
+- 401: no or bad credentials (`invalid_request_token` for an unknown `sarq_` token);
+- 409 `stream_subscription_required`: an app without a stream subscription;
+- 400 `unknown_event_id`: the cursor isn't an event of this feed;
+- 400 `invalid_query`: a type this feed never carries;
+- 429 `too_many_streams`: 5 open streams per app or account, with `Retry-After`;
+- 503 `stream_capacity_reached`: the server is full or restarting, with `Retry-After`.
 
 ```sh
 curl -N "$ACCOUNTS_URL/v1/events/stream" -u "$APP_ID:$APP_SECRET"
@@ -197,8 +206,8 @@ curl -N "$ACCOUNTS_URL/v1/events/stream" -u "$APP_ID:$APP_SECRET" -H "Last-Event
 
 ## App events
 
-Sent to every app the account is a live member of (signed in or imported) that has a webhook,
-and only with what that app may see.
+We send these to every app the account is a live member of (signed in or imported) that has a
+webhook, and only with what that app may see.
 
 | Type | When | `data` |
 |---|---|---|
@@ -210,12 +219,16 @@ and only with what that app may see.
 | `silicon.custodian_changed` | a member Silicon got a new custodian (a transfer was accepted) | `uuid`, `membership_id`, `from`, `to` (account summaries) |
 | `ping` | a test (`POST …/webhook/test`) | `{}` |
 
-`membership.signed_out` reasons: `app_revoked` (the app revoked the token at
-`/v1/oauth/revoke`), `stk_rotated` (the Silicon's custodian rotated its STK, which ends every
-sign-in of the Silicon), `refresh_token_reuse` (a used refresh token was presented, so the
-sign-in was revoked), `authorization_code_reuse` (a code was redeemed twice, so the tokens issued
-from it were revoked). `user_signed_out` and `session_revoked` exist too; they end first-party
-sign-ins (the CLI, the account site), which no app receives.
+The `membership.signed_out` reasons:
+
+- `app_revoked`: the app revoked the token at `/v1/oauth/revoke`;
+- `stk_rotated`: the Silicon's custodian rotated its STK, which ends every sign-in of the Silicon;
+- `refresh_token_reuse`: a used refresh token was presented, so the sign-in was revoked;
+- `authorization_code_reuse`: a code was redeemed twice, so the tokens issued from it were
+  revoked.
+
+`user_signed_out` and `session_revoked` exist too, but they end first-party sign-ins (the CLI,
+the account site), which no app receives.
 
 Real payloads:
 
@@ -263,8 +276,8 @@ Real payloads:
 
 ## Silicon events
 
-Sent to a Silicon's own webhook. Separate from app webhooks, same delivery rules. `app_id` is null
-and `silicon` is the Silicon's uuid.
+These go to a Silicon's own webhook. They're separate from app webhooks but follow the same
+delivery rules. `app_id` is null and `silicon` is the Silicon's uuid.
 
 | Type | When | `data` |
 |---|---|---|
@@ -278,11 +291,11 @@ and `silicon` is the Silicon's uuid.
 | `silicon.custodian.changed` | a transfer was accepted | `uuid`, `id`, `from`, `to` (account summaries) |
 | `ping` | a test (`POST /v1/me/webhook/test`) | `{}` |
 
-`released: true` means the account was never activated and its id is free again; create the
-account again naming a Carbon who will accept.
+`released: true` means the account was never activated and its id is free again. Create the
+account again, naming a Carbon who will accept.
 
-Real payloads (`silicon` objects shortened). A self-created Silicon's `silicon.created`, then one
-created by its custodian:
+Real payloads (`silicon` objects shortened). First a self-created Silicon's `silicon.created`,
+then one created by its custodian:
 
 ```json
 {"app_id":null,"data":{"id":"si:echo","request":{"custodian":"c:saket","expires_at":"2026-10-21T02:42:16.450Z","id":"01a1143d-7d18-7330-9003-b16a9b0f309f","kind":"initial","status":"pending"},"silicon":{"uuid":"eiy","id":"si:echo","status":"pending_custodian","…":"…"},"status":"pending_custodian","uuid":"eiy"},"event_id":"01a1143d-7d1b-7330-931e-7b2c72c1b45c","occurred_at":"2026-10-07T02:42:16.475Z","silicon":"eiy","type":"silicon.created"}
@@ -317,6 +330,6 @@ created by its custodian:
 ```
 
 A self-created Silicon's `silicon.created` can arrive before the Silicon has stored the
-`webhook_secret` from the same response. A receiver that doesn't know the secret yet should
-answer non-2xx: the delivery is retried 10 seconds later, signed again. New event types may be
-added; answer 2xx and ignore types you don't know.
+`webhook_secret` from the same response. If your receiver doesn't know the secret yet, answer
+non-2xx: we retry 10 seconds later, signed again. We may add new event types, so answer 2xx and
+ignore the types you don't know.

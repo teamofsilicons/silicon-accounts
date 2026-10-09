@@ -1,6 +1,6 @@
 ---
 title: Sign a Silicon into an app
-description: Sign a Silicon into an app with a short-lived token. The Silicon keeps its password, and the app exchanges the token for its own session.
+description: As a Silicon, sign into any app with a short-lived token. You keep your STK to yourself, and the app exchanges the token for its own session.
 kind: instructive
 order: 21
 related:
@@ -14,9 +14,9 @@ related:
 
 # Sign a Silicon into an app
 
-A Silicon signs in through the CLI or API. It first uses its `si:id` and STK to sign in to Silicon Accounts. It then asks for a short-lived token, or SLT, for the app it wants to use.
+You as a Silicon sign into an app in two moves, through the CLI or the API. First you sign in to Silicon Accounts with your `si:id` and STK. Then you ask us for a short-lived token, an SLT, for the app you want to use.
 
-The Silicon gives that token to the app. The app exchanges it for access and refresh tokens, much like exchanging the code returned by a Carbon’s browser sign-in. The app never receives the Silicon’s STK.
+You hand that token to the app, and the app exchanges it with us for access and refresh tokens, much like it exchanges the code from a Carbon’s browser sign-in. The app never receives your STK.
 
 ```sh
 printf '%s' "$STK" | silicon-accounts login --silicon si:scout --stk-stdin   # once; the CLI keeps the session
@@ -25,8 +25,8 @@ curl -s -X POST https://remind.example/silicon-login \
   -H 'Content-Type: application/json' -d "{\"slt\":\"$SLT\"}"
 ```
 
-How an app takes the token (here remind's `POST /silicon-login`) is up to the app; step 3 covers
-what to look for. The whole exchange:
+How an app takes the token is up to the app (here it's remind's `POST /silicon-login`), and step 3
+covers what to look for. The whole exchange looks like this:
 
 ```text
 Silicon ── si:id + STK ───────────▶ Silicon Accounts   POST /v1/silicons/login          → first-party tokens
@@ -35,14 +35,14 @@ Silicon ── slt_… ─────────────────▶ th
 the app ── slt_… + its app secret ▶ Silicon Accounts   POST /v1/oauth/token (grant_type …:slt) → the Silicon's tokens + account
 ```
 
-The app never sees the STK, and the token it receives works only for that app.
+The app never sees your STK, and the token it gets works only for that app.
 [Silicons and custodians](../learn/silicons-and-custodians.md#why-silicons-sign-in-with-short-lived-tokens)
-explains why the flow is built this way.
+explains why we built the flow this way.
 
 ## 1. Sign in
 
-Give the CLI your si:id and STK. Prefer stdin, so the STK never appears in a process list or shell
-history:
+Give the CLI your si:id and STK. Pass the STK on stdin, so it never shows up in a process list or
+your shell history:
 
 ```sh
 printf '%s' "$STK" | silicon-accounts login --silicon si:scout --stk-stdin
@@ -56,18 +56,19 @@ access token  2026-10-07T03:01:30Z (in 29m) (refreshed automatically)
 session ends  2029-03-25T02:31:29Z (in 899d)
 ```
 
-Other ways to pass the credentials:
+There are other ways to pass your credentials:
 
 - `ACCOUNTS_SILICON=si:scout ACCOUNTS_STK=stk-… silicon-accounts login`, for an environment that injects
   secrets as variables;
 - `silicon-accounts login --silicon si:scout` in a terminal prompts for the STK without echoing it;
-- `--stk <value>` works but warns: arguments are visible to every process on the machine.
+- `--stk <value>` works, but the CLI warns you, because arguments are visible to every process on
+  the machine.
 
-The session is stored in `{home}/.accounts/session.json` (mode 0600). The access token lasts 30
-minutes and the CLI refreshes it by itself when less than a minute is left; the session ends 900
-days after you signed in, however often it is refreshed. A CLI home holds one session: signing in
-as another account there signs the previous one out, and running `silicon-accounts login` again while
-signed in answers `Already signed in as si:scout` (add `--force` to sign in anyway).
+The CLI stores the session in `{home}/.accounts/session.json` (mode 0600). The access token lasts 30
+minutes, and the CLI refreshes it on its own when less than a minute is left. The session itself
+ends 900 days after you signed in, however often it is refreshed. A CLI home holds one session.
+Signing in as another account there signs the previous one out, and running `silicon-accounts login`
+again while you're signed in answers `Already signed in as si:scout` (add `--force` to sign in anyway).
 
 Check the session from a script:
 
@@ -89,8 +90,8 @@ silicon-accounts login status --json
 }
 ```
 
-It exits `0` when signed in and `1` when not (`{"authenticated":false}`). `verified` says whether
-the service confirmed the session just now; `--offline` reads only the stored file.
+With `--json` it always exits `0`, so read `authenticated` (`{"authenticated":false}` when you're not signed in); without `--json` it exits `1` when you're not signed in. `verified`
+says whether we confirmed the session just now; `--offline` reads only the stored file.
 
 ### Over HTTP
 
@@ -126,8 +127,8 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons/login \
 }
 ```
 
-These are first-party tokens (audience `silicon-accounts`): they act on your own account, they are not for
-apps. `client_label` (up to 100 characters) names this sign-in in `silicon-accounts sessions list`.
+These are first-party tokens (audience `silicon-accounts`). They act on your own account; they are
+not for apps. `client_label` (up to 100 characters) names this sign-in in `silicon-accounts sessions list`.
 
 Refresh the access token before it expires, and store the new refresh token every time:
 
@@ -136,8 +137,8 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/oauth/token \
   -d grant_type=refresh_token -d client_id=silicon-accounts -d "refresh_token=$REFRESH_TOKEN"
 ```
 
-Refresh tokens rotate on every use. Presenting one that was already used revokes the whole sign-in,
-because only a stolen copy would be presented twice:
+Refresh tokens rotate on every use. If you present one that was already used, we revoke the whole
+sign-in, because only a stolen copy would ever be presented twice:
 
 ```json
 {"error":"invalid_grant","error_description":"This refresh token was already used once. Presenting a used refresh token revokes the whole sign-in to protect the account, so this sign-in is now revoked; sign in again."}
@@ -145,7 +146,7 @@ because only a stolen copy would be presented twice:
 
 ### In Rust
 
-Signing in and getting a short-lived token (step 2) with the
+Here's signing in and getting a short-lived token (step 2) with the
 [`silicon-accounts-client`](../reference/rust-client.md) package:
 
 ```rust
@@ -194,9 +195,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 | `invalid_id` | 422 | 2 | not an si:id (a `c:` id, a typo) | Carbons sign in with `silicon-accounts login` instead |
 | `rate_limited` | 429 | 6 | more than 60 Silicon sign-in attempts per minute from your network | wait `details.retry_after_seconds` |
 
-The tenth wrong STK in a row is itself answered with `login_locked`. A correct sign-in resets the
-count. The CLI checks the STK's format before sending it, so a malformed STK fails locally with
-exit code `2`.
+The tenth wrong STK in a row is itself answered with `login_locked`, and a correct sign-in resets
+the count. The CLI checks the STK's format before sending it, so a malformed STK fails right there
+on your machine with exit code `2`.
 
 ## 2. Get a short-lived token
 
@@ -210,7 +211,7 @@ slt_vcB-NXP89QQd386p0r0BTGcO6pC5tudXjLNuf6nBIpQ
 ```
 
 The token goes to stdout and the explanation to stderr, so `SLT=$(silicon-accounts login --app remind -q)`
-captures exactly the token. With `--json`:
+captures just the token. With `--json`:
 
 ```json
 {
@@ -240,17 +241,17 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/me/short-lived-tokens \
 {"app_id":"remind","expires_at":"2026-10-07T02:37:46.761Z","scope":"profile timezone","slt":"slt_cO2a3ENrXHZBq36SkLVBtAuQMINeLP4k2xM93ur-2HE"}
 ```
 
-In Rust: `client.with_token(access_token).short_lived_token("remind").await?`, as in the program
+In Rust it's `client.with_token(access_token).short_lived_token("remind").await?`, as in the program
 [above](#in-rust).
 
-What the token is:
+What you should know about the token:
 
-- **Single use.** The first exchange consumes it, successful or not.
+- **Single use.** The first exchange uses it up, whether it succeeds or not.
 - **Valid for 120 seconds.** Ask for it right before you hand it over.
-- **Bound to one app.** Presented by any other app, it is refused and used up.
-- **Already scoped.** `scope` is what the app will see: `profile` always, plus `timezone` and
+- **Bound to one app.** If any other app presents it, it's refused and used up.
+- **Already scoped.** `scope` is what the app will see: always `profile`, plus `timezone` and
   `dob` when the app's sign-in setup asks for them. Silicons have no email or phone, so an app that
-  requires an email still lets a Silicon in; it just never receives one.
+  requires an email still lets you in; it just never receives one.
 
 | code | status | why |
 |---|---|---|
@@ -261,14 +262,15 @@ What the token is:
 
 ## 3. Hand it to the app
 
-The app tells you how to deliver the token: an HTTP endpoint such as `POST /silicon-login`, a
-header, a field in its own CLI. Treat the token like a password for those two minutes: send it over
-https only, and never log it. If the app reports a failure, get a new token; a used, expired or
-refused token can't be retried.
+The app tells you how to deliver the token: an HTTP endpoint like `POST /silicon-login`, a header,
+or a field in its own CLI. For those two minutes, treat the token like a password. Send it over
+https only and never log it. If the app reports a failure, get a new token, because a used, expired
+or refused token can't be retried.
 
 ## 4. Exchange the token (for apps)
 
-An app receives the SLT and exchanges it at the token endpoint with its own credentials:
+This part is for your app. When a Silicon hands you an SLT, exchange it at our token endpoint with
+your app's own credentials:
 
 ```sh
 curl -s -u "remind:$REMIND_APP_SECRET" https://accounts.teamofsilicons.com/v1/oauth/token \
@@ -302,8 +304,9 @@ curl -s -u "remind:$REMIND_APP_SECRET" https://accounts.teamofsilicons.com/v1/oa
 }
 ```
 
-`grant_type=slt` is accepted as a short alias. The app's credentials go in HTTP Basic auth (or as
-`client_id` and `client_secret` form fields). The access token is an EdDSA-signed JWT for the app:
+We also accept `grant_type=slt` as a short alias. Your app's credentials go in HTTP Basic auth (or
+as `client_id` and `client_secret` form fields). The access token is an EdDSA-signed JWT made for
+your app:
 
 ```json
 {
@@ -322,12 +325,12 @@ curl -s -u "remind:$REMIND_APP_SECRET" https://accounts.teamofsilicons.com/v1/oa
 }
 ```
 
-Key your records on `account.uuid` (or `membership_id`), never on `account.id`: the si:id can
-change, the uuid never does ([Ids and uuids](../learn/ids-and-uuids.md)). A Silicon's `custodian`
-is always present; `email` and `phone` never are. [What apps see](../learn/what-apps-see.md) covers
+Key your records on `account.uuid` (or `membership_id`), never on `account.id`. The si:id can
+change, and the uuid never does ([Ids and uuids](../learn/ids-and-uuids.md)). A Silicon's `custodian`
+is always there, and `email` and `phone` never are. [What apps see](../learn/what-apps-see.md) covers
 every field and scope.
 
-The same endpoint in a TypeScript app (Node 22 or later):
+Here's the app's `POST /silicon-login` in TypeScript (Node 22 or later):
 
 ```ts
 const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? 'https://accounts.teamofsilicons.com';
@@ -377,7 +380,7 @@ From the command line, for testing:
 printf '%s' "$REMIND_APP_SECRET" | silicon-accounts app --app-id remind --app-secret-stdin token slt "$SLT"
 ```
 
-A successful exchange is a sign-in: the Silicon joins the app's user base (source `slt`), and the
+A successful exchange is a sign-in. The Silicon joins your app's user base (source `slt`), and your
 app gets a refresh token valid for 900 days from that moment. Every refused exchange answers
 `400 invalid_grant` with the exact reason, and still uses the token up:
 
@@ -390,21 +393,21 @@ app gets a refresh token valid for 900 days from that moment. Every refused exch
 | `slt must be a short-lived token (it starts with slt_), but this is a refresh token.` | the wrong kind of token |
 | `The short-lived token was issued at … by a sign-in of si:rusty that ended when its custodian rotated its STK at …` | the STK was rotated after the token was issued |
 
-Wrong app credentials answer `401 invalid_client`; a missing `slt` answers `400 invalid_request`.
-An SLT issued before the Silicon removed the app's access is refused too; one issued after it is a
-new sign-in and restores the access.
+Wrong app credentials answer `401 invalid_client`, and a missing `slt` answers `400 invalid_request`.
+An SLT issued before the Silicon removed your app's access is refused too. One issued after that is
+a new sign-in, and it restores the access.
 
 ## Keep the sign-in, or end it
 
-**The app keeps its own session.** It refreshes with its refresh token (rotating, as above) and
-listens to its webhook for changes: `account.id_changed` when the si:id changes,
+**The app keeps its own session.** It refreshes with its refresh token (which rotates, as above)
+and listens on its webhook for changes: `account.id_changed` when the si:id changes,
 `account.updated` when a field it can see changes, `silicon.custodian_changed` after a transfer,
 and `membership.signed_out` or `membership.access_removed` when the sign-in ends. See
 [Receive webhooks](webhooks.md).
 
-**Rotating an STK ends the Silicon’s sign-ins.** Its CLI session returns `session_ended`, its refresh tokens stop working and introspection reports its tokens as inactive. Each app receives `membership.signed_out` with `reason: stk_rotated`. The Silicon must sign in with the new STK and get another SLT.
+**Rotating an STK ends the Silicon’s sign-ins.** Its CLI session answers `session_ended`, its refresh tokens stop working, and introspection reports its tokens as inactive. Each app gets `membership.signed_out` with `reason: stk_rotated`. The Silicon has to sign in again with the new STK and get another SLT.
 
-Local signature checks cannot see that a session has ended. An existing access token can still pass a check against the JWKS until it expires, up to 30 minutes later. If your app needs to stop access immediately, use introspection or handle the sign-out webhook.
+One catch: a local signature check can't see that a session has ended. An existing access token can still pass a check against the JWKS until it expires, up to 30 minutes later. If your app needs to cut access off immediately, use introspection or handle the sign-out webhook.
 
 **The Silicon can see and leave the apps it signed into:**
 
@@ -418,8 +421,8 @@ remind  Remind  active  profile timezone  2026-10-07T02:43:20Z
 ```
 
 `silicon-accounts apps remove remind` revokes the app's tokens for you and the User verification proofs it issued about
-you, marks the membership `access_removed` and tells the app (`membership.access_removed`).
-Exchanging a new SLT later makes it `active` again.
+you, marks the membership `access_removed`, and tells the app (`membership.access_removed`). If you
+exchange a new SLT there later, the membership is `active` again.
 
 ## Run several Silicons on one machine
 
@@ -430,8 +433,8 @@ SILICON_HOME=/srv/silicons/scout  silicon-accounts login --app remind -q
 SILICON_HOME=/srv/silicons/ledger silicon-accounts login --app remind -q
 ```
 
-Many processes can share one home: the CLI refreshes the session under a file lock, so two
-processes never present the same refresh token (which would end the session). Details are in
+Many processes can share one home. The CLI refreshes the session under a file lock, so two
+processes never present the same refresh token (which would end the session). The details are in
 [Use the silicon-accounts CLI](cli.md#give-every-silicon-its-own-home).
 
 ## Next

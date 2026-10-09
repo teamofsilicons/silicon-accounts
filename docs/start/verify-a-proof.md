@@ -1,6 +1,6 @@
 ---
 title: Verify a proof
-description: Check an app verification or User verification token sent to your app. Read the result and decide whether to allow the requested action.
+description: When another app sends yours an App verification or User verification proof, ask us to check it, then read the answer and decide whether to allow the call.
 kind: instructive
 order: 40
 related:
@@ -12,9 +12,9 @@ related:
 
 # Verify a proof
 
-When another app sends your app a proof token (`sap_…`), ask Silicon Accounts to check it. Authenticate the check with your own app’s ID and secret. Accounts tells you whether the proof is valid for your app right now, who issued it and, for User verification, which account it represents.
+When another app sends your app a proof token (`sap_…`), ask us to check it, authenticated with your own app’s id and secret. We tell you whether the proof is valid for your app right now, which app issued it and, for User verification, which account it speaks for.
 
-Your app then checks the returned scopes and decides whether to allow the requested action. Start with this verification request:
+Then your app checks the scopes that come back and decides whether to allow what's being asked. Here's the check:
 
 ```bash
 curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" \
@@ -38,30 +38,30 @@ A valid proof answers `200` with everything you need to decide:
 }
 ```
 
-Here the app `dm` may act at `briefcase` for the Silicon `si:scout` (uuid `8HV`), with the scope `files.write`, until 02:43:13 UTC. Anything else answers `200` with exactly:
+Here the app `dm` may act at `briefcase` for the Silicon `si:scout` (uuid `8HV`), with the scope `files.write`, until 02:43:13 UTC. Anything else answers `200` with exactly this:
 
 ```json
 {"valid": false, "expires_at": null}
 ```
 
-These are real responses from a local Silicon Accounts stack, like every response on this page.
+Like every response on this page, these are real answers from a local Silicon Accounts stack.
 
 ## Steps
 
-1. **Take the token from the call.** How a proof travels between two apps is up to them; the apps in these docs send `Authorization: Proof sap_…`. Send only the token itself to Silicon Accounts, without the `Proof ` label.
-2. **Ask Silicon Accounts** with `POST /v1/proofs/verify`, authenticated as your app (`Authorization: Basic base64(app_id:app_secret)`) and the body `{"proof_token": "sap_…"}`. A proof verifies only for the apps it names, and only when they ask with their own credentials: the same token checked by `remind` instead of `briefcase` is `{"valid": false, "expires_at": null}`.
-3. **Refuse unless `valid` is `true`.** Every other case gets the same answer on purpose (see [Valid, or not valid, and nothing more](../learn/proofs.md#valid-or-not-valid-and-nothing-more)), so there is nothing to branch on.
+1. **Take the token from the call.** How a proof travels between two apps is up to them; the apps in these docs send `Authorization: Proof sap_…`. Send us only the token itself, without the `Proof ` label.
+2. **Ask Silicon Accounts** with `POST /v1/proofs/verify`, authenticated as your app (`Authorization: Basic base64(app_id:app_secret)`), with the body `{"proof_token": "sap_…"}`. A proof verifies only for the apps it names, and only when they ask with their own credentials. The same token checked by `remind` instead of `briefcase` is `{"valid": false, "expires_at": null}`.
+3. **Refuse unless `valid` is `true`.** Every other case gets the same answer on purpose (see [Valid, or not valid, and nothing more](../learn/proofs.md#valid-or-not-valid-and-nothing-more)), so there's nothing to branch on.
 4. **Check what this call needs** before acting:
    - `kind`: `user_verification` means the issuing app acts for an account; `app_verification` means the issuing app calls as itself and `user` is `null`.
    - `issuing_app.app_id`: the app making the call. Accept only the apps you decided to trust for this endpoint.
-   - `scopes`: must contain the scope this endpoint requires. Scopes are strings the apps agree on; Silicon Accounts carries them and never interprets them. A valid proof without the scope you need is still a refusal.
+   - `scopes`: must contain the scope this endpoint requires. Scopes are strings the apps agree on between themselves; we carry them and never interpret them. A valid proof without the scope you need is still a refusal.
    - `user.uuid` (User verification): the account to act for. Key your data on the uuid, which never changes; `user.id` (`c:…` or `si:…`) is for display and can change.
    - `expires_at`: when this proof token stops verifying.
 5. **Act and answer.** Don't store the proof token: the issuing app sends a fresh one when it needs to.
 
 ## In TypeScript
 
-`verifyProof` needs only `fetch` and `btoa`, so it runs in Node.js 18+, Deno, Bun and Workers. The endpoint around it is plain `node:http`; the same call fits an Express, Fastify or Next.js handler.
+`verifyProof` needs only `fetch` and `btoa`, so it runs in Node.js 18+, Deno, Bun and Workers. The endpoint around it is plain `node:http`, and the same call drops into an Express, Fastify or Next.js handler.
 
 ```ts
 import { createServer } from "node:http";
@@ -96,7 +96,7 @@ createServer(async (req, res) => {
 }).listen(3000);
 ```
 
-Against the local stack, a valid User verification proof from `dm` got `201 {"saved_for":"eiy","via":"dm"}`, and the same endpoint answered `403` for a revoked proof and for `sap_nope`.
+On the local stack, a valid User verification proof from `dm` got `201 {"saved_for":"eiy","via":"dm"}`, and the same endpoint answered `403` for a revoked proof and for `sap_nope`.
 
 ## In Rust
 
@@ -138,7 +138,7 @@ async fn main() -> Result<(), BoxError> {
 }
 ```
 
-`verify_proof` returns `ProofVerification::Invalid` for every `{"valid": false}` answer, and an `Err` only when the request itself failed (bad credentials, network). Against the local stack, `check_proof` returned `Some("eiy")` for a valid User verification proof from `dm`, `None` for the same proof with the scope `files.delete`, `None` when `remind` checked it, and `Some("commit")` for an app verification proof from `commit`; the program printed `refuse the call` for `sap_nope`.
+`verify_proof` returns `ProofVerification::Invalid` for every `{"valid": false}` answer, and an `Err` only when the request itself failed (bad credentials, network). On the local stack, `check_proof` returned `Some("eiy")` for a valid User verification proof from `dm`, `None` for the same proof with the scope `files.delete`, `None` when `remind` checked it, and `Some("commit")` for an App verification proof from `commit`. For `sap_nope`, the program printed `refuse the call`.
 
 ## With the CLI
 
@@ -151,7 +151,7 @@ ACCOUNTS_APP_ID=briefcase ACCOUNTS_APP_SECRET="$BRIEFCASE_APP_SECRET" \
 valid: User verification proof from dm for briefcase, on behalf of si:scout_two (8HV), scopes files.write files.read, until 2026-10-07T03:12:16Z (in 29m)
 ```
 
-The exit code is `0` when the proof is valid and `2` when it is not, so `silicon-accounts app proof verify "$TOKEN" && …` works in scripts and fails closed. Other exit codes mean the check itself didn't happen: `3` when your app's credentials were refused (wrong secret, disabled app), `1` when Silicon Accounts couldn't be reached. A command-line mistake also exits `2`, including running it as the app's owner without the app secret (verifying needs the app's own credentials); add `--json` to tell them apart: a checked proof prints the service's answer (`{"valid": …}`), a failure prints `{"error": {…}}`. Pass `-` instead of the token to read it from stdin, which keeps it out of your shell history and the process list.
+It exits `0` when the proof is valid and `2` when it isn't, so `silicon-accounts app proof verify "$TOKEN" && …` works in scripts and fails closed. Any other exit code means the check itself didn't happen: `3` when your app's credentials were refused (wrong secret, disabled app), and `1` when we couldn't be reached. A command-line mistake also exits `2`, and that includes running it as the app's owner without the app secret, because verifying needs the app's own credentials. To tell them apart, add `--json`: a checked proof prints our answer (`{"valid": …}`), and a failure prints `{"error": {…}}`. Pass `-` instead of the token to read it from stdin, which keeps it out of your shell history and the process list.
 
 ## What the answers mean
 
@@ -168,7 +168,7 @@ The exit code is `0` when the proof is valid and `2` when it is not, so `silicon
 
 ## Caching answers
 
-Verify on every call that needs the proof. It's cheap: on a local stack, one verification after another measured p50 0.46 ms and p99 0.89 ms, and 10 at a time p50 1.0 ms (numbers and conditions in [How proofs work](../learn/proofs.md#verification-is-a-live-call)). A revocation takes effect at Silicon Accounts immediately; a cached `valid: true` hides it until the cache entry expires. If you must cache, keep entries for seconds and never past the answer's `expires_at`.
+Verify on every call that needs the proof. It's cheap: on a local stack, one verification after another measured p50 0.46 ms and p99 0.89 ms, and 10 at a time p50 1.0 ms (the numbers and conditions are in [How proofs work](../learn/proofs.md#verification-is-a-live-call)). A revocation takes effect with us immediately, but a cached `valid: true` hides it until the cache entry expires. If you have to cache, keep entries for seconds, and never past the answer's `expires_at`.
 
 ## Related
 

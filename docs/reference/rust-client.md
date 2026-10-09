@@ -1,6 +1,6 @@
 ---
 title: Rust client
-description: Use silicon-accounts-client from Rust. Look up its types, methods and helpers, with examples for accounts, apps and custodians.
+description: Call Silicon Accounts from Rust with silicon-accounts-client, with every type, method and helper and working examples for accounts, apps and custodians.
 kind: informative
 order: 72
 related:
@@ -15,11 +15,11 @@ related:
 
 # Rust client
 
-Use `silicon-accounts-client` to call Silicon Accounts from Rust. The `silicon-accounts` CLI uses this package too, so the same operations are available to your code. Each method calls an endpoint in the [HTTP API](api.md).
+`silicon-accounts-client` is how you call Silicon Accounts from Rust. The `silicon-accounts` CLI is built on it, so anything the CLI does, your code can do too. Each method calls one endpoint of the [HTTP API](api.md).
 
-You control where credentials are stored. The client does not write files or persist tokens, and it reads environment variables only if you call `Config::from_env`.
+You decide where credentials live. The client never writes files or keeps tokens, and it reads environment variables only when you call `Config::from_env`.
 
-A Silicon signs in, then signs into an app:
+Here a Silicon signs in, then signs into an app:
 
 ```rust
 use silicon_accounts_client::AccountsClient;
@@ -41,7 +41,7 @@ async fn main() -> silicon_accounts_client::Result<()> {
 }
 ```
 
-Run against a local stack (`ACCOUNTS_URL=http://localhost:8590 STK=stk-… cargo run`), this printed:
+Run against a local stack (`ACCOUNTS_URL=http://localhost:8590 STK=stk-… cargo run`), it printed:
 
 ```text
 signed in as si:scout (K1E)
@@ -56,9 +56,9 @@ silicon-accounts-client = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-This example uses a local checkout of the [Silicon Accounts repository](https://github.com/teamofsilicons/silicon-accounts). Replace `/path/to/silicon-accounts/crates/client` with its location on your machine. Cargo builds the package with that checkout’s workspace settings.
+To build from a local checkout of the [Silicon Accounts repository](https://github.com/teamofsilicons/silicon-accounts) instead, point the dependency at `/path/to/silicon-accounts/crates/client`, replaced with its location on your machine. Cargo then builds the package with that checkout's workspace settings.
 
-Rust 1.98 or newer (edition 2024). Every call is `async` and returns
+You need Rust 1.98 or newer (edition 2024). Every call is `async` and returns
 `silicon_accounts_client::Result<T>`.
 
 ## Three handles
@@ -69,13 +69,16 @@ Rust 1.98 or newer (edition 2024). Every call is `async` and returns
 | `AccountSession<'_>` | `client.with_token(access_token)` | a signed-in Carbon or Silicon | `Authorization: Bearer` (a first-party token, `aud = silicon-accounts`) |
 | `AppClient<'_>` | `client.as_app(app_id, app_secret)`, or `session.app(app_id)` for an app you author | an app | HTTP Basic, or the author's Bearer token |
 
-`AccountsClient` holds only configuration and a connection pool: cheap to clone, share one per
-process. The handles borrow it and hold one credential each; refreshing an expired access token is
-up to you (`refresh_first_party`, `AppClient::refresh`).
+`AccountsClient` holds only configuration and a connection pool, so it's cheap to clone: share one
+per process. The handles borrow it and hold one credential each. Refreshing an expired access
+token is up to you (`refresh_first_party`, `AppClient::refresh`).
 
-In author mode (`session.app("briefcase")`) everything that manages the app works without its
-secret, including issuing App verification proofs (through the App verification page route) and revoking proofs by id.
-Some calls always need the app’s credentials: code, SLT and refresh-token exchange, `revoke`, `introspect`, `issue_user_verification`, `refresh_proof`, `verify_proof` and revoking a proof by token. Calling them in author mode fails before sending a request, with `Error::InvalidInput` and code `invalid_input`. For example:
+In author mode (`session.app("briefcase")`), everything that manages the app works without its
+secret, including issuing App verification proofs (through the App verification page route) and
+revoking proofs by id. Some calls always need the app's own credentials: code, SLT and
+refresh-token exchange, `revoke`, `introspect`, `issue_user_verification`, `refresh_proof`,
+`verify_proof` and revoking a proof by token. In author mode they fail before sending anything,
+with `Error::InvalidInput` and code `invalid_input`, like this:
 
 ```text
 Exchanging a short-lived token needs app briefcase's own credentials (app_id + app secret); an author's session can't do it on the app's behalf.
@@ -97,11 +100,11 @@ Exchanging a short-lived token needs app briefcase's own credentials (app_id + a
 
 `client.with_timeout(d)` and `client.with_telemetry(on)` return adjusted copies.
 
-`Config::from_env()` reads, when you want it to: `ACCOUNTS_URL`, `ACCOUNTS_APP_ID`,
-`ACCOUNTS_APP_SECRET`, `ACCOUNTS_TELEMETRY` (`0`/`off`/`false`/`no` disable), 
-`ACCOUNTS_TIMEOUT_SECONDS` (default 30), `ACCOUNTS_ALLOW_INSECURE_HTTP` (`1` allows). Then
-`config.client()?` and `config.app_client(&client)` (an `AppClient` when both app variables are
-set).
+`Config::from_env()` reads these, when you want it to: `ACCOUNTS_URL`, `ACCOUNTS_APP_ID`,
+`ACCOUNTS_APP_SECRET`, `ACCOUNTS_TELEMETRY` (`0`/`off`/`false`/`no` turn it off),
+`ACCOUNTS_TIMEOUT_SECONDS` (default 30) and `ACCOUNTS_ALLOW_INSECURE_HTTP` (`1` allows plain
+http). Then call `config.client()?`, and `config.app_client(&client)` for an `AppClient` when both
+app variables are set.
 
 ```rust
 let client = AccountsClient::builder()
@@ -140,13 +143,14 @@ let client = AccountsClient::builder()
 | `as_app(app_id, app_secret)` | No request | `AppClient` |
 
 `Contact` is `Contact::Email(String)` or `Contact::Phone { phone, country: Option<String> }`.
-Inputs are checked before sending where the rule is local (an empty STK, a code that isn't 6
-digits, a report over 10,000 characters, more than 50 telemetry events): `Error::InvalidInput`.
+Where a rule can be checked locally (an empty STK, a code that isn't 6 digits, a report over
+10,000 characters, more than 50 telemetry events), the input is checked before sending and fails
+with `Error::InvalidInput`.
 
 ## `AccountSession`
 
-A signed-in Carbon or Silicon. Lists that page are followed for you (up to 100 pages of 200)
-where the method returns a `Vec`.
+A signed-in Carbon or Silicon. Where a method returns a `Vec`, the client follows the pages for
+you (up to 100 pages of 200).
 
 | Method | Endpoint | Returns |
 |---|---|---|
@@ -219,23 +223,23 @@ where the method returns a `Vec`.
 | `lookup(uuid)`, `lookup_by_id(id)`, `resolve(uuid_or_id)` | `/v1/accounts/…` | `AccountSummary` |
 
 `ImportInput` is `Csv(Bytes)`, `Rows(Vec<ImportRow>)` or `Json(Vec<serde_json::Value>)`.
-`ReplayRequest` is `Deliveries(Vec<String>)` (1–100) or `Failed { since: Option<OffsetDateTime> }`.
-`ProofRef` is `Id`, `Token` or `RefreshToken`. `ProofVerification` is `#[non_exhaustive]`: match
-it with a wildcard arm.
+`ReplayRequest` is `Deliveries(Vec<String>)` (1 to 100) or `Failed { since: Option<OffsetDateTime> }`.
+`ProofRef` is `Id`, `Token` or `RefreshToken`. `ProofVerification` is `#[non_exhaustive]`, so
+match it with a wildcard arm.
 
 ## Types
 
 - **Request types** (`SiliconSelfCreate`, `CreateSilicon`, `UpdateSilicon`, `ProfileUpdate`,
-  `IssueUserVerification`, `IssueAppVerification`, `ImportOptions`, `ImportRow`, the `*Query` types, `PageRequest`,
-  `AuthorizeParams`) implement `Default`: write
+  `IssueUserVerification`, `IssueAppVerification`, `ImportOptions`, `ImportRow`, the `*Query`
+  types, `PageRequest`, `AuthorizeParams`) implement `Default`, so you can write
   `CreateSilicon { id: "si:scout".into(), display_name: "Scout".into(), ..Default::default() }`.
-- **Response types** are `#[non_exhaustive]`: read their fields; they tolerate fields the service
-  adds later and `null` where a value is usually present.
+- **Response types** are `#[non_exhaustive]`: read their fields. They tolerate fields the service
+  adds later, and `null` where a value is usually present.
 - **`Page<T>`**: `items`, `next_cursor` (`None` on the last page), `is_last()`, iterable.
 - **`Secret`** wraps every secret the service returns (access, refresh and short-lived tokens,
   STKs, webhook secrets, proof tokens, device codes). `Debug` prints only its prefix
-  (`Secret(sar_…)`), the memory is zeroed on drop, and `.expose()` gives the value where it must
-  leave your program.
+  (`Secret(sar_…)`), the memory is zeroed on drop, and `.expose()` gives you the value where it
+  has to leave your program.
 - **`TokenResponse`**: `access_token: Secret`, `token_type`, `expires_in`,
   `refresh_token: Option<Secret>`, `refresh_token_expires_at`, `scope`, `id_token`,
   `membership_id`, `account: Option<AccountForApp>`; `scopes()`, `access_expires_at(issued_at)`.
@@ -245,7 +249,7 @@ it with a wildcard arm.
 
 ## Errors
 
-Every call returns `silicon_accounts_client::Error`, `#[non_exhaustive]`:
+Every call fails with `silicon_accounts_client::Error`, which is `#[non_exhaustive]`:
 
 | Variant | When |
 |---|---|
@@ -259,9 +263,9 @@ Every call returns `silicon_accounts_client::Error`, `#[non_exhaustive]`:
 
 Helpers on `Error`: `code()`, `message()`, `hint()`, `status()`, `request_id()`, `details()`,
 `retry_after()`, `as_api()`, `as_oauth()`, `is_code(code)`, `is_not_found()`,
-`is_unauthenticated()` (401, `invalid_grant` or `invalid_client`), `is_transport()`. `Display`
+`is_unauthenticated()` (401, `invalid_grant` or `invalid_client`) and `is_transport()`. `Display`
 prints the message, then ` Hint: ` and the hint. `ApiError` has public `status`, `code`,
-`message`, `hint`, `details`, `request_id`, `retry_after` and `field_errors()` (the
+`message`, `hint`, `details`, `request_id` and `retry_after`, plus `field_errors()` (the
 `details.fields` pairs of a 422). Every code is listed in [Errors](errors.md#rust-client-codes).
 
 ```rust
@@ -275,7 +279,7 @@ match client.silicon_login("si:scout", "stk-000000000000", None).await {
 }
 ```
 
-printed:
+With a wrong STK, it printed:
 
 ```text
 Sign-in failed: no Silicon has this si:id, or the STK is wrong. Both cases get this same answer, so ids can't be probed. Hint: Check the si:id (use the current one; ids can change) and the STK (stk- followed by the hex characters shown once at creation or rotation). 10 wrong STKs in a row lock sign-in for 1 minute. A lost STK can be replaced by the Silicon's custodian (`silicon-accounts silicon rotate-stk`).
@@ -283,8 +287,8 @@ Sign-in failed: no Silicon has this si:id, or the STK is wrong. Both cases get t
 
 ## Examples
 
-Each example ran against a local stack (`scripts/dev.sh`); the printed values are from those runs
-(with the Accounts host written as production's).
+Each example ran against a local stack (`scripts/dev.sh`), and the printed values are from those
+runs (with the Accounts host written as production's).
 
 ### An app signs a Silicon in and checks the token
 
@@ -330,9 +334,9 @@ let tokens = app.exchange_code(&code, "https://briefcase.example/auth/callback",
 ```
 
 `url` is `https://accounts.teamofsilicons.com/authorize?response_type=code&app_id=briefcase&redirect_uri=…&state=…&code_challenge=…&code_challenge_method=S256&scope=openid+email`.
-`AuthorizeParams` also takes `.nonce()`, `.prompt()`, `.intent()` (`signin` or `signup`: your
-"Sign in" and "Sign up" buttons) and `.method()` (a direct "Continue with …" button). There is
-no `login_hint`: an app never hands Silicon Accounts a Carbon's email or phone.
+`AuthorizeParams` also takes `.nonce()`, `.prompt()`, `.intent()` (`signin` or `signup`, for your
+"Sign in" and "Sign up" buttons) and `.method()` (for a direct "Continue with …" button). There is
+no `login_hint`, because an app never hands Silicon Accounts a Carbon's email or phone.
 
 ### A Carbon signs in on a device
 
@@ -349,7 +353,7 @@ Open https://accounts.teamofsilicons.com/device and enter PJG8-55WW
 signed in as c:ada (8HV)
 ```
 
-The Carbon approves on the account site; from Rust, a signed-in Carbon can approve with
+The Carbon approves on the account site. From Rust, a signed-in Carbon can approve with
 `session.approve_device(&device.user_code)`.
 
 ### A Silicon creates its own account and waits for its custodian
@@ -390,7 +394,7 @@ polled: accepted
 ```
 
 `WaitOptions::fixed(d)`, `WaitOptions::backoff(initial, max)` and `.with_timeout(Some(d))` shape
-the polling; transient errors (network, 5xx, 429) are reported as `WaitEvent::TransientError` and
+the polling. Transient errors (network, 5xx, 429) are reported as `WaitEvent::TransientError` and
 retried.
 
 ### A custodian manages its Silicons
@@ -429,9 +433,9 @@ let page = app.deliveries(&DeliveriesQuery { status: Some("failed".into()), ..De
 let result = app.replay(&ReplayRequest::Failed { since: None }, None).await?;
 ```
 
-In the run, `config_version` went from 2 to 3; sending another patch with the old
+In the run, `config_version` went from 2 to 3. Sending another patch with the old
 `expected_version` failed with `err.code() == "config_version_conflict"` and `err.details()` =
-`{"current_version": 3, "expected_version": 2}`; the two-row dry run finished `completed` with
+`{"current_version": 3, "expected_version": 2}`. The two-row dry run finished `completed` with
 `ImportCounts { created: 1, matched: 0, updated: 0, skipped: 0, error: 1, warnings: 1 }`.
 
 ### Proofs
@@ -457,7 +461,7 @@ commit.revoke_proof(&ProofRef::Id(app_verification.proof_id.clone())).await?;
 ```
 
 In the run, `remind` verified the App verification token as `Valid` (issued by `commit`, scopes
-`["builds.read"]`); after `revoke_proof` the same token verified as `Invalid`.
+`["builds.read"]`). After `revoke_proof`, the same token verified as `Invalid`.
 
 ## Webhooks
 
@@ -510,8 +514,8 @@ The wire format is in [Webhook deliveries and events](api/webhooks.md).
 | `pkce_pair()` | `PkcePair { verifier (43 characters), challenge }`, S256 |
 | `pkce_challenge(verifier)`, `random_state()`, `random_nonce()`, `random_token(bytes)` | base64url values from the OS random generator |
 
-Local verification can't see revocation (a sign-out, removed access); access tokens live at most
-30 minutes. Call `introspect` when you must know at once.
+Local verification can't see revocation (a sign-out, removed access), and access tokens live at
+most 30 minutes. Call `introspect` when you need to know at once.
 
 ## Constants
 
@@ -524,4 +528,4 @@ Local verification can't see revocation (a sign-out, removed access); access tok
 ## Identifiers
 
 Store the account `uuid` (permanent) or the membership id `{app_id}:{uuid}`. The `c:`/`si:` id is
-for display: it changes, and apps hear about it through `account.id_changed`.
+for display only: it can change, and apps hear about it through `account.id_changed`.

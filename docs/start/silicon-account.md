@@ -1,6 +1,6 @@
 ---
 title: Get a Silicon account
-description: Create a Silicon account and ask a Carbon to be its custodian, or have the Carbon create it. Save the password and wait for approval if needed.
+description: Create your own Silicon account and name your Carbon as its custodian, or let your Carbon create it for you. Save the STK the moment you see it, and wait for approval if you need to.
 kind: instructive
 order: 20
 related:
@@ -14,9 +14,9 @@ related:
 
 # Get a Silicon account
 
-Every Silicon account has a permanent `uuid`, a public ID such as `si:scout`, a password called an STK and a Carbon responsible for it, called its custodian.
+Every Silicon account has four things: a permanent `uuid`, a public id like `si:scout`, a password we call the STK, and a custodian, the Carbon who is responsible for it.
 
-If you are a Silicon creating your own account, name the Carbon who will be your custodian. They have 14 days to accept. You can sign in once they approve:
+If you as a Silicon are creating your own account, name the Carbon who will be your custodian. They have 14 days to accept, and you can sign in as soon as they do:
 
 ```sh
 silicon-accounts silicon create --id si:scout --custodian c:saket --wait
@@ -32,11 +32,11 @@ c:saket accepted: si:scout is active.
 Signed in as si:scout.
 ```
 
-The STK line is the only time the STK is ever shown. Store it before you do anything else.
+That STK line is the only time you will ever see your STK. Store it before you do anything else.
 
-The examples on this page use the production service, `https://accounts.teamofsilicons.com`. Point
-the CLI at another instance with `--url` or `ACCOUNTS_URL` (see [Use the silicon-accounts CLI](cli.md)).
-To use a local development stack, follow [Run it yourself](../index.md#run-it-yourself) and set `ACCOUNTS_URL=http://localhost:8590`.
+The examples on this page talk to our production service, `https://accounts.teamofsilicons.com`. To point
+the CLI at another instance, use `--url` or `ACCOUNTS_URL` (see [Use the silicon-accounts CLI](cli.md)).
+For a local development stack, follow [Run it yourself](../index.md#run-it-yourself) and set `ACCOUNTS_URL=http://localhost:8590`.
 
 ## Choose how the account is created
 
@@ -45,14 +45,14 @@ To use a local development stack, follow [Run it yourself](../index.md#run-it-yo
 | The Silicon itself | `silicon-accounts silicon create --id si:… --custodian c:…` | after the custodian accepts (up to 14 days) | you are on your own and know which Carbon will be responsible for you |
 | A Carbon, signed in | `silicon-accounts silicon create --id si:…` | right away; the Carbon is the custodian | a Carbon is at hand and creates you |
 
-Both paths end with the same kind of account. The only difference is consent: a Carbon who creates
-a Silicon has agreed to be its custodian by doing so, while a Carbon named by a Silicon has not,
-so they must say yes first. [Silicons and custodians](../learn/silicons-and-custodians.md) explains
-why.
+Both ways give you the same kind of account. The only difference is consent. A Carbon who creates
+a Silicon has agreed to be its custodian just by doing it. A Carbon named by a Silicon hasn't agreed
+to anything yet, so they say yes first. [Silicons and custodians](../learn/silicons-and-custodians.md)
+explains why.
 
 ## Before you start
 
-- **Pick an si:id.** `si:` plus 3 to 30 of `a-z`, `0-9`, `-` and `_`, case-insensitive. Check it:
+- **Pick an si:id.** It's `si:` plus 3 to 30 of `a-z`, `0-9`, `-` and `_`, and case doesn't matter. Check it:
 
   ```sh
   silicon-accounts id available si:scout
@@ -62,18 +62,18 @@ why.
   si:scout is available.
   ```
 
-  The command exits `0` when the id is free, `5` when it is taken, reserved or a reserved word, and
-  `2` when it is not a valid id, and suggests free ids close to the one you asked for. The rules and the
-  reasoning are in [Ids and uuids](../learn/ids-and-uuids.md).
+  The command exits `0` when the id is free, `5` when it's taken, reserved or a reserved word, and
+  `2` when it isn't a valid id. It also suggests free ids close to the one you asked for. The rules,
+  and why they are the way they are, are in [Ids and uuids](../learn/ids-and-uuids.md).
 - **Agree with your custodian first.** Any Silicon can name any Carbon, so the request email tells
-  the Carbon to decline Silicons they don't know. Tell them it is coming. You can name them by
-  their `c:id` or by an email address; an email address works even if nobody has an account with
-  it yet (they get an invitation and find the request after signing up with that address).
-- **Have somewhere to keep the STK.** It is shown exactly once and only its hash is stored, so
-  nobody, including the service, can show it to you again.
-- **Give each Silicon its own CLI home** if several run on one machine: the CLI keeps one session
-  per home. Set `SILICON_HOME` (or `ACCOUNTS_HOME`, or `--home`) to a directory per Silicon. See
-  [Use the silicon-accounts CLI](cli.md#give-every-silicon-its-own-home).
+  the Carbon to decline Silicons they don't know. Let your Carbon know it's coming. You can name
+  them by their `c:id` or by an email address. An email works even if nobody has an account with it
+  yet: they get an invitation, and they find your request once they sign up with that address.
+- **Have somewhere to keep the STK.** We show it exactly once and store only its hash, so nobody,
+  not even us, can show it to you again.
+- **Give each Silicon its own CLI home** if several of you run on one machine, because the CLI keeps
+  one session per home. Set `SILICON_HOME` (or `ACCOUNTS_HOME`, or `--home`) to a separate directory
+  for each Silicon. See [Use the silicon-accounts CLI](cli.md#give-every-silicon-its-own-home).
 
 ## Create your own account
 
@@ -93,32 +93,33 @@ silicon-accounts silicon create --id si:scout --custodian c:saket --wait
 | `--wait` | keep running until the custodian decides, then sign in |
 | `--idempotency-key <key>` | reuse it when retrying; see [Retry safely](#retry-safely) |
 
-If you are signed in as a Carbon in this CLI home, `silicon-accounts silicon create` creates the Silicon
-with *you* as its custodian instead. Add `--self-create` to send a Silicon's own request anyway.
+One thing to watch: if you are signed in as a Carbon in this CLI home, `silicon-accounts silicon create`
+creates the Silicon with *you* as its custodian instead. Add `--self-create` to send the Silicon's own
+request anyway.
 
 ### 2. Wait for the answer
 
-Until the custodian answers, the account exists with the status `pending_custodian`: the si:id is
-taken, but signing in is refused with `custodian_pending`. There are three ways to learn the answer;
-pick the one that fits how long your process runs.
+Until your custodian answers, the account exists with the status `pending_custodian`. The si:id is
+taken, so nobody else can have it, but signing in is refused with `custodian_pending`. You can learn
+the answer in three ways. Pick the one that fits how long your process runs.
 
-**Keep the command running (`--wait`).** The CLI polls every 5 seconds, doubling to at most 60
-seconds, and stops when the custodian accepts, declines or the request expires. When they accept,
-it signs you in and stores the session in your CLI home. Flags that change this:
+**Keep the command running (`--wait`).** The CLI checks every 5 seconds, doubling up to at most 60
+seconds, and stops when your custodian accepts, declines or the request expires. When they accept,
+it signs you in and stores the session in your CLI home. These flags change that:
 
-- `--timeout 2h` gives up after that long (default `14d`): exit code `1`, error code `timed_out`.
-  The request stays open.
-- Ctrl-C stops waiting: exit code `130`, error code `interrupted`. The request stays open.
-- `--no-login` doesn't sign in after an acceptance. Nor does the CLI when this home is already
-  signed in as another account; it says so, and you sign in where the Silicon runs.
+- `--timeout 2h` gives up after that long (default `14d`) with exit code `1` and error code
+  `timed_out`. The request stays open.
+- Ctrl-C stops waiting with exit code `130` and error code `interrupted`. The request stays open.
+- `--no-login` skips the sign-in after an acceptance. The CLI also skips it when this home is already
+  signed in as another account. It tells you so, and you sign in wherever the Silicon runs.
 
-Resume waiting at any time with the request id:
+You can pick the wait back up at any time with the request id:
 
 ```sh
 silicon-accounts silicon request status 01a11433-097f-71b5-9ab2-9fbf26649772 --wait
 ```
 
-**Check later.** Without `--wait` the command returns at once and saves the request id and its
+**Check later.** Without `--wait`, the command returns at once. It saves the request id and its
 polling token (`sarq_…`) in `{home}/.accounts/requests/<request-id>.json` (mode 0600):
 
 ```sh
@@ -155,11 +156,11 @@ silicon-accounts silicon request status 01a11435-b2e0-75eb-98ff-d43d2c839070 --j
 }
 ```
 
-`request status` reads the token from the saved file. From another home or machine, pass it with
-`--token sarq_…`.
+`request status` reads the token from that saved file. From another home or another machine, pass
+it with `--token sarq_…`.
 
-**Be told (`--webhook`).** Prefer this for a Silicon that runs for days: polling for two weeks is
-wasteful, and a webhook arrives within seconds of the decision. See
+**Be told (`--webhook`).** If you run for days, this is the one to pick. Polling for two weeks is
+wasteful, and a webhook reaches you within seconds of the decision. See
 [Get notified with a webhook](#get-notified-with-a-webhook).
 
 ### 3. Act on the answer
@@ -171,23 +172,24 @@ wasteful, and a webhook arrives within seconds of the decision. See
 | no answer within 14 days | `expired` | released, like a decline | exit `1`, `custodian_request_expired` |
 | the named Carbon deleted their account first | `cancelled` | released, like a decline | exit `1`, `custodian_request_cancelled` |
 
-A released account never became active, so it is gone for good, and its uuid is never reused. To
-try again, create the account again (the si:id is free immediately), naming a Carbon who expects
-the request.
+A released account never became active, so it's gone for good and its uuid is never reused. To try
+again, just create the account again (the si:id is free right away), and this time name a Carbon who
+expects the request.
 
-Signing in to a released account says what happened instead of a generic failure:
+If you try to sign in to a released account, we tell you what happened instead of giving a generic
+failure:
 
 ```json
 {"error":{"code":"custodian_declined","hint":"Create the account again with POST /v1/silicons (`silicon-accounts silicon create`), naming a Carbon who will accept.","message":"si:ledger can't sign in: the Carbon it named as custodian declined on 2026-10-07T02:33:31.772Z, so the account was never activated and the id was released."}}
 ```
 
-The same holds for `custodian_expired` (no answer within 14 days) and for a request whose Carbon
-deleted their account (`custodian_declined`, saying so in the message).
+It works the same way for `custodian_expired` (no answer within 14 days), and for a request whose
+Carbon deleted their account (`custodian_declined`, with the message saying so).
 
 ### Over HTTP
 
-The same three steps without the CLI. Create the account (no authentication; send an
-`Idempotency-Key` so a retry can't create a second request):
+Here are the same three steps without the CLI. First create the account. It needs no
+authentication, but send an `Idempotency-Key` so a retry can't create a second request:
 
 ```sh
 curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons \
@@ -230,13 +232,13 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons \
 }
 ```
 
-Body fields: `id` and `display_name` (1 to 100 characters) and `custodian` (a `c:id` or an email)
-are required; `timezone`, `pfp_url` (https), `stk` and `webhook_url` are optional. Unknown fields
-are refused. `stk` and `webhook_secret` are `null` when you chose the STK or gave no webhook. A
-custodian named by email is shown masked (`s***@example.com`); one named by `c:id` is shown as
-the `c:id`.
+In the body, `id`, `display_name` (1 to 100 characters) and `custodian` (a `c:id` or an email) are
+required. `timezone`, `pfp_url` (https), `stk` and `webhook_url` are optional, and we refuse any
+field we don't know. In the response, `stk` is `null` when you chose your own STK, and
+`webhook_secret` is `null` when you gave no webhook. A custodian you named by email comes back
+masked (`s***@example.com`); one you named by `c:id` comes back as the `c:id`.
 
-Poll the request with its token:
+Then poll the request with its token:
 
 ```sh
 curl -s https://accounts.teamofsilicons.com/v1/silicons/requests/01a11434-d064-7378-81da-3da681e7b6b8 \
@@ -260,18 +262,19 @@ curl -s https://accounts.teamofsilicons.com/v1/silicons/requests/01a11434-d064-7
 }
 ```
 
-`status` is `pending`, `accepted`, `declined`, `expired` or `cancelled`. After a decline or expiry
-`silicon.id` is `null` and `silicon.status` is `deleted`: the account was released. Without the
-token the call answers `401 request_token_required`; with a wrong token, `404
-custodian_request_not_found`. Poll no faster than every 5 seconds and back off to a minute, as the
-CLI does.
+`status` is one of `pending`, `accepted`, `declined`, `expired` or `cancelled`. After a decline or
+an expiry, `silicon.id` is `null` and `silicon.status` is `deleted`, because the account was
+released. Without the token the call answers `401 request_token_required`, and with a wrong token
+`404 custodian_request_not_found`. Poll no faster than every 5 seconds and back off to once a
+minute, the way the CLI does.
 
-Once the status is `accepted`, sign in with `POST /v1/silicons/login`; see
-[Sign a Silicon into an app](silicon-sign-in-to-apps.md#1-sign-in).
+Once the status is `accepted`, sign in with `POST /v1/silicons/login` (see
+[Sign a Silicon into an app](silicon-sign-in-to-apps.md#1-sign-in)).
 
 ### In Rust
 
-With the [`silicon-accounts-client`](../reference/rust-client.md) package, which the CLI is built on:
+The same thing with the [`silicon-accounts-client`](../reference/rust-client.md) package, which the
+CLI itself is built on:
 
 ```rust
 use silicon_accounts_client::{AccountsClient, SiliconSelfCreate, WaitEvent, WaitOptions};
@@ -329,13 +332,13 @@ fn store_secret(name: &str, value: &str) {
 }
 ```
 
-`wait_for_custodian_decision` retries network errors, 5xx answers and rate limits by itself, and
-returns `Error::TimedOut` when its timeout passes (the request stays open).
+`wait_for_custodian_decision` retries network errors, 5xx answers and rate limits on its own. When
+its timeout passes it returns `Error::TimedOut`, and the request stays open.
 
 ## Have a Carbon create it
 
-A Carbon who is signed in creates the Silicon and becomes its custodian. The account is active at
-once:
+A signed-in Carbon creates the Silicon and becomes its custodian. There's no waiting: the account
+is active at once.
 
 ```sh
 silicon-accounts silicon create --id si:mapper --display-name Mapper --timezone UTC
@@ -348,32 +351,32 @@ STK (shown once, store it now): stk-c743aeed4346
 ```
 
 The Carbon then hands the STK to the Silicon over a private channel. Over HTTP this is
-`POST /v1/me/silicons` with the Carbon's access token; [Be a Silicon's custodian](custodians.md)
-has the details, together with everything else a custodian does.
+`POST /v1/me/silicons` with the Carbon's access token. [Be a Silicon's custodian](custodians.md)
+has the details, along with everything else a custodian does.
 
 ## The STK
 
-The STK is the Silicon's password. Together with the si:id it signs the Silicon in.
+The STK is a Silicon's password. Together with your si:id, it's how you sign in.
 
 | | format | how |
 |---|---|---|
 | generated (default) | `stk-` + 12 lowercase hex characters, e.g. `stk-59e5f08f3bbe` | returned once by the create or rotate call |
 | chosen | `stk-` + 8 to 32 hex characters | `--stk-stdin`, or `"stk"` in the HTTP body |
 
-- **Shown once.** Only an Argon2id hash is stored. A generated STK appears in the create (or
-  rotate) response and never again; a chosen STK is never echoed back.
+- **Shown once.** We store only an Argon2id hash. A generated STK appears in the create (or
+  rotate) response and never again, and an STK you chose is never echoed back.
 - **Lost STK?** Nobody can recover it. Your custodian replaces it with
   `silicon-accounts silicon rotate-stk si:scout`, which prints a new one.
-- **Rotation ends everything.** A rotation stops the old STK at once and signs the Silicon out
-  everywhere, including the tokens apps hold. Sign in again with the new STK. See
+- **Rotation ends everything.** It stops the old STK at once and signs you out everywhere,
+  including the tokens apps hold. Sign in again with the new STK. See
   [Rotate the STK](custodians.md#rotate-the-stk).
-- **Input is forgiving.** The service lowercases an STK and accepts the bare hex without `stk-`
-  (`08b7FF3E…` becomes `stk-08b7ff3e…`). Store and send the canonical `stk-…` form anyway.
+- **Input is forgiving.** We lowercase an STK and accept the bare hex without `stk-`
+  (`08b7FF3E…` becomes `stk-08b7ff3e…`). Still, store and send the canonical `stk-…` form.
 - **Keep it out of process lists.** Pass it on stdin (`--stk-stdin`) or in `ACCOUNTS_STK`, never as
-  `--stk <value>`: arguments are visible to every process on the machine and end up in shell
-  history. The CLI warns when you use `--stk`.
+  `--stk <value>`. Arguments are visible to every process on the machine and end up in shell
+  history, so the CLI warns you when you use `--stk`.
 
-To choose your own (32 hex characters here):
+To choose your own (32 hex characters in this example):
 
 ```sh
 openssl rand -hex 16 | silicon-accounts silicon create --id si:scout --custodian c:saket --stk-stdin
@@ -382,26 +385,26 @@ openssl rand -hex 16 | silicon-accounts silicon create --id si:scout --custodian
 ## Sign in with a key instead of the STK
 
 If you run unattended, on a server or in a scheduled job, you don't have to keep your STK there.
-Register a key once, keep its private half on that machine, and sign in with it. Each sign-in
-sends a signed assertion that works once and expires within 5 minutes, so nothing that is sent
-can be reused.
+Register a key once, keep its private half on that machine, and sign in with the key. Each sign-in
+sends a signed assertion that works once and expires within 5 minutes, so nothing you send can be
+reused.
 
 ```sh
 silicon-accounts silicon keys add si:scout --generate ~/.accounts/scout.key --name build-box
 silicon-accounts login --silicon si:scout --key ~/.accounts/scout.key
 ```
 
-`--generate` makes a new Ed25519 key and saves its private half with only you able to read it.
-An existing key works too: `--key ~/.ssh/id_ed25519` (unencrypted OpenSSH or PEM), or
+`--generate` makes a new Ed25519 key and saves its private half so only you can read it. A key you
+already have works too: `--key ~/.ssh/id_ed25519` (unencrypted OpenSSH or PEM), or
 `--public-key ~/.ssh/id_ed25519.pub` to register just the public half. Your custodian can add or
-revoke your keys as well (`silicon-accounts silicon keys list si:scout`). Revoking a key ends the
-sign-ins it started. Set `ACCOUNTS_SILICON` and `ACCOUNTS_SILICON_KEY` to sign in without flags.
+revoke your keys as well (`silicon-accounts silicon keys list si:scout`), and revoking a key ends
+the sign-ins it started. Set `ACCOUNTS_SILICON` and `ACCOUNTS_SILICON_KEY` to sign in without flags.
 The HTTP side is in the [reference](../reference/api/silicons.md#silicon-keys).
 
 ## Get notified with a webhook
 
-A webhook tells a Silicon about its own account. Set it at creation (`--webhook` or
-`webhook_url`), or later as the Silicon:
+A webhook tells you, the Silicon, about your own account. Set it when you create the account
+(`--webhook` or `webhook_url`), or later, signed in as the Silicon:
 
 ```sh
 silicon-accounts webhook set https://scout.example/hooks/accounts
@@ -413,12 +416,13 @@ Signing secret (shown once, store it now): whsec_VtcXQvX85bClvfp5_3WPNR0BML_AwWm
 Verify every delivery's X-Accounts-Signature with it (`silicon-accounts docs webhooks`).
 ```
 
-`silicon-accounts webhook test` queues a `ping`, and `silicon-accounts webhook remove` stops the notifications.
-Setting the URL again generates a new secret. Your custodian can set or remove the same webhook
-with `silicon-accounts silicon webhook set si:scout https://scout.example/hooks/accounts` and
-`silicon-accounts silicon webhook remove si:scout`.
+`silicon-accounts webhook test` queues a `ping`, and `silicon-accounts webhook remove` stops the
+notifications. Setting the URL again gives you a new secret. Your custodian can set or remove the
+same webhook with `silicon-accounts silicon webhook set si:scout https://scout.example/hooks/accounts`
+and `silicon-accounts silicon webhook remove si:scout`.
 
-Every delivery is a signed `POST` with JSON. These are the events, with real payloads below:
+Every delivery is a signed `POST` with a JSON body. These are the events, and a real payload
+follows the table:
 
 | event | when | `data` |
 |---|---|---|
@@ -432,7 +436,7 @@ Every delivery is a signed `POST` with JSON. These are the events, with real pay
 | `silicon.custodian.changed` | a transfer moved you to another custodian | `uuid`, `id`, `from`, `to` |
 | `ping` | a test from `silicon-accounts webhook test` | `{}` |
 
-The envelope, here for an expired request:
+Here is the envelope, for an expired request:
 
 ```json
 {
@@ -452,12 +456,12 @@ The envelope, here for an expired request:
 }
 ```
 
-`silicon` is your uuid and `app_id` is always `null` on a Silicon webhook. The headers are
-`X-Accounts-Event-Id`, `X-Accounts-Event-Type`, `X-Accounts-Delivery-Id`, `X-Accounts-Timestamp`
-and `X-Accounts-Signature: v1=<hex HMAC-SHA256(secret, "{timestamp}.{raw body}")>`, sent with
-`User-Agent: SiliconAccounts-Webhooks/1`.
+`silicon` is your uuid, and `app_id` is always `null` on a Silicon webhook. Every delivery carries
+the headers `X-Accounts-Event-Id`, `X-Accounts-Event-Type`, `X-Accounts-Delivery-Id`,
+`X-Accounts-Timestamp` and `X-Accounts-Signature: v1=<hex HMAC-SHA256(secret, "{timestamp}.{raw body}")>`,
+and comes with `User-Agent: SiliconAccounts-Webhooks/1`.
 
-A receiver in TypeScript (Node 22 or later) that verifies the signature, refuses stale
+Here's a receiver in TypeScript (Node 22 or later). It verifies the signature, refuses stale
 timestamps and drops duplicates:
 
 ```ts
@@ -496,41 +500,42 @@ createServer((req, res) => {
 }).listen(8080);
 ```
 
-Things that matter when you rely on it:
+What to know when you rely on it:
 
-- **`silicon.created` usually arrives before you have stored the secret**: it is sent the moment
+- **`silicon.created` usually arrives before you have stored the secret.** We send it the moment
   the account exists, often before the create response reaches you. Answer it with a non-2xx
-  status; it is retried 10 seconds later, then after 30 s, 1 min, 5 min, 15 min, 30 min and hourly,
-  for up to 72 hours, with the same `event_id`.
-- **Answer with any 2xx within 10 seconds**, then do the work. Anything else is a failed attempt.
+  status and we retry it 10 seconds later, then after 30 s, 1 min, 5 min, 15 min, 30 min and then
+  hourly, for up to 72 hours, always with the same `event_id`.
+- **Answer with any 2xx within 10 seconds**, then do the work. Anything else counts as a failed
+  attempt.
 - **Deduplicate on `event_id`.** The same event can arrive more than once.
-- **The URL must be https** and reach a public server; local and private addresses are refused.
+- **The URL must be https** and reach a public server. We refuse local and private addresses.
 - **Test pings are limited** to 10 per hour per Silicon, and a new ping replaces earlier ones that
   are still being retried.
 - **A delivery that still fails 72 hours after the event is marked failed, and you can replay
   it.** See what failed with `silicon-accounts webhook deliveries --status failed`
   (`GET /v1/me/webhook/deliveries?status=failed`), fix your endpoint, then send it again with
-  `silicon-accounts webhook replay --failed` (`POST /v1/me/webhook/replay` `{"status": "failed"}`): same
-  `event_id`, your current URL and secret, a fresh 72 hours. Test pings are never replayed (send a
-  new one). Your custodian can do the same for you
+  `silicon-accounts webhook replay --failed` (`POST /v1/me/webhook/replay` `{"status": "failed"}`).
+  A replay keeps the same `event_id`, uses your current URL and secret, and gets a fresh 72 hours.
+  Test pings are never replayed, so just send a new one. Your custodian can do the same for you
   ([A Silicon's deliveries and replays](webhooks.md#a-silicons-deliveries-and-replays)).
 
-Signature verification in Rust, replays and every delivery rule are in
+You'll find signature verification in Rust, replays and every delivery rule in
 [Receive webhooks](webhooks.md) and [How webhooks work](../learn/webhooks.md).
 
 ## Retry safely
 
-Self-creation is not safe to repeat blindly: a second attempt after a lost response fails with
-`id_taken`, and the first response held your only copy of the STK. Send an idempotency key and
-reuse it on every retry of the same request:
+Don't blindly repeat a self-creation. If the response gets lost, a second attempt fails with
+`id_taken`, and that lost response held your only copy of the STK. Send an idempotency key instead,
+and reuse it on every retry of the same request:
 
 ```sh
 silicon-accounts silicon create --id si:scout --custodian c:saket --idempotency-key create-si-scout-1
 ```
 
-Within 10 minutes the same key and the same body return the original response, with the same STK,
+Within 10 minutes, the same key with the same body returns the original response: the same STK,
 request token and webhook secret, plus the header `Idempotent-Replayed: true`. The window is 10
-minutes rather than the usual 24 hours because the stored copy holds those secrets (it is kept
+minutes instead of the usual 24 hours because the stored copy holds those secrets (we keep it
 encrypted). For self-creation the key belongs to the network you call from, so retry from the same
 machine. The same key with a different body answers `409 idempotency_key_reused`.
 
@@ -547,16 +552,16 @@ machine. The same key with a different body answers `409 idempotency_key_reused`
 | `idempotency_key_reused` | 409 | the key was used for a different body | use a new key for a new request |
 | `custodian_pending` | 403 | (sign-in) the custodian hasn't accepted yet; `details.request_id` and `details.expires_at` say which request | wait, or poll the request |
 
-A full list is in [Errors](../reference/errors.md).
+The full list is in [Errors](../reference/errors.md).
 
-Limits that apply here: 10 successful self-creations per hour per network, 60 attempts per hour
-per network (failed ones included), at most 20 self-created Silicons waiting for the same custodian
+The limits that apply here: 10 successful self-creations per hour per network, 60 attempts per hour
+per network (failed ones included), at most 20 self-created Silicons waiting on the same custodian
 (counted per `c:id` and per email address), and one pending custodian request per Silicon.
 [Limits](../reference/limits.md) lists them all.
 
 ## Next
 
-- [Sign a Silicon into an app](silicon-sign-in-to-apps.md): sign in with the si:id and STK, and get
+- [Sign a Silicon into an app](silicon-sign-in-to-apps.md): sign in with your si:id and STK, and get
   a short-lived token for an app.
 - [Be a Silicon's custodian](custodians.md): what the Carbon on the other side does.
 - [Silicons and custodians](../learn/silicons-and-custodians.md): why it works this way.

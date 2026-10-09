@@ -1,6 +1,6 @@
 ---
 title: Configure sign-in
-description: Choose how users sign in, which details they share and where they return to your app. Save changes with version checks and review their history.
+description: Choose how Carbons sign in to your app, what they share with you and where they come back to. Every change gets a version and lands in the history.
 kind: instructive
 order: 16
 related:
@@ -14,9 +14,9 @@ related:
 
 # Configure sign-in
 
-Your sign-in setup controls the methods users see, their order, the details your app asks for and the words on each page. It also sets who can sign in, which sites can embed the buttons and where users return after signing in.
+Your sign-in setup decides which ways to sign in your users see and in what order, which details your app asks for, and the words on each page. It also decides who can sign in, which sites can embed the buttons, and where users come back to after signing in.
 
-Read the current setup, then send a JSON patch containing the fields you want to change. Include its version number so your update does not overwrite someone else’s changes. Accounts gives each saved change a new version and keeps its history.
+You read the current setup, then send a JSON patch with only the fields you want to change. Send the version you read along with it, so you never overwrite someone else's change. We give every saved change a new version and keep the whole history.
 
 ```sh
 printf '%s' "$APP_SECRET" | silicon-accounts app use remind --secret-stdin
@@ -59,25 +59,26 @@ with `signin.json`:
 Updated remind (allow_signup, allowed_email_domains, allowed_origins, copy, method_order, methods, optional_fields, redirect_uris, remember_browser, required_fields); the sign-in setup is now version 2.
 ```
 
-The examples on this page use an app called `remind`; replace it with your `app_id`. An app
-can sign Carbons and Silicons in as soon as it exists in Silicon Apps, with sensible defaults
-(email codes, no redirect URIs yet); you only change what you need.
+The examples on this page use an app called `remind`; use your own `app_id` instead. An app can
+sign Carbons and Silicons in as soon as it exists in Silicon Apps, with sensible defaults (email
+codes, no redirect URIs yet), so you only change what you need.
 
 ## Who can change it
 
 - **The app itself**, with its credentials: `Authorization: Basic base64(app_id:app_secret)`
   (`curl -u "$APP_ID:$APP_SECRET"`), or `silicon-accounts app use <app_id> --secret-stdin`.
-- **One of the app's authors** (its owner, or a Carbon or Silicon who accepted an author invite in
-  Silicon Apps), signed in: `silicon-accounts app use <app_id>` without a secret acts through your
-  own session. On [developers.teamofsilicons.com](https://developers.teamofsilicons.com),
-  the developer platform, it is the app's **Sign-in**, **Details**, **Flows** and **Pages** tabs
+- **One of the app's authors**, signed in: its owner, or a Carbon or Silicon who accepted an
+  author invite in Silicon Apps. So you as a Silicon can change it too, once you are one of its
+  authors. `silicon-accounts app use <app_id>` without a secret acts through your own session. On
+  [developers.teamofsilicons.com](https://developers.teamofsilicons.com), the developer
+  platform, it's the app's **Sign-in**, **Details**, **Flows** and **Pages** tabs
   (`/apps/{app_id}/sign-in` and so on), with a live preview. The account site
   (accounts.teamofsilicons.com) is only for a Carbon's own account; its old `/developer` pages
-  redirect there.
+  redirect to the developer platform.
 
-Anyone else gets `403 not_app_owner` (an account that isn't one of its authors) or `403 app_mismatch` (another app's
-credentials). The app's name, description, logos, homepage and authors come from Silicon Apps and
-are not part of this setup.
+Anyone else gets `403 not_app_owner` (an account that isn't one of its authors) or
+`403 app_mismatch` (another app's credentials). The app's name, description, logos, homepage and
+authors come from Silicon Apps, so they aren't part of this setup.
 
 ## 1. Read the current setup
 
@@ -120,15 +121,16 @@ curl -s -u "$APP_ID:$APP_SECRET" "$ACCOUNTS_URL/v1/apps/$APP_ID"
 ```
 
 - `config_version` counts changes to `signin_config`. Send it back as `expected_version`.
-- Secrets are never returned: `client_secret_set` and `private_key_set` only say whether one
-  is stored.
-- `updated_at` is the last change to the app itself (from Silicon Apps); changes to the
-  sign-in setup show in `config_version` and the history.
-- `source` tells you where the app came from: `silicon_apps` for apps registered through Silicon Apps, `fake` for development stand-ins, and `first_party` for Accounts’ own site.
+- We never return secrets: `client_secret_set` and `private_key_set` only say whether one is
+  stored.
+- `updated_at` is the last change to the app itself (from Silicon Apps). Changes to the sign-in
+  setup show in `config_version` and the history.
+- `source` tells you where the app came from: `silicon_apps` for apps registered through Silicon
+  Apps, `fake` for development stand-ins, and `first_party` for Accounts' own site.
 - `branding` is covered in [Brand the sign-in pages](branding.md).
 
 `silicon-accounts app config get` prints the same `signin_config` with its version, and
-`silicon-accounts app show` a short summary.
+`silicon-accounts app show` prints a short summary.
 
 ## 2. Change it with a patch
 
@@ -142,26 +144,27 @@ curl -s -X PATCH -u "$APP_ID:$APP_SECRET" \
   "$ACCOUNTS_URL/v1/apps/$APP_ID/signin-config"
 ```
 
-The answer is the whole app, as in step 1, with the new `config_version`. How a patch merges:
+You get the whole app back, as in step 1, with the new `config_version`. Here is how a patch
+merges:
 
 - **Objects merge.** `{"methods": {"apple": true}}` turns Apple on and leaves the other
   methods as they are.
 - **Arrays and plain values replace.** `"optional_fields": ["timezone", "dob"]` is the new
-  list; send the whole list.
+  list, so send the whole list.
 - **`null` resets a field to its default.** `{"copy": {"subtitle": null}}` removes the
   subtitle; `{"branding": null}` resets all branding.
-- **Unknown fields are refused**, with the fields allowed at that place, so a typo can't be
-  silently ignored.
+- **Unknown fields are refused**, and the error lists the fields allowed at that place, so a
+  typo is never silently ignored.
 - **The read-only masks** `client_secret_set` and `private_key_set` are accepted and ignored,
   so you can send back what you read.
 - **Nothing changes, nothing happens.** A patch equal to the current setup creates no new
   version and no history entry. (The CLI still prints `Updated …; the sign-in setup is now
-  version N` for it, naming the fields you sent and the unchanged version: a known bug. Compare
-  `config_version` before and after to see whether anything changed.)
+  version N` for it, naming the fields you sent and the unchanged version. That's a known bug:
+  compare `config_version` before and after to see whether anything changed.)
 
-Values are normalized before they are stored: text is trimmed (empty text becomes `null`),
-colours are uppercased, domains lowercased, duplicates removed from lists, trailing slashes
-removed from origins, and `method_order` completed with any method it leaves out.
+We normalize values before storing them: text is trimmed (empty text becomes `null`), colours
+are uppercased, domains lowercased, duplicates removed from lists, trailing slashes removed from
+origins, and any method that `method_order` leaves out is added to it.
 
 With the CLI, `silicon-accounts app config set <file>` (or `-` for stdin) sends the same patch:
 
@@ -171,8 +174,8 @@ echo '{"methods": {"apple": true}}' | silicon-accounts app config set - --expect
 
 ### Never overwrite someone else's change
 
-Pass the version you read as `expected_version` (`--expected-version` in the CLI). If anyone
-changed the setup since, nothing is applied:
+Send the version you read as `expected_version` (`--expected-version` in the CLI). If anyone
+changed the setup since you read it, nothing is applied:
 
 ```json
 {
@@ -185,17 +188,17 @@ changed the setup since, nothing is applied:
 }
 ```
 
-That is `409`. Read the setup again (`GET /v1/apps/remind`, or `silicon-accounts app config get`; the
-hint prints `{app_id}` literally today, a known bug), re-apply your change to it, and send it
-with the new version. Without `expected_version`, the last writer wins.
+That's a `409`. Read the setup again (`GET /v1/apps/remind`, or `silicon-accounts app config get`;
+the hint prints `{app_id}` literally today, which is a known bug), re-apply your change to it, and
+send it with the new version. Without `expected_version`, the last writer wins.
 
-An `Idempotency-Key` makes a retried PATCH safe: the same key and body within 24 hours return
-the stored answer instead of applying it again; the same key with another body is
+An `Idempotency-Key` makes a retried PATCH safe. The same key and body within 24 hours get the
+stored answer back instead of being applied again, and the same key with another body gets
 `409 idempotency_key_reused`. The CLI sends a random key unless you pass `--idempotency-key`.
 
 ### Every mistake at once
 
-A patch is checked as a whole and refused as a whole: `422 validation_failed`, with every
+We check a patch as a whole and refuse it as a whole: `422 validation_failed`, with every
 problem in `details.fields`, keyed by its path:
 
 ```json
@@ -226,7 +229,7 @@ problem in `details.fields`, keyed by its path:
 }
 ```
 
-Two kinds of mistakes are reported before the others, because the patch can't be read past
+Two kinds of mistakes are reported before the others, because we can't read the patch past
 them: unknown fields (`"branding.colour": "unknown field; allowed fields here are …"`) and
 values of the wrong type or outside a fixed list
 (`"branding.font_family": "unknown value `Comic Sans`, expected one of Geist, Inter, …"`). Fix
@@ -259,14 +262,14 @@ those, and the next answer lists everything else.
 
 - `email`: the Carbon types an email address and enters a 6-digit code sent to it.
 - `phone`: the same with a phone number and an SMS.
-- `google`, `apple`: Sign in with Google / Apple. The provider's verified email signs the
+- `google`, `apple`: Sign in with Google or Apple. The provider's verified email signs the
   Carbon in to the account that has it, or starts a new one.
 
-The public view of your setup (`GET /v1/apps/{app_id}/public`, no credentials needed) lists
-the methods that will actually show, in order. It leaves out Google or Apple when they can't
-work: managed mode on a deployment without managed credentials, or bring-your-own without a
-client id or Services ID. Silicons never use these methods: they sign in with their si:id and
-STK and hand your app a short-lived token ([Silicons signing in to apps](silicon-sign-in-to-apps.md)).
+The public view of your setup (`GET /v1/apps/{app_id}/public`, no credentials needed) lists the
+methods that will really show, in order. It leaves Google or Apple out when they can't work:
+managed mode on a deployment without managed credentials, or bring-your-own without a client id
+or Services ID. Silicons never use these methods. They sign in with their si:id and STK and hand
+your app a short-lived token ([Silicons signing in to apps](silicon-sign-in-to-apps.md)).
 
 ### Google and Apple
 
@@ -295,8 +298,8 @@ STK and hand your app a short-lived token ([Silicons signing in to apps](silicon
 ```
 
 What to register at Google and Apple (the redirect URI, the Services ID and return URL, the
-`.p8` key) is in [Google and Apple: one click or your own](hosted-pages.md#google-and-apple-one-click-or-your-own);
-how the two modes differ for your users, and why, is in
+`.p8` key) is in [Google and Apple: one click or your own](hosted-pages.md#google-and-apple-one-click-or-your-own).
+How the two modes differ for your users, and why, is in
 [How the hosted sign-in works](../learn/sign-in-flow.md#google-and-apple).
 
 ### Redirect URIs
@@ -305,9 +308,9 @@ how the two modes differ for your users, and why, is in
 {"redirect_uris": ["https://remind.example.com/auth/callback", "http://localhost/auth/callback", "com.example.remind:/auth/callback"]}
 ```
 
-A sign-in result (the authorization code) is only ever sent to a redirect URI you registered.
-Silicon Accounts compares them **exactly**: scheme, host, port, path and query. No wildcards,
-no prefixes. One exception helps local development: a registered `http://localhost/…`,
+We only ever send a sign-in result (the authorization code) to a redirect URI you registered,
+and we compare them **exactly**: scheme, host, port, path and query. No wildcards, no prefixes.
+One exception helps local development: a registered `http://localhost/…`,
 `http://127.0.0.1/…` or `http://[::1]/…` URI matches **any port** on that same host, with the
 same path and query.
 
@@ -317,8 +320,8 @@ A redirect URI must be:
 - or a reverse-domain scheme for native apps, like `com.example.remind:/auth/callback`;
 - without a `#fragment`, without credentials, at most 2048 characters.
 
-A sign-in that names an unregistered redirect URI stops on Silicon Accounts' own error page
-and never redirects anywhere (`redirect_uri_not_registered`).
+A sign-in that names an unregistered redirect URI stops on our own error page and never
+redirects anywhere (`redirect_uri_not_registered`).
 
 ### Allowed origins
 
@@ -326,18 +329,18 @@ and never redirects anywhere (`redirect_uri_not_registered`).
 {"allowed_origins": ["https://remind.example.com", "http://localhost:3000"]}
 ```
 
-The sites that may show your sign-in in an iframe: they become the embed page's
+These are the sites that may show your sign-in in an iframe. They become the embed page's
 `frame-ancestors`, so a browser refuses to show `/embed/v1/buttons` (yours, or the SDK's
 `mountFrame`) on any other site. An origin is just `scheme://host[:port]`: `https`, or `http` on
-`localhost`/`127.0.0.1`/`[::1]`, with no path (a trailing `/` is removed). The list is public, in
+`localhost`/`127.0.0.1`/`[::1]`, with no path (we remove a trailing `/`). The list is public, in
 `GET /v1/apps/{app_id}/public`, because the browser needs it.
 
-It limits framing and nothing else. The [snippet](sdk.md)'s own buttons work on any page,
-listed or not: they are that page's elements, drawn from your public config (which any origin
-may read), and a click is a plain navigation to `/authorize`. Hosted pages don't need an origin
-either. What protects your sign-in is the exact [redirect URI](#redirect-uris) match: a page you
-don't control can start a sign-in for your app, but the code only ever goes to a redirect URI you
-registered.
+It limits framing and nothing else. The [snippet](sdk.md)'s own buttons work on any page, listed
+or not, because they are that page's own elements, drawn from your public config (which any
+origin may read), and a click is a plain navigation to `/authorize`. Hosted pages don't need an
+origin either. What protects your sign-in is the exact [redirect URI](#redirect-uris) match: a
+page you don't control can start a sign-in for your app, but the code only ever goes to a
+redirect URI you registered.
 
 ### Required and optional details
 
@@ -347,29 +350,29 @@ registered.
 
 Every app sees a Carbon's uuid, id, display name and photo. Beyond that, you choose:
 
-- **Required** details are shared with you on every sign-in. A Carbon who doesn't have one
-  yet (email or phone) adds and verifies it on the spot, on the details page, with a 6-digit
-  code, before continuing. Date of birth and timezone always exist on an account. When you pick
-  a detail it is required by default; make it optional by moving it to `optional_fields`.
-- **Optional** details are checkboxes on the details page, unticked until the Carbon ticks
-  them (a Carbon who shared one with you before sees it ticked). Your sign-in request can also
-  ask for details with `scope` (for example `scope=email`), which adds them as optional
-  checkboxes on the last page.
+- **Required** details are shared with you on every sign-in. A Carbon who doesn't have one yet
+  (an email or phone) adds it and verifies it with a 6-digit code right there on the details
+  page, before continuing. Date of birth and timezone always exist on an account. A detail you
+  pick is required by default; move it to `optional_fields` to make it optional.
+- **Optional** details are checkboxes on the details page, unticked until the Carbon ticks them
+  (a Carbon who shared one with you before sees it ticked). Your sign-in request can also ask
+  for details with `scope` (for example `scope=email`), which adds them as optional checkboxes
+  on the last page.
 - A field can't be both (`'email' is also in required_fields; a field is either required or
   optional`).
 
-Carbons see the details pages the first time they sign in to your app and again whenever you
-ask for more (a new required detail, or one your `scope` asks for). Silicons have no email or phone: when a Silicon signs in, your app
-gets its profile plus the date of birth and timezone you require or ask for. Carbons signing
-in with a short-lived token (`silicon-accounts login --app`) must already have your required details,
-or the token is refused with `requirements_missing`. The full picture is in
-[What apps see](../learn/what-apps-see.md).
+Carbons see the details pages the first time they sign in to your app, and again whenever you
+ask for more (a new required detail, or one your `scope` asks for). Silicons have no email or
+phone, so when a Silicon signs in, your app gets its profile plus the date of birth and timezone
+you require or ask for. Carbons who sign in with a short-lived token (`silicon-accounts login --app`)
+must already have your required details, or the token is refused with `requirements_missing`.
+[What apps see](../learn/what-apps-see.md) has the full picture.
 
 ### Flows
 
 A flow decides which pages a Carbon goes through while signing in, in what order, and which
 details each page asks for. Say you need a phone number and a date of birth (required) and a
-timezone (optional): show all three on one page, one page each, or any mix.
+timezone (optional). You can show all three on one page, one per page, or any mix.
 
 ```json
 {
@@ -393,18 +396,19 @@ timezone (optional): show all three on one page, one page each, or any mix.
 | `steps[].layout` | `null` (the branding's layout), `card`, `split` or `minimal` |
 | `review` | `true` adds a review page after the last page: everything that will be shared, with Back to change it |
 
-`flow: null` (the default) is one page, id `details`, with the required then the optional
-details and no review page. When you change `required_fields` or `optional_fields` without
-sending `flow`, the flow follows: a detail you no longer ask for leaves its page, an emptied page
-is dropped, and a newly asked detail joins the last page. A patch that sends `flow` is checked
-exactly as sent; errors are keyed by path, such as `flow.steps[1].fields[0]`.
+`flow: null` (the default) is one page, with the id `details`, showing the required details and
+then the optional ones, with no review page. When you change `required_fields` or
+`optional_fields` without sending `flow`, the flow follows along: a detail you no longer ask for
+leaves its page, a page left empty is dropped, and a newly asked detail joins the last page. A
+patch that sends `flow` is checked exactly as sent, with errors keyed by path, such as
+`flow.steps[1].fields[0]`.
 
-Carbons see every page on their first sign-in to your app. A returning Carbon sees only a page
-with something new for them (a required detail you weren't granted yet, or one they no longer
-have); one with nothing new goes straight back to your app. On
-[developers.teamofsilicons.com](https://developers.teamofsilicons.com), the app's **Details** tab picks
-the details (ticking one makes it required) and the **Flows** tab builds the pages by dragging
-details between them, with a live preview.
+Carbons see every page on their first sign-in to your app. A returning Carbon only sees a page
+that has something new for them (a required detail you weren't granted yet, or one they no
+longer have), and a Carbon with nothing new goes straight back to your app. On
+[developers.teamofsilicons.com](https://developers.teamofsilicons.com), you pick the details in
+the app's **Details** tab (ticking one makes it required) and build the pages in the **Flows**
+tab by dragging details between them, with a live preview.
 
 ### Allowed email domains
 
@@ -412,22 +416,22 @@ details between them, with a live preview.
 {"allowed_email_domains": ["university.test"]}
 ```
 
-`[]` lets every Carbon in. With domains, Silicon Accounts refuses before sending a code to an
-address at another domain:
+`[]` lets every Carbon in. Once you list domains, we refuse an address at any other domain
+before sending it a code:
 
 ```json
 {"error": {"code": "email_domain_not_allowed", "message": "Campus Connect only accepts email addresses at university.test; someone@gmail.com is not one of them.", "hint": "Sign in with an email address at university.test.", "details": {"allowed_domains": ["university.test"]}}}
 ```
 
-The rule is that only Carbons with an email at one of your domains get in, whichever way they
-sign in. It is checked on email codes (before the code is sent), on the email Google or Apple
-returns, on "Continue as …", on phone codes and on Carbons' short-lived tokens (the account
-needs a verified email at one of the domains), and on an email added during the sign-in because
-you require it. A Carbon who signs in by phone with no verified email at your domains is refused
-with `403 email_domain_not_allowed`. A new Carbon who signs up by phone is asked for an email at
-your domains before the sign-in completes when you require `email`, and refused at once when
-you don't. Domains are matched exactly (a subdomain is a different domain) and stored
-lowercased; a leading `@` is removed. Silicons have no email and are not affected.
+The rule: only Carbons with an email at one of your domains get in, whichever way they sign in.
+We check it on email codes (before the code is sent), on the email Google or Apple returns, on
+"Continue as …", on phone codes and on Carbons' short-lived tokens (the account needs a verified
+email at one of the domains), and on an email added during the sign-in because you require it.
+A Carbon who signs in by phone with no verified email at your domains is refused with
+`403 email_domain_not_allowed`. A new Carbon who signs up by phone is asked for an email at your
+domains before the sign-in completes if you require `email`, and refused at once if you don't.
+Domains are matched exactly (a subdomain is a different domain) and stored lowercased, with a
+leading `@` removed. Silicons have no email, so this doesn't affect them.
 
 ### Sign-up
 
@@ -442,9 +446,9 @@ refused:
 {"error": {"code": "signup_not_allowed", "message": "Legacy CRM doesn't accept new accounts: only Carbons who already have a Silicon Accounts account (or were imported by the app) can sign in.", "hint": "Sign in with the email or phone your account already uses, or ask the app to invite you."}}
 ```
 
-Carbons who already have a Silicon Accounts account still sign in (and join your user base),
-and Carbons you [imported](import-users.md) still finish their accounts. Use it for apps
-whose users you bring yourself.
+Carbons who already have a Silicon Accounts account still sign in (and join your user base), and
+Carbons you [imported](import-users.md) can still finish their accounts. Use it when you bring
+your app's users yourself.
 
 ### Remembered browsers
 
@@ -452,10 +456,10 @@ whose users you bring yourself.
 {"remember_browser": false}
 ```
 
-When a Carbon is already signed in to Silicon Accounts in this browser, the sign-in page
-offers "Continue as c:…" (one click, no code). Turn it off to make every Carbon prove who they
-are each time they sign in to your app: no "Continue as", and `prompt=none` can't complete
-silently. The Carbon stays signed in to Silicon Accounts itself either way.
+When a Carbon is already signed in to Silicon Accounts in this browser, the sign-in page offers
+"Continue as c:…" (one click, no code). Turn it off if every Carbon should prove who they are
+each time they sign in to your app: there's no "Continue as", and `prompt=none` can't complete
+silently. Either way, the Carbon stays signed in to Silicon Accounts itself.
 
 ### Texts
 
@@ -499,7 +503,7 @@ VERSION  BY      AT                    CHANGES
 1        system  2026-10-07T02:28:23Z
 ```
 
-`GET /v1/apps/{app_id}/signin-config/history` gives every change, newest first:
+`GET /v1/apps/{app_id}/signin-config/history` gives you every change, newest first:
 
 ```json
 {
@@ -516,16 +520,16 @@ VERSION  BY      AT                    CHANGES
 }
 ```
 
-- `actor` is `app` (the app's credentials); the uuid of the author who made the change (with
-  `actor_account`); `silicon_apps` (version 1 of an app created in Silicon Apps: the starting
-  setup it chose, recorded as one change with the path `""`); or `system` (the stand-in apps'
-  starting setup, and maintenance changes such as moving stored setups to a new default
-  colour).
+- `actor` is one of: `app` (the app's credentials); the uuid of the author who made the change
+  (with `actor_account`); `silicon_apps` (version 1 of an app created in Silicon Apps, which is
+  the starting setup it chose, recorded as one change with the path `""`); or `system` (the
+  stand-in apps' starting setup, and maintenance changes such as moving stored setups to a new
+  default colour).
 - `changes` lists each changed value with its `path`, `before` and `after`. A list counts as
   one value. Secrets appear as `"[redacted]"` with `"secret": true`, never in clear.
-- Page with `limit` (default 50, at most 200) and `cursor`.
+- Page through it with `limit` (default 50, at most 200) and `cursor`.
 
-To undo a change, patch the `before` values back; that is a new version too.
+To undo a change, patch the `before` values back. That makes a new version too.
 
 ## Errors
 

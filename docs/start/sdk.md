@@ -1,6 +1,6 @@
 ---
 title: Drop in the SDK snippet
-description: Add the SDK script to show sign-in buttons on your page. Configure the buttons and finish sign-in through your server’s callback.
+description: Add one script tag and your sign-in buttons show up on your page. Set up the buttons, then finish the sign-in through your server's callback.
 kind: instructive
 order: 13
 related:
@@ -12,9 +12,9 @@ related:
 
 # Drop in the SDK snippet
 
-Add the SDK with one `<script>` tag to show sign-in buttons on your page. It uses the methods, colours and logo configured for your app. Your server creates the `state` and PKCE challenge, and handles the callback just as it does for the [hosted pages](hosted-pages.md).
+Add the SDK with one `<script>` tag and it shows your sign-in buttons on your page, with the methods, colours and logo you set up for your app. Your server still makes the `state` and PKCE challenge, and handles the callback just as it does for the [hosted pages](hosted-pages.md).
 
-Load the script from `https://accounts.teamofsilicons.com/sdk/v1.js`. It is about 20 KB, has no dependencies and is cached for 5 minutes. It allows cross-origin loading with `Access-Control-Allow-Origin: *`.
+Load the script from `https://accounts.teamofsilicons.com/sdk/v1.js`. It's about 20 KB, has no dependencies and is cached for 5 minutes. It allows cross-origin loading with `Access-Control-Allow-Origin: *`.
 
 ```ts
 // sdk-app.ts: the SDK snippet renders the buttons; state + PKCE are made on your server.
@@ -91,7 +91,7 @@ createServer(async (req, res) => {
 }).listen(PORT, () => console.log(`Open http://localhost:${PORT}/`));
 ```
 
-In a browser the page shows "Continue with Google", "Continue with Apple", "Continue with
+In a browser, the page shows "Continue with Google", "Continue with Apple", "Continue with
 email" and "Continue with phone" (briefcase's methods, in its order) and the "Powered by
 Silicon Accounts" line. Choosing email went to:
 
@@ -101,16 +101,16 @@ https://accounts.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=http
 
 and the callback answered `Signed in as c:grace-hopper (briefcase:ptO)`.
 
-The SDK puts its buttons in a Shadow DOM so their styles stay separate from your page. It uses a constructed stylesheet, which keeps the button styles working with a strict `style-src`.
+The SDK puts its buttons in a Shadow DOM, so their styles stay separate from your page. It uses a constructed stylesheet, which keeps the button styles working under a strict `style-src`.
 
-The buttons do not need an `allowed_origins` entry. They belong to your page, and clicking one navigates to `/authorize`. An iframe does need an allowed origin, whether you use `mountFrame` or [write the iframe yourself](iframe.md).
+The buttons don't need an `allowed_origins` entry: they belong to your page, and clicking one navigates to `/authorize`. An iframe does need an allowed origin, whether you use `mountFrame` or [write the iframe yourself](iframe.md).
 
-If your page sets a Content-Security-Policy, allow the script and its request with `script-src https://accounts.teamofsilicons.com; connect-src https://accounts.teamofsilicons.com`. Add `frame-src https://accounts.teamofsilicons.com` when using `mountFrame`.
+If your page sets a Content-Security-Policy, allow the script and its request with `script-src https://accounts.teamofsilicons.com; connect-src https://accounts.teamofsilicons.com`. Add `frame-src https://accounts.teamofsilicons.com` when you use `mountFrame`.
 
 ## Script attributes
 
-`data-app-id` and `data-redirect-uri` make the script render buttons by itself; without
-`data-app-id` it only defines `window.SiliconAccounts`.
+With `data-app-id` and `data-redirect-uri`, the script renders the buttons by itself. Without
+`data-app-id`, it only defines `window.SiliconAccounts`.
 
 | Attribute | Meaning |
 |---|---|
@@ -125,17 +125,17 @@ If your page sets a Content-Security-Policy, allow the script and its request wi
 | `data-intent` | `signup` opens the sign-up version of our pages ("Create your {app} account"); with `data-buttons="intents"` it keeps only the "Sign up" button. Default `signin`. | |
 | `data-theme` | `light` or `dark` paints the buttons that way. Otherwise your branding's forced theme wins, else the SDK reads the page behind the buttons (the first opaque background, else the page's `color-scheme`) and follows it when your page switches theme. |
 
-Email (else phone) is the one filled button; Google and Apple stay neutral, as their
+Email (else phone) is the one filled button. Google and Apple stay neutral, as their
 guidelines ask. Colours, corners, button style, font and density come from your app's
 [branding](branding.md).
 
 ## Let the SDK make state and PKCE
 
-A static site with no session store can let the browser keep the sign-in: with
+A static site with no session store can let the browser keep the sign-in. With
 `data-pkce="S256"` and no `data-state`, the SDK makes the state, the PKCE pair (and a nonce
 when `scope` includes `openid`) and saves them in `sessionStorage` before leaving the page.
 Your callback page calls `SiliconAccounts.handleCallback()`, which checks the state against
-that saved record and hands back the code and its verifier; your server only exchanges them,
+that saved record and hands back the code and its verifier. Your server only exchanges them,
 so the app secret still never reaches the browser. Register the callback page
 (`http://localhost:3000/signed-in` here) as a redirect URI.
 
@@ -200,33 +200,33 @@ createServer(async (req, res) => {
 }).listen(PORT, () => console.log(`Open http://localhost:${PORT}/`));
 ```
 
-After a sign-in the callback page shows `Signed in as c:sdk2-docs (briefcase:jTb)`.
+After a sign-in, the callback page shows `Signed in as c:sdk2-docs (briefcase:jTb)`.
 Reloading it shows:
 
 ```text
 unknown_state: Silicon Accounts: no sign-in with this state was started in this browser tab, or it was already finished. Start the sign-in again (never reuse a callback address).
 ```
 
-because `handleCallback` removes the saved record: a callback works once. The saved record is
-JSON under the key `silicon-accounts:auth:<state>`:
+because `handleCallback` removes the saved record, so a callback works only once. The saved
+record is JSON under the key `silicon-accounts:auth:<state>`:
 
 ```json
 {"state": "…", "code_verifier": "…", "nonce": null, "redirect_uri": "http://localhost:3000/signed-in", "app_id": "briefcase", "created_at": 1791341046000}
 ```
 
-`sessionStorage` belongs to one tab, so the sign-in must finish in the tab that started it;
-that is also what makes a link from someone else fail the state check. Server-made state (the
+`sessionStorage` belongs to one tab, so the sign-in must finish in the tab that started it.
+That's also what makes a link from someone else fail the state check. Server-made state (the
 first example) works across tabs and survives blocked storage, so prefer it when you have a
 server session. Keep `/exchange` same-origin: a JSON body can't be sent cross-site without a
-CORS preflight your server never answers.
+CORS preflight, and your server never answers one.
 
 ## window.SiliconAccounts
 
-Every option is optional when the script tag already carries it; options override attributes.
-Options use camelCase: `appId`, `redirectUri`, `state`, `codeChallenge`,
+Every option is optional when the script tag already carries it, and options override
+attributes. Options use camelCase: `appId`, `redirectUri`, `state`, `codeChallenge`,
 `codeChallengeMethod`, `scope`, `nonce`, `prompt`, `intent` (`"signin"` or `"signup"`), `method`,
 `buttons` (`"methods"` or `"intents"`, for `renderButtons`), `pkce` (`"S256"` or `true`), `theme`.
-There is no email or phone option: `loginHint`, `data-login-hint`, `email` and `phone` are
+There is no email or phone option. `loginHint`, `data-login-hint`, `email` and `phone` are
 ignored with one console warning, because your app never hands Silicon Accounts a Carbon's
 email or phone; the Carbon types it on our pages.
 
@@ -248,7 +248,7 @@ email or phone; the Carbon types it on our pages.
 | `missing_state` | The callback has no state. |
 | `unknown_state` | No sign-in with this state was started in this tab, or it was already finished. |
 
-The script fires `silicon-accounts:ready` on `document` when it has loaded (`event.detail` is
+The script fires `silicon-accounts:ready` on `document` once it has loaded (`event.detail` is
 the API), so code that runs before an `async` script finishes can wait for it:
 
 ```html
@@ -265,7 +265,7 @@ the API), so code that runs before an `async` script finishes can wait for it:
 ## When the buttons don't appear
 
 Problems are drawn where the buttons would be ("These sign-in buttons are not set up
-correctly") and logged to the console with the same words:
+correctly") and logged to the console in the same words:
 
 | Shown | Why |
 |---|---|
@@ -276,4 +276,4 @@ correctly") and logged to the console with the same words:
 | could not reach https://accounts.teamofsilicons.com | The config fetch failed three times (it retries after 0.5 s and 1.5 s, so a page that is navigating away never reports it). Check `connect-src`. |
 
 Like the iframe, the snippet doesn't check `data-redirect-uri` against your registered list
-until a button is clicked: an unregistered one stops at the hosted page.
+until a button is clicked, and an unregistered one stops at the hosted page.

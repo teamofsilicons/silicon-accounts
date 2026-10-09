@@ -1,6 +1,6 @@
 ---
 title: Brand the sign-in pages
-description: Choose your app’s colours, fonts, logo and page layout. Apply them to the sign-in pages, iframe and sign-in buttons.
+description: Make the sign-in pages, the iframe and the buttons look like your app, with your colours, fonts, logo and layout.
 kind: instructive
 order: 17
 related:
@@ -12,9 +12,9 @@ related:
 
 # Brand the sign-in pages
 
-Your sign-in pages can use your app’s colours, fonts and logo. You can also choose the corner shape, button style, layout, background and spacing. Set separate colours for light and dark mode.
+Your sign-in pages can wear your app's colours, fonts and logo, so they feel like your own. You also choose the corner shape, button style, layout, background and spacing, and you set separate colours for light and dark mode.
 
-These settings apply throughout sign-in: the opening page, email and phone codes, account setup, required details, the sharing screen and the buttons in an iframe or snippet. Branding is saved as part of your [sign-in setup](sign-in-config.md), and every change gets a version number.
+Your branding applies all the way through sign-in: the opening page, the email and phone codes, account setup, required details, the what's-shared screen, and the buttons in an iframe or the snippet. It is saved as part of your [sign-in setup](sign-in-config.md), so every change gets a version number.
 
 ```sh
 printf '%s' "$APP_SECRET" | silicon-accounts app use waveform --secret-stdin
@@ -49,10 +49,10 @@ with `branding.json`:
 Updated waveform (branding); the sign-in setup is now version 9.
 ```
 
-Everything you leave out keeps its current value; for an app that never set any branding,
-that is the Silicon Accounts look. A palette that was never set fills its colours from the
-same theme's defaults, so your dark palette never inherits light colours. Over HTTP it is the
-same patch:
+Everything you leave out keeps its current value, and for an app that never set any branding,
+that's the Silicon Accounts look. A palette you never set takes its colours from the same
+theme's defaults, so your dark palette never inherits light colours. Over HTTP, it's the same
+patch:
 
 ```sh
 curl -s -X PATCH -u "$APP_ID:$APP_SECRET" \
@@ -61,8 +61,8 @@ curl -s -X PATCH -u "$APP_ID:$APP_SECRET" \
   "$ACCOUNTS_URL/v1/apps/$APP_ID/signin-config"
 ```
 
-The pages read the result from `GET /v1/apps/{app_id}/public` (no credentials, CORS `*`), which
-is where your own code can read it too:
+The pages read the result from `GET /v1/apps/{app_id}/public` (no credentials, CORS `*`), and
+your own code can read it there too:
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/apps/waveform/public"
@@ -99,11 +99,11 @@ curl -s "$ACCOUNTS_URL/v1/apps/waveform/public"
 }
 ```
 
-You can make the same changes in your app’s **Pages** tab (`/apps/{app_id}/pages`) on [developers.teamofsilicons.com](https://developers.teamofsilicons.com). It lets you edit the wording too.
+You can make the same changes in your app's **Pages** tab (`/apps/{app_id}/pages`) on [developers.teamofsilicons.com](https://developers.teamofsilicons.com), where you can edit the wording too.
 
-The live preview shows each step, including sign-in and sign-up, opening Google or Apple, code entry, account setup, your custom flow, the sharing screen and embedded buttons. Switch between light and dark mode, or desktop and phone, to check each layout.
+Its live preview shows every step: sign-in and sign-up, opening Google or Apple, entering a code, account setup, your custom flow, the what's-shared screen and the embedded buttons. Switch between light and dark, or desktop and phone, to check each layout.
 
-You can change branding with the app’s credentials or the session of one of its authors. See [who can change the setup](sign-in-config.md#who-can-change-it).
+Branding can be changed with the app's credentials, or by one of its authors through their own session. See [who can change the setup](sign-in-config.md#who-can-change-it).
 
 ## The variables
 
@@ -114,12 +114,12 @@ You can change branding with the app’s credentials or the session of one of it
 | `dark` | the dark palette below | 8 colours | Colours when the page is dark. |
 | `logo_url` | `null` | `https` URL, or a `data:image/…` URI up to 128 KB | Your logo at the top of the form (and on your side of the split layout). Without one, the logo your app has in Silicon Apps is used. |
 | `logo_dark_url` | `null` | same | The logo on dark pages. Falls back to `logo_url`, then to your app's dark logo, then to its logo. |
-| `logo_height` | `36` | 16–96 (px, whole number) | The logo's height. |
+| `logo_height` | `36` | 16 to 96 (px, whole number) | The logo's height. |
 | `show_app_name` | `true` | `true`, `false` | Your app's name next to the logo. With `false` the name is hidden only while a logo shows: no logo (or one that fails to load) always shows the name. |
 | `font_family` | `Geist` | the font list below | All text. |
 | `heading_font_family` | `null` | the font list, or `null` | Headings. `null` uses `font_family`. |
 | `corner_style` | `squircle` | `squircle`, `rounded`, `sharp` | The shape of corners. `squircle`: smooth continuous curves; `rounded`: circular arcs; `sharp`: square corners (the radius is ignored). |
-| `radius` | `18` | 0–40 (px, whole number) | Corner radius of buttons and fields. Panels scale from it (the card's radius is about 1.9 times it). |
+| `radius` | `18` | 0 to 40 (px, whole number) | Corner radius of buttons and fields. Panels scale from it (the card's radius is about 1.9 times it). |
 | `button_style` | `solid` | `solid`, `soft`, `outline` | Primary buttons: filled with `primary`, a light tint of `primary` with `primary`-coloured text, or a `primary` outline. |
 | `layout` | `card` | `card`, `split`, `minimal` | `card`: the form in a centred card. `split`: your logo, title and subtitle on the left half of the page, the form on the right (it folds into a card on narrow screens). `minimal`: no card, a narrower column, more air. |
 | `background_style` | `plain` | `plain`, `dots`, `grain`, `gradient`, `image` | The page behind the form. `dots`: a fading dot grid; `grain`: a fine noise texture; `gradient`: two soft glows of `primary`; `image`: your picture. Decoration sits behind the form and never changes its contrast. |
@@ -130,7 +130,8 @@ Values are exact: `"Inter"`, not `"inter"`; `"split"`, not `"Split"`. Numbers ar
 
 ### The palettes
 
-Each theme has the same eight colours, written `#RRGGBB` (any letter case; stored uppercase):
+Each theme has the same eight colours, written `#RRGGBB` (any letter case; we store them
+uppercase):
 
 | colour | light default | dark default | used for |
 |---|---|---|---|
@@ -143,8 +144,8 @@ Each theme has the same eight colours, written `#RRGGBB` (any letter case; store
 | `border` | `#E8E3DA` | `#4A4845` | Borders and dividers. |
 | `danger` | `#B42318` | `#FF8A80` | Error messages. |
 
-With `theme: "auto"` set both palettes: a visitor whose device is dark sees `dark`. With a
-forced theme, only that palette is used.
+With `theme: "auto"`, set both palettes, because a visitor whose device is dark sees `dark`.
+With a forced theme, only that palette is used.
 
 ## Contrast: at least 4.5:1
 
@@ -155,8 +156,8 @@ Two pairs must be readable in both themes, or the patch is refused:
 | `primary_foreground` | `primary` | Button text: "Continue", "Send code", "Finish setup". |
 | `foreground` | `background` | Page text. |
 
-The minimum is 4.5:1, the WCAG AA level for normal-size text. The defaults are well above it
-(button text 6.10:1, page text 12.24:1 light and 14.30:1 dark). A refusal gives the measured
+The minimum is 4.5:1, the WCAG AA level for normal-size text. Our defaults are well above it
+(button text 6.10:1, page text 12.24:1 light and 14.30:1 dark). A refusal tells you the measured
 ratio, rounded down to two decimals:
 
 ```sh
@@ -180,15 +181,15 @@ curl -s -X PATCH -u "$APP_ID:$APP_SECRET" -H 'Content-Type: application/json' \
 }
 ```
 
-Two ways to fix it: keep the colour and flip the text (`#22C55E` under `#0A0A0A` is well
-above 4.5:1), or darken the colour (`#15803D` under `#FFFFFF` is 5.01:1). The check runs on the
-whole result of the patch, so changing `primary` alone can break a pair you set earlier.
+There are two ways to fix it: keep the colour and flip the text (`#22C55E` under `#0A0A0A` is
+well above 4.5:1), or darken the colour (`#15803D` under `#FFFFFF` is 5.01:1). The check runs on
+the whole result of the patch, so changing `primary` alone can break a pair you set earlier.
 
-Other colours are not refused, but read them the same way: text sits on `surface` in the
-card, so keep `foreground` and `muted` at 4.5:1 there too. Error text is the one exception
-the pages handle for you: when `danger` reads below 4.5:1 on your `surface` or `background`,
-the pages move it toward your `foreground` just far enough to pass, and keep every other
-colour exactly as you chose it.
+We don't refuse other colours, but check them the same way: text sits on `surface` in the card,
+so keep `foreground` and `muted` at 4.5:1 there too. Error text is the one case the pages handle
+for you. When `danger` reads below 4.5:1 on your `surface` or `background`, the pages move it
+toward your `foreground` just far enough to pass, and keep every other colour exactly as you
+chose it.
 
 ## Logos
 
@@ -196,14 +197,14 @@ colour exactly as you chose it.
 {"branding": {"logo_url": "https://cdn.example.com/waveform/logo.svg", "logo_dark_url": "https://cdn.example.com/waveform/logo-dark.svg", "logo_height": 40}}
 ```
 
-- `https` URLs, or inline `data:image/png`, `jpeg`, `webp`, `gif` or `svg+xml` URIs up to
-  128 KB. Plain `http` is refused (`'http://…' must use https`); a larger inline logo is
+- Use an `https` URL, or an inline `data:image/png`, `jpeg`, `webp`, `gif` or `svg+xml` URI up
+  to 128 KB. Plain `http` is refused (`'http://…' must use https`), and a larger inline logo is
   refused with "inline data URIs must be at most 128 KB; host the logo and use an https URL".
-- The pages load your logo from your URL as is, without sending the page address as a
-  referrer. Serve it from a host that stays up: a logo that fails to load is replaced by your
-  app's name.
-- Without `logo_url`, the logo your app has in Silicon Apps is used, so many apps never set
-  one here.
+- The pages load your logo from your URL as it is, without sending the page address as a
+  referrer. Serve it from a host that stays up, because a logo that fails to load is replaced by
+  your app's name.
+- Without `logo_url`, the logo your app has in Silicon Apps is used, so many apps never set one
+  here.
 - The whole PATCH body may be at most 512 KB, which leaves room for two inline logos.
 
 ## Fonts
@@ -221,17 +222,16 @@ colour exactly as you chose it.
 | `JetBrains Mono` | monospace |
 | `System` | the visitor's own interface font |
 
-Only these. They are served by Silicon Accounts itself and loaded only when a page uses them,
-so your sign-in never waits on, or reports visitors to, a third-party font host. A heading
-font with a body font is the usual pairing: `"font_family": "Inter", "heading_font_family":
-"Fraunces"`.
+Only these. We serve them ourselves and load each one only when a page uses it, so your sign-in
+never waits on a third-party font host or reports your visitors to one. The usual pairing is a
+body font with a heading font: `"font_family": "Inter", "heading_font_family": "Fraunces"`.
 
 ## "Powered by Silicon Accounts"
 
 Every page ends with "Powered by Silicon Accounts", with "Silicon Accounts" linking to
-`https://accounts.teamofsilicons.com`. It is not a variable: it can't be removed, hidden,
-recoloured or restyled, and it is drawn outside the branded part of the page, in Silicon
-Accounts' own colours (light or dark with the visitor), so no branding reaches it. The iframe and the snippet show it too, on an
+`https://accounts.teamofsilicons.com`. It isn't a variable: you can't remove, hide, recolour or
+restyle it. We draw it outside the branded part of the page, in our own colours (light or dark,
+following the visitor), so no branding reaches it. The iframe and the snippet show it too, on an
 opaque pill of their own so it reads on any page. [Why](../learn/branding.md#powered-by-silicon-accounts).
 
 ## The iframe and the snippet
@@ -246,7 +246,7 @@ style, density and font. Which palette they paint is decided in this order:
   `dark`; otherwise your page decides: the first opaque background behind the buttons, or the
   page's color scheme.
 
-Setting them up is in [Add sign-in to your app](add-sign-in.md).
+How to set them up is in [Add sign-in to your app](add-sign-in.md).
 
 ## Reset and undo
 
@@ -270,8 +270,8 @@ Setting them up is in [Add sign-in to your app](add-sign-in.md).
 | `branding.font_family` | ``unknown value `Comic Sans`, expected one of Geist, Inter, IBM Plex Sans, DM Sans, Space Grotesk, Source Serif 4, Fraunces, Instrument Serif, JetBrains Mono, System`` |
 | `branding.colour` | `unknown field; allowed fields here are background_image_url, background_style, button_style, corner_style, dark, density, font_family, heading_font_family, layout, light, logo_dark_url, logo_height, logo_url, radius, show_app_name, theme` |
 
-All of them are `422 validation_failed`, with every problem in `details.fields`. Colour
-contrast is only checked once all eight colours of a palette are valid.
+All of these are `422 validation_failed`, with every problem in `details.fields`. We only check
+colour contrast once all eight colours of a palette are valid.
 
 ## Related
 

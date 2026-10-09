@@ -1,6 +1,6 @@
 ---
 title: Errors
-description: Find an error code, understand what caused it and see what to do next. Includes HTTP, OAuth, Rust client and webhook errors.
+description: Every error code we return, what caused it and what to do next, across the HTTP API, OAuth, the Rust client, webhooks and the CLI.
 kind: informative
 order: 70
 related:
@@ -13,9 +13,9 @@ related:
 
 # Errors
 
-When a request fails, read the error’s `code`, `message` and any `hint` or `details`. The code identifies the kind of failure, the message explains what happened, and the hint suggests a next step.
+When a request fails, we tell you why in the error's `code` and `message`, plus a `hint` and `details` when there is something to add. The code says what kind of failure it is, the message explains what happened, and the hint suggests what to do next.
 
-Use the code in your program’s error handling. The wording of a message can change. The tables below list the causes and recovery steps for each code.
+Branch on the code in your program, never on the message: we may reword a message, but the code stays. The tables below give the cause of every code and how to recover from it.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/silicons/login" -H 'Content-Type: application/json' \
@@ -34,27 +34,27 @@ curl -s -X POST "$ACCOUNTS_URL/v1/silicons/login" -H 'Content-Type: application/
 
 ## The two shapes
 
-Everything except the three OAuth endpoints:
+Everything except the three OAuth endpoints answers like this:
 
 ```json
 { "error": { "code": "…", "message": "…", "hint": "…", "details": { } } }
 ```
 
-- `code`: stable, snake_case; branch on it, never on the message text.
+- `code`: stable, snake_case. Branch on it, never on the message text.
 - `message`: what went wrong and why, naming the values involved.
-- `hint`: what to do next (sometimes absent).
+- `hint`: what to do next (sometimes missing).
 - `details`: structured extras: `fields` (422 `validation_failed`: path → problem),
   `retry_after_seconds` (423, 429), `suggestions` (`id_taken`), `request_id` (5xx), and the
   per-code details listed below.
-- 423 and 429 also set the `Retry-After` header; 401 responses are `Cache-Control: no-store`; 5xx
-  bodies never describe internals.
+- 423 and 429 also set the `Retry-After` header. 401 responses are `Cache-Control: no-store`. 5xx
+  bodies never describe our internals.
 
-`POST /v1/oauth/token`, `/v1/oauth/revoke` and `/v1/oauth/introspect` answer RFC 6749 bodies,
-`{"error": "invalid_grant", "error_description": "…"}`, because OAuth libraries expect them
-([OAuth errors](#oauth-errors)).
+`POST /v1/oauth/token`, `/v1/oauth/revoke` and `/v1/oauth/introspect` answer with RFC 6749
+bodies, `{"error": "invalid_grant", "error_description": "…"}`, because that's what OAuth
+libraries expect ([OAuth errors](#oauth-errors)).
 
-Always log the `X-Request-Id` response header with an error; it identifies the request in the
-service's logs (`silicon-accounts report` and `POST /v1/reports` take it in the message).
+Always log the `X-Request-Id` response header with an error. It identifies the request in our
+logs, and `silicon-accounts report` and `POST /v1/reports` take it in the message.
 
 ## How to react, by status
 
@@ -94,7 +94,7 @@ service's logs (`silicon-accounts report` and `POST /v1/reports` take it in the 
 
 | Code | Status | Cause and fix |
 |---|---|---|
-| `invalid_idempotency_key` | 400 | `Idempotency-Key` isn't 1–200 visible ASCII characters (no spaces) |
+| `invalid_idempotency_key` | 400 | `Idempotency-Key` isn't 1 to 200 visible ASCII characters (no spaces) |
 | `idempotency_key_reused` | 409 | the key was used for a different body on this endpoint; use a new key for a new request |
 | `idempotency_in_progress` | 409 | a request with this key is still running; retry in a few seconds |
 | `idempotency_result_unavailable` | 409 | the stored secret-bearing result can no longer be decrypted, so it isn't run again; check the current state (e.g. list your Silicons) before retrying with a new key |
@@ -235,8 +235,8 @@ service's logs (`silicon-accounts report` and `POST /v1/reports` take it in the 
 | `requirements_missing` | 409 | a required email or phone of the page isn't on the account yet (`details.missing`): add it with `details/add` + `details/verify` |
 | `invalid_state` | 400 | a provider callback with a malformed `state` |
 
-Codes carried in `flow.error` (and in `?error=` on your redirect URI) rather than as HTTP errors:
-`login_required`, `consent_required`, `interaction_required` (`prompt=none`), `access_denied`
+Some codes come in `flow.error` (and in `?error=` on your redirect URI) rather than as HTTP
+errors: `login_required`, `consent_required`, `interaction_required` (`prompt=none`), `access_denied`
 (cancelled on a details or review page), `provider_cancelled`, `provider_error`, `provider_token_invalid`,
 `provider_unavailable`, `provider_config_changed`, `provider_answer_elsewhere`,
 `provider_email_invalid`, `email_not_verified`, `hosted_domain_mismatch` (a Google account
@@ -302,8 +302,8 @@ outside the app's `google.hosted_domain`), `signup_expired`, `session_changed` (
 | `owner_not_found` / `owner_email_conflict` / `owner_unavailable` | 422 / 409 / 409 | Silicon Apps sync: the owner can't be resolved |
 
 Import rows carry their own message codes (`missing_identifier`, `ambiguous_match`,
-`duplicate_in_file`, `external_id_conflict`, `id_conflict`, …): see
-[Import existing users](../start/import-users.md).
+`duplicate_in_file`, `external_id_conflict`, `id_conflict`, …), and
+[Import existing users](../start/import-users.md) lists them.
 
 ## Subscriptions and the event stream
 
@@ -318,7 +318,7 @@ Import rows carry their own message codes (`missing_identifier`, `ambiguous_matc
 | `too_many_streams` | 429 | 5 streams are already open for this app or account: close one (one stream carries every event of the feed), then retry after `Retry-After` |
 | `stream_capacity_reached` | 503 | this server is full or restarting: reconnect after `Retry-After` with `Last-Event-ID` |
 
-A stream that ends on purpose sends `event: stream.closed` with a `reason` first; see
+When we end a stream on purpose, we send `event: stream.closed` with a `reason` first. See
 [Event stream](api/webhooks.md#event-stream).
 
 ## Versions and capabilities
@@ -346,7 +346,7 @@ A stream that ends on purpose sends `event: stream.closed` with a `reason` first
 | `invalid_proof_id` | 400 | not a UUID |
 | `proof_not_found` | 404 | not a proof you can see |
 
-A proof that doesn't verify is never an error: `POST /v1/proofs/verify` answers 200
+A proof that doesn't verify is never an error: `POST /v1/proofs/verify` answers 200 with
 `{"valid": false, "expires_at": null}`.
 
 ## Server
@@ -359,15 +359,15 @@ A proof that doesn't verify is never an error: `POST /v1/proofs/verify` answers 
 | `web_not_built` | 503 | (static hosting only) the account site build is incomplete |
 | `dev_outbox_disabled` | 404 | the development outbox is off |
 
-When a framework layer (not a handler) refuses a request, the code is derived from the status:
+When a request is refused by a framework layer rather than a handler, the code comes from the status:
 `forbidden` 403, `conflict` 409, `gone` 410, `locked` 423, `not_acceptable` 406,
 `length_required` 411, `uri_too_long` 414, `range_not_satisfiable` 416, `not_implemented` 501,
 `bad_gateway` 502, `unavailable` 503, `gateway_timeout` 504, `request_failed` (other 4xx).
 
 ## OAuth errors
 
-From `/v1/oauth/token`, `/revoke` and `/introspect`, as `{"error", "error_description"}`, with
-`Cache-Control: no-store`.
+These come from `/v1/oauth/token`, `/revoke` and `/introspect` as `{"error", "error_description"}`,
+with `Cache-Control: no-store`.
 
 | `error` | Status | Cause |
 |---|---|---|
@@ -386,8 +386,8 @@ From `/v1/oauth/token`, `/revoke` and `/introspect`, as `{"error", "error_descri
 
 ## Rust client codes
 
-`silicon_accounts_client::Error::code()` returns the service's code for API and OAuth errors,
-and its own codes for failures that never reached a response:
+`silicon_accounts_client::Error::code()` returns our code for API and OAuth errors, and its own
+codes for failures that never got a response:
 
 | Code | Variant | Meaning |
 |---|---|---|
@@ -399,14 +399,14 @@ and its own codes for failures that never reached a response:
 | `token_malformed`, `token_unsupported_algorithm`, `token_unknown_key`, `token_invalid_key`, `token_bad_signature`, `token_expired`, `token_not_yet_valid`, `token_wrong_audience`, `token_wrong_issuer`, `token_missing_claim` | `Error::Token` | local access-token verification failed |
 | `http_<status>` | `Error::Api` | a non-Silicon-Accounts error body (a proxy or load balancer answered) |
 
-Webhook verification (`WebhookError`): `EmptySecret`, `MissingHeader`, `InvalidTimestamp`,
+Webhook verification (`WebhookError`) has `EmptySecret`, `MissingHeader`, `InvalidTimestamp`,
 `TimestampOutOfTolerance` (more than 5 minutes off), `InvalidSignatureFormat`,
-`SignatureMismatch`, `InvalidBody`. Reject the delivery (answer 400 or 401) in every case.
+`SignatureMismatch` and `InvalidBody`. Refuse the delivery (answer 400 or 401) in every case.
 Details: [Rust client](rust-client.md#errors).
 
-The `silicon-accounts` CLI prints these same codes (with `--json`:
+The `silicon-accounts` CLI prints these same codes (with `--json`, as
 `{"error":{"code","message","hint","exit_code","status","request_id","details"}}`) and maps them
 to exit codes ([Exit codes](cli.md#exit-codes)). It also has codes of its own, for problems it
-finds without asking the service (`not_signed_in`, `wrong_account_kind`, `invalid_arguments`,
-`corrupt_state_file`, `unknown_topic`…): [CLI error codes](cli.md#cli-error-codes) lists them
-with their exit codes.
+finds without asking us (`not_signed_in`, `wrong_account_kind`, `invalid_arguments`,
+`corrupt_state_file`, `unknown_topic`…), and [CLI error codes](cli.md#cli-error-codes) lists
+them with their exit codes.

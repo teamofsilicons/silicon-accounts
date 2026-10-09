@@ -1,6 +1,6 @@
 ---
 title: Service endpoints
-description: Check service health and configuration, submit a bug report and look up the SDK, embed, telemetry and development endpoints.
+description: Check that we're up and what this deployment supports, send us a bug report, and find the SDK, embed, telemetry and development endpoints.
 kind: informative
 order: 68
 related:
@@ -11,7 +11,7 @@ related:
 
 # Service endpoints
 
-Use these endpoints to check whether the service is running, read its configuration metadata or submit a bug report. This page also lists the SDK and embed resources, telemetry endpoint and development outbox.
+Use these to check that the service is running, see how this deployment is set up, or send us a bug report. This page also covers the SDK and embed resources, the telemetry endpoint and the development outbox.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/meta"          # which deployment answered (public origin)
@@ -19,19 +19,19 @@ curl -s "$ACCOUNTS_API_URL/healthz"      # ok                  (accounts-api's o
 curl -s "$ACCOUNTS_API_URL/readyz"       # {"database":"ok"}
 ```
 
-Send health and readiness probes directly to `accounts-api`. For a local stack, set `ACCOUNTS_API_URL=http://127.0.0.1:8589`. In production, use the internal address of the API process.
+Send health and readiness probes straight to `accounts-api`. On a local stack that's `ACCOUNTS_API_URL=http://127.0.0.1:8589`; in production, use the API process's internal address.
 
-The public account site forwards `/v1/*` and `/.well-known/*` to that process. It does not forward `/healthz` or `/readyz`. Calling those paths through `$ACCOUNTS_URL` returns the site’s HTML 404 page.
+The public account site forwards `/v1/*` and `/.well-known/*` to that process, but not `/healthz` or `/readyz`. Calling those through `$ACCOUNTS_URL` gets you the site's HTML 404 page.
 
 ## `GET /healthz`
 
-Liveness: **200** `ok` (plain text, `no-store`). Checks nothing but the process. On `accounts-api`'s
-own address only.
+Liveness: **200** `ok` (plain text, `no-store`). It checks nothing but the process, and it
+answers only on `accounts-api`'s own address.
 
 ## `GET /readyz`
 
-Readiness, on `accounts-api`'s own address only: **200** `{"database": "ok"}` when Postgres
-answers, else **503**:
+Readiness, only on `accounts-api`'s own address: **200** `{"database": "ok"}` when Postgres
+answers, otherwise **503**:
 
 ```json
 {
@@ -62,17 +62,17 @@ What this deployment is. Public.
 }
 ```
 
-`environment` is `production`, `development` or `test`; `developer_url` is the developer
-platform, where apps' sign-in is set up (`ACCOUNTS_DEVELOPER_URL`; the account site's
-`/developer` pages redirect there); `providers` says whether one-click
-(managed) Google and Apple are configured; `delivery` is `providers` (Postmark and Twilio) or
-`local` (nothing is sent; development only).
+`environment` is `production`, `development` or `test`. `developer_url` is the developer
+platform, where apps set up their sign-in (`ACCOUNTS_DEVELOPER_URL`; the account site's
+`/developer` pages redirect there). `providers` says whether one-click (managed) Google and Apple
+are configured. `delivery` is `providers` (Postmark and Twilio) or `local` (nothing is sent;
+development only).
 
 ## `POST /v1/reports`
 
-Report a bug to the Silicon Accounts maintainers, optionally with the pull request that fixes
-it. Public; signed-in reports name the account (send the Bearer token or cookie). **Idempotent.**
-5 reports per IP per hour. Unknown fields are refused.
+Tell the Silicon Accounts maintainers about a bug, and add the pull request that fixes it if you
+have one (we'd be grateful). It's public; a signed-in report names the account (send the Bearer
+token or cookie). **Idempotent.** 5 reports per IP per hour. Unknown fields are refused.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/reports" -H 'Content-Type: application/json' \
@@ -86,13 +86,13 @@ curl -s -X POST "$ACCOUNTS_URL/v1/reports" -H 'Content-Type: application/json' \
 { "report_id": "01a11439-e90a-7133-aca9-e337db93d14f", "status": "queued", "recipients": 3 }
 ```
 
-`message` is 1 to 10,000 characters; `pr_url` must be https. Each report is emailed to every
+`message` is 1 to 10,000 characters, and `pr_url` must be https. Every report is emailed to each
 maintainer address. Errors: 422 `validation_failed`, 429 `rate_limited`. The CLI's
 `silicon-accounts report "…" --pr <link>` calls this endpoint.
 
 ## `POST /v1/telemetry/events`
 
-Client telemetry, forwarded to Space Station. Public; 120 requests per IP per minute.
+Client telemetry, which we forward to Space Station. Public; 120 requests per IP per minute.
 
 ```json
 {
@@ -102,20 +102,20 @@ Client telemetry, forwarded to Space Station. Public; 120 requests per IP per mi
 }
 ```
 
-At most 50 events; `name` matches `^[a-z0-9_.]{1,64}$`; `source` is 1–64 characters of
-`a-z 0-9 _ . -`; `step` is 1–200 printable characters; `progress` is 0 to 1; `data` is an object
-of at most 8 KB. **202** `{"accepted": 1, "forwarded": false}` (`forwarded` is true when Space
-Station took them). A request with `X-Accounts-Telemetry: off` (or the cookie
+At most 50 events. `name` matches `^[a-z0-9_.]{1,64}$`; `source` is 1 to 64 characters of
+`a-z 0-9 _ . -`; `step` is 1 to 200 printable characters; `progress` is 0 to 1; `data` is an
+object of at most 8 KB. Answers **202** `{"accepted": 1, "forwarded": false}` (`forwarded` is
+true when Space Station took them). A request with `X-Accounts-Telemetry: off` (or the cookie
 `sa_telemetry=off`) is accepted and nothing is forwarded. Errors: 422 `validation_failed`, 429
 `rate_limited`.
 
 ## `GET /v1/dev/outbox`
 
-**Development only**: the emails and text messages the service recorded, newest first, with the
+**Development only.** The emails and text messages the service recorded, newest first, with the
 6-digit code parsed out, so local tests can sign in without an inbox. Query: `to`, `purpose`,
-`limit` (1–200, default 50). It works only when `ACCOUNTS_EXPOSE_DEV_OUTBOX=true` outside
-production: in production it answers exactly like an unknown route (404 `route_not_found`);
-elsewhere with the outbox off, 404 `dev_outbox_disabled`.
+`limit` (1 to 200, default 50). It works only when `ACCOUNTS_EXPOSE_DEV_OUTBOX=true` outside
+production. In production it answers exactly like an unknown route (404 `route_not_found`);
+elsewhere, with the outbox off, it answers 404 `dev_outbox_disabled`.
 
 ```sh
 curl -s "http://localhost:8590/v1/dev/outbox?to=ada@example.test&limit=1" | jq -r '.items[0].code'
@@ -130,10 +130,10 @@ null). `to` matches the exact address (case-insensitive; phones in E.164, URL-en
 
 ## `GET /v1/capabilities`
 
-What this deployment supports, so a Silicon or an app can check before it relies on something.
+What this deployment supports, so a Silicon or an app can check before relying on something.
 Public, CORS `*`, cacheable for 5 minutes. Each capability has `supported`, a `description`, its
-`endpoints` and its `docs`; the answer also lists the API versions, the ways to authenticate, the
-main limits and links to the OpenAPI document, the agent card, the MCP server and `llms.txt`.
+`endpoints` and its `docs`. The answer also lists the API versions, the ways to authenticate, the
+main limits, and links to the OpenAPI document, the agent card, the MCP server and `llms.txt`.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/capabilities?require=sse,subscriptions"
@@ -175,9 +175,9 @@ The capabilities are `rest_json`, `openapi`, `structured_errors`, `rate_limit_he
 `bearer_tokens`, `client_credentials`, `oauth2`, `openid_connect`, `device_flow`,
 `short_lived_tokens`, `proofs`, `webhooks`, `webhook_signatures`, `webhook_replay`, `sse`,
 `stream_resume`, `subscriptions`, `imports`, `agent_card`, `mcp` and `llms_txt`. `require` takes
-1 to 50 of them separated by commas (case and `-` don't matter; `event_streaming`,
-`idempotency`, `a2a` and a few other common names work too). When one is unknown or unsupported
-the answer is 422:
+1 to 50 of them, separated by commas. Case and `-` don't matter, and `event_streaming`,
+`idempotency`, `a2a` and a few other common names work too. If one is unknown or unsupported, the
+answer is 422:
 
 ```json
 {
@@ -208,7 +208,7 @@ curl -s "$ACCOUNTS_URL/openapi.json" | jq '.paths | keys | length'
 The [A2A](https://a2a-protocol.org) agent card: what the service is, its skills (create a Silicon
 account, sign a Silicon into an app, verify a proof, manage app sign-in, subscribe to account
 events), how to authenticate, and links to the OpenAPI document, `llms.txt`, the docs and the MCP
-server. Public, CORS `*`, cacheable for 5 minutes. The service speaks REST and MCP, not A2A tasks:
+server. Public, CORS `*`, cacheable for 5 minutes. We speak REST and MCP, not A2A tasks:
 `capabilities.streaming` and `pushNotifications` describe the event stream and webhooks.
 
 ```json
@@ -228,17 +228,20 @@ server. Public, CORS `*`, cacheable for 5 minutes. The service speaks REST and M
 
 ## `GET /embed/v1/buttons` and `GET /sdk/v1.js`
 
-The sign-in iframe and the SDK script for apps. In production the account site serves both: the
-iframe with `frame-ancestors 'self' <the app's allowed_origins>` (none configured, unknown app:
-`'none'`), the SDK with `Access-Control-Allow-Origin: *` and `Cache-Control: public,
-max-age=300`. See [the iframe](../../start/iframe.md) and [the SDK](../../start/sdk.md). The API
-serves them itself only in the legacy static-hosting setup (`ACCOUNTS_WEB_DIST`); otherwise it
-answers 404 `route_not_found` with a hint.
+The sign-in iframe and the SDK script for apps. In production the account site serves both:
+
+- the iframe with `frame-ancestors 'self' <the app's allowed_origins>` (`'none'` when none are
+  configured or the app is unknown);
+- the SDK with `Access-Control-Allow-Origin: *` and `Cache-Control: public, max-age=300`.
+
+See [the iframe](../../start/iframe.md) and [the SDK](../../start/sdk.md). The API serves them
+itself only in the legacy static-hosting setup (`ACCOUNTS_WEB_DIST`); otherwise it answers 404
+`route_not_found` with a hint.
 
 ## Unknown paths
 
 On the public origin, any other path under `/v1` or `/.well-known` (the paths the account site
-forwards), and on `accounts-api`'s own address any unknown path at all:
+forwards), and any unknown path at all on `accounts-api`'s own address, gets:
 
 ```json
 {
@@ -250,8 +253,8 @@ forwards), and on `accounts-api`'s own address any unknown path at all:
 }
 ```
 
-Every other unknown path on the public origin (`/embed/v1/nope`, `/sdk/v2.js`, `/healthz`) is
-the account site's HTML 404 page, because the site, not `accounts-api`, answers it.
+Every other unknown path on the public origin (`/embed/v1/nope`, `/sdk/v2.js`, `/healthz`) gets
+the account site's HTML 404 page, because the site answers it, not `accounts-api`.
 
-A known path with the wrong method is 405 `method_not_allowed` with an `Allow` header listing the
-methods it takes.
+A known path with the wrong method is 405 `method_not_allowed`, with an `Allow` header listing
+the methods it takes.

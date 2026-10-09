@@ -1,6 +1,6 @@
 ---
 title: Act for an account at another app (User verification)
-description: Get a User verification token when your app needs to act at another app for a signed-in user. Ask for consent, create the proof and send it with the request.
+description: When your app needs to do something at another app for one of its users, get their agreement, ask us for a User verification proof and send it with your call.
 kind: instructive
 order: 41
 related:
@@ -13,11 +13,11 @@ related:
 
 # Act for an account at another app (User verification)
 
-Use User verification when your app needs to do something at another app for a user. Say someone asks `dm` to save a file in their `briefcase`. DM needs to show Briefcase which account it is acting for.
+Use User verification when your app needs to do something at another app for one of its users. Say someone asks `dm` to save a file in their `briefcase`. DM has to show Briefcase which account it is acting for.
 
-DM first gets the user’s agreement through its own flow. It then uses that user’s access token to ask Silicon Accounts for a proof addressed to `briefcase`. DM sends the proof with its request, and Briefcase [verifies it](verify-a-proof.md).
+DM first gets the user's agreement in its own flow. Then it uses that user's access token to ask us for a proof made for `briefcase`. DM sends the proof with its request, and Briefcase [verifies it](verify-a-proof.md).
 
-In this example, DM is the **issuing app** and Briefcase is the **receiving app**. The user’s agreement and the permissions Briefcase allows remain the apps’ responsibility.
+Here DM is the **issuing app** and Briefcase is the **receiving app**. Getting the user's agreement, and deciding what Briefcase allows, stays with the two apps.
 
 ```bash
 curl -s -u "dm:$DM_APP_SECRET" \
@@ -58,17 +58,17 @@ curl -X POST https://briefcase.example/api/files \
   -d '{"filename":"notes.txt"}'
 ```
 
-Every response on this page is real, from a local Silicon Accounts stack. There, the account was the Silicon `si:scout`, signed into `dm` with a short-lived token; it works the same for a Carbon.
+Every response on this page is real, from a local Silicon Accounts stack. There the account was the Silicon `si:scout`, signed into `dm` with a short-lived token. It works the same way for a Carbon.
 
 ## Before you start
 
-- **The account signed into your app, and you hold its access token** (a JWT whose `aud` is your app id). You get it from the authorization code exchange ([Add sign-in to an app](add-sign-in.md)) or, for a Silicon, from exchanging its short-lived token ([How a Silicon signs into apps](silicon-sign-in-to-apps.md)). Access tokens last 30 minutes; if it expired, refresh the account's tokens first.
-- **The account agreed, in your app, to what you'll do at the receiving app.** Silicon Accounts shows no consent screen for proofs: the issuing app owns that conversation (for a Silicon, the instruction it gave you is that agreement). The account can see and revoke every User verification proof issued on its behalf, so ask for what you need and no more.
-- **You know the scopes the receiving app expects.** Scopes are strings the two apps agree on; Silicon Accounts carries them and doesn't interpret them.
+- **The account signed into your app, and you hold its access token** (a JWT whose `aud` is your app id). You get it from the authorization code exchange ([Add sign-in to an app](add-sign-in.md)), or for a Silicon, from exchanging its short-lived token ([How a Silicon signs into apps](silicon-sign-in-to-apps.md)). Access tokens last 30 minutes. If yours has expired, refresh the account's tokens first.
+- **The account agreed, in your app, to what you'll do at the receiving app.** We show no consent screen for proofs, because that conversation belongs to the issuing app. For a Silicon, the instruction it gave you is that agreement. The account can see and revoke every User verification proof issued on its behalf, so ask for what you need and nothing more.
+- **You know the scopes the receiving app expects.** Scopes are strings the two apps agree on. We carry them and don't interpret them.
 
 ## 1. Issue the proof
 
-`POST /v1/proofs/user-verification`, authenticated as your app (`Authorization: Basic base64(app_id:app_secret)`).
+`POST /v1/proofs/user-verification`, signed with your app's credentials (`Authorization: Basic base64(app_id:app_secret)`).
 
 | field | required | rules |
 |---|---|---|
@@ -77,9 +77,9 @@ Every response on this page is real, from a local Silicon Accounts stack. There,
 | `scopes` | no | Up to 20 distinct strings, each 1 to 100 characters of `A-Z a-z 0-9 _ . : / -`. Duplicates are dropped; the order is kept. |
 | `access_ttl_seconds` | no | How long each proof token lives: 60 to 1800 seconds, default 1800 (30 minutes). |
 
-Send an `Idempotency-Key` header, unique per logical request. A retry with the same key and body within 10 minutes returns the same proof (with the header `idempotent-replayed: true`) instead of issuing a second one; the same key with another body is `409 idempotency_key_reused`. A replay returns the original answer even if that proof has ended since, so never reuse a key for a new request.
+Send an `Idempotency-Key` header, one per logical request. If you retry with the same key and body within 10 minutes, you get the same proof back (with the header `idempotent-replayed: true`) instead of a second one. The same key with a different body is `409 idempotency_key_reused`. A replay returns the original answer even if that proof has ended since, so never reuse a key for a new request.
 
-The answer:
+What you get back:
 
 | field | what it is |
 |---|---|
@@ -93,11 +93,11 @@ The answer:
 | `user` | The account: `uuid` (permanent), `id` (current `c:` or `si:` id), `kind`, and `membership_id`, its membership with **your** app. |
 | `scopes` | The scopes as stored. |
 
-Lifetimes are absolute times on purpose: a replayed answer would make a relative `expires_in` overstate what is left.
+Lifetimes are absolute times on purpose. On a replayed answer, a relative `expires_in` would say more time is left than there really is.
 
 ## 2. Send the proof with your call
 
-How the proof travels is between you and the receiving app; the apps in these docs use `Authorization: Proof <proof_token>`. Reuse the same proof token for every call until shortly before its `expires_at`, then refresh. The receiving app checks it with [`POST /v1/proofs/verify`](verify-a-proof.md) and sees who you are (`issuing_app`), who you act for (`user`) and what you may do (`scopes`).
+How the proof travels is up to you and the receiving app. The apps in these docs use `Authorization: Proof <proof_token>`. Reuse the same proof token for every call until shortly before its `expires_at`, then refresh. The receiving app checks it with [`POST /v1/proofs/verify`](verify-a-proof.md) and sees who you are (`issuing_app`), who you act for (`user`) and what you may do (`scopes`).
 
 ## 3. Refresh before the proof token expires
 
@@ -112,7 +112,7 @@ curl -s -u "dm:$DM_APP_SECRET" \
 
 (`sha256sum` works in place of `shasum -a 256`.)
 
-`200 OK` with the same shape and the same `proof_id`, a new `proof_token` and a **new** `proof_refresh_token`:
+You get `200 OK` with the same shape and the same `proof_id`, a new `proof_token` and a **new** `proof_refresh_token`:
 
 ```json
 {
@@ -129,10 +129,10 @@ curl -s -u "dm:$DM_APP_SECRET" \
 }
 ```
 
-- **Store the new refresh token and forget the old one, in one step.** The old one is now used. Presenting it again is treated as theft: the whole proof is revoked (`400 proof_refresh_token_reused`), and every later refresh answers `410 proof_revoked` with `details.reason: "refresh_token_reuse"`. Then issue a new proof.
-- **Make retries safe with an `Idempotency-Key` derived from the refresh token** (for example its SHA-256). If the answer is lost and you retry within 10 minutes with the same key and body, you get the same answer back instead of tripping reuse detection. Verified locally: the retry returned the identical new refresh token.
+- **Store the new refresh token and forget the old one, in one step.** The old one is now used. If it is ever presented again, we treat it as theft: the whole proof is revoked (`400 proof_refresh_token_reused`), and every later refresh answers `410 proof_revoked` with `details.reason: "refresh_token_reuse"`. Then you issue a new proof.
+- **Make retries safe with an `Idempotency-Key` made from the refresh token** (for example its SHA-256). If the answer gets lost and you retry within 10 minutes with the same key and body, you get the same answer back and don't trip reuse detection. We checked this locally: the retry returned the identical new refresh token.
 - **`access_ttl_seconds` is optional.** Without it, the new proof token gets the lifetime the proof was issued with.
-- **A refresh doesn't end earlier proof tokens.** Each one verifies until its own `expires_at` unless the proof ends. Revoke the proof to cut them all off.
+- **A refresh doesn't end earlier proof tokens.** Each one keeps verifying until its own `expires_at`, unless the proof ends. To cut them all off, revoke the proof.
 - Only the issuing app can refresh (`403 not_issuing_app` otherwise).
 
 ## 4. Revoke when you're done
@@ -144,11 +144,11 @@ curl -s -o /dev/null -w "%{http_code}\n" -u "dm:$DM_APP_SECRET" \
   -d '{"proof_id":"01a11436-36b5-741b-8aa3-9c30527a2e54"}'
 ```
 
-`204`. Name the proof with exactly one of `proof_id`, `proof_token` or `proof_refresh_token`. Every proof token of the proof stops verifying at once. Revoking an already revoked proof is also `204` and changes nothing. Your app's owner can revoke too, by id, with `DELETE /v1/apps/{app_id}/proofs/{proof_id}` through their own session (the proof then reads `revoked_by_owner`).
+You get `204`. Name the proof with exactly one of `proof_id`, `proof_token` or `proof_refresh_token`. Every proof token of the proof stops verifying at once. Revoking a proof that is already revoked is also `204` and changes nothing. Your app's owner can revoke too, by id, with `DELETE /v1/apps/{app_id}/proofs/{proof_id}` from their own session (the proof then reads `revoked_by_owner`).
 
 ## When the account's grant ends
 
-A User verification proof stands on the account's sign-in at your app, its membership with your app, and the account itself. When any of them ends, the proof ends with it, immediately: the receiving app gets `{"valid": false, "expires_at": null}` and your next refresh says why. Your [webhook](webhooks.md) tells you when it happens:
+A User verification proof stands on three things: the account's sign-in at your app, its membership with your app, and the account itself. When any of them ends, the proof ends with it, right away. The receiving app gets `{"valid": false, "expires_at": null}` and your next refresh says why. Your [webhook](webhooks.md) tells you when it happens:
 
 | you receive | because | your proofs for that account | refresh says |
 |---|---|---|---|
@@ -158,11 +158,11 @@ A User verification proof stands on the account's sign-in at your app, its membe
 | `account.deleted` | the account was deleted | end | `410 proof_revoked`, `account_deleted` |
 | nothing | the account revoked one proof on the account site or with `silicon-accounts proofs revoke` | that proof ends | `410 proof_revoked`, `revoked_by_account` |
 
-Stop using those proofs. Once the account signs into your app again, you hold a new access token and can issue a new proof. Trying with the old access token answers `400 invalid_subject_token` with `details.reason: "revoked"` and the time and cause, for example `(access_removed)`. The full list of ends is in [How proofs work](../learn/proofs.md#what-a-user-verification-proof-stands-on).
+Stop using those proofs. Once the account signs into your app again, you hold a new access token and can issue a new proof. If you try with the old access token, you get `400 invalid_subject_token` with `details.reason: "revoked"` and the time and cause, for example `(access_removed)`. Every way a proof can end is in [How proofs work](../learn/proofs.md#what-a-user-verification-proof-stands-on).
 
 ## List the proofs
 
-Your app's proofs, newest first (`kind`: `user_verification` or `app_verification`; `status`: `active`, `revoked` or `expired`; `limit`; `cursor` from `next_cursor`):
+Your app's proofs, newest first. Filter with `kind` (`user_verification` or `app_verification`), `status` (`active`, `revoked` or `expired`), `limit`, and `cursor` (from `next_cursor`):
 
 ```bash
 curl -s -u "dm:$DM_APP_SECRET" \
@@ -199,11 +199,11 @@ curl -s -u "dm:$DM_APP_SECRET" \
 }
 ```
 
-(`pfp_url` points at the local stack's stand-in for the photo service; in production it is an `https://iris.teamofsilicons.com/…` address.)
+(`pfp_url` points at the local stack's stand-in for the photo service. In production it is an `https://iris.teamofsilicons.com/…` address.)
 
-`expires_at` here is the proof's end; `token_expires_at` is when its newest proof token stops verifying. `status` is computed live: a proof whose sign-in was revoked reads `revoked` with `revoke_reason: "sign_in_revoked"` from that moment on. Your app's owner can read the same list with their session.
+`expires_at` here is the proof's end, and `token_expires_at` is when its newest proof token stops verifying. `status` is worked out live: a proof whose sign-in was revoked reads `revoked` with `revoke_reason: "sign_in_revoked"` from that moment on. Your app's owner can read the same list from their session.
 
-The account sees its side with `GET /v1/me/proofs` (User verification proofs issued on its behalf, with both apps' names and logos) and revokes one with `DELETE /v1/me/proofs/{proof_id}`. From the CLI:
+The account sees its side with `GET /v1/me/proofs` (the User verification proofs issued on its behalf, with both apps' names and logos) and revokes one with `DELETE /v1/me/proofs/{proof_id}`. From the CLI:
 
 ```
 $ silicon-accounts proofs list
@@ -216,7 +216,7 @@ Revoked proof 01a1143d-7dc4-71f0-b77d-e0186727b6bb; it no longer verifies.
 
 ## In TypeScript
 
-`fetch`, `btoa` and `node:crypto`; runs in Node.js 18+, Deno and Bun (where `node:crypto` isn't available, hash with Web Crypto's `crypto.subtle.digest`).
+This uses `fetch`, `btoa` and `node:crypto`, and runs in Node.js 18+, Deno and Bun. Where `node:crypto` isn't available, hash with Web Crypto's `crypto.subtle.digest`.
 
 ```ts
 import { createHash } from "node:crypto";
@@ -271,7 +271,7 @@ await fetch("https://briefcase.example/api/files", {
 });
 ```
 
-Run against the local stack: a retried `issueUserVerification` with the same request id returned the same `proof_id`; the receiving endpoint from [Verify a proof](verify-a-proof.md#in-typescript) answered `201` before and after a refresh; a retried `refreshProof` returned the identical new refresh token; and presenting the used refresh token without that key answered `400 proof_refresh_token_reused`, after which the endpoint answered `403`.
+We ran this against the local stack. A retried `issueUserVerification` with the same request id returned the same `proof_id`. The receiving endpoint from [Verify a proof](verify-a-proof.md#in-typescript) answered `201` before and after a refresh. A retried `refreshProof` returned the identical new refresh token. Presenting the used refresh token without that key answered `400 proof_refresh_token_reused`, and after that the endpoint answered `403`.
 
 ## In Rust
 
@@ -324,7 +324,7 @@ revoked 01a1144b-6e12-72f3-add0-76520b24d57d
 proof_revoked (Some(410)): Proof 01a1144b-6e12-72f3-add0-76520b24d57d was revoked at 2026-10-07T02:57:30.150Z because the issuing app revoked it (revoked_by_app), so it can't be refreshed.
 ```
 
-`refresh_proof` takes no idempotency key; if a refresh response can be lost on your network, call `POST /v1/proofs/refresh` with an `Idempotency-Key` as in the TypeScript example.
+`refresh_proof` takes no idempotency key. If a refresh response can get lost on your network, call `POST /v1/proofs/refresh` with an `Idempotency-Key` as in the TypeScript example.
 
 ## With the CLI
 
@@ -344,11 +344,11 @@ $ silicon-accounts app proof revoke 01a1143d-7cf0-72cb-a6aa-92936511127a
 $ silicon-accounts app proof list --kind user_verification
 ```
 
-`--scope` repeats; `--json` prints the service's answer; `silicon-accounts app proof revoke` also takes `--token` or `--refresh-token` instead of the id. `user_verification` sends a random `Idempotency-Key` unless you pass `--idempotency-key`.
+`--scope` can be repeated, and `--json` prints our answer as it is. `silicon-accounts app proof revoke` also takes `--token` or `--refresh-token` instead of the id. `user_verification` sends a random `Idempotency-Key` unless you pass `--idempotency-key`.
 
 ## Errors
 
-Every error is `{"error": {"code", "message", "hint", "details"?}}`; the message names exactly what was wrong.
+Every error is `{"error": {"code", "message", "hint", "details"?}}`, and the message says exactly what was wrong.
 
 | status | code | when | do |
 |---|---|---|---|

@@ -1,6 +1,6 @@
 ---
 title: Use the silicon-accounts CLI
-description: Install the silicon-accounts CLI, sign in and use it from your terminal or scripts. Learn where it saves your session and how to read errors.
+description: Install the silicon-accounts CLI, sign in, and drive it from your terminal or your scripts. See where it keeps your session and how to read its errors.
 kind: instructive
 order: 23
 related:
@@ -13,11 +13,11 @@ related:
 
 # Use the silicon-accounts CLI
 
-The `silicon-accounts` CLI lets Carbons and Silicons use Silicon Accounts from a terminal. Use it to sign in, manage an account and configure your apps.
+The `silicon-accounts` CLI is how Carbons and Silicons use Silicon Accounts from a terminal. You sign in with it, look after your account and set up your apps.
 
-Add `--help` to a command to see how it works. Add `--json` when a script needs to read its output. If a command fails, the error explains the problem and what to try next.
+Add `--help` to any command to see how it works, and `--json` when a script needs to read the output. If a command fails, the error tells you what went wrong and what to try next.
 
-The CLI uses the [`silicon-accounts-client`](../reference/rust-client.md) Rust package for every operation. You can use that same package in your own Rust code.
+Every CLI operation goes through the [`silicon-accounts-client`](../reference/rust-client.md) Rust package, and you can use that same package in your own Rust code.
 
 ```sh
 silicon-accounts --help                                                      # the whole command tree
@@ -41,20 +41,20 @@ silicon-accounts login status --json                                         # r
 
 ## Install
 
-Install Silicon Apps first using the [installer for your system](/docs/apps/start/install), then run:
+Install Silicon Apps first with the [installer for your system](/docs/apps/start/install), then run:
 
 ```sh
 silicon-apps install silicon-accounts
 silicon-accounts --version
 ```
 
-This installs the latest production release for your system. Silicon Apps keeps it up to date. Rust is not required, and Accounts does not run a separate updater. Existing settings and sessions stay in `.accounts`.
+That installs the latest production release for your system, and Silicon Apps keeps it up to date from then on. You don't need Rust, and Accounts doesn't run an updater of its own. Your existing settings and sessions stay in `.accounts`.
 
-To build from source instead, install Rust 1.98 or later and run `cargo install silicon-accounts-cli`. The package installs the `silicon-accounts` command in `~/.cargo/bin`.
+If you'd rather build it from source, install Rust 1.98 or later and run `cargo install silicon-accounts-cli`. That puts the `silicon-accounts` command in `~/.cargo/bin`.
 
 ## Point it at a Silicon Accounts instance
 
-The CLI talks to `https://accounts.teamofsilicons.com` unless told otherwise. First match wins:
+The CLI talks to `https://accounts.teamofsilicons.com` unless you tell it otherwise. The first match wins:
 
 1. `--url <URL>` on the command;
 2. `ACCOUNTS_URL`;
@@ -62,12 +62,12 @@ The CLI talks to `https://accounts.teamofsilicons.com` unless told otherwise. Fi
 4. the URL of the stored session, or of a code sign-in waiting for its code;
 5. `https://accounts.teamofsilicons.com`.
 
-For local development, follow [Run it yourself](../index.md#run-it-yourself) and set `ACCOUNTS_URL=http://localhost:8590`. Leave the URL unset to use the hosted service.
+For local development, follow [Run it yourself](../index.md#run-it-yourself) and set `ACCOUNTS_URL=http://localhost:8590`. To use our hosted service, leave the URL unset.
 
 Plain `http://` is accepted only for this machine (`localhost`, `*.localhost`, `127.0.0.0/8`,
-`::1`), so tokens and STKs never cross a network unencrypted; `ACCOUNTS_ALLOW_INSECURE_HTTP=1`
-lifts that on a network you trust. A session belongs to the URL it was created at: with another
-URL, commands answer `not_signed_in` (`You are signed in to … as si:scout, but this command
+`::1`), so tokens and STKs never cross a network unencrypted. On a network you trust,
+`ACCOUNTS_ALLOW_INSECURE_HTTP=1` lifts that. A session belongs to the URL it was created at. Point a
+command at another URL and it answers `not_signed_in` (`You are signed in to … as si:scout, but this command
 targets …`) until you sign in there too.
 
 ## Sign in
@@ -79,22 +79,22 @@ targets …`) until you sign in there too.
 | a Carbon without a browser | `silicon-accounts login --email you@example.com` (or `--phone`), then type the 6-digit code |
 | a Carbon in a script | `silicon-accounts login --email you@example.com`, then `silicon-accounts login --email you@example.com --code 123456` |
 
-Approving a browser code from another machine where you are already signed in works too:
+You can also approve a browser code from another machine where you're already signed in:
 `silicon-accounts device approve WDJB-MJHT`. `silicon-accounts login --app <app_id>` prints a short-lived token for
-an app, signing in first when it needs to; [Sign a Silicon into an app](silicon-sign-in-to-apps.md)
-covers it. `silicon-accounts logout` revokes this session and deletes the stored tokens; your other
+an app, signing you in first when it needs to; [Sign a Silicon into an app](silicon-sign-in-to-apps.md)
+covers it. `silicon-accounts logout` revokes this session and deletes the stored tokens. Your other
 sessions stay signed in (`silicon-accounts sessions list` shows them).
 
 ## Script it
 
-The CLI is built to be driven by Silicons and scripts as much as by Carbons.
+We built the CLI to be driven by Silicons and scripts just as much as by Carbons.
 
 **Results on stdout, everything else on stderr.** Progress, notices and the suggested next commands
-(`Next:`) go to stderr, so `$(…)` captures only the result. `-q` drops the extras; results and errors
-still print.
+(`Next:`) go to stderr, so `$(…)` captures only the result. `-q` drops the extras, and results and
+errors still print.
 
 **`--json` everywhere.** With `--json`, stdout holds one JSON document: the result, or the error.
-Errors keep their shape:
+Errors keep the same shape:
 
 ```json
 {
@@ -112,13 +112,13 @@ Errors keep their shape:
 }
 ```
 
-`code` is stable and safe to branch on; `message` says what happened and why; `hint` says what to
-do; `status` and `request_id` come from the service (quote the request id in a bug report);
-`details` carries the specifics, such as `retry_after_seconds`, `suggestions` or `fields`. A
-command that must show something before it finishes writes it to stderr as one JSON object per
-line: the browser code of `silicon-accounts login` (`{"event":"device_code",…}`), or the new account of
-`silicon-accounts silicon create --wait` (`{"event":"silicon_created",…,"stk":"stk-…"}`) before the wait
-starts, so the STK is never lost if the wait is cut short.
+`code` is stable and safe to branch on. `message` says what happened and why, and `hint` says what
+to do. `status` and `request_id` come from us (quote the request id in a bug report), and `details`
+carries the specifics, such as `retry_after_seconds`, `suggestions` or `fields`. A command that has
+to show you something before it finishes writes it to stderr as one JSON object per line. That's the
+browser code of `silicon-accounts login` (`{"event":"device_code",…}`), or the new account of
+`silicon-accounts silicon create --wait` (`{"event":"silicon_created",…,"stk":"stk-…"}`), written before
+the wait starts so the STK is never lost if the wait is cut short.
 
 **Exit codes you can branch on:**
 
@@ -133,7 +133,7 @@ starts, so the STK is never lost if the wait is cut short.
 | `6` | rate limited or locked: wait `details.retry_after_seconds` |
 | `130` | interrupted with Ctrl-C |
 
-A few commands use exit codes as answers: `silicon-accounts login status` exits `1` when not signed in. With `--json`, it exits `0` and reports `authenticated: false`.
+A few commands use exit codes as answers. `silicon-accounts login status` exits `1` when you're not signed in; with `--json`, it exits `0` and reports `authenticated: false`.
 `silicon-accounts id available` exits `0` (free), `5` (taken, reserved, or a reserved word) or `2`
 (not a valid id).
 
@@ -145,14 +145,14 @@ and land in shell history. Use `--stk-stdin`, `--app-secret-stdin` or `--secret-
 printf '%s' "$REFRESH_TOKEN" | silicon-accounts app token refresh -
 ```
 
-**No prompts in scripts.** The CLI asks questions only when stdin and stderr are terminals and
+**No prompts in scripts.** The CLI only asks you questions when stdin and stderr are terminals and
 `--json` is off. Otherwise a missing value is an error that names the flag to pass, for example
 `No STK was given for si:scout.` with the hint `Pipe it with --stk-stdin, set ACCOUNTS_STK, or pass
 --stk.`
 
 ## Give every Silicon its own home
 
-The CLI keeps its state in `{home}/.accounts/`. The home is, first match wins:
+The CLI keeps its state in `{home}/.accounts/`. To find the home, the first match wins:
 
 1. `--home <DIR>`;
 2. `ACCOUNTS_HOME`;
@@ -161,7 +161,7 @@ The CLI keeps its state in `{home}/.accounts/`. The home is, first match wins:
 4. `SILICON_HOME`;
 5. `~`.
 
-A home holds one session, so every Silicon on a machine needs its own. The simplest way is
+A home holds one session, so every Silicon on a machine needs its own. The easiest way is
 `SILICON_HOME`:
 
 ```sh
@@ -175,8 +175,8 @@ source  SILICON_HOME
 state   /srv/silicons/scout/.accounts
 ```
 
-Whatever names the home must be an existing directory. Anything else stops the command before it
-does anything, saying what is wrong and where the value came from (exit code `2`):
+Whatever names the home has to point at an existing directory. Anything else stops the command
+before it does anything, and it tells you what's wrong and where the value came from (exit code `2`):
 
 ```text
 error: not a directory: /srv/silicons/nope (it does not exist; set by SILICON_HOME)
@@ -195,9 +195,9 @@ What lives there:
 | `session.lock` | the lock that serializes token refreshes |
 
 Files are written atomically with mode 0600 in a 0700 directory, because they hold tokens and
-secrets. Many processes can use one home at once: refreshes happen under the lock, since refresh
+secrets. Many processes can use one home at once. Refreshes happen under the lock, because refresh
 tokens rotate and presenting a used one would end the session. `silicon-accounts config home <DIR>` doesn't
-move an existing session; sign in again in the new home.
+move an existing session, so sign in again in the new home.
 
 ## Settings
 
@@ -227,12 +227,12 @@ Flags win over environment variables, which win over `config.json`.
 
 ## Telemetry
 
-The CLI reports command activity to Space Station. For a flow with several steps, it sends an event for each step, such as `login.silicon.started`, `login.slt.issued` or `silicon.create.requested`. A final `cli.command` event records the result, exit and error codes, duration, CLI version, operating system and architecture. It also records whether you used `--json` and whether the caller was a Carbon or Silicon.
+The CLI reports command activity to Space Station. For a flow with several steps, it sends an event for each step, like `login.silicon.started`, `login.slt.issued` or `silicon.create.requested`. A final `cli.command` event records the result, the exit and error codes, the duration, the CLI version, the operating system and the architecture. It also records whether you used `--json` and whether the caller was a Carbon or a Silicon.
 
-These events do not include tokens, STKs, secrets, account IDs, UUIDs or contact details. The only identifier they can include is the app ID that a short-lived token was requested for. Commands that never contact the service send no events. The CLI waits at most 1.5 seconds to send them.
+These events don't include tokens, STKs, secrets, account ids, uuids or contact details. The only identifier they can carry is the app id a short-lived token was requested for. Commands that never contact us send no events, and the CLI waits at most 1.5 seconds to send them.
 
-It is on by default. Turn it off with `silicon-accounts config telemetry off`, or for one process with
-`ACCOUNTS_TELEMETRY=0`.
+Telemetry is on by default. Turn it off with `silicon-accounts config telemetry off`, or for a single
+process with `ACCOUNTS_TELEMETRY=0`.
 
 ## Get help
 
@@ -243,7 +243,7 @@ silicon-accounts help silicon create    # the same
 silicon-accounts docs                   # the bundled guides; silicon-accounts docs silicons, silicon-accounts docs custodians, …
 ```
 
-The guides ship inside the CLI, so they always match its version. The
+The guides ship inside the CLI, so they always match the version you have. The
 [CLI reference](../reference/cli.md) has every command and option.
 
 ## Report a bug
@@ -257,13 +257,13 @@ silicon-accounts report "wrong hint for login_locked" --pr https://github.com/te
 Report 01a1143c-746a-7381-b51a-44f2076a78e5 sent: it is emailed to the Silicon Accounts maintainers (3 recipients).
 ```
 
-Say what you ran, what you expected and what happened, with the request id from the error. Every
-report is emailed to the maintainers. A signed-in report names your account; signed out, it is
-anonymous. The CLI version and operating system are appended unless you pass `--no-diagnostics`.
-If you fixed it yourself, pass the link to your pull request with `--pr` (https only); the
-repository is `github.com/teamofsilicons/silicon-accounts`, though only its product contract is
-pushed there so far. Reports are limited to 5 per hour per network and 10,000
-characters; `-` reads the message from stdin.
+Say what you ran, what you expected and what happened, and include the request id from the error.
+Every report is emailed to the maintainers. A report sent while you're signed in names your account;
+signed out, it's anonymous. We append the CLI version and operating system unless you pass
+`--no-diagnostics`. If you fixed it yourself, pass the link to your pull request with `--pr` (https
+only), and we'd be grateful. The repository is `github.com/teamofsilicons/silicon-accounts`, though
+only its product contract is pushed there so far. You can send 5 reports per hour per network, each
+up to 10,000 characters, and `-` reads the message from stdin.
 
 ## Next
 
