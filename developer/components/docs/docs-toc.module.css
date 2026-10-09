@@ -47,6 +47,7 @@
   font-size: var(--text-sm);
 }
 .summary {
+  list-style: none;
   display: flex;
   width: 100%;
   min-height: 46px;
@@ -62,13 +63,13 @@
   text-align: left;
   cursor: pointer;
 }
+.summary::-webkit-details-marker { display: none; }
 .summary:focus-visible { outline: none; color: var(--accent-ink); }
 .summaryText { display: flex; min-width: 0; align-items: baseline; gap: var(--space-2); }
-.summaryCurrent { overflow: hidden; color: var(--text-muted); font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
-.summaryCurrent::before { content: "·"; margin-right: var(--space-2); color: var(--border-strong); }
 .chevron { flex: none; color: var(--text-muted); transition: transform var(--duration-standard) var(--ease-spring); }
-.disclosure[data-open] .chevron { transform: rotate(180deg); }
+.disclosure[open] .chevron { transform: rotate(180deg); }
 .disclosureBody { max-height: min(60vh, 420px); overflow-y: auto; padding: 0 8px 10px; border-top: 1px solid var(--border-subtle); }
+.disclosureBody .link:hover { color: var(--foreground); }
 .disclosureBody .list { padding-top: 6px; }
 .disclosureBody .link { padding: 7px 8px; border-radius: 8px; }
 .disclosureBody [data-depth="3"] > .link { padding-left: 22px; }

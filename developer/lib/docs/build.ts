@@ -3,9 +3,15 @@
  * first). The site never reads docs/ at run time: everything it needs is bundled here, so the standalone server works
  * without the repository beside it.
  *
- *   lib/docs/generated/pages.ts   every page's front matter and Markdown, imported by the /docs routes (git-ignored)
+ *   lib/docs/generated/pages.ts   every page's front matter, Markdown and last change, imported by the /docs routes
+ *                                 (git-ignored)
+ *   lib/docs/generated/llms.ts    developer/llms/llms.md and llms-full.md exactly as written, served at /llms.txt and
+ *                                 /llms-full.txt (git-ignored; a missing llms-full.md leaves the generated full text)
  *   public/docs/<path>.md         each page as written, served at /docs/<path>.md (git-ignored)
  *   public/docs.md                docs/index.md with its links made relative to /, served at /docs.md
+ *
+ * A page's last change (`modified`, ISO 8601) is its file's last commit, or the file's own time when it has changes
+ * not committed yet (or no git is at hand). It feeds dateModified, the sitemap's lastmod and the JSON API.
  *
  * It also checks the docs and prints every problem with its file and line: front matter (title, description, kind,
  * order, related), links to pages that don't exist, and #anchors that name no heading on the page they point to.
@@ -21,6 +27,7 @@
  * temporary name and renamed into place, and only when its content changed, so readers never see half a file and a
  * running `next dev` only reloads for real changes.
  */
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, rmdirSync, statSync, watch, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +39,8 @@ import { slugOf, SECTIONS } from "./site";
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const generatedFile = join(webRoot, "lib", "docs", "generated", "pages.ts");
+const generatedLlms = join(webRoot, "lib", "docs", "generated", "llms.ts");
+const llmsDir = join(webRoot, "llms");
 const publicDocs = join(webRoot, "public", "docs");
 const publicIndex = join(webRoot, "public", "docs.md");
 
@@ -73,6 +82,42 @@ function markdownFiles(root: string, directory = root): string[] {
     const stats = statSync(path);
     if (stats.isDirectory()) out.push(...markdownFiles(root, path));
     else if (stats.isFile() && name.endsWith(".md")) out.push(relative(root, path).split(sep).join("/"));
+  }
+  return out;
+}
+
+/** Runs git in `directory`, or null when git or the repository is not there. */
+function git(directory: string, args: string[]): string | null {
+  try {
+    return execFileSync("git", args, { cwd: directory, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 15_000, maxBuffer: 32 * 1024 * 1024 });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * When each file under `directory` last changed, as ISO 8601 (keys are paths relative to it): its last commit, or the
+ * file's own modification time when it has uncommitted changes, is untracked, or git is not available.
+ */
+function modifiedDates(directory: string, files: string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  const log = git(directory, ["log", "--format=--%cI", "--name-only", "--relative", "--", "."]);
+  if (log !== null) {
+    let date: string | null = null;
+    for (const line of log.split("\n")) {
+      if (line.startsWith("--")) date = line.slice(2).trim();
+      else if (line.trim() && date && !out.has(line.trim())) out.set(line.trim(), new Date(date).toISOString());
+    }
+  }
+  const dirty = new Set((git(directory, ["ls-files", "-m", "-o", "--exclude-standard", "--", "."]) ?? "").split("\n").map(line => line.trim()).filter(Boolean));
+  for (const file of files) {
+    if (log === null || dirty.has(file) || !out.has(file)) {
+      try {
+        out.set(file, statSync(join(directory, file)).mtime.toISOString());
+      } catch {
+        out.delete(file);
+      }
+    }
   }
   return out;
 }
@@ -145,13 +190,15 @@ function collect(docsDir: string): BuildResult {
     problems.push(`${docsDir}: no docs directory here (set ACCOUNTS_DOCS_DIR or pass --docs <dir>); the site will have no docs pages`);
     return { sources, raw, problems };
   }
-  for (const path of markdownFiles(docsDir)) {
+  const files = markdownFiles(docsDir);
+  const modified = modifiedDates(docsDir, files);
+  for (const path of files) {
     const text = readFileSync(join(docsDir, path), "utf8");
     raw.set(path, text);
     const { yaml, body, bodyLine } = splitFrontMatter(text);
     const { source, problems: found } = readDocSource(path, yaml, body, bodyLine);
     for (const problem of found) problems.push(`docs/${path}: ${problem}`);
-    sources.push(source);
+    sources.push({ ...source, modified: modified.get(path) ?? null });
   }
   if (!sources.some(source => source.path === "index.md")) problems.push("docs/index.md is missing: /docs has no landing page and shows the list of pages instead");
 
@@ -193,6 +240,36 @@ function bundleModule(sources: DocSource[]): string {
   ].join("\n");
 }
 
+/** The hand-written agent files, exactly as written (null when one is missing), and when each last changed. */
+interface LlmsFiles {
+  index: string | null;
+  full: string | null;
+  indexModified: string | null;
+  fullModified: string | null;
+}
+
+function readLlms(): LlmsFiles {
+  const names = ["llms.md", "llms-full.md"];
+  const present = names.filter(name => existsSync(join(llmsDir, name)));
+  const modified = present.length ? modifiedDates(llmsDir, present) : new Map<string, string>();
+  const read = (name: string) => (present.includes(name) ? readFileSync(join(llmsDir, name), "utf8") : null);
+  return { index: read("llms.md"), full: read("llms-full.md"), indexModified: modified.get("llms.md") ?? null, fullModified: modified.get("llms-full.md") ?? null };
+}
+
+function llmsModule(files: LlmsFiles): string {
+  return [
+    "/* Generated by lib/docs/build.ts from developer/llms/: do not edit. Run `pnpm build:docs` (pnpm dev and pnpm build do). */",
+    "",
+    "/** developer/llms/llms.md exactly as written, served at /llms.txt (null: the file is missing, the index is generated). */",
+    `export const LLMS_TXT: string | null = ${JSON.stringify(files.index)};`,
+    "/** developer/llms/llms-full.md exactly as written, served at /llms-full.txt (null: missing, the full text is generated). */",
+    `export const LLMS_FULL_TXT: string | null = ${JSON.stringify(files.full)};`,
+    `export const LLMS_TXT_MODIFIED: string | null = ${JSON.stringify(files.indexModified)};`,
+    `export const LLMS_FULL_TXT_MODIFIED: string | null = ${JSON.stringify(files.fullModified)};`,
+    "",
+  ].join("\n");
+}
+
 /** Removes .md files under public/docs that no longer have a page, then empty directories. */
 function prune(directory: string, keep: Set<string>, root = directory): void {
   if (!existsSync(directory)) return;
@@ -212,9 +289,10 @@ function prune(directory: string, keep: Set<string>, root = directory): void {
   }
 }
 
-function write(result: BuildResult): string[] {
+function write(result: BuildResult, llms: LlmsFiles): string[] {
   const written: string[] = [];
   if (writeIfChanged(generatedFile, bundleModule(result.sources))) written.push(relative(webRoot, generatedFile));
+  if (writeIfChanged(generatedLlms, llmsModule(llms))) written.push(relative(webRoot, generatedLlms));
   for (const [path, text] of result.raw) {
     if (writeIfChanged(join(publicDocs, ...path.split("/")), text)) written.push(`public/docs/${path}`);
   }
@@ -236,7 +314,12 @@ function run(options: Options): number {
   const landing = readFileSync(join(webRoot, "lib/docs/landing.md"), "utf8");
   const parsed = splitFrontMatter(landing);
   const root = readDocSource("index.md", parsed.yaml, parsed.body, parsed.bodyLine);
-  const result: BuildResult = { sources: [root.source], raw: new Map([["index.md", landing]]), problems: root.problems };
+  const landingModified = modifiedDates(join(webRoot, "lib/docs"), ["landing.md"]).get("landing.md") ?? null;
+  const result: BuildResult = { sources: [{ ...root.source, modified: landingModified }], raw: new Map([["index.md", landing]]), problems: root.problems };
+  const llms = readLlms();
+  // Not a problem for --check: the agent files fall back to the generated text, and are the Carbon's to write.
+  if (llms.index === null && !options.quiet) console.warn("build:docs: developer/llms/llms.md is missing, so /llms.txt serves the generated index");
+  if (llms.full === null && !options.quiet) console.warn("build:docs: developer/llms/llms-full.md is missing, so /llms-full.txt serves the generated full text");
   for (const [product, data] of [["accounts", accounts], ["apps", apps]] as const) {
     result.sources.push(...data.sources.map(source => ({ ...source, path: `${product}/${source.path}`, related: source.related.map(path => `${product}/${path}`) })));
     for (const [path, raw] of data.raw) result.raw.set(`${product}/${path}`, raw);
@@ -262,7 +345,7 @@ function run(options: Options): number {
       if (target && anchor && !parseMarkdown(target.body).headings.some(heading => heading.id === anchor)) result.problems.push(`${source.path}: link "${href}" names no heading in ${target.path}`);
     }
   }
-  const written = options.check ? [] : write(result);
+  const written = options.check ? [] : write(result, llms);
   for (const problem of result.problems) console.warn(`build:docs: ${problem}`);
   if (!options.quiet) {
     const where = relative(webRoot, options.docs) || options.docs;
@@ -287,8 +370,9 @@ function main() {
 
   console.log(`build:docs: watching ${options.docs} (Ctrl-C to stop)`);
   let timer: NodeJS.Timeout | null = null;
-  for (const directory of [options.docs, options.apps, join(webRoot, "lib/docs")]) watch(directory, { recursive: true }, (_event, filename) => {
+  for (const directory of [options.docs, options.apps, join(webRoot, "lib/docs"), llmsDir].filter(existsSync)) watch(directory, { recursive: true }, (_event, filename) => {
     if (directory.endsWith("lib/docs") && filename !== "landing.md") return;
+    if (directory === llmsDir && !String(filename ?? "").endsWith(".md")) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       try {

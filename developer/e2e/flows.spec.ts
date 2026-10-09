@@ -4,7 +4,7 @@ test("creation shows a one-time secret and flushes an edit before another setup 
   page,
 }) => {
   const changes = await mock(page, true);
-  await page.goto("/");
+  await page.goto("/apps");
   await page.getByRole("button", { name: "New app", exact: true }).first().click();
   await page.getByLabel("App name", { exact: true }).fill("A useful app");
   await page.getByLabel("App ID", { exact: true }).fill("test-app");
@@ -98,7 +98,7 @@ test("creation dialog traps keyboard focus and returns it on Escape", async ({
   page,
 }) => {
   await mock(page, true);
-  await page.goto("/");
+  await page.goto("/apps");
   const trigger = page.getByRole("button", { name: "New app", exact: true }).first();
   await trigger.focus();
   await page.keyboard.press("Enter");

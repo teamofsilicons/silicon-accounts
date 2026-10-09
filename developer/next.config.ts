@@ -66,6 +66,14 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   // `next dev` answers its dev assets to localhost only by default; local stacks are also opened on 127.0.0.1.
   allowedDevOrigins: ["127.0.0.1"],
+  // The site's own font files never change in place (a new cut gets a new name); the icons and social image may.
+  async headers() {
+    return [
+      { source: "/fonts/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
+      { source: "/:file(og.png|icon.svg|icon-192.png|icon-512.png|icon-maskable-512.png|apple-touch-icon.png|favicon.ico)", headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }] },
+      ...["/docs.md", "/docs/:path(.+\\.md)"].map(source => ({ source, headers: [{ key: "Content-Type", value: "text/markdown; charset=utf-8" }, { key: "Cache-Control", value: "public, max-age=300, stale-while-revalidate=86400" }, { key: "Access-Control-Allow-Origin", value: "*" }] })),
+    ];
+  },
   experimental: {
     ...(distDir === ".next" ? {} : { turbopackFileSystemCacheForBuild: false }),
   },

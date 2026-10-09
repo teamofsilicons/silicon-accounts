@@ -17,19 +17,19 @@
 .crumbs svg { color: var(--border-strong); }
 .crumbs a { color: var(--text-secondary); text-decoration: none; }
 .crumbs a:hover { color: var(--foreground); }
-.crumbs a:focus-visible { outline: none; color: var(--foreground); text-decoration: underline; text-underline-offset: .22em; }
+.crumbs a:focus-visible { outline: none; background: none; box-shadow: none; color: var(--foreground); text-decoration: underline; text-underline-offset: .22em; }
 .eyebrow { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
 .title {
   margin: 0;
   color: var(--foreground);
-  font-family: var(--font-serif);
-  font-size: clamp(2.375rem, 1.7rem + 2.4vw, 3.25rem);
-  font-weight: 400;
-  letter-spacing: -.014em;
-  line-height: 1.04;
+  font-family: var(--font-display);
+  font-size: clamp(2.125rem, 1.6rem + 2vw, 3rem);
+  font-weight: 600;
+  letter-spacing: var(--tracking-display);
+  line-height: 1.06;
   text-wrap: balance;
 }
-.landingTitle { font-size: clamp(2.75rem, 1.9rem + 3.4vw, 4.25rem); line-height: 1; }
+.landingTitle { font-size: clamp(2.5rem, 1.8rem + 3vw, 3.75rem); line-height: 1.02; }
 .lede { max-width: 62ch; margin: 0; color: var(--text-secondary); font-size: 1.125rem; line-height: 1.55; text-wrap: pretty; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); margin-top: var(--space-1); }
 .kind {
@@ -48,11 +48,15 @@
   white-space: nowrap;
 }
 .kind[data-kind="instructive"] { --sq-fill: var(--accent-subtle); --sq-stroke: color-mix(in oklab, var(--accent) 30%, var(--border)); color: var(--accent-strong); }
+.updated { color: var(--text-muted); font-size: var(--text-sm); }
+.metaLink { display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; }
+.metaLink:hover, .metaLink:focus-visible { color: var(--foreground); text-decoration: underline; text-underline-offset: .22em; }
+.metaLink svg { color: var(--text-muted); }
 
 .tocInline { display: none; }
 
 /* Related pages and cards. */
-.sectionTitle { margin: 0 0 var(--space-4); color: var(--foreground); font-family: var(--font-serif); font-size: 1.75rem; font-weight: 400; letter-spacing: -.01em; line-height: 1.15; }
+.sectionTitle { margin: 0 0 var(--space-4); color: var(--foreground); font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
 .related { margin-top: var(--space-6); padding-top: var(--space-8); border-top: 1px solid var(--border-subtle); }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: var(--space-3); }
 .card {
@@ -100,7 +104,7 @@
 .everyPage { margin-top: var(--space-6); padding-top: var(--space-8); border-top: 1px solid var(--border-subtle); }
 .everyGroups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: var(--space-8) var(--space-6); }
 .everyGroup { display: grid; align-content: start; gap: var(--space-2); }
-.everyGroupTitle { margin: 0; font-size: var(--text-base); font-weight: 500; }
+.everyGroupTitle { margin: 0; font-size: var(--text-base); font-weight: 600; }
 .everyGroupTitle a { color: var(--foreground); text-decoration: none; }
 .everyGroupTitle a:hover { text-decoration: underline; text-underline-offset: .22em; }
 .everyGroupText { margin: 0 0 var(--space-2); color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.5; }

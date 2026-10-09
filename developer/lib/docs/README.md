@@ -11,9 +11,11 @@ The native docs engine bundles `../docs/` as Accounts and `../docs-apps/` as App
 | `/docs/<product>/<path>.md` | Original Markdown, including product `index.md` |
 | `/docs.md`, `/docs/index.md` | Shared landing Markdown |
 | `/docs/search-index.json` | One search index with product-labelled results |
-| `/llms.txt`, `/llms-full.txt` | Combined index and full documentation |
+| `/docs/search?q=` | The same search, server-rendered (no script needed) |
+| `/llms.txt`, `/llms-full.txt` | `developer/llms/llms.md` and `llms-full.md` exactly as written (generated text if missing) |
+| `/api/docs/search`, `/api/docs/pages`, `/api/docs/pages/{product}/{path}` | The docs as JSON (`lib/docs/api.ts`) |
 
-The shell is public for all `/docs` descendants. Canonical links use `developers.teamofsilicons.com`; exports use `DEVELOPER_PUBLIC_URL` when configured, the canonical origin in production, or the local request origin in development.
+Every `/docs` page is public, server-rendered HTML. Canonical links use `developers.teamofsilicons.com`; exports use `DEVELOPER_PUBLIC_URL` when configured, the canonical origin in production, or the local request origin in development.
 
 ## Writing a page
 
@@ -64,7 +66,7 @@ Use the plain, conversational language of the sibling Silicon projects’ unders
 
 | File | Does |
 | --- | --- |
-| `lib/docs/build.ts` | the build step: reads `docs/`, checks it, writes `lib/docs/generated/pages.ts` and `public/docs/**` |
+| `lib/docs/build.ts` | the build step: reads `docs/`, checks it, writes `lib/docs/generated/pages.ts` (with each page's last change), `lib/docs/generated/llms.ts` and `public/docs/**` |
 | `lib/docs/frontmatter.ts` | the front matter (a small YAML subset) and its checks |
 | `lib/docs/markdown.ts` | the Markdown parser (CommonMark + GitHub tables, strikethrough, autolinks, task items, alerts) |
 | `lib/docs/links.ts` | resolves links written for files into site addresses |
@@ -72,8 +74,9 @@ Use the plain, conversational language of the sibling Silicon projects’ unders
 | `lib/docs/content.ts` | the pages in reading order, navigation, previous/next, parsed pages (server only) |
 | `lib/docs/search-index.ts`, `lib/docs/search.ts` | the search index (server) and ranking (browser) |
 | `lib/docs/llms.ts` | `/llms.txt` and `/llms-full.txt` |
+| `lib/docs/api.ts` | the docs as data: search with filters, page lists and pages, for the JSON API, MCP and `/docs/search` |
 | `components/docs/` | the frame, navigation, search, contents, article, Markdown and code block components |
-| `app/(shell)/docs/`, `app/(docs)/` | HTML routes and plain-text exports |
+| `app/(public)/docs/`, `app/llms.txt/`, `app/llms-full.txt/`, `app/api/docs/` | HTML routes, plain-text exports and the JSON API |
 
 The parser was checked against markdown-it on every page of the docs (identical output, apart from the alerts and the
 dropped comments) and the highlighter on every code block (lossless).

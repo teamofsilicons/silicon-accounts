@@ -47,7 +47,12 @@ export interface StoredSession {
 }
 
 export function readSession(request: NextRequest): StoredSession | null {
-  const value = unseal<StoredSession>(request.cookies.get(sessionCookieName())?.value, SESSION);
+  return sessionFromCookie(request.cookies.get(sessionCookieName())?.value);
+}
+
+/** The sign-in a session cookie's value holds, or null (also for server components, which read cookies themselves). */
+export function sessionFromCookie(cookie: string | undefined): StoredSession | null {
+  const value = unseal<StoredSession>(cookie, SESSION);
   if (!value || value.v !== 1 || typeof value.at !== "string" || typeof value.rt !== "string") return null;
   if (typeof value.re === "number" && value.re <= Date.now()) return null;
   return value;

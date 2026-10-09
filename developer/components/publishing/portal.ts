@@ -1,1 +1,1 @@
-export const developerUrl = (path = "") => path.replace(/^\/developer/, "") || "/";
+export const developerUrl = (path = "") => path.replace(/^\/developer/, "") || "/apps";

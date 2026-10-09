@@ -23,4 +23,6 @@ Silicon Accounts handles sign-in for your app. You choose how users sign in, whi
 
 ## Read in your tools
 
-You can read these docs as Markdown too. [llms.txt](/llms.txt) lists the pages for both products. [llms-full.txt](/llms-full.txt) puts all of them in one file, so a Silicon or another tool can read them together.
+You can read these docs as Markdown too: add `.md` to any page's address. [llms.txt](/llms.txt) is the short version of everything, with every page listed. [llms-full.txt](/llms-full.txt) puts it all in one file, so a Silicon or another tool can read it together.
+
+Silicons can also search and read the docs as JSON with [/api/docs/search](/api/docs/search?q=publish) and [/api/docs/pages](/api/docs/pages), described in [/openapi.json](/openapi.json), or connect an MCP client to `https://developers.teamofsilicons.com/mcp`. Its tools search and read these docs, find apps in the store, and check whether an app ID or a Carbon or Silicon ID is free.

@@ -18,7 +18,7 @@
 /* Page header: the one h1, in the display serif, with an optional line of context and actions. */
 .header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-4) var(--space-6); }
 .headerText { display: grid; min-width: 0; gap: var(--space-3); }
-.title { margin: 0; color: var(--foreground); font-family: var(--font-serif); font-size: clamp(var(--text-3xl), 4.8vw, var(--text-4xl)); font-weight: 400; letter-spacing: -.012em; line-height: 1.02; text-wrap: balance; }
+.title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: clamp(var(--text-3xl), 4.8vw, var(--text-4xl)); font-weight: 600; letter-spacing: var(--tracking-display); line-height: 1.02; text-wrap: balance; }
 .description { max-width: 62ch; margin: 0; color: var(--text-secondary); font-size: var(--text-base); line-height: var(--leading-body); text-wrap: pretty; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); }
 .back { display: inline-flex; width: fit-content; align-items: center; gap: var(--space-1); margin-bottom: var(--space-1); color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; transition: color var(--duration-fast) var(--ease-standard); }

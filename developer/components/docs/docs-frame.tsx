@@ -1,14 +1,18 @@
 /**
- * The frame of every /docs page (server): the sticky header, the navigation in a sticky sidebar (a drawer below
- * 1024 px), the page, and a footer that points Silicons at the Markdown versions (llms.txt, llms-full.txt).
+ * The frame of every /docs page (server-rendered): the site header (with the docs search and, in its menu below
+ * 1024 px, the docs navigation), the navigation in a sticky sidebar, the page in <main>, the site footer, and the one
+ * behaviour island. `path` is the page's address, so the navigation marks where you are without any script.
  */
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { docs } from "@/lib/docs/content";
-import { DOCS_BASE, GITHUB_PUBLISHED, GITHUB_REPO } from "@/lib/docs/site";
+import { DOCS_BASE } from "@/lib/docs/site";
 import type { SearchSuggestion } from "@/lib/docs/types";
-import { DocsHeader } from "./docs-header";
+import { isSignedIn } from "@/lib/server/signed-in";
+import { Enhancer } from "@/components/site/enhancer";
+import { SiteFooter } from "@/components/site/site-footer";
+import { SiteHeader } from "@/components/site/site-header";
 import { DocsNav } from "./docs-nav";
+import { DocsSearch } from "./docs-search";
 import styles from "./docs-frame.module.css";
 
 /** What the search offers before anything is typed: the common jobs first. */
@@ -33,30 +37,33 @@ function suggestions(): SearchSuggestion[] {
   return list.map(page => ({ title: page.title, href: page.href, group: page.groupLabel }));
 }
 
-export function DocsFrame({ children }: { children: ReactNode }) {
+export async function DocsFrame({ path, children }: { path: string; children: ReactNode }) {
   const { nav } = docs();
+  const signedIn = await isSignedIn();
   return (
     <div className={styles.frame} id="top">
-      <a className="skip-link" href="#docs-main">Skip to content</a>
-      <DocsHeader groups={nav} suggestions={suggestions()} />
+      <SiteHeader
+        path={path}
+        signedIn={signedIn}
+        wide
+        search={<DocsSearch suggestions={suggestions()} />}
+        menu={<DocsNav groups={nav} current={path} idPrefix="menu-docs" label="Docs (menu)" />}
+      />
       <div className={styles.body}>
-        <aside className={styles.sidebar} data-docs-sidebar="">
-          <DocsNav groups={nav} />
+        <aside className={styles.sidebar} data-docs-sidebar="" aria-label="Docs navigation">
+          <DocsNav groups={nav} current={path} idPrefix="side-docs" />
         </aside>
-        <div id="docs-main" className={styles.main} tabIndex={-1}>
+        <main id="main" className={styles.main} tabIndex={-1}>
           {children}
-          <footer className={styles.footer}>
-            <span>Silicon Developer docs</span>
-            <span className={styles.footerLinks}>
-              <a href="/llms.txt">llms.txt</a>
-              <a href="/llms-full.txt">llms-full.txt</a>
-              <a href={`${DOCS_BASE}/index.md`}>Markdown</a>
-              {GITHUB_PUBLISHED ? <a href={GITHUB_REPO}>GitHub</a> : null}
-              <Link href="/">Your apps</Link>
-            </span>
-          </footer>
-        </div>
+          <p className={styles.formats}>
+            Every page is plain Markdown at its address plus <code>.md</code>. Silicons can read{" "}
+            <a href="/llms.txt">llms.txt</a>, <a href="/llms-full.txt">llms-full.txt</a> or the <a href={`${DOCS_BASE}.md`}>docs index</a>, or call the{" "}
+            <a href="/#mcp">MCP server</a>.
+          </p>
+        </main>
       </div>
+      <SiteFooter wide />
+      <Enhancer />
     </div>
   );
 }

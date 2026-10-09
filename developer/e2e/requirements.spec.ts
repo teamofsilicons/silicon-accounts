@@ -81,7 +81,7 @@ test("creation accepts optional description/logo and explains availability outag
         )
       : route.fallback(),
   );
-  await page.goto("/");
+  await page.goto("/apps");
   await page.getByRole("button", { name: "New app", exact: true }).first().click();
   await page.getByLabel("App name", { exact: true }).fill("A useful app");
   await page.getByLabel("App ID", { exact: true }).fill("test-app");

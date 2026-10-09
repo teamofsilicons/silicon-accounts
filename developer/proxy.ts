@@ -12,11 +12,15 @@
  *
  * An address under an app that names no tab (/apps/briefcase/bogus) is answered with the not-found page and a real 404;
  * the account site's old tab names (branding, proofs) redirect to their tabs here (pages, app_verification).
+ *
+ * / is the public home page. A browser that is signed in to the developer site (the sealed session cookie, read here
+ * without calling the API) goes on to its apps at /apps instead, so the old links to / still open the workspace.
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { findPage, findPageByPath, isGroup } from "./lib/docs/content";
 import { isUnknownAppTab, renamedAppTab } from "./lib/app-tabs";
 import { accountsPublicUrl, localIrisImageSource, originOf } from "./lib/server/config";
+import { readSession } from "./lib/server/session";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -43,11 +47,24 @@ function docsAddressMissing(pathname: string): boolean {
   if (!pathname.startsWith("/docs/")) return false;
   let path: string;
   try { path = decodeURIComponent(pathname.slice(6)).replace(/\/+$/, ""); } catch { return true; }
-  if (!path || path === "search-index.json" || path === "index" || /^(apps|accounts)\/index$/.test(path)) return false;
+  if (!path || path === "search-index.json" || path === "search" || path === "index" || /^(apps|accounts)\/index$/.test(path)) return false;
   return path.endsWith(".md") ? !findPageByPath(path) : !findPage(path) && !isGroup(path);
 }
 
+function signedIn(request: NextRequest): boolean {
+  try {
+    return readSession(request) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname === "/" && signedIn(request)) {
+    const target = new URL(request.url);
+    target.pathname = "/apps";
+    return NextResponse.redirect(target, 307);
+  }
   if (/^\/apps\/apps(?:\/|$)/.test(request.nextUrl.pathname)) {
     const target = new URL(request.url);
     target.pathname = target.pathname.replace(/^\/apps\/apps(?=\/|$)/, "/apps/silicon-apps");
@@ -83,7 +100,8 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: "/((?!api/|auth/|_next/static|_next/image|favicon\\.ico|icon\\.svg|robots\\.txt).*)",
+      // Route handlers (the BFF, the agent files, the JSON API, MCP) and static files set their own headers.
+      source: "/((?!api/|auth/|mcp|\\.well-known/|_next/static|_next/image|fonts/|favicon\\.ico|icon|apple-touch-icon|og\\.png|robots\\.txt|sitemap\\.xml|llms|openapi\\.json|manifest\\.webmanifest).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

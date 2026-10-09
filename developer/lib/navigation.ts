@@ -7,14 +7,17 @@
 import { APP_TABS, appTabFrom, type AppTab } from "./app-tabs";
 
 export const paths = {
-  home: "/",
+  /** The signed-in workspace: your apps (/ is the public home page and sends a signed-in browser here). */
+  home: "/apps",
+  /** The public home page. */
+  site: "/",
   signIn: "/sign-in",
   docs: "/docs",
   settings: "/settings",
   invitations: "/invitations",
   appVerification: (appId?: string) => `/app-verification${appId ? `?app_id=${encodeURIComponent(appId)}` : ""}`,
   /** The apps home. */
-  developer: "/",
+  developer: "/apps",
   developerApp: (appId: string, tab?: AppTab) => `/apps/${encodeURIComponent(appId)}${tab && tab !== "overview" ? `/${tab}` : ""}`,
   authSignIn: (returnTo?: string, prompt?: "login" | "select_account") => {
     const query = new URLSearchParams();

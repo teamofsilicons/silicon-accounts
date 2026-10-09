@@ -1,32 +1,33 @@
 /**
- * The site's typefaces through next/font: downloaded at build and self-hosted under /_next/static/media, so the
- * Content-Security-Policy keeps font-src 'self'. Geist for the interface, Instrument Serif for display moments,
- * JetBrains Mono for ids, tokens and code. Each sets a CSS variable on <html> that styles/tokens.css maps onto
- * --font-body, --font-display, --font-serif and --font-mono.
- *
- * Branding fonts for hosted sign-in pages load on demand from lib/branding/fonts.ts.
+ * Branding fonts that ship through next/font: Geist, Instrument Serif and JetBrains Mono are three of the faces an app
+ * may pick for its hosted sign-in pages (lib/branding/fonts.ts), so the Pages tab's live preview must be able to show
+ * them. They are downloaded at build and self-hosted under /_next/static/media (font-src 'self'), never preloaded, and
+ * a browser only fetches one when a branded preview actually uses it. The site's own faces are in styles/fonts.css.
  */
 import { Geist, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 
-export const geist = Geist({
+const geist = Geist({
   subsets: ["latin", "latin-ext"],
   variable: "--font-geist",
   display: "swap",
+  preload: false,
 });
 
-export const instrumentSerif = Instrument_Serif({
+const instrumentSerif = Instrument_Serif({
   subsets: ["latin", "latin-ext"],
   weight: "400",
   style: ["normal", "italic"],
   variable: "--font-instrument-serif",
   display: "swap",
+  preload: false,
 });
 
-export const jetbrainsMono = JetBrains_Mono({
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin", "latin-ext"],
   variable: "--font-jetbrains-mono",
   display: "swap",
+  preload: false,
 });
 
-/** The class names that put the three font variables on <html>. */
-export const fontVariables = [geist.variable, instrumentSerif.variable, jetbrainsMono.variable].join(" ");
+/** The class names that put the three branding font variables on <html>. */
+export const brandFontVariables = [geist.variable, instrumentSerif.variable, jetbrainsMono.variable].join(" ");

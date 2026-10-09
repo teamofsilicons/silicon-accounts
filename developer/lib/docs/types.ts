@@ -21,6 +21,8 @@ export interface DocSource {
   body: string;
   /** The file's line number of the body's first line, so problems can name lines. */
   bodyLine: number;
+  /** When the file last changed (ISO 8601): its last commit, or its own time when it has uncommitted changes. */
+  modified?: string | null;
 }
 
 export interface DocsBundle {

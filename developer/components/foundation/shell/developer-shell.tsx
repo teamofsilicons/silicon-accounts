@@ -3,7 +3,8 @@
 /**
  * The developer site's frame for signed-in pages: a calm top bar (the brand, Apps, Docs, search, theme and the account
  * menu), the page, the ⌘K palette and page transitions. It also guards every page: a visitor without a session goes to
- * /sign-in and comes back to the page they asked for.
+ * the hosted sign-in and comes back to the page they asked for. The public pages (the home page and the docs) have their
+ * own server-rendered frame (components/site, components/docs/docs-frame.tsx).
  *
  * Every navigation the shell starts (the brand, Apps, the palette, signing out) asks the page's navigation guards first
  * (lib/navigation-guard.ts), and so does a plain click on any other link while a guard protects its destination: a
@@ -70,13 +71,12 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
   const isApple = useSyncExternalStore(subscribeNothing, detectApple, () => false);
   const accountsUrl = accountsUrlOf(meta.data?.public_url);
   const docsUrl = paths.docs;
-  const onDocs = pathname === paths.docs || pathname.startsWith(`${paths.docs}/`);
   const onApps = pathname === paths.home || pathname.startsWith("/apps/");
 
   // Every page needs a session.
   useEffect(() => {
-    if (status === "signed_out" && !onDocs) beginSignIn(window.location.pathname + window.location.search);
-  }, [status, pathname, onDocs]);
+    if (status === "signed_out") beginSignIn(window.location.pathname + window.location.search);
+  }, [status, pathname]);
 
   /** Navigates inside a page transition (no guard asked: the caller did). */
   const push = useCallback((href: string) => {
@@ -128,7 +128,6 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
   // ⌘K toggles the palette.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (onDocs) return;
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
         event.preventDefault();
         toggleCommandPalette();
@@ -136,7 +135,7 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [paletteOpen, onDocs]);
+  }, [paletteOpen]);
 
   const user = useMemo<UserMenuUser | null>(() => (me ? { name: me.display_name, email: me.id ?? me.uuid, avatarSrc: me.pfp_url } : null), [me]);
 
@@ -161,18 +160,18 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
             }}>Apps</Link>
             <Link href={paths.appVerification()} data-sq="surface" className={styles.navLink} aria-current={pathname === paths.appVerification() ? "page" : undefined}>App verification</Link>
             <Link href={paths.invitations} data-sq="surface" className={styles.navLink}>Invitations</Link>
-            <Link href={docsUrl} data-sq="surface" className={styles.navLink} aria-current={onDocs ? "page" : undefined}>Docs</Link>
+            <a href={docsUrl} data-sq="surface" className={styles.navLink}>Docs</a>
           </nav>
         </div>
         <div className={styles.topEnd}>
-          {!onDocs ? <button data-sq="surface" type="button" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}>
+          <button data-sq="surface" type="button" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}>
             <Search size={16} strokeWidth={1.75} aria-hidden="true" />
             <span className={styles.searchLabel}>Search and jump</span>
             <kbd data-sq="surface">{isApple ? "⌘ K" : "Ctrl K"}</kbd>
-          </button> : null}
-          {!onDocs ? <span className={styles.tool}>
+          </button>
+          <span className={styles.tool}>
             <ThemeSwitch theme={theme} variant="eclipse" iconOnly onThemeChange={(next, _variant, trigger) => change(next, trigger)} />
-          </span> : null}
+          </span>
           {user ? (
             <UserMenu
               user={user}
@@ -198,7 +197,7 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
     </div>
   );
 
-  if (status === "signed_in" || onDocs) {
+  if (status === "signed_in") {
     return chrome(
       <ViewTransition key={pathname.split("/").slice(0, 3).join("/") || "/"} enter={PAGE_CLASSES} exit={PAGE_CLASSES} default="none">
         <div className={styles.page}>{children}</div>

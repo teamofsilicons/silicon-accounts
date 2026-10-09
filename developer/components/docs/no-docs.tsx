@@ -2,7 +2,6 @@
  * The docs' two empty states (server): an address with no page (the docs' 404), and a build without docs (the
  * bundle is empty because lib/docs/build.ts did not run or found no docs/ directory).
  */
-import Link from "next/link";
 import { docs } from "@/lib/docs/content";
 import { DOCS_BASE } from "@/lib/docs/site";
 import styles from "./doc-article.module.css";
@@ -17,18 +16,18 @@ export function DocsNotFound() {
           <p className={styles.eyebrow}>404</p>
           <h1 className={styles.title}>No page here</h1>
           <p className={styles.lede}>
-            Nothing in the docs lives at this address: the page may have moved or been renamed. Search the docs (⌘K or /),
-            or start from one of the groups below.
+            Nothing in the docs lives at this address: the page may have moved or been renamed. <a href="/docs/search">Search
+            the docs</a> (⌘K or /), or start from one of the groups below.
           </p>
         </header>
         <ul className={extra.groups} role="list">
-          <li><Link href={DOCS_BASE} className={styles.card} data-sq="surface"><span className={styles.cardTitle}>Overview</span><span className={styles.cardText}>Silicon Apps and Silicon Accounts guides, concepts, and reference.</span></Link></li>
+          <li><a href={DOCS_BASE} className={styles.card} data-sq="surface"><span className={styles.cardTitle}>Overview</span><span className={styles.cardText}>Silicon Apps and Silicon Accounts guides, concepts, and reference.</span></a></li>
           {groups.map(group => (
             <li key={group.key}>
-              <Link href={group.href!} className={styles.card} data-sq="surface">
+              <a href={group.href!} className={styles.card} data-sq="surface">
                 <span className={styles.cardTitle}>{group.label}</span>
                 <span className={styles.cardText}>{group.items.length} page{group.items.length === 1 ? "" : "s"}: {group.items.slice(0, 3).map(item => item.title).join(", ")}{group.items.length > 3 ? ", …" : ""}</span>
-              </Link>
+              </a>
             </li>
           ))}
         </ul>

@@ -138,7 +138,7 @@ test("dialog keyboard focus restores on cancel and BFF rejects unauthenticated r
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
   expect((await request.get("/api/accounts/apps/test-app/account-verification-request")).status()).toBe(401);
-  expect((await request.post("/api/accounts/apps/test-app/account-verification-request", { headers: { Origin: "http://127.0.0.1:8620" }, data: { reason: "Unsigned request" } })).status()).toBe(401);
+  expect((await request.post("/api/accounts/apps/test-app/account-verification-request", { headers: { Origin: `http://127.0.0.1:${process.env.E2E_PORT || 8620}` }, data: { reason: "Unsigned request" } })).status()).toBe(401);
 });
 
 for (const width of [320, 1440]) test(`account verification form and receipt fit ${width}px in both themes`, async ({ page }) => {

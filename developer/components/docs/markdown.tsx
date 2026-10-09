@@ -1,12 +1,11 @@
 /**
  * Renders a docs page's Markdown AST (lib/docs/markdown.ts) as React, on the server. Links are resolved for the site
- * (lib/docs/links.ts): pages become client-side links to /docs/…, files outside docs/ go to GitHub (only once the
+ * (lib/docs/links.ts): pages become plain links to /docs/…, files outside docs/ go to GitHub (only once the
  * repository is published there: GITHUB_PUBLISHED in lib/docs/site.ts; until then they render as text), a link to a page
  * that does not exist renders as its text. Headings get anchors, code blocks are highlighted, GitHub alerts
  * (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`) become callouts, and tables scroll sideways on
  * narrow screens.
  */
-import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { ArrowUpRight, Info, Lightbulb, MessageSquareWarning, OctagonAlert, TriangleAlert } from "lucide-react";
 import { pageExists } from "@/lib/docs/content";
@@ -35,7 +34,7 @@ function InlineLink({ href, title, children, context }: { href: string; title: s
   switch (link.kind) {
     case "page":
     case "section":
-      return <Link href={link.href} title={tooltip}>{children}</Link>;
+      return <a href={link.href} title={tooltip}>{children}</a>;
     case "anchor":
     case "site":
       return <a href={link.href} title={tooltip}>{children}</a>;

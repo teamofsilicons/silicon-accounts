@@ -59,7 +59,7 @@ test("the live BFF rejects store operations and unsigned management before upstr
   expect((await request.get("/api/apps/apps")).status()).toBe(404);
   expect((await request.post("/api/apps/reports", {data: {text: "fixture"}})).status()).toBe(404);
   expect((await request.get("/api/apps/apps?mine=true")).status()).toBe(401);
-  expect((await request.post("/api/apps/apps/test-app/packages/linux-x86_64", {headers: {Origin: "http://127.0.0.1:8620"}, data: "not-authenticated"})).status()).toBe(401);
+  expect((await request.post("/api/apps/apps/test-app/packages/linux-x86_64", {headers: {Origin: `http://127.0.0.1:${process.env.E2E_PORT || 8620}`}, data: "not-authenticated"})).status()).toBe(401);
 });
 
 test("shared telemetry preference persists and applies to publishing requests", async ({ page }) => {

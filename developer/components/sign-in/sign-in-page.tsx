@@ -6,6 +6,7 @@
  * A failed sign-in shows fixed words for its error code: the address's own description is never shown (anyone could
  * put their words in a link).
  */
+import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CircleAlert, LogOut } from "lucide-react";
@@ -46,10 +47,10 @@ export function SignInPage({ error, returnTo, signedOut }: { error: string | nul
   return (
     <main className={styles.page}>
       <div className={styles.column}>
-        <div className={styles.brand}>
+        <Link href={paths.site} className={styles.brand} aria-label="Silicon Developer, home">
           <BrandMark className={styles.mark} />
-          <span>Silicon <span className={styles.muted}>Developer</span></span>
-        </div>
+          <span aria-hidden="true">Silicon <span className={styles.muted}>Developer</span></span>
+        </Link>
         <section data-sq="surface" className={styles.card} aria-labelledby="sign-in-title">
           <h1 id="sign-in-title" className={styles.title}>Build with Silicon</h1>
           <p className={styles.lede}>

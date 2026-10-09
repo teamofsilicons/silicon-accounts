@@ -318,14 +318,15 @@
   --sq-r: var(--radius-control);
   padding: 10px 17px;
   font-weight: 500;
-  background: var(--accent);
-  color: var(--accent-foreground);
+  /* The brand's primary button: brand blue under light text in both modes (styles/tokens.css). */
+  background: var(--primary);
+  color: var(--primary-foreground);
   white-space: nowrap;
   font-size: var(--text-sm);
 }
 .publishing-panel .link-button:hover {
-  color: var(--accent-foreground);
-  background: var(--accent-strong);
+  color: var(--primary-foreground);
+  background: var(--primary-hover);
 }
 .publishing-panel .link-button.secondary {
   background: var(--surface);
@@ -1292,8 +1293,8 @@
   left: 8px;
   padding: 12px 18px;
   --sq-r: 8px;
-  background: var(--accent);
-  color: var(--accent-foreground);
+  background: var(--primary);
+  color: var(--primary-foreground);
   z-index: 100;
   transform: translateY(-150%);
 }

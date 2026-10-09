@@ -1,6 +1,7 @@
 /*
- * The docs' reading typography: Geist for text, Instrument Serif for section headings (the site's display face),
- * JetBrains Mono for code. Everything is spaced from the element above it, so any order of blocks reads evenly.
+ * The docs' reading typography: the system text face (SF Pro on Apple devices, BDO Grotesk elsewhere) for text, BDO
+ * Grotesk for headings, the system monospace for code. Everything is spaced from the element above it, so any order of
+ * blocks reads evenly.
  */
 .prose {
   --prose-gap: 1.125rem;
@@ -15,18 +16,19 @@
 .prose > * + *, .calloutBody > * + *, .quote > * + * { margin-top: var(--prose-gap); }
 .prose p { text-wrap: pretty; }
 .prose strong { font-weight: 600; }
+.prose ::selection { background: color-mix(in oklab, var(--accent) 26%, transparent); }
 .prose del { color: var(--text-muted); }
 
-/* Headings: sections in the serif, smaller levels in Geist. The sticky docs header never covers a heading jumped to. */
+/* Headings in the display face. The sticky header never covers a heading jumped to. */
 .h2, .h3, .h4, .h5, .h6 { position: relative; color: var(--foreground); scroll-margin-top: calc(var(--docs-top, 64px) + 24px); text-wrap: balance; }
 .prose > .h2 { margin-top: 3rem; }
 .prose > .h3 { margin-top: 2.25rem; }
 .prose > .h4, .prose > .h5, .prose > .h6 { margin-top: 1.75rem; }
 .prose > :is(.h2, .h3, .h4, .h5, .h6) + * { margin-top: .75rem; }
 .prose > .h2:first-child, .prose > .h3:first-child { margin-top: 0; }
-.h2 { font-family: var(--font-serif); font-size: clamp(1.75rem, 1.45rem + 1vw, 2.125rem); font-weight: 400; letter-spacing: -.012em; line-height: 1.12; }
-.h3 { font-size: 1.1875rem; font-weight: 500; letter-spacing: -.012em; line-height: 1.35; }
-.h4 { font-size: 1rem; font-weight: 500; line-height: 1.45; }
+.h2 { font-family: var(--font-display); font-size: clamp(1.5rem, 1.3rem + .8vw, 1.875rem); font-weight: 600; letter-spacing: -.022em; line-height: 1.18; }
+.h3 { font-family: var(--font-display); font-size: 1.1875rem; font-weight: 600; letter-spacing: -.015em; line-height: 1.35; }
+.h4 { font-size: 1rem; font-weight: 600; line-height: 1.45; }
 .h5, .h6 { color: var(--text-secondary); font-size: .9375rem; font-weight: 500; line-height: 1.45; }
 .h2 .inlineCode { font-size: .72em; vertical-align: .12em; }
 .h3 .inlineCode, .h4 .inlineCode { font-size: .86em; }
@@ -58,9 +60,8 @@
 /* Links and inline code. */
 .prose a:not(.anchor) { color: var(--accent-ink); text-decoration-line: underline; text-decoration-color: color-mix(in oklab, currentColor 38%, transparent); text-decoration-thickness: 1px; text-underline-offset: .22em; transition: text-decoration-color var(--duration-fast) var(--ease-standard); }
 .prose a:not(.anchor):hover { text-decoration-color: currentColor; }
-/* Code inside a link sits on the code chip (--surface-muted), where the link ink is too faint in dark mode (#82ACEE on
-   #464441 is 4.2:1). The chip's text keeps the link's hue, moved towards the foreground: 5.0:1 dark, 6.4:1 light. The
-   link's underline still runs under it. */
+/* Code inside a link sits on the code chip (--surface-muted). The chip's text keeps the link's hue, moved towards the
+   foreground so it reads at least as well as plain link text there. The link's underline still runs under it. */
 .prose a:not(.anchor) .inlineCode { color: color-mix(in oklab, var(--accent-ink) 80%, var(--foreground)); }
 .external { white-space: normal; }
 .externalIcon { display: inline-block; margin-left: 1px; vertical-align: .05em; opacity: .7; }

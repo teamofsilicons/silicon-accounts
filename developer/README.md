@@ -16,9 +16,9 @@ pnpm typecheck      # next typegen + tsc --noEmit
 pnpm lint           # eslint, zero warnings
 pnpm build          # next build (output: standalone)
 pnpm start          # the production build on $PORT (8600)
-pnpm test           # unit tests: sealing, return paths, both proxy allowlists, flows
+pnpm test           # unit tests: sealing, return paths, both proxy allowlists, flows, agent files, MCP, rate limits
 pnpm exec playwright install chromium
-pnpm test:e2e       # common portal and publishing behavior, mocked service contracts
+pnpm test:e2e       # portal, publishing, docs, home page, agent files, JSON API and MCP (E2E_PORT, default 8620)
 pnpm test:production-routing # after pnpm build: standalone routing with Caddy HTTPS headers
 ```
 
@@ -111,11 +111,14 @@ checking pages with curl or a browser without the hosted sign-in.
 | BFF | `/auth/*`, `/api/accounts/*` | `app/auth/`, `app/api/`, `lib/server/` (config, seal, session) |
 | Shell | every signed-in page: the top bar (brand, Apps, Docs, ⌘K, theme, account menu), the sign-in gate, page transitions | `app/(shell)/layout.tsx`, `components/foundation/shell/` |
 | Sign-in | `/sign-in` (the front door and where failed sign-ins land) | `app/sign-in/`, `components/sign-in/` |
-| Apps home | `/` (owned and authored apps; “New app” registers it through Apps and shows the secret once) | `components/developer/home/` |
+| Public home page | `/` for anyone not signed in (a signed-in browser is sent on to `/apps` by `proxy.ts`, from the sealed cookie alone) | `app/(public)/page.tsx`, `components/home/`, `components/site/` |
+| Apps home | `/apps` (owned and authored apps; “New app” registers it through Apps and shows the secret once) | `components/developer/home/` |
 | An app | `/apps/[appId]/[[...tab]]`: Overview, Publishing, Releases, Authors, History, Sign-in, Details, Flows, Pages, Users, Import, Webhooks, App verification, Embed | `components/developer/app/` (scope, tab frame), `components/developer/tabs/`, `lib/app-tabs.ts` |
 | Verification history | `/app-verification` | `components/developer/verification/` |
 | Invitations and preferences | `/invitations`, `/settings` | `components/publishing/`, native shell pages |
-| Unified docs | public `/docs`, `/docs/apps/**`, `/docs/accounts/**` | `components/docs/`, `lib/docs/`, `app/(shell)/docs/` |
+| Unified docs | public `/docs`, `/docs/apps/**`, `/docs/accounts/**`, `/docs/search` | `components/docs/`, `lib/docs/`, `app/(public)/docs/` |
+| Agent files | `/llms.txt`, `/llms-full.txt`, `/robots.txt`, `/sitemap.xml`, `/.well-known/agent.json`, `/.well-known/security.txt`, `/openapi.json`, `/manifest.webmanifest` | `app/<file>/route.ts`, `lib/agent/`, `llms/` (the Carbon's own text) |
+| Public JSON API and MCP | `/api/docs`, `/api/docs/search`, `/api/docs/pages`, `/api/docs/pages/{product}/{path}`, `/mcp` | `app/api/docs/`, `app/mcp/`, `lib/docs/api.ts`, `lib/mcp/`, `lib/server/rate-limit.ts` |
 | Copied from `web/` and adapted | Arc UI, the foundation (layout, branding runtime, squircles, theme, providers), the API client and hooks | `components/arc/`, `components/foundation/`, `lib/` |
 
 The copied parts started as `web/`'s and are now this app's own: change them here, with the same rules (squircles,
@@ -124,13 +127,51 @@ tokens, Carbons/Silicons vocabulary, errors in the server's words). `lib/api/htt
 
 ## Unified documentation
 
-`/docs` is public and combines Silicon Apps and Silicon Accounts in the portal's native shell. The documentation engine was copied from `web/` and adapted here: the repository's `docs/` maps to `/docs/accounts`, `docs-apps/` maps to `/docs/apps`, and `lib/docs/landing.md` is the common landing page. Existing page bodies and heading anchors are preserved. Each product has its own navigation, related pages, and previous/next sequence; one search covers both and labels every result by product. Docs keyboard search owns ⌘K/Ctrl-K and `/`, while the portal's command palette remains available elsewhere. Theme switching and the docs menu stay available on small screens.
+`/docs` is public and combines Silicon Apps and Silicon Accounts in the public site's frame (server-rendered HTML; see "The public site" below). The documentation engine was copied from `web/` and adapted here: the repository's `docs/` maps to `/docs/accounts`, `docs-apps/` maps to `/docs/apps`, and `lib/docs/landing.md` is the common landing page. Existing page bodies and heading anchors are preserved. Each product has its own navigation, related pages, and previous/next sequence; one search covers both and labels every result by product. Docs keyboard search owns ⌘K/Ctrl-K and `/`, while the portal's command palette remains available elsewhere. Theme switching and the docs menu stay available on small screens.
 
 `pnpm build:docs` bundles all content and emits the original Markdown into `public/docs/<product>/…`; `pnpm dev`, `pnpm typecheck`, and `pnpm build` run it first. `pnpm build:docs --check` validates front matter, page links and anchors. Override source directories with `ACCOUNTS_DOCS_DIR` and `APPS_DOCS_DIR`. `pnpm build:docs --watch` updates the bundle while authoring. The standalone deployment needs generated `public/` and `.next/static` beside its server, as the deployment installer already supplies; it never needs source Markdown at runtime.
 
-`/docs.md` and `/docs/index.md` export the common landing page. `/docs/accounts/index.md`, `/docs/apps/index.md`, and every namespaced `*.md` export their exact source. `/llms.txt` indexes both products; `/llms-full.txt` contains both full texts. These use `DEVELOPER_PUBLIC_URL` (or the canonical production origin), never the Accounts service origin. Public docs override the private portal's no-index metadata and declare canonical developer URLs. Unknown docs addresses are checked before streaming and return a real 404.
+`/docs.md` and `/docs/index.md` export the common landing page. `/docs/accounts/index.md`, `/docs/apps/index.md`, and every namespaced `*.md` export their exact source. `/llms.txt` and `/llms-full.txt` are the Carbon's own `llms/llms.md` and `llms/llms-full.md`, bundled by `pnpm build:docs` and served exactly as written (never edit them here); a build without one falls back to the generated index or full text, which use `DEVELOPER_PUBLIC_URL` (or the canonical production origin), never the Accounts service origin. Public docs override the private portal's no-index metadata and declare canonical developer URLs. Unknown docs addresses are checked before streaming and return a real 404.
 
 See `lib/docs/README.md` for the Markdown authoring format. Accounts' former docs routes and the Apps store's former docs routes redirect to this portal; those redirects live in their respective apps.
+
+## The public site
+
+`/`, `/docs/**` and the agent files are for anyone, people, crawlers and Silicons, and stay as close to HTML as possible:
+
+- **Server-rendered, plain links.** The pages are React Server Components; their links are plain `<a>` elements (a public
+  page is a full document: no client router state, nothing prefetched). The only client code is three small islands:
+  the theme switch and the footer's theme choice (`components/site/theme-controls.tsx`), the docs search
+  (`components/docs/docs-search.tsx`, a native `<dialog>`; its trigger is a link to the server-rendered `/docs/search`,
+  so search works without script), and one behaviour island (`components/site/enhancer.tsx`: copy buttons, "Show all
+  lines", "On this page" marking, keeping the sidebar's current page in view). The header's menu below 900 px is a native
+  popover. The portal's providers, query client, motion library and Radix layers load only under `app/(shell)` and
+  `/sign-in`.
+- **One look, two modes.** `styles/tokens.css` (light: `#F7F8FA` / `#292929`; dark: `#02040A` / `#F7F8FA`; brand blue
+  `#1F5FB8` for buttons and fills; every text token measured at 4.5:1 or more), BDO Grotesk self-hosted from
+  `public/fonts/bdo-grotesk/` (`styles/fonts.css`, SIL OFL 1.1) for display and as the text face where the system has no
+  SF Pro. Light, dark or the system's, nothing else. `app/fonts.ts` keeps three Google faces only for apps' branded
+  sign-in previews (never preloaded).
+- **Search and answer engines.** `lib/seo.tsx` gives every public page its title, description, canonical, Open Graph
+  and Twitter card (`public/og.png`, 1200 by 630) and its JSON-LD: Organization and WebSite (with a SearchAction on
+  `/docs/search`) everywhere, TechArticle and BreadcrumbList on docs pages (dateModified is the source file's last
+  commit, recorded by `pnpm build:docs`), FAQPage and WebPage on the home page. `node scripts/brand/render.mjs`
+  re-renders the social image and the icons from `scripts/brand/`.
+- **For Silicons.** `/api/docs/search?q=&product=apps|accounts&kind=start|learn|reference|overview&limit=`,
+  `/api/docs/pages?product=&kind=` and `/api/docs/pages/{product}/{path}` answer JSON with errors as
+  `{"error": {"code", "message", "hint"}}`, described by `/openapi.json` (which links the Accounts and Apps APIs'
+  own descriptions). `/mcp` is a stateless MCP server over Streamable HTTP (protocol 2025-06-18; `initialize`, `ping`,
+  `tools/list`, `tools/call`; JSON, or a one-event SSE stream when the client accepts only `text/event-stream`; GET is
+  405) with seven read-only tools: `search_docs`, `read_doc`, `list_docs`, `search_apps`, `get_app` and `check_app_id`
+  (the Apps API at `APPS_API_URL`, public reads) and `check_account_id` (the Accounts API at `ACCOUNTS_API_URL`). Every
+  page also registers `search_docs` and `read_doc` with WebMCP when the browser offers `navigator.modelContext`
+  (`lib/webmcp.ts`, inline with the CSP nonce). `/.well-known/agent.json` is the A2A card.
+- **Rate limits** (`lib/site.ts`, `lib/server/rate-limit.ts`): 120 requests a minute to the docs API and 60 to `/mcp` per
+  client address (the first `X-Forwarded-For` entry, which Caddy sets), in this process's memory; every answer carries
+  `RateLimit-*` headers and a refused one is 429 with `Retry-After`.
+- **robots.txt** opens everything public to every crawler, names the answer-engine and agent crawlers, and keeps out `/api/`, `/auth/`,
+  `/mcp`, the portal's pages, `/sign-in` and the search results. **sitemap.xml** lists the home page, every docs page and
+  group, and the two llms files, with `lastmod`.
 
 ## The app's tabs
 
