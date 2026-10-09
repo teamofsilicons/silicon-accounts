@@ -1,7 +1,9 @@
 # Production verification: 2026-10-09
 
-Production runs `a2d85c5a770f7c19cccf6a7c3e23b0fbe5efce31` (see the last section).
-The first attempt, `2efa04a`, was rolled back; it is recorded first.
+Production runs `9b46dc9fdfb609b09a48ed18e5bca15bc3426b66`, Accounts 0.4.0 on
+migration 19 (see the last section). It follows `a2d85c5`, which was live from
+06:33 to 10:38 UTC. The first attempt of the day, `2efa04a`, was rolled back; it
+is recorded first.
 
 ## Agent entry points release: deployed, then rolled back
 
@@ -249,3 +251,122 @@ error lines. The web and developer logs held only clean startup lines. Each had
 one "Failed with result 'exit-code'": that is the previous process exiting 143
 on SIGTERM at 06:33:54, the usual restart pattern. SSM
 `374a4794-8939-4f0c-a625-4b559d38e271` showed those lines.
+
+## Accounts 0.4.0: live
+
+Source `9b46dc9fdfb609b09a48ed18e5bca15bc3426b66`, workspace version 0.4.0.
+Since `a2d85c5` it adds migrations 0018 (short-lived token bounds) and 0019
+(app-bound `silicon.custodian_changed` payloads cut to `{uuid, id}` by a trigger
+and a one-time rewrite), plus API fixes. It removes WebMCP from both sites and
+updates the docs and `llms-full.txt`. The installer and packager are unchanged.
+
+### Preflight
+
+- Clean tree at `9b46dc9`. With `CARGO_TARGET_DIR=target/integration` the full
+  workspace passed 975 tests (3 existing ignored, none failed). Web typecheck,
+  lint and 30 unit tests passed; developer typecheck, lint and 37 unit tests
+  passed.
+- Both sites were built for production with the same variables as before. Both
+  standalone routing tests passed on those builds, and both builds keep
+  `skipProxyUrlNormalize: true`. Neither build contains `modelContext` or
+  `webmcp`.
+- ARM64 API SHA-256 `a51584d2063199251b2e7b7839717b09d896e96e4fc4d9a68ad245044dfac833`,
+  migrator `adae161c31e5e75f67f96f1ec32f2014bc5c5c05da0c8d1c4fa72fc87b84c1f1`
+  (glibc 2.34 target, 0018 and 0019 embedded). The Node and Caddy archives
+  matched their checksums.
+- Archive `releases/9b46dc9fdfb609b09a48ed18e5bca15bc3426b66.tar.gz`, 120206159
+  bytes, SHA-256 `1572b0ab005a5a8bedb2caa692d2305dee96c3502afe850b403f020a96c921a9`.
+  56 internal links were preserved, and its `install.py` matches the committed one.
+- Rollback readiness: the `a2d85c5` API refuses only embedded migrations that have
+  not been applied, so 0018 and 0019 would not stop it. 0018 adds two nullable
+  columns whose check holds when both are null, which is how the previous API
+  inserts. 0019 adds a function and a trigger that only cut payloads. No rollback
+  was needed.
+
+### Install
+
+Read-only precheck SSM `75681c4b-02e0-4425-8bb8-7cca2431d37f` found `a2d85c5`
+active on migration 17, with one account, three apps, one membership, one
+short-lived token and no app-bound `silicon.custodian_changed` rows.
+
+Install SSM `cb188c53-797a-4b9d-865d-953f539b7ee9` ran from 10:38:31 to 10:38:53
+UTC and succeeded. It verified the archive SHA-256 before extracting the
+installer. It retained `backups/predeploy-20261009T103846Z.dump` (259708 bytes in
+S3 and on the host), SHA-256
+`c1f1d653eff9b54b6450137abf4504ccf4e160b84dfd3624c60d181ca28929d8`, before
+applying 0018 and 0019 (2 applied, 17 already applied). Local readiness passed.
+
+Postcheck SSM `c9c33cb8-ae6b-42e1-b7af-3a3cd4d8274d` confirmed the host state:
+
+- `current` points at the `9b46dc9` release, and `previous-release` at `a2d85c5`.
+- Both binary hashes and `build.json` match. Six services and timers are active.
+- Migration 19: 19 applied, none failed; 0018 and 0019 at 10:38:46.
+- Unchanged counts, the custodian trigger present, and zero capped short-lived
+  tokens (expected).
+- The same RS256 key was loaded.
+- The Caddy direct block and `APPS_API_URL` are kept, and the federation loopback
+  flag is absent.
+- Zero API ERROR or WARN lines and zero web `EPROTO` lines.
+- The landing returned 200 on the host with Caddy's headers.
+
+### Public verification
+
+- `/v1/meta` reports version 0.4.0, production. `/readyz` returns
+  `{"database":"ok"}`.
+- `GET /v1/capabilities?require=event_stream` returns 200 (an unknown
+  requirement returns 422); `/v1/capabilities` reports 0.4.0 and 27 capabilities.
+- Discovery still has the Accounts issuer, EdDSA and RS256, and the same six
+  grants; JWKS lists both keys. `/openapi.json` returns 200 with 135 paths,
+  including `/v1/events/stream`. `/.well-known/agent.json` reports 0.4.0 and six
+  skills.
+- `curl --max-time 5 -N` on `/v1/events/stream` returned the API's JSON 401
+  `unauthenticated`, not HTML; no live stream was exercised. Both `/mcp`
+  `initialize` calls return 2025-06-18.
+- Signed-out `GET https://accounts.teamofsilicons.com/` returned 200 (188383
+  bytes) with the landing text and `<main`, three times without a cookie. With a
+  stale `__Host-sa_session` and with a stale `sa_session` it served the same
+  landing and cleared the cookie.
+- The account site's agent files (`/llms.txt`, `/llms-full.txt`, `/robots.txt`,
+  `/sitemap.xml`, `/.well-known/security.txt`, `/manifest.webmanifest`) and
+  `/sdk/v1.js` return 200; `/docs` returns 308 to the developer docs.
+- No `modelContext` or `webmcp` appears in the raw HTML of the account landing,
+  `/sign-in`, the developer home, `/docs`, `/docs/apps` or
+  `/docs/accounts/start/webhooks`.
+- A headless browser at 1440 and 390 px showed the landing heading, `/sign-in`
+  with Continue with Google, Continue with Apple, Email/Phone, the email field and
+  Continue, and the developer home. The developer sign-in reached the hosted
+  "Sign in to Silicon Developer" page. There were no page errors or horizontal
+  overflow, and the screenshots were inspected. Nothing was submitted.
+- Developer site:
+  - `/`, `/docs`, `/docs/accounts`, `/docs/apps` and
+    `/docs/accounts/start/webhooks` return 200. That page's `.md` matches
+    `docs/start/webhooks.md` byte for byte; an unknown page returns 404.
+  - `/llms-full.txt` starts with `# Silicon Developer docs (full)`, is 754362
+    bytes, and is byte-identical to `developer/llms/llms-full.md`.
+  - `/api/docs/search?q=webhooks` returns 60 matches led by "Receive webhooks".
+  - `/.well-known/agent.json` has seven skills; `/openapi.json`, `/auth/session`
+    and `/sign-in` return 200.
+  - `/auth/sign-in` returns 303 to the Accounts `/authorize` with
+    `app_id=developer`, the exact `/auth/callback` redirect URI, S256 and a
+    43-character challenge.
+
+### Log watch
+
+From 10:41 to 10:48 UTC the landing, `/sign-in`, `/readyz`,
+`/v1/capabilities?require=event_stream`, the developer home and `/docs` were
+probed in twelve rounds. From about 10:43:45 to 10:45:32 this workstation's probes
+timed out, and then its local resolver failed to resolve the developer host.
+Public resolvers (1.1.1.1, 8.8.8.8) returned `3.138.98.112` throughout, and the
+developer site answered 200 through that address. The host's journal shows no
+warning, restart or error in that window, so the gap was on the workstation's
+side. All other rounds were 200 everywhere.
+
+Log scan SSM `77f294a6-1aa2-4651-92e4-f5367e03841e` covered the ten minutes after
+the switch. It found no restarts, zero API ERROR or WARN lines, zero Caddy error
+lines, and only startup lines in the web and developer logs. Each had one
+"Failed with result 'exit-code'", the previous process exiting on SIGTERM at the
+restart, as in every earlier release.
+
+The OpenAPI document's `info.version` still reads 0.3.0 (`crates/server/openapi.json`)
+while the service reports 0.4.0. That is cosmetic, and is noted for the next
+source change.
