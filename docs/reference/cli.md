@@ -54,7 +54,7 @@ Every command takes these, before or after the command name.
 | `ACCOUNTS_URL` | the Silicon Accounts URL (default `https://accounts.teamofsilicons.com`) |
 | `ACCOUNTS_HOME` | the directory holding `.accounts/`; beats the configured home |
 | `SILICON_HOME` | the home when nothing else sets one (else `~`); also where `silicon-accounts config home` keeps its pointer file |
-| `ACCOUNTS_SILICON`, `ACCOUNTS_STK` | a Silicon's si:id and STK for `silicon-accounts login` |
+| `ACCOUNTS_SILICON`, `ACCOUNTS_STK` | a Silicon's si:id and STK for `silicon-accounts login` (`silicon-apps` reads `SILICON_STK` instead; see below) |
 | `ACCOUNTS_SILICON_KEY` | a Silicon's private key file for `silicon-accounts login`, instead of the STK (see `silicon-accounts silicon keys`) |
 | `ACCOUNTS_APP_ID` | the app for `silicon-accounts app …` |
 | `ACCOUNTS_APP_SECRET` | that app's secret |
@@ -65,6 +65,15 @@ Every command takes these, before or after the command name.
 | `NO_COLOR` | no colours on stderr (colours are only used when stderr is a terminal) |
 | `TZ` | the timezone `silicon-accounts silicon create` uses when `--timezone` is not given (else the system's, else UTC) |
 | `HOSTNAME`, `COMPUTERNAME` | the machine name in the default sign-in label `silicon-accounts CLI on <host> (<os>)` |
+
+For a Silicon's sign-in, `--federated` (or `--github-actions`) wins, then `--stk`, then
+`--stk-stdin`. Without any of those, `ACCOUNTS_SILICON_KEY` wins over `ACCOUNTS_STK`, and the CLI
+asks for the STK only when neither is set and it runs in a terminal.
+
+The `silicon-apps` CLI names its variables differently: it reads a Silicon's STK from `SILICON_STK`
+(`--stk-env NAME` picks another) and its home from `--home`, then `SILICON_HOME`, then its own
+saved home, then `~`. A Silicon that uses both CLIs sets both STK variables, or runs
+`silicon-apps login --silicon si:NAME --stk-env ACCOUNTS_STK`.
 
 ## URL resolution
 
@@ -244,10 +253,12 @@ While a command runs, the CLI buffers a few events. When the command ends, it se
 Station. Each event has `source: "cli"`, a `step`, a `progress` from 0 to 1, a `name` and a
 `data` object:
 
-- `cli.step` events for steps of multi-step flows: `login.silicon.started`, `login.code.sent`,
+- `cli.step` events for steps of multi-step flows: `login.silicon.started`,
+  `login.silicon_key.started`, `login.federated.started`, `login.code.sent`,
   `login.device.code_shown`, `login.device.approved`, `login.done`, `login.slt.issued`,
-  `session.refreshed`, `silicon.create.custodian`, `silicon.create.requested`,
-  `silicon.create.accepted`, `app.import.started`;
+  `session.refreshed`, `session.reexchanged`, `silicon.create.custodian`,
+  `silicon.create.requested`, `silicon.create.accepted`, `token.identity.issued`,
+  `app.import.started`;
 - one `cli.command` event per command with `outcome`, `exit_code`, `error_code`, `duration_ms`,
   `json` and `account_kind`.
 
@@ -255,6 +266,12 @@ Every `data` also carries `command`, `cli_version`, `os` and `arch`. Tokens, STK
 account ids and uuids, and contact details are never sent; the only identifier is the app id in
 `login.slt.issued`. Nothing is sent when a command never contacted the service or couldn't reach
 it.
+
+The service checks every event again before it forwards anything: only the CLI's step names,
+command paths and known `data` fields, each in its known shape, reach Space Station, and anything
+else is dropped or sent as `other` ([the rules](api/service.md#post-v1telemetryevents)). The
+`source` that `login.federated.started` reports (where the CI token came from) is one of the
+fields dropped.
 
 Telemetry is on by default. `silicon-accounts config telemetry off` (or `ACCOUNTS_TELEMETRY=0`)
 turns it off, and then every request to the service also carries `X-Accounts-Telemetry: off`, so
@@ -514,8 +531,8 @@ As `silicon-accounts --help` prints it:
       app proof list                        List proofs this app issued
     app webhook                             The app's webhook: endpoint, secret, test, deliveries,
                                             replay
-      app webhook set <URL>                 Set the endpoint (a new signing secret is printed
-                                            once)
+      app webhook set <URL>                 Set the endpoint (the first time, its signing secret
+                                            is printed once)
       app webhook remove                    Remove the endpoint
       app webhook rotate                    Rotate the signing secret (printed once; the old one
                                             stops immediately)
@@ -2684,7 +2701,7 @@ silicon-accounts app webhook [OPTIONS] <COMMAND>
 
 | subcommand | what it does |
 |---|---|
-| [`set`](#silicon-accounts-app-webhook-set) | Set the endpoint (a new signing secret is printed once) |
+| [`set`](#silicon-accounts-app-webhook-set) | Set the endpoint (the first time, its signing secret is printed once) |
 | [`remove`](#silicon-accounts-app-webhook-remove) | Remove the endpoint |
 | [`rotate`](#silicon-accounts-app-webhook-rotate) | Rotate the signing secret (printed once; the old one stops immediately) |
 | [`test`](#silicon-accounts-app-webhook-test) | Queue a test `ping` delivery (a retry with the same --idempotency-key queues no second ping) |
@@ -2696,9 +2713,16 @@ Also takes the [app credentials options](#silicon-accounts-app) and the [global 
 
 ##### `silicon-accounts app webhook set`
 
-Set the endpoint (a new signing secret is printed once).
+Set the endpoint (the first time, its signing secret is printed once).
 
-A retry with the same --idempotency-key (within 10 minutes) prints the same secret instead of generating another.
+Setting the endpoint again, to the same URL or another, keeps the signing secret and the chosen updates; make a new secret with `silicon-accounts app webhook rotate`. A new secret is made only when the app has none: the first time, or after `silicon-accounts app webhook remove`. A retry with the same --idempotency-key (within 10 minutes) prints the same answer.
+
+It prints the signing secret only when it made one. Otherwise it prints:
+
+```text
+Webhook of briefcase set to https://briefcase.example/webhooks.
+It keeps its signing secret; `silicon-accounts app webhook rotate` makes a new one.
+```
 
 ```text
 silicon-accounts app webhook set [OPTIONS] <URL>

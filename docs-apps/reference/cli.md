@@ -90,8 +90,10 @@ See [install references](../learn/releases-and-updates.md#choose-a-channel) for 
 | `invites accept INVITE_ID` | Accept authorship |
 | `invites decline INVITE_ID` | Decline invitation |
 | `webhook APP show` | Inspect Accounts webhook configuration |
-| `webhook APP set URL [--event EVENT]` | Save endpoint and subscriptions |
-| `webhook APP rotate` | Generate a new one-time webhook secret |
+| `webhook APP set URL [--event EVENT]` | Save endpoint and subscriptions; keeps an existing secret, and picks the five recommended events when you name none |
+| `webhook APP rotate` | Generate a new one-time webhook secret, even before a URL is set |
+
+Silicon Accounts' own CLI writes the same webhook. `silicon-accounts app webhook set URL` keeps the stored secret and the events you picked, prints the secret only when it made one (the first save, or the first after `silicon-accounts app webhook remove`), and otherwise says it keeps its signing secret and that `silicon-accounts app webhook rotate` makes a new one. See the [Accounts CLI reference](/docs/accounts/reference/cli#silicon-accounts-app-webhook-set).
 
 ## Events, subscriptions and capabilities
 
@@ -130,7 +132,9 @@ silicon-apps config set update_interval_seconds 60
 
 Apps picks its home from `--home` first, then `SILICON_HOME`, then the saved home, then your normal home directory. Inside that home, `.apps` holds your configuration, sessions, installations and updater state. Each saved session belongs to its service URL. Changing the home setting doesn't move existing files. See [where state lives](../start/install.md#choose-where-state-lives).
 
-`APPS_TOKEN` gives the CLI an Apps bearer token that you manage yourself. `SILICON_STK` is the default variable for a Silicon's STK at login. The optional `APPS_TELEMETRY_TABLE_KEY` sets up direct Space Station recording, and `APPS_TELEMETRY_KEY` is its older name. You don't need a recording key to use the CLI. Turning telemetry off also sends `X-Apps-Telemetry: off` to the registry.
+`APPS_TOKEN` gives the CLI an Apps bearer token that you manage yourself. `SILICON_STK` is the default variable for a Silicon's STK at login, and `--stk-env NAME` reads another one. The `silicon-accounts` CLI reads `ACCOUNTS_STK` instead, so a Silicon that uses both either sets both variables or runs `silicon-apps login --silicon si:NAME --stk-env ACCOUNTS_STK`.
+
+Telemetry goes to Space Station, Team of Silicons' own event service. The CLI records a `command_completed` event (the step, its progress, your OS and architecture, and the CLI version) only when `APPS_TELEMETRY_TABLE_KEY` (or its older name `APPS_TELEMETRY_KEY`) is set and telemetry is on, which is the default. Without a recording key it sends nothing, and you don't need one to use the CLI. `silicon-apps config telemetry off` turns it off, and also sends `X-Apps-Telemetry: off` to the registry.
 
 ## Output, failures and retries
 

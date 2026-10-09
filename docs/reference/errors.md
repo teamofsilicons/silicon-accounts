@@ -323,7 +323,7 @@ Import rows carry their own message codes (`missing_identifier`, `ambiguous_matc
 | `invalid_webhook_events` | 422 | `PUT /v1/apps/{app_id}/webhook` `events` names something that isn't an update |
 | `stream_subscription_required` | 409 | an app opened `GET /v1/events/stream` without a stream subscription: create one with `POST /v1/apps/{app_id}/subscriptions` `{"delivery":"stream"}` |
 | `unknown_event_id` | 400 | the stream's `Last-Event-ID` or `after` isn't an event of this feed: resume with the last id this stream sent you, or connect without one |
-| `too_many_streams` | 429 | 5 streams are already open for this app or account: close one (one stream carries every event of the feed), then retry after `Retry-After` |
+| `too_many_streams` | 429 | 5 streams are already open for this app or account on this API server: close one (one stream carries every event of the feed), then retry after `Retry-After` |
 | `stream_capacity_reached` | 503 | this server is full or restarting: reconnect after `Retry-After` with `Last-Event-ID` |
 
 When we end a stream on purpose, we send `event: stream.closed` with a `reason` first. See
@@ -381,15 +381,15 @@ with `Cache-Control: no-store`.
 |---|---|---|
 | `invalid_request` | 400 (413 for a body over 64 KB) | a parameter is missing, repeated or malformed; the client authenticated twice |
 | `invalid_client` | 401 | unknown app, wrong secret, disabled app, or no credentials; `WWW-Authenticate: Basic realm="Silicon Accounts"` |
-| `invalid_grant` | 400 | the code, refresh token, SLT or device code is unknown, expired, already used (a reused refresh token or code also revokes its sign-in), revoked, another app's, or its account is deleted or removed the app's access; a `redirect_uri` or PKCE mismatch; a token exchange's outside token refused, with the reason and its code in brackets: `invalid_federated_token` (malformed, unsafe algorithm, bad signature, unknown key, expired, not yet valid, used before), `no_matching_trust` (no trust of the Silicon accepts its issuer, audience and claims), `issuer_unavailable` (the issuer's keys couldn't be read) |
-| `unauthorized_client` | 400 | a public client (`client_id` without a secret) used a grant that needs the secret, an app without `device_flow` used the device-code grant, or an app asked for a token exchange (it signs a Silicon into Silicon Accounts itself) |
+| `invalid_grant` | 400 | the code, refresh token, SLT or device code is unknown, expired, already used (a reused refresh token or code also revokes its sign-in), revoked, another app's, or its account is deleted or removed the app's access; an SLT minted by a Silicon's CI sign-in past the end it was given, or whose trust was removed; a sign-in past its end (`The refresh token expired at …`); a `redirect_uri` or PKCE mismatch; a token exchange's outside token refused, with the reason and its code in brackets: `invalid_federated_token` (malformed, unsafe algorithm, bad signature, unknown key, expired, not yet valid, used before), `no_matching_trust` (no trust of the Silicon accepts its issuer, audience and claims), `issuer_unavailable` (the issuer's keys couldn't be read) |
+| `unauthorized_client` | 400 | a public client (`client_id` without a secret) used a grant that needs the secret (the description lists the ones it may use: an app's tool needs `public_client` for a code with PKCE and for the SLT grant, and `device_flow` for the device-code grant), an app without `device_flow` used the device-code grant, or an app asked for a token exchange (it signs a Silicon into Silicon Accounts itself) |
 | `unsupported_grant_type` | 400 | the grant isn't supported (the description names the alternative) |
 | `invalid_scope` | 400 | a refresh asked for more scopes than were granted |
 | `authorization_pending` | 400 | device sign-in not approved yet; keep polling |
 | `slow_down` | 400 | polled within 5 seconds of the last poll; add 5 seconds |
 | `access_denied` | 400 | the Carbon denied the device sign-in |
 | `expired_token` | 400 | the device code expired (10 minutes) |
-| `rate_limited` | 429 | more than 60 token exchanges per minute from one address; wait `Retry-After` seconds |
+| `rate_limited` | 429 | only for two grants: more than 60 token exchanges (`token-exchange`), or 60 Silicon sign-in attempts (`jwt-bearer`, counted together with `POST /v1/silicons/login`, before the client or assertion is checked), per minute from one address; wait `Retry-After` seconds. Code, SLT, refresh and device-code requests have no per-address limit |
 | `server_error` | 500 | a fault on our side (request id in the description) |
 | `temporarily_unavailable` | 503 | the request ran past its time budget |
 

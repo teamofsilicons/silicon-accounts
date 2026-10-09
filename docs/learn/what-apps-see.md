@@ -14,7 +14,7 @@ related:
 
 # What your app sees about an account
 
-Your app gets the account details the account has agreed to share with you. We show you that same view everywhere: the `account` field of the token response, `/v1/userinfo`, your app's user base and its webhooks.
+Your app gets the account details the account has agreed to share with you. We show you that same view everywhere: the `account` field of the token response, `/v1/userinfo`, your app's user base and its webhooks. (One gap: the user base leaves out a Silicon's `custodian`, see below.)
 
 This page covers which fields you get, how required and optional details are shared and how to keep your copy up to date when they change.
 
@@ -50,7 +50,7 @@ The full story of ids is in [Ids and uuids](ids-and-uuids.md).
 | `phone` | `phone`, `phone_verified` | The primary phone, in E.164 (`+12025550147`). Carbons only. |
 | `dob` | `dob` | `YYYY-MM-DD`. A Silicon's is the day its account was created. |
 | `timezone` | `timezone` | An IANA name such as `Asia/Kolkata`. |
-| (Silicons) | `custodian: {uuid, id}` | Always present for a Silicon: the Carbon responsible for it. |
+| (Silicons) | `custodian: {uuid, id}` | The Carbon responsible for it, in the token response's `account`, `/v1/userinfo`, `GET /v1/accounts/{uuid}` and `account.updated`. It is `null` only while a self-created Silicon waits for its custodian to accept. Such a Silicon can't sign in yet, so you only meet that in a lookup (`GET /v1/accounts/{uuid}`). Not in the access token or `id_token` claims, and not in your user base (`/v1/apps/{app_id}/users`). |
 
 `version` goes up with every change to the account, and `updated_at` is when it last changed. A detail outside the granted scopes is just absent, never `null`. We only ever share the primary email and phone: a Carbon can have up to 10 of each, and the others stay private.
 
@@ -170,7 +170,7 @@ One entry of `GET /v1/apps/{app_id}/users/{uuid}`:
 
 Use `q` to search the uuid, public id, display name, `external_id` and imported emails or phone numbers. Searching a primary email or phone number needs the matching scope, so search can never find a detail the account hasn't shared with you. You can also filter by `status`, `kind` and `source`, and page through results with `limit` (up to 200) and `cursor`.
 
-`history` lists the last 20 sign-ins to your app with their time, method and outcome. Methods are `email`, `phone`, `google`, `apple`, `session` and `slt`. It never includes IP addresses. For imports, see [Import existing users](../start/import-users.md).
+`history` lists the last 20 sign-ins to your app with their time, method and outcome. Methods are `email`, `phone`, `google`, `apple`, `session`, `device` (your tool's device sign-in), `slt` (a Silicon's short-lived token, exchanged with your secret) and `slt_public_client` (the same token, exchanged by your own tool with `public_client` on). It never includes IP addresses. For imports, see [Import existing users](../start/import-users.md).
 
 ## Stay in sync: webhooks
 
@@ -180,8 +180,13 @@ Tokens show the account as it was at sign-in; webhooks tell you when it changes.
 curl -s -X PUT -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/apps/$ACCOUNTS_APP_ID/webhook" \
   -H 'Content-Type: application/json' -H 'Idempotency-Key: set-webhook-1' \
   -d '{"url": "https://briefcase.example/hooks/accounts"}'
-# {"secret":"whsec_ha5wDQgUlYp64OOPVqUSpWQMAPvF7fkye6atRTmyXMY","url":"https://briefcase.example/hooks/accounts"}
+# {"events":null,"secret":"whsec_ha5wDQgUlYp64OOPVqUSpWQMAPvF7fkye6atRTmyXMY","url":"https://briefcase.example/hooks/accounts"}
 ```
+
+The first PUT makes the signing secret and shows it once. Later PUTs keep it (`"secret": null`)
+and keep the updates you picked unless you send `events`; a new webhook gets every update.
+`POST …/webhook/rotate-secret` makes a new secret. [Receive webhooks](../start/webhooks.md) has the
+details.
 
 Your app hears about every account that is a member (active or imported):
 
@@ -190,9 +195,9 @@ Your app hears about every account that is a member (active or imported):
 | `account.id_changed` | The `c:`/`si:` id changed. | Update the id you display. |
 | `account.updated` | A detail your app may see changed: `data.changed` lists them, `data.account` is the new view. | Update your copy. |
 | `account.deleted` | The account was deleted. | Delete or anonymise its data. |
-| `membership.signed_out` | One of your sign-ins ended. `data.reason`: `app_revoked` (your app revoked it), `refresh_token_reuse`, `authorization_code_reuse` (a token or code was used twice) or `stk_rotated` (a Silicon's custodian rotated its STK). | End your own session for it. |
+| `membership.signed_out` | One of your sign-ins ended. `data.reason`: `app_revoked` (your app revoked it), `refresh_token_reuse`, `authorization_code_reuse` (a token or code was used twice), `stk_rotated` (a Silicon's custodian rotated its STK) or `session_revoked` (a Silicon's CI trust was removed, ending the sign-ins made from it). | End your own session for it. |
 | `membership.access_removed` | The account removed your app's access. | End its sessions; you no longer receive its details. |
-| `silicon.custodian_changed` | A member Silicon moved to another custodian. | Update who is responsible for it. |
+| `silicon.custodian_changed` | A member Silicon moved to another custodian. `data.from` and `data.to` are the old and new custodian as `{uuid, id}`. | Update who is responsible for it. |
 | `ping` | You sent a test. | Answer 2xx. |
 
 `account.updated` respects scopes: your app only hears about details it may see, and its `data.account` holds only those. Scopes belong to each membership, not to the app, so two members of the same app can differ. When Lin renamed herself and changed her timezone, briefcase (where Lin had granted `timezone`) got `"changed": ["display_name", "timezone"]` with the new timezone in `data.account`. dm, where she hadn't, got `"changed": ["display_name"]` and no timezone at all. A change your app can't see sends it nothing.
@@ -204,5 +209,32 @@ Every delivery is signed (`X-Accounts-Signature: v1=<hex HMAC-SHA256(secret, "{t
 - An account's other emails and phones, or any detail outside its grant.
 - How the account signs in to Silicon Accounts (which emails, Google or Apple identities) and where from. Sign-in history shows your app the method and outcome, never an IP address.
 - Its other apps, and what it shares with them.
-- A Silicon's STK, its webhook, or anything about its custodian beyond the custodian's uuid and id.
+- A Silicon's STK, its webhook, or anything about its custodian beyond the custodian's uuid and id, `silicon.custodian_changed` included.
 - Anything at all after the account removed your access, except that it did.
+
+## When a Silicon works for its custodian
+
+A Silicon often works for its custodian, so your app may want to let it reach the custodian's
+data. Here is exactly what we give you:
+
+- **You know who the custodian is.** Every Silicon sign-in returns `account.custodian` (`uuid` and
+  `id`), and `/v1/userinfo` gives it again. That tells you which Carbon answers for the Silicon. It
+  doesn't let the Silicon act as that Carbon.
+- **There is no delegation grant.** A Silicon's sign-in is always the Silicon itself: a
+  short-lived token signs in the account that made it, and no grant lets one account act for
+  another at your app (our token exchange refuses an `actor_token`). User verification proofs let
+  one app act at another for the same account. They don't let a Silicon act for its Carbon.
+
+So let the Carbon decide, inside your app:
+
+1. The Carbon signs in to your app as themselves.
+2. They allow their Silicon there, for example with a "Let si:scout use my notes" setting. Store
+   the Silicon's uuid next to the Carbon's uuid.
+3. When the Silicon signs in, check that its `account.custodian.uuid` is the Carbon who allowed it
+   before you show it the Carbon's data. Compare uuids, never ids.
+4. Make sure your webhook gets the `custodian_change` update (it isn't among the recommended
+   defaults), and drop the permission when `silicon.custodian_changed` says the Silicon has a new
+   custodian.
+
+The Carbon can take the permission back in your app at any time, and nothing about it changes
+what the Silicon can do anywhere else.

@@ -34,6 +34,13 @@ silicon-accounts custodian accept 01a11433-097f-71b5-9ab2-9fbf26649772
 Accepted request 01a11433-097f-71b5-9ab2-9fbf26649772: you are now the custodian.
 ```
 
+> [!IMPORTANT]
+> Your own sign-in is the root of control over your Silicons: whoever signs in as you can rotate
+> their STKs, add keys and CI trusts, transfer them or delete them. You sign in with an email code,
+> a phone code, Google or Apple, and we don't offer multi-factor authentication yet. Prefer Google
+> or Apple, with that provider's own multi-factor sign-in turned on
+> ([why](../learn/security.md#your-sign-in-controls-your-silicons)).
+
 You can do everything on this page on the account site too, at
 [accounts.teamofsilicons.com/silicons](https://accounts.teamofsilicons.com/silicons), or over HTTP
 with a Carbon's access token (see [Over HTTP](#over-http)). These commands are for Carbons. A
@@ -300,7 +307,9 @@ The Silicon's webhook gets `silicon.custodian.changed`:
 }
 ```
 
-Every app the Silicon signed into gets `silicon.custodian_changed` with the same `from` and `to`.
+Every app the Silicon signed into gets `silicon.custodian_changed`, whose `from` and `to` hold only
+each custodian's `uuid` and `id` (`{"uuid": "zQo", "id": "c:saket"}`): an app never sees a
+custodian's name, photo, kind or status, not even in a replay.
 And every transfer stays in the Silicon's history (`silicon-accounts history --kind custodian`, run as the
 Silicon):
 

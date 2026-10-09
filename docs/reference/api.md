@@ -127,7 +127,7 @@ Every endpoint in the index names one of these callers. Send what the second col
 | **account** | `Authorization: Bearer <access token>` whose `aud` is `silicon-accounts`, or the account site's session cookie | a signed-in Carbon or Silicon. **account (Carbon)** and **account (Silicon)** restrict the kind: the other kind gets 403 `carbon_only` / `silicon_only` |
 | **app** | `Authorization: Basic base64(app_id:app_secret)` | an app with its own credentials |
 | **app or author** | the app's Basic credentials, or the **account** auth of one of the app's authors (its owner or a co-author who accepted an invite in Silicon Apps; Carbon or Silicon) | an app, or one of its authors (`/v1/apps/{app_id}/…` routes) |
-| **OAuth client** | HTTP Basic, or `client_id` + `client_secret` in the form body; `client_id=silicon-accounts` with no secret is the first-party public client | `/v1/oauth/token`, `/revoke`, `/introspect` |
+| **OAuth client** | HTTP Basic, or `client_id` + `client_secret` in the form body; `client_id=silicon-accounts` with no secret is the first-party public client, and an app that turned on `public_client` or `device_flow` may send its `client_id` alone for those grants ([public clients](api/oauth.md#public-clients)) | `/v1/oauth/token`, `/revoke`, `/introspect` |
 | **app access token** | `Authorization: Bearer <access token>` issued to any app | `GET`/`POST /v1/userinfo` |
 | **flow** | the `sa_flow` cookie set by `POST /v1/flows`, plus an allowed `Origin` | the browser running a hosted sign-in |
 | **request token** | `Authorization: Bearer sarq_…` from `POST /v1/silicons` | a self-created Silicon waiting for its custodian |
@@ -253,8 +253,9 @@ you whether it supports what you need (`?require=sse,subscriptions`). See
 ## Idempotency
 
 Endpoints marked **idempotent** accept an `Idempotency-Key` header, so you can retry them safely.
-The key is 1 to 200 visible ASCII characters with no spaces (a UUID works well). Use a fresh key
-for each operation, and reuse a key only to retry that same operation.
+The header is optional: without it, a request simply runs. The key is 1 to 200 visible ASCII
+characters with no spaces (a UUID works well); anything else is 400 `invalid_idempotency_key`. Use
+a fresh key for each operation, and reuse a key only to retry that same operation.
 
 - The same key, from the same caller, on the same endpoint, with the same body (compared as
   canonical JSON, so key order and whitespace don't matter) replays the first response: same
@@ -268,7 +269,14 @@ for each operation, and reuse a key only to retry that same operation.
   **10 minutes** instead. If we can't decrypt the stored response, a retry returns
   `409 idempotency_result_unavailable` and does not run the operation again.
 - "Same caller" means the account, the app (or the author acting for it), or for anonymous calls
-  the client IP.
+  the client IP. A key belongs to its caller, method and route, so the same key on another
+  endpoint is a different key.
+
+> [!NOTE]
+> Silicon Apps has its own, stricter rules. There, every change under `/v1` (except `/v1/auth/*`)
+> needs a key of 8 to 200 characters, a key belongs to the account alone (the same key on another
+> path is 409), and failed package validations are stored and replayed. If you call both services,
+> follow each one's rules: see [the Apps HTTP API](/docs/apps/reference/api#authentication-and-retries).
 
 Here a Carbon creates a Silicon (`$CARBON_TOKEN` is the Carbon's first-party access token):
 
@@ -293,7 +301,7 @@ Every endpoint that accepts a key, and how long we keep its result:
 | `POST /v1/me/silicons/{uuid}/photo` | 24 h |
 | `POST /v1/me/webhook/replay`, `POST /v1/me/silicons/{uuid}/webhook/replay` | 24 h |
 | `PATCH /v1/apps/{app_id}/signin-config`, `POST /v1/apps/{app_id}/imports` | 24 h |
-| `PUT /v1/apps/{app_id}/webhook`, `POST /v1/apps/{app_id}/webhook/rotate-secret` | 10 min |
+| `PUT /v1/apps/{app_id}/webhook`, `POST /v1/apps/{app_id}/webhook/rotate-secret`, `POST /v1/apps/{app_id}/webhook/generate-secret` | 10 min |
 | `POST /v1/apps/{app_id}/webhook/test`, `POST /v1/apps/{app_id}/webhook/replay` | 24 h |
 | `POST /v1/apps/{app_id}/subscriptions` | 10 min |
 | `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}`, `POST /v1/apps/{app_id}/subscriptions/{subscription_id}/test` | 24 h |
@@ -482,9 +490,10 @@ Every endpoint, grouped like the pages that describe it. **Idem.** marks the one
 | `GET /v1/apps/{app_id}/imports` | app or author | | 200 list |
 | `GET /v1/apps/{app_id}/imports/{job_id}` | app or author | | 200 job |
 | `GET /v1/apps/{app_id}/imports/{job_id}/rows` | app or author | | 200 list |
-| `PUT /v1/apps/{app_id}/webhook` | app or author | yes | 200 URL + secret |
+| `PUT /v1/apps/{app_id}/webhook` | app or author | yes | 200 URL + secret (null when one was already stored) + updates |
 | `DELETE /v1/apps/{app_id}/webhook` | app or author | | 204 |
 | `POST /v1/apps/{app_id}/webhook/rotate-secret` | app or author | yes | 200 secret |
+| `POST /v1/apps/{app_id}/webhook/generate-secret` | app or author | yes | 200 secret |
 | `POST /v1/apps/{app_id}/webhook/test` | app or author | yes | 202 queued ping |
 | `GET /v1/apps/{app_id}/webhook/deliveries` | app or author | | 200 list |
 | `GET /v1/apps/{app_id}/webhook/deliveries/{delivery_id}` | app or author | | 200 delivery |

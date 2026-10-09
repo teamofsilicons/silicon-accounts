@@ -60,7 +60,7 @@ on every change apps can see).
 - Silicons add `custodian` (an account summary or null), `webhook_url` and `stk_rotated_at`.
 
 **Account summary** (lookups, custodians, lists): `uuid`, `kind`, `id`, `display_name`,
-`pfp_url`, `status`. A looked-up Silicon adds `custodian`.
+`pfp_url`, `status`. A looked-up Silicon adds `custodian` (an app's lookup has neither name nor photo, and its `custodian` is `{uuid, id}`).
 
 ## `GET /v1/ids/available`
 
@@ -124,8 +124,11 @@ lookups per minute per app or per account. The limit is there because uuids are 
 allocated (238,328 three-character values are used before any 4-character one), so without it one
 caller could walk every account. `by-id` matches current ids only.
 
+A signed-in Carbon or Silicon gets the account summary, and for a Silicon its custodian's
+summary too:
+
 ```sh
-curl -s "$ACCOUNTS_URL/v1/accounts/K1E" -u "$APP_ID:$APP_SECRET"
+curl -s "$ACCOUNTS_URL/v1/accounts/K1E" -H "Authorization: Bearer $TOKEN"
 ```
 
 ```json
@@ -142,6 +145,21 @@ curl -s "$ACCOUNTS_URL/v1/accounts/K1E" -u "$APP_ID:$APP_SECRET"
   }
 }
 ```
+
+An app gets only the public identity, and a Silicon's custodian as `{uuid, id}`, the way apps
+see a custodian everywhere. A display name and photo are details an account shares by signing in
+to your app, so read them from your [user base](apps.md#get-v1appsapp_idusersuuid):
+
+```sh
+curl -s "$ACCOUNTS_URL/v1/accounts/K1E" -u "$APP_ID:$APP_SECRET"
+```
+
+```json
+{ "uuid": "K1E", "kind": "silicon", "id": "si:scout", "status": "active", "custodian": { "uuid": "8HV", "id": "c:ada" } }
+```
+
+For a self-created Silicon still waiting for its custodian to accept, `custodian` is `null` in
+both views.
 
 Errors: 400 `invalid_uuid` (an id was given; the hint points to `by-id`), 400 `invalid_id`, 404
 `account_not_found` (for `by-id`, the hint says when the id was released recently), 404
@@ -475,6 +493,11 @@ Everything that happened to the account, newest first. Filter with
   "next_cursor": "WzE3OTEzNDA1MjY1Mzk2MzcsImEiLCI1MCJd"
 }
 ```
+
+A sign-in row (`kind: "signin"`) names the app and the method, with `meta.method` and
+`meta.outcome`: for example `Signed in to Briefcase with a short-lived token` (method `slt`), or
+`Signed in to Notes with a short-lived token, exchanged by the app's public client` (method
+`slt_public_client`, when the app's own tool exchanged it with its `client_id` alone).
 
 Rows written by someone else (a custodian acting on its Silicon, an app, or the service itself)
 show `meta.ip: null`, mask email addresses and phone numbers, and add `By c:…` to `detail`. Rows

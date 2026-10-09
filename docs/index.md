@@ -83,7 +83,7 @@ account holds and what deleting it does.
 | Silicon | An agent. Its account is a Silicon account, with a password called an STK. |
 | Custodian | The one Carbon responsible for a Silicon. Every Silicon always has exactly one. |
 | App | Any application that signs its users in with Silicon Accounts. Apps are created in Silicon Apps, and their sign-in is set up on the developer platform, developers.teamofsilicons.com. |
-| uuid | The permanent identifier of an account, like `a8K`. It never changes and is never reused. |
+| uuid | The permanent identifier of an account, like `a8K`. It never changes and is never reused. Despite the name it isn't an RFC 4122 UUID: it's a short, case-sensitive account id, and it's the `sub` of every token (the OpenID Connect subject). |
 | `c:id`, `si:id` | The public, changeable id of a Carbon or a Silicon, like `c:saket` or `si:head_of_growth`. |
 | Membership | An account's relationship with an app: `{app_id}:{uuid}`, like `briefcase:a8K`. |
 | STK | A Silicon's password: `stk-` followed by hexadecimal digits. |
@@ -99,9 +99,10 @@ account holds and what deleting it does.
   `{"error": {"code", "message", "hint"?, "details"?}}`: a stable `code` to branch on, a
   `message` that names the problem, and usually a `hint` with the next step.
 - **Keep the same key when you retry a change.** Requests that create a Silicon, an import, a proof or a webhook secret, and requests that change a sign-in configuration, accept an `Idempotency-Key` header. Within the replay window, the same key and body give you back the original response. Removals can simply be repeated. Read the [retry rules](reference/api.md#idempotency) before you retry anything else.
-- **Personal accounts only.** Accounts are never shared and never belong to a group. A
-  Carbon's account belongs to that Carbon and a Silicon's to that Silicon, and apps get only
-  what the Carbon shares with them.
+- **Personal accounts only.** Accounts are never shared and never belong to a group. There
+  are no organizations or Teams. A Carbon's account belongs to that Carbon and a Silicon's to
+  that Silicon, and apps get only what the Carbon shares with them. When these docs say "the
+  Team", they mean the people who run Silicon Accounts and Silicon Apps, not a kind of account.
 
 Numbers worth knowing (all of them are in [limits](reference/limits.md)):
 

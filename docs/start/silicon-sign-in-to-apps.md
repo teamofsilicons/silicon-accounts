@@ -33,6 +33,7 @@ Silicon ── si:id + STK ───────────▶ Silicon Accounts
 Silicon ── app_id ────────────────▶ Silicon Accounts   POST /v1/me/short-lived-tokens   → slt_…
 Silicon ── slt_… ─────────────────▶ the app            however the app asks for it
 the app ── slt_… + its app secret ▶ Silicon Accounts   POST /v1/oauth/token (grant_type …:slt) → the Silicon's tokens + account
+          (or client_id alone, for an app's own tool with public_client on)
 ```
 
 The app never sees your STK, and the token it gets works only for that app.
@@ -263,14 +264,20 @@ What you should know about the token:
 ## 3. Hand it to the app
 
 The app tells you how to deliver the token: an HTTP endpoint like `POST /silicon-login`, a header,
-or a field in its own CLI. For those two minutes, treat the token like a password. Send it over
+or a field in its own CLI. An app's CLI usually forwards the token to the app's server, which
+exchanges it with the app's secret; an app that turned on `public_client` lets its own CLI
+exchange it directly. For those two minutes, treat the token like a password. Send it over
 https only and never log it. If the app reports a failure, get a new token, because a used, expired
 or refused token can't be retried.
 
 ## 4. Exchange the token (for apps)
 
 This part is for your app. When a Silicon hands you an SLT, exchange it at our token endpoint with
-your app's own credentials:
+your app's own credentials, on your server. If your app is a command-line or desktop tool with no
+server, turn on `public_client` in its sign-in setup and exchange the SLT with your `client_id`
+alone, no secret; we record that sign-in with the method `slt_public_client`. Every other app sends
+its secret ([CLI plus backend](add-sign-in.md#cli-plus-backend) shows both).
+
 
 ```sh
 curl -s -u "remind:$REMIND_APP_SECRET" https://accounts.teamofsilicons.com/v1/oauth/token \
@@ -381,7 +388,12 @@ printf '%s' "$REMIND_APP_SECRET" | silicon-accounts app --app-id remind --app-se
 ```
 
 A successful exchange is a sign-in. The Silicon joins your app's user base (source `slt`), and your
-app gets a refresh token valid for 900 days from that moment. Every refused exchange answers
+app gets a refresh token valid for 900 days from that moment. When the Silicon got the token from a
+CI job's sign-in, your app's sign-in ends when that CI sign-in does (`refresh_token_expires_at`
+says when, refreshing never moves it, and near it so does the access token's `exp`), and removing
+the CI trust ends it with a `membership.signed_out` of reason `session_revoked`. Signing the CI
+sign-in out doesn't end it
+([CI and the cloud](ci-and-cloud.md#what-an-app-sign-in-from-ci-lasts)). Every refused exchange answers
 `400 invalid_grant` with the exact reason, and still uses the token up:
 
 | `error_description` starts with | why |
@@ -392,8 +404,12 @@ app gets a refresh token valid for 900 days from that moment. Every refused exch
 | `The short-lived token is not known` | mistyped, or never issued |
 | `slt must be a short-lived token (it starts with slt_), but this is a refresh token.` | the wrong kind of token |
 | `The short-lived token was issued at … by a sign-in of si:rusty that ended when its custodian rotated its STK at …` | the STK was rotated after the token was issued |
+| `The short-lived token was issued by a sign-in of si:rusty from a trusted outside token, and that sign-in ended at …` | it came from a CI sign-in that has reached the end it was given |
+| `The short-lived token was issued by a sign-in of si:rusty from a trusted outside token, and its custodian or the Silicon removed that trust …` | it came from a CI sign-in whose trust was removed |
 
 Wrong app credentials answer `401 invalid_client`, and a missing `slt` answers `400 invalid_request`.
+A `client_id` without a secret answers `400 unauthorized_client` unless your app turned on
+`public_client`.
 An SLT issued before the Silicon removed your app's access is refused too. One issued after that is
 a new sign-in, and it restores the access.
 

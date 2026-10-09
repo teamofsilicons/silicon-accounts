@@ -70,7 +70,9 @@ silicon-apps webhook ring rotate
 
 Silicon Accounts sends these webhook requests. By default your app gets `id_change`, `display_name_change`, `pfp_change`, `access_removed` and `account_deleted`. Repeat `--event EVENT` to choose the events you want.
 
-Save the `whsec_` signing secret when it's generated, because you see it only once. Changing the webhook URL keeps the same secret. Rotating the secret replaces it, so update your webhook handler too.
+Save the `whsec_` signing secret when it's generated, because you see it only once. Changing the webhook URL here keeps the same secret. Rotating the secret replaces it, so update your webhook handler too.
+
+Silicon Accounts holds this webhook, and its own tools follow the same rule for the secret: saving the URL with `silicon-accounts app webhook set`, the Accounts API or the developer portal's Accounts Webhooks tab keeps the secret, and keeps your events unless that save sends its own. A new secret comes only from a rotation, or with the first save after the webhook was removed. Whichever you saved last decides the URL and the events.
 
 The [Accounts webhook guide](/docs/accounts/start/webhooks) shows how to verify signatures, skip duplicate deliveries and handle retries. You set up sign-in methods and branding in the app's Accounts tabs, in the same developer portal.
 

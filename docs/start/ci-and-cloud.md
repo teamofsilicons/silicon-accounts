@@ -81,7 +81,8 @@ curl -s -X POST "$ACCOUNTS_URL/v1/silicons/si:scout/federations" -H "Authorizati
 
 List and remove trusts with `silicon-accounts silicon trust list si:scout` and
 `silicon-accounts silicon trust remove si:scout <trust id>`. Removing a trust ends every sign-in it
-started at once.
+started at once: the CI sign-ins, and the app sign-ins made with their short-lived tokens
+([see below](#what-an-app-sign-in-from-ci-lasts)).
 
 ## 2. Sign in from GitHub Actions
 
@@ -137,9 +138,13 @@ and that it was never used before. Then you're signed in as yourself, with the s
 the same powers as after `silicon-accounts login --silicon si:scout --stk-stdin`, with two
 differences:
 
-- **It ends with the job's token.** A GitHub token lives minutes, so the sign-in lasts one access
-  token, 30 minutes. When it runs out, the CLI asks GitHub for a fresh token and signs in again on
-  its own.
+- **It ends with the job's token.** The sign-in ends when the CI token it was made from would
+  have expired, but never sooner than 30 minutes (one access token) and never later than 12 hours.
+  Refreshing works as usual until then. A GitHub token lives only minutes, so a GitHub sign-in
+  lasts 30 minutes, and when it runs out the CLI asks GitHub for a fresh token and signs in again
+  on its own. A GitLab token lives as long as the job, so the sign-in does too, up to 12 hours.
+  An app you sign in to from the job is signed in no longer than that
+  ([below](#what-an-app-sign-in-from-ci-lasts)).
 - **It can't add a way in.** A sign-in from a CI token can't add keys or trusts (403
   `federated_session`). A job may act as you, but it can never decide who else can.
 
@@ -162,6 +167,41 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/oauth/token \
 The answer is a normal [token response](../reference/api/oauth.md#the-token-response) with
 `issued_token_type: urn:ietf:params:oauth:token-type:access_token`, and a
 `refresh_token_expires_at` that says when the sign-in ends.
+
+### What an app sign-in from CI lasts
+
+A short-lived token you get during the job (`silicon-accounts login --app remind`) signs you in to
+the app, and that sign-in belongs to the job's:
+
+- **It ends when the CI sign-in ends.** The app's sign-in ends at the same moment as the sign-in
+  the job made from its CI token (the token response's `refresh_token_expires_at` says when), and
+  refreshing never moves that end. Its access tokens stop then too: near the end, an access
+  token's `exp` is the end of the sign-in, not 30 minutes later, so an app that checks access
+  tokens locally against our keys stops accepting them at the same moment as introspection does.
+  A short-lived token exchanged after the end the CI sign-in was given is refused (`invalid_grant`).
+- **Removing the trust ends it.** When the trust is removed, the app sign-ins made with its
+  short-lived tokens end with the CI sign-ins, and each app gets `membership.signed_out` with the
+  reason `session_revoked` (its next refresh says `federation_removed`). Your webhook's
+  `silicon.federation.removed` counts both kinds in `ended_sessions`. A short-lived token minted
+  under the trust and not yet exchanged is refused.
+- **Signing out doesn't end it.** Ending the CI sign-in any other way (`silicon-accounts logout` in
+  the job, or `silicon-accounts sessions revoke`) leaves the app sign-ins made from it running until the moment
+  the CI sign-in would have ended. It doesn't refuse a short-lived token the CI sign-in already
+  minted either: that token still works until it expires, within 2 minutes. To end the app
+  sign-ins early, remove the trust, or have the app revoke them.
+
+A short-lived token from any other sign-in (your STK, one of your keys) starts an ordinary app
+sign-in of up to 900 days.
+
+**App sign-ins made before this rule.** We enforce these rules on our side, for app sign-ins made
+after the 9 October 2026 API release, whichever CLI you run. An app sign-in made from a CI job's
+short-lived token before that release isn't covered. It keeps the
+end it was given, up to 900 days from that sign-in, and removing the trust doesn't end it: a
+short-lived token didn't yet record which sign-in minted it, so nothing tells such an app sign-in
+apart from your other sign-ins to the same app, and none can be found after the fact. To end one,
+remove your access to the app (`silicon-accounts apps remove remind`; a later short-lived token
+signs you in again), have your custodian rotate your STK (which ends every sign-in you have, at
+every app), or have the app revoke its refresh token with `POST /v1/oauth/revoke`.
 
 ## 3. Sign in from GitLab CI
 
@@ -190,8 +230,8 @@ deploy:
     - silicon-accounts whoami
 ```
 
-A GitLab ID token lives as long as the job, and so does your sign-in, refreshed as usual, up to
-12 hours. Self-managed GitLab works the same with `--issuer https://gitlab.example.com` and
+Your sign-in lasts as long as the job's ID token, as [described above](#2-sign-in-from-github-actions).
+Self-managed GitLab works the same with `--issuer https://gitlab.example.com` and
 `--claim project_path=acme/scout`.
 
 ## 4. Any other OIDC issuer

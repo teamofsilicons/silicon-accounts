@@ -97,17 +97,37 @@ Client telemetry, which we forward to Space Station. Public; 120 requests per IP
 ```json
 {
   "events": [
-    { "source": "cli", "step": "login.code", "name": "cli.step", "progress": 0.5, "data": { "ok": true } }
+    { "source": "cli", "step": "login.code.sent", "name": "cli.step", "progress": 0.4,
+      "data": { "channel": "email", "command": "login", "cli_version": "0.4.0", "os": "macos", "arch": "aarch64" } }
   ]
 }
 ```
 
 At most 50 events. `name` matches `^[a-z0-9_.]{1,64}$`; `source` is 1 to 64 characters of
 `a-z 0-9 _ . -`; `step` is 1 to 200 printable characters; `progress` is 0 to 1; `data` is an
-object of at most 8 KB. Answers **202** `{"accepted": 1, "forwarded": false}` (`forwarded` is
-true when Space Station took them). A request with `X-Accounts-Telemetry: off` (or the cookie
-`sa_telemetry=off`) is accepted and nothing is forwarded. Errors: 422 `validation_failed`, 429
-`rate_limited`.
+object of at most 8 KB. Answers **202** `{"accepted": 1, "forwarded": true}` (`forwarded` is
+false when nothing is forwarded for this request). A request with `X-Accounts-Telemetry: off` (or
+the cookie `sa_telemetry=off`) is accepted and nothing is forwarded. Errors: 422
+`validation_failed`, 429 `rate_limited`.
+
+We forward only what the `silicon-accounts` CLI reports, word for word, so no identifier or free
+text gets through whatever its shape:
+
+- only the CLI's events: `source` `cli`, `name` `cli.command` or `cli.step` (others are accepted
+  and dropped);
+- `step` as one of the CLI's step names or command paths, anything else as `other`; `progress`
+  rounded to the hundredth;
+- in `data`, only `cli_version` (a release version such as `0.4.0` or `0.5.0-rc.1`), `outcome`,
+  `exit_code`, `duration_ms` (a day at most), `json`, `account_kind`, `kind`, `method`,
+  `channel`, `browser_opened`, `dry_run`, `format`, `ttl_seconds` (a day at most), `wait`,
+  `webhook`, `signed_in`, each only as the CLI sends it (a flag, a count, an exit code from
+  -1000 to 1000, or one of a fixed set of words) or as `null`; `command`, `os`, `arch` and
+  `error_code` as one of the words the CLI uses, else `other`; and `app` or `app_id` (an app
+  id) only on the `login.slt.issued` step. Everything else is dropped, the `source` the CLI
+  reports for a `--federated` sign-in included.
+
+The validation and the 202 answer don't change with this filter: an event is accepted when it is
+well formed, whatever is forwarded of it.
 
 ## `GET /v1/dev/outbox`
 
@@ -170,14 +190,33 @@ curl -s "$ACCOUNTS_URL/v1/capabilities?require=sse,subscriptions"
 }
 ```
 
-The capabilities are `rest_json`, `openapi`, `structured_errors`, `rate_limit_headers`,
+The 27 capabilities are `rest_json`, `openapi`, `structured_errors`, `rate_limit_headers`,
 `idempotency_keys`, `pagination`, `version_negotiation`, `capability_negotiation`,
 `bearer_tokens`, `client_credentials`, `oauth2`, `openid_connect`, `device_flow`,
-`short_lived_tokens`, `proofs`, `webhooks`, `webhook_signatures`, `webhook_replay`, `sse`,
-`stream_resume`, `subscriptions`, `imports`, `agent_card`, `mcp` and `llms_txt`. `require` takes
-1 to 50 of them, separated by commas. Case and `-` don't matter, and `event_streaming`,
-`idempotency`, `a2a` and a few other common names work too. If one is unknown or unsupported, the
-answer is 422:
+`short_lived_tokens`, `workload_identity_federation`, `identity_tokens`, `proofs`, `webhooks`,
+`webhook_signatures`, `webhook_replay`, `sse`, `stream_resume`, `subscriptions`, `imports`,
+`agent_card`, `mcp` and `llms_txt`. `require` takes 1 to 50 of them (each at most 64 characters),
+separated by commas. Case doesn't matter, and `-`, `.` and spaces count as `_`.
+
+Some common names work as aliases:
+
+| You may send | It means |
+|---|---|
+| `event_stream`, `event_streaming`, `events_stream`, `server_sent_events`, `streaming` | `sse` |
+| `idempotency` | `idempotency_keys` |
+| `webhook` | `webhooks` |
+| `subscription` | `subscriptions` |
+| `oauth` | `oauth2` |
+| `oidc` | `openid_connect` |
+| `errors` | `structured_errors` |
+| `rate_limits` | `rate_limit_headers` |
+| `versioning` | `version_negotiation` |
+| `token_exchange`, `trusted_publishing`, `oidc_federation`, `federation` | `workload_identity_federation` |
+| `cloud_federation`, `id_tokens_for_clouds` | `identity_tokens` |
+| `a2a` | `agent_card` |
+
+Anything else is unknown. `graphql`, for example, is neither a name nor an alias. If one name is
+unknown or unsupported, the answer is 422:
 
 ```json
 {
@@ -190,7 +229,12 @@ answer is 422:
 }
 ```
 
-An empty or oversized `require` is 400 `invalid_query`.
+An empty `require`, more than 50 names or a name over 64 characters is 400 `invalid_query`.
+
+Silicon Apps answers `require` differently, so don't share one parser between the two services.
+Its names are its own (`streaming`, `target:linux-x86_64`, …) and must match exactly, an empty
+`require` is ignored, and its 422 `capabilities_missing` lists `details.missing` as objects with a
+reason each. See [the Apps HTTP API](/docs/apps/reference/api#discovery-versions-and-limits).
 
 ## `GET /openapi.json` and `GET /v1/openapi.json`
 

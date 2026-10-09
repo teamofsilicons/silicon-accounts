@@ -138,6 +138,7 @@ let client = AccountsClient::builder()
 | `revoke_first_party(token)` | `POST /v1/oauth/revoke` (`client_id=silicon-accounts`) | `()` |
 | `exchange_developer_code(code, redirect_uri, code_verifier)` | `POST /v1/oauth/token` (`client_id=developer`, PKCE S256, no secret) | `TokenResponse` with `aud = developer` tokens (the developer platform's server side) |
 | `refresh_public_client(client_id, refresh_token)`, `revoke_public_client(client_id, token)` | `POST /v1/oauth/token` / `revoke` for `silicon-accounts` or `developer` | `TokenResponse` / `()` |
+| `exchange_slt_public_client(app_id, slt)` | `POST /v1/oauth/token`, SLT grant with `client_id` alone (an app with `public_client` on: its own command-line or desktop tool) | `TokenResponse`; the sign-in is recorded with method `slt_public_client` |
 | `report(message, pr_url, access_token, idempotency_key)` | `POST /v1/reports` | `ReportReceipt` |
 | `send_telemetry(&[TelemetryEvent])` | `POST /v1/telemetry/events` (3-second timeout) | `()`; nothing when telemetry is off |
 | `with_token(access_token)` | No request | `AccountSession` |
@@ -221,7 +222,8 @@ In CI, the `federation` module reads the job's OIDC token:
 | `start_import(&ImportInput, &ImportOptions, idempotency_key)` | `POST …/imports` (5-minute timeout) | `ImportJob` |
 | `imports(&PageRequest)`, `import_job(job_id)`, `import_rows(job_id, &ImportRowsQuery)` | `GET …/imports…` | `Page<ImportJob>` / `ImportJob` / `Page<ImportRowResult>` |
 | `wait_for_import(job_id, poll)`, `wait_for_import_with(job_id, &WaitOptions, on_event)` | polls the job | the finished `ImportJob` |
-| `set_webhook(url, idempotency_key)`, `remove_webhook()`, `rotate_webhook_secret(key)`, `test_webhook(key)` | `…/webhook…` | `AppWebhook` / `()` / `WebhookSecret` / `WebhookTestResult` |
+| `set_webhook(url, idempotency_key)`, `remove_webhook()`, `rotate_webhook_secret(key)`, `test_webhook(key)` | `…/webhook…` | `AppWebhook` / `()` / `WebhookSecret` / `WebhookTestResult`. `set_webhook` keeps the stored secret (`AppWebhook::secret` is `None`) and the chosen updates; it returns a new secret only when the app had none (the first time, or after `remove_webhook`) ([why](api/apps.md#put-v1appsapp_idwebhook)) |
+| `set_webhook_events(url, &events, key)`, `generate_webhook_secret(key)`, `webhook_settings()` | `PUT …/webhook` with `events`, `POST …/webhook/generate-secret`, `GET …/webhook` | `AppWebhook` / `WebhookSecret` / JSON. `set_webhook_events` picks those updates and keeps the stored secret like `set_webhook`; `generate_webhook_secret` makes or replaces the secret, even before a URL is set, and a later save keeps it |
 | `deliveries(&DeliveriesQuery)`, `delivery(id)` | `…/webhook/deliveries…` | `Page<WebhookDelivery>` / `DeliveryDetail` |
 | `replay(&ReplayRequest, idempotency_key)` | `…/webhook/replay` | `ReplayResult` (`replayed_count()`, `skipped_count()`) |
 | `issue_user_verification(&IssueUserVerification, key)` | `POST /v1/proofs/user-verification` | `IssuedProof` |

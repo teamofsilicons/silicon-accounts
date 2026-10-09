@@ -150,6 +150,12 @@ printf '%s' "$REFRESH_TOKEN" | silicon-accounts app token refresh -
 `No STK was given for si:scout.` with the hint `Pipe it with --stk-stdin, set ACCOUNTS_STK, or pass
 --stk.`
 
+**Two CLIs, two STK variables.** `silicon-accounts` reads the STK from `ACCOUNTS_STK`, but
+`silicon-apps login --silicon` reads `SILICON_STK` by default. A Silicon that signs in with both
+sets both variables, or passes `--stk-env ACCOUNTS_STK` to `silicon-apps`. When
+`ACCOUNTS_SILICON_KEY` (a key file) and `ACCOUNTS_STK` are both set, `silicon-accounts` signs in
+with the key.
+
 ## Give every Silicon its own home
 
 The CLI keeps its state in `{home}/.accounts/`. To find the home, the first match wins:
@@ -227,12 +233,14 @@ Flags win over environment variables, which win over `config.json`.
 
 ## Telemetry
 
-The CLI reports command activity to Space Station. For a flow with several steps, it sends an event for each step, like `login.silicon.started`, `login.slt.issued` or `silicon.create.requested`. A final `cli.command` event records the result, the exit and error codes, the duration, the CLI version, the operating system and the architecture. It also records whether you used `--json` and whether the caller was a Carbon or a Silicon.
+The CLI reports command activity to Space Station, the event service Team of Silicons runs for its own products. It never talks to Space Station directly: it sends its events to Silicon Accounts (`POST /v1/telemetry/events`, without your credentials), which forwards them. For a flow with several steps, it sends an event for each step, like `login.silicon.started`, `login.slt.issued` or `silicon.create.requested`. A final `cli.command` event records the result, the exit and error codes, the duration, the CLI version, the operating system and the architecture. It also records whether you used `--json` and whether the caller was a Carbon or a Silicon.
 
-These events don't include tokens, STKs, secrets, account ids, uuids or contact details. The only identifier they can carry is the app id a short-lived token was requested for. Commands that never contact us send no events, and the CLI waits at most 1.5 seconds to send them.
+These events don't include tokens, STKs, secrets, account ids, uuids or contact details. The only identifier they can carry is the app id a short-lived token was requested for. Silicon Accounts checks that too: it forwards only the CLI's own step names, command paths, fields and words, and anything else as `other` or not at all, so even a changed or older CLI can't send more. Commands that never contact us send no events, and the CLI waits at most 1.5 seconds to send them.
 
 Telemetry is on by default. Turn it off with `silicon-accounts config telemetry off`, or for a single
-process with `ACCOUNTS_TELEMETRY=0`.
+process with `ACCOUNTS_TELEMETRY=0` (the variable beats the setting). When it's off, every request
+also carries `X-Accounts-Telemetry: off`, so the service records nothing about those requests
+either. [Security](../learn/security.md#telemetry) says what the service itself records.
 
 ## Get help
 

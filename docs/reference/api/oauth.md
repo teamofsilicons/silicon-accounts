@@ -230,7 +230,11 @@ Every refresh returns a new refresh token and kills the old one. If a used refre
 presented, we revoke the whole sign-in (the token family): every access and refresh token in it
 stops working, and your app gets `membership.signed_out` with reason `refresh_token_reuse`. So
 always store the new token before you use it. `refresh_token_expires_at` doesn't move: a sign-in
-lasts at most 900 days from when it started.
+lasts at most 900 days from when it started, and one that has an earlier end (a Silicon's sign-in
+from CI, or an app sign-in made from a short-lived token it minted) keeps that end. After it, a
+refresh answers `invalid_grant` with `The refresh token expired at … (refresh tokens last 900 days
+from sign-in at most, and a sign-in that started from a CI job's outside token ends with that
+job's sign-in); sign in again.`
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" -u "$APP_ID:$APP_SECRET" \
@@ -257,6 +261,10 @@ and you exchange it here. The alias `grant_type=slt` works too.
 | Parameter | |
 |---|---|
 | `slt` | the `slt_…` token (single use, 120 seconds, only for the app it was issued for) |
+
+Your server sends the app's secret. An app that turned on `public_client` may also exchange the
+token from its own command-line or desktop tool with `client_id` alone and no secret
+([public clients](#public-clients)). Every other app needs the secret (`unauthorized_client`).
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" -u "$APP_ID:$APP_SECRET" \
@@ -288,7 +296,16 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" -u "$APP_ID:$APP_SECRET" \
 ```
 
 We refuse an SLT if, after it was issued, the Silicon's STK was rotated or the account removed
-your app's access.
+your app's access. We record the sign-in in the account's sign-in history with the method `slt`,
+or `slt_public_client` when your tool exchanged it without a secret.
+
+An SLT minted by a Silicon's sign-in from CI (the [token exchange](#grant_typeurnietfparamsoauthgrant-typetoken-exchange)
+below) starts a sign-in that ends when that CI sign-in ends: `refresh_token_expires_at` is that
+moment, refreshing never moves it, and near it `expires_in` (and the access token's `exp`) stop
+there too. Such an SLT is refused once the trust it came from was removed or the end the CI
+sign-in was given has passed. Signing the CI sign-in out or revoking it doesn't refuse an SLT it
+already minted, which still expires within 2 minutes. Removing the trust later ends your sign-in
+(`membership.signed_out`, reason `session_revoked`).
 
 ### `grant_type=urn:ietf:params:oauth:grant-type:device_code`
 
@@ -333,12 +350,22 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
 A Silicon signing in with a key (RFC 7523). `assertion` is a JWT signed with one of its
 [registered keys](silicons.md#silicon-keys), and `client_id` is `silicon-accounts`. The answer is
 the same first-party token response as `POST /v1/silicons/login`. Any other client gets
-`unauthorized_client`, and a bad assertion is `invalid_grant` with the reason.
+`unauthorized_client`, and a bad assertion is `invalid_grant` with the reason. It shares
+`POST /v1/silicons/login`'s limit: 60 Silicon sign-in attempts per minute from one address across
+both. Every attempt counts, before the client or the assertion is checked, so moving between the
+two endpoints buys no extra attempts. Over the limit:
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
   -d grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer \
   -d assertion="$ASSERTION" -d client_id=silicon-accounts
+```
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 41
+
+{"error": "rate_limited", "error_description": "Too many Silicon sign-in attempts from this network: the limit is 60 per minute. Wait 41 seconds before trying again."}
 ```
 
 ### `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`
@@ -363,7 +390,8 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
   -d silicon=si:scout
 ```
 
-The answer is the usual [token response](#the-token-response), plus `issued_token_type`:
+The answer is the usual [token response](#the-token-response), plus `issued_token_type`. A
+30-minute sign-in may answer `expires_in: 1799`, because its access token can't outlive it:
 
 ```json
 {
@@ -401,7 +429,9 @@ token lives minutes, so its sign-in is one access token long. A GitLab job's tok
 as the job, so a long job keeps its sign-in by refreshing, and never past its own end. That is the
 point: a copied session can't outlive the job that earned it. The sign-in is a first-party session
 with origin `federated`, recorded in the Silicon's sign-in history with method `federated`, and
-removing the trust ends it.
+removing the trust ends it. So does an app sign-in made from a short-lived token minted in that
+session: it ends no later than the CI sign-in, and removing the trust ends it too
+([what an app sign-in from CI lasts](../../start/ci-and-cloud.md#what-an-app-sign-in-from-ci-lasts)).
 
 Every refusal is `invalid_grant`, with the reason and its code in brackets:
 `invalid_federated_token` (malformed, an unsafe algorithm, a bad signature, an unknown key,
@@ -416,11 +446,11 @@ per minute from one address, then 429 `rate_limited` with `Retry-After`.
 
 | Field | |
 |---|---|
-| `access_token` | an EdDSA (Ed25519) JWT, valid `expires_in` seconds (1800) |
+| `access_token` | an EdDSA (Ed25519) JWT, valid `expires_in` seconds (1800 at most) |
 | `token_type` | `Bearer` |
-| `expires_in` | 1800 |
+| `expires_in` | 1800, or less when the sign-in ends sooner (an access token never outlives its sign-in) |
 | `refresh_token` | `sar_…`, rotates on every refresh |
-| `refresh_token_expires_at` | when the sign-in ends at the latest (900 days after it started) |
+| `refresh_token_expires_at` | when the sign-in ends at the latest (900 days after it started; sooner for a Silicon's sign-in from CI, and for an app sign-in made from a short-lived token that CI sign-in minted) |
 | `scope` | the granted scopes, space-separated |
 | `id_token` | only when `openid` was granted |
 | `membership_id` | `{app_id}:{uuid}` |
@@ -481,13 +511,13 @@ appear with the `phone` and `dob` scopes. A refresh returns a fresh `id_token` t
 |---|---|---|
 | 400 | `invalid_request` | a parameter is missing, repeated or malformed; the client authenticated twice |
 | 401 | `invalid_client` | unknown app, wrong secret, disabled app, no credentials (with `WWW-Authenticate: Basic`) |
-| 400 | `invalid_grant` | the code, refresh token, SLT or device code is unknown, expired, already used, revoked, issued to another app, or its account was deleted or removed the app's access; a `redirect_uri` or PKCE mismatch |
-| 400 | `unauthorized_client` | a public client (`client_id` with no secret) asked for a grant that needs the secret, or an app without `device_flow` asked for the device-code grant |
+| 400 | `invalid_grant` | the code, refresh token, SLT or device code is unknown, expired, already used, revoked, issued to another app, or its account was deleted or removed the app's access; an SLT minted by a Silicon's CI sign-in past the end it was given, or whose trust was removed; a `redirect_uri` or PKCE mismatch |
+| 400 | `unauthorized_client` | a public client (`client_id` with no secret) asked for a grant that needs the secret (the description lists what it may use: `authorization_code` with PKCE and the SLT grant need `public_client` on, the device-code grant needs `device_flow`), or an app without `device_flow` asked for the device-code grant |
 | 400 | `unsupported_grant_type` | any other `grant_type` (the description says what to use instead: App verification proofs for `client_credentials`, the hosted pages for `password`) |
 | 400 | `invalid_scope` | a refresh asked for a scope that wasn't granted, or an unknown scope |
 | 400 | `authorization_pending`, `slow_down`, `access_denied`, `expired_token` | device-code polling (above) |
 | 413 | `invalid_request` | the body is over 64 KB |
-| 429 | `rate_limited` | more than 60 token exchanges per minute from one address (`Retry-After`) |
+| 429 | `rate_limited` | `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`: more than 60 of them per minute from one address; `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`: more than 60 Silicon sign-in attempts per minute from one address, counted together with `POST /v1/silicons/login` (`Retry-After` either way). Code, SLT, refresh and device-code exchanges have no per-address limit here. |
 | 500 | `server_error` | a fault on our side (the description carries the request id) |
 | 503 | `temporarily_unavailable` | the request ran past its 30-second budget |
 
@@ -659,9 +689,15 @@ endpoint accepts your app's `client_id` alone (`token_endpoint_auth_method` `non
 |---|---|
 | `authorization_code` | `public_client`; the sign-in must have used PKCE with `code_challenge_method=S256`, and the exchange sends the `code_verifier` (a code without PKCE is `invalid_grant`) |
 | `urn:ietf:params:oauth:grant-type:device_code` | `device_flow` |
+| `urn:silicon:params:oauth:grant-type:slt` | `public_client`; recorded with the sign-in method `slt_public_client`. The SLT is the proof: single use, 120 seconds, only for your app, and only the account that minted it can hand it over |
 | `refresh_token` | either; only the app's own sign-ins |
 
-`POST /v1/oauth/revoke` accepts it too, for the app's own tokens. Short-lived tokens and
-introspection always need the secret (`unauthorized_client`, `invalid_client`). Loopback redirect
+Any other grant, or one of these without the setting it needs, is `unauthorized_client`, and the
+description lists what your public client may use: `refresh_token`, the device-code grant with
+`device_flow` on, and `authorization_code` with PKCE S256 and the SLT grant with `public_client` on.
+In Rust, `AccountsClient::exchange_slt_public_client(app_id, slt)` exchanges an SLT this way.
+
+`POST /v1/oauth/revoke` accepts it too, for the app's own tokens. Introspection always needs the
+secret (`invalid_client`). Loopback redirect
 URIs (`http://127.0.0.1/…`, `http://[::1]/…`, `http://localhost/…`) match on any port, as RFC 8252
 asks.

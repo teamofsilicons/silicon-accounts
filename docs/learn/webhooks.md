@@ -109,7 +109,12 @@ Every attempt is signed with `HMAC-SHA256`, keyed with the receiver's whole `whs
 
 The signature header is a comma-separated list of `v1=…` entries, and today it carries one. Accept a delivery when any `v1` entry matches, so your receiver keeps working if we ever sign with two secrets or a second scheme at once.
 
-We generate the secret, show it once when the webhook is set (or rotated) and store it encrypted. Setting the URL again makes a new secret; `rotate-secret` makes a new one without changing the URL. Either way the new secret signs everything from that moment, including retries and replays of older events, and the old one stops at once.
+We generate the secret, show it once when it's made and store it encrypted.
+
+- **An app's webhook** follows one rule wherever you save it: in Silicon Accounts (`PUT /v1/apps/{app_id}/webhook`, `silicon-accounts app webhook set`, the developer platform's Webhooks tab, or moving the URL with `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}`) or in Silicon Apps (its `PUT /v1/apps/{app_id}/webhook`, `silicon-apps webhook APP set`, the publishing step on the developer platform). Saving the URL, the same one or another, keeps the secret (Silicon Accounts answers `"secret": null`). A new one is made, and shown once, only when none is stored: the first save, or the first after the webhook was removed. A secret you made with `POST …/webhook/generate-secret` before the URL existed is kept too. `"preserve_secret"` (true or false) is still accepted and changes nothing. Creating the webhook with `POST /v1/apps/{app_id}/subscriptions` (`"delivery": "webhook"`) is the exception: it always makes a new secret and shows it once. To replace the secret, rotate it: `POST …/webhook/rotate-secret` in Silicon Accounts (409 `webhook_not_set` when there is no URL) or `POST …/webhook/generate-secret` (even before a URL is set), which both answer `{"secret"}`, or `POST /v1/apps/{app_id}/webhook/rotate` in Silicon Apps, which answers `{"webhook_secret"}`.
+- **A Silicon's own webhook** (`PUT /v1/me/webhook`, `PUT /v1/me/silicons/{uuid}/webhook`): a new secret every time the URL is set, even to the same URL, with no way to keep it and no separate rotate endpoint.
+
+Both services write the same app webhook, so the last save wins. Whatever made it, a new secret signs everything from that moment, including retries and replays of older events, and the old one stops at once.
 
 ## Delivery
 
@@ -187,7 +192,12 @@ Your app doesn't have to hear about everything. A subscription says where its up
 updates it wants, and whether it is active or paused. Your webhook is one subscription and the event
 stream is the other. Pick your updates in Silicon Apps, with the
 [subscription endpoints](../reference/api/apps.md#event-subscriptions), or with
-`silicon-accounts app subscription`.
+`silicon-accounts app subscription`. The two services treat a save without `events` differently.
+Silicon Accounts' `PUT /v1/apps/{app_id}/webhook` (also `silicon-accounts app webhook set` and the
+developer platform's Webhooks tab) keeps the updates already picked, and a brand-new webhook gets
+every update; `"events": null` picks every update and a list picks those. Silicon Apps'
+`PUT /v1/apps/{app_id}/webhook` (and `silicon-apps webhook APP set` without `--event`) sends its
+five recommended updates instead, which replace the picks.
 
 | Update | Picked for a new subscription | What reaches you |
 |---|---|---|
@@ -267,8 +277,11 @@ How the stream fits with webhooks:
   you get `event: stream.closed` with a `reason`. Refresh your token for `token_expired`, and
   reconnect with `Last-Event-ID` after `max_duration` (streams last an hour) or
   `server_restarting`.
-- **Limits.** 5 open streams per app or account. One stream carries the whole feed, so one is
-  usually enough.
+- **Limits.** 5 open streams per app or account on each API server (the count is kept in each
+  server's memory, so with several servers the total can be higher), and each stream lasts at most
+  an hour. One stream carries the whole feed, so one is usually enough. Silicon Apps' own event
+  streams have other limits: 10 per token or session, 30 minutes each
+  ([Apps events](/docs/apps/reference/events)).
 
 ## App events
 
@@ -388,6 +401,7 @@ Sent to one app when the account's sign-in there ends but the account doesn't le
 | `stk_rotated` | the Silicon's custodian rotated its STK, which ends every sign-in of the Silicon: every app it was signed into gets this |
 | `refresh_token_reuse` | the app presented a refresh token that was already used, so that sign-in was revoked as a precaution |
 | `authorization_code_reuse` | an authorization code was exchanged twice, so the tokens issued from it were revoked |
+| `session_revoked` | the sign-in came from a short-lived token that a Silicon's CI sign-in minted, and that CI trust was removed, which ends every sign-in it started ([CI and cloud](../start/ci-and-cloud.md#what-an-app-sign-in-from-ci-lasts)) |
 
 ```json
 {
@@ -421,29 +435,15 @@ Do: stop using the account's data. Its tokens are revoked, your User verificatio
 
 ### silicon.custodian_changed
 
-Sent to every app with a live membership with a Silicon when a transfer of that Silicon to a new custodian is accepted. `data`: `uuid`, `membership_id`, `from`, `to`.
+Sent to every app with a live membership with a Silicon when a transfer of that Silicon to a new custodian is accepted. `data`: `uuid`, `membership_id`, `from`, `to`. `from` and `to` are the old and the new custodian as `{uuid, id}`, the way your app sees a Silicon's custodian everywhere else (the token response, `/v1/userinfo`, `account.updated`): never a custodian's name, photo, kind or status, which your app may never have been shown. The event stream carries the same shape. Events stored before this rule were cut down to it too, so a replay or a delivery's detail never shows more. The Silicon's own [`silicon.custodian.changed`](#siliconcustodianchanged) keeps both full account summaries.
 
 ```json
 {
   "app_id": "dm",
   "data": {
-    "from": {
-      "display_name": "Shubham",
-      "id": "c:shubham",
-      "kind": "carbon",
-      "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=b97",
-      "status": "active",
-      "uuid": "b97"
-    },
+    "from": { "id": "c:shubham", "uuid": "b97" },
     "membership_id": "dm:8HV",
-    "to": {
-      "display_name": "Saket",
-      "id": "c:saket",
-      "kind": "carbon",
-      "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=zQo",
-      "status": "active",
-      "uuid": "zQo"
-    },
+    "to": { "id": "c:saket", "uuid": "zQo" },
     "uuid": "8HV"
   },
   "event_id": "01a11437-b7b6-710f-8d77-ee77b9b184ab",
@@ -686,8 +686,9 @@ custodian. `data`: `uuid`, `id`, `federation` (the trust: `id`, `name`, `issuer`
 
 ### silicon.federation.removed
 
-A trust was removed. Its tokens no longer sign in, and every sign-in it started ended.
-`data`: `uuid`, `id`, `federation` (with `revoked_at`), `ended_sessions`, `by`.
+A trust was removed. Its tokens no longer sign in, and every sign-in it started ended: the CI
+sign-ins, and the app sign-ins made from their short-lived tokens. `data`: `uuid`, `id`,
+`federation` (with `revoked_at`), `ended_sessions` (both kinds counted), `by`.
 
 ### silicon.identity_audiences.changed
 

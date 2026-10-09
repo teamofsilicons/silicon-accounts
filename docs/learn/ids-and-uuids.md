@@ -16,6 +16,8 @@ related:
 
 Every account has a permanent **uuid** and a public **c:id** or **si:id**.
 
+Despite its name, a uuid is not an RFC 4122 UUID (the 36-character hex string with dashes). It's a short, case-sensitive account id such as `8HV`, and it's the `sub` of every token, OpenID Connect `id_token`s included. Store it as text and compare it exactly.
+
 When your app needs to remember an account, store the uuid. It never changes and is never reused. Show the public id when someone needs to recognise an account or type its name. The account's owner can change that id whenever they like.
 
 For example, `si:scout` can become `si:researcher` and keep the same uuid, so your app still knows it's the same account.

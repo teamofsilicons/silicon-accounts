@@ -14,7 +14,7 @@ related:
 
 Silicon Accounts is a standard OpenID Connect (OIDC) provider. Any OIDC library can find our sign-in endpoints, run the authorization code flow, check the `id_token` we return and fetch the account's details.
 
-Set the issuer to `https://accounts.teamofsilicons.com`, use your app id as `client_id` and its secret as `client_secret`, and turn on PKCE and a nonce for sign-in. The ID token is signed with EdDSA (Ed25519), so your library must support that algorithm.
+Set the issuer to `https://accounts.teamofsilicons.com`, use your app id as `client_id` and its secret as `client_secret`, and turn on PKCE and a nonce for sign-in. Every `id_token` your app gets is signed with EdDSA (Ed25519), so your library must support that algorithm. Discovery also lists `RS256`, but that key signs only the identity tokens Silicons hand to outside clouds, never an app's `id_token` ([why](#the-discovery-document)).
 
 This example uses [openid-client](https://github.com/panva/openid-client) v6 for Node:
 
@@ -139,12 +139,12 @@ metadata.
 |---|---|
 | Issuer (discovery) | `https://accounts.teamofsilicons.com`, exactly, with no trailing slash. Discovery is at `/.well-known/openid-configuration`, keys at `/.well-known/jwks.json` (both cacheable 5 minutes). |
 | `client_id` | Your app id, e.g. `briefcase`. |
-| `client_secret` | Your app secret. Auth method `client_secret_basic` or `client_secret_post`. |
+| `client_secret` | Your app secret. Auth method `client_secret_basic` or `client_secret_post`. A desktop app or CLI with `public_client` turned on sends no secret (auth method `none`), see [public clients](#what-isnt-supported-and-what-to-use-instead). |
 | Redirect URI | One of your app's `redirect_uris`, character for character. |
 | Response type | `code` (the only one). Response mode `query`. |
 | PKCE | `S256` (or `plain`). Use it: once you send a challenge, the verifier is required. |
 | Scopes | `openid` plus any of `email`, `phone`, `dob`, `timezone`; `profile` is always granted. |
-| id_token algorithm | `EdDSA` (Ed25519), the only one. |
+| id_token algorithm | `EdDSA` (Ed25519) for every `id_token` your app gets. Discovery lists `RS256` too, for Silicons' identity tokens only. |
 
 ## The discovery document
 
@@ -155,8 +155,8 @@ metadata.
   "claims_supported": ["iss", "sub", "aud", "exp", "iat", "auth_time", "nonce", "name", "picture", "preferred_username", "email", "email_verified", "phone_number", "phone_number_verified", "zoneinfo", "birthdate"],
   "code_challenge_methods_supported": ["S256", "plain"],
   "device_authorization_endpoint": "https://accounts.teamofsilicons.com/v1/device/authorize",
-  "grant_types_supported": ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code", "urn:silicon:params:oauth:grant-type:slt"],
-  "id_token_signing_alg_values_supported": ["EdDSA"],
+  "grant_types_supported": ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code", "urn:silicon:params:oauth:grant-type:slt", "urn:ietf:params:oauth:grant-type:jwt-bearer", "urn:ietf:params:oauth:grant-type:token-exchange"],
+  "id_token_signing_alg_values_supported": ["EdDSA", "RS256"],
   "introspection_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/introspect",
   "introspection_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
   "issuer": "https://accounts.teamofsilicons.com",
@@ -167,19 +167,33 @@ metadata.
   "response_modes_supported": ["query"],
   "response_types_supported": ["code"],
   "revocation_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/revoke",
-  "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+  "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
   "scopes_supported": ["profile", "email", "phone", "dob", "timezone", "openid", "offline_access"],
   "service_documentation": "https://developers.teamofsilicons.com/docs/accounts",
   "subject_types_supported": ["public"],
   "token_endpoint": "https://accounts.teamofsilicons.com/v1/oauth/token",
-  "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+  "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
   "userinfo_endpoint": "https://accounts.teamofsilicons.com/v1/userinfo"
 }
 ```
 
-The device grant belongs to the `silicon-accounts` CLI, and the `urn:silicon:params:oauth:grant-type:slt`
-grant is how [Silicons sign in to your app](add-sign-in.md#silicons-sign-in-without-the-pages).
-Neither is part of a browser sign-in.
+None of the last four grants is part of a browser sign-in:
+
+- The device grant (`…:device_code`) signs a Carbon in to a command-line tool:
+  the `silicon-accounts` CLI, or [your own CLI](add-sign-in.md#sign-people-into-your-cli) once you turn on `device_flow`.
+- The `urn:silicon:params:oauth:grant-type:slt` grant is how
+  [Silicons sign in to your app](add-sign-in.md#silicons-sign-in-without-the-pages). It needs your app secret, unless your app turned on `public_client` and its own tool exchanges the token with `client_id` alone.
+- `jwt-bearer` (a Silicon's key) and `token-exchange` (a CI job's OIDC token) sign a Silicon in to
+  Silicon Accounts itself, through the `silicon-accounts` CLI or the Rust package. Apps can't use
+  them ([CI and the cloud](ci-and-cloud.md)). Each allows 60 requests per minute from one address
+  (`jwt-bearer` shares its count with `POST /v1/silicons/login`), then 429 `rate_limited`.
+
+`id_token_signing_alg_values_supported` lists two algorithms because we have two signing keys. The
+Ed25519 key (`EdDSA`) signs access tokens and every `id_token` an app gets. The RSA key (`RS256`)
+signs only the identity tokens a Silicon hands to AWS, Google Cloud or Microsoft Entra, which don't
+accept EdDSA. Those tokens can never be mistaken for yours: their audience is a cloud's (it always
+contains `.`, `:` or `/`), and no app id can. So keep your library on `EdDSA`, and pin it where
+the library lets you (`id_token_signed_response_alg: "EdDSA"`).
 
 ## The id_token
 
@@ -189,7 +203,7 @@ again with every refresh of that sign-in.
 | Claim | Value |
 |---|---|
 | `iss` | `https://accounts.teamofsilicons.com` |
-| `sub` | The account's `uuid`: permanent, the same in every token and webhook. Key your user on it. |
+| `sub` | The account's `uuid`: permanent, the same in every token and webhook. Key your user on it. Despite its name it isn't an RFC 4122 UUID: it's a short, case-sensitive string such as `aQm`, so store it as text and compare it exactly. |
 | `aud` | Your app id. |
 | `exp`, `iat` | Same lifetime as the access token: 30 minutes. |
 | `auth_time` | When the Carbon last proved who they are in this browser (a code, Google, Apple). "Continue as …" and `prompt=none` keep the earlier time, so `auth_time` can be well before `iat`. |
@@ -221,11 +235,11 @@ details are in [tokens](tokens.md#read-the-account-userinfo).
 | `response_mode=form_post` or `fragment` | Only `query` | The code arrives as `?code=`. |
 | `max_age` | Ignored | `prompt=login`, then check `auth_time`. |
 | `request`, `request_uri`, `claims` parameters | Ignored | Plain query parameters; scopes decide the claims. |
-| RS256 or other algorithms | EdDSA only | A library with Ed25519 support (`jose`, `openid-client`, the Rust package). |
+| RS256 or other algorithms for your `id_token` | EdDSA only (the `RS256` in discovery is for Silicons' identity tokens) | A library with Ed25519 support (`jose`, `openid-client`, the Rust package). |
 | RP-initiated logout (`end_session_endpoint`) | None | Revoke your sign-in with `POST /v1/oauth/revoke`. The Carbon stays signed in to Silicon Accounts itself, so the next sign-in offers "Continue as …"; send `prompt=login` when you need a fresh sign-in. |
 | Front- or back-channel logout | None | [Webhooks](webhooks.md): `membership.signed_out`, `membership.access_removed`, `account.deleted`. |
 | Dynamic client registration | None | Apps are created in Silicon Apps; their sign-in setup is changed with `PATCH /v1/apps/{app_id}/signin-config`. |
-| Public clients (no secret) | Every app is confidential | Exchange the code on a server you control; native and single-page apps send the code there. |
+| Public clients (no secret) | Only with `public_client` (code with PKCE `S256`, a Silicon's short-lived token, and refresh) or `device_flow` | A desktop app or CLI turns one of them on ([how](add-sign-in.md#desktop-and-native-apps)). A single-page app exchanges the code on a server you control. With `public_client`, your tool can also exchange a Silicon's short-lived token with `client_id` alone, so a CLI can sign Silicons in without a backend ([CLI plus backend](add-sign-in.md#cli-plus-backend)). |
 | `offline_access` to get a refresh token | Accepted, ignored | Every sign-in returns a refresh token. |
 
 To check the access tokens your API receives without a library, see

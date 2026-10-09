@@ -45,10 +45,10 @@ Every grant (a code, a Silicon's short-lived token or a refresh) gets the same a
 
 | Field | Meaning |
 |---|---|
-| `access_token` | A JWT (EdDSA) for your app, valid `expires_in` seconds: 1800, 30 minutes. Send it to your own API, or to Silicon Accounts' `/v1/userinfo`. |
+| `access_token` | A JWT (EdDSA) for your app, valid `expires_in` seconds: 1800, 30 minutes, or less in the last 30 minutes of a sign-in that ends early, because an access token never outlives its sign-in. Send it to your own API, or to Silicon Accounts' `/v1/userinfo`. |
 | `token_type` | Always `Bearer`. |
 | `refresh_token` | `sar_…`, opaque. Rotates on every refresh; one use each. |
-| `refresh_token_expires_at` | When this sign-in ends at the latest: 900 days after it started. Refreshing never moves it. |
+| `refresh_token_expires_at` | When this sign-in ends at the latest: 900 days after it started, or, for a Silicon's sign-in made from a short-lived token its CI job minted, when that CI sign-in ends. Refreshing never moves it. |
 | `scope` | What the account granted your app, space-separated, e.g. `profile email openid`. |
 | `id_token` | Only when the sign-in included `openid`. See [the id_token](oidc.md#the-id_token). |
 | `membership_id` | `{app_id}:{uuid}`, the account's membership with your app. |
@@ -75,7 +75,12 @@ exact description.
 
 A Silicon signs in to your app by handing you a short-lived token (`slt_…`), which it gets with
 `silicon-accounts login --app <your app_id>`. The token works once, lasts 2 minutes, and only your
-app can exchange it:
+app can exchange it, with its secret, so the exchange runs on your server. A CLI forwards the
+token there ([CLI plus backend](add-sign-in.md#cli-plus-backend)). If your app turned on
+`public_client`, its own command-line or desktop tool may exchange the token with `client_id`
+alone instead (`-d client_id=briefcase` and no secret; in Rust,
+`AccountsClient::exchange_slt_public_client`), and we record that sign-in with the method
+`slt_public_client`:
 
 ```sh
 curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/token" \
@@ -149,6 +154,13 @@ it shows up in your user base and in the account's sign-in history. Every refusa
 | Minted for another app | `The short-lived token was issued for the app 'briefcase', not for 'dm'; …` |
 | Minted before the Silicon's custodian rotated its STK | `The short-lived token was issued at … by a sign-in of si:scout that ended when its custodian rotated its STK at …` |
 | Minted before the account removed your app's access | `c:… removed the access of the app 'briefcase' at …, after this short-lived token was issued at …` |
+| Minted by a Silicon's CI sign-in that has since reached the end it was given | `The short-lived token was issued by a sign-in of si:scout from a trusted outside token, and that sign-in ended at …` |
+| Minted by a Silicon's CI sign-in whose trust was removed | `The short-lived token was issued by a sign-in of si:scout from a trusted outside token, and its custodian or the Silicon removed that trust …` |
+
+A token minted by a Silicon's sign-in from CI starts a sign-in at your app that ends when that CI
+sign-in ends, and removing the CI trust ends it with `membership.signed_out` (reason
+`session_revoked`). [CI and the cloud](ci-and-cloud.md#what-an-app-sign-in-from-ci-lasts) has the
+details.
 
 ## Refresh
 
@@ -164,7 +176,8 @@ let tokens = app.refresh(refresh_token).await?;   // store tokens.refresh_token 
 
 **Rotation.** Every refresh gives you a new refresh token and spends the one you sent. The new
 one keeps the sign-in's original `refresh_token_expires_at`, so a sign-in lasts at most 900 days
-from the moment the account signed in, however often you refresh.
+from the moment the account signed in (or until the end of the CI sign-in it came from), however
+often you refresh.
 
 **Reuse detection.** We treat a spent refresh token coming back as theft. The whole sign-in
 (every token issued from it, including the newest) is revoked at once, and your webhook gets
@@ -248,7 +261,7 @@ answer is `invalid_grant` with the reason:
 | `error_description` | Why |
 |---|---|
 | `The sign-in this refresh token belongs to was revoked at … (app_revoked); sign in again.` | Your app revoked it. Other reasons in the parentheses: `refresh_token_reuse`, `authorization_code_reuse`, `access_removed` (the account removed your app's access), `stk_rotated` (a Silicon's custodian rotated its STK), `account_deleted`. |
-| `The refresh token expired at … (refresh tokens last 900 days from sign-in); sign in again.` | The sign-in reached its 900 days. |
+| `The refresh token expired at … (refresh tokens last 900 days from sign-in at most, and a sign-in that started from a CI job's outside token ends with that job's sign-in); sign in again.` | The sign-in reached its end: 900 days, or the end of the CI sign-in a Silicon got its short-lived token from. |
 | `This refresh token was already used once. …` | Reuse: the sign-in is now revoked. |
 | `The refresh token was issued to a different app, not to 'dm'; an app can only refresh its own tokens.` | Each app refreshes its own tokens. |
 | `The refresh token is not known to Silicon Accounts: it is mistyped, or it belongs to another environment.` | A typo or another environment. |

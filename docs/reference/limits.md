@@ -48,7 +48,7 @@ sign in once per job and reuse the session, not sign in once per command.
 | Device sign-ins started (`POST /v1/device/authorize`) | 60 per 10 minutes; 600 per 10 minutes for one app's tools | IP; app |
 | Device codes looked up, approved or denied (`/v1/device/{user_code}…`) | 60 per 10 minutes | Carbon |
 | Connecting Google or Apple (`POST /v1/me/identities/{provider}`) | 30 per hour | account |
-| Silicon sign-in attempts (`POST /v1/silicons/login`) | 60 per minute | IP |
+| Silicon sign-in attempts (`POST /v1/silicons/login`, and `grant_type=…:jwt-bearer` at `POST /v1/oauth/token`, counted together) | 60 per minute | IP |
 | Token exchanges with an outside OIDC token (`grant_type=…:token-exchange`) | 60 per minute | IP |
 | Identity tokens (`POST /v1/me/identity-tokens`) | 60 per minute | Silicon |
 | Silicon self-creations (`POST /v1/silicons`) | 10 successful per hour, and 60 attempts of any outcome per hour | IP |
@@ -78,11 +78,11 @@ sign in once per job and reuse the session, not sign in once per command.
 | Hosted sign-in flow (and its `sa_flow` cookie) | 60 minutes |
 | Sign-up session (`sa_signup`) | 48 hours (**contract**) |
 | Browser session (`sa_session`) | 900 days |
-| Access token | 30 minutes, 1800 seconds (**contract**) |
-| Refresh token / sign-in | 900 days from the sign-in, not extended by refreshing (**contract**); every refresh rotates the token |
+| Access token | 30 minutes, 1800 seconds (**contract**), and never past the end of its sign-in: in a sign-in's last 30 minutes, `expires_in` is shorter (a 30-minute CI sign-in may answer 1799) |
+| Refresh token / sign-in | 900 days from the sign-in, not extended by refreshing (**contract**); every refresh rotates the token. Shorter for a sign-in from a trusted outside token and for app sign-ins made from its short-lived tokens (below) |
 | Authorization code | 120 seconds, single use |
 | Short-lived token (`slt_…`) | 120 seconds, single use, one app |
-| Sign-in from a trusted outside token (token exchange) | until the outside token expires: at least 30 minutes, at most 12 hours; refresh tokens rotate within it |
+| Sign-in from a trusted outside token (token exchange) | until the outside token expires: at least 30 minutes, at most 12 hours; refresh tokens rotate within it. An app sign-in from a short-lived token minted in it ends no later than it does, and refreshing never moves that end; signing the CI sign-in out early doesn't shorten it, but removing the trust ends it |
 | Identity token | 60 to 3600 seconds, default 300 |
 | A trusted issuer's keys (JWKS) | cached for 10 minutes; fetched again for an unknown `kid`, at most every 30 seconds per issuer |
 | Device code | 600 seconds; poll every 5 seconds (`slow_down` if faster) |
@@ -112,7 +112,7 @@ sign in once per job and reuse the session, not sign in once per command.
 | Request body | 64 KB; photos 2 MB; `PATCH …/signin-config` 512 KB; imports 50 MB; Silicon Apps sync 5 MB |
 | Time budget per request | 30 seconds; photo uploads and sync 60 seconds; imports 5 minutes (then 503 `request_timeout`) |
 | Page size | 1 to 200, default 50 |
-| `Idempotency-Key` | 1 to 200 visible ASCII characters |
+| `Idempotency-Key` | 1 to 200 visible ASCII characters, optional (Silicon Apps requires 8 to 200 on every change) |
 | `X-Request-Id` kept from the client | 1 to 128 characters of `A-Z a-z 0-9 - _ . :` |
 | Redirect URIs / allowed origins / allowed email domains per app | 50 / 50 / 100 |
 | Branding | `logo_height` 16 to 96 px, `radius` 0 to 40 px, inline logos 128 KB each, text contrast at least 4.5:1, `copy.title` 80 and `copy.subtitle` 200 characters |
@@ -164,7 +164,7 @@ sign in once per job and reuse the session, not sign in once per command.
 
 | What | Value |
 |---|---|
-| Open streams (`GET /v1/events/stream`) | 5 per app or account; 500 per server (429 `too_many_streams` / 503 `stream_capacity_reached`, with `Retry-After`) |
+| Open streams (`GET /v1/events/stream`) | 5 per app or account on each API server (counted in that server's memory); 500 per server (429 `too_many_streams` / 503 `stream_capacity_reached`, with `Retry-After`). Silicon Apps' streams differ: 10 per token or session, 30 minutes each |
 | How often a stream looks for new events | every second, at most 100 events per read |
 | Heartbeat (`: heartbeat`) | after 15 seconds without events |
 | Reconnect delay told to clients (`retry:`) | 5 seconds |

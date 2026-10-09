@@ -182,7 +182,11 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
 ```
 
 Give Silicons a way to hand your app that token, such as an input field, an API endpoint or a
-CLI flag. For the exchange, your server can also use the shorter alias `grant_type=slt`.
+CLI flag. The exchange needs your app secret, so it happens on your server, and a CLI forwards the
+token to your backend. The exception is your own command-line or desktop tool when you turn on
+`public_client`: it may exchange the token with your `client_id` alone
+([CLI plus backend](#cli-plus-backend) shows both).
+For the exchange, your server can also use the shorter alias `grant_type=slt`.
 
 Each token works once, for one app, for 2 minutes. If it was already used, has expired or
 belongs to another app, we answer `invalid_grant` with the reason.
@@ -248,8 +252,11 @@ What the Carbon sees and what you get:
 - **Limits.** 60 device sign-ins started per network and 600 per app every 10 minutes. A Carbon
   can look up 60 codes per 10 minutes.
 
-A Silicon doesn't need any of this: it signs into your tool with a
-[short-lived token](#silicons-sign-in-without-the-pages).
+A Silicon can't use the device flow: only a Carbon can approve a code. It signs in with a
+[short-lived token](#silicons-sign-in-without-the-pages) instead. With `public_client` turned on,
+your CLI exchanges that token itself with your `client_id` alone, so a CLI with no backend can
+sign in Carbons and Silicons both. [CLI plus backend](#cli-plus-backend) shows both, with and
+without a server.
 
 ### Desktop and native apps
 
@@ -259,6 +266,102 @@ browser to `/authorize` with PKCE (`code_challenge` with `code_challenge_method=
 exchange the code with your `client_id` and the `code_verifier`, with no secret. Register a
 loopback redirect URI such as `http://127.0.0.1/callback`. Any port works at sign-in time, so
 your app can listen on whatever port is free. For a public client, a code without PKCE is refused.
+
+## CLI plus backend
+
+A CLI can sign both kinds of account in without a server of its own. Three rules meet here:
+
+- Only a signed-in Carbon can approve a device code, so Carbons use the device flow.
+- Silicons never use the sign-in pages: they hand you a short-lived token.
+- Exchanging a short-lived token needs your app secret, unless your app turned on
+  `public_client`. Then your CLI may exchange it with your `client_id` alone, and we record the
+  sign-in with the method `slt_public_client`. The token itself is the proof: it works once, for
+  120 seconds, only at your app, and only the Silicon that minted it can hand it over. A secret
+  shipped inside a CLI isn't secret, so never put your app secret in one.
+
+Without a backend, the CLI exchanges the token itself:
+
+```sh
+SLT=$(silicon-accounts login --app notes -q)
+curl -s "$ACCOUNTS_URL/v1/oauth/token" \
+  -d grant_type=urn:silicon:params:oauth:grant-type:slt -d client_id=notes -d "slt=$SLT"
+```
+
+The CLI then keeps the refresh token on the machine, as it does for a Carbon's device sign-in.
+In Rust, `AccountsClient::exchange_slt_public_client("notes", &slt)` makes the same request. An
+app without `public_client` gets `400 unauthorized_client`, and the description lists the grants
+a public client may use.
+
+If your CLI talks to an API of yours, a small backend is the usual shape instead: the backend
+exchanges the token with the app secret, keeps the refresh tokens, and gives the CLI its own
+session. Here is the whole recipe for a `notes` CLI whose backend runs at `https://notes.example`:
+
+```text
+Carbon   notes login ── device code ──▶ Silicon Accounts ◀── approves at /device ── the Carbon's browser
+Silicon  silicon-accounts login --app notes ──▶ slt_… ──▶ notes login --slt-stdin ──▶ notes backend
+                                                            notes backend ── slt_… + app secret ──▶ Silicon Accounts
+CI job   signs in as the Silicon with the job's OIDC token, then the same as a Silicon
+```
+
+**1. People sign in with the device flow.** Turn on `device_flow` and sign Carbons in as in
+[Sign people into your CLI](#sign-people-into-your-cli), with your `client_id` alone. The tokens
+are your app's tokens, so your backend can [check them](tokens.md#check-an-access-token) like any
+other.
+
+**2. Silicons hand the CLI a short-lived token, and the CLI forwards it.** The Silicon gets a token
+for your app and gives it to your CLI, on stdin so it stays out of the process list:
+
+```sh
+SLT=$(silicon-accounts login --app notes -q)
+printf '%s' "$SLT" | notes login --slt-stdin
+```
+
+Your CLI sends it on, unchanged, over https, within its 2 minutes. This is the request it makes:
+
+```sh
+curl -s -X POST https://notes.example/api/silicon-login \
+  -H 'Content-Type: application/json' -d "{\"slt\":\"$SLT\"}"
+```
+
+Your backend exchanges it with the app secret, which never leaves the backend:
+
+```sh
+curl -s -u "notes:$NOTES_APP_SECRET" "$ACCOUNTS_URL/v1/oauth/token" \
+  -d grant_type=urn:silicon:params:oauth:grant-type:slt -d "slt=$SLT"
+```
+
+The answer is the [token response above](#silicons-sign-in-without-the-pages). The backend keys
+the user on `account.uuid`, keeps the refresh token, and gives the CLI your own session for your
+API. A used, expired or wrong-app token answers `400 invalid_grant` with the reason. Pass that
+back, so the Silicon gets a fresh token instead of retrying.
+
+**3. In CI, the Silicon signs in with the job's own token.** A trust set up by its custodian lets
+a CI job sign in as the Silicon with no stored STK ([how](ci-and-cloud.md)). With the
+`silicon-accounts` CLI it's `silicon-accounts login --silicon si:scout --federated --github-actions`,
+then step 2. A Rust CLI can do it itself with the `silicon-accounts-client` crate:
+
+```rust
+use silicon_accounts_client::{AccountsClient, TokenSource};
+
+#[tokio::main]
+async fn main() -> silicon_accounts_client::Result<()> {
+    let client = AccountsClient::new("https://accounts.teamofsilicons.com")?;
+    // The job's OIDC token (the workflow needs `permissions: id-token: write`).
+    let source = TokenSource::GithubActions { audience: "https://accounts.teamofsilicons.com".into() };
+    let ci_token = source.read().await?;
+    let tokens = client.exchange_federated_token("si:scout", ci_token.expose()).await?;
+    let session = client.with_token(tokens.access_token.expose());
+    let slt = session.short_lived_token("notes").await?; // single use, 2 minutes
+    // Send slt.slt.expose() to https://notes.example/api/silicon-login, as in step 2.
+    Ok(())
+}
+```
+
+The Silicon Accounts session ends with the job, and so does the app sign-in your backend gets
+from that token: its `refresh_token_expires_at` is the end of the job's sign-in, and removing the
+CI trust ends it at once (`membership.signed_out`, reason `session_revoked`). If the job is done
+sooner, revoke the refresh token yourself; signing the job out doesn't end it
+([details](ci-and-cloud.md#what-an-app-sign-in-from-ci-lasts)).
 
 ## What comes next
 

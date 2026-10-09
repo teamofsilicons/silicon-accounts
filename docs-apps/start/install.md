@@ -69,9 +69,9 @@ cargo install silicon-apps-cli
 
 Cargo installs the standalone CLI. Unlike the bootstrap installers, it doesn't register Apps itself as a managed installation from the catalog.
 
-Silicon Apps and Silicon Accounts both have native store packages for all nine supported targets. The installers register Apps for automatic updates, and Apps keeps Accounts up to date too.
+Silicon Apps and Silicon Accounts both have native store packages for all nine supported targets, each checked on its own target by our CI before we added it. The installers register Apps for automatic updates, and Apps keeps Accounts up to date too.
 
-The GitHub downloads, the store packages and the upload validation workers are published separately. Before you upload a package, run `silicon-apps targets` to see which workers are available.
+That's true of these two first-party CLIs only. Packages other authors upload are validated by our upload workers, and today the only live worker is `linux-x86_64`. The GitHub downloads, the store packages and the upload validation workers are published separately. Before you upload a package, run `silicon-apps capabilities` to see which workers are live right now.
 
 ## Find and install an app
 
@@ -142,6 +142,8 @@ silicon-apps search --private
 
 If you're signed in to the [Accounts CLI](/docs/accounts/reference/cli), `silicon-accounts login --app silicon-apps` makes the token for you. It works once and expires after two minutes. Apps exchanges it for a session and keeps you signed in. `silicon-apps logout` revokes the session and clears your local credentials.
 
+A Silicon can also sign in with its STK: `silicon-apps login --silicon si:NAME` reads the STK from `SILICON_STK`. The Accounts CLI reads `ACCOUNTS_STK` instead, so either set both or add `--stk-env ACCOUNTS_STK`.
+
 ## Choose where state lives
 
 ```sh
@@ -156,7 +158,7 @@ Use the same home for signing in, installing apps and running the updater. Chang
 
 Your saved sign-in belongs to the exact Apps and Accounts service URLs you used. If you change either URL, sign in again. Each installed app also remembers which registry it came from, so changing the server setting won't switch where its updates come from. See the [CLI configuration reference](../reference/cli.md#configuration).
 
-Telemetry is on by default when a Space Station destination is configured. The browser and the CLI each have their own setting, for their own client. When you're signed in, platform registration feeds the observed population of each target, independently of diagnostic telemetry.
+Telemetry goes to Space Station, Team of Silicons' own event service. It's on by default, but the CLI sends nothing unless a Space Station recording key (`APPS_TELEMETRY_TABLE_KEY`) is set in its environment, and then only a short event per command (its step, your OS and architecture, the CLI version). `silicon-apps config telemetry off` turns it off. The browser and the CLI each have their own setting, for their own client. When you're signed in, platform registration feeds the observed population of each target, independently of diagnostic telemetry.
 
 ## Uninstall or review
 

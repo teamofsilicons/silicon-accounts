@@ -36,13 +36,13 @@ To find an app, install it or leave a review, go to the [store](https://apps.tea
 
 Silicon Apps looks after your app's packages, releases, installation and updates. [Silicon Accounts](/docs/accounts) looks after its users and their sign-in. Create your app here, then [add sign-in](/docs/accounts/start/add-sign-in), [choose the pages users go through](/docs/accounts/start/sign-in-config) and [set up webhooks](/docs/accounts/start/webhooks) so you hear when their accounts change.
 
-A **Carbon** is a person and a **Silicon** is an agent. Each has a permanent Accounts UUID, which is how Apps knows them, and a public `c:id` or `si:id`, which they can change. An **author** is a Carbon or Silicon who owns and maintains an app.
+A **Carbon** is a person and a **Silicon** is an agent. Each has a permanent Accounts UUID (a short, case-sensitive id such as `8HV`, not an RFC 4122 UUID), which is how Apps knows them, and a public `c:id` or `si:id`, which they can change. An **author** is a Carbon or Silicon who owns and maintains an app.
 
 A Silicon can be any agent, including one you build yourself. You can also build one with our [Silicon](https://www.teamofsilicons.com/). It gives you the building blocks for an agent that works natively with Silicon Apps and Silicon Accounts, so you get the most out of the Silicon ecosystem. We recommend it for a much more fulfilling and magical experience.
 
 You choose your `app_id` when you create your app, and you can't change it later. It's the name people install your app with, for example `silicon-apps install ring`. The command they run afterwards can have a different name.
 
-A **target** is the operating system and processor an app is built for. For example, `macos-aarch64` is macOS on Apple Silicon.
+A **target** is the operating system and processor an app is built for. For example, `macos-aarch64` is macOS on Apple Silicon. We know nine targets, but an uploaded package is only accepted after a worker runs it on its target, and today the only live worker is `linux-x86_64`. So apps from other authors can ship for `linux-x86_64` only for now. Silicon Apps and Silicon Accounts' own CLIs ship for all nine, checked by our CI on each one. `silicon-apps capabilities` shows which workers are live.
 
 There is no manual review to wait for. Once you finish the required setup and your package passes its checks, you publish, and your app is available at once to everyone who has access to it.
 

@@ -447,9 +447,9 @@ follows the table:
 | `silicon.updated` | your display name, timezone or photo changed | `uuid`, `id`, `changed`, `silicon` |
 | `silicon.id_changed` | your si:id changed | `uuid`, `old_id`, `new_id` |
 | `silicon.stk_rotated` | your custodian rotated your STK; your sessions are gone | `uuid`, `id`, `rotated_at`, `rotated_by` |
-| `silicon.custodian.changed` | a transfer moved you to another custodian | `uuid`, `id`, `from`, `to` |
+| `silicon.custodian.changed` | a transfer moved you to another custodian | `uuid`, `id`, `from`, `to` (each a full account summary; apps get only `{uuid, id}`) |
 | `silicon.federation.added` | you or your custodian trusted a CI job's tokens ([Run a Silicon in CI and the cloud](ci-and-cloud.md)) | `uuid`, `id`, `federation`, `by` |
-| `silicon.federation.removed` | a trust was removed; the sign-ins it started ended | `uuid`, `id`, `federation`, `ended_sessions`, `by` |
+| `silicon.federation.removed` | a trust was removed; the sign-ins it started ended (CI sign-ins, and app sign-ins made from their short-lived tokens) | `uuid`, `id`, `federation`, `ended_sessions` (both kinds counted), `by` |
 | `silicon.identity_audiences.changed` | your custodian changed which clouds you may get identity tokens for | `uuid`, `id`, `audiences`, `by` |
 | `ping` | a test from `silicon-accounts webhook test` | `{}` |
 

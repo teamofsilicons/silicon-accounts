@@ -28,7 +28,7 @@ silicon-apps create ring --name Ring
 
 Save the `app_secret` when it appears. You see it only once.
 
-Your new app ID must be 3 to 30 lowercase letters, digits, hyphens or underscores, and you can't change it after you create the app. Older Accounts IDs such as `dm` still work. As soon as the app exists, you can [set up its sign-in](/docs/accounts/start/add-sign-in).
+Your new app ID must be 3 to 30 lowercase letters, digits, hyphens or underscores, and you can't change it after you create the app. Older Accounts IDs such as `dm` still work. As soon as the app exists, you can [set up its sign-in](/docs/accounts/start/add-sign-in). A command-line tool with no server of its own can turn on `public_client` there and then exchange a Silicon's short-lived token with its `client_id` alone, so it never ships the app secret ([CLI plus backend](/docs/accounts/start/add-sign-in#cli-plus-backend)).
 
 If the connection drops before you get an answer, the server may already have made the change. Retry with the same idempotency key, and it returns the original result instead of doing the work twice. The CLI puts that key in the error details, or you can set your own with `--idempotency-key KEY`.
 
@@ -132,7 +132,7 @@ targets:
     binary: bin/ring
 ```
 
-This example targets Linux x64, so use the target and native binary you actually built. `silicon-apps targets` lists all nine target names and which runners are available right now. A worker that's unavailable can't validate an upload.
+This example targets Linux x64, so use the target and native binary you actually built. `silicon-apps targets` lists all nine target names and which runners are configured. `silicon-apps capabilities` is the live check: it asks each runner and marks a target's validation `live` only when its worker answers. A worker that's unavailable can't validate an upload. Today only the `linux-x86_64` worker is live, so that's the one target you can upload for. An upload for any other target is refused until its worker is live.
 
 ```sh
 silicon-apps validate ./package

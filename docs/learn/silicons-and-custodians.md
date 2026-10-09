@@ -75,7 +75,7 @@ The STK is a password, and it's kept as simple as one: a string that fits in an 
 
 **Shown once, stored as a hash.** We keep only an Argon2id hash of the STK, so a copy of the database reveals no STK, and guessing one from a hash is slow by design. The plain STK exists only in the response that created it. For the 10 minutes in which a retried request may replay that response (with the same `Idempotency-Key`), the stored copy is encrypted, so even that window shows nothing to someone reading the database.
 
-**Guessing gets nowhere.** An unknown si:id and a wrong STK get the same answer (`invalid_credentials`) after the same Argon2id work, so neither the answer nor its timing reveals which ids exist. Ten wrong STKs in a row lock the Silicon's sign-in for 60 seconds, the correct STK included, so a guesser can't tell a guess was right from it working during the lock. We count attempts before checking the STK, so firing many guesses in parallel gets no more than ten checks. On top of that, a network can make 60 Silicon sign-in attempts per minute. At these rates, guessing 48 random bits online is hopeless.
+**Guessing gets nowhere.** An unknown si:id and a wrong STK get the same answer (`invalid_credentials`) after the same Argon2id work, so neither the answer nor its timing reveals which ids exist. Ten wrong STKs in a row lock the Silicon's sign-in for 60 seconds, the correct STK included, so a guesser can't tell a guess was right from it working during the lock. We count attempts before checking the STK, so firing many guesses in parallel gets no more than ten checks. On top of that, a network can make 60 Silicon sign-in attempts per minute, counted together whether they use the STK or a key, at `POST /v1/silicons/login` or the token endpoint's `jwt-bearer` grant. At these rates, guessing 48 random bits online is hopeless.
 
 **Rotation ends every sign-in.** If an STK may have leaked, the custodian can rotate it, and the old STK stops working right away. We revoke the Silicon's sessions and refresh tokens, refuse the short-lived tokens it was already given, and send apps `membership.signed_out` with `reason: stk_rotated`. That way nobody holding an old SLT can start another session.
 
@@ -91,7 +91,7 @@ A Silicon can't use an app's sign-in page, because every method there (email cod
 - **A leaked SLT is worth little.** It works for one app, once, within 120 seconds. If another app presents it, it's refused and used up.
 - **What the app sees is decided when the SLT is issued.** Its scopes are `profile`, plus `timezone` and `dob` when the app's sign-in setup asks for them. A Silicon has no email or phone, so an app that requires them still lets the Silicon in and just never receives them. The alternative would lock Silicons out of every app that wants an email from Carbons.
 - **The app needs one grant type, not a second sign-in system.** The exchange is a normal call to the token endpoint (`grant_type=urn:silicon:params:oauth:grant-type:slt`), and the answer has the same shape as a Carbon's code exchange: an access token, a refresh token and the account.
-- **An SLT carries the authority of the sign-in that issued it.** It's refused if the STK was rotated after it was issued, or if the Silicon removed the app's access after it was issued. An SLT issued after a removal is a new decision, and gives the access back.
+- **An SLT carries the authority of the sign-in that issued it.** It's refused if the STK was rotated after it was issued, or if the Silicon removed the app's access after it was issued. An SLT issued after a removal is a new decision, and gives the access back. One issued by a sign-in from CI also carries that sign-in's end: the app sign-in it starts ends no later ([below](#why-a-ci-job-can-sign-in-without-a-secret)).
 
 ## Why a CI job can sign in without a secret
 
@@ -116,13 +116,21 @@ cloud](../start/ci-and-cloud.md) has the steps. Each rule has a reason:
   service's audience, so it can't be replayed here. By default a trust wants our own URL.
 - **Every token works once.** A token's `jti` is remembered until the token expires, so a token
   copied out of a job's log can't sign in again.
-- **The sign-in ends with the job's token.** A GitHub token lives minutes, so its sign-in is one
-  access token, 30 minutes. A GitLab token lives as long as the job, and the sign-in follows it,
-  up to 12 hours. A copied session never outlives the job that earned it.
-- **A CI sign-in can't add a way in.** It may act as the Silicon (sign into apps, call the API),
-  but it can't add keys or trusts. A compromised job can't leave a door open behind it.
+- **The sign-in ends with the job's token.** It ends when the CI token would have expired, but
+  never sooner than 30 minutes and never later than 12 hours. A copied session never outlives the
+  job that earned it.
+- **App sign-ins end with it.** A short-lived token minted during the job signs the Silicon in to
+  an app only until the job's sign-in ends: the app's refresh token stops then, and so do its
+  access tokens. Otherwise a job of minutes could leave an app sign-in of 900 days behind.
+  [What an app sign-in from CI lasts](../start/ci-and-cloud.md#what-an-app-sign-in-from-ci-lasts)
+  has the details, including app sign-ins made before this rule.
+- **A CI sign-in can't add a way in to Silicon Accounts.** It may act as the Silicon (sign into
+  apps, call the API), but it can't add keys or trusts. A compromised job can't leave a door open
+  behind it here.
 - **Removing a trust ends what it started.** Every sign-in made through a trust ends the moment
-  the trust is removed, like revoking a key or rotating the STK.
+  the trust is removed, like revoking a key or rotating the STK: the CI sign-ins, and the app
+  sign-ins made from their short-lived tokens, whose apps hear `membership.signed_out` with the
+  reason `session_revoked`.
 - **The custodian's other controls still hold.** The app allow-list decides which apps the Silicon
   can sign into from CI too, and every sign-in is in its history with the method `federated`.
 

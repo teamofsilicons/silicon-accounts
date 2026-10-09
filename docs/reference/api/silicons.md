@@ -226,7 +226,7 @@ custodian's sessions list.
 | 403 | `account_deleted` | the Silicon was deleted |
 | 422 | `invalid_stk` / `invalid_id` | not an STK / not a si:id at all (nothing was checked) |
 | 423 | `login_locked` | 10 wrong STKs in a row: sign-in locked for 60 seconds (`Retry-After`) |
-| 429 | `rate_limited` | 60 sign-in attempts per IP per minute |
+| 429 | `rate_limited` | 60 sign-in attempts per IP per minute, counted together with `grant_type=…:jwt-bearer` at `POST /v1/oauth/token` |
 
 ```json
 {
@@ -258,6 +258,8 @@ JWT:
 
 The same assertion works at the token endpoint, as RFC 7523 asks
 ([`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`](oauth.md#grant_typeurnietfparamsoauthgrant-typejwt-bearer)).
+Both endpoints count against one limit: 60 Silicon sign-in attempts per minute from one address,
+whichever of them you use.
 Errors: 401 `invalid_assertion` (malformed, expired, the wrong `aud`, no live key of that Silicon
 signed it, or its `jti` was used before), 403 `account_not_active`, 422 `validation_failed`
 (an assertion together with `id` or `stk`).
@@ -381,8 +383,15 @@ and event stream get `silicon.federation.added`.
 ### `DELETE /v1/silicons/{id}/federations/{federation_id}`
 
 **204.** The trust stops working at once, and every sign-in it started ends (those tokens answer
-`token_revoked`). Repeating it changes nothing. 404 `federation_not_found`. The Silicon's webhook
-and event stream get `silicon.federation.removed` with `ended_sessions`.
+`token_revoked`): the CI sign-ins, and the app sign-ins made from the short-lived tokens they
+minted, whose apps get `membership.signed_out` with reason `session_revoked` (a refresh then says
+`federation_removed`). Repeating it changes nothing. 404 `federation_not_found`. The Silicon's
+webhook and event stream get `silicon.federation.removed` with `ended_sessions` (both kinds
+counted). Ending a CI sign-in any other way (signing it out, or `DELETE /v1/me/sessions/{id}`) doesn't
+end the app sign-ins made from its short-lived tokens; they still end when the CI sign-in would
+have. App sign-ins made from such tokens before the 9 October 2026 API release aren't linked to
+the trust, so removing it doesn't end them
+([CI and the cloud](../../start/ci-and-cloud.md#what-an-app-sign-in-from-ci-lasts) says how to).
 
 The exchange itself is a token request:
 [`grant_type=urn:ietf:params:oauth:grant-type:token-exchange`](oauth.md#grant_typeurnietfparamsoauthgrant-typetoken-exchange).
@@ -470,6 +479,11 @@ only at that app.
 - For a Carbon, they are `profile` plus the app's required details, plus the optional details
   the Carbon already granted this app on its what's-shared screen (an active membership's
   grant). If a required one is missing: 409 `requirements_missing` (`details.missing`).
+- Minted by a Silicon's sign-in from CI (a [trust relationship](#trust-relationships)), the token
+  records that sign-in's end and its trust: the app sign-in it starts ends no later than the CI
+  sign-in, the exchange refuses it once the trust was removed or the end the CI sign-in was given
+  has passed, and removing the trust later ends that app sign-in too. Signing the CI sign-in out
+  or revoking it doesn't refuse a token it already minted, which expires within 2 minutes anyway.
 
 Errors: 422 `validation_failed` (`app_id` isn't an app id at all), 404 `unknown_app`, 403
 `app_disabled`, 422 `first_party_app` (`silicon-accounts` itself), 403 `account_not_active` (the
@@ -879,8 +893,9 @@ history and the Silicon's show it. Repeating it changes nothing. Errors: 404
 
 The Silicon's sign-ins, newest first:
 `{"items": [{"at", "app": {"app_id", "name"} | null, "method", "outcome", "ip", "user_agent"}], "next_cursor"}`.
-`method` is `silicon_stk` (its own sign-in to Silicon Accounts, with `app` null), `slt`,
-`device`, …, and `outcome` is `success` or `failed`. Takes `?limit=` and `?cursor=`.
+`method` is `silicon_stk` (its own sign-in to Silicon Accounts, with `app` null), `slt` (an app
+exchanged its short-lived token), `slt_public_client` (an app's own tool exchanged it with its
+`client_id` alone), `device`, …, and `outcome` is `success` or `failed`. Takes `?limit=` and `?cursor=`.
 
 ### `GET` and `PUT /v1/me/silicons/{uuid}/allowed-apps`
 

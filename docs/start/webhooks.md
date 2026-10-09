@@ -27,7 +27,7 @@ curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" \
 ```
 
 ```json
-{"secret":"whsec_W1R3u9l25YmDv906DMbhc4REXN-rdU9Bio7vVGFFJQ8","url":"https://briefcase.example/webhooks/accounts"}
+{"events":null,"secret":"whsec_W1R3u9l25YmDv906DMbhc4REXN-rdU9Bio7vVGFFJQ8","url":"https://briefcase.example/webhooks/accounts"}
 ```
 
 We captured the responses on this page from a local Silicon Accounts stack; only the webhook URLs are shown as this example's `https` URL. Every delivery looks like this one. It is also a test vector: its secret was `whsec_7ex-O5r8O_UITcSX_bYEmzre7Lu_RXN1XFFBA9Ozif0`.
@@ -55,7 +55,7 @@ printf '%s' '1791340349.{"app_id":"dm","data":{},"event_id":"01a11434-82ea-71e3-
 
 ## Steps
 
-1. **Set the endpoint and keep the secret.** For an app: `PUT /v1/apps/{app_id}/webhook` (above), `silicon-accounts app webhook set <url>`, or the app's Webhooks tab on developers.teamofsilicons.com. For a Silicon, see [Silicon webhooks](#silicon-webhooks). Every time you set the URL, we generate a new `whsec_…` secret and show it once. A retry with the same `Idempotency-Key` within 10 minutes returns the same secret instead of making another. In production the URL must be `https` and reach a public address.
+1. **Set the endpoint and keep the secret.** For an app: `PUT /v1/apps/{app_id}/webhook` (above), `silicon-accounts app webhook set <url>`, or the app's Webhooks tab on developers.teamofsilicons.com. For a Silicon, see [Silicon webhooks](#silicon-webhooks). The first time you set the URL, we generate a `whsec_…` secret and show it once (if you made one first with `POST /v1/apps/{app_id}/webhook/generate-secret`, we keep that one instead). Setting the URL again, the same one or another, keeps that secret (the answer's `secret` is null, and the Webhooks tab says it was saved with the same signing secret) and keeps the updates you picked unless you send `events` (`null` for every update, or a list); a brand-new webhook gets every update. A new secret comes only from a rotation (`POST /v1/apps/{app_id}/webhook/rotate-secret`, `silicon-accounts app webhook rotate`, or Rotate secret on the Webhooks tab), with the first save after you removed the webhook, or from creating the webhook with `POST /v1/apps/{app_id}/subscriptions`, which always makes one ([the reference](../reference/api/apps.md#put-v1appsapp_idwebhook)). `preserve_secret` is still accepted and changes nothing. A retry with the same `Idempotency-Key` within 10 minutes returns the same answer. Silicon Apps (`silicon-apps webhook APP set`, or the publishing step on the developer platform) keeps the secret the same way, and the two write the same webhook. In production the URL must be `https` and reach a public address.
 2. **Verify every delivery before you trust it:**
    1. Read the raw request body as bytes. Verify those bytes, never JSON you serialized again.
    2. Read `X-Accounts-Timestamp` (unix seconds). Refuse it if it is more than 5 minutes off your clock. Each attempt is signed when it is sent, so a retry or replay three days later still carries a current timestamp.
@@ -76,9 +76,9 @@ App webhooks only carry events about accounts with a live membership with your a
 | `account.id_changed` | `uuid`, `membership_id`, `kind`, `old_id`, `new_id` | Show `new_id`. Keep keying on the uuid, which never changes. |
 | `account.updated` | `uuid`, `membership_id`, `changed`, `account` | Replace the fields you store with `account` (the account as your app may see it) if `account.version` is newer. `changed` lists only fields your app may see. |
 | `account.deleted` | `uuid`, `membership_id` | Delete or anonymise the account's data. Its tokens and User verification proofs already ended. |
-| `membership.signed_out` | `uuid`, `membership_id`, `reason` | End the account's sessions in your app. Its tokens are already revoked, and User verification proofs your app issued from them ended. `reason`: `app_revoked`, `stk_rotated`, `refresh_token_reuse` or `authorization_code_reuse`. |
+| `membership.signed_out` | `uuid`, `membership_id`, `reason` | End the account's sessions in your app. Its tokens are already revoked, and User verification proofs your app issued from them ended. `reason`: `app_revoked`, `stk_rotated`, `refresh_token_reuse`, `authorization_code_reuse` or `session_revoked` (a Silicon's CI trust was removed). |
 | `membership.access_removed` | `uuid`, `membership_id` | The account removed your app's access: stop using its data. Its tokens and your User verification proofs for it ended. It can sign in again later. |
-| `silicon.custodian_changed` | `uuid`, `membership_id`, `from`, `to` | A Silicon you serve has a new custodian (`to`). |
+| `silicon.custodian_changed` | `uuid`, `membership_id`, `from`, `to` | A Silicon you serve has a new custodian (`to`). `from` and `to` are each `{uuid, id}`. |
 | `ping` | `{}` | A test delivery. Answer `2xx`. |
 
 Every event, with a real payload and exactly when we send it, is in [the event catalogue](../learn/webhooks.md#app-events).
@@ -365,7 +365,7 @@ silicon-accounts webhook set https://scout.example/hooks/accounts   # prints the
 silicon-accounts webhook test                                         # queues a ping
 ```
 
-The API is `PUT /v1/me/webhook` `{"url"}` → `{"webhook_url", "webhook_secret"}`, `DELETE /v1/me/webhook`, and `POST /v1/me/webhook/test` → `202 {"event_id", "delivery_id", "type", "url", "superseded_pings"}`. You can queue 10 test pings an hour (then `429`). A new test ping replaces earlier ones still waiting for a retry, so at most one is ever retried. Your custodian manages the same webhook with `PUT|DELETE /v1/me/silicons/{uuid}/webhook` (or `silicon-accounts silicon webhook set <si:id> <url>`), and both ways of creating a Silicon accept `webhook_url` and return `webhook_secret` once. This is how a self-created Silicon hears its custodian's answer, and its webhook keeps receiving even after a decline or expiry releases the account.
+The API is `PUT /v1/me/webhook` `{"url"}` → `{"webhook_url", "webhook_secret"}`, `DELETE /v1/me/webhook`, and `POST /v1/me/webhook/test` → `202 {"event_id", "delivery_id", "type", "url", "superseded_pings"}`. You can queue 10 test pings an hour (then `429`). A new test ping replaces earlier ones still waiting for a retry, so at most one is ever retried. Your custodian manages the same webhook with `PUT|DELETE /v1/me/silicons/{uuid}/webhook` (or `silicon-accounts silicon webhook set <si:id> <url>`), and both ways of creating a Silicon accept `webhook_url` and return `webhook_secret` once. A Silicon's webhook works a little differently from an app's: setting its URL, the same one or another, always makes a new secret and shows it once (an app's keeps its secret), there is no separate rotate endpoint, so you rotate by setting the URL again, and the fields are named `webhook_url` and `webhook_secret` rather than `url` and `secret`. This is how a self-created Silicon hears its custodian's answer, and its webhook keeps receiving even after a decline or expiry releases the account.
 
 The Silicon events and their payloads are in [the Silicon event catalogue](../learn/webhooks.md#silicon-events).
 

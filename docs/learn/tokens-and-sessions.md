@@ -22,7 +22,7 @@ This page explains how long each one lives, why refresh tokens change every time
 | Session | Lives in | Lasts | Ended by |
 |---|---|---|---|
 | Silicon Accounts' browser session | An HttpOnly cookie on `accounts.teamofsilicons.com` | up to 900 days | The Carbon signing out on the account site, or removing it from their sessions list |
-| Your app's sign-in (a *token family*) | Your server: the refresh token and the access tokens it mints | up to 900 days from the sign-in | Your app revoking it, the account removing your access, a Silicon's STK rotation, account deletion, token reuse, or its 900 days |
+| Your app's sign-in (a *token family*) | Your server: the refresh token and the access tokens it mints | up to 900 days from the sign-in (a Silicon's sign-in made from a CI job ends with the job's sign-in) | Your app revoking it, the account removing your access, a Silicon's STK rotation, removing the CI trust it came from, account deletion, token reuse, or its end |
 | Your app's own session | Whatever you use (usually your own cookie) | You decide | You |
 
 They are independent on purpose. Signing out of your app (revoking) doesn't sign the browser out of Silicon Accounts, because the Carbon may be signed in to ten other apps there. Signing out of Silicon Accounts doesn't end your app's sign-in either, because your app decides how long its users stay signed in. The one link that matters runs one way: when your sign-in ends for a reason you didn't cause, we tell your webhook and you end your own session.
@@ -31,7 +31,7 @@ Since the browser session outlives your sign-in, a Carbon who signs out of your 
 
 ## Access tokens: short and self-contained
 
-An access token is a JWT signed with Ed25519 (`alg: EdDSA`), issued to your app (`aud` is your app id) for 30 minutes. It carries everything an API needs to decide who is calling: the account's uuid (`sub`), its kind, its id when the token was issued, the membership id, the sign-in it belongs to (`fid`) and the granted scopes.
+An access token is a JWT signed with Ed25519 (`alg: EdDSA`), issued to your app (`aud` is your app id) for 30 minutes, or until its sign-in ends if that comes sooner: an access token never outlives its sign-in. It carries everything an API needs to decide who is calling: the account's uuid (`sub`), its kind, its id when the token was issued, the membership id, the sign-in it belongs to (`fid`) and the granted scopes.
 
 - **Self-contained**, so your API can verify it with the public keys at `/.well-known/jwks.json` without calling us on every request. Keys are named by `kid`. Cache the key set, and fetch it again when a token names a key you don't have.
 - **Short**, because a self-contained token can't be called back: once issued, it verifies until `exp`. Thirty minutes caps how long an API that only checks locally can still accept a revoked sign-in. When an action can't wait that long (deleting data, moving money), ask [introspection](../start/tokens.md#check-an-access-token). It knows about revocation right away, and it also refuses tokens whose membership is no longer active.
@@ -43,7 +43,7 @@ A refresh token is opaque (`sar_…`), and we store it only as a keyed hash, so 
 
 1. **It rotates.** Each refresh gives you a new refresh token and spends the old one.
 2. **Reuse ends the sign-in.** If a spent refresh token comes back, two parties hold the sign-in and we can't tell which one is the thief. So we revoke the whole family, the newest tokens included, and tell your app (`membership.signed_out`, reason `refresh_token_reuse`). A stolen refresh token gets at most one use before the theft shows up, instead of quietly living for years.
-3. **900 days, then sign in again.** The limit counts from the moment the account signed in, and refreshing doesn't extend it. A sliding window would let a stolen token live forever as long as someone keeps using it; a fixed one puts an end on every sign-in.
+3. **900 days, then sign in again.** The limit counts from the moment the account signed in, and refreshing doesn't extend it. A sign-in that starts with an earlier end keeps that end: a Silicon's sign-in made from a short-lived token its CI job minted ends with the job's sign-in. A sliding window would let a stolen token live forever as long as someone keeps using it; a fixed one puts an end on every sign-in.
 
 The cost of rule 2 is that you can't refresh one sign-in twice in parallel. Two workers or two tabs refreshing the same token at the same moment look exactly like a thief and the owner: one succeeds, the other trips reuse detection, and the sign-in ends. Refresh through one place per sign-in (one in-process request shared by all callers, or a lock in your session store), and save the new refresh token before you use anything else from the answer.
 
@@ -56,8 +56,9 @@ The cost of rule 2 is that you can't refresh one sign-in twice in parallel. Two 
 | A used authorization code is presented again | `membership.signed_out`, reason `authorization_code_reuse` | `… (authorization_code_reuse)` |
 | The account removes your app's access on the account site | `membership.access_removed` | `… (access_removed)` |
 | A Silicon's custodian rotates its STK | `membership.signed_out`, reason `stk_rotated` | `… (stk_rotated)` |
+| A Silicon's CI trust is removed, for a sign-in made from a short-lived token its CI sign-in minted | `membership.signed_out`, reason `session_revoked` | `… (federation_removed)` |
 | The account is deleted | `account.deleted` | `… (account_deleted)` |
-| 900 days pass | nothing | `The refresh token expired at …` |
+| 900 days pass, or the CI sign-in a Silicon's sign-in came from ends | nothing | `The refresh token expired at …` |
 
 When an account removes your access, we revoke every sign-in your app holds for it (and the User verification proofs your app issued about it), mark the membership `access_removed` in your user base, and stop showing you its contact details. They come back only when the account signs in to your app again, through the what's-shared screen.
 
@@ -68,7 +69,7 @@ The access tokens of an ended sign-in keep verifying locally until their `exp`, 
 Both are bearer credentials that pass through places your server doesn't control (a URL, a Silicon's terminal), so we keep both as narrow as we can:
 
 - An **authorization code** is bound to your app, the redirect URI and the PKCE challenge of its request. It works once and expires after 120 seconds. Its exchange and the tokens it issues happen in one transaction, so of two exchanges at the same moment exactly one wins, and the loser's attempt revokes the winner's tokens (the code had leaked).
-- A **short-lived token** (`slt_…`) is how a Silicon signs in to your app. The Silicon's own signed-in session mints it for one app. It works once and expires after 120 seconds. We refuse it if the Silicon's STK was rotated after it was minted (rotation ends every sign-in of the Silicon, tokens already handed out included), or if the account removed your app's access after it was minted.
+- A **short-lived token** (`slt_…`) is how a Silicon signs in to your app. The Silicon's own signed-in session mints it for one app. It works once and expires after 120 seconds. We refuse it if the Silicon's STK was rotated after it was minted (rotation ends every sign-in of the Silicon, tokens already handed out included), or if the account removed your app's access after it was minted. One minted by a Silicon's sign-in from a CI job starts a sign-in that ends when that CI sign-in was set to end, and is refused once its trust was removed or that end has passed. Signing the CI sign-in out or revoking it doesn't refuse one it already minted, which expires within 2 minutes anyway. Removing the trust later ends that sign-in too, but signing the CI sign-in out doesn't: your sign-in still runs to the CI sign-in's end ([CI and cloud](../start/ci-and-cloud.md#what-an-app-sign-in-from-ci-lasts)). Your server exchanges it with your app secret; your own command-line or desktop tool may exchange it with your `client_id` alone if your app turned on `public_client`.
 
 ## The id_token is for your client, not for APIs
 
@@ -82,7 +83,7 @@ A Carbon can shrink that grant by turning off optional details on the what's-sha
 
 ## Keep tokens on your server
 
-- **Your app is a confidential client unless you say otherwise.** Exchanging a code needs your app secret, so the exchange happens on a server you control, and single-page apps hand the code (or the code and verifier) to that server. Desktop apps and CLIs can't keep a secret, so you can turn on `public_client`: they then redeem codes with PKCE (S256) and `client_id` alone, and the device flow (`device_flow`) works for tools with no browser at all.
+- **Your app is a confidential client unless you say otherwise.** Exchanging a code needs your app secret, so the exchange happens on a server you control, and single-page apps hand the code (or the code and verifier) to that server. Desktop apps and CLIs can't keep a secret, so you can turn on `public_client`: they then redeem codes with PKCE (S256) and exchange a Silicon's short-lived token with `client_id` alone (that sign-in is recorded with the method `slt_public_client`), and the device flow (`device_flow`) works for tools with no browser at all. Without `public_client`, a Silicon's short-lived token is exchanged with the app secret, so a CLI that Silicons use forwards it to a backend ([CLI plus backend](../start/add-sign-in.md#cli-plus-backend)).
 - **Refresh tokens are long-lived credentials.** Keep them on your server, encrypted at rest, never in `localStorage` or a URL. Give the browser your own session cookie instead.
 - **Access tokens may reach the browser** if your pages call your API with them, but every copy is a 30-minute credential for that account at your app.
 

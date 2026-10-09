@@ -195,7 +195,7 @@ Errors:
 - 409 `stream_subscription_required`: an app without a stream subscription;
 - 400 `unknown_event_id`: the cursor isn't an event of this feed;
 - 400 `invalid_query`: a type this feed never carries;
-- 429 `too_many_streams`: 5 open streams per app or account, with `Retry-After`;
+- 429 `too_many_streams`: 5 open streams per app or account on each API server, with `Retry-After`;
 - 503 `stream_capacity_reached`: the server is full or restarting, with `Retry-After`.
 
 ```sh
@@ -216,7 +216,7 @@ webhook, and only with what that app may see.
 | `account.deleted` | the account was deleted | `uuid`, `membership_id` |
 | `membership.signed_out` | a sign-in of the account at the app ended | `uuid`, `membership_id`, `reason` |
 | `membership.access_removed` | the account removed the app's access | `uuid`, `membership_id` |
-| `silicon.custodian_changed` | a member Silicon got a new custodian (a transfer was accepted) | `uuid`, `membership_id`, `from`, `to` (account summaries) |
+| `silicon.custodian_changed` | a member Silicon got a new custodian (a transfer was accepted) | `uuid`, `membership_id`, `from`, `to` (each `{uuid, id}` only: the old and the new custodian, as every app sees a Silicon's custodian; replays, delivery details and the event stream show the same, events stored before this rule included) |
 | `ping` | a test (`POST …/webhook/test`) | `{}` |
 
 The `membership.signed_out` reasons:
@@ -225,10 +225,13 @@ The `membership.signed_out` reasons:
 - `stk_rotated`: the Silicon's custodian rotated its STK, which ends every sign-in of the Silicon;
 - `refresh_token_reuse`: a used refresh token was presented, so the sign-in was revoked;
 - `authorization_code_reuse`: a code was redeemed twice, so the tokens issued from it were
-  revoked.
+  revoked;
+- `session_revoked`: the sign-in was made from a short-lived token that a Silicon's CI sign-in
+  minted, and that CI trust was removed, which ends every sign-in it started
+  ([CI and cloud](../../start/ci-and-cloud.md#what-an-app-sign-in-from-ci-lasts)).
 
-`user_signed_out` and `session_revoked` exist too, but they end first-party sign-ins (the CLI,
-the account site), which no app receives.
+`user_signed_out` exists too, and `session_revoked` also ends first-party sign-ins (the CLI, the
+account site), but no app receives those.
 
 Real payloads:
 
@@ -271,7 +274,7 @@ Real payloads:
 ```
 
 ```json
-{"app_id":"briefcase","data":{"from":{"display_name":"Saket","id":"c:saket","kind":"carbon","pfp_url":"https://iris.teamofsilicons.com/pfp/carbon?id=zQo","status":"active","uuid":"zQo"},"membership_id":"briefcase:K1E","to":{"display_name":"Ada Lovelace","id":"c:ada","kind":"carbon","pfp_url":"https://iris.teamofsilicons.com/pfp/carbon?id=8HV","status":"active","uuid":"8HV"},"uuid":"K1E"},"event_id":"01a11436-d5e4-7794-842d-4efffcc475b0","occurred_at":"2026-10-07T02:35:00.452Z","silicon":null,"type":"silicon.custodian_changed"}
+{"app_id":"briefcase","data":{"from":{"id":"c:saket","uuid":"zQo"},"membership_id":"briefcase:K1E","to":{"id":"c:ada","uuid":"8HV"},"uuid":"K1E"},"event_id":"01a11436-d5e4-7794-842d-4efffcc475b0","occurred_at":"2026-10-07T02:35:00.452Z","silicon":null,"type":"silicon.custodian_changed"}
 ```
 
 ## Silicon events
@@ -288,9 +291,9 @@ delivery rules. `app_id` is null and `silicon` is the Silicon's uuid.
 | `silicon.updated` | its details changed | `uuid`, `id`, `changed`, `silicon` |
 | `silicon.id_changed` | its si:id changed | `uuid`, `old_id`, `new_id` |
 | `silicon.stk_rotated` | its custodian rotated the STK: the old one is dead and every sign-in ended | `uuid`, `id`, `rotated_at`, `rotated_by` (account summary) |
-| `silicon.custodian.changed` | a transfer was accepted | `uuid`, `id`, `from`, `to` (account summaries) |
+| `silicon.custodian.changed` | a transfer was accepted | `uuid`, `id`, `from`, `to` (full account summaries, unlike the `{uuid, id}` an app gets) |
 | `silicon.federation.added` | the Silicon or its custodian trusted outside OIDC tokens (a CI job's) | `uuid`, `id`, `federation` (the trust), `by` (account summary) |
-| `silicon.federation.removed` | a trust was removed and the sign-ins it started ended | `uuid`, `id`, `federation`, `ended_sessions`, `by` |
+| `silicon.federation.removed` | a trust was removed and the sign-ins it started ended | `uuid`, `id`, `federation`, `ended_sessions` (the CI sign-ins it ended, plus the app sign-ins made from their short-lived tokens), `by` |
 | `silicon.identity_audiences.changed` | the custodian changed which outside services it may get identity tokens for | `uuid`, `id`, `audiences`, `by` |
 | `ping` | a test (`POST /v1/me/webhook/test`) | `{}` |
 

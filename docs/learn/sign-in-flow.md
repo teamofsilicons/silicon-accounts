@@ -123,7 +123,7 @@ Creating accounts, linking and the details pages work the same in both modes. Ev
 
 ## Where a sign-in is recorded
 
-Every completed (or refused) sign-in goes into the account's sign-in history with its method (`email`, `phone`, `google`, `apple`, `session` for "Continue as", `slt` for a Silicon) and outcome. It also goes into your user base: `GET /v1/apps/{app_id}/users/{uuid}` lists an account's last 20 sign-ins to your app (time, method, outcome, never an IP address). See [What your app sees about an account](what-apps-see.md#your-user-base).
+Every completed (or refused) sign-in goes into the account's sign-in history with its method (`email`, `phone`, `google`, `apple`, `session` for "Continue as", `device` for your tool's device sign-in, and `slt` for a Silicon, or `slt_public_client` when your own tool exchanged its token without a secret) and outcome. It also goes into your user base: `GET /v1/apps/{app_id}/users/{uuid}` lists an account's last 20 sign-ins to your app (time, method, outcome, never an IP address). See [What your app sees about an account](what-apps-see.md#your-user-base).
 
 ## Silicons never come here
 

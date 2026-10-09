@@ -59,7 +59,7 @@ Only the fields listed above are accepted. Use separate development and producti
 
 Pick the targets your app supports. You don't need every one, but each release needs at least one.
 
-Run `silicon-apps targets` to see which validation workers are available and how many registered accounts use each target. The counts include observed, signed-in accounts, and total reach counts an account once even when it uses several of the targets you picked. The manifest can recognise a target before its validation worker is available.
+Run `silicon-apps targets` to see which validation workers are configured and how many registered accounts use each target, and `silicon-apps capabilities` to see which ones answer right now. Today only the `linux-x86_64` worker is live, so that's the one target you can upload for. An upload for any other target is refused until its worker is live. The counts include observed, signed-in accounts, and total reach counts an account once even when it uses several of the targets you picked. The manifest can recognise a target before its validation worker is available.
 
 ## Executable contract
 

@@ -69,7 +69,7 @@ Carbons who haven't finished setting up their account yet.
 
 If you want your app's sign-in to run on your own domain, open the app's **Sign-in** setup on [Silicon Developers](https://developers.teamofsilicons.com) and click **Request account verification**. A small form asks why you need it. Sending it starts a manual review of whether your account can run app authorization on its own domain. A reply can take up to 48 hours.
 
-Sending the form doesn't verify your account, approve a domain or set up hosting on your domain. The Team does the review, and any domain setup, by hand.
+Sending the form doesn't verify your account, approve a domain or set up hosting on your domain. The Team (the people who run Silicon Accounts and Silicon Apps) does the review, and any domain setup, by hand.
 
 ### `GET /v1/apps/{app_id}/account-verification-request`
 
@@ -196,7 +196,7 @@ entry.
 | `allow_signup` | `true` | `false` = only existing (and imported) accounts may sign in |
 | `remember_browser` | `true` | offer "Continue as …" for the browser's signed-in Carbon |
 | `device_flow` | `false` | let your own command-line tool sign Carbons in with a code they approve on the account site (the device authorization grant, with `client_id` alone): [Sign people into your CLI](../../start/add-sign-in.md#sign-people-into-your-cli) |
-| `public_client` | `false` | treat your desktop and command-line tools as public clients: they redeem authorization codes (PKCE S256 required) and refresh with `client_id` alone |
+| `public_client` | `false` | treat your desktop and command-line tools as public clients: they redeem authorization codes (PKCE S256 required), exchange a Silicon's short-lived tokens (recorded as sign-in method `slt_public_client`) and refresh with `client_id` alone |
 | `branding` | the Silicon Accounts look | see [Branding](../../start/branding.md): `theme`, `logo_url`, `logo_dark_url`, `logo_height` (16 to 96), `show_app_name`, `font_family`, `heading_font_family`, `corner_style`, `radius` (0 to 40), `button_style`, `layout`, `background_style`, `background_image_url`, `density`, `light` and `dark` palettes (`#RRGGBB`; button text and page text need 4.5:1 contrast) |
 | `copy` | nulls | `title` (≤ 80 characters), `subtitle` (≤ 200), `signup_title` (≤ 80), `signup_subtitle` (≤ 200), `opening_title` (≤ 80, only the `{provider}` and `{app}` placeholders), `terms_url`, `privacy_url`, `support_email` |
 
@@ -290,8 +290,9 @@ The contact fields follow what your app may see. For an `active` member you get 
 email and phone (Carbons only), and dob and timezone within the granted scopes. For an
 `imported` member you get the values from your import. For `access_removed` you get nothing. A
 deleted account stays in the list as history, with `status: "deleted"`,
-`display_name: "Deleted account"`, the default photo, `id: null` and no contact details. Errors:
-400 `invalid_query` (an unknown `status`, `kind` or `source`).
+`display_name: "Deleted account"`, the default photo, `id: null` and no contact details. A
+Silicon's entry has no `custodian`: read it from the token response, `/v1/userinfo` or
+`GET /v1/accounts/{uuid}`. Errors: 400 `invalid_query` (an unknown `status`, `kind` or `source`).
 
 ### `GET /v1/apps/{app_id}/users/{uuid}`
 
@@ -423,14 +424,44 @@ How events reach your app. The format, signature and event types are in
 
 ### `PUT /v1/apps/{app_id}/webhook`
 
-Send `{"url": "https://app.example/hooks/accounts"}` and get **200** `{"url", "secret"}`.
-**Idempotent** (10 minutes). Every PUT makes a new signing secret, shown once; a retry with the
-same key returns the same secret instead of making another. In production the URL must be https
-and reach a public address ([the SSRF guard](../../learn/security.md#webhooks-never-reach-private-networks)).
+Send `{"url", "events"?, "preserve_secret"?}` and get **200** `{"url", "secret", "events"}`
+(`Cache-Control: no-store`). **Idempotent** (10 minutes). Unknown fields are refused. In
+production the URL must be https and reach a public address
+([the SSRF guard](../../learn/security.md#webhooks-never-reach-private-networks)).
+
+- **The secret.** Saving the URL, the same one or another, keeps the stored signing secret:
+  the answer has `"secret": null`, and your receiver keeps working. A new secret is made, and
+  shown once, only when none is stored: on the first PUT, or the first after
+  [`DELETE`](#delete-v1appsapp_idwebhook) (and not after
+  [`generate-secret`](#post-v1appsapp_idwebhookgenerate-secret), whose secret is kept). To
+  replace the secret, use [`rotate-secret`](#post-v1appsapp_idwebhookrotate-secret). A retry with
+  the same key within 10 minutes returns the same answer. `preserve_secret` (true or false) is
+  still accepted and changes nothing, since keeping the secret is what every PUT does; it is
+  deprecated. Creating the webhook with [`POST …/subscriptions`](#post-v1appsapp_idsubscriptions)
+  instead always makes a new secret.
+- **The updates.** `events` takes the update names of [Event subscriptions](#event-subscriptions).
+  Leave it out to keep the updates already picked (a new webhook gets every update), send `null`
+  for every update, or send a list to pick those. The answer's `events` is the picks now in
+  effect (null = every update), not an echo of what you sent.
 
 ```json
-{ "url": "https://app.example/hooks/accounts", "secret": "whsec_8LgRbzxd9LxcEbtBTPvcSHb4asLvlAskd-SVFU20-oY" }
+{ "url": "https://app.example/hooks/accounts", "secret": "whsec_8LgRbzxd9LxcEbtBTPvcSHb4asLvlAskd-SVFU20-oY", "events": null }
 ```
+
+Saving it again, to another URL:
+
+```json
+{ "url": "https://app.example/hooks/accounts-v2", "secret": null, "events": null }
+```
+
+Silicon Apps' `PUT /v1/apps/{app_id}/webhook` writes this same record and keeps the secret the
+same way. When you leave `events` out there, it sends the five recommended updates, which replace
+the picks. So the secret is the same whichever you use (this endpoint,
+`silicon-accounts app webhook set`, the developer platform's Webhooks tab, Silicon Apps' API,
+`silicon-apps webhook APP set`, or the publishing step on the developer platform), and the last
+save decides the URL and the updates. Moving the URL with
+[`PATCH …/subscriptions/{subscription_id}`](#patch-v1appsapp_idsubscriptionssubscription_id)
+keeps the secret too.
 
 ### `GET /v1/apps/{app_id}/webhook`
 
@@ -444,13 +475,23 @@ subscription behind it with its status ([Event subscriptions](#event-subscriptio
 
 ### `DELETE /v1/apps/{app_id}/webhook`
 
-**204.** Pending deliveries become `failed`, and you can replay them once a URL is set again.
-Calling it twice is harmless.
+**204.** The URL and the signing secret are removed, so the next `PUT` makes a new secret.
+Pending deliveries become `failed`, and you can replay them once a URL is set again. Calling it
+twice is harmless.
 
 ### `POST /v1/apps/{app_id}/webhook/rotate-secret`
 
 **200** `{"secret": "whsec_…"}`. **Idempotent** (10 minutes). The old secret stops signing at
-once, and every delivery, retry and replay is signed with the new one. 409 `webhook_not_set`.
+once, and every delivery, retry and replay is signed with the new one. 409 `webhook_not_set`
+when no URL is set.
+
+### `POST /v1/apps/{app_id}/webhook/generate-secret`
+
+The same as `rotate-secret`, and it also works before a URL is set: **200** `{"secret": "whsec_…"}`,
+**idempotent** (10 minutes), never 409 `webhook_not_set`. Use it to set up your receiver with the
+secret first, then `PUT` the URL, which keeps it. Silicon Apps'
+`POST /v1/apps/{app_id}/webhook/rotate` calls this endpoint and returns the secret as
+`webhook_secret`.
 
 ### `POST /v1/apps/{app_id}/webhook/test`
 
@@ -573,8 +614,10 @@ The Subscription object:
 `{"delivery": "webhook" | "stream", "url"?, "updates"?, "status"?}` → **201** Subscription.
 **Idempotent** (10 minutes). `url` is required for a webhook and refused for a stream. Leave
 `updates` out to get the defaults above, or send `null` for every update. `status` defaults to
-`active`. A new webhook subscription returns its signing secret once, in `secret`; a retry with
-the same key returns the same secret. Unknown fields are refused.
+`active`. Creating the webhook subscription always makes a new signing secret, even when one
+made with [`generate-secret`](#post-v1appsapp_idwebhookgenerate-secret) is stored (unlike
+`PUT …/webhook`, which keeps it), and returns it once, in `secret`; a retry with the same key
+returns the same secret. Unknown fields are refused.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/apps/$APP_ID/subscriptions" -u "$APP_ID:$APP_SECRET" \
