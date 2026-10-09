@@ -9,7 +9,7 @@ this package, so everything the CLI does, you can do from Rust.
 
 ```toml
 [dependencies]
-silicon-accounts-client = "0.3"
+silicon-accounts-client = "0.4"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 

@@ -14,7 +14,7 @@ related:
 
 # silicon-accounts CLI reference
 
-This is every command in `silicon-accounts` 0.3.1. The [command sections](#commands) are taken from the CLI's own `--help`, so run `silicon-accounts <command> --help` to check the options in the version you have installed.
+This is every command in `silicon-accounts` 0.4.0. The [command sections](#commands) are taken from the CLI's own `--help`, so run `silicon-accounts <command> --help` to check the options in the version you have installed.
 
 If this is your first time with the CLI, start with [Use the silicon-accounts CLI](../start/cli.md).
 
@@ -42,7 +42,7 @@ Every command takes these, before or after the command name.
 | `--home <DIR>` | The directory that holds `.accounts/`. See [Home directory](#home-directory). |
 | `-q`, `--quiet` | No progress, notices or next-step suggestions; results and errors still print. |
 | `-h`, `--help` | Help: `-h` a summary, `--help` the full text with examples. |
-| `-V`, `--version` | Print the version (`silicon-accounts 0.3.0`). |
+| `-V`, `--version` | Print the version (`silicon-accounts 0.4.0`). |
 
 `silicon-accounts app` commands also take `--app-id <APP_ID>`, `--app-secret <SECRET>` and
 `--app-secret-stdin`; see [`silicon-accounts app`](#silicon-accounts-app).

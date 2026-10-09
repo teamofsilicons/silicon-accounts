@@ -212,7 +212,7 @@ home       /srv/silicons/scout  (from SILICON_HOME)
 state dir  /srv/silicons/scout/.accounts
 app        none
 signed in  si:scout at https://accounts.teamofsilicons.com
-version    0.3.1
+version    0.4.0
 ```
 
 | command | does |

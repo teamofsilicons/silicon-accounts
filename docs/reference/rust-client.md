@@ -52,7 +52,7 @@ hand slt_f_92poub5NdUOgmXcmMSPdMIhg3HvS18a1v147ycz3M to briefcase
 
 ```toml
 [dependencies]
-silicon-accounts-client = "0.3"
+silicon-accounts-client = "0.4"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 

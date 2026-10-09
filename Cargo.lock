@@ -2916,7 +2916,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-account"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "futures",
@@ -2933,7 +2933,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-apps"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "csv",
@@ -2958,7 +2958,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-auth"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "cookie",
@@ -2979,7 +2979,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-cli"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "assert_cmd",
  "axum",
@@ -2998,7 +2998,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-client"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3021,7 +3021,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3070,7 +3070,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-oauth"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "jsonwebtoken",
@@ -3086,7 +3086,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-proofs"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "serde",
@@ -3102,7 +3102,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-server"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3137,7 +3137,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-silicons"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "serde",
@@ -3153,7 +3153,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-worker"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "axum",

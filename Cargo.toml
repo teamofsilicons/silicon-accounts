@@ -17,7 +17,7 @@ members = [
 [workspace.package]
 edition = "2024"
 rust-version = "1.98"
-version = "0.3.0"
+version = "0.4.0"
 license = "MIT"
 repository = "https://github.com/teamofsilicons/silicon-accounts"
 authors = ["Team of Silicons"]
@@ -32,7 +32,7 @@ silicon-accounts-silicons = { path = "crates/silicons" }
 silicon-accounts-apps = { path = "crates/apps" }
 silicon-accounts-proofs = { path = "crates/proofs" }
 silicon-accounts-worker = { path = "crates/worker" }
-silicon-accounts-client = { path = "crates/client", version = "0.3.0" }
+silicon-accounts-client = { path = "crates/client", version = "0.4.0" }
 # external (keep alphabetical)
 aes-gcm = "0.10.3"
 anyhow = "1.0.100"
