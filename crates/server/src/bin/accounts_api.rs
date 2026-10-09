@@ -112,6 +112,15 @@ async fn run() -> Result<(), (u8, String)> {
                 format!("error: verification retry migration failed: {e}"),
             )
         })?;
+    // The RS256 key of identity tokens: made and stored (sealed with the keyring) on the very
+    // first start, loaded on every later one, so the JWKS carries it before the first request.
+    match state.identity_signer().await {
+        Ok(signer) => tracing::info!(kid = signer.kid(), "identity-token signing key ready"),
+        Err(e) => tracing::error!(
+            error = %e.message,
+            "the identity-token signing key could not be loaded or made; identity tokens and the JWKS will try again on first use"
+        ),
+    }
     // The stored setup of the developer platform's app says this deployment's callback.
     match accounts_server::first_party::sync_developer_app(&state).await {
         Ok(accounts_server::first_party::DeveloperSync::Updated { version }) => tracing::info!(

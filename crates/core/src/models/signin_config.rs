@@ -218,8 +218,46 @@ pub struct Palette {
 }
 
 impl Palette {
-    /// The Silicon Accounts light palette.
+    /// The Silicon Accounts light palette: the account site's and the developer site's own
+    /// colours (`web/styles/tokens.css`): a `#F7F8FA` page, `#292929` text, the brand blue
+    /// `#1F5FB8` for buttons under white text (6.2:1), muted `#5C6370` (6.0:1 on the card, 5.6:1
+    /// on the page). New apps store it; an app that kept the older warm default keeps it as stored
+    /// ([`Palette::legacy_light`]), and the hosted pages paint that one in this look.
     pub fn default_light() -> Palette {
+        Palette {
+            primary: "#1F5FB8".into(),
+            primary_foreground: "#FFFFFF".into(),
+            background: "#F7F8FA".into(),
+            surface: "#FFFFFF".into(),
+            foreground: "#292929".into(),
+            muted: "#5C6370".into(),
+            border: "#E2E5EB".into(),
+            danger: "#B42318".into(),
+        }
+    }
+
+    /// The Silicon Accounts dark palette (`web/styles/tokens.css`): a `#02040A` page and a
+    /// `#0B0F18` card, `#F7F8FA` text, filled buttons in the brand blue `#1F5FB8` under `#F7F8FA`
+    /// text (5.8:1; the lighter `#5B8FE0` would put button text at 3.2:1, so it stays an ink for
+    /// links), muted `#9BA4B4` (7.4:1 on the card), error text `#FF8A80` (8.6:1 on the card).
+    pub fn default_dark() -> Palette {
+        Palette {
+            primary: "#1F5FB8".into(),
+            primary_foreground: "#F7F8FA".into(),
+            background: "#02040A".into(),
+            surface: "#0B0F18".into(),
+            foreground: "#F7F8FA".into(),
+            muted: "#9BA4B4".into(),
+            border: "#1F2635".into(),
+            danger: "#FF8A80".into(),
+        }
+    }
+
+    /// The light palette apps were given before the Silicon look (warm paper `#FFFDF9`, charcoal
+    /// `#353432` text). Apps that kept it store it as it is (no migration); the hosted pages
+    /// recognise it, all eight colours, and paint [`Palette::default_light`] instead
+    /// (`web/lib/branding/defaults.ts` LEGACY_LIGHT).
+    pub fn legacy_light() -> Palette {
         Palette {
             primary: "#1F5FB8".into(),
             primary_foreground: "#FFFDF9".into(),
@@ -232,11 +270,9 @@ impl Palette {
         }
     }
 
-    /// The Silicon Accounts dark palette. Filled buttons keep the brand blue `#1F5FB8` under
-    /// `#FFFDF9` text (6.1:1, WCAG AA for text); the lighter `#5B8FE0` is only an ink for links
-    /// and accents on dark surfaces and would put button text at 3.2:1. Error text is `#FF8A80`
-    /// (5.45:1 on the `#353432` card); the old `#F97066` read at 4.46:1 there (migration 0004).
-    pub fn default_dark() -> Palette {
+    /// The dark palette apps were given before the Silicon look (`#2A2927` page, `#353432` card);
+    /// see [`Palette::legacy_light`] (`web/lib/branding/defaults.ts` LEGACY_DARK).
+    pub fn legacy_dark() -> Palette {
         Palette {
             primary: "#1F5FB8".into(),
             primary_foreground: "#FFFDF9".into(),
@@ -1696,9 +1732,71 @@ mod tests {
     fn partial_documents_fill_the_right_palette_defaults() {
         let c = SigninConfig::from_stored(&json!({"branding": {"dark": {"primary": "#112233"}}}));
         assert_eq!(c.branding.dark.primary, "#112233");
-        assert_eq!(c.branding.dark.background, "#2A2927");
-        assert_eq!(c.branding.light.background, "#FFFDF9");
+        assert_eq!(c.branding.dark.background, "#02040A");
+        assert_eq!(c.branding.light.background, "#F7F8FA");
         assert!(c.methods.email);
+    }
+
+    #[test]
+    fn new_apps_get_the_silicon_palettes() {
+        let c = SigninConfig::default();
+        assert_eq!(c.branding.light, Palette::default_light());
+        assert_eq!(c.branding.dark, Palette::default_dark());
+        let light = &c.branding.light;
+        assert_eq!(
+            (
+                light.background.as_str(),
+                light.foreground.as_str(),
+                light.primary.as_str()
+            ),
+            ("#F7F8FA", "#292929", "#1F5FB8")
+        );
+        let dark = &c.branding.dark;
+        assert_eq!(
+            (
+                dark.background.as_str(),
+                dark.foreground.as_str(),
+                dark.primary.as_str()
+            ),
+            ("#02040A", "#F7F8FA", "#1F5FB8")
+        );
+        // What a new app stores is the new look, all eight colours.
+        let stored = serde_json::to_value(&c).expect("serializes");
+        assert_eq!(stored["branding"]["light"]["background"], "#F7F8FA");
+        assert_eq!(stored["branding"]["dark"]["surface"], "#0B0F18");
+    }
+
+    #[test]
+    fn stored_palettes_never_change_with_the_defaults() {
+        // An app that kept the older warm defaults stored all eight colours of them: reading it,
+        // and saving an unrelated change on top, keep them exactly (no migration of stored configs).
+        let mut stored = serde_json::to_value(SigninConfig::default()).expect("serializes");
+        stored["branding"]["light"] = serde_json::to_value(Palette::legacy_light()).expect("light");
+        stored["branding"]["dark"] = serde_json::to_value(Palette::legacy_dark()).expect("dark");
+        let c = SigninConfig::from_stored(&stored);
+        assert_eq!(c.branding.light, Palette::legacy_light());
+        assert_eq!(c.branding.dark, Palette::legacy_dark());
+        let saved = c
+            .apply_patch(&json!({"branding": {"radius": 24}}), no_secrets())
+            .expect("an unrelated change saves");
+        assert_eq!(saved.branding.radius, 24);
+        assert_eq!(saved.branding.light, Palette::legacy_light());
+        assert_eq!(saved.branding.dark, Palette::legacy_dark());
+        // An app's own colours stay too.
+        let own = c
+            .apply_patch(
+                &json!({"branding": {"light": {"primary": "#17775C"}}}),
+                no_secrets(),
+            )
+            .expect("its own primary");
+        assert_eq!(own.branding.light.primary, "#17775C");
+        assert_eq!(own.branding.light.background, "#FFFDF9");
+        // Resetting a palette (null) gives the new look.
+        let reset = c
+            .apply_patch(&json!({"branding": {"light": null}}), no_secrets())
+            .expect("reset");
+        assert_eq!(reset.branding.light, Palette::default_light());
+        assert_eq!(reset.branding.dark, Palette::legacy_dark());
     }
 
     #[test]
@@ -1785,7 +1883,7 @@ mod tests {
         // so it is refused now, with the measured ratio.
         let err = SigninConfig::default()
             .apply_patch(
-                &json!({"branding": {"dark": {"primary": "#5B8FE0"}}}),
+                &json!({"branding": {"dark": {"primary": "#5B8FE0", "primary_foreground": "#FFFDF9"}}}),
                 no_secrets(),
             )
             .expect_err("3.2:1 button text");
@@ -1822,9 +1920,11 @@ mod tests {
                 (&p.primary_foreground, &p.primary),
                 (&p.foreground, &p.background),
                 (&p.foreground, &p.surface),
-                // Error text sits on the card and on the page.
+                // Error text and muted text sit on the card and on the page.
                 (&p.danger, &p.surface),
                 (&p.danger, &p.background),
+                (&p.muted, &p.surface),
+                (&p.muted, &p.background),
             ] {
                 let ratio = contrast_ratio(fg, bg).expect("hex colours");
                 assert!(
@@ -1834,8 +1934,9 @@ mod tests {
             }
         }
         // Filled buttons are the brand blue in both themes.
+        assert_eq!(Palette::default_light().primary, "#1F5FB8");
         assert_eq!(Palette::default_dark().primary, "#1F5FB8");
-        assert_eq!(Palette::default_dark().primary_foreground, "#FFFDF9");
+        assert_eq!(Palette::default_dark().primary_foreground, "#F7F8FA");
         // A stored document without a dark palette gets the new default.
         let c = SigninConfig::from_stored(&json!({"branding": {}}));
         assert_eq!(c.branding.dark.primary, "#1F5FB8");

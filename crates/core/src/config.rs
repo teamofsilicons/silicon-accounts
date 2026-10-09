@@ -66,6 +66,7 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_ENVIRONMENT",
     "ACCOUNTS_EXPOSE_DEV_OUTBOX",
     "ACCOUNTS_EXTRA_ALLOWED_ORIGINS",
+    "ACCOUNTS_FEDERATION_ALLOW_LOOPBACK",
     "ACCOUNTS_GOOGLE_AUTH_URL",
     "ACCOUNTS_GOOGLE_CLIENT_ID",
     "ACCOUNTS_GOOGLE_CLIENT_SECRET",
@@ -299,6 +300,10 @@ pub struct Settings {
     pub worker_enabled: bool,
     /// ACCOUNTS_WEBHOOK_ALLOW_PRIVATE (allow http and private/loopback webhook targets).
     pub webhook_allow_private: bool,
+    /// ACCOUNTS_FEDERATION_ALLOW_LOOPBACK (tests and local runs only): lets a trusted OIDC
+    /// issuer live on a loopback address over http, so a mock issuer can stand in for GitHub.
+    /// Private, link-local and other addresses stay refused. Never true in production.
+    pub federation_allow_loopback: bool,
     /// ACCOUNTS_LOG_FILTER.
     pub log_filter: String,
     /// ACCOUNTS_OTP_TTL_SECONDS (contract: 600).
@@ -568,6 +573,7 @@ impl Settings {
             telemetry_table_key: None,
             worker_enabled: true,
             webhook_allow_private: !prod,
+            federation_allow_loopback: false,
             log_filter: "info,accounts=debug".into(),
             otp_ttl_seconds: CONTRACT_OTP_TTL_SECONDS,
             otp_lock_seconds: CONTRACT_OTP_LOCK_SECONDS,
@@ -889,6 +895,7 @@ impl Settings {
         s.telemetry_table_key = r.secret("ACCOUNTS_TELEMETRY_TABLE_KEY");
         s.worker_enabled = r.bool("ACCOUNTS_WORKER_ENABLED", true);
         s.webhook_allow_private = r.bool("ACCOUNTS_WEBHOOK_ALLOW_PRIVATE", !prod);
+        s.federation_allow_loopback = r.bool("ACCOUNTS_FEDERATION_ALLOW_LOOPBACK", false);
         s.log_filter = r.string("ACCOUNTS_LOG_FILTER", "info,accounts=debug");
         s.otp_ttl_seconds = r.int(
             "ACCOUNTS_OTP_TTL_SECONDS",
@@ -932,6 +939,12 @@ impl Settings {
                 r.problem(
                     "ACCOUNTS_WEBHOOK_ALLOW_PRIVATE",
                     "must be false in production: it turns off the SSRF guard, so anyone who can set a webhook URL could make the service call private, loopback and cloud-metadata addresses",
+                );
+            }
+            if s.federation_allow_loopback {
+                r.problem(
+                    "ACCOUNTS_FEDERATION_ALLOW_LOOPBACK",
+                    "must be false in production: it lets a trusted OIDC issuer live on a loopback address over http, which only a test's mock issuer needs",
                 );
             }
             if !s.public_url.starts_with("https://") {
@@ -1218,6 +1231,34 @@ mod tests {
         assert!(s.cookie_secure);
         assert!(!s.webhook_allow_private);
         assert_eq!(s.encryption_current_version, 2);
+    }
+
+    #[test]
+    fn production_refuses_loopback_federation_issuers() {
+        let err = Settings::from_lookup(lookup(&[
+            ("ACCOUNTS_ENVIRONMENT", "production"),
+            ("ACCOUNTS_PUBLIC_URL", "https://accounts.teamofsilicons.com"),
+            (
+                "ACCOUNTS_TOKEN_PEPPER",
+                "ZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1-f4CBgoM",
+            ),
+            (
+                "ACCOUNTS_ENCRYPTION_KEYRING",
+                "{\"2\":\"yMnKy8zNzs_Q0dLT1NXW19jZ2tvc3d7f4OHi4-Tl5uc\"}",
+            ),
+            ("ACCOUNTS_ENCRYPTION_CURRENT_VERSION", "2"),
+            (
+                "ACCOUNTS_JWT_PRIVATE_KEY",
+                "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+            ),
+            ("ACCOUNTS_DELIVERY", "providers"),
+            ("ACCOUNTS_POSTMARK_SERVER_TOKEN", "pm-token"),
+            ("ACCOUNTS_FEDERATION_ALLOW_LOOPBACK", "true"),
+        ]))
+        .expect_err("must refuse");
+        let vars: Vec<_> = err.problems.iter().map(|p| p.var.as_str()).collect();
+        assert_eq!(vars, vec!["ACCOUNTS_FEDERATION_ALLOW_LOOPBACK"], "{err}");
+        assert!(!Settings::for_tests().federation_allow_loopback);
     }
 
     #[test]

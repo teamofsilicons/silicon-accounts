@@ -139,10 +139,12 @@ curl -s "$ACCOUNTS_URL/.well-known/openid-configuration"
     "authorization_code",
     "refresh_token",
     "urn:ietf:params:oauth:grant-type:device_code",
-    "urn:silicon:params:oauth:grant-type:slt"
+    "urn:silicon:params:oauth:grant-type:slt",
+    "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    "urn:ietf:params:oauth:grant-type:token-exchange"
   ],
   "subject_types_supported": ["public"],
-  "id_token_signing_alg_values_supported": ["EdDSA"],
+  "id_token_signing_alg_values_supported": ["EdDSA", "RS256"],
   "scopes_supported": ["profile", "email", "phone", "dob", "timezone", "openid", "offline_access"],
   "claims_supported": [
     "iss", "sub", "aud", "exp", "iat", "auth_time", "nonce", "name", "picture",
@@ -162,13 +164,21 @@ curl -s "$ACCOUNTS_URL/.well-known/openid-configuration"
 
 ## `GET /.well-known/jwks.json`
 
-The public keys that sign access tokens and `id_token`s. Public, CORS `*`, cacheable for 5
-minutes. Cache it, and fetch it again when a token names a `kid` you don't have.
+The public keys that sign our tokens. Public, CORS `*`, cacheable for 5 minutes. Cache it, and
+fetch it again when a token names a `kid` you don't have.
+
+There are two keys, and each token names its own by `kid`. The Ed25519 key (`alg: EdDSA`) signs
+access tokens and the `id_token`s apps get. The RSA key (`alg: RS256`) signs only
+[identity tokens](silicons.md#identity-tokens), the tokens a Silicon hands to AWS, Google Cloud or
+Microsoft Entra, because those services don't accept EdDSA. `id_token_signing_alg_values_supported`
+lists both for the same reason. We make the RSA key ourselves the first time the service starts
+and keep it encrypted, so every server signs with the same one.
 
 ```json
 {
   "keys": [
-    { "kty": "OKP", "crv": "Ed25519", "x": "YJpQ5011mgRRBUr1o9VT1FjZaKeccFlUhDxZNxWWSyg", "kid": "dev-1", "use": "sig", "alg": "EdDSA" }
+    { "kty": "OKP", "crv": "Ed25519", "x": "YJpQ5011mgRRBUr1o9VT1FjZaKeccFlUhDxZNxWWSyg", "kid": "dev-1", "use": "sig", "alg": "EdDSA" },
+    { "kty": "RSA", "n": "2BhLHTcCMc2C8jj8Dfu2CuLgo3rw7XOooUkUXuNeB_5a…", "e": "AQAB", "kid": "jtyg9CxxwfY7YxYO9Gj68RfBX-6ouKX882NNGHAvMck", "use": "sig", "alg": "RS256" }
   ]
 }
 ```
@@ -186,7 +196,8 @@ object of strings). Responses are `Cache-Control: no-store`, and errors come as 
 Two first-party clients send no secret:
 
 - `client_id=silicon-accounts` is the first-party public client (the `silicon-accounts` CLI). It
-  may only use `refresh_token` and the device-code grant (`unauthorized_client` otherwise).
+  may only use `refresh_token`, the device-code grant, `jwt-bearer` and `token-exchange`
+  (`unauthorized_client` otherwise). A token exchange may leave the client out altogether.
 - `client_id=developer` is the developer platform (developers.teamofsilicons.com, whose server
   holds the tokens). It may only use `authorization_code` with PKCE `S256` (a missing challenge
   or `plain` is `invalid_grant`, and the code is burnt), `refresh_token` for its own tokens, and
@@ -330,6 +341,77 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
   -d assertion="$ASSERTION" -d client_id=silicon-accounts
 ```
 
+### `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`
+
+A Silicon signing in from CI with the OIDC token its CI gives the job, through a
+[trust relationship](silicons.md#trust-relationships) its custodian (or the Silicon) set up. This is
+RFC 8693 token exchange, the way cloud providers take a CI job's token too.
+
+| Parameter | |
+|---|---|
+| `subject_token` | the outside OIDC token (a JWT) |
+| `subject_token_type` | `urn:ietf:params:oauth:token-type:jwt` (or `urn:ietf:params:oauth:token-type:id_token`) |
+| `silicon` | the si:id or uuid of the Silicon to sign in |
+| `requested_token_type` | optional; only `urn:ietf:params:oauth:token-type:access_token` |
+| `client_id` | `silicon-accounts`, or leave it out |
+
+```sh
+curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
+  -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+  -d subject_token="$CI_TOKEN" \
+  -d subject_token_type=urn:ietf:params:oauth:token-type:jwt \
+  -d silicon=si:scout
+```
+
+The answer is the usual [token response](#the-token-response), plus `issued_token_type`:
+
+```json
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSIsImtpZCI6ImRldi0xIn0...",
+  "token_type": "Bearer",
+  "expires_in": 1800,
+  "refresh_token": "sar_Wm1kO3n2...",
+  "refresh_token_expires_at": "2026-10-09T05:41:27.204Z",
+  "scope": "profile",
+  "membership_id": "silicon-accounts:b97",
+  "account": { "uuid": "b97", "kind": "silicon", "id": "si:scout", "...": "..." },
+  "issued_token_type": "urn:ietf:params:oauth:token-type:access_token"
+}
+```
+
+What we check, in this order:
+
+1. The token is a JWT signed with `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`,
+   `ES384` or `EdDSA` (never `none` or a shared secret), and its `iss` is an issuer the Silicon
+   trusts. Nothing is fetched for an issuer no trust names.
+2. Its signature verifies with a key from the issuer's JWKS. We find the JWKS through the
+   issuer's discovery document, keep it for 10 minutes, and fetch it again when a token names a
+   `kid` we don't have (at most every 30 seconds per issuer).
+3. `exp` hasn't passed and `nbf` has, with 30 seconds of clock skew; `iat` is there and not in
+   the future.
+4. One trust accepts it: its `aud` includes the trust's audience and every condition equals the
+   claim exactly.
+5. A `jti`, when the token has one, was never exchanged before: a token signs in once.
+
+**The sign-in ends when the outside token expires**, but never sooner than one access token (30
+minutes) and never later than 12 hours after the exchange. `refresh_token_expires_at` says when.
+Within that window the refresh token rotates as usual; after it, every token of the sign-in stops,
+and the job exchanges a fresh token from its CI (the CLI does that on its own). A GitHub Actions
+token lives minutes, so its sign-in is one access token long. A GitLab job's token lives as long
+as the job, so a long job keeps its sign-in by refreshing, and never past its own end. That is the
+point: a copied session can't outlive the job that earned it. The sign-in is a first-party session
+with origin `federated`, recorded in the Silicon's sign-in history with method `federated`, and
+removing the trust ends it.
+
+Every refusal is `invalid_grant`, with the reason and its code in brackets:
+`invalid_federated_token` (malformed, an unsafe algorithm, a bad signature, an unknown key,
+expired, not yet valid, or replayed), `no_matching_trust` (the Silicon trusts no such issuer, or
+no trust accepts the audience and claims, named in the description), `issuer_unavailable` (the
+issuer's keys couldn't be read). A refusal for a token that provably came from the trusted issuer
+is recorded in the Silicon's sign-in history; a forged one is not. An app's own credentials get
+`unauthorized_client`, since this grant signs a Silicon into Silicon Accounts itself. 60 exchanges
+per minute from one address, then 429 `rate_limited` with `Retry-After`.
+
 ### The token response
 
 | Field | |
@@ -401,10 +483,11 @@ appear with the `phone` and `dob` scopes. A refresh returns a fresh `id_token` t
 | 401 | `invalid_client` | unknown app, wrong secret, disabled app, no credentials (with `WWW-Authenticate: Basic`) |
 | 400 | `invalid_grant` | the code, refresh token, SLT or device code is unknown, expired, already used, revoked, issued to another app, or its account was deleted or removed the app's access; a `redirect_uri` or PKCE mismatch |
 | 400 | `unauthorized_client` | the public client asked for a grant only confidential clients may use, or an app asked for the device-code grant |
-| 400 | `unsupported_grant_type` | any other `grant_type` (the description says what to use instead: App verification proofs for `client_credentials`, User verification proofs for token exchange) |
+| 400 | `unsupported_grant_type` | any other `grant_type` (the description says what to use instead: App verification proofs for `client_credentials`, the hosted pages for `password`) |
 | 400 | `invalid_scope` | a refresh asked for a scope that wasn't granted, or an unknown scope |
 | 400 | `authorization_pending`, `slow_down`, `access_denied`, `expired_token` | device-code polling (above) |
 | 413 | `invalid_request` | the body is over 64 KB |
+| 429 | `rate_limited` | more than 60 token exchanges per minute from one address (`Retry-After`) |
 | 500 | `server_error` | a fault on our side (the description carries the request id) |
 | 503 | `temporarily_unavailable` | the request ran past its 30-second budget |
 

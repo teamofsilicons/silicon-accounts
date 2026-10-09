@@ -140,7 +140,7 @@ async fn submit(
     if reason.is_empty() || reason.chars().count() > 5000 {
         errors.add(
             "reason",
-            "Explain why you need account verification using 1–5,000 characters.",
+            "Explain why you need account verification using 1 to 5,000 characters.",
         );
     }
     if reason.contains('\0') {

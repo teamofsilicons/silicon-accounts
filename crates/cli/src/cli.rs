@@ -189,6 +189,14 @@ pub enum Commands {
     )]
     Device(DeviceArgs),
 
+    /// Tokens for outside services: an identity token proves a Silicon to AWS, Google Cloud or Microsoft Entra with no stored cloud key.
+    ///
+    /// The Silicon's custodian first allows the audience (`silicon-accounts silicon audiences allow`). The token is an RS256 OpenID Connect ID token, verifiable with our JWKS; it prints alone on stdout, ready for a command substitution.
+    #[command(
+        after_long_help = "Examples:\n  silicon-accounts token identity --audience sts.amazonaws.com\n  silicon-accounts token identity --audience sts.amazonaws.com --ttl 900 > /tmp/web-identity-token\n  aws sts assume-role-with-web-identity --role-arn arn:aws:iam::123456789012:role/scout \\\n      --role-session-name scout \\\n      --web-identity-token \"$(silicon-accounts token identity --audience sts.amazonaws.com)\""
+    )]
+    Token(OutsideTokenArgs),
+
     /// App mode: an app's sign-in setup, user base, imports, tokens, webhooks and proofs.
     ///
     /// Acts with the app's credentials (--app-id/--app-secret, ACCOUNTS_APP_ID/ACCOUNTS_APP_SECRET, or `silicon-accounts app use <app_id> --secret-stdin`), or as the app's owner when you are signed in as the Carbon who owns it. Token calls, User verification proofs, proof verification and refresh need the app's own credentials; an owner can issue App verification proofs (the app's App verification page) and revoke the app's proofs by id. Apps are created in Silicon Apps (`silicon-accounts app new`).
@@ -239,6 +247,10 @@ const LOGIN_EXAMPLES: &str = "Examples:
                                                    finish a code sent by an earlier call
   printf '%s' \"$STK\" | silicon-accounts login --silicon si:scout --stk-stdin
   ACCOUNTS_SILICON=si:scout ACCOUNTS_STK=stk-… silicon-accounts login --json
+  silicon-accounts login --silicon si:scout --federated --github-actions
+                                                   in a GitHub Actions job, no stored secret
+  silicon-accounts login --silicon si:scout --federated env:SILICON_ID_TOKEN
+                                                   GitLab CI (an id_tokens variable)
   silicon-accounts login --app remind                      print a short-lived token for remind
   silicon-accounts login status --json                     {\"authenticated\":true,\"kind\":\"silicon\",…}
 
@@ -297,6 +309,24 @@ pub struct LoginArgs {
     /// Sign the Silicon in with this private key file instead of its STK (a key registered with `silicon-accounts silicon keys add`) [env: ACCOUNTS_SILICON_KEY].
     #[arg(long, value_name = "FILE", conflicts_with_all = ["stk", "stk_stdin"])]
     pub key: Option<PathBuf>,
+
+    /// Sign the Silicon in with an outside OIDC token it is trusted for (a CI job's token, see `silicon-accounts silicon trust`): the token, @FILE or env:VAR. The sign-in ends when that token expires (at least 30 minutes); then the CLI exchanges a fresh one from the same source when it can.
+    #[arg(
+        long,
+        value_name = "TOKEN|@FILE|env:VAR",
+        num_args = 0..=1,
+        default_missing_value = "",
+        conflicts_with_all = ["stk", "stk_stdin", "key", "email", "phone", "challenge"]
+    )]
+    pub federated: Option<String>,
+
+    /// With --federated (or alone): ask GitHub Actions for the job's OIDC token (ACTIONS_ID_TOKEN_REQUEST_URL, needs `permissions: id-token: write`) and exchange it.
+    #[arg(long, conflicts_with_all = ["stk", "stk_stdin", "key", "email", "phone", "challenge"])]
+    pub github_actions: bool,
+
+    /// The audience to ask GitHub Actions for [default: the Silicon Accounts URL, the default audience of a trust].
+    #[arg(long, value_name = "AUDIENCE", requires = "github_actions")]
+    pub audience: Option<String>,
 
     /// Carbon: send a 6-digit sign-in code to this email.
     #[arg(long, value_name = "EMAIL", conflicts_with = "phone")]
@@ -746,6 +776,22 @@ pub enum SiliconCommand {
     )]
     Keys(SiliconKeysArgs),
 
+    /// A Silicon's trust relationships: let a CI job (GitHub Actions, GitLab, any https OIDC issuer) sign it in with the job's own token, so no secret is stored in CI.
+    ///
+    /// A trust names the issuer, the audience the token must carry (default: the Silicon Accounts URL) and conditions: claims that must equal a value exactly, at least one (for GitHub and GitLab one must name the repository, the project or their owner). The job then runs `silicon-accounts login --silicon si:<id> --federated --github-actions`. Removing a trust ends the sign-ins it started.
+    #[command(
+        after_long_help = "Examples:\n  silicon-accounts silicon trust add si:scout --github acme/scout --claim ref=refs/heads/main\n  silicon-accounts silicon trust add si:scout --gitlab acme/scout --claim ref_type=branch --claim ref=main\n  silicon-accounts silicon trust add si:scout --issuer https://ci.example.com \\\n      --audience https://accounts.teamofsilicons.com --claim sub=pipeline:deploy\n  silicon-accounts silicon trust list si:scout\n  silicon-accounts silicon trust remove si:scout 0192f0c2-…"
+    )]
+    Trust(SiliconTrustArgs),
+
+    /// The outside services a Silicon may get identity tokens for (AWS, Google Cloud, Microsoft Entra).
+    ///
+    /// A Silicon may get none until its custodian allows an audience; the custodian changes the list, the Silicon can read it. The Silicon then runs `silicon-accounts token identity --audience <audience>`.
+    #[command(
+        after_long_help = "Examples:\n  silicon-accounts silicon audiences allow si:scout sts.amazonaws.com\n  silicon-accounts silicon audiences allow si:scout api://AzureADTokenExchange\n  silicon-accounts silicon audiences list si:scout\n  silicon-accounts silicon audiences remove si:scout sts.amazonaws.com"
+    )]
+    Audiences(SiliconAudiencesArgs),
+
     /// One of your Silicons' sign-ins, newest first (app, method, outcome, address).
     Signins {
         /// si:id or uuid.
@@ -865,6 +911,111 @@ pub enum SiliconKeysCommand {
         silicon: String,
         /// The key id.
         key_id: String,
+    },
+}
+
+#[derive(Debug, Args)]
+pub struct SiliconTrustArgs {
+    #[command(subcommand)]
+    pub command: SiliconTrustCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SiliconTrustCommand {
+    /// Trust tokens from an issuer whose claims match: --github, --gitlab, or --issuer with --claim.
+    Add {
+        /// si:id or uuid (yourself, or a Silicon you are custodian of).
+        silicon: String,
+        /// GitHub Actions in this repository (owner/repo): the issuer https://token.actions.githubusercontent.com and the claim repository=owner/repo.
+        #[arg(long, value_name = "OWNER/REPO", conflicts_with_all = ["gitlab", "issuer"])]
+        github: Option<String>,
+        /// GitLab.com CI in this project (group/project): the issuer https://gitlab.com and the claim project_path=group/project.
+        #[arg(long, value_name = "GROUP/PROJECT", conflicts_with = "issuer")]
+        gitlab: Option<String>,
+        /// Any https OpenID Connect issuer with discovery.
+        #[arg(long, value_name = "URL")]
+        issuer: Option<String>,
+        /// The aud the token must carry [default: the Silicon Accounts URL].
+        #[arg(long, value_name = "AUDIENCE")]
+        audience: Option<String>,
+        /// A claim that must equal a value exactly, as name=value (repeat it; every one must match).
+        #[arg(long = "claim", value_name = "NAME=VALUE")]
+        claims: Vec<String>,
+        /// A name to tell trusts apart.
+        #[arg(long, value_name = "TEXT")]
+        name: Option<String>,
+    },
+    /// List a Silicon's trusts (removed ones too).
+    List {
+        /// si:id or uuid.
+        silicon: String,
+    },
+    /// Remove a trust: it stops working and the sign-ins it started end.
+    Remove {
+        /// si:id or uuid.
+        silicon: String,
+        /// The trust id.
+        trust_id: String,
+    },
+}
+
+#[derive(Debug, Args)]
+pub struct SiliconAudiencesArgs {
+    #[command(subcommand)]
+    pub command: SiliconAudiencesCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SiliconAudiencesCommand {
+    /// Show the audiences the Silicon may get identity tokens for.
+    List {
+        /// si:id or uuid.
+        silicon: String,
+    },
+    /// Allow more audiences (custodian): sts.amazonaws.com, your Google Cloud provider's URL, api://AzureADTokenExchange.
+    Allow {
+        /// si:id or uuid.
+        silicon: String,
+        /// Audiences to add.
+        #[arg(required = true)]
+        audiences: Vec<String>,
+    },
+    /// Stop allowing audiences (custodian); with --all, allow none.
+    Remove {
+        /// si:id or uuid.
+        silicon: String,
+        /// Audiences to remove.
+        #[arg(required_unless_present = "all", conflicts_with = "all")]
+        audiences: Vec<String>,
+        /// Remove every audience.
+        #[arg(long)]
+        all: bool,
+    },
+}
+
+// ---- tokens for outside services ------------------------------------------------------------
+
+#[derive(Debug, Args)]
+pub struct OutsideTokenArgs {
+    #[command(subcommand)]
+    pub command: OutsideTokenCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OutsideTokenCommand {
+    /// Print an identity token (an RS256 OIDC ID token) for an outside service, signed in as a Silicon.
+    ///
+    /// The audience must be one your custodian allows. The token alone goes to stdout (--json gives its details too). Hand it to the service: `aws sts assume-role-with-web-identity --web-identity-token`, a Google Cloud credential configuration file, or Microsoft Entra's client assertion.
+    #[command(
+        after_long_help = "Examples:\n  silicon-accounts token identity --audience sts.amazonaws.com\n  silicon-accounts token identity --audience api://AzureADTokenExchange --ttl 600\n  silicon-accounts token identity --audience sts.amazonaws.com --json"
+    )]
+    Identity {
+        /// The outside service's audience (e.g. sts.amazonaws.com).
+        #[arg(long, value_name = "AUDIENCE")]
+        audience: String,
+        /// Seconds the token lives, 60 to 3600.
+        #[arg(long, value_name = "SECONDS", default_value_t = 300, value_parser = clap::value_parser!(u32).range(60..=3600))]
+        ttl: u32,
     },
 }
 

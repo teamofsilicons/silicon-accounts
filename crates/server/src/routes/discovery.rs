@@ -163,6 +163,28 @@ const CAPABILITIES: &[Capability] = &[
         docs: "reference/api/silicons",
     },
     Capability {
+        name: "workload_identity_federation",
+        description: "A Silicon signs in from CI with no stored secret: its custodian trusts an outside OIDC issuer (GitHub Actions, GitLab, any https issuer) for tokens whose claims match exactly, and the job exchanges its token for the Silicon's session (RFC 8693 token exchange), which ends when that token expires.",
+        endpoints: &[
+            "POST /v1/silicons/{id}/federations",
+            "GET /v1/silicons/{id}/federations",
+            "DELETE /v1/silicons/{id}/federations/{federation_id}",
+            "POST /v1/oauth/token",
+        ],
+        docs: "start/ci-and-cloud",
+    },
+    Capability {
+        name: "identity_tokens",
+        description: "A signed-in Silicon gets an RS256 OpenID Connect ID token for an outside audience its custodian allows (AWS STS, Google Cloud workload identity federation, Microsoft Entra federated credentials), so the cloud trusts the Silicon and no cloud key is stored.",
+        endpoints: &[
+            "POST /v1/me/identity-tokens",
+            "GET /v1/silicons/{id}/identity-audiences",
+            "PUT /v1/silicons/{id}/identity-audiences",
+            "GET /.well-known/jwks.json",
+        ],
+        docs: "start/ci-and-cloud",
+    },
+    Capability {
         name: "proofs",
         description: "User verification and App verification proofs: hand an identity from one app to another and verify it.",
         endpoints: &[
@@ -257,6 +279,12 @@ const ALIASES: &[(&str, &str)] = &[
     ("errors", "structured_errors"),
     ("rate_limits", "rate_limit_headers"),
     ("versioning", "version_negotiation"),
+    ("token_exchange", "workload_identity_federation"),
+    ("trusted_publishing", "workload_identity_federation"),
+    ("oidc_federation", "workload_identity_federation"),
+    ("federation", "workload_identity_federation"),
+    ("cloud_federation", "identity_tokens"),
+    ("id_tokens_for_clouds", "identity_tokens"),
 ];
 
 /// The capability a requested name means (case and `-` / `_` / `.` insensitive).
@@ -343,6 +371,7 @@ pub async fn capabilities(
             {"name": "stk", "description": "A Silicon's STK, exchanged once for a bearer token at POST /v1/silicons/login; never sent on other requests."},
             {"name": "request_token", "description": "Authorization: Bearer sarq_..., the token a self-created Silicon got from POST /v1/silicons, for its request status and its event stream while it waits for its custodian.", "header": "Authorization"},
             {"name": "oauth2_authorization_code", "description": "Hosted sign-in for apps: authorization code with PKCE S256 at /authorize and POST /v1/oauth/token."},
+            {"name": "federated_token", "description": "A Silicon trusted for an outside OIDC issuer (a CI job's token from GitHub Actions or GitLab) exchanges that token at POST /v1/oauth/token (grant_type urn:ietf:params:oauth:grant-type:token-exchange) for the Silicon's tokens; the sign-in ends when the outside token expires (at least 30 minutes, at most 12 hours). No stored secret."},
             {"name": "session_cookie", "description": "The account site's session cookie (browsers only)."}
         ],
         "limits": {
@@ -467,6 +496,13 @@ pub async fn agent_card(State(state): State<AppState>) -> Response {
                 "description": "A signed-in Silicon or Carbon gets a single-use, two-minute token for an app (POST /v1/me/short-lived-tokens); the app exchanges it for tokens of its own. No browser needed.",
                 "tags": ["sign-in", "tokens", "handoff"],
                 "examples": ["Sign me into briefcase."]
+            },
+            {
+                "id": "ci-and-cloud",
+                "name": "Run a Silicon in CI and the cloud",
+                "description": "A CI job signs in as a Silicon with its own OIDC token (POST /v1/oauth/token, token exchange) once the custodian trusts the repository (POST /v1/silicons/{id}/federations), and the Silicon gets OIDC identity tokens for AWS, Google Cloud and Microsoft Entra (POST /v1/me/identity-tokens). No stored secret anywhere.",
+                "tags": ["ci", "federation", "oidc", "cloud"],
+                "examples": ["Let GitHub Actions in acme/scout sign in as si:scout.", "Give me a token for sts.amazonaws.com."]
             },
             {
                 "id": "verify-proof",

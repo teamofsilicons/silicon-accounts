@@ -494,6 +494,8 @@ fn method_phrase(method: &str) -> String {
         "slt" => "a short-lived token".into(),
         "device" => "the silicon-accounts CLI (device code)".into(),
         "session" => "the browser session".into(),
+        "silicon_key" => "a Silicon key".into(),
+        "federated" => "a trusted outside token (CI)".into(),
         other => other.replace('_', " "),
     }
 }
@@ -668,6 +670,41 @@ fn silicon_entry(
             },
         ),
         "silicon.deleted" => (format!("Silicon {si} deleted"), None),
+        "silicon.federation.added" => (
+            format!(
+                "{si} now trusts tokens from {}",
+                detail_str(details, "issuer").unwrap_or_else(|| "an outside issuer".into())
+            ),
+            details
+                .and_then(|d| d.get("conditions"))
+                .and_then(Value::as_object)
+                .map(|c| {
+                    let names: Vec<&str> = c.keys().map(String::as_str).collect();
+                    format!("When {} match", names.join(", "))
+                }),
+        ),
+        "silicon.federation.removed" => (
+            format!(
+                "{si} no longer trusts tokens from {}",
+                detail_str(details, "issuer").unwrap_or_else(|| "an outside issuer".into())
+            ),
+            details
+                .and_then(|d| d.get("ended_sessions"))
+                .and_then(Value::as_u64)
+                .filter(|n| *n > 0)
+                .map(|n| format!("{n} sign-in{} ended", if n == 1 { "" } else { "s" })),
+        ),
+        "silicon.identity_audiences.set" => (
+            format!("Identity token audiences of {si} changed"),
+            Some(match string_list(details, "audiences") {
+                list if list.is_empty() => "No outside service allowed".to_string(),
+                list => format!("Allowed: {}", list.join(", ")),
+            }),
+        ),
+        "silicon.identity_token.issued" => (
+            format!("{si} got an identity token"),
+            detail_str(details, "audience").map(|a| format!("For {a}")),
+        ),
         "silicon.self_created" => (
             format!("{si} created its own account"),
             detail_str(details, "custodian").map(|c| {

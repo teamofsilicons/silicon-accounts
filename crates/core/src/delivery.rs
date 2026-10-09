@@ -734,10 +734,10 @@ pub mod templates {
 
     fn wrap_html(title: &str, body_html: &str) -> String {
         format!(
-            "<!doctype html><html><body style=\"margin:0;padding:24px;background:#FFFDF9;color:#353432;\
+            "<!doctype html><html><body style=\"margin:0;padding:24px;background:#F7F8FA;color:#292929;\
              font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif\">\
-             <div style=\"max-width:480px;margin:0 auto\"><p style=\"font-size:13px;color:#6F6B66\">{}</p>{}\
-             <p style=\"font-size:12px;color:#6F6B66;margin-top:32px\">Sent by Silicon Accounts · \
+             <div style=\"max-width:480px;margin:0 auto\"><p style=\"font-size:13px;color:#5C6370\">{}</p>{}\
+             <p style=\"font-size:12px;color:#5C6370;margin-top:32px\">Sent by Silicon Accounts · \
              <a href=\"{}\" style=\"color:#1F5FB8\">accounts.teamofsilicons.com</a></p></div></body></html>",
             escape_html(title),
             body_html,
@@ -765,7 +765,7 @@ pub mod templates {
                 "<p style=\"font-size:16px\">Your verification code is</p>\
                  <p style=\"font-size:32px;letter-spacing:6px;font-family:ui-monospace,Menlo,monospace;margin:8px 0 16px\">{}</p>\
                  <p>{} It expires in {minutes} minutes.</p>\
-                 <p style=\"color:#6F6B66\">If you didn't ask for this code, ignore this email: nobody can use your account without it.</p>",
+                 <p style=\"color:#5C6370\">If you didn't ask for this code, ignore this email: nobody can use your account without it.</p>",
                 escape_html(code),
                 escape_html(&line)
             ),
@@ -814,7 +814,7 @@ pub mod templates {
                 "<p>The Silicon <b>{}</b> ({}) created its Silicon Accounts account and named you as its custodian.</p>\
                  <p>As its custodian you manage its account: its details, its id and its STK.</p>\
                  <p><a href=\"{}/silicons\" style=\"color:#1F5FB8\">Accept or decline</a> before {}.</p>\
-                 <p style=\"color:#6F6B66\">If you don't know this Silicon, decline the request.</p>",
+                 <p style=\"color:#5C6370\">If you don't know this Silicon, decline the request.</p>",
                 escape_html(silicon_name),
                 escape_html(silicon_id),
                 escape_html(site_url),
@@ -847,7 +847,7 @@ pub mod templates {
             &format!(
                 "<p>The Silicon <b>{}</b> ({}) named this email address as its custodian on Silicon Accounts.</p>\
                  <p>To accept, <a href=\"{}\" style=\"color:#1F5FB8\">sign up</a> with this email address; the request will be waiting for you. It expires at {}.</p>\
-                 <p style=\"color:#6F6B66\">If you don't know this Silicon, ignore this email.</p>",
+                 <p style=\"color:#5C6370\">If you don't know this Silicon, ignore this email.</p>",
                 escape_html(silicon_name),
                 escape_html(silicon_id),
                 escape_html(site_url),

@@ -125,6 +125,7 @@ let client = AccountsClient::builder()
 | `oidc_discovery()` | `GET /.well-known/openid-configuration` | `OidcDiscovery` |
 | `authorize_url(&AuthorizeParams)` | builds `/authorize?…` | `Url` (no request) |
 | `silicon_login(id, stk, client_label)` | `POST /v1/silicons/login` | `TokenResponse` |
+| `exchange_federated_token(silicon, subject_token)` | `POST /v1/oauth/token` (token exchange, `client_id=silicon-accounts`) | `TokenResponse` with `issued_token_type`; the sign-in ends when the outside token expires |
 | `silicon_self_create(&SiliconSelfCreate, idempotency_key)` | `POST /v1/silicons` | `SiliconSelfCreated` (`silicon`, `stk`, `request`, `request_token`, `webhook_secret`) |
 | `silicon_request_status(request_id, request_token)` | `GET /v1/silicons/requests/{id}` | `CustodianRequestStatus` |
 | `wait_for_custodian_decision(request_id, request_token, &WaitOptions, on_event)` | polls the above | the final `CustodianRequestStatus` |
@@ -170,6 +171,9 @@ you (up to 100 pages of 200).
 | `delete_account(confirm)` | `DELETE /v1/me` | `()` |
 | `signout(refresh_token)` | `POST /v1/oauth/revoke` | `()` |
 | `short_lived_token(app_id)` | `POST /v1/me/short-lived-tokens` | `ShortLivedToken` (`slt`, `app_id`, `expires_at`) |
+| `identity_token(audience, ttl_seconds)` | `POST /v1/me/identity-tokens` (Silicons) | `IdentityToken` (`identity_token`, `audience`, `subject`, `jti`, `kid`, `expires_at`, …) |
+| `add_federation(silicon, &NewFederation)`, `federations(silicon)`, `remove_federation(silicon, id)` | `/v1/silicons/{id}/federations…` | `Federation` / `Vec<Federation>` / `()` |
+| `identity_audiences(silicon)`, `set_identity_audiences(silicon, &[..])` | `/v1/silicons/{id}/identity-audiences` | `IdentityAudiences` |
 | `proofs()`, `revoke_proof(proof_id)` | `/v1/me/proofs…` | `Vec<MyProof>` / `()` |
 | `set_my_webhook(url)`, `remove_my_webhook()`, `test_my_webhook()` | `/v1/me/webhook…` (Silicons) | `SiliconWebhook` / `()` / `WebhookTestResult` |
 | `my_webhook_deliveries(&DeliveriesQuery)`, `my_webhook_delivery(id)` | `GET /v1/me/webhook/deliveries…` (Silicons) | `Page<WebhookDelivery>` / `DeliveryDetail` |
@@ -192,6 +196,12 @@ you (up to 100 pages of 200).
 | `lookup(uuid)`, `lookup_by_id(id)`, `resolve(uuid_or_id)` | `/v1/accounts/…` | `AccountSummary` |
 
 `SiliconView` is `Me`. Photos are checked before sending: PNG, JPEG, WebP or GIF, at most 2 MB.
+
+In CI, the `federation` module reads the job's OIDC token:
+`TokenSource::parse("env:SILICON_ID_TOKEN")` (also `@file` or the token itself),
+`TokenSource::GithubActions { audience }` or `github_actions_id_token(audience)` (from
+`ACTIONS_ID_TOKEN_REQUEST_URL`), then `TokenSource::read().await` gives the token for
+`exchange_federated_token`. See [Run a Silicon in CI and the cloud](../start/ci-and-cloud.md).
 
 ## `AppClient`
 

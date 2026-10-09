@@ -51,6 +51,8 @@ const HANDLE_RESERVATIONS: &str = "delete from handle_reservations where handle 
     (select handle from handle_reservations where reserved_until < now() - interval '1 day' limit 5000)";
 const SILICON_KEY_ASSERTIONS: &str = "delete from silicon_key_assertions where (silicon_uuid, jti) in \
     (select silicon_uuid, jti from silicon_key_assertions where expires_at < now() limit 5000)";
+const FEDERATED_TOKEN_USES: &str = "delete from federated_token_uses where (issuer, jti) in \
+    (select issuer, jti from federated_token_uses where expires_at < now() limit 5000)";
 const SIGNUP_SESSIONS: &str = "delete from signup_sessions where id in \
     (select id from signup_sessions where expires_at < now() - interval '7 days' \
        or consumed_at < now() - interval '7 days' limit 5000)";
@@ -68,6 +70,7 @@ pub struct CleanupReport {
     pub signup_sessions: u64,
     pub rate_limits: u64,
     pub silicon_key_assertions: u64,
+    pub federated_token_uses: u64,
     /// `"<table>: <error>"` for steps that failed (the others still ran).
     pub errors: Vec<String>,
 }
@@ -85,6 +88,7 @@ impl CleanupReport {
             + self.signup_sessions
             + self.rate_limits
             + self.silicon_key_assertions
+            + self.federated_token_uses
     }
 }
 
@@ -150,6 +154,11 @@ pub async fn run_once(state: &AppState) -> CleanupReport {
         e,
         "silicon_key_assertions",
         purge_batched(pool, SILICON_KEY_ASSERTIONS).await,
+    );
+    r.federated_token_uses = tally(
+        e,
+        "federated_token_uses",
+        purge_batched(pool, FEDERATED_TOKEN_USES).await,
     );
     match pool.acquire().await {
         Ok(mut conn) => {

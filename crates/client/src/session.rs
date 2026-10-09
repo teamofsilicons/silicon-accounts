@@ -790,6 +790,100 @@ impl<'a> AccountSession<'a> {
         .map(|_| ())
     }
 
+    /// `POST /v1/silicons/{id}/federations`: trusts outside OIDC tokens for a Silicon
+    /// (yourself, or one you are custodian of): tokens from `issuer`, for `audience`, whose
+    /// claims equal every condition sign the Silicon in. A session that itself came from an
+    /// outside token can't add one.
+    pub async fn add_federation(
+        &self,
+        silicon: &str,
+        federation: &crate::types::NewFederation,
+    ) -> Result<crate::types::Federation> {
+        let body = serde_json::to_value(federation).map_err(|e| {
+            crate::Error::invalid_input(
+                format!("The trust can't be encoded: {e}."),
+                "Check its fields.",
+            )
+        })?;
+        self.send(
+            Method::POST,
+            &["v1", "silicons", silicon.trim(), "federations"],
+            Some(&body),
+        )
+        .await?
+        .json()
+    }
+
+    /// `GET /v1/silicons/{id}/federations`: the Silicon's trusts, newest first, removed ones
+    /// too.
+    pub async fn federations(&self, silicon: &str) -> Result<Vec<crate::types::Federation>> {
+        let page: Page<crate::types::Federation> = self
+            .get(&["v1", "silicons", silicon.trim(), "federations"])
+            .await?;
+        Ok(page.items)
+    }
+
+    /// `DELETE /v1/silicons/{id}/federations/{federation_id}`: the trust stops working and the
+    /// sign-ins it started end.
+    pub async fn remove_federation(&self, silicon: &str, federation_id: &str) -> Result<()> {
+        self.send(
+            Method::DELETE,
+            &[
+                "v1",
+                "silicons",
+                silicon.trim(),
+                "federations",
+                federation_id.trim(),
+            ],
+            None,
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// `GET /v1/silicons/{id}/identity-audiences`: the outside services the Silicon may get
+    /// identity tokens for.
+    pub async fn identity_audiences(
+        &self,
+        silicon: &str,
+    ) -> Result<crate::types::IdentityAudiences> {
+        self.get(&["v1", "silicons", silicon.trim(), "identity-audiences"])
+            .await
+    }
+
+    /// `PUT /v1/silicons/{id}/identity-audiences` (custodian): replaces the list (empty: none).
+    pub async fn set_identity_audiences(
+        &self,
+        silicon: &str,
+        audiences: &[String],
+    ) -> Result<crate::types::IdentityAudiences> {
+        let body = json!({ "audiences": audiences });
+        self.send(
+            Method::PUT,
+            &["v1", "silicons", silicon.trim(), "identity-audiences"],
+            Some(&body),
+        )
+        .await?
+        .json()
+    }
+
+    /// `POST /v1/me/identity-tokens` (a signed-in Silicon): an OIDC ID token for `audience`
+    /// (one its custodian allows), living `ttl_seconds` (60 to 3600, default 300), to hand to
+    /// an outside service such as AWS STS (`AssumeRoleWithWebIdentity`).
+    pub async fn identity_token(
+        &self,
+        audience: &str,
+        ttl_seconds: Option<u32>,
+    ) -> Result<crate::types::IdentityToken> {
+        let mut body = json!({ "audience": audience.trim() });
+        if let Some(ttl) = ttl_seconds {
+            body["ttl_seconds"] = json!(ttl);
+        }
+        self.send(Method::POST, &["v1", "me", "identity-tokens"], Some(&body))
+            .await?
+            .json()
+    }
+
     /// `DELETE /v1/me/silicons/{uuid}/transfer`: cancel a pending transfer.
     pub async fn cancel_transfer(&self, uuid: &str) -> Result<()> {
         self.send(

@@ -1,12 +1,13 @@
 ---
 title: Silicons and custodians
-description: Why every Silicon has a custodian, how its STK is looked after, and why it signs in to apps with short-lived tokens.
+description: Why every Silicon has a custodian, how its STK is looked after, why it signs in to apps with short-lived tokens, and how it runs in CI and the cloud with no stored secret.
 kind: informative
 order: 20
 related:
   - start/silicon-account.md
   - start/custodians.md
   - start/silicon-sign-in-to-apps.md
+  - start/ci-and-cloud.md
   - learn/ids-and-uuids.md
   - learn/webhooks.md
   - learn/tokens-and-sessions.md
@@ -26,7 +27,7 @@ There are no shared or group accounts here: every account belongs to one Carbon 
 | | Carbon | Silicon |
 |---|---|---|
 | id | `c:saket` | `si:scout` |
-| signs in with | an email or SMS code, Google or Apple | its si:id and STK |
+| signs in with | an email or SMS code, Google or Apple | its si:id and STK, a key, or a CI job's token it is trusted for |
 | signs into apps through | the app's sign-in pages | a short-lived token it hands to the app |
 | email and phone | up to 10 of each | none |
 | date of birth | set by the Carbon | the day the account was created; never changes |
@@ -91,6 +92,60 @@ A Silicon can't use an app's sign-in page, because every method there (email cod
 - **What the app sees is decided when the SLT is issued.** Its scopes are `profile`, plus `timezone` and `dob` when the app's sign-in setup asks for them. A Silicon has no email or phone, so an app that requires them still lets the Silicon in and just never receives them. The alternative would lock Silicons out of every app that wants an email from Carbons.
 - **The app needs one grant type, not a second sign-in system.** The exchange is a normal call to the token endpoint (`grant_type=urn:silicon:params:oauth:grant-type:slt`), and the answer has the same shape as a Carbon's code exchange: an access token, a refresh token and the account.
 - **An SLT carries the authority of the sign-in that issued it.** It's refused if the STK was rotated after it was issued, or if the Silicon removed the app's access after it was issued. An SLT issued after a removal is a new decision, and gives the access back.
+
+## Why a CI job can sign in without a secret
+
+A Silicon that runs in CI used to need a stored secret: its STK, or a key, in the CI's secret
+settings. Anyone who can read those settings, or a log that printed one by mistake, can then be
+the Silicon anywhere, for as long as nobody notices. But CI systems already prove who a job is:
+GitHub Actions, GitLab and others give every job an OIDC token, signed by the platform, that says
+which repository, branch and workflow it came from. So a Silicon's custodian (or the Silicon) can
+trust that proof instead, and the job keeps no secret at all. [Run a Silicon in CI and the
+cloud](../start/ci-and-cloud.md) has the steps. Each rule has a reason:
+
+- **The custodian, or the Silicon, decides.** A trust is a new way to sign in as the Silicon, so
+  only the two who already answer for it can add one. Every trust added or removed is in both
+  their histories and reaches the Silicon's webhook (`silicon.federation.added`,
+  `silicon.federation.removed`), so a trust nobody expected is visible at once.
+- **A trust always names more than an issuer.** Every job on GitHub can get a token from the same
+  issuer, so trusting the issuer alone would trust every repository on GitHub. A trust needs at
+  least one condition, and for GitHub and GitLab one must name the repository, the project or
+  their owner. Conditions match exactly, with no wildcards, so a condition never matches more than
+  you read in it.
+- **The audience is checked.** A token a job got for another service (say AWS) carries that
+  service's audience, so it can't be replayed here. By default a trust wants our own URL.
+- **Every token works once.** A token's `jti` is remembered until the token expires, so a token
+  copied out of a job's log can't sign in again.
+- **The sign-in ends with the job's token.** A GitHub token lives minutes, so its sign-in is one
+  access token, 30 minutes. A GitLab token lives as long as the job, and the sign-in follows it,
+  up to 12 hours. A copied session never outlives the job that earned it.
+- **A CI sign-in can't add a way in.** It may act as the Silicon (sign into apps, call the API),
+  but it can't add keys or trusts. A compromised job can't leave a door open behind it.
+- **Removing a trust ends what it started.** Every sign-in made through a trust ends the moment
+  the trust is removed, like revoking a key or rotating the STK.
+- **The custodian's other controls still hold.** The app allow-list decides which apps the Silicon
+  can sign into from CI too, and every sign-in is in its history with the method `federated`.
+
+## Why a Silicon gets identity tokens, and who allows them
+
+Clouds have their own version of the same idea. AWS, Google Cloud and Microsoft Entra trust an
+outside OIDC issuer for short-lived credentials, so a workload never holds a cloud key. Silicon
+Accounts is such an issuer: a signed-in Silicon asks for an identity token for one audience, and
+the cloud trusts tokens whose `sub` is that Silicon's uuid. The Silicon is one identity wherever it
+runs, a CI job, a server or a laptop, and its custodian stays in charge:
+
+- **None until the custodian allows it.** Each Silicon has a list of audiences it may get tokens
+  for, empty to begin with, and only the custodian changes it. Turning the feature on for a
+  Silicon is a decision, never a default.
+- **An identity token can't be mistaken for anything of ours.** It says `token_use: identity`, is
+  signed with a different algorithm from our access tokens (RS256, not EdDSA), and our API refuses
+  it as a bearer token. An audience must look like a host name, URL or URN, so it can never equal
+  an app id, and our own URL is refused: a Silicon can't use one to sign into an app past its
+  sign-in rules.
+- **It names the Silicon by uuid.** `sub` never changes, while `si_id` can, so a cloud policy that
+  matches `sub` keeps naming the same Silicon. `custodian` lets a policy require a custodian too.
+- **It is short.** 300 seconds by default, an hour at most, and every one issued is in the
+  Silicon's and the custodian's history.
 
 ## Why a Silicon has its own webhook
 

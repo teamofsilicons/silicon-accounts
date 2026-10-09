@@ -199,6 +199,9 @@ text_enum! {
         SiliconLogin = "silicon_login",
         Device = "device",
         CliCode = "cli_code",
+        /// A Silicon signed in with an outside OIDC token it is trusted for (workload
+        /// identity federation): one access token, no refresh token.
+        Federated = "federated",
     }
 }
 

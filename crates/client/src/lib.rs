@@ -47,6 +47,7 @@ mod app;
 mod client;
 mod config;
 mod error;
+pub mod federation;
 mod jwt;
 mod pkce;
 mod public;
@@ -66,6 +67,7 @@ pub use client::{
 };
 pub use config::{Config, parse_flag};
 pub use error::{ApiError, Error, OAuthError, Result, TokenError, WebhookError};
+pub use federation::{TOKEN_EXCHANGE_GRANT_TYPE, TokenSource, github_actions_id_token};
 pub use jwt::{Claims, VerifyOptions, verify_access_token};
 pub use pkce::{
     AuthorizeParams, PkcePair, pkce_challenge, pkce_pair, random_nonce, random_state, random_token,

@@ -460,7 +460,7 @@
         ],
         "operationId": "exchangeToken",
         "summary": "Token endpoint (every grant)",
-        "description": "Exchange an authorization code, refresh a sign-in, redeem a Silicon's short-lived token, poll a device code, or sign a Silicon in with a key-signed assertion (jwt-bearer, client_id silicon-accounts). Authenticate with HTTP Basic or `client_id` + `client_secret` in the body, never both. Public clients send `client_id` alone: `silicon-accounts` (the CLI: refresh_token, device_code, jwt-bearer), `developer` (authorization_code with PKCE S256, refresh_token), and apps that turned on `device_flow` (device_code, refresh_token) or `public_client` (authorization_code with PKCE S256, refresh_token). Every refresh rotates the refresh token; presenting a used one revokes the whole sign-in. Responses are `Cache-Control: no-store`.",
+        "description": "Exchange an authorization code, refresh a sign-in, redeem a Silicon's short-lived token, poll a device code, sign a Silicon in with a key-signed assertion (jwt-bearer, client_id silicon-accounts), or sign a Silicon in with an outside OIDC token it is trusted for (token-exchange, RFC 8693: `subject_token`, `subject_token_type`, `silicon`; `client_id` may be left out). A token exchange checks the token's signature against its issuer's JWKS, `iss`, `aud`, `exp`, `nbf`, `iat` (30 seconds of skew) and one trust's every condition, uses its `jti` once, and answers a sign-in that ends when the outside token expires, at least 30 minutes and at most 12 hours later (`TokenExchangeResponse`); every refusal is `invalid_grant` with the reason, the code in brackets (`invalid_federated_token`, `no_matching_trust`, `issuer_unavailable`), and 60 exchanges per minute per address answer 429 `rate_limited` with `Retry-After`. Authenticate with HTTP Basic or `client_id` + `client_secret` in the body, never both. Public clients send `client_id` alone: `silicon-accounts` (the CLI: refresh_token, device_code, jwt-bearer), `developer` (authorization_code with PKCE S256, refresh_token), and apps that turned on `device_flow` (device_code, refresh_token) or `public_client` (authorization_code with PKCE S256, refresh_token). Every refresh rotates the refresh token; presenting a used one revokes the whole sign-in. Responses are `Cache-Control: no-store`.",
         "security": [
           {
             "oauthClient": []
@@ -488,7 +488,7 @@
         },
         "responses": {
           "200": {
-            "description": "Tokens.",
+            "description": "Tokens (a token exchange also says `issued_token_type`).",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -500,7 +500,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokenResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TokenResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TokenExchangeResponse"
+                    }
+                  ]
                 }
               }
             }
@@ -513,6 +520,27 @@
           },
           "413": {
             "$ref": "#/components/responses/OAuthPayloadTooLarge"
+          },
+          "429": {
+            "description": "Too many token exchanges from this address (60 per minute). `{\"error\":\"rate_limited\",\"error_description\"}` with `Retry-After`.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
           },
           "500": {
             "$ref": "#/components/responses/OAuthServerError"
@@ -9185,6 +9213,621 @@
         }
       }
     },
+    "/v1/silicons/{id}/federations": {
+      "get": {
+        "tags": [
+          "Silicons"
+        ],
+        "operationId": "listSiliconFederations",
+        "summary": "A Silicon's trust relationships",
+        "description": "For the Silicon itself or its custodian. Which outside OIDC tokens (CI jobs on GitHub Actions, GitLab or any https issuer) sign the Silicon in. Newest first, removed ones too.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The Silicon's si:id or uuid.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The trusts.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Page"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Federation"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found.\n\n- `silicon_not_found`: not a Silicon you are custodian of, nor yourself (other Carbons' Silicons are never revealed)",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "silicon_not_found",
+                    "message": "Not a Silicon you are custodian of, nor yourself (other Carbons' Silicons are never revealed)."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "silicon_not_found"
+            ]
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Silicons"
+        ],
+        "operationId": "addSiliconFederation",
+        "summary": "Trust outside OIDC tokens for a Silicon",
+        "description": "For the Silicon itself or its custodian (workload identity federation, like trusted publishers). Tokens from `issuer`, carrying `audience` (default: this service's public URL), whose claims equal every condition exactly sign the Silicon in at `POST /v1/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`. At least one condition is required, so a whole issuer is never trusted; for GitHub Actions (`https://token.actions.githubusercontent.com`) and GitLab.com (`https://gitlab.com`) one must name the repository, the project or their owner. The issuer must serve OIDC discovery over https from a public address (it is fetched now). A session that itself came from an outside token can't add a trust. At most 20 live trusts. The Silicon's webhook and stream get `silicon.federation.added`.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The Silicon's si:id or uuid.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FederationAdd"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Trusted.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Federation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Not allowed.\n\n- `federated_session`: this session came from a trusted outside token, and such a session can't add trusts or keys; add it from a session signed in with the STK or a key, or as the custodian\n- `account_not_active`: the account isn't active (pending custodian, unfinished import)\n- `origin_not_allowed`: a cookie-authenticated POST/PUT/PATCH/DELETE came without the account site's `Origin`; use a Bearer token instead of the cookie",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "federated_session",
+                    "message": "This session came from a trusted outside token, and such a session can't add trusts or keys; add it from a session signed in with the STK or a key, or as the custodian."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "federated_session",
+              "account_not_active",
+              "origin_not_allowed"
+            ]
+          },
+          "404": {
+            "description": "Not found.\n\n- `silicon_not_found`: not a Silicon you are custodian of, nor yourself (other Carbons' Silicons are never revealed)",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "silicon_not_found",
+                    "message": "Not a Silicon you are custodian of, nor yourself (other Carbons' Silicons are never revealed)."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "silicon_not_found"
+            ]
+          },
+          "409": {
+            "description": "Conflict.\n\n- `federation_exists`: the Silicon already trusts these tokens (`details.federation_id`)\n- `too_many_federations`: the Silicon already has 20 live trusts",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "federation_exists",
+                    "message": "The Silicon already trusts these tokens (`details.federation_id`)."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "federation_exists",
+              "too_many_federations"
+            ]
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "description": "Validation failed.\n\n- `validation_failed`: `details.fields` names each problem: an issuer that isn't public https, no condition, a reserved claim (iss, aud, exp, nbf, iat, jti) as a condition, or a GitHub or GitLab trust without a repository or project condition\n- `issuer_unreachable`: the issuer's `/.well-known/openid-configuration` couldn't be read, doesn't name the same issuer, or names a `jwks_uri` that isn't public https",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "`details.fields` names each problem: an issuer that isn't public https, no condition, a reserved claim (iss, aud, exp, nbf, iat, jti) as a condition, or a GitHub or GitLab trust without a repository or project condition."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "validation_failed",
+              "issuer_unreachable"
+            ]
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/silicons/{id}/federations/{federation_id}": {
+      "delete": {
+        "tags": [
+          "Silicons"
+        ],
+        "operationId": "removeSiliconFederation",
+        "summary": "Remove a trust relationship",
+        "description": "For the Silicon itself or its custodian. The trust stops working at once and the sign-ins it started end. Repeating it changes nothing. The Silicon's webhook and stream get `silicon.federation.removed`.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The Silicon's si:id or uuid.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "federation_id",
+            "in": "path",
+            "required": true,
+            "description": "The trust's id.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Not found.\n\n- `silicon_not_found`: not a Silicon you are custodian of, nor yourself (other Carbons' Silicons are never revealed)\n- `federation_not_found`: no trust with this id belongs to the Silicon",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "silicon_not_found",
+                    "message": "Not a Silicon you are custodian of, nor yourself (other Carbons' Silicons are never revealed)."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "silicon_not_found",
+              "federation_not_found"
+            ]
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/silicons/{id}/identity-audiences": {
+      "get": {
+        "tags": [
+          "Silicons"
+        ],
+        "operationId": "getIdentityAudiences",
+        "summary": "The audiences a Silicon may get identity tokens for",
+        "description": "For the Silicon itself or its custodian. Empty for every Silicon until its custodian allows one.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The Silicon's si:id or uuid.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The audiences.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityAudiences"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found.\n\n- `silicon_not_found`: not a Silicon you are custodian of, nor yourself (other Carbons' Silicons are never revealed)",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "silicon_not_found",
+                    "message": "Not a Silicon you are custodian of, nor yourself (other Carbons' Silicons are never revealed)."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "silicon_not_found"
+            ]
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Silicons"
+        ],
+        "operationId": "setIdentityAudiences",
+        "summary": "Choose the audiences a Silicon may get identity tokens for",
+        "description": "The custodian only. Replaces the list (`[]`: none). Each audience is printable ASCII without spaces, at most 400 characters, and shaped like a host name, URL or URN (it holds `.`, `:` or `/`, so it can never be an app id); this service's own URL is refused. At most 20. The Silicon's webhook and stream get `silicon.identity_audiences.changed`.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The Silicon's si:id or uuid.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityAudiencesSet"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The new list.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityAudiences"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Not allowed.\n\n- `custodian_only`: only the Silicon's custodian chooses its audiences\n- `origin_not_allowed`: a cookie-authenticated POST/PUT/PATCH/DELETE came without the account site's `Origin`; use a Bearer token instead of the cookie",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "custodian_only",
+                    "message": "Only the Silicon's custodian chooses its audiences."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "custodian_only",
+              "origin_not_allowed"
+            ]
+          },
+          "404": {
+            "description": "Not found.\n\n- `silicon_not_found`: not a Silicon you are custodian of, nor yourself (other Carbons' Silicons are never revealed)",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "silicon_not_found",
+                    "message": "Not a Silicon you are custodian of, nor yourself (other Carbons' Silicons are never revealed)."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "silicon_not_found"
+            ]
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
     "/v1/me/short-lived-tokens": {
       "post": {
         "tags": [
@@ -9361,6 +10004,110 @@
               "first_party_app",
               "validation_failed"
             ]
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/me/identity-tokens": {
+      "post": {
+        "tags": [
+          "Silicons"
+        ],
+        "operationId": "issueIdentityToken",
+        "summary": "Get an identity token for an outside service",
+        "description": "A signed-in Silicon gets an OpenID Connect ID token for one audience its custodian allows: AWS STS (`sts.amazonaws.com`), a Google Cloud workload identity provider, Microsoft Entra (`api://AzureADTokenExchange`). It is an RS256 JWT signed with this service's identity-token key (in `/.well-known/jwks.json` with its own `kid`), with `iss` (the public URL), `sub` (the Silicon's uuid), `aud`, `iat`, `nbf`, `exp`, `jti`, `kind: silicon`, `si_id`, `custodian` (the custodian's uuid) and `token_use: identity`. This API never accepts it as a bearer token (401 `identity_token_not_accepted`). Lives 60 to 3600 seconds (default 300). Each one is recorded in the Silicon's and the custodian's history (never the token). 60 per minute per Silicon.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The token.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityToken"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Not allowed.\n\n- `audience_not_allowed`: the Silicon's custodian hasn't allowed this audience (`details.allowed_audiences`)\n- `silicon_only`: a Carbon asked; identity tokens prove Silicons\n- `account_not_active`: the account isn't active (pending custodian, unfinished import)\n- `origin_not_allowed`: a cookie-authenticated POST/PUT/PATCH/DELETE came without the account site's `Origin`; use a Bearer token instead of the cookie",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "audience_not_allowed",
+                    "message": "The Silicon's custodian hasn't allowed this audience (`details.allowed_audiences`)."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "audience_not_allowed",
+              "silicon_only",
+              "account_not_active",
+              "origin_not_allowed"
+            ]
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -19481,7 +20228,7 @@
         "properties": {
           "grant_type": {
             "type": "string",
-            "description": "`authorization_code`, `refresh_token`, `urn:silicon:params:oauth:grant-type:slt` (alias `slt`), `urn:ietf:params:oauth:grant-type:device_code` (alias `device_code`) or `urn:ietf:params:oauth:grant-type:jwt-bearer`."
+            "description": "`authorization_code`, `refresh_token`, `urn:silicon:params:oauth:grant-type:slt` (alias `slt`), `urn:ietf:params:oauth:grant-type:device_code` (alias `device_code`), `urn:ietf:params:oauth:grant-type:jwt-bearer` or `urn:ietf:params:oauth:grant-type:token-exchange`."
           },
           "code": {
             "type": "string",
@@ -19514,6 +20261,29 @@
           "assertion": {
             "type": "string",
             "description": "jwt-bearer: a JWT signed with one of the Silicon's registered keys (with `client_id=silicon-accounts`)."
+          },
+          "subject_token": {
+            "type": "string",
+            "description": "token-exchange: the outside OIDC token a CI job got (a JWT), from an issuer the Silicon trusts."
+          },
+          "subject_token_type": {
+            "type": "string",
+            "enum": [
+              "urn:ietf:params:oauth:token-type:jwt",
+              "urn:ietf:params:oauth:token-type:id_token"
+            ],
+            "description": "token-exchange: the kind of `subject_token`."
+          },
+          "silicon": {
+            "type": "string",
+            "description": "token-exchange: the si:id or uuid of the Silicon to sign in."
+          },
+          "requested_token_type": {
+            "type": "string",
+            "enum": [
+              "urn:ietf:params:oauth:token-type:access_token"
+            ],
+            "description": "token-exchange: optional; only an access token is ever issued."
           },
           "client_id": {
             "type": "string",
@@ -19567,6 +20337,61 @@
           "id_token": {
             "type": "string",
             "description": "Only when `openid` was granted."
+          },
+          "membership_id": {
+            "type": "string"
+          },
+          "account": {
+            "$ref": "#/components/schemas/AccountForApp"
+          }
+        }
+      },
+      "TokenExchangeResponse": {
+        "type": "object",
+        "description": "The answer to a token exchange (RFC 8693): the usual token response plus `issued_token_type`. The sign-in ends when the outside token expires, at least 30 minutes (one access token) and at most 12 hours after the exchange; its refresh tokens rotate as usual until then.",
+        "required": [
+          "access_token",
+          "issued_token_type",
+          "token_type",
+          "expires_in",
+          "refresh_token",
+          "refresh_token_expires_at",
+          "scope",
+          "membership_id",
+          "account"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "A first-party EdDSA JWT (`aud: silicon-accounts`)."
+          },
+          "issued_token_type": {
+            "type": "string",
+            "enum": [
+              "urn:ietf:params:oauth:token-type:access_token"
+            ]
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "1800 seconds."
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "`sar_...`; rotates on every refresh, and stops working when the sign-in ends."
+          },
+          "refresh_token_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the sign-in ends: when the outside token expires, at least 30 minutes and at most 12 hours from now."
+          },
+          "scope": {
+            "type": "string"
           },
           "membership_id": {
             "type": "string"
@@ -19860,7 +20685,7 @@
       },
       "Jwks": {
         "type": "object",
-        "description": "The Ed25519 keys that sign access tokens and id_tokens. Fetch again when a token names a `kid` you don't have.",
+        "description": "The keys that sign our tokens, each found by its `kid`: the Ed25519 key (`kty OKP`, `alg EdDSA`) of access tokens and id_tokens, then the RSA key (`kty RSA`, `alg RS256`) of identity tokens, which cloud providers verify. Fetch again when a token names a `kid` you don't have.",
         "required": [
           "keys"
         ],
@@ -19891,6 +20716,14 @@
                 },
                 "alg": {
                   "type": "string"
+                },
+                "n": {
+                  "type": "string",
+                  "description": "RSA modulus, base64url."
+                },
+                "e": {
+                  "type": "string",
+                  "description": "RSA exponent, base64url."
                 }
               }
             }
@@ -21007,6 +21840,225 @@
           }
         },
         "additionalProperties": false
+      },
+      "Federation": {
+        "type": "object",
+        "description": "A trust relationship: tokens from `issuer`, for `audience`, whose claims equal every condition, sign the Silicon in.",
+        "required": [
+          "id",
+          "name",
+          "issuer",
+          "audience",
+          "conditions",
+          "created_by",
+          "created_at",
+          "last_used_at",
+          "revoked_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "issuer": {
+            "type": "string",
+            "format": "uri",
+            "description": "The OIDC issuer, without a trailing slash."
+          },
+          "audience": {
+            "type": "string",
+            "description": "The `aud` the token must carry."
+          },
+          "conditions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Claim name to the exact value it must have; every one must match."
+          },
+          "created_by": {
+            "type": "string",
+            "description": "The uuid of the Silicon or the custodian who added it."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "FederationAdd": {
+        "type": "object",
+        "required": [
+          "issuer",
+          "conditions"
+        ],
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "format": "uri",
+            "description": "An https OIDC issuer with discovery: `https://token.actions.githubusercontent.com` (GitHub Actions), `https://gitlab.com` (GitLab.com), or any other public one."
+          },
+          "audience": {
+            "type": "string",
+            "description": "The `aud` the token must carry; this service's public URL (`https://accounts.teamofsilicons.com`) when left out."
+          },
+          "conditions": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 10,
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Claim name to exact value, for example `{\"repository\": \"acme/scout\", \"ref\": \"refs/heads/main\"}`. Not `iss`, `aud`, `exp`, `nbf`, `iat` or `jti`."
+          },
+          "name": {
+            "type": "string",
+            "description": "At most 100 characters; from the issuer when left out."
+          }
+        },
+        "additionalProperties": false
+      },
+      "IdentityAudiences": {
+        "type": "object",
+        "required": [
+          "silicon",
+          "audiences"
+        ],
+        "properties": {
+          "silicon": {
+            "type": "object",
+            "required": [
+              "uuid"
+            ],
+            "properties": {
+              "uuid": {
+                "type": "string"
+              },
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "audiences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Empty: no identity tokens at all."
+          }
+        }
+      },
+      "IdentityAudiencesSet": {
+        "type": "object",
+        "required": [
+          "audiences"
+        ],
+        "properties": {
+          "audiences": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "maxLength": 400
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "IdentityTokenRequest": {
+        "type": "object",
+        "required": [
+          "audience"
+        ],
+        "properties": {
+          "audience": {
+            "type": "string",
+            "description": "One of the Silicon's allowed audiences."
+          },
+          "ttl_seconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 3600,
+            "default": 300
+          }
+        },
+        "additionalProperties": false
+      },
+      "IdentityToken": {
+        "type": "object",
+        "required": [
+          "identity_token",
+          "token_type",
+          "issuer",
+          "subject",
+          "audience",
+          "jti",
+          "kid",
+          "issued_at",
+          "expires_at",
+          "expires_in"
+        ],
+        "properties": {
+          "identity_token": {
+            "type": "string",
+            "description": "The RS256 JWT to hand the outside service."
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "urn:ietf:params:oauth:token-type:id_token"
+            ]
+          },
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "subject": {
+            "type": "string",
+            "description": "The Silicon's uuid (`sub`)."
+          },
+          "audience": {
+            "type": "string"
+          },
+          "jti": {
+            "type": "string"
+          },
+          "kid": {
+            "type": "string",
+            "description": "The signing key's id in the JWKS."
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_in": {
+            "type": "integer"
+          }
+        }
       },
       "SiliconApp": {
         "type": "object",
@@ -24670,7 +25722,7 @@
         ]
       },
       "Unauthorized": {
-        "description": "No credentials, or bad ones. Sign in again, or fix the token or app secret. The shared codes:\n\n- `unauthenticated`: no credentials; sign in (`silicon-accounts login`) or send the app's Basic credentials\n- `invalid_authorization`: the `Authorization` header is unreadable or uses an unsupported scheme\n- `invalid_token`: not an access token, a bad signature, or expired (access tokens last 30 minutes: refresh)\n- `token_wrong_audience`: an app's token was used where a first-party (`aud = silicon-accounts`) token is needed, or a developer-platform token (`aud = developer`, `details.aud`) outside the routes it may use (`GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and the owner routes under `/v1/apps/{app_id}/…`); the message names the method and route\n- `token_revoked`: the sign-in behind the token ended (signed out, STK rotated, account deleted, refresh token reuse); the message says when and why; sign in again\n- `session_expired`: the session cookie was signed out, revoked or expired\n- `account_auth_required`: app credentials (Basic) were sent to an endpoint that acts for an account\n- `app_credentials_required`: an app endpoint got no credentials\n- `invalid_app_credentials`: unknown app_id, wrong secret, or malformed Basic header",
+        "description": "No credentials, or bad ones. Sign in again, or fix the token or app secret. The shared codes:\n\n- `unauthenticated`: no credentials; sign in (`silicon-accounts login`) or send the app's Basic credentials\n- `invalid_authorization`: the `Authorization` header is unreadable or uses an unsupported scheme\n- `invalid_token`: not an access token, a bad signature, or expired (access tokens last 30 minutes: refresh)\n- `token_wrong_audience`: an app's token was used where a first-party (`aud = silicon-accounts`) token is needed, or a developer-platform token (`aud = developer`, `details.aud`) outside the routes it may use (`GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and the owner routes under `/v1/apps/{app_id}/…`); the message names the method and route\n- `identity_token_not_accepted`: an identity token (`token_use: identity`, for outside services) was sent as a bearer token; send the access token\n- `token_revoked`: the sign-in behind the token ended (signed out, STK rotated, account deleted, refresh token reuse); the message says when and why; sign in again\n- `session_expired`: the session cookie was signed out, revoked or expired\n- `account_auth_required`: app credentials (Basic) were sent to an endpoint that acts for an account\n- `app_credentials_required`: an app endpoint got no credentials\n- `invalid_app_credentials`: unknown app_id, wrong secret, or malformed Basic header",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"
@@ -24697,6 +25749,7 @@
           "invalid_authorization",
           "invalid_token",
           "token_wrong_audience",
+          "identity_token_not_accepted",
           "token_revoked",
           "session_expired",
           "account_auth_required",

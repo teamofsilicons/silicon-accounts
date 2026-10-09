@@ -37,8 +37,8 @@ async fn patch_deep_merges_replaces_arrays_and_records_history() {
         "colours are canonicalized"
     );
     assert_eq!(
-        cfg["branding"]["light"]["background"], "#FFFDF9",
-        "untouched keys keep their values"
+        cfg["branding"]["light"]["background"], "#F7F8FA",
+        "untouched keys keep their values (a new app's default: the Silicon look)"
     );
     assert_eq!(
         cfg["branding"]["dark"]["primary"], "#1F5FB8",
@@ -235,7 +235,7 @@ async fn validation_errors_name_the_field() {
         patch(
             &a.app_id,
             &a.secret,
-            json!({"branding": {"dark": {"primary": "#5B8FE0"}}}),
+            json!({"branding": {"dark": {"primary": "#5B8FE0", "primary_foreground": "#FFFDF9"}}}),
         ),
     )
     .await;

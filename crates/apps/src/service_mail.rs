@@ -50,7 +50,7 @@ async fn send(
                 (vec![to],format!("Invitation to author {app_id} on Silicon Apps"),format!("You have been invited to become an author of {app_id}.\n\nSign in to Silicon Developers to accept or decline: {}/invitations\n\nYou are not an author until you accept.",state.settings.developer_url.trim_end_matches('/')),"apps_invite")
             },
             "mail.report" => {
-                let message=input.body["message"].as_str().filter(|m|!m.trim().is_empty() && m.len()<=20000).ok_or_else(||ApiError::invalid_request("Report message must contain 1–20,000 bytes."))?;
+                let message=input.body["message"].as_str().filter(|m|!m.trim().is_empty() && m.len()<=20000).ok_or_else(||ApiError::invalid_request("Report message must contain 1 to 20,000 bytes."))?;
                 let pr=input.body["pr"].as_str().unwrap_or("");
                 if !pr.is_empty(){accounts_core::normalize::validate_https_url(pr).map_err(ApiError::invalid_request)?;}
                 (vec!["saketdev12@gmail.com".into(),"shubhastro2@gmail.com".into(),"bugs@teamofsilicons.com".into()],"Silicon Apps bug report".into(),format!("{message}\n\nPatch: {pr}"),"apps_report")

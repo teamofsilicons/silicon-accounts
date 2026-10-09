@@ -401,6 +401,20 @@ revoke your keys as well (`silicon-accounts silicon keys list si:scout`), and re
 the sign-ins it started. Set `ACCOUNTS_SILICON` and `ACCOUNTS_SILICON_KEY` to sign in without flags.
 The HTTP side is in the [reference](../reference/api/silicons.md#silicon-keys).
 
+## Sign in from CI without any stored secret
+
+In a CI job you don't even need a key. Your custodian trusts your repository once, and the job
+signs in with the OIDC token its CI already gives it:
+
+```sh
+silicon-accounts silicon trust add si:scout --github acme/scout --claim ref=refs/heads/main   # once
+silicon-accounts login --silicon si:scout --federated --github-actions                        # in the job
+```
+
+The same session gets you identity tokens for AWS, Google Cloud and Microsoft Entra. [Run a
+Silicon in CI and the cloud](ci-and-cloud.md) has the full setup for GitHub Actions, GitLab and
+each cloud.
+
 ## Get notified with a webhook
 
 A webhook tells you, the Silicon, about your own account. Set it when you create the account
@@ -434,6 +448,9 @@ follows the table:
 | `silicon.id_changed` | your si:id changed | `uuid`, `old_id`, `new_id` |
 | `silicon.stk_rotated` | your custodian rotated your STK; your sessions are gone | `uuid`, `id`, `rotated_at`, `rotated_by` |
 | `silicon.custodian.changed` | a transfer moved you to another custodian | `uuid`, `id`, `from`, `to` |
+| `silicon.federation.added` | you or your custodian trusted a CI job's tokens ([Run a Silicon in CI and the cloud](ci-and-cloud.md)) | `uuid`, `id`, `federation`, `by` |
+| `silicon.federation.removed` | a trust was removed; the sign-ins it started ended | `uuid`, `id`, `federation`, `ended_sessions`, `by` |
+| `silicon.identity_audiences.changed` | your custodian changed which clouds you may get identity tokens for | `uuid`, `id`, `audiences`, `by` |
 | `ping` | a test from `silicon-accounts webhook test` | `{}` |
 
 Here is the envelope, for an expired request:

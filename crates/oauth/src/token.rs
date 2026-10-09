@@ -3,14 +3,14 @@
 use std::time::Instant;
 
 use accounts_core::http::{ClientAuth, ClientMeta, authenticate_client};
-use accounts_core::views::TokenResponse;
+use accounts_core::views::{TokenExchangeResponse, TokenResponse};
 use accounts_core::{AppState, DEVELOPER_APP_ID, FIRST_PARTY_APP_ID, OAuthError};
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::extract::rejection::BytesRejection;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::grants;
@@ -27,7 +27,11 @@ pub const DEVICE_CODE_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:devic
 /// Grant type of a Silicon's key-signed assertion (RFC 7523), for the first-party client.
 pub const JWT_BEARER_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:jwt-bearer";
 
-const SUPPORTED: &str = "authorization_code, refresh_token, urn:silicon:params:oauth:grant-type:slt, urn:ietf:params:oauth:grant-type:device_code or urn:ietf:params:oauth:grant-type:jwt-bearer";
+/// Grant type of a token exchange (RFC 8693): a Silicon signs in with an outside OIDC token
+/// it is trusted for (workload identity federation), for the first-party client.
+pub const TOKEN_EXCHANGE_GRANT_TYPE: &str = accounts_core::federation::TOKEN_EXCHANGE_GRANT_TYPE;
+
+const SUPPORTED: &str = "authorization_code, refresh_token, urn:silicon:params:oauth:grant-type:slt, urn:ietf:params:oauth:grant-type:device_code, urn:ietf:params:oauth:grant-type:jwt-bearer or urn:ietf:params:oauth:grant-type:token-exchange";
 
 /// Parameters of a token request. Every field is optional so a missing one gets a precise
 /// error instead of a generic parse failure. No `Debug`: it carries secrets.
@@ -44,6 +48,11 @@ pub(crate) struct TokenParams {
     pub slt: Option<String>,
     pub device_code: Option<String>,
     pub assertion: Option<String>,
+    pub subject_token: Option<String>,
+    pub subject_token_type: Option<String>,
+    pub requested_token_type: Option<String>,
+    pub actor_token: Option<String>,
+    pub silicon: Option<String>,
 }
 
 /// The grants the token endpoint supports.
@@ -54,6 +63,7 @@ pub(crate) enum Grant {
     Slt,
     DeviceCode,
     JwtBearer,
+    TokenExchange,
 }
 
 impl Grant {
@@ -69,11 +79,9 @@ impl Grant {
             SLT_GRANT_TYPE | "slt" => return Ok(Grant::Slt),
             DEVICE_CODE_GRANT_TYPE | "device_code" => return Ok(Grant::DeviceCode),
             JWT_BEARER_GRANT_TYPE => return Ok(Grant::JwtBearer),
+            TOKEN_EXCHANGE_GRANT_TYPE => return Ok(Grant::TokenExchange),
             "client_credentials" => {
-                " Silicon Accounts doesn't issue app-only access tokens: one app proves itself to another with an app verification proof (POST /v1/proofs/app-verification)."
-            }
-            "urn:ietf:params:oauth:grant-type:token-exchange" => {
-                " To act for an account at another app, get a User verification proof (POST /v1/proofs/user-verification) with the account's access token."
+                " Silicon Accounts doesn't issue app-only access tokens: one app proves itself to another with an App verification proof (POST /v1/proofs/app-verification)."
             }
             "password" => {
                 " Carbons never hand their credentials to apps: send them through the hosted sign-in (/authorize). Silicons get a short-lived token with `silicon-accounts login --app <app_id>` and the app exchanges it with grant_type=urn:silicon:params:oauth:grant-type:slt."
@@ -96,15 +104,18 @@ impl Grant {
             Grant::Slt => SLT_GRANT_TYPE,
             Grant::DeviceCode => DEVICE_CODE_GRANT_TYPE,
             Grant::JwtBearer => JWT_BEARER_GRANT_TYPE,
+            Grant::TokenExchange => TOKEN_EXCHANGE_GRANT_TYPE,
         }
     }
 }
 
 /// What a request was, for logs and telemetry (never secrets).
 #[derive(Default)]
-struct Trace {
+pub(crate) struct Trace {
     grant: Option<&'static str>,
     app_id: Option<String>,
+    /// Seconds to wait before retrying, for a refusal that is a rate limit.
+    pub(crate) retry_after: Option<u64>,
 }
 
 /// `POST /v1/oauth/token`.
@@ -137,8 +148,31 @@ pub(crate) async fn token(
                 "token_refused",
                 json!({"grant_type": trace.grant, "app_id": trace.app_id, "error": e.error, "duration_ms": duration_ms}),
             );
-            oauth_error(e)
+            let mut response = oauth_error(e);
+            if let Some(seconds) = trace.retry_after
+                && let Ok(v) = axum::http::HeaderValue::from_str(&seconds.to_string())
+            {
+                response
+                    .headers_mut()
+                    .insert(axum::http::header::RETRY_AFTER, v);
+            }
+            response
         }
+    }
+}
+
+/// What a token request issued: a sign-in, or a sign-in from a token exchange (which also says
+/// `issued_token_type`, RFC 8693).
+#[derive(Serialize)]
+#[serde(untagged)]
+enum Issued {
+    Tokens(Box<TokenResponse>),
+    Exchanged(Box<TokenExchangeResponse>),
+}
+
+impl From<TokenResponse> for Issued {
+    fn from(t: TokenResponse) -> Self {
+        Issued::Tokens(Box::new(t))
     }
 }
 
@@ -148,39 +182,64 @@ async fn handle(
     headers: &HeaderMap,
     body: Result<Bytes, BytesRejection>,
     trace: &mut Trace,
-) -> Result<TokenResponse, OAuthError> {
+) -> Result<Issued, OAuthError> {
     let params: TokenParams = parse_body(headers, body, "The token request")?;
     let grant = Grant::parse(opt(params.grant_type.as_deref()))?;
     trace.grant = Some(grant.as_str());
-    let client = authenticate_client(
-        state,
-        headers,
-        params.client_id.as_deref(),
-        params.client_secret.as_deref(),
-    )
-    .await?;
+    // A token exchange signs a Silicon into Silicon Accounts itself, so a CI job may leave the
+    // client out: it is the first-party client.
+    let client_id = match (grant, opt(params.client_id.as_deref())) {
+        (Grant::TokenExchange, None)
+            if !headers.contains_key(axum::http::header::AUTHORIZATION) =>
+        {
+            Some(FIRST_PARTY_APP_ID)
+        }
+        (_, id) => id,
+    };
+    let client =
+        authenticate_client(state, headers, client_id, params.client_secret.as_deref()).await?;
     trace.app_id = Some(client.app.app_id.clone());
+    if grant == Grant::TokenExchange {
+        if client.app.app_id != FIRST_PARTY_APP_ID {
+            return Err(OAuthError::unauthorized_client(format!(
+                "grant_type={TOKEN_EXCHANGE_GRANT_TYPE} signs a Silicon into Silicon Accounts itself with a trusted outside token: send client_id={FIRST_PARTY_APP_ID} (or no client at all). To act for an account at another app, get a User verification proof (POST /v1/proofs/user-verification)."
+            )));
+        }
+        let response = grants::federated::exchange(state, &params, meta, trace).await?;
+        return Ok(Issued::Exchanged(Box::new(response)));
+    }
+    let tokens = issue(state, meta, &params, grant, &client).await?;
+    Ok(tokens.into())
+}
+
+async fn issue(
+    state: &AppState,
+    meta: &ClientMeta,
+    params: &TokenParams,
+    grant: Grant,
+    client: &ClientAuth,
+) -> Result<TokenResponse, OAuthError> {
     match grant {
         Grant::AuthorizationCode => {
             // Public clients redeem their own codes, and the grant requires PKCE S256 for them
             // (a code alone proves nothing without a secret): the developer platform, and the
             // command-line and desktop tools of apps that turned on `public_client`.
             if client.app.app_id != DEVELOPER_APP_ID
-                && !(client.public && app_setting(state, &client, |c| c.public_client).await?)
+                && !(client.public && app_setting(state, client, |c| c.public_client).await?)
             {
-                refuse_public_client(&client, grant)?;
+                refuse_public_client(client, grant)?;
             }
-            grants::code::exchange(state, &client, &params, meta).await
+            grants::code::exchange(state, client, params, meta).await
         }
         // Public or not, a client only ever refreshes its own tokens (core checks the family).
-        Grant::RefreshToken => grants::refresh::exchange(state, &client, &params, meta).await,
+        Grant::RefreshToken => grants::refresh::exchange(state, client, params, meta).await,
         Grant::Slt => {
-            refuse_public_client(&client, grant)?;
-            grants::slt::exchange(state, &client, &params, meta).await
+            refuse_public_client(client, grant)?;
+            grants::slt::exchange(state, client, params, meta).await
         }
         Grant::DeviceCode => {
-            require_device_client(state, &client).await?;
-            grants::device::exchange(state, &client, &params, meta).await
+            require_device_client(state, client).await?;
+            grants::device::exchange(state, client, params, meta).await
         }
         Grant::JwtBearer => {
             // A Silicon's own sign-in to Silicon Accounts: first-party tokens only.
@@ -205,6 +264,9 @@ async fn handle(
                     }
                 })
         }
+        Grant::TokenExchange => Err(OAuthError::server_error(
+            "a token exchange reached the token-issuing path",
+        )),
     }
 }
 
@@ -286,7 +348,8 @@ mod tests {
         let e = Grant::parse(Some("client_credentials")).expect_err("unsupported");
         assert_eq!(e.error, "unsupported_grant_type");
         assert!(
-            e.description.contains("/v1/proofs/app-verification"),
+            e.description.contains("App verification proof")
+                && e.description.contains("/v1/proofs/app-verification"),
             "{}",
             e.description
         );

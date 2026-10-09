@@ -289,6 +289,9 @@ delivery rules. `app_id` is null and `silicon` is the Silicon's uuid.
 | `silicon.id_changed` | its si:id changed | `uuid`, `old_id`, `new_id` |
 | `silicon.stk_rotated` | its custodian rotated the STK: the old one is dead and every sign-in ended | `uuid`, `id`, `rotated_at`, `rotated_by` (account summary) |
 | `silicon.custodian.changed` | a transfer was accepted | `uuid`, `id`, `from`, `to` (account summaries) |
+| `silicon.federation.added` | the Silicon or its custodian trusted outside OIDC tokens (a CI job's) | `uuid`, `id`, `federation` (the trust), `by` (account summary) |
+| `silicon.federation.removed` | a trust was removed and the sign-ins it started ended | `uuid`, `id`, `federation`, `ended_sessions`, `by` |
+| `silicon.identity_audiences.changed` | the custodian changed which outside services it may get identity tokens for | `uuid`, `id`, `audiences`, `by` |
 | `ping` | a test (`POST /v1/me/webhook/test`) | `{}` |
 
 `released: true` means the account was never activated and its id is free again. Create the

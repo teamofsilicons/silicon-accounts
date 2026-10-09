@@ -12,8 +12,8 @@ use time::OffsetDateTime;
 
 use crate::cli::{
     CustodianArgs, CustodianCommand, DeliveriesFilter, OwnWebhookArgs, OwnWebhookCommand,
-    RequestCommand, SiliconAppsCommand, SiliconArgs, SiliconCommand, SiliconCreateArgs,
-    SiliconKeysCommand, SiliconWebhookCommand,
+    RequestCommand, SiliconAppsCommand, SiliconArgs, SiliconAudiencesCommand, SiliconCommand,
+    SiliconCreateArgs, SiliconKeysCommand, SiliconTrustCommand, SiliconWebhookCommand,
 };
 use crate::cmd::app::{deliveries_outcome, delivery_outcome, replay_outcome, replay_request};
 use crate::ctx::{Ctx, StoredRequest, UrlSource};
@@ -182,6 +182,8 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
         },
         SiliconCommand::Apps(apps) => silicon_apps(ctx, apps.command).await,
         SiliconCommand::Keys(keys) => silicon_keys(ctx, keys.command).await,
+        SiliconCommand::Trust(trust) => silicon_trust(ctx, trust.command).await,
+        SiliconCommand::Audiences(audiences) => silicon_audiences(ctx, audiences.command).await,
         SiliconCommand::Signins {
             silicon,
             limit,
@@ -1082,6 +1084,175 @@ fn allowed_text(silicon: &str, allowed: &Option<Vec<String>>) -> String {
             "{silicon} may get short-lived tokens only for: {}.",
             list.join(", ")
         ),
+    }
+}
+
+async fn silicon_trust(ctx: &Ctx, command: SiliconTrustCommand) -> CliResult<Outcome> {
+    use silicon_accounts_client::NewFederation;
+    use silicon_accounts_client::federation::{GITHUB_ACTIONS_ISSUER, GITLAB_ISSUER};
+    match command {
+        SiliconTrustCommand::Add {
+            silicon,
+            github,
+            gitlab,
+            issuer,
+            audience,
+            claims,
+            name,
+        } => {
+            let key = silicon.trim().to_string();
+            let mut conditions = std::collections::BTreeMap::new();
+            let issuer = if let Some(repo) = &github {
+                conditions.insert("repository".to_string(), repo.trim().to_string());
+                GITHUB_ACTIONS_ISSUER.to_string()
+            } else if let Some(project) = &gitlab {
+                conditions.insert("project_path".to_string(), project.trim().to_string());
+                GITLAB_ISSUER.to_string()
+            } else if let Some(issuer) = &issuer {
+                issuer.trim().to_string()
+            } else {
+                return Err(CliError::invalid(
+                    "Say which tokens to trust.",
+                    "Pass --github owner/repo, --gitlab group/project, or --issuer <https URL> with at least one --claim name=value.",
+                ));
+            };
+            for claim in &claims {
+                let Some((name, value)) = claim.split_once('=') else {
+                    return Err(CliError::invalid(
+                        format!("--claim {claim} is not name=value."),
+                        "Write each condition as --claim name=value, e.g. --claim ref=refs/heads/main.",
+                    ));
+                };
+                conditions.insert(name.trim().to_string(), value.trim().to_string());
+            }
+            let new = NewFederation {
+                issuer,
+                audience: audience.map(|a| a.trim().to_string()),
+                conditions,
+                name,
+            };
+            let trust = with_session!(ctx, |s| s.add_federation(&key, &new))?;
+            let conditions = trust
+                .conditions
+                .iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let text = format!(
+                "{key} now trusts tokens from {} for the audience {} when {conditions} ({}).",
+                trust.issuer, trust.audience, trust.id
+            );
+            let next = if trust.issuer == GITHUB_ACTIONS_ISSUER {
+                format!("silicon-accounts login --silicon {key} --federated --github-actions")
+            } else {
+                format!("silicon-accounts login --silicon {key} --federated env:<VARIABLE>")
+            };
+            Ok(Outcome::new(to_json(&trust), text).next(next, "sign in from the CI job"))
+        }
+        SiliconTrustCommand::List { silicon } => {
+            let key = silicon.trim().to_string();
+            let trusts = with_session!(ctx, |s| s.federations(&key))?;
+            let rows: Vec<Vec<String>> = trusts
+                .iter()
+                .map(|t| {
+                    vec![
+                        t.id.clone(),
+                        t.issuer.clone(),
+                        t.conditions
+                            .iter()
+                            .map(|(k, v)| format!("{k}={v}"))
+                            .collect::<Vec<_>>()
+                            .join(" "),
+                        t.last_used_at.clone().unwrap_or_else(|| "never".into()),
+                        if t.revoked_at.is_some() {
+                            "removed".into()
+                        } else {
+                            "live".into()
+                        },
+                    ]
+                })
+                .collect();
+            Ok(Outcome::new(
+                json!({ "silicon": key, "items": to_json(&trusts) }),
+                table(
+                    &["TRUST", "ISSUER", "CONDITIONS", "LAST USED", "STATE"],
+                    &rows,
+                    &format!(
+                        "{key} trusts no outside tokens: add one with `silicon-accounts silicon trust add {key} --github <owner/repo>`."
+                    ),
+                ),
+            ))
+        }
+        SiliconTrustCommand::Remove { silicon, trust_id } => {
+            let key = silicon.trim().to_string();
+            with_session!(ctx, |s| s.remove_federation(&key, &trust_id))?;
+            Ok(Outcome::new(
+                json!({ "removed": true, "silicon": key, "trust_id": trust_id }),
+                format!(
+                    "Removed the trust {trust_id} of {key}: its tokens no longer sign in, and the sign-ins it started ended."
+                ),
+            ))
+        }
+    }
+}
+
+async fn silicon_audiences(ctx: &Ctx, command: SiliconAudiencesCommand) -> CliResult<Outcome> {
+    let text = |key: &str, list: &[String]| {
+        if list.is_empty() {
+            format!("{key} may not get identity tokens for any outside service.")
+        } else {
+            format!("{key} may get identity tokens for: {}.", list.join(", "))
+        }
+    };
+    match command {
+        SiliconAudiencesCommand::List { silicon } => {
+            let key = silicon.trim().to_string();
+            let current = with_session!(ctx, |s| s.identity_audiences(&key))?;
+            Ok(Outcome::new(
+                to_json(&current),
+                text(&key, &current.audiences),
+            ))
+        }
+        SiliconAudiencesCommand::Allow { silicon, audiences } => {
+            let key = silicon.trim().to_string();
+            let current = with_session!(ctx, |s| s.identity_audiences(&key))?;
+            let mut list = current.audiences.clone();
+            for a in audiences {
+                let a = a.trim().to_string();
+                if !list.contains(&a) {
+                    list.push(a);
+                }
+            }
+            let updated = with_session!(ctx, |s| s.set_identity_audiences(&key, &list))?;
+            Ok(
+                Outcome::new(to_json(&updated), text(&key, &updated.audiences)).next(
+                    "silicon-accounts token identity --audience <audience>",
+                    "as the Silicon, get a token",
+                ),
+            )
+        }
+        SiliconAudiencesCommand::Remove {
+            silicon,
+            audiences,
+            all,
+        } => {
+            let key = silicon.trim().to_string();
+            let list: Vec<String> = if all {
+                Vec::new()
+            } else {
+                let current = with_session!(ctx, |s| s.identity_audiences(&key))?;
+                current
+                    .audiences
+                    .into_iter()
+                    .filter(|a| !audiences.iter().any(|r| r.trim() == a))
+                    .collect()
+            };
+            let updated = with_session!(ctx, |s| s.set_identity_audiences(&key, &list))?;
+            Ok(Outcome::new(
+                to_json(&updated),
+                text(&key, &updated.audiences),
+            ))
+        }
     }
 }
 

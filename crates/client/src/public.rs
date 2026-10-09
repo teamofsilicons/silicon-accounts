@@ -159,6 +159,44 @@ impl AccountsClient {
         .await
     }
 
+    /// `POST /v1/oauth/token` with a token exchange (RFC 8693): signs the Silicon `silicon`
+    /// (its si:id or uuid) in with an outside OIDC token it is trusted for, such as a GitHub
+    /// Actions or GitLab CI job's token (see [`crate::federation`]). The answer is a
+    /// first-party token response whose sign-in ends when the outside token expires (at least
+    /// 30 minutes, at most 12 hours; `refresh_token_expires_at` says when). Refresh it as usual
+    /// until then; after that, read a fresh token from the CI and exchange again.
+    ///
+    /// Errors (OAuth `invalid_grant` with a precise description): no trust of the Silicon
+    /// accepts the token (issuer, audience or a claim differs), it expired, its signature
+    /// doesn't verify, or its `jti` was used before.
+    pub async fn exchange_federated_token(
+        &self,
+        silicon: &str,
+        subject_token: &str,
+    ) -> Result<TokenResponse> {
+        let silicon = silicon.trim();
+        let subject_token = subject_token.trim();
+        if silicon.is_empty() || subject_token.is_empty() {
+            return Err(Error::invalid_input(
+                "A token exchange needs both the Silicon's si:id and the outside OIDC token.",
+                "Pass the si:id (e.g. si:scout) and the token your CI gives the job.",
+            ));
+        }
+        let request = Request::new(
+            Method::POST,
+            self.endpoint(&["v1", "oauth", "token"]),
+            Auth::None,
+        )
+        .form(&[
+            ("grant_type", crate::federation::TOKEN_EXCHANGE_GRANT_TYPE),
+            ("subject_token", subject_token),
+            ("subject_token_type", crate::federation::JWT_TOKEN_TYPE),
+            ("silicon", silicon),
+            ("client_id", FIRST_PARTY_APP_ID),
+        ]);
+        self.execute(request).await?.json()
+    }
+
     /// `POST /v1/silicons`: a Silicon creates its own account and names its custodian.
     /// The account stays `pending_custodian` until the custodian accepts (14 days).
     /// Store `stk` and `webhook_secret` from the response now: they are shown once.

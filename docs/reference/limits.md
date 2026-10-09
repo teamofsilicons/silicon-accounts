@@ -49,6 +49,8 @@ sign in once per job and reuse the session, not sign in once per command.
 | Device codes looked up, approved or denied (`/v1/device/{user_code}…`) | 60 per 10 minutes | Carbon |
 | Connecting Google or Apple (`POST /v1/me/identities/{provider}`) | 30 per hour | account |
 | Silicon sign-in attempts (`POST /v1/silicons/login`) | 60 per minute | IP |
+| Token exchanges with an outside OIDC token (`grant_type=…:token-exchange`) | 60 per minute | IP |
+| Identity tokens (`POST /v1/me/identity-tokens`) | 60 per minute | Silicon |
 | Silicon self-creations (`POST /v1/silicons`) | 10 successful per hour, and 60 attempts of any outcome per hour | IP |
 | Self-created Silicons waiting for one custodian | 20 pending | c:id or email |
 | Transfer requests | 30 per hour | custodian |
@@ -80,6 +82,9 @@ sign in once per job and reuse the session, not sign in once per command.
 | Refresh token / sign-in | 900 days from the sign-in, not extended by refreshing (**contract**); every refresh rotates the token |
 | Authorization code | 120 seconds, single use |
 | Short-lived token (`slt_…`) | 120 seconds, single use, one app |
+| Sign-in from a trusted outside token (token exchange) | until the outside token expires: at least 30 minutes, at most 12 hours; refresh tokens rotate within it |
+| Identity token | 60 to 3600 seconds, default 300 |
+| A trusted issuer's keys (JWKS) | cached for 10 minutes; fetched again for an unknown `kid`, at most every 30 seconds per issuer |
 | Device code | 600 seconds; poll every 5 seconds (`slow_down` if faster) |
 | Silicon custodian request (initial or transfer) | 14 days (**contract**: 2 weeks) |
 | Id reservation after a change | 10 days (**contract**); the previous owner may take it back meanwhile |
@@ -140,6 +145,21 @@ sign in once per job and reuse the session, not sign in once per command.
 | Assertion `jti` | 1 to 200 characters, each used once |
 | Key name | at most 100 characters |
 
+## Trust relationships and identity tokens
+
+| What | Value |
+|---|---|
+| Live trusts per Silicon | 20 |
+| Conditions per trust | 1 to 10 |
+| Condition claim name / value | 1 to 100 characters of `a-z A-Z 0-9 _ - . : /` / 1 to 500 characters |
+| Issuer / audience of a trust | 300 / 400 characters |
+| Trust name | at most 100 characters |
+| Outside token | 16 KB |
+| Clock skew on an outside token's `exp`, `nbf`, `iat` | 30 seconds |
+| Fetching an issuer's discovery document or JWKS | https, 5 seconds to connect, 10 seconds in all, 256 KB, no redirects |
+| Identity token audiences per Silicon | 0 to 20 (none until the custodian allows one), each at most 400 characters |
+| Identity token signing key | RSA 2048, RS256 |
+
 ## Event streams
 
 | What | Value |
@@ -163,6 +183,7 @@ Every 10 minutes a sweep deletes, in batches:
 - expired idempotency results;
 - id reservations, 1 day after they ended;
 - sign-up sessions, 7 days after they expired or were used;
+- used `jti`s of Silicon key assertions and of outside tokens, once they expired;
 - rate-limit windows older than a day.
 
 Proof tokens are deleted 1 day after they expire, and every token of a proof 30 days after the

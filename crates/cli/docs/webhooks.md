@@ -100,7 +100,9 @@ that can see at least one changed field. Use `account.version` to ignore stale u
 
 Silicon events: `silicon.created`, `silicon.custodian.accepted`,
 `silicon.custodian.declined`, `silicon.custodian.expired`, `silicon.updated`,
-`silicon.id_changed`, `silicon.stk_rotated`, `silicon.custodian.changed`, `ping`.
+`silicon.id_changed`, `silicon.stk_rotated`, `silicon.custodian.changed`,
+`silicon.federation.added`, `silicon.federation.removed`,
+`silicon.identity_audiences.changed`, `ping`.
 
 ## Retries and replay
 

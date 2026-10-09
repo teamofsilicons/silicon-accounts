@@ -894,7 +894,7 @@ async fn exchange_code(
             "provider_error",
             format!(
                 "{name} refused to exchange the sign-in code: {error}{}{}.",
-                if description.is_empty() { "" } else { " — " },
+                if description.is_empty() { "" } else { ": " },
                 description.chars().take(300).collect::<String>()
             ),
             "Try again, or use another sign-in method.",
@@ -1225,12 +1225,12 @@ fn error_page(settings: &Settings, headers: &HeaderMap, error: ApiError) -> Resp
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
          <title>Sign-in can't continue · Silicon Accounts</title></head>\
-         <body style=\"margin:0;padding:24px;background:#FFFDF9;color:#353432;font-family:system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif\">\
+         <body style=\"margin:0;padding:24px;background:#F7F8FA;color:#292929;font-family:system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif\">\
          <main id=\"callback-error\" data-error=\"{code}\" style=\"max-width:480px;margin:10vh auto\">\
          <h1 style=\"font-weight:500;font-size:24px\">This sign-in can't continue</h1>\
-         <p>{message}</p><p style=\"color:#6F6B66\">{hint}</p>\
+         <p>{message}</p><p style=\"color:#5C6370\">{hint}</p>\
          <p><a href=\"{site}\" style=\"color:#1F5FB8\">Go to Silicon Accounts</a></p></main>\
-         <footer style=\"text-align:center;font-size:13px;color:#6F6B66\">Powered by \
+         <footer style=\"text-align:center;font-size:13px;color:#5C6370\">Powered by \
          <a href=\"{product}\" style=\"color:#1F5FB8\">Silicon Accounts</a></footer></body></html>",
         code = escape(&error.code),
         message = escape(&error.message),

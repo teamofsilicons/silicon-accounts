@@ -5,12 +5,12 @@
 //!
 //! | route | what |
 //! |---|---|
-//! | `POST /v1/oauth/token` | every grant: `authorization_code`, `refresh_token`, `urn:silicon:params:oauth:grant-type:slt` (alias `slt`), `urn:ietf:params:oauth:grant-type:device_code` |
+//! | `POST /v1/oauth/token` | every grant: `authorization_code`, `refresh_token`, `urn:silicon:params:oauth:grant-type:slt` (alias `slt`), `urn:ietf:params:oauth:grant-type:device_code`, `urn:ietf:params:oauth:grant-type:jwt-bearer`, `urn:ietf:params:oauth:grant-type:token-exchange` (a Silicon's trusted outside OIDC token; the sign-in ends when that token expires) |
 //! | `POST /v1/oauth/revoke` | RFC 7009: ends the sign-in (token family) behind a refresh or access token; always 200 once the client is authenticated |
 //! | `POST /v1/oauth/introspect` | RFC 7662: is this token of the calling app live right now? |
 //! | `GET`/`POST /v1/userinfo` | the account as the token's app may see it, plus the OIDC claim names |
 //! | `GET /.well-known/openid-configuration` | OIDC discovery |
-//! | `GET /.well-known/jwks.json` | the Ed25519 key that signs access tokens and `id_tokens` |
+//! | `GET /.well-known/jwks.json` | the Ed25519 key that signs access tokens and `id_tokens`, and the RS256 key of identity tokens |
 //! | `POST /v1/device/authorize` | RFC 8628: starts a device sign-in for the silicon-accounts CLI |
 //!
 //! Rules that hold across the crate:
@@ -42,7 +42,8 @@
 //!   codes 600 s polled every 5 s (`accounts_core::repo::tokens`).
 //! - Revocation, refresh-token reuse and code reuse are written to `audit_log` as
 //!   `oauth.token_revoked`, `oauth.refresh_reuse_detected` and `oauth.code_reuse_detected`;
-//!   SLT and device sign-ins to `signin_history` (methods `slt` and `device`). Code exchanges
+//!   SLT, device and token-exchange sign-ins to `signin_history` (methods `slt`, `device` and
+//!   `federated`). Code exchanges
 //!   don't add history: the consent step that issued the code already recorded the sign-in.
 
 mod credentials;
@@ -64,7 +65,7 @@ use tokio::task::JoinHandle;
 
 pub use device::DEVICE_AUTHORIZE_PER_IP;
 pub use sweep::{GRANT_RETENTION_DAYS, PurgedGrants, purge_expired_grants};
-pub use token::{DEVICE_CODE_GRANT_TYPE, SLT_GRANT_TYPE};
+pub use token::{DEVICE_CODE_GRANT_TYPE, SLT_GRANT_TYPE, TOKEN_EXCHANGE_GRANT_TYPE};
 
 /// The `membership.signed_out` reason sent when a reused authorization code revokes the
 /// tokens issued from it (core's `events::signout_reason::AUTHORIZATION_CODE_REUSE`).

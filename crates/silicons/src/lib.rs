@@ -8,6 +8,9 @@
 //! | `GET /v1/silicons/requests/{id}` | `Bearer sarq_…` | the custodian's decision, for the waiting Silicon |
 //! | `POST /v1/silicons/login` | public | si:id + STK, or a key-signed assertion → first-party tokens |
 //! | `GET`/`POST /v1/silicons/{id}/keys`, `DELETE …/keys/{key_id}` | the Silicon or its custodian | the Silicon's Ed25519 keys |
+//! | `GET`/`POST /v1/silicons/{id}/federations`, `DELETE …/federations/{federation_id}` | the Silicon or its custodian | trust relationships: which outside OIDC tokens (CI jobs) sign the Silicon in |
+//! | `GET`/`PUT /v1/silicons/{id}/identity-audiences` | the Silicon or its custodian (`PUT`: the custodian) | the outside services the Silicon may get identity tokens for |
+//! | `POST /v1/me/identity-tokens` | session (Silicon) | an OIDC identity token for one allowed outside audience (AWS, Google Cloud, Microsoft Entra) |
 //! | `POST /v1/me/short-lived-tokens` | session | a 2-minute single-use token to sign into one app |
 //! | `PUT`/`DELETE /v1/me/webhook`, `POST /v1/me/webhook/test` | session (Silicon) | the Silicon's own webhook |
 //! | `GET /v1/me/webhook/deliveries[/{id}]`, `POST /v1/me/webhook/replay` (IDEMPOTENT) | session (Silicon) | its webhook's deliveries: list, inspect, replay |
@@ -35,7 +38,9 @@ mod common;
 mod custodian;
 mod custodian_apps;
 mod custodian_requests;
+mod federations;
 mod history;
+mod identity;
 mod input;
 mod keys;
 mod lifecycle;
@@ -58,6 +63,7 @@ use axum::response::Response;
 use axum::routing::{get, post, put};
 use tokio::task::JoinHandle;
 
+pub use identity::IDENTITY_TOKENS_PER_SILICON;
 pub use login::{LOCK_SECONDS, MAX_STK_FAILURES};
 pub use own_webhook::WEBHOOK_TESTS_PER_SILICON;
 pub use requests::{MAX_PENDING_PER_CUSTODIAN, REQUEST_TTL_DAYS};
@@ -75,6 +81,19 @@ pub fn router() -> Router<AppState> {
             "/v1/silicons/{id}/keys/{key_id}",
             axum::routing::delete(keys::revoke),
         )
+        .route(
+            "/v1/silicons/{id}/federations",
+            get(federations::list).post(federations::add),
+        )
+        .route(
+            "/v1/silicons/{id}/federations/{federation_id}",
+            axum::routing::delete(federations::remove),
+        )
+        .route(
+            "/v1/silicons/{id}/identity-audiences",
+            get(identity::get_audiences).put(identity::set_audiences),
+        )
+        .route("/v1/me/identity-tokens", post(identity::issue))
         .route(
             "/v1/silicons/requests/{id}",
             get(self_create::request_status),

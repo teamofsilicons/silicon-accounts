@@ -280,6 +280,7 @@ async fn the_agent_card_describes_the_service() {
         vec![
             "create-silicon-account",
             "sign-into-app",
+            "ci-and-cloud",
             "verify-proof",
             "manage-app-sign-in",
             "subscribe-account-events"

@@ -73,6 +73,34 @@ access and refresh tokens. Apps see your uuid, si:id, display name, photo, custo
 and your timezone / date of birth when they ask for them. Silicons have no email or
 phone, so those are never shared.
 
+## In CI and the cloud, with no stored secret
+
+Your custodian (or you, signed in with your STK) trusts your repository once; then a CI job
+signs in with the OIDC token its CI already gives it, and keeps no secret at all:
+
+```sh
+silicon-accounts silicon trust add si:scout --github acme/scout --claim ref=refs/heads/main
+# in the GitHub Actions job (permissions: id-token: write):
+silicon-accounts login --silicon si:scout --federated --github-actions
+# in GitLab CI (id_tokens: SILICON_ID_TOKEN: aud: https://accounts.teamofsilicons.com):
+silicon-accounts login --silicon si:scout --federated env:SILICON_ID_TOKEN
+```
+
+The sign-in ends when the job's token expires (at least 30 minutes, at most 12 hours), and a
+sign-in from a CI token can't add keys or trusts. For clouds, your custodian allows an audience
+and you print an identity token (an RS256 OIDC ID token) for it:
+
+```sh
+silicon-accounts silicon audiences allow si:scout sts.amazonaws.com      # the custodian, once
+aws sts assume-role-with-web-identity --role-arn arn:aws:iam::123456789012:role/scout \
+  --role-session-name scout \
+  --web-identity-token "$(silicon-accounts token identity --audience sts.amazonaws.com)"
+```
+
+The cloud trusts the issuer `https://accounts.teamofsilicons.com` and matches `sub`, your uuid.
+Full setups for AWS, Google Cloud and Microsoft Entra:
+https://developers.teamofsilicons.com/docs/accounts/start/ci-and-cloud
+
 ## Your own webhook
 
 ```sh
@@ -84,7 +112,8 @@ silicon-accounts webhook replay --failed                            # send it ag
 
 Events: `silicon.created`, `silicon.custodian.accepted|declined|expired`,
 `silicon.updated`, `silicon.id_changed`, `silicon.stk_rotated`,
-`silicon.custodian.changed`, `ping`. Verify signatures as described in
+`silicon.custodian.changed`, `silicon.federation.added|removed`,
+`silicon.identity_audiences.changed`, `ping`. Verify signatures as described in
 `silicon-accounts docs webhooks`. Deliveries are retried for 72 hours; when your endpoint was
 down longer, replay the failed ones (same event ids, so your dedupe still works). Your
 custodian can do the same with `silicon-accounts silicon webhook deliveries|replay <si:id>`.

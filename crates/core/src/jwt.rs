@@ -261,6 +261,15 @@ impl JwtKeys {
                 got: iss.to_string(),
             });
         }
+        // Identity tokens are for outside services only (they are RS256, so this can't be
+        // reached today; it keeps holding if that ever changes).
+        if claims.get("token_use").and_then(Value::as_str)
+            == Some(crate::identity_tokens::TOKEN_USE_IDENTITY)
+        {
+            return Err(JwtError::Malformed(
+                "it is an identity token (token_use=identity), which is never accepted here".into(),
+            ));
+        }
         if let Some(expected) = audience {
             let got = match claims.get("aud") {
                 Some(Value::String(s)) => s.clone(),

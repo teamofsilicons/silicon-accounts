@@ -1,8 +1,11 @@
 //! OIDC discovery (`/.well-known/openid-configuration`) and the JWKS (`/.well-known/jwks.json`).
 //!
 //! The issuer is `ACCOUNTS_PUBLIC_URL`; every endpoint is absolute on it. Access tokens and
-//! `id_tokens` are `EdDSA` (Ed25519) JWTs whose `kid` names the key in the JWKS. Both documents are
-//! public and may be cached for 5 minutes (CORS `*` comes from the server's middleware).
+//! `id_tokens` are `EdDSA` (Ed25519) JWTs whose `kid` names the key in the JWKS. Identity tokens
+//! (a Silicon's OIDC tokens for outside services such as AWS STS, Google Cloud and Microsoft
+//! Entra, which don't accept EdDSA) are RS256 with their own key, published in the same JWKS
+//! after the Ed25519 key. Both documents are public and may be cached for 5 minutes (CORS `*`
+//! comes from the server's middleware).
 
 use accounts_core::AppState;
 use accounts_core::models::Scope;
@@ -11,7 +14,9 @@ use axum::response::Response;
 use serde_json::{Value, json};
 
 use crate::respond::cacheable;
-use crate::token::{DEVICE_CODE_GRANT_TYPE, JWT_BEARER_GRANT_TYPE, SLT_GRANT_TYPE};
+use crate::token::{
+    DEVICE_CODE_GRANT_TYPE, JWT_BEARER_GRANT_TYPE, SLT_GRANT_TYPE, TOKEN_EXCHANGE_GRANT_TYPE,
+};
 
 /// Seconds clients may cache discovery and the JWKS.
 const CACHE_SECONDS: u32 = 300;
@@ -21,9 +26,19 @@ pub(crate) async fn openid_configuration(State(state): State<AppState>) -> Respo
     cacheable(&document(&state), CACHE_SECONDS)
 }
 
-/// `GET /.well-known/jwks.json`.
+/// `GET /.well-known/jwks.json`: the Ed25519 key, then the RS256 identity-token key. When the
+/// identity-token key can't be read (the database is down), the Ed25519 key is still served,
+/// but not for long: outside verifiers would cache a set without the RS256 key.
 pub(crate) async fn jwks(State(state): State<AppState>) -> Response {
-    cacheable(&state.keys.jwt.jwks(), CACHE_SECONDS)
+    let mut keys = vec![state.keys.jwt.jwk()];
+    match state.identity_signer().await {
+        Ok(signer) => keys.push(signer.jwk().clone()),
+        Err(e) => {
+            tracing::error!(error = %e.message, "the identity-token key could not be loaded for the JWKS");
+            return cacheable(&json!({ "keys": keys }), 10);
+        }
+    }
+    cacheable(&json!({ "keys": keys }), CACHE_SECONDS)
 }
 
 /// The discovery document.
@@ -48,9 +63,11 @@ fn document(state: &AppState) -> Value {
             DEVICE_CODE_GRANT_TYPE,
             SLT_GRANT_TYPE,
             JWT_BEARER_GRANT_TYPE,
+            TOKEN_EXCHANGE_GRANT_TYPE,
         ],
         "subject_types_supported": ["public"],
-        "id_token_signing_alg_values_supported": ["EdDSA"],
+        // EdDSA: id_tokens for apps. RS256: identity tokens for outside services.
+        "id_token_signing_alg_values_supported": ["EdDSA", "RS256"],
         "scopes_supported": Scope::ALL.iter().map(Scope::as_str).collect::<Vec<_>>(),
         "claims_supported": [
             "iss", "sub", "aud", "exp", "iat", "auth_time", "nonce",

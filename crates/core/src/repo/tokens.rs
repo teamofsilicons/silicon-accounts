@@ -181,9 +181,20 @@ pub struct NewFamily<'a> {
 
 /// Creates a token family (expires 900 days from now).
 pub async fn create_family(conn: &mut PgConnection, new: &NewFamily<'_>) -> ApiResult<TokenFamily> {
+    create_family_for(conn, new, None).await
+}
+
+/// Creates a token family that expires `lifetime_seconds` from now (database clock), or 900
+/// days from now.
+async fn create_family_for(
+    conn: &mut PgConnection,
+    new: &NewFamily<'_>,
+    lifetime_seconds: Option<i64>,
+) -> ApiResult<TokenFamily> {
     Ok(sqlx::query_as::<_, TokenFamily>(concat!(
         "insert into token_families (id, app_id, account_uuid, origin, scopes, browser_session_id, label, expires_at, ip, user_agent, auth_time) \
-         values ($1, $2, $3, $4, $5, $6, $7, now() + make_interval(days => $8), $9, $10, $11) returning ",
+         values ($1, $2, $3, $4, $5, $6, $7, \
+                 now() + coalesce(make_interval(secs => $12), make_interval(days => $8)), $9, $10, $11) returning ",
         family_columns!()
     ))
     .bind(Uuid::now_v7())
@@ -197,9 +208,13 @@ pub async fn create_family(conn: &mut PgConnection, new: &NewFamily<'_>) -> ApiR
     .bind(new.ip)
     .bind(new.user_agent.map(|u| u.chars().take(400).collect::<String>()))
     .bind(new.auth_time)
+    .bind(lifetime_seconds.map(|s| s as f64))
     .fetch_one(&mut *conn)
     .await?)
 }
+
+/// The `issued_token_type` of an access token (RFC 8693).
+pub const ACCESS_TOKEN_TYPE: &str = "urn:ietf:params:oauth:token-type:access_token";
 
 async fn insert_refresh(
     conn: &mut PgConnection,
@@ -248,6 +263,33 @@ pub async fn issue_tokens(
     settings: &Settings,
     req: IssueRequest<'_>,
 ) -> ApiResult<TokenResponse> {
+    issue_tokens_inner(conn, keys, settings, req, None)
+        .await
+        .map(|(response, _)| response)
+}
+
+/// Like [`issue_tokens`], for a sign-in that ends `lifetime_seconds` from now (database clock)
+/// instead of after 900 days: its refresh tokens rotate as usual but stop with it, and so do its
+/// access tokens. Used for sign-ins with a trusted outside token, which never outlive that
+/// token by more than one access token. Returns the response and the family, so the caller can
+/// link the family to what started it.
+pub async fn issue_tokens_for(
+    conn: &mut PgConnection,
+    keys: &Keys,
+    settings: &Settings,
+    req: IssueRequest<'_>,
+    lifetime_seconds: i64,
+) -> ApiResult<(TokenResponse, TokenFamily)> {
+    issue_tokens_inner(conn, keys, settings, req, Some(lifetime_seconds.max(1))).await
+}
+
+async fn issue_tokens_inner(
+    conn: &mut PgConnection,
+    keys: &Keys,
+    settings: &Settings,
+    req: IssueRequest<'_>,
+    lifetime_seconds: Option<i64>,
+) -> ApiResult<(TokenResponse, TokenFamily)> {
     if !req.account.is_active() {
         return Err(ApiError::forbidden(
             "account_not_active",
@@ -259,7 +301,7 @@ pub async fn issue_tokens(
         ));
     }
     let scopes = crate::models::normalize_scopes(req.scopes.to_vec());
-    let family = create_family(
+    let family = create_family_for(
         conn,
         &NewFamily {
             app_id: req.app_id,
@@ -272,10 +314,11 @@ pub async fn issue_tokens(
             user_agent: req.user_agent,
             auth_time: req.auth_time,
         },
+        lifetime_seconds,
     )
     .await?;
     let refresh_token = insert_refresh(conn, &keys.pepper, family.id, 1).await?;
-    build_response(
+    let response = build_response(
         conn,
         keys,
         settings,
@@ -284,7 +327,8 @@ pub async fn issue_tokens(
         refresh_token,
         req.nonce,
     )
-    .await
+    .await?;
+    Ok((response, family))
 }
 
 async fn build_response(
@@ -590,6 +634,9 @@ pub async fn verify_access_token(
             format!("The bearer token must be an access token (a JWT starting with eyJ), but this is {what}."),
         )
         .hint("Exchange it at POST /v1/oauth/token for an access token, or sign in again."));
+    }
+    if crate::identity_tokens::is_identity_token(token) {
+        return Err(crate::identity_tokens::not_an_access_token());
     }
     let claims = keys.jwt.verify_access(token, audience).map_err(|e| match e {
         JwtError::WrongAudience { expected, got } => ApiError::unauthenticated(

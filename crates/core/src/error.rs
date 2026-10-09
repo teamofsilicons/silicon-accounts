@@ -339,7 +339,7 @@ impl FieldErrors {
         if parts.is_empty() {
             "The request has invalid fields.".to_string()
         } else {
-            format!("Invalid fields — {}.", parts.join("; "))
+            format!("Invalid fields: {}.", parts.join("; "))
         }
     }
 
@@ -518,18 +518,18 @@ mod tests {
         );
         assert_eq!(
             f.summary(),
-            "Invalid fields — display_name: The display name is empty; it must be 1 to 100 characters."
+            "Invalid fields: display_name: The display name is empty; it must be 1 to 100 characters."
         );
         f.add("dob", "Use a date like 1990-04-21. ");
         assert_eq!(
             f.summary(),
-            "Invalid fields — display_name: The display name is empty; it must be 1 to 100 characters; dob: Use a date like 1990-04-21."
+            "Invalid fields: display_name: The display name is empty; it must be 1 to 100 characters; dob: Use a date like 1990-04-21."
         );
         f.add("custodian", "Name a Carbon, e.g. c:scout.");
         f.add("timezone", "unknown");
         assert_eq!(
             f.summary(),
-            "Invalid fields — custodian: Name a Carbon, e.g. c:scout; display_name: The display name is empty; it must be 1 to 100 characters; dob: Use a date like 1990-04-21; and 1 more."
+            "Invalid fields: custodian: Name a Carbon, e.g. c:scout; display_name: The display name is empty; it must be 1 to 100 characters; dob: Use a date like 1990-04-21; and 1 more."
         );
         // details.fields keep each message whole.
         assert_eq!(f.to_json()["custodian"], "Name a Carbon, e.g. c:scout.");

@@ -51,6 +51,12 @@ pub mod types {
     pub const SILICON_STK_ROTATED: &str = "silicon.stk_rotated";
     /// Silicon-facing custodian change (to the Silicon's own webhook).
     pub const SILICON_OWN_CUSTODIAN_CHANGED: &str = "silicon.custodian.changed";
+    /// A trust relationship for outside OIDC tokens was added to the Silicon.
+    pub const SILICON_FEDERATION_ADDED: &str = "silicon.federation.added";
+    /// A trust relationship was removed (the sign-ins it started ended).
+    pub const SILICON_FEDERATION_REMOVED: &str = "silicon.federation.removed";
+    /// The custodian changed the audiences the Silicon may get identity tokens for.
+    pub const SILICON_IDENTITY_AUDIENCES_CHANGED: &str = "silicon.identity_audiences.changed";
 }
 
 /// `membership.signed_out` reasons.
@@ -117,6 +123,9 @@ pub const SILICON_EVENT_TYPES: &[&str] = &[
     types::SILICON_ID_CHANGED,
     types::SILICON_STK_ROTATED,
     types::SILICON_OWN_CUSTODIAN_CHANGED,
+    types::SILICON_FEDERATION_ADDED,
+    types::SILICON_FEDERATION_REMOVED,
+    types::SILICON_IDENTITY_AUDIENCES_CHANGED,
     types::PING,
 ];
 

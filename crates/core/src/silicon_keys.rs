@@ -449,7 +449,7 @@ pub async fn sign_in(
         &SigninRecord {
             account_uuid: Some(&account.uuid),
             app_id: Some(crate::FIRST_PARTY_APP_ID),
-            method: "silicon_key",
+            method: audit::method::SILICON_KEY,
             outcome: audit::outcome::SUCCESS,
             ip: meta.ip.as_deref(),
             user_agent: meta.user_agent.as_deref(),

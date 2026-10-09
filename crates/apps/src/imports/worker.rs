@@ -353,7 +353,7 @@ async fn process_job(state: &AppState, conn: &mut PgConnection, job: &JobRecord)
                     // The cause is logged by ApiError::internal; the job says what it means.
                     return Err(ApiError {
                         message: format!(
-                            "Silicon Accounts hit an internal error while importing rows {first}–{last}, so the job stopped there. Rows before {first} were imported; re-submit the file to import the rest (rows already imported match their accounts)."
+                            "Silicon Accounts hit an internal error while importing rows {first} to {last}, so the job stopped there. Rows before {first} were imported; re-submit the file to import the rest (rows already imported match their accounts)."
                         ),
                         ..e
                     });
@@ -361,7 +361,7 @@ async fn process_job(state: &AppState, conn: &mut PgConnection, job: &JobRecord)
                 Err(e) => {
                     return Err(ApiError {
                         message: format!(
-                            "Rows {first}–{last} could not be imported: {}",
+                            "Rows {first} to {last} could not be imported: {}",
                             e.message
                         ),
                         ..e

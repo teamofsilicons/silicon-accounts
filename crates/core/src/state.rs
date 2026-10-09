@@ -76,6 +76,10 @@ pub struct AppState {
     /// 60 s cache of verified app credentials.
     pub app_cache: AppCredentialCache,
     pub telemetry: Telemetry,
+    /// Fetches trusted OIDC issuers' keys (SSRF-guarded) and caches them.
+    pub federation: crate::federation::FederationClient,
+    /// The RS256 key of identity tokens, loaded from (or made in) the database on first use.
+    pub identity_key: crate::identity_tokens::IdentityKeyCell,
 }
 
 impl std::fmt::Debug for AppState {
@@ -107,6 +111,9 @@ impl AppState {
         let http = build_http_client()?;
         let sender = crate::delivery::sender_from_settings(&settings, &http);
         let telemetry = Telemetry::from_settings(&settings);
+        let federation =
+            crate::federation::FederationClient::new(settings.federation_allow_loopback)
+                .map_err(StartupError::Http)?;
         Ok(AppState {
             db,
             settings: Arc::new(settings),
@@ -115,6 +122,8 @@ impl AppState {
             sender,
             app_cache: AppCredentialCache::new(),
             telemetry,
+            federation,
+            identity_key: crate::identity_tokens::IdentityKeyCell::new(),
         })
     }
 
@@ -130,6 +139,19 @@ impl AppState {
         keys.stk = hasher;
         self.keys = Arc::new(keys);
         self
+    }
+
+    /// Uses this identity-token key instead of the stored one (tests).
+    pub fn with_identity_key(mut self, signer: crate::identity_tokens::IdentitySigner) -> AppState {
+        self.identity_key = crate::identity_tokens::IdentityKeyCell::with(signer);
+        self
+    }
+
+    /// The identity-token signing key (loaded from, or made in, the database once).
+    pub async fn identity_signer(
+        &self,
+    ) -> crate::ApiResult<&crate::identity_tokens::IdentitySigner> {
+        self.identity_key.get(&self.db, &self.keys.keyring).await
     }
 
     pub fn settings(&self) -> &Settings {

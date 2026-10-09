@@ -434,6 +434,12 @@ Every endpoint, grouped like the pages that describe it. **Idem.** marks the one
 | `GET /v1/silicons/requests/{id}` | request token | | 200 request |
 | `POST /v1/silicons/login` | public | | 200 token response |
 | `POST /v1/me/short-lived-tokens` | account | | 201 short-lived token |
+| `POST /v1/me/identity-tokens` | account (Silicon) | | 201 identity token |
+| `GET /v1/silicons/{id}/federations` | account (the Silicon or its custodian) | | 200 list |
+| `POST /v1/silicons/{id}/federations` | account (the Silicon or its custodian) | | 201 trust |
+| `DELETE /v1/silicons/{id}/federations/{federation_id}` | account (the Silicon or its custodian) | | 204 |
+| `GET /v1/silicons/{id}/identity-audiences` | account (the Silicon or its custodian) | | 200 audiences |
+| `PUT /v1/silicons/{id}/identity-audiences` | account (custodian) | | 200 audiences |
 | `PUT /v1/me/webhook` | account (Silicon) | | 200 webhook + secret |
 | `DELETE /v1/me/webhook` | account (Silicon) | | 204 |
 | `POST /v1/me/webhook/test` | account (Silicon) | | 202 queued ping |

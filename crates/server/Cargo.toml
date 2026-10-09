@@ -52,6 +52,9 @@ uuid.workspace = true
 silicon-accounts-core = { workspace = true, features = ["test-support"] }
 base64.workspace = true
 ed25519-dalek.workspace = true
+jsonwebtoken.workspace = true
+p256.workspace = true
+rsa.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 tower.workspace = true

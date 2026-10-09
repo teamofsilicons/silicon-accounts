@@ -104,7 +104,7 @@ async fn change_my_id(
 | module | what | key items |
 |---|---|---|
 | `config` | `ACCOUNTS_*` settings, dev defaults, production refusals | `Settings::from_env`, `Settings::for_tests`, `Settings::from_lookup`, `VARIABLES`, `DEV_*` |
-| `state` | shared state | `AppState { db, settings, keys, http, sender, app_cache, telemetry }`, `Keys { pepper, keyring, jwt, stk }` |
+| `state` | shared state | `AppState { db, settings, keys, http, sender, app_cache, telemetry, federation, identity_key }` (+ `identity_signer()`, `with_identity_key`), `Keys { pepper, keyring, jwt, stk }` |
 | `db` | pool + embedded migrations | `connect`, `connect_url`, `migrate` → `MigrationReport`, `pending_migrations`, `ping`, `MIGRATOR` |
 | `error` | API errors | `ApiError`, `ApiResult`, `FieldErrors`, `OAuthError` |
 | `ids` | uuid scramble, `c:`/`si:` ids, suggestions | `uuid_for_number`, `number_for_uuid`, `AccountId`, `IdError`, `validate_handle`, `handle_candidates`, `pick_available`, `membership_id`, `validate_app_id` |
@@ -123,13 +123,15 @@ async fn change_my_id(
 | `repo::apps` | apps | `get`, `require_active`, `owned_by`, `signin_row` → `AppSigninRow`, `effective_config`, `webhook_target`, `AppCredentialCache`, `AppAuthError`, `unknown_app`, `app_disabled` |
 | `repo::memberships` | `{app_id}:{uuid}` | `get`, `upsert_signin` (+`GrantMode`), `upsert_imported`, `list_for_account`, `remove_access`, `webhook_targets` (one row per member app and active subscription) |
 | `repo::subscriptions` | app event subscriptions | `Subscription`, `list`, `get`, `by_delivery`, `lock`, `insert_stream`, `set_webhook_updates` (the webhook's updates live in `app_signin_configs.webhook_events`; a trigger keeps its row in step), `set_stream_updates`, `set_status`, `delete_stream`, `validate_updates`, `wants` |
-| `repo::tokens` | grants | `issue_tokens`, `refresh`, `verify_access_token`, `create_family`, `find_family`, `family_for_refresh_token`, `revoke_family`, `revoke_families` (+`RevokeFilter`), `list_families`, `count_active_families`, `create_code`/`consume_code`, `create_slt`/`consume_slt`, `create_device`/`create_app_device`/`device_by_user_code`/`decide_device`/`poll_device`/`poll_app_device`, `GrantError` |
+| `repo::tokens` | grants | `issue_tokens`, `issue_tokens_for` (a sign-in with its own end, for token exchanges), `refresh`, `verify_access_token`, `create_family`, `find_family`, `family_for_refresh_token`, `revoke_family`, `revoke_families` (+`RevokeFilter`), `list_families`, `count_active_families`, `create_code`/`consume_code`, `create_slt`/`consume_slt`, `create_device`/`create_app_device`/`device_by_user_code`/`decide_device`/`poll_device`/`poll_app_device`, `GrantError` |
 | `repo::sessions` | browser sessions | `create`, `lookup`, `get`, `touch`, `mark_authenticated`, `authenticated_at`, `revoke`, `revoke_all`, `list_active` |
 | `repo::otp` | 6-digit codes | `send`, `verify` (+`Expect`, `Attempt`), `get`, `purge` |
 | `repo::rate_limit` | fixed windows | `enforce`, `enforce_pool`, `hit`, `peek` (no count), `take` (weighted), `bucket`, `limits::*`, `purge` |
 | `repo::idempotency` | Idempotency-Key | `run` (sealed when secret-bearing), `scope`, `begin`/`complete`/`abandon`, `seal`/`unseal`, `request_hash`, `purge` |
 | `repo::audit` | history | `record(AuditEntry)`, `signin(SigninRecord)`, `handle_history`, `method::*`, `outcome::*` |
 | `access` | admitting a Carbon without the hosted pages | `carbon_may_sign_in` (domain rule, required details) |
+| `federation` | workload identity federation: trusted outside OIDC tokens (CI jobs) sign a Silicon in | `validate` (`NewFederation` → `ValidFederation`), `check_url` (https, public addresses; loopback only with `federation_allow_loopback`), `FederationClient` (SSRF-guarded fetch, JWKS cache: `discover`, `age_cache`, `clear`), `peek`, `verify` → `VerifiedToken` (`mismatch(trust)`), `sign_in` (the token exchange), `session_seconds`, `live_federations`, `is_federated_session`, `federated_session_refused`, `Federation`, `GITHUB_ACTIONS_ISSUER`, `GITLAB_ISSUER` |
+| `identity_tokens` | a Silicon's OIDC ID tokens for clouds (RS256) | `IdentitySigner` (`generate`, `from_pkcs8_der`, `sign`, `verify`, `jwk`, `kid`), `IdentityKeyCell`, `load_or_create` (made once, sealed with the keyring, stored in `signing_keys`), `IdentityClaims`, `validate_audience`, `is_identity_token`, `not_an_access_token`, `TOKEN_USE_IDENTITY` |
 | `silicon_keys` | Silicon key credentials | `parse_public_key`, `PublicKey::fingerprint`, `read_assertion`, `Assertion::signed_by`, `sign_in` (assertion to first-party tokens), `SiliconKey`, `audiences` |
 | `events` | webhooks and the event stream | `APP_UPDATE_CHOICES`, `DEFAULT_UPDATES`, `APP_EVENT_TYPES`, `SILICON_EVENT_TYPES`, `event_types_for_updates`, `ping_subscription`, `notify_id_changed`, `notify_profile_updated`, `account_deleted`, `membership_signed_out`, `signed_out_for_families`, `membership_access_removed`, `notify_custodian_changed`, `silicon_custodian_declined`, `silicon_custodian_expired`, `emit_to_app`, `emit_to_silicon`, `ping_app`, `ping_silicon`, `current_url`, `current_secret`, `new_webhook_secret`, `retry_delay_seconds`, `signout_reason::*`, `declined_reason::*`, header constants |
 | `delivery` | email/SMS | `enqueue`, `enqueue_otp`, `spawn_deliver`, `deliver_now`, `claim_due`, `deliver_claimed` (claim-checked), `CLAIM_SECONDS`, `Sender`, `PostmarkSender`, `TwilioSender`, `LocalSender`, `templates::*`, `extract_code` |
@@ -278,13 +280,22 @@ step is dropped (no step left = `null`), a newly requested detail joins the last
 carries `flow` is validated exactly as sent.
 `first_party_redirect_allowed(settings, uri)` compares parsed origins.
 
-Default palettes (`Palette::default_light`, `default_dark`): filled buttons are the brand blue
-`#1F5FB8` under `#FFFDF9` text in both themes (6.1:1). The dark default was `#5B8FE0` (3.2:1 under
-`#FFFDF9`, below AA); migration 0003 moved every stored config still carrying that old default pair
-to `#1F5FB8` (a new config version and a `system` history entry). `#5B8FE0` remains the site's ink
-for links and accents on dark surfaces, not a fill. Error text (`danger`) meets 4.5:1 on the card
-and the page in both themes: the dark default is `#FF8A80` (5.45:1 on `#353432`); migration 0004
-moved stored configs that still paired the old `#F97066` (4.46:1) with the default dark card.
+Default palettes (`Palette::default_light`, `default_dark`) are the Silicon look of the account
+site and the developer site (`web/styles/tokens.css`): light `#F7F8FA` page, `#FFFFFF` card,
+`#292929` text, muted `#5C6370`, border `#E2E5EB`; dark `#02040A` page, `#0B0F18` card, `#F7F8FA`
+text, muted `#9BA4B4`, border `#1F2635`; filled buttons are the brand blue `#1F5FB8` under white
+(6.2:1) in light and `#F7F8FA` (5.8:1) in dark; error text `#B42318` and `#FF8A80`. Every text pair
+meets 4.5:1 on the card and the page (`default_palettes_meet_wcag_aa_for_text`). New apps store
+these. Apps made before them keep the older warm defaults exactly as stored (`Palette::legacy_light`,
+`legacy_dark`: `#FFFDF9` paper, `#353432` text; no migration), and the hosted pages paint those in
+the new look (`web/lib/branding/defaults.ts` LEGACY_LIGHT, LEGACY_DARK). A palette reset with
+`null` takes the new defaults.
+
+Earlier palette changes: the dark default fill was `#5B8FE0` (3.2:1 under `#FFFDF9`, below AA);
+migration 0003 moved every stored config still carrying that pair to `#1F5FB8` (a new config
+version and a `system` history entry). `#5B8FE0` remains an ink for links and accents on dark
+surfaces, not a fill. The dark `danger` was `#F97066` (4.46:1 on the old `#353432` card); migration
+0004 moved stored configs that still paired it with that card to `#FF8A80`.
 
 ## views
 

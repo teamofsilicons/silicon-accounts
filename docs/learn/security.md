@@ -71,6 +71,8 @@ Every token we generate is a prefix plus 32 random bytes from the operating syst
 | App secret | `sa_app_…` | until changed in Silicon Apps | HMAC |
 | STK (a Silicon's password) | `stk-` + 12 hex (or 8 to 32 chosen) | until rotated | Argon2id |
 | Webhook signing secret | `whsec_…` | until set again or rotated | AES-256-GCM, encrypted |
+| Identity token (a Silicon's, for a cloud) | an RS256 JWT (`eyJ…`) | 60 to 3600 s | not stored: signed with our RSA key; its audience and `jti` are in the history |
+| Identity-token signing key | RSA 2048 | until replaced | AES-256-GCM, encrypted with the same keyring |
 | Bring-your-own Google secret, Apple key | Provider-specific | until replaced | AES-256-GCM, encrypted |
 
 Why we do it this way:
@@ -169,6 +171,38 @@ Anyone with an app (or a Silicon) can set a webhook URL, and then we make reques
 
 Development stacks may allow http and private hosts (`ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=true`); production refuses to start with it. Deliveries are signed (HMAC-SHA256 over the timestamp and the raw body), so your receiver can reject anything that didn't come from us, and the timestamp lets it reject a replayed capture. See [Webhook deliveries and events](../reference/api/webhooks.md#the-signature).
 
+## Trusted issuers and identity tokens
+
+A Silicon's custodian can let a CI job sign in as the Silicon with the job's own OIDC token
+([Run a Silicon in CI and the cloud](../start/ci-and-cloud.md)). That means we fetch an outside
+issuer's discovery document and keys, and we trust what those keys sign. So:
+
+- **Fetching is guarded like webhooks.** An issuer and its `jwks_uri` must be https, without
+  credentials, a query or a fragment. We resolve the host and refuse it if **any** address isn't
+  public, connect to exactly the addresses we checked (no DNS rebinding), follow no redirects, use
+  no proxy, give up after 5 seconds to connect and 10 seconds in all, and read at most 256 KB.
+  We fetch nothing for an issuer no trust names, so a stranger can't make us call out. Tests and
+  local runs may let an issuer live on a loopback address over http
+  (`ACCOUNTS_FEDERATION_ALLOW_LOOPBACK=true`, for a mock issuer); production refuses to start with
+  it, and private and link-local addresses stay refused even then.
+- **Keys are cached, briefly.** An issuer's keys are kept for 10 minutes and fetched again when a
+  token names a key we don't have, at most every 30 seconds per issuer, so a rotation is picked up
+  at once and a flood of made-up key ids can't make us hammer the issuer.
+- **Every check, every time.** The signature (RS, PS, ES or EdDSA, never `none` or a shared
+  secret), `iss`, `aud`, `exp` and `nbf` with 30 seconds of clock skew, an `iat` that isn't in the
+  future, every condition of one trust exactly, and a `jti` used once. A refusal for a token that
+  really came from the trusted issuer goes in the Silicon's sign-in history; a forged one doesn't,
+  so nobody can fill that history with junk.
+- **60 exchanges per minute from one address**, then 429 with `Retry-After`.
+
+Identity tokens go the other way: a Silicon proves itself to AWS, Google Cloud or Microsoft Entra.
+Those services verify RS256 (Entra validates only RS256), and not EdDSA, so identity tokens have
+their own RSA 2048 key, published in our JWKS next to the Ed25519 key under its own `kid` (the key's
+RFC 7638 thumbprint). The service makes that key itself the first time it starts, encrypts it with
+the same keyring as webhook secrets, and stores it, so every server signs with the same key and a
+database copy reveals nothing. Our API refuses an identity token as a bearer token
+(`identity_token_not_accepted`), and introspection calls it inactive.
+
 ## What is never logged
 
 - Tokens, codes, STKs, secrets and `Authorization` headers are never written to logs or audit records. Types that carry them print redacted (`Secret(sar_…)`), in the service and in the Rust client.
@@ -180,7 +214,7 @@ Development stacks may allow http and private hosts (`ACCOUNTS_WEBHOOK_ALLOW_PRI
 
 ## Running it safely
 
-`accounts-api` checks its production configuration before it starts. It refuses to start with missing or development-only credential keys, local email delivery that doesn't really send, no Postmark token, the development outbox turned on, or webhook SSRF protection turned off. It also requires an HTTPS public URL, secure cookies and the set lifetimes: 600 seconds for codes, 60 seconds for the lock and 1800 seconds for access tokens.
+`accounts-api` checks its production configuration before it starts. It refuses to start with missing or development-only credential keys, local email delivery that doesn't really send, no Postmark token, the development outbox turned on, webhook SSRF protection turned off, or loopback issuers allowed for federation. It also requires an HTTPS public URL, secure cookies and the set lifetimes: 600 seconds for codes, 60 seconds for the lock and 1800 seconds for access tokens.
 
 Behind a load balancer, the API trusts `X-Forwarded-For` only when `ACCOUNTS_TRUST_FORWARDED_FOR=true`. It uses the **right-most** entry, the one the balancer appended, for rate limits and history, because the caller may have supplied the earlier ones.
 

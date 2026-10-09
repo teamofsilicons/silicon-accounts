@@ -20,10 +20,6 @@ async fn grant_type_is_required_and_must_be_supported() {
     for (grant, mentions) in [
         ("password", "/authorize"),
         ("client_credentials", "/v1/proofs/app-verification"),
-        (
-            "urn:ietf:params:oauth:grant-type:token-exchange",
-            "/v1/proofs/user-verification",
-        ),
         ("implicit", "PKCE"),
         ("magic", "'magic' is not supported"),
     ] {
@@ -35,6 +31,27 @@ async fn grant_type_is_required_and_must_be_supported() {
             .await;
         assert_oauth_error(&r, 400, "unsupported_grant_type", mentions);
     }
+    // A token exchange signs a Silicon into Silicon Accounts itself; an app acting for an
+    // account at another app uses a User verification proof instead.
+    let r = ctx
+        .call(
+            router(),
+            token_req(
+                &app.app_id,
+                &secret,
+                &[(
+                    "grant_type",
+                    "urn:ietf:params:oauth:grant-type:token-exchange",
+                )],
+            ),
+        )
+        .await;
+    assert_oauth_error(
+        &r,
+        400,
+        "unauthorized_client",
+        "/v1/proofs/user-verification",
+    );
 }
 
 #[tokio::test]

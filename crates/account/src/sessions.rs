@@ -51,7 +51,7 @@ pub(crate) struct SessionView {
     kind: String,
     label: Option<String>,
     /// For `cli` sessions: how they signed in (`device`, `cli_code`, `silicon_login`,
-    /// `authorization_code`).
+    /// `authorization_code`, `federated`).
     origin: Option<String>,
     ip: Option<String>,
     user_agent: Option<String>,
@@ -211,6 +211,7 @@ fn family_label(kind: &str, origin: Option<&str>) -> &'static str {
         Some("device") => "silicon-accounts CLI (approved in the browser)",
         Some("cli_code") => "silicon-accounts CLI (email or phone code)",
         Some("silicon_login") => "Silicon sign-in with its STK",
+        Some("federated") => "Silicon sign-in with a trusted outside token (CI)",
         Some("authorization_code") => "Silicon Accounts sign-in",
         _ => "First-party sign-in",
     }

@@ -437,6 +437,17 @@ impl std::fmt::Debug for TokenResponse {
     }
 }
 
+/// The answer to a token exchange (RFC 8693) that signs a Silicon in with a trusted outside
+/// token: the usual token response plus `issued_token_type`. Its sign-in ends when the outside
+/// token expires (at least one access token later), so `refresh_token_expires_at` is near.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TokenExchangeResponse {
+    #[serde(flatten)]
+    pub tokens: TokenResponse,
+    /// `urn:ietf:params:oauth:token-type:access_token`.
+    pub issued_token_type: String,
+}
+
 /// `{"app_id","name","logo_url","logo_dark_url","homepage_url"}`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppSummary {

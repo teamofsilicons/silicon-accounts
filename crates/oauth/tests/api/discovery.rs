@@ -36,14 +36,19 @@ async fn the_discovery_document_describes_every_endpoint() {
             "refresh_token",
             "urn:ietf:params:oauth:grant-type:device_code",
             "urn:silicon:params:oauth:grant-type:slt",
-            "urn:ietf:params:oauth:grant-type:jwt-bearer"
+            "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            "urn:ietf:params:oauth:grant-type:token-exchange"
         ])
     );
     assert_eq!(
         d["code_challenge_methods_supported"],
         json!(["S256", "plain"])
     );
-    assert_eq!(d["id_token_signing_alg_values_supported"], json!(["EdDSA"]));
+    // EdDSA for apps' id_tokens, RS256 for identity tokens (cloud providers don't take EdDSA).
+    assert_eq!(
+        d["id_token_signing_alg_values_supported"],
+        json!(["EdDSA", "RS256"])
+    );
     assert_eq!(d["subject_types_supported"], json!(["public"]));
     assert_eq!(
         d["token_endpoint_auth_methods_supported"],
@@ -86,7 +91,11 @@ async fn the_jwks_publishes_the_signing_key() {
     assert_eq!(r.status, 200);
     assert_eq!(header(&r, "cache-control"), "public, max-age=300");
     let keys = r.json["keys"].as_array().expect("keys");
-    assert_eq!(keys.len(), 1);
+    // The Ed25519 key first, then the RS256 key of identity tokens.
+    assert_eq!(keys.len(), 2);
+    assert_eq!(keys[1]["kty"], "RSA");
+    assert_eq!(keys[1]["alg"], "RS256");
+    assert!(keys[1].get("d").is_none(), "never the private key");
     let k = &keys[0];
     assert_eq!(k["kty"], "OKP");
     assert_eq!(k["crv"], "Ed25519");

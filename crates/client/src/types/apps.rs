@@ -106,7 +106,7 @@ pub struct Branding {
 
 /// Colours for one theme. The service rejects primary/primary_foreground (button text) or
 /// foreground/background (page text) pairs with contrast below 4.5:1 (WCAG AA for text). The
-/// defaults fill buttons with `#1F5FB8` under `#FFFDF9` in both themes.
+/// defaults fill buttons with `#1F5FB8` under white (light) and `#F7F8FA` (dark).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ThemeColors {

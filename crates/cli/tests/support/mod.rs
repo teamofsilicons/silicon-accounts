@@ -372,6 +372,19 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
             "The access token is missing, expired or revoked.",
             "Sign in again.",
         ),
+        ("GET", "/github-oidc")
+            if auth.as_deref() == Some("bearer gh-request-token")
+                && query.contains("audience=") =>
+        {
+            (200, json!({ "count": 1, "value": "eyJ.ci.ok" }))
+        }
+        ("POST", "/v1/me/identity-tokens") if silicon_bearer => (
+            201,
+            json!({ "identity_token": "eyJ.identity.sig", "token_type": "urn:ietf:params:oauth:token-type:id_token",
+                    "issuer": "http://accounts.test", "subject": SILICON_UUID, "audience": json_body["audience"],
+                    "jti": "j-1", "kid": "rsa-kid", "issued_at": "2026-10-09T00:00:00.000Z",
+                    "expires_at": "2026-10-09T00:05:00.000Z", "expires_in": json_body["ttl_seconds"] }),
+        ),
         ("POST", "/v1/me/short-lived-tokens") if silicon_bearer || carbon_bearer => (
             201,
             json!({ "slt": "slt_test_token", "app_id": json_body["app_id"], "expires_at": "2099-01-01T00:02:00.000Z" }),
@@ -429,6 +442,29 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
                 {
                     (200, carbon_tokens(&st))
                 }
+                Some("urn:ietf:params:oauth:grant-type:token-exchange")
+                    if f.get("subject_token").map(String::as_str) == Some("eyJ.ci.ok")
+                        && f.get("silicon").map(String::as_str) == Some(SILICON_ID)
+                        && f.get("subject_token_type").map(String::as_str)
+                            == Some("urn:ietf:params:oauth:token-type:jwt") =>
+                {
+                    let mut tokens = silicon_tokens(&st);
+                    if let Some(t) = tokens.as_object_mut() {
+                        t.insert(
+                            "refresh_token_expires_at".into(),
+                            json!("2026-10-09T01:00:00.000Z"),
+                        );
+                        t.insert(
+                            "issued_token_type".into(),
+                            json!("urn:ietf:params:oauth:token-type:access_token"),
+                        );
+                    }
+                    (200, tokens)
+                }
+                Some("urn:ietf:params:oauth:grant-type:token-exchange") => (
+                    400,
+                    json!({ "error": "invalid_grant", "error_description": "si:scout trusts the issuer, but not this token: a trust wants other values for 'repository' (the token has 'mallory/scout'). (no_matching_trust)" }),
+                ),
                 Some("urn:ietf:params:oauth:grant-type:device_code") => {
                     st.device_polls += 1;
                     if st.device_polls < 2 {
@@ -812,6 +848,8 @@ impl Env {
             "ACCOUNTS_APP_SECRET",
             "ACCOUNTS_TIMEOUT_SECONDS",
             "ACCOUNTS_ALLOW_INSECURE_HTTP",
+            "ACTIONS_ID_TOKEN_REQUEST_URL",
+            "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
             "TZ",
         ] {
             cmd.env_remove(var);
@@ -836,6 +874,8 @@ impl Env {
             "ACCOUNTS_APP_SECRET",
             "ACCOUNTS_TIMEOUT_SECONDS",
             "ACCOUNTS_ALLOW_INSECURE_HTTP",
+            "ACTIONS_ID_TOKEN_REQUEST_URL",
+            "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
             "TZ",
         ] {
             cmd.env_remove(var);

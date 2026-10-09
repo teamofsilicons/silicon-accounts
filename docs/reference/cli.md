@@ -289,7 +289,7 @@ print the guide. To be sure you get a guide, use `silicon-accounts docs <topic>`
 | topic | what it covers |
 |---|---|
 | `getting-started` (`start`, `getting`, `intro`, `login`, `quickstart`) | sign in, check who you are, the first commands |
-| `silicons` (`silicon`, `stk`) | how a Silicon gets an account, signs in, and signs into apps |
+| `silicons` (`silicon`, `stk`, `ci`, `federation`, `trust`, `cloud`, `identity-tokens`) | how a Silicon gets an account, signs in, signs into apps, and runs in CI and the cloud with no stored secret |
 | `custodians` (`custodian`, `transfer`) | being a Silicon's custodian |
 | `apps` (`app`, `sign-in`, `signin`, `oauth`, `tokens`) | adding sign-in to an app |
 | `proofs` (`proof`, `app-verification`, `user-verification`) | User verification and App verification proofs |
@@ -409,6 +409,26 @@ As `silicon-accounts --help` prints it:
       silicon keys revoke <SILICON> <KEY_ID>
                                             Revoke a key: it stops working and the sign-ins it
                                             started end
+    silicon trust                           A Silicon's trust relationships: let a CI job (GitHub
+                                            Actions, GitLab, any https OIDC issuer) sign it in
+                                            with the job's own token, so no secret is stored in CI
+      silicon trust add <SILICON>           Trust tokens from an issuer whose claims match:
+                                            --github, --gitlab, or --issuer with --claim
+      silicon trust list <SILICON>          List a Silicon's trusts (removed ones too)
+      silicon trust remove <SILICON> <TRUST_ID>
+                                            Remove a trust: it stops working and the sign-ins it
+                                            started end
+    silicon audiences                       The outside services a Silicon may get identity tokens
+                                            for (AWS, Google Cloud, Microsoft Entra)
+      silicon audiences list <SILICON>      Show the audiences the Silicon may get identity tokens
+                                            for
+      silicon audiences allow <SILICON> <AUDIENCES>
+                                            Allow more audiences (custodian): sts.amazonaws.com,
+                                            your Google Cloud provider's URL,
+                                            api://AzureADTokenExchange
+      silicon audiences remove <SILICON> [AUDIENCES]
+                                            Stop allowing audiences (custodian); with --all, allow
+                                            none
     silicon signins <SILICON>               One of your Silicons' sign-ins, newest first (app,
                                             method, outcome, address)
     silicon transfer <SILICON>              Transfer a Silicon to another Carbon (they must accept
@@ -441,6 +461,11 @@ As `silicon-accounts --help` prints it:
     device show <CODE>                      Show a pending CLI sign-in (label, status, expiry)
     device approve <CODE>                   Approve it: the other machine gets signed in as you
     device deny <CODE>                      Deny it
+  token                                     Tokens for outside services: an identity token proves
+                                            a Silicon to AWS, Google Cloud or Microsoft Entra with
+                                            no stored cloud key
+    token identity                          Print an identity token (an RS256 OIDC ID token) for
+                                            an outside service, signed in as a Silicon
   app                                       App mode: an app's sign-in setup, user base, imports,
                                             tokens, webhooks and proofs
     app use <APP_ID>                        Choose the app for later `silicon-accounts app`
@@ -550,7 +575,7 @@ Reports this package's identity. `silicon-accounts accounts --json` returns `app
 
 Sign in as a Carbon or a Silicon, or get a short-lived token for an app.
 
-Carbons sign in with a browser code (device flow) or with a 6-digit code sent to their email or phone. Silicons sign in with their si:id and STK. The session is stored in `{home}/.accounts/session.json` (mode 0600) and refreshed automatically.
+Carbons sign in with a browser code (device flow) or with a 6-digit code sent to their email or phone. Silicons sign in with their si:id and STK, a registered key (`--key`), or in CI with the job's own OIDC token (`--federated`, see [Run a Silicon in CI and the cloud](../start/ci-and-cloud.md)). The session is stored in `{home}/.accounts/session.json` (mode 0600) and refreshed automatically.
 
 With --app, prints a short-lived token (SLT, 2 minutes, single use) for that app; if you are already signed in it is returned directly. Hand the SLT to the app, which exchanges it for your tokens. This is how Silicons sign into apps. Check the session with `silicon-accounts login status --json`.
 
@@ -569,6 +594,9 @@ silicon-accounts login <COMMAND>
 | `--stk <STK>` | The Silicon's STK (prefer --stk-stdin or ACCOUNTS_STK: arguments are visible to other processes) |
 | `--stk-stdin` | Read the STK from stdin |
 | `--key <FILE>` | Sign the Silicon in with this private key file instead of its STK (a key registered with `silicon-accounts silicon keys add`) [env: ACCOUNTS_SILICON_KEY] |
+| `--federated [<TOKEN\|@FILE\|env:VAR>]` | Sign the Silicon in with an outside OIDC token it is trusted for (a CI job's token, see `silicon-accounts silicon trust`): the token, @FILE or env:VAR. The sign-in ends when that token expires (at least 30 minutes); then the CLI exchanges a fresh one from the same source when it can |
+| `--github-actions` | With --federated (or alone): ask GitHub Actions for the job's OIDC token (ACTIONS_ID_TOKEN_REQUEST_URL, needs `permissions: id-token: write`) and exchange it |
+| `--audience <AUDIENCE>` | The audience to ask GitHub Actions for [default: the Silicon Accounts URL, the default audience of a trust] |
 | `--email <EMAIL>` | Carbon: send a 6-digit sign-in code to this email |
 | `--phone <PHONE>` | Carbon: send a 6-digit sign-in code by SMS to this phone number |
 | `--country <CC>` | Country for a local phone number (ISO code, e.g. IN, US) |
@@ -589,6 +617,10 @@ silicon-accounts login --email saket@example.com --code 123456
                                                  finish a code sent by an earlier call
 printf '%s' "$STK" | silicon-accounts login --silicon si:scout --stk-stdin
 ACCOUNTS_SILICON=si:scout ACCOUNTS_STK=stk-… silicon-accounts login --json
+silicon-accounts login --silicon si:scout --federated --github-actions
+                                                 in a GitHub Actions job, no stored secret
+silicon-accounts login --silicon si:scout --federated env:SILICON_ID_TOKEN
+                                                 GitLab CI (an id_tokens variable)
 silicon-accounts login --app remind                      print a short-lived token for remind
 silicon-accounts login status --json                     {"authenticated":true,"kind":"silicon",…}
 
@@ -1577,6 +1609,155 @@ silicon-accounts silicon keys revoke [OPTIONS] <SILICON> <KEY_ID>
 | `<SILICON>` | si:id or uuid |
 | `<KEY_ID>` | The key id |
 
+#### `silicon-accounts silicon trust`
+
+A Silicon's trust relationships: let a CI job (GitHub Actions, GitLab, any https OIDC issuer) sign it in with the job's own token, so no secret is stored in CI.
+
+A trust names the issuer, the audience the token must carry (default: the Silicon Accounts URL) and conditions: claims that must equal a value exactly, at least one (for GitHub and GitLab one must name the repository, the project or their owner). The job then runs `silicon-accounts login --silicon si:<id> --federated --github-actions`. Removing a trust ends the sign-ins it started.
+
+```text
+silicon-accounts silicon trust [OPTIONS] <COMMAND>
+```
+
+| subcommand | what it does |
+|---|---|
+| [`add`](#silicon-accounts-silicon-trust-add) | Trust tokens from an issuer whose claims match: --github, --gitlab, or --issuer with --claim |
+| [`list`](#silicon-accounts-silicon-trust-list) | List a Silicon's trusts (removed ones too) |
+| [`remove`](#silicon-accounts-silicon-trust-remove) | Remove a trust: it stops working and the sign-ins it started end |
+
+Examples, as `--help` prints them:
+
+```text
+silicon-accounts silicon trust add si:scout --github acme/scout --claim ref=refs/heads/main
+silicon-accounts silicon trust add si:scout --gitlab acme/scout --claim ref_type=branch --claim ref=main
+silicon-accounts silicon trust add si:scout --issuer https://ci.example.com \
+    --audience https://accounts.teamofsilicons.com --claim sub=pipeline:deploy
+silicon-accounts silicon trust list si:scout
+silicon-accounts silicon trust remove si:scout 0192f0c2-…
+```
+
+A sign-in that itself came from a CI token can't add a trust (`federated_session`, exit `3`).
+
+##### `silicon-accounts silicon trust add`
+
+Trust tokens from an issuer whose claims match: --github, --gitlab, or --issuer with --claim
+
+```text
+silicon-accounts silicon trust add [OPTIONS] <SILICON>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid (yourself, or a Silicon you are custodian of) |
+| `--github <OWNER/REPO>` | GitHub Actions in this repository (owner/repo): the issuer https://token.actions.githubusercontent.com and the claim repository=owner/repo |
+| `--gitlab <GROUP/PROJECT>` | GitLab.com CI in this project (group/project): the issuer https://gitlab.com and the claim project_path=group/project |
+| `--issuer <URL>` | Any https OpenID Connect issuer with discovery |
+| `--audience <AUDIENCE>` | The aud the token must carry [default: the Silicon Accounts URL] |
+| `--claim <NAME=VALUE>` | A claim that must equal a value exactly, as name=value (repeat it; every one must match) |
+| `--name <TEXT>` | A name to tell trusts apart |
+
+```text
+si:scout now trusts tokens from https://token.actions.githubusercontent.com for the audience https://accounts.teamofsilicons.com when ref=refs/heads/main, repository=acme/scout (01a11f12-acbc-776e-bfee-b26bd64e2d7a).
+```
+
+##### `silicon-accounts silicon trust list`
+
+List a Silicon's trusts (removed ones too)
+
+```text
+silicon-accounts silicon trust list [OPTIONS] <SILICON>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+
+```text
+TRUST                                 ISSUER                                       CONDITIONS                                 LAST USED  STATE
+01a11f12-acbc-776e-bfee-b26bd64e2d7a  https://token.actions.githubusercontent.com  ref=refs/heads/main repository=acme/scout  never      live
+```
+
+##### `silicon-accounts silicon trust remove`
+
+Remove a trust: it stops working and the sign-ins it started end
+
+```text
+silicon-accounts silicon trust remove [OPTIONS] <SILICON> <TRUST_ID>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+| `<TRUST_ID>` | The trust id |
+
+#### `silicon-accounts silicon audiences`
+
+The outside services a Silicon may get identity tokens for (AWS, Google Cloud, Microsoft Entra).
+
+A Silicon may get none until its custodian allows an audience; the custodian changes the list, the Silicon can read it. The Silicon then runs `silicon-accounts token identity --audience <audience>`.
+
+```text
+silicon-accounts silicon audiences [OPTIONS] <COMMAND>
+```
+
+| subcommand | what it does |
+|---|---|
+| [`list`](#silicon-accounts-silicon-audiences-list) | Show the audiences the Silicon may get identity tokens for |
+| [`allow`](#silicon-accounts-silicon-audiences-allow) | Allow more audiences (custodian): sts.amazonaws.com, your Google Cloud provider's URL, api://AzureADTokenExchange |
+| [`remove`](#silicon-accounts-silicon-audiences-remove) | Stop allowing audiences (custodian); with --all, allow none |
+
+Examples, as `--help` prints them:
+
+```text
+silicon-accounts silicon audiences allow si:scout sts.amazonaws.com
+silicon-accounts silicon audiences allow si:scout api://AzureADTokenExchange
+silicon-accounts silicon audiences list si:scout
+silicon-accounts silicon audiences remove si:scout sts.amazonaws.com
+```
+
+##### `silicon-accounts silicon audiences list`
+
+Show the audiences the Silicon may get identity tokens for
+
+```text
+silicon-accounts silicon audiences list [OPTIONS] <SILICON>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+
+##### `silicon-accounts silicon audiences allow`
+
+Allow more audiences (custodian): sts.amazonaws.com, your Google Cloud provider's URL, api://AzureADTokenExchange
+
+```text
+silicon-accounts silicon audiences allow [OPTIONS] <SILICON> <AUDIENCES>...
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+| `<AUDIENCES>...` | Audiences to add |
+
+```text
+si:scout may get identity tokens for: sts.amazonaws.com, api://AzureADTokenExchange.
+```
+
+##### `silicon-accounts silicon audiences remove`
+
+Stop allowing audiences (custodian); with --all, allow none
+
+```text
+silicon-accounts silicon audiences remove [OPTIONS] <SILICON> [AUDIENCES]...
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+| `[AUDIENCES]...` | Audiences to remove |
+| `--all` | Remove every audience |
+
 #### `silicon-accounts silicon signins`
 
 One of your Silicons' sign-ins, newest first (app, method, outcome, address)
@@ -1896,6 +2077,50 @@ silicon-accounts device deny [OPTIONS] <CODE>
 | argument or option | meaning |
 |---|---|
 | `<CODE>` | The code |
+
+### `silicon-accounts token`
+
+Tokens for outside services: an identity token proves a Silicon to AWS, Google Cloud or Microsoft Entra with no stored cloud key.
+
+The Silicon's custodian first allows the audience (`silicon-accounts silicon audiences allow`). The token is an RS256 OpenID Connect ID token, verifiable with our JWKS; it prints alone on stdout, ready for a command substitution.
+
+```text
+silicon-accounts token [OPTIONS] <COMMAND>
+```
+
+| subcommand | what it does |
+|---|---|
+| [`identity`](#silicon-accounts-token-identity) | Print an identity token (an RS256 OIDC ID token) for an outside service, signed in as a Silicon |
+
+Examples, as `--help` prints them:
+
+```text
+silicon-accounts token identity --audience sts.amazonaws.com
+silicon-accounts token identity --audience sts.amazonaws.com --ttl 900 > /tmp/web-identity-token
+aws sts assume-role-with-web-identity --role-arn arn:aws:iam::123456789012:role/scout \
+    --role-session-name scout \
+    --web-identity-token "$(silicon-accounts token identity --audience sts.amazonaws.com)"
+```
+
+#### `silicon-accounts token identity`
+
+Print an identity token (an RS256 OIDC ID token) for an outside service, signed in as a Silicon.
+
+The audience must be one your custodian allows. The token alone goes to stdout (--json gives its details too). Hand it to the service: `aws sts assume-role-with-web-identity --web-identity-token`, a Google Cloud credential configuration file, or Microsoft Entra's client assertion.
+
+```text
+silicon-accounts token identity [OPTIONS] --audience <AUDIENCE>
+```
+
+| argument or option | meaning |
+|---|---|
+| `--audience <AUDIENCE>` | The outside service's audience (e.g. sts.amazonaws.com) |
+| `--ttl <SECONDS>` | Seconds the token lives, 60 to 3600 [default: 300] |
+
+With `--json` you get the token and its details: `identity_token`, `token_type`, `issuer`,
+`subject` (your uuid), `audience`, `jti`, `kid`, `issued_at`, `expires_at`, `expires_in`. An
+audience your custodian hasn't allowed fails with `audience_not_allowed` (exit `3`); a Carbon gets
+`wrong_account_kind` (exit `3`).
 
 ### `silicon-accounts app`
 

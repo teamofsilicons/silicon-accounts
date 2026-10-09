@@ -90,6 +90,13 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
                 .filter(|v| !v.trim().is_empty())
         }
     });
+    let federated = args.federated.is_some() || args.github_actions;
+    if federated && silicon.is_none() {
+        return Err(CliError::invalid(
+            "--federated signs a Silicon in with an outside token, but no si:id was given.",
+            "Add --silicon si:<id> (or set ACCOUNTS_SILICON): the Silicon whose trust matches this CI job.",
+        ));
+    }
     if args.key.is_some() && silicon.is_none() {
         return Err(CliError::invalid(
             "--key signs a Silicon in, but no si:id was given.",
@@ -149,7 +156,12 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
                 .map(std::path::PathBuf::from)
         }
     });
-    let (tokens, method) = if let (Some(id), Some(file)) = (&silicon, &key_file) {
+    let mut federation = None;
+    let (tokens, method) = if let (true, Some(id)) = (federated, &silicon) {
+        let (tokens, stored) = federated_login(ctx, &args, id).await?;
+        federation = stored;
+        (tokens, "federated")
+    } else if let (Some(id), Some(file)) = (&silicon, &key_file) {
         (key_login(ctx, id, file, &label).await?, "silicon_key")
     } else if let Some(id) = silicon {
         (silicon_login(ctx, &args, &id, &label).await?, "silicon_stk")
@@ -172,7 +184,11 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
     } else {
         None
     };
-    let session = ctx.store_tokens(&tokens, me.as_ref(), method)?;
+    let mut session = ctx.store_tokens(&tokens, me.as_ref(), method)?;
+    if federation.is_some() {
+        session.federation = federation;
+        ctx.save_session(&session)?;
+    }
     let _ = home::remove_file(&ctx.home()?.file("login-challenge.json"));
     ctx.telemetry.step(
         "login.done",
@@ -322,6 +338,63 @@ async fn key_login(
     Ok(client
         .silicon_login_with_key(&id, &key, None, Some(label))
         .await?)
+}
+
+/// Signs a Silicon in with an outside OIDC token it is trusted for: the token from
+/// `--federated <TOKEN|@FILE|env:VAR>`, or from GitHub Actions with `--github-actions`. Returns
+/// the tokens and, when the source can be read again, how to sign in again on expiry.
+async fn federated_login(
+    ctx: &Ctx,
+    args: &LoginArgs,
+    id: &str,
+) -> CliResult<(TokenResponse, Option<crate::ctx::StoredFederation>)> {
+    use silicon_accounts_client::TokenSource;
+    let id = util::with_prefix(id, AccountKind::Silicon);
+    let client = ctx.client()?;
+    let source = if args.github_actions {
+        let audience = match &args.audience {
+            Some(a) if !a.trim().is_empty() => a.trim().to_owned(),
+            // A trust's default audience is the service's public URL.
+            _ => client
+                .meta()
+                .await?
+                .public_url
+                .trim_end_matches('/')
+                .to_owned(),
+        };
+        TokenSource::GithubActions { audience }
+    } else {
+        match args.federated.as_deref().map(str::trim) {
+            Some(spec) if !spec.is_empty() => TokenSource::parse(spec),
+            _ => {
+                return Err(CliError::invalid(
+                    "--federated needs the outside token: the token itself, @<file> or env:<VARIABLE>.",
+                    "In GitHub Actions use --federated --github-actions; in GitLab CI pass env:<the id_tokens variable>.",
+                ));
+            }
+        }
+    };
+    if matches!(source, TokenSource::Literal(_)) {
+        ctx.out.warn("Passing a token as an argument exposes it to other processes; prefer env:VAR or @file.");
+    }
+    ctx.telemetry.step(
+        "login.federated.started",
+        0.3,
+        json!({ "source": source.describe() }),
+    );
+    let token = source.read().await?;
+    let tokens = client.exchange_federated_token(&id, token.expose()).await?;
+    let stored = source
+        .is_rereadable()
+        .then(|| crate::ctx::StoredFederation {
+            silicon: id.clone(),
+            source: source.describe(),
+            audience: match &source {
+                TokenSource::GithubActions { audience } => Some(audience.clone()),
+                _ => None,
+            },
+        });
+    Ok((tokens, stored))
 }
 
 enum CodeLogin {

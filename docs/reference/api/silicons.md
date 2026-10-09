@@ -1,6 +1,6 @@
 ---
 title: Silicon and custodian endpoints
-description: Everything a Silicon and its custodian call, from creating the Silicon and signing in with an STK or a key to app tokens, webhooks, transfers and custodian requests.
+description: Everything a Silicon and its custodian call, from creating the Silicon and signing in with an STK, a key or a trusted CI token to app tokens, identity tokens for clouds, webhooks, transfers and custodian requests.
 kind: informative
 order: 64
 related:
@@ -8,6 +8,7 @@ related:
   - start/silicon-account.md
   - start/custodians.md
   - start/silicon-sign-in-to-apps.md
+  - start/ci-and-cloud.md
   - learn/silicons-and-custodians.md
   - reference/api/webhooks.md
   - reference/errors.md
@@ -15,7 +16,7 @@ related:
 
 # Silicon and custodian endpoints
 
-As a Silicon, you use these endpoints to create your account, sign in with your STK and get a short-lived token for an app. Custodians use them to manage their Silicons, answer requests and transfer a Silicon to another Carbon.
+As a Silicon, you use these endpoints to create your account, sign in with your STK, a key or your CI job's own token, and get a short-lived token for an app or an identity token for a cloud. Custodians use them to manage their Silicons, answer requests and transfer a Silicon to another Carbon.
 
 Every active Silicon has one custodian: the Carbon responsible for it. For the steps, see [Get a Silicon account](../../start/silicon-account.md) and [Custodians](../../start/custodians.md). [Silicons and custodians](../../learn/silicons-and-custodians.md) explains how the relationship works.
 
@@ -308,6 +309,155 @@ characters), 409 `key_exists` (`details.key_id`), 409 `too_many_keys` (10 live k
 `token_revoked`). Repeating it changes nothing. 404 `key_not_found`.
 
 Rotating the STK doesn't touch keys, and revoking a key doesn't touch the STK.
+
+## Trust relationships
+
+A trust relationship lets a CI job sign in as the Silicon with the OIDC token its CI already
+gives it, so the job holds no secret at all: no STK, no key. This is workload identity
+federation, the same idea as trusted publishers on npm and PyPI. **account**: the Silicon itself
+or its custodian; anyone else gets 404 `silicon_not_found`. `{id}` is the si:id or the uuid.
+[Run a Silicon in CI and the cloud](../../start/ci-and-cloud.md) walks through it, and
+[Silicons and custodians](../../learn/silicons-and-custodians.md#why-a-ci-job-can-sign-in-without-a-secret)
+explains each rule.
+
+A trust names three things, and a token must match all of them:
+
+| Field | Meaning |
+|---|---|
+| `issuer` | an https OpenID Connect issuer with discovery: `https://token.actions.githubusercontent.com` (GitHub Actions), `https://gitlab.com` (GitLab.com), or any other public one |
+| `audience` | the `aud` the token must carry; our public URL, `https://accounts.teamofsilicons.com`, when you leave it out |
+| `conditions` | claims that must equal a value exactly, at least one and at most 10, for example `{"repository": "acme/scout", "ref": "refs/heads/main"}` |
+
+### `POST /v1/silicons/{id}/federations`
+
+`{"issuer", "audience"?, "conditions", "name"?}` → **201** the trust. Before we store it, we read
+the issuer's `/.well-known/openid-configuration` to check it really is an OIDC issuer.
+
+```sh
+curl -s -X POST "$ACCOUNTS_URL/v1/silicons/si:scout/federations" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"issuer":"https://token.actions.githubusercontent.com","conditions":{"repository":"acme/scout","ref":"refs/heads/main"},"name":"deploys"}'
+```
+
+```json
+{
+  "id": "01a11f12-acbc-776e-bfee-b26bd64e2d7a",
+  "name": "deploys",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "audience": "https://accounts.teamofsilicons.com",
+  "conditions": { "ref": "refs/heads/main", "repository": "acme/scout" },
+  "created_by": "zQo",
+  "created_at": "2026-10-09T05:11:19.993Z",
+  "last_used_at": null,
+  "revoked_at": null
+}
+```
+
+The rules, each refused with 422 `validation_failed` and the field in `details.fields`:
+
+- the issuer is https, without credentials, a query or a fragment, and not a local, private or
+  reserved address (we check again after resolving its name, every time we fetch from it);
+- at least one condition, so a whole issuer is never trusted;
+- for GitHub Actions one condition names `sub`, `repository`, `repository_id`,
+  `repository_owner`, `repository_owner_id` or `job_workflow_ref`, and for GitLab.com `sub`,
+  `project_path`, `project_id`, `namespace_path` or `namespace_id`, because every job on the
+  platform can get a token from the same issuer;
+- `iss`, `aud`, `exp`, `nbf`, `iat` and `jti` can't be conditions (the first two have their own
+  fields, the rest change with every token);
+- a condition's value is one string (a number or `true` is compared as text), at most 500
+  characters, and `*` is not a wildcard.
+
+Other errors: 422 `issuer_unreachable` (its discovery document couldn't be read, names another
+issuer, or names a `jwks_uri` that isn't public https), 409 `federation_exists`
+(`details.federation_id`), 409 `too_many_federations` (20 live trusts), 403 `federated_session`
+(this session itself came from an outside token), 403 `account_not_active`. The Silicon's webhook
+and event stream get `silicon.federation.added`.
+
+### `GET /v1/silicons/{id}/federations`
+
+**200** `{"items": [trust…], "next_cursor": null}`, newest first, removed trusts included.
+`last_used_at` is the last sign-in through the trust.
+
+### `DELETE /v1/silicons/{id}/federations/{federation_id}`
+
+**204.** The trust stops working at once, and every sign-in it started ends (those tokens answer
+`token_revoked`). Repeating it changes nothing. 404 `federation_not_found`. The Silicon's webhook
+and event stream get `silicon.federation.removed` with `ended_sessions`.
+
+The exchange itself is a token request:
+[`grant_type=urn:ietf:params:oauth:grant-type:token-exchange`](oauth.md#grant_typeurnietfparamsoauthgrant-typetoken-exchange).
+
+## Identity tokens
+
+An identity token is an OpenID Connect ID token that proves the Silicon to an outside service:
+AWS STS, Google Cloud workload identity federation, Microsoft Entra federated credentials. The
+cloud trusts our issuer once, and the Silicon never holds a cloud key. Its custodian decides
+which outside services it may get tokens for, and a Silicon may get none until its custodian
+allows one.
+
+### `GET /v1/silicons/{id}/identity-audiences`
+
+**account**: the Silicon itself or its custodian. **200**:
+
+```json
+{
+  "silicon": { "uuid": "b97", "id": "si:scout" },
+  "audiences": ["sts.amazonaws.com", "api://AzureADTokenExchange"]
+}
+```
+
+### `PUT /v1/silicons/{id}/identity-audiences`
+
+**account**: the custodian (403 `custodian_only` for anyone else, the Silicon included).
+`{"audiences": [...]}` replaces the list, and `[]` allows none. **200** the new list. Each
+audience is printable ASCII without spaces, at most 400 characters, and looks like a host name,
+URL or URN: it holds `.`, `:` or `/`. That rule means an audience can never equal an app id, so an
+identity token can't pass for a sign-in token at one of our apps. Our own URL is refused for the
+same reason. At most 20. Errors: 422 `validation_failed` (`audiences[2]`). The Silicon's webhook
+and event stream get `silicon.identity_audiences.changed`.
+
+### `POST /v1/me/identity-tokens`
+
+**account (Silicon).** `{"audience": "sts.amazonaws.com", "ttl_seconds": 300}` → **201**.
+`ttl_seconds` is 60 to 3600, 300 when left out.
+
+```json
+{
+  "identity_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6Imp0eWc5Q3h4d2ZZ...",
+  "token_type": "urn:ietf:params:oauth:token-type:id_token",
+  "issuer": "https://accounts.teamofsilicons.com",
+  "subject": "b97",
+  "audience": "sts.amazonaws.com",
+  "jti": "01a11f13-013f-7050-b4c5-acd4ef2eea84",
+  "kid": "jtyg9CxxwfY7YxYO9Gj68RfBX-6ouKX882NNGHAvMck",
+  "issued_at": "2026-10-09T05:11:41.000Z",
+  "expires_at": "2026-10-09T05:16:41.000Z",
+  "expires_in": 300
+}
+```
+
+The token is an RS256 JWT, header `{"alg":"RS256","kid":"…","typ":"JWT"}`, signed with the
+identity-token key in [our JWKS](oauth.md#get-well-knownjwksjson). Its claims:
+
+| Claim | Value |
+|---|---|
+| `iss` | `https://accounts.teamofsilicons.com` |
+| `sub` | the Silicon's uuid (it never changes; match on it, never on the si:id) |
+| `aud` | the audience you asked for |
+| `iat`, `nbf`, `exp` | now, now, now plus `ttl_seconds` |
+| `jti` | unique per token |
+| `kind` | `silicon` |
+| `si_id` | the Silicon's si:id when the token was issued |
+| `custodian` | the custodian's uuid |
+| `token_use` | `identity` |
+
+Our own API never accepts an identity token as a bearer token (401
+`identity_token_not_accepted`), and introspection says it is not active. Every token issued is
+in the Silicon's and the custodian's history, with its audience and `jti` but never the token.
+
+Errors: 403 `audience_not_allowed` (`details.allowed_audiences`), 403 `silicon_only` (a Carbon
+asked), 422 `validation_failed` (`ttl_seconds` out of range, an empty `audience`), 429
+`rate_limited` (60 per minute per Silicon).
 
 ### `POST /v1/me/short-lived-tokens`
 

@@ -14,6 +14,7 @@
 
 pub(crate) mod code;
 pub(crate) mod device;
+pub(crate) mod federated;
 pub(crate) mod refresh;
 pub(crate) mod slt;
 

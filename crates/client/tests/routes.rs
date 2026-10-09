@@ -1407,3 +1407,103 @@ async fn silicon_key_calls() {
     assert_eq!(claims["aud"], "https://accounts.example/v1/oauth/token");
     assert!(claims["exp"].as_i64().unwrap() - claims["iat"].as_i64().unwrap() <= 300);
 }
+
+#[tokio::test]
+async fn federation_and_identity_token_calls() {
+    let mock = Mock::start().await;
+    let c = AccountsClient::new(&mock.url).unwrap();
+    let s = c.with_token("eyJ.scout");
+    let trust = json!({"id": "f1", "name": "deploys", "issuer": "https://token.actions.githubusercontent.com",
+        "audience": "https://accounts.teamofsilicons.com", "conditions": {"repository": "acme/scout"},
+        "created_by": "a8K", "created_at": "2026-10-09T00:00:00.000Z", "last_used_at": null, "revoked_at": null});
+    let mut conditions = std::collections::BTreeMap::new();
+    conditions.insert("repository".to_string(), "acme/scout".to_string());
+    let new = silicon_accounts_client::NewFederation {
+        issuer: "https://token.actions.githubusercontent.com".into(),
+        audience: None,
+        conditions,
+        name: Some("deploys".into()),
+    };
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/silicons/si:scout/federations",
+        Reply::json(201, trust.clone()),
+        s.add_federation("si:scout", &new)
+    );
+    assert_eq!(
+        r.json(),
+        json!({"issuer": "https://token.actions.githubusercontent.com", "conditions": {"repository": "acme/scout"}, "name": "deploys"})
+    );
+    check!(
+        mock,
+        "GET",
+        "/v1/silicons/si:scout/federations",
+        Reply::json(200, page(trust)),
+        s.federations("si:scout")
+    );
+    check!(
+        mock,
+        "DELETE",
+        "/v1/silicons/si:scout/federations/f1",
+        Reply::empty(204),
+        s.remove_federation("si:scout", "f1")
+    );
+    let audiences =
+        json!({"silicon": {"uuid": "b9Z", "id": "si:scout"}, "audiences": ["sts.amazonaws.com"]});
+    check!(
+        mock,
+        "GET",
+        "/v1/silicons/b9Z/identity-audiences",
+        Reply::json(200, audiences.clone()),
+        s.identity_audiences("b9Z")
+    );
+    let r = check!(
+        mock,
+        "PUT",
+        "/v1/silicons/b9Z/identity-audiences",
+        Reply::json(200, audiences),
+        s.set_identity_audiences("b9Z", &["sts.amazonaws.com".to_string()])
+    );
+    assert_eq!(r.json(), json!({"audiences": ["sts.amazonaws.com"]}));
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/me/identity-tokens",
+        Reply::json(
+            201,
+            json!({"identity_token": "eyJ.id.sig", "token_type": "urn:ietf:params:oauth:token-type:id_token",
+            "issuer": "https://accounts.example", "subject": "b9Z", "audience": "sts.amazonaws.com", "jti": "j1",
+            "kid": "k", "issued_at": "2026-10-09T00:00:00.000Z", "expires_at": "2026-10-09T00:05:00.000Z", "expires_in": 300})
+        ),
+        s.identity_token("sts.amazonaws.com", Some(600))
+    );
+    assert_eq!(
+        r.json(),
+        json!({"audience": "sts.amazonaws.com", "ttl_seconds": 600})
+    );
+    // The exchange is a form post to the token endpoint, as the first-party client.
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/oauth/token",
+        Reply::json(
+            200,
+            json!({"access_token": "eyJ", "token_type": "Bearer", "expires_in": 1800,
+            "issued_token_type": "urn:ietf:params:oauth:token-type:access_token", "scope": "profile"})
+        ),
+        c.exchange_federated_token("si:scout", "eyJ.ci.sig")
+    );
+    let form = r.form();
+    assert_eq!(
+        form["grant_type"],
+        "urn:ietf:params:oauth:grant-type:token-exchange"
+    );
+    assert_eq!(form["subject_token"], "eyJ.ci.sig");
+    assert_eq!(
+        form["subject_token_type"],
+        "urn:ietf:params:oauth:token-type:jwt"
+    );
+    assert_eq!(form["silicon"], "si:scout");
+    assert_eq!(form["client_id"], "silicon-accounts");
+}

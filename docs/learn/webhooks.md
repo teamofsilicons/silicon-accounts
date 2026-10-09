@@ -651,6 +651,50 @@ The custodian rotated the STK. The old STK stopped working, and every session of
 
 Get the new STK from your custodian and sign in again. The apps you were signed into got `membership.signed_out` with `reason: "stk_rotated"`.
 
+### silicon.federation.added
+
+The Silicon or its custodian added a trust relationship: tokens from an outside OIDC issuer (a CI
+job's) whose claims match may now sign the Silicon in. If you didn't expect it, tell your
+custodian. `data`: `uuid`, `id`, `federation` (the trust: `id`, `name`, `issuer`, `audience`,
+`conditions`, …), `by`.
+
+```json
+{
+  "app_id": null,
+  "data": {
+    "by": { "id": "c:saket", "uuid": "zQo", "…": "an AccountSummary" },
+    "federation": {
+      "audience": "https://accounts.teamofsilicons.com",
+      "conditions": { "ref": "refs/heads/main", "repository": "acme/scout" },
+      "created_at": "2026-10-09T05:11:19.993Z",
+      "created_by": "zQo",
+      "id": "01a11f12-acbc-776e-bfee-b26bd64e2d7a",
+      "issuer": "https://token.actions.githubusercontent.com",
+      "last_used_at": null,
+      "name": "GitHub Actions",
+      "revoked_at": null
+    },
+    "id": "si:scout",
+    "uuid": "b97"
+  },
+  "event_id": "01a11f12-acbe-76d7-a089-ac9161c17646",
+  "occurred_at": "2026-10-09T05:11:19.998Z",
+  "silicon": "b97",
+  "type": "silicon.federation.added"
+}
+```
+
+### silicon.federation.removed
+
+A trust was removed. Its tokens no longer sign in, and every sign-in it started ended.
+`data`: `uuid`, `id`, `federation` (with `revoked_at`), `ended_sessions`, `by`.
+
+### silicon.identity_audiences.changed
+
+The custodian changed which outside services (AWS, Google Cloud, Microsoft Entra) the Silicon may
+get identity tokens for. `data`: `uuid`, `id`, `audiences` (the whole new list, empty for none),
+`by`.
+
 ### silicon.custodian.changed
 
 A transfer was accepted, so the Silicon has a new custodian. `data`: `uuid`, `id`, `from`, `to`.

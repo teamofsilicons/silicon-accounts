@@ -70,6 +70,10 @@ pub mod method {
     pub const SLT: &str = "slt";
     pub const DEVICE: &str = "device";
     pub const SESSION: &str = "session";
+    /// A Silicon's key-signed assertion.
+    pub const SILICON_KEY: &str = "silicon_key";
+    /// An outside OIDC token the Silicon is trusted for (workload identity federation).
+    pub const FEDERATED: &str = "federated";
 }
 
 /// Sign-in outcomes recorded in `signin_history.outcome`.

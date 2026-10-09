@@ -9,7 +9,7 @@ pub const TOPICS: &[(&str, &str, &str)] = &[
     ),
     (
         "silicons",
-        "How a Silicon gets an account, signs in, and signs into apps",
+        "How a Silicon gets an account, signs in, signs into apps, and runs in CI and the cloud",
         include_str!("../docs/silicons.md"),
     ),
     (
@@ -59,7 +59,9 @@ pub fn find(topic: &str) -> Option<(&'static str, &'static str)> {
     let wanted = topic.trim().to_ascii_lowercase().replace([' ', '_'], "-");
     let wanted = match wanted.as_str() {
         "start" | "getting" | "intro" | "login" | "quickstart" => "getting-started",
-        "silicon" | "stk" => "silicons",
+        "silicon" | "stk" | "ci" | "federation" | "trust" | "cloud" | "identity-tokens" => {
+            "silicons"
+        }
         "custodian" | "transfer" => "custodians",
         "app" | "sign-in" | "signin" | "oauth" | "tokens" => "apps",
         "proof" | "user_verification" | "app_verification" | "app-verification"

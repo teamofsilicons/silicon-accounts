@@ -32,7 +32,11 @@ use crate::history::Actor;
 const KEY_COLUMNS: &str = "id, silicon_uuid, name, public_key, fingerprint, created_by, created_at, last_used_at, revoked_at";
 
 /// The Silicon `{id}` when the caller is it or its custodian.
-async fn silicon_for(conn: &mut PgConnection, me: &AccountAuth, key: &str) -> ApiResult<Account> {
+pub(crate) async fn silicon_for(
+    conn: &mut PgConnection,
+    me: &AccountAuth,
+    key: &str,
+) -> ApiResult<Account> {
     let key = key.trim();
     let found = if key.contains(':') {
         accounts::by_handle(conn, key).await?
@@ -91,6 +95,10 @@ pub(crate) async fn add(
     }
     let mut tx = state.db.begin().await?;
     let silicon = silicon_for(&mut tx, &me, &key).await?;
+    // A CI job signed in with an outside token acts as the Silicon, but never adds a way in.
+    if accounts_core::federation::is_federated_session(&mut tx, &me).await? {
+        return Err(accounts_core::federation::federated_session_refused("keys"));
+    }
     let Some(silicon) = accounts::lock(&mut tx, &silicon.uuid).await? else {
         return Err(silicon_not_found(&key));
     };

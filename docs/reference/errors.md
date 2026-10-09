@@ -109,7 +109,8 @@ logs, and `silicon-accounts report` and `POST /v1/reports` take it in the messag
 | `invalid_authorization` | 401 | the `Authorization` header is unreadable or uses an unsupported scheme |
 | `invalid_token` | 401 | not an access token, a bad signature, or expired (access tokens last 30 minutes: refresh) |
 | `token_wrong_audience` | 401 | an app's token was used where a first-party (`aud = silicon-accounts`) token is needed, or a developer-platform token (`aud = developer`, `details.aud`) outside the routes it may use (`GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and the owner routes under `/v1/apps/{app_id}/…`); the message names the method and route |
-| `token_revoked` | 401 | the sign-in behind the token ended (signed out, STK rotated, account deleted, refresh token reuse); the message says when and why; sign in again |
+| `identity_token_not_accepted` | 401 | an identity token (`token_use: identity`, made for AWS, Google Cloud or Entra) was sent as a bearer token; send the access token |
+| `token_revoked` | 401 | the sign-in behind the token ended (signed out, STK rotated, account deleted, refresh token reuse, a removed key or trust); the message says when and why; sign in again |
 | `session_expired` | 401 | the session cookie was signed out, revoked or expired |
 | `account_deleted` | 401 / 403 / 404 / 409 | the account was deleted: 401 for its own tokens, 403 at Silicon sign-in, 404 at lookups, 409 when it happened during the request |
 | `origin_not_allowed` | 403 | a cookie-authenticated POST/PUT/PATCH/DELETE came without the account site's `Origin`; use a Bearer token instead of the cookie |
@@ -281,6 +282,13 @@ outside the app's `google.hosted_domain`), `signup_expired`, `session_changed` (
 | `key_not_found` | 404 | no key with this id belongs to the Silicon |
 | `app_not_allowed` | 403 | the Silicon's custodian only lets it get short-lived tokens for the apps in `details.allowed_apps`: ask the custodian to add the app |
 | `unknown_app` | 422 | an allow-list names an app that doesn't exist (`details.unknown`) |
+| `federation_exists` | 409 | the Silicon already trusts these tokens (`details.federation_id`) |
+| `too_many_federations` | 409 | 20 live trusts already: remove one first |
+| `federation_not_found` | 404 | no trust with this id belongs to the Silicon |
+| `issuer_unreachable` | 422 | a new trust's issuer has no discovery document we can read over https from a public address, it names another issuer, or its `jwks_uri` isn't public https (`details.issuer`) |
+| `federated_session` | 403 | a sign-in that came from a trusted outside token tried to add a key or a trust: do it from the STK or a key, or as the custodian |
+| `custodian_only` | 403 | only the Silicon's custodian chooses its identity token audiences |
+| `audience_not_allowed` | 403 | the Silicon's custodian hasn't allowed this audience for identity tokens (`details.allowed_audiences`) |
 
 ## Apps
 
@@ -373,14 +381,15 @@ with `Cache-Control: no-store`.
 |---|---|---|
 | `invalid_request` | 400 (413 for a body over 64 KB) | a parameter is missing, repeated or malformed; the client authenticated twice |
 | `invalid_client` | 401 | unknown app, wrong secret, disabled app, or no credentials; `WWW-Authenticate: Basic realm="Silicon Accounts"` |
-| `invalid_grant` | 400 | the code, refresh token, SLT or device code is unknown, expired, already used (a reused refresh token or code also revokes its sign-in), revoked, another app's, or its account is deleted or removed the app's access; a `redirect_uri` or PKCE mismatch |
-| `unauthorized_client` | 400 | a public client (`client_id` without a secret) used a grant that needs the secret, or an app without `device_flow` used the device-code grant |
+| `invalid_grant` | 400 | the code, refresh token, SLT or device code is unknown, expired, already used (a reused refresh token or code also revokes its sign-in), revoked, another app's, or its account is deleted or removed the app's access; a `redirect_uri` or PKCE mismatch; a token exchange's outside token refused, with the reason and its code in brackets: `invalid_federated_token` (malformed, unsafe algorithm, bad signature, unknown key, expired, not yet valid, used before), `no_matching_trust` (no trust of the Silicon accepts its issuer, audience and claims), `issuer_unavailable` (the issuer's keys couldn't be read) |
+| `unauthorized_client` | 400 | a public client (`client_id` without a secret) used a grant that needs the secret, an app without `device_flow` used the device-code grant, or an app asked for a token exchange (it signs a Silicon into Silicon Accounts itself) |
 | `unsupported_grant_type` | 400 | the grant isn't supported (the description names the alternative) |
 | `invalid_scope` | 400 | a refresh asked for more scopes than were granted |
 | `authorization_pending` | 400 | device sign-in not approved yet; keep polling |
 | `slow_down` | 400 | polled within 5 seconds of the last poll; add 5 seconds |
 | `access_denied` | 400 | the Carbon denied the device sign-in |
 | `expired_token` | 400 | the device code expired (10 minutes) |
+| `rate_limited` | 429 | more than 60 token exchanges per minute from one address; wait `Retry-After` seconds |
 | `server_error` | 500 | a fault on our side (request id in the description) |
 | `temporarily_unavailable` | 503 | the request ran past its time budget |
 

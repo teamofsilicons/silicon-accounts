@@ -42,6 +42,10 @@ pub struct TokenResponse {
     /// The account as the app may see it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account: Option<AccountForApp>,
+    /// For a token exchange (RFC 8693): `urn:ietf:params:oauth:token-type:access_token`.
+    /// Such a sign-in ends when the outside token it came from expires.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issued_token_type: Option<String>,
 }
 
 fn bearer() -> String {

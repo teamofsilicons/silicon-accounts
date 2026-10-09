@@ -49,9 +49,41 @@ pub struct StoredSession {
     pub account: StoredAccount,
     #[serde(with = "time::serde::rfc3339")]
     pub signed_in_at: OffsetDateTime,
-    /// `device`, `email`, `phone` or `silicon_stk`.
+    /// `device`, `email`, `phone`, `silicon_stk`, `silicon_key` or `federated`.
     #[serde(default)]
     pub method: String,
+    /// For `federated`: where a fresh outside token comes from, so the CLI signs in again on
+    /// its own when the sign-in ends with the outside token it came from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub federation: Option<StoredFederation>,
+}
+
+/// How a federated session gets a fresh outside token: never the token itself.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredFederation {
+    /// The Silicon's si:id.
+    pub silicon: String,
+    /// `github-actions`, `env:NAME` or `@path`.
+    pub source: String,
+    /// The audience asked for (`github-actions`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audience: Option<String>,
+}
+
+impl StoredFederation {
+    /// The token source this describes.
+    pub fn token_source(&self) -> Option<silicon_accounts_client::TokenSource> {
+        use silicon_accounts_client::TokenSource;
+        match self.source.as_str() {
+            "github-actions" => Some(TokenSource::GithubActions {
+                audience: self.audience.clone().unwrap_or_default(),
+            }),
+            other if other.starts_with("env:") || other.starts_with('@') => {
+                Some(TokenSource::parse(other))
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -440,6 +472,14 @@ impl Ctx {
         }
         let current = &latest;
         let Some(refresh_token) = current.refresh_token.clone() else {
+            // A federated session without a refresh token: exchange a fresh outside token.
+            if let Some(source) = current
+                .federation
+                .as_ref()
+                .and_then(|f| f.token_source().map(|s| (f.silicon.clone(), s)))
+            {
+                return self.reexchange(current, &source.0, &source.1).await;
+            }
             return Err(session_ended(
                 current,
                 "the stored session has no refresh token",
@@ -469,11 +509,60 @@ impl Ctx {
                 Ok(session)
             }
             Err(err) if err.is_unauthenticated() => {
+                // A federated sign-in ends with its outside token: exchange a fresh one.
+                if let Some((silicon, source)) = current
+                    .federation
+                    .as_ref()
+                    .and_then(|f| f.token_source().map(|s| (f.silicon.clone(), s)))
+                {
+                    return self.reexchange(current, &silicon, &source).await;
+                }
                 if let Some(latest) = self.load_session()?
                     && latest.refresh_token.as_deref() == Some(refresh_token.as_str())
                 {
                     self.clear_session()?;
                 }
+                Err(session_ended(current, &err.message()))
+            }
+            Err(err) => Err(err.into()),
+        }
+    }
+
+    /// Signs a federated session in again with a fresh outside token from the same source
+    /// (call with the session lock held).
+    async fn reexchange(
+        &self,
+        current: &StoredSession,
+        silicon: &str,
+        source: &silicon_accounts_client::TokenSource,
+    ) -> CliResult<StoredSession> {
+        let token = source.read().await.map_err(|e| {
+            session_ended(
+                current,
+                &format!(
+                    "a fresh outside token could not be read from {}: {}",
+                    source.describe(),
+                    e.message()
+                ),
+            )
+        })?;
+        let client = self.client()?;
+        match client
+            .exchange_federated_token(silicon, token.expose())
+            .await
+        {
+            Ok(tokens) => {
+                let mut session = current.clone();
+                session.access_token = tokens.access_token.expose().to_owned();
+                session.expires_at = tokens.access_expires_at(OffsetDateTime::now_utc());
+                session.refresh_token =
+                    tokens.refresh_token.as_ref().map(|t| t.expose().to_owned());
+                session.refresh_expires_at = tokens.refresh_token_expires_at;
+                self.save_session(&session)?;
+                self.telemetry.step("session.reexchanged", 1.0, json!({}));
+                Ok(session)
+            }
+            Err(err) if err.is_unauthenticated() || err.as_oauth().is_some() => {
                 Err(session_ended(current, &err.message()))
             }
             Err(err) => Err(err.into()),
@@ -525,6 +614,7 @@ impl Ctx {
             account,
             signed_in_at: now,
             method: method.to_owned(),
+            federation: None,
         };
         let _lock = home::lock(&self.home()?.state_dir(), "session")?;
         self.save_session(&session)?;

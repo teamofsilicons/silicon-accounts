@@ -7,6 +7,7 @@ pub mod config;
 pub mod login;
 pub mod misc;
 pub mod silicon;
+pub mod token;
 
 use crate::cli::Commands;
 use crate::ctx::Ctx;
@@ -40,6 +41,7 @@ pub async fn run(ctx: &Ctx, command: Commands) -> CliResult<Outcome> {
         Commands::Silicon(args) => silicon::silicon(ctx, args).await,
         Commands::Webhook(args) => silicon::own_webhook(ctx, args).await,
         Commands::Custodian(args) => silicon::custodian(ctx, args).await,
+        Commands::Token(args) => token::token(ctx, args).await,
         Commands::App(args) => app::app(ctx, args).await,
         Commands::Config(args) => config::config(ctx, args).await,
         Commands::Report(args) => misc::report(ctx, args).await,

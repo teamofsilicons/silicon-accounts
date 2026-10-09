@@ -465,3 +465,109 @@ pub struct SiliconKeyInfo {
     )]
     pub revoked_at: Option<String>,
 }
+
+/// A trust relationship (`/v1/silicons/{id}/federations`): outside OIDC tokens from `issuer`,
+/// for `audience`, whose claims equal every condition, sign the Silicon in.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct Federation {
+    /// Its id.
+    #[serde(deserialize_with = "lenient_string")]
+    pub id: String,
+    /// Its name.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub name: String,
+    /// The OIDC issuer (`https://token.actions.githubusercontent.com` for GitHub Actions).
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub issuer: String,
+    /// The `aud` the token must carry.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub audience: String,
+    /// Claim name → the exact value it must have.
+    #[serde(default)]
+    pub conditions: BTreeMap<String, String>,
+    /// Who added it (account uuid).
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub created_by: String,
+    /// RFC 3339.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub created_at: String,
+    /// Last sign-in through it.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_used_at: Option<String>,
+    /// When it was removed.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub revoked_at: Option<String>,
+}
+
+/// A trust relationship to add (`POST /v1/silicons/{id}/federations`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct NewFederation {
+    /// An https OIDC issuer with discovery, e.g. `https://token.actions.githubusercontent.com`.
+    pub issuer: String,
+    /// The `aud` the token must carry; the service's public URL when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audience: Option<String>,
+    /// Claim name → exact value, at least one (e.g. `repository` → `acme/scout`).
+    pub conditions: BTreeMap<String, String>,
+    /// A name to tell trusts apart.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+/// The outside services a Silicon may get identity tokens for
+/// (`/v1/silicons/{id}/identity-audiences`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct IdentityAudiences {
+    /// The Silicon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub silicon: Option<Value>,
+    /// The allowed audiences (empty: none).
+    #[serde(default)]
+    pub audiences: Vec<String>,
+}
+
+/// An identity token (`POST /v1/me/identity-tokens`): an RS256 OIDC ID token that proves the
+/// Silicon to an outside service, verifiable with the service's JWKS.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct IdentityToken {
+    /// The JWT to hand the outside service (e.g. `aws sts assume-role-with-web-identity`).
+    pub identity_token: Secret,
+    /// `urn:ietf:params:oauth:token-type:id_token`.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub token_type: String,
+    /// `iss`: the Silicon Accounts public URL.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub issuer: String,
+    /// `sub`: the Silicon's uuid.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub subject: String,
+    /// `aud`.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub audience: String,
+    /// `jti`.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub jti: String,
+    /// The signing key's id in the JWKS.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub kid: String,
+    /// RFC 3339.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub issued_at: String,
+    /// RFC 3339.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub expires_at: String,
+    /// Seconds the token lives.
+    #[serde(default)]
+    pub expires_in: i64,
+}
