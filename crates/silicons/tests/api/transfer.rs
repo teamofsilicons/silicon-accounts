@@ -109,6 +109,16 @@ async fn transfer_accepted_moves_the_silicon_and_tells_everyone() {
         apps.last().map(|(_, p)| p["data"]["to"]["id"].clone()),
         Some(json!(to.handle))
     );
+    // Apps see the custodians as `{uuid, id}` only; the Silicon sees their summaries.
+    assert_eq!(
+        apps.last().map(|(_, p)| p["data"]["from"].clone()),
+        Some(json!({"uuid": from.uuid, "id": from.handle}))
+    );
+    assert_eq!(
+        apps.last().map(|(_, p)| p["data"]["to"].clone()),
+        Some(json!({"uuid": to.uuid, "id": to.handle}))
+    );
+    assert_eq!(p["data"]["to"]["display_name"], json!(to.display_name));
     // The old custodian can't manage it any more; the new one can.
     let r = call(
         &ctx,

@@ -1625,9 +1625,9 @@ pub struct AppWebhookArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum AppWebhookCommand {
-    /// Set the endpoint (a new signing secret is printed once).
+    /// Set the endpoint (the first time, its signing secret is printed once).
     ///
-    /// A retry with the same --idempotency-key (within 10 minutes) prints the same secret instead of generating another.
+    /// Setting the endpoint again, to the same URL or another, keeps the signing secret and the chosen updates; make a new secret with `silicon-accounts app webhook rotate`. A new secret is made only when the app has none: the first time, or after `silicon-accounts app webhook remove`. A retry with the same --idempotency-key (within 10 minutes) prints the same answer.
     Set {
         /// The endpoint URL.
         // Not named `url`: that id is the global --url flag (see SiliconWebhookCommand::Set).

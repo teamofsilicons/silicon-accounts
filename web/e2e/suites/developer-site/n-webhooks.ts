@@ -3,9 +3,10 @@
  * developer site. The fake app's inbox (and a generic sink of the testkit) verify every signature, dedupe by event_id
  * and fail on request. A URL that is not one is stopped in place; a test ping is delivered (drawer: attempt, payload)
  * and a replay re-sends the same event_id; against a failing endpoint a delivery keeps retrying (no replay while it
- * does), gives up after 72 hours (SQL time travel) and is replayed from the Failed filter; a new URL comes with a new
- * signing secret shown once (masked, never stored in the page or the API's answers); a rotated secret signs the next
- * delivery; removing the webhook fails what was pending. The app's own webhook is put back at the end.
+ * does), gives up after 72 hours (SQL time travel) and is replayed from the Failed filter; a rotated signing secret is
+ * shown once (masked, never stored in the page or the API's answers); a new URL keeps it (the tab says so and shows no
+ * secret) and the next delivery there is signed with it; another rotation signs the next delivery; removing the webhook
+ * fails what was pending. The app's own webhook is put back at the end.
  */
 import type { Journey } from "../../context";
 import { developerApi, json, shot, sleep, sql, tag } from "../../lib";
@@ -30,7 +31,7 @@ const shortId = (id: string) => (id.length > 12 ? `${id.slice(0, 8)}…${id.slic
 
 export const journey: Journey = {
   name: "developer-site-webhooks",
-  title: "the Webhooks tab: a wrong URL stopped in place; a test ping delivered (attempt and payload in its drawer) and replayed with the same event_id; a failing endpoint retried (no replay while retrying), given up after 72 h (time travel) and replayed from Failed; a new URL with its secret shown once; a rotated secret signing the next delivery; removing the webhook failing what was pending",
+  title: "the Webhooks tab: a wrong URL stopped in place; a test ping delivered (attempt and payload in its drawer) and replayed with the same event_id; a failing endpoint retried (no replay while retrying), given up after 72 h (time travel) and replayed from Failed; a rotated secret shown once; a new URL keeping it; another rotation signing the next delivery; removing the webhook failing what was pending",
   async run(ctx) {
     const { env, results } = ctx;
     const t = tag();
@@ -172,19 +173,28 @@ export const journey: Journey = {
       const around = allText.slice(Math.max(0, allText.indexOf("Newest first")), Math.max(0, allText.indexOf("Newest first")) + 400);
       results.check("Replay all failed with nothing failed says so (\"Nothing to replay\", why)", /Nothing to replay/.test(allText) && /No delivery has failed/.test(allText), around);
 
-      // A new URL: its secret is shown once.
+      // A rotated secret is shown once, and a new URL keeps it.
+      await panel.getByRole("button", { name: "Rotate secret" }).click();
+      await panel.getByRole("button", { name: "Rotate", exact: true }).click();
+      const set = await revealSecret("Your new webhook signing secret");
+      await shot(env, page, "ds-n-02-secret");
+      results.check("Rotate secret reveals the new signing secret once: masked (whsec_••••) until shown, then gone after \"I've stored it\"", /^whsec_•+$/.test(set.masked) && /^whsec_[A-Za-z0-9_-]{20,}$/.test(set.secret) && /This is the only time it is shown/.test(set.text) && !(await page.content()).includes(set.secret), `${set.masked} / ${set.secret.slice(0, 10)}…`);
+      await inboxSecret(inbox, set.secret);
       await panel.getByRole("button", { name: "Change URL" }).click();
       await panel.getByRole("textbox", { name: "New webhook URL" }).fill(sink);
+      const keptCopy = await panel.getByText("Saving keeps the current signing secret. Rotate it to get a new one.").isVisible();
       await panel.getByRole("button", { name: "Save the new URL" }).click();
-      const set = await revealSecret("Your webhook signing secret");
-      await shot(env, page, "ds-n-02-secret");
-      results.check("a new URL reveals its new signing secret once: masked (whsec_••••) until shown, then gone after \"I've stored it\"", /^whsec_•+$/.test(set.masked) && /^whsec_[A-Za-z0-9_-]{20,}$/.test(set.secret) && /This is the only time it is shown/.test(set.text) && !(await page.content()).includes(set.secret), `${set.masked} / ${set.secret.slice(0, 10)}…`);
+      const keptNote = page.getByText("Saved with the same signing secret", { exact: true });
+      const kept = await keptNote.waitFor({ timeout: 15_000 }).then(() => true).catch(() => false);
+      const revealed = await page.getByRole("group", { name: "Your webhook signing secret" }).isVisible().catch(() => false);
+      await shot(env, page, "ds-n-02b-secret-kept");
+      results.check("saving a new URL keeps the signing secret: the form says it will, the tab says it did, and no secret is revealed", keptCopy && kept && !revealed, `form copy: ${keptCopy}; note: ${kept}; reveal: ${revealed}`);
       const stored = await developerApi<{ webhook?: { url: string | null; secret_set: boolean } }>(env, page, `/apps/${APP}`);
       results.check("the API (through the developer site) stores the new URL and only says a secret is set", stored.body.webhook?.url === sink && stored.body.webhook.secret_set === true && !JSON.stringify(stored.body).includes(set.secret), JSON.stringify(stored.body.webhook));
       await inboxSecret(sink, set.secret);
       const toSink = await ping();
       const atSink = await until(async () => (await readInbox(sink)).items.find(item => item.event_id === toSink?.event_id) ?? null, 15_000);
-      results.check("the next ping reaches the new URL, signed with the new secret", !!atSink, JSON.stringify(atSink).slice(0, 120));
+      results.check("the next ping reaches the new URL, signed with the secret it kept", !!atSink, JSON.stringify(atSink).slice(0, 120));
 
       // Rotating the secret: the next delivery is signed with the new one only.
       await panel.getByRole("button", { name: "Rotate secret" }).click();

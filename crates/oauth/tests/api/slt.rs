@@ -360,3 +360,110 @@ async fn missing_and_wrong_kinds_of_short_lived_tokens() {
     let r = exchange_slt(&ctx, &app.app_id, &secret, SLT_GRANT, "slt_unknown").await;
     assert_oauth_error(&r, 400, "invalid_grant", "not known");
 }
+
+/// Turns one sign-in setting of an app on.
+async fn turn_on(ctx: &TestContext, app_id: &str, setting: &str) {
+    ctx.exec(&format!(
+        "update app_signin_configs set config = config || jsonb_build_object('{setting}', true) where app_id = '{app_id}'"
+    ))
+    .await;
+}
+
+/// `grant_type=slt` with `client_id` alone (the app's public client, no secret).
+async fn exchange_public(
+    ctx: &TestContext,
+    client_id: &str,
+    slt: &str,
+) -> accounts_core::test_support::Resp {
+    ctx.call(
+        router(),
+        accounts_core::test_support::Req::post("/v1/oauth/token").form(&[
+            ("grant_type", SLT_GRANT),
+            ("slt", slt),
+            ("client_id", client_id),
+        ]),
+    )
+    .await
+}
+
+/// An app's own command-line tool has no server to keep a secret in: once the app turns on
+/// `public_client`, it exchanges a Silicon's short-lived token with its client_id alone, and the
+/// sign-in is recorded as a public client's. Without it the secret is still required.
+#[tokio::test]
+async fn an_apps_public_client_exchanges_short_lived_tokens_once_public_client_is_on() {
+    let ctx = TestContext::new().await;
+    let custodian = ctx.carbon().await;
+    let (silicon, _) = ctx.silicon(&custodian.uuid).await;
+    let (app, secret) = ctx.app("notes").await;
+
+    // Neither setting: the app has to authenticate.
+    let slt = make_slt(&ctx, &silicon, &app.app_id, &[Scope::Profile]).await;
+    let r = exchange_public(&ctx, &app.app_id, &slt).await;
+    assert_oauth_error(&r, 401, "invalid_client", "client_secret is required");
+    // device_flow alone makes it a public client, but not one that takes short-lived tokens.
+    turn_on(&ctx, &app.app_id, "device_flow").await;
+    let r = exchange_public(&ctx, &app.app_id, &slt).await;
+    assert_oauth_error(&r, 400, "unauthorized_client", "public_client on");
+    // Refused before the token was looked at: it still works with the secret.
+    assert_tokens(&exchange_slt(&ctx, &app.app_id, &secret, SLT_GRANT, &slt).await);
+
+    // With public_client on, client_id alone is enough.
+    turn_on(&ctx, &app.app_id, "public_client").await;
+    let slt = make_slt(&ctx, &silicon, &app.app_id, &[Scope::Profile]).await;
+    let r = exchange_public(&ctx, &app.app_id, &slt).await;
+    let body = assert_tokens(&r).clone();
+    assert_eq!(body["account"]["uuid"], silicon.uuid.as_str());
+    let methods: Vec<String> = sqlx::query_scalar(
+        "select method || ':' || outcome from signin_history where account_uuid = $1 order by id",
+    )
+    .bind(&silicon.uuid)
+    .fetch_all(&ctx.state.db)
+    .await
+    .expect("history");
+    assert_eq!(
+        methods,
+        vec![
+            "slt:success".to_string(),
+            "slt_public_client:success".to_string()
+        ],
+        "a secretless exchange is recorded as a public client's"
+    );
+    // It keeps the Silicon signed in with client_id alone too.
+    let r = ctx
+        .call(
+            router(),
+            accounts_core::test_support::Req::post("/v1/oauth/token").form(&[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", s(&body, "refresh_token")),
+                ("client_id", app.app_id.as_str()),
+            ]),
+        )
+        .await;
+    assert_tokens(&r);
+
+    // Still single use and bound to its app.
+    let r = exchange_public(&ctx, &app.app_id, &slt).await;
+    assert_oauth_error(&r, 400, "invalid_grant", "already used");
+    let (other, _) = ctx.app("desk").await;
+    turn_on(&ctx, &other.app_id, "public_client").await;
+    let slt = make_slt(&ctx, &silicon, &app.app_id, &[Scope::Profile]).await;
+    let r = exchange_public(&ctx, &other.app_id, &slt).await;
+    assert_oauth_error(&r, 400, "invalid_grant", &app.app_id);
+    // A refused public sign-in is recorded as a public client's too.
+    let slt = make_slt(&ctx, &silicon, &app.app_id, &[Scope::Profile]).await;
+    ctx.exec(&format!(
+        "update accounts set status = 'pending_custodian' where uuid = '{}'",
+        silicon.uuid
+    ))
+    .await;
+    let r = exchange_public(&ctx, &app.app_id, &slt).await;
+    assert_oauth_error(&r, 400, "invalid_grant", "custodian hasn't accepted");
+    let failed: i64 = sqlx::query_scalar(
+        "select count(*) from signin_history where account_uuid = $1 and method = 'slt_public_client' and outcome = 'failed'",
+    )
+    .bind(&silicon.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("history");
+    assert_eq!(failed, 1);
+}

@@ -30,8 +30,10 @@ export const journey: Journey = {
     const count = async (condition: string) => (await sqlRows<{ n: number }>(env, `select count(*)::int as n from webhook_deliveries where target_kind = 'app' and target_id = '${APP}' and ${condition}`))[0]?.n ?? 0;
     const replay = (body: unknown) => appCall<ReplayAnswer>(env, APP, "POST", `/v1/apps/${APP}/webhook/replay`, { json: body, idempotencyKey: randomUUID() });
     const carbon = await newCarbon(ctx, "limits");
-    const set = must(`${APP} sets a webhook at its fake app`, await appCall<{ url: string; secret: string }>(env, APP, "PUT", `/v1/apps/${APP}/webhook`, { json: { url: inboxUrl(env, APP) } }), 200).body;
-    await setInboxSecret(env, APP, set.secret);
+    const set = must(`${APP} sets a webhook at its fake app`, await appCall<{ url: string; secret: string | null }>(env, APP, "PUT", `/v1/apps/${APP}/webhook`, { json: { url: inboxUrl(env, APP) } }), 200).body;
+    // Setting the URL keeps a stored secret (secret null): rotate to know the one in use.
+    const secret = set.secret ?? must(`${APP} rotates its secret`, await appCall<{ secret: string }>(env, APP, "POST", `/v1/apps/${APP}/webhook/rotate-secret`, { idempotencyKey: randomUUID() }), 200).body.secret;
+    await setInboxSecret(env, APP, secret);
     try {
       await signIntoApp(ctx, carbon, APP);
       await setFaults(env, APP, 10_000, 500);

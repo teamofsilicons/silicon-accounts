@@ -1,7 +1,13 @@
 //! The app's webhook (app or owner):
 //!
-//! - `PUT /v1/apps/{app_id}/webhook` `{"url"}` → `{"url","secret"}`: a new signing secret every
-//!   time the URL is set (shown once).
+//! - `PUT /v1/apps/{app_id}/webhook` `{"url","events"?}` → `{"url","secret","events"}`: sets
+//!   the URL. One rule for the secret, as everywhere (`PATCH …/subscriptions/{id}`, the Silicon
+//!   Apps sync): saving the URL keeps the stored signing secret (`secret` is null), and a new one
+//!   is made (and shown once) only when none is stored, which is when the webhook is first
+//!   created (or set again after it was removed); `rotate-secret` replaces it. `events` absent
+//!   keeps the current picks (every update for a new webhook), `null` picks every update, a
+//!   list picks those. `preserve_secret` is still accepted and changes nothing (keeping the
+//!   secret is what every save does).
 //! - `DELETE /v1/apps/{app_id}/webhook` → 204. Pending deliveries become `failed` (replayable
 //!   once a new URL is set).
 //! - `POST /v1/apps/{app_id}/webhook/rotate-secret` → `{"secret"}`.
@@ -44,7 +50,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::signin_config::ensure_config_row;
-use crate::util::{caller_scope, from_micros, micros};
+use crate::util::{caller_scope, double_option, from_micros, micros};
 
 /// Most deliveries one replay request re-queues.
 pub const MAX_REPLAY: usize = 100;
@@ -76,10 +82,18 @@ pub(crate) fn router() -> Router<AppState> {
 #[serde(deny_unknown_fields)]
 struct SetWebhook {
     url: String,
-    #[serde(default)]
-    events: Option<Vec<String>>,
-    #[serde(default)]
-    preserve_secret: bool,
+    /// Absent: keep the current picks (every update for a new webhook); `null`: every update; a
+    /// list: those updates.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    events: Option<Option<Vec<String>>>,
+    /// Accepted for compatibility: saving the URL always keeps the stored secret now. Part of
+    /// the request (and its idempotency fingerprint) only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    preserve_secret: Option<bool>,
 }
 
 fn webhook_not_set(app_id: &str) -> ApiError {
@@ -132,30 +146,42 @@ async fn set_webhook(
         "PUT",
         &format!("/v1/apps/{app_id}/webhook"),
     );
-    // The response carries a fresh secret: a retry with the same key gets the same secret for
-    // 10 minutes instead of rotating it again.
+    // The first save answers with a new secret: a retry with the same key gets the same answer
+    // for 10 minutes.
     let mut r = idempotency::run(&state, key.as_deref(), &scope, &body, true, || async {
         let url = validate_webhook_url(&state.settings, &body.url).map_err(|m| {
             let mut f = FieldErrors::new();
             f.add("url", m);
             ApiError::validation(f)
         })?;
-        if let Some(selected) = &body.events
+        if let Some(Some(selected)) = &body.events
             && (selected.len() > 9 || selected.iter().any(|event| !events::APP_UPDATE_CHOICES.contains(&event.as_str()))) {
                 return Err(ApiError::unprocessable("invalid_webhook_events", "events must contain only id_change, display_name_change, pfp_change, timezone_change, email_change, phone_change, custodian_change, access_removed, account_deleted."));
         }
         let url = url.to_string();
         let mut tx = state.db.begin().await?;
         ensure_config_row(&mut tx, &app_id).await?;
-        let (previous, existing): (Option<String>,Option<Vec<u8>>) = sqlx::query_as(
-            "select webhook_url,webhook_secret_enc from app_signin_configs where app_id = $1 for update",
-        )
-        .bind(&app_id)
-        .fetch_one(&mut *tx)
-        .await?;
-        let (secret, enc) = match existing.filter(|_|body.preserve_secret) {
-            Some(enc) => (None,enc),
-            None => {let (secret,enc)=events::new_webhook_secret(&state.keys.keyring)?;(Some(secret),enc)},
+        let (previous, existing, current_events): (Option<String>, Option<Vec<u8>>, Option<Value>) =
+            sqlx::query_as(
+                "select webhook_url, webhook_secret_enc, webhook_events from app_signin_configs where app_id = $1 for update",
+            )
+            .bind(&app_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        // The stored secret stays (one made with generate-secret too); a new one only when none
+        // is stored. Replacing it is rotate-secret's job.
+        let (secret, enc) = match existing {
+            Some(enc) => (None, enc),
+            None => {
+                let (secret, enc) = events::new_webhook_secret(&state.keys.keyring)?;
+                (Some(secret), enc)
+            }
+        };
+        // The picks stay unless events is sent; a new webhook gets every update.
+        let picks: Option<Value> = match &body.events {
+            Some(sent) => sent.as_ref().map(|v| json!(v)),
+            None if previous.is_some() => current_events,
+            None => None,
         };
         sqlx::query(
             "update app_signin_configs set webhook_url = $2, webhook_secret_enc = $3, webhook_events = $4, updated_at = now() where app_id = $1",
@@ -163,7 +189,7 @@ async fn set_webhook(
         .bind(&app_id)
         .bind(&url)
         .bind(&enc)
-        .bind(body.events.as_ref().map(|v| json!(v)))
+        .bind(&picks)
         .execute(&mut *tx)
         .await?;
         let (actor_kind, actor_id) = auth.audit_actor();
@@ -173,14 +199,14 @@ async fn set_webhook(
                 target_kind: Some("app"),
                 target_id: Some(&app_id),
                 app_id: Some(&app_id),
-                details: json!({"url": url, "previous_url": previous}),
+                details: json!({"url": url, "previous_url": previous, "new_secret": secret.is_some()}),
                 ip: meta.ip.as_deref(),
                 ..audit::AuditEntry::new(actor_kind, Some(&actor_id), "app.webhook.set")
             },
         )
         .await?;
         tx.commit().await?;
-        Ok((StatusCode::OK, json!({"url": url, "secret": secret, "events": body.events})))
+        Ok((StatusCode::OK, json!({"url": url, "secret": secret, "events": picks})))
     })
     .await?;
     no_store(&mut r);

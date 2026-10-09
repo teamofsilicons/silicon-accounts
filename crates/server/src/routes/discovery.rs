@@ -266,6 +266,7 @@ const CAPABILITIES: &[Capability] = &[
 
 /// Other names clients use for a capability.
 const ALIASES: &[(&str, &str)] = &[
+    ("event_stream", "sse"),
     ("event_streaming", "sse"),
     ("events_stream", "sse"),
     ("server_sent_events", "sse"),
@@ -546,6 +547,8 @@ mod tests {
         assert_eq!(resolve("sse"), Some("sse"));
         assert_eq!(resolve(" SSE "), Some("sse"));
         assert_eq!(resolve("event-streaming"), Some("sse"));
+        assert_eq!(resolve("event_stream"), Some("sse"));
+        assert_eq!(resolve("Event-Stream"), Some("sse"));
         assert_eq!(resolve("idempotency"), Some("idempotency_keys"));
         assert_eq!(resolve("graphql"), None);
         let mut names: Vec<&str> = CAPABILITIES.iter().map(|c| c.name).collect();

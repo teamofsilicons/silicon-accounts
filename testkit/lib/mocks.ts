@@ -327,7 +327,7 @@ export class FakeAppsClient {
     return { recovered: res.body.recovered };
   }
 
-  /** The fake app registers its own webhook at Silicon Accounts (PUT /v1/apps/{app}/webhook) and keeps the new secret. */
+  /** The fake app registers its own webhook at Silicon Accounts (PUT /v1/apps/{app}/webhook) and keeps a fresh secret (rotated when the URL kept a stored one). */
   async connectWebhook(appId: string, url?: string): Promise<void> {
     expectStatus(await this.http.post(`/${appId}/_connect-webhook`, { json: url ? { url } : {} }), 200);
   }

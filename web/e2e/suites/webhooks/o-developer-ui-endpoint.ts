@@ -1,8 +1,9 @@
 /**
  * The owner's Webhooks tab on the developer site, the endpoint side (developers.teamofsilicons.com
  * /apps/campus-connect/webhooks, owner it@university.test signed in through the developer site's BFF), in the browser: Change URL refuses a bad URL in place (the page's own check, and a 422 only the server can give, shown under
- * the field), Cancel keeps the URL, saving a new URL shows its new signing secret once and the next ping is signed with
- * it; Remove webhook fails what is pending at once and disables "Replay all failed"; setting a URL again, the failed
+ * the field), Cancel keeps the URL, saving a new URL keeps the signing secret (the tab says so and shows none), Rotate
+ * secret shows the new one once and the next ping is signed with it; Remove webhook fails what is pending at once and
+ * disables "Replay all failed"; setting a URL again shows a new secret (none was stored any more), the failed
  * delivery is selected in the table and replayed ("Replay 1 selected") to the new URL with the same event_id; a failed
  * delivery about a Carbon who removed the app's access shows its account details hidden, has no replay button, and
  * replaying it by selection names the server's reason. Two Carbons at university.test (the app allows only that
@@ -39,6 +40,12 @@ const shortId = (id: string) => (id.length > 12 ? `${id.slice(0, 8)}…${id.slic
 async function storedUrl(env: Parameters<typeof sqlRows>[0]): Promise<string | null> {
   const [row] = await sqlRows<{ url: string | null }>(env, `select webhook_url as url from app_signin_configs where app_id = '${APP}'`);
   return row?.url ?? null;
+}
+
+/** The stored signing secret as encrypted (hex): the same bytes mean the same secret was kept, not made again. */
+async function storedSecret(env: Parameters<typeof sqlRows>[0]): Promise<string | null> {
+  const [row] = await sqlRows<{ secret: string | null }>(env, `select encode(webhook_secret_enc, 'hex') as secret from app_signin_configs where app_id = '${APP}'`);
+  return row?.secret ?? null;
 }
 
 /** The error a field announces (aria-invalid, and the text of its aria-describedby error message), once it has one. */
@@ -96,7 +103,7 @@ async function readSecret(page: Page, title: string): Promise<{ masked: boolean;
 
 export const journey: Journey = {
   name: "webhooks-developer-ui-endpoint",
-  title: "the owner's Webhooks tab on the developer site: Change URL (refused in place by the page and by the server, Cancel, new secret shown once and used), Remove webhook (pending fails, Replay all failed disabled), set it again and Replay 1 selected, a skipped replay's reason shown",
+  title: "the owner's Webhooks tab on the developer site: Change URL (refused in place by the page and by the server, Cancel, saved with the same secret), Rotate secret (shown once and used), Remove webhook (pending fails, Replay all failed disabled), set it again and Replay 1 selected, a skipped replay's reason shown",
   timeoutMs: 6 * 60_000,
   async run(ctx) {
     const { env, results, browser } = ctx;
@@ -149,23 +156,31 @@ export const journey: Journey = {
       await tab.getByRole("button", { name: "Change URL" }).waitFor({ timeout: 10_000 });
       results.check("Cancel goes back to the current URL, unchanged", (await tab.getByText(original, { exact: true }).isVisible()) && (await storedUrl(env)) === original);
 
-      // ---- Change URL: saved, new secret shown once and used ----------------------------------------------------------------
+      // ---- Change URL: saved with the same secret; a rotation's secret shown once and used ------------------------------
+      const secretBefore = await storedSecret(env);
       await tab.getByRole("button", { name: "Change URL" }).click();
       await field.fill(sinkUrl);
       await tab.getByRole("button", { name: "Save the new URL" }).click();
-      const first = await readSecret(page, "Your webhook signing secret");
-      results.check("saving a new URL shows its new signing secret, masked until revealed", first.masked && /^whsec_[A-Za-z0-9_-]{43}$/.test(first.secret), `${first.secret.slice(0, 10)}…`);
+      const keptNote = page.getByText("Saved with the same signing secret", { exact: true });
+      const keptShown = await keptNote.waitFor({ timeout: 20_000 }).then(() => true).catch(() => false);
       await tab.getByText(sinkUrl, { exact: true }).waitFor({ timeout: 10_000 }).catch(() => undefined);
+      const revealed = await page.getByRole("group", { name: "Your webhook signing secret" }).isVisible().catch(() => false);
+      results.check("saving a new URL keeps the signing secret: the tab says so, reveals no secret and keeps working (the stored secret is the same bytes)", keptShown && !revealed && (await tab.getByRole("button", { name: "Change URL" }).isVisible()) && secretBefore !== null && (await storedSecret(env)) === secretBefore, `note: ${keptShown}; reveal: ${revealed}`);
       results.check("…the new URL is stored and shown", (await storedUrl(env)) === sinkUrl && (await tab.getByText(sinkUrl, { exact: true }).isVisible()), String(await storedUrl(env)));
-      await shot(env, page, "wh-ui2-02-new-url-secret");
+      await shot(env, page, "wh-ui2-02-new-url-secret-kept");
+      // The fake app knows the kept secret, the sink doesn't: a rotation gives the sink one the journey knows.
+      await tab.getByRole("button", { name: "Rotate secret" }).click();
+      await tab.getByRole("button", { name: "Rotate", exact: true }).click({ timeout: 10_000 });
+      const first = await readSecret(page, "Your new webhook signing secret");
+      results.check("Rotate secret shows the new signing secret, masked until revealed, and the kept-secret note goes", first.masked && /^whsec_[A-Za-z0-9_-]{43}$/.test(first.secret) && !(await keptNote.isVisible().catch(() => false)), `${first.secret.slice(0, 10)}…`);
       await setInboxSecret(env, sink, first.secret);
-      const reveal = page.getByRole("group", { name: "Your webhook signing secret" });
+      const reveal = page.getByRole("group", { name: "Your new webhook signing secret" });
       await reveal.getByRole("button", { name: "I've stored it" }).click();
       await sleep(400);
       results.check("…and it is gone once stored", !(await reveal.isVisible().catch(() => false)));
       await tab.getByRole("button", { name: "Send test ping" }).click();
       const pinged = await waitEvent(env, sink, { type: "ping" });
-      results.check("Send test ping goes to the new URL, signed with the secret the page showed (nothing refused)", !!pinged && ((await inboxEvents(env, sink, { uuid: "none" })).rejected ?? []).length === 0, pinged?.event_id ?? "nothing in 25 s");
+      results.check("Send test ping goes to the new URL, signed with the rotated secret the page showed (nothing refused)", !!pinged && ((await inboxEvents(env, sink, { uuid: "none" })).rejected ?? []).length === 0, pinged?.event_id ?? "nothing in 25 s");
 
       // ---- Remove webhook with a delivery pending ----------------------------------------------------------------------------
       await setFaults(env, sink, 1000, 500);
@@ -189,7 +204,7 @@ export const journey: Journey = {
       await tab.getByLabel("Webhook URL", { exact: true }).fill(original);
       await save.click();
       const second = await readSecret(page, "Your webhook signing secret");
-      results.check("setting the URL again shows another new secret", second.masked && /^whsec_/.test(second.secret) && second.secret !== first.secret);
+      results.check("setting the URL again after removing the webhook shows a new secret (removing it dropped the old one)", second.masked && /^whsec_/.test(second.secret) && second.secret !== first.secret);
       await setInboxSecret(env, APP, second.secret, false);
       await page.getByRole("group", { name: "Your webhook signing secret" }).getByRole("button", { name: "I've stored it" }).click();
       await setFaults(env, sink, 0);

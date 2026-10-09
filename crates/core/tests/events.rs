@@ -207,6 +207,27 @@ async fn silicon_webhooks_and_custodian_changes() {
     assert_eq!(own[0].1["silicon"], s.uuid);
     assert_eq!(own[0].1["app_id"], Value::Null);
     assert_eq!(own[0].1["data"]["to"]["uuid"], new.uuid);
+    // The Silicon itself gets both custodians' summaries.
+    assert_eq!(own[0].1["data"]["to"]["display_name"], new.display_name);
+    assert_eq!(own[0].1["data"]["from"]["kind"], "carbon");
+
+    // The app gets each custodian as `{uuid, id}` only, like everywhere else: never the name,
+    // photo, kind or status of a Carbon who may never have signed into it.
+    let (kind, payload) = events_for(&ctx, &app.app_id)
+        .await
+        .into_iter()
+        .find(|(t, _)| t == types::SILICON_CUSTODIAN_CHANGED)
+        .expect("app event");
+    assert_eq!(kind, types::SILICON_CUSTODIAN_CHANGED);
+    assert_eq!(
+        payload["data"]["from"],
+        serde_json::json!({"uuid": old.uuid, "id": old.handle})
+    );
+    assert_eq!(
+        payload["data"]["to"],
+        serde_json::json!({"uuid": new.uuid, "id": new.handle})
+    );
+    assert_eq!(payload["data"]["uuid"], s.uuid);
 
     // The Silicon's secret decrypts for signing; the app gets the custodian in account.updated.
     let secret = events::current_secret(

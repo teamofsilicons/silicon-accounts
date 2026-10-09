@@ -1281,16 +1281,13 @@ async fn run_webhook(
         } => {
             let key = idempotency_key.unwrap_or_else(util::idempotency_key);
             let hook = app.set_webhook(&endpoint, Some(&key)).await?;
-            let secret = hook
-                .secret
-                .as_ref()
-                .map(|s| {
-                    format!(
-                        "\nSigning secret (shown once, store it now): {}",
-                        s.expose()
-                    )
-                })
-                .unwrap_or_default();
+            let secret = match hook.secret.as_ref() {
+                Some(s) => format!(
+                    "\nSigning secret (shown once, store it now): {}",
+                    s.expose()
+                ),
+                None => "\nIt keeps its signing secret; `silicon-accounts app webhook rotate` makes a new one.".to_owned(),
+            };
             Ok(Outcome::new(
                 to_json(&hook),
                 format!("Webhook of {app_id} set to {}.{secret}", hook.url),

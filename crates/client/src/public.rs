@@ -310,6 +310,29 @@ impl AccountsClient {
         self.execute(request).await?.json()
     }
 
+    /// Exchanges a Silicon's short-lived token (`slt_…`) at your app's own command-line or
+    /// desktop tool, with the app's `client_id` alone: no secret, for an app that turned on
+    /// `public_client` in its sign-in setup (other apps exchange with their secret through
+    /// [`AppClient::exchange_slt`]). The token is single use, lives 2 minutes and works only
+    /// for the app it was minted for.
+    pub async fn exchange_slt_public_client(
+        &self,
+        app_id: &str,
+        slt: &str,
+    ) -> Result<TokenResponse> {
+        let request = Request::new(
+            Method::POST,
+            self.endpoint(&["v1", "oauth", "token"]),
+            Auth::None,
+        )
+        .form(&[
+            ("grant_type", SLT_GRANT_TYPE),
+            ("slt", slt.trim()),
+            ("client_id", app_id.trim()),
+        ]);
+        self.execute(request).await?.json()
+    }
+
     async fn device_poll_as(&self, client_id: &str, device_code: &str) -> Result<DevicePoll> {
         let request = Request::new(
             Method::POST,

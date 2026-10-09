@@ -87,17 +87,81 @@ async fn set_rotate_test_and_remove_the_webhook() {
     );
     assert!(!details.json.to_string().contains(&first));
 
-    // Setting it again issues a new secret; rotating too.
+    // Saving the URL again (the same or another) keeps the secret and the picks, like moving
+    // the webhook subscription does: only rotate-secret makes a new one.
+    assert_eq!(
+        r.json["events"],
+        Value::Null,
+        "a new webhook gets every update"
+    );
+    let r = call(
+        &ctx,
+        Req::put(&base)
+            .basic(&a.app_id, &a.secret)
+            .json(json!({"url": url, "events": ["id_change", "account_deleted"]})),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["secret"], Value::Null);
+    assert_eq!(r.json["events"], json!(["id_change", "account_deleted"]));
+    let moved = "http://127.0.0.1:8593/wh/moved";
     let r = call(
         &ctx,
         Req::put(&base)
             .session(&ctx.state.settings, &a.cookie)
-            .json(json!({"url": url})),
+            .json(json!({"url": moved})),
     )
     .await;
-    assert_eq!(r.status, 200);
-    let second = r.json["secret"].as_str().expect("secret").to_string();
-    assert_ne!(first, second);
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["url"], moved);
+    assert_eq!(r.json["secret"], Value::Null, "{}", r.json);
+    assert_eq!(
+        r.json["events"],
+        json!(["id_change", "account_deleted"]),
+        "omitting events keeps the picks"
+    );
+    assert_eq!(
+        stored_secret(&ctx, &a.app_id).await.as_deref(),
+        Some(first.as_str())
+    );
+    let r = call(&ctx, Req::get(&base).basic(&a.app_id, &a.secret)).await;
+    assert_eq!(r.json["url"], moved);
+    assert_eq!(r.json["events"], json!(["id_change", "account_deleted"]));
+    let updates: Option<Value> = sqlx::query_scalar(
+        "select updates from app_event_subscriptions where app_id = $1 and delivery = 'webhook'",
+    )
+    .bind(&a.app_id)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("subscription");
+    assert_eq!(updates, Some(json!(["id_change", "account_deleted"])));
+    // `preserve_secret` is still accepted, either way, and changes nothing.
+    for preserve in [true, false] {
+        let r = call(
+            &ctx,
+            Req::put(&base)
+                .basic(&a.app_id, &a.secret)
+                .json(json!({"url": url, "preserve_secret": preserve})),
+        )
+        .await;
+        assert_eq!(r.status, 200, "{}", r.json);
+        assert_eq!(r.json["secret"], Value::Null);
+    }
+    assert_eq!(
+        stored_secret(&ctx, &a.app_id).await.as_deref(),
+        Some(first.as_str())
+    );
+    // `events: null` picks every update again.
+    let r = call(
+        &ctx,
+        Req::put(&base)
+            .basic(&a.app_id, &a.secret)
+            .json(json!({"url": url, "events": null})),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["events"], Value::Null);
+    let second = first.clone();
 
     // A retried rotation (same Idempotency-Key) returns the same secret instead of rotating twice.
     let rotate = || {
@@ -185,6 +249,48 @@ async fn set_rotate_test_and_remove_the_webhook() {
     .await;
     assert_eq!(r.status, 409, "replays need a current URL");
     assert_eq!(r.error_code(), Some("webhook_not_set"));
+
+    // Setting a URL after the removal creates the webhook again: a new secret, every update.
+    let r = call(
+        &ctx,
+        Req::put(&base)
+            .basic(&a.app_id, &a.secret)
+            .json(json!({"url": url})),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let fresh = r.json["secret"].as_str().expect("a new secret").to_string();
+    assert!(fresh.starts_with("whsec_") && fresh != third);
+    assert_eq!(r.json["events"], Value::Null);
+}
+
+/// A secret made with generate-secret before the URL is set is the one the webhook keeps.
+#[tokio::test]
+async fn a_generated_secret_is_kept_when_the_url_is_set() {
+    let ctx = TestContext::new().await;
+    let a = owned_app(&ctx, "whg").await;
+    let base = format!("/v1/apps/{}/webhook", a.app_id);
+    let r = call(
+        &ctx,
+        Req::post(&format!("{base}/generate-secret")).basic(&a.app_id, &a.secret),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let generated = r.json["secret"].as_str().expect("secret").to_string();
+    let r = call(
+        &ctx,
+        Req::put(&base)
+            .basic(&a.app_id, &a.secret)
+            .json(json!({"url": "http://127.0.0.1:8593/whg/webhooks", "events": ["id_change"]})),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["secret"], Value::Null);
+    assert_eq!(r.json["events"], json!(["id_change"]));
+    assert_eq!(
+        stored_secret(&ctx, &a.app_id).await.as_deref(),
+        Some(generated.as_str())
+    );
 }
 
 #[tokio::test]

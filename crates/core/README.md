@@ -123,7 +123,7 @@ async fn change_my_id(
 | `repo::apps` | apps | `get`, `require_active`, `owned_by`, `signin_row` → `AppSigninRow`, `effective_config`, `webhook_target`, `AppCredentialCache`, `AppAuthError`, `unknown_app`, `app_disabled` |
 | `repo::memberships` | `{app_id}:{uuid}` | `get`, `upsert_signin` (+`GrantMode`), `upsert_imported`, `list_for_account`, `remove_access`, `webhook_targets` (one row per member app and active subscription) |
 | `repo::subscriptions` | app event subscriptions | `Subscription`, `list`, `get`, `by_delivery`, `lock`, `insert_stream`, `set_webhook_updates` (the webhook's updates live in `app_signin_configs.webhook_events`; a trigger keeps its row in step), `set_stream_updates`, `set_status`, `delete_stream`, `validate_updates`, `wants` |
-| `repo::tokens` | grants | `issue_tokens`, `issue_tokens_for` (a sign-in with its own end, for token exchanges), `refresh`, `verify_access_token`, `create_family`, `find_family`, `family_for_refresh_token`, `revoke_family`, `revoke_families` (+`RevokeFilter`), `list_families`, `count_active_families`, `create_code`/`consume_code`, `create_slt`/`consume_slt`, `create_device`/`create_app_device`/`device_by_user_code`/`decide_device`/`poll_device`/`poll_app_device`, `GrantError` |
+| `repo::tokens` | grants | `issue_tokens`, `issue_tokens_for` (a sign-in with its own end, for token exchanges), `issue_tokens_until` (a sign-in that ends by a given moment, for an SLT minted by a token-exchange sign-in), `refresh`, `verify_access_token`, `create_family`, `find_family`, `family_for_refresh_token`, `revoke_family`, `revoke_families` (+`RevokeFilter`), `list_families`, `count_active_families`, `create_code`/`consume_code`, `create_slt`/`create_slt_within` (+`SltBound`)/`consume_slt`, `create_device`/`create_app_device`/`device_by_user_code`/`decide_device`/`poll_device`/`poll_app_device`, `GrantError` |
 | `repo::sessions` | browser sessions | `create`, `lookup`, `get`, `touch`, `mark_authenticated`, `authenticated_at`, `revoke`, `revoke_all`, `list_active` |
 | `repo::otp` | 6-digit codes | `send`, `verify` (+`Expect`, `Attempt`), `get`, `purge` |
 | `repo::rate_limit` | fixed windows | `enforce`, `enforce_pool`, `hit`, `peek` (no count), `take` (weighted), `bucket`, `limits::*`, `purge` |
@@ -463,6 +463,9 @@ let code = tokens::consume_code(&state.db, &state.keys.pepper, code, app_id, red
 
 // SLTs and device codes:
 let (slt, expires_at) = tokens::create_slt(&mut conn, &state.keys.pepper, &uuid, app_id, &scopes).await?;
+// Minted by a token-exchange (CI) sign-in: the SLT records its end and trust (federation::session_bound).
+let bound = accounts_core::federation::session_bound(&mut conn, &auth).await?;
+let (slt, expires_at) = tokens::create_slt_within(&mut conn, &state.keys.pepper, &uuid, app_id, &scopes, bound).await?;
 let slt_row = tokens::consume_slt(&state.db, &state.keys.pepper, slt, app_id).await.map_err(|e| e.to_oauth())?;
 let start = tokens::create_device(&mut conn, &state.keys.pepper, Some(label)).await?;  // DeviceStart
 tokens::decide_device(&mut conn, user_code, &me_uuid, approve).await?;
@@ -515,7 +518,7 @@ and carries the failure streak and cooldown. `challenge.masked_destination()`,
 - `rate_limit::enforce(&mut conn, &rate_limit::bucket("ids_available:ip", ip), rate_limit::limits::IDS_AVAILABLE_PER_IP, "id lookups from this network")`
   → 429 with `Retry-After`. Limits: `IDS_AVAILABLE_PER_IP` 120/min, `SILICON_SELF_CREATE_PER_IP`
   10/h, `REPORTS_PER_IP` 5/h, `OTP_SEND_PER_IP` 30/10 min (applied by `otp::send`),
-  `SILICON_LOGIN_PER_IP` 60/min, `TELEMETRY_PER_IP` 120/min. Use `enforce_pool` outside transactions.
+  `SILICON_LOGIN_PER_IP` 60/min (bucket `SILICON_LOGIN_BUCKET`, shared by `POST /v1/silicons/login` and the jwt-bearer grant), `TELEMETRY_PER_IP` 120/min. Use `enforce_pool` outside transactions.
   `peek` answers without counting (refuse a flood before any work, count successes only);
   `take(&mut tx, bucket, n, limit)` takes `n` at once (weighted budgets such as imported rows).
 - `idempotency::run(&state, key.as_deref(), &scope, &body, secret_bearing, || async { Ok((status, json)) })`

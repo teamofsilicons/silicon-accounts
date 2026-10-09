@@ -101,6 +101,8 @@ println!("{} signed in as membership {}", account.id, account.membership_id);
 
 // Silicons sign in with a short-lived token instead of the browser:
 let tokens = app.exchange_slt(&slt_from_the_silicon).await?;
+// Your own CLI or desktop tool, with `public_client` on and no secret:
+let tokens = client.exchange_slt_public_client("briefcase", &slt_from_the_silicon).await?;
 ```
 
 ### Check access tokens
@@ -217,8 +219,9 @@ let job = app
     .await?;
 let job = app.wait_for_import(&job.id, std::time::Duration::from_secs(1)).await?;
 let details = app.update_signin_config(&serde_json::json!({"methods": {"google": true}}), Some(7), None).await?;
-// Webhook calls take an idempotency key: a retried set/rotate returns the same secret, a
-// retried test queues one ping.
+// Webhook calls take an idempotency key: a retried set/rotate returns the same answer, a
+// retried test queues one ping. Setting the URL keeps the stored secret (`hook.secret` is
+// None); only the first set, or one after remove_webhook, returns a new one.
 let hook = app.set_webhook("https://app.example.com/hooks/accounts", Some("wh-set-1")).await?;
 ```
 

@@ -866,14 +866,16 @@ pub struct ImportRowsQuery {
     pub cursor: Option<String>,
 }
 
-/// The app's webhook endpoint with its new signing secret (shown once).
+/// The app's webhook endpoint, with its signing secret when this save generated one (shown
+/// once).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct AppWebhook {
     /// The endpoint.
     #[serde(default, deserialize_with = "lenient_string")]
     pub url: String,
-    /// `whsec_…`.
+    /// `whsec_…`: the new signing secret, shown once. Only when this save generated one (the
+    /// app had none); `None` when the stored secret was kept.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secret: Option<Secret>,
 }

@@ -19,6 +19,12 @@
 //! access token (30 minutes) later and at most [`MAX_SESSION_SECONDS`] later, with refresh tokens
 //! rotating as usual inside that window. Removing the trust ends it.
 //!
+//! **Signing into apps from it.** A short-lived token the sign-in mints (`POST
+//! /v1/me/short-lived-tokens`) records the sign-in's end and trust ([`session_bound`]); the app
+//! sign-in it starts ends no later than this one (its token family expires at the same moment
+//! at the latest), is refused once the trust is removed, and is linked to the trust in
+//! `silicon_federation_sessions`, so removing the trust ends it as well.
+//!
 //! **Fetching** discovery and keys goes through its own HTTP client: https only, no proxy, no
 //! redirects, 5 s to connect and 10 s in all, at most [`MAX_DOCUMENT_BYTES`] per document, and
 //! a DNS resolver that refuses any host with an address that isn't public (private, loopback,
@@ -1189,6 +1195,34 @@ pub async fn is_federated_session(conn: &mut PgConnection, auth: &AccountAuth) -
             .fetch_optional(&mut *conn)
             .await?;
     Ok(origin.as_deref() == Some(TokenOrigin::Federated.as_str()))
+}
+
+/// When `auth` is a sign-in that came from a trusted outside token: its trust and the end of
+/// its token family. A short-lived token it mints carries both (`repo::tokens::SltBound`), so
+/// the app sign-in made from that token ends no later than this sign-in and belongs to the same
+/// trust (removing the trust ends it too).
+pub async fn session_bound(
+    conn: &mut PgConnection,
+    auth: &AccountAuth,
+) -> ApiResult<Option<tokens::SltBound>> {
+    let AuthVia::Bearer { family_id, .. } = &auth.via else {
+        return Ok(None);
+    };
+    let row: Option<(Uuid, OffsetDateTime)> = sqlx::query_as(
+        "select s.federation_id, f.expires_at from silicon_federation_sessions s \
+         join token_families f on f.id = s.family_id \
+         where s.family_id = $1 and f.origin = $2",
+    )
+    .bind(family_id)
+    .bind(TokenOrigin::Federated.as_str())
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(
+        row.map(|(federation_id, family_expires_cap)| tokens::SltBound {
+            federation_id,
+            family_expires_cap,
+        }),
+    )
 }
 
 /// 403 `federated_session`: a sign-in from an outside token tried to add a sign-in method.

@@ -288,10 +288,11 @@ pub struct CustodianChanged {
     /// `{app_id}:{uuid}`.
     #[serde(default, deserialize_with = "lenient_string")]
     pub membership_id: String,
-    /// The previous custodian.
+    /// The previous custodian: its `uuid` and `id` only (apps never get a custodian's name,
+    /// photo, kind or status).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<AccountRef>,
-    /// The new custodian.
+    /// The new custodian: its `uuid` and `id` only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<AccountRef>,
 }

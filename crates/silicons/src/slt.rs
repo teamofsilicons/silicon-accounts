@@ -15,6 +15,10 @@
 //! The token is stored under a share lock on the account row with the session re-checked
 //! (`common::lock_live_session`), so it can't outlive an STK rotation or account deletion that
 //! runs at the same time.
+//!
+//! A token minted by a sign-in from a trusted outside token (a CI job) records that sign-in's
+//! end and trust (core's `federation::session_bound`): the app sign-in made from it ends no
+//! later than the CI sign-in, and removing the trust ends it.
 
 use accounts_core::error::{ApiError, ApiResult, FieldErrors};
 use accounts_core::http::{AccountAuth, ClientMeta, Json};
@@ -90,8 +94,18 @@ pub async fn create(
             carbon_scopes(&mut tx, &config, &account, &app.app_id, &app.name).await?
         }
     };
-    let (slt, expires_at) =
-        tokens::create_slt(&mut tx, &state.keys.pepper, &account.uuid, &app_id, &scopes).await?;
+    // A sign-in from a trusted outside token (a CI job) ends early and belongs to its trust:
+    // the token carries both, so the app sign-in made from it can't outlive either.
+    let bound = accounts_core::federation::session_bound(&mut tx, &auth).await?;
+    let (slt, expires_at) = tokens::create_slt_within(
+        &mut tx,
+        &state.keys.pepper,
+        &account.uuid,
+        &app_id,
+        &scopes,
+        bound,
+    )
+    .await?;
     // The sign-in itself is listed when the app exchanges the token (signin_history).
     Actor::account(&account.uuid, meta.ip.as_deref())
         .record_unlisted(
@@ -99,7 +113,11 @@ pub async fn create(
             "slt.issued",
             ("account", &account.uuid),
             Some(&app_id),
-            json!({"scope": scopes_to_string(&scopes)}),
+            json!({
+                "scope": scopes_to_string(&scopes),
+                "federation_id": bound.map(|b| b.federation_id),
+                "sign_in_ends_by": bound.map(|b| format_rfc3339_ms(b.family_expires_cap)),
+            }),
         )
         .await?;
     tx.commit().await?;
@@ -114,9 +132,9 @@ pub async fn create(
     ))
 }
 
-/// 422 `first_party_app` for Silicon Accounts' own apps (`silicon-accounts`, `developer`). Both are
-/// public clients, and only an app with its own client secret can exchange a short-lived token,
-/// so a token minted for either could never be used.
+/// 422 `first_party_app` for Silicon Accounts' own apps (`silicon-accounts`, `developer`). The
+/// token endpoint never lets either exchange a short-lived token, so a token minted for either
+/// could never be used.
 fn first_party_app(app_id: &str, developer_url: &str) -> ApiError {
     let message = if app_id == accounts_core::DEVELOPER_APP_ID {
         format!(

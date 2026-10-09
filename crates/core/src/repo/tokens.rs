@@ -181,20 +181,22 @@ pub struct NewFamily<'a> {
 
 /// Creates a token family (expires 900 days from now).
 pub async fn create_family(conn: &mut PgConnection, new: &NewFamily<'_>) -> ApiResult<TokenFamily> {
-    create_family_for(conn, new, None).await
+    create_family_for(conn, new, None, None).await
 }
 
 /// Creates a token family that expires `lifetime_seconds` from now (database clock), or 900
-/// days from now.
+/// days from now, and in any case no later than `ends_by`.
 async fn create_family_for(
     conn: &mut PgConnection,
     new: &NewFamily<'_>,
     lifetime_seconds: Option<i64>,
+    ends_by: Option<OffsetDateTime>,
 ) -> ApiResult<TokenFamily> {
     Ok(sqlx::query_as::<_, TokenFamily>(concat!(
         "insert into token_families (id, app_id, account_uuid, origin, scopes, browser_session_id, label, expires_at, ip, user_agent, auth_time) \
          values ($1, $2, $3, $4, $5, $6, $7, \
-                 now() + coalesce(make_interval(secs => $12), make_interval(days => $8)), $9, $10, $11) returning ",
+                 least(now() + coalesce(make_interval(secs => $12), make_interval(days => $8)), $13), \
+                 $9, $10, $11) returning ",
         family_columns!()
     ))
     .bind(Uuid::now_v7())
@@ -209,6 +211,7 @@ async fn create_family_for(
     .bind(new.user_agent.map(|u| u.chars().take(400).collect::<String>()))
     .bind(new.auth_time)
     .bind(lifetime_seconds.map(|s| s as f64))
+    .bind(ends_by)
     .fetch_one(&mut *conn)
     .await?)
 }
@@ -263,7 +266,7 @@ pub async fn issue_tokens(
     settings: &Settings,
     req: IssueRequest<'_>,
 ) -> ApiResult<TokenResponse> {
-    issue_tokens_inner(conn, keys, settings, req, None)
+    issue_tokens_inner(conn, keys, settings, req, None, None)
         .await
         .map(|(response, _)| response)
 }
@@ -280,7 +283,30 @@ pub async fn issue_tokens_for(
     req: IssueRequest<'_>,
     lifetime_seconds: i64,
 ) -> ApiResult<(TokenResponse, TokenFamily)> {
-    issue_tokens_inner(conn, keys, settings, req, Some(lifetime_seconds.max(1))).await
+    issue_tokens_inner(
+        conn,
+        keys,
+        settings,
+        req,
+        Some(lifetime_seconds.max(1)),
+        None,
+    )
+    .await
+}
+
+/// Like [`issue_tokens`], for a sign-in that must end by `ends_by` (it ends then, or after 900
+/// days if that is sooner): its refresh tokens rotate as usual but stop with it, and so do its
+/// access tokens. Used for an app sign-in made from a short-lived token that a sign-in with a
+/// trusted outside token minted, which never outlives that sign-in. The caller refuses an
+/// `ends_by` that has passed. Returns the response and the family.
+pub async fn issue_tokens_until(
+    conn: &mut PgConnection,
+    keys: &Keys,
+    settings: &Settings,
+    req: IssueRequest<'_>,
+    ends_by: OffsetDateTime,
+) -> ApiResult<(TokenResponse, TokenFamily)> {
+    issue_tokens_inner(conn, keys, settings, req, None, Some(ends_by)).await
 }
 
 async fn issue_tokens_inner(
@@ -289,6 +315,7 @@ async fn issue_tokens_inner(
     settings: &Settings,
     req: IssueRequest<'_>,
     lifetime_seconds: Option<i64>,
+    ends_by: Option<OffsetDateTime>,
 ) -> ApiResult<(TokenResponse, TokenFamily)> {
     if !req.account.is_active() {
         return Err(ApiError::forbidden(
@@ -315,6 +342,7 @@ async fn issue_tokens_inner(
             auth_time: req.auth_time,
         },
         lifetime_seconds,
+        ends_by,
     )
     .await?;
     let refresh_token = insert_refresh(conn, &keys.pepper, family.id, 1).await?;
@@ -342,15 +370,32 @@ async fn build_response(
 ) -> ApiResult<TokenResponse> {
     let scopes = family.scope_list();
     let scope = scopes_to_string(&scopes);
-    let (access_token, claims) = keys.jwt.sign_access(&AccessTokenInput {
-        account_uuid: &account.uuid,
-        app_id: &family.app_id,
-        kind: account.kind,
-        id: account.id(),
-        family_id: family.id,
-        scope: &scope,
-        ttl_seconds: settings.access_token_ttl_seconds,
-    })?;
+    // An access token never outlives its sign-in. A sign-in that ends within an access token's
+    // lifetime (one from a CI job's outside token, or an app sign-in made from its short-lived
+    // token, near its end) gets one whose `exp` is the sign-in's end, so an app that checks
+    // tokens locally against the JWKS stops accepting it when introspection does. Signed again
+    // only when the clock moved past a second between the two readings.
+    let ends = family.expires_at.unix_timestamp();
+    let mut ttl_seconds = settings
+        .access_token_ttl_seconds
+        .min(ends - OffsetDateTime::now_utc().unix_timestamp())
+        .max(1);
+    let (access_token, claims) = loop {
+        let signed = keys.jwt.sign_access(&AccessTokenInput {
+            account_uuid: &account.uuid,
+            app_id: &family.app_id,
+            kind: account.kind,
+            id: account.id(),
+            family_id: family.id,
+            scope: &scope,
+            ttl_seconds,
+        })?;
+        let over = signed.1.exp - ends;
+        if over <= 0 || ttl_seconds == 1 {
+            break signed;
+        }
+        ttl_seconds = (ttl_seconds - over).max(1);
+    };
     let view = load_account_for_app(conn, account, &family.app_id, &scopes).await?;
     let id_token = if scopes.contains(&Scope::Openid) {
         let mut c = IdTokenClaims {
@@ -383,7 +428,7 @@ async fn build_response(
     Ok(TokenResponse {
         access_token,
         token_type: "Bearer".into(),
-        expires_in: settings.access_token_ttl_seconds,
+        expires_in: ttl_seconds,
         refresh_token,
         refresh_token_expires_at: family.expires_at,
         scope,
@@ -448,7 +493,7 @@ pub async fn refresh(
     }
     if expired {
         return Err(GrantError::Invalid(format!(
-            "The refresh token expired at {} (refresh tokens last {REFRESH_TOKEN_DAYS} days from sign-in); sign in again.",
+            "The refresh token expired at {} (refresh tokens last {REFRESH_TOKEN_DAYS} days from sign-in at most, and a sign-in that started from a CI job's outside token ends with that job's sign-in); sign in again.",
             crate::timefmt::format_rfc3339_ms(family.expires_at)
         )));
     }
@@ -947,6 +992,22 @@ pub struct ShortLivedToken {
     pub created_at: OffsetDateTime,
     pub expires_at: OffsetDateTime,
     pub consumed_at: Option<OffsetDateTime>,
+    /// The latest the app sign-in made from it may end: the end of the sign-in that minted it,
+    /// when that one ends early (a sign-in from a trusted outside token). `None` = 900 days.
+    pub family_expires_cap: Option<OffsetDateTime>,
+    /// The trust (`silicon_federations`) of the sign-in that minted it, if it came from a
+    /// trusted outside token.
+    pub federation_id: Option<Uuid>,
+}
+
+/// What a short-lived token inherits from a sign-in that came from a trusted outside token
+/// (core's `federation`): the app sign-in it starts ends no later than that sign-in does, and
+/// belongs to the same trust.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SltBound {
+    pub federation_id: Uuid,
+    /// The `expires_at` of the minting sign-in's token family.
+    pub family_expires_cap: OffsetDateTime,
 }
 
 impl ShortLivedToken {
@@ -963,10 +1024,23 @@ pub async fn create_slt(
     app_id: &str,
     scopes: &[Scope],
 ) -> ApiResult<(String, OffsetDateTime)> {
+    create_slt_within(conn, pepper, account_uuid, app_id, scopes, None).await
+}
+
+/// [`create_slt`] for a sign-in that may end early: with `bound`, the token records the end and
+/// the trust of the sign-in that minted it, and the exchange keeps the app sign-in within them.
+pub async fn create_slt_within(
+    conn: &mut PgConnection,
+    pepper: &Pepper,
+    account_uuid: &str,
+    app_id: &str,
+    scopes: &[Scope],
+    bound: Option<SltBound>,
+) -> ApiResult<(String, OffsetDateTime)> {
     let token = random_token(prefix::SLT);
     let expires_at: OffsetDateTime = sqlx::query_scalar(
-        "insert into short_lived_tokens (token_hash, account_uuid, app_id, scopes, expires_at) \
-         values ($1, $2, $3, $4, now() + make_interval(secs => $5)) returning expires_at",
+        "insert into short_lived_tokens (token_hash, account_uuid, app_id, scopes, expires_at, family_expires_cap, federation_id) \
+         values ($1, $2, $3, $4, now() + make_interval(secs => $5), $6, $7) returning expires_at",
     )
     .bind(pepper.hash(&token))
     .bind(account_uuid)
@@ -975,6 +1049,8 @@ pub async fn create_slt(
         scopes.to_vec(),
     )))
     .bind(SLT_TTL_SECONDS as f64)
+    .bind(bound.map(|b| b.family_expires_cap))
+    .bind(bound.map(|b| b.federation_id))
     .fetch_one(&mut *conn)
     .await?;
     Ok((token, expires_at))
@@ -998,7 +1074,7 @@ pub async fn consume_slt(
     let mut tx = pool.begin().await?;
     let row: Option<(ShortLivedToken, bool)> = sqlx::query_as::<_, SltRow>(
         "select token_hash, account_uuid, app_id, scopes, created_at, expires_at, consumed_at, \
-                expires_at <= now() as expired from short_lived_tokens \
+                family_expires_cap, federation_id, expires_at <= now() as expired from short_lived_tokens \
          where token_hash = $1 for update",
     )
     .bind(pepper.hash(slt))

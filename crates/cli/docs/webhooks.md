@@ -6,16 +6,18 @@ into it, and tells a Silicon about its own account. Both kinds follow the same r
 ## Set one up
 
 ```sh
-silicon-accounts app webhook set https://briefcase.example/webhooks   # app; prints whsec_… once
+silicon-accounts app webhook set https://briefcase.example/webhooks   # app; prints whsec_… the first time
 silicon-accounts webhook set https://scout.example/hooks              # a Silicon's own
 silicon-accounts app webhook test                                     # sends a `ping`
 ```
 
-A new signing secret is generated every time you set the URL; `silicon-accounts app webhook
-rotate` makes a new one without changing the URL. Store it where your receiver can
-read it. `set`, `rotate` and `test` send an idempotency key (random, or yours with
-`--idempotency-key`): a retried request returns the same secret, or queues no second ping,
-instead of doing it twice.
+An app's webhook gets its signing secret the first time you set the URL (or the first time
+after `silicon-accounts app webhook remove`). Setting the URL again, the same one or another,
+keeps that secret and the updates you picked; `silicon-accounts app webhook rotate` makes a
+new secret without changing the URL. A Silicon's own webhook gets a new secret every time
+its URL is set. Store the secret where your receiver can read it. `set`, `rotate` and `test`
+send an idempotency key (random, or yours with `--idempotency-key`): a retried request
+returns the same answer, or queues no second ping, instead of doing it twice.
 
 ## Pick your updates, or stream them
 
@@ -92,7 +94,7 @@ App events:
 | `account.deleted` | uuid, membership_id | delete or anonymise the account's data |
 | `membership.signed_out` | uuid, membership_id, reason | drop its sessions (tokens are already revoked) |
 | `membership.access_removed` | uuid, membership_id | the account removed your access; stop using its data |
-| `silicon.custodian_changed` | uuid, membership_id, from, to | a Silicon you serve has a new custodian |
+| `silicon.custodian_changed` | uuid, membership_id, from, to (each `{uuid, id}`) | a Silicon you serve has a new custodian |
 | `ping` | {} | test delivery |
 
 `account.updated` only lists fields your app is allowed to see, and only reaches apps

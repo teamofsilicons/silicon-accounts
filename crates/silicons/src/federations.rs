@@ -6,7 +6,7 @@
 //! |---|---|---|
 //! | `POST /v1/silicons/{id}/federations` | the Silicon, or its custodian | `{"issuer", "audience"?, "conditions", "name"?}` → 201 the trust |
 //! | `GET /v1/silicons/{id}/federations` | the same | `{"items": [trust…], "next_cursor": null}`, newest first, removed ones too |
-//! | `DELETE /v1/silicons/{id}/federations/{federation_id}` | the same | 204: the trust stops working and the sign-ins it started end |
+//! | `DELETE /v1/silicons/{id}/federations/{federation_id}` | the same | 204: the trust stops working and the sign-ins it started end, with the app sign-ins made from their short-lived tokens (those apps get `membership.signed_out`, reason `session_revoked`) |
 //!
 //! `{id}` is the Silicon's si:id or uuid; anyone else gets 404 `silicon_not_found`. Adding a
 //! trust reads the issuer's discovery document first, so a trust always names a reachable
@@ -201,7 +201,8 @@ pub(crate) async fn remove(
     .bind(&me.account.uuid)
     .fetch_one(&mut *tx)
     .await?;
-    // The sign-ins the trust started end with it.
+    // The sign-ins the trust started end with it: the CI sign-ins, and the app sign-ins made
+    // from the short-lived tokens they minted (whose apps hear `membership.signed_out`).
     let families: Vec<Uuid> = sqlx::query_scalar(
         "select s.family_id from silicon_federation_sessions s join token_families f on f.id = s.family_id \
          where s.federation_id = $1 and f.revoked_at is null",
@@ -209,9 +210,14 @@ pub(crate) async fn remove(
     .bind(id)
     .fetch_all(&mut *tx)
     .await?;
+    let mut ended = Vec::with_capacity(families.len());
     for family in &families {
-        tokens::revoke_family(&mut tx, *family, "federation_removed").await?;
+        if let Some(f) = tokens::revoke_family(&mut tx, *family, "federation_removed").await? {
+            ended.push(f);
+        }
     }
+    events::signed_out_for_families(&mut tx, &ended, events::signout_reason::SESSION_REVOKED)
+        .await?;
     Actor::account(&me.account.uuid, meta.ip.as_deref())
         .record_for(
             &mut tx,

@@ -560,7 +560,7 @@ export async function setInboxSecret(env: Env, inbox: string, secret: string | n
   return must(`secret of ${inbox}`, await inboxCall<{ recovered: number }>(env, inbox, "POST", "/_webhook-secret", { secret, keep_previous: keepPrevious }), 200).body;
 }
 
-/** The fake app registers its own webhook URL again (PUT /v1/apps/{app}/webhook) and keeps the new secret. */
+/** The fake app registers its own webhook URL again (PUT /v1/apps/{app}/webhook) and keeps a fresh secret (rotated when the URL kept a stored one). */
 export async function reconnectAppWebhook(env: Env, appId: string): Promise<void> {
   must(`${appId} reconnects its webhook`, await inboxCall(env, appId, "POST", "/_connect-webhook", {}), 200);
 }

@@ -785,4 +785,22 @@ async fn app_device_flow_uses_the_app_id_without_a_secret() {
     assert_eq!(form["grant_type"], "refresh_token");
     assert_eq!(form["refresh_token"], "sar_x");
     assert_eq!(form["client_id"], "notes");
+    // A Silicon's short-lived token, exchanged by the app's public client (no secret).
+    client
+        .exchange_slt_public_client(" notes ", " slt_x ")
+        .await
+        .unwrap();
+    let exchange = mock.requests()[3].clone();
+    assert!(
+        exchange.header("authorization").is_none(),
+        "no secret is sent"
+    );
+    let form = exchange.form();
+    assert_eq!(
+        form["grant_type"],
+        "urn:silicon:params:oauth:grant-type:slt"
+    );
+    assert_eq!(form["slt"], "slt_x");
+    assert_eq!(form["client_id"], "notes");
+    assert!(!form.contains_key("client_secret"));
 }

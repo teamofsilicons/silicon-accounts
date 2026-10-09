@@ -492,6 +492,7 @@ fn method_phrase(method: &str) -> String {
         "apple" => "Apple".into(),
         "silicon_stk" => "the STK".into(),
         "slt" => "a short-lived token".into(),
+        "slt_public_client" => "a short-lived token, exchanged by the app's public client".into(),
         "device" => "the silicon-accounts CLI (device code)".into(),
         "session" => "the browser session".into(),
         "silicon_key" => "a Silicon key".into(),

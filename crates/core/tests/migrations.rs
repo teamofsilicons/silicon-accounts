@@ -461,3 +461,150 @@ async fn accounts_rename_refuses_to_merge_an_existing_app() {
     .unwrap();
     assert_eq!(count, 2);
 }
+
+#[tokio::test]
+async fn migration_0019_cuts_stored_custodian_changes_to_uuid_and_id_for_apps() {
+    let db = accounts_core::test_support::TestDb::empty().await;
+    accounts_core::db::MIGRATOR
+        .run_to(18, &db.pool)
+        .await
+        .expect("migrate to 0018");
+    let summary = |uuid: &str, id: &str, name: &str| {
+        serde_json::json!({
+            "uuid": uuid, "kind": "carbon", "id": id, "display_name": name,
+            "pfp_url": format!("https://iris.example/pfp/{uuid}"), "status": "active",
+        })
+    };
+    let payload = |kind: &str, app: Option<&str>| {
+        serde_json::json!({
+            "event_id": "01a11436-d5e4-7794-842d-4efffcc475b0",
+            "type": kind,
+            "occurred_at": "2026-10-07T02:35:00.452Z",
+            "app_id": app,
+            "silicon": if app.is_some() { None } else { Some("K1E") },
+            "data": {
+                "uuid": "K1E", "membership_id": "briefcase:K1E",
+                "from": summary("zQo", "c:saket", "Saket"),
+                "to": summary("8HV", "c:ada", "Ada Lovelace"),
+            },
+        })
+    };
+    let insert = |id: &'static str,
+                  kind: &'static str,
+                  target_kind: &'static str,
+                  target: &'static str,
+                  body: serde_json::Value| {
+        let pool = db.pool.clone();
+        async move {
+            sqlx::query(
+                "insert into webhook_events (event_id, type, target_kind, target_id, account_uuid, payload) \
+                 values ($1::uuid, $2, $3, $4, 'K1E', $5)",
+            )
+            .bind(id)
+            .bind(kind)
+            .bind(target_kind)
+            .bind(target)
+            .bind(body)
+            .execute(&pool)
+            .await
+            .expect("event");
+        }
+    };
+    let app_event = "01a11436-d5e4-7794-842d-4efffcc475b0";
+    let own_event = "01a11436-d5e4-7794-842d-4efffcc475b1";
+    insert(
+        app_event,
+        "silicon.custodian_changed",
+        "app",
+        "briefcase",
+        payload("silicon.custodian_changed", Some("briefcase")),
+    )
+    .await;
+    insert(
+        own_event,
+        "silicon.custodian.changed",
+        "silicon",
+        "K1E",
+        payload("silicon.custodian.changed", None),
+    )
+    .await;
+    accounts_core::db::migrate(&db.pool)
+        .await
+        .expect("apply the rest");
+
+    let stored = |id: &'static str| {
+        let pool = db.pool.clone();
+        async move {
+            sqlx::query_scalar::<_, serde_json::Value>(
+                "select payload from webhook_events where event_id = $1::uuid",
+            )
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .expect("payload")
+        }
+    };
+    let app = stored(app_event).await;
+    assert_eq!(
+        app["data"]["from"],
+        serde_json::json!({"uuid": "zQo", "id": "c:saket"})
+    );
+    assert_eq!(
+        app["data"]["to"],
+        serde_json::json!({"uuid": "8HV", "id": "c:ada"})
+    );
+    assert_eq!(app["data"]["membership_id"], "briefcase:K1E");
+    assert_eq!(app["event_id"], app_event);
+    // The Silicon's own event keeps the summaries.
+    assert_eq!(
+        stored(own_event).await,
+        payload("silicon.custodian.changed", None)
+    );
+
+    // A row written after the migration with the full summaries (an API task still running the
+    // code from before it, during a release) is cut down as it is stored; the Silicon's own
+    // event isn't touched.
+    let late_app_event = "01a11436-d5e4-7794-842d-4efffcc475b2";
+    let late_own_event = "01a11436-d5e4-7794-842d-4efffcc475b3";
+    insert(
+        late_app_event,
+        "silicon.custodian_changed",
+        "app",
+        "remind",
+        payload("silicon.custodian_changed", Some("remind")),
+    )
+    .await;
+    insert(
+        late_own_event,
+        "silicon.custodian.changed",
+        "silicon",
+        "K1E",
+        payload("silicon.custodian.changed", None),
+    )
+    .await;
+    let late = stored(late_app_event).await;
+    assert_eq!(
+        late["data"]["from"],
+        serde_json::json!({"uuid": "zQo", "id": "c:saket"})
+    );
+    assert_eq!(
+        late["data"]["to"],
+        serde_json::json!({"uuid": "8HV", "id": "c:ada"})
+    );
+    assert_eq!(late["app_id"], "remind");
+    assert_eq!(
+        stored(late_own_event).await,
+        payload("silicon.custodian.changed", None)
+    );
+    // An update that puts a summary back is cut too.
+    sqlx::query("update webhook_events set payload = $2 where event_id = $1::uuid")
+        .bind(late_app_event)
+        .bind(payload("silicon.custodian_changed", Some("remind")))
+        .execute(&db.pool)
+        .await
+        .expect("update");
+    assert_eq!(
+        stored(late_app_event).await["data"]["to"],
+        serde_json::json!({"uuid": "8HV", "id": "c:ada"})
+    );
+}

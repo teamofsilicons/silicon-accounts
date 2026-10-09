@@ -32,6 +32,12 @@
 //!   past such a change: the grant either sees the change and refuses, or the change sees and
 //!   revokes the new sign-in. An SLT is refused when the Silicon's STK was rotated, or the
 //!   account removed the app's access, after the SLT was issued (a code likewise for removal).
+//! - An SLT minted by a sign-in from a trusted outside token (a CI job) starts an app sign-in
+//!   that ends no later than that CI sign-in and is linked to its trust: the exchange refuses
+//!   once the trust is removed (deciding under a share lock on the trust row, which removal
+//!   update-locks first), and removing the trust later ends the app sign-in too.
+//! - Apps that turned on `public_client` may exchange SLTs with their `client_id` alone (their
+//!   command-line or desktop tool has no server for a secret); every other app sends its secret.
 //! - An access token stops working at its `exp` on introspection and userinfo (no clock-skew
 //!   leeway: this server issued it). An app's token reads the account (userinfo) only while the
 //!   account's membership with the app is active, as introspection reports it.
@@ -42,8 +48,9 @@
 //!   codes 600 s polled every 5 s (`accounts_core::repo::tokens`).
 //! - Revocation, refresh-token reuse and code reuse are written to `audit_log` as
 //!   `oauth.token_revoked`, `oauth.refresh_reuse_detected` and `oauth.code_reuse_detected`;
-//!   SLT, device and token-exchange sign-ins to `signin_history` (methods `slt`, `device` and
-//!   `federated`). Code exchanges
+//!   SLT, device and token-exchange sign-ins to `signin_history` (methods `slt`, or
+//!   `slt_public_client` when an app's public client exchanged the SLT without a secret, `device`
+//!   and `federated`). Code exchanges
 //!   don't add history: the consent step that issued the code already recorded the sign-in.
 
 mod credentials;

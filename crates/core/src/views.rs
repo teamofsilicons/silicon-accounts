@@ -54,6 +54,15 @@ pub struct CustodianRef {
     pub id: Option<String>,
 }
 
+impl From<&AccountSummary> for CustodianRef {
+    fn from(a: &AccountSummary) -> Self {
+        CustodianRef {
+            uuid: a.uuid.clone(),
+            id: a.id.clone(),
+        }
+    }
+}
+
 /// An email in `Me.emails`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EmailView {

@@ -3,6 +3,7 @@
 use std::time::Instant;
 
 use accounts_core::http::{ClientAuth, ClientMeta, authenticate_client};
+use accounts_core::repo::rate_limit;
 use accounts_core::views::{TokenExchangeResponse, TokenResponse};
 use accounts_core::{AppState, DEVELOPER_APP_ID, FIRST_PARTY_APP_ID, OAuthError};
 use axum::body::Bytes;
@@ -186,6 +187,9 @@ async fn handle(
     let params: TokenParams = parse_body(headers, body, "The token request")?;
     let grant = Grant::parse(opt(params.grant_type.as_deref()))?;
     trace.grant = Some(grant.as_str());
+    if grant == Grant::JwtBearer {
+        limit_silicon_sign_ins(state, meta, trace).await?;
+    }
     // A token exchange signs a Silicon into Silicon Accounts itself, so a CI job may leave the
     // client out: it is the first-party client.
     let client_id = match (grant, opt(params.client_id.as_deref())) {
@@ -234,7 +238,16 @@ async fn issue(
         // Public or not, a client only ever refreshes its own tokens (core checks the family).
         Grant::RefreshToken => grants::refresh::exchange(state, client, params, meta).await,
         Grant::Slt => {
-            refuse_public_client(client, grant)?;
+            // An app's own command-line or desktop tool has no server to keep a secret in, so an
+            // app that turned on `public_client` may exchange with its client_id alone: the SLT
+            // is the proof (single use, 120 s, bound to this app, and only the account that
+            // minted it can hand it over). Other apps still need their secret.
+            if !(client.public
+                && !accounts_core::is_first_party_app_id(&client.app.app_id)
+                && app_setting(state, client, |c| c.public_client).await?)
+            {
+                refuse_public_client(client, grant)?;
+            }
             grants::slt::exchange(state, client, params, meta).await
         }
         Grant::DeviceCode => {
@@ -270,6 +283,42 @@ async fn issue(
     }
 }
 
+/// A key-signed assertion is the credential `POST /v1/silicons/login` takes too, so it counts
+/// against the same limit, in the same bucket: 60 Silicon sign-in attempts per minute per
+/// address across both endpoints (core's `rate_limit::SILICON_LOGIN_BUCKET`). Every attempt
+/// counts, before the client or the assertion is checked. Over it: 429 `rate_limited` with
+/// `Retry-After`.
+async fn limit_silicon_sign_ins(
+    state: &AppState,
+    meta: &ClientMeta,
+    trace: &mut Trace,
+) -> Result<(), OAuthError> {
+    let limited = rate_limit::enforce_pool(
+        &state.db,
+        &rate_limit::bucket(rate_limit::SILICON_LOGIN_BUCKET, meta.ip_or_unknown()),
+        rate_limit::limits::SILICON_LOGIN_PER_IP,
+        "Silicon sign-in attempts from this network",
+    )
+    .await;
+    match limited {
+        Ok(()) => Ok(()),
+        Err(e) if e.status == StatusCode::TOO_MANY_REQUESTS => {
+            trace.retry_after = e.retry_after;
+            let hint = e
+                .hint
+                .as_deref()
+                .map(|h| format!(" {h}"))
+                .unwrap_or_default();
+            Err(OAuthError::new(
+                StatusCode::TOO_MANY_REQUESTS,
+                "rate_limited",
+                format!("{}{hint}", e.message),
+            ))
+        }
+        Err(e) => Err(OAuthError::server_error(e.message)),
+    }
+}
+
 /// One setting of the client app's sign-in setup.
 async fn app_setting(
     state: &AppState,
@@ -287,7 +336,8 @@ async fn app_setting(
 /// Public clients (`client_id` without a secret) may only use some grants: `silicon-accounts`
 /// refreshes and polls device codes, `developer` redeems its codes (PKCE S256) and refreshes,
 /// and an app's public tools do what its sign-in setup turned on (`device_flow`: poll device
-/// codes; `public_client`: redeem codes with PKCE S256), plus refresh.
+/// codes; `public_client`: redeem codes with PKCE S256 and exchange short-lived tokens), plus
+/// refresh.
 fn refuse_public_client(client: &ClientAuth, grant: Grant) -> Result<(), OAuthError> {
     if client.public {
         let allowed = if client.app.app_id == DEVELOPER_APP_ID {
@@ -297,7 +347,7 @@ fn refuse_public_client(client: &ClientAuth, grant: Grant) -> Result<(), OAuthEr
             format!("grant_type=refresh_token and grant_type={DEVICE_CODE_GRANT_TYPE}")
         } else {
             format!(
-                "grant_type=refresh_token, grant_type={DEVICE_CODE_GRANT_TYPE} (with device_flow on) and grant_type=authorization_code with PKCE S256 (with public_client on)"
+                "grant_type=refresh_token, grant_type={DEVICE_CODE_GRANT_TYPE} (with device_flow on), and grant_type=authorization_code with PKCE S256 and grant_type={SLT_GRANT_TYPE} (with public_client on)"
             )
         };
         return Err(OAuthError::unauthorized_client(format!(

@@ -255,7 +255,10 @@ async fn a_ci_job_signs_a_silicon_in_with_its_own_token() {
         "urn:ietf:params:oauth:token-type:access_token"
     );
     assert_eq!(r.json["token_type"], "Bearer");
-    assert_eq!(r.json["expires_in"], 1800);
+    // One access token: it expires with the sign-in, whose end the database set a moment
+    // before the token was signed (so a second may have passed).
+    let expires_in = r.json["expires_in"].as_i64().expect("expires_in");
+    assert!((1795..=1800).contains(&expires_in), "{}", r.json);
     assert!(r.json["refresh_token"].is_string(), "{}", r.json);
     let ends = time::OffsetDateTime::parse(
         r.json["refresh_token_expires_at"].as_str().expect("ends"),
@@ -790,4 +793,344 @@ async fn a_sign_in_lasts_as_long_as_the_outside_token_and_refreshes_within_it() 
     .expect("time travel");
     let me = send(&ctx, Req::get("/v1/me").bearer(&access)).await;
     assert_eq!(me.status, 401, "{}", me.json);
+}
+
+/// Exchanges a short-lived token at `app_id` with its secret.
+async fn exchange_slt(ctx: &TestContext, app_id: &str, secret: &str, slt: &str) -> Resp {
+    send(
+        ctx,
+        Req::post("/v1/oauth/token").basic(app_id, secret).form(&[
+            ("grant_type", "urn:silicon:params:oauth:grant-type:slt"),
+            ("slt", slt),
+        ]),
+    )
+    .await
+}
+
+/// A short-lived token for `app_id`, minted with `access`.
+async fn mint_slt(ctx: &TestContext, access: &str, app_id: &str) -> String {
+    let r = send(
+        ctx,
+        Req::post("/v1/me/short-lived-tokens")
+            .bearer(access)
+            .json(json!({"app_id": app_id})),
+    )
+    .await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    r.json["slt"].as_str().expect("slt").to_string()
+}
+
+fn rfc3339(value: &Value) -> time::OffsetDateTime {
+    time::OffsetDateTime::parse(
+        value.as_str().expect("timestamp"),
+        &time::format_description::well_known::Rfc3339,
+    )
+    .expect("rfc3339")
+}
+
+/// A CI job's sign-in may sign the Silicon into an app with a short-lived token, but the app
+/// sign-in never outlives the CI sign-in or the trust behind it.
+#[tokio::test]
+async fn an_app_sign_in_from_a_ci_job_ends_with_the_ci_sign_in_and_its_trust() {
+    let ctx = context().await;
+    let issuer = MockIssuer::start().await;
+    let ec = ec_key(31, "ec-1");
+    issuer.publish(&ec);
+    let custodian = ctx.carbon().await;
+    let (silicon, _stk) = ctx.silicon(&custodian.uuid).await;
+    let handle = silicon.handle.clone().expect("si:id");
+    let custodian_token = ctx.first_party_tokens(&custodian).await.access_token;
+    let r = trust(
+        &ctx,
+        &custodian_token,
+        &handle,
+        json!({"issuer": issuer.url, "conditions": {"repository": "acme/scout"}, "name": "deploys"}),
+    )
+    .await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    let federation_id = r.json["id"].as_str().expect("id").to_string();
+    let (app, secret) = ctx.app("remind").await;
+    // The app listens, so it hears when the sign-in ends.
+    let r = send(
+        &ctx,
+        Req::put(&format!("/v1/apps/{}/webhook", app.app_id))
+            .basic(&app.app_id, &secret)
+            .json(json!({"url": "http://127.0.0.1:8593/remind/webhooks"})),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+
+    // A one-hour job signs in; its short-lived token signs the Silicon into the app.
+    let ci = exchange(
+        &ctx,
+        &handle,
+        &issuer.token(&ec, json!({"exp": now() + 3600})),
+    )
+    .await;
+    assert_eq!(ci.status, 200, "{}", ci.json);
+    let ci_ends = rfc3339(&ci.json["refresh_token_expires_at"]);
+    let access = ci.json["access_token"]
+        .as_str()
+        .expect("access")
+        .to_string();
+    let slt = mint_slt(&ctx, &access, &app.app_id).await;
+    let cap: Option<time::OffsetDateTime> = sqlx::query_scalar(
+        "select family_expires_cap from short_lived_tokens where account_uuid = $1",
+    )
+    .bind(&silicon.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("slt");
+    let close = |a: time::OffsetDateTime, b: time::OffsetDateTime| {
+        (a - b).abs() < time::Duration::milliseconds(1)
+    };
+    assert!(
+        cap.is_some_and(|cap| close(cap, ci_ends)),
+        "the token records when the CI sign-in ends: {cap:?} vs {ci_ends}"
+    );
+    let signed_in = exchange_slt(&ctx, &app.app_id, &secret, &slt).await;
+    assert_eq!(signed_in.status, 200, "{}", signed_in.json);
+    // Not 900 days: the app sign-in ends when the CI sign-in does.
+    assert_eq!(
+        rfc3339(&signed_in.json["refresh_token_expires_at"]),
+        ci_ends,
+        "{}",
+        signed_in.json
+    );
+    let app_family_ends: time::OffsetDateTime = sqlx::query_scalar(
+        "select expires_at from token_families where account_uuid = $1 and app_id = $2",
+    )
+    .bind(&silicon.uuid)
+    .bind(&app.app_id)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("family");
+    assert!(
+        close(app_family_ends, ci_ends),
+        "{app_family_ends} vs {ci_ends}"
+    );
+    // Refreshing keeps that end.
+    let refreshed = send(
+        &ctx,
+        Req::post("/v1/oauth/token")
+            .basic(&app.app_id, &secret)
+            .form(&[
+                ("grant_type", "refresh_token"),
+                (
+                    "refresh_token",
+                    signed_in.json["refresh_token"].as_str().expect("refresh"),
+                ),
+            ]),
+    )
+    .await;
+    assert_eq!(refreshed.status, 200, "{}", refreshed.json);
+    assert_eq!(
+        rfc3339(&refreshed.json["refresh_token_expires_at"]),
+        ci_ends
+    );
+    let app_refresh = refreshed.json["refresh_token"]
+        .as_str()
+        .expect("refresh")
+        .to_string();
+
+    // A sign-in with the STK isn't capped: its short-lived tokens start ordinary app sign-ins.
+    let stk_session = ctx.first_party_tokens(&silicon).await.access_token;
+    let (other, other_secret) = ctx.app("briefcase").await;
+    let slt = mint_slt(&ctx, &stk_session, &other.app_id).await;
+    let r = exchange_slt(&ctx, &other.app_id, &other_secret, &slt).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let long = rfc3339(&r.json["refresh_token_expires_at"]);
+    assert!(
+        long > time::OffsetDateTime::now_utc() + time::Duration::days(899),
+        "{}",
+        r.json
+    );
+
+    // A token minted when the CI sign-in is about to end can't start a longer sign-in.
+    let slt = mint_slt(&ctx, &access, &app.app_id).await;
+    sqlx::query(
+        "update short_lived_tokens set family_expires_cap = now() - interval '1 second' where consumed_at is null",
+    )
+    .execute(&ctx.state.db)
+    .await
+    .expect("time travel");
+    let r = exchange_slt(&ctx, &app.app_id, &secret, &slt).await;
+    assert_eq!(r.status, 400, "{}", r.json);
+    assert_eq!(r.json["error"], "invalid_grant");
+    assert!(description(&r).contains("that sign-in ended"), "{}", r.json);
+
+    // Removing the trust ends the app sign-in too, and the app hears it; a token minted under
+    // the trust before it was removed is refused.
+    let pending = mint_slt(&ctx, &access, &app.app_id).await;
+    let r = send(
+        &ctx,
+        Req::delete(&format!(
+            "/v1/silicons/{handle}/federations/{federation_id}"
+        ))
+        .bearer(&custodian_token),
+    )
+    .await;
+    assert_eq!(r.status, 204, "{}", r.json);
+    let r = send(
+        &ctx,
+        Req::post("/v1/oauth/token")
+            .basic(&app.app_id, &secret)
+            .form(&[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", &app_refresh),
+            ]),
+    )
+    .await;
+    assert_eq!(r.status, 400, "{}", r.json);
+    assert!(description(&r).contains("federation_removed"), "{}", r.json);
+    let signed_out: Vec<Value> = sqlx::query_scalar(
+        "select payload -> 'data' from webhook_events where target_kind = 'app' and target_id = $1 and type = 'membership.signed_out'",
+    )
+    .bind(&app.app_id)
+    .fetch_all(&ctx.state.db)
+    .await
+    .expect("events");
+    assert_eq!(signed_out.len(), 1, "{signed_out:?}");
+    assert_eq!(signed_out[0]["uuid"], silicon.uuid.as_str());
+    assert_eq!(signed_out[0]["reason"], "session_revoked");
+    // The STK sign-in's app session is untouched.
+    let alive: i64 = sqlx::query_scalar(
+        "select count(*) from token_families where account_uuid = $1 and app_id = $2 and revoked_at is null",
+    )
+    .bind(&silicon.uuid)
+    .bind(&other.app_id)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("families");
+    assert_eq!(alive, 1);
+    let removed: Value = sqlx::query_scalar(
+        "select payload -> 'data' from webhook_events where target_kind = 'silicon' and target_id = $1 and type = 'silicon.federation.removed'",
+    )
+    .bind(&silicon.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("removed event");
+    assert_eq!(
+        removed["ended_sessions"], 2,
+        "the CI sign-in and the app sign-in"
+    );
+    let r = exchange_slt(&ctx, &app.app_id, &secret, &pending).await;
+    assert_eq!(r.status, 400, "{}", r.json);
+    assert!(description(&r).contains("removed that trust"), "{}", r.json);
+}
+
+/// The `exp` and `iat` of a JWT (the payload is read, not verified).
+fn exp_and_iat(jwt: &Value) -> (i64, i64) {
+    let payload = jwt
+        .as_str()
+        .and_then(|t| t.split('.').nth(1))
+        .expect("a JWT");
+    let claims: Value = serde_json::from_slice(
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(payload)
+            .expect("base64url"),
+    )
+    .expect("claims");
+    (
+        claims["exp"].as_i64().expect("exp"),
+        claims["iat"].as_i64().expect("iat"),
+    )
+}
+
+/// An access token never outlives its sign-in: an app sign-in made from a CI job's
+/// short-lived token near the end of the CI sign-in gets access tokens whose `exp` (and
+/// `expires_in`) stop at that end, so an app that checks tokens locally against the JWKS stops
+/// accepting them when introspection does. Ordinary sign-ins still get 30 minutes.
+#[tokio::test]
+async fn access_tokens_never_outlive_an_app_sign_in_from_a_ci_job() {
+    let ctx = context().await;
+    let issuer = MockIssuer::start().await;
+    let ec = ec_key(32, "ec-1");
+    issuer.publish(&ec);
+    let custodian = ctx.carbon().await;
+    let (silicon, _stk) = ctx.silicon(&custodian.uuid).await;
+    let handle = silicon.handle.clone().expect("si:id");
+    let custodian_token = ctx.first_party_tokens(&custodian).await.access_token;
+    let r = trust(
+        &ctx,
+        &custodian_token,
+        &handle,
+        json!({"issuer": issuer.url, "conditions": {"repository": "acme/scout"}}),
+    )
+    .await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    let (app, secret) = ctx.app("remind").await;
+    let ci = exchange(
+        &ctx,
+        &handle,
+        &issuer.token(&ec, json!({"exp": now() + 3600})),
+    )
+    .await;
+    assert_eq!(ci.status, 200, "{}", ci.json);
+    let access = ci.json["access_token"]
+        .as_str()
+        .expect("access")
+        .to_string();
+
+    // The CI sign-in has 10 minutes left when its short-lived token is minted.
+    sqlx::query(
+        "update token_families set expires_at = now() + interval '10 minutes' where account_uuid = $1 and origin = 'federated'",
+    )
+    .bind(&silicon.uuid)
+    .execute(&ctx.state.db)
+    .await
+    .expect("time travel");
+    let slt = mint_slt(&ctx, &access, &app.app_id).await;
+    let signed_in = exchange_slt(&ctx, &app.app_id, &secret, &slt).await;
+    assert_eq!(signed_in.status, 200, "{}", signed_in.json);
+    let ends = rfc3339(&signed_in.json["refresh_token_expires_at"]).unix_timestamp();
+    let (exp, iat) = exp_and_iat(&signed_in.json["access_token"]);
+    let expires_in = signed_in.json["expires_in"].as_i64().expect("expires_in");
+    assert!(
+        exp <= ends && ends - exp <= 1,
+        "exp {exp} vs the sign-in's end {ends}"
+    );
+    assert_eq!(expires_in, exp - iat);
+    assert!((590..=600).contains(&expires_in), "{}", signed_in.json);
+
+    // Refreshing with 5 minutes left: the same.
+    sqlx::query(
+        "update token_families set expires_at = now() + interval '5 minutes' where account_uuid = $1 and app_id = $2",
+    )
+    .bind(&silicon.uuid)
+    .bind(&app.app_id)
+    .execute(&ctx.state.db)
+    .await
+    .expect("time travel");
+    let refreshed = send(
+        &ctx,
+        Req::post("/v1/oauth/token")
+            .basic(&app.app_id, &secret)
+            .form(&[
+                ("grant_type", "refresh_token"),
+                (
+                    "refresh_token",
+                    signed_in.json["refresh_token"].as_str().expect("refresh"),
+                ),
+            ]),
+    )
+    .await;
+    assert_eq!(refreshed.status, 200, "{}", refreshed.json);
+    let ends = rfc3339(&refreshed.json["refresh_token_expires_at"]).unix_timestamp();
+    let (exp, iat) = exp_and_iat(&refreshed.json["access_token"]);
+    assert!(exp <= ends && ends - exp <= 1, "exp {exp} vs {ends}");
+    assert_eq!(refreshed.json["expires_in"].as_i64(), Some(exp - iat));
+    assert!(exp - iat <= 300, "{}", refreshed.json);
+
+    // An app sign-in from an STK sign-in lasts 900 days, and its access tokens 30 minutes.
+    let stk_session = ctx.first_party_tokens(&silicon).await.access_token;
+    let (other, other_secret) = ctx.app("briefcase").await;
+    let slt = mint_slt(&ctx, &stk_session, &other.app_id).await;
+    let r = exchange_slt(&ctx, &other.app_id, &other_secret, &slt).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let (exp, iat) = exp_and_iat(&r.json["access_token"]);
+    assert_eq!(
+        (exp - iat, r.json["expires_in"].as_i64()),
+        (1800, Some(1800))
+    );
 }

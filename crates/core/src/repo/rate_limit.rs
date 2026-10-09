@@ -35,12 +35,18 @@ pub mod limits {
     pub const REPORTS_PER_IP: Limit = Limit::new(5, 3600);
     /// OTP sends: 30 per 10 minutes per IP (the per-destination limit is enforced by `otp::send`).
     pub const OTP_SEND_PER_IP: Limit = Limit::new(30, 600);
-    /// `POST /v1/silicons/login`: 60 per minute per IP (brute-force speed bump on top of the
-    /// per-Silicon lockout).
+    /// A Silicon's own sign-in from one IP: 60 per minute, counted in one bucket
+    /// ([`super::SILICON_LOGIN_BUCKET`]) for `POST /v1/silicons/login` (STK or key assertion) and
+    /// `grant_type=jwt-bearer` at `POST /v1/oauth/token` (the same key assertion): every attempt
+    /// at either endpoint counts against the one limit, so moving between them buys no extra
+    /// attempts. A brute-force speed bump on top of the per-Silicon lockout.
     pub const SILICON_LOGIN_PER_IP: Limit = Limit::new(60, 60);
     /// `POST /v1/telemetry/events`: 120 per minute per IP.
     pub const TELEMETRY_PER_IP: Limit = Limit::new(120, 60);
 }
+
+/// The bucket name of [`limits::SILICON_LOGIN_PER_IP`] (keyed by IP with [`bucket`]).
+pub const SILICON_LOGIN_BUCKET: &str = "silicon_login:ip";
 
 /// Outcome of a hit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

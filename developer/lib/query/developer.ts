@@ -161,8 +161,9 @@ function useRefreshApp(appId: string) {
 }
 
 /**
- * Sets the webhook URL: `run(url)`. The answer's `secret` (whsec_…) is shown once, so this is a secret mutation (never
- * cached). Pass `{ toast: false }` to explain a refused URL beside the field instead of in a toast.
+ * Sets the webhook URL: `run(url)`. The stored signing secret is kept (`secret` null); when none was stored, the answer's
+ * new `secret` (whsec_…) is shown once, so this is a secret mutation (never cached). Pass `{ toast: false }` to explain
+ * a refused URL beside the field instead of in a toast.
  */
 export function useSetWebhook(appId: string, meta: { toast?: boolean } = {}) {
   const refresh = useRefreshApp(appId);

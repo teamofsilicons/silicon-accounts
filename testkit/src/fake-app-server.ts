@@ -1035,11 +1035,21 @@ export async function start(options: FakeAppServerOptions = {}): Promise<FakeApp
     const body = ctx.contentType() === 'application/json' ? await jsonObject(ctx) : {};
     const url = str(body.url) ?? `${selfUrl}/${rt.app.app_id}/webhooks`;
     const res = await callAccounts(`/v1/apps/${encodeURIComponent(rt.app.app_id)}/webhook`, { method: 'PUT', app: rt.app, json: { url } });
-    if (!res.ok || !isRecord(res.body) || typeof res.body.secret !== 'string') {
+    if (!res.ok || !isRecord(res.body)) {
       ctx.sendJson(res.status === 0 ? 502 : res.ok ? 502 : res.status, { ok: false, status: res.status, error: res.body ?? res.error });
       return;
     }
-    const { recovered } = rt.inbox.setSecret(res.body.secret);
+    // Setting the URL keeps a stored secret (secret null); a fresh one comes from a rotation.
+    let secret = typeof res.body.secret === 'string' ? res.body.secret : null;
+    if (secret === null) {
+      const rotated = await callAccounts(`/v1/apps/${encodeURIComponent(rt.app.app_id)}/webhook/rotate-secret`, { method: 'POST', app: rt.app, json: {} });
+      if (!rotated.ok || !isRecord(rotated.body) || typeof rotated.body.secret !== 'string') {
+        ctx.sendJson(rotated.status === 0 ? 502 : rotated.ok ? 502 : rotated.status, { ok: false, status: rotated.status, error: rotated.body ?? rotated.error });
+        return;
+      }
+      secret = rotated.body.secret;
+    }
+    const { recovered } = rt.inbox.setSecret(secret);
     ctx.sendJson(200, { ok: true, url: res.body.url ?? url, secret_set: true, recovered });
   });
 

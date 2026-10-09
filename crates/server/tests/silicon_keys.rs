@@ -273,3 +273,81 @@ async fn a_silicon_signs_in_with_its_key_instead_of_its_stk() {
     assert_eq!(r.status, 422);
     assert!(r.json["error"]["details"]["fields"]["public_key"].is_string());
 }
+
+/// `grant_type=jwt-bearer` takes the same credential as `POST /v1/silicons/login`, so it counts
+/// against the same 60 attempts per minute per address, in the same bucket.
+#[tokio::test]
+async fn the_jwt_bearer_grant_shares_the_silicon_sign_in_limit() {
+    let ctx = TestContext::new().await;
+    let custodian = ctx.carbon().await;
+    let (silicon, _stk) = ctx.silicon(&custodian.uuid).await;
+    let handle = silicon.handle.clone().expect("si:id");
+    let silicon_token = ctx.first_party_tokens(&silicon).await.access_token;
+    let laptop = key(1);
+    let r = send(
+        &ctx,
+        Req::post(&format!("/v1/silicons/{handle}/keys"))
+            .bearer(&silicon_token)
+            .json(json!({"public_key": public(&laptop), "name": "laptop"})),
+    )
+    .await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    let grant = |jti: &str| {
+        let a = assertion(&laptop, json!({"alg": "EdDSA"}), claims(&ctx, &handle, jti));
+        Req::post("/v1/oauth/token").form(&[
+            ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+            ("assertion", &a),
+            ("client_id", "silicon-accounts"),
+        ])
+    };
+
+    // This network made 59 attempts this minute: the 60th goes through, the 61st waits.
+    ctx.exec(
+        "insert into rate_limits (bucket, window_started_at, count) values ('silicon_login:ip:unknown', now(), 59)",
+    )
+    .await;
+    let r = send(&ctx, grant("jti-limit-1")).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let r = send(&ctx, grant("jti-limit-2")).await;
+    assert_eq!(r.status, 429, "{}", r.json);
+    assert_eq!(r.json["error"], "rate_limited", "{}", r.json);
+    assert!(
+        r.json["error_description"]
+            .as_str()
+            .is_some_and(|d| d.contains("Silicon sign-in attempts")),
+        "{}",
+        r.json
+    );
+    let retry_after: u64 = r
+        .headers
+        .get("retry-after")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse().ok())
+        .expect("Retry-After");
+    assert!((1..=60).contains(&retry_after), "{retry_after}");
+
+    // One bucket for both endpoints: the grant's attempts count at POST /v1/silicons/login.
+    let r = login(
+        &ctx,
+        &assertion(
+            &laptop,
+            json!({"alg": "EdDSA"}),
+            claims(&ctx, &handle, "jti-limit-3"),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, 429, "{}", r.json);
+    assert_eq!(r.error_code(), Some("rate_limited"));
+    // Once the window ends, the refused assertion still works: the limit is checked before it.
+    ctx.exec("update rate_limits set count = 0 where bucket = 'silicon_login:ip:unknown'")
+        .await;
+    let r = send(&ctx, grant("jti-limit-2")).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let count: i32 = sqlx::query_scalar(
+        "select count from rate_limits where bucket = 'silicon_login:ip:unknown'",
+    )
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("bucket");
+    assert_eq!(count, 1, "the grant counted in the login bucket");
+}

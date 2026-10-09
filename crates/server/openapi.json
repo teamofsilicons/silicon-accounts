@@ -239,7 +239,7 @@
             "name": "require",
             "in": "query",
             "required": false,
-            "description": "Comma-separated capability names that must be supported, like `sse,subscriptions,webhooks`. Known names: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, proofs, webhooks, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, mcp, llms_txt.",
+            "description": "Comma-separated capability names that must be supported, like `sse,subscriptions,webhooks`. Known names: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, mcp, llms_txt. Aliases are accepted too, such as `event_stream`, `event_streaming`, `events_stream`, `server_sent_events` and `streaming` for `sse`.",
             "schema": {
               "type": "string"
             }
@@ -460,7 +460,7 @@
         ],
         "operationId": "exchangeToken",
         "summary": "Token endpoint (every grant)",
-        "description": "Exchange an authorization code, refresh a sign-in, redeem a Silicon's short-lived token, poll a device code, sign a Silicon in with a key-signed assertion (jwt-bearer, client_id silicon-accounts), or sign a Silicon in with an outside OIDC token it is trusted for (token-exchange, RFC 8693: `subject_token`, `subject_token_type`, `silicon`; `client_id` may be left out). A token exchange checks the token's signature against its issuer's JWKS, `iss`, `aud`, `exp`, `nbf`, `iat` (30 seconds of skew) and one trust's every condition, uses its `jti` once, and answers a sign-in that ends when the outside token expires, at least 30 minutes and at most 12 hours later (`TokenExchangeResponse`); every refusal is `invalid_grant` with the reason, the code in brackets (`invalid_federated_token`, `no_matching_trust`, `issuer_unavailable`), and 60 exchanges per minute per address answer 429 `rate_limited` with `Retry-After`. Authenticate with HTTP Basic or `client_id` + `client_secret` in the body, never both. Public clients send `client_id` alone: `silicon-accounts` (the CLI: refresh_token, device_code, jwt-bearer), `developer` (authorization_code with PKCE S256, refresh_token), and apps that turned on `device_flow` (device_code, refresh_token) or `public_client` (authorization_code with PKCE S256, refresh_token). Every refresh rotates the refresh token; presenting a used one revokes the whole sign-in. Responses are `Cache-Control: no-store`.",
+        "description": "Exchange an authorization code, refresh a sign-in, redeem a Silicon's short-lived token, poll a device code, sign a Silicon in with a key-signed assertion (jwt-bearer, client_id silicon-accounts), or sign a Silicon in with an outside OIDC token it is trusted for (token-exchange, RFC 8693: `subject_token`, `subject_token_type`, `silicon`; `client_id` may be left out). A token exchange checks the token's signature against its issuer's JWKS, `iss`, `aud`, `exp`, `nbf`, `iat` (30 seconds of skew) and one trust's every condition, uses its `jti` once, and answers a sign-in that ends when the outside token expires, at least 30 minutes and at most 12 hours later (`TokenExchangeResponse`); every refusal is `invalid_grant` with the reason, the code in brackets (`invalid_federated_token`, `no_matching_trust`, `issuer_unavailable`), and 60 exchanges per minute per address answer 429 `rate_limited` with `Retry-After`. jwt-bearer shares the limit of `POST /v1/silicons/login`: 60 Silicon sign-in attempts per minute per address across both, then 429 `rate_limited` with `Retry-After`. A short-lived token minted by a sign-in from an outside token starts an app sign-in that ends no later than that sign-in (`refresh_token_expires_at`) and ends when its trust is removed; once the trust is removed or that sign-in has ended, the token is refused with `invalid_grant`. Authenticate with HTTP Basic or `client_id` + `client_secret` in the body, never both. Public clients send `client_id` alone: `silicon-accounts` (the CLI: refresh_token, device_code, jwt-bearer), `developer` (authorization_code with PKCE S256, refresh_token), and apps that turned on `device_flow` (device_code, refresh_token) or `public_client` (authorization_code with PKCE S256, slt, refresh_token). Every other app sends its secret to redeem a short-lived token. Every refresh rotates the refresh token; presenting a used one revokes the whole sign-in. Responses are `Cache-Control: no-store`.",
         "security": [
           {
             "oauthClient": []
@@ -522,7 +522,7 @@
             "$ref": "#/components/responses/OAuthPayloadTooLarge"
           },
           "429": {
-            "description": "Too many token exchanges from this address (60 per minute). `{\"error\":\"rate_limited\",\"error_description\"}` with `Retry-After`.",
+            "description": "Too many token exchanges (60 per minute), or too many Silicon sign-in attempts (jwt-bearer: 60 per minute, shared with `POST /v1/silicons/login`), from this address. `{\"error\":\"rate_limited\",\"error_description\"}` with `Retry-After`.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -9513,7 +9513,7 @@
         ],
         "operationId": "removeSiliconFederation",
         "summary": "Remove a trust relationship",
-        "description": "For the Silicon itself or its custodian. The trust stops working at once and the sign-ins it started end. Repeating it changes nothing. The Silicon's webhook and stream get `silicon.federation.removed`.",
+        "description": "For the Silicon itself or its custodian. The trust stops working at once and the sign-ins it started end, with the app sign-ins made from their short-lived tokens (those apps get `membership.signed_out` with reason `session_revoked`; `ended_sessions` counts both). Repeating it changes nothing. The Silicon's webhook and stream get `silicon.federation.removed`.",
         "security": [
           {
             "bearerAuth": []
@@ -9835,7 +9835,7 @@
         ],
         "operationId": "createShortLivedToken",
         "summary": "A short-lived token for an app",
-        "description": "How a Silicon (or a Carbon) signs into an app without its sign-in page: hand the `slt` to the app, which redeems it at `POST /v1/oauth/token`. Single use, 120 seconds, only at that app.",
+        "description": "How a Silicon (or a Carbon) signs into an app without its sign-in page: hand the `slt` to the app, which redeems it at `POST /v1/oauth/token`. Single use, 120 seconds, only at that app. A token minted by a sign-in from a trusted outside token (a CI job) carries that sign-in's end and trust: the app sign-in it starts ends no later than the CI sign-in, and removing the trust ends it.",
         "security": [
           {
             "bearerAuth": []
@@ -13421,7 +13421,7 @@
         ],
         "operationId": "setAppWebhook",
         "summary": "Set the app's webhook",
-        "description": "Sets the app's webhook subscription. Every PUT makes a new signing secret, shown once (a retry with the same Idempotency-Key within 10 minutes returns the same secret), unless `preserve_secret` keeps the stored one. In production the URL must be https and reach a public address.",
+        "description": "Sets the app's webhook URL (its webhook subscription). One rule for the signing secret, as when a webhook subscription is moved: saving the URL, the same one or another, keeps the stored secret and `secret` is null. A new secret is made, and shown once, only when the app has none: when the webhook is first created (or set again after it was removed); a secret made with `generate-secret` before the URL is set is kept. Replace it with `rotate-secret`. `events` absent keeps the current picks (every update for a new webhook), `null` picks every update, a list picks those. A retry with the same Idempotency-Key within 10 minutes returns the same answer. `preserve_secret` is still accepted and changes nothing. In production the URL must be https and reach a public address.",
         "security": [
           {
             "appBasic": []
@@ -13456,7 +13456,7 @@
         },
         "responses": {
           "200": {
-            "description": "The webhook and its new secret.",
+            "description": "The webhook, its secret when this save made one (else null), and the updates it receives.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -18378,7 +18378,7 @@
         ],
         "operationId": "sendTelemetry",
         "summary": "Client telemetry",
-        "description": "Forwarded to Space Station. At most 50 events. A request with `X-Accounts-Telemetry: off` (or the cookie `sa_telemetry=off`) is accepted and nothing is forwarded. 120 requests per IP per minute.",
+        "description": "Forwarded to Space Station, cut down to what the silicon-accounts CLI reports, word for word, so no identifier or free text is forwarded whatever its shape. Only the CLI's events are forwarded (`source` `cli`, `name` `cli.command` or `cli.step`); others are accepted and dropped. `step` is forwarded only as one of the CLI's step names or command paths, else as `other`, and `progress` to the hundredth. `data` keeps only the known fields: `cli_version` (a release version), `outcome`, `exit_code`, `duration_ms` (a day at most), `json`, `account_kind`, `kind`, `method`, `channel`, `browser_opened`, `dry_run`, `format`, `ttl_seconds` (a day at most), `wait`, `webhook`, `signed_in`, `app` / `app_id` on the `login.slt.issued` step, and `command`, `os`, `arch` and `error_code` as one of the words the CLI uses, else `other`. Everything else is dropped. At most 50 events. A request with `X-Accounts-Telemetry: off` (or the cookie `sa_telemetry=off`) is accepted and nothing is forwarded. 120 requests per IP per minute.",
         "security": [],
         "parameters": [
           {
@@ -20252,7 +20252,7 @@
           },
           "slt": {
             "type": "string",
-            "description": "slt: the Silicon's `slt_...` short-lived token."
+            "description": "slt: the Silicon's `slt_...` short-lived token. Apps send their secret, or `client_id` alone with `public_client` on."
           },
           "device_code": {
             "type": "string",
@@ -20287,7 +20287,7 @@
           },
           "client_id": {
             "type": "string",
-            "description": "With `client_secret` instead of HTTP Basic. Alone, it is a public client: `silicon-accounts` (the CLI), `developer`, or an app that turned on `device_flow` or `public_client`."
+            "description": "With `client_secret` instead of HTTP Basic. Alone, it is a public client: `silicon-accounts` (the CLI), `developer`, or an app that turned on `device_flow` or `public_client` (with `public_client`, also to redeem a short-lived token)."
           },
           "client_secret": {
             "type": "string"
@@ -20319,7 +20319,7 @@
           },
           "expires_in": {
             "type": "integer",
-            "description": "1800 seconds."
+            "description": "1800 seconds, or fewer when the sign-in ends sooner: an access token never outlives its sign-in."
           },
           "refresh_token": {
             "type": "string",
@@ -20328,7 +20328,7 @@
           "refresh_token_expires_at": {
             "type": "string",
             "format": "date-time",
-            "description": "When the sign-in ends at the latest (900 days after it started)."
+            "description": "When the sign-in ends at the latest: 900 days after it started, or sooner for an app sign-in made from a short-lived token that a Silicon's CI sign-in minted (it ends with that CI sign-in)."
           },
           "scope": {
             "type": "string",
@@ -20379,7 +20379,7 @@
           },
           "expires_in": {
             "type": "integer",
-            "description": "1800 seconds."
+            "description": "1800 seconds, or fewer when the sign-in ends sooner: an access token never outlives its sign-in."
           },
           "refresh_token": {
             "type": "string",
@@ -22154,7 +22154,7 @@
           },
           "method": {
             "type": "string",
-            "description": "`silicon_stk`, `silicon_key`, `slt`, `device`, ..."
+            "description": "`silicon_stk`, `silicon_key`, `slt`, `slt_public_client`, `device`, ..."
           },
           "outcome": {
             "type": "string",
@@ -22863,11 +22863,12 @@
               "$ref": "#/components/schemas/UpdateName"
             },
             "maxItems": 9,
-            "description": "The updates this webhook receives; null or absent = every update."
+            "description": "The updates this webhook receives: absent keeps the current picks (every update for a new webhook), null picks every update, a list picks those."
           },
           "preserve_secret": {
             "type": "boolean",
-            "description": "Keep the stored signing secret (for example one made with `generate-secret`) instead of making a new one; `secret` is then null."
+            "description": "Accepted for compatibility and ignored: saving the URL always keeps the stored signing secret.",
+            "deprecated": true
           }
         },
         "additionalProperties": false
@@ -22888,7 +22889,7 @@
               "string",
               "null"
             ],
-            "description": "`whsec_...`: the new signing secret, shown once; null with `preserve_secret`."
+            "description": "`whsec_...`: the new signing secret, shown once, when this save made one (the app had none); null when the stored secret was kept."
           },
           "events": {
             "type": [
@@ -22897,7 +22898,8 @@
             ],
             "items": {
               "$ref": "#/components/schemas/UpdateName"
-            }
+            },
+            "description": "The updates the webhook receives now; null = every update."
           }
         }
       },
@@ -24987,15 +24989,16 @@
               "properties": {
                 "source": {
                   "type": "string",
-                  "description": "1 to 64 characters of a-z 0-9 _ . -, like cli or web."
+                  "description": "1 to 64 characters of a-z 0-9 _ . -. Only `cli` is forwarded."
                 },
                 "step": {
                   "type": "string",
-                  "description": "1 to 200 printable characters."
+                  "description": "1 to 200 printable characters. Forwarded only as one of the CLI's step names (`login.device.approved`) or command paths (`app webhook set`); anything else is forwarded as `other`."
                 },
                 "name": {
                   "type": "string",
-                  "pattern": "^[a-z0-9_.]{1,64}$"
+                  "pattern": "^[a-z0-9_.]{1,64}$",
+                  "description": "Only `cli.command` and `cli.step` are forwarded."
                 },
                 "progress": {
                   "type": "number",
@@ -25005,7 +25008,7 @@
                 "data": {
                   "type": "object",
                   "additionalProperties": true,
-                  "description": "At most 8 KB; never secrets."
+                  "description": "At most 8 KB; never secrets. Only the known fields listed on the operation are forwarded, each only in its shape or as one of its words; the rest is dropped."
                 }
               }
             },
@@ -25596,7 +25599,7 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/Capability"
             },
-            "description": "Keyed by capability name: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, proofs, webhooks, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, mcp, llms_txt."
+            "description": "Keyed by capability name: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, mcp, llms_txt."
           },
           "auth_methods": {
             "type": "array",

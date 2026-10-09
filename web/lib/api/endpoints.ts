@@ -340,9 +340,13 @@ export const apps = {
   },
 
   webhook: {
-    /** Sets the URL; a new `whsec_…` secret is returned (shown once) each time. */
+    /**
+     * Sets the URL and keeps the stored signing secret (`secret` null) and the update picks (`events`, null = every
+     * update). A new `whsec_…` secret comes back (shown once) only when none was stored: the first save, or the first
+     * after the webhook was removed. `rotateSecret` replaces it.
+     */
     set: (appId: string, url: string, options?: OwnerCall) =>
-      request<{ url: string; secret: string }>(`/v1/apps/${seg(appId)}/webhook`, { method: "PUT", body: { url }, idempotencyKey: options?.idempotencyKey, auth: ownerAuth(options?.credentials), signal: options?.signal }),
+      request<{ url: string; secret: string | null; events: string[] | null }>(`/v1/apps/${seg(appId)}/webhook`, { method: "PUT", body: { url }, idempotencyKey: options?.idempotencyKey, auth: ownerAuth(options?.credentials), signal: options?.signal }),
     /** 204; pending deliveries become failed. */
     remove: (appId: string, credentials?: Owner) => request<null>(`/v1/apps/${seg(appId)}/webhook`, { method: "DELETE", auth: ownerAuth(credentials) }),
     rotateSecret: (appId: string, options?: OwnerCall) =>

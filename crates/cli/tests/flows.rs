@@ -636,6 +636,56 @@ fn a_custodian_checks_an_id_for_its_silicon() {
         );
 }
 
+/// `app webhook set` prints the signing secret the first time; saving the endpoint again keeps
+/// the secret, and says so.
+#[test]
+fn app_webhook_set_keeps_the_secret_after_the_first_time() {
+    let mock = Mock::start();
+    let env = Env::new();
+    let set = |url: &str| {
+        let mut cmd = env.cmd();
+        cmd.args([
+            "--url",
+            &mock.url,
+            "app",
+            "--app-id",
+            APP_ID,
+            "--app-secret",
+            APP_SECRET,
+            "webhook",
+            "set",
+            url,
+        ]);
+        cmd
+    };
+    set("https://briefcase.example/webhooks")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Signing secret (shown once, store it now): whsec_first",
+        ));
+    set("https://briefcase.example/moved")
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains(
+                "Webhook of briefcase set to https://briefcase.example/moved.",
+            )
+            .and(predicate::str::contains("It keeps its signing secret"))
+            .and(predicate::str::contains("app webhook rotate"))
+            .and(predicate::str::contains("whsec_").not()),
+        );
+    let (_, body) = mock
+        .requests("PUT", "/v1/apps/briefcase/webhook")
+        .pop()
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&body).unwrap(),
+        json!({"url": "https://briefcase.example/moved"}),
+        "the CLI sends only the URL: the service keeps the secret and the picks"
+    );
+}
+
 /// `app subscription …`: list, create (defaults, picked updates, every update, paused), update,
 /// test and delete, each sending exactly what the API expects.
 #[test]

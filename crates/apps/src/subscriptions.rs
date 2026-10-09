@@ -30,13 +30,13 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::signin_config::ensure_config_row;
-use crate::util::caller_scope;
+use crate::util::{caller_scope, double_option};
 
 pub(crate) fn router() -> Router<AppState> {
     Router::new()
@@ -54,15 +54,6 @@ pub(crate) fn router() -> Router<AppState> {
             "/v1/apps/{app_id}/subscriptions/{subscription_id}/test",
             post(test_subscription),
         )
-}
-
-/// `Some(None)` for an explicit `null`, `None` when the field is absent.
-fn double_option<'de, D, T>(d: D) -> Result<Option<Option<T>>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    Option::<T>::deserialize(d).map(Some)
 }
 
 #[derive(Debug, Deserialize, Serialize)]

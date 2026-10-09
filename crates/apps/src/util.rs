@@ -2,7 +2,18 @@
 
 use accounts_core::ApiError;
 use accounts_core::http::{AppActor, AppOrOwner};
+use serde::{Deserialize, Deserializer};
 use time::OffsetDateTime;
+
+/// For `#[serde(default, deserialize_with = "double_option")]`: `Some(None)` for an explicit
+/// `null`, `None` when the field is absent.
+pub fn double_option<'de, D, T>(d: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(d).map(Some)
+}
 
 /// `"app:{app_id}"` or `"account:{uuid}"`: who is calling, for idempotency scopes.
 pub fn caller_scope(auth: &AppOrOwner) -> String {

@@ -43,9 +43,10 @@ export const journey: Journey = {
     const receiver = await Receiver.start();
     try {
       const path = `/browser-${uid()}`;
-      const set = must("point browser's webhook at the receiver", await appCall<{ url: string; secret: string }>(env, APP, "PUT", `/v1/apps/${APP}/webhook`, { json: { url: receiver.url(path) } }), 200);
-      const secret = set.body.secret;
-      results.check("setting the URL returns it and a new 32-byte whsec_ secret, not cacheable", set.body.url === receiver.url(path) && /^whsec_[A-Za-z0-9_-]{43}$/.test(secret) && /no-store/.test(set.headers.get("cache-control") ?? ""), `${set.body.url} ${set.headers.get("cache-control")}`);
+      const set = must("point browser's webhook at the receiver", await appCall<{ url: string; secret: string | null }>(env, APP, "PUT", `/v1/apps/${APP}/webhook`, { json: { url: receiver.url(path) } }), 200);
+      // Setting the URL keeps a stored secret (secret null); a new one only when the app had none.
+      const secret = set.body.secret ?? must("rotate browser's secret", await appCall<{ secret: string }>(env, APP, "POST", `/v1/apps/${APP}/webhook/rotate-secret`), 200).body.secret;
+      results.check("setting the URL returns it (with a secret only when the app had none), not cacheable; the secret is a 32-byte whsec_", set.body.url === receiver.url(path) && /^whsec_[A-Za-z0-9_-]{43}$/.test(secret) && /no-store/.test(set.headers.get("cache-control") ?? ""), `${set.body.url} ${set.headers.get("cache-control")}`);
       const app = must("app details", await appCall<{ webhook?: { url?: string; secret_set?: boolean } }>(env, APP, "GET", `/v1/apps/${APP}`), 200);
       results.check("the app's details show the URL and secret_set, never the secret", sameJson(app.body.webhook, { url: receiver.url(path), secret_set: true }) && !app.text.includes("whsec_"), short(app.body.webhook));
 

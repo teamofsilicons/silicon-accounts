@@ -68,6 +68,8 @@ pub mod method {
     pub const APPLE: &str = "apple";
     pub const SILICON_STK: &str = "silicon_stk";
     pub const SLT: &str = "slt";
+    /// A short-lived token exchanged by an app's public client (`public_client` on, no secret).
+    pub const SLT_PUBLIC_CLIENT: &str = "slt_public_client";
     pub const DEVICE: &str = "device";
     pub const SESSION: &str = "session";
     /// A Silicon's key-signed assertion.

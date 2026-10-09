@@ -27,7 +27,6 @@ import {
 } from "./_helpers";
 
 const APPS = ["briefcase", "remind"];
-const SUMMARY_KEYS = ["display_name", "id", "kind", "pfp_url", "status", "uuid"];
 
 async function lastSeqs(ctx: Ctx, inboxes: string[]): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
@@ -110,8 +109,8 @@ export const journey: Journey = {
       const problems = envelopeProblems(event!.payload, { type: "silicon.custodian_changed", app_id: app, silicon: null });
       results.check(`transfer: ${app}'s envelope is right`, problems.length === 0, problems.join("; "));
       const data = event!.payload.data as { uuid?: string; membership_id?: string; from?: Record<string, unknown>; to?: Record<string, unknown> };
-      checkEq(results, `transfer: ${app}'s data is {uuid, membership_id, from, to} with full account summaries`, { keys: Object.keys(data).sort(), uuid: data.uuid, membership_id: data.membership_id, fromKeys: Object.keys(data.from ?? {}).sort(), toKeys: Object.keys(data.to ?? {}).sort() }, { keys: ["from", "membership_id", "to", "uuid"], uuid: silicon.uuid, membership_id: `${app}:${silicon.uuid}`, fromKeys: SUMMARY_KEYS, toKeys: SUMMARY_KEYS });
-      checkEq(results, `transfer: ${app} learns it moved from the old custodian to the new one`, { from: [data.from?.uuid, data.from?.id, data.from?.kind], to: [data.to?.uuid, data.to?.id, data.to?.kind] }, { from: [keeper.uuid, keeper.id, "carbon"], to: [heir.uuid, heir.id, "carbon"] });
+      checkEq(results, `transfer: ${app}'s data is {uuid, membership_id, from, to} with each custodian as {uuid, id} only`, { keys: Object.keys(data).sort(), uuid: data.uuid, membership_id: data.membership_id, fromKeys: Object.keys(data.from ?? {}).sort(), toKeys: Object.keys(data.to ?? {}).sort() }, { keys: ["from", "membership_id", "to", "uuid"], uuid: silicon.uuid, membership_id: `${app}:${silicon.uuid}`, fromKeys: ["id", "uuid"], toKeys: ["id", "uuid"] });
+      checkEq(results, `transfer: ${app} learns it moved from the old custodian to the new one`, { from: [data.from?.uuid, data.from?.id], to: [data.to?.uuid, data.to?.id] }, { from: [keeper.uuid, keeper.id], to: [heir.uuid, heir.id] });
     }
     const own = await waitEvent(env, sink, { type: "silicon.custodian.changed", uuid: silicon.uuid, after: after[sink] });
     const ownData = own?.payload.data as { uuid?: string; id?: string; from?: { uuid?: string }; to?: { uuid?: string } } | undefined;

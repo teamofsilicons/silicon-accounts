@@ -46,6 +46,8 @@ pub struct MockState {
     /// The app's sign-in setup version and redirect URIs (PATCH signin-config changes them).
     pub config_version: i64,
     pub redirect_uris: Value,
+    /// The app's webhook URL (`PUT /v1/apps/briefcase/webhook` sets it).
+    pub app_webhook_url: Option<String>,
 }
 
 pub struct Mock {
@@ -546,6 +548,19 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
             201,
             json!({ "silicon": new_silicon("active"), "stk": STK, "webhook_secret": null }),
         ),
+        // Like the service: a new secret only when the app has none; saving again keeps it.
+        ("PUT", "/v1/apps/briefcase/webhook") if app_auth => {
+            let first = st.app_webhook_url.is_none();
+            st.app_webhook_url = json_body["url"].as_str().map(str::to_owned);
+            (
+                200,
+                json!({
+                    "url": json_body["url"],
+                    "secret": if first { json!("whsec_first") } else { Value::Null },
+                    "events": null,
+                }),
+            )
+        }
         ("GET", "/v1/apps/briefcase/subscriptions") if app_auth => (
             200,
             json!({"items": [subscription("webhook", Value::Null)], "next_cursor": null}),

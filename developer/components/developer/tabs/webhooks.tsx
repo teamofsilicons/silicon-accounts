@@ -2,11 +2,11 @@
 
 /**
  * Webhooks: where Silicon Accounts tells the app that something changed about an account that signed into it (id
- * changes, updates, sign-outs, removed access, deletions, Silicon custodian changes). Set or change the URL (a new
- * whsec_ signing secret is shown once), rotate the secret, send a test ping, and see every delivery with its attempts
- * and payload. Failed deliveries can be replayed one by one, selected, or all at once; whatever the server skipped is
- * named with its reason. Every set, rotation, ping and replay keeps one Idempotency-Key until it succeeds, so a retry
- * after a lost answer never rotates twice or sends a second ping.
+ * changes, updates, sign-outs, removed access, deletions, Silicon custodian changes). Set or change the URL (the first
+ * save shows a new whsec_ signing secret once; a later one keeps it), rotate the secret, send a test ping, and see every
+ * delivery with its attempts and payload. Failed deliveries can be replayed one by one, selected, or all at once;
+ * whatever the server skipped is named with its reason. Every set, rotation, ping and replay keeps one Idempotency-Key
+ * until it succeeds, so a retry after a lost answer never rotates twice or sends a second ping.
  */
 import { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -176,6 +176,8 @@ export function WebhooksTab() {
   const changeButton = useRef<HTMLButtonElement>(null);
   const [urlError, setUrlError] = useState<string | undefined>();
   const [secret, setSecret] = useState<{ value: string; reason: "set" | "rotated" } | null>(null);
+  // Saving a URL keeps the stored signing secret (the answer's `secret` is null): said in place, with nothing to reveal.
+  const [kept, setKept] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<string[]>([]);
   // The delivery the drawer shows, with its event type: the drawer names it even after a replay or a refresh moved the
@@ -206,7 +208,14 @@ export function WebhooksTab() {
     if (problem) return;
     try {
       const result = await setWebhook.run(value);
-      setSecret({ value: result.secret, reason: "set" });
+      // A secret comes back only when this save made one (none was stored); otherwise the old one keeps signing.
+      if (typeof result.secret === "string") {
+        setSecret({ value: result.secret, reason: "set" });
+        setKept(false);
+      } else {
+        setSecret(null);
+        setKept(true);
+      }
       setEditing(false);
       setFocusUrl(false);
       setUrl("");
@@ -221,6 +230,7 @@ export function WebhooksTab() {
 
   const rotate = async () => {
     const result = await rotateSecret.run();
+    setKept(false);
     setSecret({ value: result.secret, reason: "rotated" });
     ctx.setApp(current => ({ ...current, webhook: { ...current.webhook, secret_set: true } }));
   };
@@ -228,6 +238,7 @@ export function WebhooksTab() {
   const remove = async () => {
     await removeWebhook.mutateAsync();
     setSecret(null);
+    setKept(false);
     setFocusUrl(true);
     ctx.setApp(current => ({ ...current, webhook: { url: null, secret_set: false } }));
   };
@@ -307,7 +318,7 @@ export function WebhooksTab() {
               </div>
               <div className={styles.endpointActions}>
                 <ActionButton label="Send test ping" pendingLabel="Sending" successLabel="Ping queued" onAction={ping} onActionError={() => undefined} />
-                <Button ref={changeButton} variant="secondary" onClick={() => { setEditing(true); setFocusUrl(true); setUrl(webhook.url ?? ""); setUrlError(undefined); }}><Pencil size={14} strokeWidth={1.75} aria-hidden="true" />Change URL</Button>
+                <Button ref={changeButton} variant="secondary" onClick={() => { setEditing(true); setFocusUrl(true); setKept(false); setUrl(webhook.url ?? ""); setUrlError(undefined); }}><Pencil size={14} strokeWidth={1.75} aria-hidden="true" />Change URL</Button>
                 <ConfirmMorph label="Rotate secret" icon={<RotateCw size={16} strokeWidth={1.75} />} prompt="Rotate? The old secret stops working now." confirmLabel="Rotate" pendingLabel="Rotating" doneLabel="Rotated" tone="neutral" onConfirm={rotate} />
                 <ConfirmMorph label="Remove webhook" icon={<Trash2 size={16} strokeWidth={1.75} />} prompt="Remove it? Pending deliveries fail." confirmLabel="Remove" pendingLabel="Removing" doneLabel="Removed" onConfirm={remove} />
               </div>
@@ -329,10 +340,15 @@ export function WebhooksTab() {
                 {webhook.url ? <Button variant="ghost" onClick={() => { setEditing(false); setFocusUrl(false); setUrl(""); setUrlError(undefined); requestAnimationFrame(() => changeButton.current?.focus()); }}>Cancel</Button> : null}
                 <Button type="submit" loading={setWebhook.isPending}>{webhook.url ? "Save the new URL" : "Save the webhook URL"}</Button>
               </div>
-              <p className={styles.muted}>Saving gives you a new signing secret, shown once.</p>
+              <p className={styles.muted}>{webhook.secret_set ? "Saving keeps the current signing secret. Rotate it to get a new one." : "Saving gives you a signing secret, shown once."}</p>
             </form>
           )}
         </Surface>
+        {kept && !secret ? (
+          <Alert tone="success" title="Saved with the same signing secret" onDismiss={() => setKept(false)}>
+            Deliveries go to the URL you saved, signed with the secret your receiver already has. Rotate the secret if you need a new one.
+          </Alert>
+        ) : null}
         {secret ? (
           <SecretReveal
             title={secret.reason === "set" ? "Your webhook signing secret" : "Your new webhook signing secret"}

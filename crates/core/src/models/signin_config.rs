@@ -550,8 +550,9 @@ pub struct SigninConfig {
     /// account site (OAuth device authorization grant, RFC 8628), without a client secret.
     pub device_flow: bool,
     /// Treat the app's command-line and desktop tools as public clients (RFC 8252): they
-    /// redeem authorization codes and refresh tokens with `client_id` alone, and every such
-    /// code must come with PKCE S256. Loopback redirect URIs take any port either way.
+    /// redeem authorization codes, short-lived tokens and refresh tokens with `client_id`
+    /// alone, and every such code must come with PKCE S256. Loopback redirect URIs take any
+    /// port either way.
     pub public_client: bool,
     pub branding: Branding,
     pub copy: SigninCopy,

@@ -752,12 +752,14 @@ pub async fn membership_access_removed(
 }
 
 /// `silicon.custodian_changed` to every member app of the Silicon:
-/// `{uuid, membership_id, from: AccountSummary, to: AccountSummary}`.
+/// `{uuid, membership_id, from: CustodianRef, to: CustodianRef}`. An app sees a Silicon's
+/// custodian as `{uuid, id}` only, here as everywhere else (`account.updated`, token responses):
+/// never the custodian's name, photo, kind or status, which the app may never have been shown.
 pub async fn silicon_custodian_changed(
     conn: &mut PgConnection,
     silicon: &Account,
-    from: &AccountSummary,
-    to: &AccountSummary,
+    from: &CustodianRef,
+    to: &CustodianRef,
 ) -> ApiResult<Vec<EmittedEvent>> {
     let targets = memberships::webhook_targets(conn, &silicon.uuid).await?;
     let mut out = Vec::with_capacity(targets.len());
@@ -781,15 +783,22 @@ pub async fn silicon_custodian_changed(
     Ok(out)
 }
 
-/// A transfer completed: `silicon.custodian_changed` to member apps and
-/// `silicon.custodian.changed` (`{uuid, id, from, to}`) to the Silicon.
+/// A transfer completed: `silicon.custodian_changed` to member apps (`from` and `to` as
+/// `{uuid, id}`) and `silicon.custodian.changed` (`{uuid, id, from, to}`, both account
+/// summaries) to the Silicon itself.
 pub async fn notify_custodian_changed(
     conn: &mut PgConnection,
     silicon: &Account,
     from: &AccountSummary,
     to: &AccountSummary,
 ) -> ApiResult<Vec<EmittedEvent>> {
-    let mut out = silicon_custodian_changed(conn, silicon, from, to).await?;
+    let mut out = silicon_custodian_changed(
+        conn,
+        silicon,
+        &CustodianRef::from(from),
+        &CustodianRef::from(to),
+    )
+    .await?;
     out.extend(
         emit_to_silicon(
             conn,

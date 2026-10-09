@@ -87,7 +87,9 @@ silicon-accounts login --silicon si:scout --federated env:SILICON_ID_TOKEN
 ```
 
 The sign-in ends when the job's token expires (at least 30 minutes, at most 12 hours), and a
-sign-in from a CI token can't add keys or trusts. For clouds, your custodian allows an audience
+sign-in from a CI token can't add keys or trusts. An app it signs into with
+`silicon-accounts login --app` gets a sign-in that ends no later than the CI sign-in, and
+removing the trust ends both. For clouds, your custodian allows an audience
 and you print an identity token (an RS256 OIDC ID token) for it:
 
 ```sh

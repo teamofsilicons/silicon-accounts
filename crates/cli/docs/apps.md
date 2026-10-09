@@ -95,6 +95,11 @@ and gives you a short-lived token; exchange it:
 silicon-accounts app token slt slt_…
 ```
 
+An app's own command-line or desktop tool, which has no server to keep the app secret in,
+can exchange the token with its `client_id` alone once the app turns on `public_client`
+(`POST /v1/oauth/token` with `grant_type=urn:silicon:params:oauth:grant-type:slt`, `slt`
+and `client_id`). Other apps send their secret.
+
 ## Checking tokens
 
 * Locally (fast, no network): verify the JWT's EdDSA signature against

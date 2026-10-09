@@ -290,6 +290,66 @@ async fn the_agent_card_describes_the_service() {
     assert!(!text.contains('\u{2014}') && !text.contains('\u{2013}'));
 }
 
+/// The capability names after `lead` in one OpenAPI description, up to the sentence's end.
+fn names_after(description: &str, lead: &str) -> Vec<String> {
+    let start = description
+        .find(lead)
+        .unwrap_or_else(|| panic!("no '{lead}' in: {description}"))
+        + lead.len();
+    let rest = &description[start..];
+    let end = rest.find('.').unwrap_or(rest.len());
+    rest[..end]
+        .split(',')
+        .map(|n| n.trim().to_owned())
+        .collect()
+}
+
+/// Both capability lists in openapi.json (the `require` parameter and the answer's
+/// `capabilities` object) name exactly the capabilities `GET /v1/capabilities` serves.
+#[tokio::test]
+async fn the_openapi_document_names_every_capability() {
+    let ctx = TestContext::new().await;
+    let r = send(&ctx, Req::get("/v1/capabilities")).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let mut served: Vec<String> = r.json["capabilities"]
+        .as_object()
+        .expect("capabilities")
+        .keys()
+        .cloned()
+        .collect();
+    served.sort_unstable();
+    let doc = spec();
+    let get = &doc["paths"]["/v1/capabilities"]["get"];
+    let require = get["parameters"]
+        .as_array()
+        .and_then(|ps| ps.iter().find(|p| p["name"] == "require"))
+        .and_then(|p| p["description"].as_str())
+        .expect("the require parameter");
+    let keyed = find_text(&doc, "Keyed by capability name: ")
+        .expect("the description of the answer's capabilities object");
+    for (what, mut listed) in [
+        ("require", names_after(require, "Known names: ")),
+        (
+            "capabilities object",
+            names_after(&keyed, "Keyed by capability name: "),
+        ),
+    ] {
+        listed.sort_unstable();
+        assert_eq!(listed, served, "the {what} description in openapi.json");
+    }
+    assert_eq!(served.len(), 27, "{served:?}");
+}
+
+/// The first string anywhere in `value` that starts with `lead`.
+fn find_text(value: &Value, lead: &str) -> Option<String> {
+    match value {
+        Value::String(s) if s.starts_with(lead) => Some(s.clone()),
+        Value::Array(items) => items.iter().find_map(|v| find_text(v, lead)),
+        Value::Object(map) => map.values().find_map(|v| find_text(v, lead)),
+        _ => None,
+    }
+}
+
 #[tokio::test]
 async fn capabilities_answer_queries_and_negotiate_versions() {
     let ctx = TestContext::new().await;
@@ -334,6 +394,16 @@ async fn capabilities_answer_queries_and_negotiate_versions() {
         json!(["sse", "subscriptions", "idempotency_keys"])
     );
     assert_eq!(r.json["require"]["missing"], json!([]));
+
+    // `event_stream` is another name for `sse`.
+    let r = send(
+        &ctx,
+        Req::get("/v1/capabilities?require=event_stream,event-stream"),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["require"]["satisfied"], true);
+    assert_eq!(r.json["require"]["supported"], json!(["sse"]));
 
     let r = send(&ctx, Req::get("/v1/capabilities?require=sse,graphql,soap")).await;
     assert_eq!(r.status, 422, "{}", r.json);

@@ -2,7 +2,7 @@
  * Secret rotation and the webhook's URL, checked with the suite's own receiver so every signature is verified here
  * against the exact secret expected (waveform's webhook points at it for the journey): a rotation signs everything after
  * it with the new secret only, a retry of a delivery made before the rotation included; an idempotent rotation returns
- * the same secret; setting the URL again (same or new) gives a new secret and moves pending retries to the new URL.
+ * the same secret; setting the URL again (same or new) keeps the secret and moves pending retries to the new URL.
  * Removing the webhook fails what is pending (replayable once a URL is set again), and pings, replays and rotations
  * then answer 409 webhook_not_set. Then the fake app server gets waveform's webhook back and verifies a replay.
  */
@@ -33,7 +33,7 @@ const APP = "waveform";
 
 export const journey: Journey = {
   name: "webhooks-secret-rotation",
-  title: "rotating the secret signs every later attempt (a pending retry included) with the new one only; idempotent rotation; a new URL gets a new secret and the pending retries; removing the webhook fails pending deliveries, which replay to the next URL; URL validation",
+  title: "rotating the secret signs every later attempt (a pending retry included) with the new one only; idempotent rotation; a new URL keeps the secret and gets the pending retries; removing the webhook fails pending deliveries, which replay to the next URL; URL validation",
   timeoutMs: 5 * 60_000,
   async run(ctx) {
     const { env, results } = ctx;
@@ -45,9 +45,12 @@ export const journey: Journey = {
     let removedPending: { event_id: string; delivery_id: string } | null = null;
     try {
       const pathA = `/wave-a-${uid()}`;
-      const s1 = must("point waveform's webhook at the receiver", await appCall<{ secret: string }>(env, APP, "PUT", `/v1/apps/${APP}/webhook`, { json: { url: receiver.url(pathA) } }), 200).body.secret;
+      const set1 = must("point waveform's webhook at the receiver", await appCall<{ secret: string | null }>(env, APP, "PUT", `/v1/apps/${APP}/webhook`, { json: { url: receiver.url(pathA) } }), 200).body;
+      // Setting the URL keeps a stored secret (secret null; the fake app connected waveform's webhook before), so
+      // rotate to know the one in use when none came back.
+      const s1 = set1.secret ?? must("rotate to a known secret", await rotate(), 200).body.secret;
       const p1 = await ping();
-      results.check("a ping is signed with the secret the URL was set with", signedBy(await arrival(p1.event_id), s1));
+      results.check("a ping is signed with the current secret", signedBy(await arrival(p1.event_id), s1));
 
       // ---- rotation ---------------------------------------------------------------------------------------------------------
       const r2 = must("rotate", await rotate(), 200);
@@ -78,18 +81,18 @@ export const journey: Journey = {
       const retried = await receiver.waitCount(request => request.headers["x-accounts-event-id"] === p5.event_id, 2);
       results.check("a delivery that failed before a rotation is retried signed with the new secret (current, not the one of its first attempt)", signedBy(before, s4) && retried.length === 2 && signedBy(retried[1], s5) && !signedBy(retried[1], s4), `${retried.length} attempts`);
 
-      // ---- setting the URL again: a new secret, and pending retries follow the URL ---------------------------------------
-      const again = must("set the same URL again", await appCall<{ url: string; secret: string }>(env, APP, "PUT", `/v1/apps/${APP}/webhook`, { json: { url: receiver.url(pathA) } }), 200).body;
+      // ---- setting the URL again: the secret stays, and pending retries follow the URL --------------------------------
+      const again = must("set the same URL again", await appCall<{ url: string; secret: string | null }>(env, APP, "PUT", `/v1/apps/${APP}/webhook`, { json: { url: receiver.url(pathA) } }), 200).body;
       const p6 = await ping();
-      results.check("setting the same URL again issues a new secret (every set does)", again.secret !== s5 && signedBy(await arrival(p6.event_id), again.secret) && !signedBy(await arrival(p6.event_id), s5), "");
+      results.check("setting the same URL again keeps the secret (secret null; pings still signed with it)", again.secret === null && signedBy(await arrival(p6.event_id), s5), short(again));
       receiver.answer({ status: 503 }, 1, request => request.body?.type === "ping" && request.path === pathA);
       const p7 = await ping();
       await waitAttempts(env, p7.delivery_id, 1);
       const pathB = `/wave-b-${uid()}`;
-      const moved = must("move to a new URL", await appCall<{ url: string; secret: string }>(env, APP, "PUT", `/v1/apps/${APP}/webhook`, { json: { url: receiver.url(pathB) } }), 200).body;
+      const moved = must("move to a new URL", await appCall<{ url: string; secret: string | null }>(env, APP, "PUT", `/v1/apps/${APP}/webhook`, { json: { url: receiver.url(pathB) } }), 200).body;
       await retryNow(env, p7.delivery_id);
       const atB = await arrival(p7.event_id, pathB);
-      results.check("a pending retry goes to the new URL, signed with the new URL's secret", !!atB && signedBy(atB, moved.secret), atB ? atB.path : "nothing at the new URL");
+      results.check("a pending retry goes to the new URL, signed with the secret it kept", moved.secret === null && !!atB && signedBy(atB, s5), atB ? atB.path : "nothing at the new URL");
       const p7done = await waitDelivery(env, APP, p7.delivery_id, d => d.status === "delivered");
       results.check("…and the delivery records the URL it was delivered to", p7done?.url === receiver.url(pathB), p7done?.url ?? "");
 

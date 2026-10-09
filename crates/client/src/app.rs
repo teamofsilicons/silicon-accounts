@@ -497,9 +497,12 @@ impl<'a> AppClient<'a> {
 
     // ---- webhooks -------------------------------------------------------------------------
 
-    /// `PUT /v1/apps/{app_id}/webhook`: sets the endpoint; a new signing secret is
-    /// generated every time and returned once. With an idempotency key, a retry within 10
-    /// minutes returns the same secret instead of generating another.
+    /// `PUT /v1/apps/{app_id}/webhook`: sets the endpoint. When the app has no signing secret
+    /// yet (the first time, or after [`AppClient::remove_webhook`]) one is generated and
+    /// returned once in [`AppWebhook::secret`]; saving the endpoint again, to the same URL or
+    /// another, keeps the secret (`secret` is `None`) and the chosen updates. Replace the secret
+    /// with [`AppClient::rotate_webhook_secret`]. With an idempotency key, a retry within 10
+    /// minutes returns the same answer.
     pub async fn set_webhook(
         &self,
         url: &str,
@@ -521,8 +524,10 @@ impl<'a> AppClient<'a> {
         self.get(self.app_url(&["webhook"])).await
     }
 
-    /// Configures the Accounts-owned webhook with Silicon Apps update choices.
-    /// Returns the new signing secret once; repeating an idempotency key returns the same result.
+    /// Configures the Accounts-owned webhook with Silicon Apps update choices. Keeps the
+    /// stored signing secret, like every save of the endpoint; a secret is generated (and
+    /// returned once) only when none is stored. Repeating an idempotency key returns the same
+    /// result.
     pub async fn set_webhook_events(
         &self,
         url: &str,
@@ -625,7 +630,8 @@ impl<'a> AppClient<'a> {
     }
 
     /// Generates or replaces the webhook signing secret before or after an endpoint is set.
-    /// `set_webhook_events` preserves it when saving endpoint and event preferences.
+    /// Saving the endpoint ([`AppClient::set_webhook`], [`AppClient::set_webhook_events`])
+    /// keeps it.
     pub async fn generate_webhook_secret(&self, key: Option<&str>) -> Result<WebhookSecret> {
         self.send(
             Method::POST,

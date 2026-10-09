@@ -16,7 +16,8 @@
 //!   request), was declined or lost its Carbon, or deleted by its custodian. The account is
 //!   re-read under a lock after the check, and the answer is the one an id that was already gone
 //!   gets. An STK rotated meanwhile is dead, so that one is `invalid_credentials`.
-//! - 60 attempts per minute per IP on top of the per-Silicon lock.
+//! - 60 attempts per minute per IP on top of the per-Silicon lock, shared with
+//!   `grant_type=jwt-bearer` at `POST /v1/oauth/token` (core's `rate_limit::SILICON_LOGIN_BUCKET`).
 //! - `{"assertion": "<JWT>"}` instead of `id` and `stk` signs in with one of the Silicon's
 //!   registered keys (core's `silicon_keys::sign_in`): no STK, no lockout (a signature can't be
 //!   guessed), 401 `invalid_assertion` when anything about it is wrong.
@@ -119,7 +120,7 @@ pub async fn login(
 ) -> Result<Json<TokenResponse>, ApiError> {
     rate_limit::enforce_pool(
         &state.db,
-        &rate_limit::bucket("silicon_login:ip", meta.ip_or_unknown()),
+        &rate_limit::bucket(rate_limit::SILICON_LOGIN_BUCKET, meta.ip_or_unknown()),
         rate_limit::limits::SILICON_LOGIN_PER_IP,
         "Silicon sign-in attempts from this network",
     )
