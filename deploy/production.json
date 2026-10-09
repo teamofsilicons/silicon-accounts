@@ -89,10 +89,10 @@
   "AccountsAppId": "silicon-accounts",
   "AccountsIdMigrationPreservationVerified": true,
   "AccountsLegacySignedTokenCompatibilityTested": true,
-  "AccountsNativeBuildRun": 37858774166,
+  "AccountsNativeBuildRun": 37899202356,
   "AccountsCliSourceRevision": "9544c01431dcabf67e3c560975396c24853d0a31",
   "LatestManagedInstallDocs": true,
-  "AccountsCliCatalogVersion": "0.3.1",
+  "AccountsCliCatalogVersion": "0.4.0",
   "AccountsCliCatalogTargets": [
     "linux-aarch64",
     "linux-armv7hf",
@@ -104,7 +104,7 @@
     "windows-i686",
     "windows-x86_64"
   ],
-  "AccountsCliCatalogProductionReleaseId": "0910d78a-772b-52c2-b3ff-dfacb48aa9b8",
+  "AccountsCliCatalogProductionReleaseId": "8a3489a1-e8fd-571c-9625-d4003d10749e",
   "IdentityTokenSigningKeyKid": "CLkhuxuEYv3Co2aKn5fcywNYA35pluzJ1QzF2vET1gM",
   "LogWatchCommandId": "e6c7e63c-52be-4718-90cb-f278ea6def76",
   "SignedOutLandingVerified": true,
