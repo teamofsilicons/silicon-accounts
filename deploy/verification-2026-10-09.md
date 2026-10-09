@@ -1,5 +1,8 @@
 # Production verification: 2026-10-09
 
+Production runs `a2d85c5a770f7c19cccf6a7c3e23b0fbe5efce31` (see the last section).
+The first attempt, `2efa04a`, was rolled back; it is recorded first.
+
 ## Agent entry points release: deployed, then rolled back
 
 Attempted source `2efa04a7b290abfe2fbe7c76022a04cca2f0855a` (agent capabilities,
@@ -144,3 +147,105 @@ Caddy's `Host` and `X-Forwarded-Proto: https` headers. Then rebuild, repackage a
 reinstall: no migration remains pending, so the installer takes a backup and
 applies nothing. After the install, check the signed-out landing text before
 anything else.
+
+## Agent entry points release with the landing fix: live
+
+Source `a2d85c5a770f7c19cccf6a7c3e23b0fbe5efce31` adds `skipProxyUrlNormalize: true`
+to `web/next.config.ts` and a web standalone routing test. Since `2efa04a` nothing
+else changed: not the API, migrations, developer site or installer.
+
+### Preflight
+
+- Clean tree at `a2d85c5`. The Rust crates are unchanged since the 957-test run
+  above. The ARM64 rebuild in `target/integration` was a no-op, with identical
+  hashes: API `69fe25d16506dbf1bdc119a108e362951b8f3f0e47f296ad1c9d70761efb1539`
+  and migrator `2995cca039f909130cf3c5aee59a77cef286c5e9d137ca7457386506815ec4ac`.
+- Web typecheck, lint and 29 unit tests passed, and both sites were rebuilt for
+  production with the same variables as before. Both standalone routing tests
+  passed on those production builds: `web` (signed-out `/`, the agent files and
+  `/sign-in`, with and without Caddy's forwarding headers) and `developer`. Both
+  builds carry `"skipProxyUrlNormalize": true`. The Node and Caddy archives
+  matched their checksums again.
+- Archive `releases/a2d85c5a770f7c19cccf6a7c3e23b0fbe5efce31.tar.gz`, 120035393
+  bytes, SHA-256 `406fa76b29de35b96559038cd86b5d024d0e0587cca0195cead523fc133ac2f1`.
+  56 internal links were preserved, and its `install.py` matches the committed one.
+
+### Install
+
+Install SSM `f691b9ad-5181-4da5-a030-f42645c2d96b` ran from 06:33:39 to 06:33:57
+UTC and succeeded. It verified the archive SHA-256 before extracting the
+installer. It retained `backups/predeploy-20261009T063352Z.dump` (259128 bytes in
+S3 and on the host), SHA-256
+`36af18f4a4ec71cb48318d79f8f429a4b80a82c1588bac951fc3967ab3098ac2`. The migrator
+reported nothing pending: 17 already applied. Local readiness passed.
+
+Postcheck `732f9405-08d3-4f72-b79e-b89988b34cb8` confirmed that `current` points at
+the `a2d85c5` release and that `previous-release` names `0940a94`. It also
+confirmed both binary hashes, `build.json`, six active services and timers,
+migration 17 with no failures, and one account, three apps and one membership.
+The API loaded the existing RS256 key (`identity-token signing key ready`, same
+kid; no new key was made). The other checks:
+
+- the Caddy direct block is present, `APPS_API_URL` is kept, and the
+  federation loopback flag is absent;
+- zero API error lines and zero web `EPROTO` lines;
+- the landing returned 200 on the host with Caddy's headers.
+
+### Public verification
+
+- Signed-out `GET https://accounts.teamofsilicons.com/` returned 200 (196891
+  bytes) five times out of five without a cookie. Every response had
+  `x-middleware-rewrite: /landing`, and the raw HTML contains "One account for
+  every Carbon and Silicon", "An identity of your own, in one command", "Create
+  your Silicon account", the FAQPage JSON-LD and `<main`. Three stale cookie sets
+  (`__Host-sa_session`, `sa_session`, both together) were each sent twice. Every
+  request returned the same 200 landing and cleared each stale cookie with
+  `Max-Age=0`. `/landing` returns 308 to `/`.
+- A headless browser rendered the pages at 1440 and 390 px with no page errors
+  and no horizontal overflow. The landing heading is "One account for every
+  Carbon and Silicon". `/sign-in` shows "Sign in to Silicon Accounts" with
+  Continue with Google, Continue with Apple, and an Email/Phone choice with the
+  email field and Continue. Screenshots were inspected. The developer home's
+  heading is "Build apps for Carbons and Silicons". Its sign-in opens the hosted
+  "Sign in to Silicon Developer" page with the same four choices. Nothing was
+  submitted.
+- API: `/readyz` `{"database":"ok"}`; `/v1/meta` version 0.3.0, production, with
+  the developer and Apps URLs and both providers. Discovery has the Accounts
+  issuer, EdDSA and RS256, and the six grants (authorization_code,
+  refresh_token, device_code, slt, jwt-bearer, token-exchange) plus the device
+  endpoint. JWKS lists `accounts-production-1` and the RS256 kid.
+  `/openapi.json` is OpenAPI 3.1.0, 0.3.0, with 135 paths including
+  `/v1/events/stream`. `/v1/capabilities` reports API version 2026-10-01, and
+  `/.well-known/agent.json` lists six skills.
+- `curl --max-time 5 -N` on `/v1/events/stream` returned the API's JSON 401
+  `unauthenticated` with `Vary: Accounts-Version`, straight from the API, not
+  HTML. No credentials were used, so a live stream was not exercised.
+- Account site: `/llms.txt` and `/llms-full.txt` (`# Silicon Accounts`),
+  `/robots.txt`, `/sitemap.xml` (4 URLs), `/.well-known/security.txt`,
+  `/manifest.webmanifest` and `/sdk/v1.js` returned 200; `/docs` returned 308 to
+  the developer docs. `POST /mcp` `initialize` returned 2025-06-18 from
+  `silicon-accounts`.
+- Developer site:
+  - `/`, `/docs`, `/docs/accounts` and `/docs/apps` returned 200.
+  - `/docs/accounts/start/webhooks` returned 200 with "Receive webhooks", and its
+    `.md` returned 200; an unknown page is a real 404.
+  - `/llms-full.txt` starts with `# Silicon Developer docs (full)`.
+  - `/api/docs/search?q=webhooks` returned 58 matches, led by "Receive webhooks".
+  - `/llms.txt`, `/robots.txt`, `/sitemap.xml` (64 URLs),
+    `/.well-known/security.txt`, `/.well-known/agent.json` (seven skills),
+    `/openapi.json`, `/auth/session` and `/sign-in` returned 200.
+  - `POST /mcp` `initialize` returned 2025-06-18 from `silicon-developer`.
+  - `/auth/sign-in` returned 303 to the Accounts `/authorize` with
+    `app_id=developer`, the exact `/auth/callback` redirect URI, S256 and a
+    43-character challenge.
+
+### Log watch
+
+From 06:53 to 06:58 UTC the landing, `/sign-in`, `/readyz`, the developer home
+and `/docs` were requested in seven rounds about 35 seconds apart; every request returned 200.
+Log scan SSM `e6c7e63c-52be-4718-90cb-f278ea6def76` covered the 25 minutes after
+the switch. It found no restarts, zero API ERROR or WARN lines and zero Caddy
+error lines. The web and developer logs held only clean startup lines. Each had
+one "Failed with result 'exit-code'": that is the previous process exiting 143
+on SIGTERM at 06:33:54, the usual restart pattern. SSM
+`374a4794-8939-4f0c-a625-4b559d38e271` showed those lines.
