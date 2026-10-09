@@ -1,8 +1,9 @@
 /**
  * Branding defaults (the Silicon Accounts look) and normalization. Mirrors crates/core models/signin_config.rs:
- * missing fields fall back to these values, and a palette fills its missing colours from the right theme. The look
- * itself changed (the Silicon family: cool #F7F8FA / #02040A, BDO Grotesk and SF Pro); the service still stores its
- * older default palettes, which normalizeBranding recognises and paints in the new look (LEGACY_LIGHT, LEGACY_DARK).
+ * missing fields fall back to these values, and a palette fills its missing colours from the right theme. The look is
+ * the Silicon family (cool #F7F8FA / #02040A, BDO Grotesk and SF Pro), and the service gives new apps these palettes
+ * (`Palette::default_light`, `default_dark`). Apps that kept the older defaults still store those, unchanged;
+ * normalizeBranding recognises them and paints the new look (LEGACY_LIGHT, LEGACY_DARK).
  */
 import type { BackgroundStyle, BrandFont, BrandLayout, Branding, ButtonStyle, CornerStyle, Density, Palette, SigninCopy, ThemeMode } from "../api/types";
 
@@ -39,10 +40,10 @@ export const DEFAULT_DARK: Palette = {
 };
 
 /**
- * The palettes the service stored as its defaults before the new look (crates/core signin_config.rs default_light and
- * default_dark: warm paper #FFFDF9 and charcoal #353432). The service fills every colour an app never chose with
- * these, so a palette equal to one of them, all eight colours, is an app that kept the Silicon Accounts look: it gets
- * the new look (DEFAULT_LIGHT, DEFAULT_DARK). A palette with any colour of the app's own stays exactly as stored.
+ * The palettes the service gave apps before the new look (crates/core signin_config.rs `legacy_light`, `legacy_dark`:
+ * warm paper #FFFDF9 and charcoal #353432). Apps made before the change store them as they were, so a palette equal to
+ * one of them, all eight colours, is an app that kept the Silicon Accounts look: it gets the new look (DEFAULT_LIGHT,
+ * DEFAULT_DARK). A palette with any colour of the app's own stays exactly as stored.
  */
 export const LEGACY_LIGHT: Palette = {
   primary: "#1F5FB8",

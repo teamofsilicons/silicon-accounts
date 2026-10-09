@@ -278,7 +278,7 @@ export interface SessionInfo {
   id: string;
   kind: "browser" | "cli" | "developer";
   /** How it was created: browser, device, cli_code, silicon_login… */
-  origin: Open<"browser" | "device" | "cli_code" | "silicon_login">;
+  origin: Open<"browser" | "device" | "cli_code" | "silicon_login" | "federated">;
   label: string | null;
   ip: string | null;
   user_agent: string | null;

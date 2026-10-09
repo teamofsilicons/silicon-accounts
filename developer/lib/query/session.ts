@@ -56,10 +56,15 @@ export function useSession(): { status: SessionStatus; me: Me | null; error: Api
   return { status, me: query.data ?? null, error: query.error ?? null, refetch: () => void query.refetch() };
 }
 
-/** Marks the session gone (an API call answered a signed-out 401); the shell then sends the visitor to sign in. */
+/**
+ * An API call answered a signed-out 401: asks again who is signed in (`/auth/session`, then `/v1/me`) instead of taking
+ * that one answer's word for it. Only when that says signed out does the shell send the visitor to sign in, and the
+ * sign-in page sends a visitor back only when the same question says signed in, so the two pages can never send a
+ * Carbon back and forth. One question at a time: many failing calls share it.
+ */
 export function markSignedOut(client: QueryClient): void {
   if (client.getQueryData(queryKeys.me.view) === null) return;
-  client.setQueryData(queryKeys.me.view, null);
+  void client.refetchQueries({ queryKey: queryKeys.me.view, exact: true }, { cancelRefetch: false });
 }
 
 /**

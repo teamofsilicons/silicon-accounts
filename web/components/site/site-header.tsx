@@ -1,8 +1,9 @@
 /**
  * The public pages' header (server-rendered), as on the developer site (developer/components/site): the brand, the
  * page's sections, the docs, the theme switch and Sign in. Below 900 px the links move into a menu: a native popover,
- * so it opens, closes on Escape or an outside tap, and keeps focus without any script of ours. Links are plain links:
- * every public page is a full HTML document.
+ * so it opens, closes on Escape or an outside tap, and keeps focus without any script of ours (its close button carries
+ * autofocus, so opening it moves focus into it, and closing it gives focus back to the menu button). Links are plain
+ * links: every public page is a full HTML document.
  */
 import { ArrowUpRight, Menu, X } from "lucide-react";
 import { Action } from "./action";
@@ -53,7 +54,7 @@ export function SiteHeader({ docsUrl }: SiteHeaderProps) {
       <div id="site-menu" popover="auto" className={styles.menu} data-sq="surface" role="dialog" aria-label="Menu">
         <div className={styles.menuHead}>
           <span className={styles.menuTitle}>Menu</span>
-          <button type="button" className={styles.iconButton} data-sq="surface" popoverTarget="site-menu" popoverTargetAction="hide" aria-label="Close the menu">
+          <button type="button" className={styles.iconButton} data-sq="surface" popoverTarget="site-menu" popoverTargetAction="hide" aria-label="Close the menu" autoFocus>
             <X size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>

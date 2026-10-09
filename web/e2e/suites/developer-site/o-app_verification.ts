@@ -66,7 +66,7 @@ export const journey: Journey = {
   async run(ctx) {
     const { env, results } = ctx;
     const t = tag();
-    const { context, page } = await ownerSignIn(ctx, APP, { label: "app_verification", returnTo: `/apps/${APP}/app-verification`, expected: [/status of 422 \(Unprocessable Entity\) @ .*\/proofs\/app_verification/, /status of 404 \(Not Found\) @ .*\/api\/accounts\/apps\/no-such-app-[a-z0-9]+\/public/] });
+    const { context, page } = await ownerSignIn(ctx, APP, { label: "app_verification", returnTo: `/apps/${APP}/app-verification`, expected: [/status of 422 \(Unprocessable Entity\) @ .*\/proofs\/app-verification/, /status of 404 \(Not Found\) @ .*\/api\/accounts\/apps\/no-such-app-[a-z0-9]+\/public/] });
     try {
       const panel = page.getByRole("tabpanel", { name: "App verification" });
       const field = panel.getByRole("textbox", { name: "The app that receives it" });

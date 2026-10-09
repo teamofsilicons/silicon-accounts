@@ -157,8 +157,8 @@ export function legibleTint(primary: string, toward: string, grounds: string[], 
   return toward.toUpperCase();
 }
 
-/** Black or paper text, whichever reads better on `background`. */
-export function readableOn(background: string, light = "#FFFDF9", dark = "#2A2927"): string {
+/** Light or dark text (white, or the Silicon ink #292929), whichever reads better on `background`. */
+export function readableOn(background: string, light = "#FFFFFF", dark = "#292929"): string {
   const onLight = contrastRatio(background, dark) ?? 0;
   const onDark = contrastRatio(background, light) ?? 0;
   return onDark >= onLight ? light : dark;

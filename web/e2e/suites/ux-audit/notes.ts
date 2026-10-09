@@ -7,7 +7,7 @@
  *   4  the site's rewrites (/v1, /.well-known), bodies over 10 MB through the proxy, proxyTimeout, agentRules
  *   5  /v1 and /.well-known outside the page proxy (no page CSP), Set-Cookie, absolute Location, Origin and
  *      X-Forwarded-For passing through unchanged
- *   6  the default dark primary #1F5FB8 with #FFFDF9 text; the server's 4.5:1 rule for button and page text
+ *   6  the default dark primary #1F5FB8 with #F7F8FA text; the server's 4.5:1 rule for button and page text
  *   7  allowed_origins, docs_url, ids/available `for=`, a custodian's Silicon photo, the sign-up photo, "Not you?"
  *      clearing the sign-up cookie, the telemetry opt-out on every request, Silicon history titles with meta.silicon
  */

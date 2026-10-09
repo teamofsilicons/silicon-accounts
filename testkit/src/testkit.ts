@@ -2,7 +2,8 @@
 // mock-oidc knows the managed Google/Apple clients and the bring-your-own clients of
 // acme-notes (Google) and orbit-games (Apple); mock-messaging accepts the dev
 // Postmark/Twilio credentials; the fake app server talks to Silicon Accounts at accountsUrl;
-// mock-iris draws the default profile photos (ACCOUNTS_IRIS_BASE_URL).
+// mock-iris draws the default profile photos (ACCOUNTS_IRIS_BASE_URL); mock-silicon-apps (only when given a port)
+// stands in for the Silicon Apps API the developer site publishes through (its APPS_API_URL).
 
 import { accountsEnvForMocks } from '../lib/env.ts';
 import { loadDevCredentials, type DevCredentials } from './credentials.ts';
@@ -11,6 +12,7 @@ import { loadFakeApps } from './fake-apps/load.ts';
 import type { SiliconAppsApp } from './fake-apps/types.ts';
 import { start as startIris, type MockIris } from './mock-iris.ts';
 import { start as startMessaging, type MockMessaging } from './mock-messaging.ts';
+import { start as startSiliconApps, type MockSiliconApps } from './mock-silicon-apps.ts';
 import { start as startOidc, type MockOidc, type OidcClientInput } from './mock-oidc.ts';
 
 export interface TestkitOptions {
@@ -20,6 +22,8 @@ export interface TestkitOptions {
   messagingPort?: number;
   fakeAppsPort?: number;
   irisPort?: number;
+  /** The stand-in Silicon Apps API's port; it starts only when this is set (0 = any free port). */
+  siliconAppsPort?: number;
   /** Silicon Accounts for the fake apps' server-to-server calls (default $ACCOUNTS_URL or http://127.0.0.1:8589). */
   accountsUrl?: string;
   /** Silicon Accounts as browsers see it (default $ACCOUNTS_PUBLIC_URL, else discovered via /v1/meta). */
@@ -39,6 +43,7 @@ export interface RunningTestkit {
   messaging: MockMessaging | null;
   fakeApps: FakeAppServer | null;
   iris: MockIris | null;
+  siliconApps: MockSiliconApps | null;
   credentials: DevCredentials;
   /** ACCOUNTS_* variables pointing Silicon Accounts at these mocks. */
   accountsEnv: Record<string, string>;
@@ -139,11 +144,21 @@ export async function startTestkit(options: TestkitOptions = {}): Promise<Runnin
             log: options.log ?? false,
           });
     if (iris) started.push(iris);
+    const siliconApps =
+      options.siliconAppsPort === undefined
+        ? null
+        : await startSiliconApps({
+            ...(options.host ? { host: options.host } : {}),
+            port: options.siliconAppsPort,
+            log: options.log ?? false,
+          });
+    if (siliconApps) started.push(siliconApps);
     return {
       oidc,
       messaging,
       fakeApps,
       iris,
+      siliconApps,
       credentials,
       accountsEnv: accountsEnvForMocks(
         { oidcUrl: oidc?.url ?? 'http://127.0.0.1:8591', messagingUrl: messaging?.url ?? 'http://127.0.0.1:8592', irisUrl: iris?.url ?? 'http://127.0.0.1:8594' },

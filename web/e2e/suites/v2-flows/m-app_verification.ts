@@ -60,7 +60,7 @@ export const journey: Journey = {
       const error = answer.body.error;
       results.check(
         `POST /v1/proofs/app-verification with ${name} → 422 app_verification_single_app, "${ATA_MESSAGE}", the hint naming {"receiving_app": …} on POST /v1/proofs/app-verification`,
-        answer.status === 422 && error?.code === "app_verification_single_app" && error.message === ATA_MESSAGE && /"receiving_app"/.test(error.hint ?? "") && /POST \/v1\/proofs\/app_verification/.test(error.hint ?? ""),
+        answer.status === 422 && error?.code === "app_verification_single_app" && error.message === ATA_MESSAGE && /"receiving_app"/.test(error.hint ?? "") && /POST \/v1\/proofs\/app-verification/.test(error.hint ?? ""),
         `${answer.status} ${JSON.stringify(answer.body).slice(0, 400)}`,
       );
     }
@@ -100,7 +100,7 @@ export const journey: Journey = {
     const home = cliHome();
     const secret = `${fakeApp("commit").secret}\n`;
     const appFlags = ["--app-id", "commit", "--app-secret-stdin", "--json"];
-    const one = await cli(env, home, ["app", "proof", "app_verification", "--to", "remind", ...appFlags], { stdin: secret });
+    const one = await cli(env, home, ["app", "proof", "app-verification", "--to", "remind", ...appFlags], { stdin: secret });
     const cliToken = typeof one.json?.proof_token === "string" ? one.json.proof_token : "";
     results.check("`silicon-accounts app proof app-verification --to remind` → one proof for remind", one.code === 0 && one.json?.receiving_app === "remind" && one.json.kind === "app_verification" && cliToken.startsWith("sap_"), `exit ${one.code} in ${one.ms} ms: ${JSON.stringify({ ...one.json, proof_token: "…", proof_refresh_token: "…" }).slice(0, 200)}`);
     results.check("…which remind verifies", (await verifyProof(ctx, "remind", cliToken)).body.valid === true);
@@ -108,18 +108,18 @@ export const journey: Journey = {
       const error = (run.json?.error ?? {}) as { message?: string; hint?: string };
       return { message: error.message ?? run.stderr.trim(), hint: error.hint ?? "" };
     };
-    const comma = await cli(env, home, ["app", "proof", "app_verification", "--to", "remind,waveform", ...appFlags], { stdin: secret });
+    const comma = await cli(env, home, ["app", "proof", "app-verification", "--to", "remind,waveform", ...appFlags], { stdin: secret });
     const commaError = cliError(comma);
     results.check(
       "`--to remind,waveform` is refused: one app per proof, with the two commands to run instead",
       comma.code !== 0 && /exactly one app/.test(commaError.message) && /remind, waveform/.test(commaError.message) && /accounts app proof app-verification --to remind/.test(commaError.hint) && /accounts app proof app-verification --to waveform/.test(commaError.hint),
       `exit ${comma.code}: ${commaError.message} | ${commaError.hint}`.slice(0, 400),
     );
-    const spaced = await cli(env, home, ["app", "proof", "app_verification", "--to", "remind waveform", ...appFlags], { stdin: secret });
+    const spaced = await cli(env, home, ["app", "proof", "app-verification", "--to", "remind waveform", ...appFlags], { stdin: secret });
     results.check("`--to \"remind waveform\"` is refused the same way", spaced.code !== 0 && /exactly one app/.test(cliError(spaced).message), `exit ${spaced.code}: ${cliError(spaced).message}`.slice(0, 300));
-    const twice = await cli(env, home, ["app", "proof", "app_verification", "--to", "remind", "--to", "waveform", ...appFlags], { stdin: secret });
+    const twice = await cli(env, home, ["app", "proof", "app-verification", "--to", "remind", "--to", "waveform", ...appFlags], { stdin: secret });
     results.check("`--to remind --to waveform` is refused (--to takes one app)", twice.code === 2 && /--to/.test(`${cliError(twice).message} ${twice.stderr}`), `exit ${twice.code}: ${cliError(twice).message || twice.stderr}`.slice(0, 300));
-    const missing = await cli(env, home, ["app", "proof", "app_verification", ...appFlags], { stdin: secret });
+    const missing = await cli(env, home, ["app", "proof", "app-verification", ...appFlags], { stdin: secret });
     results.check(
       "no --to is refused, and the --json error says which argument is missing (--to <APP_ID>), not only \"the following required arguments were not provided:\"",
       missing.code === 2 && /--to/.test(cliError(missing).message),

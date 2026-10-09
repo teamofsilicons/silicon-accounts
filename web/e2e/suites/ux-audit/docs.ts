@@ -31,7 +31,8 @@ export const journeys: Journey[] = [
       const findings = findingsFor(ctx);
       const context = await auditContext(browser);
       const page = await context.newPage();
-      const missing = [/status of 404 .*\/docs\/uxa-no-such-page/];
+      // The account site's /docs addresses lead to the developer site's /docs/accounts, so the 404 answers there.
+      const missing = [/status of 404 .*\/docs\/(accounts\/)?uxa-no-such-page/];
       results.watch(page, "docs", missing);
       collectConsole(page, missing);
 
@@ -57,13 +58,14 @@ export const journeys: Journey[] = [
       await settle(page, 400);
       await auditOverlay(ctx, page, findings, {
         name: "docs-search",
-        // By its shortcut, not its name: on a phone the trigger shows only its icon and has no name (axe reports it).
-        trigger: p => p.locator('button[aria-haspopup="dialog"][aria-keyshortcuts]').filter({ visible: true }).first(),
+        // By its shortcut, not its name: the trigger is a link to /docs/search (search works without script) that opens
+        // the search dialog in place; on a phone it shows only its icon.
+        trigger: p => p.locator('[aria-haspopup="dialog"][aria-keyshortcuts]').filter({ visible: true }).first(),
         panel: p => p.getByRole("dialog", { name: "Search the docs" }),
         kind: "modal",
       }, undefined, [VARIANTS[0]!, VARIANTS[3]!]);
       // With results: a query, then the first result opens with Enter.
-      await page.locator('button[aria-haspopup="dialog"][aria-keyshortcuts]').filter({ visible: true }).first().click();
+      await page.locator('[aria-haspopup="dialog"][aria-keyshortcuts]').filter({ visible: true }).first().click();
       const box = page.getByRole("dialog", { name: "Search the docs" }).getByRole("combobox").or(page.getByRole("dialog", { name: "Search the docs" }).getByRole("textbox")).first();
       await box.fill("rate limit");
       const options = page.getByRole("dialog", { name: "Search the docs" }).getByRole("option");
@@ -76,15 +78,15 @@ export const journeys: Journey[] = [
       const moved = await page.waitForURL(url => url.href !== before && url.pathname.startsWith("/docs"), { timeout: 10_000 }).then(() => true, () => false);
       results.check("docs-search: Enter opens the highlighted result", moved, page.url().replace(env.site, ""));
 
-      // The phone menu (below 1024 px).
+      // The phone menu (below 900 px): the header's native popover, which holds the docs' navigation on a docs page.
       await page.goto(`${env.site}/docs/learn/sign-in-flow`);
       await page.locator("main h1").first().waitFor({ timeout: 30_000 });
       await settle(page, 400);
       await auditOverlay(ctx, page, findings, {
         name: "docs-menu",
-        trigger: p => p.getByRole("button", { name: "Open the docs menu" }),
-        panel: p => p.getByRole("dialog", { name: "Docs" }),
-        kind: "modal",
+        trigger: p => p.getByRole("button", { name: "Open the menu" }),
+        panel: p => p.getByRole("dialog", { name: "Menu" }),
+        kind: "popover",
       }, undefined, [VARIANTS[2]!, VARIANTS[3]!]);
 
       // A jump from "On this page" (1440: the rail) lands its heading below the sticky top bar.

@@ -158,11 +158,12 @@ A stack is named by its port base, the site's port:
 | base + 3 | the fake apps (`/<app_id>/…`) |
 | base + 4 | mock Iris (`/pfp/carbon?id=…`, `/_requests`) |
 | base + 5 | the developer site (`http://localhost:<base+5>`, its own public origin: `/sign-in`, `/auth/*`, `/api/accounts/*`, `/apps/<app_id>/<tab>`) |
+| base + 6 | the Silicon Apps API the developer site calls (`APPS_API_URL`): the testkit's stand-in (`testkit/src/mock-silicon-apps.ts`, `/_refuse`, `/_requests`), or the real one on a stack started with `scripts/dev.sh --apps=on` |
 
 `scripts/e2e.sh` takes `E2E_PORT_BASE` (or `--base`) when given; otherwise it leases the first free base of 9600,
 9610, … 9990 (from `E2E_BASE_START` when set, wrapping around): a lease is the directory `.dev/locks/e2e-<base>` (made
-atomically, holding the run's pid; a dead run's lease is taken over), and a base is only used when all seven ports
-(base − 1 … base + 5) are free. Bases are 10 apart so neighbours never overlap. `scripts/e2e-all.sh` asks run n for
+atomically, holding the run's pid; a dead run's lease is taken over), and a base is only used when all eight ports
+(base - 1 to base + 6) are free. Bases are 10 apart so neighbours never overlap. `scripts/e2e-all.sh` asks run n for
 base 9600 + 10·n and each run takes the next free one when that is busy, so it coexists with stacks other runs (or
 agents) hold. The default `scripts/dev.sh` stack is 8589–8594 with the developer site on 8600 (keep e2e runs off it: a
 person may be using it), `scripts/journeys.sh` uses 9690.

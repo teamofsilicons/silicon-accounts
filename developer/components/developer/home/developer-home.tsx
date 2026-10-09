@@ -136,6 +136,10 @@ export function DeveloperHome() {
     );
   }
 
+  // Publishing details come from Silicon Apps. When it can't answer (or refuses the sign-in), the apps from Silicon
+  // Accounts still show, and this says why their publishing state is missing.
+  const publishingError = publishing.error as (Error & { hint?: string }) | undefined;
+
   return (
     <Page width="default">
       <PageHeader
@@ -143,6 +147,12 @@ export function DeveloperHome() {
         description="Manage sign-in with Silicon Accounts and publish with Silicon Apps."
         actions={<Button variant="secondary" onClick={() => setNewApp(true)}><Plus size={16} strokeWidth={1.75} aria-hidden="true" />New app</Button>}
       />
+      {publishingError ? (
+        <Alert tone="warning" title="Publishing details could not be loaded" className={styles.notice}>
+          {publishingError.message}{publishingError.hint ? ` ${publishingError.hint}` : ""}
+          <span className={styles.alertActions}><Button size="sm" variant="secondary" onClick={publishing.reload}>Try again</Button></span>
+        </Alert>
+      ) : null}
       {content}
       <CreateApp open={newApp} close={() => { setNewApp(false); void owned.refetch(); }} />
     </Page>

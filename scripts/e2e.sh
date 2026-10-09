@@ -14,7 +14,8 @@
 #
 # Ports: the base is the site's port; accounts-api is base-1, mock-oidc base+1, mock-messaging base+2, the fake apps
 # base+3, mock Iris base+4, the developer platform base+5 (when developer/ has its Next.js app; its build is
-# developer/.next-<base>/). E2E_PORT_BASE (or --base N) picks it; otherwise the first free base of 9600, 9610, … 9990
+# developer/.next-<base>/), and base+6 for the Silicon Apps API the developer platform calls (APPS_API_URL: the
+# testkit's stand-in). E2E_PORT_BASE (or --base N) picks it; otherwise the first free base of 9600, 9610, … 9990
 # (from E2E_BASE_START when set) is leased (.dev/locks/e2e-<base>/ while this runs), so parallel runs never collide.
 # E2E_BASE_FILE=<path>: write the base this run got there as soon as it has it (scripts/e2e-all.sh reads it).
 # Per stack: database accounts_e2e_<base> (dropped afterwards), site build web/.next-<base>/ (deleted afterwards),
@@ -84,7 +85,7 @@ LEASE=""
 port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 ports_free() { # base
   local offset
-  for offset in -1 0 1 2 3 4 5; do
+  for offset in -1 0 1 2 3 4 5 6; do
     if port_busy "$(($1 + offset))"; then return 1; fi
   done
   return 0
@@ -120,7 +121,7 @@ if [ -n "$BASE" ]; then
     "pick another one (E2E_PORT_BASE=9610 …), or leave it out and a free base is chosen"
   if ! ports_free "$BASE"; then
     release
-    fail "a port of base $BASE ($((BASE - 1))–$((BASE + 5))) is in use" "stop what holds it, or leave E2E_PORT_BASE out and a free base is chosen"
+    fail "a port of base $BASE ($((BASE - 1)) to $((BASE + 6))) is in use" "stop what holds it, or leave E2E_PORT_BASE out and a free base is chosen"
   fi
 else
   # From E2E_BASE_START up to 9990, then from 9600 up to it: the first base that can be leased and whose ports are free.

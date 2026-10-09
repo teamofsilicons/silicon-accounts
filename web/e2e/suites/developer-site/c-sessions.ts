@@ -33,7 +33,8 @@ export const journey: Journey = {
     const started = Date.now();
     await signInOnDeveloper(env, developer, null);
     results.metric("signing in to the developer site with \"Continue as\"", Date.now() - started);
-    results.check("a browser signed in on the account site continues as that Carbon on the developer site (no code)", developer.url() === `${env.developer}/`, developer.url());
+    // `/` is the public home page; a signed-in browser goes on to its apps at /apps.
+    results.check("a browser signed in on the account site continues as that Carbon on the developer site (no code), on its apps at /apps", developer.url() === `${env.developer}/apps`, developer.url());
     await developer.getByRole("heading", { name: "No apps yet" }).waitFor({ timeout: 30_000 });
     await shot(env, developer, "ds-c-01-no-apps");
     const sealed = (await readDevSession(context, env)).session as DevSession;
@@ -71,7 +72,7 @@ export const journey: Journey = {
     results.check("…the developer site's next call answers 401 (the sign-in behind its cookie is revoked) and clears the cookie", call.status === 401 && ["token_revoked", "signed_out"].includes(errorCode(call.body) ?? "") && !(await readDevSession(context, env)).cookie?.value, `${call.status} ${errorCode(call.body)}`);
     const refresh = await tokenCall<{ error?: string; error_description?: string }>(ctx, { grant_type: "refresh_token", refresh_token: sealed.rt, client_id: "developer" });
     results.check("…its refresh token is refused, naming the revoked session", refresh.status === 400 && refresh.body.error === "invalid_grant" && /revoked/.test(refresh.body.error_description ?? ""), refresh.body.error_description?.slice(0, 200) ?? "");
-    await developer.goto(`${env.developer}/`).catch(() => undefined);
+    await developer.goto(`${env.developer}/apps`).catch(() => undefined);
     await developer.waitForURL(url => url.pathname === "/sign-in", { timeout: 30_000 });
     await shot(env, developer, "ds-c-03-developer-signed-out");
     results.check("…and the open developer site goes back to its sign-in card", developer.url().startsWith(`${env.developer}/sign-in`), developer.url());

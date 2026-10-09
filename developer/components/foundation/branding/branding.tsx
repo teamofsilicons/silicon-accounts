@@ -124,8 +124,8 @@ export function PoweredBy({ theme, overlay, className }: PoweredByProps) {
       <p className={styles.pill}>
         <svg className={styles.mark} viewBox="0 0 64 64" aria-hidden="true">
           <path fill="#1F5FB8" d="M32 0c19.6 0 25.4 1.4 28.6 3.4C62.6 6.6 64 12.4 64 32s-1.4 25.4-3.4 28.6C57.4 62.6 51.6 64 32 64S6.6 62.6 3.4 60.6C1.4 57.4 0 51.6 0 32S1.4 6.6 3.4 3.4C6.6 1.4 12.4 0 32 0Z" />
-          <circle cx="32" cy="25" r="9" fill="#FFFDF9" />
-          <path fill="#FFFDF9" d="M15 49c2.6-8 9.2-12.5 17-12.5S46.4 41 49 49c-4.6 3-10.4 4.6-17 4.6S19.6 52 15 49Z" />
+          <circle cx="32" cy="25" r="9" fill="#FFFFFF" />
+          <path fill="#FFFFFF" d="M15 49c2.6-8 9.2-12.5 17-12.5S46.4 41 49 49c-4.6 3-10.4 4.6-17 4.6S19.6 52 15 49Z" />
         </svg>
         <span>Powered by <a href={POWERED_BY_HREF} target="_blank" rel="noopener">Silicon Accounts</a></span>
       </p>

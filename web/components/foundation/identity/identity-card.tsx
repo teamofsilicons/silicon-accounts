@@ -207,7 +207,7 @@ export function IdentityField({ label, value, mono, copyLabel, children, wide, c
     <div className={cx(styles.field, wide && styles.wide, className)}>
       <span className={styles.fieldLabel}>{label}</span>
       <span className={styles.fieldValue}>
-        {children ?? <span className={cx(styles.fieldText, mono && styles.mono)} title={value ?? undefined}>{value || "–"}</span>}
+        {children ?? <span className={cx(styles.fieldText, mono && styles.mono)} title={value ?? undefined}>{value || "Not set"}</span>}
         {copyLabel && value ? <CopyButton value={value} label={copyLabel} iconOnly variant="plain" className={styles.copy} /> : null}
       </span>
     </div>
@@ -286,7 +286,7 @@ export function LiveClock({ timeZone, className, showZone = true }: { timeZone: 
     tick();
     return () => window.clearTimeout(timer);
   }, []);
-  let time = "–";
+  let time = "--:--";
   if (now !== null) {
     try {
       time = formatTime(now, timeZone);

@@ -497,7 +497,8 @@ test("online docs include a concrete publishing path and explain state and updat
   for (const command of ["apps availability ring", "apps create ring --name Ring", "apps validate ./package", "apps pack ./package --output ./ring.tar.gz", "apps upload ring --target linux-x86_64 ./ring.tar.gz", "apps release ring --version 0.1.0 --package PACKAGE_ID", "apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0", "apps publish ring"])
     await expect(page.locator("code").filter({ hasText: command }).first()).toBeVisible();
   await page.goto("/docs/apps/learn/releases-and-updates");
-  await expect(page.getByText(/An exact version selects the initial release/)).toBeVisible();
+  // The docs' own words (docs-apps/, rewritten in the house voice): an exact version is where you start, not a pin.
+  await expect(page.getByText(/An exact version picks the release you start on/)).toBeVisible();
   await page.goto("/docs/apps/start/install");
-  await expect(page.getByText(/Changing the saved home does not move your existing files/)).toBeVisible();
+  await expect(page.getByText(/Changing the saved home (does not|doesn.t) move your existing files/)).toBeVisible();
 });

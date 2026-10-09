@@ -57,7 +57,7 @@ export function AccountVerificationRequestSection({ appId }: { appId: string }) 
     }
   };
 
-  return <Section id="signin-account-verification" title="Account verification" description="Want to use your own domain for sign-in, such as login.yourapp.com? Request account verification and our team will review it. A response may take up to 48 hours.">
+  return <Section id="signin-account-verification" title="Account verification" description="Want to use your own domain for sign-in, such as login.yourapp.com? Request account verification and we will review it. A response may take up to 48 hours.">
     {state.isPending ? <Skeleton lines={2} label="Checking account verification request" /> : null}
     {state.error ? <Alert tone="danger" title="Request status could not be loaded">{state.error.message} {state.error.hint}<span className={styles.retry}><Button variant="secondary" size="sm" onClick={() => void state.refetch()}>Try request status again</Button></span></Alert> : null}
     {request ? <Surface className={styles.receipt}>
@@ -69,12 +69,12 @@ export function AccountVerificationRequestSection({ appId }: { appId: string }) 
       <p className={styles.note}>Submitted {formatDateTime(request.submitted_at)} from {request.context_app.name} ({request.context_app.app_id}).</p>
       <p className={styles.reason}>{request.reason}</p>
       {pending ? <p className={styles.note}>A response may take up to 48 hours, expected by {formatDateTime(request.response_expected_by)}. This request applies to your account across the apps you manage.</p> : request.reviewed_at ? <p className={styles.note}>Reviewed {formatDateTime(request.reviewed_at)}.</p> : null}
-      <p className={styles.note}>Domain setup is handled with our team after review. Submitting a request does not change your sign-in domain.</p>
+      <p className={styles.note}>We set up the domain with you after the review. Submitting a request does not change your sign-in domain.</p>
     </Surface> : null}
     {!state.isPending && !state.error && !pending ? <div className={styles.actions}><Button variant="secondary" onClick={() => { setFailure(null); setReasonError(undefined); setJustSubmitted(false); setOpen(true); }}>Request account verification</Button></div> : null}
 
     <Dialog open={open} onOpenChange={next => { if (!submit.isPending) setOpen(next); }}>
-      <DialogContent title="Request account verification" description="Tell us why you want to use your own domain for sign-in. Our team will review your request; a response may take up to 48 hours." className={styles.dialog}
+      <DialogContent title="Request account verification" description="Tell us why you want to use your own domain for sign-in. We will review your request; a response may take up to 48 hours." className={styles.dialog}
         onCloseAutoFocus={event => { if (focusReceipt.current && status.current) { event.preventDefault(); status.current.focus({ preventScroll: true }); } focusReceipt.current = false; }}>
         <form className={styles.form} onSubmit={event => void send(event)} noValidate>
           <Textarea ref={field} label="Reason" rows={5} value={reason} disabled={submit.isPending} error={reasonError} description={`${[...reason.trim()].length.toLocaleString()} / ${MAX_VERIFICATION_REASON.toLocaleString()} characters`} onChange={event => { setReason(event.currentTarget.value); setReasonError(undefined); setFailure(null); }} placeholder="How would using your own sign-in domain help your app?" />

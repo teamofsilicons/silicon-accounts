@@ -61,6 +61,7 @@
 }
 
 .alertActions { display: block; margin-top: var(--space-3); }
+.notice { margin-bottom: var(--space-4); }
 
 @media (prefers-reduced-motion: reduce) {
   .tile, .newTile, .tileArrow { transition: none; }

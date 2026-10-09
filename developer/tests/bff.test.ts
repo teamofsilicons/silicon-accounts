@@ -14,7 +14,7 @@ test("a sealed value opens only for its purpose and secret", () => {
   assert.deepEqual(unseal(sealed, "sa_dev_session", SECRET), { at: "eyJ…", rt: "sar_x" });
   assert.equal(unseal(sealed, "sa_dev_signin", SECRET), null, "another cookie's purpose does not open it");
   assert.equal(unseal(sealed, "sa_dev_session", `${SECRET}-other`), null, "another secret does not open it");
-  const tampered = `${sealed.slice(0, -2)}${sealed.endsWith("A") ? "B" : "A"}${sealed.slice(-1)}`;
+  const tampered = `${sealed.slice(0, -2)}${sealed.at(-2) === "A" ? "B" : "A"}${sealed.slice(-1)}`;
   assert.equal(unseal(tampered, "sa_dev_session", SECRET), null, "a changed byte fails authentication");
   assert.equal(unseal("garbage", "sa_dev_session", SECRET), null);
   assert.equal(unseal(undefined, "sa_dev_session", SECRET), null);

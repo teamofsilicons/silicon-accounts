@@ -526,14 +526,14 @@ brief: fonts SF Pro and BDO Grotesk; light #F7F8FA / #292929, dark #02040A / #F7
   `app/fonts.ts` (next/font, `preload: false`) only because apps may pick them for their hosted pages; the other
   branding fonts still load on demand (`lib/branding/fonts.ts`).
 - **The hosted pages' default look** (`lib/branding/defaults.ts`, `apply.ts`, `styles/branding.css`): DEFAULT_LIGHT and
-  DEFAULT_DARK are the Silicon palettes. The API still stores and serves its older defaults (crates/core
-  `default_light`/`default_dark`, warm paper #FFFDF9), so `normalizeBranding` recognises a palette equal to them in all
+  DEFAULT_DARK are the Silicon palettes, and the API gives new apps the same ones (crates/core
+  `default_light`/`default_dark`). Apps made before that still store the older defaults (warm paper #FFFDF9; crates/core
+  `legacy_light`/`legacy_dark`, never migrated), so `normalizeBranding` recognises a palette equal to them in all
   eight colours (LEGACY_LIGHT, LEGACY_DARK) and paints the new one; a palette with any colour of the app's own stays
   exactly as stored (dm's green on its paper keeps its paper). An app that kept every default colour and the default
   font (Geist) wears the site's faces (`isSiliconLook`, `data-look="silicon"`, DemiBold headings); any font of its own
   is kept. Silicon Accounts' own pages (`HostedFrame site`) carry `data-look="silicon"` too. "Powered by", the embed's
-  pill and the SDK (`sdk/v1.ts`: the same recognition, 9.2 KB gzipped) use the new colours. When the API's own
-  defaults change to the new palette, nothing here needs to change.
+  pill and the SDK (`sdk/v1.ts`: the same recognition, 9.2 KB gzipped) use the new colours.
 - **Device approval for apps' tools** (`components/auth/device.tsx`): `GET /v1/device/{user_code}` now names the app
   (`app`, `first_party`, `scopes`); an app's own command-line tool is shown in the app's look ("Sign in to {app}?",
   what it will see, "Powered by"), the silicon-accounts CLI keeps the Silicon Accounts look.
@@ -546,6 +546,11 @@ Silicons (an identity of their own, no browser, the exact commands, "Create your
 account, no passwords, see and remove apps, look after Silicons, revoke User verifications), answers questions
 (FAQPage JSON-LD) and points app builders to the developer site once. The header, footer, action links and code
 blocks are the developer site's (`components/site/`, the same CSS).
+
+Keyboard (2026-10-09, from the ux-audit suite): the header menu's close button carries `autofocus`, so opening the
+native popover moves focus into it and Escape returns it to the menu button; the footer's theme choice shows keyboard
+focus as an accent edge (as on the developer site); the closing section's command, which scrolls sideways on a phone,
+is a named focusable region (`role="region"`, "The create command") with an accent edge and tint when focused.
 
 - `proxy.ts` marks the request `x-sa-surface: public` for a page load of `/` without a session cookie, or with one the
   API refuses (a 401 from `GET /v1/session`; that cookie is then cleared), and rewrites it to `app/landing` (a direct

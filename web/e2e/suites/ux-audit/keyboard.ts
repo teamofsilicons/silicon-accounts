@@ -414,7 +414,7 @@ export const journeys: Journey[] = [
       await sleep(400);
       await checkSkipShape(ctx, page, "keyboard: the developer site");
       const tabs: Array<readonly [string, string, readonly RegExp[]]> = [["/", "home", [/Briefcase/, /Search and jump/]]];
-      for (const tab of TABS) tabs.push([tabPath("briefcase", tab), tab, [new RegExp(`^${tab === "app_verification" ? "App verification" : tab === "sign-in" ? "Sign-in" : tab[0]!.toUpperCase() + tab.slice(1)}$`)]]);
+      for (const tab of TABS) tabs.push([tabPath("briefcase", tab), tab, [new RegExp(`^${tab === "app-verification" ? "App verification" : tab === "sign-in" ? "Sign-in" : tab[0]!.toUpperCase() + tab.slice(1)}$`)]]);
       for (const [path, name, expected] of tabs) {
         await openDeveloperPage(ctx, page, path);
         await walkStep(ctx, page, findings, `keyboard-developer ${name}`, [...expected], false);
@@ -446,7 +446,7 @@ export const journeys: Journey[] = [
           // On a phone the docs' sidebar is behind the menu button, so the walk is the page itself.
           await page.goto(`${env.site}/docs/start/add-sign-in`);
           await page.locator("main h1").first().waitFor({ timeout: 30_000 });
-          await walkStep(ctx, page, findings, "keyboard-pages docs 390", [/Open the docs menu/], false);
+          await walkStep(ctx, page, findings, "keyboard-pages docs 390", [/Open the menu/], false);
         }
         await context.close();
       }

@@ -1,6 +1,6 @@
 /**
  * Nobody sees or changes an app they don't own. A fresh Carbon (who owns nothing) signs in to the developer site: the
- * apps page says so and explains where apps come from; every page of someone else's app says "You don't own …" and
+ * apps page says so and offers to create one (the Silicon Apps registration); every page of someone else's app says "You don't own …" and
  * shows none of it; every owner route answers 403 not_app_owner through the BFF without a byte of the app's setup, and
  * every write is refused with nothing stored. An owner of one app is just as much a stranger to another.
  */
@@ -8,13 +8,13 @@ import type { Journey } from "../../context";
 import { developerApi, sleep, shot } from "../../lib";
 import { appDetail, asApp, errorCode, freshSignIn, ownerSignIn } from "./_helpers";
 
-const TABS = ["", "/sign-in", "/details", "/flows", "/pages", "/users", "/import", "/webhooks", "/app_verification", "/embed"];
+const TABS = ["", "/sign-in", "/details", "/flows", "/pages", "/users", "/import", "/webhooks", "/app-verification", "/embed"];
 /** The browser logs the 403/404 answers these pages are built on as failed resources. */
 const EXPECTED = [/status of 403 \(Forbidden\)/, /status of 404 \(Not Found\)/];
 
 export const journey: Journey = {
   name: "developer-site-non-owner",
-  title: "a Carbon who owns no app sees an empty apps page and where apps come from; another Carbon's app shows \"You don't own …\" on every tab, its owner routes answer 403 with nothing of the app, and every write is refused with nothing stored; an owner of one app is a stranger to the others",
+  title: "a Carbon who owns no app sees an empty apps page that offers to create one; another Carbon's app shows \"You don't own …\" on every tab, its owner routes answer 403 with nothing of the app, and every write is refused with nothing stored; an owner of one app is a stranger to the others",
   async run(ctx) {
     const { env, results } = ctx;
     const target = "briefcase";
@@ -27,16 +27,17 @@ export const journey: Journey = {
     await sleep(400);
     await shot(env, page, "ds-d-01-no-apps");
     const home = (await page.locator("main").innerText()).replace(/\s+/g, " ");
-    results.check("the apps page says there are no apps yet, and that apps are created in Silicon Apps", /No apps yet/.test(home) && /Apps are created in Silicon Apps/.test(home) && !/Silicon Apps isn't open yet/.test(home), home.slice(0, 240));
+    results.check("the apps page says there are no apps yet, and that an app made here gets Accounts sign-in and Apps publishing", /No apps yet/.test(home) && /Create your first app to configure Accounts sign-in and publish packages through Apps/.test(home) && !/Publishing details could not be loaded/.test(home), home.slice(0, 240));
     const owned = await developerApi<{ items?: unknown[] }>(env, page, "/me/owned-apps");
     results.check("…GET /me/owned-apps through the BFF is empty", owned.status === 200 && (owned.body.items ?? []).length === 0, `${owned.status} ${(owned.body.items ?? []).length}`);
-    await page.getByRole("button", { name: "How apps are made" }).click();
-    const dialog = page.getByRole("dialog", { name: "Apps come from Silicon Apps" });
+    await page.getByRole("button", { name: "Create an app" }).click();
+    const dialog = page.getByRole("dialog", { name: "Create an app" });
     await dialog.waitFor({ timeout: 10_000 });
     const dialogText = (await dialog.innerText()).replace(/\s+/g, " ");
     await shot(env, page, "ds-d-02-new-app");
-    results.check("\"How apps are made\" explains Silicon Apps and that this Carbon owns no stand-in app", /Silicon Apps isn.t open yet/.test(dialogText) && /You don.t own a stand-in app/.test(dialogText), dialogText.slice(0, 300));
-    await dialog.getByRole("button", { name: "Done" }).click();
+    results.check("\"Create an app\" asks for a name and an app ID that can never change", (await dialog.getByRole("textbox", { name: "App name", exact: true }).count()) === 1 && (await dialog.getByRole("textbox", { name: "App ID", exact: true }).count()) === 1 && /This cannot be changed/.test(dialogText), dialogText.slice(0, 300));
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "hidden", timeout: 10_000 });
 
     // Someone else's app, on every tab.
     const leaked: string[] = [];

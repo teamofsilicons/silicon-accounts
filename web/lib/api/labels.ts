@@ -30,4 +30,5 @@ export const SESSION_ORIGINS: Record<string, string> = {
   device: "CLI sign-in approved in a browser",
   cli_code: "CLI sign-in with a code",
   silicon_login: "Silicon sign-in with its STK",
+  federated: "Silicon sign-in from a trusted CI job",
 };

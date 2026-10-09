@@ -340,7 +340,7 @@ function Glance({ me, apps, appsFailed }: { me: Me; apps: MyApp[] | undefined; a
           <Link key={row.label} href={row.href} className={styles.glanceRow}>
             <span className={styles.glanceValue}>
               {row.value !== undefined ? <AnimatedCounter value={row.value} />
-                : row.failed ? <><span aria-hidden="true">–</span><span className="sr-only">Did not load.</span></>
+                : row.failed ? <><span aria-hidden="true">?</span><span className="sr-only">Did not load.</span></>
                   : <SkeletonBlock width="2ch" height="28px" radius="6px" index={index} />}
             </span>
             <span className={styles.glanceLabel}>

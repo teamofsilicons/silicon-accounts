@@ -165,6 +165,26 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
   else if (index.status === "failed") status = "Search is unavailable";
   else status = hits.length ? `${hits.length === 24 ? "Top 24" : hits.length} result${hits.length === 1 ? "" : "s"}` : "No results";
 
+  /**
+   * A modal keeps keyboard focus: the native dialog lets Tab leave for the browser's own controls after its last stop,
+   * so Tab from the last control comes back to the first (and Shift+Tab from the first goes to the last).
+   */
+  const keepFocusInside = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
+    if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return;
+    const stops = [...event.currentTarget.querySelectorAll<HTMLElement>("input, button, a[href], [tabindex]:not([tabindex='-1'])")]
+      .filter(element => !element.hasAttribute("disabled") && element.getClientRects().length > 0);
+    const first = stops[0];
+    const last = stops.at(-1);
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <>
       <a
@@ -203,6 +223,7 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
           // A click outside the panel lands on the dialog itself (it spans the window): close.
           if (event.target === dialogRef.current) hide();
         }}
+        onKeyDown={keepFocusInside}
       >
         <div className={styles.panel} data-sq="clip">
           <div className={styles.searchRow}>
@@ -235,7 +256,8 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
                 <X size={15} strokeWidth={1.75} aria-hidden="true" />
               </button>
             ) : null}
-            <button type="button" className={styles.close} data-sq="surface" aria-label="Close the search" onClick={hide}>Esc</button>
+            {/* The name starts with the visible word (WCAG 2.5.3), as the command palette's Esc button does. */}
+            <button type="button" className={styles.close} data-sq="surface" aria-label="Esc: close the search" onClick={hide}>Esc</button>
           </div>
 
           <div className={styles.status} role="status" aria-live="polite">{open ? status : ""}</div>

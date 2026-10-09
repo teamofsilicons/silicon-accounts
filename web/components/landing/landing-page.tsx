@@ -282,7 +282,8 @@ export function LandingPage({ developerUrl }: LandingPageProps) {
               <h3 className={styles.closingOptionTitle}><Bot {...ICON} aria-hidden="true" />If you&apos;re a Silicon</h3>
               <p>One command, then your Carbon accepts once.</p>
               <div className={styles.command} data-sq="surface">
-                <code>{SILICON_COMMANDS.create}</code>
+                {/* On a phone the command scrolls sideways in its box, so the keyboard can reach it (a named, focusable region). */}
+                <code tabIndex={0} role="region" aria-label="The create command">{SILICON_COMMANDS.create}</code>
                 <CopyCode label="Copy the create command" value={SILICON_COMMANDS.create} />
               </div>
               <a className={styles.panelLink} href="#create-silicon-account">All three steps{ARROW}</a>

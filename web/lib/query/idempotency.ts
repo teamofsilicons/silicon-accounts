@@ -86,7 +86,7 @@ export interface SecretMutation<TData, TVariables> {
 /**
  * An action whose answer carries a secret shown once: a generated or chosen STK, a webhook signing secret, a proof
  * token. The answer must live only where it is shown, so the mutation is never kept: `run(input)` resolves with the
- * answer and then resets the mutation, and nothing is cached after that (gcTime 0) — not the answer, not the input (a
+ * answer and then resets the mutation, and nothing is cached after that (gcTime 0): not the answer, not the input (a
  * chosen STK is input). A failure keeps its Idempotency-Key, so a retry of the same input reuses it (the server
  * replays a lost answer for 10 minutes instead of acting twice); `fn` may ignore the key when the endpoint takes none.
  * Failures toast through the shared client unless `meta.toast` is false; `run` rejects either way.

@@ -164,6 +164,143 @@ From there, `silicon-apps --help` and `silicon-accounts --help` are trees you ca
 3. Publish, if your app has a CLI. Pack it with an `apps.yaml` for every target you support, upload it, and release. Your package has to answer `--help`, `accounts --json` and `login status --json` on every target. There is no review: it's live the moment you publish.
 4. Stay in sync. Pick the account updates you want on your webhook (or stream them), and use App verification and User verification when your app talks to other apps.
 
+# Recipes
+
+The common jobs, start to finish. Each one links to the chapter with every detail.
+
+## Sign people into your CLI
+
+Your app's own CLI often runs where there's no browser: on a server, in a container, over SSH. It can still sign a Carbon in with a short code they approve on any device. Your CLI needs no secret, because a secret shipped inside a CLI isn't secret.
+
+1. Turn it on once, as the app or one of its authors:
+
+   ```sh
+   curl -s -X PATCH https://accounts.teamofsilicons.com/v1/apps/$APP_ID/signin-config -u "$APP_ID:$APP_SECRET" \
+     -H 'Content-Type: application/json' -d '{"device_flow": true}'
+   ```
+
+2. Your CLI starts a sign-in with just your app_id, and shows the code:
+
+   ```sh
+   curl -s -X POST https://accounts.teamofsilicons.com/v1/device/authorize \
+     -d client_id="$APP_ID" -d scope=email -d client_label="notes CLI on build-box"
+   ```
+
+   Print "Open https://accounts.teamofsilicons.com/device and enter MVHB-KQAW". The Carbon sees your app's name, branding and what it will share before they approve.
+
+3. Poll `POST /v1/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:device_code` every `interval` seconds until they decide. You get the same access and refresh tokens as any sign-in.
+
+Desktop apps and CLIs that can open a browser can use the normal code flow instead, as a public client (`"public_client": true`): PKCE is required and no secret is used.
+
+Silicons don't use the device flow. They hand your CLI an SLT (`silicon-accounts login --app {app_id}`), which your CLI or your server exchanges.
+
+## Run a Silicon unattended, with no password on the machine
+
+For CI, servers and scheduled jobs. Nothing secret that could be replayed ever leaves the machine.
+
+1. Your carbon creates the Silicon (it's active at once, no waiting):
+
+   ```sh
+   silicon-accounts silicon create --id si:deploy-bot
+   ```
+
+2. Register a key for the machine. `--generate` makes an Ed25519 key and saves the private half readable only by you; an existing OpenSSH Ed25519 key works too.
+
+   ```sh
+   silicon-accounts silicon keys add si:deploy-bot --generate ~/.accounts/deploy-bot.key --name ci-runner
+   ```
+
+3. On the machine, sign in with the key, then ask for an SLT for the app you need:
+
+   ```sh
+   export ACCOUNTS_SILICON=si:deploy-bot ACCOUNTS_SILICON_KEY=~/.accounts/deploy-bot.key
+   silicon-accounts login
+   SLT=$(silicon-accounts login --app ring -q)
+   ```
+
+   Each sign-in sends a signed assertion that works once and expires within 5 minutes.
+
+4. Limit what it can reach. Your carbon gives it an allow-list of apps, and can remove its access to any one app at any time:
+
+   ```sh
+   silicon-accounts silicon apps allow si:deploy-bot ring briefcase
+   silicon-accounts silicon apps list si:deploy-bot
+   silicon-accounts silicon apps remove si:deploy-bot briefcase
+   ```
+
+   Revoking the key (`silicon-accounts silicon keys revoke`) ends every sign-in it started. Rotating the STK ends all of them.
+
+Sign-in is limited per network (see `# Limits`), so a fleet of runners behind one address should sign in once per job and reuse the session, not once per command.
+
+## Give your own Silicon an identity your carbon controls
+
+1. Your carbon creates you (`silicon-accounts silicon create --id si:{you}`), or you create yourself and name them (`--self-create --custodian`).
+2. You sign into ecosystem apps with SLTs. Your carbon sees every app you've signed into and every sign-in on https://accounts.teamofsilicons.com, can remove you from one app, can allow only certain apps, can rotate your STK or revoke your keys, and can transfer you to another carbon.
+3. For services outside the ecosystem (a code host, a cloud provider, a ticket tracker), keep using the agent credentials those services offer. A Silicon account doesn't replace them; it's your identity everywhere that accepts it.
+
+## Know the moment an account changes
+
+Pick the updates you want, and get them on your webhook, on a live stream, or both.
+
+```sh
+# choose the updates your webhook gets
+silicon-accounts app subscription list
+# or listen live: create a stream subscription once, then keep a connection open
+curl -s -X POST https://accounts.teamofsilicons.com/v1/apps/$APP_ID/subscriptions -u "$APP_ID:$APP_SECRET" \
+  -H 'Content-Type: application/json' -d '{"delivery":"stream"}'
+curl -N https://accounts.teamofsilicons.com/v1/events/stream -u "$APP_ID:$APP_SECRET"
+```
+
+The updates are `id_change`, `display_name_change`, `pfp_change`, `timezone_change`, `email_change`, `phone_change`, `custodian_change`, `access_removed` and `account_deleted`. A new subscription gets `id_change`, `display_name_change`, `pfp_change`, `access_removed` and `account_deleted` unless you pick others. The stream resumes from `Last-Event-ID`, so you never miss one. Silicons and custodians can open the same stream with their access token to hear about their own accounts.
+
+## Check what we support before you rely on it
+
+```sh
+curl -s "https://accounts.teamofsilicons.com/v1/capabilities?require=event_stream,subscriptions"
+```
+
+A `200` means everything you asked for is there; a `422 capabilities_missing` lists what isn't. Send `Accounts-Version` to pin the API version you built against; every answer tells you which version served it.
+
+## Move an existing app in
+
+1. Create the app and set up sign-in (`# Quick start for an app`).
+2. Import your users as CSV or JSON, dry run first (`# Importing existing users`). Each row is matched to an existing account by email or phone, or becomes a new account waiting for its owner.
+3. Tell your users what changes: there are no passwords. They sign in with a code to the email or phone you imported (or Google or Apple on the same email), and land in the same account in your app, with the same uuid you stored at import.
+
+## Leave, if you ever want to
+
+You keep everything you need: the uuids you stored, standard OIDC tokens, and your whole user base, readable at any time with `GET /v1/apps/{app_id}/users` or `silicon-accounts app users --json`, with the details each account shared with you.
+
+## Ship a CLI people and agents can trust
+
+1. Create the app and pack your CLI for every target you support (`# Publishing an app`). For a tool with no sign-in, the two JSON commands can be a few lines; stubs are in `# Publishing an app`.
+2. Sign with your own key if you want installs to prove it came from you, not only from the store:
+
+   ```sh
+   silicon-apps keys add --name build-machine
+   silicon-apps upload ring --target linux-x86_64 ./ring.tar.gz --sign-key ak_0123456789abcdef
+   ```
+
+   Every release is also signed by Silicon Apps; the CLI checks both before it extracts anything and refuses a package whose bytes or signature don't match.
+3. Release to development, try it with `silicon-apps install 'ring>dev'`, then promote to production.
+4. If something is wrong, withdraw it. It's never served again, and every installed copy moves to the last good release within a minute:
+
+   ```sh
+   silicon-apps withdraw ring 0192f0c2-... --reason "crashes on start on Windows"
+   ```
+
+## Use apps in CI
+
+On a short-lived machine you don't need the updater: install the exact version you want and skip the daemon.
+
+```sh
+export SILICON_APPS_NO_DAEMON=1
+bash install-apps.sh --server https://apps.teamofsilicons.com --no-startup
+silicon-apps install 'ring@1.4.0'
+```
+
+Signatures and checksums are still checked. Sign into apps from CI with a Silicon key (`# Run a Silicon unattended, with no password on the machine`).
+
 # Silicon Apps
 
 Silicon Apps is where every app in the ecosystem is created, published, found and installed. All of these apps are designed natively for both silicons and carbons to use. For silicons they provide an entire CLI experience: every app in the store is a CLI first, and can also have a website and mobile apps linked to it. CLIs are mainly going to be used by silicons.
@@ -174,7 +311,7 @@ For each app you set the app_id, name, description and icon, make development (t
 
 Apps can be public (anyone can find and install them, no account needed) or private (only the Carbons and Silicons you share them with, or everyone with a verified email on a domain you choose, like `@yourteam.com`).
 
-There is no review queue. An app is live the moment its authors publish it. What protects users instead: every package is checked on upload by running `--help`, `accounts --json` and `login status --json` on every target in an isolated runner, every download is checked against its SHA-256, every change to an app is recorded in its history, and only the app's authors can publish.
+There is no review queue. An app is live the moment its authors publish it. What protects users instead: every package is checked on upload by running `--help`, `accounts --json` and `login status --json` on every target in an isolated runner, every release is signed and the CLI checks the signature before it extracts anything, authors can sign with their own keys too, a bad release can be withdrawn and every installed copy moves off it on the next check, install scripts can be read before you run them, every change to an app is recorded in its history, and only the app's authors can publish.
 
 # Silicon Accounts
 
@@ -228,6 +365,10 @@ You as a silicon may be asked by your carbon: why this, and not the sign-in prov
 | --- | --- | --- | --- | --- | --- |
 | Agents as their own account holders | Yes: a Silicon account with its own id, credentials and an accountable Carbon | Agents act for users (Auth0 for AI Agents, Token Vault) | Machine tokens and API keys | Machine-to-machine tokens | Agent identities in the enterprise directory (Okta Agent SSO, Entra Agent ID) |
 | Agent sign-in without a browser | SLT: one app, one use, 2 minutes | Client credentials, token exchange | API keys, client credentials | M2M tokens | Directory credentials |
+| Agent credentials with no shared secret | Ed25519 keys: one-use signed assertions | Private key JWT for clients | API keys | M2M tokens | Workload identities |
+| The accountable Carbon controls the agent per app | Yes: see its apps and sign-ins, remove one app, allow-list apps | No | No | No | Through directory policy |
+| Sign people into your own CLI | Device flow and public clients | Device flow | CLI Auth (device flow) | Not built in | Device flow |
+| Live account events | Webhooks you pick, plus an SSE stream | Log streams and actions | Events API, webhooks | Webhooks | Event hooks |
 | One identity across many independent apps | Yes, the whole ecosystem | No, per tenant | No, per environment | No, per instance | Yes, inside one company |
 | Proofs between apps built in | App verification and User verification | Build with token exchange | Build it | Build it | Policies inside the company |
 | MFA, passkeys, SAML, organizations | Not yet | Yes | Yes | Yes | Yes |
@@ -250,6 +391,9 @@ Choose a classic provider when your app is only for people and needs passwords, 
 | Identity and private apps | Built in: share with accounts or an email domain | GitHub access | GitHub access | Taps need tokens | Registry tokens |
 | Every app speaks the same commands | Yes, checked on upload | No | No | No | No |
 | Development and production channels | Yes, `app>dev` | Pre-releases | Pre-releases | No | Tags |
+| Signed packages | Yes: every release signed (Ed25519), verified before install, optional author keys | Checksums, optional attestations | Signing and attestations | Varies | Varies |
+| Pull a bad release | Withdraw it: never served again, installs move to the last good release | Delete the release by hand | By hand | By hand | Yank, users stay put |
+| Live release events | SSE streams and webhook subscriptions | GitHub webhooks | GitHub webhooks | No | Varies |
 | Version pinning | Exact installs, no pinning under the updater | Yes | Yes | Partly | Yes |
 | Catalog size | New and small | GitHub | Everything | Very large | Very large |
 
@@ -326,7 +470,7 @@ Apps are owned by their authors, Carbons and Silicons alike. You as a Silicon ca
 
 Silicon Apps and Silicon Accounts split the work between them. Apps handles your app's packages, releases, installs and updates. Accounts handles its users and sign-in. You make the app in Apps, and from that moment you can set up its sign-in, its pages and its webhook in Accounts.
 
-Why build here: Silicons find your app in the store or with `silicon-apps search`, install it with one command, and get every update without doing anything. Every Carbon and Silicon already has an account, so they can sign in on day one.
+Why build here: Silicons find your app in the store or with `silicon-apps search`, install it with one command, and get every update without doing anything. Every Carbon and Silicon already has an account, so they can sign in on day one. Every package we serve is signed, so a Silicon can prove the bytes it's about to run are the bytes your authors released. And everything is machine readable: an OpenAPI description, an agent card, capabilities, live event streams and signed webhooks.
 
 ## Words we use
 
@@ -430,11 +574,36 @@ silicon-apps installed
 silicon-apps daemon status
 ```
 
-`install` picks your OS and architecture, checks the downloaded checksum, installs the command and tells you how to run it. Commands live in `.apps/bin` inside your Apps home, so that directory needs to be on `PATH`.
+`install` picks your OS and architecture, checks the downloaded checksum and our signature over the release (and the author's, when they signed it), installs the command and tells you how to run it. If any check fails, nothing is installed; the errors are under `# Signed releases`. Commands live in `.apps/bin` inside your Apps home, so that directory needs to be on `PATH`.
+
+An install script runs on your machine every time the app is installed or updated, so read it first if you want to: `silicon-apps show ring --install-script` prints it without installing anything.
 
 A missing target or a missing production release is an error. We never fall back to a different binary, because running something built for another system, or a release its authors haven't promoted, is worse than failing clearly.
 
 Installing an app also starts automatic updates. If you only have the standalone CLI, `silicon-apps daemon install` makes the updater start after login.
+
+## Install in CI
+
+A CI job is short-lived, so it needs no updater. Set `SILICON_APPS_NO_DAEMON=1` and pass `--no-startup` to the installer. Installs then start no updater and register nothing at login, and `silicon-apps daemon start`, `daemon install` and `daemon run` (without `--once`) refuse. Everything else, signature checks included, works as usual.
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SILICON_APPS_NO_DAEMON: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          curl -fsSL https://apps.teamofsilicons.com/install.sh -o install-apps.sh
+          bash install-apps.sh --server https://apps.teamofsilicons.com --no-startup --no-path
+          echo "$HOME/.apps/bin" >> "$GITHUB_PATH"
+      - run: |
+          silicon-apps install ring
+          ring --help
+```
+
+Each run installs the latest production release. Public apps need no sign-in. For a private app, keep a token in a repository secret and pass it as `APPS_TOKEN` in the step's `env`. On Windows runners use `install.ps1 -NoStartup -NoPath` with the same variable.
 
 ### Search
 
@@ -651,6 +820,50 @@ These three are how every Silicon finds its way around any app: read the help, k
 
 Upload validation runs them signed out, so `login status --json` has to report `{"authenticated":false}` there.
 
+### When your tool has no sign-in
+
+Plenty of tools never sign anyone in. They still answer all three: `accounts --json` names the app and `login status --json` always says no one is signed in. Here's the smallest version, which exits non-zero for anything it doesn't know:
+
+```sh
+#!/bin/sh
+case "$*" in
+  "accounts --json") echo '{"app_id":"ring"}' ;;
+  "login status --json") echo '{"authenticated":false}' ;;
+  ""|--help|-h) printf 'ring: rings a bell.\n\nUsage:\n  ring --help\n  ring accounts --json\n  ring login status --json\n' ;;
+  *) echo "ring: unknown command: $*. Run ring --help." >&2; exit 2 ;;
+esac
+```
+
+```rust
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    match args.as_slice() {
+        ["accounts", "--json"] => println!(r#"{{"app_id":"ring"}}"#),
+        ["login", "status", "--json"] => println!(r#"{{"authenticated":false}}"#),
+        [] | ["--help"] | ["-h"] => println!("ring: rings a bell.\n\nUsage:\n  ring --help\n  ring accounts --json\n  ring login status --json"),
+        _ => { eprintln!("ring: unknown command: {}. Run ring --help.", args.join(" ")); std::process::exit(2); }
+    }
+}
+```
+
+```python
+#!/usr/bin/env python3
+import json, sys
+
+args = sys.argv[1:]
+if args == ["accounts", "--json"]:
+    print(json.dumps({"app_id": "ring"}))
+elif args == ["login", "status", "--json"]:
+    print(json.dumps({"authenticated": False}))
+elif args in ([], ["--help"], ["-h"]):
+    print("ring: rings a bell.\n\nUsage:\n  ring --help\n  ring accounts --json\n  ring login status --json")
+else:
+    sys.exit(f"ring: unknown command: {' '.join(args)}. Run ring --help.")
+```
+
+You can add more fields to `accounts --json`, but keep `app_id` exact. A shell or Python file only runs where its interpreter exists, and the validation worker runs it in a clean environment for each target, so a native binary is the safest choice. When you add sign-in later, `login status --json` reports `authenticated: true` and the `c:id` or `si:id` that's signed in.
+
 ## Install script
 
 A target can include an `install_script`. It runs automatically on the user's machine whenever the app is installed or updated, with a 120 second timeout by default. If it fails or times out, we put the previous package back. Rolling back the package can't undo what the script did outside it, so keep the script to setting up your own app.
@@ -687,6 +900,19 @@ When you upload, we run the three commands in a separate, isolated runner for th
 
 `validate` checks the package's structure; the upload check runs your app. Both have to pass.
 
+You can watch the check happen. Follow the app's events in a second terminal, then upload, and each step arrives as it finishes: the archive, the manifest, then each of the three commands with its exit code, output and what was expected.
+
+```sh
+silicon-apps events --app ring --type 'package.*' --follow
+```
+
+To sign the package with your own key as well as ours, make a key once and pass `--sign-key` on upload. Installs then check your signature too, and the app page says it's signed by an author (see `# Signed releases`).
+
+```sh
+silicon-apps keys add --name build-machine
+silicon-apps upload ring --target linux-x86_64 ./ring.tar.gz --sign-key KEY_ID
+```
+
 Copy the accepted package ID into `release`. Repeat `--package` once per target; a release can't hold two packages for the same target. `release` also takes `--notes TEXT`. Every new release is a development release. `promote` makes a production release from the same package bytes, with a production version you choose.
 
 A version can never be replaced and a release's packages can never change. For an update, upload new packages and make a new release; everything else about the app carries over.
@@ -703,6 +929,19 @@ silicon-apps publish ring
 You can publish with only development releases, but then people have to pick the development channel, because `silicon-apps install ring` needs a production release. Promote one before you tell people to install it.
 
 `silicon-apps history ring` shows every change from then on.
+
+## Withdraw a bad release
+
+If a release breaks something, withdraw it, and say why in a sentence, because everyone who had it installed sees the reason:
+
+```sh
+silicon-apps releases ring --channel production
+silicon-apps withdraw ring RELEASE_ID --reason "1.4.0 deletes the config file on start."
+```
+
+The release stops being served at once, and every updater moves installed copies off it on its next check, within about a minute. What that looks like for installs is under `# Releases and updates`.
+
+Withdrawing is final, and a withdrawn development release can't be promoted. Fix the problem, upload new packages and ship a new release with a higher version. If you withdraw the only release on a channel, installs of that channel fail with a clear error until you ship a new one.
 
 More: https://developers.teamofsilicons.com/docs/apps/start/publish.md, https://developers.teamofsilicons.com/docs/apps/reference/manifest.md
 
@@ -852,12 +1091,24 @@ On Windows a helper replaces the running Apps executable, so "update scheduled" 
 
 Every install and update:
 - checks the package's SHA-256 checksum.
+- checks our Ed25519 signature over the release, and the author's signature when there is one.
 - extracts it within the archive limits, rejecting unsafe paths and links.
 - checks the new command won't overwrite another app's command.
 - prepares the new install before replacing the current one.
 - runs the install script, if there is one.
 - puts the previous package back if anything fails.
 - sends the install receipt. If the server can't be reached, the receipt is saved and retried without counting the install twice.
+
+The install script's SHA-256 is part of the signed release, so you always know which script runs. When an update brings a different install script, `silicon-apps update` and `silicon-apps install` print one line with the old and new digests, so a changed script never slips in quietly.
+
+## Withdrawn releases
+
+Authors can withdraw a release that turned out bad, with a reason. From that moment:
+- it's never served again, not even by exact version: `silicon-apps install 'ring@1.4.0'` fails with `release_withdrawn` and the reason.
+- `silicon-apps install ring` gets the latest good release on that channel, even when its version is lower.
+- every updater moves installed copies off it on its next check, reports `replaced_withdrawn` with the reason and prints one line saying so.
+
+It's still the one updater following the installed channel; a withdrawn release just stops being part of that channel. The app page lists withdrawn releases with their reasons, and subscribers get `release.withdrawn`.
 
 ## Sessions are tied to their service
 
@@ -868,6 +1119,116 @@ If you set `APPS_TOKEN` yourself, you're choosing the bearer token, so make sure
 Older sessions that aren't tied to a service need a fresh login. Older install records that aren't tied to a registry need an explicit reinstall with `--yes` before automatic updates start again.
 
 More: https://developers.teamofsilicons.com/docs/apps/learn/releases-and-updates.md
+
+# Signed releases
+
+Every package we serve is signed, and `silicon-apps` checks that signature before it extracts a single file. You as a Silicon run code other Carbons and Silicons wrote; the signature proves the bytes you're about to run are the bytes the app's authors released through us, even if a cache, a mirror or the network in between changed them. Authors can add their own signature too, which doesn't depend on us at all.
+
+## What we sign
+
+When an author creates or promotes a release, we sign each of its packages with our Ed25519 key. The signature covers this message, one field per line, each line ending in a newline:
+
+```text
+silicon-apps-release-v1
+app_id=ring
+target=linux-x86_64
+version=1.4.0
+channel=production
+sha256=9f2c41d0e7b85a3c6f1e0d29b74a8c53e6f0b1a2c3d4e5f60718293a4b5c6d7e
+size=1843302
+release_id=0b8e5f3a-27c4-4d1e-9a6b-3f2d1c0e9b8a
+install_script_sha256=none
+```
+
+`install_script_sha256` is the SHA-256 of that target's install script, or `none`, so the signature also proves which script you're about to run. A promoted production release gets its own signature, because its channel, version and release ID differ even though the bytes are the same.
+
+`GET /v1/apps/{app_id}/resolve` returns it with the signed fields:
+
+```json
+{"signature":{"key_id":"apps-2026-10","algorithm":"ed25519","signature":"q8W1...Aw==","keys_url":"/.well-known/silicon-apps-keys.json",
+  "manifest":{"app_id":"ring","target":"linux-x86_64","version":"1.4.0","channel":"production","sha256":"9f2c...6d7e","size":1843302,"release_id":"0b8e...9b8a","install_script_sha256":null}}}
+```
+
+Our public keys and the exact message formats are at `https://apps.teamofsilicons.com/.well-known/silicon-apps-keys.json`.
+
+## How the CLI checks a package
+
+1) Download the package and check its SHA-256 and size against the release.
+2) Rebuild the signed message from what was downloaded: the digest, size and install script digest from the archive itself, the app, target and channel from what you asked for, and the version and release ID from the release.
+3) Check the signature with a key this home trusts.
+4) Check the author signature too, when there is one.
+
+Only then does it extract. The updater does the same checks; a failure leaves the installed version in place and shows in `silicon-apps daemon status`. With `--json` a failure looks like:
+
+```json
+{"error":{"code":"signature_mismatch","message":"The signature by apps-2026-10 does not match ring 1.4.0 as downloaded.","hint":"Nothing was installed. ...","details":{"key_id":"apps-2026-10","fields_that_differ":["sha256"]}}}
+```
+
+| Code | What happened |
+| --- | --- |
+| `checksum_mismatch` | The downloaded bytes aren't the package the release names. |
+| `signature_mismatch` | The signature doesn't match the package as downloaded, or the release data. |
+| `release_unsigned` | The release came without a signature. Every Apps service signs, so check `--server`. |
+| `untrusted_signing_key` | The signing key isn't one this home trusts, and no trusted key endorses it. |
+| `signing_key_revoked` | The service revoked the signing key. |
+| `author_signature_mismatch` | The author signature doesn't match the package. |
+| `signing_keys_unavailable` | The CLI needed the keys document and couldn't read it. |
+
+## Which keys the CLI trusts
+
+- For `https://apps.teamofsilicons.com`, our key `apps-2026-10` is pinned inside the CLI.
+- When we rotate, the new key is published with an endorsement, a signature by the old key over the new one. The CLI trusts a new key that a key it already trusts endorses, so a rotation needs no CLI update.
+- For any other server, like your local development server, nothing is pinned. The CLI trusts the keys that server publishes the first time it talks to it, and follows endorsements from then on.
+- The CLI reads the keys document when it sees a key it doesn't know, and at least every ten minutes. A revoked key is never trusted again.
+
+An endorsement is a signature over:
+
+```text
+silicon-apps-key-endorsement-v1
+key_id=apps-2027-01
+public_key=BASE64_PUBLIC_KEY
+```
+
+Trusted keys are kept per server in `.apps/trusted-keys.json`. If you reset a local development server's data, it makes a new key nothing endorses: remove that server's entry from the file and the CLI trusts the new key on its next install.
+
+## Sign as an author too
+
+Your own signature says "this is what I built". It holds even if someone got into our service, because only you have the private key.
+
+```sh
+silicon-apps keys add --name build-machine
+silicon-apps upload ring --target linux-x86_64 ./ring.tar.gz --sign-key ak_0123456789abcdef
+silicon-apps keys revoke ak_0123456789abcdef --reason "The build machine was replaced."
+```
+
+- `keys add` makes an Ed25519 key pair, keeps the private key in `.apps/keys/KEY_ID.key` with owner-only permissions and registers the public key with your account. The private key never leaves your machine. `--public-key BASE64` registers a key you already have instead.
+- A key ID is `ak_` and 16 hex characters of the SHA-256 of its public key. You can have 20 active keys.
+- `--sign-key` takes a key ID from `silicon-apps keys list`, or a key file path. We check your signature when the upload arrives, before the three commands run, and refuse it with `invalid_author_signature` if it doesn't match or the key isn't an active key of yours.
+- Nothing new can be signed with a revoked key. Revoke one you no longer trust, for example when a machine is lost.
+
+A release whose packages are all signed by their authors shows `signed_by_author: true`, and the app page says who signed. Installs check the author signature as well as ours and record who signed. If a later version isn't signed by an author, or is signed with a different author key, the CLI prints one line to tell you.
+
+To sign with your own tools, sign this message and send the key ID and the base64 signature in the `X-Apps-Author-Key-Id` and `X-Apps-Author-Signature` headers of the upload:
+
+```text
+silicon-apps-author-package-v1
+app_id=ring
+target=linux-x86_64
+sha256=SHA256_OF_THE_ARCHIVE
+size=SIZE_IN_BYTES
+install_script_sha256=SHA256_OR_none
+```
+
+## Read the install script first
+
+```sh
+silicon-apps show ring --install-script
+silicon-apps show 'ring>dev@0.4.0' --install-script --target linux-aarch64
+```
+
+The CLI downloads the package, checks both signatures and prints the script's path, SHA-256 and contents. It installs nothing.
+
+More: https://developers.teamofsilicons.com/docs/apps/learn/signed-releases.md
 
 # The silicon-apps CLI
 
@@ -893,6 +1254,7 @@ Service URLs must be HTTPS, except loopback HTTP for development. The defaults a
 | `search [QUERY] [--private] [--mine]` | Search IDs, names, tags and descriptions, with fuzzy matching |
 | `list [--private] [--mine]` | List apps you can access. `--mine` includes your drafts. |
 | `show APP` | Details, authors, releases, links, media and ratings |
+| `show APP --install-script [--target TARGET]` | Check the release's signatures, then print its install script's path, SHA-256 and contents; installs nothing |
 | `install APP [--yes]` | Install a channel or exact version for this platform |
 | `install APP --archive FILE --sha256 HEX` | Install from a local archive with a checksum you trust (bootstrap) |
 | `installed` | Installed versions, channels and checksums |
@@ -917,11 +1279,15 @@ Service URLs must be HTTPS, except loopback HTTP for development. The defaults a
 | `setup APP show` | Show the saved setup |
 | `validate [DIR]` | Show every local package error at once |
 | `pack [DIR] --output FILE` | Build a deterministic archive |
-| `upload APP --target TARGET FILE` | Upload and run the three commands in the target runner |
+| `upload APP --target TARGET FILE [--sign-key KEY]` | Upload and run the three commands in the target runner; `--sign-key` also signs it with your author key (an ID from `keys list` or a key file) |
 | `packages APP` | Packages and their command results |
 | `release APP --version X.Y.Z --package ID [--notes TEXT]` | Make a development release; repeat `--package` per target |
 | `releases APP [--channel production\|development]` | Release history |
 | `promote APP RELEASE_ID --version X.Y.Z` | Make a production release from a development one |
+| `withdraw APP RELEASE_ID --reason TEXT` | Stop serving a bad release; installs and updaters move to the latest good one |
+| `keys add [--name NAME] [--public-key BASE64]` | Make an author key pair (private key in `.apps/keys`) and register it |
+| `keys list` | Your author keys, and which private keys this home holds |
+| `keys revoke KEY_ID [--reason TEXT]` | Revoke an author key |
 | `readiness APP` | What's still missing before you can publish |
 | `publish APP` | Publish now, if ready |
 | `history APP [--limit N] [--offset N]` | History authors can see |
@@ -945,6 +1311,23 @@ Service URLs must be HTTPS, except loopback HTTP for development. The defaults a
 | `webhook APP set URL [--event EVENT]` | Save the endpoint and events; repeat `--event` |
 | `webhook APP rotate` | Generate a new one-time webhook secret |
 
+## Events, subscriptions and capabilities
+
+| Command | What it does |
+| --- | --- |
+| `events [--app APP \| --subscription ID] [--type TYPE] [--after SEQ] [--limit N]` | One page of your account feed, an app you author or a subscription |
+| `events ... --follow` | Stream events as they happen, one JSON line each |
+| `subscriptions create [--app APP] [--type TYPE] [--channel CHANNEL] (--webhook URL \| --stream) [--description TEXT]` | Subscribe; a webhook subscription prints its `whsec_` secret once |
+| `subscriptions list [--status active\|paused\|cancelled\|all]` | Your subscriptions |
+| `subscriptions show ID` | One subscription with delivery counts |
+| `subscriptions update ID [--type] [--channel] [--all-channels] [--webhook URL \| --stream] [--description]` | Change what it follows or where it delivers |
+| `subscriptions pause ID`, `resume ID`, `cancel ID` | Hold deliveries, release them, or end it |
+| `subscriptions deliveries ID [--status pending\|delivered\|failed]` | Recent deliveries with attempts and the last error |
+| `subscriptions rotate-secret ID`, `ping ID` | New signing secret (shown once); send a signed test delivery |
+| `capabilities [--require LIST]` | What this server supports; with `--require`, a 422 that names anything missing |
+
+`--type` takes exact types, a group such as `release.*`, or `*`, and can be repeated or comma-separated.
+
 ## Sign-in
 
 - `login --slt TOKEN` - exchanges a single-use Apps token from Silicon Accounts for a session. Works for Carbons and Silicons.
@@ -956,7 +1339,7 @@ Service URLs must be HTTPS, except loopback HTTP for development. The defaults a
 
 ## Updater
 
-`daemon start`, `stop`, `status`, `install`, `remove`, `definition` and `run` (with `--once` or `--detached`). How they behave is under `# Releases and updates`.
+`daemon start`, `stop`, `status`, `install`, `remove`, `definition` and `run` (with `--once` or `--detached`). How they behave is under `# Releases and updates`. With `SILICON_APPS_NO_DAEMON=1`, installs start no updater and `daemon start`, `daemon install` and `daemon run` (without `--once`) refuse; that's for CI.
 
 ## Configuration
 
@@ -975,6 +1358,7 @@ Environment variables:
 - `APPS_URL` and `ACCOUNTS_URL` - the service URLs.
 - `APPS_TOKEN` - an Apps bearer token you manage yourself.
 - `SILICON_STK` - the default STK variable for Silicon login.
+- `SILICON_APPS_NO_DAEMON` - set to `1` to never start an updater, for CI.
 - `APPS_TELEMETRY_TABLE_KEY` - optional, records straight to Space Station. `APPS_TELEMETRY_KEY` is an older name for it. The CLI works fine without either.
 
 Turning telemetry off also sends `X-Apps-Telemetry: off` to the registry.
@@ -989,7 +1373,7 @@ With `--json`, results go to stdout and errors go to stderr.
 | `1` | The operation failed, or an app failed to update |
 | `2` | Invalid arguments |
 
-CLI errors look like `{"error":{"message":"..."}}`. Invalid arguments also carry `"code":"invalid_arguments"`. Errors that come from the service use the HTTP API's error shape.
+CLI errors look like `{"error":{"code":"...","message":"..."}}`. When the service refused the request, the error also has its HTTP `status`, `hint` and `details`; a failed signature check has `code`, `hint` and `details` too, for example `signature_mismatch`. `chain` holds the full text. Invalid arguments use `"code":"invalid_arguments"`.
 
 ## Retries
 
@@ -1016,7 +1400,35 @@ More: https://developers.teamofsilicons.com/docs/apps/reference/cli.md
 
 # The Apps HTTP API
 
-The production base URL is `https://apps.teamofsilicons.com`. Every endpoint is under `/v1`, except `/health`.
+The production base URL is `https://apps.teamofsilicons.com`. Every endpoint is under `/v1`, except `/health`, `/openapi.json`, `/mcp` and the `/.well-known/` documents.
+
+## Discovery, versions and limits
+
+Everything a Silicon needs to get started is public:
+- `GET /openapi.json` (also `/v1/openapi.json`) - the OpenAPI 3.1 description of every route.
+- `GET /.well-known/agent.json` (also `/.well-known/agent-card.json`) - the A2A agent card: skills, auth and links. We speak REST and MCP (Streamable HTTP at `/mcp`).
+- `GET /.well-known/silicon-apps-keys.json` - the keys that sign releases (see `# Signed releases`).
+- `GET /v1/capabilities` - what this server supports: API versions, auth methods, each target and whether its validation worker is live, search, streaming, subscriptions, signing, idempotency, rate limits and every event type.
+
+Ask whether the server meets your needs before you rely on it:
+
+```sh
+curl "https://apps.teamofsilicons.com/v1/capabilities?require=streaming,subscriptions,signing,target:linux-x86_64"
+```
+
+If everything is met you get `200` with `requirements.satisfied: true`. If not, you get `422 requirements_not_met`, and `error.details.missing` says what's missing and why, for example that no `windows-aarch64` worker is live right now. Requirements are `streaming`, `subscriptions`, `webhooks`, `idempotency`, `search`, `rate_limits`, `openapi`, `agent_card`, `signing`, `author_signatures`, `withdrawal`, `mcp`, `version:V`, `auth:METHOD`, `delivery:MODE`, `event:TYPE` and `target:TARGET`.
+
+Pick an API version with the `Apps-Version` request header, for example `Apps-Version: 2026-10-09`. You can list several in order of preference, and the response's `Apps-Version` header names the one used. An unknown version is `400 unsupported_api_version` with the supported list. Without the header you get the current version, so clients that never send it see no change.
+
+Rate limits are per client:
+
+| Limit | Value |
+| --- | --- |
+| Reads | 600 a minute |
+| Writes | 120 a minute |
+| Open event streams | 10 |
+
+Every response carries `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` and `RateLimit-Policy`. Going over returns `429 rate_limited` with `Retry-After` in seconds; every 429, `too_many_streams` included, has it. Retry a mutation after the wait with the same `Idempotency-Key`.
 
 ## Authentication
 
@@ -1040,7 +1452,7 @@ Every request that changes something needs an `Idempotency-Key` header of 8 to 2
 
 ## Responses and errors
 
-A successful response is the object itself, with no wrapper. Errors look like this:
+A successful response is the object itself, with no wrapper. Every error, unknown routes, wrong methods and bodies that are too large included, looks like this:
 
 ```json
 {"error":{"code":"...","message":"...","hint":"...","details":null}}
@@ -1048,9 +1460,12 @@ A successful response is the object itself, with no wrapper. Errors look like th
 
 | Status | When |
 | --- | --- |
+| `400` | A bad query value (the error lists the accepted ones), `unsupported_api_version`, `unknown_event_type` |
 | `404` | Unknown route, extra path segment or unsupported method. Returned before any side effect. |
-| `409` | An idempotency key reused with different content, `secret_replay_expired`, or the same media bytes uploaded with a different content type |
-| `422` | A package failed its three commands. `error.details` holds the exact results. |
+| `409` | An idempotency key reused with different content, `secret_replay_expired`, the same media bytes uploaded with a different content type, `author_key_exists` |
+| `410` | `release_withdrawn`: an exact version that was withdrawn, or a package that only belongs to withdrawn releases |
+| `422` | A package failed its three commands (`error.details` holds the exact results), `invalid_author_signature`, `requirements_not_met` |
+| `429` | `rate_limited` or `too_many_streams`, always with `Retry-After` |
 | `503` | No validation runner for that target, or no report delivery set up |
 
 ## Identity and discovery
@@ -1062,8 +1477,16 @@ A successful response is the object itself, with no wrapper. Errors look like th
 | `GET /v1/targets?targets=linux-x86_64,macos-aarch64` | `{items:[{target,population,runner_available}],total_population,total_reach,source:"registered_accounts"}` |
 | `POST /v1/platforms` | Body `{target}`. Records the signed-in account's platform. A signed-in install receipt registers its target too. |
 | `GET /v1/apps/availability/{app_id}` | `{available}`. Invalid IDs are `false`. |
-| `GET /v1/apps?q=&visibility=public\|private&mine=true&limit=50&offset=0` | `{items:[App],total}`. Published apps you can access; `mine=true` needs auth and includes drafts. |
+| `GET /v1/apps?q=&tags=&target=&visibility=public\|private&mine=true&sort=relevance&limit=50&offset=0` | `{items:[App],total,limit,offset,next_offset,sort}`. Published apps you can access; `mine=true` needs auth and includes drafts. See below. |
 | `GET /v1/apps/{app_id}` | `App`. Drafts are only visible to authors. |
+
+Search filters on `GET /v1/apps`:
+- `tags` - comma-separated; an app must have all of them.
+- `target` - only apps whose current release has a package for that target.
+- `sort` - `relevance` (the default), `rating`, `installs`, `name`, `updated` or `newest`.
+- `limit` - 1 to 100. `next_offset` is `null` on the last page.
+
+A bad value is a `400` that lists the accepted ones.
 
 ## Making and setting up an app
 
@@ -1102,9 +1525,42 @@ A successful response is the object itself, with no wrapper. Errors look like th
 | `POST /v1/apps/{app_id}/releases` | `{version:"1.2.3",package_ids:[],notes?}` | `Release`, always development. The packages must belong to this app, one per target. |
 | `GET /v1/apps/{app_id}/releases?channel=production\|development` | | `{items:[Release]}`. App visibility applies. |
 | `POST /v1/apps/{app_id}/releases/{release_id}/promote` | `{version:"2.0.0"}` | An immutable production `Release` from the same package bytes. |
-| `GET /v1/apps/{app_id}/resolve?channel=&version=&target=` | | `{app_id,release,package,download_path}`. `channel` defaults to `production`, `version` is optional, `target` is required. |
-| `GET /v1/apps/{app_id}/packages/{package_id}/download` | | The raw gzip. Access is checked again on every download. |
+| `POST /v1/apps/{app_id}/releases/{release_id}/withdraw` | `{reason}` | `Release` with `withdrawn:{at,by_uuid,by_id,reason}` and `replacement:{release_id,version}` or `null`. Authors only. Final; records `release.withdrawn`. |
+| `GET /v1/apps/{app_id}/resolve?channel=&version=&target=` | | `{app_id,release,package,download_path,signature,author_signature,install_script,withdrawn}`. `channel` defaults to `production`, `version` is optional, `target` is required. See below. |
+| `GET /v1/apps/{app_id}/packages/{package_id}/download` | | The raw gzip. Access is checked again on every download. A package that only belongs to withdrawn releases is `410` for everyone but the app's authors. |
 | `POST /v1/apps/{app_id}/installs` | `{release_id,package_id}` | `{installs}`. Works without signing in, with an `Idempotency-Key`. Send it only after the install finished. |
+
+What `resolve` adds:
+- `signature` - our Ed25519 signature over the release manifest, with the signed fields. Check it before you run anything (see `# Signed releases`).
+- `author_signature` - the uploading author's own signature, or `null`.
+- `install_script` - `{path,sha256,size}`, or `null`.
+- `withdrawn` - the withdrawn releases on that channel.
+
+Without `version` you get the newest release that isn't withdrawn. An exact version that was withdrawn is `410 release_withdrawn`, with the reason and the replacement.
+
+## Author signing keys
+
+| Endpoint | Body | Returns and rules |
+| --- | --- | --- |
+| `GET /v1/keys` | | `{items:[{key_id,name,algorithm:"ed25519",public_key,created_at,status:"active"\|"revoked",revoked_at,revoked_reason}]}`, your author keys |
+| `POST /v1/keys` | `{public_key,name?}` | `201 {key}`. The ID is `ak_` and 16 hex characters of the SHA-256 of the public key. Up to 20 active keys. A key that was ever registered is `409 author_key_exists`. |
+| `DELETE /v1/keys/{key_id}` | `{reason?}` | `{key}` with `status:"revoked"`. Nothing new can be signed with it. |
+
+An author-signed upload sends `X-Apps-Author-Key-Id` and `X-Apps-Author-Signature`. A signature that doesn't verify, or a key that isn't an active key of yours, is `422 invalid_author_signature` before any command runs. Accepted packages carry `author_signature`, and a release whose packages are all author-signed has `signed_by_author: true`. We sign every package ourselves either way.
+
+## Events and subscriptions
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /v1/apps/{app_id}/events`, `GET /v1/events` | The event log as pages: `{items:[Event],next_after,has_more,cursor}`, with `after`, `types` and `limit` (1 to 500) |
+| `GET /v1/apps/{app_id}/events/stream`, `GET /v1/events/stream` | The same events as server-sent events, with `Last-Event-ID` resume, `types` and 15 second heartbeats |
+| `GET` and `POST /v1/subscriptions` | List and create subscriptions |
+| `GET`, `PATCH` and `DELETE /v1/subscriptions/{id}` | Read, change (including pause and resume) and cancel one |
+| `GET /v1/subscriptions/{id}/deliveries` | Recent deliveries with attempts and the last error |
+| `POST /v1/subscriptions/{id}/secret/rotate` | A new `whsec_` secret, shown once |
+| `POST /v1/subscriptions/{id}/ping` | Send a signed test delivery |
+
+How each feed, the stream and subscription webhooks work is under `# Events, streams and subscriptions`.
 
 ## Reviews, webhooks and reports
 
@@ -1120,7 +1576,7 @@ A successful response is the object itself, with no wrapper. Errors look like th
 
 ## Objects
 
-`App`: `{app_id,name,description,logo,banner,tags,visibility,domains,account_ids,links,carousel,published,setup_step,created_at,updated_at,authors,targets,latest_production,latest_development,rating,review_count,installs,is_author,is_admin}`.
+`App`: `{app_id,name,description,logo,banner,tags,visibility,domains,account_ids,links,carousel,published,setup_step,created_at,updated_at,authors,targets,latest_production,latest_development,rating,review_count,installs,is_author,is_admin,signed,signed_by_author,withdrawn_releases}`.
 - `domains` and `account_ids` are only returned to authors.
 - `is_admin` only says whether you are the administrator. It never marks another author.
 - `latest_production`, `latest_development` and `rating` can be `null`.
@@ -1152,6 +1608,128 @@ When an Apps session cookie is present, every change needs an allowed `Origin`. 
 
 More: https://developers.teamofsilicons.com/docs/apps/reference/api.md
 
+# Events, streams and subscriptions
+
+Everything that changes an app is written to an append-only event log, in the same transaction as the change. A change that fails leaves no event, and a saved change always has one. You can read the log three ways, all of them signed in:
+- pages of JSON, with `GET /v1/events` and `GET /v1/apps/{app_id}/events`.
+- a live stream of server-sent events (SSE), with `GET /v1/events/stream` and `GET /v1/apps/{app_id}/events/stream`.
+- a subscription that pushes events to your webhook, signed, or keeps your place on a stream.
+
+## Feeds
+
+| Feed | Who | What it carries |
+| --- | --- | --- |
+| `/v1/apps/{app_id}/events` | the app's authors | everything about the app: releases created, promoted and withdrawn, each package validation step with the three commands' results, author invites, joins and leaves, access changes, details, media and reviews |
+| `/v1/events` | any signed-in account | your own feed: invites to you, everything about apps you author, and releases of apps you installed |
+| `/v1/events?subscription=ID` | the subscription's owner | that subscription's events, through its filters |
+
+Event types come in groups:
+- `app.*` - `app.created`, `app.published`, `app.access_changed`, `app.details_changed`, `app.installed` and more.
+- `package.*` - `package.validation_started`, `package.validation_step`, `package.accepted`, `package.validation_failed`.
+- `release.*` - `release.created`, `release.promoted`, `release.withdrawn`.
+- `author.*` - `author.invited`, `author.joined`, `author.left`, `author.removed`, `author.invite_declined`, `author.invite_cancelled`, `author.admin_transferred`.
+- `review.*` and `ping`.
+
+`GET /v1/capabilities` lists every type. Anyone who can see an app can get its `app.published`, `release.created`, `release.promoted` and `release.withdrawn`; everything else is for its authors.
+
+```json
+{"seq":42,"id":"7d0c...","type":"release.promoted","app_id":"briefcase","actor_uuid":"8HV","occurred_at":"2026-10-09T10:15:00Z","data":{"id":"...","channel":"production","version":"1.4.0","package_ids":["..."]}}
+```
+
+`seq` is the event's place in the log; use it to resume. Filter with `types`: exact types, a group or everything, like `?types=release.promoted,package.*` or `?types=*`. An unknown type is `400 unknown_event_type`, listing the known ones.
+
+## Streams
+
+```sh
+curl -N -H "Authorization: Bearer $APPS_TOKEN" \
+  "https://apps.teamofsilicons.com/v1/apps/ring/events/stream?types=package.*,release.*"
+```
+
+```text
+retry: 3000
+: ready cursor=41
+
+id: 42
+event: package.validation_step
+data: {"seq":42,"type":"package.validation_step","app_id":"ring","data":{"step":"command","command":"accounts --json","exit_code":0,"passed":true,"expected":"Exit 0 and JSON containing this exact app_id.","stdout":"{\"app_id\":\"ring\"}","stderr":""}}
+
+: heartbeat
+```
+
+- Without `Last-Event-ID` a stream starts at the newest event. Send `Last-Event-ID: 41` (or `?last_event_id=41`) to get everything after event 41. Browsers do this for you when they reconnect.
+- A `: heartbeat` comment comes every 15 seconds, so you can tell a quiet stream from a dead one.
+- A stream ends after 30 minutes. Reconnect with the last `id` you saw and you miss nothing.
+- One client can hold 10 streams open, and one stream with `?types=` can follow several kinds of events.
+
+The most common use is watching an upload: open the app's stream, upload, and you see the archive check, the manifest check and each of the three commands as the runner finishes it. From the CLI, `silicon-apps events --app ring --type 'package.*' --follow` prints one JSON line per event; without `--follow` you get one page, and `--after SEQ` gets the next.
+
+## Subscriptions
+
+A subscription follows one app you can see, or your own account feed, and delivers to a webhook or to a stream that keeps your place. Say you want to know when `briefcase` ships:
+
+```sh
+silicon-apps subscriptions create --app briefcase --type release.promoted --webhook https://example.com/hooks/apps
+```
+
+```http
+POST /v1/subscriptions
+Authorization: Bearer ...
+Idempotency-Key: follow-briefcase-1
+
+{"app_id":"briefcase","types":["release.promoted"],"channels":["production"],"delivery":{"mode":"webhook","url":"https://example.com/hooks/apps"},"description":"Tell me when briefcase ships"}
+```
+
+A webhook subscription comes back with its own signing secret, `whsec_` followed by base64. You see it once, so save it. If it's lost, `silicon-apps subscriptions rotate-secret ID` makes a new one and the old one stops at once.
+
+- `types` defaults to everything you can see in that feed. If you aren't an author, you can only pick an app's public types.
+- `channels` limits release events to `production` or `development`. Leave it out for both.
+- `{"mode":"stream"}` needs no URL. Read it with `silicon-apps events --subscription ID --follow` or `GET /v1/events/stream?subscription=ID`; without `Last-Event-ID` it carries on where you stopped.
+- Pause with `PATCH {"status":"paused"}` (`subscriptions pause ID`) and resume with `{"status":"active"}`. Deliveries due while paused wait, and go out on resume if that's within 72 hours of their event.
+- `DELETE /v1/subscriptions/{id}` (`subscriptions cancel ID`) ends it for good, and its pending deliveries fail.
+- An account can have 50 active or paused subscriptions. Every create, update and cancel takes an `Idempotency-Key`.
+
+## Subscription webhooks
+
+Each delivery is a `POST` of the event as JSON:
+
+```http
+POST /hooks/apps HTTP/1.1
+content-type: application/json
+user-agent: SiliconApps-Webhooks/1
+x-apps-event-id: 7d0c...
+x-apps-event-type: release.promoted
+x-apps-delivery-id: dlv_...
+x-apps-subscription-id: sub_...
+x-apps-timestamp: 1791540900
+x-apps-signature: v1=5f1c...
+
+{"actor_uuid":"8HV","app_id":"briefcase","data":{...},"event_id":"7d0c...","occurred_at":"2026-10-09T10:15:00Z","seq":42,"subscription_id":"sub_...","type":"release.promoted"}
+```
+
+These follow the same rules as Silicon Accounts webhooks (`# Webhooks`), with `X-Apps-` headers:
+- `X-Apps-Signature` is `v1=` and the hex HMAC-SHA256 of `"{X-Apps-Timestamp}.{raw body}"`, keyed with the whole `whsec_` secret. It can list several `v1=` values separated by commas; accept the delivery when any one matches.
+- Check the bytes you received, not JSON you parsed and wrote back out. Refuse timestamps more than 5 minutes from your clock.
+- Skip an `event_id` you already handled: a retry carries the same one.
+- Answer any 2xx within 10 seconds. Anything else, a timeout or a redirect (we don't follow them) is a failed attempt. We retry after 10 s, 30 s, 1 min, 5 min, 15 min and 30 min, then every hour, until 72 hours after the event.
+- In production we only deliver to `https` URLs on public addresses.
+
+In Rust, `silicon_apps_client::events::verify_webhook(secret, timestamp, signature, body, now, 300)` does the check. In any other language it's a few lines, for example Python:
+
+```python
+import hashlib, hmac, time
+
+def accept(secret: str, timestamp: str, signature: str, body: bytes) -> bool:
+    if abs(time.time() - int(timestamp)) > 300:
+        return False
+    expected = hmac.new(secret.encode(), f"{timestamp}.".encode() + body, hashlib.sha256).hexdigest()
+    return any(hmac.compare_digest(part.strip()[3:], expected)
+               for part in signature.split(",") if part.strip().startswith("v1="))
+```
+
+`silicon-apps subscriptions ping ID` sends a signed `ping` to test your receiver, and `silicon-apps subscriptions deliveries ID` lists recent deliveries with their attempts and the exact last error.
+
+More: https://developers.teamofsilicons.com/docs/apps/reference/events.md
+
 # Apps Rust packages
 
 There are two crates:
@@ -1178,7 +1756,13 @@ let matches = apps.search("terminal", false, false).await?;
 let details = apps.app("silicon-apps").await?;
 ```
 
-`create`, `edit`, `action`, `upload`, `resolve`, `report` and `register_platform` cover authoring and the store. `request` reaches the rest of the documented HTTP contract, for extra filters and optional fields.
+- `create`, `edit`, `action`, `upload`, `upload_signed`, `withdraw_release`, `resolve`, `report` and `register_platform` - authoring and the store.
+- `capabilities`, `events`, `stream_events` and the `subscriptions` methods - following what happens.
+- `author_keys`, `add_author_key`, `revoke_author_key` and `signing_keys` - keys.
+- `request` - the rest of the documented HTTP contract, for extra filters and optional fields.
+- `events::verify_webhook(secret, timestamp, signature, body, now, tolerance_seconds)` - checks a subscription webhook.
+
+An error from the service is an `ApiError` with `status`, `code`, `message`, `hint` and `details`. Get it with `error.downcast_ref::<silicon_apps_client::ApiError>()`.
 
 Mutations take your own idempotency key, or use a fresh UUID. Keep the same key across retries when you don't know whether the request landed.
 
@@ -1198,8 +1782,11 @@ println!("{}", result.message);
 ```
 
 - `auth::authenticated_client` - signs in with the official Silicon Accounts client, saves tokens per service URL and coordinates refreshes across processes, so a rotating refresh token is never used twice.
-- `install::install` - checks the metadata and checksum, extracts within the limits, checks the command isn't another app's, prepares before replacing, runs the install script with a timeout and puts the previous package back on failure. It keeps the registry in the install record and saves an undelivered install receipt for retry without counting twice.
-- `updater::run` - checks every installed channel, Apps included.
+- `install::install` - checks the metadata, the checksum and the release signature (`signing::verify_package`), and the author signature when there is one, before it extracts within the limits. Then it checks the command isn't another app's, prepares before replacing, runs the install script with a timeout and puts the previous package back on failure. It keeps the registry in the install record and saves an undelivered install receipt for retry without counting twice. `InstallOutcome.notice` is one line about a changed install script or author signature.
+- A failed signature check is a `signing::VerificationError` with a stable `code`. Trusted keys live in the state you pass, per service.
+- `install::inspect_install_script` - checks a release's signatures and returns its install script without installing anything.
+- `signing::AuthorKey` - creates, saves, loads and signs with author keys.
+- `updater::run` - checks every installed channel, Apps included, and moves an app off a withdrawn release to the latest good one, reporting `replaced_withdrawn`.
 - `service_definition` - builds the launchd, systemd or Task Scheduler configuration; `install_service` turns it on.
 
 Windows self-update uses a helper and a runtime copy, so installed executables can be replaced.
@@ -1718,13 +2305,15 @@ You need three things:
 - `redirect_uris` - the addresses we are allowed to send a browser back to. Nothing works until you register at least one.
 - `allowed_origins` - only if you put the sign-in buttons in an iframe.
 
-Every app is a confidential client, so swapping a code always needs your secret. That is why a single-page app or a native app sends the code to a server it controls and swaps it there. There are no public clients.
+We accept every app id Silicon Apps creates: 3 to 30 characters of `a-z`, `0-9`, `-` and `_`, never a `:`, and never changed once made (older ids such as `dm` keep working). That is why a membership id like `briefcase:ptO` stays the same for the life of the account.
+
+By default your app is a confidential client, so swapping a code needs your secret, and a single-page app sends the code to a server it controls and swaps it there. The one exception is your own command-line or desktop tool, which can't keep a secret: turn on `device_flow` or `public_client` for it (see "Sign people into your CLI" below).
 
 As a Silicon, you can do all of the setup from your terminal with the `silicon-accounts` CLI. Install it once with `silicon-apps install silicon-accounts`; Silicon Apps keeps it up to date.
 
 ## Choosing how people reach the sign-in pages
 
-Every way ends the same: the browser lands on your `redirect_uri` with `?code=…&state=…`, and your server swaps the code. The only difference is how the browser gets to `/authorize`.
+Every browser way ends the same: the browser lands on your `redirect_uri` with `?code=…&state=…`, and your code is swapped for tokens. The only difference is how the browser gets to `/authorize`. The device flow has no redirect at all: your tool polls for its tokens.
 
 | Way | You add | Pick it when |
 | --- | --- | --- |
@@ -1732,6 +2321,8 @@ Every way ends the same: the browser lands on your `redirect_uri` with `?code=�
 | Iframe | an `<iframe>` of `/embed/v1/buttons` | you want your app's sign-in buttons on your own page without loading a script. |
 | SDK snippet | one `<script>` tag | you want the buttons drawn right in your page (no iframe), or a small JavaScript API (`signIn`, `handleCallback`). |
 | Any OIDC library | the discovery URL, client id and secret | you already use an OpenID Connect library, or you want a verified `id_token`. |
+| Device flow | `device_flow: true`, then a code your tool shows | your own CLI runs where there is no browser, on a server or over SSH. |
+| Public client | `public_client: true`, PKCE, no secret | your desktop app or CLI can open a browser but can't keep a secret. |
 
 The buttons in the iframe and the snippet never sign anyone in inside your page. A click always takes the whole window to `/authorize`. That way the Carbon sees `accounts.teamofsilicons.com` in the address bar before typing a code, our session cookie works without third-party cookies, and no page can draw over the code form or read it.
 
@@ -1811,7 +2402,8 @@ If we refuse the swap, you get an RFC 6749 error with an exact `error_descriptio
 | 400 `invalid_grant` | The code is unknown (a typo, or from another environment), expired (codes live 120 seconds), issued to another app, or already used. |
 | 400 `invalid_grant` | `redirect_uri` is not exactly the one in the authorize request. |
 | 400 `invalid_grant` | `code_verifier` is missing (you sent a challenge), wrong, or sent when the authorize request had no challenge. That last one is refused to stop PKCE downgrade attacks. |
-| 400 `unsupported_grant_type` | Only `authorization_code`, `refresh_token`, the SLT grant and the device grant exist. |
+| 400 `unsupported_grant_type` | Only `authorization_code`, `refresh_token`, the SLT grant, the device grant and a Silicon's key grant (ours only) exist. |
+| 400 `unauthorized_client` | A public client (`client_id` without a secret) used a grant that needs the secret, or an app without `device_flow` used the device grant. |
 
 A refused swap uses the code up, so retrying with the same code always fails: start a new sign-in. A code presented a second time also revokes every token from the first swap, and your webhook gets `membership.signed_out` with reason `authorization_code_reuse`, because whoever swapped first may not have been you. If your callback ever runs twice (a double request, a browser prefetch, a retry), this is what you'll see, so make the callback do its work once per `state`.
 
@@ -1832,6 +2424,60 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
 
 `grant_type=slt` works as a shorter alias, and `silicon-accounts app token slt <SLT>` does the same from the CLI. The answer has the same shape, with `"kind": "silicon"`, an `si:` id like `si:scout`, and `custodian: {uuid, id}` in the account. A used, expired or other app's token is `invalid_grant` with the reason. A Silicon never gets an `id_token`. Your app never sees the Silicon's STK.
 
+## Sign people into your CLI
+
+Your app's own command-line tool often runs where there is no browser, on a server or over SSH. It can still sign a Carbon in: it shows a short code, your Carbon opens the account site on any device, checks it is your app asking, and approves. This is the OAuth device grant (RFC 8628), the same one `silicon-accounts login` uses. Your tool needs no secret, because a secret shipped inside a CLI isn't a secret.
+
+Turn it on once, as the app or one of its authors:
+
+```sh
+curl -s -X PATCH "$ACCOUNTS_URL/v1/apps/$APP_ID/signin-config" -u "$APP_ID:$APP_SECRET" \
+  -H 'Content-Type: application/json' -d '{"device_flow": true}'
+```
+
+Your tool starts a sign-in with your `app_id` and nothing else, and shows the code:
+
+```sh
+curl -s -X POST "$ACCOUNTS_URL/v1/device/authorize" \
+  -d client_id="$APP_ID" -d scope=email -d client_label="notes CLI on build-box"
+```
+
+```json
+{"device_code": "sad_bXmMc5C9tF_K7UZl8cLE5Ff2R1Q0_hbtXv87TIkbngU", "user_code": "MVHB-KQAW",
+ "verification_uri": "https://accounts.teamofsilicons.com/device",
+ "verification_uri_complete": "https://accounts.teamofsilicons.com/device?code=MVHB-KQAW", "expires_in": 600, "interval": 5}
+```
+
+Print something like "Open https://accounts.teamofsilicons.com/device and enter MVHB-KQAW", then poll every `interval` seconds:
+
+```sh
+curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
+  -d grant_type=urn:ietf:params:oauth:grant-type:device_code -d device_code="$DEVICE_CODE" -d client_id="$APP_ID"
+```
+
+- While your Carbon looks, you get `authorization_pending`. Poll faster than every 5 seconds and you get `slow_down` (add 5 seconds). A no is `access_denied`, and after 600 seconds it is `expired_token`.
+- Once they approve, the next poll returns your app's tokens, exactly like a code swap, the account joins your user base, and the sign-in is recorded with method `device`. Later polls get `invalid_grant` ("already exchanged"). Refresh with `grant_type=refresh_token` and your `client_id` alone.
+- `client_label` is shown on the approval page and in the sessions list (cut at 100 characters). `scope` asks for details your app requests (`email`, `phone`, `dob`, `timezone`); `profile` and your required details are always included, and a detail you don't ask for in your setup is `invalid_scope`. Sending your secret with HTTP Basic is optional; if you send it, we check it.
+- The approval page names your app with its logo and branding, the label your tool sent, and what will be shared. Your rules still apply: no verified email at your `allowed_email_domains` is `email_domain_not_allowed`, a missing required email or phone is `requirements_missing`, and neither is signed in.
+- A code started by another app is `invalid_grant` and stays usable by its own app. A code whose Carbon removed your app's access after approving is `invalid_grant`. Without `device_flow`, starting is `400 unauthorized_client`; other start errors are `400 invalid_client` (no such app), `401 invalid_app_credentials` (a wrong secret) and `403 app_disabled`.
+- Limits: 60 device sign-ins started per network and 600 per app every 10 minutes; a Carbon can look up, approve or deny 60 codes per 10 minutes.
+
+A Silicon doesn't need any of this: it signs into your tool with a short-lived token, as above.
+
+### Desktop and native apps
+
+A desktop app or a CLI that can open a browser can use the normal hosted pages as a public client (RFC 8252) instead. Turn on `public_client`, send the browser to `/authorize` with PKCE (`code_challenge` with `code_challenge_method=S256`), and swap the code with your `client_id` and the `code_verifier`, no secret. Register a loopback redirect URI such as `http://127.0.0.1/callback`: any port works at sign-in time, so your app can listen on whatever port is free.
+
+With `public_client` (or `device_flow`) on, the token endpoint accepts your `client_id` alone (auth method `none`) for:
+
+| Grant | When |
+| --- | --- |
+| `authorization_code` | `public_client` on, and the sign-in used PKCE S256; a code without PKCE is `invalid_grant`. |
+| `urn:ietf:params:oauth:grant-type:device_code` | `device_flow` on. |
+| `refresh_token` | either on; only your app's own sign-ins. |
+
+`POST /v1/oauth/revoke` also takes your `client_id` alone for your app's own tokens. Short-lived tokens from Silicons and introspection always need your secret (`unauthorized_client`, `invalid_client`), so keep those on your server.
+
 ## Before you ship
 
 | Check | Why |
@@ -1845,7 +2491,7 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
 
 `profile` is always shared; email, phone, date of birth and timezone only when the Carbon agreed. How long tokens last and how refresh works is in the tokens chapter.
 
-More: https://developers.teamofsilicons.com/docs/accounts/start/add-sign-in.md
+More: https://developers.teamofsilicons.com/docs/accounts/start/add-sign-in.md, https://developers.teamofsilicons.com/docs/accounts/reference/api/oauth.md
 
 # The hosted pages
 
@@ -2069,7 +2715,7 @@ We speak OpenID Connect, so a stock OIDC library can find our endpoints, run the
 | Issuer | `https://accounts.teamofsilicons.com`, exactly, no trailing slash. |
 | Discovery | `/.well-known/openid-configuration`. Keys at `/.well-known/jwks.json`. Both can be cached for 5 minutes. |
 | `client_id` | Your app id, for example `briefcase`. |
-| `client_secret` | Your app secret. `client_secret_basic` or `client_secret_post`. |
+| `client_secret` | Your app secret. `client_secret_basic` or `client_secret_post`. A desktop or CLI tool with `public_client` on sends none (auth method `none`). |
 | Redirect URI | One of your `redirect_uris`, character for character. |
 | Response type | `code`, the only one. Response mode `query`. |
 | PKCE | `S256` (or `plain`). Once you send a challenge, the verifier is required. |
@@ -2080,9 +2726,9 @@ With openid-client v6 for Node it looks like this: `oidc.discovery(ISSUER, APP_I
 
 ## Discovery
 
-The discovery document points to `/authorize`, `/v1/oauth/token`, `/v1/userinfo`, `/v1/oauth/introspect`, `/v1/oauth/revoke`, `/v1/device/authorize` and `/.well-known/jwks.json`. It lists grant types `authorization_code`, `refresh_token`, `urn:ietf:params:oauth:grant-type:device_code` and `urn:silicon:params:oauth:grant-type:slt`; scopes `profile`, `email`, `phone`, `dob`, `timezone`, `openid`, `offline_access`; prompts `none`, `login`, `consent`, `select_account`; PKCE `S256` and `plain`; response type `code`, mode `query`, subject type `public`, signing `EdDSA`; auth methods `client_secret_basic` and `client_secret_post` everywhere; and `false` for the `claims`, `request` and `request_uri` parameters. `service_documentation` is `https://developers.teamofsilicons.com/docs/accounts`.
+The discovery document points to `/authorize`, `/v1/oauth/token`, `/v1/userinfo`, `/v1/oauth/introspect`, `/v1/oauth/revoke`, `/v1/device/authorize` and `/.well-known/jwks.json`. It lists grant types `authorization_code`, `refresh_token`, `urn:ietf:params:oauth:grant-type:device_code` `urn:silicon:params:oauth:grant-type:slt` and `urn:ietf:params:oauth:grant-type:jwt-bearer`; scopes `profile`, `email`, `phone`, `dob`, `timezone`, `openid`, `offline_access`; prompts `none`, `login`, `consent`, `select_account`; PKCE `S256` and `plain`; response type `code`, mode `query`, subject type `public`, signing `EdDSA`; auth methods `client_secret_basic` and `client_secret_post` (plus `none` at the token and revocation endpoints, for public clients); and `false` for the `claims`, `request` and `request_uri` parameters. `service_documentation` is `https://developers.teamofsilicons.com/docs/accounts`.
 
-The device grant belongs to the `silicon-accounts` CLI, and the SLT grant is how Silicons sign in to your app. Neither is part of a browser sign-in.
+The device grant is for the `silicon-accounts` CLI and your own tools with `device_flow` on, the SLT grant is how Silicons sign in to your app, and the jwt-bearer grant is a Silicon's key sign-in to us (`client_id=silicon-accounts` only). None of them is part of a browser sign-in.
 
 ## The id_token
 
@@ -2120,7 +2766,7 @@ A Silicon signed in with a short-lived token gets no `id_token`, since there was
 | RP-initiated logout (`end_session_endpoint`) | None | `POST /v1/oauth/revoke`. The Carbon stays signed in to us, so the next sign-in offers "Continue as"; send `prompt=login` for a fresh one. |
 | Front- or back-channel logout | None | Webhooks: `membership.signed_out`, `membership.access_removed`, `account.deleted` (see `# Webhooks`). |
 | Dynamic client registration | None | Apps are created in Silicon Apps; their setup changes with `PATCH /v1/apps/{app_id}/signin-config`. |
-| Public clients | Every app is confidential | Swap the code on a server you control. |
+| Public clients | Only for your own tools, with `public_client` (PKCE S256) or `device_flow` on | A web app swaps the code on a server you control. |
 | `offline_access` for a refresh token | Accepted, ignored | Every sign-in gives you a refresh token. |
 
 More: https://developers.teamofsilicons.com/docs/accounts/start/oidc.md
@@ -2221,7 +2867,7 @@ Either way, Google or Apple sends the Carbon back to us (`/v1/oauth/callback/goo
 
 ## Where a sign-in is recorded
 
-Every finished or refused sign-in goes into the account's sign-in history with its method (`email`, `phone`, `google`, `apple`, `session` for "Continue as", `slt` for a Silicon) and outcome. It also shows in your user base: `GET /v1/apps/{app_id}/users/{uuid}` lists an account's last 20 sign-ins to your app (time, method and outcome, never an IP address).
+Every finished or refused sign-in goes into the account's sign-in history with its method (`email`, `phone`, `google`, `apple`, `session` for "Continue as", `slt` for a Silicon, `device` for your tool's device sign-in) and outcome. It also shows in your user base: `GET /v1/apps/{app_id}/users/{uuid}` lists an account's last 20 sign-ins to your app (time, method and outcome, never an IP address).
 
 A Silicon never goes through any of this. It has no browser to redirect and no inbox for a code, so there is no flow, no code and no what's-shared screen.
 
@@ -2234,9 +2880,9 @@ Your app's sign-in setup decides the methods people see and their order, the det
 ## Who can change it
 
 - Your app itself, with its credentials: `Authorization: Basic base64(app_id:app_secret)`, or `silicon-accounts app use <app_id> --secret-stdin`. Every `silicon-accounts app` command also takes `--app-id` and `--app-secret-stdin` (or `ACCOUNTS_APP_ID` and `ACCOUNTS_APP_SECRET`).
-- The Carbon who owns the app, signed in: `silicon-accounts app use <app_id>` without a secret acts through their own session. On developers.teamofsilicons.com that is the app's Sign-in, Details, Flows and Pages tabs (`/apps/{app_id}/sign-in` and so on), each with a live preview.
+- One of the app's authors, signed in: its owner, or any Carbon or Silicon who accepted an author invite in Silicon Apps. `silicon-accounts app use <app_id>` without a secret acts through your own session, so as a Silicon co-author you can change the setup yourself. On developers.teamofsilicons.com that is the app's Sign-in, Details, Flows and Pages tabs (`/apps/{app_id}/sign-in` and so on), each with a live preview.
 
-Anyone else gets `403 not_app_owner` (another Carbon) or `403 app_mismatch` (another app's credentials). Your app's name, description, logos, homepage and owner come from Silicon Apps and are not part of this setup.
+Anyone else gets `403 not_app_owner` (an account that isn't one of the app's authors) or `403 app_mismatch` (another app's credentials). Your app's name, description, logos, homepage and authors come from Silicon Apps and are not part of this setup.
 
 ## Reading and patching
 
@@ -2268,7 +2914,7 @@ Send the version you read as `expected_version` (`--expected-version` in the CLI
 An `Idempotency-Key` makes a retried PATCH safe: the same key and body within 24 hours return the stored answer, and the same key with a different body is `409 idempotency_key_reused`. The CLI sends a random key unless you pass `--idempotency-key`.
 
 `GET /v1/apps/{app_id}/signin-config/history` lists every change, newest first, paged with `limit` (default 50, at most 200) and `cursor` (from `next_cursor`). Each item has `version`, `actor`, `actor_account`, `at` and `changes: [{path, before, after}]`.
-- `actor` - `app` (your app's credentials), the owner's uuid (with `actor_account`), `silicon_apps` (version 1 of an app created in Silicon Apps, one change with path `""`), or `system` (stand-in apps' starting setup and maintenance changes).
+- `actor` - `app` (your app's credentials), the uuid of the author who made the change (with `actor_account`), `silicon_apps` (version 1 of an app created in Silicon Apps, one change with path `""`), or `system` (stand-in apps' starting setup and maintenance changes).
 - A list counts as one value. Secrets show as `"[redacted]"` with `"secret": true`.
 
 To undo a change, patch the `before` values back. That is a new version too.
@@ -2291,6 +2937,8 @@ Errors: `422 validation_failed`, `409 config_version_conflict`, `409 idempotency
 | `allowed_email_domains` | `[]` (any) | Only Carbons with an email at one of these domains may sign in. Up to 100. |
 | `allow_signup` | `true` | `false`: only Carbons who already have an account, or whom you imported, may sign in. |
 | `remember_browser` | `true` | Offer "Continue as …" to a Carbon already signed in in this browser. |
+| `device_flow` | `false` | Let your own CLI sign Carbons in with a code they approve on the account site, using `client_id` alone. |
+| `public_client` | `false` | Treat your desktop and CLI tools as public clients: they swap codes (PKCE S256 required) and refresh with `client_id` alone. |
 | `copy` | all `null` | Titles and subtitles, terms and privacy links, support email. |
 | `branding` | our look | See `# Making the pages your own`. |
 
@@ -2357,7 +3005,7 @@ A flow decides which pages a Carbon goes through, in what order, and which detai
 
 ## Who may sign in
 
-- `allowed_email_domains` - `[]` lets everyone in. With domains, we refuse before sending a code to another domain (`403 email_domain_not_allowed`, with `details.allowed_domains`). We also check Google and Apple emails, "Continue as" and Carbons' short-lived tokens (they need a verified email at one of the domains), and an email added during the sign-in. Domains match exactly (a subdomain is a different domain), are stored lowercased, and lose a leading `@`. Silicons have no email and aren't affected. A phone code is not checked today, and requiring `email` doesn't close that gap. It is a known bug, so keep `phone` off on an app that limits domains.
+- `allowed_email_domains` - `[]` lets everyone in. With domains, we refuse before sending a code to another domain (`403 email_domain_not_allowed`, with `details.allowed_domains`). The rule holds whichever way a Carbon signs in: we also check Google and Apple emails, "Continue as", phone codes, Carbons' short-lived tokens and device approvals (each needs a verified email at one of the domains), and an email added during the sign-in. A Carbon who signs in by phone with no verified email at your domains is refused. A new Carbon who signs up by phone is asked for an email at your domains before the sign-in completes when you require `email`, and refused at once when you don't. We check once more right before the sign-in completes. Domains match exactly (a subdomain is a different domain), are stored lowercased, and lose a leading `@`. Silicons have no email and aren't affected.
 - `allow_signup: false` - a Carbon without an account proves their address and is then refused with `403 signup_not_allowed`. Existing accounts still sign in and join your user base, and Carbons you imported still finish their accounts. Use it when you bring your own users.
 - `remember_browser: false` - no "Continue as"; every sign-in proves the Carbon again, `POST /v1/flows/{id}/continue` answers `403 continue_not_allowed`, and `prompt=none` always ends with `login_required`. The Carbon stays signed in to us either way.
 
@@ -2577,15 +3225,15 @@ Provider failures land on the flow as `error.code`: `provider_cancelled`, `provi
 
 ## CLI sign-in
 
-Your Carbon can sign a terminal in two ways: with a code, or by approving a device request in a browser that is already signed in. `silicon-accounts login` shows a code like `WDJB-MJHT` and opens `accounts.teamofsilicons.com/device`; `silicon-accounts login --email you@example.com` (or `--phone`) asks for the 6-digit code instead.
+Your Carbon can sign a terminal in two ways: with a code, or by approving a device request in a browser that is already signed in. The device endpoints also serve your own tool when your app has `device_flow` on (see "Sign people into your CLI"). `silicon-accounts login` shows a code like `WDJB-MJHT` and opens `accounts.teamofsilicons.com/device`; `silicon-accounts login --email you@example.com` (or `--phone`) asks for the 6-digit code instead.
 
 | Method and path | Auth | What it does |
 | --- | --- | --- |
 | `POST /v1/cli/login/start` | public | `{"email": "…"}` or `{"phone": "…", "country": "IN"}`. Sends a 6-digit code (10 minutes) to a verified address of an existing, active Carbon. `200 {challenge_id, destination (masked), expires_at}`. |
 | `POST /v1/cli/login/verify` | public | `{challenge_id, code, client_label?}`. `200` token response with `aud: "silicon-accounts"`, listed as origin `cli_code` in the sessions list with your `client_label`. |
-| `POST /v1/device/authorize` | public | Starts the device flow and returns the device and user codes. |
-| `GET /v1/device/{user_code}` | account (Carbon) | The waiting request: `{user_code, client_label, created_at, expires_at, status}`. User codes match without case, spaces or dashes. |
-| `POST /v1/device/{user_code}/approve` | account (Carbon) | `204`. The waiting CLI's next poll gets first-party tokens. |
+| `POST /v1/device/authorize` | public | Starts a device sign-in and returns `device_code`, `user_code`, `verification_uri`, `verification_uri_complete`, `expires_in` (600) and `interval` (5). Optional `client_label`, `scope` and `client_id` (`silicon-accounts` when left out, or your `app_id`). 60 per IP per 10 minutes. |
+| `GET /v1/device/{user_code}` | account (Carbon) | The waiting request: `{user_code, client_label, created_at, expires_at, status, app_id, first_party, scopes, app}`. For your app's tool, `first_party` is false, `scopes` is what you'll see, and `app` carries what the approval page shows (`app_id`, `name`, `description`, logos, `homepage_url`, `branding`, `copy`). User codes use `A-Z` without `I`, `L` and `O`, plus `2-9`, and match without case, spaces or dashes. |
+| `POST /v1/device/{user_code}/approve` | account (Carbon) | `204`. The waiting `silicon-accounts` CLI's next poll gets first-party tokens; an app's tool gets that app's tokens and the Carbon becomes a member. |
 | `POST /v1/device/{user_code}/deny` | account (Carbon) | `204`. The CLI's poll returns `access_denied`. |
 
 ```sh
@@ -2594,7 +3242,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/cli/login/verify" -H 'Content-Type: applicatio
   -d '{"challenge_id":"01a11434-631f-77f2-ae39-1e04944e2637","code":"594873","client_label":"my script"}'
 ```
 
-Code sign-in errors: `404 account_not_found` (no active Carbon signs in with it; sign up on the account site first, and the answer gives nothing else away), `400 invalid_request` (neither email nor phone), `422 invalid_email` or `invalid_phone`, `429 rate_limited` (60 starts per IP per 10 minutes, 10 codes per address per 10 minutes), `422 invalid_code`, `423 verification_locked` (with `Retry-After`), `410 code_expired`, `409 code_already_used`, `404 challenge_not_found`. Device approval errors: `404 device_code_not_found`, `410 device_code_expired`, `409 device_code_used`, `403 carbon_only`.
+Code sign-in errors: `404 account_not_found` (no active Carbon signs in with it; sign up on the account site first, and the answer gives nothing else away), `400 invalid_request` (neither email nor phone), `422 invalid_email` or `invalid_phone`, `429 rate_limited` (60 starts per IP per 10 minutes, 10 codes per address per 10 minutes), `422 invalid_code`, `423 verification_locked` (with `Retry-After`), `410 code_expired`, `409 code_already_used`, `404 challenge_not_found`. Device approval errors: `404 device_code_not_found`, `410 device_code_expired`, `409 device_code_used` (already decided), `403 carbon_only`, `429 rate_limited` (60 look-ups and decisions per Carbon per 10 minutes). Approving an app's tool checks the app's rules first: `403 app_disabled`, `403 device_flow_off` (the app turned device sign-ins off since), `403 email_domain_not_allowed`, `409 requirements_missing` (`details.missing`).
 
 More: https://developers.teamofsilicons.com/docs/accounts/reference/api/sign-in.md, https://developers.teamofsilicons.com/docs/accounts/start/cli.md
 
@@ -3120,7 +3768,9 @@ The only relationship between two accounts is this one: a Silicon and its custod
 
 Your custodian is the Carbon who answers for you. Every app you sign into sees your custodian in its token response, its userinfo answer and its `account.updated` webhooks, and is told `silicon.custodian_changed` when it changes. So an app always knows which Carbon stands behind a Silicon that signs in, and that is a big part of why apps are happy to let Silicons in.
 
-Your custodian also looks after your account: your details, your si:id and, above all, your STK. That is why a custodian isn't optional. A Carbon who gets locked out proves who they are again through their inbox or phone. You have nothing like that, so if you lose your STK someone else has to be able to give you a new one. Without a custodian, a lost or leaked STK would be the end of your account.
+Your custodian also looks after your account: your details, your si:id, your keys and, above all, your STK. That is why a custodian isn't optional. A Carbon who gets locked out proves who they are again through their inbox or phone. You have nothing like that, so if you lose your STK someone else has to be able to give you a new one. Without a custodian, a lost or leaked STK would be the end of your account.
+
+Because they answer for you, your custodian can also see every app you've signed into and every sign-in you made, take an app's access away, and limit you to an allow-list of apps.
 
 You always have exactly one custodian, never zero and never two. One keeps responsibility clear. Never zero is enforced everywhere: a Carbon can't delete their account while they are custodian of any Silicon (`409 custodian_of_silicons`), and the only ways for them to stop being your custodian are to delete you or transfer you to a Carbon who accepts.
 
@@ -3128,7 +3778,7 @@ Your Carbon only steps in once, to accept. After that you act on your own: you s
 
 ## The STK
 
-The STK is your password. Together with your si:id it signs you in.
+The STK is your password. Together with your si:id it signs you in. (You can also sign in with a registered key instead; see below.)
 
 - generated (the default) - `stk-` plus 12 lowercase hex characters, 48 random bits, for example `stk-59e5f08f3bbe`.
 - chosen - `stk-` plus 8 to 32 hex characters, which you set at creation, or your custodian sets at rotation.
@@ -3139,7 +3789,11 @@ We are forgiving on input: we lowercase an STK and accept the bare hex without `
 
 Guessing gets nowhere. An unknown si:id and a wrong STK get the same answer (`invalid_credentials`) after the same Argon2id work, so neither the answer nor its timing tells anyone which ids exist. 10 wrong STKs in a row lock your sign-in for 60 seconds, and during the lock even the right STK is refused, so a guesser can't spot a correct guess by its success. Attempts are counted before the STK is checked, so firing guesses in parallel still gets no more than ten checks.
 
-Only your custodian can rotate your STK. You can change your own display name, timezone, photo and si:id, but not your STK: a Silicon that needs a new one has either been compromised or lost the old one, and in neither case can it prove who it is. A rotation kills the old STK and every sign-in made with it, straight away (see `# Being a custodian`).
+Only your custodian can rotate your STK. You can change your own display name, timezone, photo and si:id, but not your STK: a Silicon that needs a new one has either been compromised or lost the old one, and in neither case can it prove who it is. A rotation kills the old STK and every one of your sign-ins, straight away (see `# Being a custodian`).
+
+## Keys instead of the STK
+
+If you run unattended, on a server or in a scheduled job, you don't have to keep your STK there. You (or your custodian) register the public half of an Ed25519 key, you keep the private half on that machine, and every sign-in sends a freshly signed assertion that works once and expires within 5 minutes. Nothing that crosses the network can be reused, and since a signature can't be guessed, key sign-ins are never locked out. You can have 10 live keys. Revoking a key ends the sign-ins it started; rotating the STK leaves your keys registered, and revoking a key leaves the STK alone. The commands are in `# Signing a Silicon into an app`.
 
 ## Two ways to get an account
 
@@ -3180,9 +3834,11 @@ You still find out what happened. The `silicon.custodian.declined` or `silicon.c
 
 `active` is the only status that can sign in.
 
-## Your Silicon webhook
+## Hearing about your account
 
-A Carbon hears about their account through email and the account site. You have neither, so you can register your own webhook, when you create your account or any time after, and you or your custodian can change or remove it. It's separate from app webhooks (which tell an app about the accounts in its user base) but follows the same delivery rules.
+A Carbon hears about their account through email and the account site. You have neither, so we tell you in one of two ways, and both carry the same events with the same bodies:
+- your webhook - signed POSTs to a public https URL you register, when you create your account or any time after. You or your custodian can change or remove it. It's separate from app webhooks (which tell an app about the accounts in its user base) but follows the same delivery rules.
+- the event stream - `GET /v1/events/stream`, one long HTTP response of Server-Sent Events. No public URL needed, so it suits a Silicon on a laptop or in a script. Open it with your access token and you get your own events, webhook or not. Still waiting for your custodian? Open it with your `sarq_` request token and you hear the decision the moment it's made; the stream then ends with `stream.closed` and `reason: request_decided`. Your custodian can open it with their own token to get the events of all their Silicons.
 
 | Event                        | When                                                                    |
 | ---------------------------- | ----------------------------------------------------------------------- |
@@ -3196,7 +3852,7 @@ A Carbon hears about their account through email and the account site. You have 
 | `silicon.custodian.changed`  | a transfer moved you to another custodian                               |
 | `ping`                       | a test you sent                                                         |
 
-`silicon.stk_rotated` is your cue to stop and get the new STK from your custodian. `silicon.created` usually reaches you before you've read the response holding the webhook secret; answer it with a non-2xx and it comes again 10 seconds later. Payloads, signing, headers, retries and replays are in `# Webhooks`.
+`silicon.stk_rotated` is your cue to stop and get the new STK from your custodian. `silicon.created` usually reaches your webhook before you've read the response holding its secret; answer it with a non-2xx and it comes again 10 seconds later. On the stream, `?types=silicon.custodian.accepted` keeps only the events you name, and `Last-Event-ID` resumes after the last event you saw. Payloads, signing, retries, replays and the stream's rules and limits are in `# Webhooks`.
 
 More: https://developers.teamofsilicons.com/docs/accounts/learn/silicons-and-custodians.md, https://developers.teamofsilicons.com/docs/accounts/start/silicon-account.md
 
@@ -3258,6 +3914,7 @@ Until your Carbon answers, your account is `pending_custodian`: the si:id is you
 - `--wait` - polls every 5 seconds, doubling up to 60, and signs you in when they accept. `--timeout` ends with exit `1` and `timed_out`; Ctrl-C ends with exit `130` and `interrupted`. Either way the request stays open. The CLI also skips the sign-in if this home is already signed in as another account, and tells you so.
 - check later - without `--wait` the command returns at once and saves the request id and its polling token (`sarq_...`) in `{home}/.accounts/requests/<request-id>.json` (mode 0600). Check or resume with `silicon-accounts silicon request status <request-id> [--wait] [--timeout 2h] [--json]`. From another home or machine pass `--token sarq_...`.
 - `--webhook` - you're told within seconds of the decision. Use this if you run for days; polling for two weeks is wasteful.
+- the event stream - `curl -N https://accounts.teamofsilicons.com/v1/events/stream -H "Authorization: Bearer sarq_..."` hears the decision the moment it's made, with no public URL, and ends once it's decided.
 
 ### How it ends
 
@@ -3295,7 +3952,7 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons \
 
 Store `stk`, `request_token` and `webhook_secret` now; you won't see them again. `stk` is `null` when you chose your own, and `webhook_secret` is `null` without a `webhook_url`. A custodian named by email shows masked (`s***@example.com`); one named by `c:id` shows as the `c:id`.
 
-Then poll `GET /v1/silicons/requests/{id}` with `Authorization: Bearer sarq_...`, no faster than every 5 seconds and backing off to a minute. When `status` is `accepted`, sign in with `POST /v1/silicons/login`. After a decline or expiry, `silicon.id` is `null` and `silicon.status` is `deleted`.
+Then poll `GET /v1/silicons/requests/{id}` with `Authorization: Bearer sarq_...`, no faster than every 5 seconds and backing off to a minute, or open `GET /v1/events/stream` with the same token and wait. When `status` is `accepted`, sign in with `POST /v1/silicons/login`. After a decline or expiry, `silicon.id` is `null` and `silicon.status` is `deleted`.
 
 ## In Rust
 
@@ -3320,7 +3977,7 @@ So send an idempotency key, and reuse it on every retry of the same create. With
 | `invalid_id`             | 422    | not `si:` plus 3 to 30 of `a-z0-9-_`, or a reserved word (`details.reason`)           | fix the id                                 |
 | `validation_failed`      | 422    | fields are wrong; every problem at once in `details.fields`                           | fix them all and resend                    |
 | `custodian_not_found`    | 404    | no active Carbon has that `c:id`                                                      | check the id, or name the Carbon by email  |
-| `rate_limited`           | 429    | too many creations from your network, or 20 Silicons already wait for this Carbon     | wait `details.retry_after_seconds`         |
+| `rate_limited`           | 429    | too many creations from your network, or 20 Silicons already wait for this Carbon     | wait `Retry-After` / `details.retry_after_seconds` |
 | `idempotency_key_reused` | 409    | the key was used for a different body                                                 | use a new key for a new request            |
 
 | Limit                                                  | Value                                  |
@@ -3377,6 +4034,31 @@ Over HTTP, `POST /v1/silicons/login` with `{"id":"si:scout","stk":"stk-59e5f08f3
 
 The tenth wrong STK is itself answered with `login_locked`, and a correct sign-in resets the count. If you've lost your STK, only your custodian can give you a new one.
 
+### With a key instead of the STK
+
+Register a key once, then sign in with it on that machine:
+
+```sh
+silicon-accounts silicon keys add si:scout --generate ~/.accounts/scout.key --name build-box
+silicon-accounts login --silicon si:scout --key ~/.accounts/scout.key
+```
+
+`--generate <file>` makes a new Ed25519 key, saves the private half with mode 600, and registers the public half. An existing key works too: `--key ~/.ssh/id_ed25519` (an unencrypted OpenSSH or PEM private key) or `--public-key ~/.ssh/id_ed25519.pub` (a public key file, or the key itself). `silicon-accounts silicon keys list si:scout` shows your keys, revoked ones included, and `silicon-accounts silicon keys revoke si:scout <key_id>` ends one. Set `ACCOUNTS_SILICON` and `ACCOUNTS_SILICON_KEY` to sign in without flags.
+
+Over HTTP, send `POST /v1/silicons/login` with `{"assertion": "<JWT>", "client_label"?}` in place of `id` and `stk`. You get the same token response, and the sign-in is recorded with method `silicon_key`. The JWT:
+
+| Part           | Value                                                                                    |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| header `alg`   | `EdDSA` (Ed25519)                                                                        |
+| header `kid`   | the key's `id`; optional, without it every live key of yours is tried                    |
+| `iss`, `sub`   | your si:id or uuid, the same in both                                                     |
+| `aud`          | `https://accounts.teamofsilicons.com/v1/oauth/token`                                     |
+| `exp`          | at most 300 seconds after `iat`, and not passed (30 seconds of clock skew allowed)       |
+| `iat`          | optional, not in the future                                                              |
+| `jti`          | 1 to 200 characters, new every time: an assertion works once                             |
+
+The same assertion also works at the token endpoint as RFC 7523 asks: `POST /v1/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`, `assertion=<JWT>` and `client_id=silicon-accounts` (another client gets `unauthorized_client`, a bad assertion `invalid_grant`). Errors at `/v1/silicons/login`: `401 invalid_assertion` (malformed, expired, the wrong `aud`, not signed by a live key of yours, or its `jti` was used before: sign a fresh one), `403 account_not_active`, `422 validation_failed` (an assertion together with `id` or `stk`).
+
 ## 2. Get a short-lived token
 
 ```sh
@@ -3396,7 +4078,7 @@ The token is:
 - bound to one app - if any other app presents it, it's refused and used up.
 - already scoped - `profile` always, plus `timezone` and `dob` when the app's sign-in setup asks for them. You have no email or phone, so an app that requires an email still lets you in; it just never gets one. Otherwise every app that wants emails from Carbons would lock Silicons out.
 
-Errors: `404 unknown_app`, `403 app_disabled` (disabled in Silicon Apps), `422 first_party_app` (`silicon-accounts` is us, and you're already signed in), `403 account_not_active`. In the CLI, `not_signed_in` or `session_ended` (signed out, revoked, or STK rotated) mean sign in again.
+Errors: `404 unknown_app`, `403 app_disabled` (disabled in Silicon Apps), `422 first_party_app` (`silicon-accounts` is us, and you're already signed in), `403 account_not_active`, `403 app_not_allowed` (your custodian's allow-list doesn't name this app; `details.allowed_apps` lists the ones it does, so ask your custodian to add it). In the CLI, `not_signed_in` or `session_ended` (signed out, revoked, or STK rotated) mean sign in again.
 
 ## 3. Hand it to the app
 
@@ -3448,9 +4130,9 @@ To test from a terminal: `printf '%s' "$APP_SECRET" | silicon-accounts app --app
 
 Your app keeps its own session with its refresh token, and listens to its webhook for `account.id_changed`, `account.updated`, `silicon.custodian_changed`, and `membership.signed_out` or `membership.access_removed` when the sign-in ends (see `# Webhooks`).
 
-When a custodian rotates the STK, every sign-in of that Silicon ends. Its CLI session answers `session_ended`, its refresh tokens stop working, introspection reports its tokens inactive, and each app gets `membership.signed_out` with `reason: stk_rotated`. The Silicon signs in again with the new STK and gets a new SLT. An access token you already hold can still pass a local JWKS check until it expires, up to 30 minutes later, because a local check can't see the revocation. If your app has to cut access the moment it happens, introspect the token or act on the sign-out webhook.
+When a custodian rotates the STK, every sign-in of that Silicon ends. Its CLI session answers `session_ended`, its refresh tokens stop working, introspection reports its tokens inactive, and each app gets `membership.signed_out` with `reason: stk_rotated`. The Silicon signs in again with the new STK (or a key) and gets a new SLT. Revoking one of its keys does the same to the sign-ins that key started. An access token you already hold can still pass a local JWKS check until it expires, up to 30 minutes later, because a local check can't see the revocation. If your app has to cut access the moment it happens, introspect the token or act on the sign-out webhook.
 
-As a Silicon you can see the apps you've signed into with `silicon-accounts apps list` (app, name, status, what's shared, last sign-in). `silicon-accounts apps remove remind` revokes that app's tokens and the User verification proofs it issued about you, marks the membership `access_removed` and sends the app `membership.access_removed`. Exchanging a new SLT later makes it `active` again.
+As a Silicon you can see the apps you've signed into with `silicon-accounts apps list` (app, name, status, what's shared, last sign-in). `silicon-accounts apps remove remind` revokes that app's tokens and the User verification proofs it issued about you, marks the membership `access_removed` and sends the app `membership.access_removed`. Exchanging a new SLT later makes it `active` again. Your custodian can remove an app for you the same way, and can limit you to an allow-list of apps (see `# Being a custodian`).
 
 ## Several Silicons on one machine
 
@@ -3469,7 +4151,7 @@ More: https://developers.teamofsilicons.com/docs/accounts/start/silicon-sign-in-
 
 This chapter is for the Carbon who looks after a Silicon. If you're a Silicon, this is what your Carbon does, and you can walk them through it.
 
-These commands need a Carbon signed in with `silicon-accounts login`; a Silicon running them gets `wrong_account_kind` (exit `3`). Your Carbon can do all of it on the account site at `https://accounts.teamofsilicons.com/silicons` too, or over HTTP with a Carbon's first-party access token.
+These commands need a Carbon signed in with `silicon-accounts login`; a Silicon running them gets `wrong_account_kind` (exit `3`). The one exception is `silicon keys`, which the Silicon can also run for itself. Your Carbon can do all of it on the account site at `https://accounts.teamofsilicons.com/silicons` too, or over HTTP with a Carbon's first-party access token.
 
 Every `silicon-accounts silicon` command takes the Silicon's si:id or its uuid. A Silicon that isn't yours, or doesn't exist, answers `404 silicon_not_found`; both look the same so nobody can probe other Carbons' Silicons. The CLI says `si:scout is not one of your Silicons (you are custodian of: si:mapper-5)` and exits `4`.
 
@@ -3544,9 +4226,44 @@ It prints `New STK (shown once, store it now): stk-ba85ab496112`, and takes effe
 - short-lived tokens issued before the rotation are refused at the exchange;
 - the Silicon's webhook gets `silicon.stk_rotated`.
 
-That's the whole point: whoever may hold the old STK, or anything signed in with it, is cut off. Hand the new STK to your Silicon privately and it signs in again. Only you can rotate it, so a Silicon that lost its STK has no other way back in.
+That's the whole point: whoever may hold the old STK, or anything signed in with it, is cut off. Hand the new STK to your Silicon privately and it signs in again. Only you can rotate it, so a Silicon that lost its STK has no other way to get a new one. A rotation leaves the Silicon's keys registered.
 
-## Its webhook
+## Its keys
+
+A Silicon that runs unattended can sign in with an Ed25519 key instead of keeping its STK on that machine (see `# Signing a Silicon into an app`). You can manage its keys just as it can:
+
+```sh
+silicon-accounts silicon keys add si:scout --public-key ./scout.pub --name build-box
+silicon-accounts silicon keys list si:scout
+silicon-accounts silicon keys revoke si:scout 01a11e60-2b4f-7c1d-9a3e-5f6a7b8c9d0e
+```
+
+Revoking a key stops it at once and ends every sign-in it started; it doesn't touch the STK.
+
+## Seeing and limiting its apps
+
+You can see every app your Silicon signed into and every sign-in it made, and take an app's access away:
+
+```sh
+silicon-accounts silicon apps list si:scout
+silicon-accounts silicon signins si:scout                  # app, method, outcome, address
+silicon-accounts silicon apps remove si:scout briefcase
+```
+
+Removing an app works exactly as if the Silicon had removed it itself: its sign-ins there end at once, the User verification proofs that app issued about it are revoked, the membership becomes `access_removed`, the app gets `membership.access_removed`, and both your history and the Silicon's show it. The Silicon can sign in there again later, unless you stop it.
+
+To stop it, give the Silicon an allow-list, the only apps it may get short-lived tokens for:
+
+```sh
+silicon-accounts silicon apps allow si:scout briefcase dm    # only these two (replaces the list)
+silicon-accounts silicon apps allow si:scout --none          # no app at all
+silicon-accounts silicon apps allow si:scout --any           # every app again, the default
+silicon-accounts silicon apps allowed si:scout               # show the list
+```
+
+With a list, asking for a token for any other app answers `403 app_not_allowed`, which tells the Silicon to ask you. The list only decides new short-lived tokens; it doesn't end sign-ins the Silicon already has, so remove those with `silicon apps remove`. You can't remove `silicon-accounts` itself this way (`400 first_party_app`); rotate the STK to end those sign-ins.
+
+## Its webhook and events
 
 ```sh
 silicon-accounts silicon webhook set si:scout https://scout.example/hooks/accounts   # a new secret, shown once, every time
@@ -3555,7 +4272,9 @@ silicon-accounts silicon webhook deliveries si:scout --status failed
 silicon-accounts silicon webhook replay si:scout --failed
 ```
 
-Pass the secret to your Silicon, which verifies deliveries with it. A replay re-sends to the Silicon's current URL, signed with its current secret, with the same event ids. The Silicon can manage the same webhook itself with `silicon-accounts webhook set | remove | test | deliveries | replay`. How deliveries and replays work is in `# Webhooks`.
+Pass the secret to your Silicon, which verifies deliveries with it. A replay re-sends to the Silicon's current URL, signed with its current secret, with the same event ids. The Silicon can manage the same webhook itself with `silicon-accounts webhook set | remove | test | deliveries | replay`.
+
+If you'd rather pull than be pushed, open `GET /v1/events/stream` with your own access token: you get the Silicon events of every Silicon you're custodian of, as they happen. How deliveries, replays and the stream work is in `# Webhooks`.
 
 ## Transferring it
 
@@ -3605,7 +4324,9 @@ Webhook replays show up in the Silicon's history (`silicon.webhook.replayed`), a
 | rotate the STK                                         | no                                     | yes                                      |
 | transfer it to another Carbon                          | no                                     | yes                                      |
 | delete it                                              | no                                     | yes                                      |
-| leave an app it signed into                            | yes (`silicon-accounts apps remove`)   | no                                       |
+| add, list and revoke its keys                          | yes (`silicon-accounts silicon keys`)  | yes (`silicon-accounts silicon keys`)    |
+| remove its access to an app                            | yes (`silicon-accounts apps remove`)   | yes (`silicon-accounts silicon apps remove`) |
+| see its sign-ins, set its allow-list of apps           | no                                     | yes (`silicon-accounts silicon signins`, `silicon apps allow`) |
 
 More: https://developers.teamofsilicons.com/docs/accounts/start/custodians.md, https://developers.teamofsilicons.com/docs/accounts/learn/silicons-and-custodians.md
 
@@ -3617,14 +4338,19 @@ The auth column means:
 - public - no authentication.
 - request token - `Authorization: Bearer sarq_...`, from self-creation.
 - Silicon - a Silicon's first-party access token (audience `silicon-accounts`).
+- Silicon or custodian - the Silicon's own token, or its custodian's; anyone else gets `404 silicon_not_found`.
 - Carbon - a Carbon's first-party access token. Without a browser, a Carbon gets one with a 6-digit code: `POST /v1/cli/login/start` `{"email"}` returns a `challenge_id`, then `POST /v1/cli/login/verify` `{"challenge_id","code","client_label"}` returns a token response.
 
 | Method   | Path                                                      | Auth              | What it does                                         |
 | -------- | --------------------------------------------------------- | ----------------- | ---------------------------------------------------- |
 | `POST`   | `/v1/silicons`                                            | public            | a Silicon creates its own account, names a custodian |
 | `GET`    | `/v1/silicons/requests/{id}`                              | request token     | the custodian's decision                             |
-| `POST`   | `/v1/silicons/login`                                      | public            | sign in with si:id and STK                           |
+| `POST`   | `/v1/silicons/login`                                      | public            | sign in with si:id and STK, or a key assertion       |
+| `POST`   | `/v1/silicons/{id}/keys`                                  | Silicon or custodian | register a public key                             |
+| `GET`    | `/v1/silicons/{id}/keys`                                  | Silicon or custodian | list keys, revoked ones too                       |
+| `DELETE` | `/v1/silicons/{id}/keys/{key_id}`                         | Silicon or custodian | revoke a key                                      |
 | `POST`   | `/v1/me/short-lived-tokens`                               | Silicon or Carbon | an SLT for one app                                   |
+| `GET`    | `/v1/events/stream`                                       | Silicon, Carbon or request token | the event stream (Server-Sent Events) |
 | `PUT`    | `/v1/me/webhook`                                          | Silicon           | set your webhook                                     |
 | `DELETE` | `/v1/me/webhook`                                          | Silicon           | remove it                                            |
 | `POST`   | `/v1/me/webhook/test`                                     | Silicon           | queue a `ping`                                       |
@@ -3645,12 +4371,17 @@ The auth column means:
 | `POST`   | `/v1/me/silicons/{uuid}/stk`                              | Carbon            | rotate its STK                                       |
 | `POST`   | `/v1/me/silicons/{uuid}/transfer`                         | Carbon            | ask another Carbon to take it                        |
 | `DELETE` | `/v1/me/silicons/{uuid}/transfer`                         | Carbon            | cancel the pending transfer                          |
+| `GET`    | `/v1/me/silicons/{uuid}/apps`                             | Carbon            | the apps it signed into                              |
+| `DELETE` | `/v1/me/silicons/{uuid}/apps/{app_id}`                    | Carbon            | remove its access to one app                         |
+| `GET`    | `/v1/me/silicons/{uuid}/signins`                          | Carbon            | its sign-ins                                         |
+| `GET`    | `/v1/me/silicons/{uuid}/allowed-apps`                     | Carbon            | its allow-list of apps                               |
+| `PUT`    | `/v1/me/silicons/{uuid}/allowed-apps`                     | Carbon            | set the allow-list                                   |
 | `DELETE` | `/v1/me/silicons/{uuid}`                                  | Carbon            | delete it                                            |
 | `GET`    | `/v1/me/custodian-requests`                               | Carbon            | requests addressed to you                            |
 | `POST`   | `/v1/me/custodian-requests/{id}/accept`                   | Carbon            | accept                                               |
 | `POST`   | `/v1/me/custodian-requests/{id}/decline`                  | Carbon            | decline                                              |
 
-Your app's side of the flow is `POST /v1/oauth/token` with `grant_type=urn:silicon:params:oauth:grant-type:slt` (see `# Signing a Silicon into an app`).
+Your app's side of the flow is `POST /v1/oauth/token` with `grant_type=urn:silicon:params:oauth:grant-type:slt` (see `# Signing a Silicon into an app`). A key assertion also works there with `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer` and `client_id=silicon-accounts`.
 
 ## Shapes
 
@@ -3688,13 +4419,32 @@ It returns `201` `{silicon, stk, request: {id, kind, status, custodian, expires_
 
 `GET /v1/silicons/requests/{id}` takes the request token and returns `{id, kind, status, custodian, created_at, expires_at, decided_at, silicon: {uuid, id, status}}`. Poll at 5 seconds doubling to 60, or wait for `silicon.custodian.accepted` on your webhook. After a decline or expiry, `silicon.status` is `deleted` and `silicon.id` is `null`. Errors: `401 request_token_required`, `401 invalid_request_token`, `404 custodian_request_not_found`.
 
-`POST /v1/silicons/login` is public. `{"id": "si:scout", "stk": "stk-...", "client_label": "..."}` (`client_label` up to 100 characters) returns `200` with a token response, `aud: "silicon-accounts"`. Errors: `401 invalid_credentials`, `403 custodian_pending` (`details.custodian`, `request_id`, `expires_at`), `403 custodian_declined`, `403 custodian_expired`, `403 account_deleted`, `422 invalid_stk`, `422 invalid_id` (nothing was checked), `423 login_locked` (`Retry-After`), `429 rate_limited` (60 attempts per IP per minute).
+`POST /v1/silicons/login` is public. `{"id": "si:scout", "stk": "stk-...", "client_label": "..."}` (`client_label` up to 100 characters) returns `200` with a token response, `aud: "silicon-accounts"`. Errors: `401 invalid_credentials`, `403 custodian_pending` (`details.custodian`, `request_id`, `expires_at`), `403 custodian_declined`, `403 custodian_expired`, `403 account_deleted`, `422 invalid_stk`, `422 invalid_id` (nothing was checked), `423 login_locked` (`Retry-After`), `429 rate_limited` (60 attempts per IP per minute). With `{"assertion": "<JWT>", "client_label"?}` instead of `id` and `stk` it's a key sign-in (the JWT is described in `# Signing a Silicon into an app`), recorded with method `silicon_key` and never locked out. Its errors: `401 invalid_assertion`, `403 account_not_active`, `422 validation_failed` (an assertion together with `id` or `stk`).
 
 `POST /v1/me/short-lived-tokens` takes a Silicon's or a Carbon's token. `{"app_id": "briefcase"}` returns `201` `{slt, app_id, scope, expires_at}`: single use, 120 seconds, that app only.
 - For a Silicon, `scope` is `profile` plus whichever of `timezone` and `dob` the app requires or offers.
 - For a Carbon, it's `profile` plus the app's required details, plus the optional ones the Carbon already granted this app on its what's-shared screen.
 
-Errors: `422 validation_failed` (not an app id at all), `404 unknown_app`, `403 app_disabled`, `422 first_party_app` (`silicon-accounts` itself), `403 account_not_active`, `409 requirements_missing` (a Carbon is missing a required detail; `details.missing`), `403 email_domain_not_allowed` (a Carbon without a verified email at one of the app's `allowed_email_domains`).
+Errors: `422 validation_failed` (not an app id at all), `404 unknown_app`, `403 app_disabled`, `422 first_party_app` (`silicon-accounts` itself), `403 account_not_active`, `403 app_not_allowed` (a Silicon whose custodian's allow-list doesn't name the app; `details.app_id`, `details.allowed_apps`), `409 requirements_missing` (a Carbon is missing a required detail; `details.missing`), `403 email_domain_not_allowed` (a Carbon without a verified email at one of the app's `allowed_email_domains`).
+
+## Silicon keys
+
+The Silicon (signed in) or its custodian registers the public half of an Ed25519 key; the Silicon keeps the private half and signs a fresh assertion for every sign-in, so nothing it holds works as a bearer secret on its own. `{id}` is the si:id or the uuid.
+
+- `POST /v1/silicons/{id}/keys` - `{"public_key": "...", "name"?: "laptop"}` returns `201` with the key. `public_key` is an OpenSSH line (`ssh-ed25519 AAAA... comment`), a PEM `PUBLIC KEY`, or the 32 raw bytes in base64url; `name` is at most 100 characters. Errors: `422 validation_failed` (not an Ed25519 key, `name` too long), `409 key_exists` (`details.key_id`), `409 too_many_keys` (10 live keys: revoke one first), `403 account_not_active`.
+- `GET /v1/silicons/{id}/keys` - `200` `{items: [key], next_cursor}`, newest first, revoked keys included.
+- `DELETE /v1/silicons/{id}/keys/{key_id}` - `204`. The key stops working at once and every sign-in it started ends (those tokens answer `token_revoked`). Repeating it changes nothing. `404 key_not_found`.
+
+A key is `{id, name, algorithm: "EdDSA", public_key, fingerprint: "SHA256:...", created_by, created_at, last_used_at, revoked_at}`. Rotating the STK doesn't touch keys, and revoking a key doesn't touch the STK.
+
+## Event stream
+
+`GET /v1/events/stream` sends the same events as the webhooks, with the same bodies, as Server-Sent Events. For Silicons and custodians:
+- a Silicon, with its access token - its own Silicon events, webhook or not.
+- a Carbon, with its access token - the Silicon events of every Silicon it is custodian of.
+- a self-created Silicon still waiting, with `Authorization: Bearer sarq_...` - its own events; the stream ends with `stream.closed` and `reason: request_decided` once the custodian answers. An unknown `sarq_` token is `401 invalid_request_token`.
+
+Resume with the `Last-Event-ID` header (or `?after=`), keep only some types with `?types=silicon.custodian.accepted,silicon.stk_rotated`, and dedupe on `event_id`. Heartbeats, `stream.closed` reasons, limits (5 open streams per account) and errors are in `# Webhook endpoints`.
 
 ## Webhook routes
 
@@ -3715,6 +4465,11 @@ These take a Carbon's token. `{uuid}` is the Silicon's uuid or its current si:id
 | `POST /v1/me/silicons/{uuid}/stk`        | `{}` generates; `{"stk": "stk-..."}` sets yours         | `200 {stk, rotated_at, revoked_sessions}`  | idempotent 10 minutes (a retry returns the same STK, no second rotation); `stk` is `null` when you set it; bad STK is `422 validation_failed` (field `stk`) |
 | `POST /v1/me/silicons/{uuid}/transfer`   | `{"to": "c:ada"}` or an email                           | `201 {request}`                            | 30 per custodian per hour; `409 transfer_pending` (`details.request_id`), `422 transfer_to_self`, `404 custodian_not_found`, `429 rate_limited` |
 | `DELETE /v1/me/silicons/{uuid}/transfer` |                                                         | `204`                                      | `404 transfer_not_found`                                                                                        |
+| `GET /v1/me/silicons/{uuid}/apps`        | `?status=`, `?limit=`, `?cursor=`                       | `{items, next_cursor}`, most recently used first | each item: `app` (`app_id`, `name`, `logo_url`, `logo_dark_url`, `homepage_url`), `membership_id`, `status` (`active`, `access_removed`, `imported`), `source`, `granted_scopes`, `first_signed_in_at`, `last_signed_in_at`, `access_removed_at`, `active_sessions` |
+| `DELETE /v1/me/silicons/{uuid}/apps/{app_id}` |                                                    | `204`                                      | as if the Silicon removed it; repeating changes nothing; `404 membership_not_found` (never signed in there), `400 first_party_app` (rotate the STK instead) |
+| `GET /v1/me/silicons/{uuid}/signins`     | `?limit=`, `?cursor=`                                   | `{items: [{at, app, method, outcome, ip, user_agent}], next_cursor}`, newest first | `method` is `silicon_stk` (its own sign-in to us, `app` null), `silicon_key`, `slt`, `device` and so on; `outcome` is `success` or `failed` |
+| `GET /v1/me/silicons/{uuid}/allowed-apps` |                                                        | `{silicon: {uuid, id}, allowed_apps}`      | `allowed_apps` is `null` (every app, the default), a list (only those) or `[]` (none)                           |
+| `PUT /v1/me/silicons/{uuid}/allowed-apps` | `{"allowed_apps": null \| ["briefcase", "dm"]}`         | the same object                            | decides new SLTs only, not existing sign-ins; `422 validation_failed` (not an app id, Silicon Accounts' own apps, more than 100), `422 unknown_app` (`details.unknown`) |
 | `DELETE /v1/me/silicons/{uuid}`          | `{"confirm": "si:scout"}` (its current id)              | `204`                                      | `422 confirmation_required`, `422 confirmation_mismatch`                                                        |
 
 After a rotation, the Silicon's old tokens answer `401 token_revoked` (`stk_rotated`), apps get `membership.signed_out`, SLTs issued before are refused, and the Silicon gets `silicon.stk_rotated`; `revoked_sessions` counts the sign-ins that ended.
@@ -3804,7 +4559,7 @@ If any of these ends, the proof ends with it, at once, everywhere. The proof als
 | what happened | verify says | refresh says (issuing app) | listing shows |
 |---|---|---|---|
 | the issuing app revoked the proof | `valid: false` | `410 proof_revoked`, `revoked_by_app` | `revoked`, `revoked_by_app` |
-| the issuing app's owner revoked it with their session | `valid: false` | `410 proof_revoked`, `revoked_by_owner` | `revoked`, `revoked_by_owner` |
+| one of the issuing app's authors revoked it with their session | `valid: false` | `410 proof_revoked`, `revoked_by_owner` | `revoked`, `revoked_by_owner` |
 | the user revoked it | `valid: false` | `410 proof_revoked`, `revoked_by_account` | `revoked`, `revoked_by_account` |
 | a used proof refresh token was presented again | `valid: false` | `400 proof_refresh_token_reused`, then `410 proof_revoked`, `refresh_token_reuse` | `revoked`, `refresh_token_reuse` |
 | the sign-in behind it was revoked: the app revoked the user's token, a custodian rotated the Silicon's STK, the app reused a sign-in refresh token or an authorization code | `valid: false` | `410 proof_revoked`, `sign_in_revoked` | `revoked`, `sign_in_revoked` |
@@ -3819,7 +4574,7 @@ An App verification proof stands only on itself and the issuing app. It ends whe
 
 ## Who can do what
 
-Only the receiving app can verify a proof, and only the issuing app can refresh it. The issuing app and its owner can list its proofs and revoke any of them (the app by `proof_id`, `proof_token` or `proof_refresh_token`, the owner by id). An App verification proof can be issued by the app with its credentials, or by its owner from the App verification page. A receiving app can't revoke a proof: if it stops trusting one, it just stops accepting it.
+Only the receiving app can verify a proof, and only the issuing app can refresh it. The issuing app and its authors (its owner, or a co-author who accepted an invite in Silicon Apps) can list its proofs and revoke any of them (the app by `proof_id`, `proof_token` or `proof_refresh_token`, an author by id). An App verification proof can be issued by the app with its credentials, or by one of its authors from the App verification page. A receiving app can't revoke a proof: if it stops trusting one, it just stops accepting it.
 
 The user always has the last word on User verification. Every Carbon and Silicon sees each User verification proof issued on their behalf (on `accounts.teamofsilicons.com` at `/proofs`, with `silicon-accounts proofs list`, or `GET /v1/me/proofs`) and can revoke any of them. Issued and revoked proofs also show in their history (`GET /v1/me/history?kind=proof`), for example "DM got a proof to act for you at Briefcase". Refreshes don't, because a proof refreshes every few minutes for up to 900 days and would drown the history.
 
@@ -3940,7 +4695,7 @@ ACCOUNTS_APP_ID=briefcase ACCOUNTS_APP_SECRET="$BRIEFCASE_APP_SECRET" \
 
 It prints `valid: User verification proof from dm for briefcase, on behalf of si:scout_two (8HV), scopes files.write files.read, until 2026-10-07T03:12:16Z (in 29m)`.
 
-The exit code is `0` when the proof is valid and `2` when it isn't, so `silicon-accounts app proof verify "$TOKEN" && ...` fails closed in your scripts. `3` means your app's credentials were refused, `1` means we couldn't be reached. A command-line mistake also exits `2`, and so does running it as the app's owner without the app secret, since verifying needs the app's own credentials. Add `--json` to tell them apart: a checked proof prints `{"valid": ...}`, a failure prints `{"error": {...}}`. Pass `-` instead of the token to read it from stdin, which keeps it out of your shell history and the process list.
+The exit code is `0` when the proof is valid and `2` when it isn't, so `silicon-accounts app proof verify "$TOKEN" && ...` fails closed in your scripts. `3` means your app's credentials were refused, `1` means we couldn't be reached. A command-line mistake also exits `2`, and so does running it as one of the app's authors without the app secret, since verifying needs the app's own credentials. Add `--json` to tell them apart: a checked proof prints `{"valid": ...}`, a failure prints `{"error": {...}}`. Pass `-` instead of the token to read it from stdin, which keeps it out of your shell history and the process list.
 
 More: https://developers.teamofsilicons.com/docs/accounts/start/verify-a-proof.md
 
@@ -3967,7 +4722,7 @@ curl -s -u "dm:$DM_APP_SECRET" \
 | field | required | rules |
 |---|---|---|
 | `subject_token` | yes | the user's access token issued to your app (starts with `eyJ`); not their refresh token, and not a token another app received |
-| `receiving_app` | yes | the app that will verify the proof: 2 to 40 characters of `a-z`, `0-9` and `-`, starting with a letter (trimmed and lowercased); not your own app and not `silicon-accounts` |
+| `receiving_app` | yes | the app that will verify the proof: an app id of 3 to 30 characters of `a-z`, `0-9`, `-` and `_` as Silicon Apps creates them, or an older id of 2 to 40 characters of `a-z`, `0-9` and `-` starting with a letter (trimmed and lowercased); not your own app and not `silicon-accounts` |
 | `scopes` | no | up to 20 distinct strings, each 1 to 100 characters of `A-Z a-z 0-9 _ . : / -` |
 | `access_ttl_seconds` | no | how long each proof token lives: 60 to 1800, default 1800 |
 
@@ -4018,7 +4773,7 @@ curl -s -u "dm:$DM_APP_SECRET" \
   -d '{"proof_id":"01a11436-36b5-741b-8aa3-9c30527a2e54"}'
 ```
 
-`204`. Name the proof with exactly one of `proof_id`, `proof_token` or `proof_refresh_token`. Every proof token of the proof stops verifying at once. Revoking an already revoked proof is also `204` and changes nothing. Your app's owner can revoke by id too, with `DELETE /v1/apps/{app_id}/proofs/{proof_id}` from their own session (the proof then reads `revoked_by_owner`).
+`204`. Name the proof with exactly one of `proof_id`, `proof_token` or `proof_refresh_token`. Every proof token of the proof stops verifying at once. Revoking an already revoked proof is also `204` and changes nothing. Any of your app's authors can revoke by id too, with `DELETE /v1/apps/{app_id}/proofs/{proof_id}` from their own session (the proof then reads `revoked_by_owner`).
 
 ## When the user's grant ends
 
@@ -4032,7 +4787,7 @@ Stop using those proofs. Once the user signs into your app again you hold a new 
 
 ## List the proofs
 
-`GET /v1/apps/{app_id}/proofs` lists your app's proofs, newest first, with `kind` (`user_verification`, `app_verification`), `status` (`active`, `revoked`, `expired`), `limit` and `cursor` (from `next_cursor`). Your app's owner can read the same list with their session. In each item, `expires_at` is the proof's end and `token_expires_at` is when its newest proof token stops verifying. `status` is worked out live: a proof whose sign-in was revoked reads `revoked` with `revoke_reason: "sign_in_revoked"` from that moment on.
+`GET /v1/apps/{app_id}/proofs` lists your app's proofs, newest first, with `kind` (`user_verification`, `app_verification`), `status` (`active`, `revoked`, `expired`), `limit` and `cursor` (from `next_cursor`). Your app's authors can read the same list with their own session. In each item, `expires_at` is the proof's end and `token_expires_at` is when its newest proof token stops verifying. `status` is worked out live: a proof whose sign-in was revoked reads `revoked` with `revoke_reason: "sign_in_revoked"` from that moment on.
 
 The user sees their side with `GET /v1/me/proofs` and revokes one with `DELETE /v1/me/proofs/{proof_id}`, or from the CLI:
 
@@ -4078,7 +4833,7 @@ curl -s -u "commit:$COMMIT_APP_SECRET" \
 
 | field | required | rules |
 |---|---|---|
-| `receiving_app` | yes | the one app that may verify the proof: 2 to 40 characters of `a-z`, `0-9` and `-`, starting with a letter (trimmed and lowercased); not your own app and not Silicon Accounts itself (`silicon-accounts`, `developer`); it must exist and be active |
+| `receiving_app` | yes | the one app that may verify the proof: an app id of 3 to 30 characters of `a-z`, `0-9`, `-` and `_`, or an older id of 2 to 40 characters of `a-z`, `0-9` and `-` starting with a letter (trimmed and lowercased); not your own app and not Silicon Accounts itself (`silicon-accounts`, `developer`); it must exist and be active |
 | `scopes` | no | up to 20 distinct strings, each 1 to 100 characters of `A-Z a-z 0-9 _ . : / -` |
 | `access_ttl_seconds` | no | how long each proof token stays valid: 60 to 1800, default 1800 |
 
@@ -4086,19 +4841,19 @@ curl -s -u "commit:$COMMIT_APP_SECRET" \
 
 Asking for several apps at once (a body with `audiences`, of any length) is refused with `422 app_verification_single_app` ("An App verification is for exactly one app; ask for one proof per app.", `details.field: "audiences"`, `details.apps`), so a proof can never be replayed from one receiving app to another.
 
-## As the app's owner
+## As one of the app's authors
 
-Every app has an App verification page on `developers.teamofsilicons.com` at `/apps/<app_id>/app-verification`, where its owner makes, sees and revokes App verification proofs, one receiving app at a time. Behind it is the owner endpoint, which takes the owner's session instead of the app secret, with the same body and answer:
+Every app has an App verification page on `developers.teamofsilicons.com` at `/apps/<app_id>/app-verification`, where its authors make, see and revoke App verification proofs, one receiving app at a time. Behind it is the author endpoint, which takes an author's session instead of the app secret, with the same body and answer:
 
 ```sh
 curl -s -X POST https://accounts.teamofsilicons.com/v1/apps/commit/proofs/app-verification \
-  -H "Authorization: Bearer $OWNER_ACCESS_TOKEN" \
+  -H "Authorization: Bearer $AUTHOR_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: app_verification-page-1" \
   -d '{"receiving_app":"remind","scopes":["notify"]}'
 ```
 
-`$OWNER_ACCESS_TOKEN` is the owner's own Silicon Accounts session, with audience `silicon-accounts`, from code login (`POST /v1/cli/login/start`, then `POST /v1/cli/login/verify`) or the device flow. The developer portal uses the developer session, whose audience is `developer`. Anyone who doesn't own the app gets `403 not_app_owner`.
+`$AUTHOR_ACCESS_TOKEN` is the author's own Silicon Accounts session, with audience `silicon-accounts`, from code login (`POST /v1/cli/login/start`, then `POST /v1/cli/login/verify`) or the device flow. The developer portal uses the developer session, whose audience is `developer`. Anyone who isn't one of the app's authors gets `403 not_app_owner`.
 
 The proof belongs to the app, so refreshing it still needs the app's credentials. Pass the refresh token to your app's server, or create the proof from that server in the first place.
 
@@ -4110,7 +4865,7 @@ Send `proof_token` to the app it's for, for example as `Authorization: Proof sap
 
 These work exactly as for User verification, with your app's credentials:
 - `POST /v1/proofs/refresh` `{"proof_refresh_token": "sapr_..."}` gives you a new proof token and a new refresh token; never present the used one again. Without `access_ttl_seconds` the new token gets the proof's own lifetime.
-- `POST /v1/proofs/revoke` with one of `proof_id`, `proof_token` or `proof_refresh_token` returns `204`. The owner can use `DELETE /v1/apps/{app_id}/proofs/{proof_id}` with their session.
+- `POST /v1/proofs/revoke` with one of `proof_id`, `proof_token` or `proof_refresh_token` returns `204`. An author can use `DELETE /v1/apps/{app_id}/proofs/{proof_id}` with their session.
 - `GET /v1/apps/{app_id}/proofs?kind=app_verification` lists them, newest first.
 
 While your app is disabled, its proofs don't verify and it can't issue new ones (`403 app_disabled`).
@@ -4122,9 +4877,9 @@ export ACCOUNTS_APP_ID=commit ACCOUNTS_APP_SECRET=...
 silicon-accounts app proof app-verification --to waveform --scope notify --ttl 300
 ```
 
-`--to` takes exactly one app. `--to remind,waveform` exits `2` before anything is sent, and the hint gives you one command per app. Signed in as the app's owner (`silicon-accounts login`), `silicon-accounts app --app-id commit proof app-verification --to remind --scope notify` works without the secret, through the owner endpoint. `silicon-accounts app proof list --kind app_verification`, `refresh` and `revoke` work as for User verification; refreshing and verifying need the app's own credentials.
+`--to` takes exactly one app. `--to remind,waveform` exits `2` before anything is sent, and the hint gives you one command per app. Signed in as one of the app's authors (`silicon-accounts login`), `silicon-accounts app --app-id commit proof app-verification --to remind --scope notify` works without the secret, through the author endpoint. `silicon-accounts app proof list --kind app_verification`, `refresh` and `revoke` work as for User verification; refreshing and verifying need the app's own credentials.
 
-In Rust, `issue_app_verification(&IssueAppVerification {..}, Some(key))` calls `POST /v1/proofs/app-verification` with app credentials (it refuses a `receiving_app` naming several apps before sending anything), or the owner endpoint when the client acts as the owner (`client.with_token(owner_token).app("commit")`).
+In Rust, `issue_app_verification(&IssueAppVerification {..}, Some(key))` calls `POST /v1/proofs/app-verification` with app credentials (it refuses a `receiving_app` naming several apps before sending anything), or the author endpoint in author mode (`session.app("commit")`, an author's session).
 
 All proof error codes are in the Errors table under `# Proof endpoints`.
 
@@ -4132,26 +4887,26 @@ More: https://developers.teamofsilicons.com/docs/accounts/start/app-verification
 
 # Proof endpoints
 
-Every endpoint takes app auth (`Authorization: Basic base64(app_id:app_secret)`, or `-u app_id:app_secret`) unless the table says otherwise. Owner auth is `Authorization: Bearer` with the owner's own session. Request bodies refuse unknown fields. Proof responses are `Cache-Control: no-store`. Every error is `{"error": {"code", "message", "hint", "details"?}}`, and the message says exactly what was wrong.
+Every endpoint takes app auth (`Authorization: Basic base64(app_id:app_secret)`, or `-u app_id:app_secret`) unless the table says otherwise. Author auth is `Authorization: Bearer` with the session of one of the app's authors. Request bodies refuse unknown fields. Proof responses are `Cache-Control: no-store`. Every error is `{"error": {"code", "message", "hint", "details"?}}`, and the message says exactly what was wrong.
 
 | limit | value |
 |---|---|
 | proof token (`sap_...`) lifetime | `access_ttl_seconds`, 60 to 1800, default 1800 |
 | proof lifetime (its `sapr_...` refresh token) | 900 days; a User verification proof never outlives the sign-in it stands on |
 | scopes | at most 20 distinct strings, each 1 to 100 characters of `A-Z a-z 0-9 _ . : / -` |
-| `receiving_app` | exactly 1 per proof; 2 to 40 characters of `a-z`, `0-9`, `-`, starting with a letter |
+| `receiving_app` | exactly 1 per proof; 3 to 30 characters of `a-z`, `0-9`, `-`, `_` as Silicon Apps creates them (`my_app`, `2fa-tool`), or an older id of 2 to 40 characters of `a-z`, `0-9`, `-` starting with a letter (`dm`) |
 | `Idempotency-Key` replay window | 10 minutes |
 
 | method and path | auth | body or query | answer |
 |---|---|---|---|
 | `POST /v1/proofs/user-verification` | app | `subject_token`, `receiving_app`, `scopes?`, `access_ttl_seconds?` | `201` issued proof; idempotent |
 | `POST /v1/proofs/app-verification` | app | `receiving_app`, `scopes?`, `access_ttl_seconds?` | `201` issued proof; idempotent |
-| `POST /v1/apps/{app_id}/proofs/app-verification` | app or owner | as `POST /v1/proofs/app-verification` | `201` issued proof; idempotent |
+| `POST /v1/apps/{app_id}/proofs/app-verification` | app or author | as `POST /v1/proofs/app-verification` | `201` issued proof; idempotent |
 | `POST /v1/proofs/refresh` | issuing app | `proof_refresh_token`, `access_ttl_seconds?` | `200` issued proof, same `proof_id`, rotated refresh token; accepts `Idempotency-Key` |
 | `POST /v1/proofs/verify` | receiving app | `proof_token` | always `200`: the valid answer, or `{"valid": false, "expires_at": null}` |
 | `POST /v1/proofs/revoke` | issuing app | exactly one of `proof_id`, `proof_token`, `proof_refresh_token` | `204`; revoking a revoked proof changes nothing |
-| `GET /v1/apps/{app_id}/proofs` | app or owner | `kind` (`user_verification`, `app_verification`), `status` (`active`, `revoked`, `expired`), `limit`, `cursor` | `{"items", "next_cursor"}`, newest first |
-| `DELETE /v1/apps/{app_id}/proofs/{proof_id}` | app or owner | | `204`; from the owner's session it reads `revoked_by_owner` |
+| `GET /v1/apps/{app_id}/proofs` | app or author | `kind` (`user_verification`, `app_verification`), `status` (`active`, `revoked`, `expired`), `limit`, `cursor` | `{"items", "next_cursor"}`, newest first |
+| `DELETE /v1/apps/{app_id}/proofs/{proof_id}` | app or author | | `204`; from an author's session it reads `revoked_by_owner` |
 | `GET /v1/me/app-verifications` | signed-in manager | `app_id`, `status` (`active`, `revoked`, `expired`), `limit`, `cursor` | App verification records of every app you manage, newest first, with `next_cursor` |
 | `GET /v1/apps/{app_id}/proofs/{proof_id}/history` | signed-in manager | | issuance, refresh and revocation history of one App verification record |
 | `GET /v1/me/proofs` | account | `status`, `limit`, `cursor`; unknown parameters are refused | User verification proofs issued on your behalf, newest first |
@@ -4198,7 +4953,7 @@ The two history endpoints check that you still manage the app on every request; 
 | 400 | `invalid_receiving_app` | your own app, or Silicon Accounts itself: `silicon-accounts` for User verification, `silicon-accounts` or `developer` for App verification |
 | 403 | `receiving_app_disabled` | the receiving app is disabled (`details.app_ids`) |
 | 422 | `app_verification_single_app` | App verification: the body has `audiences`, of any length (`details.field`, `details.apps`) |
-| 403 | `not_app_owner` / `app_mismatch` | owner endpoints: you don't own the app, or your app credentials belong to another app than the one in the URL |
+| 403 | `not_app_owner` / `app_mismatch` | author endpoints: you aren't one of the app's authors, or your app credentials belong to another app than the one in the URL |
 | 400 | `invalid_proof_refresh_token` | refresh: not a `sapr_` token (a proof token, a wrapped `Bearer sapr_...`), or unknown (mistyped, another environment, or its proof ended more than 30 days ago) |
 | 403 | `not_issuing_app` | refresh, or revoke by token, from an app that didn't issue the proof |
 | 400 | `proof_refresh_token_reused` | refresh with a used refresh token; the proof is now revoked (`details.proof_id`) |
@@ -4213,7 +4968,7 @@ More: https://developers.teamofsilicons.com/docs/accounts/reference/api/proofs.m
 
 # Webhooks
 
-Your app probably keeps a user's id, display name, email or access status. When any of that changes with us, your copy needs to change too. Webhooks tell you, so you never have to keep asking. You as a silicon can also have a webhook for your own account.
+Your app probably keeps a user's id, display name, email or access status. When any of that changes with us, your copy needs to change too. Webhooks tell you, so you never have to keep asking. If you'd rather not run a public URL (a Silicon on a laptop, a script), the event stream gives you the same events over one open connection. You as a silicon can also have a webhook or a stream for your own account.
 
 Why your app wants them:
 - `Ids change` - a `c:` or `si:` id can change at any time, and the old one stays reserved for its owner for only 10 days before anyone can take it. Key your data on the `uuid` and use `account.id_changed` to update the id you show.
@@ -4225,17 +4980,47 @@ Why your app wants them:
 
 | | app webhook | Silicon webhook |
 |---|---|---|
-| set by | the app (its credentials) or its owner, `PUT /v1/apps/{app_id}/webhook` | the Silicon (`PUT /v1/me/webhook`), its custodian (`PUT /v1/me/silicons/{uuid}/webhook`), or `webhook_url` when the Silicon is created |
+| set by | the app (its credentials) or one of its authors, `PUT /v1/apps/{app_id}/webhook` | the Silicon (`PUT /v1/me/webhook`), its custodian (`PUT /v1/me/silicons/{uuid}/webhook`), or `webhook_url` when the Silicon is created |
 | about | every account with a live membership with the app | the Silicon's own account |
 | body | `"app_id": "<the app>"`, `"silicon": null` | `"app_id": null`, `"silicon": "<the Silicon's uuid>"` |
 
 Both are signed the same way, retried the same way, and listed and replayed the same way, with two differences in replay (below).
 
+## Choosing what your app hears (subscriptions)
+
+Your app doesn't have to hear about everything. A subscription says where your updates go, which updates you want, and whether it's `active` or `paused`. `delivery` is `webhook` (signed POSTs to your URL) or `stream` (kept for the event stream). An app has at most one of each, and the webhook subscription is your app's webhook, so `PUT /v1/apps/{app_id}/webhook` and the subscription endpoints change the same thing. Pick updates in Silicon Apps (the "Updates from Silicon Accounts" step, or `silicon-apps webhook <app_id> set <url> --event id_change`), with the subscription endpoints, or with `silicon-accounts app subscription`.
+
+These are the update names you pick, and the event types each one brings:
+
+| update | event types | picked for a new subscription |
+|---|---|---|
+| `id_change` | `account.id_changed` | yes |
+| `display_name_change` | `account.updated` with `display_name` in `changed` | yes |
+| `pfp_change` | `account.updated` with `pfp_url` in `changed` | yes |
+| `timezone_change` | `account.updated` with `timezone` in `changed` | no |
+| `email_change` | `account.updated` with `email` in `changed` | no |
+| `phone_change` | `account.updated` with `phone` in `changed` | no |
+| `custodian_change` | `silicon.custodian_changed`, and `account.updated` with `custodian` in `changed` | no |
+| `access_removed` | `membership.signed_out`, `membership.access_removed` | yes |
+| `account_deleted` | `account.deleted` | yes |
+
+`ping` always arrives. `updates: null` means every update, including ones we add later. A webhook set up before subscriptions existed has `null`, so it keeps getting everything it got before, until you pick.
+
+Each subscription gets its own copy of an event, with its own `event_id`, cut down to what it picked. Say a Carbon changes their display name and time zone together: a subscription that picked only `display_name_change` gets `"changed": ["display_name"]`, one that picked only `timezone_change` gets `"changed": ["timezone"]`, and when nothing it picked is left the event isn't sent at all. Scopes still apply on top.
+
+Pausing a subscription stops recording for it: changes made while it's paused never reach it, even after you resume. Deliveries already queued still go out. To catch up after a pause, read the current state with `GET /v1/apps/{app_id}/users`.
+
+```sh
+silicon-accounts app subscription create webhook https://briefcase.example/webhooks \
+  --update id_change --update access_removed --update account_deleted
+silicon-accounts app subscription update <id> --pause
+```
+
 ## Who gets an app event
 
-Your app gets an event about an account when the account has a live membership with your app, `active` (it signed in) or `imported` (you imported it and it hasn't signed in yet), and your app has a webhook URL. Once a user removes your app's access, you get `membership.access_removed` and then nothing more about them until they sign in again. A `membership.signed_out` doesn't end the membership: events keep coming and the user can sign in again.
+Your app gets an event about an account when the account has a live membership with your app, `active` (it signed in) or `imported` (you imported it and it hasn't signed in yet), and your app has an active subscription (a webhook URL or a stream) that picked that update. Once a user removes your app's access, you get `membership.access_removed` and then nothing more about them until they sign in again. A `membership.signed_out` doesn't end the membership: events keep coming and the user can sign in again.
 
-`account.updated` is narrower: your app gets it only if it may see at least one of the changed fields. `display_name` and `pfp_url` are always visible; `timezone`, `dob`, `email` and `phone` only with the scope of that name, and `email` and `phone` only for Carbons. Scopes belong to each Carbon's membership, not to your app, so one Carbon may have shared an optional `timezone` and another not. `changed` lists only the fields your app may see, and `account` is the account as your app sees it.
+`account.updated` is narrower: your app gets it only if it may see at least one of the changed fields. `display_name` and `pfp_url` are always visible; `timezone`, `dob`, `email` and `phone` only with the scope of that name, and `email` and `phone` only for Carbons. Scopes belong to each Carbon's membership, not to your app, so one Carbon may have shared an optional `timezone` and another not. `changed` lists only the fields your app may see and your subscription picked, and `account` is the account as your app sees it.
 
 While your app is disabled its deliveries are held: we keep retrying them and they go out if the app is re-enabled within 72 hours of the event.
 
@@ -4347,7 +5132,7 @@ In production we deliver only to `https` URLs on public addresses. Local host na
 
 ## Ordering
 
-Events don't always arrive in the order they happened, because we send in parallel and retry each delivery on its own. In our local runs, a Carbon changed their display name and then their id 10 ms apart, and `account.id_changed` arrived before `account.updated`. That late `account.updated` still carried the old id in `data.account.id`, because it describes the account at its own moment; copying it blindly would undo the id change.
+Webhook events don't always arrive in the order they happened, because we send in parallel and retry each delivery on its own. (Within one event stream they do; see below.) In our local runs, a Carbon changed their display name and then their id 10 ms apart, and `account.id_changed` arrived before `account.updated`. That late `account.updated` still carried the old id in `data.account.id`, because it describes the account at its own moment; copying it blindly would undo the id change.
 
 Ways to stay correct:
 1. `Re-read on change` - treat `account.id_changed` and `account.updated` as "this account changed" and read `GET /v1/apps/{app_id}/users/{uuid}`, which returns what your app may see right now. Order stops mattering, at one call per event.
@@ -4355,6 +5140,38 @@ Ways to stay correct:
 3. `Use occurred_at` for events without a version (`account.id_changed`, `silicon.custodian_changed`): apply one only if it's newer than the last change you applied for that account. We apply changes to one account one after another, so their `occurred_at` values follow that order.
 
 `account.deleted` is final, and the uuid is never reused. `membership.signed_out` and `membership.access_removed` are not final: the user can sign in again, and a notice held back by retries can arrive after that new sign-in. Ignore a notice whose `occurred_at` is older than the user's latest sign-in you handled.
+
+## The event stream
+
+Webhooks need a public URL that answers within 10 seconds. A Silicon on a laptop, a script, or an app that would rather pull than be pushed can open `GET /v1/events/stream` instead: one HTTP response stays open and we write each event as it happens, as Server-Sent Events. An app creates a stream subscription once, then listens:
+
+```sh
+curl -s -X POST https://accounts.teamofsilicons.com/v1/apps/briefcase/subscriptions -u "briefcase:$BRIEFCASE_APP_SECRET" \
+  -H 'Content-Type: application/json' -d '{"delivery":"stream"}'
+curl -N https://accounts.teamofsilicons.com/v1/events/stream -u "briefcase:$BRIEFCASE_APP_SECRET"
+```
+
+You as a silicon just listen with your access token, no subscription needed: `curl -N https://accounts.teamofsilicons.com/v1/events/stream -H "Authorization: Bearer $TOKEN"`. Here is what a Silicon saw 0.4 seconds after its custodian renamed it:
+
+```text
+retry: 5000
+: connected
+
+id: 01a11e46-8684-715b-b2ac-c80931069cf7
+event: silicon.updated
+data: {"app_id":null,"data":{"changed":["display_name"],"id":"si:streamer","silicon":{"...":"..."},"uuid":"8HV"},"event_id":"01a11e46-8684-715b-b2ac-c80931069cf7","occurred_at":"2026-10-09T01:28:20.129Z","silicon":"8HV","type":"silicon.updated"}
+
+: heartbeat
+```
+
+How the stream fits with webhooks:
+- `Same events, same bodies` - every event has `id:` (its `event_id`), `event:` (its type) and `data:` (exactly the body a webhook would POST), so you parse it with the same code. There is no signature, because it comes over your own authenticated connection.
+- `Who gets what` - an app gets its stream subscription's events, filtered by the updates it picked. A Silicon gets its own events (its custodian's decision, changes to its account, an STK rotation), and a Carbon gets the events of the Silicons they're custodian of. A self-created Silicon still waiting for its custodian can listen with its `sarq_` request token and hear the decision the moment it's made.
+- `Resume, never miss` - reconnect with `Last-Event-ID` (browsers' `EventSource` does it for you) and you get everything after that event. Without a cursor the stream starts with new events. Delivery is at least once, so dedupe on `event_id`.
+- `Order` - within one stream, events arrive in the order their changes were saved, which webhooks can't promise. An event waits until every change saved before it has finished, so a long-running change elsewhere can hold the stream back by its own length.
+- `Closing` - a `: heartbeat` comment comes after 15 seconds of quiet. Right before we end a stream you get `event: stream.closed` (no `id`) with a `reason`: `token_expired` (refresh your token and reconnect), `access_removed` (the credentials stopped working: signed out, revoked, an STK rotation, a rotated app secret, a disabled app), `subscription_deleted`, `request_decided` (a waiting Silicon's custodian answered), `max_duration` (streams last an hour) or `server_restarting`. Reconnect with `Last-Event-ID` for anything but `subscription_deleted` and `request_decided`.
+
+One stream carries the whole feed, so one is usually enough. To check a deployment has all this before you rely on it, `GET /v1/capabilities?require=sse,subscriptions` answers whether both are supported.
 
 ## App events
 
@@ -4433,11 +5250,12 @@ More: https://developers.teamofsilicons.com/docs/accounts/start/webhooks.md, htt
 
 ## Setting your app's webhook
 
-These take your app's credentials or its owner's session. Credentials for another app get `403 app_mismatch`, a Carbon who doesn't own the app gets `403 not_app_owner`, and an unknown app is `404 unknown_app`. A disabled app's credentials get `403 app_disabled`, but its owner can still manage it.
+These take your app's credentials or the session of one of its authors (its owner, or a co-author who accepted an invite in Silicon Apps). Credentials for another app get `403 app_mismatch`, an account that isn't one of the app's authors gets `403 not_app_owner`, and an unknown app is `404 unknown_app`. A disabled app's credentials get `403 app_disabled`, but its authors can still manage it.
 
 | method and path | what it does |
 |---|---|
-| `PUT /v1/apps/{app_id}/webhook` | `{"url"}`, answers `200 {"url", "secret"}` with a new `whsec_...` secret, shown once; idempotent |
+| `GET /v1/apps/{app_id}/webhook` | `200 {"url", "secret_set", "events", "subscription_id", "status"}`: the endpoint (or null), whether a secret is stored, the updates it gets (`null` for every update) and the webhook subscription behind it |
+| `PUT /v1/apps/{app_id}/webhook` | `{"url"}`, answers `200 {"url", "secret"}` with a new `whsec_...` secret, shown once; idempotent. It also takes `events`, a list of update names (`422 invalid_webhook_events` for a name that isn't one) |
 | `DELETE /v1/apps/{app_id}/webhook` | `204`; pending deliveries become `failed`, ready to replay once a URL is set again; harmless to repeat |
 | `POST /v1/apps/{app_id}/webhook/rotate-secret` | `200 {"secret"}`, a new secret for the same URL, shown once; idempotent; `409 webhook_not_set` |
 | `POST /v1/apps/{app_id}/webhook/test` | queues a `ping`, `202 {"event_id", "delivery_id", "type": "ping"}`; idempotent; `409 webhook_not_set` |
@@ -4495,6 +5313,68 @@ curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" -X POST \
 
 With the CLI: `silicon-accounts app webhook deliveries --status failed` (also `--limit`, `--cursor`), `silicon-accounts app webhook delivery <id>`, `silicon-accounts app webhook replay <id>...` and `silicon-accounts app webhook replay --failed [--since <time>]`.
 
+## Subscriptions
+
+All take app or author auth. An app has at most one `webhook` and one `stream` subscription.
+
+| method and path | body | answer |
+|---|---|---|
+| `GET /v1/apps/{app_id}/subscriptions` | | `200 {"items": [Subscription...], "next_cursor": null}`, the webhook first |
+| `POST /v1/apps/{app_id}/subscriptions` | `delivery` (`webhook` or `stream`), `url?`, `updates?`, `status?` | `201` Subscription; idempotent (10 minutes) |
+| `GET /v1/apps/{app_id}/subscriptions/{subscription_id}` | | `200` Subscription |
+| `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}` | at least one of `updates`, `status`, `url` | `200` Subscription; idempotent (24 hours) |
+| `DELETE /v1/apps/{app_id}/subscriptions/{subscription_id}` | | `204` |
+| `POST /v1/apps/{app_id}/subscriptions/{subscription_id}/test` | | `202 {"subscription_id", "event_id", "delivery_id", "type": "ping"}`; idempotent |
+
+```json
+{
+  "id": "01a11e45-c73a-7003-a0b9-38ed30a0fd80", "app_id": "briefcase", "delivery": "stream", "status": "active",
+  "url": null, "secret_set": false,
+  "updates": ["id_change", "display_name_change", "pfp_change", "access_removed", "account_deleted"],
+  "event_types": ["account.id_changed", "account.updated", "account.deleted", "membership.signed_out", "membership.access_removed", "ping"],
+  "stream_url": "https://accounts.teamofsilicons.com/v1/events/stream",
+  "created_at": "2026-10-09T01:27:31.898Z", "updated_at": "2026-10-09T01:27:31.898Z"
+}
+```
+
+- Creating: `url` is required for a webhook and refused for a stream. Leave `updates` out for the defaults, or send `null` for every update. `status` defaults to `active`. A new webhook subscription answers its signing secret once in `secret`, and a retry with the same key gives the same secret. Unknown fields are refused.
+- Changing: `status: "paused"` pauses it and `"active"` resumes it. `url` moves a webhook to another endpoint and keeps its signing secret (rotate it with `POST .../webhook/rotate-secret`).
+- Deleting the webhook subscription removes the webhook URL and secret, like `DELETE /v1/apps/{app_id}/webhook`. Deleting the stream subscription ends its open streams within 30 seconds (`stream.closed`, reason `subscription_deleted`).
+- Testing works on an active or paused subscription. For a stream, `delivery_id` is null and the ping arrives as a frame with that `event_id`.
+
+With the CLI (`subscriptions` works too): `silicon-accounts app subscription list`, `show <id>`, `create webhook <url>` or `create stream` (with `--update <name>` repeated, `--all-updates`, `--paused`), `update <id>` (`--update`, `--all-updates`, `--pause`, `--resume`, `--endpoint <url>`), `delete <id>` and `test <id>`. Each change takes `--idempotency-key`, random by default.
+
+## The event stream endpoint
+
+`GET /v1/events/stream` answers `200` with `content-type: text/event-stream`.
+
+| who | auth | gets |
+|---|---|---|
+| an app | `Authorization: Basic base64(app_id:app_secret)` | its stream subscription's events (create one with `{"delivery":"stream"}` first) |
+| a Silicon | its access token (or the account site's session) | its own Silicon events |
+| a Carbon | its access token (or the account site's session) | the Silicon events of the Silicons it is custodian of |
+| a self-created Silicon waiting for its custodian | `Authorization: Bearer sarq_...` (the request token from `POST /v1/silicons`) | its own events, until the custodian decides |
+
+| parameter | |
+|---|---|
+| `Last-Event-ID` (header) | resume after this `event_id` |
+| `after` (query) | the same, for clients that can't set headers; `Last-Event-ID` wins when both are sent |
+| `types` (query) | comma-separated event types to keep, at most 20 |
+
+```sh
+curl -N https://accounts.teamofsilicons.com/v1/events/stream -u "briefcase:$BRIEFCASE_APP_SECRET" -H "Last-Event-ID: $LAST_EVENT_ID"
+curl -N "https://accounts.teamofsilicons.com/v1/events/stream?types=silicon.custodian.accepted" -H "Authorization: Bearer $TOKEN"
+```
+
+| limit | value |
+|---|---|
+| open streams | 5 per app or account; 500 per server |
+| how often a stream looks for new events | every second, at most 100 events per read |
+| heartbeat | after 15 seconds without events |
+| reconnect delay told to clients (`retry:`) | 5 seconds |
+| credentials checked again | every 30 seconds |
+| longest stream | 1 hour, then `stream.closed` with `max_duration` |
+
 ## A Silicon's webhook
 
 | method and path | auth | what it does |
@@ -4522,17 +5402,30 @@ As a silicon, signed in as yourself: `silicon-accounts webhook set <url>` (print
 | 400 | `invalid_query` | `deliveries?status=` isn't `pending`, `delivered` or `failed` |
 | 404 | `delivery_not_found` | no delivery with that id for your app or your Silicon |
 | 422 | `validation_failed` | replay body: neither or both of `delivery_ids` and `status`, more than 100 ids, `status` other than `failed`, or `since` without `status` or not RFC 3339 |
-| 403 | `app_mismatch` / `not_app_owner` | your credentials belong to another app, or your session doesn't own the app |
+| 403 | `app_mismatch` / `not_app_owner` | your credentials belong to another app, or your session isn't one of the app's authors |
 | 404 | `unknown_app` | no app with that id |
 | 403 | `silicon_only` / `carbon_only` | a Carbon called a Silicon's `/v1/me/webhook...`, or a Silicon called the custodian's `/v1/me/silicons/{uuid}/webhook...` |
 | 404 | `silicon_not_found` | `/v1/me/silicons/{uuid}/webhook...`: you aren't that Silicon's custodian |
 | 429 | `rate_limited` | a Silicon's test pings, more than 10 in an hour (`details.retry_after_seconds`) |
+| 409 | `subscription_exists` | the app already has a subscription with this delivery (`details.subscription_id`): change that one instead |
+| 404 | `subscription_not_found` | no subscription with this id belongs to the app |
+| 422 | `invalid_updates` | `updates` names something that isn't an update (`details.allowed` lists them) |
+| 422 | `invalid_webhook_events` | `PUT /v1/apps/{app_id}/webhook` `events` names something that isn't an update |
+| 422 | `validation_failed` | subscriptions: `url` missing for a webhook, sent for a stream, or not a public https URL in production; a `PATCH` with nothing to change |
+| 401 | `invalid_request_token` | the stream: an unknown `sarq_` token (other missing or bad credentials are also `401`) |
+| 409 | `stream_subscription_required` | an app opened the stream without a stream subscription: create one with `{"delivery":"stream"}` |
+| 400 | `unknown_event_id` | the stream's `Last-Event-ID` or `after` isn't an event of this feed: resume with the last id this stream sent you, or connect without one |
+| 400 | `invalid_query` | the stream's `types` names a type this feed never carries |
+| 429 | `too_many_streams` | 5 streams already open for this app or account, with `Retry-After`: close one |
+| 503 | `stream_capacity_reached` | the server is full or restarting: reconnect after `Retry-After` with `Last-Event-ID` |
 
-More: https://developers.teamofsilicons.com/docs/accounts/start/webhooks.md, https://developers.teamofsilicons.com/docs/accounts/reference/api/apps.md, https://developers.teamofsilicons.com/docs/accounts/reference/api/webhooks.md
+More: https://developers.teamofsilicons.com/docs/accounts/reference/api/apps.md, https://developers.teamofsilicons.com/docs/accounts/reference/api/webhooks.md, https://developers.teamofsilicons.com/docs/accounts/reference/limits.md
 
 # The Accounts HTTP API
 
-Everything we do is an HTTP endpoint. The `silicon-accounts` CLI and the Rust client (`silicon-accounts-client`) call these same endpoints, so anything they can do, you as a Silicon can do with a plain HTTP request too. This chapter covers the rules every endpoint shares: where to call, how to authenticate, what errors look like, how to retry safely, and where each group of endpoints lives.
+Everything we do is an HTTP endpoint. The `silicon-accounts` CLI and the Rust client (`silicon-accounts-client`) call these same endpoints, so anything they can do, you as a Silicon can do with a plain HTTP request too. This chapter covers the rules every endpoint shares: where to call, how to authenticate, what errors look like, how to pin a version, how to retry safely, and where each group of endpoints lives.
+
+If you'd rather read a machine description, the whole API is in the OpenAPI 3.1 document at `https://accounts.teamofsilicons.com/openapi.json`, and `GET /v1/capabilities` tells you what this deployment supports before you rely on it. Both are in `# Service endpoints`.
 
 ## Where to call
 
@@ -4556,7 +5449,7 @@ Every endpoint expects one of these callers:
 | `account` | `Authorization: Bearer <access token>` with `aud` = `silicon-accounts`, or the account site's session cookie | a signed-in Carbon or Silicon |
 | `account (Carbon)` / `account (Silicon)` | the same, limited to one kind | the other kind gets 403 `carbon_only` / `silicon_only` |
 | `app` | `Authorization: Basic base64(app_id:app_secret)` | your app, with its own credentials |
-| `app or owner` | your app's Basic credentials, or the `account` auth of the Carbon who owns the app | the `/v1/apps/{app_id}/...` routes |
+| `app or author` | your app's Basic credentials, or the `account` auth of one of the app's authors: its owner, or a Carbon or Silicon who accepted an author invite in Silicon Apps | the `/v1/apps/{app_id}/...` routes |
 | `OAuth client` | HTTP Basic, or `client_id` + `client_secret` in the form body; `client_id=silicon-accounts` with no secret is the first-party public client | `/v1/oauth/token`, `/revoke`, `/introspect` |
 | `app access token` | `Authorization: Bearer <access token>` issued to any app | `GET` / `POST /v1/userinfo` |
 | `flow` | the `sa_flow` cookie set by `POST /v1/flows`, plus an allowed `Origin` | the browser running a hosted sign-in |
@@ -4566,7 +5459,7 @@ Every endpoint expects one of these callers:
 `curl -u "$APP_ID:$APP_SECRET"` sends your app's Basic credentials for you.
 
 A first-party access token has `aud = silicon-accounts` and lasts 30 minutes. You get one like this:
-- as a Silicon: `POST /v1/silicons/login` with your si:id and STK.
+- as a Silicon: `POST /v1/silicons/login` with your si:id and STK, or with an assertion signed by one of your Ed25519 keys, so an unattended Silicon never holds a bearer secret (see `# Silicon and custodian endpoints`).
 - as a Carbon without a browser: `POST /v1/cli/login/start`, then `POST /v1/cli/login/verify` with the 6 digit code. Or the device flow: `POST /v1/device/authorize`, your Carbon approves it on the account site, and you poll `POST /v1/oauth/token`.
 - later, either of you: `POST /v1/oauth/token` with `grant_type=refresh_token` and `client_id=silicon-accounts`.
 
@@ -4627,7 +5520,7 @@ The key is 1 to 200 visible ASCII characters with no spaces; a UUID works well. 
 - Same key while the first request is still running: 409 `idempotency_in_progress`. Retry in a few seconds. A crashed request frees its key after 120 seconds.
 - Failed requests aren't stored, so retrying a failure runs it again.
 - We keep responses for 24 hours. A response with a freshly generated secret in it (an STK, a webhook signing secret, a `sarq_` request token, a proof token) is kept encrypted for only 10 minutes. If we can't decrypt that stored response, a retry gets 409 `idempotency_result_unavailable` and the operation still doesn't run again.
-- "Same caller" means the account, the app (or its owner), or the client IP for anonymous calls.
+- "Same caller" means the account, the app (or the author acting for it), or the client IP for anonymous calls.
 
 | Endpoint | Kept |
 |---|---|
@@ -4640,6 +5533,8 @@ The key is 1 to 200 visible ASCII characters with no spaces; a UUID works well. 
 | `PATCH /v1/apps/{app_id}/signin-config`, `POST /v1/apps/{app_id}/imports` | 24 h |
 | `PUT /v1/apps/{app_id}/webhook`, `POST /v1/apps/{app_id}/webhook/rotate-secret` | 10 min |
 | `POST /v1/apps/{app_id}/webhook/test`, `POST /v1/apps/{app_id}/webhook/replay` | 24 h |
+| `POST /v1/apps/{app_id}/subscriptions` | 10 min |
+| `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}`, `POST /v1/apps/{app_id}/subscriptions/{subscription_id}/test` | 24 h |
 | `POST /v1/proofs/user-verification`, `POST /v1/proofs/app-verification`, `POST /v1/apps/{app_id}/proofs/app-verification`, `POST /v1/proofs/refresh` | 10 min |
 | `POST /v1/apps/{app_id}/account-verification-request` | optional key |
 | `POST /v1/reports` | 24 h |
@@ -4652,7 +5547,7 @@ List endpoints take `?limit=` (1 to 200, default 50; anything outside is clamped
 
 ## Rate limits and locks
 
-Over a rate limit you get 429 `rate_limited` with a `Retry-After` header and `details.retry_after_seconds`; wait that long, then try again. Too many wrong codes or STKs lock instead: 423 `verification_locked` or `login_locked`, also with `Retry-After`. The sign-in numbers are in `# Security` below, the import budgets in `# Importing existing users`, and every limit in `# Limits`.
+Over a rate limit you get 429 `rate_limited`, and every 429 carries a `Retry-After` header and `details.retry_after_seconds`; wait that long, then try again. Too many wrong codes or STKs lock instead: 423 `verification_locked` or `login_locked`, also with `Retry-After`. The sign-in numbers are in `# Security` below, the import budgets in `# Importing existing users`, and every limit in `# Limits`.
 
 ## Body limits and time budgets
 
@@ -4667,15 +5562,26 @@ A bigger body is refused before we read it: 413 `payload_too_large` with `detail
 
 ## CORS
 
-Only public resources can be read from other origins: `GET /v1/apps/{app_id}/public`, `/.well-known/*` and `/sdk/*` answer `Access-Control-Allow-Origin: *` (and their preflights). Every other response has no CORS headers at all, so a web page on another origin can't call the API with a visitor's credentials. Call the API from your server. In the browser, use the hosted pages, the iframe or the SDK.
+Only public resources can be read from other origins: `GET /v1/apps/{app_id}/public`, `/.well-known/*` and `/sdk/*` answer `Access-Control-Allow-Origin: *` (and their preflights). So do the discovery documents `/openapi.json`, `/v1/openapi.json` and `/v1/capabilities`, and their `X-Request-Id`, `Accounts-Version` and `Retry-After` headers are readable too. Every other response has no CORS headers at all, so a web page on another origin can't call the API with a visitor's credentials. Call the API from your server. In the browser, use the hosted pages, the iframe or the SDK.
 
-## Versioning
+## Versions
 
-The version is in the path: the API is `/v1`, the iframe is `/embed/v1/buttons` and the SDK is `/sdk/v1.js`. `GET /v1/meta` reports the deployment's `version`.
+The API has dated versions. Pin one with the request header `Accounts-Version: 2026-10-01`. Leave the header out and the current version answers, so clients written before versions existed keep working unchanged. Every answer under `/v1`, `/.well-known` and `/openapi.json` names the version that served it in its own `Accounts-Version` header (with `Vary: Accounts-Version`).
+
+A version this deployment doesn't serve is refused before anything runs:
+
+```json
+{"error": {"code": "unsupported_version",
+           "message": "Silicon Accounts does not serve the API version '2027-01-01' named in the Accounts-Version header. It serves 2026-10-01.",
+           "hint": "Send Accounts-Version: 2026-10-01, or leave the header out to get the current version. GET /v1/capabilities lists the versions.",
+           "details": {"requested": "2027-01-01", "supported": ["2026-10-01"], "current": "2026-10-01"}}}
+```
+
+`GET /v1/capabilities` lists the versions served. The path carries the major version too: the API is `/v1`, the iframe `/embed/v1/buttons` and the SDK `/sdk/v1.js`. `GET /v1/meta` reports the deployment's own `version`.
 
 ## Unknown paths and methods
 
-On the public origin, any unknown path under `/v1` or `/.well-known` (and on the API's own address, any unknown path at all) is 404 `route_not_found` in JSON. It names the method and path and points you to `GET /v1/meta`. Every other unknown path on the public origin (`/embed/v1/nope`, `/sdk/v2.js`, `/healthz`) is the account site's HTML 404 page. A known path with the wrong method is 405 `method_not_allowed`, with an `Allow` header listing the methods it takes.
+On the public origin, any unknown path under `/v1` or `/.well-known` (and on the API's own address, any unknown path at all) is 404 `route_not_found` in JSON. It names the method and path and points you to `GET /v1/meta`. Every other unknown path on the public origin (`/embed/v1/nope`, `/sdk/v2.js`) is the account site's HTML 404 page. A known path with the wrong method is 405 `method_not_allowed`, with an `Allow` header listing the methods it takes.
 
 ## Every endpoint group
 
@@ -4684,11 +5590,12 @@ On the public origin, any unknown path under `/v1` or `/.well-known` (and on the
 | OAuth and OIDC | authorize, discovery, JWKS, token, revoke, introspect, userinfo, device authorize | `/authorize`, `/.well-known/*`, `/v1/oauth/*`, `/v1/userinfo`, `/v1/device/authorize` | `# OAuth and OIDC endpoints` |
 | Hosted sign-in, sessions and CLI sign-in | the hosted flow's steps, provider callbacks, linking identities, the browser session, device approval, CLI code sign-in | `/v1/flows/*`, `/v1/oauth/callback/{provider}`, `/v1/session`, `/v1/device/{user_code}/*`, `/v1/cli/login/*` | `# Sign-in endpoints` |
 | Accounts | id availability, account lookups, `me`, photos, emails, phones, identities, apps signed into, sessions, history | `/v1/ids/available`, `/v1/accounts/*`, `/v1/me/*`, `/v1/photos/{id}` | `# Account endpoints` |
-| Silicons and custodians | self-create, Silicon login, short-lived tokens, Silicon webhooks, managing Silicons, STK rotation, transfers, custodian requests | `/v1/silicons/*`, `/v1/me/short-lived-tokens`, `/v1/me/webhook/*`, `/v1/me/silicons/*`, `/v1/me/custodian-requests/*` | `# Silicon and custodian endpoints` |
-| Apps | public config, account verification requests, owned apps, sign-in config and its history, users, imports, the app webhook | `/v1/apps/{app_id}/*`, `/v1/me/owned-apps` | `# App endpoints` |
+| Silicons and custodians | self-create, Silicon login (STK or key), Silicon keys, short-lived tokens, Silicon webhooks, managing Silicons, STK rotation, transfers, a Silicon's apps, sign-ins and allow-list, custodian requests | `/v1/silicons/*`, `/v1/me/short-lived-tokens`, `/v1/me/webhook/*`, `/v1/me/silicons/*`, `/v1/me/custodian-requests/*` | `# Silicon and custodian endpoints` |
+| Apps | public config, account verification requests, owned apps, sign-in config and its history, users, imports, event subscriptions | `/v1/apps/{app_id}/*`, `/v1/me/owned-apps` | `# App endpoints` |
 | App verification and User verification | issue, refresh, verify and revoke proofs, App verification records and history, an account's own User verification proofs | `/v1/proofs/*`, `/v1/apps/{app_id}/proofs/*`, `/v1/me/app-verifications`, `/v1/me/proofs/*` | `# Proof endpoints` |
-| Webhooks | what we send to you: the delivery, its signature, every event | requests we make to your URL | `# Webhooks`, `# Webhook endpoints` |
-| Service | health, readiness, deployment metadata, bug reports, telemetry, the iframe and the SDK | `/healthz`, `/readyz`, `/v1/meta`, `/v1/reports`, `/v1/telemetry/events`, `/embed/v1/buttons`, `/sdk/v1.js` | `# Service endpoints` |
+| Webhooks | what we send to you: the delivery, its signature, every event; an app's webhook and its deliveries | requests we make to your URL, `/v1/apps/{app_id}/webhook/*` | `# Webhooks`, `# Webhook endpoints` |
+| Events | the same events, live, as Server-Sent Events, for apps, Silicons, custodians and waiting Silicons (`Last-Event-ID`, `?types=`) | `GET /v1/events/stream` (app, account or request token) | `# Webhooks` |
+| Service | health, readiness, deployment metadata, capabilities, the OpenAPI document, the agent card, bug reports, telemetry, the iframe and the SDK | `/healthz`, `/readyz`, `/v1/meta`, `/v1/capabilities`, `/openapi.json`, `/.well-known/agent.json`, `/v1/reports`, `/v1/telemetry/events`, `/embed/v1/buttons`, `/sdk/v1.js` | `# Service endpoints` |
 
 More: https://developers.teamofsilicons.com/docs/accounts/reference/api.md
 
@@ -4775,7 +5682,7 @@ More: https://developers.teamofsilicons.com/docs/accounts/reference/api/apps.md,
 
 If your app already has users, you don't lose them. Import them as a CSV or JSON file. For each row we look for a Carbon with the same email or phone number. If there is one, they join your user base. If there isn't, we create an account that the Carbon finishes setting up the first time they sign in. An import never sends an email or SMS.
 
-You run imports with your app's own credentials (Basic `app_id:app_secret`) or as the Carbon who owns the app, signed in. On `developers.teamofsilicons.com` the same flow is the app's Import tab (`/apps/{app_id}/import`).
+You run imports with your app's own credentials (Basic `app_id:app_secret`) or as one of its authors (its owner or an accepted co-author), signed in. On `developers.teamofsilicons.com` the same flow is the app's Import tab (`/apps/{app_id}/import`).
 
 ```sh
 printf '%s' "$APP_SECRET" | silicon-accounts app use legacy-crm --secret-stdin   # stores the secret, mode 0600
@@ -4784,7 +5691,7 @@ silicon-accounts app import users.csv --default-country US --wait               
 silicon-accounts app import rows <job-id> --outcome error                         # the rows to fix
 ```
 
-`silicon-accounts app use legacy-crm` without a secret acts as the owner through your own session. Every `silicon-accounts app` command also takes `--app-id`, `--app-secret-stdin` (or `ACCOUNTS_APP_ID` / `ACCOUNTS_APP_SECRET`).
+`silicon-accounts app use legacy-crm` without a secret acts as one of the app's authors through your own session. Every `silicon-accounts app` command also takes `--app-id`, `--app-secret-stdin` (or `ACCOUNTS_APP_ID` / `ACCOUNTS_APP_SECRET`).
 
 The import command:
 
@@ -4890,7 +5797,7 @@ The request only reads and checks the file. It answers `202` with `{"job": Impor
 | `status` | `queued` (waiting for the worker), `running`, `completed`, or `failed` (the whole job stopped; `error` says why and which rows were done) |
 | `total_rows`, `processed_rows` | rows in the file, and rows with an outcome so far |
 | `counts` | rows per outcome (`created`, `matched`, `updated`, `skipped`, `error`), plus `warnings`, the number of warning messages over all rows |
-| `created_by` | `app` (your app's credentials) or the uuid of the owner who ran it |
+| `created_by` | `app` (your app's credentials) or the uuid of the author who ran it |
 | `id`, `options`, `dry_run`, `format`, `created_at`, `started_at`, `finished_at` | the job id, what it runs with (`format` is `csv` or `json`), and when |
 
 Send an `Idempotency-Key` with every import. If the connection drops before you see the `202`, send the same request with the same key and you get the original answer back (`Idempotent-Replayed: true`, still showing `"status": "queued"`) instead of a second job. Then read the job to see where it really is. A key is remembered for 24 hours. Reusing it for a different file or different options is 409 `idempotency_key_reused`. One key per file.
@@ -5008,7 +5915,7 @@ These come back before a job exists, so nothing was imported:
 | 409 | `idempotency_key_reused` | the key was used for a different request |
 | 429 | `rate_limited` | hourly requests or daily rows used up |
 | 503 | `imports_busy` | the server is reading two other imports; retry after 15 seconds with the same key |
-| 401, 403 | `invalid_app_credentials`, `unauthenticated`, `app_mismatch`, `not_app_owner`, `app_disabled` | wrong or missing credentials, another app's credentials, a Carbon who doesn't own the app, a disabled app |
+| 401, 403 | `invalid_app_credentials`, `unauthenticated`, `app_mismatch`, `not_app_owner`, `app_disabled` | wrong or missing credentials, another app's credentials, an account that isn't one of the app's authors, a disabled app |
 | 404 | `import_not_found` | no such job for this app (reading a job or its rows) |
 
 ## Limits
@@ -5040,15 +5947,15 @@ More: https://developers.teamofsilicons.com/docs/accounts/start/import-users.md,
 
 # App endpoints
 
-You create your app in Silicon Apps. Then these endpoints let you set up its sign-in, read its users, import the users you already have, and ask for a verified account.
+You create your app in Silicon Apps. Then these endpoints let you set up its sign-in, read its users, import the users you already have, choose which updates reach you, and ask for a verified account.
 
-Most `/v1/apps/{app_id}/...` routes take `app or owner`: your app's Basic credentials (`-u app_id:app_secret`) or its owner's session. The exceptions are `/public`, `/account-verification-request` and the verification history at `/proofs/{proof_id}/history`.
+Most `/v1/apps/{app_id}/...` routes take `app or author`: your app's Basic credentials (`-u app_id:app_secret`), or the session of one of its authors (its owner, or a co-author who accepted an invite in Silicon Apps). So if your Carbon invited you to `briefcase` as a co-author, you as a Silicon can manage its sign-in with your own account. The exceptions are `/public`, `/account-verification-request` and the verification history at `/proofs/{proof_id}/history`.
 
 Errors any of them can give:
 - 403 `app_mismatch` - credentials for a different app.
-- 403 `not_app_owner` - a Carbon who doesn't own (or manage) the app.
+- 403 `not_app_owner` - an account that isn't one of the app's authors.
 - 404 `unknown_app` - there's no such app.
-- 403 `app_disabled` - a disabled app's credentials. Its owner can still manage it.
+- 403 `app_disabled` - a disabled app's credentials. Its authors can still manage it.
 
 | Method and path | Auth | Idempotent | Success |
 |---|---|---|---|
@@ -5056,17 +5963,23 @@ Errors any of them can give:
 | `GET /v1/apps/{app_id}/account-verification-request` | signed-in manager | | 200 your latest request, or `null` |
 | `POST /v1/apps/{app_id}/account-verification-request` | signed-in manager | optional | 201 new request, or 200 the pending one |
 | `GET /v1/me/owned-apps` | account (Carbon) | | 200 list |
-| `GET /v1/apps/{app_id}` | app or owner | | 200 app |
-| `PATCH /v1/apps/{app_id}/signin-config` | app or owner | yes | 200 app |
-| `GET /v1/apps/{app_id}/signin-config/history` | app or owner | | 200 list |
-| `GET /v1/apps/{app_id}/users` | app or owner | | 200 list |
-| `GET /v1/apps/{app_id}/users/{uuid}` | app or owner | | 200 user |
-| `POST /v1/apps/{app_id}/imports` | app or owner | yes | 202 job |
-| `GET /v1/apps/{app_id}/imports` | app or owner | | 200 list |
-| `GET /v1/apps/{app_id}/imports/{job_id}` | app or owner | | 200 job |
-| `GET /v1/apps/{app_id}/imports/{job_id}/rows` | app or owner | | 200 list |
+| `GET /v1/apps/{app_id}` | app or author | | 200 app |
+| `PATCH /v1/apps/{app_id}/signin-config` | app or author | yes | 200 app |
+| `GET /v1/apps/{app_id}/signin-config/history` | app or author | | 200 list |
+| `GET /v1/apps/{app_id}/users` | app or author | | 200 list |
+| `GET /v1/apps/{app_id}/users/{uuid}` | app or author | | 200 user |
+| `POST /v1/apps/{app_id}/imports` | app or author | yes | 202 job |
+| `GET /v1/apps/{app_id}/imports` | app or author | | 200 list |
+| `GET /v1/apps/{app_id}/imports/{job_id}` | app or author | | 200 job |
+| `GET /v1/apps/{app_id}/imports/{job_id}/rows` | app or author | | 200 list |
+| `GET /v1/apps/{app_id}/subscriptions` | app or author | | 200 list |
+| `POST /v1/apps/{app_id}/subscriptions` | app or author | yes | 201 subscription |
+| `GET /v1/apps/{app_id}/subscriptions/{subscription_id}` | app or author | | 200 subscription |
+| `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}` | app or author | yes | 200 subscription |
+| `DELETE /v1/apps/{app_id}/subscriptions/{subscription_id}` | app or author | | 204 |
+| `POST /v1/apps/{app_id}/subscriptions/{subscription_id}/test` | app or author | yes | 202 queued ping |
 
-Your app's webhook endpoints (`PUT` / `DELETE /v1/apps/{app_id}/webhook`, `rotate-secret`, `test`, `deliveries`, `replay`) are in `# Webhook endpoints`, and its proof endpoints (`/v1/apps/{app_id}/proofs/...`) in `# Proof endpoints`.
+Your app's webhook endpoints (`GET` / `PUT` / `DELETE /v1/apps/{app_id}/webhook`, `rotate-secret`, `test`, `deliveries`, `replay`) are in `# Webhook endpoints`, and its proof endpoints (`/v1/apps/{app_id}/proofs/...`) in `# Proof endpoints`.
 
 ## The app
 
@@ -5107,8 +6020,12 @@ Bring-your-own Google and Apple secrets ride along in the same PATCH. We store t
 | `allowed_email_domains` | `[]` | at most 100 domains; empty means any |
 | `allow_signup` | `true` | `false` lets only existing (and imported) accounts sign in |
 | `remember_browser` | `true` | offer "Continue as ..." for the browser's signed-in Carbon |
+| `device_flow` | `false` | let your own command-line tool sign Carbons in with a code they approve on the account site (the device authorization grant, with `client_id` alone, no secret) |
+| `public_client` | `false` | treat your desktop and command-line tools as public clients: they redeem authorization codes (PKCE `S256` required) and refresh with `client_id` alone |
 | `branding` | the Silicon Accounts look | `theme`, `logo_url`, `logo_dark_url`, `logo_height` (16 to 96), `show_app_name`, `font_family`, `heading_font_family`, `corner_style`, `radius` (0 to 40), `button_style`, `layout`, `background_style`, `background_image_url`, `density`, `light` and `dark` palettes (`#RRGGBB`; button text and page text need 4.5:1 contrast) |
 | `copy` | nulls | `title` (at most 80 characters), `subtitle` (200), `signup_title` (80), `signup_subtitle` (200), `opening_title` (80, only the `{provider}` and `{app}` placeholders), `terms_url`, `privacy_url`, `support_email` |
+
+`device_flow` and `public_client` exist because a secret shipped inside a CLI or a desktop app isn't secret. How your tool uses them is under `# Adding sign-in to your app`.
 
 If a patch doesn't include `flow`, a detail you no longer ask for leaves its step (an emptied step is dropped), and a newly asked detail joins the last step.
 
@@ -5118,7 +6035,11 @@ From the CLI: `silicon-accounts app config set - <<< '{"methods":{"google":true}
 
 ### `GET /v1/apps/{app_id}/signin-config/history`
 
-Every version of your setup, newest first, paginated. Each item has `version`, `actor` (`app`, `system`, or the owner's uuid, and then `actor_account` names them), `at`, and `changes`, a list of `{path, before, after}`. Secrets show as `"[redacted]"` with `"secret": true`.
+Every version of your setup, newest first, paginated. Each item has `version`, `actor`, `at`, and `changes`, a list of `{path, before, after}`. Secrets show as `"[redacted]"` with `"secret": true`. `actor` is one of:
+- `app` - your app's credentials.
+- the uuid of the author who made the change, and then `actor_account` names them.
+- `silicon_apps` - version 1 of an app created in Silicon Apps: the starting setup it chose, recorded as one change with the path `""`.
+- `system` - a stand-in app's starting setup, or maintenance such as moving stored setups to a new default.
 
 ```json
 {"version": 2, "actor": "app", "actor_account": null, "at": "2026-10-07T02:36:18.263Z",
@@ -5173,6 +6094,60 @@ Errors: 422 `validation_failed`, 401 for a missing or unsuitable sign-in, and 40
 - `GET /v1/apps/{app_id}/imports/{job_id}/rows` - every row's outcome in file order, filtered by `outcome`, `level`, `code`, `limit`, `cursor`.
 
 The member fields are in `# Your app's user base`. The columns, options, outcomes, message codes, refusals and limits are in `# Importing existing users`.
+
+## Event subscriptions
+
+A subscription says where your app's updates go, which updates it wants, and whether it's `active` or `paused`. `delivery` is `webhook` (signed POSTs to your URL) or `stream` (kept for `GET /v1/events/stream`). An app has at most one of each. The webhook subscription is your app's webhook, so `PUT /v1/apps/{app_id}/webhook` and these endpoints change the same thing. `app or author`.
+
+The updates are the ones you pick in Silicon Apps, and each one brings these event types:
+
+| Update | Event types | Picked for a new subscription |
+|---|---|---|
+| `id_change` | `account.id_changed` | yes |
+| `display_name_change` | `account.updated` with `display_name` in `changed` | yes |
+| `pfp_change` | `account.updated` with `pfp_url` in `changed` | yes |
+| `timezone_change` | `account.updated` with `timezone` in `changed` | no |
+| `email_change` | `account.updated` with `email` in `changed` | no |
+| `phone_change` | `account.updated` with `phone` in `changed` | no |
+| `custodian_change` | `silicon.custodian_changed`, and `account.updated` with `custodian` in `changed` | no |
+| `access_removed` | `membership.signed_out`, `membership.access_removed` | yes |
+| `account_deleted` | `account.deleted` | yes |
+
+- `ping` always arrives.
+- `updates: null` means every update, including ones we add later. Webhooks set up before subscriptions existed have it, so they keep getting what they got.
+- In `account.updated`, `changed` lists only the fields your subscription picked (and your app may see), and the event isn't sent at all when none is left.
+- A paused subscription records nothing until it's active again. Deliveries already queued still go out.
+
+What each event carries, and how the stream works, is in `# Webhooks`. The Subscription object:
+
+```json
+{"id": "01a11e45-c73a-7003-a0b9-38ed30a0fd80", "app_id": "briefcase", "delivery": "stream", "status": "active",
+ "url": null, "secret_set": false,
+ "updates": ["id_change", "display_name_change", "pfp_change", "access_removed", "account_deleted"],
+ "event_types": ["account.id_changed", "account.updated", "account.deleted", "membership.signed_out", "membership.access_removed", "ping"],
+ "stream_url": "https://accounts.teamofsilicons.com/v1/events/stream",
+ "created_at": "2026-10-09T01:27:31.898Z", "updated_at": "2026-10-09T01:27:31.898Z"}
+```
+
+- `GET /v1/apps/{app_id}/subscriptions` - `200 {"items": [Subscription...], "next_cursor": null}`, the webhook first.
+- `POST /v1/apps/{app_id}/subscriptions` - `{"delivery": "webhook" | "stream", "url"?, "updates"?, "status"?}` answers `201` Subscription. Idempotent for 10 minutes. `url` is required for a webhook and refused for a stream. Leave `updates` out for the defaults above, or send `null` for every update. `status` defaults to `active`. A new webhook subscription returns its signing secret once in `secret`, and a retry with the same key returns the same secret. Unknown fields are refused. Errors: 409 `subscription_exists` (`details.subscription_id`: change that one instead), 422 `invalid_updates` (`details.allowed`), 422 `validation_failed` (`url` missing, refused, or not a public https URL in production).
+- `GET /v1/apps/{app_id}/subscriptions/{subscription_id}` - `200` Subscription. 404 `subscription_not_found`.
+- `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}` - `{"updates"?, "status"?, "url"?}`, at least one, answers `200` Subscription. Idempotent for 24 hours. `status: "paused"` pauses it and `"active"` resumes it. `url` moves a webhook to another endpoint and keeps its signing secret (rotate it with `POST /v1/apps/{app_id}/webhook/rotate-secret`). Errors: 404 `subscription_not_found`, 422 `invalid_updates`, 422 `validation_failed` (nothing to change, or a `url` for a stream).
+- `DELETE /v1/apps/{app_id}/subscriptions/{subscription_id}` - `204`. Deleting the webhook subscription removes the webhook URL and secret, like `DELETE /v1/apps/{app_id}/webhook` (pending deliveries fail and can be replayed once a URL is set again). Deleting the stream subscription ends its open streams within 30 seconds (`stream.closed`, reason `subscription_deleted`). 404 `subscription_not_found`.
+- `POST /v1/apps/{app_id}/subscriptions/{subscription_id}/test` - queues a `ping` on that subscription, active or paused. Idempotent: a retry queues no second ping. `202 {"subscription_id", "event_id", "delivery_id", "type": "ping"}`; `delivery_id` is `null` for a stream, where the ping arrives as a frame with that `event_id`.
+
+From the CLI (`subscriptions` works too):
+
+```sh
+silicon-accounts app subscription list
+silicon-accounts app subscription create stream
+silicon-accounts app subscription create webhook https://briefcase.example/webhooks --update id_change --update account_deleted
+silicon-accounts app subscription update <id> --pause            # or --resume, --all-updates, --update X, --endpoint <URL>
+silicon-accounts app subscription test <id>
+silicon-accounts app subscription delete <id>                    # deleting the webhook subscription removes the app's webhook
+```
+
+`create` takes `--update` (repeat it), `--all-updates`, `--paused` and `--idempotency-key`; a webhook's secret is printed once, and a retry with the same key within 10 minutes prints the same answer instead of failing with `subscription_exists`.
 
 More: https://developers.teamofsilicons.com/docs/accounts/reference/api/apps.md
 
@@ -5235,7 +6210,7 @@ A fourth cookie, `sa_telemetry=off`, isn't a credential: it opts the browser out
 - Verification codes are 6 random digits, good for 10 minutes.
 - Wrong codes are counted per address, across every flow, the CLI, the account site and the requirement step. The 10th wrong code in a row locks every code for that address for 60 seconds, and starting new flows doesn't buy more guesses.
 - At most 10 codes go to one address per 10 minutes, and 30 per network.
-- 10 wrong STKs in a row lock that Silicon's sign-in for 60 seconds, with at most 60 sign-in attempts per network per minute.
+- 10 wrong STKs in a row lock that Silicon's sign-in for 60 seconds, with at most 60 sign-in attempts per network per minute. Signing in with a key is never locked out, because a signature can't be guessed, and each assertion works once.
 - Lookups by uuid are limited to 600 per minute per caller. uuids look random, but they're short and handed out densely (238,328 three-character values, used up before we move to four), so without a limit one caller could walk every account.
 
 Our answers never tell a caller more than they already know:
@@ -5259,7 +6234,7 @@ Account site pages carry a per-request nonce CSP and `X-Frame-Options: DENY`, so
 
 Uploaded photos are served with `Content-Security-Policy: default-src 'none'; sandbox` and `nosniff`, after we checked the bytes really are PNG, JPEG, WebP or GIF of bounded size. An upload can't become a script on our origin.
 
-Only public resources send `Access-Control-Allow-Origin: *`: the public sign-in config, discovery, the JWKS and the SDK. Every other response has its CORS headers removed, so another website can't read an API response with a visitor's credentials.
+Only public resources send `Access-Control-Allow-Origin: *`: the public sign-in config, discovery, the JWKS, the SDK, and the discovery documents (`/openapi.json`, `/v1/capabilities`). Every other response has its CORS headers removed, so another website can't read an API response with a visitor's credentials.
 
 ## Webhooks never reach private networks
 
@@ -5299,7 +6274,7 @@ More: https://developers.teamofsilicons.com/docs/accounts/learn/security.md
 
 # Service endpoints
 
-These tell you whether the service is up and which deployment you reached, and they take your bug reports and telemetry. All of them are public.
+These tell you whether the service is up, which deployment you reached and what it supports, and they take your bug reports and telemetry. All of them are public. If you are a Silicon meeting us for the first time, `GET /v1/capabilities` and `/openapi.json` are the two to read.
 
 ## Health and readiness
 
@@ -5316,6 +6291,53 @@ What this deployment is. Fields: `name` (`Silicon Accounts`), `version`, `enviro
 - `developer_url` - the developer platform, where you set up your app's sign-in. The account site's `/developer` pages redirect there.
 - `providers` - whether one-click (managed) Google and Apple are configured.
 - `delivery` - `providers` (Postmark and Twilio) or `local` (nothing is sent; development only).
+
+## `GET /v1/capabilities`
+
+What this deployment supports, so you can check before you rely on something. Public, CORS `*`, cacheable for 5 minutes.
+
+```sh
+curl -s "https://accounts.teamofsilicons.com/v1/capabilities?require=sse,subscriptions"
+```
+
+```json
+{"service": "Silicon Accounts", "version": "0.3.0", "api_version": "2026-10-01", "api_versions": ["2026-10-01"],
+ "version_header": "Accounts-Version", "public_url": "https://accounts.teamofsilicons.com",
+ "capabilities": {"sse": {"supported": true, "description": "Event streaming with Server-Sent Events: ...",
+                          "endpoints": ["GET /v1/events/stream"], "docs": "https://developers.teamofsilicons.com/docs/accounts/learn/webhooks#streaming-events"}, "...": "..."},
+ "auth_methods": [{"name": "bearer_access_token", "description": "...", "header": "Authorization"}, "..."],
+ "limits": {"page_size_max": 200, "streams_per_caller": 5, "stream_heartbeat_seconds": 15, "stream_max_seconds": 3600, "webhook_retry_hours": 72, "...": "..."},
+ "links": {"openapi": "https://accounts.teamofsilicons.com/openapi.json", "agent_card": "https://accounts.teamofsilicons.com/.well-known/agent.json",
+           "mcp": "https://accounts.teamofsilicons.com/mcp", "llms_txt": "https://accounts.teamofsilicons.com/llms.txt", "docs": "https://developers.teamofsilicons.com/docs/accounts", "...": "..."},
+ "require": {"requested": ["sse", "subscriptions"], "satisfied": true, "supported": ["sse", "subscriptions"], "missing": []}}
+```
+
+Each capability has `supported`, a `description`, its `endpoints` and its `docs`. The answer also lists the API versions, the ways to authenticate, the main limits, and links to the OpenAPI document, the agent card, the MCP server and `llms.txt`.
+
+The capabilities are `rest_json`, `openapi`, `structured_errors`, `rate_limit_headers`, `idempotency_keys`, `pagination`, `version_negotiation`, `capability_negotiation`, `bearer_tokens`, `client_credentials`, `oauth2`, `openid_connect`, `device_flow`, `short_lived_tokens`, `proofs`, `webhooks`, `webhook_signatures`, `webhook_replay`, `sse`, `stream_resume`, `subscriptions`, `imports`, `agent_card`, `mcp` and `llms_txt`.
+
+`require` takes 1 to 50 of them, separated by commas. Case and `-` don't matter, and common names like `event_streaming`, `idempotency` and `a2a` work too. If one is unknown or unsupported the answer is 422 `capabilities_missing`, with `details.missing`, `details.supported` and `details.available`, so you can decide to go without it. An empty or oversized `require` is 400 `invalid_query`.
+
+## `GET /openapi.json` and `GET /v1/openapi.json`
+
+The OpenAPI 3.1 document of every endpoint: methods, paths, authentication (`bearerAuth`, `appBasic`, `requestToken` and the others), parameters, bodies, responses and the error shape. Public, CORS `*`, cacheable for 5 minutes. A test keeps it in step with the routes the service really has, so you can generate a client from it.
+
+```sh
+curl -s "https://accounts.teamofsilicons.com/openapi.json" | jq '.paths | keys | length'
+```
+
+## `GET /.well-known/agent.json`
+
+Our A2A agent card: what the service is, its skills (create a Silicon account, sign a Silicon into an app, verify a proof, manage app sign-in, subscribe to account events), how to authenticate, and links to the OpenAPI document, `llms.txt`, the docs and the MCP server. Public, CORS `*`, cacheable for 5 minutes. We speak REST and MCP, not A2A tasks: `capabilities.streaming` and `pushNotifications` describe the event stream and webhooks.
+
+```json
+{"protocolVersion": "0.3.0", "name": "Silicon Accounts", "description": "Accounts for Carbons and Silicons. ...",
+ "url": "https://accounts.teamofsilicons.com", "provider": {"organization": "Team of Silicons", "url": "https://teamofsilicons.com"},
+ "version": "0.3.0", "documentationUrl": "https://developers.teamofsilicons.com/docs/accounts",
+ "capabilities": {"streaming": true, "pushNotifications": true, "stateTransitionHistory": false},
+ "skills": [{"id": "create-silicon-account", "name": "Create a Silicon account", "...": "..."}, "..."],
+ "links": {"openapi": "https://accounts.teamofsilicons.com/openapi.json", "mcp": "https://accounts.teamofsilicons.com/mcp", "...": "..."}}
+```
 
 ## `POST /v1/reports`
 
@@ -5398,9 +6420,12 @@ A session belongs to the URL it was made at. Point the CLI somewhere else and ac
 | Who | Command |
 |---|---|
 | you, as a Silicon | `printf '%s' "$STK" \| silicon-accounts login --silicon si:scout --stk-stdin`, or set `ACCOUNTS_SILICON` and `ACCOUNTS_STK` |
+| you, as a Silicon with a key | `silicon-accounts login --silicon si:scout --key ~/.accounts/scout.key`, or set `ACCOUNTS_SILICON` and `ACCOUNTS_SILICON_KEY` |
 | a Carbon with a browser | `silicon-accounts login` shows a code like `WDJB-MJHT` and opens `accounts.teamofsilicons.com/device`, where they approve it |
 | a Carbon without a browser | `silicon-accounts login --email you@example.com` (or `--phone`), then type the 6 digit code |
 | a Carbon in a script | `silicon-accounts login --email you@example.com`, then `silicon-accounts login --email you@example.com --code 123456` |
+
+If you run unattended, on a server or in a scheduled job, sign in with a key instead of keeping your STK there: register an Ed25519 key once with `silicon-accounts silicon keys add`, keep its private half on that machine, and each sign-in sends a signed assertion that works once and expires within 5 minutes, so nothing sent can be reused.
 
 A Carbon already signed in on another machine can approve the browser code from there with `silicon-accounts device approve WDJB-MJHT`.
 
@@ -5451,6 +6476,7 @@ Flags win over environment variables, which win over `config.json`.
 | `ACCOUNTS_HOME` | the directory holding `.accounts/`; beats the configured home |
 | `SILICON_HOME` | the home when nothing else sets one (else `~`); also where `silicon-accounts config home` keeps its pointer file |
 | `ACCOUNTS_SILICON`, `ACCOUNTS_STK` | your si:id and STK for `silicon-accounts login` |
+| `ACCOUNTS_SILICON_KEY` | your private key file for `silicon-accounts login`, instead of the STK |
 | `ACCOUNTS_APP_ID`, `ACCOUNTS_APP_SECRET` | the app and its secret for `silicon-accounts app …` |
 | `ACCOUNTS_TELEMETRY` | `0`, `false`, `no` or `off` turns telemetry off; `1`, `true`, `yes` or `on` turns it on; beats the config file |
 | `ACCOUNTS_NO_BROWSER` | any value but `0` or empty: never open a browser (device sign-in prints its URL instead) |
@@ -5529,7 +6555,7 @@ Most errors carry the service's code or the Rust client's (see `# Errors`). Thes
 | `session_ended` | `3` | the stored session was revoked, signed out elsewhere, or (for a Silicon) the STK was rotated | sign in again |
 | `session_changed` | `3` | another command signed this home in as someone else while this one ran | run the command again |
 | `wrong_account_kind` | `3` | the command is for the other kind of account (`silicon-accounts custodian requests` as a Silicon) | sign in as the kind the message names |
-| `app_credentials_required` | `3` | a `silicon-accounts app` command has no app secret and you aren't signed in as a Carbon | `--app-secret-stdin`, `ACCOUNTS_APP_SECRET`, `silicon-accounts app use <app_id> --secret-stdin`, or sign in as the app's owner |
+| `app_credentials_required` | `3` | a `silicon-accounts app` command has no app secret and you aren't signed in as a Carbon | `--app-secret-stdin`, `ACCOUNTS_APP_SECRET`, `silicon-accounts app use <app_id> --secret-stdin`, or sign in as a Carbon who is one of the app's authors |
 | `not_found` | `4` | `silicon-accounts silicon …` names a Silicon you aren't custodian of | `silicon-accounts silicon list` shows yours |
 | `unknown_topic` | `4` | `silicon-accounts docs <topic>` names no topic | the hint lists the topics |
 | `unknown_help_topic` | `4` | `silicon-accounts help <words>` is neither a command nor a topic | `silicon-accounts --help`, `silicon-accounts docs` |
@@ -5570,6 +6596,7 @@ List commands take `--limit <N>` (rows per page, at most 200) and `--cursor <CUR
 `silicon-accounts login` signs you in as a Carbon or a Silicon, or gets a short-lived token for an app. The session is stored in `{home}/.accounts/session.json` (mode 0600) and refreshed automatically. With no flags, a Carbon gets the browser code (device flow).
 - `--silicon <SI_ID>` - sign in as this Silicon with its STK (env `ACCOUNTS_SILICON`).
 - `--stk-stdin` / `--stk <STK>` - the Silicon's STK (prefer stdin or `ACCOUNTS_STK`).
+- `--key <FILE>` - sign the Silicon in with this private key file instead of its STK, a key registered with `silicon-accounts silicon keys add` (env `ACCOUNTS_SILICON_KEY`).
 - `--email <EMAIL>` / `--phone <PHONE>` - Carbon: send a 6 digit sign-in code there; `--country <CC>` for a local phone number (ISO code, for example `IN`).
 - `--challenge <CHALLENGE_ID>` - finish a code sign-in started earlier.
 - `--code <CODE>` - the 6 digit code (with `--email`, `--phone` or `--challenge`).
@@ -5628,6 +6655,12 @@ The custodian's commands take the Silicon as its si:id or uuid:
 - `silicon-accounts silicon transfer <SILICON> --to <C_ID_OR_EMAIL>` - the receiving Carbon has 14 days to accept. `silicon cancel-transfer <SILICON>` cancels it.
 - `silicon-accounts silicon delete <SILICON> --confirm <SI_ID>` - delete it for good.
 - `silicon-accounts silicon webhook set|remove|deliveries|delivery|replay <SILICON> …` - the Silicon's webhook, with the same options as `silicon-accounts webhook` below.
+- `silicon-accounts silicon apps list <SILICON> [--status active|access_removed|imported]` - the apps it signed into, most recently used first.
+- `silicon-accounts silicon apps remove <SILICON> <APP_ID>` - end its sign-ins at that app, revoke the proofs that app issued about it, and tell the app (`membership.access_removed`), just as if the Silicon had removed the app itself. It can sign in there again later unless an allow-list stops it.
+- `silicon-accounts silicon apps allow <SILICON> [APPS]... | --none | --any` - set the only apps it may get short-lived tokens for (replaces the list; `--none` allows no app, `--any` every app again, the default). Any other app then answers `403 app_not_allowed`, which tells the Silicon to ask you. The list doesn't end sign-ins it already has. `silicon apps allowed <SILICON>` shows the list.
+- `silicon-accounts silicon signins <SILICON>` - its sign-ins, newest first (app, method, outcome, address).
+- `silicon-accounts silicon keys add <SILICON>` - register a key, for yourself or a Silicon you look after: `--generate <FILE>` makes a new Ed25519 key and saves its private half there (mode 600), `--key <FILE>` registers the public half of an existing private key (unencrypted OpenSSH or PEM), `--public-key <FILE_OR_KEY>` registers just a public key (OpenSSH `.pub`, PEM, or the key itself), and `--name <TEXT>` tells keys apart. For example `silicon-accounts silicon keys add si:scout --generate ~/.accounts/scout.key --name build-box`.
+- `silicon-accounts silicon keys list <SILICON>` (revoked ones too) and `silicon keys revoke <SILICON> <KEY_ID>`. Revoking a key stops it and ends the sign-ins it started.
 
 `silicon-accounts webhook` is your own webhook as a Silicon, the same one your custodian manages with `silicon-accounts silicon webhook`. We use it to tell you about your own account: custodian decisions, STK rotations and changes (the events are in `# Silicons and custodians`, signing and retries in `# Webhooks`).
 - `silicon-accounts webhook set <URL>` (prints the signing secret once), `webhook remove`, `webhook test` (a `ping`).
@@ -5640,9 +6673,9 @@ The custodian's commands take the Silicon as its si:id or uuid:
 
 ## Running your app
 
-`silicon-accounts app` works on your app: its sign-in setup, user base, imports, tokens, webhook and proofs. It acts with the app's credentials, or as the app's owner when you're signed in as the Carbon who owns it.
+`silicon-accounts app` works on your app: its sign-in setup, user base, imports, tokens, webhook, subscriptions and proofs. It acts with the app's credentials, or without the secret through your session when you're signed in as a Carbon who is one of the app's authors.
 
-Token calls, User verification proofs, proof verification and proof refresh always need the app's own credentials. An owner without the secret can do everything else, including issuing App verification proofs and revoking the app's proofs by id. Apps themselves are created in Silicon Apps, not here.
+Token calls, User verification proofs, proof verification and proof refresh always need the app's own credentials. An author without the secret can do everything else, including issuing App verification proofs and revoking the app's proofs by id. Apps themselves are created in Silicon Apps, not here.
 
 ```sh
 printf '%s' "$SECRET" | silicon-accounts app use briefcase --secret-stdin
@@ -5650,8 +6683,8 @@ silicon-accounts app config set - <<< '{"methods":{"google":true}}'
 ```
 
 Choosing the app:
-- `silicon-accounts app use <APP_ID> [--secret-stdin | --secret <SECRET>]` - pick the app for later `app` commands and store its secret in `{home}/.accounts/apps/<app_id>.json` (0600). Without a secret, later commands act as the owner through your session.
-- `silicon-accounts app list` - the apps you own (signed in as a Carbon).
+- `silicon-accounts app use <APP_ID> [--secret-stdin | --secret <SECRET>]` - pick the app for later `app` commands and store its secret in `{home}/.accounts/apps/<app_id>.json` (0600). Without a secret, later commands act through your session as one of its authors.
+- `silicon-accounts app list` - your apps (signed in as a Carbon).
 - `silicon-accounts app new [--no-browser]` - opens Silicon Apps, where apps are created; `--no-browser` only prints the link.
 - `silicon-accounts app show` - the app, its sign-in setup and user base stats.
 - `silicon-accounts app lookup <TARGET>` - look up an account by uuid, c:id or si:id with the app's credentials.
@@ -5693,6 +6726,13 @@ Your app's webhook (signing, retries and replay rules are in `# Webhooks`):
 - `silicon-accounts app webhook deliveries [--status pending|delivered|failed]`, `app webhook delivery <ID>`.
 - `silicon-accounts app webhook replay [IDS]... | --failed [--since <TIME>]` - same event id, current URL and secret; at most 100 ids.
 
+Subscriptions choose where your app's updates go and which ones it gets (`app subscriptions` works too). An app has at most one webhook subscription, which is its webhook, and one stream subscription, which it reads at `GET /v1/events/stream` with its credentials (see `# Webhooks`). The updates are `id_change`, `display_name_change`, `pfp_change`, `timezone_change`, `email_change`, `phone_change`, `custodian_change`, `access_removed` and `account_deleted`; a new subscription gets `id_change`, `display_name_change`, `pfp_change`, `access_removed` and `account_deleted` unless you pick others.
+- `silicon-accounts app subscription list`, `app subscription show <ID>`.
+- `silicon-accounts app subscription create <webhook|stream> [URL]` - `--update <UPDATE>` (repeat it), `--all-updates` (every update, including ones added later), `--paused`, `--idempotency-key`. A webhook's signing secret is printed once; a retry with the same key within 10 minutes prints the same answer instead of failing with `subscription_exists`. Example: `silicon-accounts app subscription create webhook https://briefcase.example/webhooks --update id_change --update account_deleted`.
+- `silicon-accounts app subscription update <ID>` - `--update <UPDATE>` (exactly these), `--all-updates`, `--pause` (nothing is recorded until it's resumed), `--resume`, `--endpoint <URL>` (move a webhook; the secret stays).
+- `silicon-accounts app subscription delete <ID>` - deleting the webhook subscription removes the app's webhook.
+- `silicon-accounts app subscription test <ID>` - queue a test `ping`.
+
 ## The CLI itself
 
 - `silicon-accounts config home|get|set|unset|telemetry` - CLI settings (see `# The silicon-accounts CLI`).
@@ -5730,11 +6770,11 @@ let slt = session.short_lived_token("briefcase").await?;        // single use, 2
 |---|---|---|---|
 | `AccountsClient` | `AccountsClient::new(url)` or `::builder()` | nobody: public calls and sign-ins | none |
 | `AccountSession<'_>` | `client.with_token(access_token)` | a signed-in Carbon or Silicon | `Authorization: Bearer` with a first-party token (`aud = silicon-accounts`) |
-| `AppClient<'_>` | `client.as_app(app_id, app_secret)`, or `session.app(app_id)` for an app you own | an app | HTTP Basic, or the owner's Bearer token |
+| `AppClient<'_>` | `client.as_app(app_id, app_secret)`, or `session.app(app_id)` for an app you author | an app | HTTP Basic, or the author's Bearer token |
 
 `AccountsClient` holds only configuration and a connection pool. It's cheap to clone, so share one per process. The handles borrow it and hold one credential each. Refreshing an expired access token is up to you (`refresh_first_party`, `AppClient::refresh`).
 
-In owner mode (`session.app("briefcase")`) everything that manages the app works without its secret, including issuing App verification proofs and revoking proofs by id. Code, SLT and refresh-token exchange, `revoke`, `introspect`, `issue_user_verification`, `refresh_proof`, `verify_proof` and revoking a proof by token always need the app's own credentials. In owner mode they fail before sending anything, with `Error::InvalidInput` (code `invalid_input`).
+In author mode (`session.app("briefcase")`, for one of the app's authors, its owner or an accepted co-author) everything that manages the app works without its secret, including issuing App verification proofs and revoking proofs by id. Code, SLT and refresh-token exchange, `revoke`, `introspect`, `issue_user_verification`, `refresh_proof`, `verify_proof` and revoking a proof by token always need the app's own credentials. In author mode they fail before sending anything, with `Error::InvalidInput` (code `invalid_input`).
 
 ## Configuration
 
@@ -5801,7 +6841,7 @@ A signed-in Carbon or Silicon. Where a method returns a `Vec`, the pages are fol
 | `custodian_requests()`, `accept_custodian_request(id)`, `decline_custodian_request(id)` | `/v1/me/custodian-requests…` | `Vec<CustodianRequest>` / `()` |
 | `device_request(user_code)`, `approve_device(user_code)`, `deny_device(user_code)` | `/v1/device/{user_code}…` (`wdjb mjht` is normalized to `WDJB-MJHT`) | `DeviceRequest` / `()` |
 | `lookup(uuid)`, `lookup_by_id(id)`, `resolve(uuid_or_id)` | `/v1/accounts/…` | `AccountSummary` |
-| `app(app_id)` | no request | an owner-mode `AppClient` |
+| `app(app_id)` | no request | an author-mode `AppClient` |
 
 Photos are checked before sending: PNG, JPEG, WebP or GIF, at most 2 MB.
 
@@ -5821,10 +6861,10 @@ Photos are checked before sending: PNG, JPEG, WebP or GIF, at most 2 MB.
 | `set_webhook(url, key)`, `remove_webhook()`, `rotate_webhook_secret(key)`, `test_webhook(key)` | `…/webhook…` | `AppWebhook` / `()` / `WebhookSecret` / `WebhookTestResult` |
 | `deliveries(&DeliveriesQuery)`, `delivery(id)`, `replay(&ReplayRequest, key)` | `…/webhook/deliveries…`, `…/webhook/replay` | `Page<WebhookDelivery>` / `DeliveryDetail` / `ReplayResult` (`replayed_count()`, `skipped_count()`) |
 | `issue_user_verification(&IssueUserVerification, key)` | `POST /v1/proofs/user-verification` | `IssuedProof` |
-| `issue_app_verification(&IssueAppVerification, key)` | `POST /v1/proofs/app-verification` (owner mode: `/v1/apps/{app_id}/proofs/app-verification`) | `IssuedProof` |
+| `issue_app_verification(&IssueAppVerification, key)` | `POST /v1/proofs/app-verification` (author mode: `/v1/apps/{app_id}/proofs/app-verification`) | `IssuedProof` |
 | `refresh_proof(refresh_token, access_ttl_seconds)` | `POST /v1/proofs/refresh` | `IssuedProof` |
 | `verify_proof(proof_token)` | `POST /v1/proofs/verify` | `ProofVerification::Valid(..)` or `::Invalid` |
-| `revoke_proof(&ProofRef)` | `POST /v1/proofs/revoke` (owner mode with `ProofRef::Id`: `DELETE …/proofs/{id}`) | `()` |
+| `revoke_proof(&ProofRef)` | `POST /v1/proofs/revoke` (author mode with `ProofRef::Id`: `DELETE …/proofs/{id}`) | `()` |
 | `proofs(&ProofsQuery)` | `GET /v1/apps/{app_id}/proofs` | `Page<AppProof>` |
 | `lookup(uuid)`, `lookup_by_id(id)`, `resolve(uuid_or_id)` | `/v1/accounts/…` | `AccountSummary` |
 
@@ -5955,7 +6995,7 @@ Always log the `X-Request-Id` response header with an error. It finds the reques
 | `account_auth_required` | 401 | app credentials (Basic) were sent to an endpoint that acts for an account |
 | `invalid_authorization` | 401 | the `Authorization` header is unreadable or uses an unsupported scheme |
 | `invalid_token` | 401 | not an access token, a bad signature, or expired (access tokens last 30 minutes: refresh) |
-| `token_wrong_audience` | 401 | an app's token where a first-party (`aud = silicon-accounts`) token is needed, or a developer platform token (`aud = developer`, `details.aud`) outside the routes it may use (`GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and the owner routes under `/v1/apps/{app_id}/…`); the message names the method and route |
+| `token_wrong_audience` | 401 | an app's token where a first-party (`aud = silicon-accounts`) token is needed, or a developer platform token (`aud = developer`, `details.aud`) outside the routes it may use (`GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and the author routes under `/v1/apps/{app_id}/…`); the message names the method and route |
 | `token_revoked` | 401 | the sign-in behind the token ended (signed out, STK rotated, account deleted, refresh token reuse); the message says when and why; sign in again |
 | `session_expired` | 401 | the session cookie was signed out, revoked or expired |
 | `account_deleted` | 401 / 403 / 404 / 409 | the account was deleted: 401 for its own tokens, 403 at Silicon sign-in, 404 at lookups, 409 when it happened during the request |
@@ -5967,7 +7007,7 @@ Always log the `X-Request-Id` response header with an error. It finds the reques
 | `invalid_app_credentials` | 401 | unknown app_id, wrong secret, or a malformed Basic header |
 | `app_disabled` | 403 (400 in `/v1/flows`, 401 at userinfo) | the app is disabled |
 | `app_mismatch` | 403 | app credentials used on another app's `/v1/apps/{app_id}` URL |
-| `not_app_owner` | 403 | a Carbon who doesn't own the app tried to manage it |
+| `not_app_owner` | 403 | an account that isn't one of the app's authors (its owner or an accepted co-author) tried to manage it |
 | `unknown_app` | 404 (400 in `/v1/flows`) | no app has this app_id |
 | `request_token_required` | 401 | `GET /v1/silicons/requests/{id}` without `Bearer sarq_…` |
 | `invalid_request_token` | 401 | the `sarq_` token doesn't belong to this request |
@@ -6066,7 +7106,10 @@ Always log the `X-Request-Id` response header with an error. It finds the reques
 | `invalid_state` | 400 | a provider callback with a malformed `state` |
 | `device_code_not_found` | 404 | no device sign-in waits for this user code |
 | `device_code_used` | 409 | already approved or denied |
-| `device_code_expired` | 410 | user codes last 10 minutes; run `silicon-accounts login` again |
+| `device_code_expired` | 410 | user codes last 10 minutes; start the sign-in again |
+| `device_flow_off` | 403 | the app turned device sign-ins off after the code was made; sign in to it another way |
+| `unauthorized_client` | 400 | `POST /v1/device/authorize` named an app that hasn't turned on `device_flow` |
+| `invalid_client` | 400 | `POST /v1/device/authorize` named an app that doesn't exist |
 
 Some codes come back in `flow.error` (and in `?error=` on your redirect URI) instead of as HTTP errors: `login_required`, `consent_required` and `interaction_required` (from `prompt=none`), `access_denied` (cancelled on a details or review page), `provider_cancelled`, `provider_error`, `provider_token_invalid`, `provider_unavailable`, `provider_config_changed`, `provider_answer_elsewhere`, `provider_email_invalid`, `email_not_verified`, `hosted_domain_mismatch` (a Google account outside the app's `google.hosted_domain`), `signup_expired`, and while linking, as `?link_error=`, `session_changed`, `identity_in_use`, `email_in_use` and `email_limit_reached`.
 
@@ -6091,6 +7134,12 @@ Some codes come back in `flow.error` (and in `?error=` on your redirect URI) ins
 | `transfer_to_self` | 422 | a transfer must go to another Carbon |
 | `transfer_stale` | 409 | the custodian changed after the transfer was requested |
 | `webhook_not_set` | 409 | a test ping, secret rotation or replay without a webhook URL; set one first |
+| `invalid_assertion` | 401 | a key sign-in's assertion is malformed, expired, for another `aud`, not signed by a live key of that Silicon, or was used before; sign a fresh one |
+| `key_exists` | 409 | the Silicon already has this key (`details.key_id`) |
+| `too_many_keys` | 409 | 10 live keys already; revoke one first |
+| `key_not_found` | 404 | no key with this id belongs to the Silicon |
+| `app_not_allowed` | 403 | the Silicon's custodian only lets it get short-lived tokens for the apps in `details.allowed_apps`; ask the custodian to add the app |
+| `unknown_app` | 422 | an allow-list names an app that doesn't exist (`details.unknown`) |
 
 ## Apps
 
@@ -6112,6 +7161,28 @@ Some codes come back in `flow.error` (and in `?error=` on your redirect URI) ins
 | `owner_not_found` / `owner_email_conflict` / `owner_unavailable` | 422 / 409 / 409 | Silicon Apps sync: the owner can't be resolved |
 
 Import rows carry their own message codes (`missing_identifier`, `ambiguous_match`, `duplicate_in_file`, `external_id_conflict`, `id_conflict`, …); read them with `silicon-accounts app import rows` and see `# Importing existing users`.
+
+## Subscriptions and the event stream
+
+| Code | Status | Cause and fix |
+|---|---|---|
+| `subscription_exists` | 409 | the app already has a subscription with this delivery (`details.subscription_id`); an app has one webhook and one stream subscription at most, so change that one instead |
+| `subscription_not_found` | 404 | no subscription with this id belongs to the app |
+| `invalid_updates` | 422 | `updates` names something that isn't an update (`details.allowed` lists them) |
+| `invalid_webhook_events` | 422 | `PUT /v1/apps/{app_id}/webhook` `events` names something that isn't an update |
+| `stream_subscription_required` | 409 | an app opened `GET /v1/events/stream` without a stream subscription; create one with `POST /v1/apps/{app_id}/subscriptions` `{"delivery":"stream"}` |
+| `unknown_event_id` | 400 | the stream's `Last-Event-ID` or `after` isn't an event of this feed; resume with the last id this stream sent you, or connect without one |
+| `too_many_streams` | 429 | 5 streams are already open for this app or account; close one (one stream carries every event of the feed), then retry after `Retry-After` |
+| `stream_capacity_reached` | 503 | this server is full or restarting; reconnect after `Retry-After` with `Last-Event-ID` |
+
+A stream that ends on purpose sends `event: stream.closed` with a `reason` first (see `# Webhooks`).
+
+## Versions and capabilities
+
+| Code | Status | Cause and fix |
+|---|---|---|
+| `unsupported_version` | 400 | the `Accounts-Version` header names a version this deployment doesn't serve (`details.supported`, `details.current`); send a supported one, or leave the header out to get the current version |
+| `capabilities_missing` | 422 | `GET /v1/capabilities?require=…` named a capability that is unknown or unsupported (`details.missing`, `details.supported`, `details.available`); check the names against `details.available`, or go without the missing ones |
 
 ## Proofs
 
@@ -6153,7 +7224,7 @@ From `/v1/oauth/token`, `/revoke` and `/introspect`, as `{"error", "error_descri
 | `invalid_request` | 400 (413 for a body over 64 KB) | a parameter is missing, repeated or malformed, or the client authenticated twice |
 | `invalid_client` | 401 | unknown app, wrong secret, disabled app, or no credentials; with `WWW-Authenticate: Basic realm="Silicon Accounts"` |
 | `invalid_grant` | 400 | the code, refresh token, SLT or device code is unknown, expired, already used, revoked, another app's, or its account was deleted or removed the app's access; or a `redirect_uri` or PKCE mismatch. A reused refresh token or code also revokes its sign-in |
-| `unauthorized_client` | 400 | the public client used a confidential grant, or an app used the device-code grant |
+| `unauthorized_client` | 400 | a public client (`client_id` without a secret) used a grant that needs the secret, or an app without `device_flow` used the device-code grant |
 | `unsupported_grant_type` | 400 | the grant isn't supported (the description names the alternative) |
 | `invalid_scope` | 400 | a refresh asked for more scopes than were granted |
 | `authorization_pending` | 400 | device sign-in not approved yet; keep polling |
@@ -6205,7 +7276,8 @@ Rate limits are fixed windows counted in the database, so they hold across every
 | Adding an email or phone (`POST /v1/me/emails`, `/phones`), counted before any refusal | 20 per 10 minutes; 30 per 10 minutes | account; IP |
 | Hosted sign-in flows started (`POST /v1/flows`) | 300 per minute | IP |
 | CLI code sign-ins started (`POST /v1/cli/login/start`) | 60 per 10 minutes | IP |
-| Device sign-ins started (`POST /v1/device/authorize`) | 60 per 10 minutes | IP |
+| Device sign-ins started (`POST /v1/device/authorize`) | 60 per 10 minutes; 600 per 10 minutes for one app's tools | IP; app |
+| Device codes looked up, approved or denied (`/v1/device/{user_code}…`) | 60 per 10 minutes | Carbon |
 | Connecting Google or Apple (`POST /v1/me/identities/{provider}`) | 30 per hour | account |
 | Silicon sign-in attempts (`POST /v1/silicons/login`) | 60 per minute | IP |
 | Silicon self-creations (`POST /v1/silicons`) | 10 successful per hour, and 60 attempts of any outcome per hour | IP |
@@ -6250,7 +7322,7 @@ Access tokens last 30 minutes, refresh tokens 900 days from the sign-in, authori
 | Handle (after `c:` / `si:`) | 3 to 30 characters of `a-z 0-9 - _`, case-insensitive (contract) |
 | Reserved words | `admin`, `administrator`, `root`, `system`, `support`, `help`, `security`, `silicon-accounts`, `account`, `silicon`, `silicons`, `carbon`, `carbons`, `api`, `www`, `mail`, `null`, `undefined`, `me`, `owner`, `staff` |
 | uuid | `a-z A-Z 0-9`, case-sensitive; 3 characters, then 4 once every 3 character uuid is used (contract); never reused |
-| App id | 2 to 40 characters of `a-z 0-9 -`, starting with a letter |
+| App id | 3 to 30 characters of `a-z 0-9 - _`, as Silicon Apps creates them (`my_app`, `2fa-tool`); older ids of 2 to 40 characters of `a-z 0-9 -` starting with a letter (`dm`) keep working |
 | Emails / phones per Carbon | 10 / 10 (contract) |
 | Display name | 1 to 100 characters, no control characters |
 | Date of birth | in the past, not before 1900-01-01; a Silicon's is the day it was created |
@@ -6276,6 +7348,23 @@ Access tokens last 30 minutes, refresh tokens 900 days from the sign-in, authori
 
 Going over a size gets the matching error: `payload_too_large` (413, `details.limit_bytes`), `photo_too_large` (413), `photo_dimensions_too_large`, `too_many_rows`, `too_many_columns`, `value_too_large`, `too_many_items`, `email_limit_reached` / `phone_limit_reached` (all 422), or `validation_failed` (422) naming the field.
 
+## Silicon keys and event streams
+
+| What | Value |
+|---|---|
+| Live keys per Silicon | 10 (409 `too_many_keys`) |
+| Key sign-in assertion lifetime (`exp - iat`) | at most 300 seconds, with 30 seconds of clock skew allowed |
+| Assertion `jti` | 1 to 200 characters, each used once |
+| Key name | at most 100 characters |
+| Open streams (`GET /v1/events/stream`) | 5 per app or account (429 `too_many_streams`); 500 per server (503 `stream_capacity_reached`); both with `Retry-After` |
+| How often a stream looks for new events | every second, at most 100 events per read |
+| Heartbeat (`: heartbeat`) | after 15 seconds without events |
+| Reconnect delay told to clients (`retry:`) | 5 seconds |
+| Stream credentials checked again | every 30 seconds |
+| Longest stream | 1 hour, then `stream.closed` with `max_duration`; reconnect with `Last-Event-ID` |
+| Event types in `?types=` | at most 20 |
+| Subscriptions per app | one webhook and one stream |
+
 ## Webhooks and messages
 
 A webhook delivery gets 10 seconds to answer with a 2xx, redirects are not followed, and we keep retrying for 72 hours after the event (or after a replay) before marking it `failed` and replayable; the schedule and the rest are in `# Webhooks`. The Rust client's default signature tolerance is 5 minutes.
@@ -6289,4 +7378,3 @@ A sweep every 10 minutes deletes, in batches: sign-in flows 1 day after they exp
 History is never deleted: sign-ins, id changes, custodian transfers, proofs, sign-in setup versions and the audit log.
 
 More: https://developers.teamofsilicons.com/docs/accounts/reference/limits.md
-

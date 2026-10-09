@@ -192,11 +192,12 @@
 .pickerOption {
   --sq-r: 9px;
   --sq-fill: transparent;
+  --sq-stroke: transparent;
   display: inline-flex;
   height: 30px;
   align-items: center;
   gap: 6px;
-  border: 0;
+  border: 1px solid var(--sq-stroke);
   padding: 0 10px;
   background: var(--sq-fill);
   color: var(--text-secondary);
@@ -208,6 +209,9 @@
 }
 .pickerOption:hover, .pickerOption:focus-visible { color: var(--foreground); }
 .pickerOption[aria-pressed="true"] { --sq-fill: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); }
+/* Keyboard position (as Arc's segmented control here): an accent edge, and a soft fill on an option not chosen. */
+.pickerOption:focus-visible { --sq-stroke: var(--accent); outline: none; }
+.pickerOption:focus-visible:not([aria-pressed="true"]) { --sq-fill: color-mix(in oklab, var(--foreground) 6%, transparent); }
 
 @media (max-width: 760px) {
   .footerTop { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); }

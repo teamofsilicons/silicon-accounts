@@ -1,9 +1,15 @@
-/** Sealed developer-session proxy for the explicitly allowed publishing API routes. */
+/**
+ * /api/apps/* → {APPS_API_URL}/v1/*: the sealed developer-session proxy for the explicitly allowed publishing routes
+ * (lib/server/apps-routes.ts), with the same server-held `aud=developer` token as /api/accounts/*. A 401 from Silicon
+ * Apps never signs the browser out on its own: Silicon Accounts decides whether the sign-in ended
+ * (lib/server/apps-refusal.ts); a refusal by Apps alone is 502 `apps_rejected_sign_in`.
+ */
 import { NextResponse, type NextRequest } from "next/server";
-import { appsApiUrl } from "@/lib/server/config";
+import { appsApiUrl, developerPublicUrl } from "@/lib/server/config";
 import { proxyRoute } from "@/lib/server/apps-routes";
+import { actionForAppsRefusal, appsRefusalBody, isLoopbackOrigin, signInStateAtAccounts } from "@/lib/server/apps-refusal";
 import {
-  SIGNED_OUT_CODES, clearSession, clientHeaders, errorBody, readSession, refreshSession, sameOriginProblem, writeSession,
+  clearSession, clientHeaders, errorBody, readSession, refreshSession, sameOriginProblem, writeSession,
   type StoredSession,
 } from "@/lib/server/session";
 
@@ -118,26 +124,22 @@ async function handle(request: NextRequest): Promise<NextResponse> {
 
   try {
     let upstream = await call(request, target.path, body, session.at);
-    if (upstream.status === 401) {
+    // A 401 from Silicon Apps is Apps refusing this token, which is not the same as the sign-in having ended: Silicon
+    // Accounts, which issued it, says which it is (lib/server/apps-refusal.ts). Never relayed as a signed-out 401.
+    for (let attempt = 0; upstream.status === 401; attempt++) {
       const text = await upstream.text();
-      let code = "";
-      try {
-        code = (JSON.parse(text) as { error?: { code?: string } }).error?.code ?? "";
-      } catch {
-        code = "";
+      const state = attempt === 0 ? await signInStateAtAccounts(session.at, headers) : "valid";
+      const action = actionForAppsRefusal(state, rotated);
+      if (action === "signed_out") return signedOut("Your sign-in to the developer site ended at Silicon Accounts.", true);
+      if (action === "refused") {
+        return json(502, appsRefusalBody(text, isLoopbackOrigin(developerPublicUrl())), response => {
+          if (rotated && session) writeSession(response, session);
+        });
       }
-      if (code === "invalid_token" && !rotated) {
-        // Expired in between (or the clock is off): one refresh, one retry.
-        const failure = await refresh();
-        if (failure) return failure;
-        upstream = await call(request, target.path, body, session.at);
-      } else if (SIGNED_OUT_CODES.has(code)) {
-        const response = new NextResponse(text, { status: 401, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
-        clearSession(response);
-        return response;
-      } else {
-        return relay(new Response(text, { status: 401, headers: upstream.headers }), session, rotated);
-      }
+      // Expired at Silicon Accounts too: one refresh, one retry.
+      const failure = await refresh();
+      if (failure) return failure;
+      upstream = await call(request, target.path, body, session.at);
     }
     return await relay(upstream, session, rotated);
   } catch (error) {

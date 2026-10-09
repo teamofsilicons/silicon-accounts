@@ -1,10 +1,51 @@
 /**
  * Branding defaults (the Silicon Accounts look) and normalization. Mirrors crates/core models/signin_config.rs:
- * missing fields fall back to these values, and a palette fills its missing colours from the right theme.
+ * missing fields fall back to these values, and a palette fills its missing colours from the right theme. The look is
+ * the Silicon family (cool #F7F8FA / #02040A, BDO Grotesk and SF Pro), and the service gives new apps these palettes
+ * (`Palette::default_light`, `default_dark`). Apps that kept the older defaults still store those, unchanged;
+ * normalizeBranding recognises them and paints the new look (LEGACY_LIGHT, LEGACY_DARK).
  */
 import type { BackgroundStyle, BrandFont, BrandLayout, Branding, ButtonStyle, CornerStyle, Density, Palette, SigninCopy, ThemeMode } from "../api/types";
 
+/**
+ * The Silicon Accounts look of the hosted pages, light: the same colours as the account site and the developer site
+ * (styles/tokens.css): #F7F8FA page, #292929 text, brand blue #1F5FB8 buttons under white text (6.2:1), muted #5C6370
+ * (6.0:1 on the card, 5.6:1 on the page).
+ */
 export const DEFAULT_LIGHT: Palette = {
+  primary: "#1F5FB8",
+  primary_foreground: "#FFFFFF",
+  background: "#F7F8FA",
+  surface: "#FFFFFF",
+  foreground: "#292929",
+  muted: "#5C6370",
+  border: "#E2E5EB",
+  danger: "#B42318",
+};
+
+/**
+ * The Silicon Accounts look, dark: #02040A page, #F7F8FA text, the brand blue #1F5FB8 for buttons under #F7F8FA text
+ * (5.8:1); links take the lighter ink the runtime derives (accentInk). Muted #9BA4B4 (7.4:1 on the card), error text
+ * #FF8A80 (8.6:1 on the card).
+ */
+export const DEFAULT_DARK: Palette = {
+  primary: "#1F5FB8",
+  primary_foreground: "#F7F8FA",
+  background: "#02040A",
+  surface: "#0B0F18",
+  foreground: "#F7F8FA",
+  muted: "#9BA4B4",
+  border: "#1F2635",
+  danger: "#FF8A80",
+};
+
+/**
+ * The palettes the service gave apps before the new look (crates/core signin_config.rs `legacy_light`, `legacy_dark`:
+ * warm paper #FFFDF9 and charcoal #353432). Apps made before the change store them as they were, so a palette equal to
+ * one of them, all eight colours, is an app that kept the Silicon Accounts look: it gets the new look (DEFAULT_LIGHT,
+ * DEFAULT_DARK). A palette with any colour of the app's own stays exactly as stored.
+ */
+export const LEGACY_LIGHT: Palette = {
   primary: "#1F5FB8",
   primary_foreground: "#FFFDF9",
   background: "#FFFDF9",
@@ -15,12 +56,7 @@ export const DEFAULT_LIGHT: Palette = {
   danger: "#B42318",
 };
 
-/**
- * The Silicon Accounts dark palette (crates/core signin_config.rs `default_dark`): filled buttons keep the brand blue
- * #1F5FB8 under #FFFDF9 text (6.1:1); the lighter #5B8FE0 is only an ink for links on dark (it would put button text
- * at 3.2:1). Error text is #FF8A80 (5.45:1 on the #353432 card; the old #F97066 read at 4.46:1, migration 0004).
- */
-export const DEFAULT_DARK: Palette = {
+export const LEGACY_DARK: Palette = {
   primary: "#1F5FB8",
   primary_foreground: "#FFFDF9",
   background: "#2A2927",
@@ -50,9 +86,7 @@ export const DEFAULT_BRANDING: Branding = {
   dark: DEFAULT_DARK,
 };
 
-export const DEFAULT_COPY: SigninCopy = {
-  title: null, subtitle: null, terms_url: null, privacy_url: null, support_email: null, opening_title: null, signup_title: null, signup_subtitle: null,
-};
+export const DEFAULT_COPY: SigninCopy = { title: null, subtitle: null, terms_url: null, privacy_url: null, support_email: null, opening_title: null, signup_title: null, signup_subtitle: null };
 
 /** The font allowlist, in the order the branding editor lists it. */
 export const BRAND_FONTS: readonly BrandFont[] = ["Geist", "Inter", "IBM Plex Sans", "DM Sans", "Space Grotesk", "Source Serif 4", "Fraunces", "Instrument Serif", "JetBrains Mono", "System"];
@@ -68,6 +102,26 @@ export const PALETTE_KEYS: readonly (keyof Palette)[] = ["primary", "primary_for
 export const LIMITS = { radius: { min: 0, max: 40 }, logoHeight: { min: 16, max: 96 }, titleMax: 80, subtitleMax: 200, continueLabelMax: 30, minContrast: 4.5 } as const;
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
+
+/** Every colour of two palettes the same (case-insensitive). */
+export function samePalette(a: Palette, b: Palette): boolean {
+  return PALETTE_KEYS.every(key => a[key].toUpperCase() === b[key].toUpperCase());
+}
+
+/** A stored palette: the new default when it is the service's old default, else exactly as stored. */
+function current(palette: Palette, legacy: Palette, fresh: Palette): Palette {
+  return samePalette(palette, legacy) ? { ...fresh } : palette;
+}
+
+/**
+ * Whether a branding is the Silicon Accounts look (an app that kept every default colour and the default font): its
+ * pages then take the site's own faces (BDO Grotesk headings over the SF Pro system text) instead of Geist. Any font
+ * or colour of the app's own keeps the app's look exactly.
+ */
+export function isSiliconLook(branding: Pick<Branding, "font_family" | "heading_font_family" | "light" | "dark">): boolean {
+  const heading = branding.heading_font_family ?? branding.font_family;
+  return branding.font_family === "Geist" && heading === "Geist" && samePalette(branding.light, DEFAULT_LIGHT) && samePalette(branding.dark, DEFAULT_DARK);
+}
 const pick = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(value as T) ? (value as T) : fallback);
 const clampNumber = (value: unknown, min: number, max: number, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : fallback);
 const urlOrNull = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
@@ -100,8 +154,8 @@ export function normalizeBranding(value: Partial<Branding> | null | undefined): 
     background_style: pick(raw.background_style, BACKGROUND_STYLES, DEFAULT_BRANDING.background_style),
     background_image_url: urlOrNull(raw.background_image_url),
     density: pick(raw.density, DENSITIES, DEFAULT_BRANDING.density),
-    light: normalizePalette(raw.light, DEFAULT_LIGHT),
-    dark: normalizePalette(raw.dark, DEFAULT_DARK),
+    light: current(normalizePalette(raw.light, DEFAULT_LIGHT), LEGACY_LIGHT, DEFAULT_LIGHT),
+    dark: current(normalizePalette(raw.dark, DEFAULT_DARK), LEGACY_DARK, DEFAULT_DARK),
   };
 }
 

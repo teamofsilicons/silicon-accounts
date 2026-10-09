@@ -217,7 +217,7 @@ function Report({ appId, job, onImportForReal, onNew }: { appId: string; job: Im
                         <tr key={row.row_number}>
                           <td className={styles.num}><button type="button" className={styles.rowOpen} onClick={() => openRow(row)} aria-label={`Open row ${row.row_number}`}>{row.row_number}</button></td>
                           <td><Badge size="sm" tone={result.tone}>{result.label}</Badge></td>
-                          <td className={`${styles.mono} ${styles.accountCell}`}>{row.id ?? (dry && row.outcome === "matched" ? "hidden in a dry run" : "–")}</td>
+                          <td className={`${styles.mono} ${styles.accountCell}`}>{row.id ?? (dry && row.outcome === "matched" ? "hidden in a dry run" : "No account")}</td>
                           <td>
                             {row.messages.length ? (
                               <ul className={styles.cellMessages} role="list">
@@ -303,16 +303,18 @@ export function ImportTab() {
   const step = importJob ? (job && isDone(job) ? 4 : 3) : wizardStep;
   const pollError = followed.error ? ApiError.from(followed.error) : null;
 
-  // A real import that finished while followed here changes the app's numbers: read them again.
+  // A real import that finished while followed here changes the app's numbers: read them again. Any finished run (a dry
+  // run too) refreshes Recent imports in the background, so "Start another import" shows it at once, with its outcome.
   const watching = useRef<string | null>(null);
   useEffect(() => {
     if (!job) return;
     if (!isDone(job)) watching.current = job.id;
     else if (watching.current === job.id) {
       watching.current = null;
+      void client.invalidateQueries({ queryKey: queryKeys.app.imports(appId), exact: true, refetchType: "all" });
       if (!dryRunOf(job)) void reload();
     }
-  }, [job, reload]);
+  }, [job, reload, client, appId]);
 
   // Each step replaces the last; keyboard and screen reader focus moves to the new step instead of falling to the page.
   const firstStep = useRef(true);

@@ -8,10 +8,14 @@
  */
 import type { AppPublic, Branding, FlowView, Palette, ThemeMode } from "../api/types";
 import { legibleTint, mixHex, mixOklab } from "./contrast";
-import { LIMITS, normalizeBranding } from "./defaults";
+import { LIMITS, isSiliconLook, normalizeBranding } from "./defaults";
 import { FONT_STACKS } from "./fonts";
 
 export type PaintTheme = "light" | "dark";
+
+/** The site's faces (styles/tokens.css), for the Silicon Accounts look: BDO Grotesk headings, SF Pro system text. */
+const SILICON_DISPLAY = '"BDO Grotesk", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif';
+const SILICON_BODY = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "BDO Grotesk", system-ui, sans-serif';
 
 /** The theme a branded page should paint: the branding's forced theme, else the visitor's theme. */
 export function resolveBrandTheme(mode: ThemeMode | undefined, visitorTheme: PaintTheme): PaintTheme {
@@ -55,6 +59,20 @@ function accentLine(p: Palette): string | null {
   return legibleTint(p.primary, p.foreground, [p.background, p.surface], 3);
 }
 
+/**
+ * Accent-coloured text on the accent tint (an info badge's words on --accent-subtle, the active tab, a hovered link):
+ * --accent-strong, at 4.5:1 on the tint over the card and over the page, on the tint a hovered badge lays (10 %), and
+ * on the page and the card themselves. The theme's own ink is the primary 22 % of the way to the text colour; it reads
+ * in light, but in dark it stays close to the primary (the default dark #1F5FB8 gives #5383C9, 2.9:1 on its tint
+ * #313C4A; the site's own dark ink is #93B8F1), so it moves on toward the text colour until it reads, as --accent-ink
+ * does (#85A7D9 there, 4.55:1). Null keeps that ink.
+ */
+export function accentStrong(p: Palette, dark: boolean): string | null {
+  const tint = dark ? 0.18 : 0.11;
+  const grounds = [p.background, p.surface, mixHex(p.surface, p.primary, tint), mixHex(p.background, p.primary, tint), mixOklab(p.surface, p.primary, 0.1)];
+  return legibleTint(p.primary, p.foreground, grounds, LIMITS.minContrast, 0.22);
+}
+
 /** The custom properties a branding paints in one theme. */
 export function brandingVariables(input: Branding | Partial<Branding> | null | undefined, theme: PaintTheme): Record<string, string> {
   const branding = normalizeBranding(input as Partial<Branding>);
@@ -62,6 +80,7 @@ export function brandingVariables(input: Branding | Partial<Branding> | null | u
   const dark = theme === "dark";
   const radius = branding.radius;
   const compact = branding.density === "compact";
+  const silicon = isSiliconLook(branding);
   const vars: Record<string, string> = {
     "--background": p.background,
     "--surface": p.surface,
@@ -74,7 +93,8 @@ export function brandingVariables(input: Branding | Partial<Branding> | null | u
     "--border-subtle": mix(p.border, 55, p.surface),
     "--border-strong": mix(p.border, 74, p.foreground),
     "--accent": p.primary,
-    "--accent-strong": mix(p.primary, 78, p.foreground),
+    // Text on the tint (info badges, the active tab): it must read there in both themes (accentStrong).
+    "--accent-strong": accentStrong(p, dark) ?? mix(p.primary, 78, p.foreground),
     "--accent-subtle": mix(p.primary, dark ? 18 : 11, "transparent"),
     "--accent-foreground": p.primary_foreground,
     // Accent-coloured text on dark surfaces needs a lighter ink than a fill does; on any palette it must read (accentInk).
@@ -99,8 +119,9 @@ export function brandingVariables(input: Branding | Partial<Branding> | null | u
     "--radius-control": px(radius),
     "--radius-panel": px(radius * (26 / 18)),
     "--radius-surface": px(radius * (34 / 18)),
-    "--font-body": FONT_STACKS[branding.font_family],
-    "--font-display": FONT_STACKS[branding.heading_font_family ?? branding.font_family],
+    // The Silicon Accounts look takes the site's own faces (styles/tokens.css); an app's choice is used as it is.
+    "--font-body": silicon ? SILICON_BODY : FONT_STACKS[branding.font_family],
+    "--font-display": silicon ? SILICON_DISPLAY : FONT_STACKS[branding.heading_font_family ?? branding.font_family],
     "--brand-logo-height": px(branding.logo_height),
     "--brand-pad": compact ? "24px" : "32px",
     "--brand-gap": compact ? "12px" : "16px",
@@ -125,6 +146,8 @@ export function brandingAttributes(input: Branding | Partial<Branding> | null | 
     "data-bg": branding.background_style === "image" && !cssUrl(branding.background_image_url) ? "plain" : branding.background_style,
     "data-button-style": branding.button_style,
     "data-density": branding.density,
+    // styles/branding.css sets the Silicon Accounts look's heading weight from this.
+    ...(isSiliconLook(branding) ? { "data-look": "silicon" } : {}),
   };
 }
 

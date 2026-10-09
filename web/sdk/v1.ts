@@ -104,7 +104,7 @@ const LIGHT: Palette = { primary: "#1F5FB8", primary_foreground: "#FFFFFF", back
  */
 const DARK: Palette = { primary: "#1F5FB8", primary_foreground: "#F7F8FA", background: "#02040A", surface: "#0B0F18", foreground: "#F7F8FA", muted: "#9BA4B4", border: "#1F2635", danger: "#FF8A80" };
 const KEYS: Array<keyof Palette> = ["primary", "primary_foreground", "background", "surface", "foreground", "muted", "border", "danger"];
-/** The palettes the service stores for apps that kept the defaults (lib/branding/defaults.ts LEGACY_*): the new look. */
+/** The older default palettes apps made before the new look still store (lib/branding/defaults.ts LEGACY_*): painted in the new look. */
 const LEGACY = {
   light: "#1F5FB8 #FFFDF9 #FFFDF9 #FFFFFF #353432 #6F6B66 #E8E3DA #B42318",
   dark: "#1F5FB8 #FFFDF9 #2A2927 #353432 #FFFDF9 #B5B0A8 #4A4845 #FF8A80",

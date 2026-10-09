@@ -73,7 +73,7 @@ export function CreateApp({ open, close }: { open: boolean; close: () => void })
             maxLength={30}
             pattern="[a-z0-9_-]{3,30}"
             placeholder="my-useful-app"
-            description="3–30 lowercase letters, numbers, hyphens, or underscores. This cannot be changed."
+            description="3 to 30 lowercase letters, numbers, hyphens, or underscores. This cannot be changed."
             error={
               id && !valid
                 ? "Choose a valid app ID."

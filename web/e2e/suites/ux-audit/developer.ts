@@ -8,7 +8,7 @@
  *   empty      a new Carbon: the apps home without apps; then an app of their own (made in the stack's database, as
  *              Silicon Apps would deliver it): the home with it and every tab (Overview, Sign-in, Details, Flows, Pages,
  *              Users, Import, Webhooks, App verification, Embed) in its empty state; the selected tab in view on a phone; the Pages
- *              tab's contrast readout judging a 3.62:1 button pair "Too low"
+ *              tab's contrast readout judging a 3.6x:1 button pair "Too low"
  *   briefcase  briefcase's owner (the seeded c:saket) after a new Carbon signed in, an import and an app verification proof: every tab
  *              with data
  *   ledgerly   ledgerly's owner (c:ledgerly-dev): the Details and Flows tabs with a two-page flow and a review, and the
@@ -197,7 +197,7 @@ export const journeys: Journey[] = [
       results.check("developer-empty: the new Carbon owns the new app", !!owned.body.items?.some(item => item.app_id === appId), JSON.stringify(owned.body).slice(0, 200));
       await auditApp(ctx, page, findings, "developer-empty", appId, new RegExp(name));
 
-      // The Pages tab's live contrast readout: a 3.62:1 button pair is "Too low" (the server refuses below 4.5:1).
+      // The Pages tab's live contrast readout: a 3.6x:1 button pair is "Too low" (the server refuses below 4.5:1).
       await openDeveloperPage(ctx, page, tabPath(appId, "pages"));
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.emulateMedia({ colorScheme: "light" });
@@ -215,8 +215,9 @@ export const journeys: Journey[] = [
       const cells = await row.getByRole("cell").evaluateAll(nodes => nodes.map(node => ({ text: (node.textContent ?? "").replace(/\s+/g, " ").trim(), title: node.getAttribute("title") ?? "", ok: node.hasAttribute("data-ok") })));
       await page.screenshot({ path: `${env.shots}/uxa-developer-empty-pages-contrast.png` });
       const [light, dark] = cells;
-      results.check("developer-empty: the Pages tab judges #FFFDF9 on #3B82F6 (3.62:1) \"Too low\" against 4.5:1 in the light column", !!light && /3\.6\d:1/.test(light.text) && /Too low/.test(light.text) && !light.ok && /4\.5:1/.test(light.title), JSON.stringify(cells));
-      results.check("developer-empty: the dark palette's default pair stays AA (6.10:1, #FFFDF9 on #1F5FB8)", !!dark && /6\.10:1/.test(dark.text) && dark.ok, JSON.stringify(dark));
+      // A new app has the Silicon look (crates/core default_light, default_dark): white button text in light, #F7F8FA in dark.
+      results.check("developer-empty: the Pages tab judges white on #3B82F6 (3.6x:1) \"Too low\" against 4.5:1 in the light column", !!light && /3\.6\d:1/.test(light.text) && /Too low/.test(light.text) && !light.ok && /4\.5:1/.test(light.title), JSON.stringify(cells));
+      results.check("developer-empty: the dark palette's default pair stays AA (5.83:1, #F7F8FA on #1F5FB8)", !!dark && /5\.83:1/.test(dark.text) && dark.ok, JSON.stringify(dark));
       // The unsaved change: leaving asks first (the guard), and "Stay" keeps it.
       results.check("developer-empty: findings saved", true, saveFindings(ctx, findings));
       await owner.context.close();

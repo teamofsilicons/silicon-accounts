@@ -62,7 +62,7 @@ export const journey: Journey = {
     results.check("a signed-out visitor to a deep link lands on the sign-in card with return_to", signInPage.searchParams.get("return_to") === deep, page.url());
     const cta = page.getByRole("link", { name: /Continue with Silicon Accounts/ });
     await cta.waitFor({ timeout: 20_000 });
-    results.check("…\"Build with Silicon Accounts\" and its one button, Continue with Silicon Accounts", (await page.getByRole("heading", { level: 1 }).innerText()).trim() === "Build with Silicon Accounts" && (await cta.getAttribute("href")) === `/auth/sign-in?return_to=${encodeURIComponent(deep)}`, String(await cta.getAttribute("href")));
+    results.check("…\"Build with Silicon\" and its one button, Continue with Silicon Accounts", (await page.getByRole("heading", { level: 1 }).innerText()).trim() === "Build with Silicon" && (await cta.getAttribute("href")) === `/auth/sign-in?return_to=${encodeURIComponent(deep)}`, String(await cta.getAttribute("href")));
     await shot(env, page, "ds-a-01-sign-in-card");
 
     const started = Date.now();

@@ -39,7 +39,7 @@ Silicon Accounts and Apps APIs, server to server:
 | `/auth/sign-out` (POST) | Revokes the refresh token (`/v1/oauth/revoke`, `client_id=developer`) and clears the cookie. The account site's own sign-in is untouched. |
 | `/auth/session` | `{"signed_in": bool}` from the sealed cookie alone (no API call). The pages ask it before `/api/accounts/me`, so a signed-out visit never logs a 401. |
 | `/api/accounts/*` | The proxy: `{ACCOUNTS_API_URL}/v1/*` with `Authorization: Bearer <access token>`. Public reads (`meta`, `apps/{id}/public`, `.well-known/openid-configuration`, `.well-known/jwks.json`) go without a token. Account reads: `me`, `me/owned-apps`, `me/app-verifications`. Everything under `apps/{app_id}/…` (the owner routes). Anything else answers 404 `not_proxied`. |
-| `/api/apps/*` | Restricted publishing proxy to `{APPS_API_URL}/v1/*`, using the same server-held `aud=developer` access token. Own-app listing requires `mine=true`. Store reviews, install receipts, package resolution, reports and platform registration are not proxied. Media paths use this proxy too, preserving private visibility checks. |
+| `/api/apps/*` | Restricted publishing proxy to `{APPS_API_URL}/v1/*`, using the same server-held `aud=developer` access token. Own-app listing requires `mine=true`. Store reviews, install receipts, package resolution, reports and platform registration are not proxied. Media paths use this proxy too, preserving private visibility checks. A 401 from Silicon Apps is never relayed as signed out on its own (see "Silicon Apps refusing the token" below). |
 | everything else | the pages |
 
 **Session cookie** (`sa_dev_session`, `__Host-sa_dev_session` over https): httpOnly, SameSite=Lax, Secure over https,
@@ -58,10 +58,23 @@ A refused refresh (`invalid_grant`) clears the cookie and answers 401 `signed_ou
 `localhost`/`127.0.0.1`) and, when the browser sends it, `Sec-Fetch-Site: same-origin`; otherwise 403
 `cross_site_request`.
 
-**Signed out**: the browser's API client treats a 401 as "signed out" only for `signed_out`, `token_revoked`,
+**Signed out**: the browser's API client treats a 401 as a sign of "signed out" only for `signed_out`, `token_revoked`,
 `account_deleted`, `unauthenticated` and `invalid_token` (`lib/query/client.ts`); other 401s, such as
-`token_wrong_audience` from an endpoint that refuses the developer platform's token, show where they happen. The shell
-then sends the visitor to `/sign-in?return_to=…`.
+`token_wrong_audience` from an endpoint that refuses the developer platform's token, show where they happen. Such a 401
+never sends anyone away on its own word: the page asks again who is signed in (`/auth/session`, then `/v1/me`,
+`markSignedOut` in `lib/query/session.ts`), and only when that says signed out does the shell send the visitor to
+`/sign-in?return_to=…`. The sign-in page sends a visitor back only when the same question says signed in, so the two
+can never pass a Carbon back and forth.
+
+**Silicon Apps refusing the token** (`lib/server/apps-refusal.ts`): Silicon Apps checks the developer token on its own
+(its JWKS, the issuer it trusts, a live check at Silicon Accounts), so it can refuse a token Silicon Accounts still
+accepts: an Apps API set up for another Accounts service (a local stack whose Apps upstream belongs to another stack),
+a key it has not fetched yet. On a 401 from Apps the proxy asks Silicon Accounts (`GET /v1/session` with the same
+token): ended there, the cookie is cleared and the browser hears 401 `signed_out`; expired there, one refresh and one
+retry; fine there, the browser hears 502 `apps_rejected_sign_in` (Apps' own code and words in `details`), and the apps
+workspace says "Publishing details could not be loaded" with the reason while the apps from Silicon Accounts stay. No
+refresh token is spent on a refusal. Before this, an Apps 401 `invalid_token` read as signed out: the shell went to
+/sign-in, the sign-in page found the session fine and went back to /apps, and the two looped.
 
 The server checks the developer audience itself (06-v2 §2): a token with `aud=developer` acts for its Carbon only on
 `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps`, `GET /v1/me/app-verifications` and the app management routes under `/v1/apps/{app_id}/…`.
@@ -79,7 +92,7 @@ Read at request time (`lib/server/config.ts`), never baked into the build:
 
 | Variable | Default | What |
 | --- | --- | --- |
-| `APPS_API_URL` | dev: `http://127.0.0.1:4310`; prod: `https://apps.teamofsilicons.com` | Silicon Apps upstream, server to server. |
+| `APPS_API_URL` | dev: `http://127.0.0.1:4310`; prod: `https://apps.teamofsilicons.com` | Silicon Apps upstream, server to server. It must trust the same Silicon Accounts as `ACCOUNTS_API_URL` (its `APPS_ACCOUNTS_URL` is that service's public URL), or it refuses this site's tokens and the pages say so. `scripts/dev.sh` sets it per stack (base + 6). |
 | `ACCOUNTS_API_URL` | `http://127.0.0.1:8589` | The Silicon Accounts API, server to server. |
 | `ACCOUNTS_PUBLIC_URL` | dev `http://localhost:8590`, prod `https://accounts.teamofsilicons.com` | The accounts site: hosted sign-in, the SDK. |
 | `DEVELOPER_PUBLIC_URL` (or `ACCOUNTS_DEVELOPER_URL`) | dev `http://localhost:$PORT` (8600), prod `https://developers.teamofsilicons.com` | This site's origin; the redirect URI is exactly `{it}/auth/callback`, as the API's `ACCOUNTS_DEVELOPER_URL` says. |
@@ -92,8 +105,22 @@ Read at request time (`lib/server/config.ts`), never baked into the build:
 
 `scripts/dev.sh` (repository root) starts this site next to the account site when `developer/package.json` exists:
 port 8600 on the default stack, else `ACCOUNTS_PORT + 5`, with `ACCOUNTS_API_URL`, `ACCOUNTS_PUBLIC_URL`,
-`DEVELOPER_PUBLIC_URL`/`ACCOUNTS_DEVELOPER_URL`, a per-stack `DEVELOPER_SESSION_SECRET` and `NEXT_DIST_DIR`. By hand,
-against a running stack:
+`DEVELOPER_PUBLIC_URL`/`ACCOUNTS_DEVELOPER_URL`, a per-stack `DEVELOPER_SESSION_SECRET`, `NEXT_DIST_DIR` and
+`APPS_API_URL` = `http://127.0.0.1:<ACCOUNTS_PORT + 6>` (8596 next to the default stack), so a stack never sends its
+tokens to an Apps API that trusts another stack. What answers there (`--apps=MODE`): by default the testkit's stand-in
+Silicon Apps API (`testkit/src/mock-silicon-apps.ts`: no apps, creates none, so the apps workspace loads and nothing
+leaves the machine); with `--apps=on` the sibling `silicon-apps` checkout's real Apps API (`apps-server`, built with
+`CARGO_TARGET_DIR=target/integration cargo build -p silicon-apps-server`), trusting the stack's accounts site and
+sharing a local `ACCOUNTS_INTERNAL_TOKEN` with accounts-api, so creating apps and publishing work end to end; with
+`--apps=off` (or an `APPS_API_URL` of your own) nothing is started. For example:
+
+```
+ACCOUNTS_PORT=8740 ACCOUNTS_API_PORT=8739 MOCK_OIDC_PORT=8741 MOCK_MESSAGING_PORT=8742 FAKE_APPS_PORT=8743 \
+  MOCK_IRIS_PORT=8744 DEVELOPER_PORT=8745 APPS_API_PORT=4610 ACCOUNTS_DB_NAME=accounts_8740 \
+  CARGO_TARGET_DIR=target/integration scripts/dev.sh --apps=on
+```
+
+By hand, against a running stack:
 
 ```
 PORT=8600 ACCOUNTS_API_URL=http://127.0.0.1:8589 ACCOUNTS_PUBLIC_URL=http://localhost:8590 pnpm -C developer dev
@@ -143,9 +170,11 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
   page is a full document: no client router state, nothing prefetched). The only client code is three small islands:
   the theme switch and the footer's theme choice (`components/site/theme-controls.tsx`), the docs search
   (`components/docs/docs-search.tsx`, a native `<dialog>`; its trigger is a link to the server-rendered `/docs/search`,
-  so search works without script), and one behaviour island (`components/site/enhancer.tsx`: copy buttons, "Show all
-  lines", "On this page" marking, keeping the sidebar's current page in view). The header's menu below 900 px is a native
-  popover. The portal's providers, query client, motion library and Radix layers load only under `app/(shell)` and
+  so search works without script; Tab and Shift+Tab cycle inside it while it is open, and its Esc button is named
+  "Esc: close the search"), and one behaviour island (`components/site/enhancer.tsx`: copy buttons, "Show all lines",
+  "On this page" marking, keeping the sidebar's current page in view). The header's menu below 900 px is a native
+  popover whose close button carries `autofocus`, so opening it moves focus into it and Escape gives focus back to the
+  menu button; the footer's theme choice shows keyboard focus as an accent edge. The portal's providers, query client, motion library and Radix layers load only under `app/(shell)` and
   `/sign-in`.
 - **One look, two modes.** `styles/tokens.css` (light: `#F7F8FA` / `#292929`; dark: `#02040A` / `#F7F8FA`; brand blue
   `#1F5FB8` for buttons and fills; every text token measured at 4.5:1 or more), BDO Grotesk self-hosted from
@@ -221,7 +250,14 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
   once, which Silicon Accounts treats as refresh token reuse (it ends the sign-in): run one instance, or route a browser
   to the same instance, until the API tolerates a short reuse window.
 - `pnpm typecheck && pnpm lint && pnpm test && pnpm build` are the gates; the browser walks are `web/e2e`'s
-  developer-site, developer-branding and ux-audit suites (`scripts/e2e.sh --suite developer-site`).
+  developer-site, developer-branding and ux-audit suites (`scripts/e2e.sh --suite developer-site`;
+  `developer-site-apps-workspace` has the stack's stand-in Silicon Apps API accept and then refuse the token).
+- The branding runtime (`lib/branding/`, `styles/branding.css`, `components/foundation/branding/`) follows the account
+  site's own (`web/lib/branding/`): the same Silicon look as the defaults (`DEFAULT_LIGHT`, `DEFAULT_DARK`, which the
+  API gives new apps too), the older warm defaults recognised and previewed in the new look (`LEGACY_LIGHT`,
+  `LEGACY_DARK`), the site's faces for an app that kept the Silicon look (`data-look="silicon"`). The Pages tab's colour
+  fields show the palette the hosted pages paint, so saving the Pages tab of an app that kept the warm defaults stores
+  the new ones.
 - Arc's local edits here (beyond `web/README.md`'s list): layers opened from plain state (no Radix Trigger: the dialogs,
   drawers and the ⌘K palette) return focus to what opened them (`components/arc/lib/return-focus.ts`); radio cards,
   the colour picker, accordions, chip groups, code blocks and copy fields show keyboard focus in fills and edges; the

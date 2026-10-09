@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Stops what scripts/dev.sh started: the site (Next.js) or its stand-in proxy, the developer platform
-# (Next.js, developer/), accounts-api and the testkit (mock Google/Apple, mock Postmark/Twilio, the fake app server).
+# (Next.js, developer/), the Silicon Apps API (--apps=on), accounts-api and the testkit (mock Google/Apple, mock
+# Postmark/Twilio, the fake app server).
 #
 #   scripts/stop.sh            the stack on ACCOUNTS_PORT (the public site port, default 8590)
 #   scripts/stop.sh --all      every stack scripts/dev.sh started (all ports)
@@ -45,6 +46,7 @@ expected_command() {
     testkit) echo 'start.ts' ;;
     web) echo "web" ;;
     developer) echo "developer" ;;
+    apps) echo 'apps-server' ;;
     proxy) echo 'dev-proxy.mjs' ;;
     *) echo "$1" ;;
   esac
@@ -99,7 +101,7 @@ stop_stack() { # run dir
   local dir="$1" f
   # The sites first (they front accounts-api), then accounts-api (it talks to the fake apps while
   # it drains), then the testkit.
-  for f in "$dir/web.pid" "$dir/developer.pid" "$dir/proxy.pid" "$dir/accounts-api.pid" "$dir/testkit.pid"; do
+  for f in "$dir/web.pid" "$dir/developer.pid" "$dir/proxy.pid" "$dir/apps.pid" "$dir/accounts-api.pid" "$dir/testkit.pid"; do
     [ -f "$f" ] && stop_one "$f"
   done
   for f in "$dir"/*.pid; do

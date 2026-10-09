@@ -147,7 +147,7 @@ export const journeys: Journey[] = [
         await auditOverlay(ctx, owner, findings, {
           name: "overlay-developer-new-app",
           trigger: p => p.getByRole("button", { name: "New app", exact: true }).first(),
-          panel: p => p.getByRole("dialog", { name: "Apps come from Silicon Apps" }),
+          panel: p => p.getByRole("dialog", { name: "Create an app" }),
           kind: "modal",
           expectedConsole: DEVELOPER_EXPECTED,
         });

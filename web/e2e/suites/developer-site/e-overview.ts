@@ -1,6 +1,6 @@
 /**
  * The developer site as an owner of several apps: the apps page (exactly the apps they own, as the API counts them, and
- * "New app" listing their stand-in apps), an app's Overview (its numbers and every part of its setup summarised from
+ * "New app" opening the app registration), an app's Overview (its numbers and every part of its setup summarised from
  * the stored setup), the ten tabs switching in the browser (no reload, titles, Back and Forward), the old tab names
  * redirecting, an unknown tab a real 404, ⌘K, and a disabled app saying so.
  */
@@ -12,7 +12,7 @@ import { accessibleText, appDetail, ownerSignIn, type AppDetailView } from "./_h
 const METHOD: Record<string, string> = { google: "Google", apple: "Apple", email: "Email", phone: "Phone" };
 const FIELD: Record<string, string> = { email: "Email address", phone: "Phone number", dob: "Date of birth", timezone: "Timezone" };
 const plural = (count: number, one: string, other = `${one}s`) => `${count.toLocaleString("en-US")} ${count === 1 ? one : other}`;
-const TABS: Array<[string, string]> = [["overview", "Overview"], ["sign-in", "Sign-in"], ["details", "Details"], ["flows", "Flows"], ["pages", "Pages"], ["users", "Users"], ["import", "Import"], ["webhooks", "Webhooks"], ["app_verification", "App verification"], ["embed", "Embed"]];
+const TABS: Array<[string, string]> = [["overview", "Overview"], ["sign-in", "Sign-in"], ["details", "Details"], ["flows", "Flows"], ["pages", "Pages"], ["users", "Users"], ["import", "Import"], ["webhooks", "Webhooks"], ["app-verification", "App verification"], ["embed", "Embed"]];
 
 /** What the Overview's setup cards say for a stored setup (developer/components/developer/tabs/overview.tsx). */
 function expectedCards(app: AppDetailView): Record<string, string[]> {
@@ -42,7 +42,7 @@ const selectedTab = (page: Page) => page.getByRole("tablist", { name: / sections
 
 export const journey: Journey = {
   name: "developer-site-overview",
-  title: "an owner of four apps: the apps page lists exactly theirs with the API's numbers and New app lists their stand-in apps; an app's Overview summarises its stored setup; the ten tabs switch in the browser with titles, Back and Forward; old tab names redirect, an unknown tab is a 404; ⌘K jumps; a disabled app says so",
+  title: "an owner of four apps: the apps page lists exactly theirs with the API's numbers and New app opens the registration; an app's Overview summarises its stored setup; the ten tabs switch in the browser with titles, Back and Forward; old tab names redirect, an unknown tab is a 404; ⌘K jumps; a disabled app says so",
   async run(ctx) {
     const { env, results } = ctx;
     const appId = "commit";
@@ -70,16 +70,17 @@ export const journey: Journey = {
     results.check("the apps page lists exactly the apps saket owns (briefcase, commit, remind, spacestation)", tiles.map(tile => tile.href).sort().join(" ") === ["briefcase", "commit", "remind", "spacestation"].map(id => `/apps/${id}`).join(" ") && owned.length === 4, tiles.map(tile => tile.href).join(" "));
     const named = owned.every(app => tiles.some(tile => tile.name === `${app.name}, ${app.app_id}, ${plural(app.users, "user")}, Stand-in app`));
     results.check("…each tile named by what it shows: name, id, the API's user count, Stand-in app", named, tiles.map(tile => tile.name).join(" | "));
-    const notice = (await page.locator("main").getByRole("status").filter({ hasText: "Silicon Apps isn't open yet" }).innerText().catch(() => "")).replace(/\s+/g, " ");
-    results.check("…with the notice that these are stand-in apps until Silicon Apps opens", /These are stand-in apps/.test(notice), notice);
+    const warning = await page.locator("main").getByRole("status").filter({ hasText: "Publishing details could not be loaded" }).count();
+    results.check("…with nothing to warn about while Silicon Apps answers (the stack's stand-in)", warning === 0, `${warning} warnings`);
     await page.getByRole("button", { name: "New app", exact: true }).first().click();
-    const dialog = page.getByRole("dialog", { name: "Apps come from Silicon Apps" });
+    const dialog = page.getByRole("dialog", { name: "Create an app" });
     await dialog.waitFor({ timeout: 10_000 });
-    const standIns = await dialog.getByRole("link").evaluateAll(links => links.map(link => link.getAttribute("href") ?? "").filter(href => href.startsWith("/apps/")));
-    results.check("New app explains Silicon Apps and lists the four stand-in apps", standIns.length === 4 && (await dialog.getByRole("link", { name: "Silicon Apps" }).count()) === 1, standIns.join(" "));
-    await dialog.getByRole("link", { name: /Commit/ }).click();
+    results.check("New app opens the registration: a name and a permanent app ID", (await dialog.getByRole("textbox", { name: "App name", exact: true }).count()) === 1 && (await dialog.getByRole("textbox", { name: "App ID", exact: true }).count()) === 1, (await dialog.innerText()).replace(/\s+/g, " ").slice(0, 200));
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "hidden", timeout: 10_000 });
+    await list.getByRole("link", { name: /^Commit, commit,/ }).click();
     await page.waitForURL(`${env.developer}/apps/${appId}`, { timeout: 20_000 });
-    results.check("…and opens one of them (the dialog closes)", (await dialog.count()) === 0, page.url());
+    results.check("…and a tile opens its app (the dialog closed)", (await dialog.count()) === 0, page.url());
 
     // The Overview: numbers and every part of the setup, from the stored setup.
     const panel = page.getByRole("tabpanel", { name: "Overview" });
@@ -156,8 +157,8 @@ export const journey: Journey = {
     await page.keyboard.press("Escape");
     results.check("…and the keyboard shortcut opens it too", reopened);
     await page.getByRole("link", { name: "Your apps" }).first().click();
-    await page.waitForURL(`${env.developer}/`, { timeout: 15_000 });
-    results.check("\"Your apps\" goes back to the apps page", page.url() === `${env.developer}/`);
+    await page.waitForURL(`${env.developer}/apps`, { timeout: 15_000 });
+    results.check("\"Your apps\" goes back to the apps page (/apps)", page.url() === `${env.developer}/apps`, page.url());
 
     // A disabled app says so (Silicon Apps disables apps; the stand-in is disabled in its database row here).
     await sql(env, "update apps set status = 'disabled' where app_id = 'spacestation'");
@@ -168,7 +169,7 @@ export const journey: Journey = {
       await shot(env, page, "ds-e-03-disabled");
       const badge = (await page.locator("main header").innerText().catch(() => "")).includes("Disabled");
       results.check("a disabled app says it can't sign anyone in until Silicon Apps enables it, and still opens its setup", shown && badge && (await page.getByRole("tablist").count()) === 1, `${shown} ${badge}`);
-      await page.goto(`${env.developer}/`);
+      await page.goto(`${env.developer}/apps`);
       await page.getByRole("list", { name: "Your apps" }).waitFor({ timeout: 30_000 });
       const tile = await page.getByRole("link", { name: /^Disabled, Space Station/ }).count();
       results.check("…and its tile on the apps page starts with Disabled", tile === 1);

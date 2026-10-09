@@ -2,7 +2,7 @@
 # The whole local Silicon Accounts stack, one command:
 #
 #   Postgres (scripts/dev-db.sh) → accounts-migrate → accounts-seed (testkit/fake-apps.json)
-#   → testkit (mock Google/Apple, mock Postmark/Twilio, the fake app server, mock Iris)
+#   → testkit (mock Google/Apple, mock Postmark/Twilio, the fake app server, mock Iris, the stand-in Silicon Apps API)
 #   → accounts-api on 127.0.0.1:8589, wired to the mocks (ACCOUNTS_DELIVERY=providers, dev outbox on, the default
 #     profile photos from mock Iris, so no page loads anything from the internet)
 #   → the account site (Next.js, web/) on http://localhost:8590: the public origin. It serves the
@@ -10,7 +10,9 @@
 #   → the developer platform (Next.js, developer/) on http://localhost:8600, when developer/package.json exists:
 #     its Next server signs Carbons in through the account site (first-party app `developer`) and calls
 #     accounts-api server to server. accounts-api gets ACCOUNTS_DEVELOPER_URL so the developer platform's sign-ins may return to
-#     {its URL}/auth/callback.
+#     {its URL}/auth/callback. Its publishing calls go to the Silicon Apps API at APPS_API_URL (below): the testkit's
+#     stand-in by default, or with --apps=on the sibling silicon-apps checkout's apps-server, trusting this stack's
+#     accounts site, so the apps workspace and publishing work end to end.
 #
 #   scripts/dev.sh               run in the foreground; Ctrl-C stops everything it started
 #   scripts/dev.sh --detach      start in the background, print the URLs and return
@@ -31,6 +33,15 @@
 #                 (its sign-in goes through the account site's hosted pages)
 #       on        always start it (fails when developer/ has no Next.js app)
 #       off       never start it
+#   scripts/dev.sh --apps=MODE        the Silicon Apps API the developer platform publishes through (APPS_API_URL):
+#       stand-in  (default) the testkit's stand-in on APPS_API_PORT (testkit/src/mock-silicon-apps.ts): it lists no
+#                 apps and creates none, so the apps workspace loads and nothing leaves the machine
+#       on        start $SILICON_APPS_DIR's apps-server on APPS_API_PORT, trusting this stack's accounts site
+#                 (APPS_ACCOUNTS_URL = the public URL), its data in .dev/apps/<ACCOUNTS_PORT>/; accounts-api and it share
+#                 a per-stack ACCOUNTS_INTERNAL_TOKEN (local only) for creating apps
+#       off       start nothing: the developer platform calls APPS_API_URL as you give it (the default when you set
+#                 APPS_API_URL). An Apps API that trusts another Silicon Accounts refuses this stack's tokens, and the
+#                 developer platform says so on its pages
 #   scripts/dev.sh --api-only    same as --web=none;   scripts/dev.sh --proxy   same as --web=proxy
 #   scripts/dev.sh --no-build    use the binaries that are already built (skip cargo build)
 #   scripts/dev.sh --release     build and run the release binaries
@@ -49,6 +60,11 @@
 #                redirect rule for the `developer` app, GET /v1/meta developer_url, and the developer site's own origin)
 #   ACCOUNTS_DEVELOPER_DIR [developer]   the developer platform's Next.js app
 #   DEVELOPER_NEXT_DIST_DIR [like NEXT_DIST_DIR]   the developer platform's build directory inside its directory
+#   APPS_API_PORT [ACCOUNTS_PORT+6]   the Silicon Apps API's port (the stand-in, or the real one with --apps=on)
+#   APPS_API_URL [http://127.0.0.1:$APPS_API_PORT]   where the developer platform calls Silicon Apps, server to server
+#                (setting it means --apps=off unless --apps says otherwise)
+#   SILICON_APPS_DIR [../silicon-apps]   the Silicon Apps checkout for --apps=on
+#   APPS_SERVER_BIN [$SILICON_APPS_DIR/target/integration/debug/apps-server]   its built apps-server
 #   ACCOUNTS_PGPORT [5444]  ACCOUNTS_DB_NAME [silicon_accounts]
 #   ACCOUNTS_PUBLIC_URL [http://localhost:$ACCOUNTS_PORT; with --web=none http://localhost:$ACCOUNTS_API_PORT]
 #   ACCOUNTS_EXTRA_ALLOWED_ORIGINS [the public URL's port on 127.0.0.1]
@@ -79,6 +95,7 @@ RESET_DB=0
 PROD=0
 WEB_MODE=auto
 DEVELOPER_MODE=auto
+APPS_MODE=""
 for arg in "$@"; do
   case "$arg" in
     -d|--detach) DETACH=1 ;;
@@ -91,10 +108,11 @@ for arg in "$@"; do
     --proxy) WEB_MODE=proxy ;;
     --web=*) WEB_MODE="${arg#--web=}" ;;
     --developer=*) DEVELOPER_MODE="${arg#--developer=}" ;;
+    --apps=*) APPS_MODE="${arg#--apps=}" ;;
     -h|--help) usage; exit 0 ;;
     *)
       echo "error: unknown argument '$arg'" >&2
-      echo "hint: scripts/dev.sh [--detach] [--prod] [--web=auto|next|proxy|external|none] [--developer=auto|on|off] [--api-only] [--proxy] [--no-build] [--release] [--reseed] [--reset-db]" >&2
+      echo "hint: scripts/dev.sh [--detach] [--prod] [--web=auto|next|proxy|external|none] [--developer=auto|on|off] [--apps=off|on] [--api-only] [--proxy] [--no-build] [--release] [--reseed] [--reset-db]" >&2
       exit 2
       ;;
   esac
@@ -112,6 +130,18 @@ case "$DEVELOPER_MODE" in
   *)
     echo "error: --developer=$DEVELOPER_MODE is not a mode" >&2
     echo "hint: use --developer=auto, on or off (scripts/dev.sh --help explains each)" >&2
+    exit 2
+    ;;
+esac
+# An Apps API you name yourself (APPS_API_URL) is used as it is; otherwise the testkit stands in for it.
+if [ -z "$APPS_MODE" ]; then
+  if [ -n "${APPS_API_URL:-}" ]; then APPS_MODE=off; else APPS_MODE=stand-in; fi
+fi
+case "$APPS_MODE" in
+  stand-in|on|off) ;;
+  *)
+    echo "error: --apps=$APPS_MODE is not a mode" >&2
+    echo "hint: use --apps=stand-in, on or off (scripts/dev.sh --help explains each)" >&2
     exit 2
     ;;
 esac
@@ -182,11 +212,14 @@ MOCK_IRIS_PORT="${MOCK_IRIS_PORT:-8594}"
 # bases 10 apart (scripts/e2e.sh) never collide.
 if [ "$ACCOUNTS_PORT" = 8590 ]; then DEFAULT_DEVELOPER_PORT=8600; else DEFAULT_DEVELOPER_PORT=$((ACCOUNTS_PORT + 5)); fi
 DEVELOPER_PORT="${DEVELOPER_PORT:-$DEFAULT_DEVELOPER_PORT}"
+# The Silicon Apps API: base+6 on every stack (8596 next to the default one), so a stack never sends its tokens to an
+# Apps API that trusts another stack's Silicon Accounts (silicon-apps' own development port 4310 belongs to none).
+APPS_API_PORT="${APPS_API_PORT:-$((ACCOUNTS_PORT + 6))}"
 PGPORT="${ACCOUNTS_PGPORT:-5444}"
 DB="${ACCOUNTS_DB_NAME:-silicon_accounts}"
 PG_BIN="${PG_BIN:-/opt/homebrew/opt/postgresql@16/bin}"
 
-for p in "$ACCOUNTS_PORT" "$API_PORT" "$MOCK_OIDC_PORT" "$MOCK_MESSAGING_PORT" "$FAKE_APPS_PORT" "$MOCK_IRIS_PORT" "$DEVELOPER_PORT" "$PGPORT"; do
+for p in "$ACCOUNTS_PORT" "$API_PORT" "$MOCK_OIDC_PORT" "$MOCK_MESSAGING_PORT" "$FAKE_APPS_PORT" "$MOCK_IRIS_PORT" "$DEVELOPER_PORT" "$APPS_API_PORT" "$PGPORT"; do
   case "$p" in
     ''|*[!0-9]*) echo "error: ports must be numbers, got '$p'" >&2; exit 2 ;;
   esac
@@ -216,6 +249,22 @@ IRIS_URL="${IRIS_URL%/}"
 DEVELOPER_URL="${ACCOUNTS_DEVELOPER_URL:-http://localhost:$DEVELOPER_PORT}"
 DEVELOPER_URL="${DEVELOPER_URL%/}"
 DEVELOPER_FRONT_URL="http://127.0.0.1:$DEVELOPER_PORT"
+APPS_API_URL="${APPS_API_URL:-http://127.0.0.1:$APPS_API_PORT}"
+APPS_API_URL="${APPS_API_URL%/}"
+SILICON_APPS_DIR="${SILICON_APPS_DIR:-$ROOT/../silicon-apps}"
+APPS_SERVER_BIN="${APPS_SERVER_BIN:-$SILICON_APPS_DIR/target/integration/debug/apps-server}"
+# --apps=on: accounts-api and the Apps API share this (local only) for the Apps API's private calls (creating apps).
+APPS_INTERNAL_TOKEN="${ACCOUNTS_INTERNAL_TOKEN:-local-stack-$ACCOUNTS_PORT-internal-token-not-for-production}"
+if [ "$APPS_MODE" = stand-in ] && [ "$APPS_API_URL" != "http://127.0.0.1:$APPS_API_PORT" ]; then
+  fail "--apps=stand-in serves the stand-in Silicon Apps API on http://127.0.0.1:$APPS_API_PORT, but APPS_API_URL is $APPS_API_URL" \
+    "leave APPS_API_URL unset (set APPS_API_PORT to move it), or use --apps=off to call $APPS_API_URL"
+fi
+if [ "$APPS_MODE" = on ]; then
+  [ -x "$APPS_SERVER_BIN" ] || fail "--apps=on needs the Silicon Apps API, but $APPS_SERVER_BIN does not exist" \
+    "build it: (cd $SILICON_APPS_DIR && CARGO_TARGET_DIR=target/integration cargo build -p silicon-apps-server), or set APPS_SERVER_BIN"
+  [ "$APPS_API_URL" = "http://127.0.0.1:$APPS_API_PORT" ] || fail "--apps=on starts the Apps API on http://127.0.0.1:$APPS_API_PORT, but APPS_API_URL is $APPS_API_URL" \
+    "leave APPS_API_URL unset with --apps=on (set APPS_API_PORT to move it)"
+fi
 
 # The site's build directory (inside the site's directory). The default stack keeps Next's own .next; any other port
 # gets .next-<port>, because ACCOUNTS_API_URL is baked into each build (web/next.config.ts reads NEXT_DIST_DIR).
@@ -260,10 +309,11 @@ fi
 ports_to_check=("$API_PORT" "$MOCK_OIDC_PORT" "$MOCK_MESSAGING_PORT" "$FAKE_APPS_PORT" "$MOCK_IRIS_PORT")
 case "$WEB_MODE" in next|proxy) ports_to_check+=("$ACCOUNTS_PORT") ;; esac
 [ "$START_DEVELOPER" = 1 ] && ports_to_check+=("$DEVELOPER_PORT")
+[ "$APPS_MODE" != off ] && ports_to_check+=("$APPS_API_PORT")
 for p in "${ports_to_check[@]}"; do
   if port_busy "$p"; then
     fail "port $p is already in use by $(who_listens "$p" || echo 'another process')" \
-      "stop it, or pick other ports: ACCOUNTS_PORT=9590 ACCOUNTS_API_PORT=9589 MOCK_OIDC_PORT=9591 MOCK_MESSAGING_PORT=9592 FAKE_APPS_PORT=9593 MOCK_IRIS_PORT=9594 DEVELOPER_PORT=9595 scripts/dev.sh"
+      "stop it, or pick other ports: ACCOUNTS_PORT=9590 ACCOUNTS_API_PORT=9589 MOCK_OIDC_PORT=9591 MOCK_MESSAGING_PORT=9592 FAKE_APPS_PORT=9593 MOCK_IRIS_PORT=9594 DEVELOPER_PORT=9595 APPS_API_PORT=9596 scripts/dev.sh"
   fi
 done
 
@@ -450,11 +500,14 @@ wait_http() {
 }
 
 rm -f "$RUN_DIR/testkit.json"
-say "starting the testkit (mock-oidc :$MOCK_OIDC_PORT, mock-messaging :$MOCK_MESSAGING_PORT, fake apps :$FAKE_APPS_PORT, mock Iris :$MOCK_IRIS_PORT)"
-launch testkit env \
+# --apps=stand-in: the testkit also stands in for the Silicon Apps API (testkit/src/mock-silicon-apps.ts).
+stand_in=()
+[ "$APPS_MODE" = stand-in ] && stand_in=(MOCK_SILICON_APPS_PORT="$APPS_API_PORT")
+say "starting the testkit (mock-oidc :$MOCK_OIDC_PORT, mock-messaging :$MOCK_MESSAGING_PORT, fake apps :$FAKE_APPS_PORT, mock Iris :$MOCK_IRIS_PORT$( [ "$APPS_MODE" = stand-in ] && echo ", stand-in Silicon Apps :$APPS_API_PORT"))"
+launch testkit env -u MOCK_SILICON_APPS_PORT \
   ACCOUNTS_URL="$TESTKIT_ACCOUNTS_URL" ACCOUNTS_PUBLIC_URL="$PUBLIC_URL" \
   MOCK_OIDC_PORT="$MOCK_OIDC_PORT" MOCK_MESSAGING_PORT="$MOCK_MESSAGING_PORT" FAKE_APPS_PORT="$FAKE_APPS_PORT" \
-  MOCK_IRIS_PORT="$MOCK_IRIS_PORT" \
+  MOCK_IRIS_PORT="$MOCK_IRIS_PORT" ${stand_in[@]+"${stand_in[@]}"} \
   TESTKIT_LOG=1 \
   "$ROOT/testkit/node_modules/.bin/tsx" "$ROOT/testkit/src/start.ts" --ready-file "$RUN_DIR/testkit.json"
 TESTKIT_PID="$LAST_PID"
@@ -495,6 +548,7 @@ ENV_FILE="$RUN_DIR/accounts-api.env"
     "ACCOUNTS_WEB_DIST=${ACCOUNTS_WEB_DIST-}"; do
     printf 'export %s=%q\n' "${kv%%=*}" "${kv#*=}"
   done
+  if [ "$APPS_MODE" = on ]; then printf 'export %s=%q\n' ACCOUNTS_INTERNAL_TOKEN "$APPS_INTERNAL_TOKEN"; fi
 } >"$ENV_FILE"
 rm -f "$ENV_FILE.tmp"
 
@@ -567,7 +621,27 @@ case "$WEB_MODE" in
     ;;
 esac
 
-# --- 7. the developer platform --------------------------------------------------------------------
+# --- 7. the Silicon Apps API (--apps=on) ----------------------------------------------------------
+# The sibling silicon-apps checkout's apps-server, trusting this stack's accounts site: it verifies the developer
+# platform's tokens with the public URL's JWKS and issuer, and creates apps through accounts-api's private routes with
+# the shared ACCOUNTS_INTERNAL_TOKEN. Its own secrets (an Apps app secret, runners, mail, telemetry) stay unset.
+APPS_PID=""
+if [ "$APPS_MODE" = on ]; then
+  APPS_DATA_DIR="$ROOT/.dev/apps/$ACCOUNTS_PORT"
+  mkdir -p "$APPS_DATA_DIR"
+  printf '%s\n' "apps-server" >"$RUN_DIR/apps.match"
+  say "starting the Silicon Apps API ($(rel "$APPS_SERVER_BIN")) on $APPS_API_URL (trusts $PUBLIC_URL; data $(rel "$APPS_DATA_DIR"))"
+  launch apps env -u APPS_ACCOUNTS_APP_SECRET -u APPS_RUNNER_URL -u APPS_RUNNER_TOKEN -u APPS_MAIL_URL -u APPS_MAIL_TOKEN \
+    -u APPS_TELEMETRY_URL -u APPS_TELEMETRY_TABLE_KEY \
+    APPS_BIND="127.0.0.1:$APPS_API_PORT" APPS_PUBLIC_URL="$APPS_API_URL" APPS_ALLOWED_ORIGINS="$DEVELOPER_URL" \
+    APPS_DATA_DIR="$APPS_DATA_DIR" APPS_DEV_AUTH=0 APPS_ACCOUNTS_URL="$PUBLIC_URL" \
+    APPS_ACCOUNTS_SERVICE_TOKEN="$APPS_INTERNAL_TOKEN" APPS_IMPORT_ACCOUNTS=0 APPS_TELEMETRY_ENABLED=false \
+    "$APPS_SERVER_BIN"
+  APPS_PID="$LAST_PID"
+  wait_http apps "$APPS_API_URL/v1/apps" "$APPS_PID" 60
+fi
+
+# --- 8. the developer platform --------------------------------------------------------------------
 # developer/ (Next.js): the browser only talks to it; its Next server signs Carbons in through the account site's
 # hosted pages (first-party app `developer`, PKCE) and calls accounts-api server to server with their tokens.
 DEV_PID=""
@@ -585,7 +659,7 @@ if [ "$START_DEVELOPER" = 1 ]; then
   dev_env=(PORT="$DEVELOPER_PORT" ACCOUNTS_API_URL="$API_URL" ACCOUNTS_PUBLIC_URL="$PUBLIC_URL"
     ACCOUNTS_DEVELOPER_URL="$DEVELOPER_URL" DEVELOPER_PUBLIC_URL="$DEVELOPER_URL" ACCOUNTS_IRIS_BASE_URL="$IRIS_URL"
     DEVELOPER_SESSION_SECRET="${DEVELOPER_SESSION_SECRET:-local-stack-$ACCOUNTS_PORT-developer-session-secret-not-for-production}"
-    NEXT_DIST_DIR="$DEVELOPER_DIST_DIR" NEXT_TELEMETRY_DISABLED=1)
+    APPS_API_URL="$APPS_API_URL" NEXT_DIST_DIR="$DEVELOPER_DIST_DIR" NEXT_TELEMETRY_DISABLED=1)
   printf '%s\n' "$DEVELOPER_DIR" >"$RUN_DIR/developer.match"
   printf '%s\n' "$DEVELOPER_DIR/$DEVELOPER_DIST_DIR" >"$RUN_DIR/developer.dist"
   if [ "$PROD" = 1 ]; then
@@ -628,6 +702,15 @@ case "$WEB_MODE" in
   external) site_line="$PUBLIC_URL   (not started: PORT=$ACCOUNTS_PORT ACCOUNTS_API_URL=$API_URL pnpm -C $(rel "$WEB_DIR") dev)" ;;
   none) site_line="$PUBLIC_URL   (API only: no site; this is accounts-api itself)" ;;
 esac
+if [ "$APPS_MODE" = on ]; then
+  apps_line="$APPS_API_URL   (silicon-apps apps-server, trusts this stack's accounts site; log apps.log)"
+elif [ "$APPS_MODE" = stand-in ]; then
+  apps_line="$APPS_API_URL   (the testkit's stand-in: no apps, creates none; --apps=on runs the real one)"
+elif [ "$START_DEVELOPER" = 1 ]; then
+  apps_line="$APPS_API_URL   (not started here; it must trust $PUBLIC_URL, or it refuses this stack's tokens)"
+else
+  apps_line="not used (no developer platform)"
+fi
 if [ "$START_DEVELOPER" = 1 ]; then
   developer_line="$DEVELOPER_URL   (Next.js $( [ "$PROD" = 1 ] && echo 'production build' || echo 'dev server'), build $(rel "$DEVELOPER_DIR")/$DEVELOPER_DIST_DIR; signs in as the app 'developer')"
 else
@@ -638,13 +721,14 @@ cat <<EOF
 Silicon Accounts dev stack is up
   public URL (site)    $site_line
   developer platform   $developer_line
+  Silicon Apps API     $apps_line
   accounts-api         $API_URL   (readiness: /readyz, dev outbox: /v1/dev/outbox)
   fake apps            http://127.0.0.1:$FAKE_APPS_PORT/
   mock Google/Apple    http://127.0.0.1:$MOCK_OIDC_PORT   (/_requests, /_identities)
   mock email/SMS       http://127.0.0.1:$MOCK_MESSAGING_PORT/_messages
   profile photos       $IRIS_URL   ($( [ "$IRIS_URL" = "http://127.0.0.1:$MOCK_IRIS_PORT" ] && echo 'mock Iris' || echo 'ACCOUNTS_IRIS_BASE_URL'))
   database             $DB_URL
-  logs                 $(rel "$LOG_DIR")/ (accounts-api.log, testkit.log$( [ -n "$FRONT_NAME" ] && echo ", $FRONT_NAME.log")$( [ "$START_DEVELOPER" = 1 ] && echo ", developer.log"), migrate.log, seed.log)$( [ "$WEB_MODE" = next ] && printf '\n  site build           %s/%s' "$(rel "$WEB_DIR")" "$DIST_DIR")
+  logs                 $(rel "$LOG_DIR")/ (accounts-api.log, testkit.log$( [ -n "$FRONT_NAME" ] && echo ", $FRONT_NAME.log")$( [ "$START_DEVELOPER" = 1 ] && echo ", developer.log")$( [ "$APPS_MODE" = on ] && echo ", apps.log"), migrate.log, seed.log)$( [ "$WEB_MODE" = next ] && printf '\n  site build           %s/%s' "$(rel "$WEB_DIR")" "$DIST_DIR")
   CLI                  $(rel "$BIN")/silicon-accounts --url $PUBLIC_URL --help
 EOF
 
@@ -658,7 +742,8 @@ echo "  Ctrl-C stops everything"
 alive_all() {
   kill -0 "$API_PID" 2>/dev/null && kill -0 "$TESTKIT_PID" 2>/dev/null \
     && { [ -z "$FRONT_PID" ] || kill -0 "$FRONT_PID" 2>/dev/null; } \
-    && { [ -z "$DEV_PID" ] || kill -0 "$DEV_PID" 2>/dev/null; }
+    && { [ -z "$DEV_PID" ] || kill -0 "$DEV_PID" 2>/dev/null; } \
+    && { [ -z "$APPS_PID" ] || kill -0 "$APPS_PID" 2>/dev/null; }
 }
 while alive_all; do
   sleep 1
@@ -666,6 +751,7 @@ done
 if ! kill -0 "$API_PID" 2>/dev/null; then dead=accounts-api
 elif ! kill -0 "$TESTKIT_PID" 2>/dev/null; then dead=testkit
 elif [ -n "$DEV_PID" ] && ! kill -0 "$DEV_PID" 2>/dev/null; then dead=developer
+elif [ -n "$APPS_PID" ] && ! kill -0 "$APPS_PID" 2>/dev/null; then dead=apps
 else dead="$FRONT_NAME"; fi
 say "$dead exited on its own; last lines of $(rel "$LOG_DIR")/$dead.log:"
 tail -n 20 "$LOG_DIR/$dead.log" >&2 || true

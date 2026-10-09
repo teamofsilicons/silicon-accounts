@@ -17,25 +17,25 @@ function toDate(value: string | number | Date | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** "Oct 6, 2026" (date-only strings are treated as calendar dates, never shifted by the time zone). */
+/** "Oct 6, 2026" (date-only strings are treated as calendar dates, never shifted by the time zone); "Not set" for none. */
 export function formatDate(value: string | number | Date | null | undefined, timeZone?: string): string {
   const date = toDate(value);
-  if (!date) return "–";
+  if (!date) return "Not set";
   const dateOnly = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
   return new Intl.DateTimeFormat(LOCALE, { month: "short", day: "numeric", year: "numeric", timeZone: dateOnly ? "UTC" : timeZone }).format(date);
 }
 
-/** "Oct 6, 2026, 14:05" in the given time zone (the visitor's by default). */
+/** "Oct 6, 2026, 14:05" in the given time zone (the visitor's by default); "Not set" for none. */
 export function formatDateTime(value: string | number | Date | null | undefined, timeZone?: string): string {
   const date = toDate(value);
-  if (!date) return "–";
+  if (!date) return "Not set";
   return new Intl.DateTimeFormat(LOCALE, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone }).format(date);
 }
 
-/** "14:05" in a time zone. */
+/** "14:05" in a time zone; "Not set" for none. */
 export function formatTime(value: string | number | Date | null | undefined, timeZone?: string, seconds = false): string {
   const date = toDate(value);
-  if (!date) return "–";
+  if (!date) return "Not set";
   return new Intl.DateTimeFormat(LOCALE, { hour: "2-digit", minute: "2-digit", second: seconds ? "2-digit" : undefined, hourCycle: "h23", timeZone }).format(date);
 }
 
@@ -50,10 +50,10 @@ const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
 ];
 const relative = new Intl.RelativeTimeFormat(LOCALE, { numeric: "auto" });
 
-/** "2 hours ago", "in 5 minutes", "just now". */
+/** "2 hours ago", "in 5 minutes", "just now"; "Never" for no time at all. */
 export function formatRelative(value: string | number | Date | null | undefined, now: number = Date.now()): string {
   const date = toDate(value);
-  if (!date) return "–";
+  if (!date) return "Never";
   const seconds = Math.round((date.getTime() - now) / 1000);
   if (Math.abs(seconds) < 45) return "just now";
   for (const [unit, size] of UNITS) {
@@ -62,10 +62,10 @@ export function formatRelative(value: string | number | Date | null | undefined,
   return relative.format(seconds, "second");
 }
 
-/** "in 9 days" style countdown for expiries; "expired" once passed. */
+/** "in 9 days" style countdown for expiries; "expired" once passed; "Never" when nothing expires. */
 export function formatExpiry(value: string | number | Date | null | undefined, now: number = Date.now()): string {
   const date = toDate(value);
-  if (!date) return "–";
+  if (!date) return "Never";
   return date.getTime() <= now ? "expired" : formatRelative(date, now);
 }
 
