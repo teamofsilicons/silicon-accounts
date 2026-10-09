@@ -105,6 +105,8 @@ export function applicationLd(): Json {
       "OpenID Connect, OAuth 2.0, an MCP server and an OpenAPI description",
     ],
     softwareHelp: { "@type": "CreativeWork", url: LINKS.developerDocs },
+    license: LINKS.accountsLicense,
+    isAccessibleForFree: true,
     publisher: { "@id": ORGANIZATION_ID },
     provider: { "@id": ORGANIZATION_ID },
     isPartOf: { "@id": WEBSITE_ID },

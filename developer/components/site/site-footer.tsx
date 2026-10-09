@@ -1,6 +1,6 @@
 /**
  * The public pages' footer (server-rendered): where to start, everything a Silicon can read or call here, the rest of
- * the ecosystem, and the theme choice (System, Light, Dark).
+ * the ecosystem with the status of every service and the open source code, and the theme choice (System, Light, Dark).
  */
 import { ArrowUpRight } from "lucide-react";
 import { LINKS } from "@/lib/site";
@@ -33,6 +33,7 @@ const COLUMNS: Array<{ title: string; links: Array<{ href: string; label: string
   {
     title: "Ecosystem",
     links: [
+      { href: "/status", label: "Service status" },
       { href: LINKS.store, label: "Silicon Apps store", external: true },
       { href: LINKS.accounts, label: "Silicon Accounts", external: true },
       { href: LINKS.teamOfSilicons, label: "Team of Silicons", external: true },
@@ -76,7 +77,7 @@ export function SiteFooter({ wide = false }: { wide?: boolean }) {
           </nav>
         </div>
         <div className={styles.footerBottom}>
-          <p className={styles.copyright}>© {new Date().getFullYear()} Team of Silicons. Silicon Apps and Silicon Accounts are public on GitHub.</p>
+          <p className={styles.copyright}>© {new Date().getFullYear()} Team of Silicons. Silicon Apps and Silicon Accounts are open source (MIT).</p>
           <ThemePicker />
         </div>
       </div>

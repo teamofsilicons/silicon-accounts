@@ -1,13 +1,14 @@
 /**
  * /.well-known/agent.json: the A2A agent card of the developer platform. Its skills are the MCP server's tools (served
  * at /mcp over Streamable HTTP, declared as an extension of the card), and it links everything else an agent needs:
- * the docs and their agent files, this site's JSON API and OpenAPI description, and the Silicon Accounts and Silicon
- * Apps APIs with their own OpenAPI descriptions.
+ * the docs and their agent files, this site's JSON API and OpenAPI description, the status page and its JSON twin, and
+ * the Silicon Accounts and Silicon Apps APIs with their own OpenAPI descriptions.
  */
 import "server-only";
 import { TOOLS } from "@/lib/mcp/tools";
 import { CANONICAL_ORIGIN, LINKS, ORGANIZATION, RATE_LIMITS, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import { SUPPORTED_VERSIONS } from "@/lib/mcp/protocol";
+import { STATUS_CACHE_SECONDS, STATUS_TIMEOUT_MS } from "@/lib/status";
 
 const SKILL_DETAILS: Record<string, { tags: string[]; examples: string[] }> = {
   search_docs: { tags: ["docs", "search", "silicon-apps", "silicon-accounts"], examples: ["How do I publish an app?", "What does invalid_grant mean?", "How does a Silicon sign in to my app?"] },
@@ -47,13 +48,14 @@ export function agentCard() {
         },
         {
           uri: `${CANONICAL_ORIGIN}/openapi.json`,
-          description: "Everything else this platform offers to agents: the docs as text and JSON, and the Silicon Accounts and Silicon Apps APIs, each with its OpenAPI description.",
+          description: "Everything else this platform offers to agents: the docs as text and JSON, whether every service is up (/status and /status.json), and the Silicon Accounts and Silicon Apps APIs, each with its OpenAPI description.",
           required: false,
           params: {
             docs: `${CANONICAL_ORIGIN}/docs`,
             llms: `${CANONICAL_ORIGIN}/llms.txt`,
             llmsFull: `${CANONICAL_ORIGIN}/llms-full.txt`,
             sitemap: `${CANONICAL_ORIGIN}/sitemap.xml`,
+            status: { page: `${CANONICAL_ORIGIN}/status`, json: `${CANONICAL_ORIGIN}/status.json`, cacheSeconds: STATUS_CACHE_SECONDS, timeoutSeconds: STATUS_TIMEOUT_MS / 1000, services: ["Silicon Accounts", "Silicon Apps", "Silicon Developer"] },
             docsApi: { url: `${CANONICAL_ORIGIN}/api/docs`, openapi: `${CANONICAL_ORIGIN}/openapi.json`, rateLimit: { requests: RATE_LIMITS.api.limit, windowSeconds: RATE_LIMITS.api.windowSeconds, per: "client address" } },
             apis: [
               { name: "Silicon Accounts API", url: LINKS.accountsApi, openapi: LINKS.accountsOpenApi, docs: `${CANONICAL_ORIGIN}/docs/accounts/reference/api`, about: "Accounts for Carbons and Silicons, sign-in for apps (OAuth 2.0 and OpenID Connect), short-lived tokens, App verification and User verification, webhooks." },

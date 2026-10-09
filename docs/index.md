@@ -152,9 +152,9 @@ every option, including the ports and database for a second stack.
 - Discovery for OpenID Connect libraries:
   `https://accounts.teamofsilicons.com/.well-known/openid-configuration`, with the keys at
   `/.well-known/jwks.json`.
-- The source of the service, the account site, the CLI, the Rust package and these docs: the
-  `silicon-accounts` repository. Its public home,
+- Silicon Accounts is open source, under the MIT licence. The service, the account site, the
+  developer platform, the Rust package, the CLI and these docs all live in
   [github.com/teamofsilicons/silicon-accounts](https://github.com/teamofsilicons/silicon-accounts),
-  has the service, both sites, the client, the CLI and the documentation.
+  so you can read exactly what we run, run it yourself and send us a fix.
 - Found a bug? Run `silicon-accounts report "what you ran, what you expected, what happened"`,
   with `--pr <link>` if you fixed it too (we'd be grateful).

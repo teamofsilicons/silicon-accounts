@@ -55,6 +55,9 @@
   line-height: 1;
   text-wrap: balance;
 }
+/* In the two-column hero the copy column is narrow below ~1150 px: cap the title by the window, so the first line keeps
+   "One account for" together instead of leaving "Carbon" on a line of its own. */
+@media (min-width: 1024px) { .heroTitle { font-size: min(clamp(2.5rem, 1.6rem + 4vw, 4.5rem), calc(6.5vw - 4px)); } }
 .heroLede { max-width: 56ch; margin: 0; color: var(--text-secondary); font-size: clamp(1.0625rem, 1rem + .3vw, 1.1875rem); line-height: 1.6; text-wrap: pretty; }
 .heroActions { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin-top: var(--space-2); }
 .heroNote { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
@@ -82,7 +85,11 @@
 .section :not(pre) > code, .hero :not(pre) > code { --sq-r: 6px; padding: .08em .34em; background: var(--surface-muted); color: var(--foreground); font-size: .86em; white-space: nowrap; }
 /* A long address or command may break anywhere rather than push the page sideways on a phone. */
 .section :not(pre) > code[data-wrap] { white-space: normal; overflow-wrap: anywhere; }
-@media (max-width: 599px) { .section :not(pre) > code, .stepText code, .notes code { white-space: normal; overflow-wrap: anywhere; } }
+@media (max-width: 599px) {
+  .section :not(pre) > code, .stepText code, .notes code { white-space: normal; overflow-wrap: anywhere; }
+  /* Short code (a flag, a tool name) stays whole: "--help" split after its dashes reads as two words. */
+  .section :not(pre) > code[data-nowrap] { white-space: nowrap; }
+}
 
 /* Feature grid. */
 .features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-8) var(--space-6); margin: 0; padding: 0; list-style: none; }
@@ -96,7 +103,9 @@ ul.featuresCompact { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-to
 /* Two panels side by side. */
 .split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
 .panel { --sq-r: var(--radius-panel); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; align-content: start; gap: var(--space-4); border: 1px solid var(--sq-stroke); padding: var(--space-6) var(--space-6) var(--space-8); background: var(--sq-fill); }
-.panelTitle { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: 1.375rem; font-weight: 600; letter-spacing: -.02em; }
+.panelTitle { display: flex; align-items: flex-start; gap: 10px; margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: 1.375rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
+/* Icons in titles that may wrap sit on the first line, centred on it (an 18 px icon in a 1.2em line). */
+.panelTitle svg, .mcpTitle svg, .closingOptionTitle svg { flex: none; margin-top: calc((1.2em - 18px) / 2); }
 .panelTitle svg { color: var(--accent-ink); }
 .panelText { margin: 0; color: var(--text-secondary); line-height: 1.65; }
 .panelNote { margin: 0; border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); color: var(--text-muted); font-size: var(--text-sm); line-height: 1.6; }
@@ -117,7 +126,7 @@ ul.agentList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); 
 .mcp { --sq-r: var(--radius-surface); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: var(--space-8); margin-top: clamp(32px, 4vw, 48px); border: 1px solid var(--sq-stroke); padding: clamp(20px, 3vw, 36px); background: var(--sq-fill); scroll-margin-top: 80px; }
 .mcpCopy { display: grid; gap: var(--space-3); min-width: 0; }
 .mcpCopy p { margin: 0; color: var(--text-secondary); line-height: 1.65; }
-.mcpTitle { display: flex; align-items: center; gap: 10px; margin: 0; font-family: var(--font-display); font-size: 1.375rem; font-weight: 600; letter-spacing: -.02em; }
+.mcpTitle { display: flex; align-items: flex-start; gap: 10px; margin: 0; font-family: var(--font-display); font-size: 1.375rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
 .mcpTitle svg { color: var(--accent-ink); }
 .tools { display: grid; gap: 6px; margin: 0; padding: 0; color: var(--text-secondary); list-style: none; }
 .mcpCode { min-width: 0; }
@@ -180,8 +189,8 @@ ul.agentList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); 
 /* Create your Silicon account: the three steps, in a lifted panel. */
 .create { --sq-r: var(--radius-surface); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; gap: var(--space-8); margin-top: clamp(48px, 6vw, 72px); border: 1px solid var(--sq-stroke); padding: clamp(20px, 4vw, 44px); background: var(--sq-fill); box-shadow: var(--shadow-raised); scroll-margin-top: 80px; }
 .createHead { display: grid; gap: var(--space-2); }
-.createTitle { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); font-weight: 600; letter-spacing: -.025em; line-height: 1.1; }
-.createTitle svg { flex: none; color: var(--accent-ink); }
+.createTitle { display: flex; align-items: flex-start; gap: 10px; margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); font-weight: 600; letter-spacing: -.025em; line-height: 1.1; }
+.createTitle svg { flex: none; margin-top: calc((1.1em - 18px) / 2); color: var(--accent-ink); }
 .createText { margin: 0; color: var(--text-secondary); font-size: 1.0625rem; line-height: 1.6; }
 ol.createSteps { display: grid; gap: var(--space-8); margin: 0; padding: 0; list-style: none; }
 .createStep { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; gap: var(--space-4); }
@@ -200,7 +209,7 @@ ul.notes { display: grid; gap: var(--space-2); margin: var(--space-1) 0 0; paddi
 .panelAccent .checks svg { color: var(--accent-ink); }
 
 /* Building an app: one short pointer to the developer site. */
-.pointer { padding: 0 var(--gutter) clamp(56px, 8vw, 96px); }
+.pointer { padding: clamp(48px, 6vw, 72px) var(--gutter) 0; }
 .pointerCard { --sq-r: var(--radius-panel); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; max-width: calc(var(--page-max) - 2 * var(--gutter)); grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-5); margin-inline: auto; border: 1px solid var(--sq-stroke); padding: var(--space-5) var(--space-6); background: var(--sq-fill); }
 .pointerIcon { --sq-r: 12px; --sq-fill: var(--accent-subtle); display: grid; width: 44px; height: 44px; place-items: center; background: var(--sq-fill); color: var(--accent-ink); }
 .pointerCopy { display: grid; gap: 4px; min-width: 0; }
@@ -242,12 +251,14 @@ ul.notes { display: grid; gap: var(--space-2); margin: var(--space-1) 0 0; paddi
 .closingTitle { margin: 0; font-family: var(--font-display); font-size: clamp(2rem, 1.4rem + 2.4vw, 3.25rem); font-weight: 600; letter-spacing: -.035em; line-height: 1.04; }
 .closingGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
 .closingOption { --sq-r: var(--radius-panel); --sq-fill: color-mix(in oklab, var(--background) 55%, var(--surface)); --sq-stroke: var(--border); display: grid; align-content: start; gap: var(--space-3); min-width: 0; border: 1px solid var(--sq-stroke); padding: var(--space-6); background: var(--sq-fill); }
-.closingOptionTitle { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: 1.375rem; font-weight: 600; letter-spacing: -.02em; }
+.closingOptionTitle { display: flex; align-items: flex-start; gap: 10px; margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: 1.375rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
 .closingOptionTitle svg { color: var(--accent-ink); }
 .closingOption > p { margin: 0; color: var(--text-secondary); line-height: 1.6; }
 .closingActions { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin-top: var(--space-1); }
 .command { --sq-r: var(--radius-control); --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; min-width: 0; align-items: center; gap: var(--space-2); border: 1px solid var(--sq-stroke); padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4); background: var(--sq-fill); }
 .command code { min-width: 0; flex: 1; overflow-x: auto; color: var(--foreground); font-size: .8125rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The command wraps between its words only, never after the dashes of a flag or inside a placeholder. */
+.command code > span { white-space: nowrap; }
 /* On a phone the command stays on one line and scrolls inside its box, rather than breaking inside a flag. */
 @media (max-width: 599px) { .command code { padding-bottom: 4px; white-space: pre; overflow-wrap: normal; } }
 /* Keyboard position on the command (a focusable region): an accent edge on its box and a soft tint behind the text. */
@@ -267,7 +278,11 @@ ul.notes { display: grid; gap: var(--space-2); margin: var(--space-1) 0 0; paddi
   .split, ul.agentList, .closingGrid { grid-template-columns: minmax(0, 1fr); }
   .pointerCard { grid-template-columns: minmax(0, 1fr); justify-items: start; }
   .artFields { grid-template-columns: repeat(2, minmax(0, auto)); }
-  .createStep { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+  /* The step number sits beside its title, and the step's text and code take the full width below. */
+  .createStep { grid-template-columns: 32px minmax(0, 1fr); gap: var(--space-3); }
+  .stepBody { display: contents; }
+  .stepBody > * { grid-column: 1 / -1; }
+  .stepBody > .stepTitle { grid-column: 2; align-self: center; padding-top: 0; }
   .features, ul.featuresCompact { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
   .panel { padding: var(--space-5) var(--space-5) var(--space-6); }
   .faqAnswer { padding-right: var(--space-2); }

@@ -33,6 +33,14 @@ export function crumbsOf(page: DocPage): Crumb[] {
 
 const DATE = new Intl.DateTimeFormat("en", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 
+/**
+ * A page title whose hyphenated words ("sign-in", "silicon-accounts") never break at the hyphen: a phone otherwise set
+ * "Add sign-" over "in to your app". Only words up to 16 characters, which fit a 320 px screen, are kept whole.
+ */
+function Title({ text }: { text: string }) {
+  return text.split(/(\S+-\S+)/).map((part, index) => (index % 2 && part.length <= 16 ? <span key={index} className={styles.keep}>{part}</span> : part));
+}
+
 function Crumbs({ crumbs }: { crumbs: Crumb[] }) {
   return (
     <nav aria-label="Breadcrumb" className={styles.crumbs}>
@@ -116,7 +124,7 @@ export function DocArticle({ page }: { page: DocPage }) {
       <article className={styles.article}>
         <header className={styles.head}>
           {landing ? <p className={styles.eyebrow}>Documentation</p> : <Crumbs crumbs={crumbs} />}
-          <h1 className={landing ? `${styles.title} ${styles.landingTitle}` : styles.title}>{page.title}</h1>
+          <h1 className={landing ? `${styles.title} ${styles.landingTitle}` : styles.title}><Title text={page.title} /></h1>
           {page.description ? <p className={styles.lede}>{page.description}</p> : null}
           <div className={styles.meta}>
             {landing ? null : <span className={styles.kind} data-sq="surface" data-kind={page.group.endsWith("reference") ? "reference" : page.kind}>{kindLabel(page)}</span>}

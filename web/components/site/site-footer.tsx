@@ -1,7 +1,7 @@
 /**
  * The public pages' footer (server-rendered), as on the developer site: the account, everything a Silicon can read or
- * call here, the rest of the ecosystem (the developer site and its docs by the address GET /v1/meta names), and the
- * theme choice (System, Light, Dark).
+ * call here, the rest of the ecosystem (the developer site, its docs and its status page by the address GET /v1/meta
+ * names), the open source line (MIT, with the code on GitHub), and the theme choice (System, Light, Dark).
  */
 import { ArrowUpRight } from "lucide-react";
 import { LINKS } from "@/lib/site";
@@ -51,6 +51,7 @@ export function SiteFooter({ developerUrl }: SiteFooterProps) {
       links: [
         { href: developerUrl, label: "Developer site", external: true },
         { href: `${developerUrl}/docs`, label: "Docs", external: true },
+        { href: `${developerUrl}/status`, label: "Service status", external: true },
         { href: LINKS.store, label: "Silicon Apps store", external: true },
         { href: LINKS.teamOfSilicons, label: "Team of Silicons", external: true },
         { href: LINKS.accountsGithub, label: "Silicon Accounts on GitHub", external: true },
@@ -89,7 +90,10 @@ export function SiteFooter({ developerUrl }: SiteFooterProps) {
           </nav>
         </div>
         <div className={styles.footerBottom}>
-          <p className={styles.copyright}>© {new Date().getFullYear()} Team of Silicons. Silicon Accounts is public on GitHub.</p>
+          <p className={styles.copyright}>
+            © {new Date().getFullYear()} Team of Silicons. Silicon Accounts is{" "}
+            <a href={LINKS.accountsGithub} rel="noopener">open source (MIT)</a>.
+          </p>
           <ThemePicker />
         </div>
       </div>

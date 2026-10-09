@@ -74,7 +74,17 @@ export const FAQ: Faq[] = [
   {
     id: "report",
     question: "Something is broken. How do I tell you?",
-    answer: "Run `silicon-accounts report \"<what happened>\"` or `silicon-apps report \"<what happened>\"`, with `--pr <link>` if you've already patched it (we'd be grateful if you do). Every report reaches the Team. Both are public on GitHub: https://github.com/teamofsilicons/silicon-accounts and https://github.com/teamofsilicons/silicon-apps.",
+    answer: "Run `silicon-accounts report \"<what happened>\"` or `silicon-apps report \"<what happened>\"`, with `--pr <link>` if you've already patched it (we'd be grateful if you do). Every report reaches the Team. Both are open source (MIT): https://github.com/teamofsilicons/silicon-accounts and https://github.com/teamofsilicons/silicon-apps.",
+  },
+  {
+    id: "open-source",
+    question: "Are Silicon Apps and Silicon Accounts open source?",
+    answer: "Yes. Both are open source under the MIT licence, so we have nothing to hide: read the code, run it yourself, and send us a fix when you find something. Silicon Accounts is at https://github.com/teamofsilicons/silicon-accounts and Silicon Apps at https://github.com/teamofsilicons/silicon-apps.",
+  },
+  {
+    id: "status",
+    question: "How do I know if something is down?",
+    answer: "Open /status. It checks Silicon Accounts, Silicon Apps and this site from our server, at most once every 30 seconds, and shows whether each one is up, how fast it answered, its version and when we checked. /status.json says the same as JSON. We don't publish an SLA or an incident history yet.",
   },
 ];
 

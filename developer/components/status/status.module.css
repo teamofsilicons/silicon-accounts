@@ -1,0 +1,127 @@
+/*
+ * /status: one calm column. The answer first, then a card per service, then the JSON twin and what we don't publish
+ * yet. Every state is said in words; the dot repeats it in colour (green up, amber some down, red down), using the
+ * text-safe --success, --warning and --danger tokens.
+ */
+.page {
+  display: grid;
+  width: 100%;
+  max-width: 920px;
+  gap: clamp(40px, 5vw, 56px);
+  margin-inline: auto;
+  padding: clamp(48px, 7vw, 88px) var(--gutter) clamp(64px, 9vw, 112px);
+}
+
+.page [data-state="up"] { --state: var(--success); }
+.page [data-state="partial"] { --state: var(--warning); }
+.page [data-state="down"] { --state: var(--danger); }
+
+.dot { --sq-r: 4px; flex: none; width: 10px; height: 10px; background: var(--state); box-shadow: 0 0 0 4px color-mix(in oklab, var(--state) 18%, transparent); }
+
+/* The answer ------------------------------------------------------------------------------------------------------ */
+.head { display: grid; gap: var(--space-4); }
+.eyebrow { margin: 0; color: var(--accent-ink); font-size: var(--text-sm); font-weight: 600; }
+.title {
+  margin: 0;
+  color: var(--foreground);
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 1.7rem + 2.4vw, 3.25rem);
+  font-weight: 600;
+  letter-spacing: -.03em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+.overall {
+  --sq-r: var(--radius-control);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: var(--space-2) 0 0;
+  border: 1px solid var(--sq-stroke);
+  padding: var(--space-4) var(--space-5);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+.overall strong { font-weight: 600; }
+.lede { max-width: 66ch; margin: 0; color: var(--text-secondary); line-height: 1.65; text-wrap: pretty; }
+.lede a, .text a { color: var(--accent-ink); text-underline-offset: .22em; }
+
+/* Sections -------------------------------------------------------------------------------------------------------- */
+.section { display: grid; gap: var(--space-4); }
+.sectionTitle { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; letter-spacing: -.02em; }
+.text { max-width: 66ch; margin: 0; color: var(--text-secondary); line-height: 1.65; }
+.page :not(pre) > code { --sq-r: 6px; padding: .08em .34em; background: var(--surface-muted); color: var(--foreground); font-family: var(--font-mono); font-size: .86em; overflow-wrap: anywhere; }
+
+/* One card per service -------------------------------------------------------------------------------------------- */
+.services { display: grid; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.service {
+  --sq-r: var(--radius-panel);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border);
+  display: grid;
+  gap: var(--space-4);
+  border: 1px solid var(--sq-stroke);
+  padding: var(--space-6);
+  background: var(--sq-fill);
+}
+.serviceHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.serviceName { margin: 0; font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; letter-spacing: -.015em; }
+.serviceName a { display: inline-flex; align-items: center; gap: 4px; color: var(--foreground); text-decoration: none; }
+.serviceName a:hover, .serviceName a:focus-visible { text-decoration: underline; text-underline-offset: .22em; }
+.serviceName svg { color: var(--text-muted); }
+.state { display: inline-flex; align-items: center; gap: 10px; margin: 0; color: var(--state); font-weight: 600; }
+.about { margin: 0; color: var(--text-secondary); line-height: 1.6; }
+
+/* Three across on a wide card, two across on a phone (a single column made every card three rows taller). */
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); gap: var(--space-3) var(--space-6); margin: 0; border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); }
+.fact { display: grid; gap: 2px; }
+.fact dt { color: var(--text-muted); font-size: var(--text-sm); }
+.fact dd { margin: 0; color: var(--foreground); font-variant-numeric: tabular-nums; font-weight: 500; }
+
+.problem { margin: 0; color: var(--danger); line-height: 1.6; }
+
+.checks { color: var(--text-secondary); font-size: var(--text-sm); }
+/* The disclosure reads as a quiet link with a chevron that turns when open, tall enough to tap, and shows keyboard
+   focus the way the site's links do (a soft fill and an underline, never a ring). */
+.checks summary {
+  --sq-r: 8px;
+  --sq-fill: transparent;
+  display: inline-flex;
+  width: fit-content;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 -4px -6px;
+  padding: 4px 8px 4px 6px;
+  background: var(--sq-fill);
+  color: var(--accent-ink);
+  cursor: pointer;
+  font-weight: 500;
+  list-style: none;
+}
+.checks summary::-webkit-details-marker { display: none; }
+.checks summary svg { flex: none; transition: transform var(--duration-fast) var(--ease-standard); }
+.checks[open] summary svg { transform: rotate(90deg); }
+.checks summary:hover { text-decoration: underline; text-underline-offset: .22em; }
+.checks summary:focus-visible {
+  --sq-fill: color-mix(in oklab, var(--accent) 12%, transparent);
+  outline: none;
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: .22em;
+}
+.checks ul { display: grid; gap: var(--space-3); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.checks li { display: grid; gap: 4px; }
+.url { width: fit-content; max-width: 100%; }
+.checkText { line-height: 1.55; }
+
+/* What we don't publish yet --------------------------------------------------------------------------------------- */
+/* ul.notYet outranks base.css's ul[role="list"] reset, which otherwise took the bullets and the indent away. */
+ul.notYet { display: grid; gap: var(--space-2); max-width: 66ch; margin: 0; padding-left: 1.2em; color: var(--text-secondary); line-height: 1.6; list-style: disc; }
+.notYet li::marker { color: var(--text-muted); }
+
+@media (prefers-reduced-motion: reduce) { .checks summary svg { transition: none; } }

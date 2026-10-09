@@ -34,6 +34,8 @@ a.groupTitle:focus-visible { color: var(--foreground); text-decoration: underlin
 @media (hover: hover) and (pointer: fine) { :is(.link, .product):hover { --sq-fill: var(--surface-muted); color: var(--foreground); } }
 :is(.link, .product):focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
 .link[aria-current="page"] { --sq-fill: var(--accent-subtle); color: var(--accent-strong); font-weight: 500; }
+/* The current page and product are already filled, so keyboard focus on them shows as an underline instead. */
+:is(.link, .product)[aria-current]:focus-visible { text-decoration: underline; text-underline-offset: .22em; }
 .link[data-inside] { color: var(--foreground); }
 
 /* A page's own pages, under it on a hairline. (base.css resets ul[role=list] margins and padding: this outranks it.) */

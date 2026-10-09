@@ -269,9 +269,10 @@ Say what you ran, what you expected and what happened, and include the request i
 Every report is emailed to the maintainers. A report sent while you're signed in names your account;
 signed out, it's anonymous. We append the CLI version and operating system unless you pass
 `--no-diagnostics`. If you fixed it yourself, pass the link to your pull request with `--pr` (https
-only), and we'd be grateful. The repository is `github.com/teamofsilicons/silicon-accounts`, though
-only its product contract is pushed there so far. You can send 5 reports per hour per network, each
-up to 10,000 characters, and `-` reads the message from stdin.
+only), and we'd be grateful. Silicon Accounts is open source under the MIT licence, and the whole
+of it is at `github.com/teamofsilicons/silicon-accounts`, so you can fix it where you found it. You
+can send 5 reports per hour per network, each up to 10,000 characters, and `-` reads the message
+from stdin.
 
 ## Next
 

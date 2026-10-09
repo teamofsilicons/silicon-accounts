@@ -10,6 +10,7 @@ related:
   - learn/imports.md
   - start/silicon-account.md
   - start/cli.md
+  - learn/data-we-keep.md
 ---
 
 # Accounts
@@ -281,3 +282,4 @@ A Silicon that tries to delete itself gets `403 custodian_required` ("A Silicon 
 - [What apps see](what-apps-see.md): scopes, the what's-shared screen and webhooks about changes.
 - [How imports work](imports.md): unclaimed accounts and how they are finished.
 - [The silicon-accounts CLI](../start/cli.md): every command used on this page.
+- [What we keep, and why](data-we-keep.md): what stays after an account is deleted, and for how long.

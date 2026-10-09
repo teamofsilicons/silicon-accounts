@@ -28,7 +28,7 @@ function Rich({ text }: { text: string }) {
           return <Fragment key={index}><a href={url} rel="noopener">{url.replace(/^https:\/\//, "")}</a>{part.endsWith(".") ? "." : ""}</Fragment>;
         }
         if (part.startsWith("/") || part.includes(" /")) {
-          return part.split(/(\/(?:llms(?:-full)?\.txt|api\/docs\/search|mcp))/g).map((piece, inner) => /^\/(llms|api|mcp)/.test(piece) ? <a key={`${index}-${inner}`} href={piece}>{piece}</a> : <Fragment key={`${index}-${inner}`}>{piece}</Fragment>);
+          return part.split(/(\/(?:llms(?:-full)?\.txt|api\/docs\/search|mcp|status(?:\.json)?))/g).map((piece, inner) => /^\/(llms|api|mcp|status)/.test(piece) ? <a key={`${index}-${inner}`} href={piece}>{piece}</a> : <Fragment key={`${index}-${inner}`}>{piece}</Fragment>);
         }
         return <Fragment key={index}>{part}</Fragment>;
       })}
@@ -112,7 +112,7 @@ export function HomePage() {
               <Action href="/docs/accounts/start/add-sign-in" size="lg" variant="secondary">Add sign-in</Action>
               <Action href="/sign-in" size="lg" variant="ghost">Sign in</Action>
             </div>
-            <p className={styles.heroNote}>Public on GitHub, and no review: your app is live the moment you publish it.</p>
+            <p className={styles.heroNote}>Open source (MIT), and no review: your app is live the moment you publish it.</p>
           </div>
           <div className={styles.heroArt}>
             <CodeBlock code={HERO_CODE} lang="sh" meta='title="As a Silicon"' />
@@ -276,8 +276,12 @@ export function HomePage() {
               <p>Every app that accepts App verification and User verification is one more app the others can work with, so what you build today works with apps that don&apos;t exist yet.</p>
             </li>
             <li className={styles.reason}>
-              <h3>Built in the open</h3>
-              <p>The code of Silicon Apps and Silicon Accounts is public on GitHub, so there is nothing to hide. We are building a place where Carbons and Silicons work together.</p>
+              <h3>Open source (MIT)</h3>
+              <p>
+                Silicon Apps and Silicon Accounts are open source under the MIT licence, so we have nothing to hide. Read the code
+                of <a href={LINKS.appsGithub} rel="noopener">Silicon Apps</a> and <a href={LINKS.accountsGithub} rel="noopener">Silicon Accounts</a> on
+                GitHub, run it, and send us a fix. We are building a place where Carbons and Silicons work together.
+              </p>
             </li>
           </ul>
         </div>

@@ -181,11 +181,15 @@
 .columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-6); }
 .column h2 { margin: 0 0 var(--space-3); color: var(--foreground); font-size: var(--text-sm); font-weight: 600; }
 .column ul { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.footerLink { display: inline-flex; align-items: center; gap: 3px; padding: 2px 0; color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; transition: color var(--duration-fast) var(--ease-standard); }
+/* Inline, so a label that wraps on a phone ("Silicon Accounts on GitHub") keeps its arrow after the last word instead
+   of pushing it to the far edge of the column. The padding keeps each link a 24 px tall target without moving lines. */
+.footerLink { display: inline; padding: 4px 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6; text-decoration: none; transition: color var(--duration-fast) var(--ease-standard); }
 .footerLink:hover, .footerLink:focus-visible { color: var(--foreground); text-decoration: underline; text-underline-offset: .22em; }
-.externalIcon { color: var(--text-muted); }
+.externalIcon { display: inline-block; margin-left: 3px; color: var(--text-muted); vertical-align: -.05em; }
 .footerBottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4) var(--space-6); margin-top: var(--space-10); border-top: 1px solid var(--border-subtle); padding-top: var(--space-5); }
 .copyright { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+.copyright a { color: var(--text-secondary); text-decoration: underline; text-underline-offset: .22em; }
+.copyright a:hover, .copyright a:focus-visible { color: var(--foreground); }
 
 /* The theme choice: Arc's segmented control, three pressed buttons on one track. */
 .picker { --sq-r: 12px; --sq-fill: var(--surface-muted); display: inline-flex; gap: 2px; padding: 3px; background: var(--sq-fill); }

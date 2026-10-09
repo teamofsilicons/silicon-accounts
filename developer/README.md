@@ -145,6 +145,7 @@ checking pages with curl or a browser without the hosted sign-in.
 | Invitations and preferences | `/invitations`, `/settings` | `components/publishing/`, native shell pages |
 | Unified docs | public `/docs`, `/docs/apps/**`, `/docs/accounts/**`, `/docs/search` | `components/docs/`, `lib/docs/`, `app/(public)/docs/` |
 | Agent files | `/llms.txt`, `/llms-full.txt`, `/robots.txt`, `/sitemap.xml`, `/.well-known/agent.json`, `/.well-known/security.txt`, `/openapi.json`, `/manifest.webmanifest` | `app/<file>/route.ts`, `lib/agent/`, `llms/` (the Carbon's own text) |
+| Status | public `/status` and its JSON twin `/status.json` | `app/(public)/status/`, `app/status.json/`, `components/status/`, `lib/status.ts` |
 | Public JSON API and MCP | `/api/docs`, `/api/docs/search`, `/api/docs/pages`, `/api/docs/pages/{product}/{path}`, `/mcp` | `app/api/docs/`, `app/mcp/`, `lib/docs/api.ts`, `lib/mcp/`, `lib/server/rate-limit.ts` |
 | Copied from `web/` and adapted | Arc UI, the foundation (layout, branding runtime, squircles, theme, providers), the API client and hooks | `components/arc/`, `components/foundation/`, `lib/` |
 
@@ -197,6 +198,13 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
 - **Rate limits** (`lib/site.ts`, `lib/server/rate-limit.ts`): 120 requests a minute to the docs API and 60 to `/mcp` per
   client address (the first `X-Forwarded-For` entry, which Caddy sets), in this process's memory; every answer carries
   `RateLimit-*` headers and a refused one is 429 with `Retry-After`.
+- **Status** (`lib/status.ts`): `/status` (server-rendered, no script of its own) and `/status.json` say whether Silicon
+  Accounts (`/readyz` and `/v1/meta` on `https://accounts.teamofsilicons.com`), Silicon Apps (`/health` on
+  `https://apps.teamofsilicons.com`) and this site (`/openapi.json` at `DEVELOPER_PUBLIC_URL`) are up, with response
+  time, version (this site's is `package.json`'s) and check time. Each check is a GET from this server with a 3 second
+  limit; one round is kept for 30 seconds in this process (on `globalThis`, shared by the page and the JSON route). No
+  SLA and no incident history are published yet, and the page says so. Linked from the footer, the sitemap, robots.txt,
+  the agent card and openapi.json.
 - **robots.txt** opens everything public to every crawler, names the answer-engine and agent crawlers, and keeps out `/api/`, `/auth/`,
   `/mcp`, the portal's pages, `/sign-in` and the search results. **sitemap.xml** lists the home page, every docs page and
   group, and the two llms files, with `lastmod`.

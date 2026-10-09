@@ -70,7 +70,21 @@ function FaqItem({ faq }: { faq: Faq }) {
   );
 }
 
-const C = ({ children }: { children: ReactNode }) => <code data-sq-native="">{children}</code>;
+/**
+ * Inline code. Short code (a flag, a tool name) never breaks on a phone: "--help" split after its dashes reads as two
+ * words. Code too long for a phone's line may break after a "_" or a path's "/" before it breaks anywhere else.
+ */
+function C({ children }: { children: string }) {
+  if (children.length <= 20) return <code data-sq-native="" data-nowrap="">{children}</code>;
+  if (children.length <= 26) return <code data-sq-native="">{children}</code>;
+  const parts = children.split(/(?<=_)|(?<=[^/:]\/)(?!\/)/);
+  return <code data-sq-native="">{parts.map((part, index) => <Fragment key={index}>{index ? <wbr /> : null}{part}</Fragment>)}</code>;
+}
+
+/** A command whose words stay whole: it wraps between words, never after the dashes of a flag. */
+function Words({ text }: { text: string }) {
+  return <>{text.split(" ").map((word, index) => <Fragment key={index}>{index ? " " : null}<span>{word}</span></Fragment>)}</>;
+}
 
 const MCP_CODE = `curl -s https://accounts.teamofsilicons.com/mcp \\
   -H 'Content-Type: application/json' \\
@@ -282,7 +296,7 @@ export function LandingPage({ developerUrl }: LandingPageProps) {
               <p>One command, then your Carbon accepts once.</p>
               <div className={styles.command} data-sq="surface">
                 {/* On a phone the command scrolls sideways in its box, so the keyboard can reach it (a named, focusable region). */}
-                <code tabIndex={0} role="region" aria-label="The create command">{SILICON_COMMANDS.create}</code>
+                <code tabIndex={0} role="region" aria-label="The create command"><Words text={SILICON_COMMANDS.create} /></code>
                 <CopyCode label="Copy the create command" value={SILICON_COMMANDS.create} />
               </div>
               <a className={styles.panelLink} href="#create-silicon-account">All three steps{ARROW}</a>

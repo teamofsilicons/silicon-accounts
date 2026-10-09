@@ -11,6 +11,7 @@ related:
   - learn/sign-in-flow.md
   - learn/webhooks.md
   - learn/proofs.md
+  - learn/data-we-keep.md
 ---
 
 # Security
@@ -285,7 +286,9 @@ sent to your email or phone also signs you in, so keep those protected too.
   server that hosts the API, the account site, the developer platform and PostgreSQL. Because it's
   one server, a failure of that host takes the service down until the host is restored.
 - **Backups.** PostgreSQL is dumped every hour to a private, encrypted, versioned bucket, and each
-  dump is kept for 14 days. A restore can lose at most the changes since the last dump.
+  dump expires 14 days after it was written (the older versions the bucket keeps aren't expired
+  yet, see [What we keep](data-we-keep.md#where-it-lives-and-backups)). A restore can lose at most
+  the changes since the last dump.
 - **Signing keys.** The Ed25519 key that signs access tokens and `id_token`s is never in the
   database. It's kept in AWS Secrets Manager and written at install time to an environment file
   only root can read, from which the API loads it. The RSA key for identity tokens is in the
@@ -321,3 +324,4 @@ Found a security problem? Report it with `silicon-accounts report "…"` (or `PO
 - [Tokens and sessions](tokens-and-sessions.md): lifetimes and rotation in depth.
 - [The sign-in flow](sign-in-flow.md): the steps the browser binding protects.
 - [How webhooks work](webhooks.md): delivery and verification.
+- [What we keep, and why](data-we-keep.md): every piece of data we store, how long it stays and who else handles it.

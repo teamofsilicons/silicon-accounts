@@ -1,10 +1,12 @@
 /**
- * /openapi.json: OpenAPI 3.1 for this site's own public endpoints: the docs JSON API, the MCP endpoint and the agent
- * files. The Silicon Accounts and Silicon Apps APIs describe themselves; `x-related-apis` links their descriptions.
+ * /openapi.json: OpenAPI 3.1 for this site's own public endpoints: the docs JSON API, the MCP endpoint, the status of
+ * every service (/status.json) and the agent files. The Silicon Accounts and Silicon Apps APIs describe themselves;
+ * `x-related-apis` links their descriptions. The code is open source under MIT, like Silicon Accounts and Silicon Apps.
  */
 import { KIND_KEYS, MAX_LIMIT, MAX_QUERY, PRODUCT_KEYS } from "@/lib/docs/api-constants";
 import { SUPPORTED_VERSIONS } from "@/lib/mcp/protocol";
 import { CANONICAL_ORIGIN, LINKS, ORGANIZATION, RATE_LIMITS, SITE_NAME } from "@/lib/site";
+import { STATUS_CACHE_SECONDS, STATUS_TIMEOUT_MS } from "@/lib/status";
 
 const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
 const json = (schema: unknown) => ({ "application/json": { schema } });
@@ -38,8 +40,13 @@ export function openApi() {
         "Errors are JSON: {\"error\": {\"code\", \"message\", \"hint\"}}. The code is stable, the message says what happened, the hint says what to do.",
         "",
         "To act on the platform (create apps, publish, sign Carbons and Silicons in, verify apps), use the Silicon Apps and Silicon Accounts APIs linked in x-related-apis.",
+        "",
+        `Is everything up? GET /status.json (or open /status): Silicon Accounts, Silicon Apps and this site, checked from our server at most every ${STATUS_CACHE_SECONDS} seconds.`,
+        "",
+        `Silicon Accounts and Silicon Apps are open source under MIT: ${LINKS.accountsGithub} and ${LINKS.appsGithub}.`,
       ].join("\n"),
       contact: { name: ORGANIZATION.name, url: ORGANIZATION.url, email: ORGANIZATION.email },
+      license: { name: "MIT", identifier: "MIT" },
     },
     servers: [{ url: CANONICAL_ORIGIN }],
     externalDocs: { description: "Silicon Developer docs", url: `${CANONICAL_ORIGIN}/docs` },
@@ -49,9 +56,12 @@ export function openApi() {
     ],
     "x-agent-card": `${CANONICAL_ORIGIN}/.well-known/agent.json`,
     "x-llms-txt": `${CANONICAL_ORIGIN}/llms.txt`,
+    "x-status": { page: `${CANONICAL_ORIGIN}/status`, json: `${CANONICAL_ORIGIN}/status.json` },
+    "x-source": [LINKS.accountsGithub, LINKS.appsGithub],
     tags: [
       { name: "Docs", description: "The developer docs as JSON." },
       { name: "MCP", description: "The Model Context Protocol server." },
+      { name: "Status", description: "Whether Silicon Accounts, Silicon Apps and this site are up right now." },
       { name: "Agent files", description: "Text and JSON files for agents and crawlers." },
     ],
     paths: {
@@ -129,6 +139,18 @@ export function openApi() {
           },
         },
       },
+      "/status.json": {
+        get: {
+          tags: ["Status"],
+          operationId: "getStatus",
+          summary: "Whether every service is up",
+          description: `Silicon Accounts (GET /readyz and /v1/meta), Silicon Apps (GET /health) and this site (GET /openapi.json at its public address), checked from our server with a ${STATUS_TIMEOUT_MS / 1000} second limit each. One round of checks is kept for ${STATUS_CACHE_SECONDS} seconds and shared by every request; Cache-Control says how much of that is left. Always 200 when this site answers: a service that is down is in the body, not the status code. No SLA and no incident history are published yet.`,
+          responses: {
+            "200": { description: "The latest round of checks.", content: json(ref("StatusReport")) },
+          },
+        },
+      },
+      "/status": { get: { tags: ["Status"], operationId: "statusPage", summary: "The same as /status.json, as a web page", responses: { "200": { description: "HTML.", content: { "text/html": { schema: { type: "string" } } } } } } },
       "/llms.txt": { get: { tags: ["Agent files"], operationId: "llmsTxt", summary: "The docs for language models, in short (llmstxt.org)", responses: { "200": { description: "Markdown text.", content: { "text/plain": { schema: { type: "string" } } } } } } },
       "/llms-full.txt": { get: { tags: ["Agent files"], operationId: "llmsFullTxt", summary: "Everything in one text file", responses: { "200": { description: "Markdown text.", content: { "text/plain": { schema: { type: "string" } } } } } } },
       "/.well-known/agent.json": { get: { tags: ["Agent files"], operationId: "agentCard", summary: "The A2A agent card", responses: { "200": { description: "The agent card.", content: json({ type: "object" }) } } } },
@@ -223,6 +245,52 @@ export function openApi() {
               },
             },
           ],
+        },
+        StatusError: {
+          type: "object",
+          required: ["code", "message"],
+          properties: { code: { type: "string", enum: ["timeout", "unreachable", "http_status", "not_ready"] }, message: { type: "string", examples: ["Did not answer within 3 seconds."] } },
+        },
+        StatusCheck: {
+          type: "object",
+          required: ["url", "purpose", "ok", "http_status", "response_ms", "error"],
+          properties: {
+            url: { type: "string", format: "uri", description: "The address we sent a GET to." },
+            purpose: { type: "string", description: "What this request tells us." },
+            ok: { type: "boolean" },
+            http_status: { type: ["integer", "null"], description: "The status code, or null when nothing answered." },
+            response_ms: { type: ["integer", "null"], description: "Milliseconds until the whole answer arrived, or null when nothing answered." },
+            error: { oneOf: [ref("StatusError"), { type: "null" }] },
+          },
+        },
+        ServiceStatus: {
+          type: "object",
+          required: ["id", "name", "url", "about", "status", "response_ms", "version", "checked_at", "error", "checks"],
+          properties: {
+            id: { type: "string", enum: ["accounts", "apps", "developer"] },
+            name: { type: "string", examples: ["Silicon Accounts"] },
+            url: { type: "string", format: "uri" },
+            about: { type: "string" },
+            status: { type: "string", enum: ["up", "down"], description: "Up when every check answered 2xx in time and said it is fine." },
+            response_ms: { type: ["integer", "null"], description: "The time of the service's health check, or null when it did not answer." },
+            version: { type: ["string", "null"], description: "The version the service reports, or null when it reported none.", examples: ["0.4.0"] },
+            checked_at: { type: "string", format: "date-time" },
+            error: { oneOf: [ref("StatusError"), { type: "null" }], description: "Why it is down: the first check that failed." },
+            checks: { type: "array", items: ref("StatusCheck") },
+          },
+        },
+        StatusReport: {
+          type: "object",
+          required: ["status", "summary", "checked_at", "cache_seconds", "timeout_ms", "services", "not_published_yet"],
+          properties: {
+            status: { type: "string", enum: ["up", "partial", "down"], description: "up: every service is up. partial: some are down. down: all are down." },
+            summary: { type: "string", examples: ["All three services are up."] },
+            checked_at: { type: "string", format: "date-time", description: "When this round of checks started." },
+            cache_seconds: { type: "integer", examples: [STATUS_CACHE_SECONDS] },
+            timeout_ms: { type: "integer", examples: [STATUS_TIMEOUT_MS] },
+            services: { type: "array", items: ref("ServiceStatus") },
+            not_published_yet: { type: "array", items: { type: "string" }, description: "What we do not publish yet, in plain words (no SLA, no incident history)." },
+          },
         },
         JsonRpcRequest: {
           type: "object",

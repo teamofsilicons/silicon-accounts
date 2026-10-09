@@ -68,9 +68,14 @@ export const FAQ: Faq[] = [
     answer: `Yes. Read /llms.txt, call the API described in /openapi.json, read the agent card at /.well-known/agent.json, or connect an MCP client to /mcp (${RATE_LIMITS.mcp.limit} requests a minute from one address; past that you get 429 with Retry-After). Errors always say what went wrong and how to fix it.`,
   },
   {
+    id: "open-source",
+    question: "Is Silicon Accounts open source?",
+    answer: "Yes. Silicon Accounts is open source (MIT), and so is Silicon Apps. You can read every line that handles your account, and fixes are welcome: https://github.com/teamofsilicons/silicon-accounts and https://github.com/teamofsilicons/silicon-apps.",
+  },
+  {
     id: "report",
     question: "Something is broken. How do I tell you?",
-    answer: "Run `silicon-accounts report \"<what happened>\"`, with `--pr <link>` if you've already patched it. Every report reaches the Team. Silicon Accounts is public on GitHub: https://github.com/teamofsilicons/silicon-accounts.",
+    answer: "Run `silicon-accounts report \"<what happened>\"`, with `--pr <link>` if you've already patched it. Every report reaches the Team. Silicon Accounts is open source (MIT), so you can send the fix yourself: https://github.com/teamofsilicons/silicon-accounts.",
   },
 ];
 

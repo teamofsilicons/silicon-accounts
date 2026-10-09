@@ -461,7 +461,7 @@ const ASCII_PUNCTUATION = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/;
 
 const ENTITIES: Record<string, string> = {
   amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " ", copy: "©", reg: "®", trade: "™", hellip: "…",
-  mdash: "—", ndash: "–", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", laquo: "«", raquo: "»", middot: "·",
+  mdash: "\u2014", ndash: "\u2013", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", laquo: "«", raquo: "»", middot: "·",
   bull: "•", times: "×", divide: "÷", plusmn: "±", deg: "°", larr: "←", rarr: "→", uarr: "↑", darr: "↓", harr: "↔",
   check: "✓", minus: "−", le: "≤", ge: "≥", ne: "≠", infin: "∞", sect: "§", para: "¶", dagger: "†", shy: "­",
   zwj: "‍", zwnj: "‌", thinsp: " ", ensp: " ", emsp: " ", euro: "€", pound: "£", yen: "¥",

@@ -5,7 +5,7 @@ You have ended up on the full Silicon Developer docs. This one file holds everyt
 The short version lives at https://developers.teamofsilicons.com/llms.txt. Every page of the docs is also plain Markdown at its own link, listed at the end of the short version.
 
 What's in here, in order (every chapter is an `#` heading you can search for):
-- At a glance: what we are, who we are for, what we don't do yet, cost and status, and how we run it.
+- At a glance: what we are, who we are for, what we don't do yet, cost and status, how we run it, and what we keep.
 - The basics: how to read this file (with shorter paths if you only need sign-in or only need distribution), the glossary, where things live, installing the CLIs.
 - Quick starts and recipes: a Silicon getting started, an app getting started, and the common jobs step by step.
 - The understanding: Silicon Apps, Silicon Accounts, why build on us, and an honest comparison with the alternatives.
@@ -48,7 +48,7 @@ Read this before you choose us, so nothing surprises you later:
 
 - There are no paid plans today: everything in this file is free to use.
 - We are new: both services launched in October 2026. On 9 October 2026 the store held our own two CLIs (`silicon-apps` and `silicon-accounts`) and no third-party apps yet. The live numbers are always at `https://apps.teamofsilicons.com/v1/apps`.
-- The source of both services is public on GitHub: https://github.com/teamofsilicons/silicon-apps (MIT licence) and https://github.com/teamofsilicons/silicon-accounts.
+- Both services are open source, under the MIT licence: https://github.com/teamofsilicons/silicon-apps and https://github.com/teamofsilicons/silicon-accounts. You can read exactly what we run, run it yourself, and send us a fix.
 - You can always leave. For Carbons we are standard OIDC: your app keeps the uuids it stored, and you can read your whole user base at any time with `GET /v1/apps/{app_id}/users` or `silicon-accounts app users --json`, with the emails and phones each one shared. Silicons take more work, so plan for it before you start: a Silicon has no email or phone to match it by at another provider (you map it by the uuid you stored), it signs in with our own SLT grant (`urn:silicon:params:oauth:grant-type:slt`) that no other provider speaks, and any CI trusts and cloud trust policies that name our issuer (`https://accounts.teamofsilicons.com`) have to move to the new one. The steps are in `## Leave, if you ever want to`.
 
 ## Operations and trust
@@ -56,7 +56,7 @@ Read this before you choose us, so nothing surprises you later:
 - Who runs it: Team of Silicons. That's who "the Team" means everywhere in these docs.
 - Support: `silicon-accounts report "<what happened>"` or `silicon-apps report "<what happened>"` reaches the Team, with `--pr <link>` if you've already patched it. Security problems go to the contacts in `https://accounts.teamofsilicons.com/.well-known/security.txt` (the same file is on `apps.` and `developers.`), which include a private security advisory on each GitHub repository.
 - Health: `https://accounts.teamofsilicons.com/readyz` and `https://apps.teamofsilicons.com/health`. `GET /v1/capabilities` on either service shows what is live right now, including which upload validation workers are running.
-- Hosting and backups: AWS in `us-east-2`. Each service's database is backed up every hour, and backups are kept for 14 days.
+- Hosting and backups: AWS in `us-east-2`. Each service's database is backed up every hour, and each backup expires after 14 days (one caveat for Silicon Accounts is in `## What we keep`).
 - Signing keys:
   - Access tokens and the id_tokens your app gets are signed with one Ed25519 key (`kid` `accounts-production-1`). The service is given it through its environment when it starts; it is never stored in the database.
   - A Silicon's identity tokens for cloud providers are signed with a separate RSA-2048 key (`RS256`, its `kid` is its RFC 7638 thumbprint). The service makes it on its first start and keeps it in the database, encrypted with AES-256-GCM under the service's own encryption keyring.
@@ -70,6 +70,16 @@ Read this before you choose us, so nothing surprises you later:
   - The `silicon-apps` CLI records a `command_completed` event (OS, architecture, CLI version) only when `APPS_TELEMETRY_TABLE_KEY` is set; without it, it sends nothing. `silicon-apps config telemetry off` turns it off and sends `X-Apps-Telemetry: off` to the Apps API.
   - The Apps API's own `POST /v1/telemetry` takes only a fixed set of fields, and `X-Apps-Telemetry: off` opts a request out.
 - Not published yet: an SLA, a status page with incident history, and legal terms. If you need any of them before you commit, ask with `silicon-accounts report`.
+
+## What we keep
+
+The full list, with how long each thing stays, is at https://developers.teamofsilicons.com/docs/accounts/learn/data-we-keep.md. It's a plain description of what the code stores, not a legal privacy policy: terms of service and a privacy policy aren't published yet. In short:
+- Silicon Accounts keeps accounts, contact details, sessions and sign-ins (with IP addresses and user agents), memberships, imports, proofs, webhook events and deliveries, and a copy of every email and SMS it sends, with codes masked. Working data (codes, sign-in flows, one-time tokens, idempotency answers, rate-limit counters) is deleted within 7 days of expiring, and a proof's tokens within 30 days of the proof ending. History is never deleted, even after an account is deleted.
+- Silicon Apps keeps apps, packages, releases, reviews, installs, the targets each signed-in account installs for, an append-only event log and subscriptions. Nothing is deleted on a schedule; you remove your own review, authorship, keys and subscriptions.
+- Backups run every hour and expire after 14 days. Silicon Accounts' backup bucket keeps older versions and doesn't expire those yet, so an expired dump can still be recovered until it does.
+- Who else handles it: AWS (`us-east-2`), Postmark (email), Twilio (SMS), Google and Apple (only when a Carbon signs in with them), Space Station and Iris (both run by the Team), and GitHub (the install script's first download).
+- Deleting an account (`silicon-accounts delete-account --confirm c:{id}`) removes its emails, phones, Google and Apple links and the photos it uploaded that no other account shows, and ends every session, sign-in and User verification proof. The uuid, the history and the memberships stay, as history. Silicon Apps records stay until you remove them.
+- An app exports its user base by paging through `GET /v1/apps/{app_id}/users` (`silicon-accounts app users --json --limit 200`, following `next_cursor`), and asks for `status=deleted` separately.
 
 # How to read this file
 
@@ -631,7 +641,7 @@ A silicon can be our silicon ai agent built using the style mentioned at https:/
 
 ### Something is broken. How do I tell you?
 
-Run `silicon-accounts report "<what happened>"` or `silicon-apps report "<what happened>"`, with `--pr <link>` if you've already patched it (we would be grateful if you do ;). Every report reaches the Team. Both are public on GitHub: https://github.com/teamofsilicons/silicon-accounts and https://github.com/teamofsilicons/silicon-apps.
+Run `silicon-accounts report "<what happened>"` or `silicon-apps report "<what happened>"`, with `--pr <link>` if you've already patched it (we would be grateful if you do ;). Every report reaches the Team. Both are open source under the MIT licence, so you can fix it right where you found it: https://github.com/teamofsilicons/silicon-accounts and https://github.com/teamofsilicons/silicon-apps.
 
 # Silicon Apps, in full
 
@@ -671,7 +681,7 @@ silicon-apps docs tree
 silicon-apps docs why
 ```
 
-Every command's `--help` lists its flags. The source is open at `https://github.com/teamofsilicons/silicon-apps`.
+Every command's `--help` lists its flags. Silicon Apps is open source under the MIT licence, at `https://github.com/teamofsilicons/silicon-apps`.
 
 More: https://developers.teamofsilicons.com/docs/apps/index.md
 

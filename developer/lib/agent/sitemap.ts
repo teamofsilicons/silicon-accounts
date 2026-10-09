@@ -1,6 +1,8 @@
 /**
  * /sitemap.xml: every public page with its last change: the home page, the docs landing page, every docs page and
- * group page, and the two agent files. The signed-in portal, the API and the search results are not pages to index.
+ * group page, the status page and the two agent files. The signed-in portal, the API and the search results are not
+ * pages to index. The status page changes with every round of checks, so it says so (changefreq always) and carries
+ * the time the sitemap was made as its lastmod.
  */
 import "server-only";
 import { docs } from "@/lib/docs/content";
@@ -11,13 +13,14 @@ interface Entry {
   path: string;
   modified: string | null;
   priority: number;
+  changefreq?: "always" | "daily" | "weekly";
 }
 
 const escapeXml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
 const latest = (dates: Array<string | null | undefined>): string | null => dates.filter((date): date is string => Boolean(date)).sort().at(-1) ?? null;
 
-export function sitemapEntries(): Entry[] {
+export function sitemapEntries(now: Date = new Date()): Entry[] {
   const { pages, nav } = docs();
   const newest = latest(pages.map(page => page.modified));
   const entries: Entry[] = [{ path: "/", modified: newest, priority: 1 }];
@@ -26,6 +29,7 @@ export function sitemapEntries(): Entry[] {
     if (!group.href) continue;
     entries.push({ path: group.href, modified: latest(pages.filter(page => page.group === group.key).map(page => page.modified)), priority: 0.6 });
   }
+  entries.push({ path: "/status", modified: now.toISOString(), priority: 0.5, changefreq: "always" });
   entries.push({ path: "/llms.txt", modified: LLMS_FILES.index.modified ?? newest, priority: 0.5 });
   entries.push({ path: "/llms-full.txt", modified: LLMS_FILES.full.modified ?? newest, priority: 0.5 });
   const seen = new Set<string>();
@@ -39,6 +43,7 @@ export function sitemapXml(): string {
       "  <url>",
       `    <loc>${escapeXml(location)}</loc>`,
       entry.modified ? `    <lastmod>${new Date(entry.modified).toISOString()}</lastmod>` : null,
+      entry.changefreq ? `    <changefreq>${entry.changefreq}</changefreq>` : null,
       `    <priority>${entry.priority.toFixed(1)}</priority>`,
       "  </url>",
     ].filter(Boolean).join("\n");

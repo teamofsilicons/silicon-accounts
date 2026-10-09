@@ -29,6 +29,7 @@
   line-height: 1.06;
   text-wrap: balance;
 }
+.keep { white-space: nowrap; }
 .landingTitle { font-size: clamp(2.5rem, 1.8rem + 3vw, 3.75rem); line-height: 1.02; }
 .lede { max-width: 62ch; margin: 0; color: var(--text-secondary); font-size: 1.125rem; line-height: 1.55; text-wrap: pretty; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); margin-top: var(--space-1); }
@@ -112,6 +113,11 @@
 .everyList li[data-child] { padding-left: 12px; border-left: 1px solid var(--border); }
 .everyList a { color: var(--accent-ink); text-decoration: none; }
 .everyList a:hover { text-decoration: underline; text-underline-offset: .22em; }
+/* On a touch screen each link gets a taller row to land a finger on (about 33 px instead of 21 px with a 6 px gap). */
+@media (pointer: coarse) {
+  .everyList { gap: 0; }
+  .everyList a { display: inline-block; padding-block: 6px; }
+}
 
 /* A group's page: its pages as cards. */
 .groupList { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }

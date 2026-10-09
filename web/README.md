@@ -552,6 +552,15 @@ native popover moves focus into it and Escape returns it to the menu button; the
 focus as an accent edge (as on the developer site); the closing section's command, which scrolls sideways on a phone,
 is a named focusable region (`role="region"`, "The create command") with an accent edge and tint when focused.
 
+Visual review (2026-10-09, light and dark at 320 to 1440 px): "Building an app?" has space above its card (it sat on
+the band's bottom edge, with all its space below); the hero title is capped by the window between 1024 and ~1150 px,
+so it stays on three lines instead of leaving "Carbon" alone; icons in card titles sit on the first line of a title that
+wraps; on a phone a step's number sits beside its title; inline code (`C`) keeps code of 20 characters or fewer whole
+(no "--" / "help" split) and lets code too long for a phone's line break after a `_` or a path's `/`; the closing
+command wraps between words only (never after a flag's dashes); footer links are inline, so a wrapped label keeps its
+arrow after the last word. The footer change is this site's only difference from the developer site's
+`components/site/site.module.css` (the store's copy has the same footer).
+
 - `proxy.ts` marks the request `x-sa-surface: public` for a page load of `/` without a session cookie, or with one the
   API refuses (a 401 from `GET /v1/session`; that cookie is then cleared), and rewrites it to `app/landing` (a direct
   visit to `/landing` goes back to `/`). That route sits outside `app/(app)`, so its module graph has no client
@@ -564,6 +573,10 @@ is a named focusable region (`role="region"`, "The create command") with an acce
   WebSite JSON-LD on the public surface, WebApplication/SoftwareApplication, WebPage and FAQPage on the landing. Every
   other page is `noindex` by default (the root metadata): account pages, `/sign-in`, `/authorize`, `/device`, the
   embed. Icons and the social image are rendered by `pnpm brand` (`scripts/brand/`, Playwright) into `public/`.
+- Open source (2026-10-09): Silicon Accounts and Silicon Apps are both MIT (each repository has a LICENSE). The footer
+  says "Silicon Accounts is open source (MIT)" with the GitHub link, the FAQ answers "Is Silicon Accounts open
+  source?", and the application JSON-LD names the license (`LINKS.accountsLicense` in `lib/site.ts`). The footer's
+  Ecosystem column also links the developer site's status page (`developer_url` + `/status`).
 
 ### Agent entry points (2026-10-09)
 
