@@ -15,7 +15,7 @@ interface Entry {
 const escapeXml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
 /** When the landing page last changed: the newer of its words' sources (the llms files are written with it). */
-export const LANDING_MODIFIED = "2026-10-09T00:00:00.000Z";
+export const LANDING_MODIFIED = "2026-10-10T00:00:00.000Z";
 
 const newest = (...dates: Array<string | null>) => dates.filter((date): date is string => Boolean(date)).sort().at(-1) ?? null;
 

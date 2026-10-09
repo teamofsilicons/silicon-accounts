@@ -51,11 +51,12 @@ test("prefetch and RSC cannot bypass redirects and render old documentation", ()
     }
   }
   for (const url of ["/v1/me", "/.well-known/openid-configuration", "/.well-known/agent.json", "/.well-known/security.txt", "/openapi.json", "/sdk/v1.js", "/_next/static/a.js",
-    "/llms.txt", "/llms-full.txt", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/mcp", "/og.png", "/icon.svg", "/icon-512.png", "/icon-maskable-512.png", "/apple-touch-icon.png", "/favicon.ico", "/fonts/bdo-grotesk/BDOGrotesk-DemiBold.woff2"]) {
+    "/llms.txt", "/llms-full.txt", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/og.png", "/icon.svg", "/icon-512.png", "/icon-maskable-512.png", "/apple-touch-icon.png", "/favicon.ico", "/fonts/bdo-grotesk/BDOGrotesk-DemiBold.woff2"]) {
     assert.equal(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url }), false, url);
   }
-  // Pages whose names start like an agent file still get the page headers.
-  for (const url of ["/", "/mcp-guide", "/apps", "/sign-in"]) assert.equal(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url }), true, url);
+  // Pages whose names start like an agent file still get the page headers, and so does /mcp: the site runs no MCP
+  // server, so it is an ordinary unknown path (the 404 page).
+  for (const url of ["/", "/llms-guide", "/mcp", "/apps", "/sign-in"]) assert.equal(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url }), true, url);
 });
 
 test("the site serves its own llms.txt and llms-full.txt: no redirect to the developer site", async () => {

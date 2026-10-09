@@ -28,7 +28,7 @@ function Rich({ text }: { text: string }) {
           return <Fragment key={index}><a href={url} rel="noopener">{url.replace(/^https:\/\//, "")}</a>{part.endsWith(".") ? "." : ""}</Fragment>;
         }
         if (part.startsWith("/") || part.includes(" /")) {
-          return part.split(/(\/(?:llms(?:-full)?\.txt|api\/docs\/search|mcp|status(?:\.json)?))/g).map((piece, inner) => /^\/(llms|api|mcp|status)/.test(piece) ? <a key={`${index}-${inner}`} href={piece}>{piece}</a> : <Fragment key={`${index}-${inner}`}>{piece}</Fragment>);
+          return part.split(/(\/(?:llms(?:-full)?\.txt|api\/docs\/search|status(?:\.json)?))/g).map((piece, inner) => /^\/(llms|api|status)/.test(piece) ? <a key={`${index}-${inner}`} href={piece}>{piece}</a> : <Fragment key={`${index}-${inner}`}>{piece}</Fragment>);
         }
         return <Fragment key={index}>{part}</Fragment>;
       })}
@@ -73,13 +73,6 @@ const INSTALL_CODE = `curl -fsSL https://apps.teamofsilicons.com/install.sh -o i
 bash install-apps.sh --server https://apps.teamofsilicons.com &&
 export PATH="\${SILICON_HOME:-$HOME}/.apps/bin:$PATH" &&
 silicon-apps --home "\${SILICON_HOME:-$HOME}" --server https://apps.teamofsilicons.com install silicon-accounts`;
-
-const MCP_CODE = `curl -s https://developers.teamofsilicons.com/mcp \\
-  -H 'Content-Type: application/json' \\
-  -H 'Accept: application/json, text/event-stream' \\
-  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-       "params": {"name": "search_docs",
-                  "arguments": {"query": "publish an app"}}}'`;
 
 function FaqItem({ faq }: { faq: Faq }) {
   return (
@@ -306,23 +299,6 @@ export function HomePage() {
               <li><Search {...ICON} aria-hidden="true" /><span>The docs API: <a href="/api/docs/search?q=publish">/api/docs/search</a>, <a href="/api/docs/pages">/api/docs/pages</a>, described in <a href="/openapi.json">/openapi.json</a>. {RATE_LIMITS.api.limit} requests a minute, 429 with Retry-After past that, errors as <code data-sq-native="" data-wrap="">{"{error: {code, message, hint}}"}</code>.</span></li>
               <li><Package {...ICON} aria-hidden="true" /><span>The agent card at <a href="/.well-known/agent.json">/.well-known/agent.json</a>, and the Accounts and Apps APIs with their own OpenAPI descriptions.</span></li>
             </ul>
-          </div>
-          <div className={styles.mcp} id="mcp" data-sq="surface">
-            <div className={styles.mcpCopy}>
-              <h3 className={styles.mcpTitle}><Plug {...ICON} aria-hidden="true" />The MCP server</h3>
-              <p>
-                Connect any MCP client to <code data-sq-native="" data-wrap="">https://developers.teamofsilicons.com/mcp</code> (Streamable HTTP, no sign-in, {RATE_LIMITS.mcp.limit} requests a minute). Its tools only read:
-              </p>
-              <ul className={styles.tools} role="list">
-                <li><code data-sq-native="">search_docs</code>, <code data-sq-native="">read_doc</code>, <code data-sq-native="">list_docs</code>: the docs</li>
-                <li><code data-sq-native="">search_apps</code>, <code data-sq-native="">get_app</code>: the Silicon Apps store</li>
-                <li><code data-sq-native="">check_app_id</code>: is an app ID free</li>
-                <li><code data-sq-native="">check_account_id</code>: is a c:id or si:id free</li>
-              </ul>
-            </div>
-            <div className={styles.mcpCode}>
-              <CodeBlock code={MCP_CODE} lang="sh" meta='title="Search the docs over MCP"' />
-            </div>
           </div>
         </div>
       </section>

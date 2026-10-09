@@ -1,7 +1,7 @@
 /**
  * Next 16 proxy (formerly middleware), run before every page: a fresh CSP nonce per request and the security headers
  * for pages. The API (/v1, /.well-known, /openapi.json), static files and the agent files (llms.txt, robots.txt,
- * sitemap.xml, the web manifest, /mcp) never pass through here: next.config.ts rewrites the API paths to the Rust API
+ * sitemap.xml, the web manifest) never pass through here: next.config.ts rewrites the API paths to the Rust API
  * untouched (Set-Cookie, Location and Origin pass through), and the agent files are route handlers with headers of
  * their own.
  *
@@ -208,7 +208,7 @@ export const config = {
     {
       // Everything except the API (rewritten to the Rust service), Next's static assets, the SDK, public files and the
       // agent files (route handlers with their own headers).
-      source: "/((?!v1/|v1$|\\.well-known/|openapi\\.json|_next/static|_next/image|sdk/|fonts/|favicon\\.ico|icon\\.svg|icon-\\d+\\.png|icon-maskable-\\d+\\.png|apple-touch-icon\\.png|og\\.png|robots\\.txt|sitemap\\.xml|llms\\.txt|llms-full\\.txt|manifest\\.webmanifest|mcp$).*)",
+      source: "/((?!v1/|v1$|\\.well-known/|openapi\\.json|_next/static|_next/image|sdk/|fonts/|favicon\\.ico|icon\\.svg|icon-\\d+\\.png|icon-maskable-\\d+\\.png|apple-touch-icon\\.png|og\\.png|robots\\.txt|sitemap\\.xml|llms\\.txt|llms-full\\.txt|manifest\\.webmanifest).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

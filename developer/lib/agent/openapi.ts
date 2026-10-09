@@ -1,10 +1,9 @@
 /**
- * /openapi.json: OpenAPI 3.1 for this site's own public endpoints: the docs JSON API, the MCP endpoint, the status of
- * every service (/status.json) and the agent files. The Silicon Accounts and Silicon Apps APIs describe themselves;
+ * /openapi.json: OpenAPI 3.1 for this site's own public endpoints: the docs JSON API, the status of every service
+ * (/status.json) and the agent files. The Silicon Accounts and Silicon Apps APIs describe themselves;
  * `x-related-apis` links their descriptions. The code is open source under MIT, like Silicon Accounts and Silicon Apps.
  */
 import { KIND_KEYS, MAX_LIMIT, MAX_QUERY, PRODUCT_KEYS } from "@/lib/docs/api-constants";
-import { SUPPORTED_VERSIONS } from "@/lib/mcp/protocol";
 import { CANONICAL_ORIGIN, LINKS, ORGANIZATION, RATE_LIMITS, SITE_NAME } from "@/lib/site";
 import { STATUS_CACHE_SECONDS, STATUS_TIMEOUT_MS } from "@/lib/status";
 
@@ -31,11 +30,11 @@ export function openApi() {
     info: {
       title: `${SITE_NAME} API`,
       version: "1.0.0",
-      summary: "Search and read the Silicon Apps and Silicon Accounts docs, and reach the platform's MCP server.",
+      summary: "Search and read the Silicon Apps and Silicon Accounts docs.",
       description: [
         "The public API of developers.teamofsilicons.com. Every endpoint is a read and needs no sign-in.",
         "",
-        `Rate limits: the docs API allows ${RATE_LIMITS.api.limit} requests and /mcp ${RATE_LIMITS.mcp.limit} requests every ${RATE_LIMITS.api.windowSeconds} seconds from one client address. Every answer carries RateLimit-Limit, RateLimit-Remaining and RateLimit-Reset; a request over the limit gets 429 with Retry-After.`,
+        `Rate limits: the docs API allows ${RATE_LIMITS.api.limit} requests every ${RATE_LIMITS.api.windowSeconds} seconds from one client address. Every answer carries RateLimit-Limit, RateLimit-Remaining and RateLimit-Reset; a request over the limit gets 429 with Retry-After.`,
         "",
         "Errors are JSON: {\"error\": {\"code\", \"message\", \"hint\"}}. The code is stable, the message says what happened, the hint says what to do.",
         "",
@@ -60,7 +59,6 @@ export function openApi() {
     "x-source": [LINKS.accountsGithub, LINKS.appsGithub],
     tags: [
       { name: "Docs", description: "The developer docs as JSON." },
-      { name: "MCP", description: "The Model Context Protocol server." },
       { name: "Status", description: "Whether Silicon Accounts, Silicon Apps and this site are up right now." },
       { name: "Agent files", description: "Text and JSON files for agents and crawlers." },
     ],
@@ -121,22 +119,6 @@ export function openApi() {
           operationId: "docsApiIndex",
           summary: "What the docs API offers",
           responses: { "200": { description: "The endpoints, with links.", headers: rateHeaders, content: json({ type: "object" }) }, ...errors },
-        },
-      },
-      "/mcp": {
-        post: {
-          tags: ["MCP"],
-          operationId: "mcp",
-          summary: "MCP server (Streamable HTTP)",
-          description: `Stateless MCP over Streamable HTTP. Protocol versions ${SUPPORTED_VERSIONS.join(", ")}. Methods: initialize, ping, tools/list, tools/call. Tools: search_docs, read_doc, list_docs, search_apps, get_app, check_app_id, check_account_id (all read-only). Answers are JSON, or a one-event SSE stream when Accept names only text/event-stream. Notifications get 202. GET answers 405: the server opens no stream of its own.`,
-          parameters: [{ name: "MCP-Protocol-Version", in: "header", required: false, schema: { type: "string", enum: [...SUPPORTED_VERSIONS] } }],
-          requestBody: { required: true, content: json({ oneOf: [ref("JsonRpcRequest"), { type: "array", items: ref("JsonRpcRequest"), maxItems: 32 }] }) },
-          responses: {
-            "200": { description: "The JSON-RPC answer.", headers: rateHeaders, content: { ...json({ oneOf: [ref("JsonRpcResponse"), { type: "array", items: ref("JsonRpcResponse") }] }), "text/event-stream": { schema: { type: "string" } } } },
-            "202": { description: "Accepted: the body held only notifications or responses." },
-            "400": { description: "Not JSON, not JSON-RPC, or an unsupported MCP-Protocol-Version.", content: json(ref("JsonRpcResponse")) },
-            "429": { description: "Too many requests from this address.", headers: { "Retry-After": { $ref: "#/components/headers/Retry-After" }, ...rateHeaders }, content: json(ref("JsonRpcResponse")) },
-          },
         },
       },
       "/status.json": {
@@ -290,21 +272,6 @@ export function openApi() {
             timeout_ms: { type: "integer", examples: [STATUS_TIMEOUT_MS] },
             services: { type: "array", items: ref("ServiceStatus") },
             not_published_yet: { type: "array", items: { type: "string" }, description: "What we do not publish yet, in plain words (no SLA, no incident history)." },
-          },
-        },
-        JsonRpcRequest: {
-          type: "object",
-          required: ["jsonrpc", "method"],
-          properties: { jsonrpc: { const: "2.0" }, id: { type: ["string", "integer", "null"] }, method: { type: "string", examples: ["initialize", "tools/list", "tools/call"] }, params: { type: "object" } },
-        },
-        JsonRpcResponse: {
-          type: "object",
-          required: ["jsonrpc", "id"],
-          properties: {
-            jsonrpc: { const: "2.0" },
-            id: { type: ["string", "integer", "null"] },
-            result: { type: "object" },
-            error: { type: "object", required: ["code", "message"], properties: { code: { type: "integer" }, message: { type: "string" }, data: {} } },
           },
         },
       },

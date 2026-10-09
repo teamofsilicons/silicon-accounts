@@ -89,7 +89,6 @@ You sign in with Google, Apple, or a code by email or phone. No passwords to rem
 
 - The Accounts API: `https://accounts.teamofsilicons.com/v1`. Spec: https://accounts.teamofsilicons.com/openapi.json
 - OpenID Connect discovery: https://accounts.teamofsilicons.com/.well-known/openid-configuration
-- MCP: `https://accounts.teamofsilicons.com/mcp`
 - Agent card: https://accounts.teamofsilicons.com/.well-known/agent.json
 
 Errors always say exactly what went wrong: `{"error": {"code", "message", "hint"}}`. Too many requests get `429` with `Retry-After`.

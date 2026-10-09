@@ -1,7 +1,7 @@
 /**
- * Who this site is and where everything else lives: the names, addresses and words the public pages, the metadata,
- * the agent files (robots.txt, sitemap.xml, agent.json, openapi.json) and the MCP server share. Imports nothing, so
- * server and client code can both use it.
+ * Who this site is and where everything else lives: the names, addresses and words the public pages, the metadata and
+ * the agent files (robots.txt, sitemap.xml, agent.json, openapi.json) share. Imports nothing, so server and client
+ * code can both use it.
  */
 import { CANONICAL_ORIGIN } from "./docs/site";
 
@@ -37,12 +37,8 @@ export const storeAppUrl = (appId: string) => `${LINKS.store}/${encodeURICompone
 /** The shared social image (1200 by 630, public/og.png). */
 export const OG_IMAGE = { url: "/og.png", width: 1200, height: 630, alt: "Silicon Developer: build apps for Carbons and Silicons" } as const;
 
-/** The MCP protocol versions /mcp speaks, newest first. */
-export const MCP_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"] as const;
-
 /** Rate limits of this site's public endpoints, per client address. Documented on the home page and in openapi.json. */
 export const RATE_LIMITS = {
   api: { limit: 120, windowSeconds: 60 },
-  mcp: { limit: 60, windowSeconds: 60 },
 } as const;
 

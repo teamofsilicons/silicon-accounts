@@ -16,9 +16,9 @@ pnpm typecheck      # next typegen + tsc --noEmit
 pnpm lint           # eslint, zero warnings
 pnpm build          # next build (output: standalone)
 pnpm start          # the production build on $PORT (8600)
-pnpm test           # unit tests: sealing, return paths, both proxy allowlists, flows, agent files, MCP, rate limits
+pnpm test           # unit tests: sealing, return paths, both proxy allowlists, flows, agent files, rate limits
 pnpm exec playwright install chromium
-pnpm test:e2e       # portal, publishing, docs, home page, agent files, JSON API and MCP (E2E_PORT, default 8620)
+pnpm test:e2e       # portal, publishing, docs, home page, agent files and JSON API (E2E_PORT, default 8620)
 pnpm test:production-routing # after pnpm build: standalone routing with Caddy HTTPS headers
 ```
 
@@ -146,7 +146,7 @@ checking pages with curl or a browser without the hosted sign-in.
 | Unified docs | public `/docs`, `/docs/apps/**`, `/docs/accounts/**`, `/docs/search` | `components/docs/`, `lib/docs/`, `app/(public)/docs/` |
 | Agent files | `/llms.txt`, `/llms-full.txt`, `/robots.txt`, `/sitemap.xml`, `/.well-known/agent.json`, `/.well-known/security.txt`, `/openapi.json`, `/manifest.webmanifest` | `app/<file>/route.ts`, `lib/agent/`, `llms/` (the Carbon's own text) |
 | Status | public `/status` and its JSON twin `/status.json` | `app/(public)/status/`, `app/status.json/`, `components/status/`, `lib/status.ts` |
-| Public JSON API and MCP | `/api/docs`, `/api/docs/search`, `/api/docs/pages`, `/api/docs/pages/{product}/{path}`, `/mcp` | `app/api/docs/`, `app/mcp/`, `lib/docs/api.ts`, `lib/mcp/`, `lib/server/rate-limit.ts` |
+| Public JSON API | `/api/docs`, `/api/docs/search`, `/api/docs/pages`, `/api/docs/pages/{product}/{path}` | `app/api/docs/`, `lib/docs/api.ts`, `lib/server/rate-limit.ts` |
 | Copied from `web/` and adapted | Arc UI, the foundation (layout, branding runtime, squircles, theme, providers), the API client and hooks | `components/arc/`, `components/foundation/`, `lib/` |
 
 The copied parts started as `web/`'s and are now this app's own: change them here, with the same rules (squircles,
@@ -190,13 +190,10 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
 - **For Silicons.** `/api/docs/search?q=&product=apps|accounts&kind=start|learn|reference|overview&limit=`,
   `/api/docs/pages?product=&kind=` and `/api/docs/pages/{product}/{path}` answer JSON with errors as
   `{"error": {"code", "message", "hint"}}`, described by `/openapi.json` (which links the Accounts and Apps APIs'
-  own descriptions). `/mcp` is a stateless MCP server over Streamable HTTP (protocol 2025-06-18; `initialize`, `ping`,
-  `tools/list`, `tools/call`; JSON, or a one-event SSE stream when the client accepts only `text/event-stream`; GET is
-  405) with seven read-only tools: `search_docs`, `read_doc`, `list_docs`, `search_apps`, `get_app` and `check_app_id`
-  (the Apps API at `APPS_API_URL`, public reads) and `check_account_id` (the Accounts API at `ACCOUNTS_API_URL`).
-  `/.well-known/agent.json` is the A2A card.
-- **Rate limits** (`lib/site.ts`, `lib/server/rate-limit.ts`): 120 requests a minute to the docs API and 60 to `/mcp` per
-  client address (the first `X-Forwarded-For` entry, which Caddy sets), in this process's memory; every answer carries
+  own descriptions). `/.well-known/agent.json` is the A2A card: its skills are those three reads, and it links the
+  rest. The site runs no MCP server: `/mcp` is a plain 404.
+- **Rate limits** (`lib/site.ts`, `lib/server/rate-limit.ts`): 120 requests a minute to the docs API per client
+  address (the first `X-Forwarded-For` entry, which Caddy sets), in this process's memory; every answer carries
   `RateLimit-*` headers and a refused one is 429 with `Retry-After`.
 - **Status** (`lib/status.ts`): `/status` (server-rendered, no script of its own) and `/status.json` say whether Silicon
   Accounts (`/readyz` and `/v1/meta` on `https://accounts.teamofsilicons.com`), Silicon Apps (`/health` on
@@ -206,7 +203,7 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
   SLA and no incident history are published yet, and the page says so. Linked from the footer, the sitemap, robots.txt,
   the agent card and openapi.json.
 - **robots.txt** opens everything public to every crawler, names the answer-engine and agent crawlers, and keeps out `/api/`, `/auth/`,
-  `/mcp`, the portal's pages, `/sign-in` and the search results. **sitemap.xml** lists the home page, every docs page and
+  the portal's pages, `/sign-in` and the search results. **sitemap.xml** lists the home page, every docs page and
   group, and the two llms files, with `lastmod`.
 
 ## The app's tabs

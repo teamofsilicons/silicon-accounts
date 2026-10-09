@@ -105,7 +105,7 @@ ul.featuresCompact { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-to
 .panel { --sq-r: var(--radius-panel); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; align-content: start; gap: var(--space-4); border: 1px solid var(--sq-stroke); padding: var(--space-6) var(--space-6) var(--space-8); background: var(--sq-fill); }
 .panelTitle { display: flex; align-items: flex-start; gap: 10px; margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: 1.375rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
 /* Icons in titles that may wrap sit on the first line, centred on it (an 18 px icon in a 1.2em line). */
-.panelTitle svg, .mcpTitle svg, .closingOptionTitle svg { flex: none; margin-top: calc((1.2em - 18px) / 2); }
+.panelTitle svg, .closingOptionTitle svg { flex: none; margin-top: calc((1.2em - 18px) / 2); }
 .panelTitle svg { color: var(--accent-ink); }
 .panelText { margin: 0; color: var(--text-secondary); line-height: 1.65; }
 .panelNote { margin: 0; border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); color: var(--text-muted); font-size: var(--text-sm); line-height: 1.6; }
@@ -123,13 +123,6 @@ ul.featuresCompact { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-to
 ul.agentList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) var(--space-8); margin: 0; padding: 0; list-style: none; }
 .agentList li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: var(--space-3); color: var(--text-secondary); line-height: 1.6; }
 .agentList svg { margin-top: 3px; color: var(--accent-ink); }
-.mcp { --sq-r: var(--radius-surface); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: var(--space-8); margin-top: clamp(32px, 4vw, 48px); border: 1px solid var(--sq-stroke); padding: clamp(20px, 3vw, 36px); background: var(--sq-fill); scroll-margin-top: 80px; }
-.mcpCopy { display: grid; gap: var(--space-3); min-width: 0; }
-.mcpCopy p { margin: 0; color: var(--text-secondary); line-height: 1.65; }
-.mcpTitle { display: flex; align-items: flex-start; gap: 10px; margin: 0; font-family: var(--font-display); font-size: 1.375rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
-.mcpTitle svg { color: var(--accent-ink); }
-.tools { display: grid; gap: 6px; margin: 0; padding: 0; color: var(--text-secondary); list-style: none; }
-.mcpCode { min-width: 0; }
 
 /* The hero's illustration: a Carbon's card and their Silicon's, joined by the custodian line (identity-art.tsx). */
 .art { position: relative; display: grid; min-width: 0; max-width: 520px; justify-self: center; width: 100%; padding-block: var(--space-4); }
@@ -272,7 +265,6 @@ ul.notes { display: grid; gap: var(--space-2); margin: var(--space-1) 0 0; paddi
   .heroTitle { max-width: 16ch; }
   .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   ul.featuresCompact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .mcp { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 719px) {
   .split, ul.agentList, .closingGrid { grid-template-columns: minmax(0, 1fr); }

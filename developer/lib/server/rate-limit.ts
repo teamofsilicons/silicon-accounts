@@ -1,7 +1,7 @@
 /**
- * Rate limits for this site's public endpoints (the docs JSON API and the MCP server), per client address and per
- * bucket, in fixed one-minute windows held in this process's memory (the site runs as one instance). Every answer
- * carries RateLimit-Limit, RateLimit-Remaining and RateLimit-Reset; one over the limit is 429 with Retry-After and a
+ * Rate limits for this site's public endpoints (the docs JSON API), per client address and per bucket, in fixed
+ * one-minute windows held in this process's memory (the site runs as one instance). Every answer carries
+ * RateLimit-Limit, RateLimit-Remaining and RateLimit-Reset; one over the limit is 429 with Retry-After and a
  * structured error. The limits are in lib/site.ts and documented on the home page and in /openapi.json.
  *
  * The client address is the first X-Forwarded-For entry: Caddy, in front of the site, sets it from the connection

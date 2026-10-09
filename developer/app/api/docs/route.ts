@@ -14,7 +14,6 @@ export function GET(request: Request) {
         pages: "/api/docs/pages?product={apps|accounts}&kind={start|learn|reference|overview}",
         page: "/api/docs/pages/{product}/{path}",
       },
-      mcp: "/mcp",
       rate_limit: { requests: RATE_LIMITS.api.limit, window_seconds: RATE_LIMITS.api.windowSeconds, per: "client address" },
     },
   }));

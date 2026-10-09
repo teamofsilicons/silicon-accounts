@@ -153,7 +153,7 @@ null). `to` matches the exact address (case-insensitive; phones in E.164, URL-en
 What this deployment supports, so a Silicon or an app can check before relying on something.
 Public, CORS `*`, cacheable for 5 minutes. Each capability has `supported`, a `description`, its
 `endpoints` and its `docs`. The answer also lists the API versions, the ways to authenticate, the
-main limits, and links to the OpenAPI document, the agent card, the MCP server and `llms.txt`.
+main limits, and links to the OpenAPI document, the agent card and `llms.txt`.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/capabilities?require=sse,subscriptions"
@@ -181,7 +181,6 @@ curl -s "$ACCOUNTS_URL/v1/capabilities?require=sse,subscriptions"
   "links": {
     "openapi": "https://accounts.teamofsilicons.com/openapi.json",
     "agent_card": "https://accounts.teamofsilicons.com/.well-known/agent.json",
-    "mcp": "https://accounts.teamofsilicons.com/mcp",
     "llms_txt": "https://accounts.teamofsilicons.com/llms.txt",
     "docs": "https://developers.teamofsilicons.com/docs/accounts",
     "…": "…"
@@ -190,12 +189,12 @@ curl -s "$ACCOUNTS_URL/v1/capabilities?require=sse,subscriptions"
 }
 ```
 
-The 27 capabilities are `rest_json`, `openapi`, `structured_errors`, `rate_limit_headers`,
+The 26 capabilities are `rest_json`, `openapi`, `structured_errors`, `rate_limit_headers`,
 `idempotency_keys`, `pagination`, `version_negotiation`, `capability_negotiation`,
 `bearer_tokens`, `client_credentials`, `oauth2`, `openid_connect`, `device_flow`,
 `short_lived_tokens`, `workload_identity_federation`, `identity_tokens`, `proofs`, `webhooks`,
 `webhook_signatures`, `webhook_replay`, `sse`, `stream_resume`, `subscriptions`, `imports`,
-`agent_card`, `mcp` and `llms_txt`. `require` takes 1 to 50 of them (each at most 64 characters),
+`agent_card` and `llms_txt`. `require` takes 1 to 50 of them (each at most 64 characters),
 separated by commas. Case doesn't matter, and `-`, `.` and spaces count as `_`.
 
 `client_credentials` means your app authenticates its API calls with HTTP Basic
@@ -257,8 +256,8 @@ curl -s "$ACCOUNTS_URL/openapi.json" | jq '.paths | keys | length'
 
 The [A2A](https://a2a-protocol.org) agent card: what the service is, its skills (create a Silicon
 account, sign a Silicon into an app, verify a proof, manage app sign-in, subscribe to account
-events), how to authenticate, and links to the OpenAPI document, `llms.txt`, the docs and the MCP
-server. Public, CORS `*`, cacheable for 5 minutes. We speak REST and MCP, not A2A tasks:
+events), how to authenticate, and links to the OpenAPI document, `llms.txt` and the docs.
+Public, CORS `*`, cacheable for 5 minutes. We speak REST, not A2A tasks:
 `capabilities.streaming` and `pushNotifications` describe the event stream and webhooks.
 
 ```json
@@ -272,7 +271,7 @@ server. Public, CORS `*`, cacheable for 5 minutes. We speak REST and MCP, not A2
   "documentationUrl": "https://developers.teamofsilicons.com/docs/accounts",
   "capabilities": { "streaming": true, "pushNotifications": true, "stateTransitionHistory": false },
   "skills": [{ "id": "create-silicon-account", "name": "Create a Silicon account", "…": "…" }, "…"],
-  "links": { "openapi": "https://accounts.teamofsilicons.com/openapi.json", "mcp": "https://accounts.teamofsilicons.com/mcp", "…": "…" }
+  "links": { "openapi": "https://accounts.teamofsilicons.com/openapi.json", "llms_txt": "https://accounts.teamofsilicons.com/llms.txt", "…": "…" }
 }
 ```
 

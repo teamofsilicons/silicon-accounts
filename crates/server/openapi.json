@@ -239,7 +239,7 @@
             "name": "require",
             "in": "query",
             "required": false,
-            "description": "Comma-separated capability names that must be supported, like `sse,subscriptions,webhooks`. Known names: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, mcp, llms_txt. Aliases are accepted too, such as `event_stream`, `event_streaming`, `events_stream`, `server_sent_events` and `streaming` for `sse`.",
+            "description": "Comma-separated capability names that must be supported, like `sse,subscriptions,webhooks`. Known names: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, llms_txt. Aliases are accepted too, such as `event_stream`, `event_streaming`, `events_stream`, `server_sent_events` and `streaming` for `sse`.",
             "schema": {
               "type": "string"
             }
@@ -25599,7 +25599,7 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/Capability"
             },
-            "description": "Keyed by capability name: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, mcp, llms_txt."
+            "description": "Keyed by capability name: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, llms_txt."
           },
           "auth_methods": {
             "type": "array",
@@ -25635,10 +25635,6 @@
                 "format": "uri"
               },
               "agent_card": {
-                "type": "string",
-                "format": "uri"
-              },
-              "mcp": {
                 "type": "string",
                 "format": "uri"
               },

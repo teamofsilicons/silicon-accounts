@@ -9,7 +9,8 @@ import { join } from "node:path";
 /**
  * The deployed entry point (`.next/standalone/server.js`) behind Caddy's HTTPS forwarding headers: internal rewrites,
  * like the signed-out `/` to `/landing`, must stay on the local listener. `next start` doesn't show the bug this guards.
- * Run after `pnpm build` with `pnpm test:production-routing`.
+ * It also checks that /mcp is gone (404: the site runs no MCP server). Run after `pnpm build` with
+ * `pnpm test:production-routing`.
  */
 test("standalone routing stays internal behind Caddy HTTPS forwarding", { timeout: 60_000 }, async () => {
   const reservation = createServer();
@@ -50,6 +51,20 @@ test("standalone routing stays internal behind Caddy HTTPS forwarding", { timeou
         const response = await fetch(`${origin}${path}`, { headers, signal: AbortSignal.timeout(10_000) });
         assert.equal(response.status, 200, `${path} forwarded=${forwarded}: ${diagnostics}`);
         if (path === "/sign-in") assert.doesNotMatch(await response.text(), /modelContext|webmcp/i, "/sign-in registers no tools in the browser");
+      }
+      // The site runs no MCP server: /mcp is an unknown path, for an MCP client's POST as much as for a browser.
+      const initialize = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } } });
+      for (const method of ["GET", "POST"]) {
+        const post = method === "POST";
+        const response = await fetch(`${origin}/mcp`, {
+          method,
+          headers: post ? { ...headers, "Content-Type": "application/json", Accept: "application/json, text/event-stream" } : headers,
+          body: post ? initialize : undefined,
+          signal: AbortSignal.timeout(10_000),
+        });
+        const text = await response.text();
+        assert.equal(response.status, 404, `${method} /mcp forwarded=${forwarded}: ${diagnostics}`);
+        assert.doesNotMatch(text, /"jsonrpc"/, `${method} /mcp answers no JSON-RPC`);
       }
     }
   } finally {

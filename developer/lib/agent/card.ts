@@ -1,32 +1,45 @@
 /**
- * /.well-known/agent.json: the A2A agent card of the developer platform. Its skills are the MCP server's tools (served
- * at /mcp over Streamable HTTP, declared as an extension of the card), and it links everything else an agent needs:
- * the docs and their agent files, this site's JSON API and OpenAPI description, the status page and its JSON twin, and
- * the Silicon Accounts and Silicon Apps APIs with their own OpenAPI descriptions.
+ * /.well-known/agent.json: the A2A agent card of the developer platform. Its skills are the docs JSON API's reads
+ * (described in /openapi.json), and it links everything else an agent needs: the docs and their agent files, the
+ * status page and its JSON twin, and the Silicon Accounts and Silicon Apps APIs with their own OpenAPI descriptions.
  */
 import "server-only";
-import { TOOLS } from "@/lib/mcp/tools";
 import { CANONICAL_ORIGIN, LINKS, ORGANIZATION, RATE_LIMITS, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
-import { SUPPORTED_VERSIONS } from "@/lib/mcp/protocol";
 import { STATUS_CACHE_SECONDS, STATUS_TIMEOUT_MS } from "@/lib/status";
 
-const SKILL_DETAILS: Record<string, { tags: string[]; examples: string[] }> = {
-  search_docs: { tags: ["docs", "search", "silicon-apps", "silicon-accounts"], examples: ["How do I publish an app?", "What does invalid_grant mean?", "How does a Silicon sign in to my app?"] },
-  read_doc: { tags: ["docs", "markdown"], examples: ["Read apps/start/publish", "Read accounts/reference/errors"] },
-  list_docs: { tags: ["docs", "index"], examples: ["List the Silicon Accounts reference pages"] },
-  search_apps: { tags: ["apps", "store", "search"], examples: ["Find a file storage app", "Which apps can send notifications?"] },
-  get_app: { tags: ["apps", "store"], examples: ["Show the app silicon-accounts"] },
-  check_app_id: { tags: ["apps", "availability"], examples: ["Is the app ID ring free?"] },
-  check_account_id: { tags: ["accounts", "availability", "identity"], examples: ["Can I take si:head_of_growth?"] },
-};
+const SKILLS = [
+  {
+    id: "search-docs",
+    name: "Search the docs",
+    description: `Search the Silicon Apps and Silicon Accounts developer docs (GET ${CANONICAL_ORIGIN}/api/docs/search?q=, with optional product, kind and limit). Returns ranked pages and sections with their URLs, Markdown URLs and a snippet.`,
+    tags: ["docs", "search", "silicon-apps", "silicon-accounts"],
+    examples: ["How do I publish an app?", "What does invalid_grant mean?", "How does a Silicon sign in to my app?"],
+    outputModes: ["application/json"],
+  },
+  {
+    id: "read-doc",
+    name: "Read a docs page",
+    description: `Read one docs page with its Markdown as written, headings and related pages (GET ${CANONICAL_ORIGIN}/api/docs/pages/{product}/{path}). Every page is also plain Markdown at its address plus .md.`,
+    tags: ["docs", "markdown"],
+    examples: ["Read apps/start/publish", "Read accounts/reference/errors"],
+    outputModes: ["application/json", "text/markdown"],
+  },
+  {
+    id: "list-docs",
+    name: "List the docs pages",
+    description: `List every docs page in reading order, optionally only one product or kind (GET ${CANONICAL_ORIGIN}/api/docs/pages).`,
+    tags: ["docs", "index"],
+    examples: ["List the Silicon Accounts reference pages"],
+    outputModes: ["application/json"],
+  },
+];
 
 export function agentCard() {
   return {
     protocolVersion: "0.3.0",
     name: SITE_NAME,
-    description: `${SITE_DESCRIPTION} Search and read the developer docs, find apps in the Silicon Apps store, and check app IDs and Carbon or Silicon IDs before you take them.`,
-    url: `${CANONICAL_ORIGIN}/mcp`,
-    preferredTransport: "JSONRPC",
+    description: `${SITE_DESCRIPTION} Search and read the developer docs as JSON, and find the Silicon Accounts and Silicon Apps APIs. We speak REST (described at ${CANONICAL_ORIGIN}/openapi.json), not A2A tasks.`,
+    url: CANONICAL_ORIGIN,
     provider: { organization: ORGANIZATION.name, url: ORGANIZATION.url },
     iconUrl: `${CANONICAL_ORIGIN}/icon-512.png`,
     version: "1.0.0",
@@ -36,16 +49,6 @@ export function agentCard() {
       pushNotifications: false,
       stateTransitionHistory: false,
       extensions: [
-        {
-          uri: "https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http",
-          description: "The skills below are MCP tools. Call them at the card's url with MCP over Streamable HTTP: stateless JSON-RPC 2.0 over POST (initialize, tools/list, tools/call, ping).",
-          required: false,
-          params: {
-            endpoint: `${CANONICAL_ORIGIN}/mcp`,
-            protocolVersions: [...SUPPORTED_VERSIONS],
-            rateLimit: { requests: RATE_LIMITS.mcp.limit, windowSeconds: RATE_LIMITS.mcp.windowSeconds, per: "client address" },
-          },
-        },
         {
           uri: `${CANONICAL_ORIGIN}/openapi.json`,
           description: "Everything else this platform offers to agents: the docs as text and JSON, whether every service is up (/status and /status.json), and the Silicon Accounts and Silicon Apps APIs, each with its OpenAPI description.",
@@ -70,15 +73,7 @@ export function agentCard() {
     security: [],
     defaultInputModes: ["application/json", "text/plain"],
     defaultOutputModes: ["application/json", "text/markdown", "text/plain"],
-    skills: TOOLS.map(tool => ({
-      id: tool.definition.name,
-      name: tool.definition.title,
-      description: tool.definition.description,
-      tags: SKILL_DETAILS[tool.definition.name]?.tags ?? [],
-      examples: SKILL_DETAILS[tool.definition.name]?.examples ?? [],
-      inputModes: ["application/json"],
-      outputModes: tool.definition.name === "read_doc" ? ["text/markdown", "application/json"] : ["application/json"],
-    })),
+    skills: SKILLS.map(skill => ({ ...skill, inputModes: ["application/json"] })),
     supportsAuthenticatedExtendedCard: false,
   };
 }

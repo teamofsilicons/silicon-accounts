@@ -98,7 +98,7 @@ export function DocsSearchPage({ query: rawQuery, product: rawProduct, kind: raw
           </section>
         )}
         <p className={styles.note}>
-          Agents can search the same way with <a href="/api/docs/search?q=publish">/api/docs/search</a> or the <code>search_docs</code> tool of the <a href="/#mcp">MCP server</a>.
+          Agents can search the same way with <a href="/api/docs/search?q=publish">/api/docs/search</a>.
         </p>
       </article>
     </div>

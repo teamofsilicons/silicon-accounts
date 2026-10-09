@@ -1,8 +1,7 @@
 /**
  * The account site's agent entry points: the hand-written llms files bundled as written, robots.txt and sitemap.xml,
- * the MCP protocol (lib/mcp/protocol.ts, the tools get the caller's context), the rate limit, the steps the MCP server
- * gives a Silicon, no tools registered in the browser, and the docs topics. The tools themselves call the API and are
- * walked against a running stack (README.md, "Agent files").
+ * no MCP server (no /mcp route, nothing that advertises one) and no tools registered in the browser. Production's
+ * answer to /mcp (404) is checked by tests-production/routing.test.ts.
  *
  *   web/node_modules/.bin/tsx --test web/tests/agent.test.ts
  */
@@ -12,10 +11,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { AI_CRAWLERS, DISALLOWED, robotsTxt } from "../lib/agent/robots";
 import { sitemapEntries, sitemapXml } from "../lib/agent/sitemap";
 import { LLMS_FULL_TXT, LLMS_TXT } from "../lib/agent/generated/llms";
-import { LATEST_VERSION, handleBody, negotiateVersion, toolError, toolResult, type Tool, type ToolContext } from "../lib/mcp/protocol";
-import { rateLimit, resetRateLimits } from "../lib/server/rate-limit";
 import { hasSessionCookie } from "../lib/server/session";
-import { DOCS_TOPICS, matchTopic, siliconAccountSteps } from "../lib/site";
 
 test("llms.txt and llms-full.txt are bundled exactly as the Carbon wrote them", () => {
   assert.equal(LLMS_TXT, existsSync("llms/llms.md") ? readFileSync("llms/llms.md", "utf8") : null);
@@ -27,12 +23,13 @@ test("robots.txt welcomes crawlers to public pages, names AI crawlers, keeps pri
   for (const agent of [...AI_CRAWLERS, "*"]) assert.match(robots, new RegExp(`^User-agent: ${agent.replace("*", "\\*")}$`, "m"));
   assert.match(robots, /^Allow: \/$/m);
   for (const path of DISALLOWED) assert.match(robots, new RegExp(`^Disallow: ${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
-  for (const path of ["/apps", "/silicons", "/proofs", "/settings", "/sign-in", "/authorize", "/device", "/embed/", "/v1/", "/mcp"]) assert.ok(DISALLOWED.includes(path), path);
+  for (const path of ["/apps", "/silicons", "/proofs", "/settings", "/sign-in", "/authorize", "/device", "/embed/", "/v1/"]) assert.ok(DISALLOWED.includes(path), path);
   // The public documents agents need stay open.
   for (const open of ["/llms.txt", "/llms-full.txt", "/openapi.json", "/.well-known/", "/sitemap.xml"]) {
     assert.ok(!DISALLOWED.some(path => open.startsWith(path)), open);
   }
   assert.doesNotMatch(robots, /^Disallow: \/$/m);
+  assert.doesNotMatch(robots, /\/mcp\b|\bMCP\b/, "robots.txt has no rule or comment about an MCP server");
   assert.match(robots, /^Sitemap: https:\/\/accounts\.teamofsilicons\.com\/sitemap\.xml$/m);
 });
 
@@ -43,57 +40,6 @@ test("sitemap.xml lists the landing page and the agent files on the canonical or
   assert.equal((xml.match(/<url>/g) ?? []).length, (xml.match(/<\/url>/g) ?? []).length);
   for (const [, loc] of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) assert.match(loc!, /^https:\/\/accounts\.teamofsilicons\.com\//);
   for (const [, date] of xml.matchAll(/<lastmod>([^<]+)<\/lastmod>/g)) assert.ok(!Number.isNaN(Date.parse(date!)), date);
-});
-
-const SERVER = { name: "test", title: "Test", version: "0.0.0", instructions: "Test server." };
-const seen: ToolContext[] = [];
-const TOOLS: Tool[] = [
-  { definition: { name: "echo", title: "Echo", description: "Echo", inputSchema: { type: "object" } }, call: async (args, context) => (seen.push(context), toolResult({ echoed: args })) },
-  { definition: { name: "fail", title: "Fail", description: "Fail", inputSchema: { type: "object" } }, call: async () => { throw new Error("boom"); } },
-  { definition: { name: "refuse", title: "Refuse", description: "Refuse", inputSchema: { type: "object" } }, call: async () => toolError("nope", "Not possible.", "Ask again.") },
-];
-const ask = async (message: unknown, context: ToolContext = {}) => handleBody(JSON.stringify(message), TOOLS, SERVER, context);
-
-test("MCP: initialize negotiates the protocol version and offers tools", async () => {
-  const answer = (await ask({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26" } })) as { result: { protocolVersion: string; capabilities: { tools: unknown }; instructions: string } };
-  assert.equal(answer.result.protocolVersion, "2025-03-26");
-  assert.ok(answer.result.capabilities.tools);
-  assert.equal(answer.result.instructions, "Test server.");
-  assert.equal(negotiateVersion("1999-01-01"), LATEST_VERSION);
-});
-
-test("MCP: tools/call hands the tool the caller's context; failures are results; JSON-RPC errors", async () => {
-  const echoed = (await ask({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "echo", arguments: { x: 1 } } }, { authorization: "Bearer t", forwardedFor: "198.51.100.7" })) as { result: { structuredContent: unknown } };
-  assert.deepEqual(echoed.result.structuredContent, { echoed: { x: 1 } });
-  assert.deepEqual(seen.at(-1), { authorization: "Bearer t", forwardedFor: "198.51.100.7" });
-  const failed = (await ask({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "fail" } })) as { result: { isError: boolean; content: Array<{ text: string }> } };
-  assert.equal(failed.result.isError, true);
-  assert.match(failed.result.content[0]!.text, /boom/);
-  const refused = (await ask({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "refuse" } })) as { result: { structuredContent: { error: { code: string } } } };
-  assert.equal(refused.result.structuredContent.error.code, "nope");
-  assert.equal(((await ask({ jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "missing" } })) as { error: { code: number } }).error.code, -32602);
-  assert.equal(((await ask({ jsonrpc: "2.0", id: 7, method: "sampling/createMessage" })) as { error: { code: number } }).error.code, -32601);
-  assert.equal(((await handleBody("{oops", TOOLS, SERVER)) as { error: { code: number } }).error.code, -32700);
-  const batch = (await ask([{ jsonrpc: "2.0", method: "notifications/initialized" }, { jsonrpc: "2.0", id: 1, method: "ping" }, { jsonrpc: "2.0", id: 2, method: "tools/list" }])) as Array<{ id: number }>;
-  assert.deepEqual(batch.map(entry => entry.id), [1, 2]);
-});
-
-test("rate limits count per address and bucket, and answer with Retry-After past the limit", () => {
-  resetRateLimits();
-  const request = (address: string) => new Request("http://local/mcp", { method: "POST", headers: { "x-forwarded-for": `${address}, 10.0.0.1` } });
-  const limit = { limit: 3, windowSeconds: 60 };
-  for (let n = 0; n < 3; n++) assert.equal(rateLimit(request("198.51.100.1"), "mcp", limit).ok, true);
-  const refused = rateLimit(request("198.51.100.1"), "mcp", limit);
-  assert.equal(refused.ok, false);
-  assert.ok(Number(refused.headers["Retry-After"]) > 0 && Number(refused.headers["Retry-After"]) <= 60);
-  assert.equal(rateLimit(request("198.51.100.2"), "mcp", limit).ok, true);
-  resetRateLimits();
-});
-
-test("how_to_create_silicon_account's steps: four, with the self-create command", () => {
-  const steps = siliconAccountSteps();
-  assert.equal(steps.steps.length, 4);
-  assert.match(steps.steps[2]!.command, /^silicon-accounts silicon create --self-create --id si:\{your-id\} --custodian /);
 });
 
 test("no page registers tools in the browser: no WebMCP script and no navigator.modelContext anywhere in the site", () => {
@@ -111,12 +57,21 @@ test("no page registers tools in the browser: no WebMCP script and no navigator.
   }
 });
 
-test("docs topics: keys, and free words matched to the closest page", () => {
-  assert.equal(matchTopic("add-sign-in"), "add-sign-in");
-  assert.equal(matchTopic("how do I add sign-in to my app"), "add-sign-in");
-  assert.equal(matchTopic("webhooks"), "webhooks");
-  assert.equal(matchTopic("zzz"), "overview");
-  for (const entry of Object.values(DOCS_TOPICS)) assert.match(entry.path, /^\/docs\/(accounts|apps)(\/|$)/);
+test("the site runs no MCP server: no /mcp route or library, and nothing it serves or links to advertises one", () => {
+  for (const path of ["app/mcp", "lib/mcp", "lib/server/rate-limit.ts"]) assert.equal(existsSync(path), false, path);
+  const sources = ["app", "components", "lib", "styles"].flatMap(dir =>
+    (readdirSync(dir, { recursive: true }) as string[])
+      .filter(file => /\.(ts|tsx|js|mjs|css)$/.test(file) && !file.includes("generated"))
+      .map(file => `${dir}/${file}`),
+  );
+  for (const file of [...sources, "proxy.ts"]) {
+    const text = readFileSync(file, "utf8");
+    assert.doesNotMatch(text, /\/mcp\b|#mcp\b/, file);
+    assert.doesNotMatch(text, /MCP (server|client|endpoint)/i, file);
+  }
+  for (const [name, text] of [["llms.txt", LLMS_TXT], ["llms-full.txt", LLMS_FULL_TXT], ["robots.txt", robotsTxt()], ["sitemap.xml", sitemapXml()]] as const) {
+    if (text !== null) assert.doesNotMatch(text, /\/mcp\b/, name);
+  }
 });
 
 test("a session cookie is recognised by name only", () => {

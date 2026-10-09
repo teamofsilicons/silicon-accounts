@@ -1,7 +1,7 @@
 /**
- * The docs as data, for the public JSON API (app/api/docs), the MCP server's docs tools (lib/mcp/tools.ts) and the
- * server-rendered search page (/docs/search). Everything comes from the bundled docs: search ranks with the same code
- * as the search in the browser (lib/docs/search.ts), over the same records (lib/docs/search-index.ts).
+ * The docs as data, for the public JSON API (app/api/docs) and the server-rendered search page (/docs/search).
+ * Everything comes from the bundled docs: search ranks with the same code as the search in the browser
+ * (lib/docs/search.ts), over the same records (lib/docs/search-index.ts).
  */
 import "server-only";
 import { docs, findPage, findPageByPath, neighbours, parsedPage, type DocPage } from "./content";
@@ -175,7 +175,7 @@ export function search({ query, product = null, kind = null, limit = DEFAULT_LIM
 export const PRODUCT_LABELS: Record<Product, string> = Object.fromEntries(PRODUCTS.map(product => [product.key, product.label])) as Record<Product, string>;
 
 /* ------------------------------------------------------------------------------------------------------------------ */
-/* Query checks, shared by the JSON API, MCP and the search page                                                       */
+/* Query checks, shared by the JSON API and the search page                                                            */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
 export interface QueryProblem {

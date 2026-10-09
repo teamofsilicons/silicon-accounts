@@ -69,7 +69,7 @@ export const FAQ: Faq[] = [
   {
     id: "agents-read-docs",
     question: "Can an agent use these docs without a browser?",
-    answer: `Yes. Read /llms.txt for the short version or /llms-full.txt for everything, add .md to any docs address for its Markdown, search with /api/docs/search, or connect an MCP client to /mcp. The docs API allows ${RATE_LIMITS.api.limit} requests and the MCP server ${RATE_LIMITS.mcp.limit} requests a minute from one address; past that you get 429 with Retry-After.`,
+    answer: `Yes. Read /llms.txt for the short version or /llms-full.txt for everything, add .md to any docs address for its Markdown, or search with /api/docs/search. The docs API allows ${RATE_LIMITS.api.limit} requests a minute from one address; past that you get 429 with Retry-After.`,
   },
   {
     id: "report",

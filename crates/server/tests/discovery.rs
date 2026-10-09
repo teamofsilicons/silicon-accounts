@@ -263,8 +263,10 @@ async fn the_agent_card_describes_the_service() {
     assert_eq!(card["capabilities"]["streaming"], true);
     assert_eq!(card["capabilities"]["pushNotifications"], true);
     assert_eq!(card["links"]["openapi"], format!("{public}/openapi.json"));
-    assert_eq!(card["links"]["mcp"], format!("{public}/mcp"));
     assert_eq!(card["links"]["llms_txt"], format!("{public}/llms.txt"));
+    // There is no MCP server: the card neither links to one nor mentions one (checked on the
+    // whole body below), and /mcp is a 404.
+    assert!(card["links"].get("mcp").is_none(), "{}", card["links"]);
     assert_eq!(
         card["documentationUrl"],
         ctx.state.settings.docs_url.as_str()
@@ -288,6 +290,11 @@ async fn the_agent_card_describes_the_service() {
     );
     let text = String::from_utf8(r.body).expect("utf8");
     assert!(!text.contains('\u{2014}') && !text.contains('\u{2013}'));
+    assert!(!text.to_ascii_lowercase().contains("mcp"), "{text}");
+    for req in [Req::get("/mcp"), Req::post("/mcp")] {
+        let r = send(&ctx, req).await;
+        assert_eq!(r.status, 404, "{}", r.json);
+    }
 }
 
 /// The capability names after `lead` in one OpenAPI description, up to the sentence's end.
@@ -337,7 +344,10 @@ async fn the_openapi_document_names_every_capability() {
         listed.sort_unstable();
         assert_eq!(listed, served, "the {what} description in openapi.json");
     }
-    assert_eq!(served.len(), 27, "{served:?}");
+    assert_eq!(served.len(), 26, "{served:?}");
+    assert!(!served.iter().any(|n| n == "mcp"), "{served:?}");
+    let text = serde_json::to_string(&doc).expect("openapi.json");
+    assert!(!text.to_ascii_lowercase().contains("mcp"));
 }
 
 /// The first string anywhere in `value` that starts with `lead`.
@@ -367,7 +377,6 @@ async fn capabilities_answer_queries_and_negotiate_versions() {
         "version_negotiation",
         "openapi",
         "agent_card",
-        "mcp",
     ] {
         assert_eq!(r.json["capabilities"][name]["supported"], true, "{name}");
         assert!(
@@ -379,6 +388,13 @@ async fn capabilities_answer_queries_and_negotiate_versions() {
     }
     assert_eq!(r.json["limits"]["streams_per_caller"], 5);
     assert!(r.json.get("require").is_none());
+    // There is no MCP server: no capability and no link for one.
+    assert!(r.json["capabilities"].get("mcp").is_none());
+    assert!(r.json["links"].get("mcp").is_none(), "{}", r.json["links"]);
+    let r = send(&ctx, Req::get("/v1/capabilities?require=mcp")).await;
+    assert_eq!(r.status, 422, "{}", r.json);
+    assert_eq!(r.error_code(), Some("capabilities_missing"));
+    assert_eq!(r.json["error"]["details"]["missing"], json!(["mcp"]));
 
     let r = send(
         &ctx,

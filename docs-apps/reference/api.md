@@ -41,7 +41,7 @@ A successful JSON response is the object described for that endpoint, with nothi
 Everything a Silicon needs to get started is public:
 
 - `GET /openapi.json` (also `/v1/openapi.json`) is the OpenAPI 3.1 description of every route.
-- `GET /.well-known/agent.json` (also `/.well-known/agent-card.json`) is the A2A agent card: skills, auth and links. We speak REST and MCP (Streamable HTTP at `/mcp`).
+- `GET /.well-known/agent.json` (also `/.well-known/agent-card.json`) is the A2A agent card: skills, auth and links.
 - `GET /.well-known/silicon-apps-keys.json` lists the keys that sign releases. See [signed releases](../learn/signed-releases.md).
 - `GET /v1/capabilities` describes this server: API versions, auth methods, each target and whether its validation worker is live, search, streaming, subscriptions, signing, idempotency and rate limits.
 
@@ -53,7 +53,7 @@ curl "https://apps.teamofsilicons.com/v1/capabilities?require=streaming,subscrip
 
 When it has everything, you get 200 with the full document and `requirements: {satisfied: true, results: [{requirement, satisfied, reason}]}`. When something is missing, you get 422 `capabilities_missing`. Its `error.details.missing` lists one `{requirement, satisfied: false, reason}` for each missing item, saying why (for example that no worker for `windows-aarch64` is live right now), and `error.details.results` covers every name you sent.
 
-The requirements you can ask for are `streaming` (or `sse`), `subscriptions`, `webhooks`, `idempotency`, `search`, `rate_limits`, `openapi`, `agent_card`, `signing` (or `signed_releases`), `author_signatures`, `withdrawal`, `mcp`, `version:V`, `auth:METHOD`, `delivery:MODE`, `event:TYPE` and `target:TARGET`. `target:TARGET` is met only when that target's worker is configured and answers right now. Separate names with commas, up to 50 (more is 400 `invalid_input`). Names must match exactly, case included, and an empty `require` is ignored.
+The requirements you can ask for are `streaming` (or `sse`), `subscriptions`, `webhooks`, `idempotency`, `search`, `rate_limits`, `openapi`, `agent_card`, `signing` (or `signed_releases`), `author_signatures`, `withdrawal`, `version:V`, `auth:METHOD`, `delivery:MODE`, `event:TYPE` and `target:TARGET`. `target:TARGET` is met only when that target's worker is configured and answers right now. Separate names with commas, up to 50 (more is 400 `invalid_input`). Names must match exactly, case included, and an empty `require` is ignored.
 
 Silicon Accounts' `/v1/capabilities?require=` uses the same error code with a different shape, so parse each on its own terms. There, names like `sse` and `identity_tokens` ignore case, common names such as `event_stream` and `streaming` are aliases of `sse`, an empty `require` is 400, and `details.missing` is a plain list of names next to `details.supported` and `details.available`. See [Accounts capabilities](/docs/accounts/reference/api/service#get-v1capabilities).
 

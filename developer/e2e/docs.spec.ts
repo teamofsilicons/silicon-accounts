@@ -132,14 +132,17 @@ test("the search index and the agent files cover every page, and llms files are 
 test("the agent card, OpenAPI, security.txt and manifest describe the platform", async ({ request }) => {
   const card = await (await request.get("/.well-known/agent.json")).json();
   expect(card.name).toBe("Silicon Developer");
-  expect(card.url).toBe("https://developers.teamofsilicons.com/mcp");
-  expect(card.skills.map((skill: { id: string }) => skill.id)).toEqual(["search_docs", "read_doc", "list_docs", "search_apps", "get_app", "check_app_id", "check_account_id"]);
+  expect(card.url).toBe("https://developers.teamofsilicons.com");
+  expect(card.skills.map((skill: { id: string }) => skill.id)).toEqual(["search-docs", "read-doc", "list-docs"]);
   const links = JSON.stringify(card);
+  expect(links).not.toMatch(/mcp|model context/i);
   for (const url of ["https://accounts.teamofsilicons.com/openapi.json", "https://apps.teamofsilicons.com/openapi.json", "https://developers.teamofsilicons.com/docs", "https://developers.teamofsilicons.com/llms.txt"]) expect(links).toContain(url);
 
   const spec = await (await request.get("/openapi.json")).json();
   expect(spec.openapi).toBe("3.1.0");
-  expect(Object.keys(spec.paths)).toEqual(expect.arrayContaining(["/api/docs/search", "/api/docs/pages", "/api/docs/pages/{product}/{path}", "/mcp"]));
+  expect(Object.keys(spec.paths)).toEqual(expect.arrayContaining(["/api/docs/search", "/api/docs/pages", "/api/docs/pages/{product}/{path}"]));
+  expect(Object.keys(spec.paths)).not.toContain("/mcp");
+  expect(JSON.stringify(spec)).not.toMatch(/mcp|model context/i);
   expect(spec["x-related-apis"].map((api: { openapi: string }) => api.openapi)).toEqual(["https://accounts.teamofsilicons.com/openapi.json", "https://apps.teamofsilicons.com/openapi.json"]);
 
   const security = await request.get("/.well-known/security.txt");
@@ -203,52 +206,24 @@ test("the API rate limit answers 429 with Retry-After and a structured error", a
   expect((await last.json()).error.code).toBe("rate_limited");
 });
 
-test("the MCP server initializes, lists its tools and runs them", async ({ request }) => {
-  const rpc = (body: unknown, headers: Record<string, string> = {}) => request.post("/mcp", { data: body, headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream", ...headers } });
-  const init = await rpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "e2e", version: "1" } } });
-  expect(init.status()).toBe(200);
-  const initBody = await init.json();
-  expect(initBody.result.protocolVersion).toBe("2025-06-18");
-  expect(initBody.result.capabilities.tools).toBeTruthy();
-  expect(initBody.result.serverInfo.name).toBe("silicon-developer");
-  expect((await rpc({ jsonrpc: "2.0", id: 9, method: "initialize", params: { protocolVersion: "1999-01-01" } })).ok()).toBe(true);
-
-  expect((await rpc({ jsonrpc: "2.0", method: "notifications/initialized" }, { "MCP-Protocol-Version": "2025-06-18" })).status()).toBe(202);
-  const tools = await (await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" })).json();
-  expect(tools.result.tools.map((tool: { name: string }) => tool.name)).toEqual(["search_docs", "read_doc", "list_docs", "search_apps", "get_app", "check_app_id", "check_account_id"]);
-  for (const tool of tools.result.tools) expect(tool.inputSchema.type).toBe("object");
-
-  const searched = await (await rpc({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "search_docs", arguments: { query: "publish an app", product: "apps" } } })).json();
-  expect(searched.result.isError).toBeFalsy();
-  expect(searched.result.structuredContent.results[0].product).toBe("apps");
-  const read = await (await rpc({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "read_doc", arguments: { path: "https://developers.teamofsilicons.com/docs/accounts/reference/errors" } } })).json();
-  expect(read.result.content[0].text).toContain("# Errors");
-  const bad = await (await rpc({ jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "read_doc", arguments: { path: "apps/nowhere" } } })).json();
-  expect(bad.result.isError).toBe(true);
-  const unknownTool = await (await rpc({ jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "delete_everything" } })).json();
-  expect(unknownTool.error.code).toBe(-32602);
-  expect((await (await rpc({ jsonrpc: "2.0", id: 7, method: "nope" })).json()).error.code).toBe(-32601);
-  const ping = await (await rpc({ jsonrpc: "2.0", id: 8, method: "ping" })).json();
-  expect(ping.result).toEqual({});
-
-  const sse = await rpc({ jsonrpc: "2.0", id: 10, method: "ping" }, { Accept: "text/event-stream" });
-  expect(sse.headers()["content-type"]).toContain("text/event-stream");
-  expect(await sse.text()).toMatch(/^event: message\ndata: \{"jsonrpc":"2.0","id":10,"result":\{\}\}\n\n$/);
-  const parse = await request.post("/mcp", { data: Buffer.from("{not json"), headers: { "Content-Type": "application/json" } });
-  expect(parse.status()).toBe(400);
-  expect((await parse.json()).error.code).toBe(-32700);
-  const get = await request.get("/mcp");
-  expect(get.status()).toBe(405);
-  expect(get.headers()["allow"]).toContain("POST");
-  const version = await rpc({ jsonrpc: "2.0", id: 11, method: "ping" }, { "MCP-Protocol-Version": "2020-01-01" });
-  expect(version.status()).toBe(400);
+test("the site runs no MCP server: /mcp answers 404 to POST and GET", async ({ request }) => {
+  const rpc = { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "e2e", version: "1" } } };
+  const post = await request.post("/mcp", { data: rpc, headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" } });
+  expect(post.status()).toBe(404);
+  expect(post.headers()["content-type"] ?? "").not.toContain("text/event-stream");
+  expect((await request.get("/mcp")).status()).toBe(404);
+  const docsApi = await (await request.get("/api/docs")).json();
+  expect(JSON.stringify(docsApi)).not.toMatch(/mcp/i);
+  const robots = await (await request.get("/robots.txt")).text();
+  expect(robots).not.toMatch(/mcp/i);
 });
 
 test("the home page is server-rendered, semantic and described for search and agents", async ({ request }) => {
   const response = await request.get("/");
   expect(response.status()).toBe(200);
   const html = await response.text();
-  for (const text of ["Build apps for Carbons and Silicons", "Silicon Apps", "Silicon Accounts", "App verification", "User verification", "Why build on us", "Does a Silicon need a Carbon?", "check_account_id"]) expect(html, text).toContain(text);
+  for (const text of ["Build apps for Carbons and Silicons", "Silicon Apps", "Silicon Accounts", "App verification", "User verification", "Why build on us", "Does a Silicon need a Carbon?", "/api/docs/search"]) expect(html, text).toContain(text);
+  expect(html).not.toMatch(/MCP server|\/mcp\b|#mcp/);
   for (const tag of ["<header", "<nav", "<main", "<section", "<footer", "<h1", "<details"]) expect(html, tag).toContain(tag);
   expect(html.match(/<h1[\s>]/g)?.length).toBe(1);
   for (const meta of ['<link rel="canonical" href="https://developers.teamofsilicons.com"/>', 'property="og:site_name" content="Silicon Developer"', 'property="og:url"', 'property="og:type" content="website"', 'property="og:title"', 'property="og:description"', 'property="og:image" content="https://developers.teamofsilicons.com/og.png"', 'name="twitter:card" content="summary_large_image"', 'content="index, follow"']) expect(html, meta).toContain(meta);

@@ -3,7 +3,6 @@
  * section and its FAQPage JSON-LD. Answers are plain text; `code` in backticks and https:// links are formatted where
  * they are shown.
  */
-import { RATE_LIMITS } from "@/lib/site";
 
 export interface Faq {
   id: string;
@@ -65,7 +64,7 @@ export const FAQ: Faq[] = [
   {
     id: "agents-without-browser",
     question: "Can an agent use this site without a browser?",
-    answer: `Yes. Read /llms.txt, call the API described in /openapi.json, read the agent card at /.well-known/agent.json, or connect an MCP client to /mcp (${RATE_LIMITS.mcp.limit} requests a minute from one address; past that you get 429 with Retry-After). Errors always say what went wrong and how to fix it.`,
+    answer: "Yes. Read /llms.txt, call the API described in /openapi.json, or read the agent card at /.well-known/agent.json. Errors always say what went wrong and how to fix it.",
   },
   {
     id: "open-source",

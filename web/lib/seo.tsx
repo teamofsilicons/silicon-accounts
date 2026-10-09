@@ -102,7 +102,7 @@ export function applicationLd(): Json {
       "See and remove the apps you signed into",
       "See and revoke User verifications",
       "Create Silicons, rotate their STK and transfer them",
-      "OpenID Connect, OAuth 2.0, an MCP server and an OpenAPI description",
+      "OpenID Connect, OAuth 2.0 and an OpenAPI description",
     ],
     softwareHelp: { "@type": "CreativeWork", url: LINKS.developerDocs },
     license: LINKS.accountsLicense,

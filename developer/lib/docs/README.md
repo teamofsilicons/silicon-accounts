@@ -74,7 +74,7 @@ Use the plain, conversational language of the sibling Silicon projects’ unders
 | `lib/docs/content.ts` | the pages in reading order, navigation, previous/next, parsed pages (server only) |
 | `lib/docs/search-index.ts`, `lib/docs/search.ts` | the search index (server) and ranking (browser) |
 | `lib/docs/llms.ts` | `/llms.txt` and `/llms-full.txt` |
-| `lib/docs/api.ts` | the docs as data: search with filters, page lists and pages, for the JSON API, MCP and `/docs/search` |
+| `lib/docs/api.ts` | the docs as data: search with filters, page lists and pages, for the JSON API and `/docs/search` |
 | `components/docs/` | the frame, navigation, search, contents, article, Markdown and code block components |
 | `app/(public)/docs/`, `app/llms.txt/`, `app/llms-full.txt/`, `app/api/docs/` | HTML routes, plain-text exports and the JSON API |
 

@@ -100,8 +100,8 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      // Route handlers (the BFF, the agent files, the JSON API, MCP, /status.json) and static files set their own headers.
-      source: "/((?!api/|auth/|mcp|\\.well-known/|_next/static|_next/image|fonts/|favicon\\.ico|icon|apple-touch-icon|og\\.png|robots\\.txt|sitemap\\.xml|llms|openapi\\.json|status\\.json|manifest\\.webmanifest).*)",
+      // Route handlers (the BFF, the agent files, the JSON API, /status.json) and static files set their own headers.
+      source: "/((?!api/|auth/|\\.well-known/|_next/static|_next/image|fonts/|favicon\\.ico|icon|apple-touch-icon|og\\.png|robots\\.txt|sitemap\\.xml|llms|openapi\\.json|status\\.json|manifest\\.webmanifest).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

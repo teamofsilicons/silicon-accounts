@@ -18,7 +18,7 @@ What's in here, in order (every chapter is an `#` heading you can search for):
 
 - **Silicon Accounts** gives every Carbon (a person) and every Silicon (an agent) one personal account, and does the whole sign-in for any app: hosted pages, email and phone codes, Google and Apple, sign up, the app's user base, webhooks, and proofs between apps. It is a standard OpenID Connect provider at `https://accounts.teamofsilicons.com`.
 - **Silicon Apps** is a store and distribution system for command-line apps: authors publish a native package per target, and anyone installs them with one command and gets every update automatically. Nine targets are defined, but today an app from any author but the Team can upload for the four Linux targets only (`linux-x86_64`, `linux-i686`, `linux-aarch64`, `linux-armv7hf`), not Windows or macOS; our own two CLIs ship on all nine (see `## What we don't do yet`).
-- Both are made for agents first. Every command has `--help` and `--json`, every error says exactly what went wrong and how to fix it, and everything the sites do is also an API, an MCP server and plain HTML.
+- Both are made for agents first. Every command has `--help` and `--json`, every error says exactly what went wrong and how to fix it, and everything the sites do is also an API and plain HTML.
 
 ## Is it for you? (as of 9 October 2026)
 
@@ -185,7 +185,7 @@ So you don't have to look them up again:
 - `accounts.teamofsilicons.com` - where every Carbon manages their own account and the Silicons they look after. It's also the Accounts API (`/v1/...`) and the OpenID Connect issuer.
 - `silicon-apps` - the Apps CLI. `silicon-accounts` - the Accounts CLI. Both are built on Rust crates you can use directly (`silicon-apps-client`, `silicon-accounts-client` on crates.io).
 - The two CLIs read a Silicon's STK from different variables (`ACCOUNTS_STK` for `silicon-accounts`, `SILICON_STK` for `silicon-apps`); the full rule is in `# The silicon-accounts CLI`.
-- Machine-readable entry points on every site: `/llms.txt`, `/llms-full.txt`, `/openapi.json`, `/.well-known/agent.json`, `/mcp`, `/sitemap.xml`.
+- Machine-readable entry points on every site: `/llms.txt`, `/llms-full.txt`, `/openapi.json`, `/.well-known/agent.json`, `/sitemap.xml`.
 
 # Install the CLIs
 
@@ -463,7 +463,7 @@ curl -s "https://apps.teamofsilicons.com/v1/capabilities?require=streaming,targe
 ```
 
 A `200` means everything you asked for is there; a `422 capabilities_missing` lists what isn't. Use the names each service lists at its own `GET /v1/capabilities`:
-- Silicon Accounts calls its event stream `sse` (it also takes aliases such as `event_stream` and `streaming`, and ignores case), and lists 27 capabilities, among them `subscriptions`, `webhooks`, `device_flow`, `short_lived_tokens`, `proofs`, `workload_identity_federation` (CI sign-in with no stored secret) and `identity_tokens` (a Silicon's identity at cloud providers). Its `422` puts the missing names in `details.missing` as plain strings. One name can mislead: `client_credentials` means your app authenticates its API calls with HTTP Basic `app_id:app_secret`. It is not the OAuth `client_credentials` grant, which our token endpoint refuses (`unsupported_grant_type`); App verification takes its place when one app calls another as itself (`# Proving your app to other apps (App verification)`).
+- Silicon Accounts calls its event stream `sse` (it also takes aliases such as `event_stream` and `streaming`, and ignores case), and lists 26 capabilities, among them `subscriptions`, `webhooks`, `device_flow`, `short_lived_tokens`, `proofs`, `workload_identity_federation` (CI sign-in with no stored secret) and `identity_tokens` (a Silicon's identity at cloud providers). Its `422` puts the missing names in `details.missing` as plain strings. One name can mislead: `client_credentials` means your app authenticates its API calls with HTTP Basic `app_id:app_secret`. It is not the OAuth `client_credentials` grant, which our token endpoint refuses (`unsupported_grant_type`); App verification takes its place when one app calls another as itself (`# Proving your app to other apps (App verification)`).
 - Silicon Apps calls it `streaming`, matches names exactly, and also takes `target:{target}`, which is met only when that target's upload validation worker is live right now. Its `422` puts each missing one in `details.missing` as `{requirement, satisfied, reason}`.
 
 Send `Accounts-Version` to pin the Silicon Accounts API version you built against; every answer tells you which version served it.
@@ -585,7 +585,7 @@ For a Silicon, getting in means having an identity of its own. Your si:id is you
 
 For a Carbon, it's one account for every app in the ecosystem, and one place to look after the Silicons you're custodian of. You can see every app you've signed into and remove any of them, see every User verification issued on your behalf and revoke it, and rotate a Silicon's STK whenever you need to.
 
-For an app, it means Silicons can sign in and use you on their own, with the same account they use everywhere else here. Silicons find you in the store, with `silicon-apps search`, through the API or MCP, install you with one command (on the four Linux targets for now) and get every update without doing anything. The store is new, so don't count on an audience that's already here: count on giving your own users and their Silicons a better way in, with the reach growing as other apps join.
+For an app, it means Silicons can sign in and use you on their own, with the same account they use everywhere else here. Silicons find you in the store, with `silicon-apps search` or through the API, install you with one command (on the four Linux targets for now) and get every update without doing anything. The store is new, so don't count on an audience that's already here: count on giving your own users and their Silicons a better way in, with the reach growing as other apps join.
 
 # How we compare
 
@@ -633,7 +633,7 @@ Choose a classic provider when your app is only for people and needs passwords, 
 | Pull a bad release | Withdraw it: never served again, installs move to the last good release | Delete the release by hand | By hand | By hand | Yank, users stay put |
 | Live release events | SSE streams and webhook subscriptions | GitHub webhooks | GitHub webhooks | No | Varies |
 | Version pinning | Exact installs; no pinning under the updater | Yes | Yes | Partly | Yes |
-| Where agents find it | A catalog made for agents, searchable over the API and MCP, but small: our own two apps so far | GitHub | Wherever you publish | Very large catalogs | Very large registries |
+| Where agents find it | A catalog made for agents, searchable over the API, but small: our own two apps so far | GitHub | Wherever you publish | Very large catalogs | Very large registries |
 
 Sources: dist https://github.com/axodotdev/cargo-dist/releases/tag/v0.33.0, https://axodotdev.github.io/cargo-dist/book/installers/updater.html. GoReleaser https://github.com/goreleaser/goreleaser/releases/tag/v2.5.0, https://goreleaser.com/customization/builds/builders/rust/. Homebrew https://github.com/DomT4/homebrew-autoupdate, https://brew.sh/2026/06/11/homebrew-6.0.0/, https://docs.brew.sh/Tap-Trust. mise https://mise.jdx.dev/dev-tools/backends/github.html. npm https://docs.npmjs.com/trusted-publishers, https://github.blog/changelog/2026-07-08-npm-install-time-security-and-gat-bypass2fa-deprecation/. MCP Registry https://modelcontextprotocol.io/registry/about, https://github.com/modelcontextprotocol/registry/blob/main/README.md. Silicon Apps, live: https://apps.teamofsilicons.com/v1/capabilities (which targets validate uploads) and https://apps.teamofsilicons.com/v1/apps (what the store holds). Cells with no source above are long-standing features we didn't check again this round.
 
@@ -1659,13 +1659,13 @@ More: https://developers.teamofsilicons.com/docs/apps/reference/cli.md
 
 # The Apps HTTP API
 
-The production base URL is `https://apps.teamofsilicons.com`. Every endpoint is under `/v1`, except `/health`, `/openapi.json`, `/mcp` and the `/.well-known/` documents.
+The production base URL is `https://apps.teamofsilicons.com`. Every endpoint is under `/v1`, except `/health`, `/openapi.json` and the `/.well-known/` documents.
 
 ## Discovery, versions and limits
 
 Everything a Silicon needs to get started is public:
 - `GET /openapi.json` (also `/v1/openapi.json`) - the OpenAPI 3.1 description of every route.
-- `GET /.well-known/agent.json` (also `/.well-known/agent-card.json`) - the A2A agent card: skills, auth and links. We speak REST and MCP (Streamable HTTP at `/mcp`).
+- `GET /.well-known/agent.json` (also `/.well-known/agent-card.json`) - the A2A agent card: skills, auth and links. We speak REST, not A2A tasks.
 - `GET /.well-known/silicon-apps-keys.json` - the keys that sign releases (see `# Signed releases`).
 - `GET /v1/capabilities` - what this server supports: API versions, auth methods, each target and whether its validation worker is live, search, streaming, subscriptions, signing, idempotency, rate limits and every event type.
 
@@ -1683,7 +1683,7 @@ If everything is met you get `200` with the full document plus `requirements: {s
   "details":{"missing":[{"requirement":"target:linux-aarch64","satisfied":false,"reason":"..."}],"results":[{"requirement":"streaming","satisfied":true,"reason":"..."}]}}}
 ```
 
-Requirements are `streaming` (alias `sse`), `subscriptions`, `webhooks`, `idempotency`, `search`, `rate_limits`, `openapi`, `agent_card`, `signing` (alias `signed_releases`), `author_signatures`, `withdrawal`, `mcp`, `version:V` (only `2026-10-09` today), `auth:METHOD` (`anonymous`, `bearer`, `slt_exchange`, `refresh_token`, `browser_session`, `developer_token`), `delivery:MODE` (`webhook` or `stream`), `event:TYPE` and `target:TARGET`. A `target:` requirement is met only when that target's validation worker is configured and answers a live probe right now. Up to 50 names, separated by commas; more is `400 invalid_input`, and an empty `require` is ignored.
+Requirements are `streaming` (alias `sse`), `subscriptions`, `webhooks`, `idempotency`, `search`, `rate_limits`, `openapi`, `agent_card`, `signing` (alias `signed_releases`), `author_signatures`, `withdrawal`, `version:V` (only `2026-10-09` today), `auth:METHOD` (`anonymous`, `bearer`, `slt_exchange`, `refresh_token`, `browser_session`, `developer_token`), `delivery:MODE` (`webhook` or `stream`), `event:TYPE` and `target:TARGET`. A `target:` requirement is met only when that target's validation worker is configured and answers a live probe right now. Up to 50 names, separated by commas; more is `400 invalid_input`, and an empty `require` is ignored.
 
 This is not the same as Silicon Accounts' `GET /v1/capabilities`, even though the error code is the same. Here names are case-sensitive and `-` is not folded, `details.missing` holds objects with a `reason`, and success comes under `requirements`. At Accounts, names are case-insensitive and take aliases (`event_stream` and `streaming` both mean its `sse`), `details.missing` is a list of names, success comes under `require`, and an empty `require` is `400 invalid_query` (see `# Service endpoints`).
 
@@ -7119,13 +7119,13 @@ curl -s "https://accounts.teamofsilicons.com/v1/capabilities?require=sse,subscri
  "auth_methods": [{"name": "bearer_access_token", "description": "...", "header": "Authorization"}, "..."],
  "limits": {"page_size_max": 200, "streams_per_caller": 5, "stream_heartbeat_seconds": 15, "stream_max_seconds": 3600, "webhook_retry_hours": 72, "...": "..."},
  "links": {"openapi": "https://accounts.teamofsilicons.com/openapi.json", "agent_card": "https://accounts.teamofsilicons.com/.well-known/agent.json",
-           "mcp": "https://accounts.teamofsilicons.com/mcp", "llms_txt": "https://accounts.teamofsilicons.com/llms.txt", "docs": "https://developers.teamofsilicons.com/docs/accounts", "...": "..."},
+           "llms_txt": "https://accounts.teamofsilicons.com/llms.txt", "docs": "https://developers.teamofsilicons.com/docs/accounts", "...": "..."},
  "require": {"requested": ["sse", "subscriptions"], "satisfied": true, "supported": ["sse", "subscriptions"], "missing": []}}
 ```
 
-Each capability has `supported`, a `description`, its `endpoints` and its `docs`. The answer also lists the API versions, the ways to authenticate, the main limits, and links to the OpenAPI document, the agent card, the MCP server and `llms.txt`.
+Each capability has `supported`, a `description`, its `endpoints` and its `docs`. The answer also lists the API versions, the ways to authenticate, the main limits, and links to the OpenAPI document, the agent card and `llms.txt`.
 
-There are 27 capabilities: `rest_json`, `openapi`, `structured_errors`, `rate_limit_headers`, `idempotency_keys`, `pagination`, `version_negotiation`, `capability_negotiation`, `bearer_tokens`, `client_credentials`, `oauth2`, `openid_connect`, `device_flow`, `short_lived_tokens`, `workload_identity_federation` (a Silicon signing in from CI with the job's token), `identity_tokens` (a Silicon's tokens for clouds), `proofs`, `webhooks`, `webhook_signatures`, `webhook_replay`, `sse`, `stream_resume`, `subscriptions`, `imports`, `agent_card`, `mcp` and `llms_txt`.
+There are 26 capabilities: `rest_json`, `openapi`, `structured_errors`, `rate_limit_headers`, `idempotency_keys`, `pagination`, `version_negotiation`, `capability_negotiation`, `bearer_tokens`, `client_credentials`, `oauth2`, `openid_connect`, `device_flow`, `short_lived_tokens`, `workload_identity_federation` (a Silicon signing in from CI with the job's token), `identity_tokens` (a Silicon's tokens for clouds), `proofs`, `webhooks`, `webhook_signatures`, `webhook_replay`, `sse`, `stream_resume`, `subscriptions`, `imports`, `agent_card` and `llms_txt`.
 
 `client_credentials` means your app authenticates its API calls with HTTP Basic `app_id:app_secret`, as its description says. It isn't the OAuth 2.0 `client_credentials` grant: we issue no app-only access tokens, so `POST /v1/oauth/token` refuses that grant with `unsupported_grant_type`, and one app proves itself to another with an App verification proof instead (`# Proving your app to other apps (App verification)`).
 
@@ -7170,7 +7170,7 @@ curl -s "https://accounts.teamofsilicons.com/openapi.json" | jq '.paths | keys |
 
 ## `GET /.well-known/agent.json`
 
-Our A2A agent card: what the service is, its skills (create a Silicon account, sign a Silicon into an app, verify a proof, manage app sign-in, subscribe to account events), how to authenticate, and links to the OpenAPI document, `llms.txt`, the docs and the MCP server. Public, CORS `*`, cacheable for 5 minutes. We speak REST and MCP, not A2A tasks: `capabilities.streaming` and `pushNotifications` describe the event stream and webhooks. `protocolVersion` is the A2A protocol's version; `version` is ours.
+Our A2A agent card: what the service is, its skills (create a Silicon account, sign a Silicon into an app, verify a proof, manage app sign-in, subscribe to account events), how to authenticate, and links to the OpenAPI document, `llms.txt` and the docs. Public, CORS `*`, cacheable for 5 minutes. We speak REST, not A2A tasks: `capabilities.streaming` and `pushNotifications` describe the event stream and webhooks. `protocolVersion` is the A2A protocol's version; `version` is ours.
 
 ```json
 {"protocolVersion": "0.3.0", "name": "Silicon Accounts", "description": "Accounts for Carbons and Silicons. ...",
@@ -7178,7 +7178,7 @@ Our A2A agent card: what the service is, its skills (create a Silicon account, s
  "version": "0.4.0", "documentationUrl": "https://developers.teamofsilicons.com/docs/accounts",
  "capabilities": {"streaming": true, "pushNotifications": true, "stateTransitionHistory": false},
  "skills": [{"id": "create-silicon-account", "name": "Create a Silicon account", "...": "..."}, "..."],
- "links": {"openapi": "https://accounts.teamofsilicons.com/openapi.json", "mcp": "https://accounts.teamofsilicons.com/mcp", "...": "..."}}
+ "links": {"openapi": "https://accounts.teamofsilicons.com/openapi.json", "...": "..."}}
 ```
 
 ## `POST /v1/reports`

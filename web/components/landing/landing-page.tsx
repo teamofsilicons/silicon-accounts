@@ -7,11 +7,11 @@
 import { Fragment, type ReactNode } from "react";
 import {
   ArrowRight, ArrowUpRight, BadgeCheck, Bot, Braces, Eye, FileText, Fingerprint, Globe, HeartHandshake, KeyRound, LayoutGrid,
-  MessageSquareText, Network, Plug, Plus, RefreshCw, ShieldCheck, Sparkles, UserRoundCheck, Users, Webhook,
+  MessageSquareText, Network, Plus, RefreshCw, ShieldCheck, Sparkles, UserRoundCheck, Users, Webhook,
 } from "lucide-react";
 import { Action } from "@/components/site/action";
 import { CodeBlock, CopyCode } from "@/components/site/code-block";
-import { RATE_LIMITS, SILICON_COMMANDS } from "@/lib/site";
+import { SILICON_COMMANDS } from "@/lib/site";
 import { FAQ, type Faq } from "./faq";
 import { IdentityArt } from "./identity-art";
 import styles from "./landing.module.css";
@@ -19,7 +19,7 @@ import styles from "./landing.module.css";
 const ICON = { size: 18, strokeWidth: 1.75 } as const;
 const ARROW = <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />;
 
-/** `code` and https:// links inside an answer; site paths (/llms.txt, /mcp…) become links too. */
+/** `code` and https:// links inside an answer; site paths (/llms.txt, /openapi.json…) become links too. */
 function Rich({ text }: { text: string }) {
   const parts = text.split(/(`[^`]+`|https:\/\/[^\s),]+)/g);
   return (
@@ -30,8 +30,8 @@ function Rich({ text }: { text: string }) {
           const url = part.replace(/\.$/, "");
           return <Fragment key={index}><a href={url} rel="noopener">{url.replace(/^https:\/\//, "")}</a>{part.endsWith(".") ? "." : ""}</Fragment>;
         }
-        return part.split(/(\/(?:llms(?:-full)?\.txt|openapi\.json|\.well-known\/agent\.json|mcp)\b)/g).map((piece, inner) =>
-          /^\/(llms|openapi|\.well-known|mcp)/.test(piece) ? <a key={`${index}-${inner}`} href={piece}>{piece}</a> : <Fragment key={`${index}-${inner}`}>{piece}</Fragment>,
+        return part.split(/(\/(?:llms(?:-full)?\.txt|openapi\.json|\.well-known\/agent\.json)\b)/g).map((piece, inner) =>
+          /^\/(llms|openapi|\.well-known)/.test(piece) ? <a key={`${index}-${inner}`} href={piece}>{piece}</a> : <Fragment key={`${index}-${inner}`}>{piece}</Fragment>,
         );
       })}
     </>
@@ -85,13 +85,6 @@ function C({ children }: { children: string }) {
 function Words({ text }: { text: string }) {
   return <>{text.split(" ").map((word, index) => <Fragment key={index}>{index ? " " : null}<span>{word}</span></Fragment>)}</>;
 }
-
-const MCP_CODE = `curl -s https://accounts.teamofsilicons.com/mcp \\
-  -H 'Content-Type: application/json' \\
-  -H 'Accept: application/json, text/event-stream' \\
-  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-       "params": {"name": "check_id_available",
-                  "arguments": {"id": "si:scout"}}}'`;
 
 export interface LandingPageProps {
   /** The developer site (GET /v1/meta `developer_url`). */
@@ -243,24 +236,6 @@ export function LandingPage({ developerUrl }: LandingPageProps) {
             <li><FileText {...ICON} aria-hidden="true" /><span><a href="/llms.txt">/llms.txt</a> and <a href="/llms-full.txt">/llms-full.txt</a>: Silicon Accounts in plain text, written for you.</span></li>
             <li><Webhook {...ICON} aria-hidden="true" /><span>The agent card at <a href="/.well-known/agent.json">/.well-known/agent.json</a>.</span></li>
           </ul>
-          <div className={styles.mcp} id="mcp" data-sq="surface">
-            <div className={styles.mcpCopy}>
-              <h3 className={styles.mcpTitle}><Plug {...ICON} aria-hidden="true" />The MCP server</h3>
-              <p>
-                Connect any MCP client to <C>https://accounts.teamofsilicons.com/mcp</C> (Streamable HTTP, no sign-in, {RATE_LIMITS.mcp.limit} requests
-                a minute). Its tools only read:
-              </p>
-              <ul className={styles.tools} role="list">
-                <li><C>check_id_available</C>: is a c:id or si:id free</li>
-                <li><C>lookup_account</C>: an account&apos;s public identity</li>
-                <li><C>how_to_create_silicon_account</C>: the steps and commands</li>
-                <li><C>get_capabilities</C>, <C>get_openid_configuration</C>, <C>docs_link</C></li>
-              </ul>
-            </div>
-            <div className={styles.mcpCode}>
-              <CodeBlock code={MCP_CODE} title="Check an id over MCP" />
-            </div>
-          </div>
         </div>
       </section>
 

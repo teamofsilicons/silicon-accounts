@@ -44,7 +44,7 @@ API's Origin check):
 | --- | --- |
 | `/v1/*`, `/.well-known/*` (but `security.txt`), `/openapi.json` | rewritten to `ACCOUNTS_API_URL` (default `http://127.0.0.1:8589`), unchanged: method, body, cookies, `Set-Cookie`, `Location`. That includes the API's discovery (`/openapi.json`, `/v1/openapi.json`, `/v1/capabilities`, `/.well-known/agent.json`, `/.well-known/openid-configuration`) and its event stream (`/v1/events/stream`; production's Caddy sends it and `/openapi.json` straight to the API) |
 | `/`, signed out | the public landing page, server-rendered with no client providers (see "The public landing page") |
-| `/llms.txt`, `/llms-full.txt`, `/robots.txt`, `/sitemap.xml`, `/.well-known/security.txt`, `/manifest.webmanifest`, `/mcp` | the site's own agent files and MCP server (see "Agent entry points") |
+| `/llms.txt`, `/llms-full.txt`, `/robots.txt`, `/sitemap.xml`, `/.well-known/security.txt`, `/manifest.webmanifest` | the site's own agent files (see "Agent entry points") |
 | `/sdk/v1.js` | `public/sdk/v1.js`, built from `sdk/v1.ts` by `pnpm build:sdk` (runs before `dev` and `build`); `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=300` |
 | `/docs`, `/docs/*`, `/docs.md` | permanent redirects to the configured developer site (mapping below) |
 | everything else | the pages below |
@@ -110,7 +110,7 @@ shared parts and a first version of each route; each area's builder owns its rou
 | Area | Routes | Code |
 | --- | --- | --- |
 | web-account | `/` (identity home when signed in), `/sign-in-methods`, `/apps`, `/silicons`, `/proofs`, `/activity`, `/settings` | `app/(app)/(shell)/(account)/`, `components/account/` |
-| public | `/` when signed out (the landing page, rewritten by `proxy.ts` to `app/landing`), the agent files, `/mcp` | `app/landing/`, `components/landing/`, `components/site/`, `app/*.txt`, `app/mcp/`, `lib/agent/`, `lib/mcp/` |
+| public | `/` when signed out (the landing page, rewritten by `proxy.ts` to `app/landing`), the agent files | `app/landing/`, `components/landing/`, `components/site/`, `app/*.txt`, `lib/agent/` |
 | web-auth | `/sign-in`, `/authorize`, `/authorize/flow/[id]`, `/device`, `/embed/v1/buttons` (polish) | `app/(app)/(auth)/`, `components/auth/` |
 | legacy web-docs | former docs routes redirect through `proxy.ts`; the old renderer and generated build remain temporarily as source, while `developer/` owns the public docs | `app/(app)/(docs)/`, `components/docs/`, `lib/docs/` (guide: `lib/docs/README.md`), `lib/docs-redirects.ts` |
 | foundation | root layout, providers, shell, dock, command palette, theme, squircles, branding runtime, API client and hooks, SDK, `proxy.ts`, `/__kitchen`, screens | `app/layout.tsx`, `components/foundation/`, `components/kitchen/`, `lib/`, `styles/`, `sdk/`, `scripts/` |
@@ -583,17 +583,16 @@ arrow after the last word. The footer change is this site's only difference from
 | Path | What |
 | --- | --- |
 | `/llms.txt`, `/llms-full.txt` | the Carbon's `web/llms/llms.md` (and `llms-full.md` when it exists, else llms.md again), exactly as written; bundled at build time by `lib/agent/build-llms.ts` into the git-ignored `lib/agent/generated/llms.ts` (`pnpm build:llms`, run by dev, build, typecheck and test). Never edit the .md files from code |
-| `/robots.txt` | `lib/agent/robots.ts`: everything public allowed, AI crawlers named and welcome; account pages, `/sign-in`, `/authorize`, `/device`, `/embed/`, `/v1/`, `/api/`, `/mcp` disallowed |
+| `/robots.txt` | `lib/agent/robots.ts`: everything public allowed, AI crawlers named and welcome; account pages, `/sign-in`, `/authorize`, `/device`, `/embed/`, `/v1/`, `/api/` disallowed |
 | `/sitemap.xml` | `lib/agent/sitemap.ts`: the landing page, the llms files and the OpenAPI description, with lastmod |
 | `/.well-known/security.txt` | the same as the developer site's (the one `/.well-known` path not forwarded to the API) |
 | `/manifest.webmanifest` | name, colours and icons |
-| `/mcp` | MCP over Streamable HTTP (`app/mcp/route.ts`, `lib/mcp/`: the developer site's protocol, stateless, 2025-06-18 and older). Read-only tools that call the API on the server: `check_id_available`, `lookup_account` (with the caller's own Authorization header, which goes along to the API and nowhere else; without one it says whether the id is held), `get_capabilities` (`/v1/capabilities`, `/v1/meta` on older servers), `get_openid_configuration`, `how_to_create_silicon_account`, `docs_link`. 60 requests a minute per address (429 with Retry-After); the API counts the tools' calls against the caller's forwarded address |
 
-The steps and commands `how_to_create_silicon_account` returns live in `lib/site.ts` (`siliconAccountSteps`, next to
-`SILICON_COMMANDS`). The pages register no tools in the browser: `/mcp` is the one place an agent calls them. The A2A
-agent card is the API's (`/.well-known/agent.json`); this site does not serve one of its own. `pnpm test` runs
-`tests/*.test.ts` (redirects, proxy surfaces, agent files, MCP protocol, rate limit), the branding tests and the hosted
-pages' unit tests.
+The site runs no MCP server (removed 2026-10-10): `/mcp` is an ordinary unknown path that answers 404, and nothing
+here (landing page, FAQ, footer, robots.txt, llms files, JSON-LD) points to one. The pages register no tools in the
+browser either. The A2A agent card is the API's (`/.well-known/agent.json`); this site does not serve one of its own.
+`pnpm test` runs `tests/*.test.ts` (redirects, proxy surfaces, agent files, no MCP server), the branding tests and the
+hosted pages' unit tests; `pnpm test:production-routing` (after a build) also checks that `/mcp` answers 404.
 
 ## Production routing
 

@@ -133,7 +133,7 @@ export function statusTargets(self: string = developerPublicUrl()): ServiceTarge
       id: "developer",
       name: "Silicon Developer",
       url: developer,
-      about: "This site: the docs, the developer portal, the docs API and the MCP server.",
+      about: "This site: the docs, the developer portal and the docs API.",
       endpoints: [
         { url: `${developer}/openapi.json`, purpose: "This site answers at its public address", healthy: body => isObject(body) && typeof body.openapi === "string" },
       ],

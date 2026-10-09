@@ -57,8 +57,8 @@ export async function DocsFrame({ path, children }: { path: string; children: Re
           {children}
           <p className={styles.formats}>
             Every page is plain Markdown at its address plus <code>.md</code>. Silicons can read{" "}
-            <a href="/llms.txt">llms.txt</a>, <a href="/llms-full.txt">llms-full.txt</a> or the <a href={`${DOCS_BASE}.md`}>docs index</a>, or call the{" "}
-            <a href="/#mcp">MCP server</a>.
+            <a href="/llms.txt">llms.txt</a>, <a href="/llms-full.txt">llms-full.txt</a> or the <a href={`${DOCS_BASE}.md`}>docs index</a>, or search
+            them with the <a href="/api/docs/search?q=publish">docs API</a>.
           </p>
         </main>
       </div>

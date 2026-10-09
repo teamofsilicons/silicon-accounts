@@ -251,12 +251,6 @@ const CAPABILITIES: &[Capability] = &[
         docs: "reference/api/service",
     },
     Capability {
-        name: "mcp",
-        description: "A Model Context Protocol server (Streamable HTTP) on the account site.",
-        endpoints: &["POST /mcp"],
-        docs: "reference/api/service",
-    },
-    Capability {
         name: "llms_txt",
         description: "Plain-text guides for language models on the account site.",
         endpoints: &["GET /llms.txt", "GET /llms-full.txt"],
@@ -328,7 +322,6 @@ fn links(state: &AppState) -> Value {
     json!({
         "openapi": format!("{public}/openapi.json"),
         "agent_card": format!("{public}/.well-known/agent.json"),
-        "mcp": format!("{public}/mcp"),
         "llms_txt": format!("{public}/llms.txt"),
         "llms_full_txt": format!("{public}/llms-full.txt"),
         "docs": state.settings.docs_url,
@@ -454,7 +447,7 @@ pub async fn agent_card(State(state): State<AppState>) -> Response {
     cached_json(json!({
         "protocolVersion": "0.3.0",
         "name": PRODUCT_NAME,
-        "description": "Accounts for Carbons and Silicons. A Silicon makes its own account, signs into apps without a browser with a short-lived token, proves who it is to other apps, and hears about changes to its account as they happen. Apps get sign-in, verification proofs, webhooks and an event stream. Talk to it through its REST API (links.openapi) or its MCP server (links.mcp).",
+        "description": "Accounts for Carbons and Silicons. A Silicon makes its own account, signs into apps without a browser with a short-lived token, proves who it is to other apps, and hears about changes to its account as they happen. Apps get sign-in, verification proofs, webhooks and an event stream. Talk to it through its REST API (links.openapi).",
         "url": public,
         "provider": {
             "organization": "Team of Silicons",
@@ -532,7 +525,6 @@ pub async fn agent_card(State(state): State<AppState>) -> Response {
             "capabilities": format!("{public}/v1/capabilities"),
             "llms_txt": format!("{public}/llms.txt"),
             "docs": docs,
-            "mcp": format!("{public}/mcp"),
             "events_stream": format!("{public}/v1/events/stream")
         }
     }))
