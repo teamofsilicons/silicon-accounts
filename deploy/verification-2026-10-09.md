@@ -1,10 +1,10 @@
 # Production verification: 2026-10-09
 
-Production runs `776fa058d757595772214706227a29b10a86a85a`, Accounts 0.4.0 on
+Production runs `a20062ccd2e8a6693bd3d3ebf9f223a04b0ca41a`, Accounts 0.4.0 on
 migration 19 (see the last section). Earlier the same day `a2d85c5` was live from
-06:33 to 10:38 UTC, `9b46dc9` from 10:38 to 12:41 UTC and `0d0f7b3` from 12:41 to
-16:02 UTC. The first attempt of the day, `2efa04a`, was rolled back; it is
-recorded first.
+06:33 to 10:38 UTC, `9b46dc9` from 10:38 to 12:41 UTC, `0d0f7b3` from 12:41 to
+16:02 UTC and `776fa05` from 16:02 to 21:22 UTC. The first attempt of the day,
+`2efa04a`, was rolled back; it is recorded first.
 
 ## Agent entry points release: deployed, then rolled back
 
@@ -579,3 +579,119 @@ request returned 200, and `/status.json` said `up` each time. Log scan SSM
 API ERROR or WARN lines, zero Caddy error lines and no other system warnings. The
 web and developer logs held only the usual restart line from the previous
 process at 16:02:05.
+
+## MCP servers removed: live
+
+Source `a20062ccd2e8a6693bd3d3ebf9f223a04b0ca41a`. At the Carbon's request it
+deletes `/mcp` from the developer and account sites. The Accounts API no longer
+lists `mcp` in `/v1/capabilities` or links `/mcp` from its agent card, and the
+docs and `llms-full.txt` are updated to match. Since `776fa05` the API changes
+only in `crates/server` (discovery and its OpenAPI document). There are no
+migrations, and the installer and packager are unchanged.
+
+### Preflight
+
+- Clean tree at `a20062c`. `cargo test -p silicon-accounts-server` passed 96
+  tests (none failed or ignored) with `CARGO_TARGET_DIR=target/integration`.
+  Web typecheck, lint and 26 unit tests passed; developer typecheck, lint and 39
+  unit tests passed.
+- Both sites were built for production with the same variables as before. Both
+  standalone routing tests passed on those builds. Neither build has an `mcp`
+  route, and both keep `skipProxyUrlNormalize: true`.
+- The new ARM64 API SHA-256 is
+  `b6134588be10ff54f6da3623c728f696377fb308911638683a7e7959e93ca08f`; the
+  migrator is unchanged at `adae161c...`. The Node and Caddy archives matched
+  their checksums.
+- Archive `releases/a20062ccd2e8a6693bd3d3ebf9f223a04b0ca41a.tar.gz`, 120266993
+  bytes, SHA-256 `ca9263f680b50f3ed22faa5e9b0a614fa96b42571757673fb2ddf552a5e4cb24`.
+  56 internal links were preserved, and its `install.py` matches the committed one.
+- With no schema change, the previous release `776fa05` remained a direct
+  rollback target.
+
+### Install
+
+Read-only precheck SSM `53ff9c2b-eb1f-419d-b508-82206f6efae0` found `776fa05`
+(API `a51584d2...`) active on migration 19. Just before the install, `POST /mcp`
+on both hosts still answered JSON-RPC (200, `application/json`).
+
+Install SSM `753f144b-acb8-4f93-bfde-bbc28ee7bbd4` ran from 21:22:29 to 21:22:53
+UTC and succeeded. It verified the archive SHA-256 before extracting the
+installer. It retained `backups/predeploy-20261009T212246Z.dump` (261514 bytes in
+S3 and on the host), SHA-256
+`2486ef64363d2702387148ac848ec95f23fc5b8c9f0306c15d6c998e8cbdcd44`. Nothing was
+pending (19 already applied), and local readiness passed.
+
+Postcheck SSM `911a3683-92f9-4f91-b9e7-e81afc814207` confirmed:
+
+- `current` points at `a20062c`, and `previous-release` at `776fa05`.
+- The new API hash, the migrator hash and `build.json` match. Six services and
+  timers are active.
+- Migration 19 with none failed; one account, three apps, one membership and the
+  RS256 key are unchanged.
+- The Caddy direct block, `APPS_API_URL` and the absent loopback flag are as
+  before. Zero API ERROR or WARN lines and zero web `EPROTO` lines.
+- On the host, the landing and `/status.json` returned 200.
+
+### Public verification
+
+- `POST` (an MCP `initialize`) and `GET` to `https://accounts.teamofsilicons.com/mcp`
+  and `https://developers.teamofsilicons.com/mcp` all return 404 with each site's
+  HTML "Not found" page, and none of them contains `jsonrpc`.
+- `/v1/capabilities` reports 0.4.0 with 26 capabilities and no `mcp` key or
+  mention; `?require=event_stream` still returns 200 and also has no mention.
+- Neither `/.well-known/agent.json` mentions `mcp`: the Accounts card has six
+  skills at 0.4.0, and the developer card has three. Neither `robots.txt` has an
+  `/mcp` line.
+- No `mcp` appears, in any case, in the account landing, the developer home,
+  `/sign-in`, `/docs`, `/status`, either `llms.txt`, either sitemap or the
+  developer `/openapi.json`. The account landing, `/sign-in`, `/docs` and the
+  developer home also contain no `modelContext` or `webmcp`.
+- `/llms-full.txt` on the developer site is byte-identical to
+  `developer/llms/llms-full.md`: 764668 bytes, 8273 lines, starting with
+  `# Silicon Developer docs (full)`. Its remaining MCP mentions describe the
+  outside protocol, other providers and the MCP Registry; it links no
+  teamofsilicons `/mcp` address.
+- `/status` and `/status.json` return 200 with "All three services are up."
+  (Accounts 0.4.0, Apps 0.1.2, Developer 0.1.0). The sitemap still lists
+  `/status`.
+- Signed-out `GET https://accounts.teamofsilicons.com/` returned 200 with the
+  landing text and `<main`, three times out of three. With a stale
+  `__Host-sa_session` and with a stale `sa_session` it served the same landing
+  and cleared the cookie.
+- A headless browser at 1440 and 390 px showed, with no page errors or overflow:
+  - the landing;
+  - `/sign-in` with Continue with Google, Continue with Apple, Email/Phone, the
+    email field and Continue;
+  - the developer home;
+  - the hosted "Sign in to Silicon Developer" page;
+  - `/status` and the data-we-keep page.
+
+  Screenshots were inspected. Nothing was submitted.
+- The developer sign-in returns 303 to the Accounts `/authorize` with
+  `app_id=developer`, the exact callback, S256 and a 43-character challenge.
+- API:
+  - `/readyz` `{"database":"ok"}`; `/v1/meta` version 0.4.0.
+  - Discovery has the Accounts issuer, EdDSA and RS256, and six grants; JWKS
+    lists both keys.
+  - `/openapi.json` returns 200 with 135 paths and no `mcp` mention.
+  - The event stream answers the API's JSON 401 under `curl --max-time 5 -N`.
+- The account site's agent files return 200, and `/docs` returns 308 to the
+  developer docs. The developer docs pages, search (61 matches),
+  `/openapi.json`, `/auth/session` and `/sign-in` return 200; the data-we-keep
+  `.md` matches its source, and an unknown page returns 404.
+
+### Log watch
+
+From 21:25 to 21:29 UTC the landing, `/sign-in`, `/readyz`, the developer home,
+`/docs`, `/status` and both `/mcp` addresses were probed in seven rounds. The
+pages returned 200, both `/mcp` addresses 404, and `/status.json` said `up`
+every time. Log scan SSM `ebef6bb4-8e1b-4c78-8275-b2c6f78dfc0a` found no
+restarts, zero API ERROR or WARN lines, zero Caddy error lines and no system
+warnings.
+
+At 21:26:30 the developer site logged one Next.js error: "The Server Reference ID
+did not match the expected format. Received "x"." That is a request carrying a
+bogus `Next-Action: x` header, which Next refuses; it did not come from these
+checks. SSM `cc0428c8-6907-4770-8b3b-606a770830b5` showed the same line 191 times
+in the developer log and 8 times in the web log since 2026-10-08, from outside
+probes. It predates this release, and the service did not restart.
