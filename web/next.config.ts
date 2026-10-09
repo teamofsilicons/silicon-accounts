@@ -68,6 +68,10 @@ const nextConfig: NextConfig = {
   ...(distDir === ".next" ? {} : { typescript: isolatedBuild(distDir) }),
   reactStrictMode: true,
   poweredByHeader: false,
+  // Keep the standalone listener's exact origin for internal proxy rewrites (the signed-out `/` rewrites to `/landing`).
+  // NextURL otherwise normalizes 127.0.0.1 to localhost, making a Caddy-forwarded HTTPS rewrite look external, and the
+  // rewrite then fails with a TLS error against the plain HTTP port.
+  skipProxyUrlNormalize: true,
   // The floating dev badge would sit on top of the embed's iframes and the dock; build and runtime errors still show.
   devIndicators: false,
   // `next dev` would (re)write its managed block into AGENTS.md / CLAUDE.md when a coding assistant runs it. Both files

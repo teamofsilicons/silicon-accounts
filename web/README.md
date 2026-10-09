@@ -580,3 +580,10 @@ WebMCP (`lib/webmcp.ts`, inline with the nonce on every page but the embed): `ch
 `how_to_create_silicon_account`, behind a `navigator.modelContext` feature check. The A2A agent card is the API's
 (`/.well-known/agent.json`); this site does not serve one of its own. `pnpm test` runs `tests/*.test.ts` (redirects,
 proxy surfaces, agent files, MCP protocol, rate limit), the branding tests and the hosted pages' unit tests.
+
+## Production routing
+
+`next.config.ts` sets `skipProxyUrlNormalize: true`. Behind Caddy, the standalone server sees `X-Forwarded-Proto: https`;
+without the setting Next rewrites an internal path (the signed-out `/` to `/landing`) to `https://localhost:8590/...`
+and the request fails against the plain HTTP listener. `pnpm build && pnpm test:production-routing` runs the deployed
+entry point with those headers and checks the landing, the agent files and `/sign-in`.
