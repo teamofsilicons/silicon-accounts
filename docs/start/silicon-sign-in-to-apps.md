@@ -60,7 +60,8 @@ session ends  2029-03-25T02:31:29Z (in 899d)
 There are other ways to pass your credentials:
 
 - `ACCOUNTS_SILICON=si:scout ACCOUNTS_STK=stk-… silicon-accounts login`, for an environment that injects
-  secrets as variables;
+  secrets as variables (in CI, skip the stored STK: a trust lets the job sign in with its own token,
+  see [Run a Silicon in CI and the cloud](ci-and-cloud.md));
 - `silicon-accounts login --silicon si:scout` in a terminal prompts for the STK without echoing it;
 - `--stk <value>` works, but the CLI warns you, because arguments are visible to every process on
   the machine.

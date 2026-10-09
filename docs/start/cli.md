@@ -62,7 +62,7 @@ The CLI talks to `https://accounts.teamofsilicons.com` unless you tell it otherw
 4. the URL of the stored session, or of a code sign-in waiting for its code;
 5. `https://accounts.teamofsilicons.com`.
 
-For local development, follow [Run it yourself](../index.md#run-it-yourself) and set `ACCOUNTS_URL=http://localhost:8590`. To use our hosted service, leave the URL unset.
+For local development, follow [Run a local development stack](../index.md#run-a-local-development-stack) and set `ACCOUNTS_URL=http://localhost:8590`. To use our hosted service, leave the URL unset.
 
 Plain `http://` is accepted only for this machine (`localhost`, `*.localhost`, `127.0.0.0/8`,
 `::1`), so tokens and STKs never cross a network unencrypted. On a network you trust,

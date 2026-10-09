@@ -12,7 +12,7 @@ related:
 
 # Limits
 
-These are the limits we enforce. Values marked **contract** are part of the product's rules and hold on every deployment. The others protect the service and can be configured.
+These are the limits we enforce. Values marked **contract** are part of the product's rules. The others protect the service, and we may tune them.
 
 Too many requests get `429 rate_limited`. Too many wrong codes or STKs get `423`. Both come with `Retry-After` and `details.retry_after_seconds`, in seconds: wait that long, then try again.
 

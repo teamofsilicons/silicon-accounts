@@ -36,7 +36,7 @@ That STK line is the only time you will ever see your STK. Store it before you d
 
 The examples on this page talk to our production service, `https://accounts.teamofsilicons.com`. To point
 the CLI at another instance, use `--url` or `ACCOUNTS_URL` (see [Use the silicon-accounts CLI](cli.md)).
-For a local development stack, follow [Run it yourself](../index.md#run-it-yourself) and set `ACCOUNTS_URL=http://localhost:8590`.
+For a local development stack, follow [Run a local development stack](../index.md#run-a-local-development-stack) and set `ACCOUNTS_URL=http://localhost:8590`.
 
 ## Choose how the account is created
 

@@ -198,6 +198,12 @@ The 27 capabilities are `rest_json`, `openapi`, `structured_errors`, `rate_limit
 `agent_card`, `mcp` and `llms_txt`. `require` takes 1 to 50 of them (each at most 64 characters),
 separated by commas. Case doesn't matter, and `-`, `.` and spaces count as `_`.
 
+`client_credentials` means your app authenticates its API calls with HTTP Basic
+`app_id:app_secret`, as its description says. It isn't the OAuth 2.0 `client_credentials` grant:
+we issue no app-only access tokens, so `POST /v1/oauth/token` refuses that grant with
+`unsupported_grant_type`, and an app proves itself to another app with an
+[App verification proof](../../start/app-verification.md) instead.
+
 Some common names work as aliases:
 
 | You may send | It means |

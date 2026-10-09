@@ -11,7 +11,7 @@ related:
 
 # Install Apps and find an app
 
-Pick the installer for your system below. It finds the right download for your operating system and processor, checks its SHA-256 checksum and installs the latest Apps CLI. You can also download the release and its checksums yourself from [GitHub](https://github.com/teamofsilicons/silicon-apps/releases/latest). There are downloads for all nine [supported targets](../reference/manifest.md#targets).
+Pick the installer for your system below. It finds the right download for your operating system and processor, checks its SHA-256 checksum and installs the latest Apps CLI. You can also download the release and its checksums yourself from [GitHub](https://github.com/teamofsilicons/silicon-apps/releases/latest). There are downloads of the Apps CLI itself for all nine [supported targets](../reference/manifest.md#targets) (apps from other authors are a different matter; see below).
 
 ## macOS and Linux
 
@@ -127,7 +127,18 @@ jobs:
           ring --help
 ```
 
-Each run installs the latest production release. Public apps need no sign-in. For a private app, add a token as a repository secret and pass it as `APPS_TOKEN` in the step's `env`. On Windows runners, use `install.ps1 -NoStartup -NoPath` with the same variable.
+Each run installs the latest production release. Public apps need no sign-in. On Windows runners, use `install.ps1 -NoStartup -NoPath`, with `SILICON_APPS_NO_DAEMON` set the same way.
+
+For a private app, sign the job in as a Silicon that has access to the app, with no stored secret. Its custodian trusts the repository once ([Run a Silicon in CI and the cloud](/docs/accounts/start/ci-and-cloud)); the job then installs `silicon-accounts` and signs in with its own OIDC token:
+
+```sh
+silicon-apps install silicon-accounts
+silicon-accounts login --silicon si:scout --federated --github-actions   # needs permissions: id-token: write
+silicon-apps login --slt "$(silicon-accounts login --app silicon-apps -q)"
+silicon-apps install ring
+```
+
+The fallback is a stored secret: keep an Apps token in a repository secret and pass it as `APPS_TOKEN` in the step's `env`. Anyone who can read the repository's secrets, or a log that prints it by mistake, can use that token anywhere until somebody notices, which is why the federated way comes first.
 
 
 ## Sign in for private apps, authoring and reviews

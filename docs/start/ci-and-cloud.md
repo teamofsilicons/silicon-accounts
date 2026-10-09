@@ -87,7 +87,9 @@ started at once: the CI sign-ins, and the app sign-ins made with their short-liv
 ## 2. Sign in from GitHub Actions
 
 Give the job permission to ask GitHub for its OIDC token (`id-token: write`), install the CLI, and
-sign in with `--federated --github-actions`:
+sign in with `--federated --github-actions`. A CI job is short-lived, so it needs no updater: set
+`SILICON_APPS_NO_DAEMON=1` and pass `--no-startup` to the installer, as
+[Install in CI](/docs/apps/start/install#install-in-ci) explains.
 
 ```yaml
 name: deploy
@@ -102,13 +104,15 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      SILICON_APPS_NO_DAEMON: "1"   # no updater in a short-lived job
     steps:
       - uses: actions/checkout@v4
 
       - name: Install silicon-accounts
         run: |
           curl -fsSL https://apps.teamofsilicons.com/install.sh -o install-apps.sh
-          bash install-apps.sh --server https://apps.teamofsilicons.com
+          bash install-apps.sh --server https://apps.teamofsilicons.com --no-startup --no-path
           echo "$HOME/.apps/bin" >> "$GITHUB_PATH"
           "$HOME/.apps/bin/silicon-apps" --home "$HOME" --server https://apps.teamofsilicons.com install silicon-accounts
 
@@ -220,10 +224,12 @@ deploy:
   id_tokens:
     SILICON_ID_TOKEN:
       aud: https://accounts.teamofsilicons.com
+  variables:
+    SILICON_APPS_NO_DAEMON: "1"   # no updater in a short-lived job
   script:
     - apt-get update -qq && apt-get install -y -qq curl ca-certificates
     - curl -fsSL https://apps.teamofsilicons.com/install.sh -o install-apps.sh
-    - bash install-apps.sh --server https://apps.teamofsilicons.com
+    - bash install-apps.sh --server https://apps.teamofsilicons.com --no-startup --no-path
     - export PATH="$HOME/.apps/bin:$PATH"
     - silicon-apps --home "$HOME" --server https://apps.teamofsilicons.com install silicon-accounts
     - silicon-accounts login --silicon si:scout --federated env:SILICON_ID_TOKEN

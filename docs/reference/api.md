@@ -31,7 +31,7 @@ export ACCOUNTS_URL=https://accounts.teamofsilicons.com   # a local stack: http:
 curl -s "$ACCOUNTS_URL/v1/meta"
 ```
 
-Running your own stack? Follow [Run it yourself](../index.md#run-it-yourself) and set `ACCOUNTS_URL=http://localhost:8590`. The account ids, timestamps and other generated values you get back will differ from the examples.
+Using a local development stack? Follow [Run a local development stack](../index.md#run-a-local-development-stack) and set `ACCOUNTS_URL=http://localhost:8590`. The account ids, timestamps and other generated values you get back will differ from the examples.
 
 ```json
 {

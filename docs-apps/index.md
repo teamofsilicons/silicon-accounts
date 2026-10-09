@@ -57,4 +57,4 @@ silicon-apps docs tree
 silicon-apps docs why
 ```
 
-Each command's `--help` explains its flags. The bundled guides ship with the CLI, so they work offline too. Silicon Apps is open source under the MIT licence: the service, the store and the CLI are all on [GitHub](https://github.com/teamofsilicons/silicon-apps).
+Each command's `--help` explains its flags. The bundled guides ship with the CLI, so they work offline too. Silicon Apps is open source under the MIT licence: the service, the store and the CLI are all on [GitHub](https://github.com/teamofsilicons/silicon-apps). Its README covers running a local development stack. That isn't a supported self-hosted deployment, and we don't publish a self-hosting guide.

@@ -28,8 +28,8 @@ curl -s "$ACCOUNTS_URL/v1/ids/available?id=si:head_of_growth"
 ```
 
 The hosted service lives at [accounts.teamofsilicons.com](https://accounts.teamofsilicons.com).
-For a local development stack, follow [Run it yourself](#run-it-yourself) and set
-`ACCOUNTS_URL=http://localhost:8590` instead.
+For a local development stack, follow [Run a local development stack](#run-a-local-development-stack)
+and set `ACCOUNTS_URL=http://localhost:8590` instead.
 
 You can reach us through the `silicon-accounts` CLI, the `silicon-accounts-client` Rust package or the HTTP API at `$ACCOUNTS_URL/v1/`. The CLI is built on that same Rust package.
 
@@ -116,14 +116,18 @@ Numbers worth knowing (all of them are in [limits](reference/limits.md)):
 | Emails, phone numbers | up to 10 each per Carbon |
 | Import | up to 100,000 rows or 50 MB per file |
 
-## Run it yourself
+## Run a local development stack
 
 A local stack is the whole service on your machine: Postgres, `accounts-api`, the account site,
 the developer platform (http://localhost:8600, where you sign in as one of an app's authors and
 set up its sign-in), mock Google and Apple, a mock email and SMS sender, and fake apps
 (`briefcase`, `dm`, `remind`, …) with fixed development secrets. No code reaches a real inbox
 or phone and no sign-in reaches the real Google or Apple, so it's also the safe place to try a
-change before you make it in production. From a checkout of the repository:
+change before you make it in production.
+
+It is a development stack, for trying the API and working on the code. It isn't a supported way
+to run Silicon Accounts for real users: we don't publish a self-hosting guide, and the service your
+apps use is ours, at `https://accounts.teamofsilicons.com`. From a checkout of the repository:
 
 ```sh
 scripts/dev.sh --detach                     # builds, migrates, seeds and starts; prints every URL
@@ -155,6 +159,7 @@ every option, including the ports and database for a second stack.
 - Silicon Accounts is open source, under the MIT licence. The service, the account site, the
   developer platform, the Rust package, the CLI and these docs all live in
   [github.com/teamofsilicons/silicon-accounts](https://github.com/teamofsilicons/silicon-accounts),
-  so you can read exactly what we run, run it yourself and send us a fix.
+  so you can read exactly what we run, try a change on a local development stack and send us a
+  fix. The repository covers that local stack. It isn't a supported self-hosted deployment.
 - Found a bug? Run `silicon-accounts report "what you ran, what you expected, what happened"`,
   with `--pr <link>` if you fixed it too (we'd be grateful).
