@@ -1,16 +1,24 @@
-//! `POST /v1/device/authorize` (RFC 8628 §3.1–3.2): starts a device sign-in for the accounts
-//! CLI. The CLI shows `user_code` and `verification_uri`, the Carbon approves on the account
-//! site (`/device`, served by the auth crate's `/v1/device/{user_code}` endpoints), and the CLI
-//! polls `POST /v1/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:device_code`.
+//! `POST /v1/device/authorize` (RFC 8628 sections 3.1 and 3.2): starts a device sign-in. The tool shows
+//! `user_code` and `verification_uri`, the Carbon approves on the account site (`/device`, served
+//! by the auth crate's `/v1/device/{user_code}` endpoints), and the tool polls
+//! `POST /v1/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:device_code`.
 //!
-//! Public (no credentials): only the first-party client `silicon-accounts` uses the device flow, so a
-//! `client_id` naming another app is refused. Body: JSON or form, all optional —
-//! `client_label` (shown on the approval page and the sessions list), `client_id`, `scope`.
-//! Errors use the API error shape. Rate-limited per IP ([`DEVICE_AUTHORIZE_PER_IP`]).
+//! Two kinds of client:
+//! - the silicon-accounts CLI: no `client_id` (or `client_id=silicon-accounts`); first-party tokens;
+//! - an app's own command-line tool: `client_id=<app_id>`, the app turned on `device_flow` in its
+//!   sign-in setup (else 400 `unauthorized_client`). No secret is needed (a CLI on someone's
+//!   machine can't keep one); with HTTP Basic the secret is checked. `scope` asks for details
+//!   the app requests (`email`, `phone`, `dob`, `timezone`); the app's required details are
+//!   always included, and `profile` always is.
+//!
+//! Body: JSON or form, all optional: `client_label` (shown on the approval page and the sessions
+//! list), `client_id`, `scope`. Errors use the API error shape. Rate-limited per IP
+//! ([`DEVICE_AUTHORIZE_PER_IP`]) and per app ([`DEVICE_AUTHORIZE_PER_APP`]).
 
 use accounts_core::http::auth::basic_credentials;
 use accounts_core::http::{ClientMeta, parse_form_or_json};
-use accounts_core::models::Scope;
+use accounts_core::models::{App, Scope, SigninConfig, normalize_scopes};
+use accounts_core::repo::apps;
 use accounts_core::repo::rate_limit::{self, Limit};
 use accounts_core::repo::tokens::{self, DEVICE_CODE_TTL_SECONDS};
 use accounts_core::{ApiError, AppState, FIRST_PARTY_APP_ID};
@@ -27,6 +35,17 @@ use crate::respond::no_store;
 
 /// At most 60 device sign-ins started per IP per 10 minutes.
 pub const DEVICE_AUTHORIZE_PER_IP: Limit = Limit::new(60, 600);
+
+/// At most 600 device sign-ins started per app per 10 minutes.
+pub const DEVICE_AUTHORIZE_PER_APP: Limit = Limit::new(600, 600);
+
+/// Who is starting a device sign-in.
+enum DeviceClient {
+    /// The silicon-accounts CLI.
+    FirstParty,
+    /// An app's own tool, with the scopes it asks for.
+    App(Box<App>, Vec<Scope>),
+}
 
 /// Longest `client_label` kept (longer ones are cut).
 const MAX_LABEL_CHARS: usize = 100;
@@ -82,15 +101,7 @@ pub(crate) async fn authorize(
             .hint("Send JSON like {\"client_label\":\"silicon-accounts CLI on my-laptop\"}, or the same fields as a form; every field is optional.")
         })?
     };
-    check_client(&headers, &params)?;
-    if let Some(scope) = opt(params.scope.as_deref()) {
-        // First-party tokens always carry `profile`; the scope is only checked for typos.
-        Scope::parse_list(scope).map_err(|e| {
-            ApiError::bad_request("invalid_scope", format!("The scope parameter has {e}.")).hint(
-                "Omit scope: device sign-ins always get first-party tokens for the silicon-accounts app.",
-            )
-        })?;
-    }
+    let client = resolve_client(&state, &headers, &params).await?;
     rate_limit::enforce_pool(
         &state.db,
         &rate_limit::bucket("device_authorize:ip", meta.ip_or_unknown()),
@@ -99,9 +110,37 @@ pub(crate) async fn authorize(
     )
     .await?;
     let label = clean_label(params.client_label.as_deref());
-    let start = {
-        let mut conn = state.db.acquire().await?;
-        tokens::create_device(&mut conn, &state.keys.pepper, label.as_deref()).await?
+    let start = match &client {
+        DeviceClient::FirstParty => {
+            if let Some(scope) = opt(params.scope.as_deref()) {
+                // First-party tokens always carry `profile`; the scope is only checked for typos.
+                Scope::parse_list(scope).map_err(|e| {
+                    ApiError::bad_request("invalid_scope", format!("The scope parameter has {e}.")).hint(
+                        "Omit scope: device sign-ins always get first-party tokens for the silicon-accounts app.",
+                    )
+                })?;
+            }
+            let mut conn = state.db.acquire().await?;
+            tokens::create_device(&mut conn, &state.keys.pepper, label.as_deref()).await?
+        }
+        DeviceClient::App(app, scopes) => {
+            rate_limit::enforce_pool(
+                &state.db,
+                &rate_limit::bucket("device_authorize:app", &app.app_id),
+                DEVICE_AUTHORIZE_PER_APP,
+                &format!("device sign-ins started for {}", app.name),
+            )
+            .await?;
+            let mut conn = state.db.acquire().await?;
+            tokens::create_app_device(
+                &mut conn,
+                &state.keys.pepper,
+                &app.app_id,
+                label.as_deref(),
+                Some(scopes),
+            )
+            .await?
+        }
     };
     let verification_uri = state.settings.url("/device");
     let verification_uri_complete = format!("{verification_uri}?code={}", start.user_code);
@@ -119,26 +158,115 @@ pub(crate) async fn authorize(
     ))
 }
 
-/// Only the first-party client may start a device sign-in (by `client_id`, or the user part of
-/// HTTP Basic credentials).
-fn check_client(headers: &HeaderMap, params: &AuthorizeParams) -> Result<(), ApiError> {
-    let basic_id = basic_credentials(headers).ok().flatten().map(|(id, _)| id);
-    let named = opt(params.client_id.as_deref())
-        .map(str::to_string)
-        .into_iter()
-        .chain(basic_id);
-    for id in named {
-        if accounts_core::canonical_first_party_app_id(&id) != FIRST_PARTY_APP_ID {
+/// The client of a device sign-in: the first-party CLI (no `client_id`, or
+/// `silicon-accounts`), or an app that turned on `device_flow` (by `client_id`, or the user part
+/// of HTTP Basic credentials, whose secret is then checked).
+async fn resolve_client(
+    state: &AppState,
+    headers: &HeaderMap,
+    params: &AuthorizeParams,
+) -> Result<DeviceClient, ApiError> {
+    let basic = basic_credentials(headers).map_err(|m| {
+        ApiError::unauthenticated("invalid_app_credentials", m).hint(
+            "Send Authorization: Basic base64(app_id:app_secret), or only client_id in the body.",
+        )
+    })?;
+    let body_id = opt(params.client_id.as_deref()).map(str::to_string);
+    let named = match (&basic, &body_id) {
+        (Some((id, _)), Some(b)) if id != b => {
             return Err(ApiError::bad_request(
-                "unauthorized_client",
+                "invalid_client",
                 format!(
-                    "The device flow is only for the first-party client '{FIRST_PARTY_APP_ID}' (the silicon-accounts CLI), not for the app '{id}'."
+                    "client_id '{b}' in the body doesn't match the Basic credentials for '{id}'."
                 ),
-            )
-            .hint("Apps sign accounts in through the hosted pages (/authorize) and exchange the code at POST /v1/oauth/token. Omit client_id, or send client_id=silicon-accounts."));
+            ));
+        }
+        (Some((id, _)), _) => Some(id.clone()),
+        (None, b) => b.clone(),
+    };
+    let Some(id) = named else {
+        return Ok(DeviceClient::FirstParty);
+    };
+    if accounts_core::canonical_first_party_app_id(&id) == FIRST_PARTY_APP_ID {
+        return Ok(DeviceClient::FirstParty);
+    }
+    let app = match &basic {
+        Some((id, secret)) => state
+            .app_cache
+            .verify(&state.db, &state.keys.pepper, id, secret)
+            .await
+            .map_err(|e| e.to_api())?,
+        None => {
+            let mut conn = state.db.acquire().await?;
+            apps::get(&mut conn, &id).await?.ok_or_else(|| {
+                ApiError::bad_request(
+                    "invalid_client",
+                    format!("There is no app '{id}', so it can't start a device sign-in."),
+                )
+                .hint("Send the client_id (app_id) of your app as Silicon Apps shows it.")
+            })?
+        }
+    };
+    if !app.is_active() {
+        return Err(ApiError::forbidden(
+            "app_disabled",
+            format!(
+                "The app '{}' is disabled, so it can't sign anyone in.",
+                app.app_id
+            ),
+        ));
+    }
+    let config = {
+        let mut conn = state.db.acquire().await?;
+        apps::effective_config(&mut conn, &state.settings, &app.app_id).await?
+    };
+    if !config.device_flow {
+        return Err(ApiError::bad_request(
+            "unauthorized_client",
+            format!(
+                "The app '{}' hasn't turned on device sign-ins, so its tools can't start one.",
+                app.app_id
+            ),
+        )
+        .hint("Its owner turns it on with PATCH /v1/apps/{app_id}/signin-config {\"device_flow\": true} (or the Accounts tab in the developer portal). Until then the app signs accounts in through /authorize."));
+    }
+    let scopes = requested_scopes(&config, opt(params.scope.as_deref()))?;
+    Ok(DeviceClient::App(Box::new(app), scopes))
+}
+
+/// `profile`, the app's required details, and the optional ones `scope` asks for. A scope the
+/// app doesn't request is `invalid_scope`.
+fn requested_scopes(config: &SigninConfig, scope: Option<&str>) -> Result<Vec<Scope>, ApiError> {
+    let mut scopes = vec![Scope::Profile];
+    scopes.extend(config.required_fields.iter().map(|f| f.scope()));
+    if let Some(scope) = scope {
+        let asked = Scope::parse_list(scope).map_err(|e| {
+            ApiError::bad_request("invalid_scope", format!("The scope parameter has {e}."))
+                .hint("Ask for details the app requests, separated by spaces: profile email phone dob timezone.")
+        })?;
+        let offered: Vec<Scope> = config
+            .requested_fields()
+            .iter()
+            .map(|f| f.scope())
+            .collect();
+        for s in asked {
+            match s {
+                Scope::Profile | Scope::Openid => {}
+                other if offered.contains(&other) => scopes.push(other),
+                other => {
+                    return Err(ApiError::bad_request(
+                        "invalid_scope",
+                        format!(
+                            "The scope '{}' isn't a detail this app asks for, so a device sign-in can't share it.",
+                            other.as_str()
+                        ),
+                    )
+                    .hint("Add it to the app's required or optional details first, or leave it out of scope."));
+                }
+            }
         }
     }
-    Ok(())
+    Ok(normalize_scopes(scopes))
 }
 
 /// Trims, turns control characters and runs of whitespace into single spaces, and keeps at most

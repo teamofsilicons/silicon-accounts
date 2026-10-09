@@ -114,7 +114,7 @@ fresh 72 hours of retries.
 
 | Who | List | One delivery | Replay |
 |---|---|---|---|
-| an app (or its owner) | [`GET /v1/apps/{app_id}/webhook/deliveries`](apps.md#get-v1appsapp_idwebhookdeliveries) | `GET /v1/apps/{app_id}/webhook/deliveries/{delivery_id}` | [`POST /v1/apps/{app_id}/webhook/replay`](apps.md#post-v1appsapp_idwebhookreplay) |
+| an app (or one of its authors) | [`GET /v1/apps/{app_id}/webhook/deliveries`](apps.md#get-v1appsapp_idwebhookdeliveries) | `GET /v1/apps/{app_id}/webhook/deliveries/{delivery_id}` | [`POST /v1/apps/{app_id}/webhook/replay`](apps.md#post-v1appsapp_idwebhookreplay) |
 | a Silicon | [`GET /v1/me/webhook/deliveries`](silicons.md#get-v1mewebhookdeliveries) | `GET /v1/me/webhook/deliveries/{delivery_id}` | [`POST /v1/me/webhook/replay`](silicons.md#post-v1mewebhookreplay) |
 | its custodian | [`GET /v1/me/silicons/{uuid}/webhook/deliveries`](silicons.md#get-v1mesiliconsuuidwebhookdeliveries) | `GET /v1/me/silicons/{uuid}/webhook/deliveries/{delivery_id}` | [`POST /v1/me/silicons/{uuid}/webhook/replay`](silicons.md#post-v1mesiliconsuuidwebhookreplay) |
 
@@ -124,6 +124,76 @@ was deleted (skipped `membership_inactive` / `account_deleted`, its detail
 withheld from it or its custodian. And a Silicon's test pings are never replayed (skipped
 `test_ping`, counted in `not_replayable`): a replay would get around its limit of 10 test pings an
 hour; an app's `ping` replays like any event.
+
+## Event stream
+
+### `GET /v1/events/stream`
+
+The same events, pushed to you over one long HTTP response as
+[Server-Sent Events](https://html.spec.whatwg.org/multipage/server-sent-events.html), so you don't
+need a public URL to hear about changes. Each event's `data` is exactly the body a webhook gets.
+
+| Who | Auth | Gets |
+|---|---|---|
+| an app | `Authorization: Basic base64(app_id:app_secret)` | the events of its stream subscription ([create one](apps.md#post-v1appsapp_idsubscriptions) with `{"delivery":"stream"}` first), filtered by the updates it picked |
+| a Silicon | its access token (or the account site's session) | its own Silicon events |
+| a Carbon | its access token (or the account site's session) | the Silicon events of the Silicons it is custodian of |
+| a self-created Silicon waiting for its custodian | `Authorization: Bearer sarq_…` (the request token from `POST /v1/silicons`) | its own events; the stream ends after the custodian's decision |
+
+| Parameter | |
+|---|---|
+| `Last-Event-ID` (header) | resume after this `event_id`: nothing after it is missed. Browsers' `EventSource` sends it on reconnect |
+| `after` (query) | the same, for clients that can't set headers; `Last-Event-ID` wins when both are sent |
+| `types` (query) | comma-separated event types to keep, like `account.updated,account.deleted` |
+
+Without a cursor the stream starts with new events. A real stream (an app's, through `curl -N`):
+
+```http
+HTTP/1.1 200 OK
+content-type: text/event-stream
+cache-control: no-store
+accounts-version: 2026-10-01
+
+retry: 5000
+: connected
+
+id: 01a11e45-ed2c-70ad-9042-652eb141059c
+event: account.updated
+data: {"app_id":"briefcase","data":{"account":{"display_name":"Saket Streamed","…":"…","version":2},"changed":["display_name"],"membership_id":"briefcase:zQo","uuid":"zQo"},"event_id":"01a11e45-ed2c-70ad-9042-652eb141059c","occurred_at":"2026-10-09T01:27:41.612Z","silicon":null,"type":"account.updated"}
+
+id: 01a11e45-eec2-774a-83b0-138146e4f988
+event: ping
+data: {"app_id":"briefcase","data":{},"event_id":"01a11e45-eec2-774a-83b0-138146e4f988","occurred_at":"2026-10-09T01:27:42.018Z","silicon":null,"type":"ping"}
+
+: heartbeat
+
+event: stream.closed
+data: {"message":"The app's stream subscription was deleted, so nothing more is kept for this stream.","reason":"subscription_deleted"}
+```
+
+- Every event has `id:` (its `event_id`), `event:` (its type) and `data:` (the webhook body).
+- `: heartbeat` comes after 15 seconds without events, so proxies keep the connection open.
+- `stream.closed` (no `id`) comes right before we end a stream. `reason` is `token_expired` (refresh
+  your token and reconnect), `access_removed` (the credentials stopped working: signed out,
+  revoked, an STK rotation, a rotated app secret, a disabled app), `subscription_deleted`,
+  `request_decided` (a waiting Silicon's custodian answered), `max_duration` (a stream lasts at most
+  an hour) or `server_restarting`. Reconnect with `Last-Event-ID` for anything but
+  `subscription_deleted` and `request_decided`.
+- Delivery is at least once, like webhooks: a resumed stream can repeat an event. Dedupe on
+  `event_id`. Within one stream, events arrive in the order their changes were saved.
+- Credentials are checked again every 30 seconds while the stream is open.
+
+Errors: 401 (no or bad credentials; `invalid_request_token` for an unknown `sarq_` token), 409
+`stream_subscription_required` (an app without a stream subscription), 400 `unknown_event_id`
+(the cursor isn't an event of this feed), 400 `invalid_query` (a type this feed never carries),
+429 `too_many_streams` (5 open streams per app or account, with `Retry-After`), 503
+`stream_capacity_reached` (the server is full or restarting, with `Retry-After`).
+
+```sh
+curl -N "$ACCOUNTS_URL/v1/events/stream" -u "$APP_ID:$APP_SECRET"
+curl -N "$ACCOUNTS_URL/v1/events/stream?types=silicon.custodian.accepted" -H "Authorization: Bearer $TOKEN"
+curl -N "$ACCOUNTS_URL/v1/events/stream" -u "$APP_ID:$APP_SECRET" -H "Last-Event-ID: $LAST_EVENT_ID"
+```
 
 ## App events
 

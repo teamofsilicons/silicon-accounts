@@ -11,6 +11,7 @@
 //! | user base | `GET /v1/apps/{app_id}/users`, `GET …/users/{uuid}` | [`users`] |
 //! | user imports | `POST|GET /v1/apps/{app_id}/imports`, `GET …/imports/{job_id}`, `GET …/imports/{job_id}/rows` | [`imports`] |
 //! | app webhook | `PUT|DELETE /v1/apps/{app_id}/webhook`, `POST …/webhook/rotate-secret`, `POST …/webhook/test`, `GET …/webhook/deliveries[/{id}]`, `POST …/webhook/replay` | [`webhooks`] |
+//! | event subscriptions | `GET|POST /v1/apps/{app_id}/subscriptions`, `GET|PATCH|DELETE …/subscriptions/{subscription_id}`, `POST …/subscriptions/{subscription_id}/test` | [`subscriptions`] |
 //! | Silicon Apps stand-in | `POST /v1/internal/apps/sync`, [`seed_fake_apps`] (used by `accounts-seed`) | [`sync`] |
 //!
 //! Auth: `/v1/apps/{app_id}/…` management routes take the app's own credentials
@@ -34,6 +35,7 @@ use tokio::task::JoinHandle;
 pub mod apps;
 pub mod imports;
 pub mod signin_config;
+pub mod subscriptions;
 pub mod sync;
 pub mod users;
 pub mod webhooks;
@@ -52,6 +54,7 @@ pub fn router() -> Router<AppState> {
         .merge(users::router())
         .merge(imports::router())
         .merge(webhooks::router())
+        .merge(subscriptions::router())
         .merge(sync::router())
         .merge(service_mail::router())
         .merge(account_verification::router())

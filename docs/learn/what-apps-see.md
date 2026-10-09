@@ -142,9 +142,11 @@ has both from the moment it exists. An optional email or phone the account lacks
 same way, and then starts ticked.
 
 Required details are why a Carbon who signs in by phone can still be required to add an email.
-With `allowed_email_domains`, the details page only accepts an email at your domains; but a
-Carbon who signs in by phone and already has a verified email elsewhere doesn't add one, so your
-app can receive an email outside your domains (keep `phone` off on such an app). A Carbon using
+With `allowed_email_domains`, every way in only lets through an account with a verified email at
+one of your domains: a Carbon who signs in by phone and has no such email is refused (`403
+email_domain_not_allowed`), and a new Carbon signing up by phone is asked for an email at your
+domains before the sign-in completes (when your app requires an email; without that, a phone
+sign-up is refused at once). A Carbon using
 the CLI to get a short-lived token can't add a detail there, so a missing detail answers
 `409 requirements_missing` and names it.
 

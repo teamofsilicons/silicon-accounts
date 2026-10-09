@@ -29,8 +29,9 @@
 use accounts_core::events::{self, types};
 use accounts_core::http::pagination::paginate;
 use accounts_core::http::{AppOrOwner, ClientMeta, IdempotencyKey, Json, Path, Query};
+use accounts_core::models::SubscriptionDelivery;
 use accounts_core::normalize::validate_webhook_url;
-use accounts_core::repo::{audit, idempotency};
+use accounts_core::repo::{audit, idempotency, subscriptions};
 use accounts_core::{ApiError, ApiResult, AppState, FieldErrors};
 use axum::Router;
 use axum::extract::State;
@@ -98,10 +99,24 @@ async fn current_webhook(conn: &mut sqlx::PgConnection, app_id: &str) -> ApiResu
 async fn get_webhook(State(state): State<AppState>, auth: AppOrOwner) -> ApiResult<Response> {
     let mut conn = state.db.acquire().await?;
     let row: Option<(Option<String>, bool, Option<Value>)> = sqlx::query_as(
-        "select webhook_url,webhook_secret_enc is not null,webhook_events from app_signin_configs where app_id=$1"
-    ).bind(&auth.app.app_id).fetch_optional(&mut *conn).await?;
+        "select webhook_url, webhook_secret_enc is not null, webhook_events from app_signin_configs where app_id = $1",
+    )
+    .bind(&auth.app.app_id)
+    .fetch_optional(&mut *conn)
+    .await?;
     let (url, secret_set, selected) = row.unwrap_or((None, false, None));
-    Ok(axum::Json(json!({"url":url,"secret_set":secret_set,"events":selected})).into_response())
+    // The webhook subscription (it exists while the URL is set) carries the status.
+    let subscription =
+        subscriptions::by_delivery(&mut conn, &auth.app.app_id, SubscriptionDelivery::Webhook)
+            .await?;
+    Ok(axum::Json(json!({
+        "url": url,
+        "secret_set": secret_set,
+        "events": selected,
+        "subscription_id": subscription.as_ref().map(|s| s.id),
+        "status": subscription.as_ref().map(|s| s.status),
+    }))
+    .into_response())
 }
 
 async fn set_webhook(
@@ -179,13 +194,13 @@ fn no_store(r: &mut Response) {
     );
 }
 
-async fn remove_webhook(
-    State(state): State<AppState>,
-    auth: AppOrOwner,
-    meta: ClientMeta,
-) -> ApiResult<Response> {
-    let app_id = auth.app.app_id.as_str();
-    let mut tx = state.db.begin().await?;
+/// Removes the app's webhook (URL and secret; the trigger removes its webhook subscription)
+/// inside the caller's transaction, and fails its pending deliveries so they show up as
+/// replayable at once. `(previous URL, deliveries failed)`, or `None` when there was none.
+pub(crate) async fn clear_webhook(
+    tx: &mut sqlx::PgConnection,
+    app_id: &str,
+) -> ApiResult<Option<(String, u64)>> {
     let previous: Option<Option<String>> = sqlx::query_scalar(
         "select webhook_url from app_signin_configs where app_id = $1 for update",
     )
@@ -193,9 +208,7 @@ async fn remove_webhook(
     .fetch_optional(&mut *tx)
     .await?;
     let Some(Some(previous)) = previous else {
-        // Already gone: deleting is idempotent.
-        tx.commit().await?;
-        return Ok(StatusCode::NO_CONTENT.into_response());
+        return Ok(None);
     };
     sqlx::query(
         "update app_signin_configs set webhook_url = null, webhook_secret_enc = null, updated_at = now() where app_id = $1",
@@ -214,6 +227,21 @@ async fn remove_webhook(
     .execute(&mut *tx)
     .await?
     .rows_affected();
+    Ok(Some((previous, failed)))
+}
+
+async fn remove_webhook(
+    State(state): State<AppState>,
+    auth: AppOrOwner,
+    meta: ClientMeta,
+) -> ApiResult<Response> {
+    let app_id = auth.app.app_id.as_str();
+    let mut tx = state.db.begin().await?;
+    let Some((previous, failed)) = clear_webhook(&mut tx, app_id).await? else {
+        // Already gone: deleting is idempotent.
+        tx.commit().await?;
+        return Ok(StatusCode::NO_CONTENT.into_response());
+    };
     let (actor_kind, actor_id) = auth.audit_actor();
     audit::record(
         &mut tx,

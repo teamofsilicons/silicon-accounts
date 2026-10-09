@@ -13,12 +13,13 @@ use crate::error::{Error, Result};
 use crate::secret::Secret;
 use crate::serde_util::unwrap_key;
 use crate::types::{
-    AccountKind, AccountSummary, Contact, ContactChallenge, CreateSilicon, CustodianRequest,
-    DeliveriesQuery, DeliveryDetail, DeviceRequest, EmailAddress, HistoryItem, HistoryQuery,
-    IdAvailability, Identity, ManagedSilicon, Me, MyApp, MyProof, OwnedApp, Page, PhoneNumber,
-    PhotoUploaded, ProfileUpdate, ReplayRequest, ReplayResult, SessionInfo, ShortLivedToken,
-    SiliconCreated, SiliconPhotoUploaded, SiliconView, SiliconWebhook, StkRotated, UpdateSilicon,
-    WebhookDelivery, WebhookTestResult,
+    AccountKind, AccountSummary, AllowedApps, Contact, ContactChallenge, CreateSilicon,
+    CustodianRequest, DeliveriesQuery, DeliveryDetail, DeviceRequest, EmailAddress, HistoryItem,
+    HistoryQuery, IdAvailability, Identity, ManagedSilicon, Me, MyApp, MyProof, OwnedApp, Page,
+    PageRequest, PhoneNumber, PhotoUploaded, ProfileUpdate, ReplayRequest, ReplayResult,
+    SessionInfo, ShortLivedToken, SiliconCreated, SiliconKeyInfo, SiliconPhotoUploaded,
+    SiliconSignin, SiliconView, SiliconWebhook, StkRotated, UpdateSilicon, WebhookDelivery,
+    WebhookTestResult,
 };
 
 /// A signed-in Carbon or Silicon, authenticated with a first-party access token
@@ -670,6 +671,123 @@ impl<'a> AccountSession<'a> {
             )
             .await?;
         response.json_from(unwrap_key(response.value()?, "request"))
+    }
+
+    /// `GET /v1/me/silicons/{uuid}/apps` (custodian): every app the Silicon signed into, most
+    /// recently used first (`status`: `active`, `access_removed` or `imported`).
+    pub async fn silicon_apps(&self, uuid: &str, status: Option<&str>) -> Result<Vec<MyApp>> {
+        let mut items = Vec::new();
+        let mut cursor: Option<String> = None;
+        for _ in 0..100 {
+            let url = self.client.endpoint_with_query(
+                &["v1", "me", "silicons", uuid.trim(), "apps"],
+                &[
+                    ("status", status.map(str::to_owned)),
+                    ("limit", Some("200".to_owned())),
+                    ("cursor", cursor.take()),
+                ],
+            );
+            let page: Page<MyApp> = self.page(url).await?;
+            items.extend(page.items);
+            match page.next_cursor {
+                Some(next) if !next.is_empty() => cursor = Some(next),
+                _ => break,
+            }
+        }
+        Ok(items)
+    }
+
+    /// `DELETE /v1/me/silicons/{uuid}/apps/{app_id}` (custodian): removes the Silicon's access
+    /// to one app. Its sign-ins there end and the app gets `membership.access_removed`.
+    pub async fn remove_silicon_app(&self, uuid: &str, app_id: &str) -> Result<()> {
+        self.send(
+            Method::DELETE,
+            &["v1", "me", "silicons", uuid.trim(), "apps", app_id.trim()],
+            None,
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// `GET /v1/me/silicons/{uuid}/signins` (custodian): one page of the Silicon's sign-ins,
+    /// newest first.
+    pub async fn silicon_signins(
+        &self,
+        uuid: &str,
+        page: &PageRequest,
+    ) -> Result<Page<SiliconSignin>> {
+        let url = self.client.endpoint_with_query(
+            &["v1", "me", "silicons", uuid.trim(), "signins"],
+            &[
+                ("limit", page.limit.map(|l| l.to_string())),
+                ("cursor", page.cursor.clone()),
+            ],
+        );
+        self.page(url).await
+    }
+
+    /// `GET /v1/me/silicons/{uuid}/allowed-apps` (custodian).
+    pub async fn silicon_allowed_apps(&self, uuid: &str) -> Result<AllowedApps> {
+        self.get(&["v1", "me", "silicons", uuid.trim(), "allowed-apps"])
+            .await
+    }
+
+    /// `PUT /v1/me/silicons/{uuid}/allowed-apps` (custodian): the apps the Silicon may get
+    /// short-lived tokens for; `None` allows every app.
+    pub async fn set_silicon_allowed_apps(
+        &self,
+        uuid: &str,
+        apps: Option<&[String]>,
+    ) -> Result<AllowedApps> {
+        let body = json!({ "allowed_apps": apps });
+        self.send(
+            Method::PUT,
+            &["v1", "me", "silicons", uuid.trim(), "allowed-apps"],
+            Some(&body),
+        )
+        .await?
+        .json()
+    }
+
+    /// `POST /v1/silicons/{id}/keys`: registers a public key for a Silicon (yourself, or one
+    /// you are custodian of). `public_key`: an OpenSSH line, a PEM PUBLIC KEY or base64url.
+    pub async fn add_silicon_key(
+        &self,
+        silicon: &str,
+        public_key: &str,
+        name: Option<&str>,
+    ) -> Result<SiliconKeyInfo> {
+        let mut body = json!({ "public_key": public_key.trim() });
+        if let Some(name) = name {
+            body["name"] = json!(name);
+        }
+        self.send(
+            Method::POST,
+            &["v1", "silicons", silicon.trim(), "keys"],
+            Some(&body),
+        )
+        .await?
+        .json()
+    }
+
+    /// `GET /v1/silicons/{id}/keys`: the Silicon's keys, newest first, revoked ones too.
+    pub async fn silicon_keys(&self, silicon: &str) -> Result<Vec<SiliconKeyInfo>> {
+        let page: Page<SiliconKeyInfo> = self
+            .get(&["v1", "silicons", silicon.trim(), "keys"])
+            .await?;
+        Ok(page.items)
+    }
+
+    /// `DELETE /v1/silicons/{id}/keys/{key_id}`: the key stops working and the sign-ins it
+    /// started end.
+    pub async fn revoke_silicon_key(&self, silicon: &str, key_id: &str) -> Result<()> {
+        self.send(
+            Method::DELETE,
+            &["v1", "silicons", silicon.trim(), "keys", key_id.trim()],
+            None,
+        )
+        .await
+        .map(|_| ())
     }
 
     /// `DELETE /v1/me/silicons/{uuid}/transfer`: cancel a pending transfer.

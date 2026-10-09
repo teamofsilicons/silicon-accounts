@@ -127,7 +127,7 @@ of any length: "An app verification is for exactly one app; ask for one proof pe
 
 ## `POST /v1/apps/{app_id}/proofs/app-verification`
 
-The same for **app or owner**: the app's owner can issue App verification proofs from the app's App verification page on
+The same for **app or author**: the app's authors can issue App verification proofs from the app's App verification page on
 developers.teamofsilicons.com without the app secret. Same body and response (and the same 422
 `app_verification_single_app` for `audiences`); 403 `app_disabled` for a disabled app.
 
@@ -187,7 +187,7 @@ yours; another app's proof id looks unknown), 400 `invalid_proof_id`, 403 `not_i
 
 ## `GET /v1/apps/{app_id}/proofs`
 
-**app or owner**: proofs the app issued, newest first. Query: `kind` (`user_verification`, `app_verification`), `status`
+**app or author**: proofs the app issued, newest first. Query: `kind` (`user_verification`, `app_verification`), `status`
 (`active`, `revoked`, `expired`), `limit`, `cursor`.
 
 ```json
@@ -221,7 +221,7 @@ Reasons: `revoked_by_app`, `revoked_by_owner`, `revoked_by_account`, `refresh_to
 
 ## `DELETE /v1/apps/{app_id}/proofs/{proof_id}`
 
-**app or owner**: revoke one of the app's proofs. **204.** 404 `proof_not_found`, 400
+**app or author**: revoke one of the app's proofs. **204.** 404 `proof_not_found`, 400
 `invalid_proof_id`.
 
 ## `GET /v1/me/app-verifications`

@@ -123,7 +123,7 @@ Each endpoint below names one of these kinds of caller.
 | **public** | nothing | anyone (some are rate limited per IP) |
 | **account** | `Authorization: Bearer <access token>` whose `aud` is `silicon-accounts`, or the account site's session cookie | a signed-in Carbon or Silicon. **account (Carbon)** and **account (Silicon)** restrict the kind: the other kind gets 403 `carbon_only` / `silicon_only` |
 | **app** | `Authorization: Basic base64(app_id:app_secret)` | an app with its own credentials |
-| **app or owner** | the app's Basic credentials, or the **account** auth of the Carbon who owns the app | an app, or its owner (`/v1/apps/{app_id}/…` routes) |
+| **app or author** | the app's Basic credentials, or the **account** auth of one of the app's authors (its owner or a co-author who accepted an invite in Silicon Apps; Carbon or Silicon) | an app, or one of its authors (`/v1/apps/{app_id}/…` routes) |
 | **OAuth client** | HTTP Basic, or `client_id` + `client_secret` in the form body; `client_id=silicon-accounts` with no secret is the first-party public client | `/v1/oauth/token`, `/revoke`, `/introspect` |
 | **app access token** | `Authorization: Bearer <access token>` issued to any app | `GET`/`POST /v1/userinfo` |
 | **flow** | the `sa_flow` cookie set by `POST /v1/flows`, plus an allowed `Origin` | the browser running a hosted sign-in |
@@ -220,6 +220,30 @@ OAuth libraries read `error` as a string:
 
 Every code, its status and its fix: [Errors](errors.md).
 
+## Versions
+
+The API has dated versions. Pin one with the request header `Accounts-Version: 2026-10-01`;
+without it the current version answers, so nothing changes for clients written before versions
+existed. Every answer under `/v1`, `/.well-known` and `/openapi.json` names the version that
+served it in its own `Accounts-Version` header (and `Vary: Accounts-Version`). A version this
+deployment doesn't serve is refused before anything runs:
+
+```json
+{
+  "error": {
+    "code": "unsupported_version",
+    "message": "Silicon Accounts does not serve the API version '2027-01-01' named in the Accounts-Version header. It serves 2026-10-01.",
+    "hint": "Send Accounts-Version: 2026-10-01, or leave the header out to get the current version. GET /v1/capabilities lists the versions.",
+    "details": { "requested": "2027-01-01", "supported": ["2026-10-01"], "current": "2026-10-01" }
+  }
+}
+```
+
+`GET /v1/capabilities` lists the versions and everything else this deployment supports, and
+answers whether it supports what you need (`?require=sse,subscriptions`):
+[Service endpoints](api/service.md#get-v1capabilities). The whole API is described by the
+OpenAPI document at [`/openapi.json`](api/service.md#get-openapijson-and-get-v1openapijson).
+
 ## Idempotency
 
 Endpoints marked **idempotent** below accept an `Idempotency-Key` header: 1 to 200 visible ASCII
@@ -234,7 +258,7 @@ retry that operation.
   a few seconds; a crashed request frees its key after 120 seconds).
 - Failed requests are not stored, so retrying a failure runs it again.
 - Responses are kept for **24 hours**. A response that contains a newly generated secret is encrypted and kept for **10 minutes** instead. This includes STKs, webhook signing secrets, `sarq_` request tokens and proof tokens. If the stored response cannot be decrypted, a retry returns `409 idempotency_result_unavailable`. It does not run the operation again.
-- "Same caller" is the account, the app (or its owner), or for anonymous calls the client IP.
+- "Same caller" is the account, the app (or the author acting for it), or for anonymous calls the client IP.
 
 A Carbon creates a Silicon (`$CARBON_TOKEN` is a Carbon's first-party access token):
 
@@ -261,6 +285,8 @@ The endpoints that accept a key, with how long their result is kept:
 | `PATCH /v1/apps/{app_id}/signin-config`, `POST /v1/apps/{app_id}/imports` | 24 h |
 | `PUT /v1/apps/{app_id}/webhook`, `POST /v1/apps/{app_id}/webhook/rotate-secret` | 10 min |
 | `POST /v1/apps/{app_id}/webhook/test`, `POST /v1/apps/{app_id}/webhook/replay` | 24 h |
+| `POST /v1/apps/{app_id}/subscriptions` | 10 min |
+| `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}`, `POST /v1/apps/{app_id}/subscriptions/{subscription_id}/test` | 24 h |
 | `POST /v1/proofs/user-verification`, `POST /v1/proofs/app-verification`, `POST /v1/apps/{app_id}/proofs/app-verification`, `POST /v1/proofs/refresh` | 10 min |
 | `POST /v1/reports` | 24 h |
 
@@ -302,6 +328,8 @@ ends with 503 `request_timeout`.
 
 Only public resources are readable from other origins: `GET /v1/apps/{app_id}/public`,
 `/.well-known/*` and `/sdk/*` answer `Access-Control-Allow-Origin: *` (and their preflights).
+So do the discovery documents `/openapi.json`, `/v1/openapi.json` and `/v1/capabilities`; their
+`X-Request-Id`, `Accounts-Version` and `Retry-After` headers are readable too.
 Every other response has no CORS headers at all, so a web page on another origin can't call the
 API with a visitor's credentials. Call the API from your server; in the browser use the hosted
 pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)).
@@ -426,22 +454,29 @@ pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)
 | `GET /v1/apps/{app_id}/account-verification-request` | signed-in manager | | 200 latest own request or null |
 | `POST /v1/apps/{app_id}/account-verification-request` | signed-in manager | optional | 201 queued request, or 200 existing pending request |
 | `GET /v1/me/owned-apps` | account (Carbon) | | 200 list |
-| `GET /v1/apps/{app_id}` | app or owner | | 200 app |
-| `PATCH /v1/apps/{app_id}/signin-config` | app or owner | yes | 200 app |
-| `GET /v1/apps/{app_id}/signin-config/history` | app or owner | | 200 list |
-| `GET /v1/apps/{app_id}/users` | app or owner | | 200 list |
-| `GET /v1/apps/{app_id}/users/{uuid}` | app or owner | | 200 user |
-| `POST /v1/apps/{app_id}/imports` | app or owner | yes | 202 job |
-| `GET /v1/apps/{app_id}/imports` | app or owner | | 200 list |
-| `GET /v1/apps/{app_id}/imports/{job_id}` | app or owner | | 200 job |
-| `GET /v1/apps/{app_id}/imports/{job_id}/rows` | app or owner | | 200 list |
-| `PUT /v1/apps/{app_id}/webhook` | app or owner | yes | 200 URL + secret |
-| `DELETE /v1/apps/{app_id}/webhook` | app or owner | | 204 |
-| `POST /v1/apps/{app_id}/webhook/rotate-secret` | app or owner | yes | 200 secret |
-| `POST /v1/apps/{app_id}/webhook/test` | app or owner | yes | 202 queued ping |
-| `GET /v1/apps/{app_id}/webhook/deliveries` | app or owner | | 200 list |
-| `GET /v1/apps/{app_id}/webhook/deliveries/{delivery_id}` | app or owner | | 200 delivery |
-| `POST /v1/apps/{app_id}/webhook/replay` | app or owner | yes | 200 result |
+| `GET /v1/apps/{app_id}` | app or author | | 200 app |
+| `PATCH /v1/apps/{app_id}/signin-config` | app or author | yes | 200 app |
+| `GET /v1/apps/{app_id}/signin-config/history` | app or author | | 200 list |
+| `GET /v1/apps/{app_id}/users` | app or author | | 200 list |
+| `GET /v1/apps/{app_id}/users/{uuid}` | app or author | | 200 user |
+| `POST /v1/apps/{app_id}/imports` | app or author | yes | 202 job |
+| `GET /v1/apps/{app_id}/imports` | app or author | | 200 list |
+| `GET /v1/apps/{app_id}/imports/{job_id}` | app or author | | 200 job |
+| `GET /v1/apps/{app_id}/imports/{job_id}/rows` | app or author | | 200 list |
+| `PUT /v1/apps/{app_id}/webhook` | app or author | yes | 200 URL + secret |
+| `DELETE /v1/apps/{app_id}/webhook` | app or author | | 204 |
+| `POST /v1/apps/{app_id}/webhook/rotate-secret` | app or author | yes | 200 secret |
+| `POST /v1/apps/{app_id}/webhook/test` | app or author | yes | 202 queued ping |
+| `GET /v1/apps/{app_id}/webhook/deliveries` | app or author | | 200 list |
+| `GET /v1/apps/{app_id}/webhook/deliveries/{delivery_id}` | app or author | | 200 delivery |
+| `POST /v1/apps/{app_id}/webhook/replay` | app or author | yes | 200 result |
+| `GET /v1/apps/{app_id}/webhook` | app or author | | 200 webhook |
+| `GET /v1/apps/{app_id}/subscriptions` | app or author | | 200 list |
+| `POST /v1/apps/{app_id}/subscriptions` | app or author | yes | 201 subscription |
+| `GET /v1/apps/{app_id}/subscriptions/{subscription_id}` | app or author | | 200 subscription |
+| `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}` | app or author | yes | 200 subscription |
+| `DELETE /v1/apps/{app_id}/subscriptions/{subscription_id}` | app or author | | 204 |
+| `POST /v1/apps/{app_id}/subscriptions/{subscription_id}/test` | app or author | yes | 202 queued ping |
 | `POST /v1/internal/apps/sync` | internal | | 200 synced apps |
 
 ### App verification and User verification · [proofs.md](api/proofs.md)
@@ -453,9 +488,9 @@ pages, the iframe or the SDK ([Add sign-in to your app](../start/add-sign-in.md)
 | `POST /v1/proofs/refresh` | app (the issuer) | yes | 200 proof |
 | `POST /v1/proofs/verify` | app (an audience) | | 200 valid or not |
 | `POST /v1/proofs/revoke` | app (the issuer) | | 204 |
-| `GET /v1/apps/{app_id}/proofs` | app or owner | | 200 list |
-| `POST /v1/apps/{app_id}/proofs/app-verification` | app or owner | yes | 201 proof |
-| `DELETE /v1/apps/{app_id}/proofs/{proof_id}` | app or owner | | 204 |
+| `GET /v1/apps/{app_id}/proofs` | app or author | | 200 list |
+| `POST /v1/apps/{app_id}/proofs/app-verification` | app or author | yes | 201 proof |
+| `DELETE /v1/apps/{app_id}/proofs/{proof_id}` | app or author | | 204 |
 | `GET /v1/me/app-verifications` | signed-in manager | | 200 retained App verification records |
 | `GET /v1/apps/{app_id}/proofs/{proof_id}/history` | signed-in manager | | 200 retained verification history |
 | `GET /v1/me/proofs` | account | | 200 User verification list |
@@ -468,6 +503,12 @@ event type are on that page. The endpoints that set a webhook and list or replay
 are under [Apps](#apps--appsmd) (an app's) and
 [Silicons and custodians](#silicons-and-custodians--siliconsmd) (a Silicon's).
 
+### Events · [webhooks.md](api/webhooks.md#event-stream)
+
+| Method and path | Auth | Idem. | Success |
+|---|---|---|---|
+| `GET /v1/events/stream` | app, account or request token | | 200 Server-Sent Events |
+
 ### Service · [service.md](api/service.md)
 
 | Method and path | Auth | Idem. | Success |
@@ -478,6 +519,9 @@ are under [Apps](#apps--appsmd) (an app's) and
 | `POST /v1/reports` | public (account optional) | yes | 201 report |
 | `POST /v1/telemetry/events` | public | | 202 |
 | `GET /v1/dev/outbox` | public, development only | | 200 list |
+| `GET /v1/capabilities` | public | | 200 capabilities, 422 when a required one is missing |
+| `GET /openapi.json`, `GET /v1/openapi.json` | public | | 200 OpenAPI 3.1 document |
+| `GET /.well-known/agent.json` | public | | 200 A2A agent card |
 | `GET /embed/v1/buttons`, `GET /sdk/v1.js` | public, served by the account site | | the embed page and the SDK |
 
 On the public origin, any other path under `/v1` or `/.well-known` is 404 `route_not_found`

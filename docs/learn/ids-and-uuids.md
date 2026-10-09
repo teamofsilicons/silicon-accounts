@@ -191,8 +191,8 @@ A Silicon that never became active is different. If its custodian request is dec
 ## Membership ids
 
 An account's membership with an app is `{app_id}:{uuid}`, for example `remind:8HV`, for Carbons and
-Silicons alike. App ids are 2 to 40 characters of `a-z`, `0-9` and `-`, starting with a letter, and
-never change; uuids never change; so a membership id is stable for the life of the account.
+Silicons alike. App ids are 3 to 30 characters of `a-z`, `0-9`, `-` and `_` (as Silicon Apps
+creates them; older ids such as `dm` keep working), never contain `:`, and never change; uuids never change; so a membership id is stable for the life of the account.
 
 It appears wherever an app meets an account: `membership_id` and `account.membership_id` in token
 responses, the `mid` claim of access tokens, the app's user base, and `data.membership_id` in app

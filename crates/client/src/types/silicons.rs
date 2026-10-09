@@ -367,3 +367,101 @@ pub struct CustodianRequest {
     )]
     pub expires_at: Option<OffsetDateTime>,
 }
+
+/// One sign-in of a Silicon, as its custodian sees it (`GET /v1/me/silicons/{uuid}/signins`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SiliconSignin {
+    /// When (RFC 3339).
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub at: String,
+    /// The app it signed into (`None` for Silicon Accounts itself).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app: Option<SigninApp>,
+    /// `silicon_stk`, `slt`, `device`, …
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub method: String,
+    /// `success` or `failed`.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub outcome: String,
+    /// The address it came from.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub ip: Option<String>,
+    /// Its user agent.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub user_agent: Option<String>,
+}
+
+/// The app of a sign-in.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SigninApp {
+    /// The app id.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub app_id: String,
+    /// Its name.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub name: Option<String>,
+}
+
+/// The apps a Silicon may get short-lived tokens for (`/v1/me/silicons/{uuid}/allowed-apps`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct AllowedApps {
+    /// `None`: every app; otherwise only these (an empty list allows none).
+    #[serde(default)]
+    pub allowed_apps: Option<Vec<String>>,
+}
+
+/// A registered Silicon key (`/v1/silicons/{id}/keys`). Public material only.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SiliconKeyInfo {
+    /// Key id (`kid` in assertions).
+    #[serde(deserialize_with = "lenient_string")]
+    pub id: String,
+    /// Its name.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub name: String,
+    /// `EdDSA`.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub algorithm: String,
+    /// The public key, base64url.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub public_key: String,
+    /// `SHA256:…`, as `ssh-keygen -l` prints it.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub fingerprint: String,
+    /// Who added it (account uuid).
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub created_by: String,
+    /// RFC 3339.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub created_at: String,
+    /// Last sign-in with it.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_used_at: Option<String>,
+    /// When it was revoked.
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub revoked_at: Option<String>,
+}

@@ -512,8 +512,28 @@ pub async fn authenticate_client(
             return Ok(ClientAuth { app, public: true });
         }
         (None, Some(id), None) => {
+            // An app whose command-line or desktop tools are public clients (it turned on
+            // `device_flow` or `public_client` in its sign-in setup) may name itself alone;
+            // what such a client may do is decided by the endpoint.
+            let mut conn = state.db.acquire().await?;
+            let app = apps::get(&mut conn, id)
+                .await
+                .map_err(|e| OAuthError::server_error(e.message))?;
+            if let Some(app) = app {
+                let config = apps::effective_config(&mut conn, &state.settings, &app.app_id)
+                    .await
+                    .map_err(|e| OAuthError::server_error(e.message))?;
+                if config.device_flow || config.public_client {
+                    if !app.is_active() {
+                        return Err(OAuthError::invalid_client(format!(
+                            "The app '{id}' is disabled, so it can't sign anyone in."
+                        )));
+                    }
+                    return Ok(ClientAuth { app, public: true });
+                }
+            }
             return Err(OAuthError::invalid_client(format!(
-                "client_secret is required for the app '{id}'; send it with HTTP Basic or as client_secret in the body."
+                "client_secret is required for the app '{id}'; send it with HTTP Basic or as client_secret in the body. An app's command-line or desktop tool can sign in without a secret once the app turns on device_flow or public_client in its sign-in setup."
             )));
         }
         (None, None, _) => {

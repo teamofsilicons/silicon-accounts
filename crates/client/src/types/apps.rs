@@ -300,6 +300,12 @@ pub struct SigninConfig {
     /// Offer "Continue as …" from the browser session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub remember_browser: Option<bool>,
+    /// Let the app's own command-line tool sign Carbons in with a code (device flow).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_flow: Option<bool>,
+    /// The app's command-line and desktop tools are public clients (PKCE, no secret).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub public_client: Option<bool>,
     /// Page styling.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub branding: Option<Branding>,
@@ -1214,4 +1220,239 @@ mod tests {
                    "review": false})
         );
     }
+}
+
+/// The updates an app can pick for an event subscription (the Silicon Apps "Updates from
+/// Silicon Accounts" choices).
+pub const APP_UPDATES: &[&str] = &[
+    "id_change",
+    "display_name_change",
+    "pfp_change",
+    "timezone_change",
+    "email_change",
+    "phone_change",
+    "custodian_change",
+    "access_removed",
+    "account_deleted",
+];
+
+/// The updates a new subscription gets when it names none.
+pub const DEFAULT_UPDATES: &[&str] = &[
+    "id_change",
+    "display_name_change",
+    "pfp_change",
+    "access_removed",
+    "account_deleted",
+];
+
+/// Where an event subscription sends updates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum SubscriptionDelivery {
+    /// Signed POSTs to the app's webhook URL.
+    Webhook,
+    /// Kept for `GET /v1/events/stream` (Server-Sent Events).
+    Stream,
+    /// A delivery this client doesn't know yet.
+    #[serde(other)]
+    Unknown,
+}
+
+/// Whether a subscription receives new events.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum SubscriptionStatus {
+    /// Events are recorded (and, for a webhook, delivered).
+    Active,
+    /// Nothing is recorded until it is active again.
+    Paused,
+    /// A status this client doesn't know yet.
+    #[serde(other)]
+    Unknown,
+}
+
+/// An app's event subscription (`/v1/apps/{app_id}/subscriptions`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct Subscription {
+    /// Subscription id.
+    #[serde(deserialize_with = "lenient_string")]
+    pub id: String,
+    /// The app.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub app_id: String,
+    /// Where updates go.
+    pub delivery: SubscriptionDelivery,
+    /// Active or paused.
+    pub status: SubscriptionStatus,
+    /// The webhook URL (webhook subscriptions).
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub url: Option<String>,
+    /// Whether a signing secret is set (webhook subscriptions).
+    #[serde(default, deserialize_with = "lenient_bool")]
+    pub secret_set: bool,
+    /// The updates picked; `None` means every update.
+    #[serde(default)]
+    pub updates: Option<Vec<String>>,
+    /// The event types this subscription receives.
+    #[serde(default, deserialize_with = "lenient_vec")]
+    pub event_types: Vec<String>,
+    /// The stream to open with the app's credentials (stream subscriptions).
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub stream_url: Option<String>,
+    /// RFC 3339.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub created_at: String,
+    /// RFC 3339.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub updated_at: String,
+    /// `whsec_…`: only in the answer that created a webhook subscription (shown once).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret: Option<Secret>,
+}
+
+/// Which updates a subscription wants.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum Updates {
+    /// The defaults ([`DEFAULT_UPDATES`]); only meaningful when creating.
+    #[default]
+    Defaults,
+    /// Every update, including ones added later.
+    All,
+    /// Exactly these (names from [`APP_UPDATES`]).
+    Only(Vec<String>),
+}
+
+impl Updates {
+    /// The JSON value sent (`None` = leave the field out).
+    pub(crate) fn to_json(&self) -> Option<Value> {
+        match self {
+            Updates::Defaults => None,
+            Updates::All => Some(Value::Null),
+            Updates::Only(list) => Some(Value::from(list.clone())),
+        }
+    }
+}
+
+/// `POST /v1/apps/{app_id}/subscriptions`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewSubscription {
+    /// Where updates go.
+    pub delivery: SubscriptionDelivery,
+    /// The webhook URL (required for a webhook, refused for a stream).
+    pub url: Option<String>,
+    /// Which updates.
+    pub updates: Updates,
+    /// Start paused (default active).
+    pub paused: bool,
+}
+
+impl NewSubscription {
+    /// A webhook subscription to `url` with the default updates.
+    pub fn webhook(url: impl Into<String>) -> Self {
+        NewSubscription {
+            delivery: SubscriptionDelivery::Webhook,
+            url: Some(url.into()),
+            updates: Updates::Defaults,
+            paused: false,
+        }
+    }
+
+    /// A stream subscription with the default updates.
+    pub fn stream() -> Self {
+        NewSubscription {
+            delivery: SubscriptionDelivery::Stream,
+            url: None,
+            updates: Updates::Defaults,
+            paused: false,
+        }
+    }
+
+    /// The same, with these updates.
+    pub fn with_updates(mut self, updates: Updates) -> Self {
+        self.updates = updates;
+        self
+    }
+
+    pub(crate) fn body(&self) -> Value {
+        let mut body = serde_json::Map::new();
+        body.insert(
+            "delivery".into(),
+            serde_json::to_value(self.delivery).unwrap_or(Value::Null),
+        );
+        if let Some(url) = &self.url {
+            body.insert("url".into(), Value::from(url.trim()));
+        }
+        if let Some(updates) = self.updates.to_json() {
+            body.insert("updates".into(), updates);
+        }
+        if self.paused {
+            body.insert("status".into(), Value::from("paused"));
+        }
+        Value::Object(body)
+    }
+}
+
+/// `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}`: what to change (at least one).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SubscriptionChanges {
+    /// New updates ([`Updates::Defaults`] leaves them unchanged).
+    pub updates: Updates,
+    /// Pause or resume.
+    pub status: Option<SubscriptionStatus>,
+    /// A new webhook URL (webhook subscriptions; the signing secret stays).
+    pub url: Option<String>,
+}
+
+impl SubscriptionChanges {
+    pub(crate) fn body(&self) -> Value {
+        let mut body = serde_json::Map::new();
+        if let Some(updates) = self.updates.to_json() {
+            body.insert("updates".into(), updates);
+        }
+        if let Some(status) = self.status {
+            body.insert(
+                "status".into(),
+                serde_json::to_value(status).unwrap_or(Value::Null),
+            );
+        }
+        if let Some(url) = &self.url {
+            body.insert("url".into(), Value::from(url.trim()));
+        }
+        Value::Object(body)
+    }
+
+    /// True when nothing would change.
+    pub fn is_empty(&self) -> bool {
+        self.updates == Updates::Defaults && self.status.is_none() && self.url.is_none()
+    }
+}
+
+/// `POST …/subscriptions/{subscription_id}/test`: the queued `ping`.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SubscriptionTest {
+    /// The subscription.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub subscription_id: String,
+    /// The `ping` event id (it arrives on the stream with this id).
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub event_id: String,
+    /// The webhook delivery (none for a stream).
+    #[serde(
+        default,
+        deserialize_with = "lenient_opt_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub delivery_id: Option<String>,
 }

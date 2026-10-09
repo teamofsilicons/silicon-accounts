@@ -17,7 +17,7 @@
 //! empty 404 from the static file server) is rewritten into the API error shape
 //! `{"error":{"code","message","hint"}}` — or an RFC 6749 body on the OAuth token, revocation
 //! and introspection endpoints ([`super::errors`]) — keeping its headers (`Allow`,
-//! `Retry-After`, …).
+//! `Retry-After`, …). A 429 always carries `Retry-After`.
 
 use accounts_core::{ApiError, AppState, Settings};
 use axum::extract::{Request, State};
@@ -60,8 +60,21 @@ pub async fn response_policy(State(state): State<AppState>, req: Request, next: 
     }
     let response = next.run(req).await;
     let mut response = json_errors(response, &method, &path).await;
+    retry_after_on_429(&mut response);
     finish(&mut response, &state.settings, &path, public_cors);
     response
+}
+
+/// Every 429 tells the client when to retry: the API's own carry `Retry-After` (and
+/// `details.retry_after_seconds`); anything else answering 429 without one gets `Retry-After: 1`.
+fn retry_after_on_429(response: &mut Response) {
+    if response.status() == StatusCode::TOO_MANY_REQUESTS
+        && !response.headers().contains_key(header::RETRY_AFTER)
+    {
+        response
+            .headers_mut()
+            .insert(header::RETRY_AFTER, HeaderValue::from_static("1"));
+    }
 }
 
 /// `204` answer to a CORS preflight on a public resource.
@@ -124,7 +137,7 @@ pub fn finish(response: &mut Response, settings: &Settings, path: &str, public_c
         );
         h.insert(
             header::ACCESS_CONTROL_EXPOSE_HEADERS,
-            HeaderValue::from_static("x-request-id"),
+            HeaderValue::from_static("x-request-id, accounts-version, retry-after"),
         );
         h.remove(header::ACCESS_CONTROL_ALLOW_CREDENTIALS);
     } else {

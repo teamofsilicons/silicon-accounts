@@ -120,7 +120,7 @@ service's logs (`silicon-accounts report` and `POST /v1/reports` take it in the 
 | `invalid_app_credentials` | 401 | unknown app_id, wrong secret, or malformed Basic header |
 | `app_disabled` | 403 (400 in `/v1/flows`, 401 at userinfo) | the app is disabled |
 | `app_mismatch` | 403 | app credentials were used on another app's `/v1/apps/{app_id}` URL |
-| `not_app_owner` | 403 | a Carbon who doesn't own the app tried to manage it |
+| `not_app_owner` | 403 | an account that isn't one of the app's authors (its owner or an accepted co-author) tried to manage it |
 | `unknown_app` | 404 (400 in `/v1/flows`) | no app has this app_id |
 | `request_token_required` | 401 | `GET /v1/silicons/requests/{id}` without `Bearer sarq_…` |
 | `invalid_request_token` | 401 | the `sarq_` token doesn't belong to this request |
@@ -249,7 +249,10 @@ outside the app's `google.hosted_domain`), `signup_expired`, `session_changed` (
 |---|---|---|
 | `device_code_not_found` | 404 | no device sign-in waits for this user code |
 | `device_code_used` | 409 | already approved or denied |
-| `device_code_expired` | 410 | user codes last 10 minutes; run `silicon-accounts login` again |
+| `device_code_expired` | 410 | user codes last 10 minutes; start the sign-in again |
+| `device_flow_off` | 403 | the app turned device sign-ins off after the code was made: sign in to it another way |
+| `unauthorized_client` | 400 | `POST /v1/device/authorize` named an app that hasn't turned on `device_flow` |
+| `invalid_client` | 400 | `POST /v1/device/authorize` named an app that doesn't exist |
 
 ## Silicons and custodians
 
@@ -272,6 +275,12 @@ outside the app's `google.hosted_domain`), `signup_expired`, `session_changed` (
 | `transfer_to_self` | 422 | a transfer must go to another Carbon |
 | `transfer_stale` | 409 | the custodian changed after the transfer was requested |
 | `webhook_not_set` | 409 | a test ping, secret rotation or replay without a webhook URL: set one first |
+| `invalid_assertion` | 401 | a key sign-in's assertion is malformed, expired, for another `aud`, not signed by a live key of that Silicon, or was used before: sign a fresh one |
+| `key_exists` | 409 | the Silicon already has this key (`details.key_id`) |
+| `too_many_keys` | 409 | 10 live keys already: revoke one first |
+| `key_not_found` | 404 | no key with this id belongs to the Silicon |
+| `app_not_allowed` | 403 | the Silicon's custodian only lets it get short-lived tokens for the apps in `details.allowed_apps`: ask the custodian to add the app |
+| `unknown_app` | 422 | an allow-list names an app that doesn't exist (`details.unknown`) |
 
 ## Apps
 
@@ -295,6 +304,29 @@ outside the app's `google.hosted_domain`), `signup_expired`, `session_changed` (
 Import rows carry their own message codes (`missing_identifier`, `ambiguous_match`,
 `duplicate_in_file`, `external_id_conflict`, `id_conflict`, …): see
 [Import existing users](../start/import-users.md).
+
+## Subscriptions and the event stream
+
+| Code | Status | Cause and fix |
+|---|---|---|
+| `subscription_exists` | 409 | the app already has a subscription with this delivery (`details.subscription_id`); an app has one webhook and one stream subscription at most: change that one instead |
+| `subscription_not_found` | 404 | no subscription with this id belongs to the app |
+| `invalid_updates` | 422 | `updates` names something that isn't an update (`details.allowed` lists them) |
+| `invalid_webhook_events` | 422 | `PUT /v1/apps/{app_id}/webhook` `events` names something that isn't an update |
+| `stream_subscription_required` | 409 | an app opened `GET /v1/events/stream` without a stream subscription: create one with `POST /v1/apps/{app_id}/subscriptions` `{"delivery":"stream"}` |
+| `unknown_event_id` | 400 | the stream's `Last-Event-ID` or `after` isn't an event of this feed: resume with the last id this stream sent you, or connect without one |
+| `too_many_streams` | 429 | 5 streams are already open for this app or account: close one (one stream carries every event of the feed), then retry after `Retry-After` |
+| `stream_capacity_reached` | 503 | this server is full or restarting: reconnect after `Retry-After` with `Last-Event-ID` |
+
+A stream that ends on purpose sends `event: stream.closed` with a `reason` first; see
+[Event stream](api/webhooks.md#event-stream).
+
+## Versions and capabilities
+
+| Code | Status | Cause and fix |
+|---|---|---|
+| `unsupported_version` | 400 | the `Accounts-Version` header names a version this deployment doesn't serve (`details.supported`, `details.current`): send a supported one or leave the header out |
+| `capabilities_missing` | 422 | `GET /v1/capabilities?require=…` named a capability that is unknown or unsupported (`details.missing`, `details.supported`, `details.available`) |
 
 ## Proofs
 
@@ -342,7 +374,7 @@ From `/v1/oauth/token`, `/revoke` and `/introspect`, as `{"error", "error_descri
 | `invalid_request` | 400 (413 for a body over 64 KB) | a parameter is missing, repeated or malformed; the client authenticated twice |
 | `invalid_client` | 401 | unknown app, wrong secret, disabled app, or no credentials; `WWW-Authenticate: Basic realm="Silicon Accounts"` |
 | `invalid_grant` | 400 | the code, refresh token, SLT or device code is unknown, expired, already used (a reused refresh token or code also revokes its sign-in), revoked, another app's, or its account is deleted or removed the app's access; a `redirect_uri` or PKCE mismatch |
-| `unauthorized_client` | 400 | the public client used a confidential grant, or an app used the device-code grant |
+| `unauthorized_client` | 400 | a public client (`client_id` without a secret) used a grant that needs the secret, or an app without `device_flow` used the device-code grant |
 | `unsupported_grant_type` | 400 | the grant isn't supported (the description names the alternative) |
 | `invalid_scope` | 400 | a refresh asked for more scopes than were granted |
 | `authorization_pending` | 400 | device sign-in not approved yet; keep polling |

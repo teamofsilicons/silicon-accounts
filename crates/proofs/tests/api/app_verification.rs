@@ -374,3 +374,39 @@ async fn the_app_verification_page_works_for_the_app_and_its_owner() {
     assert_eq!(r.status, 404);
     assert_eq!(r.error_code(), Some("unknown_app"));
 }
+
+/// Silicon Apps creates ids like `my_app` and `2fa-tool` (3 to 30 characters of a-z, 0-9, '-'
+/// and '_'): they can receive App verification and User verification proofs like any other app.
+#[tokio::test]
+async fn silicon_apps_ids_with_underscores_and_leading_digits_receive_proofs() {
+    let w = World::new().await;
+    let (tool, tool_secret) = w.ctx.app("2fa_tool").await;
+    assert!(tool.app_id.starts_with("2fa_tool-"), "{}", tool.app_id);
+    let r = w
+        .app_verification_as(
+            &w.dm,
+            &w.dm_secret,
+            json!({"receiving_app": tool.app_id, "scopes": ["codes.read"]}),
+        )
+        .await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    assert_eq!(r.json["receiving_app"], tool.app_id);
+    let v = w.verify_as(&tool, &tool_secret, &token(&r.json)).await;
+    assert_eq!(v.json["valid"], true, "{}", v.json);
+
+    let mut body = w.user_verification_body();
+    body["receiving_app"] = json!(tool.app_id);
+    let r = w.user_verification(body).await;
+    assert_eq!(r.status, 201, "{}", r.json);
+    let v = w.verify_as(&tool, &tool_secret, &token(&r.json)).await;
+    assert_eq!(v.json["valid"], true, "{}", v.json);
+    assert_eq!(v.json["receiving_app"]["app_id"], tool.app_id);
+
+    // Still refused: what no service ever issues.
+    for bad in ["My App", "a", "has.dot"] {
+        let mut body = w.user_verification_body();
+        body["receiving_app"] = json!(bad);
+        let r = w.user_verification(body).await;
+        assert_eq!(r.status.as_u16() / 100, 4, "{bad}: {}", r.json);
+    }
+}

@@ -122,6 +122,43 @@ impl AccountsClient {
         .await
     }
 
+    /// `POST /v1/silicons/login` with an assertion signed by one of the Silicon's registered
+    /// keys instead of its STK: first-party tokens, like [`AccountsClient::silicon_login`].
+    /// `silicon` is its si:id (or uuid); `kid` is the key's id when known (else every key of
+    /// the Silicon is tried). Reads `/v1/meta` first for the assertion's audience.
+    ///
+    /// Errors: `invalid_assertion` (401: no live key of the Silicon signed it, or it was used
+    /// before), `account_not_active` (403).
+    pub async fn silicon_login_with_key(
+        &self,
+        silicon: &str,
+        key: &crate::SiliconSigningKey,
+        kid: Option<&str>,
+        client_label: Option<&str>,
+    ) -> Result<TokenResponse> {
+        let silicon = silicon.trim();
+        if silicon.is_empty() {
+            return Err(Error::invalid_input(
+                "Signing in with a key needs the Silicon's si:id.",
+                "Pass the si:id (e.g. si:scout).",
+            ));
+        }
+        let public_url = self.meta().await?.public_url;
+        let audience = format!("{}/v1/oauth/token", public_url.trim_end_matches('/'));
+        let mut body = json!({ "assertion": key.assertion(silicon, &audience, kid, 120) });
+        if let Some(label) = client_label {
+            body["client_label"] = json!(label);
+        }
+        self.send_json(
+            Method::POST,
+            self.endpoint(&["v1", "silicons", "login"]),
+            Auth::None,
+            &body,
+            None,
+        )
+        .await
+    }
+
     /// `POST /v1/silicons`: a Silicon creates its own account and names its custodian.
     /// The account stays `pending_custodian` until the custodian accepts (14 days).
     /// Store `stk` and `webhook_secret` from the response now: they are shown once.
@@ -178,6 +215,64 @@ impl AccountsClient {
 
     /// Polls the token endpoint once for a device sign-in.
     pub async fn device_poll(&self, device_code: &str) -> Result<DevicePoll> {
+        self.device_poll_as(FIRST_PARTY_APP_ID, device_code).await
+    }
+
+    /// `POST /v1/device/authorize` for your app's own command-line tool (the app turned on
+    /// `device_flow` in its sign-in setup): no secret, just the `app_id`. `scope` asks for
+    /// details the app requests (space-separated, e.g. `"email timezone"`); its required
+    /// details are always included. Show `user_code` and `verification_uri`, then poll with
+    /// [`AccountsClient::app_device_poll`].
+    pub async fn app_device_authorize(
+        &self,
+        app_id: &str,
+        scope: Option<&str>,
+        client_label: Option<&str>,
+    ) -> Result<DeviceAuthorization> {
+        let mut body = json!({ "client_id": app_id.trim() });
+        if let Some(scope) = scope {
+            body["scope"] = json!(scope);
+        }
+        if let Some(label) = client_label {
+            body["client_label"] = json!(label);
+        }
+        self.send_json(
+            Method::POST,
+            self.endpoint(&["v1", "device", "authorize"]),
+            Auth::None,
+            &body,
+            None,
+        )
+        .await
+    }
+
+    /// Polls the token endpoint once for a device sign-in of your app's tool (`client_id`
+    /// alone). Approved: the app's tokens for the Carbon.
+    pub async fn app_device_poll(&self, app_id: &str, device_code: &str) -> Result<DevicePoll> {
+        self.device_poll_as(app_id.trim(), device_code).await
+    }
+
+    /// Rotates a refresh token of your app's public tool (the app turned on `device_flow` or
+    /// `public_client`), with its `client_id` alone.
+    pub async fn refresh_app_public_client(
+        &self,
+        app_id: &str,
+        refresh_token: &str,
+    ) -> Result<TokenResponse> {
+        let request = Request::new(
+            Method::POST,
+            self.endpoint(&["v1", "oauth", "token"]),
+            Auth::None,
+        )
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh_token.trim()),
+            ("client_id", app_id.trim()),
+        ]);
+        self.execute(request).await?.json()
+    }
+
+    async fn device_poll_as(&self, client_id: &str, device_code: &str) -> Result<DevicePoll> {
         let request = Request::new(
             Method::POST,
             self.endpoint(&["v1", "oauth", "token"]),
@@ -186,7 +281,7 @@ impl AccountsClient {
         .form(&[
             ("grant_type", DEVICE_CODE_GRANT_TYPE),
             ("device_code", device_code),
-            ("client_id", FIRST_PARTY_APP_ID),
+            ("client_id", client_id),
         ]);
         match self.execute(request).await {
             Ok(response) => Ok(DevicePoll::Tokens(Box::new(response.json()?))),

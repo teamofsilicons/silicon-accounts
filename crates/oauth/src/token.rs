@@ -24,7 +24,10 @@ pub const SLT_GRANT_TYPE: &str = "urn:silicon:params:oauth:grant-type:slt";
 /// Grant type of the device flow (RFC 8628). The bare alias `device_code` is accepted too.
 pub const DEVICE_CODE_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:device_code";
 
-const SUPPORTED: &str = "authorization_code, refresh_token, urn:silicon:params:oauth:grant-type:slt or urn:ietf:params:oauth:grant-type:device_code";
+/// Grant type of a Silicon's key-signed assertion (RFC 7523), for the first-party client.
+pub const JWT_BEARER_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:jwt-bearer";
+
+const SUPPORTED: &str = "authorization_code, refresh_token, urn:silicon:params:oauth:grant-type:slt, urn:ietf:params:oauth:grant-type:device_code or urn:ietf:params:oauth:grant-type:jwt-bearer";
 
 /// Parameters of a token request. Every field is optional so a missing one gets a precise
 /// error instead of a generic parse failure. No `Debug`: it carries secrets.
@@ -40,6 +43,7 @@ pub(crate) struct TokenParams {
     pub scope: Option<String>,
     pub slt: Option<String>,
     pub device_code: Option<String>,
+    pub assertion: Option<String>,
 }
 
 /// The grants the token endpoint supports.
@@ -49,6 +53,7 @@ pub(crate) enum Grant {
     RefreshToken,
     Slt,
     DeviceCode,
+    JwtBearer,
 }
 
 impl Grant {
@@ -63,11 +68,11 @@ impl Grant {
             "refresh_token" => return Ok(Grant::RefreshToken),
             SLT_GRANT_TYPE | "slt" => return Ok(Grant::Slt),
             DEVICE_CODE_GRANT_TYPE | "device_code" => return Ok(Grant::DeviceCode),
+            JWT_BEARER_GRANT_TYPE => return Ok(Grant::JwtBearer),
             "client_credentials" => {
                 " Silicon Accounts doesn't issue app-only access tokens: one app proves itself to another with an app verification proof (POST /v1/proofs/app-verification)."
             }
-            "urn:ietf:params:oauth:grant-type:token-exchange"
-            | "urn:ietf:params:oauth:grant-type:jwt-bearer" => {
+            "urn:ietf:params:oauth:grant-type:token-exchange" => {
                 " To act for an account at another app, get a User verification proof (POST /v1/proofs/user-verification) with the account's access token."
             }
             "password" => {
@@ -90,6 +95,7 @@ impl Grant {
             Grant::RefreshToken => "refresh_token",
             Grant::Slt => SLT_GRANT_TYPE,
             Grant::DeviceCode => DEVICE_CODE_GRANT_TYPE,
+            Grant::JwtBearer => JWT_BEARER_GRANT_TYPE,
         }
     }
 }
@@ -156,9 +162,12 @@ async fn handle(
     trace.app_id = Some(client.app.app_id.clone());
     match grant {
         Grant::AuthorizationCode => {
-            // The developer platform is a public client: it redeems its own codes, and the
-            // grant requires PKCE S256 for it (a code alone proves nothing without a secret).
-            if client.app.app_id != DEVELOPER_APP_ID {
+            // Public clients redeem their own codes, and the grant requires PKCE S256 for them
+            // (a code alone proves nothing without a secret): the developer platform, and the
+            // command-line and desktop tools of apps that turned on `public_client`.
+            if client.app.app_id != DEVELOPER_APP_ID
+                && !(client.public && app_setting(state, &client, |c| c.public_client).await?)
+            {
                 refuse_public_client(&client, grant)?;
             }
             grants::code::exchange(state, &client, &params, meta).await
@@ -170,24 +179,67 @@ async fn handle(
             grants::slt::exchange(state, &client, &params, meta).await
         }
         Grant::DeviceCode => {
-            require_first_party(&client)?;
-            grants::device::exchange(state, &params, meta).await
+            require_device_client(state, &client).await?;
+            grants::device::exchange(state, &client, &params, meta).await
+        }
+        Grant::JwtBearer => {
+            // A Silicon's own sign-in to Silicon Accounts: first-party tokens only.
+            if client.app.app_id != FIRST_PARTY_APP_ID {
+                return Err(OAuthError::unauthorized_client(format!(
+                    "grant_type={JWT_BEARER_GRANT_TYPE} signs a Silicon into Silicon Accounts itself: send client_id={FIRST_PARTY_APP_ID}. To act for an account at another app, get a User verification proof (POST /v1/proofs/user-verification)."
+                )));
+            }
+            let assertion = opt(params.assertion.as_deref()).ok_or_else(|| {
+                OAuthError::invalid_request(format!(
+                    "assertion is required for grant_type={JWT_BEARER_GRANT_TYPE}: a JWT signed with one of the Silicon's registered keys."
+                ))
+            })?;
+            accounts_core::silicon_keys::sign_in(state, meta, assertion, None)
+                .await
+                .map_err(|e| {
+                    if e.is_server_error() {
+                        OAuthError::server_error(e.message)
+                    } else {
+                        let hint = e.hint.map(|h| format!(" {h}")).unwrap_or_default();
+                        OAuthError::invalid_grant(format!("{}{hint}", e.message))
+                    }
+                })
         }
     }
 }
 
-/// The public first-party clients: `silicon-accounts` may only refresh and poll device codes,
-/// `developer` may only redeem its codes (PKCE S256) and refresh.
+/// One setting of the client app's sign-in setup.
+async fn app_setting(
+    state: &AppState,
+    client: &ClientAuth,
+    pick: impl Fn(&accounts_core::models::SigninConfig) -> bool,
+) -> Result<bool, OAuthError> {
+    let mut conn = state.db.acquire().await?;
+    let config =
+        accounts_core::repo::apps::effective_config(&mut conn, &state.settings, &client.app.app_id)
+            .await
+            .map_err(|e| OAuthError::server_error(e.message))?;
+    Ok(pick(&config))
+}
+
+/// Public clients (`client_id` without a secret) may only use some grants: `silicon-accounts`
+/// refreshes and polls device codes, `developer` redeems its codes (PKCE S256) and refreshes,
+/// and an app's public tools do what its sign-in setup turned on (`device_flow`: poll device
+/// codes; `public_client`: redeem codes with PKCE S256), plus refresh.
 fn refuse_public_client(client: &ClientAuth, grant: Grant) -> Result<(), OAuthError> {
     if client.public {
         let allowed = if client.app.app_id == DEVELOPER_APP_ID {
             "grant_type=authorization_code (with PKCE S256) and grant_type=refresh_token"
                 .to_string()
-        } else {
+        } else if client.app.app_id == FIRST_PARTY_APP_ID {
             format!("grant_type=refresh_token and grant_type={DEVICE_CODE_GRANT_TYPE}")
+        } else {
+            format!(
+                "grant_type=refresh_token, grant_type={DEVICE_CODE_GRANT_TYPE} (with device_flow on) and grant_type=authorization_code with PKCE S256 (with public_client on)"
+            )
         };
         return Err(OAuthError::unauthorized_client(format!(
-            "grant_type={} needs a confidential client. client_id={} without a client_secret is a first-party public client, which may only use {allowed}; apps authenticate with their own client_id and client_secret (HTTP Basic or in the body).",
+            "grant_type={} needs a confidential client. client_id={} without a client_secret is a public client, which may only use {allowed}; send the app's client_secret too (HTTP Basic or in the body) for anything else.",
             grant.as_str(),
             client.app.app_id
         )));
@@ -195,15 +247,22 @@ fn refuse_public_client(client: &ClientAuth, grant: Grant) -> Result<(), OAuthEr
     Ok(())
 }
 
-/// Device codes belong to the first-party app (the silicon-accounts CLI).
-fn require_first_party(client: &ClientAuth) -> Result<(), OAuthError> {
-    if client.app.app_id != FIRST_PARTY_APP_ID {
+/// Device codes are for the first-party CLI and for apps that turned on `device_flow`.
+async fn require_device_client(state: &AppState, client: &ClientAuth) -> Result<(), OAuthError> {
+    if client.app.app_id == DEVELOPER_APP_ID {
         return Err(OAuthError::unauthorized_client(format!(
-            "grant_type={DEVICE_CODE_GRANT_TYPE} is only for the first-party client '{FIRST_PARTY_APP_ID}' (the silicon-accounts CLI: send client_id={FIRST_PARTY_APP_ID} without a client_secret). The app '{}' signs accounts in through /authorize and exchanges the code with grant_type=authorization_code.",
-            client.app.app_id
+            "grant_type={DEVICE_CODE_GRANT_TYPE} is only for the first-party client '{FIRST_PARTY_APP_ID}' (the silicon-accounts CLI) and for apps that turn on device_flow; the developer platform signs Carbons in with authorization codes."
         )));
     }
-    Ok(())
+    if client.app.app_id == FIRST_PARTY_APP_ID
+        || app_setting(state, client, |c| c.device_flow).await?
+    {
+        return Ok(());
+    }
+    Err(OAuthError::unauthorized_client(format!(
+        "grant_type={DEVICE_CODE_GRANT_TYPE} is not turned on for the app '{}'. An app lets its own command-line tool sign Carbons in with a code once it sets \"device_flow\": true in its sign-in setup (PATCH /v1/apps/{{app_id}}/signin-config); until then it signs accounts in through /authorize.",
+        client.app.app_id
+    )))
 }
 
 #[cfg(test)]

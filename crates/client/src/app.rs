@@ -19,8 +19,9 @@ use crate::types::{
     AccountKind, AccountSummary, AppDetails, AppProof, AppUser, AppWebhook, ConfigHistoryEntry,
     DeliveriesQuery, DeliveryDetail, ImportInput, ImportJob, ImportOptions, ImportRowResult,
     ImportRowsQuery, Introspection, IssueAppVerification, IssueUserVerification, IssuedProof, Jwks,
-    Page, PageRequest, ProofRef, ProofVerification, ProofsQuery, ReplayRequest, ReplayResult,
-    TokenResponse, UserInfo, UsersQuery, WebhookDelivery, WebhookSecret, WebhookTestResult,
+    NewSubscription, Page, PageRequest, ProofRef, ProofVerification, ProofsQuery, ReplayRequest,
+    ReplayResult, Subscription, SubscriptionChanges, SubscriptionTest, TokenResponse, UserInfo,
+    UsersQuery, WebhookDelivery, WebhookSecret, WebhookTestResult,
 };
 use crate::wait::{WaitEvent, WaitOptions};
 
@@ -533,6 +534,91 @@ impl<'a> AppClient<'a> {
             self.app_url(&["webhook"]),
             Some(&json!({"url":url,"events":events,"preserve_secret":true})),
             key,
+        )
+        .await?
+        .json()
+    }
+
+    // ---- event subscriptions ----------------------------------------------------------
+
+    /// `GET /v1/apps/{app_id}/subscriptions`: where the app's updates go (at most one webhook
+    /// and one stream subscription).
+    pub async fn subscriptions(&self) -> Result<Page<Subscription>> {
+        self.get(self.app_url(&["subscriptions"])).await
+    }
+
+    /// `GET /v1/apps/{app_id}/subscriptions/{subscription_id}`.
+    pub async fn subscription(&self, subscription_id: &str) -> Result<Subscription> {
+        self.get(self.app_url(&["subscriptions", subscription_id.trim()]))
+            .await
+    }
+
+    /// `POST /v1/apps/{app_id}/subscriptions`. A webhook subscription's answer carries its
+    /// signing secret once ([`Subscription::secret`]); with an idempotency key, a retry within
+    /// 10 minutes returns the same answer instead of failing with `subscription_exists`.
+    pub async fn create_subscription(
+        &self,
+        new: &NewSubscription,
+        idempotency_key: Option<&str>,
+    ) -> Result<Subscription> {
+        self.send(
+            Method::POST,
+            self.app_url(&["subscriptions"]),
+            Some(&new.body()),
+            idempotency_key,
+        )
+        .await?
+        .json()
+    }
+
+    /// `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}`: change its updates, pause or
+    /// resume it, or move a webhook (the signing secret stays).
+    pub async fn update_subscription(
+        &self,
+        subscription_id: &str,
+        changes: &SubscriptionChanges,
+        idempotency_key: Option<&str>,
+    ) -> Result<Subscription> {
+        if changes.is_empty() {
+            return Err(Error::invalid_input(
+                "Nothing to change: set updates, status or url.",
+                "For example pause it, or pick the updates it should receive.",
+            ));
+        }
+        self.send(
+            Method::PATCH,
+            self.app_url(&["subscriptions", subscription_id.trim()]),
+            Some(&changes.body()),
+            idempotency_key,
+        )
+        .await?
+        .json()
+    }
+
+    /// `DELETE /v1/apps/{app_id}/subscriptions/{subscription_id}`. Deleting the webhook
+    /// subscription removes the app's webhook.
+    pub async fn delete_subscription(&self, subscription_id: &str) -> Result<()> {
+        self.send(
+            Method::DELETE,
+            self.app_url(&["subscriptions", subscription_id.trim()]),
+            None,
+            None,
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// `POST /v1/apps/{app_id}/subscriptions/{subscription_id}/test`: queues a `ping` on it.
+    pub async fn test_subscription(
+        &self,
+        subscription_id: &str,
+        idempotency_key: Option<&str>,
+    ) -> Result<SubscriptionTest> {
+        self.send(
+            Method::POST,
+            self.app_url(&["subscriptions", subscription_id.trim(), "test"]),
+            None,
+            idempotency_key,
         )
         .await?
         .json()

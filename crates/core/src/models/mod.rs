@@ -423,6 +423,25 @@ text_enum! {
 }
 
 text_enum! {
+    /// Where an app's event subscription sends its updates.
+    pub enum SubscriptionDelivery {
+        /// Signed POSTs to the app's webhook URL.
+        Webhook = "webhook",
+        /// Kept for `GET /v1/events/stream` (Server-Sent Events).
+        Stream = "stream",
+    }
+}
+
+text_enum! {
+    /// Whether an event subscription receives new events.
+    pub enum SubscriptionStatus {
+        Active = "active",
+        /// Nothing is recorded for it until it is active again.
+        Paused = "paused",
+    }
+}
+
+text_enum! {
     /// Who performed an audited action.
     pub enum ActorKind {
         Account = "account",

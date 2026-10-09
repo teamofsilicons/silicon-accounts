@@ -11,7 +11,7 @@ use axum::response::Response;
 use serde_json::{Value, json};
 
 use crate::respond::cacheable;
-use crate::token::{DEVICE_CODE_GRANT_TYPE, SLT_GRANT_TYPE};
+use crate::token::{DEVICE_CODE_GRANT_TYPE, JWT_BEARER_GRANT_TYPE, SLT_GRANT_TYPE};
 
 /// Seconds clients may cache discovery and the JWKS.
 const CACHE_SECONDS: u32 = 300;
@@ -47,6 +47,7 @@ fn document(state: &AppState) -> Value {
             "refresh_token",
             DEVICE_CODE_GRANT_TYPE,
             SLT_GRANT_TYPE,
+            JWT_BEARER_GRANT_TYPE,
         ],
         "subject_types_supported": ["public"],
         "id_token_signing_alg_values_supported": ["EdDSA"],
@@ -57,8 +58,10 @@ fn document(state: &AppState) -> Value {
             "email", "email_verified", "phone_number", "phone_number_verified",
             "zoneinfo", "birthdate",
         ],
-        "token_endpoint_auth_methods_supported": client_auth,
-        "revocation_endpoint_auth_methods_supported": client_auth,
+        // `none`: public clients (the first-party CLI, and apps' tools with `device_flow` or
+        // `public_client` on) send client_id alone.
+        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
+        "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
         "introspection_endpoint_auth_methods_supported": client_auth,
         "code_challenge_methods_supported": ["S256", "plain"],
         "prompt_values_supported": ["none", "login", "consent", "select_account"],

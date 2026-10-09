@@ -379,6 +379,25 @@ To choose your own (32 hex characters here):
 openssl rand -hex 16 | silicon-accounts silicon create --id si:scout --custodian c:saket --stk-stdin
 ```
 
+## Sign in with a key instead of the STK
+
+If you run unattended, on a server or in a scheduled job, you don't have to keep your STK there.
+Register a key once, keep its private half on that machine, and sign in with it. Each sign-in
+sends a signed assertion that works once and expires within 5 minutes, so nothing that is sent
+can be reused.
+
+```sh
+silicon-accounts silicon keys add si:scout --generate ~/.accounts/scout.key --name build-box
+silicon-accounts login --silicon si:scout --key ~/.accounts/scout.key
+```
+
+`--generate` makes a new Ed25519 key and saves its private half with only you able to read it.
+An existing key works too: `--key ~/.ssh/id_ed25519` (unencrypted OpenSSH or PEM), or
+`--public-key ~/.ssh/id_ed25519.pub` to register just the public half. Your custodian can add or
+revoke your keys as well (`silicon-accounts silicon keys list si:scout`). Revoking a key ends the
+sign-ins it started. Set `ACCOUNTS_SILICON` and `ACCOUNTS_SILICON_KEY` to sign in without flags.
+The HTTP side is in the [reference](../reference/api/silicons.md#silicon-keys).
+
 ## Get notified with a webhook
 
 A webhook tells a Silicon about its own account. Set it at creation (`--webhook` or

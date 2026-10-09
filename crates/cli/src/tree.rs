@@ -27,6 +27,7 @@ pub fn command() -> Command {
         "  ACCOUNTS_HOME                   directory holding .accounts/ (beats the configured home)",
         "  SILICON_HOME                    the home when nothing else is set (else ~)",
         "  ACCOUNTS_SILICON, ACCOUNTS_STK  a Silicon's si:id and STK for `silicon-accounts login`",
+        "  ACCOUNTS_SILICON_KEY            a Silicon's private key file, instead of the STK",
         "  ACCOUNTS_APP_ID                 the app for `silicon-accounts app …`",
         "  ACCOUNTS_APP_SECRET             its app secret",
         "  ACCOUNTS_TELEMETRY=0            turn telemetry off",

@@ -6,6 +6,7 @@ mod common;
 
 mod client_e2e;
 mod custodian;
+mod custodian_apps;
 mod custodian_requests;
 mod login;
 mod own_webhook;

@@ -207,12 +207,7 @@ async fn only_the_first_party_client_polls_device_codes() {
             ),
         )
         .await;
-    assert_oauth_error(
-        &r,
-        400,
-        "unauthorized_client",
-        "only for the first-party client",
-    );
+    assert_oauth_error(&r, 400, "unauthorized_client", "not turned on");
 }
 
 #[tokio::test]

@@ -510,6 +510,13 @@ pub struct SigninConfig {
     pub allow_signup: bool,
     /// Offer "Continue as …" from the browser session.
     pub remember_browser: bool,
+    /// Let the app's own command-line tool sign Carbons in with a code they approve on the
+    /// account site (OAuth device authorization grant, RFC 8628), without a client secret.
+    pub device_flow: bool,
+    /// Treat the app's command-line and desktop tools as public clients (RFC 8252): they
+    /// redeem authorization codes and refresh tokens with `client_id` alone, and every such
+    /// code must come with PKCE S256. Loopback redirect URIs take any port either way.
+    pub public_client: bool,
     pub branding: Branding,
     pub copy: SigninCopy,
     /// The pages that ask for the details; `null` = one page with every requested detail (see
@@ -531,6 +538,8 @@ impl Default for SigninConfig {
             allowed_email_domains: Vec::new(),
             allow_signup: true,
             remember_browser: true,
+            device_flow: false,
+            public_client: false,
             branding: Branding::default(),
             copy: SigninCopy::default(),
             flow: None,
@@ -1007,6 +1016,9 @@ impl SigninConfig {
             self.flow = None;
             self.allowed_email_domains.clear();
             self.allow_signup = true;
+            // Their public clients and the CLI's device flow are built in, not settings.
+            self.device_flow = false;
+            self.public_client = false;
         }
         self
     }

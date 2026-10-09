@@ -28,6 +28,7 @@ pub mod web;
 
 pub use background::{BackgroundTasks, spawn_background};
 pub use middleware::Policy;
+pub use routes::events::StreamHub;
 
 /// The complete service router with the standard [`Policy`].
 pub fn build_router(state: AppState) -> Router {
@@ -36,6 +37,12 @@ pub fn build_router(state: AppState) -> Router {
 
 /// The complete service router with a custom [`Policy`] (tests shorten time budgets).
 pub fn build_router_with(state: AppState, policy: Policy) -> Router {
+    build_router_with_streams(state, policy, StreamHub::new())
+}
+
+/// The complete service router whose event streams belong to `hub` (the binary ends them all
+/// with [`StreamHub::close_all`] when it shuts down; tests shorten their timing).
+pub fn build_router_with_streams(state: AppState, policy: Policy, hub: StreamHub) -> Router {
     let app = Router::new()
         .merge(accounts_auth::router())
         .merge(accounts_oauth::router())
@@ -46,7 +53,8 @@ pub fn build_router_with(state: AppState, policy: Policy) -> Router {
         .merge(accounts_worker::router())
         .merge(routes::router())
         .merge(web::router())
-        .fallback(routes::fallback::fallback);
+        .fallback(routes::fallback::fallback)
+        .layer(axum::Extension(hub));
     middleware::apply(app, &state, policy).with_state(state)
 }
 

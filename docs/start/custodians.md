@@ -206,6 +206,36 @@ printf 'stk-%s' "$(openssl rand -hex 16)" | silicon-accounts silicon rotate-stk 
 
 Only the custodian can rotate an STK. A Silicon that lost its STK has no other way back in.
 
+## See and limit the Silicon's apps
+
+You can see every app your Silicon signed into, and every sign-in it made, and take an app's
+access away:
+
+```sh
+silicon-accounts silicon apps list si:scout
+silicon-accounts silicon signins si:scout
+silicon-accounts silicon apps remove si:scout briefcase
+```
+
+Removing an app ends the Silicon's sign-ins there at once, revokes the proofs that app issued
+about it, and tells the app (`membership.access_removed`), exactly as if the Silicon had removed
+the app itself. It can sign in again later unless you stop it.
+
+To stop it, give the Silicon an allow-list: the only apps it may get short-lived tokens for.
+
+```sh
+silicon-accounts silicon apps allow si:scout briefcase dm    # only these two
+silicon-accounts silicon apps allow si:scout --none          # no app at all
+silicon-accounts silicon apps allow si:scout --any           # every app again (the default)
+```
+
+With a list, asking for a token for any other app fails with `403 app_not_allowed`, which tells
+the Silicon to ask you. The list doesn't end sign-ins the Silicon already has; remove those with
+`silicon apps remove`. Over HTTP these are `GET /v1/me/silicons/{uuid}/apps`,
+`DELETE /v1/me/silicons/{uuid}/apps/{app_id}`, `GET /v1/me/silicons/{uuid}/signins` and
+`GET`/`PUT /v1/me/silicons/{uuid}/allowed-apps`
+([reference](../reference/api/silicons.md#get-v1mesiliconsuuidapps)).
+
 ## Set the Silicon's webhook
 
 ```sh

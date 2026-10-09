@@ -72,7 +72,8 @@ pending migrations. On Ctrl-C / SIGTERM, at the same moment, it stops accepting 
 lets in-flight requests finish (30 s at most), and the worker stops claiming work and finishes the
 webhooks and emails it is sending (normally within one 10 s send timeout; anything still running
 after 20 s is cut off and, still claimed, retried by a node once its 60 s claim ends). The whole
-stop takes at most 30 s.
+stop takes at most 30 s. Open event streams (`GET /v1/events/stream`) end at
+once with `stream.closed` (`server_restarting`), so clients reconnect elsewhere with `Last-Event-ID`.
 
 ## Endpoints owned here
 
@@ -83,6 +84,10 @@ stop takes at most 30 s.
 | `GET /v1/meta` | name, version, environment, public URL, Silicon Apps URL, docs URL (`docs_url`, ACCOUNTS_DOCS_URL, default `https://developers.teamofsilicons.com/docs/accounts`), developer platform (`developer_url`, ACCOUNTS_DEVELOPER_URL, default `https://developers.teamofsilicons.com`, `http://localhost:8600` outside production), managed providers, delivery mode |
 | `POST /v1/reports` | bug report (optional session; 5/hour per IP; message 1..10000 chars; `pr_url` https; `Idempotency-Key`) mailed to every `ACCOUNTS_REPORT_RECIPIENTS` address → `201 {"report_id","status":"queued","recipients":3}` |
 | `POST /v1/telemetry/events` | ≤ 50 events named `^[a-z0-9_.]{1,64}$` (the CLI sends `cli.command` / `cli.step`), forwarded to Space Station unless the caller opted out (`X-Accounts-Telemetry: off` or the cookie `sa_telemetry=off`) → `202 {"accepted","forwarded"}` |
+| `GET /openapi.json`, `GET /v1/openapi.json` | the OpenAPI 3.1 document (`openapi.json` in this crate, served without indentation; `tests/discovery.rs` keeps it equal to the routes) |
+| `GET /.well-known/agent.json` | the A2A agent card |
+| `GET /v1/capabilities[?require=a,b]` | what this deployment supports; 422 `capabilities_missing` when a required one isn't |
+| `GET /v1/events/stream` | account events as Server-Sent Events (`routes::events`: feeds, resume, limits, `StreamHub`) |
 | `GET /v1/dev/outbox?to=&purpose=&limit=` | recorded messages with the parsed OTP `code`; only with `ACCOUNTS_EXPOSE_DEV_OUTBOX=true` outside production (production answers like an unknown route) |
 | `GET /embed/v1/buttons?app_id=…` | legacy static hosting only (`ACCOUNTS_WEB_DIST`): the iframe page with `frame-ancestors 'self' <app allowed_origins>` (`'none'` for unknown/disabled apps or no origins). The Next.js site serves its own embed page and builds `frame-ancestors` from `GET /v1/apps/{app_id}/public` `allowed_origins` |
 | `GET /sdk/v1.js` | legacy static hosting only: the SDK, CORS `*`, `Cache-Control: public, max-age=300` (the Next.js site serves its own) |
@@ -118,13 +123,15 @@ stop takes at most 30 s.
    CORS `*` only for `/v1/apps/{app_id}/public`, `/sdk/*`, `/.well-known/*` (preflights answered
    here); every other response leaves without CORS headers. Plain-text 4xx/5xx (axum's 405,
    framework rejections) are rewritten into `{"error":{"code","message","hint"}}`.
-5. **Limits**: body limits by route — 64 KB default, 2 MB for the photo uploads
+5. **Version**: `Accounts-Version` on a request pins the API version (400 `unsupported_version`
+   with the supported list for any other); every API answer names the version that served it.
+6. **Limits**: body limits by route — 64 KB default, 2 MB for the photo uploads
    (`POST /v1/me/photo`, `/v1/me/silicons/{uuid}/photo`, `/v1/flows/{id}/signup/photo`), 50 MB
    (+64 KB envelope) `POST /v1/apps/{app_id}/imports`, 5 MB `POST /v1/internal/apps/sync`,
    512 KB `PATCH /v1/apps/{app_id}/signin-config` (two inline logos of up to 128 KB) —
    enforced on `Content-Length` and on the body stream (`413 payload_too_large`); time budgets
    30 s / 60 s (photo, sync) / 5 min (imports) → `503 request_timeout`.
-6. **Panic recovery**: a panicking handler becomes `500 internal` with `details.request_id`.
+7. **Panic recovery**: a panicking handler becomes `500 internal` with `details.request_id`.
 
 Errors these layers make (413, 503 time budget, 500 panic, rewritten 405 / plain-text errors)
 use the API error object everywhere except `/v1/oauth/token`, `/v1/oauth/revoke` and

@@ -90,6 +90,12 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
                 .filter(|v| !v.trim().is_empty())
         }
     });
+    if args.key.is_some() && silicon.is_none() {
+        return Err(CliError::invalid(
+            "--key signs a Silicon in, but no si:id was given.",
+            "Add --silicon si:<id> (or set ACCOUNTS_SILICON).",
+        ));
+    }
     if (args.stk.is_some() || args.stk_stdin) && silicon.is_none() {
         return Err(CliError::invalid(
             "--stk and --stk-stdin sign in a Silicon, but no si:id was given.",
@@ -133,7 +139,19 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
     }
 
     let previous = ctx.load_session()?;
-    let (tokens, method) = if let Some(id) = silicon {
+    let key_file = args.key.clone().or_else(|| {
+        if args.stk.is_some() || args.stk_stdin {
+            None
+        } else {
+            std::env::var("ACCOUNTS_SILICON_KEY")
+                .ok()
+                .filter(|v| !v.trim().is_empty())
+                .map(std::path::PathBuf::from)
+        }
+    });
+    let (tokens, method) = if let (Some(id), Some(file)) = (&silicon, &key_file) {
+        (key_login(ctx, id, file, &label).await?, "silicon_key")
+    } else if let Some(id) = silicon {
         (silicon_login(ctx, &args, &id, &label).await?, "silicon_stk")
     } else if code_mode {
         match code_login(ctx, &args, &label).await? {
@@ -282,6 +300,28 @@ async fn silicon_login(
     let client = ctx.client()?;
     ctx.telemetry.step("login.silicon.started", 0.3, json!({}));
     Ok(client.silicon_login(&id, &stk, Some(label)).await?)
+}
+
+async fn key_login(
+    ctx: &Ctx,
+    id: &str,
+    file: &std::path::Path,
+    label: &str,
+) -> CliResult<TokenResponse> {
+    let id = util::with_prefix(id, AccountKind::Silicon);
+    if !id.starts_with("si:") {
+        return Err(CliError::invalid(
+            format!("`{id}` is not a Silicon id: Silicon ids start with si: (e.g. si:scout)."),
+            "Only Silicons sign in with a key.",
+        ));
+    }
+    let key = silicon_accounts_client::SiliconSigningKey::from_file(file)?;
+    let client = ctx.client()?;
+    ctx.telemetry
+        .step("login.silicon_key.started", 0.3, json!({}));
+    Ok(client
+        .silicon_login_with_key(&id, &key, None, Some(label))
+        .await?)
 }
 
 enum CodeLogin {

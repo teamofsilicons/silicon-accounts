@@ -84,7 +84,7 @@ With your app's credentials: `POST /v1/proofs/app-verification`.
 
 | field | required | rules |
 |---|---|---|
-| `receiving_app` | yes | The one app id that may verify the proof: 2 to 40 characters of `a-z`, `0-9` and `-`, starting with a letter (trimmed and lowercased). Not your own app, and not Silicon Accounts itself (`silicon-accounts`, `developer`). It must exist and be active. A body with `audiences` (any length) is 422 `app_verification_single_app`. |
+| `receiving_app` | yes | The one app id that may verify the proof: 3 to 30 characters of `a-z`, `0-9`, `-` and `_` as Silicon Apps creates them, or an older id of 2 to 40 characters of `a-z`, `0-9` and `-` starting with a letter (trimmed and lowercased). Not your own app, and not Silicon Accounts itself (`silicon-accounts`, `developer`). It must exist and be active. A body with `audiences` (any length) is 422 `app_verification_single_app`. |
 | `scopes` | no | Up to 20 distinct strings, each 1 to 100 characters of `A-Z a-z 0-9 _ . : / -`. |
 | `access_ttl_seconds` | no | How long each proof token lives: 60 to 1800 seconds, default 1800. |
 
@@ -92,19 +92,19 @@ Send an `Idempotency-Key`: a retry with the same key and body within 10 minutes 
 
 The answer has the same fields as a User verification proof, with `user: null`. `refresh_expires_at` is 900 days after issuing. Keep `proof_refresh_token` on your side; send `proof_token` to the apps.
 
-**As the app's owner.** Every app has an App verification page on [developers.teamofsilicons.com](https://developers.teamofsilicons.com) (`/apps/<app_id>/app-verification`) where its owner makes, sees and revokes App verification proofs, one app at a time. Behind it is the owner endpoint, which takes the owner's session instead of the app secret, with the same body and the same answer:
+**As one of the app's authors.** Every app has an App verification page on [developers.teamofsilicons.com](https://developers.teamofsilicons.com) (`/apps/<app_id>/app-verification`) where its owner makes, sees and revokes App verification proofs, one app at a time. Behind it is the owner endpoint, which takes the owner's session instead of the app secret, with the same body and the same answer:
 
 ```bash
 curl -s -X POST https://accounts.teamofsilicons.com/v1/apps/commit/proofs/app-verification \
-  -H "Authorization: Bearer $OWNER_ACCESS_TOKEN" \
+  -H "Authorization: Bearer $AUTHOR_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: app_verification-page-1" \
   -d '{"receiving_app":"remind","scopes":["notify"]}'
 ```
 
-`$OWNER_ACCESS_TOKEN` belongs to the owner’s Silicon Accounts session and has audience `silicon-accounts`. You get it through code login (`POST /v1/cli/login/start`, then `POST /v1/cli/login/verify`) or the device flow.
+`$AUTHOR_ACCESS_TOKEN` belongs to the author’s Silicon Accounts session and has audience `silicon-accounts`. You get it through code login (`POST /v1/cli/login/start`, then `POST /v1/cli/login/verify`) or the device flow.
 
-The CLI handles this for you. Sign in as the owner with `silicon-accounts login`, then run `silicon-accounts app --app-id commit proof app-verification …` without an app secret ([example below](#with-the-cli)). In the developer portal, the App verification page uses your developer session, whose audience is `developer`. A Carbon without ownership gets `403 not_app_owner`.
+The CLI handles this for you. Sign in as an author with `silicon-accounts login`, then run `silicon-accounts app --app-id commit proof app-verification …` without an app secret ([example below](#with-the-cli)). In the developer portal, the App verification page uses your developer session, whose audience is `developer`. A Carbon without ownership gets `403 not_app_owner`.
 
 The resulting proof belongs to the app. Refreshing it still requires the app’s credentials. Pass the refresh token to your app’s server, or create the proof from that server in the first place.
 
@@ -127,7 +127,7 @@ Send `proof_token` to the one app it is for, for example as `Authorization: Proo
 These work exactly as for User verification proofs, with your app's credentials:
 
 - `POST /v1/proofs/refresh` `{"proof_refresh_token": "sapr_…"}` returns a new proof token and a new refresh token; the used refresh token must never be presented again (that revokes the proof). Without `access_ttl_seconds` the new token gets the proof's own lifetime: refreshing the 60-second proof from a local test gave another 60-second token, which verified, while the expired first token answered `{"valid": false, "expires_at": null}`. See [Refresh before the proof token expires](user-verification.md#3-refresh-before-the-proof-token-expires).
-- `POST /v1/proofs/revoke` with one of `proof_id`, `proof_token` or `proof_refresh_token` returns `204`; the owner can use `DELETE /v1/apps/{app_id}/proofs/{proof_id}` with their session.
+- `POST /v1/proofs/revoke` with one of `proof_id`, `proof_token` or `proof_refresh_token` returns `204`; an author can use `DELETE /v1/apps/{app_id}/proofs/{proof_id}` with their session.
 - `GET /v1/apps/{app_id}/proofs?kind=app_verification` lists them, newest first:
 
 ```json
@@ -225,7 +225,7 @@ error: An App verification proof is for exactly one app, but --to names 2: remin
 hint: Issue one proof per app; each app verifies its own: silicon-accounts app proof app-verification --to remind ; silicon-accounts app proof app-verification --to waveform
 ```
 
-Signed in as the app's owner (`silicon-accounts login`), `silicon-accounts app --app-id commit proof app-verification --to remind --scope notify` works without the secret, through the owner endpoint. `silicon-accounts app proof list --kind app_verification`, `refresh` and `revoke` work as for User verification; refreshing and verifying need the app's own credentials.
+Signed in as one of the app's authors (`silicon-accounts login`), `silicon-accounts app --app-id commit proof app-verification --to remind --scope notify` works without the secret, through the owner endpoint. `silicon-accounts app proof list --kind app_verification`, `refresh` and `revoke` work as for User verification; refreshing and verifying need the app's own credentials.
 
 ## Errors
 
@@ -237,7 +237,7 @@ Signed in as the app's owner (`silicon-accounts login`), `silicon-accounts app -
 | 403 | `receiving_app_disabled` | The receiving app is disabled. |
 | 403 | `app_disabled` | Your app is disabled, so it can't issue proofs. |
 | 422 | `validation_failed` | Every field problem at once in `details.fields`, for example `{"receiving_app": "…"}` or `{"access_ttl_seconds": "must be between 60 and 1800 seconds; got 30", "scopes[1]": "'has space' contains ' '; …", "scopes[2]": "must not be empty; …"}`. |
-| 403 | `not_app_owner` / `app_mismatch` | Owner endpoint: you don't own the app, or your app credentials belong to another app than the one in the URL. |
+| 403 | `not_app_owner` / `app_mismatch` | Author endpoint: you aren't one of the app's authors, or your app credentials belong to another app than the one in the URL. |
 | 409 | `idempotency_key_reused` | The `Idempotency-Key` was used with a different body. |
 
 Refresh and revoke errors are the same as for User verification: see [the User verification errors](user-verification.md#errors).

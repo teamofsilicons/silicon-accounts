@@ -118,7 +118,7 @@ Numbers worth knowing (all of them are in [limits](reference/limits.md)):
 ## Run it yourself
 
 A local stack is the whole service on your machine: Postgres, `accounts-api`, the account site,
-the developer platform (http://localhost:8600, where you sign in as an app's owner and set up its
+the developer platform (http://localhost:8600, where you sign in as one of an app's authors and set up its
 sign-in), mock Google and Apple, a mock email and SMS sender, and fake apps (`briefcase`, `dm`, `remind`,
 …) with fixed development secrets. No code reaches a real inbox or phone and no sign-in reaches
 the real Google or Apple, so it is also the safe place to try a change before you make it in

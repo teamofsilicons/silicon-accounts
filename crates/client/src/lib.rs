@@ -54,6 +54,7 @@ mod secret;
 mod serde_util;
 mod service;
 mod session;
+mod silicon_key;
 pub mod types;
 mod wait;
 mod webhook;
@@ -72,6 +73,7 @@ pub use pkce::{
 pub use public::{DEVICE_CODE_GRANT_TYPE, SLT_GRANT_TYPE};
 pub use secret::Secret;
 pub use session::AccountSession;
+pub use silicon_key::SiliconSigningKey;
 pub use types::*;
 pub use wait::{WaitEvent, WaitOptions};
 pub use webhook::{

@@ -35,7 +35,8 @@ async fn the_discovery_document_describes_every_endpoint() {
             "authorization_code",
             "refresh_token",
             "urn:ietf:params:oauth:grant-type:device_code",
-            "urn:silicon:params:oauth:grant-type:slt"
+            "urn:silicon:params:oauth:grant-type:slt",
+            "urn:ietf:params:oauth:grant-type:jwt-bearer"
         ])
     );
     assert_eq!(
@@ -46,7 +47,7 @@ async fn the_discovery_document_describes_every_endpoint() {
     assert_eq!(d["subject_types_supported"], json!(["public"]));
     assert_eq!(
         d["token_endpoint_auth_methods_supported"],
-        json!(["client_secret_basic", "client_secret_post"])
+        json!(["client_secret_basic", "client_secret_post", "none"])
     );
     let scopes: Vec<&str> = d["scopes_supported"]
         .as_array()

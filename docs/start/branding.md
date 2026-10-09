@@ -103,7 +103,7 @@ You can make the same changes in your app’s **Pages** tab (`/apps/{app_id}/pag
 
 The live preview shows each step, including sign-in and sign-up, opening Google or Apple, code entry, account setup, your custom flow, the sharing screen and embedded buttons. Switch between light and dark mode, or desktop and phone, to check each layout.
 
-You can change branding with the app’s credentials or its owner’s session. See [who can change the setup](sign-in-config.md#who-can-change-it).
+You can change branding with the app’s credentials or the session of one of its authors. See [who can change the setup](sign-in-config.md#who-can-change-it).
 
 ## The variables
 

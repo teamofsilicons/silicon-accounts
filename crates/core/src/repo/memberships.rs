@@ -217,22 +217,40 @@ pub async fn remove_access(
     })
 }
 
-/// A member app that should hear about an account (live membership + webhook configured).
+/// Where an event about an account is recorded for one member app: one of the app's active
+/// subscriptions (its webhook, or the event stream).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct MemberTarget {
     pub app_id: String,
     pub membership_id: String,
     pub granted_scopes: Vec<String>,
-    pub webhook_url: String,
+    pub subscription_id: uuid::Uuid,
+    pub delivery: crate::models::SubscriptionDelivery,
+    /// The updates the subscription wants (`null` = every update).
+    pub updates: Option<Value>,
+    /// The app's webhook URL (webhook subscriptions only).
+    pub webhook_url: Option<String>,
 }
 
 impl MemberTarget {
     pub fn scopes(&self) -> Vec<Scope> {
         scopes_from_strings(&self.granted_scopes)
     }
+
+    /// The subscription's updates (`None` = every update).
+    pub fn updates(&self) -> Option<Vec<String>> {
+        crate::repo::subscriptions::updates_from_json(self.updates.as_ref())
+    }
+
+    /// True when the subscription wants the update `choice`.
+    pub fn wants(&self, choice: &str) -> bool {
+        crate::repo::subscriptions::wants(self.updates().as_deref(), choice)
+    }
 }
 
-/// Apps with a live membership (`active` or `imported`) and a webhook URL, by app id.
+/// Event targets for an account: every active subscription of every app it has a live
+/// membership with (`active` or `imported`), by app id, the webhook first. A webhook
+/// subscription counts while the app has a webhook URL; a stream subscription always.
 ///
 /// A disabled app is still a target: its events are stored like any other app's and the worker
 /// holds their deliveries ("Not sent: … is disabled"), so an app re-enabled within the delivery
@@ -243,10 +261,13 @@ pub async fn webhook_targets(
     account_uuid: &str,
 ) -> ApiResult<Vec<MemberTarget>> {
     Ok(sqlx::query_as::<_, MemberTarget>(
-        "select m.app_id, m.membership_id, m.granted_scopes, c.webhook_url from memberships m \
-         join app_signin_configs c on c.app_id = m.app_id \
-         where m.account_uuid = $1 and m.status in ('active', 'imported') and c.webhook_url is not null \
-         order by m.app_id",
+        "select m.app_id, m.membership_id, m.granted_scopes, s.id as subscription_id, s.delivery, \
+         s.updates, c.webhook_url from memberships m \
+         join app_event_subscriptions s on s.app_id = m.app_id and s.status = 'active' \
+         left join app_signin_configs c on c.app_id = m.app_id \
+         where m.account_uuid = $1 and m.status in ('active', 'imported') \
+           and (s.delivery = 'stream' or c.webhook_url is not null) \
+         order by m.app_id, s.delivery desc",
     )
     .bind(account_uuid)
     .fetch_all(&mut *conn)

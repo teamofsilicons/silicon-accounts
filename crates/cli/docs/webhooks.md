@@ -17,6 +17,39 @@ read it. `set`, `rotate` and `test` send an idempotency key (random, or yours wi
 `--idempotency-key`): a retried request returns the same secret, or queues no second ping,
 instead of doing it twice.
 
+## Pick your updates, or stream them
+
+A subscription says where your app's updates go (its webhook, or the event stream), which
+updates it wants and whether it is active or paused. Your webhook is one subscription; a
+stream is the other.
+
+```sh
+silicon-accounts app subscription list
+silicon-accounts app subscription create stream                       # the default updates
+silicon-accounts app subscription create webhook https://briefcase.example/webhooks \
+    --update id_change --update account_deleted
+silicon-accounts app subscription update <id> --pause                 # nothing recorded while paused
+silicon-accounts app subscription update <id> --all-updates --resume
+silicon-accounts app subscription test <id>                           # a `ping` on it
+silicon-accounts app subscription delete <id>
+```
+
+The updates are `id_change`, `display_name_change`, `pfp_change`, `timezone_change`,
+`email_change`, `phone_change`, `custodian_change`, `access_removed` and
+`account_deleted`. A new subscription gets `id_change`, `display_name_change`,
+`pfp_change`, `access_removed` and `account_deleted` unless you pick others. A webhook set
+before subscriptions existed keeps every update.
+
+Read a stream subscription with your app's credentials:
+
+```sh
+curl -N -u "$APP_ID:$APP_SECRET" https://accounts.teamofsilicons.com/v1/events/stream
+```
+
+Each event arrives as `id: <event_id>`, `event: <type>` and `data: <the webhook body>`.
+Reconnect with `Last-Event-ID` and nothing is missed. A Silicon streams its own events with
+its access token the same way.
+
 ## Verify every delivery
 
 Each delivery is a `POST` with JSON and these headers:

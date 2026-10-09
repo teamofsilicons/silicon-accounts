@@ -615,13 +615,14 @@ impl Ctx {
 
     pub fn app_path(&self, app_id: &str) -> CliResult<PathBuf> {
         if app_id.is_empty()
+            || app_id.len() > 40
             || !app_id
                 .bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
         {
             return Err(CliError::invalid(
                 format!(
-                    "`{app_id}` is not an app id: app ids are lowercase letters, digits and dashes (e.g. briefcase)."
+                    "`{app_id}` is not an app id: app ids are lowercase letters, digits, dashes and underscores (e.g. briefcase or my_app)."
                 ),
                 "Check the app id in Silicon Apps or with `silicon-accounts app list`.",
             ));

@@ -6,17 +6,18 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 use silicon_accounts_client::{
-    AppClient, AppDetails, DeliveriesQuery, DeliveryDetail, ImportInput, ImportJob, ImportOptions,
-    ImportRowsQuery, IssueAppVerification, IssueUserVerification, MAX_IMPORT_BYTES, Page,
-    PageRequest, ProofRef, ProofVerification, ProofsQuery, ReplayRequest, ReplayResult, UsersQuery,
-    WaitEvent, WaitOptions, WebhookDelivery,
+    APP_UPDATES, AppClient, AppDetails, DeliveriesQuery, DeliveryDetail, ImportInput, ImportJob,
+    ImportOptions, ImportRowsQuery, IssueAppVerification, IssueUserVerification, MAX_IMPORT_BYTES,
+    NewSubscription, Page, PageRequest, ProofRef, ProofVerification, ProofsQuery, ReplayRequest,
+    ReplayResult, Subscription, SubscriptionChanges, SubscriptionDelivery, SubscriptionStatus,
+    Updates, UsersQuery, WaitEvent, WaitOptions, WebhookDelivery,
 };
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
 use crate::cli::{
-    AppArgs, AppCommand, AppConfigCommand, AppWebhookCommand, ImportArgs, ImportCommand,
-    ImportFormat, ProofCommand, TokenCommand,
+    AppArgs, AppCommand, AppConfigCommand, AppSubscriptionCommand, AppWebhookCommand, DeliveryArg,
+    ImportArgs, ImportCommand, ImportFormat, ProofCommand, TokenCommand,
 };
 use crate::ctx::{AppSelection, Ctx, StoredApp};
 use crate::error::{CliError, CliResult, EXIT_FAILURE, EXIT_INVALID};
@@ -320,6 +321,7 @@ async fn run_selected(
         }
         AppCommand::Proof(proof) => run_proof(app, &app_id, proof.command).await,
         AppCommand::Webhook(webhook) => run_webhook(app, &app_id, webhook.command).await,
+        AppCommand::Subscription(sub) => run_subscription(app, &app_id, sub.command).await,
         AppCommand::Lookup { target } => {
             let account = app.resolve(&target).await?;
             Ok(Outcome::new(
@@ -1363,6 +1365,209 @@ async fn run_webhook(
                 &format!("Webhook of {app_id}"),
                 "silicon-accounts app webhook replay --failed",
                 "silicon-accounts app webhook deliveries --status pending",
+            ))
+        }
+    }
+}
+
+// ---- event subscriptions -------------------------------------------------------------------
+
+/// The updates a list of `--update` flags (or `--all-updates`) asks for.
+fn updates_arg(updates: Vec<String>, all: bool) -> CliResult<Updates> {
+    if all {
+        return Ok(Updates::All);
+    }
+    if updates.is_empty() {
+        return Ok(Updates::Defaults);
+    }
+    let mut picked: Vec<String> = Vec::new();
+    for u in updates
+        .iter()
+        .flat_map(|u| u.split(','))
+        .map(|u| u.trim().to_ascii_lowercase().replace('-', "_"))
+        .filter(|u| !u.is_empty())
+    {
+        if !APP_UPDATES.contains(&u.as_str()) {
+            return Err(CliError::invalid(
+                format!("'{u}' is not an update."),
+                format!("Pick from {}.", APP_UPDATES.join(", ")),
+            ));
+        }
+        if !picked.contains(&u) {
+            picked.push(u);
+        }
+    }
+    Ok(Updates::Only(picked))
+}
+
+fn subscription_line(s: &Subscription) -> String {
+    let updates = match &s.updates {
+        None => "every update".to_string(),
+        Some(list) if list.is_empty() => "no updates (test pings only)".to_string(),
+        Some(list) => list.join(", "),
+    };
+    let target = match s.delivery {
+        SubscriptionDelivery::Webhook => s.url.clone().unwrap_or_default(),
+        _ => s
+            .stream_url
+            .clone()
+            .unwrap_or_else(|| "the event stream".into()),
+    };
+    format!(
+        "{} {} ({}) to {target}\n  updates: {updates}\n  event types: {}",
+        to_json(&s.delivery).as_str().unwrap_or("?"),
+        s.id,
+        to_json(&s.status).as_str().unwrap_or("?"),
+        s.event_types.join(", ")
+    )
+}
+
+async fn run_subscription(
+    app: &AppClient<'_>,
+    app_id: &str,
+    command: AppSubscriptionCommand,
+) -> CliResult<Outcome> {
+    match command {
+        AppSubscriptionCommand::List => {
+            let page = app.subscriptions().await?;
+            let rows: Vec<Vec<String>> = page
+                .items
+                .iter()
+                .map(|s| {
+                    vec![
+                        s.id.clone(),
+                        to_json(&s.delivery).as_str().unwrap_or("?").to_string(),
+                        to_json(&s.status).as_str().unwrap_or("?").to_string(),
+                        s.updates
+                            .as_ref()
+                            .map_or_else(|| "every update".to_string(), |u| u.join(",")),
+                        s.url.clone().unwrap_or_default(),
+                    ]
+                })
+                .collect();
+            Ok(Outcome::new(
+                to_json(&page),
+                table(
+                    &["SUBSCRIPTION", "DELIVERY", "STATUS", "UPDATES", "URL"],
+                    &rows,
+                    &format!(
+                        "{app_id} has no subscriptions: create one with `silicon-accounts app subscription create stream` or `… create webhook <URL>`."
+                    ),
+                ),
+            ))
+        }
+        AppSubscriptionCommand::Show { id } => {
+            let s = app.subscription(&id).await?;
+            Ok(Outcome::new(to_json(&s), subscription_line(&s)))
+        }
+        AppSubscriptionCommand::Create {
+            delivery,
+            endpoint,
+            updates,
+            all_updates,
+            paused,
+            idempotency_key,
+        } => {
+            let updates = updates_arg(updates, all_updates)?;
+            let mut new = match delivery {
+                DeliveryArg::Webhook => {
+                    let url = endpoint.ok_or_else(|| {
+                        CliError::invalid(
+                            "A webhook subscription needs the URL to send updates to.",
+                            "Run `silicon-accounts app subscription create webhook https://…`.",
+                        )
+                    })?;
+                    NewSubscription::webhook(url)
+                }
+                DeliveryArg::Stream => {
+                    if endpoint.is_some() {
+                        return Err(CliError::invalid(
+                            "A stream subscription has no URL.",
+                            "Leave the URL out; read the stream at GET /v1/events/stream with the app's credentials.",
+                        ));
+                    }
+                    NewSubscription::stream()
+                }
+            }
+            .with_updates(updates);
+            new.paused = paused;
+            let key = idempotency_key.unwrap_or_else(util::idempotency_key);
+            let s = app.create_subscription(&new, Some(&key)).await?;
+            let secret = s
+                .secret
+                .as_ref()
+                .map(|x| {
+                    format!(
+                        "\nSigning secret (shown once, store it now): {}",
+                        x.expose()
+                    )
+                })
+                .unwrap_or_default();
+            Ok(Outcome::new(
+                to_json(&s),
+                format!("Created for {app_id}: {}{secret}", subscription_line(&s)),
+            )
+            .next(
+                format!("silicon-accounts app subscription test {}", s.id),
+                "send a test ping",
+            ))
+        }
+        AppSubscriptionCommand::Update {
+            id,
+            updates,
+            all_updates,
+            pause,
+            resume,
+            endpoint,
+            idempotency_key,
+        } => {
+            let changes = SubscriptionChanges {
+                updates: updates_arg(updates, all_updates)?,
+                status: if pause {
+                    Some(SubscriptionStatus::Paused)
+                } else if resume {
+                    Some(SubscriptionStatus::Active)
+                } else {
+                    None
+                },
+                url: endpoint,
+            };
+            if changes.is_empty() {
+                return Err(CliError::invalid(
+                    "Nothing to change.",
+                    "Pass --update (repeatable), --all-updates, --pause, --resume or --endpoint.",
+                ));
+            }
+            let key = idempotency_key.unwrap_or_else(util::idempotency_key);
+            let s = app.update_subscription(&id, &changes, Some(&key)).await?;
+            Ok(Outcome::new(
+                to_json(&s),
+                format!("Updated: {}", subscription_line(&s)),
+            ))
+        }
+        AppSubscriptionCommand::Delete { id } => {
+            app.delete_subscription(&id).await?;
+            Ok(Outcome::new(
+                json!({ "deleted": true, "id": id }),
+                format!("Deleted the subscription {id} of {app_id}."),
+            ))
+        }
+        AppSubscriptionCommand::Test {
+            id,
+            idempotency_key,
+        } => {
+            let key = idempotency_key.unwrap_or_else(util::idempotency_key);
+            let t = app.test_subscription(&id, Some(&key)).await?;
+            Ok(Outcome::new(
+                to_json(&t),
+                format!(
+                    "Queued a `ping` (event {}){}.",
+                    t.event_id,
+                    t.delivery_id
+                        .as_deref()
+                        .map(|d| format!(", delivery {d}"))
+                        .unwrap_or_else(|| ", on the stream".into())
+                ),
             ))
         }
     }

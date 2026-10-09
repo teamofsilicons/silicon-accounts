@@ -1120,3 +1120,290 @@ async fn app_calls() {
         owned.revoke_proof(&ProofRef::Id("p1".into()))
     );
 }
+
+fn subscription(delivery: &str) -> Value {
+    json!({"id": "s1", "app_id": "briefcase", "delivery": delivery, "status": "active",
+        "url": if delivery == "webhook" { json!("https://x") } else { Value::Null },
+        "secret_set": delivery == "webhook", "updates": ["id_change"],
+        "event_types": ["account.id_changed", "ping"], "stream_url": null,
+        "created_at": "2026-10-09T00:00:00.000Z", "updated_at": "2026-10-09T00:00:00.000Z"})
+}
+
+#[tokio::test]
+async fn subscription_calls() {
+    use silicon_accounts_client::{
+        NewSubscription, SubscriptionChanges, SubscriptionDelivery, SubscriptionStatus, Updates,
+    };
+    let mock = Mock::start().await;
+    let c = AccountsClient::new(&mock.url).unwrap();
+    let a = c.as_app("briefcase", "sa_app_secret");
+
+    let r = check!(
+        mock,
+        "GET",
+        "/v1/apps/briefcase/subscriptions",
+        Reply::json(200, page(subscription("webhook"))),
+        a.subscriptions()
+    );
+    assert!(
+        r.header("authorization")
+            .is_some_and(|h| h.starts_with("Basic "))
+    );
+    let list = a.subscriptions().await.unwrap();
+    assert_eq!(list.items[0].delivery, SubscriptionDelivery::Webhook);
+    assert_eq!(
+        list.items[0].updates.as_deref(),
+        Some(&["id_change".to_string()][..])
+    );
+
+    // A webhook with the defaults: no updates field, so the service picks them.
+    let mut created = subscription("webhook");
+    created["secret"] = json!("whsec_x");
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/apps/briefcase/subscriptions",
+        Reply::json(201, created),
+        a.create_subscription(&NewSubscription::webhook(" https://x "), Some("sub-1"))
+    );
+    assert_eq!(r.json(), json!({"delivery": "webhook", "url": "https://x"}));
+    assert_eq!(r.header("idempotency-key"), Some("sub-1"));
+    let made = a
+        .create_subscription(&NewSubscription::webhook("https://x"), None)
+        .await
+        .unwrap();
+    assert_eq!(
+        made.secret.map(|s| s.expose().to_string()).as_deref(),
+        Some("whsec_x")
+    );
+
+    // A stream with every update, starting paused.
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/apps/briefcase/subscriptions",
+        Reply::json(201, subscription("stream")),
+        a.create_subscription(
+            &NewSubscription {
+                paused: true,
+                ..NewSubscription::stream().with_updates(Updates::All)
+            },
+            None
+        )
+    );
+    assert_eq!(
+        r.json(),
+        json!({"delivery": "stream", "updates": null, "status": "paused"})
+    );
+
+    check!(
+        mock,
+        "GET",
+        "/v1/apps/briefcase/subscriptions/s1",
+        Reply::json(200, subscription("stream")),
+        a.subscription(" s1 ")
+    );
+    let r = check!(
+        mock,
+        "PATCH",
+        "/v1/apps/briefcase/subscriptions/s1",
+        Reply::json(200, subscription("stream")),
+        a.update_subscription(
+            "s1",
+            &SubscriptionChanges {
+                updates: Updates::Only(vec!["id_change".into(), "account_deleted".into()]),
+                status: Some(SubscriptionStatus::Paused),
+                url: None,
+            },
+            Some("sub-patch-1")
+        )
+    );
+    assert_eq!(
+        r.json(),
+        json!({"updates": ["id_change", "account_deleted"], "status": "paused"})
+    );
+    assert_eq!(r.header("idempotency-key"), Some("sub-patch-1"));
+    let before = mock
+        .requests_to("PATCH", "/v1/apps/briefcase/subscriptions/s1")
+        .len();
+    let err = a
+        .update_subscription("s1", &SubscriptionChanges::default(), None)
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("Nothing to change"), "{err}");
+    assert_eq!(
+        mock.requests_to("PATCH", "/v1/apps/briefcase/subscriptions/s1")
+            .len(),
+        before,
+        "nothing was sent"
+    );
+    check!(
+        mock,
+        "DELETE",
+        "/v1/apps/briefcase/subscriptions/s1",
+        Reply::empty(204),
+        a.delete_subscription("s1")
+    );
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/apps/briefcase/subscriptions/s1/test",
+        Reply::json(
+            202,
+            json!({"subscription_id": "s1", "event_id": "e1", "delivery_id": null})
+        ),
+        a.test_subscription("s1", Some("sub-test-1"))
+    );
+    assert_eq!(r.header("idempotency-key"), Some("sub-test-1"));
+    let t = a.test_subscription("s1", None).await.unwrap();
+    assert_eq!(t.event_id, "e1");
+    assert_eq!(t.delivery_id, None);
+
+    // Statuses and deliveries a newer service adds don't break older clients.
+    let mut future = subscription("carrier_pigeon");
+    future["status"] = json!("draining");
+    mock.on(
+        "GET",
+        "/v1/apps/briefcase/subscriptions/s9",
+        Reply::json(200, future),
+    );
+    let s = a.subscription("s9").await.unwrap();
+    assert_eq!(s.delivery, SubscriptionDelivery::Unknown);
+    assert_eq!(s.status, SubscriptionStatus::Unknown);
+}
+
+#[tokio::test]
+async fn custodian_app_controls() {
+    let mock = Mock::start().await;
+    let c = AccountsClient::new(&mock.url).unwrap();
+    let s = c.with_token("eyJ.custodian");
+    let my_app = json!({"app": {"app_id": "briefcase", "name": "Briefcase"}, "membership_id": "briefcase:b9Z",
+        "status": "active", "granted_scopes": ["profile"]});
+    let r = check!(
+        mock,
+        "GET",
+        "/v1/me/silicons/b9Z/apps",
+        Reply::json(200, page(my_app)),
+        s.silicon_apps(" b9Z ", Some("active"))
+    );
+    assert_eq!(r.query.as_deref(), Some("status=active&limit=200"));
+    assert_eq!(r.header("authorization"), Some("Bearer eyJ.custodian"));
+    check!(
+        mock,
+        "DELETE",
+        "/v1/me/silicons/b9Z/apps/briefcase",
+        Reply::empty(204),
+        s.remove_silicon_app("b9Z", " briefcase ")
+    );
+    let r = check!(
+        mock,
+        "GET",
+        "/v1/me/silicons/b9Z/signins",
+        Reply::json(
+            200,
+            page(
+                json!({"at": "2026-10-09T00:00:00.000Z", "app": {"app_id": "briefcase", "name": "Briefcase"},
+            "method": "slt", "outcome": "success", "ip": "203.0.113.9", "user_agent": null})
+            )
+        ),
+        s.silicon_signins(
+            "b9Z",
+            &PageRequest {
+                limit: Some(20),
+                cursor: None
+            }
+        )
+    );
+    assert_eq!(r.query.as_deref(), Some("limit=20"));
+    let signins = s
+        .silicon_signins("b9Z", &PageRequest::default())
+        .await
+        .unwrap();
+    assert_eq!(signins.items[0].method, "slt");
+    check!(
+        mock,
+        "GET",
+        "/v1/me/silicons/b9Z/allowed-apps",
+        Reply::json(200, json!({"allowed_apps": null})),
+        s.silicon_allowed_apps("b9Z")
+    );
+    let r = check!(
+        mock,
+        "PUT",
+        "/v1/me/silicons/b9Z/allowed-apps",
+        Reply::json(200, json!({"allowed_apps": ["briefcase"]})),
+        s.set_silicon_allowed_apps("b9Z", Some(&["briefcase".to_string()]))
+    );
+    assert_eq!(r.json(), json!({"allowed_apps": ["briefcase"]}));
+    let r = check!(
+        mock,
+        "PUT",
+        "/v1/me/silicons/b9Z/allowed-apps",
+        Reply::json(200, json!({"allowed_apps": null})),
+        s.set_silicon_allowed_apps("b9Z", None)
+    );
+    assert_eq!(r.json(), json!({"allowed_apps": null}));
+}
+
+#[tokio::test]
+async fn silicon_key_calls() {
+    let mock = Mock::start().await;
+    let c = AccountsClient::new(&mock.url).unwrap();
+    let s = c.with_token("eyJ.scout");
+    let key_json = json!({"id": "k1", "name": "laptop", "algorithm": "EdDSA", "public_key": "x",
+        "fingerprint": "SHA256:x", "created_by": "b9Z", "created_at": "2026-10-09T00:00:00.000Z"});
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/silicons/si:scout/keys",
+        Reply::json(201, key_json.clone()),
+        s.add_silicon_key("si:scout", " ssh-ed25519 AAAA ", Some("laptop"))
+    );
+    assert_eq!(
+        r.json(),
+        json!({"public_key": "ssh-ed25519 AAAA", "name": "laptop"})
+    );
+    check!(
+        mock,
+        "GET",
+        "/v1/silicons/si:scout/keys",
+        Reply::json(200, page(key_json)),
+        s.silicon_keys("si:scout")
+    );
+    check!(
+        mock,
+        "DELETE",
+        "/v1/silicons/si:scout/keys/k1",
+        Reply::empty(204),
+        s.revoke_silicon_key("si:scout", "k1")
+    );
+    mock.on(
+        "GET",
+        "/v1/meta",
+        Reply::json(
+            200,
+            json!({"name": "Silicon Accounts", "public_url": "https://accounts.example"}),
+        ),
+    );
+    let key = silicon_accounts_client::SiliconSigningKey::generate();
+    let r = check!(
+        mock,
+        "POST",
+        "/v1/silicons/login",
+        Reply::json(200, tokens()),
+        c.silicon_login_with_key("si:scout", &key, Some("k1"), Some("scout on build box"))
+    );
+    let body = r.json();
+    assert_eq!(body["client_label"], "scout on build box");
+    let jwt = body["assertion"].as_str().unwrap();
+    let payload = jwt.split('.').nth(1).unwrap();
+    let claims: Value = serde_json::from_slice(
+        &base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload)
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(claims["iss"], "si:scout");
+    assert_eq!(claims["sub"], "si:scout");
+    assert_eq!(claims["aud"], "https://accounts.example/v1/oauth/token");
+    assert!(claims["exp"].as_i64().unwrap() - claims["iat"].as_i64().unwrap() <= 300);
+}

@@ -43,7 +43,8 @@ IP" means the client address (the right-most `X-Forwarded-For` entry behind the 
 | Adding an email or phone (`POST /v1/me/emails`, `/phones`), counted before any refusal | 20 per 10 minutes; 30 per 10 minutes | account; IP |
 | Hosted sign-in flows started (`POST /v1/flows`) | 300 per minute | IP |
 | CLI code sign-ins started (`POST /v1/cli/login/start`) | 60 per 10 minutes | IP |
-| Device sign-ins started (`POST /v1/device/authorize`) | 60 per 10 minutes | IP |
+| Device sign-ins started (`POST /v1/device/authorize`) | 60 per 10 minutes; 600 per 10 minutes for one app's tools | IP; app |
+| Device codes looked up, approved or denied (`/v1/device/{user_code}…`) | 60 per 10 minutes | Carbon |
 | Connecting Google or Apple (`POST /v1/me/identities/{provider}`) | 30 per hour | account |
 | Silicon sign-in attempts (`POST /v1/silicons/login`) | 60 per minute | IP |
 | Silicon self-creations (`POST /v1/silicons`) | 10 successful per hour, and 60 attempts of any outcome per hour | IP |
@@ -93,7 +94,7 @@ IP" means the client address (the right-most `X-Forwarded-For` entry behind the 
 |---|---|
 | Handle (after `c:` / `si:`) | 3–30 characters of `a-z 0-9 - _`, case-insensitive (**contract**); reserved words: `admin`, `administrator`, `root`, `system`, `support`, `help`, `security`, `silicon-accounts`, `account`, `silicon`, `silicons`, `carbon`, `carbons`, `api`, `www`, `mail`, `null`, `undefined`, `me`, `owner`, `staff` |
 | uuid | `a-z A-Z 0-9`, case-sensitive; 3 characters, then 4 once every 3-character uuid is used (**contract**); never reused |
-| App id | 2–40 characters of `a-z 0-9 -`, starting with a letter |
+| App id | 3 to 30 characters of `a-z 0-9 - _`, as Silicon Apps creates them (`my_app`, `2fa-tool`); older ids of 2 to 40 characters of `a-z 0-9 -` starting with a letter (`dm`) keep working |
 | Emails per Carbon / phones per Carbon | 10 / 10 (**contract**) |
 | Display name | 1–100 characters, no control characters |
 | Date of birth | in the past, not before 1900-01-01; a Silicon's is its creation date |
@@ -127,6 +128,28 @@ IP" means the client address (the right-most `X-Forwarded-For` entry behind the 
 | Redirects | not followed |
 | Signature timestamp tolerance (Rust client default) | 5 minutes |
 | Email and SMS sending | at most 8 attempts; a code's message stops retrying once the code expired |
+
+## Silicon keys
+
+| What | Value |
+|---|---|
+| Live keys per Silicon | 10 |
+| Assertion lifetime (`exp - iat`) | at most 300 seconds (30 seconds of clock skew allowed) |
+| Assertion `jti` | 1 to 200 characters, each used once |
+| Key name | at most 100 characters |
+
+## Event streams
+
+| What | Value |
+|---|---|
+| Open streams (`GET /v1/events/stream`) | 5 per app or account; 500 per server (429 `too_many_streams` / 503 `stream_capacity_reached`, with `Retry-After`) |
+| How often a stream looks for new events | every second, at most 100 events per read |
+| Heartbeat (`: heartbeat`) | after 15 seconds without events |
+| Reconnect delay told to clients (`retry:`) | 5 seconds |
+| Credentials checked again | every 30 seconds |
+| Longest stream | 1 hour, then `stream.closed` with `max_duration`: reconnect with `Last-Event-ID` |
+| Event types in `?types=` | at most 20 |
+| Subscriptions per app | one webhook and one stream |
 
 ## Retention
 

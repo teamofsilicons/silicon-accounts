@@ -1015,6 +1015,23 @@ pub struct DeviceAuthorization {
     pub expires_at: OffsetDateTime,
     pub approved_at: Option<OffsetDateTime>,
     pub last_polled_at: Option<OffsetDateTime>,
+    /// What an app's tool asked to share (`None` for the silicon-accounts CLI: `profile`).
+    pub scopes: Option<Vec<String>>,
+}
+
+impl DeviceAuthorization {
+    /// True for a sign-in of Silicon Accounts' own CLI.
+    pub fn first_party(&self) -> bool {
+        crate::is_first_party_app_id(&self.app_id)
+    }
+
+    /// The scopes the approving Carbon shares.
+    pub fn scope_list(&self) -> Vec<crate::models::Scope> {
+        match &self.scopes {
+            Some(s) => crate::models::scopes_from_strings(s),
+            None => vec![crate::models::Scope::Profile],
+        }
+    }
 }
 
 /// Result of [`create_device`]. `Debug` hides the device code (a bearer credential).
@@ -1049,7 +1066,7 @@ struct DeviceRow {
 
 macro_rules! device_columns {
     () => {
-        "device_code_hash, user_code, app_id, status, account_uuid, client_label, created_at, expires_at, approved_at, last_polled_at"
+        "device_code_hash, user_code, app_id, status, account_uuid, client_label, created_at, expires_at, approved_at, last_polled_at, scopes"
     };
 }
 
@@ -1059,6 +1076,19 @@ pub async fn create_device(
     pepper: &Pepper,
     client_label: Option<&str>,
 ) -> ApiResult<DeviceStart> {
+    create_app_device(conn, pepper, crate::FIRST_PARTY_APP_ID, client_label, None).await
+}
+
+/// Starts a device authorization for `app_id` (600 s, poll every 5 s) asking for `scopes`
+/// (`None` for the first-party CLI).
+pub async fn create_app_device(
+    conn: &mut PgConnection,
+    pepper: &Pepper,
+    app_id: &str,
+    client_label: Option<&str>,
+    scopes: Option<&[crate::models::Scope]>,
+) -> ApiResult<DeviceStart> {
+    let scopes: Option<Vec<String>> = scopes.map(crate::models::scope_strings);
     let device_code = random_token(prefix::DEVICE_CODE);
     let label = client_label
         .map(|l| l.trim().chars().take(100).collect::<String>())
@@ -1066,13 +1096,15 @@ pub async fn create_device(
     for _ in 0..8 {
         let user_code = crate::crypto::generate_user_code();
         let res: Result<OffsetDateTime, sqlx::Error> = sqlx::query_scalar(
-            "insert into device_authorizations (device_code_hash, user_code, app_id, status, client_label, expires_at) \
-             values ($1, $2, 'silicon-accounts', 'pending', $3, now() + make_interval(secs => $4)) returning expires_at",
+            "insert into device_authorizations (device_code_hash, user_code, app_id, status, client_label, expires_at, scopes) \
+             values ($1, $2, $5, 'pending', $3, now() + make_interval(secs => $4), $6) returning expires_at",
         )
         .bind(pepper.hash(&device_code))
         .bind(&user_code)
         .bind(&label)
         .bind(DEVICE_CODE_TTL_SECONDS as f64)
+        .bind(app_id)
+        .bind(&scopes)
         .fetch_one(&mut *conn)
         .await;
         match res {
@@ -1195,13 +1227,24 @@ pub async fn decide_device(
     Ok(updated)
 }
 
-/// Polls a device code. Approved → marks it consumed and returns it (issue tokens for
-/// `account_uuid` with origin `device`, app `silicon-accounts`). Otherwise `AuthorizationPending`,
-/// `SlowDown` (polled within 5 s), `AccessDenied`, `ExpiredToken` or `Invalid`.
+/// Polls a device code of the first-party CLI; see [`poll_app_device`].
 pub async fn poll_device(
     pool: &PgPool,
     pepper: &Pepper,
     device_code: &str,
+) -> Result<DeviceAuthorization, GrantError> {
+    poll_app_device(pool, pepper, device_code, crate::FIRST_PARTY_APP_ID).await
+}
+
+/// Polls a device code on behalf of `app_id`. Approved → marks it consumed and returns it
+/// (issue tokens for `account_uuid` with origin `device`). Otherwise `AuthorizationPending`,
+/// `SlowDown` (polled within 5 s), `AccessDenied`, `ExpiredToken` or `Invalid` (also for a code
+/// started by another app, which stays untouched).
+pub async fn poll_app_device(
+    pool: &PgPool,
+    pepper: &Pepper,
+    device_code: &str,
+    app_id: &str,
 ) -> Result<DeviceAuthorization, GrantError> {
     let device_code = device_code.trim();
     let mut tx = pool.begin().await?;
@@ -1225,9 +1268,14 @@ pub async fn poll_device(
             "The device_code is not known: it is mistyped or was never issued.".into(),
         ));
     };
+    if d.app_id != app_id {
+        return Err(GrantError::Invalid(format!(
+            "The device_code was started for another app, not for '{app_id}'; poll with the client_id that started it."
+        )));
+    }
     if expired && d.status != "consumed" {
         return Err(GrantError::ExpiredToken(format!(
-            "The device code expired at {}; run `silicon-accounts login` again.",
+            "The device code expired at {}; start the sign-in again for a new code.",
             crate::timefmt::format_rfc3339_ms(d.expires_at)
         )));
     }

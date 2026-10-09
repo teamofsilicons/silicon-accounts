@@ -138,11 +138,11 @@ Some details shape who becomes what:
   (`finishing_import`); finishing keeps the account's uuid, so your records already point at
   it.
 - **`allowed_email_domains`** is checked before an email code is sent, on Google and Apple
-  emails, for "Continue as" (the account needs a verified email at one of the domains), and on
-  an email added on a details page. A phone code isn't checked today, so an account that
-  signs in by phone gets through even when its email is at another domain (requiring `email`
-  doesn't help when the account already has one). Keep `phone` off on an app that restricts
-  domains.
+  emails, for "Continue as", after a phone code, and on an email added on a details page: only
+  an account with a verified email at one of the domains gets in, whichever way it signs in. A
+  new Carbon who signs up by phone is asked for an email at the domains on the details page
+  when the app requires an email, and refused at once when it doesn't. The check runs once
+  more right before the sign-in completes.
 
 ## Continue as …
 

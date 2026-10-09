@@ -3104,8 +3104,10 @@ name = "silicon-accounts-server"
 version = "0.3.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "bytes",
  "dotenvy",
+ "ed25519-dalek",
  "futures",
  "http-body-util",
  "serde",

@@ -13,7 +13,9 @@
 //! - id reservations 1 day after `reserved_until` (the id is already free then;
 //!   `handle_history` keeps the record of the change);
 //! - sign-up sessions 7 days after their 48 h lifetime ended or after they were used;
-//! - rate-limit windows that ended over a day ago (core `rate_limit::purge`).
+//! - rate-limit windows that ended over a day ago (core `rate_limit::purge`);
+//! - the jti of every Silicon key assertion once the assertion expired (it can't be replayed
+//!   after that anyway).
 //!
 //! History is never deleted: accounts, memberships, sessions, token families, refresh tokens,
 //! proofs, webhook events/deliveries/attempts, messages, reports, imports, `audit_log`,
@@ -47,6 +49,8 @@ const DEVICE_AUTHORIZATIONS: &str = "delete from device_authorizations where dev
     (select device_code_hash from device_authorizations where expires_at < now() - interval '7 days' limit 5000)";
 const HANDLE_RESERVATIONS: &str = "delete from handle_reservations where handle in \
     (select handle from handle_reservations where reserved_until < now() - interval '1 day' limit 5000)";
+const SILICON_KEY_ASSERTIONS: &str = "delete from silicon_key_assertions where (silicon_uuid, jti) in \
+    (select silicon_uuid, jti from silicon_key_assertions where expires_at < now() limit 5000)";
 const SIGNUP_SESSIONS: &str = "delete from signup_sessions where id in \
     (select id from signup_sessions where expires_at < now() - interval '7 days' \
        or consumed_at < now() - interval '7 days' limit 5000)";
@@ -63,6 +67,7 @@ pub struct CleanupReport {
     pub handle_reservations: u64,
     pub signup_sessions: u64,
     pub rate_limits: u64,
+    pub silicon_key_assertions: u64,
     /// `"<table>: <error>"` for steps that failed (the others still ran).
     pub errors: Vec<String>,
 }
@@ -79,6 +84,7 @@ impl CleanupReport {
             + self.handle_reservations
             + self.signup_sessions
             + self.rate_limits
+            + self.silicon_key_assertions
     }
 }
 
@@ -139,6 +145,11 @@ pub async fn run_once(state: &AppState) -> CleanupReport {
         e,
         "signup_sessions",
         purge_batched(pool, SIGNUP_SESSIONS).await,
+    );
+    r.silicon_key_assertions = tally(
+        e,
+        "silicon_key_assertions",
+        purge_batched(pool, SILICON_KEY_ASSERTIONS).await,
     );
     match pool.acquire().await {
         Ok(mut conn) => {

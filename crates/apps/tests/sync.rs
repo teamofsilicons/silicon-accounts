@@ -549,3 +549,48 @@ async fn seeding_the_testkit_fake_apps() {
     );
     let _ = std::fs::remove_file(&bad);
 }
+
+/// Silicon Apps ids such as `my_app` and `2fa-tool` sync and sign people in like any other.
+#[tokio::test]
+async fn sync_accepts_every_id_silicon_apps_creates() {
+    let ctx = ctx_with_token().await;
+    let mut apps = Vec::new();
+    for id in ["my_app", "2fa-tool", "a_b"] {
+        let mut app = notes_app();
+        app["app_id"] = json!(id);
+        app["name"] = json!(format!("App {id}"));
+        app["secret"] = json!(format!("sa_app_{id}_0123456789abcdefghijklmnopqrstuv"));
+        app["webhook_url"] = Value::Null;
+        app["webhook_secret"] = Value::Null;
+        apps.push(app);
+    }
+    let r = call(&ctx, sync(json!({ "apps": apps }))).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    let ids: Vec<&str> = r.json["apps"]
+        .as_array()
+        .expect("apps")
+        .iter()
+        .filter_map(|a| a["app_id"].as_str())
+        .collect();
+    assert_eq!(ids, vec!["my_app", "2fa-tool", "a_b"]);
+    // Its own credentials work on its routes.
+    let r = call(
+        &ctx,
+        Req::get("/v1/apps/my_app")
+            .basic("my_app", "sa_app_my_app_0123456789abcdefghijklmnopqrstuv"),
+    )
+    .await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["app_id"], "my_app");
+
+    // What no service creates is still refused, naming the field.
+    let mut bad = notes_app();
+    bad["app_id"] = json!("My App");
+    let r = call(&ctx, sync(json!({ "apps": [bad] }))).await;
+    assert_eq!(r.status, 422, "{}", r.json);
+    assert!(
+        r.json["error"]["details"]["fields"]["apps[0].app_id"].is_string(),
+        "{}",
+        r.json
+    );
+}

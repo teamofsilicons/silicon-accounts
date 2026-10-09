@@ -6,11 +6,12 @@
 //! |---|---|---|
 //! | `POST /v1/silicons` | public, IDEMPOTENT | a Silicon creates its own account and names its custodian (c:id or email) |
 //! | `GET /v1/silicons/requests/{id}` | `Bearer sarq_…` | the custodian's decision, for the waiting Silicon |
-//! | `POST /v1/silicons/login` | public | si:id + STK → first-party tokens |
+//! | `POST /v1/silicons/login` | public | si:id + STK, or a key-signed assertion → first-party tokens |
+//! | `GET`/`POST /v1/silicons/{id}/keys`, `DELETE …/keys/{key_id}` | the Silicon or its custodian | the Silicon's Ed25519 keys |
 //! | `POST /v1/me/short-lived-tokens` | session | a 2-minute single-use token to sign into one app |
 //! | `PUT`/`DELETE /v1/me/webhook`, `POST /v1/me/webhook/test` | session (Silicon) | the Silicon's own webhook |
 //! | `GET /v1/me/webhook/deliveries[/{id}]`, `POST /v1/me/webhook/replay` (IDEMPOTENT) | session (Silicon) | its webhook's deliveries: list, inspect, replay |
-//! | `/v1/me/silicons…` | session (Carbon) | the custodian's side: create, view, edit, photo upload, id, webhook (and its deliveries), STK, transfer, delete |
+//! | `/v1/me/silicons…` | session (Carbon) | the custodian's side: create, view, edit, photo upload, id, webhook (and its deliveries), STK, transfer, delete, the Silicon's apps, sign-ins and allowed apps |
 //! | `/v1/me/custodian-requests…` | session (Carbon) | requests addressed to me: list, accept, decline |
 //!
 //! [`spawn_background`] starts the custodian-request expiry sweep (every minute). Overdue
@@ -32,9 +33,11 @@
 
 mod common;
 mod custodian;
+mod custodian_apps;
 mod custodian_requests;
 mod history;
 mod input;
+mod keys;
 mod lifecycle;
 mod login;
 mod notify;
@@ -67,6 +70,11 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/v1/silicons", post(self_create::create))
         .route("/v1/silicons/login", post(login::login))
+        .route("/v1/silicons/{id}/keys", get(keys::list).post(keys::add))
+        .route(
+            "/v1/silicons/{id}/keys/{key_id}",
+            axum::routing::delete(keys::revoke),
+        )
         .route(
             "/v1/silicons/requests/{id}",
             get(self_create::request_status),
@@ -121,6 +129,22 @@ pub fn router() -> Router<AppState> {
             post(webhook_deliveries::custodian_replay),
         )
         .route("/v1/me/silicons/{uuid}/stk", post(custodian::rotate_stk))
+        .route(
+            "/v1/me/silicons/{uuid}/apps",
+            get(custodian_apps::list_apps),
+        )
+        .route(
+            "/v1/me/silicons/{uuid}/apps/{app_id}",
+            axum::routing::delete(custodian_apps::remove_app),
+        )
+        .route(
+            "/v1/me/silicons/{uuid}/signins",
+            get(custodian_apps::list_signins),
+        )
+        .route(
+            "/v1/me/silicons/{uuid}/allowed-apps",
+            get(custodian_apps::get_allowed_apps).put(custodian_apps::set_allowed_apps),
+        )
         .route(
             "/v1/me/silicons/{uuid}/transfer",
             post(custodian::transfer).delete(custodian::cancel_transfer),

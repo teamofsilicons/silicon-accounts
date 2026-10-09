@@ -23,6 +23,7 @@
 //!   (30 s leeway on `nbf`), as JWTs are; timestamps written into payloads (`occurred_at`) and
 //!   telemetry also use the node's clock.
 
+pub mod access;
 pub mod config;
 pub mod crypto;
 pub mod db;
@@ -38,6 +39,7 @@ pub mod normalize;
 pub mod pfp;
 pub mod photo_upload;
 pub mod repo;
+pub mod silicon_keys;
 pub mod state;
 pub mod telemetry;
 pub mod timefmt;

@@ -233,7 +233,7 @@ requests to it. Without a guard that would let someone aim the service at intern
 - the connection is made to exactly the addresses that were checked, so DNS rebinding can't swap
   the address between check and request;
 - redirects are not followed and no proxy is used;
-- the error recorded for the app owner (`last_error`) never names the addresses the host resolved
+- the error recorded for the app's authors (`last_error`) never names the addresses the host resolved
   to, or whether it resolved at all, so the guard can't be used to map internal DNS.
 
 Development stacks may allow http and private hosts (`ACCOUNTS_WEBHOOK_ALLOW_PRIVATE=true`);

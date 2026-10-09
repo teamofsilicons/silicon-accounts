@@ -19,9 +19,9 @@ related:
 
 Create your app in Silicon Apps, then use these Accounts endpoints to configure its sign-in, manage its users, import existing users and set up webhooks.
 
-Most `/v1/apps/{app_id}/…` routes accept **app or owner** authentication. Use the app’s credentials (`-u app_id:app_secret`) or its owner’s session. The exceptions are `/public`, `/account-verification-request` and [verification history](proofs.md#get-v1appsapp_idproofsproof_idhistory) at `/proofs/{proof_id}/history`. Their sections describe the required access.
+Most `/v1/apps/{app_id}/…` routes accept **app or author** authentication. Use the app’s credentials (`-u app_id:app_secret`) or the session of one of its authors: its owner, or a co-author who accepted an invite in Silicon Apps. The exceptions are `/public`, `/account-verification-request` and [verification history](proofs.md#get-v1appsapp_idproofsproof_idhistory) at `/proofs/{proof_id}/history`. Their sections describe the required access.
 
-Credentials for a different app return `403 app_mismatch`. A Carbon without ownership gets `403 not_app_owner`. An unknown app returns `404 unknown_app`. A disabled app’s credentials return `403 app_disabled`, although its owner can still manage it.
+Credentials for a different app return `403 app_mismatch`. An account that isn't one of the app's authors gets `403 not_app_owner`. An unknown app returns `404 unknown_app`. A disabled app’s credentials return `403 app_disabled`, although its authors can still manage it.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/apps/$APP_ID" -u "$APP_ID:$APP_SECRET"
@@ -189,6 +189,8 @@ GET. No change means no new version; every change adds a history entry.
 | `allowed_email_domains` | `[]` | at most 100 domains; empty = any |
 | `allow_signup` | `true` | `false` = only existing (and imported) accounts may sign in |
 | `remember_browser` | `true` | offer "Continue as …" for the browser's signed-in Carbon |
+| `device_flow` | `false` | let your own command-line tool sign Carbons in with a code they approve on the account site (the device authorization grant, with `client_id` alone): [Sign people into your CLI](../../start/add-sign-in.md#sign-people-into-your-cli) |
+| `public_client` | `false` | treat your desktop and command-line tools as public clients: they redeem authorization codes (PKCE S256 required) and refresh with `client_id` alone |
 | `branding` | the Silicon Accounts look | see [Branding](../../start/branding.md): `theme`, `logo_url`, `logo_dark_url`, `logo_height` (16–96), `show_app_name`, `font_family`, `heading_font_family`, `corner_style`, `radius` (0–40), `button_style`, `layout`, `background_style`, `background_image_url`, `density`, `light` and `dark` palettes (`#RRGGBB`; button text and page text need 4.5:1 contrast) |
 | `copy` | nulls | `title` (≤ 80 characters), `subtitle` (≤ 200), `signup_title` (≤ 80), `signup_subtitle` (≤ 200), `opening_title` (≤ 80, only the `{provider}` and `{app}` placeholders), `terms_url`, `privacy_url`, `support_email` |
 
@@ -217,7 +219,7 @@ The guide with every option explained: [Sign-in configuration](../../start/sign-
 
 ## `GET /v1/apps/{app_id}/signin-config/history`
 
-Every version of the setup, newest first, paginated. `actor` is `app`, `system`, or the owner's
+Every version of the setup, newest first, paginated. `actor` is `app`, `system`, or the author's
 uuid (then `actor_account` names them); secrets show as `"[redacted]"` with `"secret": true`.
 
 ```json
@@ -411,6 +413,16 @@ address ([the SSRF guard](../../learn/security.md#webhooks-never-reach-private-n
 { "url": "https://app.example/hooks/accounts", "secret": "whsec_8LgRbzxd9LxcEbtBTPvcSHb4asLvlAskd-SVFU20-oY" }
 ```
 
+### `GET /v1/apps/{app_id}/webhook`
+
+**200** `{"url", "secret_set", "events", "subscription_id", "status"}`: the endpoint (or null), whether
+a signing secret is stored, the updates it gets (`events`, null for every update), and the webhook
+subscription behind it with its status ([Event subscriptions](#event-subscriptions)).
+
+```json
+{ "url": "http://127.0.0.1:8798/briefcase", "secret_set": true, "events": ["id_change"], "subscription_id": "70a1e076-0f93-4b95-ab86-70b681893a19", "status": "active" }
+```
+
 ### `DELETE /v1/apps/{app_id}/webhook`
 
 **204.** Pending deliveries become `failed` (replayable once a URL is set again). Repeating it is
@@ -486,6 +498,109 @@ carrying an account's data are never replayed to an app that lost access to it).
 `status: "failed"`, `remaining` counts replayable failed deliveries still waiting (call again until
 0) and `not_replayable` the failed ones that will never be sent. Errors: 422 `validation_failed`
 (neither field, or more than 100 ids), 409 `webhook_not_set`.
+
+## Event subscriptions
+
+A subscription says where your app's updates go, which updates it wants and whether it is
+active or paused. `delivery` is `webhook` (signed POSTs to your URL) or `stream` (kept for
+[`GET /v1/events/stream`](webhooks.md#event-stream)). An app has at most one of each: the webhook
+subscription is your app's webhook, so `PUT /v1/apps/{app_id}/webhook` and these endpoints change
+the same thing. **app or author**.
+
+The updates are the ones you pick in Silicon Apps, and each brings these event types:
+
+| Update | Event types | Picked for a new subscription |
+|---|---|---|
+| `id_change` | `account.id_changed` | yes |
+| `display_name_change` | `account.updated` with `display_name` in `changed` | yes |
+| `pfp_change` | `account.updated` with `pfp_url` in `changed` | yes |
+| `timezone_change` | `account.updated` with `timezone` in `changed` | no |
+| `email_change` | `account.updated` with `email` in `changed` | no |
+| `phone_change` | `account.updated` with `phone` in `changed` | no |
+| `custodian_change` | `silicon.custodian_changed`, and `account.updated` with `custodian` in `changed` | no |
+| `access_removed` | `membership.signed_out`, `membership.access_removed` | yes |
+| `account_deleted` | `account.deleted` | yes |
+
+`ping` always arrives. `updates: null` means every update, including ones added later: webhooks
+set up before subscriptions existed have it, so they keep receiving what they received. In
+`account.updated`, `changed` lists only the fields your subscription picked (and your app may
+see), and the event isn't sent at all when none is left. A paused subscription gets nothing
+recorded until it is active again; deliveries already queued still go out.
+
+The Subscription object:
+
+```json
+{
+  "id": "01a11e45-c73a-7003-a0b9-38ed30a0fd80",
+  "app_id": "briefcase",
+  "delivery": "stream",
+  "status": "active",
+  "url": null,
+  "secret_set": false,
+  "updates": ["id_change", "display_name_change", "pfp_change", "access_removed", "account_deleted"],
+  "event_types": ["account.id_changed", "account.updated", "account.deleted", "membership.signed_out", "membership.access_removed", "ping"],
+  "stream_url": "https://accounts.teamofsilicons.com/v1/events/stream",
+  "created_at": "2026-10-09T01:27:31.898Z",
+  "updated_at": "2026-10-09T01:27:31.898Z"
+}
+```
+
+### `GET /v1/apps/{app_id}/subscriptions`
+
+**200** `{"items": [Subscription…], "next_cursor": null}`, the webhook first.
+
+### `POST /v1/apps/{app_id}/subscriptions`
+
+`{"delivery": "webhook" | "stream", "url"?, "updates"?, "status"?}` → **201** Subscription.
+**Idempotent** (10 minutes). `url` is required for a webhook and refused for a stream. `updates`
+left out picks the defaults above; `null` picks every update. `status` defaults to `active`.
+A new webhook subscription answers its signing secret once in `secret`; a retry with the same
+key returns the same secret. Unknown fields are refused.
+
+```sh
+curl -s -X POST "$ACCOUNTS_URL/v1/apps/$APP_ID/subscriptions" -u "$APP_ID:$APP_SECRET" \
+  -H 'Content-Type: application/json' -H 'Idempotency-Key: stream-sub-1' \
+  -d '{"delivery":"stream"}'
+```
+
+Errors: 409 `subscription_exists` (`details.subscription_id`: change that one instead), 422
+`invalid_updates` (`details.allowed`), 422 `validation_failed` (`url` missing, refused or not a
+public https URL in production).
+
+### `GET /v1/apps/{app_id}/subscriptions/{subscription_id}`
+
+**200** Subscription. 404 `subscription_not_found`.
+
+### `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}`
+
+`{"updates"?, "status"?, "url"?}` (at least one) → **200** Subscription. **Idempotent** (24 hours).
+`status: "paused"` pauses it, `"active"` resumes it. `url` moves a webhook to another endpoint and
+keeps its signing secret (rotate it with `POST …/webhook/rotate-secret`).
+
+```sh
+curl -s -X PATCH "$ACCOUNTS_URL/v1/apps/$APP_ID/subscriptions/$SUB_ID" -u "$APP_ID:$APP_SECRET" \
+  -H 'Content-Type: application/json' -d '{"updates":["id_change"]}'
+```
+
+Errors: 404 `subscription_not_found`, 422 `invalid_updates`, 422 `validation_failed` (nothing to
+change, or a `url` for a stream).
+
+### `DELETE /v1/apps/{app_id}/subscriptions/{subscription_id}`
+
+**204.** Deleting the webhook subscription removes the webhook URL and secret, like
+`DELETE /v1/apps/{app_id}/webhook` (pending deliveries fail and can be replayed once a URL is set
+again). Deleting the stream subscription ends its open streams within 30 seconds
+(`stream.closed`, reason `subscription_deleted`). 404 `subscription_not_found`.
+
+### `POST /v1/apps/{app_id}/subscriptions/{subscription_id}/test`
+
+Queues a `ping` on that subscription, active or paused. **Idempotent** (a retry queues no second
+ping). **202** `{"subscription_id", "event_id", "delivery_id", "type": "ping"}`; `delivery_id` is
+null for a stream, where the ping arrives as a frame with that `event_id`.
+
+```json
+{ "subscription_id": "01a11e45-c73a-7003-a0b9-38ed30a0fd80", "event_id": "01a11e45-eec2-774a-83b0-138146e4f988", "delivery_id": null, "type": "ping" }
+```
 
 ## `POST /v1/internal/apps/sync`
 

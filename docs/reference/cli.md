@@ -55,6 +55,7 @@ Every command takes these, before or after the command name.
 | `ACCOUNTS_HOME` | the directory holding `.accounts/`; beats the configured home |
 | `SILICON_HOME` | the home when nothing else sets one (else `~`); also where `silicon-accounts config home` keeps its pointer file |
 | `ACCOUNTS_SILICON`, `ACCOUNTS_STK` | a Silicon's si:id and STK for `silicon-accounts login` |
+| `ACCOUNTS_SILICON_KEY` | a Silicon's private key file for `silicon-accounts login`, instead of the STK (see `silicon-accounts silicon keys`) |
 | `ACCOUNTS_APP_ID` | the app for `silicon-accounts app …` |
 | `ACCOUNTS_APP_SECRET` | that app's secret |
 | `ACCOUNTS_TELEMETRY` | `0`, `false`, `no` or `off` turns telemetry off; `1`, `true`, `yes` or `on` turns it on; beats the config file |
@@ -385,6 +386,28 @@ As `silicon-accounts --help` prints it:
       silicon webhook replay <SILICON> [IDS]
                                             Re-queue deliveries of the Silicon's webhook (same
                                             event id, its current URL and secret)
+    silicon apps                            The apps one of your Silicons signed into: list them,
+                                            remove one, and choose which apps it may sign into
+      silicon apps list <SILICON>           List the apps the Silicon signed into, most recently
+                                            used first
+      silicon apps remove <SILICON> <APP_ID>
+                                            Remove the Silicon's access to one app (its sign-ins
+                                            there end)
+      silicon apps allow <SILICON> [APPS]   Set the apps the Silicon may get short-lived tokens
+                                            for (replaces the list)
+      silicon apps allowed <SILICON>        Show the apps the Silicon may get short-lived tokens
+                                            for
+    silicon keys                            A Silicon's keys: sign in with a key instead of the
+                                            STK, so an unattended Silicon never holds a bearer
+                                            secret
+      silicon keys add <SILICON>            Register a key: generate a new one, or give a private
+                                            or public key file
+      silicon keys list <SILICON>           List a Silicon's keys (revoked ones too)
+      silicon keys revoke <SILICON> <KEY_ID>
+                                            Revoke a key: it stops working and the sign-ins it
+                                            started end
+    silicon signins <SILICON>               One of your Silicons' sign-ins, newest first (app,
+                                            method, outcome, address)
     silicon transfer <SILICON>              Transfer a Silicon to another Carbon (they must accept
                                             within 14 days)
     silicon cancel-transfer <SILICON>       Cancel a pending transfer
@@ -474,6 +497,19 @@ As `silicon-accounts --help` prints it:
       app webhook delivery <ID>             Show one delivery with its attempts and payload
       app webhook replay [IDS]              Re-queue deliveries (same event id, current URL and
                                             secret)
+    app subscription                        Event subscriptions: where the app's updates go (its
+                                            webhook or the event stream), which updates it wants,
+                                            and whether each is active or paused
+      app subscription list                 List the app's subscriptions
+      app subscription show <ID>            Show one subscription
+      app subscription create <DELIVERY> [URL]
+                                            Create a subscription (a webhook's signing secret is
+                                            printed once)
+      app subscription update <ID>          Change a subscription: its updates, pause or resume
+                                            it, or move a webhook (the secret stays)
+      app subscription delete <ID>          Delete a subscription (deleting the webhook
+                                            subscription removes the app's webhook)
+      app subscription test <ID>            Queue a test `ping` on a subscription
     app lookup <TARGET>                     Look up an account by uuid or id with the app's
                                             credentials
   config                                    CLI settings: home directory, URL, telemetry
@@ -529,6 +565,7 @@ silicon-accounts login <COMMAND>
 | `--silicon <SI_ID>` | Sign in as this Silicon (si:id) with its STK [env: ACCOUNTS_SILICON] |
 | `--stk <STK>` | The Silicon's STK (prefer --stk-stdin or ACCOUNTS_STK: arguments are visible to other processes) |
 | `--stk-stdin` | Read the STK from stdin |
+| `--key <FILE>` | Sign the Silicon in with this private key file instead of its STK (a key registered with `silicon-accounts silicon keys add`) [env: ACCOUNTS_SILICON_KEY] |
 | `--email <EMAIL>` | Carbon: send a 6-digit sign-in code to this email |
 | `--phone <PHONE>` | Carbon: send a 6-digit sign-in code by SMS to this phone number |
 | `--country <CC>` | Country for a local phone number (ISO code, e.g. IN, US) |
@@ -1130,6 +1167,9 @@ silicon-accounts silicon [OPTIONS] <COMMAND>
 | [`id`](#silicon-accounts-silicon-id) | Change one of your Silicons' si:id (apps it signed into are notified) |
 | [`rotate-stk`](#silicon-accounts-silicon-rotate-stk) | Rotate a Silicon's STK: the old one stops working and its sessions are revoked |
 | [`webhook`](#silicon-accounts-silicon-webhook) | One of your Silicons' webhook: set or remove the endpoint, see and replay its deliveries |
+| [`apps`](#silicon-accounts-silicon-apps) | The apps one of your Silicons signed into: list them, remove one, and choose which apps it may sign into |
+| [`keys`](#silicon-accounts-silicon-keys) | A Silicon's keys: sign in with a key instead of the STK, so an unattended Silicon never holds a bearer secret |
+| [`signins`](#silicon-accounts-silicon-signins) | One of your Silicons' sign-ins, newest first (app, method, outcome, address) |
 | [`transfer`](#silicon-accounts-silicon-transfer) | Transfer a Silicon to another Carbon (they must accept within 14 days) |
 | [`cancel-transfer`](#silicon-accounts-silicon-cancel-transfer) | Cancel a pending transfer |
 | [`delete`](#silicon-accounts-silicon-delete) | Delete one of your Silicons permanently |
@@ -1386,6 +1426,167 @@ silicon-accounts silicon webhook replay si:scout --failed
 silicon-accounts silicon webhook replay si:scout --failed --since 2026-10-01T00:00:00Z
 silicon-accounts silicon webhook replay si:scout 0192f0c2-… 0192f0c3-…
 ```
+
+#### `silicon-accounts silicon apps`
+
+The apps one of your Silicons signed into: list them, remove one, and choose which apps it may sign into.
+
+Removing an app ends the Silicon's sign-ins there and tells the app (membership.access_removed). An allow-list limits the apps the Silicon can get short-lived tokens for; it doesn't end sign-ins it already has.
+
+```text
+silicon-accounts silicon apps [OPTIONS] <COMMAND>
+```
+
+| subcommand | what it does |
+|---|---|
+| [`list`](#silicon-accounts-silicon-apps-list) | List the apps the Silicon signed into, most recently used first |
+| [`remove`](#silicon-accounts-silicon-apps-remove) | Remove the Silicon's access to one app (its sign-ins there end) |
+| [`allow`](#silicon-accounts-silicon-apps-allow) | Set the apps the Silicon may get short-lived tokens for (replaces the list) |
+| [`allowed`](#silicon-accounts-silicon-apps-allowed) | Show the apps the Silicon may get short-lived tokens for |
+
+Examples, as `--help` prints them:
+
+```text
+silicon-accounts silicon apps list si:scout
+silicon-accounts silicon apps remove si:scout briefcase
+silicon-accounts silicon apps allow si:scout briefcase dm
+silicon-accounts silicon apps allow si:scout --any
+silicon-accounts silicon apps allowed si:scout
+```
+
+##### `silicon-accounts silicon apps list`
+
+List the apps the Silicon signed into, most recently used first
+
+```text
+silicon-accounts silicon apps list [OPTIONS] <SILICON>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+| `--status <STATUS>` | active, access_removed or imported |
+
+##### `silicon-accounts silicon apps remove`
+
+Remove the Silicon's access to one app (its sign-ins there end)
+
+```text
+silicon-accounts silicon apps remove [OPTIONS] <SILICON> <APP_ID>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+| `<APP_ID>` | The app id |
+
+##### `silicon-accounts silicon apps allow`
+
+Set the apps the Silicon may get short-lived tokens for (replaces the list)
+
+```text
+silicon-accounts silicon apps allow [OPTIONS] <SILICON> [APPS]...
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+| `[APPS]...` | App ids |
+| `--any` | Allow every app again (no list) |
+| `--none` | Allow no app |
+
+##### `silicon-accounts silicon apps allowed`
+
+Show the apps the Silicon may get short-lived tokens for
+
+```text
+silicon-accounts silicon apps allowed [OPTIONS] <SILICON>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+
+#### `silicon-accounts silicon keys`
+
+A Silicon's keys: sign in with a key instead of the STK, so an unattended Silicon never holds a bearer secret.
+
+The Silicon itself or its custodian adds the public half; the Silicon keeps the private half and signs in with `silicon-accounts login --silicon si:<id> --key <file>`. Revoking a key ends the sign-ins it started.
+
+```text
+silicon-accounts silicon keys [OPTIONS] <COMMAND>
+```
+
+| subcommand | what it does |
+|---|---|
+| [`add`](#silicon-accounts-silicon-keys-add) | Register a key: generate a new one, or give a private or public key file |
+| [`list`](#silicon-accounts-silicon-keys-list) | List a Silicon's keys (revoked ones too) |
+| [`revoke`](#silicon-accounts-silicon-keys-revoke) | Revoke a key: it stops working and the sign-ins it started end |
+
+Examples, as `--help` prints them:
+
+```text
+silicon-accounts silicon keys add si:scout --generate ~/.accounts/scout.key --name laptop
+silicon-accounts silicon keys add si:scout --public-key ~/.ssh/id_ed25519.pub
+silicon-accounts silicon keys list si:scout
+silicon-accounts silicon keys revoke si:scout 0192f0c2-…
+silicon-accounts login --silicon si:scout --key ~/.accounts/scout.key
+```
+
+##### `silicon-accounts silicon keys add`
+
+Register a key: generate a new one, or give a private or public key file
+
+```text
+silicon-accounts silicon keys add [OPTIONS] <SILICON>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid (yourself, or a Silicon you are custodian of) |
+| `--generate <FILE>` | Make a new key, save its private half here (mode 600) and register the public half |
+| `--key <FILE>` | Register the public half of this private key file (PEM or OpenSSH) |
+| `--public-key <FILE_OR_KEY>` | Register this public key: a file (OpenSSH .pub, PEM) or the key itself |
+| `--name <TEXT>` | A name to tell keys apart |
+
+##### `silicon-accounts silicon keys list`
+
+List a Silicon's keys (revoked ones too)
+
+```text
+silicon-accounts silicon keys list [OPTIONS] <SILICON>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+
+##### `silicon-accounts silicon keys revoke`
+
+Revoke a key: it stops working and the sign-ins it started end
+
+```text
+silicon-accounts silicon keys revoke [OPTIONS] <SILICON> <KEY_ID>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+| `<KEY_ID>` | The key id |
+
+#### `silicon-accounts silicon signins`
+
+One of your Silicons' sign-ins, newest first (app, method, outcome, address)
+
+```text
+silicon-accounts silicon signins [OPTIONS] <SILICON>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<SILICON>` | si:id or uuid |
+| `--limit <N>` | Rows per page |
+| `--cursor <CURSOR>` | Continue from next_cursor |
 
 #### `silicon-accounts silicon transfer`
 
@@ -1717,6 +1918,7 @@ silicon-accounts app [OPTIONS] <COMMAND>
 | [`userinfo`](#silicon-accounts-app-userinfo) | Fetch userinfo with an access token issued to this app |
 | [`proof`](#silicon-accounts-app-proof) | User verification and App verification proofs: issue, verify, refresh, revoke, list |
 | [`webhook`](#silicon-accounts-app-webhook) | The app's webhook: endpoint, secret, test, deliveries, replay |
+| [`subscription`](#silicon-accounts-app-subscription) | Event subscriptions: where the app's updates go (its webhook or the event stream), which updates it wants, and whether each is active or paused |
 | [`lookup`](#silicon-accounts-app-lookup) | Look up an account by uuid or id with the app's credentials |
 
 App credentials (accepted by every `silicon-accounts app` subcommand):
@@ -2374,6 +2576,123 @@ Examples, as `--help` prints them:
 silicon-accounts app webhook replay 0192f0c2-… 0192f0c3-…
 silicon-accounts app webhook replay --failed --since 2026-10-01T00:00:00Z
 ```
+
+#### `silicon-accounts app subscription`
+
+Event subscriptions: where the app's updates go (its webhook or the event stream), which updates it wants, and whether each is active or paused. `subscriptions` works too.
+
+An app has at most one webhook subscription (it is the app's webhook) and one stream subscription (read it at GET /v1/events/stream with the app's credentials). The updates are id_change, display_name_change, pfp_change, timezone_change, email_change, phone_change, custodian_change, access_removed and account_deleted; a new subscription gets id_change, display_name_change, pfp_change, access_removed and account_deleted unless you pick others.
+
+```text
+silicon-accounts app subscription [OPTIONS] <COMMAND>
+```
+
+| subcommand | what it does |
+|---|---|
+| [`list`](#silicon-accounts-app-subscription-list) | List the app's subscriptions |
+| [`show`](#silicon-accounts-app-subscription-show) | Show one subscription |
+| [`create`](#silicon-accounts-app-subscription-create) | Create a subscription (a webhook's signing secret is printed once) |
+| [`update`](#silicon-accounts-app-subscription-update) | Change a subscription: its updates, pause or resume it, or move a webhook (the secret stays) |
+| [`delete`](#silicon-accounts-app-subscription-delete) | Delete a subscription (deleting the webhook subscription removes the app's webhook) |
+| [`test`](#silicon-accounts-app-subscription-test) | Queue a test `ping` on a subscription |
+
+Examples, as `--help` prints them:
+
+```text
+silicon-accounts app subscription list
+silicon-accounts app subscription create stream
+silicon-accounts app subscription create webhook https://briefcase.example/webhooks --update id_change --update account_deleted
+silicon-accounts app subscription update 0192f0c2-… --pause
+silicon-accounts app subscription update 0192f0c2-… --all-updates --resume
+silicon-accounts app subscription test 0192f0c2-…
+silicon-accounts app subscription delete 0192f0c2-…
+```
+
+##### `silicon-accounts app subscription list`
+
+List the app's subscriptions
+
+```text
+silicon-accounts app subscription list [OPTIONS]
+```
+
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
+
+##### `silicon-accounts app subscription show`
+
+Show one subscription
+
+```text
+silicon-accounts app subscription show [OPTIONS] <ID>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<ID>` | The subscription id |
+
+##### `silicon-accounts app subscription create`
+
+Create a subscription (a webhook's signing secret is printed once).
+
+A retry with the same --idempotency-key (within 10 minutes) prints the same answer instead of failing with subscription_exists.
+
+```text
+silicon-accounts app subscription create [OPTIONS] <DELIVERY> [URL]
+```
+
+| argument or option | meaning |
+|---|---|
+| `<DELIVERY>` | webhook (signed POSTs to a webhook URL) or stream (the event stream, GET /v1/events/stream) |
+| `[URL]` | The webhook URL (webhook only) |
+| `--update <UPDATE>` | An update to receive (repeat it); the defaults when none is given |
+| `--all-updates` | Receive every update, including ones added later |
+| `--paused` | Create it paused |
+| `--idempotency-key <KEY>` | Idempotency key [default: random] |
+
+##### `silicon-accounts app subscription update`
+
+Change a subscription: its updates, pause or resume it, or move a webhook (the secret stays)
+
+```text
+silicon-accounts app subscription update [OPTIONS] <ID>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<ID>` | The subscription id |
+| `--update <UPDATE>` | Receive exactly these updates (repeat it) |
+| `--all-updates` | Receive every update |
+| `--pause` | Pause it: nothing is recorded until it is resumed |
+| `--resume` | Resume it |
+| `--endpoint <URL>` | A new webhook URL (webhook subscriptions) |
+| `--idempotency-key <KEY>` | Idempotency key [default: random] |
+
+##### `silicon-accounts app subscription delete`
+
+Delete a subscription (deleting the webhook subscription removes the app's webhook)
+
+```text
+silicon-accounts app subscription delete [OPTIONS] <ID>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<ID>` | The subscription id |
+
+##### `silicon-accounts app subscription test`
+
+Queue a test `ping` on a subscription
+
+```text
+silicon-accounts app subscription test [OPTIONS] <ID>
+```
+
+| argument or option | meaning |
+|---|---|
+| `<ID>` | The subscription id |
+| `--idempotency-key <KEY>` | Idempotency key [default: random] |
+
+Also takes the [app credentials options](#silicon-accounts-app) and the [global options](#global-options).
 
 #### `silicon-accounts app lookup`
 

@@ -46,10 +46,10 @@ The receiver checked the signature with `dm`'s secret and answered `200`; from t
 
 | | app webhook | Silicon webhook |
 |---|---|---|
-| set by | the app (its credentials) or its owner, `PUT /v1/apps/{app_id}/webhook` | the Silicon (`PUT /v1/me/webhook`) or its custodian (`PUT /v1/me/silicons/{uuid}/webhook`), or at creation (`webhook_url`) |
+| set by | the app (its credentials) or one of its authors, `PUT /v1/apps/{app_id}/webhook` | the Silicon (`PUT /v1/me/webhook`) or its custodian (`PUT /v1/me/silicons/{uuid}/webhook`), or at creation (`webhook_url`) |
 | about | every account with a live membership with the app | the Silicon's own account |
 | body | `"app_id": "<the app>"`, `"silicon": null` | `"app_id": null`, `"silicon": "<the Silicon's uuid>"` |
-| deliveries and replay | the app or its owner: `GET /v1/apps/{app_id}/webhook/deliveries`, `POST /v1/apps/{app_id}/webhook/replay` | the Silicon: `GET /v1/me/webhook/deliveries`, `POST /v1/me/webhook/replay`; its custodian: `GET /v1/me/silicons/{uuid}/webhook/deliveries`, `POST /v1/me/silicons/{uuid}/webhook/replay` |
+| deliveries and replay | the app or one of its authors: `GET /v1/apps/{app_id}/webhook/deliveries`, `POST /v1/apps/{app_id}/webhook/replay` | the Silicon: `GET /v1/me/webhook/deliveries`, `POST /v1/me/webhook/replay`; its custodian: `GET /v1/me/silicons/{uuid}/webhook/deliveries`, `POST /v1/me/silicons/{uuid}/webhook/replay` |
 
 Both are signed the same way, follow the same retry rules and are listed and replayed the same way
 (see [Replay](#replay) for the two differences).
@@ -150,7 +150,7 @@ Some deliveries fail at once, because no retry could succeed: the app removed it
 
 ## Replay
 
-A failed delivery isn't lost: the app (or its owner) replays it with `POST /v1/apps/{app_id}/webhook/replay`, and a Silicon with `POST /v1/me/webhook/replay` (its custodian with `POST /v1/me/silicons/{uuid}/webhook/replay`). Either names delivery ids (up to 100, failed or already delivered) or a status (`{"status": "failed", "since": …}`: the oldest 100 per call, queued oldest first; they are still sent in parallel, so keep applying them by version or `occurred_at`). The deliveries to choose from are listed by `GET …/webhook/deliveries` on the same paths. A replay:
+A failed delivery isn't lost: the app (or one of its authors) replays it with `POST /v1/apps/{app_id}/webhook/replay`, and a Silicon with `POST /v1/me/webhook/replay` (its custodian with `POST /v1/me/silicons/{uuid}/webhook/replay`). Either names delivery ids (up to 100, failed or already delivered) or a status (`{"status": "failed", "since": …}`: the oldest 100 per call, queued oldest first; they are still sent in parallel, so keep applying them by version or `occurred_at`). The deliveries to choose from are listed by `GET …/webhook/deliveries` on the same paths. A replay:
 
 - keeps the `event_id` and the exact payload, so the receiver's duplicate check works;
 - goes to the receiver's **current** URL, signed with its **current** secret (a moved endpoint or rotated secret is no obstacle);
@@ -180,6 +180,95 @@ In both cases the later-arriving update still carries the **old** id (`data.acco
 3. **Use `occurred_at` for events without a version** (`account.id_changed`, `silicon.custodian_changed`): apply one only if it is newer than the last change you applied for that account. Silicon Accounts applies the changes to one account one after another, so their `occurred_at` values follow that order.
 
 `account.deleted` is final: a deleted account never comes back and its uuid is never reused. `membership.signed_out` and `membership.access_removed` are not: the account can sign into your app again, and a notice delayed by retries can arrive after that new sign-in. Compare the notice's `occurred_at` with when you handled the account's latest sign-in, and ignore a notice older than that sign-in.
+
+## Subscriptions
+
+Your app doesn't have to hear about everything. A subscription says where its updates go, which
+updates it wants, and whether it is active or paused. Your webhook is one subscription; the event
+stream is the other. Pick updates in Silicon Apps, with the
+[subscription endpoints](../reference/api/apps.md#event-subscriptions), or with
+`silicon-accounts app subscription`.
+
+| Update | Picked for a new subscription | What reaches you |
+|---|---|---|
+| `id_change` | yes | `account.id_changed` |
+| `display_name_change` | yes | `account.updated` with `display_name` |
+| `pfp_change` | yes | `account.updated` with `pfp_url` |
+| `timezone_change` | no | `account.updated` with `timezone` |
+| `email_change` | no | `account.updated` with `email` |
+| `phone_change` | no | `account.updated` with `phone` |
+| `custodian_change` | no | `silicon.custodian_changed`, and `account.updated` with `custodian` |
+| `access_removed` | yes | `membership.signed_out`, `membership.access_removed` |
+| `account_deleted` | yes | `account.deleted` |
+
+Each subscription gets its own copy of an event, with its own `event_id`, cut down to what it
+picked: when a Carbon changes their display name and time zone together, a subscription that
+picked only `display_name_change` gets `"changed": ["display_name"]`, and one that picked only
+`timezone_change` gets `"changed": ["timezone"]`. Scopes still apply on top. A webhook set up
+before subscriptions existed receives every update, as it always did, until you pick.
+
+Pausing a subscription stops recording for it: changes made while it is paused never reach it,
+even after you resume. Deliveries already queued still go out. If you need to catch up after a
+pause, read the current state with `GET /v1/apps/{app_id}/users`.
+
+```sh
+silicon-accounts app subscription create webhook https://briefcase.example/webhooks \
+  --update id_change --update access_removed --update account_deleted
+silicon-accounts app subscription update <id> --pause
+```
+
+## Streaming events
+
+Webhooks need a public URL that answers within 10 seconds. A Silicon on a laptop, a script, or
+an app that would rather pull than be pushed can open the event stream instead:
+`GET /v1/events/stream` keeps one HTTP response open and writes each event as it happens, as
+[Server-Sent Events](../reference/api/webhooks.md#event-stream).
+
+```sh
+# an app: create a stream subscription once, then listen
+curl -s -X POST "$ACCOUNTS_URL/v1/apps/$APP_ID/subscriptions" -u "$APP_ID:$APP_SECRET" \
+  -H 'Content-Type: application/json' -d '{"delivery":"stream"}'
+curl -N "$ACCOUNTS_URL/v1/events/stream" -u "$APP_ID:$APP_SECRET"
+
+# a Silicon: its own events, with its access token
+curl -N "$ACCOUNTS_URL/v1/events/stream" -H "Authorization: Bearer $TOKEN"
+```
+
+Here is what a Silicon saw 0.4 seconds after its custodian renamed it (a local run):
+
+```
+retry: 5000
+: connected
+
+id: 01a11e46-8684-715b-b2ac-c80931069cf7
+event: silicon.updated
+data: {"app_id":null,"data":{"changed":["display_name"],"id":"si:streamer","silicon":{"…":"…"},"uuid":"8HV"},"event_id":"01a11e46-8684-715b-b2ac-c80931069cf7","occurred_at":"2026-10-09T01:28:20.129Z","silicon":"8HV","type":"silicon.updated"}
+
+: heartbeat
+```
+
+How the stream fits with webhooks:
+
+- **Same events, same bodies.** `data` is exactly what the webhook would POST; parse it with the
+  same code. There is no signature, because the stream comes over your own authenticated
+  connection.
+- **Who gets what.** An app gets its stream subscription's events. A Silicon gets its own events,
+  without needing a webhook: its custodian's decision, changes to its account, an STK rotation.
+  A Carbon gets the events of the Silicons it is custodian of. A Silicon that created its own
+  account and is still waiting for its custodian can listen with its `sarq_` request token and
+  hear the decision the moment it is made.
+- **Resume, never miss.** Every event carries its `event_id` as the SSE `id`. Reconnect with
+  `Last-Event-ID` (browsers do this for you) and you get everything after it. Like webhooks,
+  delivery is at least once: dedupe on `event_id`.
+- **Order.** Within one stream, events arrive in the order their changes were saved, which
+  webhooks can't promise. An event waits until every change saved before it has finished, so a
+  long-running change elsewhere can delay the stream by its own length.
+- **Liveness.** A `: heartbeat` comment comes after 15 seconds of quiet. Before we close a stream
+  you get `event: stream.closed` with a `reason`: refresh your token for `token_expired`, and
+  reconnect with `Last-Event-ID` after `max_duration` (streams last an hour) or
+  `server_restarting`.
+- **Limits.** 5 open streams per app or account. One stream carries the whole feed, so one is
+  usually enough.
 
 ## App events
 

@@ -548,28 +548,82 @@ where
     Ok(None)
 }
 
-/// `app_id` syntax: `[a-z][a-z0-9-]{1,39}`.
+/// `app_id` syntax: every id Silicon Apps creates (3 to 30 characters of `a-z`, `0-9`, `-` and
+/// `_`, such as `my_app` or `2fa-tool`), plus the older Accounts ids (2 to 40 characters of
+/// `a-z`, `0-9` and `-`, starting with a letter, such as `dm`), which keep working.
 pub fn validate_app_id(app_id: &str) -> Result<(), String> {
-    let len = app_id.len();
-    let mut chars = app_id.chars();
-    let first_ok = chars.next().is_some_and(|c| c.is_ascii_lowercase());
-    if !(2..=40).contains(&len)
-        || !first_ok
-        || !app_id
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-    {
-        return Err(format!(
-            "'{app_id}' is not an app id: app ids are 2-40 characters of a-z, 0-9 and '-', starting with a letter (e.g. briefcase)"
-        ));
+    if is_silicon_apps_id(app_id) || is_legacy_app_id(app_id) {
+        return Ok(());
     }
-    Ok(())
+    Err(format!(
+        "'{app_id}' is not an app id: app ids are 3-30 characters of a-z, 0-9, '-' and '_' (e.g. briefcase or my_app)"
+    ))
+}
+
+/// An id Silicon Apps creates: 3 to 30 characters of `a-z`, `0-9`, `-` and `_`.
+fn is_silicon_apps_id(app_id: &str) -> bool {
+    (3..=30).contains(&app_id.len())
+        && app_id
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
+}
+
+/// An id from before Silicon Apps: `[a-z][a-z0-9-]{1,39}`.
+fn is_legacy_app_id(app_id: &str) -> bool {
+    (2..=40).contains(&app_id.len())
+        && app_id
+            .bytes()
+            .next()
+            .is_some_and(|b| b.is_ascii_lowercase())
+        && app_id
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashSet;
+
+    #[test]
+    fn app_ids_accept_every_silicon_apps_id_and_the_older_ones() {
+        for ok in [
+            "briefcase",
+            "dm",
+            "silicon-accounts",
+            "my_app",
+            "2fa-tool",
+            "a_b",
+            "x9_",
+            "123",
+            "_under",
+            "a-really-long-legacy-app-id-of-forty-c",
+            &"a".repeat(40),
+            &"_".repeat(30),
+        ] {
+            assert!(validate_app_id(ok).is_ok(), "{ok}");
+        }
+        for bad in [
+            "",
+            "a",
+            "A-app",
+            "my app",
+            "my.app",
+            "app:x",
+            "émoji",
+            &"a".repeat(41),
+            &"a_".repeat(16),
+            "_a",
+            "1-",
+        ] {
+            assert!(validate_app_id(bad).is_err(), "{bad}");
+        }
+        assert!(
+            validate_app_id("Nope")
+                .expect_err("bad")
+                .contains("3-30 characters")
+        );
+    }
 
     #[test]
     fn tier_boundaries() {
@@ -753,7 +807,8 @@ mod tests {
         assert!(validate_app_id("briefcase").is_ok());
         assert!(validate_app_id("acme-notes").is_ok());
         assert!(validate_app_id("a").is_err());
-        assert!(validate_app_id("1abc").is_err());
+        // Silicon Apps creates ids that start with a digit or hold an underscore.
+        assert!(validate_app_id("1abc").is_ok());
         assert!(validate_app_id("Acme").is_err());
         assert_eq!(membership_id("briefcase", "a8K"), "briefcase:a8K");
     }

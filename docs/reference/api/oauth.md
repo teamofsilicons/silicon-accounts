@@ -185,7 +185,7 @@ platform (developers.teamofsilicons.com, whose server holds the tokens): it may 
 code is burnt), `refresh_token` for its own tokens, and `/v1/oauth/revoke`; other grants are
 `unauthorized_client` and introspection is `invalid_client`. Its tokens have `aud: "developer"`
 and act for their Carbon only on `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps` and
-the owner routes under `/v1/apps/{app_id}/…`; anywhere else they get 401
+the author routes under `/v1/apps/{app_id}/…`; anywhere else they get 401
 `token_wrong_audience`.
 
 ### `grant_type=authorization_code`
@@ -274,18 +274,24 @@ after the SLT was issued.
 
 ### `grant_type=urn:ietf:params:oauth:grant-type:device_code`
 
-The `silicon-accounts` CLI's device sign-in (RFC 8628); only the first-party client may use it. The alias
-`grant_type=device_code` works too.
+The device sign-in (RFC 8628) of the `silicon-accounts` CLI and of apps' own tools (apps that turn
+on `device_flow`). The alias `grant_type=device_code` works too.
 
 | Parameter | |
 |---|---|
 | `device_code` | the `sad_…` code from `POST /v1/device/authorize` |
-| `client_id` | `silicon-accounts` |
+| `client_id` | `silicon-accounts`, or your `app_id` (your secret is optional: HTTP Basic works too) |
 
 Poll every `interval` seconds (5). Until the Carbon decides you get `authorization_pending`;
 polling faster than every 5 seconds gets `slow_down` (add 5 seconds to your interval); a denial
 is `access_denied`; after 600 seconds `expired_token`. Once approved, the first poll returns the
 tokens and later ones get `invalid_grant` ("already exchanged").
+
+An app's tool gets tokens for the app, with the scopes the Carbon approved, and the sign-in
+counts like any other: the account becomes an active member and the sign-in is recorded
+(method `device`). A code started by another app is `invalid_grant` and stays usable by its own
+app. A code whose Carbon removed your app's access after approving is `invalid_grant`. An app
+that hasn't turned on `device_flow` gets `unauthorized_client`.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
@@ -298,6 +304,19 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
   "error": "authorization_pending",
   "error_description": "The Carbon hasn't approved this device code yet; keep polling every 5 seconds."
 }
+```
+
+### `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`
+
+A Silicon's key sign-in (RFC 7523): `assertion` is a JWT signed with one of its
+[registered keys](silicons.md#silicon-keys), `client_id=silicon-accounts`. The answer is the same
+first-party token response as `POST /v1/silicons/login`. Another client gets
+`unauthorized_client`; a bad assertion is `invalid_grant` with the reason.
+
+```sh
+curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
+  -d grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer \
+  -d assertion="$ASSERTION" -d client_id=silicon-accounts
 ```
 
 ### The token response
@@ -490,11 +509,10 @@ token), `invalid_authorization`, `invalid_token` (malformed, or expired at its e
 
 ## `POST /v1/device/authorize`
 
-Starts a device sign-in for the `silicon-accounts` CLI (RFC 8628). Public. The body (JSON or form) is
-optional: `client_label` (shown on the approval page and in the sessions list; cut at 100
-characters), `client_id` (if sent, must be `silicon-accounts`: 400 `unauthorized_client` otherwise),
-`scope` (checked for typos only: 400 `invalid_scope`). At most 60 per IP per 10 minutes. Errors
-use the API error shape.
+Starts a device sign-in (RFC 8628) for the `silicon-accounts` CLI, or for an app's own tool. Public.
+The body (JSON or form) is optional: `client_label` (shown on the approval page and in the
+sessions list; cut at 100 characters), `client_id` (`silicon-accounts` when left out), `scope`.
+At most 60 per IP per 10 minutes. Errors use the API error shape.
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/device/authorize" \
@@ -517,3 +535,30 @@ Show `user_code` and `verification_uri` to the Carbon, who approves on the accou
 (`/v1/device/{user_code}/approve`, see [Hosted sign-in](sign-in.md#device-approval)); poll the
 token endpoint with the device-code grant. User codes use `A-Z` without `I`, `L` and `O`, plus
 `2-9`; typed codes are matched without spaces, dashes or case.
+
+### For an app's tool
+
+`client_id=<your app_id>` (or HTTP Basic with your secret, which is then checked) starts a
+device sign-in for your app once it turned on `device_flow` in its sign-in setup; until then 400
+`unauthorized_client`. `scope` (space-separated) asks for details your app requests (`email`,
+`phone`, `dob`, `timezone`); your required details and `profile` are always included, and a
+detail your app doesn't ask for is 400 `invalid_scope`. At most 600 per app per 10 minutes.
+Other errors: 400 `invalid_client` (no such app), 401 `invalid_app_credentials` (a wrong
+secret), 403 `app_disabled`. The guide: [Sign people into your CLI](../../start/add-sign-in.md#sign-people-into-your-cli).
+
+## Public clients
+
+An app's command-line and desktop tools can't keep a secret. With `public_client` (or
+`device_flow`) on in its sign-in setup, the token endpoint accepts the app's `client_id` alone
+(`token_endpoint_auth_method` `none`) for:
+
+| Grant | With |
+|---|---|
+| `authorization_code` | `public_client`; the sign-in must have used PKCE with `code_challenge_method=S256`, and the exchange sends the `code_verifier` (a code without PKCE is `invalid_grant`) |
+| `urn:ietf:params:oauth:grant-type:device_code` | `device_flow` |
+| `refresh_token` | either; only the app's own sign-ins |
+
+`POST /v1/oauth/revoke` accepts it for the app's own tokens. Short-lived tokens and introspection
+always need the secret (`unauthorized_client`, `invalid_client`). Loopback redirect URIs
+(`http://127.0.0.1/…`, `http://[::1]/…`, `http://localhost/…`) match on any port, as RFC 8252
+asks.

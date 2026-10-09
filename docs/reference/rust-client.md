@@ -67,18 +67,18 @@ Rust 1.98 or newer (edition 2024). Every call is `async` and returns
 |---|---|---|---|
 | `AccountsClient` | `AccountsClient::new(url)` or `::builder()` | nobody: public calls, sign-ins | none |
 | `AccountSession<'_>` | `client.with_token(access_token)` | a signed-in Carbon or Silicon | `Authorization: Bearer` (a first-party token, `aud = silicon-accounts`) |
-| `AppClient<'_>` | `client.as_app(app_id, app_secret)`, or `session.app(app_id)` for an app you own | an app | HTTP Basic, or the owner's Bearer token |
+| `AppClient<'_>` | `client.as_app(app_id, app_secret)`, or `session.app(app_id)` for an app you author | an app | HTTP Basic, or the author's Bearer token |
 
 `AccountsClient` holds only configuration and a connection pool: cheap to clone, share one per
 process. The handles borrow it and hold one credential each; refreshing an expired access token is
 up to you (`refresh_first_party`, `AppClient::refresh`).
 
-In owner mode (`session.app("briefcase")`) everything that manages the app works without its
+In author mode (`session.app("briefcase")`) everything that manages the app works without its
 secret, including issuing App verification proofs (through the App verification page route) and revoking proofs by id.
-Some calls always need the app’s credentials: code, SLT and refresh-token exchange, `revoke`, `introspect`, `issue_user_verification`, `refresh_proof`, `verify_proof` and revoking a proof by token. Calling them in owner mode fails before sending a request, with `Error::InvalidInput` and code `invalid_input`. For example:
+Some calls always need the app’s credentials: code, SLT and refresh-token exchange, `revoke`, `introspect`, `issue_user_verification`, `refresh_proof`, `verify_proof` and revoking a proof by token. Calling them in author mode fails before sending a request, with `Error::InvalidInput` and code `invalid_input`. For example:
 
 ```text
-Exchanging a short-lived token needs app briefcase's own credentials (app_id + app secret); the owner's session can't do it on the app's behalf.
+Exchanging a short-lived token needs app briefcase's own credentials (app_id + app secret); an author's session can't do it on the app's behalf.
 ```
 
 ## Configuration
@@ -183,7 +183,7 @@ where the method returns a `Vec`.
 | `delete_silicon(uuid, confirm)` | `DELETE /v1/me/silicons/{uuid}` | `()` |
 | `custodian_requests()`, `accept_custodian_request(id)`, `decline_custodian_request(id)` | `/v1/me/custodian-requests…` | `Vec<CustodianRequest>` / `()` |
 | `owned_apps()` | `GET /v1/me/owned-apps` | `Vec<OwnedApp>` |
-| `app(app_id)` | No request | an owner-mode `AppClient` |
+| `app(app_id)` | No request | an author-mode `AppClient` |
 | `device_request(user_code)`, `approve_device(user_code)`, `deny_device(user_code)` | `/v1/device/{user_code}…` (user codes are normalized: `wdjb mjht` → `WDJB-MJHT`) | `DeviceRequest` / `()` |
 | `lookup(uuid)`, `lookup_by_id(id)`, `resolve(uuid_or_id)` | `/v1/accounts/…` | `AccountSummary` |
 
@@ -211,10 +211,10 @@ where the method returns a `Vec`.
 | `deliveries(&DeliveriesQuery)`, `delivery(id)` | `…/webhook/deliveries…` | `Page<WebhookDelivery>` / `DeliveryDetail` |
 | `replay(&ReplayRequest, idempotency_key)` | `…/webhook/replay` | `ReplayResult` (`replayed_count()`, `skipped_count()`) |
 | `issue_user_verification(&IssueUserVerification, key)` | `POST /v1/proofs/user-verification` | `IssuedProof` |
-| `issue_app_verification(&IssueAppVerification, key)` | `POST /v1/proofs/app-verification` (owner mode: `/v1/apps/{app_id}/proofs/app-verification`) | `IssuedProof` |
+| `issue_app_verification(&IssueAppVerification, key)` | `POST /v1/proofs/app-verification` (author mode: `/v1/apps/{app_id}/proofs/app-verification`) | `IssuedProof` |
 | `refresh_proof(refresh_token, access_ttl_seconds)` | `POST /v1/proofs/refresh` | `IssuedProof` |
 | `verify_proof(proof_token)` | `POST /v1/proofs/verify` | `ProofVerification::Valid(..)` or `::Invalid` |
-| `revoke_proof(&ProofRef)` | `POST /v1/proofs/revoke` (owner mode with `ProofRef::Id`: `DELETE …/proofs/{id}`) | `()` |
+| `revoke_proof(&ProofRef)` | `POST /v1/proofs/revoke` (author mode with `ProofRef::Id`: `DELETE …/proofs/{id}`) | `()` |
 | `proofs(&ProofsQuery)` | `GET /v1/apps/{app_id}/proofs` | `Page<AppProof>` |
 | `lookup(uuid)`, `lookup_by_id(id)`, `resolve(uuid_or_id)` | `/v1/accounts/…` | `AccountSummary` |
 

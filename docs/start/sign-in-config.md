@@ -67,15 +67,16 @@ can sign Carbons and Silicons in as soon as it exists in Silicon Apps, with sens
 
 - **The app itself**, with its credentials: `Authorization: Basic base64(app_id:app_secret)`
   (`curl -u "$APP_ID:$APP_SECRET"`), or `silicon-accounts app use <app_id> --secret-stdin`.
-- **The Carbon who owns the app**, signed in: `silicon-accounts app use <app_id>` without a secret acts
-  through your own session. On [developers.teamofsilicons.com](https://developers.teamofsilicons.com),
+- **One of the app's authors** (its owner, or a Carbon or Silicon who accepted an author invite in
+  Silicon Apps), signed in: `silicon-accounts app use <app_id>` without a secret acts through your
+  own session. On [developers.teamofsilicons.com](https://developers.teamofsilicons.com),
   the developer platform, it is the app's **Sign-in**, **Details**, **Flows** and **Pages** tabs
   (`/apps/{app_id}/sign-in` and so on), with a live preview. The account site
   (accounts.teamofsilicons.com) is only for a Carbon's own account; its old `/developer` pages
   redirect there.
 
-Anyone else gets `403 not_app_owner` (another Carbon) or `403 app_mismatch` (another app's
-credentials). The app's name, description, logos, homepage and owner come from Silicon Apps and
+Anyone else gets `403 not_app_owner` (an account that isn't one of its authors) or `403 app_mismatch` (another app's
+credentials). The app's name, description, logos, homepage and authors come from Silicon Apps and
 are not part of this setup.
 
 ## 1. Read the current setup
@@ -418,20 +419,15 @@ address at another domain:
 {"error": {"code": "email_domain_not_allowed", "message": "Campus Connect only accepts email addresses at university.test; someone@gmail.com is not one of them.", "hint": "Sign in with an email address at university.test.", "details": {"allowed_domains": ["university.test"]}}}
 ```
 
-The rule is that only Carbons with an email at one of your domains get in. It is checked on
-email codes (before the code is sent), on the email Google or Apple returns, on "Continue as …"
-and on Carbons' short-lived tokens (the account needs a verified email at one of the domains),
-and on an email added during the sign-in because you require it. Domains are matched exactly
-(a subdomain is a different domain) and stored lowercased; a leading `@` is removed. Silicons
-have no email and are not affected.
-
-> [!WARNING]
-> Today a **phone code is not checked** against the domains, and requiring `email` doesn't
-> close the gap: a Carbon who signs in by phone and already has a verified email at another
-> domain gets through with it. This is a known bug; the intended rule is the one above for every
-> method, so a phone sign-in will need a verified email at one of your domains, as "Continue as
-> …" and short-lived tokens already do. Until phone sign-ins are checked, keep `phone` off on an
-> app that restricts domains.
+The rule is that only Carbons with an email at one of your domains get in, whichever way they
+sign in. It is checked on email codes (before the code is sent), on the email Google or Apple
+returns, on "Continue as …", on phone codes and on Carbons' short-lived tokens (the account
+needs a verified email at one of the domains), and on an email added during the sign-in because
+you require it. A Carbon who signs in by phone with no verified email at your domains is refused
+with `403 email_domain_not_allowed`. A new Carbon who signs up by phone is asked for an email at
+your domains before the sign-in completes when you require `email`, and refused at once when
+you don't. Domains are matched exactly (a subdomain is a different domain) and stored
+lowercased; a leading `@` is removed. Silicons have no email and are not affected.
 
 ### Sign-up
 
@@ -520,7 +516,7 @@ VERSION  BY      AT                    CHANGES
 }
 ```
 
-- `actor` is `app` (the app's credentials); the uuid of the owner who made the change (with
+- `actor` is `app` (the app's credentials); the uuid of the author who made the change (with
   `actor_account`); `silicon_apps` (version 1 of an app created in Silicon Apps: the starting
   setup it chose, recorded as one change with the path `""`); or `system` (the stand-in apps'
   starting setup, and maintenance changes such as moving stored setups to a new default
@@ -540,7 +536,7 @@ To undo a change, patch the `before` values back; that is a new version too.
 | 409 | `idempotency_key_reused` | The `Idempotency-Key` was used for a different patch. |
 | 413 | `payload_too_large` | The body is over 512 KB (two inline logos of 128 KB fit). |
 | 401 | `invalid_app_credentials`, `unauthenticated` | Wrong or missing credentials. |
-| 403 | `app_mismatch`, `not_app_owner` | Another app's credentials, or a Carbon who doesn't own the app. |
+| 403 | `app_mismatch`, `not_app_owner` | Another app's credentials, or an account that isn't one of the app's authors. |
 
 ## From code
 

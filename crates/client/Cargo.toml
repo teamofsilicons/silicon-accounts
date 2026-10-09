@@ -17,6 +17,7 @@ path = "src/lib.rs"
 [dependencies]
 base64.workspace = true
 bytes.workspace = true
+ed25519-dalek.workspace = true
 hex.workspace = true
 hmac.workspace = true
 jsonwebtoken.workspace = true
@@ -33,7 +34,6 @@ zeroize.workspace = true
 
 [dev-dependencies]
 axum.workspace = true
-ed25519-dalek.workspace = true
 
 [lints]
 workspace = true

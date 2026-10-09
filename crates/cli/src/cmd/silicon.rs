@@ -6,13 +6,14 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use silicon_accounts_client::{
     AccountKind, AccountsClient, CreateSilicon, CustodianRequestStatus, DeliveriesQuery,
-    ManagedSilicon, SiliconSelfCreate, UpdateSilicon, WaitEvent, WaitOptions,
+    ManagedSilicon, PageRequest, SiliconSelfCreate, UpdateSilicon, WaitEvent, WaitOptions,
 };
 use time::OffsetDateTime;
 
 use crate::cli::{
     CustodianArgs, CustodianCommand, DeliveriesFilter, OwnWebhookArgs, OwnWebhookCommand,
-    RequestCommand, SiliconArgs, SiliconCommand, SiliconCreateArgs, SiliconWebhookCommand,
+    RequestCommand, SiliconAppsCommand, SiliconArgs, SiliconCommand, SiliconCreateArgs,
+    SiliconKeysCommand, SiliconWebhookCommand,
 };
 use crate::cmd::app::{deliveries_outcome, delivery_outcome, replay_outcome, replay_request};
 use crate::ctx::{Ctx, StoredRequest, UrlSource};
@@ -179,6 +180,46 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
                 ))
             }
         },
+        SiliconCommand::Apps(apps) => silicon_apps(ctx, apps.command).await,
+        SiliconCommand::Keys(keys) => silicon_keys(ctx, keys.command).await,
+        SiliconCommand::Signins {
+            silicon,
+            limit,
+            cursor,
+        } => {
+            let key = silicon.trim().to_string();
+            let page = with_session!(ctx, |s| s.silicon_signins(
+                &key,
+                &PageRequest {
+                    limit,
+                    cursor: cursor.clone()
+                }
+            ))?;
+            let rows: Vec<Vec<String>> = page
+                .items
+                .iter()
+                .map(|i| {
+                    vec![
+                        i.at.clone(),
+                        i.app
+                            .as_ref()
+                            .map_or_else(|| "Silicon Accounts".to_string(), |a| a.app_id.clone()),
+                        i.method.clone(),
+                        i.outcome.clone(),
+                        i.ip.clone().unwrap_or_default(),
+                    ]
+                })
+                .collect();
+            let mut text = table(
+                &["AT", "APP", "METHOD", "OUTCOME", "ADDRESS"],
+                &rows,
+                &format!("{key} has no sign-ins yet."),
+            );
+            if let Some(next) = &page.next_cursor {
+                text.push_str(&format!("\nMore: --cursor {next}"));
+            }
+            Ok(Outcome::new(to_json(&page), text))
+        }
         SiliconCommand::Transfer { silicon, to } => {
             let managed = resolve(ctx, &silicon).await?;
             let uuid = managed.silicon.uuid.clone();
@@ -959,6 +1000,196 @@ pub async fn custodian(ctx: &Ctx, args: CustodianArgs) -> CliResult<Outcome> {
             Ok(Outcome::new(
                 json!({ "declined": true, "request_id": id }),
                 format!("Declined request {id}."),
+            ))
+        }
+    }
+}
+
+async fn silicon_apps(ctx: &Ctx, command: SiliconAppsCommand) -> CliResult<Outcome> {
+    match command {
+        SiliconAppsCommand::List { silicon, status } => {
+            let key = silicon.trim().to_string();
+            let apps = with_session!(ctx, |s| s.silicon_apps(&key, status.as_deref()))?;
+            let rows: Vec<Vec<String>> = apps
+                .iter()
+                .map(|a| {
+                    vec![
+                        a.app.app_id.clone(),
+                        a.app.name.clone(),
+                        a.status.clone(),
+                        a.granted_scopes.join(" "),
+                    ]
+                })
+                .collect();
+            Ok(Outcome::new(
+                json!({ "silicon": key, "items": to_json(&apps) }),
+                table(
+                    &["APP", "NAME", "STATUS", "SHARES"],
+                    &rows,
+                    &format!("{key} hasn't signed into any app."),
+                ),
+            ))
+        }
+        SiliconAppsCommand::Remove { silicon, app_id } => {
+            let key = silicon.trim().to_string();
+            with_session!(ctx, |s| s.remove_silicon_app(&key, &app_id))?;
+            Ok(Outcome::new(
+                json!({ "removed": true, "silicon": key, "app_id": app_id }),
+                format!(
+                    "Removed {key}'s access to {app_id}: its sign-ins there ended and the app was told."
+                ),
+            ))
+        }
+        SiliconAppsCommand::Allow {
+            silicon,
+            apps,
+            any,
+            none,
+        } => {
+            let key = silicon.trim().to_string();
+            let list: Option<Vec<String>> = if any {
+                None
+            } else if none {
+                Some(Vec::new())
+            } else {
+                Some(apps)
+            };
+            let allowed =
+                with_session!(ctx, |s| s.set_silicon_allowed_apps(&key, list.as_deref()))?;
+            Ok(Outcome::new(
+                to_json(&allowed),
+                allowed_text(&key, &allowed.allowed_apps),
+            ))
+        }
+        SiliconAppsCommand::Allowed { silicon } => {
+            let key = silicon.trim().to_string();
+            let allowed = with_session!(ctx, |s| s.silicon_allowed_apps(&key))?;
+            Ok(Outcome::new(
+                to_json(&allowed),
+                allowed_text(&key, &allowed.allowed_apps),
+            ))
+        }
+    }
+}
+
+fn allowed_text(silicon: &str, allowed: &Option<Vec<String>>) -> String {
+    match allowed {
+        None => format!("{silicon} may get short-lived tokens for every app."),
+        Some(list) if list.is_empty() => {
+            format!("{silicon} may not get short-lived tokens for any app.")
+        }
+        Some(list) => format!(
+            "{silicon} may get short-lived tokens only for: {}.",
+            list.join(", ")
+        ),
+    }
+}
+
+async fn silicon_keys(ctx: &Ctx, command: SiliconKeysCommand) -> CliResult<Outcome> {
+    use silicon_accounts_client::SiliconSigningKey;
+    match command {
+        SiliconKeysCommand::Add {
+            silicon,
+            generate,
+            private_key,
+            public_key,
+            name,
+        } => {
+            let key_silicon = silicon.trim().to_string();
+            let (public, saved) = if let Some(path) = &generate {
+                if path.exists() {
+                    return Err(CliError::invalid(
+                        format!(
+                            "{} already exists; a new key never overwrites a file.",
+                            path.display()
+                        ),
+                        "Choose another path, or register that key with --key.",
+                    ));
+                }
+                let path = std::path::absolute(path).unwrap_or_else(|_| path.clone());
+                let key = SiliconSigningKey::generate();
+                let pem = key.to_pkcs8_pem()?;
+                home::write_private(&path, pem.as_bytes())?;
+                (key.public_key_base64url(), Some(path.display().to_string()))
+            } else if let Some(path) = &private_key {
+                (
+                    SiliconSigningKey::from_file(path)?.public_key_base64url(),
+                    None,
+                )
+            } else if let Some(given) = &public_key {
+                let path = std::path::Path::new(given);
+                let text = if path.is_file() {
+                    std::fs::read_to_string(path).map_err(|e| CliError::io("read", path, &e))?
+                } else {
+                    given.clone()
+                };
+                (text.trim().to_string(), None)
+            } else {
+                return Err(CliError::invalid(
+                    "Say which key to add.",
+                    "Pass --generate <file> for a new key, --key <private key file>, or --public-key <file or key>.",
+                ));
+            };
+            let info = with_session!(ctx, |s| s.add_silicon_key(
+                &key_silicon,
+                &public,
+                name.as_deref()
+            ))?;
+            let mut text = format!(
+                "Added the key {} ({}, {}) to {key_silicon}.",
+                info.id, info.name, info.fingerprint
+            );
+            if let Some(path) = &saved {
+                text.push_str(&format!(
+                    "\nIts private half is in {path} (only you can read it); keep it there and back it up privately."
+                ));
+            }
+            Ok(Outcome::new(to_json(&info), text).next(
+                format!(
+                    "silicon-accounts login --silicon {key_silicon} --key {}",
+                    saved.as_deref().unwrap_or("<private key file>")
+                ),
+                "sign in with the key",
+            ))
+        }
+        SiliconKeysCommand::List { silicon } => {
+            let key_silicon = silicon.trim().to_string();
+            let keys = with_session!(ctx, |s| s.silicon_keys(&key_silicon))?;
+            let rows: Vec<Vec<String>> = keys
+                .iter()
+                .map(|k| {
+                    vec![
+                        k.id.clone(),
+                        k.name.clone(),
+                        k.fingerprint.clone(),
+                        k.last_used_at.clone().unwrap_or_else(|| "never".into()),
+                        if k.revoked_at.is_some() {
+                            "revoked".into()
+                        } else {
+                            "live".into()
+                        },
+                    ]
+                })
+                .collect();
+            Ok(Outcome::new(
+                json!({ "silicon": key_silicon, "items": to_json(&keys) }),
+                table(
+                    &["KEY", "NAME", "FINGERPRINT", "LAST USED", "STATE"],
+                    &rows,
+                    &format!(
+                        "{key_silicon} has no keys: add one with `silicon-accounts silicon keys add {key_silicon} --generate <file>`."
+                    ),
+                ),
+            ))
+        }
+        SiliconKeysCommand::Revoke { silicon, key_id } => {
+            let key_silicon = silicon.trim().to_string();
+            with_session!(ctx, |s| s.revoke_silicon_key(&key_silicon, &key_id))?;
+            Ok(Outcome::new(
+                json!({ "revoked": true, "silicon": key_silicon, "key_id": key_id }),
+                format!(
+                    "Revoked the key {key_id} of {key_silicon}: it no longer signs in, and the sign-ins it started ended."
+                ),
             ))
         }
     }

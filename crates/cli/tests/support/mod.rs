@@ -141,6 +141,16 @@ impl Mock {
     }
 }
 
+fn subscription(delivery: &str, updates: Value) -> Value {
+    json!({
+        "id": "sub-1", "app_id": APP_ID, "delivery": delivery, "status": "active",
+        "url": null, "secret_set": delivery == "webhook", "updates": updates,
+        "event_types": ["account.id_changed", "ping"],
+        "stream_url": if delivery == "stream" { json!("http://127.0.0.1/v1/events/stream") } else { Value::Null },
+        "created_at": "2026-10-09T00:00:00.000Z", "updated_at": "2026-10-09T00:00:00.000Z"
+    })
+}
+
 fn error(status: u16, code: &str, message: &str, hint: &str) -> (u16, Value) {
     (
         status,
@@ -296,6 +306,52 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
     let json_body: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
 
     let (status, value): (u16, Value) = match (method.as_str(), path.as_str()) {
+        ("GET", "/v1/meta") => (
+            200,
+            json!({"name": "Silicon Accounts", "public_url": "http://accounts.test"}),
+        ),
+        ("POST", "/v1/silicons/login") if json_body.get("assertion").is_some() => {
+            let parts: Vec<&str> = json_body["assertion"]
+                .as_str()
+                .unwrap_or("")
+                .split('.')
+                .collect();
+            let payload = parts
+                .get(1)
+                .map(|p| base64url_decode(p))
+                .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+                .unwrap_or(Value::Null);
+            if parts.len() == 3
+                && payload["iss"] == SILICON_ID
+                && payload["sub"] == SILICON_ID
+                && payload["aud"] == "http://accounts.test/v1/oauth/token"
+                && payload["jti"].is_string()
+            {
+                (200, silicon_tokens(&st))
+            } else {
+                error(
+                    401,
+                    "invalid_assertion",
+                    "No live key of this Silicon signed the assertion.",
+                    "Sign a fresh one.",
+                )
+            }
+        }
+        ("POST", "/v1/silicons/si:scout/keys") if carbon_bearer || silicon_bearer => (
+            201,
+            json!({"id": "key-1", "name": json_body["name"].as_str().unwrap_or("key"), "algorithm": "EdDSA",
+                "public_key": json_body["public_key"], "fingerprint": "SHA256:abc", "created_by": "a8K",
+                "created_at": "2026-10-09T00:00:00.000Z", "last_used_at": null, "revoked_at": null}),
+        ),
+        ("GET", "/v1/silicons/si:scout/keys") if carbon_bearer || silicon_bearer => (
+            200,
+            json!({"items": [{"id": "key-1", "name": "laptop", "algorithm": "EdDSA", "public_key": "x",
+                "fingerprint": "SHA256:abc", "created_by": "a8K", "created_at": "2026-10-09T00:00:00.000Z",
+                "last_used_at": null, "revoked_at": null}], "next_cursor": null}),
+        ),
+        ("DELETE", "/v1/silicons/si:scout/keys/key-1") if carbon_bearer || silicon_bearer => {
+            (204, Value::Null)
+        }
         ("POST", "/v1/silicons/login") => {
             if json_body["id"] == SILICON_ID && json_body["stk"] == st.stk.as_str() {
                 (200, silicon_tokens(&st))
@@ -454,6 +510,49 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
             201,
             json!({ "silicon": new_silicon("active"), "stk": STK, "webhook_secret": null }),
         ),
+        ("GET", "/v1/apps/briefcase/subscriptions") if app_auth => (
+            200,
+            json!({"items": [subscription("webhook", Value::Null)], "next_cursor": null}),
+        ),
+        ("POST", "/v1/apps/briefcase/subscriptions") if app_auth => {
+            let delivery = json_body["delivery"].as_str().unwrap_or("").to_string();
+            let mut s = subscription(
+                &delivery,
+                json_body.get("updates").cloned().unwrap_or(json!([
+                    "id_change",
+                    "display_name_change",
+                    "pfp_change",
+                    "access_removed",
+                    "account_deleted"
+                ])),
+            );
+            if json_body["status"] == "paused" {
+                s["status"] = json!("paused");
+            }
+            if delivery == "webhook" {
+                s["url"] = json_body["url"].clone();
+                s["secret"] = json!("whsec_sub");
+            }
+            (201, s)
+        }
+        ("GET", "/v1/apps/briefcase/subscriptions/sub-1") if app_auth => {
+            (200, subscription("stream", Value::Null))
+        }
+        ("PATCH", "/v1/apps/briefcase/subscriptions/sub-1") if app_auth => {
+            let mut s = subscription("stream", Value::Null);
+            if let Some(u) = json_body.get("updates") {
+                s["updates"] = u.clone();
+            }
+            if let Some(st) = json_body.get("status") {
+                s["status"] = st.clone();
+            }
+            (200, s)
+        }
+        ("DELETE", "/v1/apps/briefcase/subscriptions/sub-1") if app_auth => (204, Value::Null),
+        ("POST", "/v1/apps/briefcase/subscriptions/sub-1/test") if app_auth => (
+            202,
+            json!({"subscription_id": "sub-1", "event_id": "ev-ping", "delivery_id": null, "type": "ping"}),
+        ),
         ("GET", "/v1/apps/briefcase") if app_auth => (200, app_details(&st)),
         ("GET", "/v1/apps/briefcase") => error(
             401,
@@ -535,6 +634,25 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
             200,
             json!({ "items": [delivery("d-1", "failed")], "next_cursor": null }),
         ),
+        ("GET", "/v1/me/silicons/si:scout/apps") if carbon_bearer => (
+            200,
+            json!({"items": [{"app": {"app_id": "briefcase", "name": "Briefcase"}, "membership_id": "briefcase:b9Z",
+                "status": "active", "source": "slt", "granted_scopes": ["profile"]}], "next_cursor": null}),
+        ),
+        ("DELETE", "/v1/me/silicons/si:scout/apps/briefcase") if carbon_bearer => {
+            (204, Value::Null)
+        }
+        ("GET", "/v1/me/silicons/si:scout/signins") if carbon_bearer => (
+            200,
+            json!({"items": [{"at": "2026-10-09T00:00:00.000Z", "app": {"app_id": "briefcase", "name": "Briefcase"},
+                "method": "slt", "outcome": "success", "ip": "203.0.113.9", "user_agent": "scout/1.0"}], "next_cursor": "c-9"}),
+        ),
+        ("PUT", "/v1/me/silicons/si:scout/allowed-apps") if carbon_bearer => {
+            (200, json!({"allowed_apps": json_body["allowed_apps"]}))
+        }
+        ("GET", "/v1/me/silicons/si:scout/allowed-apps") if carbon_bearer => {
+            (200, json!({"allowed_apps": ["briefcase"]}))
+        }
         ("GET", "/v1/me/silicons/b9Z/webhook/deliveries") if carbon_bearer => (
             200,
             json!({ "items": [delivery("d-1", "failed")], "next_cursor": "c-2" }),
@@ -617,6 +735,25 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
         .headers_mut()
         .insert("x-request-id", "req-test-1".parse().unwrap());
     response
+}
+
+fn base64url_decode(text: &str) -> Vec<u8> {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let mut bits: u32 = 0;
+    let mut count = 0;
+    let mut out = Vec::new();
+    for c in text.bytes() {
+        let Some(v) = ALPHABET.iter().position(|a| *a == c) else {
+            continue;
+        };
+        bits = (bits << 6) | v as u32;
+        count += 6;
+        if count >= 8 {
+            count -= 8;
+            out.push((bits >> count) as u8);
+        }
+    }
+    out
 }
 
 fn base64_encode(text: &str) -> String {

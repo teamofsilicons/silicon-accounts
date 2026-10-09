@@ -235,6 +235,74 @@ Errors: 401 `request_token_required`, 401 `invalid_request_token`, 404
 }
 ```
 
+### Signing in with a key
+
+`POST /v1/silicons/login` also takes `{"assertion": "<JWT>", "client_label"?}` instead of `id` and
+`stk`: a short-lived JWT signed with one of the Silicon's [registered keys](#silicon-keys). The
+answer is the same token response, the sign-in is recorded with method `silicon_key`, and
+nothing is locked out (a signature can't be guessed). The JWT:
+
+| Part | Value |
+|---|---|
+| header `alg` | `EdDSA` (Ed25519) |
+| header `kid` | the key's `id` (optional: without it every live key of the Silicon is tried) |
+| `iss`, `sub` | the Silicon's si:id or uuid, the same in both |
+| `aud` | `https://accounts.teamofsilicons.com/v1/oauth/token` (the public URL plus `/v1/oauth/token`) |
+| `exp` | at most 300 seconds after `iat`, not passed |
+| `iat` | optional, not in the future |
+| `jti` | 1 to 200 characters, new every time: an assertion works once |
+
+The same assertion works at the token endpoint as RFC 7523 asks
+([`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`](oauth.md#grant_typeurnietfparamsoauthgrant-typejwt-bearer)).
+Errors: 401 `invalid_assertion` (malformed, expired, the wrong `aud`, no live key of that Silicon
+signed it, or its `jti` was used before), 403 `account_not_active`, 422 `validation_failed`
+(an assertion together with `id` or `stk`).
+
+```sh
+silicon-accounts login --silicon si:scout --key ~/.accounts/scout.key
+```
+
+## Silicon keys
+
+A Silicon that runs unattended shouldn't hold a bearer secret like its STK. Instead the Silicon
+(signed in) or its custodian registers the public half of an Ed25519 key, and the Silicon keeps
+the private half and signs a fresh assertion for every sign-in. **account**: the Silicon itself
+or its custodian; anyone else gets 404 `silicon_not_found`. `{id}` is the si:id or the uuid.
+
+### `POST /v1/silicons/{id}/keys`
+
+`{"public_key": "…", "name"?: "laptop"}` → **201** the key. `public_key` is an OpenSSH line
+(`ssh-ed25519 AAAA… comment`), a PEM `PUBLIC KEY`, or the 32 raw bytes in base64url.
+
+```json
+{
+  "id": "01a11e60-2b4f-7c1d-9a3e-5f6a7b8c9d0e",
+  "name": "laptop",
+  "algorithm": "EdDSA",
+  "public_key": "FkOL8HqIxUoZLDhATDfAdnsv4RRZCC21pA74lLsCybk",
+  "fingerprint": "SHA256:Kq5c…",
+  "created_by": "K1E",
+  "created_at": "2026-10-09T02:10:00.000Z",
+  "last_used_at": null,
+  "revoked_at": null
+}
+```
+
+Errors: 422 `validation_failed` (`public_key` isn't an Ed25519 key, `name` over 100 characters),
+409 `key_exists` (`details.key_id`), 409 `too_many_keys` (10 live keys), 403
+`account_not_active`.
+
+### `GET /v1/silicons/{id}/keys`
+
+**200** `{"items": [key…], "next_cursor": null}`, newest first, revoked keys included.
+
+### `DELETE /v1/silicons/{id}/keys/{key_id}`
+
+**204.** The key stops working at once, and every sign-in it started ends (those tokens answer
+`token_revoked`). Repeating it changes nothing. 404 `key_not_found`.
+
+Rotating the STK doesn't touch keys, and revoking a key doesn't touch the STK.
+
 ### `POST /v1/me/short-lived-tokens`
 
 `{"app_id": "briefcase"}` → **201** `{"slt", "app_id", "scope", "expires_at"}` (example at the
@@ -249,7 +317,9 @@ at that app.
 
 Errors: 422 `validation_failed` (`app_id` isn't an app id at all), 404 `unknown_app`, 403
 `app_disabled`, 422 `first_party_app` (`silicon-accounts` itself), 403 `account_not_active` (the account
-isn't active, so it can't sign into apps), 409
+isn't active, so it can't sign into apps), 403 `app_not_allowed` (a Silicon whose custodian's
+[allow-list](#get-and-put-v1mesiliconsuuidallowed-apps) doesn't name the app; `details.app_id`,
+`details.allowed_apps`), 409
 `requirements_missing`, 403 `email_domain_not_allowed` (a Carbon without a verified email at the
 app's `allowed_email_domains`).
 
@@ -596,6 +666,65 @@ Silicon has one pending transfer at a time. 30 transfer requests per custodian p
 ### `DELETE /v1/me/silicons/{uuid}/transfer`
 
 Cancel the pending transfer. **204.** 404 `transfer_not_found`.
+
+### `GET /v1/me/silicons/{uuid}/apps`
+
+The apps the Silicon signed into, most recently used first, the same items as
+[`GET /v1/me/apps`](accounts.md#get-v1meapps): `app`, `membership_id`, `status` (`active`,
+`access_removed`, `imported`), `source`, `granted_scopes`, `first_signed_in_at`,
+`last_signed_in_at`, `access_removed_at`, `active_sessions`. `?status=`, `?limit=`, `?cursor=`.
+`{uuid}` takes the si:id too.
+
+```json
+{
+  "items": [
+    {
+      "app": { "app_id": "briefcase", "name": "Briefcase", "logo_url": "…", "logo_dark_url": null, "homepage_url": "…" },
+      "membership_id": "briefcase:K1E",
+      "status": "active",
+      "source": "slt",
+      "granted_scopes": ["profile"],
+      "first_signed_in_at": "2026-10-09T01:20:11.004Z",
+      "last_signed_in_at": "2026-10-09T01:20:11.004Z",
+      "access_removed_at": null,
+      "active_sessions": 1
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+### `DELETE /v1/me/silicons/{uuid}/apps/{app_id}`
+
+Remove the Silicon's access to one app. **204.** The same as the Silicon removing it itself: its
+sign-ins at the app end, the User verification proofs about it are revoked, the membership
+becomes `access_removed`, and the app gets `membership.access_removed`. Both your history and the
+Silicon's show it. Repeating it changes nothing. Errors: 404 `membership_not_found` (it never
+signed into that app), 400 `first_party_app` (`silicon-accounts`: rotate the STK to end those
+sign-ins), 404 `silicon_not_found`.
+
+### `GET /v1/me/silicons/{uuid}/signins`
+
+The Silicon's sign-ins, newest first: `{"items": [{"at", "app": {"app_id", "name"} | null,
+"method", "outcome", "ip", "user_agent"}], "next_cursor"}`. `method` is `silicon_stk` (its own
+sign-in to Silicon Accounts, `app` null), `slt`, `device`, …; `outcome` is `success` or
+`failed`. `?limit=`, `?cursor=`.
+
+### `GET` and `PUT /v1/me/silicons/{uuid}/allowed-apps`
+
+The apps the Silicon may get [short-lived tokens](#post-v1meshort-lived-tokens) for:
+`{"silicon": {"uuid", "id"}, "allowed_apps": null | ["app_id", …]}`. `null` (the default) allows
+every app; a list allows only those; an empty list allows none. `PUT` takes
+`{"allowed_apps": …}` and answers the same object. The list only decides new short-lived
+tokens: sign-ins the Silicon already has stay until you remove them above.
+
+```sh
+curl -s -X PUT "$ACCOUNTS_URL/v1/me/silicons/si:scout/allowed-apps" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"allowed_apps": ["briefcase", "dm"]}'
+```
+
+Errors: 422 `validation_failed` (not an app id, Silicon Accounts' own apps, more than 100),
+422 `unknown_app` (`details.unknown`: no app has that id), 404 `silicon_not_found`.
 
 ### `DELETE /v1/me/silicons/{uuid}`
 

@@ -540,3 +540,187 @@ fn help_points_at_a_docs_topic_that_is_not_a_command() {
         .stdout(predicate::str::contains("--level"))
         .stdout(predicate::str::contains("--code"));
 }
+
+/// A custodian's controls over its Silicon's apps: list, remove one, sign-ins, allow-list.
+#[test]
+fn custodians_manage_their_silicons_apps() {
+    let mock = Mock::start();
+    let custodian = Env::new();
+    carbon_login(&custodian, &mock);
+    let output = custodian
+        .cmd()
+        .args(["silicon", "apps", "list", "si:scout", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert_eq!(
+        stdout_json(&output)["items"][0]["app"]["app_id"],
+        "briefcase"
+    );
+    custodian
+        .cmd()
+        .args(["silicon", "apps", "remove", "si:scout", "briefcase"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Removed si:scout's access to briefcase",
+        ));
+    assert_eq!(
+        mock.count("DELETE", "/v1/me/silicons/si:scout/apps/briefcase"),
+        1
+    );
+    custodian
+        .cmd()
+        .args(["silicon", "signins", "si:scout"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("203.0.113.9"))
+        .stdout(predicate::str::contains("--cursor c-9"));
+    custodian
+        .cmd()
+        .args(["silicon", "apps", "allow", "si:scout", "briefcase", "dm"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("only for: briefcase, dm"));
+    let (_, body) = mock
+        .requests("PUT", "/v1/me/silicons/si:scout/allowed-apps")
+        .pop()
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&body).unwrap(),
+        json!({"allowed_apps": ["briefcase", "dm"]})
+    );
+    custodian
+        .cmd()
+        .args(["silicon", "apps", "allow", "si:scout", "--any"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("every app"));
+    let (_, body) = mock
+        .requests("PUT", "/v1/me/silicons/si:scout/allowed-apps")
+        .pop()
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&body).unwrap(),
+        json!({"allowed_apps": null})
+    );
+    custodian
+        .cmd()
+        .args(["silicon", "apps", "allowed", "si:scout"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("only for: briefcase"));
+    custodian
+        .cmd()
+        .args(["silicon", "apps", "allow", "si:scout"])
+        .assert()
+        .code(2);
+}
+
+/// Silicon keys: generate and register one, list and revoke, and sign in with it instead of
+/// the STK.
+#[test]
+fn silicons_sign_in_with_a_key() {
+    let mock = Mock::start();
+    let custodian = Env::new();
+    carbon_login(&custodian, &mock);
+    let key_file = custodian.path().join("keys").join("scout.key");
+    let output = custodian
+        .cmd()
+        .args([
+            "silicon",
+            "keys",
+            "add",
+            "si:scout",
+            "--name",
+            "laptop",
+            "--generate",
+        ])
+        .arg(&key_file)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert_eq!(stdout_json(&output)["id"], "key-1");
+    let pem = std::fs::read_to_string(&key_file).unwrap();
+    assert!(pem.starts_with("-----BEGIN PRIVATE KEY-----"));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(&key_file).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+    }
+    let (_, body) = mock
+        .requests("POST", "/v1/silicons/si:scout/keys")
+        .pop()
+        .unwrap();
+    let sent: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(sent["name"], "laptop");
+    assert_eq!(
+        sent["public_key"].as_str().map(str::len),
+        Some(43),
+        "32 bytes, base64url"
+    );
+    // Never overwrites a file.
+    custodian
+        .cmd()
+        .args(["silicon", "keys", "add", "si:scout", "--generate"])
+        .arg(&key_file)
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("already exists"));
+    custodian
+        .cmd()
+        .args(["silicon", "keys", "list", "si:scout"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("SHA256:abc"));
+
+    // The Silicon signs in with the key: no STK anywhere.
+    let silicon = Env::new();
+    let output = silicon
+        .cmd()
+        .args([
+            "--url",
+            &mock.url,
+            "login",
+            "--silicon",
+            "si:scout",
+            "--key",
+        ])
+        .arg(&key_file)
+        .arg("--json")
+        .env_remove("ACCOUNTS_STK")
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", stderr(&output));
+    let (_, body) = mock.requests("POST", "/v1/silicons/login").pop().unwrap();
+    let sent: Value = serde_json::from_str(&body).unwrap();
+    assert!(sent.get("stk").is_none());
+    assert!(
+        sent["assertion"]
+            .as_str()
+            .is_some_and(|a| a.split('.').count() == 3)
+    );
+    silicon
+        .cmd()
+        .args(["login", "status", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("si:scout"));
+    // --key without a Silicon, or with an STK, is refused before anything is sent.
+    Env::new()
+        .cmd()
+        .args(["--url", &mock.url, "login", "--key"])
+        .arg(&key_file)
+        .env_remove("ACCOUNTS_SILICON")
+        .assert()
+        .code(2);
+
+    custodian
+        .cmd()
+        .args(["silicon", "keys", "revoke", "si:scout", "key-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Revoked the key key-1"));
+}

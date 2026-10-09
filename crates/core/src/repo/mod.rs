@@ -21,6 +21,7 @@ pub mod otp;
 pub mod photos;
 pub mod rate_limit;
 pub mod sessions;
+pub mod subscriptions;
 pub mod tokens;
 
 /// True when a database error is a unique violation (optionally on a given constraint/index).

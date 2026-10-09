@@ -141,7 +141,12 @@ async fn run() -> Result<(), (u8, String)> {
     } else {
         BackgroundTasks::none()
     };
-    let app = accounts_server::build_router(state.clone());
+    let streams = accounts_server::StreamHub::new();
+    let app = accounts_server::build_router_with_streams(
+        state.clone(),
+        accounts_server::Policy::default(),
+        streams.clone(),
+    );
     tracing::info!(
         bind = %bind_addr,
         public_url = %state.settings.public_url,
@@ -168,6 +173,9 @@ async fn run() -> Result<(), (u8, String)> {
     let (stop_tx, stop_rx) = watch::channel(false);
     tokio::spawn(async move {
         accounts_server::shutdown_signal().await;
+        // Event streams never end on their own: close them now so the drain doesn't wait on
+        // them (clients reconnect elsewhere with Last-Event-ID).
+        streams.close_all();
         let _ = stop_tx.send(true);
     });
     let mut graceful_rx = stop_rx.clone();

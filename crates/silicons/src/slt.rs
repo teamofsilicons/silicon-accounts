@@ -9,6 +9,9 @@
 //!   missing), plus optional fields the Carbon already granted this app on its consent screen.
 //!   An app restricted to some email domains only lets in Carbons with a verified email there.
 //!
+//! A Silicon whose custodian set an allow-list (`/v1/me/silicons/{uuid}/allowed-apps`) only gets
+//! tokens for the apps on it: 403 `app_not_allowed` otherwise.
+//!
 //! The token is stored under a share lock on the account row with the session re-checked
 //! (`common::lock_live_session`), so it can't outlive an STK rotation or account deletion that
 //! runs at the same time.
@@ -71,6 +74,14 @@ pub async fn create(
     // the same time either finishes first (and this refuses) or waits until the token is stored
     // (and the token is older than the rotation, so the app can't exchange it).
     let account = lock_live_session(&mut tx, &auth, "get a short-lived token").await?;
+    if account.kind == AccountKind::Silicon
+        && let Some(allowed) = crate::custodian_apps::allowed_apps(&mut tx, &account.uuid).await?
+        && !allowed.contains(&app_id)
+    {
+        return Err(crate::custodian_apps::app_not_allowed(
+            &account, &app_id, &allowed,
+        ));
+    }
     let app = apps::require_active(&mut tx, &app_id).await?;
     let config = apps::effective_config(&mut tx, &state.settings, &app_id).await?;
     let scopes = match account.kind {

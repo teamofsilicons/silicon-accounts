@@ -420,7 +420,7 @@ The custodian does the same for its Silicon, signed in as itself: `GET /v1/me/si
 | 400 | `invalid_query` | `deliveries?status=` isn't `pending`, `delivered` or `failed`. |
 | 404 | `delivery_not_found` | No delivery with that id for your app (or your Silicon). |
 | 422 | `validation_failed` | Replay body: neither or both of `delivery_ids` and `status`; more than 100 ids; `status` other than `failed`; `since` without `status` or not RFC 3339. |
-| 403 | `app_mismatch` / `not_app_owner` | Your credentials belong to another app, or your session doesn't own the app. |
+| 403 | `app_mismatch` / `not_app_owner` | Your credentials belong to another app, or your session isn't one of the app's authors. |
 | 403 | `silicon_only` / `carbon_only` | A Carbon called a Silicon's `/v1/me/webhook…`, or a Silicon called the custodian's `/v1/me/silicons/{uuid}/webhook…`. |
 | 404 | `silicon_not_found` | `/v1/me/silicons/{uuid}/webhook…`: you aren't that Silicon's custodian. |
 | 429 | `rate_limited` | A Silicon's test pings: more than 10 in an hour (`details.retry_after_seconds`). |

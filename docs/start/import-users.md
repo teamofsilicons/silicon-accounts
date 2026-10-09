@@ -86,10 +86,10 @@ The dry run applies the same rules as the real import, but it saves no accounts 
 ## Before you start
 
 - **Credentials.** Imports are run with the app's own credentials (`app_id` and app secret,
-  from Silicon Apps) or by the Carbon who owns the app, signed in. Over HTTP the credentials
+  from Silicon Apps) or by one of its authors (its owner or an accepted co-author), signed in. Over HTTP the credentials
   are `Authorization: Basic base64(app_id:app_secret)`, which is what `curl -u` sends. With
   the CLI, `silicon-accounts app use legacy-crm --secret-stdin` stores the secret (mode 0600); run
-  `silicon-accounts app use legacy-crm` without a secret to act as the owner through your own session.
+  `silicon-accounts app use legacy-crm` without a secret to act as one of the app's authors through your own session.
 - **Where.** The CLI talks to `https://accounts.teamofsilicons.com` unless `--url` or
   `ACCOUNTS_URL` says otherwise. The curl examples assume:
 
@@ -274,7 +274,7 @@ curl -s -u "$APP_ID:$APP_SECRET" "$ACCOUNTS_URL/v1/apps/$APP_ID/imports/01a11440
 | `status` | `queued` (waiting for the worker), `running`, `completed`, or `failed` (the whole job stopped; `error` says why and which rows were done). |
 | `total_rows`, `processed_rows` | Rows in the file, and rows with an outcome so far. |
 | `counts` | Rows per outcome (`created`, `matched`, `updated`, `skipped`, `error`) and the number of warning messages over all rows. |
-| `created_by` | `app` (the app's credentials) or the uuid of the owner who ran it. |
+| `created_by` | `app` (the app's credentials) or the uuid of the author who ran it. |
 | `options`, `dry_run`, `format` | What the job runs with. |
 
 `silicon-accounts app import status <job-id> --wait` follows a job from the CLI, and
@@ -559,8 +559,8 @@ These answers come back before a job exists: nothing was imported. Errors have t
 | 409 | `idempotency_key_reused` | The key was used for a different request. | Use a new key for a new file. |
 | 429 | `rate_limited` | Hourly requests or daily rows used up. | Wait `Retry-After` seconds. |
 | 503 | `imports_busy` | The server is reading two other imports. | Retry after 15 seconds with the same key. |
-| 401 | `invalid_app_credentials`, `unauthenticated` | Wrong secret, or no credentials. | Send the app's current secret, or sign in as its owner. |
-| 403 | `app_mismatch`, `not_app_owner`, `app_disabled` | Another app's credentials, a Carbon who doesn't own the app, or a disabled app. | Use this app's credentials or its owner's session. |
+| 401 | `invalid_app_credentials`, `unauthenticated` | Wrong secret, or no credentials. | Send the app's current secret, or sign in as one of its authors. |
+| 403 | `app_mismatch`, `not_app_owner`, `app_disabled` | Another app's credentials, an account that isn't one of the app's authors, or a disabled app. | Use this app's credentials or its owner's session. |
 | 404 | `import_not_found` | No such job for this app (when reading a job or its rows). | Take the id from the `202` or from the job list. |
 
 ## From code

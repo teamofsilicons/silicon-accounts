@@ -184,6 +184,77 @@ Give Silicons a way to hand your app that token, such as an input field, an API 
 
 Each token works once, for one app, for 2 minutes. If it has already been used, has expired or belongs to another app, Accounts returns `invalid_grant` with the reason. [Sign a Silicon in to an app](silicon-sign-in-to-apps.md) explains the Silicon’s steps. [Exchange, refresh, check and revoke tokens](tokens.md#a-silicons-short-lived-token) explains the exchange.
 
+## Sign people into your CLI
+
+Your app's own command-line tool often runs where no browser is, on a server or over SSH. It
+can still sign a Carbon in: it shows a short code, the Carbon opens the account site on any
+device, checks it is your app asking, and approves. This is the OAuth device authorization
+grant (RFC 8628), the same one `silicon-accounts login` uses. Your tool needs no secret, because
+a secret shipped inside a CLI isn't secret.
+
+Turn it on once (as the app or one of its authors):
+
+```sh
+curl -s -X PATCH "$ACCOUNTS_URL/v1/apps/$APP_ID/signin-config" -u "$APP_ID:$APP_SECRET" \
+  -H 'Content-Type: application/json' -d '{"device_flow": true}'
+```
+
+Then your tool starts a sign-in with your `app_id` and nothing else, and shows the code:
+
+```sh
+curl -s -X POST "$ACCOUNTS_URL/v1/device/authorize" \
+  -d client_id="$APP_ID" -d scope=email -d client_label="notes CLI on build-box"
+```
+
+```json
+{
+  "device_code": "sad_bXmMc5C9tF_K7UZl8cLE5Ff2R1Q0_hbtXv87TIkbngU",
+  "user_code": "MVHB-KQAW",
+  "verification_uri": "https://accounts.teamofsilicons.com/device",
+  "verification_uri_complete": "https://accounts.teamofsilicons.com/device?code=MVHB-KQAW",
+  "expires_in": 600,
+  "interval": 5
+}
+```
+
+Print something like "Open https://accounts.teamofsilicons.com/device and enter MVHB-KQAW", and
+poll every `interval` seconds until the Carbon decides:
+
+```sh
+curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
+  -d grant_type=urn:ietf:params:oauth:grant-type:device_code \
+  -d device_code="$DEVICE_CODE" -d client_id="$APP_ID"
+```
+
+You get `authorization_pending` while the Carbon looks, `slow_down` if you poll faster than
+every 5 seconds, `access_denied` if they say no and `expired_token` after 10 minutes. Once they
+approve, the next poll returns your app's tokens, exactly like a code exchange, and the account
+joins your user base. Refresh with `grant_type=refresh_token` and your `client_id` alone.
+
+What the Carbon sees and what you get:
+
+- **Your app, not ours.** The approval page names your app with its logo and branding, the
+  label your tool sent, and what it will share: `profile`, the details you require, and the
+  optional ones you asked for in `scope`.
+- **Your rules.** Your `allowed_email_domains` and required details apply: a Carbon without a
+  verified email at your domains gets `email_domain_not_allowed`, one missing a required email or
+  phone gets `requirements_missing`, and neither is signed in.
+- **Limits.** 60 device sign-ins started per network and 600 per app every 10 minutes; a Carbon
+  can look up 60 codes per 10 minutes.
+
+A Silicon doesn't need any of this: it signs into your tool with a
+[short-lived token](#silicons-sign-in-without-the-pages).
+
+### Desktop and native apps
+
+A desktop app or a CLI that can open a browser can use the normal hosted pages as a public
+client (RFC 8252) instead: turn on `public_client` in the same sign-in setup, send the
+Carbon's browser to `/authorize` with PKCE (`code_challenge` with
+`code_challenge_method=S256`), and exchange the code with your `client_id` and the
+`code_verifier`, no secret. Register a loopback redirect URI such as
+`http://127.0.0.1/callback`: any port works at sign-in time, so your app can listen on whatever
+port is free. A code without PKCE is refused to a public client.
+
 ## What comes next
 
 - **Keep the sign-in alive.** The access token lasts 30 minutes; refresh it with the refresh

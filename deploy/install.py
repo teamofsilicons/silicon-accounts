@@ -126,6 +126,15 @@ accounts.teamofsilicons.com {
     handle @readiness {
         reverse_proxy 127.0.0.1:8589
     }
+    # The event stream goes straight to the API and is flushed as it is written (Server-Sent
+    # Events must not wait in a buffer); the OpenAPI document lives on the API too.
+    @api_direct path /v1/events/stream /openapi.json
+    handle @api_direct {
+        reverse_proxy 127.0.0.1:8589 {
+            header_up X-Forwarded-For {remote_host}
+            flush_interval -1
+        }
+    }
     handle {
         reverse_proxy 127.0.0.1:8590 {
             header_up X-Forwarded-For {remote_host}

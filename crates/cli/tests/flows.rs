@@ -6,7 +6,7 @@
 mod support;
 
 use predicates::prelude::*;
-use serde_json::Value;
+use serde_json::{Value, json};
 use support::{APP_ID, APP_SECRET, CARBON_EMAIL, Env, Mock, STK, stdout_json};
 
 #[test]
@@ -634,4 +634,153 @@ fn a_custodian_checks_an_id_for_its_silicon() {
             predicate::str::contains("silicon_not_found")
                 .or(predicate::str::contains("not the custodian")),
         );
+}
+
+/// `app subscription …`: list, create (defaults, picked updates, every update, paused), update,
+/// test and delete, each sending exactly what the API expects.
+#[test]
+fn app_subscriptions_pick_updates_and_destinations() {
+    let mock = Mock::start();
+    let env = Env::new();
+    let app = |args: &[&str]| {
+        let mut cmd = env.cmd();
+        cmd.args([
+            "--url",
+            &mock.url,
+            "app",
+            "--app-id",
+            APP_ID,
+            "--app-secret",
+            APP_SECRET,
+        ])
+        .args(args);
+        cmd
+    };
+
+    let output = app(&["subscription", "list", "--json"]).output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(stdout_json(&output)["items"][0]["delivery"], "webhook");
+    app(&["subscriptions", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("every update"));
+
+    // A webhook with picked updates prints the secret once.
+    app(&[
+        "subscription",
+        "create",
+        "webhook",
+        "https://briefcase.example/webhooks",
+        "--update",
+        "id_change",
+        "--update",
+        "Account-Deleted,id_change",
+        "--idempotency-key",
+        "sub-cli-1",
+    ])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("whsec_sub"));
+    let (_, body) = mock
+        .requests("POST", "/v1/apps/briefcase/subscriptions")
+        .pop()
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&body).unwrap(),
+        json!({"delivery": "webhook", "url": "https://briefcase.example/webhooks", "updates": ["id_change", "account_deleted"]})
+    );
+
+    // A paused stream with every update; the defaults leave updates out.
+    let output = app(&[
+        "subscription",
+        "create",
+        "stream",
+        "--all-updates",
+        "--paused",
+        "--json",
+    ])
+    .output()
+    .unwrap();
+    assert!(output.status.success());
+    assert_eq!(stdout_json(&output)["status"], "paused");
+    let (_, body) = mock
+        .requests("POST", "/v1/apps/briefcase/subscriptions")
+        .pop()
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&body).unwrap(),
+        json!({"delivery": "stream", "updates": null, "status": "paused"})
+    );
+    app(&["subscription", "create", "stream"])
+        .assert()
+        .success();
+    let (_, body) = mock
+        .requests("POST", "/v1/apps/briefcase/subscriptions")
+        .pop()
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&body).unwrap(),
+        json!({"delivery": "stream"})
+    );
+
+    // Mistakes are caught before anything is sent.
+    let before = mock.count("POST", "/v1/apps/briefcase/subscriptions");
+    app(&["subscription", "create", "webhook"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("needs the URL"));
+    app(&[
+        "subscription",
+        "create",
+        "stream",
+        "--update",
+        "favourite_colour",
+    ])
+    .assert()
+    .code(2)
+    .stderr(predicate::str::contains("id_change"));
+    assert_eq!(
+        mock.count("POST", "/v1/apps/briefcase/subscriptions"),
+        before
+    );
+    app(&["subscription", "update", "sub-1"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("Nothing to change"));
+
+    app(&[
+        "subscription",
+        "update",
+        "sub-1",
+        "--pause",
+        "--update",
+        "pfp_change",
+    ])
+    .assert()
+    .success();
+    let (_, body) = mock
+        .requests("PATCH", "/v1/apps/briefcase/subscriptions/sub-1")
+        .pop()
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&body).unwrap(),
+        json!({"updates": ["pfp_change"], "status": "paused"})
+    );
+    app(&["subscription", "show", "sub-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("stream sub-1"));
+    app(&["subscription", "test", "sub-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ev-ping"));
+    app(&["subscription", "delete", "sub-1"]).assert().success();
+    assert_eq!(
+        mock.count("DELETE", "/v1/apps/briefcase/subscriptions/sub-1"),
+        1
+    );
 }

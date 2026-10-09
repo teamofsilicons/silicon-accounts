@@ -6,16 +6,18 @@ use std::time::Duration;
 use axum::http::Method;
 
 /// Path prefixes the service owns. Everything else is the account site (single-page app).
-pub const API_PREFIXES: [&str; 6] = [
+pub const API_PREFIXES: [&str; 7] = [
     "/v1",
     "/.well-known",
     "/embed",
     "/sdk",
     "/healthz",
     "/readyz",
+    "/openapi.json",
 ];
 
-/// True for `/v1`, `/v1/…`, `/.well-known/…`, `/embed/…`, `/sdk/…`, `/healthz`, `/readyz`.
+/// True for `/v1`, `/v1/…`, `/.well-known/…`, `/embed/…`, `/sdk/…`, `/healthz`, `/readyz`,
+/// `/openapi.json`.
 pub fn is_api_path(path: &str) -> bool {
     API_PREFIXES.iter().any(|prefix| {
         path == *prefix
@@ -35,10 +37,17 @@ pub fn is_health_path(path: &str) -> bool {
     path == "/healthz" || path == "/readyz"
 }
 
+/// Public discovery documents outside `/.well-known`: the OpenAPI document (both paths) and
+/// the capabilities.
+pub const DISCOVERY_PATHS: [&str; 3] = ["/openapi.json", "/v1/openapi.json", "/v1/capabilities"];
+
 /// Resources any origin may read (`Access-Control-Allow-Origin: *`): an app's public sign-in
 /// config, the SDK and discovery documents. Everything else sends no CORS headers.
 pub fn is_public_cors_path(path: &str) -> bool {
-    path.starts_with("/sdk/") || path.starts_with("/.well-known/") || is_app_public_config(path)
+    path.starts_with("/sdk/")
+        || path.starts_with("/.well-known/")
+        || DISCOVERY_PATHS.contains(&path)
+        || is_app_public_config(path)
 }
 
 /// `/v1/apps/{app_id}/public`.
@@ -214,6 +223,7 @@ mod tests {
             "/sdk/v1.js",
             "/healthz",
             "/readyz",
+            "/openapi.json",
         ] {
             assert!(is_api_path(p), "{p}");
         }
@@ -235,6 +245,11 @@ mod tests {
         assert!(is_public_cors_path("/v1/apps/briefcase/public"));
         assert!(is_public_cors_path("/sdk/v1.js"));
         assert!(is_public_cors_path("/.well-known/openid-configuration"));
+        assert!(is_public_cors_path("/.well-known/agent.json"));
+        assert!(is_public_cors_path("/openapi.json"));
+        assert!(is_public_cors_path("/v1/openapi.json"));
+        assert!(is_public_cors_path("/v1/capabilities"));
+        assert!(!is_public_cors_path("/v1/events/stream"));
         assert!(!is_public_cors_path("/v1/apps/briefcase"));
         assert!(!is_public_cors_path("/v1/apps//public"));
         assert!(!is_public_cors_path("/v1/apps/briefcase/public/x"));

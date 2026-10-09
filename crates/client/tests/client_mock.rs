@@ -737,3 +737,52 @@ async fn list_helpers_follow_cursors() {
     assert_eq!(calls[0].query.as_deref(), Some("limit=200"));
     assert_eq!(calls[1].query.as_deref(), Some("limit=200&cursor=c2"));
 }
+
+/// An app's own tool: device sign-in and refresh with its `client_id` alone.
+#[tokio::test]
+async fn app_device_flow_uses_the_app_id_without_a_secret() {
+    let mock = Mock::start().await;
+    mock.on(
+        "POST",
+        "/v1/device/authorize",
+        Reply::json(200, json!({"device_code": "sad_app", "user_code": "WDJB-MJHT", "verification_uri": "http://x/device",
+            "verification_uri_complete": "http://x/device?code=WDJB-MJHT", "expires_in": 600, "interval": 5})),
+    );
+    mock.on(
+        "POST",
+        "/v1/oauth/token",
+        Reply::json(400, json!({"error": "authorization_pending"})),
+    );
+    mock.on(
+        "POST",
+        "/v1/oauth/token",
+        Reply::json(200, token_body("b9Z")),
+    );
+    let client = AccountsClient::new(&mock.url).unwrap();
+    let device = client
+        .app_device_authorize(" notes ", Some("email timezone"), Some("notes CLI"))
+        .await
+        .unwrap();
+    assert_eq!(device.user_code, "WDJB-MJHT");
+    let start = mock.requests()[0].clone();
+    assert_eq!(
+        start.json(),
+        json!({"client_id": "notes", "scope": "email timezone", "client_label": "notes CLI"})
+    );
+    assert!(start.header("authorization").is_none(), "no secret is sent");
+    assert_eq!(
+        client.app_device_poll("notes", "sad_app").await.unwrap(),
+        DevicePoll::Pending
+    );
+    let form = mock.requests()[1].form();
+    assert_eq!(form["client_id"], "notes");
+    assert_eq!(form["device_code"], "sad_app");
+    client
+        .refresh_app_public_client("notes", " sar_x ")
+        .await
+        .unwrap();
+    let form = mock.requests()[2].form();
+    assert_eq!(form["grant_type"], "refresh_token");
+    assert_eq!(form["refresh_token"], "sar_x");
+    assert_eq!(form["client_id"], "notes");
+}

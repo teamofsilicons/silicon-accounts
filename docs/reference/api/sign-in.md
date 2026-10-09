@@ -477,15 +477,30 @@ The account site's half of the device flow ([`POST /v1/device/authorize`](oauth.
   "client_label": "silicon-accounts CLI on build box",
   "created_at": "2026-10-07T02:36:05.176Z",
   "expires_at": "2026-10-07T02:46:05.176Z",
-  "status": "pending"
+  "status": "pending",
+  "app_id": "silicon-accounts",
+  "first_party": true,
+  "scopes": ["profile"],
+  "app": null
 }
 ```
+
+For an app's tool, `first_party` is false, `scopes` is what the app will see, and `app` carries
+what the approval page shows: `app_id`, `name`, `description`, `logo_url`, `logo_dark_url`,
+`homepage_url`, and the app's sign-in `branding` and `copy`. Each Carbon can look up, approve or
+deny 60 codes per 10 minutes (429 `rate_limited`).
 
 ### `POST /v1/device/{user_code}/approve` and `/deny`
 
 **204**. Approving signs the waiting CLI in as you (its next poll gets first-party tokens);
 denying makes its poll return `access_denied`. Errors: 404 `device_code_not_found`, 410
 `device_code_expired`, 409 `device_code_used` (already decided), 403 `carbon_only`.
+
+Approving an app's tool applies the app's rules first: 403 `app_disabled`, 403
+`device_flow_off` (the app turned device sign-ins off since), 403 `email_domain_not_allowed`
+(no verified email at its `allowed_email_domains`), 409 `requirements_missing` (a required
+email or phone you haven't added, `details.missing`). The tool's next poll then gets the app's
+tokens, and you become a member of the app.
 
 ## CLI code sign-in
 

@@ -17,6 +17,9 @@
 //!   re-read under a lock after the check, and the answer is the one an id that was already gone
 //!   gets. An STK rotated meanwhile is dead, so that one is `invalid_credentials`.
 //! - 60 attempts per minute per IP on top of the per-Silicon lock.
+//! - `{"assertion": "<JWT>"}` instead of `id` and `stk` signs in with one of the Silicon's
+//!   registered keys (core's `silicon_keys::sign_in`): no STK, no lockout (a signature can't be
+//!   guessed), 401 `invalid_assertion` when anything about it is wrong.
 
 use accounts_core::crypto::stk::{StkHasher, normalize as normalize_stk};
 use accounts_core::error::{ApiError, ApiResult};
@@ -44,12 +47,17 @@ pub const LOCK_SECONDS: i64 = accounts::STK_LOCK_SECONDS;
 /// Label of the token family when the caller sends no `client_label`.
 pub const DEFAULT_LABEL: &str = "Silicon sign-in";
 
-/// `POST /v1/silicons/login` body.
+/// `POST /v1/silicons/login` body: `{"id", "stk"}`, or `{"assertion"}` (a JWT signed with one of
+/// the Silicon's registered keys, see `keys`).
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LoginBody {
-    pub id: String,
-    pub stk: String,
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub stk: Option<String>,
+    #[serde(default)]
+    pub assertion: Option<String>,
     #[serde(default)]
     pub client_label: Option<String>,
 }
@@ -116,8 +124,50 @@ pub async fn login(
         "Silicon sign-in attempts from this network",
     )
     .await?;
-    let id = parse_login_id(&body.id)?;
-    let presented = normalize_stk(&body.stk).map_err(|m| {
+    if let Some(assertion) = body.assertion.as_deref() {
+        if body.id.is_some() || body.stk.is_some() {
+            let mut f = accounts_core::FieldErrors::new();
+            f.add(
+                "assertion",
+                "send either an assertion or an id and STK, not both (the assertion names the Silicon)",
+            );
+            return Err(ApiError::validation(f));
+        }
+        let response = accounts_core::silicon_keys::sign_in(
+            &state,
+            &meta,
+            assertion,
+            input::client_label(body.client_label.as_deref()).as_deref(),
+        )
+        .await;
+        if response.is_err() {
+            let mut conn = state.db.acquire().await?;
+            audit::signin(
+                &mut conn,
+                &SigninRecord {
+                    account_uuid: None,
+                    app_id: Some(accounts_core::FIRST_PARTY_APP_ID),
+                    method: "silicon_key",
+                    outcome: audit::outcome::FAILED,
+                    ip: meta.ip.as_deref(),
+                    user_agent: meta.user_agent.as_deref(),
+                },
+            )
+            .await?;
+        }
+        return response.map(Json);
+    }
+    let missing = |field: &str| {
+        let mut f = accounts_core::FieldErrors::new();
+        f.add(
+            field,
+            "required: sign in with your si:id and STK, or with an assertion signed by your key",
+        );
+        ApiError::validation(f)
+    };
+    let id = parse_login_id(body.id.as_deref().ok_or_else(|| missing("id"))?)?;
+    let stk = body.stk.as_deref().ok_or_else(|| missing("stk"))?;
+    let presented = normalize_stk(stk).map_err(|m| {
         ApiError::unprocessable("invalid_stk", m)
             .hint("Send the STK exactly as it was shown: stk- followed by 8 to 32 hexadecimal characters.")
     })?;

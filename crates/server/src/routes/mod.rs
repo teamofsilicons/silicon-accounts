@@ -8,6 +8,10 @@
 //! | `POST /v1/reports` | optional session | bug report mailed to the report recipients |
 //! | `POST /v1/telemetry/events` | public | client telemetry forwarded to Space Station |
 //! | `GET /v1/dev/outbox` | public, dev only | messages recorded by the service (with OTP codes) |
+//! | `GET /openapi.json`, `GET /v1/openapi.json` | public | the OpenAPI 3.1 document |
+//! | `GET /.well-known/agent.json` | public | the A2A agent card |
+//! | `GET /v1/capabilities` | public | what this deployment supports; `?require=` answers 200 or 422 |
+//! | `GET /v1/events/stream` | app, account or request token | account events as Server-Sent Events |
 //!
 //! Plus the fallback: JSON 404 for unknown API routes, the account site for everything else.
 
@@ -16,6 +20,8 @@ use axum::Router;
 use axum::routing::{get, post};
 
 pub mod dev;
+pub mod discovery;
+pub mod events;
 pub mod fallback;
 pub mod health;
 pub mod reports;
@@ -30,4 +36,9 @@ pub fn router() -> Router<AppState> {
         .route("/v1/reports", post(reports::create))
         .route("/v1/telemetry/events", post(telemetry::ingest))
         .route("/v1/dev/outbox", get(dev::outbox))
+        .route("/openapi.json", get(discovery::openapi))
+        .route("/v1/openapi.json", get(discovery::openapi))
+        .route("/.well-known/agent.json", get(discovery::agent_card))
+        .route("/v1/capabilities", get(discovery::capabilities))
+        .route("/v1/events/stream", get(events::stream))
 }

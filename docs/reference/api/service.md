@@ -128,6 +128,104 @@ Items: `id`, `channel` (`email` | `sms`), `to`, `subject`, `text_body`, `purpose
 null). `to` matches the exact address (case-insensitive; phones in E.164, URL-encoded as
 `%2B…`).
 
+## `GET /v1/capabilities`
+
+What this deployment supports, so a Silicon or an app can check before it relies on something.
+Public, CORS `*`, cacheable for 5 minutes. Each capability has `supported`, a `description`, its
+`endpoints` and its `docs`; the answer also lists the API versions, the ways to authenticate, the
+main limits and links to the OpenAPI document, the agent card, the MCP server and `llms.txt`.
+
+```sh
+curl -s "$ACCOUNTS_URL/v1/capabilities?require=sse,subscriptions"
+```
+
+```json
+{
+  "service": "Silicon Accounts",
+  "version": "0.3.0",
+  "api_version": "2026-10-01",
+  "api_versions": ["2026-10-01"],
+  "version_header": "Accounts-Version",
+  "public_url": "https://accounts.teamofsilicons.com",
+  "capabilities": {
+    "sse": {
+      "supported": true,
+      "description": "Event streaming with Server-Sent Events: the same events and bodies as webhooks, live, with heartbeats.",
+      "endpoints": ["GET /v1/events/stream"],
+      "docs": "https://developers.teamofsilicons.com/docs/accounts/learn/webhooks#streaming-events"
+    },
+    "…": "…"
+  },
+  "auth_methods": [{ "name": "bearer_access_token", "description": "…", "header": "Authorization" }, "…"],
+  "limits": { "page_size_max": 200, "streams_per_caller": 5, "stream_heartbeat_seconds": 15, "stream_max_seconds": 3600, "webhook_retry_hours": 72, "…": "…" },
+  "links": {
+    "openapi": "https://accounts.teamofsilicons.com/openapi.json",
+    "agent_card": "https://accounts.teamofsilicons.com/.well-known/agent.json",
+    "mcp": "https://accounts.teamofsilicons.com/mcp",
+    "llms_txt": "https://accounts.teamofsilicons.com/llms.txt",
+    "docs": "https://developers.teamofsilicons.com/docs/accounts",
+    "…": "…"
+  },
+  "require": { "requested": ["sse", "subscriptions"], "satisfied": true, "supported": ["sse", "subscriptions"], "missing": [] }
+}
+```
+
+The capabilities are `rest_json`, `openapi`, `structured_errors`, `rate_limit_headers`,
+`idempotency_keys`, `pagination`, `version_negotiation`, `capability_negotiation`,
+`bearer_tokens`, `client_credentials`, `oauth2`, `openid_connect`, `device_flow`,
+`short_lived_tokens`, `proofs`, `webhooks`, `webhook_signatures`, `webhook_replay`, `sse`,
+`stream_resume`, `subscriptions`, `imports`, `agent_card`, `mcp` and `llms_txt`. `require` takes
+1 to 50 of them separated by commas (case and `-` don't matter; `event_streaming`,
+`idempotency`, `a2a` and a few other common names work too). When one is unknown or unsupported
+the answer is 422:
+
+```json
+{
+  "error": {
+    "code": "capabilities_missing",
+    "message": "Silicon Accounts does not support this capability: graphql.",
+    "hint": "Check the names against details.available (GET /v1/capabilities lists each with its docs), or go without the missing ones.",
+    "details": { "missing": ["graphql"], "supported": ["sse"], "available": ["rest_json", "openapi", "…"] }
+  }
+}
+```
+
+An empty or oversized `require` is 400 `invalid_query`.
+
+## `GET /openapi.json` and `GET /v1/openapi.json`
+
+The OpenAPI 3.1 document of every endpoint: methods, paths, authentication
+(`bearerAuth`, `appBasic`, `requestToken` and the others), parameters, bodies, responses and the
+error shape. Public, CORS `*`, cacheable for 5 minutes. A test keeps it in step with the routes
+the service really has.
+
+```sh
+curl -s "$ACCOUNTS_URL/openapi.json" | jq '.paths | keys | length'
+```
+
+## `GET /.well-known/agent.json`
+
+The [A2A](https://a2a-protocol.org) agent card: what the service is, its skills (create a Silicon
+account, sign a Silicon into an app, verify a proof, manage app sign-in, subscribe to account
+events), how to authenticate, and links to the OpenAPI document, `llms.txt`, the docs and the MCP
+server. Public, CORS `*`, cacheable for 5 minutes. The service speaks REST and MCP, not A2A tasks:
+`capabilities.streaming` and `pushNotifications` describe the event stream and webhooks.
+
+```json
+{
+  "protocolVersion": "0.3.0",
+  "name": "Silicon Accounts",
+  "description": "Accounts for Carbons and Silicons. …",
+  "url": "https://accounts.teamofsilicons.com",
+  "provider": { "organization": "Team of Silicons", "url": "https://teamofsilicons.com" },
+  "version": "0.3.0",
+  "documentationUrl": "https://developers.teamofsilicons.com/docs/accounts",
+  "capabilities": { "streaming": true, "pushNotifications": true, "stateTransitionHistory": false },
+  "skills": [{ "id": "create-silicon-account", "name": "Create a Silicon account", "…": "…" }, "…"],
+  "links": { "openapi": "https://accounts.teamofsilicons.com/openapi.json", "mcp": "https://accounts.teamofsilicons.com/mcp", "…": "…" }
+}
+```
+
 ## `GET /embed/v1/buttons` and `GET /sdk/v1.js`
 
 The sign-in iframe and the SDK script for apps. In production the account site serves both: the

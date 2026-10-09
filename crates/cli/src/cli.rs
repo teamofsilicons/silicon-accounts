@@ -294,6 +294,10 @@ pub struct LoginArgs {
     #[arg(long)]
     pub stk_stdin: bool,
 
+    /// Sign the Silicon in with this private key file instead of its STK (a key registered with `silicon-accounts silicon keys add`) [env: ACCOUNTS_SILICON_KEY].
+    #[arg(long, value_name = "FILE", conflicts_with_all = ["stk", "stk_stdin"])]
+    pub key: Option<PathBuf>,
+
     /// Carbon: send a 6-digit sign-in code to this email.
     #[arg(long, value_name = "EMAIL", conflicts_with = "phone")]
     pub email: Option<String>,
@@ -726,6 +730,34 @@ pub enum SiliconCommand {
     )]
     Webhook(SiliconWebhookArgs),
 
+    /// The apps one of your Silicons signed into: list them, remove one, and choose which apps it may sign into.
+    ///
+    /// Removing an app ends the Silicon's sign-ins there and tells the app (membership.access_removed). An allow-list limits the apps the Silicon can get short-lived tokens for; it doesn't end sign-ins it already has.
+    #[command(
+        after_long_help = "Examples:\n  silicon-accounts silicon apps list si:scout\n  silicon-accounts silicon apps remove si:scout briefcase\n  silicon-accounts silicon apps allow si:scout briefcase dm\n  silicon-accounts silicon apps allow si:scout --any\n  silicon-accounts silicon apps allowed si:scout"
+    )]
+    Apps(SiliconAppsArgs),
+
+    /// A Silicon's keys: sign in with a key instead of the STK, so an unattended Silicon never holds a bearer secret.
+    ///
+    /// The Silicon itself or its custodian adds the public half; the Silicon keeps the private half and signs in with `silicon-accounts login --silicon si:<id> --key <file>`. Revoking a key ends the sign-ins it started.
+    #[command(
+        after_long_help = "Examples:\n  silicon-accounts silicon keys add si:scout --generate ~/.accounts/scout.key --name laptop\n  silicon-accounts silicon keys add si:scout --public-key ~/.ssh/id_ed25519.pub\n  silicon-accounts silicon keys list si:scout\n  silicon-accounts silicon keys revoke si:scout 0192f0c2-…\n  silicon-accounts login --silicon si:scout --key ~/.accounts/scout.key"
+    )]
+    Keys(SiliconKeysArgs),
+
+    /// One of your Silicons' sign-ins, newest first (app, method, outcome, address).
+    Signins {
+        /// si:id or uuid.
+        silicon: String,
+        /// Rows per page.
+        #[arg(long, value_name = "N")]
+        limit: Option<u32>,
+        /// Continue from next_cursor.
+        #[arg(long)]
+        cursor: Option<String>,
+    },
+
     /// Transfer a Silicon to another Carbon (they must accept within 14 days).
     Transfer {
         /// si:id or uuid.
@@ -795,6 +827,89 @@ pub struct SiliconCreateArgs {
     /// Idempotency key; reuse it when retrying so the Silicon is created only once [default: random].
     #[arg(long, value_name = "KEY")]
     pub idempotency_key: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct SiliconKeysArgs {
+    #[command(subcommand)]
+    pub command: SiliconKeysCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SiliconKeysCommand {
+    /// Register a key: generate a new one, or give a private or public key file.
+    Add {
+        /// si:id or uuid (yourself, or a Silicon you are custodian of).
+        silicon: String,
+        /// Make a new key, save its private half here (mode 600) and register the public half.
+        #[arg(long, value_name = "FILE", conflicts_with_all = ["private_key", "public_key"])]
+        generate: Option<PathBuf>,
+        /// Register the public half of this private key file (PEM or OpenSSH).
+        #[arg(long = "key", value_name = "FILE", conflicts_with = "public_key")]
+        private_key: Option<PathBuf>,
+        /// Register this public key: a file (OpenSSH .pub, PEM) or the key itself.
+        #[arg(long, value_name = "FILE_OR_KEY")]
+        public_key: Option<String>,
+        /// A name to tell keys apart.
+        #[arg(long, value_name = "TEXT")]
+        name: Option<String>,
+    },
+    /// List a Silicon's keys (revoked ones too).
+    List {
+        /// si:id or uuid.
+        silicon: String,
+    },
+    /// Revoke a key: it stops working and the sign-ins it started end.
+    Revoke {
+        /// si:id or uuid.
+        silicon: String,
+        /// The key id.
+        key_id: String,
+    },
+}
+
+#[derive(Debug, Args)]
+pub struct SiliconAppsArgs {
+    #[command(subcommand)]
+    pub command: SiliconAppsCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SiliconAppsCommand {
+    /// List the apps the Silicon signed into, most recently used first.
+    List {
+        /// si:id or uuid.
+        silicon: String,
+        /// active, access_removed or imported.
+        #[arg(long, value_name = "STATUS")]
+        status: Option<String>,
+    },
+    /// Remove the Silicon's access to one app (its sign-ins there end).
+    Remove {
+        /// si:id or uuid.
+        silicon: String,
+        /// The app id.
+        app_id: String,
+    },
+    /// Set the apps the Silicon may get short-lived tokens for (replaces the list).
+    Allow {
+        /// si:id or uuid.
+        silicon: String,
+        /// App ids.
+        #[arg(required_unless_present_any = ["any", "none"], conflicts_with_all = ["any", "none"])]
+        apps: Vec<String>,
+        /// Allow every app again (no list).
+        #[arg(long, conflicts_with = "none")]
+        any: bool,
+        /// Allow no app.
+        #[arg(long)]
+        none: bool,
+    },
+    /// Show the apps the Silicon may get short-lived tokens for.
+    Allowed {
+        /// si:id or uuid.
+        silicon: String,
+    },
 }
 
 #[derive(Debug, Args)]
@@ -1057,6 +1172,14 @@ pub enum AppCommand {
     Proof(ProofArgs),
     /// The app's webhook: endpoint, secret, test, deliveries, replay.
     Webhook(AppWebhookArgs),
+    /// Event subscriptions: where the app's updates go (its webhook or the event stream), which updates it wants, and whether each is active or paused.
+    ///
+    /// An app has at most one webhook subscription (it is the app's webhook) and one stream subscription (read it at GET /v1/events/stream with the app's credentials). The updates are id_change, display_name_change, pfp_change, timezone_change, email_change, phone_change, custodian_change, access_removed and account_deleted; a new subscription gets id_change, display_name_change, pfp_change, access_removed and account_deleted unless you pick others.
+    #[command(
+        visible_alias = "subscriptions",
+        after_long_help = "Examples:\n  silicon-accounts app subscription list\n  silicon-accounts app subscription create stream\n  silicon-accounts app subscription create webhook https://briefcase.example/webhooks --update id_change --update account_deleted\n  silicon-accounts app subscription update 0192f0c2-… --pause\n  silicon-accounts app subscription update 0192f0c2-… --all-updates --resume\n  silicon-accounts app subscription test 0192f0c2-…\n  silicon-accounts app subscription delete 0192f0c2-…"
+    )]
+    Subscription(AppSubscriptionArgs),
     /// Look up an account by uuid or id with the app's credentials.
     Lookup {
         /// uuid, c:id or si:id.
@@ -1410,6 +1533,92 @@ pub enum AppWebhookCommand {
         /// With --failed: only deliveries created since this RFC 3339 time.
         #[arg(long, value_name = "TIME", requires = "failed")]
         since: Option<String>,
+        /// Idempotency key [default: random].
+        #[arg(long, value_name = "KEY")]
+        idempotency_key: Option<String>,
+    },
+}
+
+#[derive(Debug, Args)]
+pub struct AppSubscriptionArgs {
+    #[command(subcommand)]
+    pub command: AppSubscriptionCommand,
+}
+
+/// Where a new subscription sends updates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum DeliveryArg {
+    /// Signed POSTs to a webhook URL.
+    Webhook,
+    /// The event stream (GET /v1/events/stream).
+    Stream,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AppSubscriptionCommand {
+    /// List the app's subscriptions.
+    List,
+    /// Show one subscription.
+    Show {
+        /// The subscription id.
+        id: String,
+    },
+    /// Create a subscription (a webhook's signing secret is printed once).
+    ///
+    /// A retry with the same --idempotency-key (within 10 minutes) prints the same answer instead of failing with subscription_exists.
+    Create {
+        /// webhook or stream.
+        #[arg(value_enum)]
+        delivery: DeliveryArg,
+        /// The webhook URL (webhook only).
+        // Not named `url`: that id is the global --url flag.
+        #[arg(value_name = "URL")]
+        endpoint: Option<String>,
+        /// An update to receive (repeat it); the defaults when none is given.
+        #[arg(long = "update", value_name = "UPDATE", conflicts_with = "all_updates")]
+        updates: Vec<String>,
+        /// Receive every update, including ones added later.
+        #[arg(long)]
+        all_updates: bool,
+        /// Create it paused.
+        #[arg(long)]
+        paused: bool,
+        /// Idempotency key [default: random].
+        #[arg(long, value_name = "KEY")]
+        idempotency_key: Option<String>,
+    },
+    /// Change a subscription: its updates, pause or resume it, or move a webhook (the secret stays).
+    Update {
+        /// The subscription id.
+        id: String,
+        /// Receive exactly these updates (repeat it).
+        #[arg(long = "update", value_name = "UPDATE", conflicts_with = "all_updates")]
+        updates: Vec<String>,
+        /// Receive every update.
+        #[arg(long)]
+        all_updates: bool,
+        /// Pause it: nothing is recorded until it is resumed.
+        #[arg(long, conflicts_with = "resume")]
+        pause: bool,
+        /// Resume it.
+        #[arg(long)]
+        resume: bool,
+        /// A new webhook URL (webhook subscriptions).
+        #[arg(long, value_name = "URL")]
+        endpoint: Option<String>,
+        /// Idempotency key [default: random].
+        #[arg(long, value_name = "KEY")]
+        idempotency_key: Option<String>,
+    },
+    /// Delete a subscription (deleting the webhook subscription removes the app's webhook).
+    Delete {
+        /// The subscription id.
+        id: String,
+    },
+    /// Queue a test `ping` on a subscription.
+    Test {
+        /// The subscription id.
+        id: String,
         /// Idempotency key [default: random].
         #[arg(long, value_name = "KEY")]
         idempotency_key: Option<String>,

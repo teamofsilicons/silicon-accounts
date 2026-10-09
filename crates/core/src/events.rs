@@ -5,11 +5,18 @@
 //! Body: `{"event_id","type","occurred_at","app_id","silicon","data"}` — `app_id` is the target
 //! app for app webhooks, `silicon` the target Silicon's uuid for Silicon webhooks.
 //!
-//! App events go to every app with a *live* membership (`active` or `imported`) and a configured
-//! webhook URL. A disabled app gets its events too: the worker holds their deliveries until the
-//! app is re-enabled (or the delivery window ends, after which they can be replayed), so the app
-//! never misses a change made while it was disabled. Call these helpers inside the same
-//! transaction as the change so events exist exactly when the change commits.
+//! App events go to every *active subscription* (see `repo::subscriptions`) of every app with a
+//! *live* membership (`active` or `imported`): its webhook (while it has a URL) and its event
+//! stream. Each subscription gets its own row, filtered by the updates it picked, and only the
+//! webhook's rows get a delivery. A disabled app gets its events too: the worker holds their
+//! deliveries until the app is re-enabled (or the delivery window ends, after which they can be
+//! replayed), so the app never misses a change made while it was disabled.
+//!
+//! Silicon events are always recorded (the Silicon reads them on `GET /v1/events/stream`, its
+//! custodian too); they get a delivery when the Silicon has a webhook URL.
+//!
+//! Call these helpers inside the same transaction as the change so events exist exactly when the
+//! change commits. They return the deliveries they queued.
 
 use serde_json::{Value, json};
 use sqlx::PgConnection;
@@ -18,8 +25,9 @@ use uuid::Uuid;
 
 use crate::crypto::Keyring;
 use crate::error::ApiResult;
-use crate::models::{Account, AccountField, AccountKind, WebhookTargetKind};
-use crate::repo::{contacts, memberships};
+use crate::models::{Account, AccountField, AccountKind, SubscriptionDelivery, WebhookTargetKind};
+use crate::repo::memberships::MemberTarget;
+use crate::repo::{contacts, memberships, subscriptions};
 use crate::views::{AccountForApp, AccountSummary, CustodianRef, MeView};
 
 /// Event type names.
@@ -65,7 +73,8 @@ pub mod declined_reason {
     pub const CUSTODIAN_ACCOUNT_DELETED: &str = "custodian_account_deleted";
 }
 
-/// Update preferences set by Silicon Apps; existing Accounts integrations with NULL keep all events.
+/// The updates an app can pick for a subscription (the Silicon Apps "Updates from Silicon
+/// Accounts" table). A subscription with no list (`null`) receives every update.
 pub const APP_UPDATE_CHOICES: &[&str] = &[
     "id_change",
     "display_name_change",
@@ -78,31 +87,84 @@ pub const APP_UPDATE_CHOICES: &[&str] = &[
     "account_deleted",
 ];
 
-async fn app_subscriptions(
-    conn: &mut PgConnection,
-    app_id: &str,
-) -> ApiResult<Option<Vec<String>>> {
-    let value: Option<Value> =
-        sqlx::query_scalar("select webhook_events from app_signin_configs where app_id=$1")
-            .bind(app_id)
-            .fetch_optional(&mut *conn)
-            .await?
-            .flatten();
-    Ok(value.map(|v| {
-        v.as_array()
-            .map(|a| {
-                a.iter()
-                    .filter_map(|s| s.as_str().map(str::to_owned))
-                    .collect()
-            })
-            .unwrap_or_default()
-    }))
+/// The updates picked for a new subscription when it names none.
+pub const DEFAULT_UPDATES: &[&str] = &[
+    "id_change",
+    "display_name_change",
+    "pfp_change",
+    "access_removed",
+    "account_deleted",
+];
+
+/// Every event type an app can receive, in a stable order.
+pub const APP_EVENT_TYPES: &[&str] = &[
+    types::ACCOUNT_ID_CHANGED,
+    types::ACCOUNT_UPDATED,
+    types::ACCOUNT_DELETED,
+    types::MEMBERSHIP_SIGNED_OUT,
+    types::MEMBERSHIP_ACCESS_REMOVED,
+    types::SILICON_CUSTODIAN_CHANGED,
+    types::PING,
+];
+
+/// Every event type a Silicon (and its custodian) can receive.
+pub const SILICON_EVENT_TYPES: &[&str] = &[
+    types::SILICON_CREATED,
+    types::SILICON_CUSTODIAN_ACCEPTED,
+    types::SILICON_CUSTODIAN_DECLINED,
+    types::SILICON_CUSTODIAN_EXPIRED,
+    types::SILICON_UPDATED,
+    types::SILICON_ID_CHANGED,
+    types::SILICON_STK_ROTATED,
+    types::SILICON_OWN_CUSTODIAN_CHANGED,
+    types::PING,
+];
+
+/// The event types an update brings. `account.updated` carries the profile changes (each its
+/// own update, listed in `changed`); a custodian's new c:id reaches apps as `account.updated`
+/// with `changed: ["custodian"]`.
+pub fn update_event_types(choice: &str) -> &'static [&'static str] {
+    match choice {
+        "id_change" => &[types::ACCOUNT_ID_CHANGED],
+        "display_name_change"
+        | "pfp_change"
+        | "timezone_change"
+        | "email_change"
+        | "phone_change" => &[types::ACCOUNT_UPDATED],
+        "custodian_change" => &[types::ACCOUNT_UPDATED, types::SILICON_CUSTODIAN_CHANGED],
+        "access_removed" => &[
+            types::MEMBERSHIP_SIGNED_OUT,
+            types::MEMBERSHIP_ACCESS_REMOVED,
+        ],
+        "account_deleted" => &[types::ACCOUNT_DELETED],
+        _ => &[],
+    }
 }
 
-async fn app_wants(conn: &mut PgConnection, app_id: &str, choice: &str) -> ApiResult<bool> {
-    Ok(app_subscriptions(conn, app_id)
-        .await?
-        .is_none_or(|items| items.iter().any(|item| item == choice)))
+/// The event types a subscription with these updates receives (`None` = every update), in
+/// [`APP_EVENT_TYPES`] order. `ping` (a test) always arrives.
+pub fn event_types_for_updates(updates: Option<&[String]>) -> Vec<&'static str> {
+    APP_EVENT_TYPES
+        .iter()
+        .copied()
+        .filter(|t| {
+            *t == types::PING
+                || updates
+                    .is_none_or(|items| items.iter().any(|u| update_event_types(u).contains(t)))
+        })
+        .collect()
+}
+
+/// The update an app event belongs to (`None` for `ping`, which every subscription gets, and
+/// for `account.updated`, which is decided per changed field).
+fn event_update(event_type: &str) -> Option<&'static str> {
+    match event_type {
+        types::ACCOUNT_ID_CHANGED => Some("id_change"),
+        types::ACCOUNT_DELETED => Some("account_deleted"),
+        types::MEMBERSHIP_SIGNED_OUT | types::MEMBERSHIP_ACCESS_REMOVED => Some("access_removed"),
+        types::SILICON_CUSTODIAN_CHANGED => Some("custodian_change"),
+        _ => None,
+    }
 }
 
 fn update_choice(field: &AccountField) -> &str {
@@ -174,57 +236,147 @@ pub fn build_payload(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn insert_event(
-    conn: &mut PgConnection,
+/// Where one event row goes: the receiver, the subscription it was recorded for (apps), and
+/// the URL a delivery is queued to (none for a stream, or a Silicon without a webhook).
+struct Destination<'a> {
     target_kind: WebhookTargetKind,
-    target_id: &str,
+    target_id: &'a str,
+    subscription_id: Option<Uuid>,
+    delivery_url: Option<&'a str>,
+}
+
+impl<'a> Destination<'a> {
+    fn member(t: &'a MemberTarget) -> Self {
+        Destination {
+            target_kind: WebhookTargetKind::App,
+            target_id: &t.app_id,
+            subscription_id: Some(t.subscription_id),
+            delivery_url: match t.delivery {
+                SubscriptionDelivery::Webhook => t.webhook_url.as_deref(),
+                SubscriptionDelivery::Stream => None,
+            },
+        }
+    }
+}
+
+/// Writes one event row and, with a delivery URL, its pending delivery (returned).
+async fn record_event(
+    conn: &mut PgConnection,
+    to: Destination<'_>,
     account_uuid: Option<&str>,
-    url: &str,
     event_type: &str,
     data: Value,
-) -> ApiResult<EmittedEvent> {
+) -> ApiResult<Option<EmittedEvent>> {
+    Ok(
+        record_event_with_id(conn, to, account_uuid, event_type, data)
+            .await?
+            .1,
+    )
+}
+
+/// [`record_event`], also returning the event id.
+async fn record_event_with_id(
+    conn: &mut PgConnection,
+    to: Destination<'_>,
+    account_uuid: Option<&str>,
+    event_type: &str,
+    data: Value,
+) -> ApiResult<(Uuid, Option<EmittedEvent>)> {
     let event_id = Uuid::now_v7();
-    let delivery_id = Uuid::now_v7();
     let occurred_at = OffsetDateTime::now_utc();
-    let (app_id, silicon) = match target_kind {
-        WebhookTargetKind::App => (Some(target_id), None),
-        WebhookTargetKind::Silicon => (None, Some(target_id)),
+    let (app_id, silicon) = match to.target_kind {
+        WebhookTargetKind::App => (Some(to.target_id), None),
+        WebhookTargetKind::Silicon => (None, Some(to.target_id)),
     };
     let payload = build_payload(event_id, event_type, occurred_at, app_id, silicon, data);
     sqlx::query(
-        "insert into webhook_events (event_id, type, target_kind, target_id, account_uuid, payload, occurred_at) \
-         values ($1, $2, $3, $4, $5, $6, $7)",
+        "insert into webhook_events (event_id, type, target_kind, target_id, account_uuid, payload, occurred_at, subscription_id) \
+         values ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(event_id)
     .bind(event_type)
-    .bind(target_kind)
-    .bind(target_id)
+    .bind(to.target_kind)
+    .bind(to.target_id)
     .bind(account_uuid)
     .bind(&payload)
     .bind(occurred_at)
+    .bind(to.subscription_id)
     .execute(&mut *conn)
     .await?;
+    let Some(url) = to.delivery_url else {
+        return Ok((event_id, None));
+    };
+    let delivery_id = Uuid::now_v7();
     sqlx::query(
         "insert into webhook_deliveries (id, event_id, target_kind, target_id, url, status) values ($1, $2, $3, $4, $5, 'pending')",
     )
     .bind(delivery_id)
     .bind(event_id)
-    .bind(target_kind)
-    .bind(target_id)
+    .bind(to.target_kind)
+    .bind(to.target_id)
     .bind(url)
     .execute(&mut *conn)
     .await?;
-    Ok(EmittedEvent {
+    Ok((
         event_id,
-        delivery_id,
-        target_kind,
-        target_id: target_id.to_string(),
-        event_type: event_type.to_string(),
-    })
+        Some(EmittedEvent {
+            event_id,
+            delivery_id,
+            target_kind: to.target_kind,
+            target_id: to.target_id.to_string(),
+            event_type: event_type.to_string(),
+        }),
+    ))
 }
 
-/// Emits an event to one app (if it has a webhook URL). Does not check memberships.
+/// One app's active subscriptions as event destinations: (subscription id, delivery, updates,
+/// webhook URL), the webhook first.
+#[derive(sqlx::FromRow)]
+struct AppTarget {
+    subscription_id: Uuid,
+    delivery: SubscriptionDelivery,
+    updates: Option<Value>,
+    webhook_url: Option<String>,
+}
+
+impl AppTarget {
+    fn wants(&self, event_type: &str) -> bool {
+        event_update(event_type).is_none_or(|choice| {
+            subscriptions::wants(
+                subscriptions::updates_from_json(self.updates.as_ref()).as_deref(),
+                choice,
+            )
+        })
+    }
+
+    fn destination<'a>(&'a self, app_id: &'a str) -> Destination<'a> {
+        Destination {
+            target_kind: WebhookTargetKind::App,
+            target_id: app_id,
+            subscription_id: Some(self.subscription_id),
+            delivery_url: match self.delivery {
+                SubscriptionDelivery::Webhook => self.webhook_url.as_deref(),
+                SubscriptionDelivery::Stream => None,
+            },
+        }
+    }
+}
+
+async fn app_targets(conn: &mut PgConnection, app_id: &str) -> ApiResult<Vec<AppTarget>> {
+    Ok(sqlx::query_as(
+        "select s.id as subscription_id, s.delivery, s.updates, c.webhook_url \
+         from app_event_subscriptions s left join app_signin_configs c on c.app_id = s.app_id \
+         where s.app_id = $1 and s.status = 'active' \
+           and (s.delivery = 'stream' or c.webhook_url is not null) \
+         order by s.delivery desc",
+    )
+    .bind(app_id)
+    .fetch_all(&mut *conn)
+    .await?)
+}
+
+/// Emits an event to one app: a row for each of its active subscriptions that wants it, and a
+/// delivery for its webhook. Does not check memberships. Returns the webhook delivery.
 pub async fn emit_to_app(
     conn: &mut PgConnection,
     app_id: &str,
@@ -232,31 +384,55 @@ pub async fn emit_to_app(
     account_uuid: Option<&str>,
     data: Value,
 ) -> ApiResult<Option<EmittedEvent>> {
-    if matches!(
-        event_type,
-        types::MEMBERSHIP_SIGNED_OUT | types::MEMBERSHIP_ACCESS_REMOVED
-    ) && !app_wants(conn, app_id, "access_removed").await?
-    {
-        return Ok(None);
-    }
-    let Some((url, _)) = crate::repo::apps::webhook_target(conn, app_id).await? else {
-        return Ok(None);
-    };
-    Ok(Some(
-        insert_event(
+    let mut queued = None;
+    for t in app_targets(conn, app_id).await? {
+        if !t.wants(event_type) {
+            continue;
+        }
+        let emitted = record_event(
             conn,
-            WebhookTargetKind::App,
-            app_id,
+            t.destination(app_id),
             account_uuid,
-            &url,
             event_type,
-            data,
+            data.clone(),
         )
-        .await?,
-    ))
+        .await?;
+        queued = queued.or(emitted);
+    }
+    Ok(queued)
 }
 
-/// Emits an event to a Silicon's own webhook (if it has one).
+/// Emits a `ping` to one subscription of an app, whatever its status (a test the app asked
+/// for): `(event_id, delivery)`, the delivery when it is the webhook.
+pub async fn ping_subscription(
+    conn: &mut PgConnection,
+    subscription: &subscriptions::Subscription,
+) -> ApiResult<(Uuid, Option<EmittedEvent>)> {
+    let url = match subscription.delivery {
+        SubscriptionDelivery::Webhook => {
+            crate::repo::apps::webhook_target(conn, &subscription.app_id)
+                .await?
+                .map(|(u, _)| u)
+        }
+        SubscriptionDelivery::Stream => None,
+    };
+    record_event_with_id(
+        conn,
+        Destination {
+            target_kind: WebhookTargetKind::App,
+            target_id: &subscription.app_id,
+            subscription_id: Some(subscription.id),
+            delivery_url: url.as_deref(),
+        },
+        None,
+        types::PING,
+        json!({}),
+    )
+    .await
+}
+
+/// Records an event for a Silicon (it reads it on the event stream) and queues a delivery to its
+/// own webhook when it has one (returned).
 pub async fn emit_to_silicon(
     conn: &mut PgConnection,
     silicon_uuid: &str,
@@ -269,19 +445,19 @@ pub async fn emit_to_silicon(
             .fetch_optional(&mut *conn)
             .await?
             .flatten();
-    let Some(url) = url else { return Ok(None) };
-    Ok(Some(
-        insert_event(
-            conn,
-            WebhookTargetKind::Silicon,
-            silicon_uuid,
-            Some(silicon_uuid),
-            &url,
-            event_type,
-            data,
-        )
-        .await?,
-    ))
+    record_event(
+        conn,
+        Destination {
+            target_kind: WebhookTargetKind::Silicon,
+            target_id: silicon_uuid,
+            subscription_id: None,
+            delivery_url: url.as_deref(),
+        },
+        Some(silicon_uuid),
+        event_type,
+        data,
+    )
+    .await
 }
 
 /// `account.id_changed` to every member app: `{uuid, membership_id, kind, old_id, new_id}`.
@@ -294,20 +470,18 @@ pub async fn account_id_changed(
     let targets = memberships::webhook_targets(conn, &account.uuid).await?;
     let mut out = Vec::with_capacity(targets.len());
     for t in targets {
-        if !app_wants(conn, &t.app_id, "id_change").await? {
+        if !t.wants("id_change") {
             continue;
         }
         let data = json!({
             "uuid": account.uuid, "membership_id": t.membership_id, "kind": account.kind,
             "old_id": old_id, "new_id": new_id,
         });
-        out.push(
-            insert_event(
+        out.extend(
+            record_event(
                 conn,
-                WebhookTargetKind::App,
-                &t.app_id,
+                Destination::member(&t),
                 Some(&account.uuid),
-                &t.webhook_url,
                 types::ACCOUNT_ID_CHANGED,
                 data,
             )
@@ -401,7 +575,7 @@ pub async fn account_updated(
     let custodian = custodian_ref(conn, account).await?;
     let mut out = Vec::new();
     for t in targets {
-        let selected = app_subscriptions(conn, &t.app_id).await?;
+        let selected = t.updates();
         let scopes = t.scopes();
         let visible: Vec<AccountField> = changed
             .iter()
@@ -431,13 +605,11 @@ pub async fn account_updated(
         let data = json!({
             "uuid": account.uuid, "membership_id": t.membership_id, "changed": visible, "account": view,
         });
-        out.push(
-            insert_event(
+        out.extend(
+            record_event(
                 conn,
-                WebhookTargetKind::App,
-                &t.app_id,
+                Destination::member(&t),
                 Some(&account.uuid),
-                &t.webhook_url,
                 types::ACCOUNT_UPDATED,
                 data,
             )
@@ -496,17 +668,15 @@ pub async fn account_deleted(
     let targets = memberships::webhook_targets(conn, account_uuid).await?;
     let mut out = Vec::with_capacity(targets.len());
     for t in targets {
-        if !app_wants(conn, &t.app_id, "account_deleted").await? {
+        if !t.wants("account_deleted") {
             continue;
         }
         let data = json!({"uuid": account_uuid, "membership_id": t.membership_id});
-        out.push(
-            insert_event(
+        out.extend(
+            record_event(
                 conn,
-                WebhookTargetKind::App,
-                &t.app_id,
+                Destination::member(&t),
                 Some(account_uuid),
-                &t.webhook_url,
                 types::ACCOUNT_DELETED,
                 data,
             )
@@ -583,18 +753,16 @@ pub async fn silicon_custodian_changed(
     let targets = memberships::webhook_targets(conn, &silicon.uuid).await?;
     let mut out = Vec::with_capacity(targets.len());
     for t in targets {
-        if !app_wants(conn, &t.app_id, "custodian_change").await? {
+        if !t.wants("custodian_change") {
             continue;
         }
         let data =
             json!({"uuid": silicon.uuid, "membership_id": t.membership_id, "from": from, "to": to});
-        out.push(
-            insert_event(
+        out.extend(
+            record_event(
                 conn,
-                WebhookTargetKind::App,
-                &t.app_id,
+                Destination::member(&t),
                 Some(&silicon.uuid),
-                &t.webhook_url,
                 types::SILICON_CUSTODIAN_CHANGED,
                 data,
             )
@@ -679,16 +847,37 @@ pub async fn silicon_custodian_expired(
     .await
 }
 
-/// `ping` to an app (`{}`), for the webhook test button.
+/// `ping` to an app's webhook (`{}`), for the webhook test button (paused or not). `None` when
+/// the app has no webhook URL.
 pub async fn ping_app(conn: &mut PgConnection, app_id: &str) -> ApiResult<Option<EmittedEvent>> {
-    emit_to_app(conn, app_id, types::PING, None, json!({})).await
+    if crate::repo::apps::webhook_target(conn, app_id)
+        .await?
+        .is_none()
+    {
+        return Ok(None);
+    }
+    match subscriptions::by_delivery(conn, app_id, SubscriptionDelivery::Webhook).await? {
+        Some(webhook) => Ok(ping_subscription(conn, &webhook).await?.1),
+        None => Err(crate::ApiError::internal(format!(
+            "the app '{app_id}' has a webhook URL but no webhook subscription"
+        ))),
+    }
 }
 
-/// `ping` to a Silicon's own webhook.
+/// `ping` to a Silicon's own webhook. `None` (and nothing recorded) when it has no webhook URL.
 pub async fn ping_silicon(
     conn: &mut PgConnection,
     silicon_uuid: &str,
 ) -> ApiResult<Option<EmittedEvent>> {
+    let url: Option<String> =
+        sqlx::query_scalar("select webhook_url from accounts where uuid = $1 and kind = 'silicon'")
+            .bind(silicon_uuid)
+            .fetch_optional(&mut *conn)
+            .await?
+            .flatten();
+    if url.is_none() {
+        return Ok(None);
+    }
     emit_to_silicon(conn, silicon_uuid, types::PING, json!({})).await
 }
 
@@ -783,6 +972,43 @@ mod tests {
         assert_eq!(p["app_id"], "briefcase");
         assert_eq!(p["silicon"], Value::Null);
         assert_eq!(p["data"], json!({}));
+    }
+
+    #[test]
+    fn updates_map_onto_event_types() {
+        assert_eq!(event_types_for_updates(None), APP_EVENT_TYPES.to_vec());
+        let defaults: Vec<String> = DEFAULT_UPDATES.iter().map(|s| s.to_string()).collect();
+        assert_eq!(
+            event_types_for_updates(Some(&defaults)),
+            vec![
+                "account.id_changed",
+                "account.updated",
+                "account.deleted",
+                "membership.signed_out",
+                "membership.access_removed",
+                "ping"
+            ]
+        );
+        assert_eq!(event_types_for_updates(Some(&[])), vec!["ping"]);
+        assert_eq!(
+            event_types_for_updates(Some(&["custodian_change".to_string()])),
+            vec!["account.updated", "silicon.custodian_changed", "ping"]
+        );
+        for choice in APP_UPDATE_CHOICES {
+            assert!(!update_event_types(choice).is_empty(), "{choice}");
+        }
+        assert_eq!(event_update(types::PING), None);
+        assert_eq!(
+            event_update(types::MEMBERSHIP_SIGNED_OUT),
+            Some("access_removed")
+        );
+        for field in AccountField::ALL {
+            let choice = update_choice(field);
+            assert!(
+                choice == "other" || APP_UPDATE_CHOICES.contains(&choice),
+                "{field:?}"
+            );
+        }
     }
 
     #[test]

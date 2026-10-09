@@ -142,7 +142,7 @@ If any link ends, the proof ends with it, at once, everywhere. The proof also ne
 | what happened | verify says | refresh says (issuing app) | listings show |
 |---|---|---|---|
 | the issuing app revoked the proof (`POST /v1/proofs/revoke`, or `DELETE /v1/apps/{app_id}/proofs/{id}`) | `valid: false` | `410 proof_revoked`, reason `revoked_by_app` | `revoked`, `revoked_by_app` |
-| the issuing app's owner revoked it (`DELETE /v1/apps/{app_id}/proofs/{id}` with their session) | `valid: false` | `410 proof_revoked`, `revoked_by_owner` | `revoked`, `revoked_by_owner` |
+| one of the issuing app's authors revoked it (`DELETE /v1/apps/{app_id}/proofs/{id}` with their session) | `valid: false` | `410 proof_revoked`, `revoked_by_owner` | `revoked`, `revoked_by_owner` |
 | the account revoked it (`DELETE /v1/me/proofs/{id}`, `silicon-accounts proofs revoke`, the account site) | `valid: false` | `410 proof_revoked`, `revoked_by_account` | `revoked`, `revoked_by_account` |
 | a used proof refresh token was presented again | `valid: false` | `400 proof_refresh_token_reused`, then `410 proof_revoked`, `refresh_token_reuse` | `revoked`, `refresh_token_reuse` |
 | the sign-in behind it was revoked: the issuing app revoked the account's token (`membership.signed_out`, `app_revoked`), a custodian rotated the Silicon's STK (`stk_rotated`), the app reused a sign-in refresh token or an authorization code | `valid: false` | `410 proof_revoked`, `sign_in_revoked` (with when and why) | `revoked`, `sign_in_revoked` |
@@ -161,11 +161,11 @@ App verification proofs stand only on themselves and the issuing app: they end w
 
 | action | User verification | App verification |
 |---|---|---|
-| issue | the issuing app, with its credentials and the account's access token | the issuing app with its credentials, or its owner through the App verification page (`POST /v1/apps/{app_id}/proofs/app-verification` with their session) |
+| issue | the issuing app, with its credentials and the account's access token | the issuing app with its credentials, or one of its authors through the App verification page (`POST /v1/apps/{app_id}/proofs/app-verification` with their session) |
 | verify | only the receiving app | only the receiving app (an app verification proof is for exactly one app; one proof per app) |
 | refresh | only the issuing app | only the issuing app |
-| revoke | the issuing app (by `proof_id`, `proof_token` or `proof_refresh_token`), its owner (by id), and the account it speaks for (by id) | the issuing app and its owner |
-| list | the issuing app and its owner (`GET /v1/apps/{app_id}/proofs`); the account (`GET /v1/me/proofs`) | the issuing app and its owner |
+| revoke | the issuing app (by `proof_id`, `proof_token` or `proof_refresh_token`), its authors (by id), and the account it speaks for (by id) | the issuing app and its authors |
+| list | the issuing app and its authors (`GET /v1/apps/{app_id}/proofs`); the account (`GET /v1/me/proofs`) | the issuing app and its authors |
 
 A receiving app can't revoke a proof. If it no longer trusts one, it simply stops accepting it; the issuing app is the one that revokes.
 

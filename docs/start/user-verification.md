@@ -73,7 +73,7 @@ Every response on this page is real, from a local Silicon Accounts stack. There,
 | field | required | rules |
 |---|---|---|
 | `subject_token` | yes | The account's **access** token issued to your app (it starts with `eyJ`). Not its refresh token, and not a token another app received. |
-| `receiving_app` | yes | The app that will verify the proof: an app id of 2 to 40 characters of `a-z`, `0-9` and `-`, starting with a letter (it is trimmed and lowercased). Not your own app, and not `silicon-accounts`. |
+| `receiving_app` | yes | The app that will verify the proof: an app id of 3 to 30 characters of `a-z`, `0-9`, `-` and `_` as Silicon Apps creates them, or an older id of 2 to 40 characters of `a-z`, `0-9` and `-` starting with a letter (it is trimmed and lowercased). Not your own app, and not `silicon-accounts`. |
 | `scopes` | no | Up to 20 distinct strings, each 1 to 100 characters of `A-Z a-z 0-9 _ . : / -`. Duplicates are dropped; the order is kept. |
 | `access_ttl_seconds` | no | How long each proof token lives: 60 to 1800 seconds, default 1800 (30 minutes). |
 
@@ -358,7 +358,7 @@ Every error is `{"error": {"code", "message", "hint", "details"?}}`; the message
 | 403 | `membership_inactive` | The account has no active membership with your app (`details.membership_id`). | The account must sign into your app again. |
 | 400 | `unknown_receiving_app` | No app has that id (`details.app_ids`). | Check the id. |
 | 400 | `invalid_receiving_app` | The receiving app is your own app, or `silicon-accounts` (Silicon Accounts itself). | Name the other app. |
-| 403 | `receiving_app_disabled` | The receiving app is disabled (`details.app_ids`). | Try later, or ask its owner. |
+| 403 | `receiving_app_disabled` | The receiving app is disabled (`details.app_ids`). | Try later, or ask its authors. |
 | 422 | `validation_failed` | Field rules, all listed in `details.fields`: e.g. `scopes[1]`, `access_ttl_seconds`, `receiving_app`, or an unknown field. | Fix the named fields. |
 | 409 | `idempotency_key_reused` | The `Idempotency-Key` was used for a different body. | Use a new key. |
 | 400 | `invalid_proof_refresh_token` | Refresh: not a `sapr_…` token (a proof token, a wrapped `Bearer sapr_…`), or unknown: mistyped, another environment, or its proof ended more than 30 days ago. | Send the newest refresh token; issue a new proof if the old one ended. |
