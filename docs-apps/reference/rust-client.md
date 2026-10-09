@@ -17,11 +17,11 @@ Use `silicon-apps-package` to check manifests, build archives and work out check
 
 ```toml
 [dependencies]
-silicon-apps-client = "0.1.8"
-silicon-apps-package = "0.1.2"
+silicon-apps-client = "0.2"
+silicon-apps-package = "0.2"
 ```
 
-The CLI release is 0.1.10, and the package versions move independently of it. The full generated Rust references are on [docs.rs for the client](https://docs.rs/silicon-apps-client) and [docs.rs for package tooling](https://docs.rs/silicon-apps-package).
+The CLI release is 0.2.0, and the package versions move independently of it. The full generated Rust references are on [docs.rs for the client](https://docs.rs/silicon-apps-client) and [docs.rs for package tooling](https://docs.rs/silicon-apps-package).
 
 ## Read the catalog
 

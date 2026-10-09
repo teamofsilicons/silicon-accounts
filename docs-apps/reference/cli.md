@@ -12,7 +12,7 @@ related:
 
 # Apps CLI reference
 
-You run the Apps CLI as `silicon-apps`. Its package is `silicon-apps-cli`, and this page describes version 0.1.10.
+You run the Apps CLI as `silicon-apps`. Its package is `silicon-apps-cli`, and this page describes version 0.2.0.
 
 Add `--help` to any command to see its options, or run `silicon-apps docs tree` to see every command and flag in the version you have installed.
 
