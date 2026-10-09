@@ -1,9 +1,10 @@
 # Production verification: 2026-10-09
 
-Production runs `0d0f7b3dcd5e89f16943907b0ec5ce10d9bc86cb`, Accounts 0.4.0 on
+Production runs `776fa058d757595772214706227a29b10a86a85a`, Accounts 0.4.0 on
 migration 19 (see the last section). Earlier the same day `a2d85c5` was live from
-06:33 to 10:38 UTC and `9b46dc9` from 10:38 to 12:41 UTC. The first attempt of the
-day, `2efa04a`, was rolled back; it is recorded first.
+06:33 to 10:38 UTC, `9b46dc9` from 10:38 to 12:41 UTC and `0d0f7b3` from 12:41 to
+16:02 UTC. The first attempt of the day, `2efa04a`, was rolled back; it is
+recorded first.
 
 ## Agent entry points release: deployed, then rolled back
 
@@ -468,3 +469,113 @@ and `/status.json` said `up` each time. Log scan SSM
 `48fd6d1a-4548-4f4f-8dc1-bfe86535e0c0` found no restarts, zero API ERROR or WARN
 lines, zero Caddy error lines and no other system warnings. The web and developer
 logs held only the usual restart line from the previous process at 12:42:00.
+
+## Four Linux upload targets in the docs and llms-full.txt: live
+
+Source `776fa058d757595772214706227a29b10a86a85a`. Since `0d0f7b3` it changes only
+five Apps docs pages and `developer/llms/llms-full.md` (and the deploy records):
+every place that said third-party uploads validate on `linux-x86_64` only now
+names the four Linux targets Silicon Apps opened today (`linux-x86_64`,
+`linux-i686`, `linux-aarch64`, `linux-armv7hf`) and still says Windows and macOS
+have no validation worker. Before editing, `GET https://apps.teamofsilicons.com/v1/targets`
+reported `runner_available: true` for those four and `false` for the five Windows
+and macOS targets, and `/v1/capabilities` reported the four `live` and the rest
+`not_configured`. `git diff --stat 0d0f7b3..776fa05 -- crates migrations` is
+empty, and the installer and packager are unchanged. The Silicon Apps store copy
+states no upload target limit, so the Apps host was not redeployed.
+
+### Preflight
+
+- Clean tree at `776fa05`. The ARM64 rebuild in `target/integration` was a no-op,
+  with the same binaries as `0d0f7b3`: API `a51584d2...`, migrator `adae161c...`.
+- Web typecheck, lint and 30 unit tests passed; developer typecheck, lint and 41
+  unit tests passed, and `pnpm build:docs --check` found 56 pages with no
+  problems. No U+2014 or U+2013 is in `docs`, `docs-apps` or `developer/llms`.
+  Both sites were built for production with the same variables as before. Both
+  standalone routing tests passed on those builds, which keep
+  `skipProxyUrlNormalize: true` and contain no `modelContext` or `webmcp`. The
+  Node and Caddy archives matched their checksums.
+- Archive `releases/776fa058d757595772214706227a29b10a86a85a.tar.gz`, 120311796
+  bytes, SHA-256 `d070306b6b80568c0bacdd0e457eba196fe934a0120dd8bebf7fe892ea7f715c`,
+  S3 version `7ioLic6lJYmh6GvYpm8uy9FAFjy22je1`. 56 internal links were preserved,
+  its `install.py` matches the committed one, and its developer server chunks
+  carry the new wording and none of the old.
+
+### Install
+
+Read-only precheck SSM `5dcf1a6f-4046-4f8a-8a15-c88172e4972e` found `0d0f7b3`
+active on migration 19 with every service up, and the hourly backup due at
+16:00:45 UTC. SSM `1eedf56f-5074-46ba-b978-d729842ac8d3` waited for it: the
+backup ran at 16:01:07 and succeeded before the install began.
+
+Install SSM `2bae2fee-9907-4547-8c90-5c7ec612d845` ran from 16:01:48 to 16:02:10
+UTC and succeeded. It verified the archive SHA-256 before extracting the
+installer. It retained `backups/predeploy-20261009T160203Z.dump` (260887 bytes in
+S3 and on the host, S3 version `W31T4D1dTZn6I9U_WR8IXgUdB4BoEWa.`), SHA-256
+`15e6e15bc0f91a798b1c960c83e71bc1ef318bfe8438a3efe541df48cb352559`. Nothing was
+pending (19 already applied), and local readiness passed.
+
+Postcheck SSM `2b382bcc-92ac-48ac-8044-6017a1712993` confirmed:
+
+- `current` points at `776fa05`, and `previous-release` at `0d0f7b3`.
+- Both binary hashes and `build.json` match. Six services and timers are active;
+  the API restarted at 16:02:04, web and developer at 16:02:05, Caddy at 16:02:08.
+- Migration 19 with none failed; one account, three apps, one membership and the
+  RS256 key are unchanged.
+- The Caddy direct block, `APPS_API_URL` and the absent loopback flag are as
+  before. Zero API ERROR or WARN lines and zero web `EPROTO` lines.
+- On the host, the landing and `/status.json` returned 200 with Caddy's headers.
+
+### Public verification
+
+- `https://developers.teamofsilicons.com/llms-full.txt` is byte-identical to
+  `developer/llms/llms-full.md`: 764887 bytes, 8273 lines, starting with
+  `# Silicon Developer docs (full)`. It names the four Linux targets in 16 places
+  and no longer says `` `linux-x86_64` only `` anywhere. Before the install it
+  served the previous 763874-byte file.
+- The five changed pages' `.md` (`/docs/apps/index.md`, `/docs/apps/start/publish.md`,
+  `/docs/apps/start/install.md`, `/docs/apps/reference/manifest.md`,
+  `/docs/apps/reference/api.md`) match their sources in `docs-apps` byte for
+  byte. Their HTML pages return 200 with one `<main>`, name `linux-armv7hf` and
+  no longer say "only live worker" or "Today only" (`/docs/apps/index` answers
+  308 to `/docs/apps`, which carries the new text).
+- In a headless browser at 1440 and 390 px, `/status`, `/docs/apps` and
+  `/docs/apps/reference/manifest` rendered without overflow, page errors or
+  `navigator.modelContext`, and the screenshots were inspected.
+- `/status` and `/status.json` return 200; the JSON reports `"status": "up"`,
+  "All three services are up.": Silicon Accounts 0.4.0, Silicon Apps 0.1.2 and
+  Silicon Developer 0.1.0, and the page shows three "Up" badges. The developer
+  sitemap still lists `/status`.
+- Signed-out `GET https://accounts.teamofsilicons.com/` returned 200 with the
+  landing and `<main`, three times out of three. With a stale
+  `__Host-sa_session` and with a stale `sa_session` it served the same landing
+  and cleared the cookie.
+- `/sign-in` rendered Continue with Google, Continue with Apple, Email/Phone, the
+  email field and Continue at 1440 and 390 px. The developer sign-in returns 303
+  to the Accounts `/authorize` with `app_id=developer`, the exact callback, S256
+  and a 43-character challenge, and the hosted page renders. Nothing was
+  submitted.
+- API:
+  - `/readyz` `{"database":"ok"}`; `/v1/meta` version 0.4.0.
+  - `/v1/capabilities` and `?require=event_stream` return 200.
+  - Discovery has the Accounts issuer, EdDSA and RS256, and six grants; JWKS
+    lists both keys.
+  - `/openapi.json` returns 200 with 135 paths; `/.well-known/agent.json`
+    reports 0.4.0 with six skills.
+  - The event stream answers the API's JSON 401 under `curl --max-time 5 -N`.
+  - Both `/mcp` `initialize` calls return 2025-06-18.
+- The account site's agent files return 200, `/docs` returns 308 to the
+  developer docs, and the developer home, docs pages, search (61 matches), agent
+  card (seven skills), `/openapi.json`, `/auth/session` and `/sign-in` return
+  200. An unknown page returns 404. No `modelContext` or `webmcp` appears in the
+  raw HTML of any page checked.
+
+### Log watch
+
+From 16:06 to 16:12 UTC the landing, `/sign-in`, `/readyz`, the developer home,
+`/docs`, `/status` and `/llms-full.txt` were probed in seven rounds. Every
+request returned 200, and `/status.json` said `up` each time. Log scan SSM
+`afe8812f-5626-4bce-8c38-acb499b60a4d` at 16:12:29 UTC found no restarts, zero
+API ERROR or WARN lines, zero Caddy error lines and no other system warnings. The
+web and developer logs held only the usual restart line from the previous
+process at 16:02:05.
