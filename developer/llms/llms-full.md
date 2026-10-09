@@ -17,20 +17,20 @@ What's in here, in order (every chapter is an `#` heading you can search for):
 ## What we are
 
 - **Silicon Accounts** gives every Carbon (a person) and every Silicon (an agent) one personal account, and does the whole sign-in for any app: hosted pages, email and phone codes, Google and Apple, sign up, the app's user base, webhooks, and proofs between apps. It is a standard OpenID Connect provider at `https://accounts.teamofsilicons.com`.
-- **Silicon Apps** is a store and distribution system for command-line apps: authors publish a native package per target, and anyone installs them with one command and gets every update automatically. Nine targets are defined, but today an app from any author but the Team can upload for `linux-x86_64` only; our own two CLIs ship on all nine (see `## What we don't do yet`).
+- **Silicon Apps** is a store and distribution system for command-line apps: authors publish a native package per target, and anyone installs them with one command and gets every update automatically. Nine targets are defined, but today an app from any author but the Team can upload for the four Linux targets only (`linux-x86_64`, `linux-i686`, `linux-aarch64`, `linux-armv7hf`), not Windows or macOS; our own two CLIs ship on all nine (see `## What we don't do yet`).
 - Both are made for agents first. Every command has `--help` and `--json`, every error says exactly what went wrong and how to fix it, and everything the sites do is also an API, an MCP server and plain HTML.
 
 ## Is it for you? (as of 9 October 2026)
 
 > **Made for you if:**
-> - you build an agent-first CLI or service, and Linux (`linux-x86_64`) is where it has to install today;
+> - you build an agent-first CLI or service, and Linux (`linux-x86_64`, `linux-i686`, `linux-aarch64` or `linux-armv7hf`) is where it has to install today;
 > - you want agents to be accountable users of your app, each with its own account and a named Carbon behind it, instead of a borrowed login or a shared key;
 > - your CI should hold no stored secrets: a Silicon signs in with the job's own OIDC token (GitHub Actions, GitLab, any OIDC issuer);
 > - your agents should reach AWS, Google Cloud or Microsoft Entra with short identity tokens instead of cloud keys;
 > - your apps should verify each other, as themselves (App verification) or for a user (User verification).
 >
 > **Not for you yet if:**
-> - you need the store to take your own CLI for macOS, Windows, ARM or 32-bit Linux today: third-party uploads validate on `linux-x86_64` only;
+> - you need the store to take your own CLI for macOS or Windows today: third-party uploads validate on the four Linux targets only;
 > - you need MFA, passkeys, SAML or organizations;
 > - your users' agents are chat assistants that connect over MCP OAuth (we have no Dynamic Client Registration or custom scopes yet);
 > - you need an SLA, terms of service, a privacy policy or a DPA before you commit: none is published yet;
@@ -45,7 +45,7 @@ Read this before you choose us, so nothing surprises you later:
 - There are no organizations or Teams of accounts: every account is personal. If you bill companies, you model the company in your own app. (When these docs say "the Team", they mean the people who run Silicon Accounts and Silicon Apps.)
 - A Silicon can't use the device flow, because only a signed-in Carbon can approve a device code. It signs in to your CLI with an SLT instead. Turn on `public_client` and your CLI exchanges that SLT itself with your `client_id` alone, no secret and no server, so a CLI on its own signs in Carbons (device flow) and Silicons (SLT) both. Never ship your app secret inside a CLI: a secret in a binary isn't secret. If your CLI talks to an API of yours, a small server that exchanges the SLT with the secret is still the usual shape (`## CLI plus server: people, Silicons and CI` in `# Recipes` shows both).
 - A Silicon always acts as itself at your app, never as its custodian: there is no delegation grant. Your app does learn who its custodian is, and can let that Carbon share things with it (`## Let a Silicon work on its custodian's things in your app` in `# Recipes`).
-- Upload validation runs only on `linux-x86_64` today, so an app from any author but the Team can publish packages for that one target right now. Our own two CLIs ship on all nine targets, because we ran and checked them natively on each one in our CI. The other eight open to every app as their validation workers come online. `silicon-apps capabilities` (or `GET /v1/capabilities`) shows which workers are live right now, and an upload for a target without one is refused with `503`.
+- Upload validation runs only on the four Linux targets today (`linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`), so an app from any author but the Team can publish packages for those four right now. Windows and macOS have no validation worker yet. Our own two CLIs ship on all nine targets, because we ran and checked them natively on each one in our CI. The five Windows and macOS targets open to every app as their validation workers come online. `silicon-apps capabilities` (or `GET /v1/capabilities`) shows which workers are live right now, and an upload for a target without one is refused with `503`.
 - Passwords are never imported. When you move existing users in, they sign in the first time with an email code (or Google or Apple) on the address you imported, and keep that account from then on.
 - Your app can't define its own OAuth scopes for third-party clients, and we don't run Dynamic Client Registration, so chat assistants that connect to MCP servers through standard OAuth can't use Silicon Accounts to reach your app yet. Silicons connect to your app with an SLT instead.
 - Signing in with Silicon Accounts works at apps that integrate it, and a Silicon's identity tokens work at cloud providers that accept OIDC federation (AWS, Google Cloud, Microsoft Entra). For other outside services (a code host, a ticket tracker), your agent still uses the credentials those services give it.
@@ -259,7 +259,7 @@ If your carbon isn't at the keyboard, create yourself instead, with the `--self-
 
 1. Create the app on https://developers.teamofsilicons.com or with `silicon-apps create {app_id} --name {Name}`. You get its `app_id` and `app_secret`; the secret is shown once. From this moment it can sign users in, even if it is only a website and never publishes a CLI.
 2. Add sign-in. Send Carbons to our hosted pages (or drop in the iframe or the SDK snippet), get them back on your redirect URL with a code, and exchange it on your server for tokens. Silicons hand you an SLT instead, which your server exchanges the same way, with your app secret. An app that is only a CLI turns on `public_client`, and then the CLI exchanges the SLT itself with its `client_id` alone (`## CLI plus server: people, Silicons and CI`). Any OpenID Connect library works too, with `https://accounts.teamofsilicons.com` as the issuer.
-3. Publish, if your app has a CLI. Pack it with an `apps.yaml` for every target you support (only `linux-x86_64` accepts uploads today), upload it, and release. The package for each target you upload has to answer `--help`, `accounts --json` and `login status --json` there. There is no review: it's live the moment you publish.
+3. Publish, if your app has a CLI. Pack it with an `apps.yaml` for every target you support (only the four Linux targets accept uploads today, not Windows or macOS), upload it, and release. The package for each target you upload has to answer `--help`, `accounts --json` and `login status --json` there. There is no review: it's live the moment you publish.
 4. Stay in sync. Pick the account updates you want on your webhook (or stream them), and use App verification and User verification when your app talks to other apps.
 
 # Recipes
@@ -486,7 +486,7 @@ Carbons move the way they would from any OIDC provider: match them by the email 
 
 ## Ship a CLI people and agents can trust
 
-1. Create the app and pack your CLI for every target you support (`# Publishing an app`). Today uploads are validated on `linux-x86_64` only, so start there; `silicon-apps capabilities` shows when more targets are live. For a tool with no sign-in, the two JSON commands can be a few lines; stubs are in `# Publishing an app`.
+1. Create the app and pack your CLI for every target you support (`# Publishing an app`). Today uploads are validated on the four Linux targets only (`linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`), so start there; Windows and macOS have no worker yet, and `silicon-apps capabilities` shows when more targets are live. For a tool with no sign-in, the two JSON commands can be a few lines; stubs are in `# Publishing an app`.
 2. Sign with your own key if you want installs to prove it came from you, not only from the store:
 
    ```sh
@@ -539,7 +539,7 @@ For each app you set the app_id, name, description and icon, make development (t
 
 Apps can be public (anyone can find and install them, no account needed) or private (only the Carbons and Silicons you share them with, or everyone with a verified email on a domain you choose, like `@yourteam.com`).
 
-There is no review queue. An app is live the moment its authors publish it. What protects users instead: every package is checked on upload by running `--help`, `accounts --json` and `login status --json` in an isolated runner for its target (today only `linux-x86_64` has one, so that's the one target an app from any author but the Team can publish for; our own two CLIs were run and checked natively on all nine in our CI), every release is signed and the CLI checks the signature before it extracts anything, authors can sign with their own keys too, a bad release can be withdrawn and every installed copy moves off it on the next check, install scripts can be read before you run them, every change to an app is recorded in its history, and only the app's authors can publish.
+There is no review queue. An app is live the moment its authors publish it. What protects users instead: every package is checked on upload by running `--help`, `accounts --json` and `login status --json` in an isolated runner for its target (today only the four Linux targets have one, `linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`, so those are the targets an app from any author but the Team can publish for, and Windows and macOS have none yet; our own two CLIs were run and checked natively on all nine in our CI), every release is signed and the CLI checks the signature before it extracts anything, authors can sign with their own keys too, a bad release can be withdrawn and every installed copy moves off it on the next check, install scripts can be read before you run them, every change to an app is recorded in its history, and only the app's authors can publish.
 
 # Silicon Accounts
 
@@ -585,7 +585,7 @@ For a Silicon, getting in means having an identity of its own. Your si:id is you
 
 For a Carbon, it's one account for every app in the ecosystem, and one place to look after the Silicons you're custodian of. You can see every app you've signed into and remove any of them, see every User verification issued on your behalf and revoke it, and rotate a Silicon's STK whenever you need to.
 
-For an app, it means Silicons can sign in and use you on their own, with the same account they use everywhere else here. Silicons find you in the store, with `silicon-apps search`, through the API or MCP, install you with one command (on `linux-x86_64` for now) and get every update without doing anything. The store is new, so don't count on an audience that's already here: count on giving your own users and their Silicons a better way in, with the reach growing as other apps join.
+For an app, it means Silicons can sign in and use you on their own, with the same account they use everywhere else here. Silicons find you in the store, with `silicon-apps search`, through the API or MCP, install you with one command (on the four Linux targets for now) and get every update without doing anything. The store is new, so don't count on an audience that's already here: count on giving your own users and their Silicons a better way in, with the reach growing as other apps join.
 
 # How we compare
 
@@ -623,7 +623,7 @@ Choose a classic provider when your app is only for people and needs passwords, 
 
 | | Silicon Apps | dist (cargo-dist) + GitHub Releases | GoReleaser | Homebrew / winget / Scoop | mise, npm, cargo, PyPI |
 | --- | --- | --- | --- | --- | --- |
-| Targets a third-party CLI ships to today | `linux-x86_64` only: third-party uploads validate there alone. Our own two CLIs ship nine targets (Linux, macOS, Windows), built and checked in our CI | Whatever your CI builds; shell, PowerShell and npm installers | Whatever your CI builds (Rust since v2.5.0, through `cargo zigbuild`; you install the toolchain) | One manager per OS: Homebrew (macOS, Linux), winget and Scoop (Windows) | mise installs any GitHub release asset, picked by OS, architecture and libc; the others per language |
+| Targets a third-party CLI ships to today | The four Linux targets (`linux-x86_64`, `linux-i686`, `linux-aarch64`, `linux-armv7hf`): third-party uploads validate there alone, and Windows and macOS have no worker yet. Our own two CLIs ship nine targets (Linux, macOS, Windows), built and checked in our CI | Whatever your CI builds; shell, PowerShell and npm installers | Whatever your CI builds (Rust since v2.5.0, through `cargo zigbuild`; you install the toolchain) | One manager per OS: Homebrew (macOS, Linux), winget and Scoop (Windows) | mise installs any GitHub release asset, picked by OS, architecture and libc; the others per language |
 | Updates | Automatic, checked every minute, per channel | Optional updater program (`{app}-update`, through axoupdater), experimental since 0.12.0 | Through each package manager | `brew upgrade` by hand, or on a schedule with the third-party homebrew-autoupdate tap (launchd, every 24 hours by default, with `--upgrade`); winget and Scoop by hand | By hand, pinnable (`mise.lock`, lockfiles) |
 | Identity and private apps | Built in: share with accounts or an email domain | GitHub access | GitHub access | Private taps need tokens; since Homebrew 6.0.0 a third-party tap must be trusted before its code runs | Registry tokens |
 | Publishing from CI with no stored secret | Yes: a Silicon signs in with the job's OIDC token, then uploads and releases (`## Use apps in CI`) | Runs in your CI with its GitHub token | Runs in your CI; publishing to crates.io is GoReleaser Pro only | You push the formula to a tap | npm: trusted publishing (OIDC) from GitHub Actions, GitLab and CircleCI; tokens that bypass 2FA lose direct publishing around January 2027 |
@@ -639,11 +639,11 @@ Sources: dist https://github.com/axodotdev/cargo-dist/releases/tag/v0.33.0, http
 
 If what you ship is an MCP server rather than a CLI, the agent channel to know is the MCP Registry. It's in preview: it launched in September 2025, its API was frozen at v0.1 in October 2025 while v1 is shaped (still the latest status in its README), breaking changes or data resets may come before general availability, and it's meant to be read mainly by aggregators that poll it about hourly. It's a catalog of MCP servers, not an installer or updater for CLIs, so it replaces no column above, and a tool that is both can be listed in both.
 
-Choose Silicon Apps when your CLI will be run by agents and people on `linux-x86_64`, you want it installed and kept current without running your own release tooling, you want sign-in and private sharing to come with it, or you want silicons to find it in a catalog made for them, knowing that catalog is small today. If you must ship to macOS, Windows, ARM or 32-bit Linux now, use another channel for those (dist or GoReleaser, with Homebrew, winget or Scoop) until their validation workers come online. Choose a language registry for libraries, and a classic release pipeline when the people running your tool must pin exact versions on long-lived machines. Nothing stops you from shipping both.
+Choose Silicon Apps when your CLI will be run by agents and people on Linux (`linux-x86_64`, `linux-i686`, `linux-aarch64` or `linux-armv7hf`), you want it installed and kept current without running your own release tooling, you want sign-in and private sharing to come with it, or you want silicons to find it in a catalog made for them, knowing that catalog is small today. If you must ship to macOS or Windows now, use another channel for those (dist or GoReleaser, with Homebrew, winget or Scoop) until their validation workers come online. Choose a language registry for libraries, and a classic release pipeline when the people running your tool must pin exact versions on long-lived machines. Nothing stops you from shipping both.
 
 # Choosing, in one minute
 
-- Building an agent-first CLI or service: Silicon Apps plus Silicon Accounts. Agents get their own accounts and a browserless sign-in (your server, or your CLI as a public client, exchanges their SLTs), people sign in with the hosted pages or the device flow, and the CLI ships and updates itself (on `linux-x86_64` for a third-party app today, more targets as they open).
+- Building an agent-first CLI or service: Silicon Apps plus Silicon Accounts. Agents get their own accounts and a browserless sign-in (your server, or your CLI as a public client, exchanges their SLTs), people sign in with the hosted pages or the device flow, and the CLI ships and updates itself (on the four Linux targets for a third-party app today, Windows and macOS as they open).
 - Giving your own Silicon an identity: a Silicon account, created by your carbon. Use it at every app in the ecosystem; keep each outside service's own agent credentials for services outside it.
 - A web app for people only, with passwords, MFA or SAML needs: a classic provider today, with Silicon sign-in added later if Silicons start using your app.
 - Chat assistants that must reach your app over MCP OAuth: a classic provider today (we have no Dynamic Client Registration or custom scopes yet).
@@ -681,7 +681,7 @@ No. An app is live the moment you publish it. The only checks are on your packag
 
 ### Which systems can my app support?
 
-Nine targets across Linux, Windows and macOS. Upload a package for every one you can; each is optional, but you need at least one. Today uploads are validated on `linux-x86_64` only, so that's the one target an app from any author but the Team can publish for right now (our own two CLIs ship on all nine, built and checked natively in our CI); the others open as their validation workers come online (`silicon-apps capabilities` shows which are live).
+Nine targets across Linux, Windows and macOS. Upload a package for every one you can; each is optional, but you need at least one. Today uploads are validated on the four Linux targets only (`linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`), so those are the targets an app from any author but the Team can publish for right now (our own two CLIs ship on all nine, built and checked natively in our CI); Windows and macOS have no validation worker yet and open as theirs come online (`silicon-apps capabilities` shows which are live).
 
 ### Should my app update itself?
 
@@ -713,7 +713,7 @@ Apps are owned by their authors, Carbons and Silicons alike. You as a Silicon ca
 
 Silicon Apps and Silicon Accounts split the work between them. Apps handles your app's packages, releases, installs and updates. Accounts handles its users and sign-in. You make the app in Apps, and from that moment you can set up its sign-in, its pages and its webhook in Accounts.
 
-Why build here: Silicons find your app in the store or with `silicon-apps search`, install it with one command (on `linux-x86_64` for an app from any author but the Team today), and get every update without doing anything. Every Carbon and Silicon here has a Silicon Accounts account, so they can sign in to your app on day one. The store is just starting: on 2026-10-09 its public apps were our own two, `silicon-apps` and `silicon-accounts`, so what Silicons can find here grows with each app that joins, yours included. Every package we serve is signed, so a Silicon can prove the bytes it's about to run are the bytes your authors released. And everything is machine readable: an OpenAPI description, an agent card, capabilities, live event streams and signed webhooks.
+Why build here: Silicons find your app in the store or with `silicon-apps search`, install it with one command (on the four Linux targets for an app from any author but the Team today), and get every update without doing anything. Every Carbon and Silicon here has a Silicon Accounts account, so they can sign in to your app on day one. The store is just starting: on 2026-10-09 its public apps were our own two, `silicon-apps` and `silicon-accounts`, so what Silicons can find here grows with each app that joins, yours included. Every package we serve is signed, so a Silicon can prove the bytes it's about to run are the bytes your authors released. And everything is machine readable: an OpenAPI description, an agent card, capabilities, live event streams and signed webhooks.
 
 ## Words we use
 
@@ -792,7 +792,7 @@ What the installers do:
 - start the updater and set it to run when you log in to your computer. Pass `--no-startup` or `-NoStartup` to skip that.
 - add Apps itself to your installed apps, so the same updater keeps the CLI up to date.
 
-Silicon Apps and Silicon Accounts both have native store packages for all nine targets. The Team publishes those two from native CI runs on every target, not through upload validation; an app from any other author can only be uploaded for `linux-x86_64` today (see `## Targets` in `# Publishing an app`). The installers register Apps for automatic updates, and Apps keeps Accounts updated too.
+Silicon Apps and Silicon Accounts both have native store packages for all nine targets. The Team publishes those two from native CI runs on every target, not through upload validation; an app from any other author can only be uploaded for the four Linux targets today, not Windows or macOS (see `## Targets` in `# Publishing an app`). The installers register Apps for automatic updates, and Apps keeps Accounts updated too.
 
 The command is `silicon-apps`. Earlier releases called it `apps`; your installed apps and sign-in stay in the same `.apps` directory when you upgrade.
 
@@ -1008,7 +1008,7 @@ To publish you need the description and at least one package that has passed val
 
 ## Packages
 
-Every release is a CLI. You upload one package per target you support. Each target is optional, but a release needs at least one. Today a new app can upload for `linux-x86_64` only (see `## Targets` below); each target you add as its validation worker comes online reaches more Carbons and Silicons.
+Every release is a CLI. You upload one package per target you support. Each target is optional, but a release needs at least one. Today a new app can upload for the four Linux targets only (see `## Targets` below); each target you add as its validation worker comes online reaches more Carbons and Silicons.
 
 A package is a `.tar.gz` with an `apps.yaml` at its root:
 
@@ -1053,7 +1053,7 @@ Only these fields are accepted. Don't put the channel in `version` (no `1.0.0-de
 | `macos-x86_64` | macOS, Intel 64-bit |
 | `macos-aarch64` | macOS, Apple Silicon |
 
-Today only `linux-x86_64` has a live validation worker in production (checked 2026-10-09). The other eight are valid in a manifest, but an upload for them can't be validated and answers `503`, so an app from any author but the Team ships on `linux-x86_64` only for now. Silicon Apps and Silicon Accounts themselves ship on all nine, because the Team publishes them from CI runs on each native target instead of through upload validation.
+Today the four Linux targets (`linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`) have a live validation worker in production (checked 2026-10-09). The five Windows and macOS targets have none yet: they are valid in a manifest, but an upload for them can't be validated and answers `503`, so an app from any author but the Team ships on those four Linux targets only for now. Silicon Apps and Silicon Accounts themselves ship on all nine, because the Team publishes them from CI runs on each native target instead of through upload validation.
 
 `silicon-apps targets` shows, for each target, how many registered accounts use it and whether a validation worker is configured (`runner_available`). That reflects configuration only, so a configured worker that is down still shows as available. `silicon-apps capabilities` (`GET /v1/capabilities`) probes the worker and is the live check: each target's validation is `live`, `not_configured` or `unreachable`. Run it before you upload.
 
@@ -1747,7 +1747,7 @@ A successful response is the object itself, with no wrapper. Every error, unknow
 | --- | --- |
 | `GET /health` | `{status:"ok",service:"silicon-apps",version}` |
 | `GET /v1/me` | `{uuid,id,display_name,verified_emails:[]}` |
-| `GET /v1/targets?targets=linux-x86_64,macos-aarch64` | `{items:[{target,population,runner_available}],total_population,total_reach,source:"registered_accounts"}`. `runner_available` says a worker is configured, not that it answers; today only `linux-x86_64` is `true`. `GET /v1/capabilities` probes it live. |
+| `GET /v1/targets?targets=linux-x86_64,macos-aarch64` | `{items:[{target,population,runner_available}],total_population,total_reach,source:"registered_accounts"}`. `runner_available` says a worker is configured, not that it answers; today it is `true` for the four Linux targets and `false` for Windows and macOS. `GET /v1/capabilities` probes it live. |
 | `POST /v1/platforms` | Body `{target}`. Records the signed-in account's platform. A signed-in install receipt registers its target too. |
 | `GET /v1/apps/availability/{app_id}` | `{available}`. Invalid IDs are `false`. |
 | `GET /v1/apps?q=&tags=&target=&visibility=public\|private&mine=true&sort=relevance&limit=50&offset=0` | `{items:[App],total,limit,offset,next_offset,sort}`. Published apps you can access; `mine=true` needs auth and includes drafts. See below. |

@@ -71,7 +71,7 @@ Cargo installs the standalone CLI. Unlike the bootstrap installers, it doesn't r
 
 Silicon Apps and Silicon Accounts both have native store packages for all nine supported targets, each checked on its own target by our CI before we added it. The installers register Apps for automatic updates, and Apps keeps Accounts up to date too.
 
-That's true of these two first-party CLIs only. Packages other authors upload are validated by our upload workers, and today the only live worker is `linux-x86_64`. The GitHub downloads, the store packages and the upload validation workers are published separately. Before you upload a package, run `silicon-apps capabilities` to see which workers are live right now.
+That's true of these two first-party CLIs only. Packages other authors upload are validated by our upload workers. Today the live workers are the four Linux ones (`linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`); Windows and macOS have none yet. The GitHub downloads, the store packages and the upload validation workers are published separately. Before you upload a package, run `silicon-apps capabilities` to see which workers are live right now.
 
 ## Find and install an app
 

@@ -132,7 +132,7 @@ targets:
     binary: bin/ring
 ```
 
-This example targets Linux x64, so use the target and native binary you actually built. `silicon-apps targets` lists all nine target names and which runners are configured. `silicon-apps capabilities` is the live check: it asks each runner and marks a target's validation `live` only when its worker answers. A worker that's unavailable can't validate an upload. Today only the `linux-x86_64` worker is live, so that's the one target you can upload for. An upload for any other target is refused until its worker is live.
+This example targets Linux x64, so use the target and native binary you actually built. `silicon-apps targets` lists all nine target names and which runners are configured. `silicon-apps capabilities` is the live check: it asks each runner and marks a target's validation `live` only when its worker answers. A worker that's unavailable can't validate an upload. Today the four Linux workers are live (`linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`), so those are the targets you can upload for. Windows and macOS have no worker yet, and an upload for one of their targets is refused until its worker is live.
 
 ```sh
 silicon-apps validate ./package
