@@ -1,9 +1,9 @@
 # Production verification: 2026-10-09
 
-Production runs `9b46dc9fdfb609b09a48ed18e5bca15bc3426b66`, Accounts 0.4.0 on
-migration 19 (see the last section). It follows `a2d85c5`, which was live from
-06:33 to 10:38 UTC. The first attempt of the day, `2efa04a`, was rolled back; it
-is recorded first.
+Production runs `0d0f7b3dcd5e89f16943907b0ec5ce10d9bc86cb`, Accounts 0.4.0 on
+migration 19 (see the last section). Earlier the same day `a2d85c5` was live from
+06:33 to 10:38 UTC and `9b46dc9` from 10:38 to 12:41 UTC. The first attempt of the
+day, `2efa04a`, was rolled back; it is recorded first.
 
 ## Agent entry points release: deployed, then rolled back
 
@@ -370,3 +370,101 @@ restart, as in every earlier release.
 The OpenAPI document's `info.version` still reads 0.3.0 (`crates/server/openapi.json`)
 while the service reports 0.4.0. That is cosmetic, and is noted for the next
 source change.
+
+## Status page, data we keep and open source wording: live
+
+Source `0d0f7b3dcd5e89f16943907b0ec5ce10d9bc86cb`. Since `9b46dc9` it adds the MIT
+`LICENSE`, the developer site's `/status` and `/status.json`, the "What we keep,
+and why" docs page, the open source (MIT) wording and visual fixes on both sites,
+and updated docs and `llms-full.txt`. `git diff --stat 9b46dc9..HEAD -- crates
+migrations` is empty, and the installer and packager are unchanged.
+
+### Preflight
+
+- Clean tree at `0d0f7b3`. The ARM64 rebuild in `target/integration` was a no-op,
+  with the same binaries as `9b46dc9`: API `a51584d2...`, migrator `adae161c...`.
+- Web typecheck, lint and 30 unit tests passed; developer typecheck, lint and 41
+  unit tests passed. Both sites were built for production with the same
+  variables as before. Both standalone routing tests passed on those builds,
+  which keep `skipProxyUrlNormalize: true` and contain no `modelContext` or
+  `webmcp`. The Node and Caddy archives matched their checksums.
+- Archive `releases/0d0f7b3dcd5e89f16943907b0ec5ce10d9bc86cb.tar.gz`, 120311783
+  bytes, SHA-256 `24787722feef6ac27de1a4a03791790cf7b65d7bec9f1fbf21329531f86eb2b7`.
+  56 internal links were preserved, and its `install.py` matches the committed one.
+
+### Install
+
+Read-only precheck SSM `87b7ffdf-f4b5-47f5-a5b8-ae28724fe431` found `9b46dc9`
+active on migration 19 with every service up.
+
+Install SSM `077632c9-ecbe-43da-ae02-0dda11c3a6b6` ran from 12:41:43 to 12:42:05
+UTC and succeeded. It verified the archive SHA-256 before extracting the
+installer. It retained `backups/predeploy-20261009T124158Z.dump` (263027 bytes in
+S3 and on the host), SHA-256
+`837710e3027fd30ae8c38c364cc1a30220888eb1736ae032e08326da1ab9c612`. Nothing was
+pending (19 already applied), and local readiness passed.
+
+Postcheck SSM `c1a85f19-a406-4d14-86c8-890068b399d2` confirmed:
+
+- `current` points at `0d0f7b3`, and `previous-release` at `9b46dc9`.
+- Both binary hashes and `build.json` match. Six services and timers are active.
+- Migration 19 with none failed; one account, three apps, one membership and the
+  RS256 key are unchanged.
+- The Caddy direct block, `APPS_API_URL` and the absent loopback flag are as
+  before. Zero API ERROR or WARN lines and zero web `EPROTO` lines.
+- On the host, the landing and `/status.json` returned 200 with Caddy's headers.
+
+### Public verification
+
+- `https://developers.teamofsilicons.com/status` and `/status.json` return 200.
+  The JSON reports `"status": "up"`, "All three services are up.": Silicon
+  Accounts 0.4.0 (`/readyz` and `/v1/meta` 200), Silicon Apps 0.1.2 (`/health`
+  200) and Silicon Developer 0.1.0 (`/openapi.json` 200). The page shows three
+  "Up" badges. In a headless browser at 1440 and 390 px it rendered "Service
+  status" without overflow or page errors, and the screenshots were inspected.
+- `/docs/accounts/learn/data-we-keep` returns 200 with "What we keep, and why";
+  its `.md` matches `docs/learn/data-we-keep.md` byte for byte.
+- Open source (MIT) wording:
+  - The account site's footer says "Silicon Accounts is open source (MIT)", and
+    its landing mentions it 10 times.
+  - The developer site's footer says "Silicon Apps and Silicon Accounts are open
+    source (MIT)", and its home mentions it 12 times.
+  - Both link the GitHub repositories, which are public and answer 200.
+- `/llms-full.txt` on the developer site is byte-identical to
+  `developer/llms/llms-full.md`: 763874 bytes, 8273 lines, starting with
+  `# Silicon Developer docs (full)`.
+- The developer sitemap lists `https://developers.teamofsilicons.com/status`.
+- No `modelContext` or `webmcp` appears in the raw HTML of the account landing,
+  `/sign-in`, the developer home, `/docs`, `/docs/apps`,
+  `/docs/accounts/start/webhooks`, the data-we-keep page or `/status`.
+- Signed-out `GET https://accounts.teamofsilicons.com/` returned 200 with the
+  landing text and `<main`, three times out of three. With a stale
+  `__Host-sa_session` and with a stale `sa_session` it served the same landing
+  and cleared the cookie.
+- `/sign-in` rendered Continue with Google, Continue with Apple, Email/Phone, the
+  email field and Continue at 1440 and 390 px. The developer sign-in returns 303
+  to the Accounts `/authorize` with `app_id=developer`, the exact callback, S256
+  and a 43-character challenge, and the hosted page renders. Nothing was
+  submitted.
+- API:
+  - `/readyz` `{"database":"ok"}`; `/v1/meta` version 0.4.0.
+  - `/v1/capabilities` and `?require=event_stream` return 200.
+  - Discovery has the Accounts issuer, EdDSA and RS256, and six grants; JWKS
+    lists both keys.
+  - `/openapi.json` returns 200 with 135 paths; `/.well-known/agent.json`
+    reports 0.4.0 with six skills.
+  - The event stream answers the API's JSON 401 under `curl --max-time 5 -N`.
+  - Both `/mcp` `initialize` calls return 2025-06-18.
+- The account site's agent files return 200, `/docs` returns 308 to the
+  developer docs, and the developer docs pages, search (61 matches), agent card
+  (seven skills), `/openapi.json`, `/auth/session` and `/sign-in` return 200.
+  An unknown page returns 404.
+
+### Log watch
+
+From 12:45 to 12:48 UTC the landing, `/sign-in`, `/readyz`, the developer home,
+`/docs` and `/status` were probed in seven rounds. Every request returned 200,
+and `/status.json` said `up` each time. Log scan SSM
+`48fd6d1a-4548-4f4f-8dc1-bfe86535e0c0` found no restarts, zero API ERROR or WARN
+lines, zero Caddy error lines and no other system warnings. The web and developer
+logs held only the usual restart line from the previous process at 12:42:00.
