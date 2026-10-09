@@ -44,10 +44,12 @@ test("standalone routing stays internal behind Caddy HTTPS forwarding", { timeou
       const body = await home.text();
       assert.equal(home.status, 200, `signed-out / forwarded=${forwarded}: ${diagnostics}`);
       assert.match(body, /<main/, "the landing renders on the server");
+      assert.doesNotMatch(body, /modelContext|webmcp/i, "the landing registers no tools in the browser");
       assert.match(home.headers.get("x-middleware-rewrite") ?? "/", /^\//, "internal rewrites stay relative");
       for (const path of ["/llms.txt", "/robots.txt", "/sitemap.xml", "/.well-known/security.txt", "/sign-in"]) {
         const response = await fetch(`${origin}${path}`, { headers, signal: AbortSignal.timeout(10_000) });
         assert.equal(response.status, 200, `${path} forwarded=${forwarded}: ${diagnostics}`);
+        if (path === "/sign-in") assert.doesNotMatch(await response.text(), /modelContext|webmcp/i, "/sign-in registers no tools in the browser");
       }
     }
   } finally {

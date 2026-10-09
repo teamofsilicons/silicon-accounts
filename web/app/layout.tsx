@@ -1,13 +1,13 @@
 /**
- * The root layout: <html> and <body> for every page, the site's faces and tokens over Arc's foundation, the no-flash
- * theme boot script and the WebMCP tools (both inline, with the request's CSP nonce). It ships no client code of its
- * own: the account pages and the hosted pages mount their providers in app/(app)/layout.tsx, so the public landing
- * page (app/landing) stays server-rendered HTML with a few small islands.
+ * The root layout: <html> and <body> for every page, the site's faces and tokens over Arc's foundation and the no-flash
+ * theme boot script (inline, with the request's CSP nonce). It ships no client code of its own: the account pages and
+ * the hosted pages mount their providers in app/(app)/layout.tsx, so the public landing page (app/landing) stays
+ * server-rendered HTML with a few small islands.
  *
  * Three surfaces share it, told apart by proxy.ts through the `x-sa-surface` request header:
  *   public  the landing page at "/" for a browser without a live session, with the Organization and WebSite JSON-LD
  *   site    the account site and the hosted sign-in pages
- *   embed   /embed/v1/buttons, a transparent document inside an app's iframe (no theme boot, no WebMCP)
+ *   embed   /embed/v1/buttons, a transparent document inside an app's iframe (no theme boot)
  * Every page is rendered per request (the nonce changes each time), so `headers()` is fine here.
  */
 import "@/components/arc/foundation.css";
@@ -22,7 +22,6 @@ import type { ReactNode } from "react";
 import { JsonLd, organizationLd, websiteLd } from "@/lib/seo";
 import { CANONICAL_ORIGIN, OG_IMAGE, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
-import { WEBMCP_SCRIPT } from "@/lib/webmcp";
 import { brandFontVariables } from "./fonts";
 
 export const metadata: Metadata = {
@@ -74,7 +73,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body>
         {children}
         {surface === "public" ? <JsonLd nonce={nonce} graph={[organizationLd(), websiteLd()]} /> : null}
-        {surface !== "embed" ? <script nonce={nonce} dangerouslySetInnerHTML={{ __html: WEBMCP_SCRIPT }} /> : null}
       </body>
     </html>
   );

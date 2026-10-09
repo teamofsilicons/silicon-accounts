@@ -1,21 +1,21 @@
 /**
  * The account site's agent entry points: the hand-written llms files bundled as written, robots.txt and sitemap.xml,
- * the MCP protocol (lib/mcp/protocol.ts, the tools get the caller's context), the rate limit, WebMCP and the docs
- * topics. The tools themselves call the API and are walked against a running stack (README.md, "Agent files").
+ * the MCP protocol (lib/mcp/protocol.ts, the tools get the caller's context), the rate limit, the steps the MCP server
+ * gives a Silicon, no tools registered in the browser, and the docs topics. The tools themselves call the API and are
+ * walked against a running stack (README.md, "Agent files").
  *
  *   web/node_modules/.bin/tsx --test web/tests/agent.test.ts
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { AI_CRAWLERS, DISALLOWED, robotsTxt } from "../lib/agent/robots";
 import { sitemapEntries, sitemapXml } from "../lib/agent/sitemap";
 import { LLMS_FULL_TXT, LLMS_TXT } from "../lib/agent/generated/llms";
 import { LATEST_VERSION, handleBody, negotiateVersion, toolError, toolResult, type Tool, type ToolContext } from "../lib/mcp/protocol";
 import { rateLimit, resetRateLimits } from "../lib/server/rate-limit";
 import { hasSessionCookie } from "../lib/server/session";
-import { DOCS_TOPICS, matchTopic } from "../lib/site";
-import { WEBMCP_SCRIPT, siliconAccountSteps } from "../lib/webmcp";
+import { DOCS_TOPICS, matchTopic, siliconAccountSteps } from "../lib/site";
 
 test("llms.txt and llms-full.txt are bundled exactly as the Carbon wrote them", () => {
   assert.equal(LLMS_TXT, existsSync("llms/llms.md") ? readFileSync("llms/llms.md", "utf8") : null);
@@ -90,15 +90,25 @@ test("rate limits count per address and bucket, and answer with Retry-After past
   resetRateLimits();
 });
 
-test("WebMCP registers check_id_available and how_to_create_silicon_account behind a feature check", () => {
-  assert.match(WEBMCP_SCRIPT, /^\(function\(\)\{\nif\(!\("modelContext" in navigator\)/);
-  assert.match(WEBMCP_SCRIPT, /name:"check_id_available"/);
-  assert.match(WEBMCP_SCRIPT, /name:"how_to_create_silicon_account"/);
-  assert.match(WEBMCP_SCRIPT, /\/v1\/ids\/available\?/);
-  assert.doesNotMatch(WEBMCP_SCRIPT, /<\/script/i);
+test("how_to_create_silicon_account's steps: four, with the self-create command", () => {
   const steps = siliconAccountSteps();
   assert.equal(steps.steps.length, 4);
   assert.match(steps.steps[2]!.command, /^silicon-accounts silicon create --self-create --id si:\{your-id\} --custodian /);
+});
+
+test("no page registers tools in the browser: no WebMCP script and no navigator.modelContext anywhere in the site", () => {
+  assert.equal(existsSync("lib/webmcp.ts"), false);
+  const sources = ["app", "components", "lib", "styles"].flatMap(dir =>
+    (readdirSync(dir, { recursive: true }) as string[])
+      .filter(file => /\.(ts|tsx|js|mjs|css)$/.test(file) && !file.includes("generated"))
+      .map(file => `${dir}/${file}`),
+  );
+  assert.ok(sources.includes("app/layout.tsx"), "the walk reaches the root layout");
+  for (const file of [...sources, "proxy.ts"]) {
+    const text = readFileSync(file, "utf8");
+    assert.doesNotMatch(text, /modelContext/, file);
+    assert.doesNotMatch(text, /webmcp/i, file);
+  }
 });
 
 test("docs topics: keys, and free words matched to the closest page", () => {

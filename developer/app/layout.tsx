@@ -1,9 +1,9 @@
 /**
  * The root layout of developers.teamofsilicons.com: <html> and <body>, the site's faces and tokens over Arc's
- * foundation, the no-flash theme boot script and the WebMCP tools (both inline, with the request's CSP nonce), and the
- * Organization and WebSite JSON-LD every page carries. It ships no client code of its own: the public pages (the home
- * page and the docs) stay server-rendered HTML with a few small islands, and the signed-in portal mounts its providers
- * in app/(shell)/layout.tsx. Every page renders per request (the nonce changes each time).
+ * foundation, the no-flash theme boot script (inline, with the request's CSP nonce), and the Organization and WebSite
+ * JSON-LD every page carries. It ships no client code of its own: the public pages (the home page and the docs) stay
+ * server-rendered HTML with a few small islands, and the signed-in portal mounts its providers in app/(shell)/layout.tsx.
+ * Every page renders per request (the nonce changes each time).
  */
 import "@/components/arc/foundation.css";
 import "@/styles/fonts.css";
@@ -16,7 +16,6 @@ import type { ReactNode } from "react";
 import { JsonLd, organizationLd, websiteLd } from "@/lib/seo";
 import { CANONICAL_ORIGIN, OG_IMAGE, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
-import { WEBMCP_SCRIPT } from "@/lib/webmcp";
 import { brandFontVariables } from "./fonts";
 
 export const metadata: Metadata = {
@@ -58,7 +57,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body>
         {children}
         <JsonLd nonce={nonce} graph={[organizationLd(), websiteLd()]} />
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: WEBMCP_SCRIPT }} />
       </body>
     </html>
   );

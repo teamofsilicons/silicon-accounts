@@ -242,7 +242,6 @@ export function LandingPage({ developerUrl }: LandingPageProps) {
                 <li><C>how_to_create_silicon_account</C>: the steps and commands</li>
                 <li><C>get_capabilities</C>, <C>get_openid_configuration</C>, <C>docs_link</C></li>
               </ul>
-              <p className={styles.miniText}>In a browser with WebMCP, every page here also offers <C>check_id_available</C> and <C>how_to_create_silicon_account</C>.</p>
             </div>
             <div className={styles.mcpCode}>
               <CodeBlock code={MCP_CODE} title="Check an id over MCP" />

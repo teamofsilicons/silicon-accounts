@@ -16,8 +16,7 @@
  */
 import "server-only";
 import { apiUrl, developerUrl } from "@/lib/server/meta";
-import { CANONICAL_ORIGIN, DOCS_TOPICS, LINKS, SILICON_COMMANDS, matchTopic } from "@/lib/site";
-import { siliconAccountSteps } from "@/lib/webmcp";
+import { CANONICAL_ORIGIN, DOCS_TOPICS, LINKS, SILICON_COMMANDS, matchTopic, siliconAccountSteps } from "@/lib/site";
 import { isToolResult, stringArg, toolError, toolResult, type Tool, type ToolContext, type ToolResult } from "./protocol";
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true } as const;

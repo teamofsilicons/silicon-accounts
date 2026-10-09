@@ -576,14 +576,16 @@ is a named focusable region (`role="region"`, "The create command") with an acce
 | `/manifest.webmanifest` | name, colours and icons |
 | `/mcp` | MCP over Streamable HTTP (`app/mcp/route.ts`, `lib/mcp/`: the developer site's protocol, stateless, 2025-06-18 and older). Read-only tools that call the API on the server: `check_id_available`, `lookup_account` (with the caller's own Authorization header, which goes along to the API and nowhere else; without one it says whether the id is held), `get_capabilities` (`/v1/capabilities`, `/v1/meta` on older servers), `get_openid_configuration`, `how_to_create_silicon_account`, `docs_link`. 60 requests a minute per address (429 with Retry-After); the API counts the tools' calls against the caller's forwarded address |
 
-WebMCP (`lib/webmcp.ts`, inline with the nonce on every page but the embed): `check_id_available` and
-`how_to_create_silicon_account`, behind a `navigator.modelContext` feature check. The A2A agent card is the API's
-(`/.well-known/agent.json`); this site does not serve one of its own. `pnpm test` runs `tests/*.test.ts` (redirects,
-proxy surfaces, agent files, MCP protocol, rate limit), the branding tests and the hosted pages' unit tests.
+The steps and commands `how_to_create_silicon_account` returns live in `lib/site.ts` (`siliconAccountSteps`, next to
+`SILICON_COMMANDS`). The pages register no tools in the browser: `/mcp` is the one place an agent calls them. The A2A
+agent card is the API's (`/.well-known/agent.json`); this site does not serve one of its own. `pnpm test` runs
+`tests/*.test.ts` (redirects, proxy surfaces, agent files, MCP protocol, rate limit), the branding tests and the hosted
+pages' unit tests.
 
 ## Production routing
 
 `next.config.ts` sets `skipProxyUrlNormalize: true`. Behind Caddy, the standalone server sees `X-Forwarded-Proto: https`;
 without the setting Next rewrites an internal path (the signed-out `/` to `/landing`) to `https://localhost:8590/...`
 and the request fails against the plain HTTP listener. `pnpm build && pnpm test:production-routing` runs the deployed
-entry point with those headers and checks the landing, the agent files and `/sign-in`.
+entry point with those headers and checks the landing, the agent files and `/sign-in` (and that neither page registers
+tools in the browser).

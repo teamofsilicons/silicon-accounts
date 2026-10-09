@@ -253,7 +253,7 @@ test("the home page is server-rendered, semantic and described for search and ag
   expect(html.match(/<h1[\s>]/g)?.length).toBe(1);
   for (const meta of ['<link rel="canonical" href="https://developers.teamofsilicons.com"/>', 'property="og:site_name" content="Silicon Developer"', 'property="og:url"', 'property="og:type" content="website"', 'property="og:title"', 'property="og:description"', 'property="og:image" content="https://developers.teamofsilicons.com/og.png"', 'name="twitter:card" content="summary_large_image"', 'content="index, follow"']) expect(html, meta).toContain(meta);
   for (const action of ['href="/docs"', 'href="/docs/apps/start/publish"', 'href="/docs/accounts/start/add-sign-in"', 'href="/sign-in"']) expect(html, action).toContain(action);
-  expect(html).toContain("navigator.modelContext.registerTool");
+  expect(html).not.toContain("modelContext");
   const graphs = [...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)].map(match => JSON.parse(match[1]!));
   const types = graphs.flatMap(graph => graph["@graph"].map((node: { "@type": string }) => node["@type"]));
   expect(types).toEqual(expect.arrayContaining(["Organization", "WebSite", "WebPage", "FAQPage"]));

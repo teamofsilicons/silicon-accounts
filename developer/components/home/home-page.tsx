@@ -315,7 +315,6 @@ export function HomePage() {
                 <li><code data-sq-native="">check_app_id</code>: is an app ID free</li>
                 <li><code data-sq-native="">check_account_id</code>: is a c:id or si:id free</li>
               </ul>
-              <p className={styles.miniText}>In a browser with WebMCP, every page here also offers <code data-sq-native="">search_docs</code> and <code data-sq-native="">read_doc</code>.</p>
             </div>
             <div className={styles.mcpCode}>
               <CodeBlock code={MCP_CODE} lang="sh" meta='title="Search the docs over MCP"' />

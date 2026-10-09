@@ -6,8 +6,8 @@
  * their own.
  *
  * - Content-Security-Policy with the nonce: script-src 'self' 'nonce-…' 'strict-dynamic' (Next adds the nonce to its
- *   own scripts; the root layout adds it to the theme boot script and the WebMCP tools), style-src 'self'
- *   'unsafe-inline', img-src 'self' https: data: blob: (plus a local stack's mock Iris, see localIrisImageSource),
+ *   own scripts; the root layout adds it to the theme boot script), style-src 'self' 'unsafe-inline',
+ *   img-src 'self' https: data: blob: (plus a local stack's mock Iris, see localIrisImageSource),
  *   font-src 'self' data:, connect-src 'self', frame-ancestors 'none', form-action 'self' https:, base-uri 'none'.
  *   Development adds 'unsafe-eval' (React's dev tooling needs it; production never does).
  * - X-Frame-Options DENY, nosniff, Referrer-Policy, and HSTS in production over https.

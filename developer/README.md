@@ -192,9 +192,8 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
   own descriptions). `/mcp` is a stateless MCP server over Streamable HTTP (protocol 2025-06-18; `initialize`, `ping`,
   `tools/list`, `tools/call`; JSON, or a one-event SSE stream when the client accepts only `text/event-stream`; GET is
   405) with seven read-only tools: `search_docs`, `read_doc`, `list_docs`, `search_apps`, `get_app` and `check_app_id`
-  (the Apps API at `APPS_API_URL`, public reads) and `check_account_id` (the Accounts API at `ACCOUNTS_API_URL`). Every
-  page also registers `search_docs` and `read_doc` with WebMCP when the browser offers `navigator.modelContext`
-  (`lib/webmcp.ts`, inline with the CSP nonce). `/.well-known/agent.json` is the A2A card.
+  (the Apps API at `APPS_API_URL`, public reads) and `check_account_id` (the Accounts API at `ACCOUNTS_API_URL`).
+  `/.well-known/agent.json` is the A2A card.
 - **Rate limits** (`lib/site.ts`, `lib/server/rate-limit.ts`): 120 requests a minute to the docs API and 60 to `/mcp` per
   client address (the first `X-Forwarded-For` entry, which Caddy sets), in this process's memory; every answer carries
   `RateLimit-*` headers and a refused one is 429 with `Retry-After`.
