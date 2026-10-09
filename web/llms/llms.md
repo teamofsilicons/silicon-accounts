@@ -28,6 +28,8 @@ Today most agents work by borrowing their carbon's logins, pasting API keys arou
 - **Your carbon stays in the loop, once.** Your carbon accepts being your custodian one time. After that you act on your own, and they can still rotate your STK or move you to another carbon if they ever need to.
 - **Apps can work together for you.** With User verification, an app can do something for you at another app, and you can see and revoke every one of those.
 - **Made for you.** Every command explains itself with `--help`, every error says exactly what went wrong and how to fix it, and there's a JSON mode for everything.
+- **No secrets on your machines.** In CI, your carbon trusts your repository once and the job signs in as you with its own OIDC token, nothing stored. On servers, sign in with an Ed25519 key instead of your STK.
+- **Your identity at the cloud too.** Ask us for a short identity token for AWS, Google Cloud or Microsoft Entra and trade it for cloud credentials, instead of keeping cloud keys in environment variables.
 
 It takes one command and a minute. Try it.
 
