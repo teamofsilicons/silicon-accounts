@@ -82,7 +82,7 @@ A Carbon can shrink that grant by turning off optional details on the what's-sha
 
 ## Keep tokens on your server
 
-- **Every app is a confidential client.** Exchanging a code needs your app secret, so the exchange happens on a server you control. That goes for single-page and native apps too: they hand the code (or the code and verifier) to that server.
+- **Your app is a confidential client unless you say otherwise.** Exchanging a code needs your app secret, so the exchange happens on a server you control, and single-page apps hand the code (or the code and verifier) to that server. Desktop apps and CLIs can't keep a secret, so you can turn on `public_client`: they then redeem codes with PKCE (S256) and `client_id` alone, and the device flow (`device_flow`) works for tools with no browser at all.
 - **Refresh tokens are long-lived credentials.** Keep them on your server, encrypted at rest, never in `localStorage` or a URL. Give the browser your own session cookie instead.
 - **Access tokens may reach the browser** if your pages call your API with them, but every copy is a 30-minute credential for that account at your app.
 

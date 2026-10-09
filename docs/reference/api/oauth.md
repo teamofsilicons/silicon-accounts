@@ -151,8 +151,8 @@ curl -s "$ACCOUNTS_URL/.well-known/openid-configuration"
     "preferred_username", "email", "email_verified", "phone_number",
     "phone_number_verified", "zoneinfo", "birthdate"
   ],
-  "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-  "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+  "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
+  "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
   "introspection_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
   "code_challenge_methods_supported": ["S256", "plain"],
   "prompt_values_supported": ["none", "login", "consent", "select_account"],
@@ -482,7 +482,7 @@ appear with the `phone` and `dob` scopes. A refresh returns a fresh `id_token` t
 | 400 | `invalid_request` | a parameter is missing, repeated or malformed; the client authenticated twice |
 | 401 | `invalid_client` | unknown app, wrong secret, disabled app, no credentials (with `WWW-Authenticate: Basic`) |
 | 400 | `invalid_grant` | the code, refresh token, SLT or device code is unknown, expired, already used, revoked, issued to another app, or its account was deleted or removed the app's access; a `redirect_uri` or PKCE mismatch |
-| 400 | `unauthorized_client` | the public client asked for a grant only confidential clients may use, or an app asked for the device-code grant |
+| 400 | `unauthorized_client` | a public client (`client_id` with no secret) asked for a grant that needs the secret, or an app without `device_flow` asked for the device-code grant |
 | 400 | `unsupported_grant_type` | any other `grant_type` (the description says what to use instead: App verification proofs for `client_credentials`, the hosted pages for `password`) |
 | 400 | `invalid_scope` | a refresh asked for a scope that wasn't granted, or an unknown scope |
 | 400 | `authorization_pending`, `slow_down`, `access_denied`, `expired_token` | device-code polling (above) |

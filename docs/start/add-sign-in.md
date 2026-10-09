@@ -82,8 +82,9 @@ You need three things.
 1. **An `app_id` and an app secret.** Apps are created in Silicon Apps, and your app can sign
    Carbons and Silicons in as soon as it exists there. The secret (`sa_app_…`) proves your
    server is the app, so keep it on the server and never put it in a page, a mobile app or a
-   repository. Every app is a confidential client and the code exchange always needs the
-   secret. That's why single-page and native apps exchange the code through a server they control.
+   repository. Your app is a confidential client unless you turn on `public_client`, so the code
+   exchange needs the secret, and single-page apps exchange the code through a server they control.
+   Desktop apps and CLIs use `public_client` or the device flow instead (see below).
 2. **Registered redirect URIs.** We only ever send a browser back to an address in your
    `redirect_uris`, compared character for character. `https` is required, except
    `http://localhost`, `http://127.0.0.1` and `http://[::1]` for development, which match on
