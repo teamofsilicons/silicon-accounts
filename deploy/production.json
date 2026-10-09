@@ -13,8 +13,8 @@
   "ArchiveSha256": "454971d31b0dee7ee6df42ecc846d3c77c1534f7bdf521744f08baa491ddd47b",
   "DeveloperUrl": "https://developers.teamofsilicons.com",
   "SecretArn": "arn:aws:secretsmanager:us-east-2:234951665042:secret:silicon-accounts/production/runtime-w3R840",
-  "MigrationVersion": 12,
-  "VerifiedAt": "2026-10-08T23:29:36.318745+00:00",
+  "MigrationVersion": 17,
+  "VerifiedAt": "2026-10-09T06:28:34+00:00",
   "ProviderCallbacksVerified": false,
   "RealProviderLoginVerified": true,
   "BackupRestoreVerified": true,
@@ -29,7 +29,7 @@
   "AppleLoginVerified": false,
   "ApiSha256": "bb82d925d90c23570ed74e48a176fd30dfa6fbc5b633286ad3fd4a7d74190f7b",
   "ConfigurationBackupRestoreVerified": true,
-  "LatestBackupKey": "backups/predeploy-20261008T232703Z.dump",
+  "LatestBackupKey": "backups/predeploy-20261009T062319Z.dump",
   "CommonDeveloperPortal": true,
   "CommonPortalAuthenticatedBrowserVerified": true,
   "CommonPortalAuthenticatedBrowserScope": "Canonical-host signed-in Your apps dashboard; Saket Gupta account menu and apps entry visible; no Explore navigation",
@@ -37,7 +37,7 @@
   "CommonPortalCliDocsVersion": "0.1.10",
   "InstallCommandId": "abb69553-1fef-4352-8f57-edbc4a3d802f",
   "VerificationCommandId": "cd83f790-ddaa-459c-acc8-efdb76494368",
-  "LatestBackupSha256": "5415f3057b9b464933ec7bde2b21b89cfe47e48ce85ffa86f4d7298a57fa6b3f",
+  "LatestBackupSha256": "716143927384ce0a9969e5d42f6958e58d8075112f3dc60af100649e3cccd55d",
   "AppVerificationHistoryUrl": "https://developers.teamofsilicons.com/app-verification",
   "AppVerificationHistoryBrowserTests": 13,
   "CommonPortalBrowserTests": 52,
@@ -104,5 +104,13 @@
     "windows-i686",
     "windows-x86_64"
   ],
-  "AccountsCliCatalogProductionReleaseId": "0910d78a-772b-52c2-b3ff-dfacb48aa9b8"
+  "AccountsCliCatalogProductionReleaseId": "0910d78a-772b-52c2-b3ff-dfacb48aa9b8",
+  "LastAttemptedRevision": "2efa04a7b290abfe2fbe7c76022a04cca2f0855a",
+  "LastAttemptedArchiveSha256": "950f967898917fc3cdd7c901131de52a9357c5396ec1c65b21ee9e60907968cf",
+  "LastAttemptedApiSha256": "69fe25d16506dbf1bdc119a108e362951b8f3f0e47f296ad1c9d70761efb1539",
+  "LastAttemptInstallCommandId": "a4b44668-18fe-4fbb-bb70-381b71092abc",
+  "LastAttemptOutcome": "Rolled back: signed-out GET / on the account site returned 500 (Next proxied its /landing rewrite to https://localhost:8590; web/next.config.ts lacks skipProxyUrlNormalize). Code is 0940a94 on schema 17.",
+  "LastAttemptRollbackCommandId": "9d6c809d-59a8-468f-9445-08103e6ec070",
+  "LastAttemptRollbackVerificationCommandId": "94cc19f3-e30d-480b-84ce-4210461548af",
+  "IdentityTokenSigningKeyKid": "CLkhuxuEYv3Co2aKn5fcywNYA35pluzJ1QzF2vET1gM"
 }
