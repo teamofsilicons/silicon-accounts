@@ -13,6 +13,9 @@ next-env.d.ts
 # Built by `pnpm build:sdk` (sdk/v1.ts → public/sdk/v1.js) before dev and build
 /public/sdk/
 
+# Built by `pnpm build:llms` (web/llms → the agent files' module) before dev, build, typecheck and test
+/lib/agent/generated/
+
 # Built by `pnpm build:docs` (../docs → the bundled pages and the raw Markdown) before dev, build and typecheck
 /lib/docs/generated/
 /public/docs/

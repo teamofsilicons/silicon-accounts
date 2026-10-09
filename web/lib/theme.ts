@@ -14,10 +14,12 @@ export type ThemePreference = Theme | "system";
 export const THEME_STORAGE_KEY = "silicon-accounts.theme";
 
 /**
- * Runs in <head> before the body paints. Kept tiny and dependency-free; skipped on the embed surface (the frame's
+ * Runs in <head> before the body paints. Kept tiny and dependency-free. It also marks <html data-js>, so controls that
+ * only work with script stay hidden in a browser without it, and follows the device's theme while the preference is
+ * "system" on pages that load no theme code of their own (the not-found page). Theming is skipped on the embed surface (the frame's
  * color-scheme must come only from its `theme` parameter, or the iframe canvas turns opaque on the app's page).
  */
-export const THEME_BOOT_SCRIPT = `(function(){var r=document.documentElement;if(r.getAttribute("data-surface")==="embed")return;var p="system";try{var s=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});if(s==="light"||s==="dark"||s==="system")p=s}catch(e){}var d=p==="dark"||(p==="system"&&!!window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);r.setAttribute("data-theme",d?"dark":"light");r.setAttribute("data-theme-preference",p);r.style.colorScheme=d?"dark":"light"})();`;
+export const THEME_BOOT_SCRIPT = `(function(){var r=document.documentElement;r.setAttribute("data-js","");if(r.getAttribute("data-surface")==="embed")return;var p="system";try{var s=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});if(s==="light"||s==="dark"||s==="system")p=s}catch(e){}var d=p==="dark"||(p==="system"&&!!window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);r.setAttribute("data-theme",d?"dark":"light");r.setAttribute("data-theme-preference",p);r.style.colorScheme=d?"dark":"light";if(p!=="system"||!window.matchMedia)return;var m=matchMedia("(prefers-color-scheme: dark)"),f=function(){if(r.getAttribute("data-theme-preference")!=="system")return;var x=m.matches?"dark":"light";r.setAttribute("data-theme",x);r.style.colorScheme=x};m.addEventListener?m.addEventListener("change",f):m.addListener&&m.addListener(f)})();`;
 
 const isBrowser = typeof window !== "undefined";
 const listeners = new Set<() => void>();

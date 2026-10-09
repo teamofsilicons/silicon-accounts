@@ -55,7 +55,8 @@ export const journeys: Journey[] = [
       const config = readFileSync(join(E2E_DIR, "..", "next.config.ts"), "utf8");
       results.check("note 4: next.config.ts sets proxyClientMaxBodySize '52mb' and proxyTimeout 300_000", /proxyClientMaxBodySize:\s*["']52mb["']/.test(config) && /proxyTimeout:\s*300_?000/.test(config), (config.match(/experimental:\s*\{[^}]*\}/)?.[0] ?? "no experimental block").replace(/\s+/g, " "));
       results.check("note 4: next.config.ts sets agentRules: false", /agentRules:\s*false/.test(config));
-      results.check("note 4: next.config.ts rewrites /v1/:path* and /.well-known/:path* to ACCOUNTS_API_URL", /source:\s*["']\/v1\/:path\*["']/.test(config) && /source:\s*["']\/\.well-known\/:path\*["']/.test(config));
+      // Every /.well-known path but security.txt (the site's own) and /openapi.json go to the API too.
+      results.check("note 4: next.config.ts rewrites /v1/:path*, /.well-known/:path (but security.txt) and /openapi.json to ACCOUNTS_API_URL", /source:\s*["']\/v1\/:path\*["']/.test(config) && /source:\s*["']\/\.well-known\/:path\(\(\?!security\\\\\.txt\$\)\.\+\)["']/.test(config) && /source:\s*["']\/openapi\.json["']/.test(config));
 
       // A 12 MB import through the site's proxy (Next cuts proxied bodies at 10 MB by default: a 500 after 30 s).
       const owner = await signedInCarbon(ctx, "uxa.notes.big");
@@ -119,7 +120,7 @@ export const journeys: Journey[] = [
   },
   {
     name: "ux-audit-notes-branding",
-    title: "UX note 6: the default dark primary #1F5FB8 with #FFFDF9 text on briefcase's hosted page; the server refuses button or page text under 4.5:1",
+    title: "UX note 6: the default dark primary #1F5FB8 with #F7F8FA text on briefcase's hosted page (the Silicon look); the server refuses button or page text under 4.5:1",
     async run(ctx) {
       const { env, results, browser } = ctx;
       const context = await auditContext(browser, { dark: true });
@@ -130,7 +131,7 @@ export const journeys: Journey[] = [
       await proceed.waitFor({ timeout: 30_000 });
       await stepReady(page);
       const look = await proceed.evaluate(element => ({ background: getComputedStyle(element).backgroundColor, color: getComputedStyle(element).color }));
-      results.check("note 6: the default dark primary button is #1F5FB8 with #FFFDF9 text (6.1:1)", look.background === "rgb(31, 95, 184)" && look.color === "rgb(255, 253, 249)", JSON.stringify(look));
+      results.check("note 6: the default dark primary button is #1F5FB8 with #F7F8FA text (5.8:1, the Silicon look of an app that kept the defaults)", look.background === "rgb(31, 95, 184)" && look.color === "rgb(247, 248, 250)", JSON.stringify(look));
       await page.screenshot({ path: `${env.shots}/uxa-notes-default-dark-primary.png` });
       await context.close();
 

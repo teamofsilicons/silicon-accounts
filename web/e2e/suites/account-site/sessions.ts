@@ -115,7 +115,8 @@ const sessions: Journey = {
     results.check("the developer site is signed out at once: its next call answers 401 (and it drops its session)", devAfter.status === 401, `${devAfter.status} ${codeOf(devAfter.body)}`);
     const devOwned = await developerApi(env, developer, "/me/owned-apps");
     results.check("…its owner calls are refused as well (401)", devOwned.status === 401, `${devOwned.status} ${codeOf(devOwned.body)}`);
-    await developer.goto(`${env.developer}/`);
+    // The developer site's "/" is its public home page now; its apps (/apps) are what asks for a sign-in.
+    await developer.goto(`${env.developer}/apps`);
     const devSignIn = await developer.waitForURL(url => url.pathname.startsWith("/sign-in"), { timeout: 20_000 }).then(() => true, () => developer.getByRole("link", { name: /Continue with Silicon Accounts/ }).isVisible().catch(() => false));
     await shot(env, developer, "acct-sessions-02-developer-signed-out");
     results.check("…and its pages ask to sign in again", devSignIn, developer.url());

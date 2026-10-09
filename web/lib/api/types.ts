@@ -1061,13 +1061,33 @@ export interface DeviceAuthorization {
   interval: number;
 }
 
-/** `GET /v1/device/{user_code}` (case-insensitive, dash optional). */
+/** The app whose own command-line tool asks through the device flow (`DeviceRequest.app`). */
+export interface DeviceApp {
+  app_id: string;
+  name: string;
+  description?: string | null;
+  logo_url?: string | null;
+  logo_dark_url?: string | null;
+  homepage_url?: string | null;
+  branding?: Partial<Branding> | null;
+  copy?: Partial<SigninCopy> | null;
+}
+
+/**
+ * `GET /v1/device/{user_code}` (case-insensitive, dash optional). The silicon-accounts CLI's own sign-ins are
+ * `first_party` with `app: null`; an app's own tool names the app (its name, logos, branding and copy, so the page can
+ * look like its sign-in) and what it will see (`scopes`). Older servers send neither (the CLI's sign-in).
+ */
 export interface DeviceRequest {
   user_code: string;
   client_label: string | null;
   created_at: Timestamp;
   expires_at: Timestamp;
   status: Open<"pending" | "approved" | "denied" | "consumed" | "expired">;
+  app_id?: string;
+  first_party?: boolean;
+  scopes?: string[];
+  app?: DeviceApp | null;
 }
 
 export interface CliLoginChallenge {

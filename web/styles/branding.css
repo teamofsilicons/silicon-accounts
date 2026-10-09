@@ -136,6 +136,11 @@
 /* Minimal: no card chrome, a narrower column and more air. */
 .sa-brand[data-layout="minimal"] .sa-brand-panel { --sq-fill: transparent; --sq-stroke: transparent; width: min(100%, 360px); padding-inline: 0; border-color: transparent; background: transparent; box-shadow: none; }
 
+/* The Silicon Accounts look (an app that kept the defaults, and Silicon Accounts' own pages): the site's faces, with
+   headings in BDO Grotesk DemiBold as on the account site and the developer site. */
+.sa-brand[data-look="silicon"] { --tracking-display: -.025em; }
+.sa-brand[data-look="silicon"] :is(h1, h2, .sa-brand-title) { font-weight: 600; }
+
 /* Density. */
 .sa-brand[data-density="compact"] .sa-brand-title { font-size: var(--text-xl); }
 

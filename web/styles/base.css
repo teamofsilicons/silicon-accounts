@@ -55,7 +55,7 @@ hr { height: 1px; margin: 0; border: 0; background: var(--border); }
 
 ::selection { background: color-mix(in oklab, var(--accent) 24%, transparent); color: inherit; }
 
-/* Thin, warm scrollbars that disappear into the surface. */
+/* Thin scrollbars that disappear into the surface. */
 * { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent; }
 
 /* Shared utilities. Kept to a handful; layout belongs to the layout primitives (components/foundation/layout). */
@@ -71,10 +71,14 @@ hr { height: 1px; margin: 0; border: 0; background: var(--border); }
   border: 0;
 }
 .mono { font-family: var(--font-mono); letter-spacing: 0; font-variant-ligatures: none; }
-.serif { font-family: var(--font-serif); font-weight: 400; letter-spacing: -.01em; }
+.serif, .display { font-family: var(--font-display); font-weight: 600; letter-spacing: var(--tracking-display); }
 .tabular { font-variant-numeric: tabular-nums; }
 .muted { color: var(--text-muted); }
 .secondary { color: var(--text-secondary); }
+
+/* Controls that only work with script stay out of sight in a browser without it: the theme boot script marks
+   <html data-js> before the first paint. */
+:root:not([data-js]) [data-js-only] { display: none !important; }
 
 /* Skip link (<SkipLink>, components/foundation/layout): invisible until keyboard focus reaches it. A squircle
    ([data-sq]): its corners come from --sq-r and its fill from --sq-fill, never border-radius. A skip link without

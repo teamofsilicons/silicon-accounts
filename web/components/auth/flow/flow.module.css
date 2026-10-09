@@ -438,6 +438,7 @@ label.shareText[data-disabled] { cursor: default; }
 /* Keyboard focus: the link takes the text colour, a full underline and a soft fill (no rings on these pages). */
 .footer a:focus-visible { background: var(--surface-muted); color: var(--foreground); text-decoration-color: currentColor; box-shadow: 0 0 0 2px var(--surface-muted); }
 .skeleton { display: grid; gap: var(--space-4); }
+.noscript { margin: 0; color: var(--foreground); font-size: var(--text-sm); line-height: var(--leading-body); }
 .problem { display: grid; gap: var(--brand-gap, var(--space-4)); }
 .details {
   display: grid;

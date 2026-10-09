@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:"BDO Grotesk";font-weight:400;src:url("../../public/fonts/bdo-grotesk/BDOGrotesk-Regular.woff2") format("woff2")}
+@font-face{font-family:"BDO Grotesk";font-weight:500;src:url("../../public/fonts/bdo-grotesk/BDOGrotesk-Medium.woff2") format("woff2")}
+@font-face{font-family:"BDO Grotesk";font-weight:600;src:url("../../public/fonts/bdo-grotesk/BDOGrotesk-DemiBold.woff2") format("woff2")}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{width:1200px;height:630px;overflow:hidden;position:relative;background:#F7F8FA;color:#292929;font-family:"BDO Grotesk",sans-serif;-webkit-font-smoothing:antialiased}
+.bg{position:absolute;inset:0;background-image:radial-gradient(rgba(41,41,41,.11) 1.2px,transparent 1.6px),radial-gradient(60% 70% at 85% 30%,rgba(31,95,184,.16),transparent 70%);background-size:26px 26px,100% 100%;background-position:13px 13px,0 0}
+.wrap{position:absolute;inset:0;padding:72px 76px;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:18px;font-size:34px;font-weight:600;letter-spacing:-.02em}
+.brand span{color:#4C5260;font-weight:500}
+.mark{width:60px;height:60px}
+h1{margin:40px 0 0;max-width:620px;font-size:72px;line-height:.98;font-weight:600;letter-spacing:-.04em}
+p{margin:22px 0 0;max-width:600px;font-size:26px;line-height:1.35;color:#4C5260;font-weight:400;letter-spacing:-.01em}
+.foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between}
+.url{font-size:26px;font-weight:600;color:#1F5FB8;letter-spacing:-.01em}
+.cards{position:absolute;right:70px;top:150px;width:400px}
+.card{border:1.5px solid #D2DBE8;border-radius:34px;background:#EEF3FA;padding:26px 28px;box-shadow:0 14px 40px rgba(16,24,40,.10)}
+.card+.link{height:44px;position:relative}
+.link:before{content:"";position:absolute;left:50%;top:-6px;bottom:-6px;border-left:3px dashed #8FB0DE}
+.who{display:flex;align-items:center;gap:16px}
+.av{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;font-size:22px;font-weight:600}
+.av.c{background:#E2E7EF;color:#4C5260}.av.s{background:#1F5FB8;color:#fff}
+.name{font-size:30px;font-weight:600;letter-spacing:-.02em}
+.kind{font-size:19px;color:#4C5260;margin-top:2px}
+.id{margin-top:16px;font:500 21px ui-monospace,Menlo,monospace;color:#292929}
+.carbon{transform:rotate(-2deg);width:88%}
+.silicon{margin-left:auto;width:94%}
+</style></head><body><div class="bg"></div>
+<div class="wrap">
+<div class="brand"><svg class="mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="#1F5FB8" d="M32 0c19.6 0 25.4 1.4 28.6 3.4C62.6 6.6 64 12.4 64 32s-1.4 25.4-3.4 28.6C57.4 62.6 51.6 64 32 64S6.6 62.6 3.4 60.6C1.4 57.4 0 51.6 0 32S1.4 6.6 3.4 3.4C6.6 1.4 12.4 0 32 0Z"/><g transform="translate(32 32) scale(.86) translate(-32 -33)"><circle cx="32" cy="24" r="9" fill="#FFFFFF"/><path fill="#FFFFFF" d="M14 50c2.7-8.4 9.6-13.2 18-13.2S47.3 41.6 50 50c-4.8 3.2-10.9 4.9-18 4.9S18.8 53.2 14 50Z"/></g></svg><div>Silicon <span>Accounts</span></div></div>
+<h1>One account for every Carbon and Silicon</h1>
+<p>Silicons sign into apps without a browser. Carbons sign in without a password.</p>
+<div class="foot"><div class="url">accounts.teamofsilicons.com</div></div>
+</div>
+<div class="cards">
+<div class="card carbon"><div class="who"><div class="av c">AO</div><div><div class="name">Ada Okafor</div><div class="kind">Carbon</div></div></div><div class="id">c:ada</div></div>
+<div class="link"></div>
+<div class="card silicon"><div class="who"><div class="av s">S</div><div><div class="name">Scout</div><div class="kind">Silicon · custodian c:ada</div></div></div><div class="id">si:scout</div></div>
+</div>
+</body></html>

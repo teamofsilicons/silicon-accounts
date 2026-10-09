@@ -42,9 +42,11 @@ API's Origin check):
 
 | Path | Served by |
 | --- | --- |
-| `/v1/*`, `/.well-known/*` | rewritten to `ACCOUNTS_API_URL` (default `http://127.0.0.1:8589`), unchanged: method, body, cookies, `Set-Cookie`, `Location` |
+| `/v1/*`, `/.well-known/*` (but `security.txt`), `/openapi.json` | rewritten to `ACCOUNTS_API_URL` (default `http://127.0.0.1:8589`), unchanged: method, body, cookies, `Set-Cookie`, `Location`. That includes the API's discovery (`/openapi.json`, `/v1/openapi.json`, `/v1/capabilities`, `/.well-known/agent.json`, `/.well-known/openid-configuration`) and its event stream (`/v1/events/stream`; production's Caddy sends it and `/openapi.json` straight to the API) |
+| `/`, signed out | the public landing page, server-rendered with no client providers (see "The public landing page") |
+| `/llms.txt`, `/llms-full.txt`, `/robots.txt`, `/sitemap.xml`, `/.well-known/security.txt`, `/manifest.webmanifest`, `/mcp` | the site's own agent files and MCP server (see "Agent entry points") |
 | `/sdk/v1.js` | `public/sdk/v1.js`, built from `sdk/v1.ts` by `pnpm build:sdk` (runs before `dev` and `build`); `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=300` |
-| `/docs`, `/docs/*`, `/docs.md`, `/llms.txt`, `/llms-full.txt` | permanent redirects to the configured developer site (mapping below) |
+| `/docs`, `/docs/*`, `/docs.md` | permanent redirects to the configured developer site (mapping below) |
 | everything else | the pages below |
 
 The rewrite proxy accepts bodies up to 52 MB and waits up to 5 minutes (`experimental.proxyClientMaxBodySize`,
@@ -67,8 +69,8 @@ cannot say).
 
 Documentation redirects use that same runtime developer-site configuration and HTTP **308**, including prefetch,
 RSC, `HEAD` and static Markdown requests. `/docs` goes to the shared `/docs` landing; `/docs/<path>` goes to
-`/docs/accounts/<path>`; `/docs.md` goes to `/docs/accounts/index.md`. The old `/docs/search-index.json`, `/llms.txt`
-and `/llms-full.txt` go to the shared endpoints at the same paths. Queries are preserved, and browsers inherit the
+`/docs/accounts/<path>`; `/docs.md` goes to `/docs/accounts/index.md`. The old `/docs/search-index.json` goes to the
+shared endpoint at the same path (`/llms.txt` and `/llms-full.txt` are this site's own now). Queries are preserved, and browsers inherit the
 original fragment because `Location` does not replace it. Unknown deep paths reach the developer site's docs 404.
 The account dock, phone sheet, command palette and signed-out landing link directly to its `/docs`, using
 `developer_url` rather than an obsolete account-site docs address. Account pages, API rewrites, hosted sign-in and
@@ -107,14 +109,16 @@ shared parts and a first version of each route; each area's builder owns its rou
 
 | Area | Routes | Code |
 | --- | --- | --- |
-| web-account | `/` (landing when signed out, identity home when signed in), `/sign-in-methods`, `/apps`, `/silicons`, `/proofs`, `/activity`, `/settings` | `app/(shell)/(account)/`, `components/account/` |
-| web-auth | `/sign-in`, `/authorize`, `/authorize/flow/[id]`, `/device`, `/embed/v1/buttons` (polish) | `app/(auth)/`, `components/auth/` |
-| legacy web-docs | former docs routes redirect through `proxy.ts`; the old renderer and generated build remain temporarily as source, while `developer/` owns the public docs | `app/(docs)/`, `components/docs/`, `lib/docs/` (guide: `lib/docs/README.md`), `lib/docs-redirects.ts` |
+| web-account | `/` (identity home when signed in), `/sign-in-methods`, `/apps`, `/silicons`, `/proofs`, `/activity`, `/settings` | `app/(app)/(shell)/(account)/`, `components/account/` |
+| public | `/` when signed out (the landing page, rewritten by `proxy.ts` to `app/landing`), the agent files, `/mcp` | `app/landing/`, `components/landing/`, `components/site/`, `app/*.txt`, `app/mcp/`, `lib/agent/`, `lib/mcp/` |
+| web-auth | `/sign-in`, `/authorize`, `/authorize/flow/[id]`, `/device`, `/embed/v1/buttons` (polish) | `app/(app)/(auth)/`, `components/auth/` |
+| legacy web-docs | former docs routes redirect through `proxy.ts`; the old renderer and generated build remain temporarily as source, while `developer/` owns the public docs | `app/(app)/(docs)/`, `components/docs/`, `lib/docs/` (guide: `lib/docs/README.md`), `lib/docs-redirects.ts` |
 | foundation | root layout, providers, shell, dock, command palette, theme, squircles, branding runtime, API client and hooks, SDK, `proxy.ts`, `/__kitchen`, screens | `app/layout.tsx`, `components/foundation/`, `components/kitchen/`, `lib/`, `styles/`, `sdk/`, `scripts/` |
 | Arc UI | the installed components (local edits below) | `components/arc/` |
 
-`app/(shell)/layout.tsx` wraps the account pages in the account shell (dock, ⌘K palette, sign-in gate).
-`app/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
+`app/(app)/layout.tsx` mounts the client providers for everything under it (one query cache across the account pages
+and the hosted pages); the root layout and the public landing load none. `app/(app)/(shell)/layout.tsx` wraps the
+account pages in the account shell (dock, ⌘K palette, sign-in gate). `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
 development only: production answers 404 unless the server runs with `ACCOUNTS_KITCHEN=1`.
 
 ## Conventions
@@ -124,7 +128,7 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   the API, the SDK, the embed. Errors say what happened and what to do next, in the server's words when it sent them
   (`message` + `hint`).
 - **Styling.** CSS modules next to each component, tokens from `styles/tokens.css` (the brand mapped onto Arc's
-  semantic roles, light and dark), no Tailwind. Filled primary actions use `--primary*` (brand blue with paper text,
+  semantic roles, light and dark), no Tailwind. Filled primary actions use `--primary*` (brand blue with light text,
   readable in both themes); `--accent` is for indicators, `--accent-ink` for accent-coloured text.
 - **Themes.** `lib/theme.ts` + `useTheme()` (`components/foundation/theme/use-theme.ts`); light, dark or device,
   stored per browser, painted before first paint by the nonce'd boot script (no flash). Change it with
@@ -504,3 +508,70 @@ What changed on this site for UNDERSTANDING.md v2 (build spec 06-v2.md):
 ### Verification terminology (2026-10-08)
 
 The shared account navigation, phone sheet and command palette call `/proofs` **User verification**. Page metadata, cards, activity filters and related copy use the same name; the route, query keys, API values and revoke behavior remain unchanged. Root `docs/` supplies the updated App verification and User verification titles to the developer site's docs navigation and search. The central managed-app history lives at `https://developers.teamofsilicons.com/app-verification`; it retains events, never raw token values.
+
+### The Silicon look and the public site (2026-10-09)
+
+The account site, the hosted pages' default look and the developer site (`developer/`) are one family now (shared
+brief: fonts SF Pro and BDO Grotesk; light #F7F8FA / #292929, dark #02040A / #F7F8FA, brand blue #1F5FB8).
+
+- **Type and colour** (`styles/fonts.css`, `styles/tokens.css`, `components/arc/foundation.css`): the developer site's
+  tokens exactly. BDO Grotesk (SIL OFL 1.1, `public/fonts/bdo-grotesk/` with its OFL.txt, `font-display: swap`, only
+  DemiBold preloaded) is the display face; text asks for the system face first (SF Pro on Apple devices; its licence
+  does not allow serving it), mono is the system mono stack. Page titles, the identity name and counters are BDO
+  Grotesk DemiBold (`--font-serif` is kept as an alias of the display face; the site has no serif). Every text token
+  clears 4.5:1 on every surface in its mode; dark accent-coloured text uses `--accent-ink` #7DAEF4 (brand blue as text
+  on #02040A is 3.3:1). BDO Grotesk's tabular figures are its monospaced set, so display-face counters keep the
+  proportional ones. The identity card's paper is a cool, faintly blue tint instead of the warm one.
+- **Fonts removed**: the site no longer loads Geist, Instrument Serif or JetBrains Mono for itself. They stay in
+  `app/fonts.ts` (next/font, `preload: false`) only because apps may pick them for their hosted pages; the other
+  branding fonts still load on demand (`lib/branding/fonts.ts`).
+- **The hosted pages' default look** (`lib/branding/defaults.ts`, `apply.ts`, `styles/branding.css`): DEFAULT_LIGHT and
+  DEFAULT_DARK are the Silicon palettes. The API still stores and serves its older defaults (crates/core
+  `default_light`/`default_dark`, warm paper #FFFDF9), so `normalizeBranding` recognises a palette equal to them in all
+  eight colours (LEGACY_LIGHT, LEGACY_DARK) and paints the new one; a palette with any colour of the app's own stays
+  exactly as stored (dm's green on its paper keeps its paper). An app that kept every default colour and the default
+  font (Geist) wears the site's faces (`isSiliconLook`, `data-look="silicon"`, DemiBold headings); any font of its own
+  is kept. Silicon Accounts' own pages (`HostedFrame site`) carry `data-look="silicon"` too. "Powered by", the embed's
+  pill and the SDK (`sdk/v1.ts`: the same recognition, 9.2 KB gzipped) use the new colours. When the API's own
+  defaults change to the new palette, nothing here needs to change.
+- **Device approval for apps' tools** (`components/auth/device.tsx`): `GET /v1/device/{user_code}` now names the app
+  (`app`, `first_party`, `scopes`); an app's own command-line tool is shown in the app's look ("Sign in to {app}?",
+  what it will see, "Powered by"), the silicon-accounts CLI keeps the Silicon Accounts look.
+
+### The public landing page (2026-10-09)
+
+`/` for anyone not signed in is `components/landing/` (server components only: the header's theme switch and the
+copy buttons are the islands, `components/site/theme-controls.tsx` and `enhancer.tsx`). It sells Silicon Accounts to
+Silicons (an identity of their own, no browser, the exact commands, "Create your Silicon account") and to Carbons (one
+account, no passwords, see and remove apps, look after Silicons, revoke User verifications), answers questions
+(FAQPage JSON-LD) and points app builders to the developer site once. The header, footer, action links and code
+blocks are the developer site's (`components/site/`, the same CSS).
+
+- `proxy.ts` marks the request `x-sa-surface: public` for a page load of `/` without a session cookie, or with one the
+  API refuses (a 401 from `GET /v1/session`; that cookie is then cleared), and rewrites it to `app/landing` (a direct
+  visit to `/landing` goes back to `/`). That route sits outside `app/(app)`, so its module graph has no client
+  providers and no account shell: the page ships only its islands and Next's runtime. Its links are plain
+  `<a>` elements, so leaving it is a full page load (eslint allows that for `components/site` and
+  `components/landing`). With a live session `/` is the identity home as before; a session that ends while the tab is
+  open shows a short "You're signed out" card (`components/account/home.tsx`).
+- The developer site's address comes from `GET /v1/meta` on the server (`lib/server/meta.ts`, shared with proxy.ts).
+- SEO (`lib/seo.tsx`, `lib/site.ts`): title, description, canonical, Open Graph and Twitter on `/`; Organization and
+  WebSite JSON-LD on the public surface, WebApplication/SoftwareApplication, WebPage and FAQPage on the landing. Every
+  other page is `noindex` by default (the root metadata): account pages, `/sign-in`, `/authorize`, `/device`, the
+  embed. Icons and the social image are rendered by `pnpm brand` (`scripts/brand/`, Playwright) into `public/`.
+
+### Agent entry points (2026-10-09)
+
+| Path | What |
+| --- | --- |
+| `/llms.txt`, `/llms-full.txt` | the Carbon's `web/llms/llms.md` (and `llms-full.md` when it exists, else llms.md again), exactly as written; bundled at build time by `lib/agent/build-llms.ts` into the git-ignored `lib/agent/generated/llms.ts` (`pnpm build:llms`, run by dev, build, typecheck and test). Never edit the .md files from code |
+| `/robots.txt` | `lib/agent/robots.ts`: everything public allowed, AI crawlers named and welcome; account pages, `/sign-in`, `/authorize`, `/device`, `/embed/`, `/v1/`, `/api/`, `/mcp` disallowed |
+| `/sitemap.xml` | `lib/agent/sitemap.ts`: the landing page, the llms files and the OpenAPI description, with lastmod |
+| `/.well-known/security.txt` | the same as the developer site's (the one `/.well-known` path not forwarded to the API) |
+| `/manifest.webmanifest` | name, colours and icons |
+| `/mcp` | MCP over Streamable HTTP (`app/mcp/route.ts`, `lib/mcp/`: the developer site's protocol, stateless, 2025-06-18 and older). Read-only tools that call the API on the server: `check_id_available`, `lookup_account` (with the caller's own Authorization header, which goes along to the API and nowhere else; without one it says whether the id is held), `get_capabilities` (`/v1/capabilities`, `/v1/meta` on older servers), `get_openid_configuration`, `how_to_create_silicon_account`, `docs_link`. 60 requests a minute per address (429 with Retry-After); the API counts the tools' calls against the caller's forwarded address |
+
+WebMCP (`lib/webmcp.ts`, inline with the nonce on every page but the embed): `check_id_available` and
+`how_to_create_silicon_account`, behind a `navigator.modelContext` feature check. The A2A agent card is the API's
+(`/.well-known/agent.json`); this site does not serve one of its own. `pnpm test` runs `tests/*.test.ts` (redirects,
+proxy surfaces, agent files, MCP protocol, rate limit), the branding tests and the hosted pages' unit tests.

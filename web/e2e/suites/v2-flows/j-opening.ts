@@ -70,7 +70,7 @@ export const journey: Journey = {
       const movedAfter = seen.movedAfterMs === null ? null : Date.now() - shownAt;
       const flow = id ? (await flowApi(env, page, id, "", undefined, ctx.ip)).body.flow ?? null : null;
       results.check("briefcase's Continue with Google (method=google) shows our page first: \"Opening Google to sign you in to Briefcase…\"", href.searchParams.get("method") === "google" && seen.title === "Opening Google to sign you in to Briefcase…", `${href.searchParams.get("method")} | ${seen.title}`);
-      results.check("…in briefcase's look (the default palette, background #FFFDF9)", seen.background === "#FFFDF9", seen.background);
+      results.check("…in briefcase's look (it kept the defaults: the Silicon look, background #F7F8FA)", seen.background === "#F7F8FA", seen.background);
       results.check("…with the \"Continue to Google\" fallback button visible", seen.fallback);
       results.check("…and \"Powered by Silicon Accounts\" in view, linking to accounts.teamofsilicons.com", seen.poweredBy.inView && seen.poweredBy.href === POWERED_BY_HREF && /Powered by Silicon Accounts/.test(seen.poweredBy.text), JSON.stringify(seen.poweredBy));
       results.check("…while it waits, the bar fills and the dots pulse (motion allowed)", scaleX(animated.bar[0]!) < 0.98 && JSON.stringify(animated.dots[0]) !== JSON.stringify(animated.dots[1]), JSON.stringify(animated));

@@ -151,7 +151,7 @@ const deletion: Journey = {
     const section = leaver.page.getByRole("region", { name: "Delete your account" });
     await section.getByText(/Your account ends for good/).waitFor({ timeout: 30_000 });
     const text = (await section.innerText()).replace(/\s+/g, " ");
-    results.check("Settings says what deleting does: apps told, sessions and proofs end, emails freed, the id reserved 10 days", text.includes("Every app you signed into is told and loses access, your sessions and proofs end, your emails and phone numbers are freed") && text.includes(`${leaver.id} stays reserved for 10 days before anyone can take it. This cannot be undone.`), text.slice(0, 320));
+    results.check("Settings says what deleting does: apps told, sessions and user verifications end, emails freed, the id reserved 10 days", text.includes("Every app you signed into is told and loses access, your sessions and user verifications end, your emails and phone numbers are freed") && text.includes(`${leaver.id} stays reserved for 10 days before anyone can take it. This cannot be undone.`), text.slice(0, 320));
     const button = leaver.page.getByRole("button", { name: "Hold to delete your account" });
     await hold(leaver.page, button, 600);
     await sleep(600);

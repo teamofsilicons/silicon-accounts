@@ -3,7 +3,7 @@
 .photo > [role="img"] { transition: transform var(--duration-spring) var(--ease-spring), opacity var(--duration-fast) var(--ease-standard); }
 .photo[data-dragging] > [role="img"] { transform: scale(1.03); opacity: .55; }
 /* The card's portrait: larger than Arc's largest avatar, initials in the display serif. */
-.portrait.portrait { width: var(--photo-size, 112px); height: var(--photo-size, 112px); font-family: var(--font-serif); font-size: calc(var(--photo-size, 112px) * .4); font-weight: 400; letter-spacing: 0; }
+.portrait.portrait { width: var(--photo-size, 112px); height: var(--photo-size, 112px); font-family: var(--font-display); font-size: calc(var(--photo-size, 112px) * .38); font-weight: 600; letter-spacing: -.02em; }
 
 /* Shown over the photo while a file is dragged onto it. */
 .dropHint {

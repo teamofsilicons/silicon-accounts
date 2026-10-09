@@ -3,9 +3,13 @@
  *
  * Topology: Next serves the whole site on the public origin (dev http://localhost:8590, prod
  * https://accounts.teamofsilicons.com) and proxies the API with rewrites, so the browser stays same-origin (cookies,
- * the API's Origin check): /v1/* and /.well-known/* → ACCOUNTS_API_URL (default http://127.0.0.1:8589). Provider
- * callbacks (/v1/oauth/callback/*, Apple's form_post too) and every API call pass through unchanged, Set-Cookie and
- * Location included.
+ * the API's Origin check): /v1/*, /.well-known/* and /openapi.json → ACCOUNTS_API_URL (default
+ * http://127.0.0.1:8589). Provider callbacks (/v1/oauth/callback/*, Apple's form_post too), the API's discovery
+ * (/openapi.json, /v1/openapi.json, /v1/capabilities, /.well-known/agent.json, /.well-known/openid-configuration), the
+ * event stream (/v1/events/stream) and every API call pass through unchanged, Set-Cookie and Location included. One
+ * file under /.well-known is the site's own: security.txt (app/.well-known/security.txt), which the API does not serve.
+ * Production's Caddy sends /v1/events/stream and /openapi.json straight to the API (deploy/install.py); locally they go
+ * through here.
  *
  * ACCOUNTS_API_URL is read when this file loads: at `next dev` start, and at `next build` for `next start` and the
  * standalone server (Next bakes rewrites into the build). Build with the address the server will use; instrumentation.ts
@@ -92,7 +96,9 @@ const nextConfig: NextConfig = {
     return {
       beforeFiles: [
         { source: "/v1/:path*", destination: `${apiUrl}/v1/:path*` },
-        { source: "/.well-known/:path*", destination: `${apiUrl}/.well-known/:path*` },
+        { source: "/openapi.json", destination: `${apiUrl}/openapi.json` },
+        // Every /.well-known path but security.txt, which the site serves itself.
+        { source: "/.well-known/:path((?!security\\.txt$).+)", destination: `${apiUrl}/.well-known/:path` },
       ],
       afterFiles: [],
       fallback: [],
@@ -104,6 +110,12 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      // The site's own font files never change in place (a new cut gets a new name); the icons and social image may.
+      { source: "/fonts/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
+      {
+        source: "/:file(og.png|icon.svg|icon-192.png|icon-512.png|icon-maskable-512.png|apple-touch-icon.png|favicon.ico)",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
       {
         // sdk/v1.js (built by `pnpm build:sdk`) is loaded by apps' pages on other origins.
         source: "/sdk/:file*",

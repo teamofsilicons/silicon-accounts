@@ -281,8 +281,11 @@ const LABEL_IN_NAME = "label-content-name-mismatch";
 
 /** Words that never name accounts or groups of them on the site (UNDERSTANDING.md: Carbons and Silicons, no Teams). */
 const BANNED = /\b(org|orgs|organi[sz]ations?|teams?|workspaces?|tenants?|humans?|AI agents?|robots?|bots?|frontend|backend)\b/gi;
-/** Vendor words the site has to use as the vendors spell them (Apple's Team ID, Google Workspace). */
-const VENDOR = /\b(Apple Team ID|Team ID|Google Workspace domain|Workspace domain|Google Workspace)\b/gi;
+/**
+ * Names the site has to use as they are spelled: vendors' (Apple's Team ID, Google Workspace) and our own (Team of
+ * Silicons, the organisation behind Silicon Accounts, named in the public pages' footer and their structured data).
+ */
+const VENDOR = /\b(Apple Team ID|Team ID|Google Workspace domain|Workspace domain|Google Workspace|Team of Silicons)\b/gi;
 /** Words worth a look (not failures): generic names for accounts where Carbon or Silicon may be meant. */
 const SOFT = /\b(people|person|users?|customers?|members?|accounts holders?)\b/gi;
 

@@ -17,8 +17,6 @@ const cases = [
   ["/docs.md", "/docs/accounts/index.md"],
   ["/docs/no-such-page", "/docs/accounts/no-such-page"],
   ["/docs/search-index.json", "/docs/search-index.json"],
-  ["/llms.txt", "/llms.txt"],
-  ["/llms-full.txt", "/llms-full.txt"],
 ] as const;
 
 test("legacy documentation permanently redirects using the service's developer origin and preserves queries", async () => {
@@ -52,8 +50,53 @@ test("prefetch and RSC cannot bypass redirects and render old documentation", ()
       assert.equal(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url: source, headers }), true, source);
     }
   }
-  for (const url of ["/v1/me", "/.well-known/openid-configuration", "/sdk/v1.js", "/_next/static/a.js"]) {
+  for (const url of ["/v1/me", "/.well-known/openid-configuration", "/.well-known/agent.json", "/.well-known/security.txt", "/openapi.json", "/sdk/v1.js", "/_next/static/a.js",
+    "/llms.txt", "/llms-full.txt", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/mcp", "/og.png", "/icon.svg", "/icon-512.png", "/icon-maskable-512.png", "/apple-touch-icon.png", "/favicon.ico", "/fonts/bdo-grotesk/BDOGrotesk-DemiBold.woff2"]) {
     assert.equal(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url }), false, url);
+  }
+  // Pages whose names start like an agent file still get the page headers.
+  for (const url of ["/", "/mcp-guide", "/apps", "/sign-in"]) assert.equal(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url }), true, url);
+});
+
+test("the site serves its own llms.txt and llms-full.txt: no redirect to the developer site", async () => {
+  for (const path of ["/llms.txt", "/llms-full.txt"]) assert.equal(developerDocsPath(path), null, path);
+});
+
+test("\"/\" is the public landing without a session cookie, and the account site with one the API accepts", async () => {
+  const originalFetch = globalThis.fetch;
+  const asked: string[] = [];
+  let answer = 200;
+  globalThis.fetch = async (input, init) => {
+    asked.push(`${String(input)} ${new Headers(init?.headers).get("cookie") ?? ""}`);
+    return new Response("{}", { status: answer });
+  };
+  const surface = (response: Response) => response.headers.get("x-middleware-request-x-sa-surface");
+  const rewrite = (response: Response) => response.headers.get("x-middleware-rewrite");
+  try {
+    const landing = await proxy(new NextRequest("https://accounts.example.test/?ref=x"));
+    assert.equal(surface(landing), "public");
+    assert.equal(rewrite(landing), "https://accounts.example.test/landing?ref=x");
+    assert.equal(asked.length, 0, "no cookie: no question to the API");
+    const direct = await proxy(new NextRequest("https://accounts.example.test/landing?ref=x"));
+    assert.equal(direct.status, 308);
+    assert.equal(direct.headers.get("location"), "https://accounts.example.test/?ref=x");
+    const live = await proxy(new NextRequest("https://accounts.example.test/", { headers: { cookie: "sa_session=live" } }));
+    assert.equal(surface(live), "site");
+    assert.equal(rewrite(live), null);
+    assert.match(asked.at(-1) ?? "", /\/v1\/session sa_session=live$/);
+    answer = 401;
+    const stale = await proxy(new NextRequest("https://accounts.example.test/", { headers: { cookie: "sa_session=old; other=1" } }));
+    assert.equal(surface(stale), "public");
+    assert.equal(rewrite(stale), "https://accounts.example.test/landing");
+    assert.match(stale.headers.get("set-cookie") ?? "", /^sa_session=; Path=\/; .*Max-Age=0/i);
+    // Client navigations (RSC) never ask; other pages never ask.
+    const before = asked.length;
+    assert.equal(surface(await proxy(new NextRequest("https://accounts.example.test/", { headers: { cookie: "sa_session=old", rsc: "1" } }))), "site");
+    assert.equal(surface(await proxy(new NextRequest("https://accounts.example.test/apps", { headers: { cookie: "sa_session=old" } }))), "site");
+    assert.equal(surface(await proxy(new NextRequest("https://accounts.example.test/embed/v1/buttons?app_id=x"))), "embed");
+    assert.equal(asked.slice(before).some(line => line.includes("/v1/session")), false);
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 

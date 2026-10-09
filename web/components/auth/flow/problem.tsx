@@ -92,6 +92,10 @@ export function LoadingCard({ label = "Opening sign-in" }: { label?: string }) {
   return (
     <div className={styles.skeleton} aria-busy="true">
       <p className="sr-only" role="status">{label}</p>
+      {/* The steps run in the browser (the flow's cookies prove it is this browser's): say so when script is off. */}
+      <noscript>
+        <p className={styles.noscript}>Signing in needs JavaScript. Turn it on for this site, then reload the page.</p>
+      </noscript>
       <SkeletonBlock width="72%" height="30px" index={0} />
       <SkeletonBlock width="48%" height="14px" index={1} />
       <SkeletonBlock width="100%" height="var(--control-height-md)" index={2} />

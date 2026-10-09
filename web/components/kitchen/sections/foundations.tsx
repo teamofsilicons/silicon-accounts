@@ -48,12 +48,12 @@ export function Foundations() {
           {SWATCHES.map(name => <Swatch key={name} name={name} />)}
         </div>
       </Specimen>
-      <Specimen title="Type: Instrument Serif for display moments, Geist for the interface, JetBrains Mono for ids">
+      <Specimen title="Type: BDO Grotesk for display, SF Pro (the system face) for the interface, the system mono for ids">
         <div className={styles.typeScale}>
           {SIZES.map(([token, label, serif]) => (
             <div key={token} className={styles.typeRow}>
               <span className={styles.typeLabel}>{label}</span>
-              <span style={{ fontSize: `var(${token})`, fontFamily: serif ? "var(--font-serif)" : "var(--font-body)", lineHeight: 1.1 }}>One account for every Carbon and Silicon</span>
+              <span style={{ fontSize: `var(${token})`, fontFamily: serif ? "var(--font-display)" : "var(--font-body)", fontWeight: serif ? 600 : 400, letterSpacing: serif ? "var(--tracking-display)" : undefined, lineHeight: 1.1 }}>One account for every Carbon and Silicon</span>
             </div>
           ))}
           <div className={styles.typeRow}>

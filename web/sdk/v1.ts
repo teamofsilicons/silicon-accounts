@@ -96,13 +96,23 @@ interface PublicApp {
 
 const TAG = "Silicon Accounts:";
 const STORAGE_PREFIX = "silicon-accounts:auth:";
-const LIGHT: Palette = { primary: "#1F5FB8", primary_foreground: "#FFFDF9", background: "#FFFDF9", surface: "#FFFFFF", foreground: "#353432", muted: "#6F6B66", border: "#E8E3DA", danger: "#B42318" };
+/** The Silicon Accounts look (lib/branding/defaults.ts DEFAULT_LIGHT): brand blue buttons under white (6.2:1). */
+const LIGHT: Palette = { primary: "#1F5FB8", primary_foreground: "#FFFFFF", background: "#F7F8FA", surface: "#FFFFFF", foreground: "#292929", muted: "#5C6370", border: "#E2E5EB", danger: "#B42318" };
 /**
- * The default dark palette (crates/core `default_dark`, lib/branding/defaults.ts DEFAULT_DARK): filled buttons are the
- * brand blue #1F5FB8 under paper white (6.1:1); accent-coloured text uses the lighter ink below (`--ink`).
+ * The dark look (lib/branding/defaults.ts DEFAULT_DARK): filled buttons are the brand blue #1F5FB8 under #F7F8FA
+ * (5.8:1); accent-coloured text uses the lighter ink below (`--ink`).
  */
-const DARK: Palette = { primary: "#1F5FB8", primary_foreground: "#FFFDF9", background: "#2A2927", surface: "#353432", foreground: "#FFFDF9", muted: "#B5B0A8", border: "#4A4845", danger: "#FF8A80" };
+const DARK: Palette = { primary: "#1F5FB8", primary_foreground: "#F7F8FA", background: "#02040A", surface: "#0B0F18", foreground: "#F7F8FA", muted: "#9BA4B4", border: "#1F2635", danger: "#FF8A80" };
+const KEYS: Array<keyof Palette> = ["primary", "primary_foreground", "background", "surface", "foreground", "muted", "border", "danger"];
+/** The palettes the service stores for apps that kept the defaults (lib/branding/defaults.ts LEGACY_*): the new look. */
+const LEGACY = {
+  light: "#1F5FB8 #FFFDF9 #FFFDF9 #FFFFFF #353432 #6F6B66 #E8E3DA #B42318",
+  dark: "#1F5FB8 #FFFDF9 #2A2927 #353432 #FFFDF9 #B5B0A8 #4A4845 #FF8A80",
+};
+const signature = (p: Palette) => KEYS.map(key => String(p[key]).toUpperCase()).join(" ");
 const SANS = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
+/** The Silicon Accounts look's text face: SF Pro on Apple devices, the system face elsewhere. */
+const SILICON = `-apple-system, BlinkMacSystemFont, "SF Pro Text", "BDO Grotesk", ${SANS}`;
 const FONTS: Record<string, string> = {
   Geist: `"Geist Variable", "Geist", ${SANS}`,
   Inter: `"Inter Variable", "Inter", ${SANS}`,
@@ -427,13 +437,13 @@ const STYLE = `
 [data-fb]::before{background:var(--sf);clip-path:var(--p)}
 .e[data-fb]::before{background:var(--sfc)}
 [data-fb]::after{background:var(--bd);clip-path:var(--q)}
-.w{display:flex!important;justify-self:center!important;align-items:center!important;gap:6px;min-height:26px;margin:0;padding:0 11px!important;border:1px solid #E8E3DA!important;border-radius:999px!important;background:#FFFDF9!important;color:#5E5A55!important;font:400 12px/1.4 "Geist Variable",${SANS}!important;white-space:nowrap;visibility:visible!important;opacity:1!important;transform:none!important;filter:none!important;clip-path:none!important}
+.w{display:flex!important;justify-self:center!important;align-items:center!important;gap:6px;min-height:26px;margin:0;padding:0 11px!important;border:1px solid #E2E5EB!important;border-radius:999px!important;background:#FFFFFF!important;color:#4C5260!important;font:400 12px/1.4 ${SILICON}!important;white-space:nowrap;visibility:visible!important;opacity:1!important;transform:none!important;filter:none!important;clip-path:none!important}
 @supports (corner-shape:squircle){.w{corner-shape:squircle}}
-.w a{color:#353432!important;font-weight:500;text-decoration:none}
+.w a{color:#292929!important;font-weight:500;text-decoration:none}
 .w a:is(:hover,:focus-visible){outline:none;text-decoration:underline;text-underline-offset:.2em}
 .w svg{display:block;flex:none}
-.sa[data-theme=dark] .w{border-color:#4A4845!important;background:#2A2927!important;color:#C9C4BC!important}
-.sa[data-theme=dark] .w a{color:#FFFDF9!important}
+.sa[data-theme=dark] .w{border-color:#1F2635!important;background:#0B0F18!important;color:#C2C8D3!important}
+.sa[data-theme=dark] .w a{color:#F7F8FA!important}
 @keyframes p{to{opacity:.55}}
 @media (prefers-reduced-motion:reduce){.b{transition:none}.b:active{transform:none}.k{animation:none}}
 `;
@@ -442,7 +452,15 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => `&#${cha
 const POWERED = `<p class="w" data-powered-by="">${POWERED_MARK}<span>Powered by <a href="${POWERED_BY_HREF}" target="_blank" rel="noopener">Silicon Accounts</a></span></p>`;
 
 function paletteFor(app: PublicApp | null, theme: "light" | "dark"): Palette {
-  return { ...(theme === "dark" ? DARK : LIGHT), ...(app?.branding?.[theme] ?? {}) };
+  const base = theme === "dark" ? DARK : LIGHT;
+  const own = { ...base, ...(app?.branding?.[theme] ?? {}) };
+  return signature(own) === LEGACY[theme] ? base : own;
+}
+
+/** An app that kept every default colour and the default font wears the Silicon Accounts look. */
+function siliconLook(app: PublicApp | null): boolean {
+  const font = app?.branding?.font_family;
+  return (!font || font === "Geist") && signature(paletteFor(app, "light")) === signature(LIGHT) && signature(paletteFor(app, "dark")) === signature(DARK);
 }
 
 let probe: CanvasRenderingContext2D | null | undefined;
@@ -518,7 +536,7 @@ function paint(root: HTMLElement, host: Element, app: PublicApp | null, requeste
     "--mt": mix(p.foreground, theme === "dark" ? 12 : 7, p.surface),
     "--dg": p.danger,
     "--r": `${Math.max(0, Math.min(40, Number(branding.radius ?? 18)))}px`,
-    "--font": FONTS[branding.font_family ?? "Geist"] ?? FONTS.Geist!,
+    "--font": siliconLook(app) ? SILICON : FONTS[branding.font_family ?? "Geist"] ?? FONTS.Geist!,
   };
   for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value);
   root.style.colorScheme = theme;

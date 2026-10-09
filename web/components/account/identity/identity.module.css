@@ -7,9 +7,9 @@
 .face { display: grid; min-width: 0; gap: var(--space-6); }
 .who { display: flex; min-width: 0; align-items: center; gap: var(--space-6); }
 .names { display: grid; min-width: 0; flex: 1; gap: var(--space-2); }
-/* The display name is an inline editor set in the display serif: the editor keeps its metrics while editing. */
-.name.name[data-variant] { --size: clamp(var(--text-3xl), 4vw, 2.75rem); --leading: round(var(--size) * 1.1, 2px); --weight: 400; --ink: var(--foreground); }
-.name > :first-child { font-family: var(--font-serif); letter-spacing: -.01em; }
+/* The display name is an inline editor set in the display face: the editor keeps its metrics while editing. */
+.name.name[data-variant] { --size: clamp(var(--text-3xl), 4vw, 2.75rem); --leading: round(var(--size) * 1.1, 2px); --weight: 600; --ink: var(--foreground); }
+.name > :first-child { font-family: var(--font-display); letter-spacing: var(--tracking-display); }
 /* A long name wraps onto more lines instead of being cut off (names run to 100 characters); while it is edited the
    field is one line again and scrolls (Arc InlineEdit marks the text layer data-layer and its root data-editing). */
 .name:not([data-editing]) [data-layer] { overflow: visible; text-overflow: clip; white-space: pre-wrap; overflow-wrap: anywhere; text-wrap: balance; }
@@ -38,7 +38,7 @@
 
 /* -------------------------------------------------- back of the card -------------------------------------------------- */
 .backHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-.backTitle { margin: 0; font-family: var(--font-serif); font-size: var(--text-3xl); font-weight: 400; line-height: 1; }
+.backTitle { margin: 0; font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 600; letter-spacing: var(--tracking-display); line-height: 1; }
 .details { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: var(--space-5) var(--space-6); margin: 0; padding-top: var(--space-5); border-top: 1px dashed color-mix(in oklab, var(--border) 85%, transparent); }
 .details > div { display: grid; min-width: 0; align-content: start; gap: var(--space-2); font-size: var(--text-sm); }
 .details dt { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
@@ -57,7 +57,9 @@
 .glanceRow { display: grid; grid-template-columns: minmax(3.5rem, auto) minmax(0, 1fr) auto; align-items: baseline; gap: var(--space-4); padding: var(--space-4) 0; border-top: 1px solid var(--border); color: var(--foreground); text-decoration: none; outline: none; }
 .glanceRow:last-child { border-bottom: 1px solid var(--border); }
 .glanceRow:hover { color: var(--foreground); }
-.glanceValue { font-family: var(--font-serif); font-size: var(--text-3xl); line-height: 1; font-variant-numeric: tabular-nums; }
+.glanceValue { font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 600; letter-spacing: var(--tracking-display); line-height: 1; font-variant-numeric: proportional-nums; }
+/* BDO Grotesk's tabular figures are its monospaced set (a footed 1, a narrow 0): the counter keeps the proportional ones. */
+.glanceValue.glanceValue * { font-weight: 600; font-variant-numeric: proportional-nums; }
 /* The rolling counter takes the column's display serif instead of its own face and size. */
 .glanceValue > span { color: inherit; font-family: inherit; font-size: inherit; font-weight: 400; letter-spacing: 0; }
 .glanceLabel { display: grid; gap: 2px; color: var(--text-secondary); font-size: var(--text-sm); transition: color var(--duration-fast) var(--ease-standard); }

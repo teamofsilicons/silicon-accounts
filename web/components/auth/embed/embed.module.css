@@ -100,11 +100,11 @@
   gap: 6px;
   margin: 0;
   padding: 0 11px !important;
-  border: 1px solid #E8E3DA !important;
+  border: 1px solid #E2E5EB !important;
   border-radius: 999px !important;
-  background: #FFFDF9 !important;
-  color: #5E5A55 !important;
-  font: 400 12px/1.4 var(--font-geist), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important;
+  background: #FFFFFF !important;
+  color: #4C5260 !important;
+  font: 400 12px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "BDO Grotesk", system-ui, sans-serif !important;
   letter-spacing: -.01em;
   white-space: nowrap;
   visibility: visible !important;
@@ -114,10 +114,10 @@
   clip-path: none !important;
 }
 @supports (corner-shape: squircle) { .powered { corner-shape: squircle; } }
-.powered a { color: #353432 !important; font-weight: 500; text-decoration: none; }
+.powered a { color: #292929 !important; font-weight: 500; text-decoration: none; }
 .powered a:is(:hover, :focus-visible) { outline: none; text-decoration: underline; text-underline-offset: .2em; }
-.powered[data-tone="dark"] { border-color: #4A4845 !important; background: #2A2927 !important; color: #C9C4BC !important; }
-.powered[data-tone="dark"] a { color: #FFFDF9 !important; }
+.powered[data-tone="dark"] { border-color: #1F2635 !important; background: #0B0F18 !important; color: #C2C8D3 !important; }
+.powered[data-tone="dark"] a { color: #F7F8FA !important; }
 
 @keyframes embed-in { from { opacity: 0; } }
 @keyframes embed-shimmer { to { background-position: -200% 0; } }

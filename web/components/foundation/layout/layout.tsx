@@ -1,7 +1,7 @@
 /**
  * Layout primitives for the account pages:
  *   <Page>            the one page container (gutters, max width, room for the dock)
- *   <PageHeader>      the page's h1 in the display serif, a line of context, actions, a back link
+ *   <PageHeader>      the page's h1 in the display face, a line of context, actions, a back link
  *   <Section>         a titled region (h2) with an optional description and actions
  *   <Stack>/<Cluster>/<Grid>   spacing on the 4px grid
  *   <Surface>         a bordered squircle region (never nest them)

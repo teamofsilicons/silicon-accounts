@@ -1,7 +1,7 @@
 # web-auth: the hosted sign-in pages
 
 The pages a Carbon sees while signing into an app, the account site's own sign-in, CLI device approval and the embed
-page. Routes are in `app/(auth)/`, everything else is here. Read `web/README.md` first (topology, conventions, hooks,
+page. Routes are in `app/(app)/(auth)/`, everything else is here. Read `web/README.md` first (topology, conventions, hooks,
 branding runtime); the product contract is `understanding/UNDERSTANDING.md`.
 
 | Route | Component | What it does |
@@ -9,7 +9,7 @@ branding runtime); the product contract is `understanding/UNDERSTANDING.md`.
 | `/authorize` | `authorize.tsx` | Creates the flow from the app's query (`POST /v1/flows`, with the browser's time zone) and hands it to the flow page through the query cache. `intent=signin\|signup` and `method=` pass through; `login_hint` (and any email or phone) is dropped: an app never hands us a Carbon's email or phone. A link that cannot start shows why in plain words and never redirects (the server's reason and fix are in the details for the app's developers); mistakes the server may report to the app offer "Back to the app", the rest "Go to your account". |
 | `/authorize/flow/[id]` | `flow-page.tsx` | One sign-in, driven by `FlowView.step`: the Opening page (`method=google\|apple`), `choose_method` (Continue as / Use another account, Google and Apple, email or phone; the sign-in or sign-up version by `intent`), `verify_code`, `signup`, `details` (each page of the app's flow), `review`, `complete`, `failed`. Google and Apple come back here. |
 | `/sign-in` | `sign-in.tsx` | Both ends of the account site's own sign-in (first-party app `silicon-accounts`, redirect `{origin}/sign-in`): starts it with `return_to` remembered against the state, and finishes it (`?code&state`, or `?error&state` with a way to try again). A code or error counts only when this browser saved its state; the page never shows the address's `error` or `error_description` (fixed words per error code), so nobody can put their own text on it with a link. |
-| `/device` | `device.tsx` | Approving a CLI sign-in: enter (or arrive with) the code, review it (the whole client label, who approves, when it expires), approve or deny, and every status after; a code that runs out while the page is open turns into "This code expired" by the clock. Signed out, it signs in and comes back with the code. |
+| `/device` | `device.tsx` | Approving a terminal sign-in: enter (or arrive with) the code, review it (the whole client label, who approves, when it expires), approve or deny, and every status after. The silicon-accounts CLI's sign-in is shown in the Silicon Accounts look; an app's own command-line tool (`GET /v1/device/{user_code}` names its `app` and `scopes`) in the app's look, with "Sign in to {app}?", what the app will see and "Powered by"; a code that runs out while the page is open turns into "This code expired" by the clock. Signed out, it signs in and comes back with the code. |
 | `/embed/v1/buttons` | `embed/embed-buttons.tsx` | The buttons apps frame: a button per method ("Continue with Google", "Continue with email", "Continue with phone number"…, `method=` keeps one), or with `buttons=intents` "Sign in" and "Sign up" (`intent=` keeps one), each opening our pages (`intent=signup` the sign-up version). No email or phone is ever passed on. The page declares the frame's color scheme from `theme` on the first byte. A config read the browser cut off is tried twice more (after 0.5 s and 1.5 s) before a problem is reported: Safari cancels a frame's requests when the page around it starts leaving, before the answer (`network_error`) or after its 200 headers while the body is still on its way (`http_200`). |
 
 ## Inside
@@ -39,8 +39,8 @@ branding runtime); the product contract is `understanding/UNDERSTANDING.md`.
   closes when focus moves on, and is no Tab stop (fixed in Arc itself; the former `flow/combobox-field.tsx` wrapper is
   gone).
 - `flow/legible.ts`: error text stays at 4.5:1 in every app's colours: a `danger` below that on the card or page moves
-  toward the text colour. Every other colour stays as the app chose it. (The default dark danger is #FF8A80 now, 5.45:1
-  on #353432; migration 0004 moved stored configs off the old #F97066.)
+  toward the text colour. Every other colour stays as the app chose it. (The default dark danger is #FF8A80: 8.6:1 on the
+  Silicon look's #0B0F18 card, 5.45:1 on the older default #353432; migration 0004 moved stored configs off #F97066.)
 - Keyboard focus shows on everything (Arc draws no rings). Arc's Switch, SegmentedControl and DatePicker trigger and
   the foundation's "Powered by" pill show it themselves now; the hosted pages add the rest (the consent switches' rows,
   the footer links, the date of birth trigger's refused state).

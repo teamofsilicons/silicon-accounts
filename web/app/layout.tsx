@@ -1,30 +1,45 @@
 /**
- * The root layout: <html> and <body> for every page, the three site fonts, the brand tokens over Arc's foundation, the
- * no-flash theme boot script (inline, with the request's CSP nonce) and the shared providers.
+ * The root layout: <html> and <body> for every page, the site's faces and tokens over Arc's foundation, the no-flash
+ * theme boot script and the WebMCP tools (both inline, with the request's CSP nonce). It ships no client code of its
+ * own: the account pages and the hosted pages mount their providers in app/(app)/layout.tsx, so the public landing
+ * page (app/landing) stays server-rendered HTML with a few small islands.
  *
- * Two surfaces share it, told apart by proxy.ts through the `x-sa-surface` request header:
- *   site   the account site, the docs and the hosted sign-in pages
- *   embed  /embed/v1/buttons, a transparent document inside an app's iframe (no theme boot, no toasts)
- * Every page is rendered per request (the nonce changes each time), so `headers()` and `cookies()` are fine here.
+ * Three surfaces share it, told apart by proxy.ts through the `x-sa-surface` request header:
+ *   public  the landing page at "/" for a browser without a live session, with the Organization and WebSite JSON-LD
+ *   site    the account site and the hosted sign-in pages
+ *   embed   /embed/v1/buttons, a transparent document inside an app's iframe (no theme boot, no WebMCP)
+ * Every page is rendered per request (the nonce changes each time), so `headers()` is fine here.
  */
 import "@/components/arc/foundation.css";
+import "@/styles/fonts.css";
 import "@/styles/tokens.css";
 import "@/styles/squircle.css";
 import "@/styles/branding.css";
 import "@/styles/base.css";
 import type { Metadata, Viewport } from "next";
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
-import { Providers } from "@/components/foundation/providers";
+import { JsonLd, organizationLd, websiteLd } from "@/lib/seo";
+import { CANONICAL_ORIGIN, OG_IMAGE, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
-import { fontVariables } from "./fonts";
+import { WEBMCP_SCRIPT } from "@/lib/webmcp";
+import { brandFontVariables } from "./fonts";
 
 export const metadata: Metadata = {
-  title: { default: "Silicon Accounts", template: "%s · Silicon Accounts" },
-  description: "One account for every Carbon and Silicon. Manage your identity, the apps you sign into, your Silicons and your proofs.",
-  applicationName: "Silicon Accounts",
+  metadataBase: new URL(CANONICAL_ORIGIN),
+  title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
   referrer: "strict-origin-when-cross-origin",
-  robots: { index: true, follow: true },
+  // Account pages are private and hosted sign-in pages are not for search engines; the landing page opens itself.
+  robots: { index: false, follow: false },
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/favicon.ico", sizes: "32x32" }, { url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  openGraph: { type: "website", siteName: SITE_NAME, locale: "en_US", images: [{ ...OG_IMAGE, url: `${CANONICAL_ORIGIN}${OG_IMAGE.url}` }] },
+  twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = {
@@ -32,30 +47,34 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FFFDF9" },
-    { media: "(prefers-color-scheme: dark)", color: "#2A2927" },
+    { media: "(prefers-color-scheme: light)", color: "#F7F8FA" },
+    { media: "(prefers-color-scheme: dark)", color: "#02040A" },
   ],
 };
 
-/** Cookie names of the browser session (`__Host-` when the API runs with secure cookies). */
-const SESSION_COOKIES = ["sa_session", "__Host-sa_session"];
+type Surface = "public" | "site" | "embed";
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const requestHeaders = await headers();
   const nonce = requestHeaders.get("x-nonce") ?? undefined;
-  const surface = requestHeaders.get("x-sa-surface") === "embed" ? "embed" : "site";
-  // No session cookie means signed out for sure: the landing page can render on the server instead of after a
-  // round trip. With a cookie, the client asks GET /v1/session (the cookie may have expired).
-  const jar = await cookies();
-  const sessionHint = SESSION_COOKIES.some(name => jar.has(name)) ? "cookie" : "none";
+  const asked = requestHeaders.get("x-sa-surface");
+  const surface: Surface = asked === "embed" || asked === "public" ? asked : "site";
 
   return (
-    <html lang="en" className={fontVariables} data-surface={surface} suppressHydrationWarning>
+    <html lang="en" className={brandFontVariables} data-surface={surface} suppressHydrationWarning>
       <head>
-        {surface === "site" ? <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} /> : null}
+        {surface !== "embed" ? (
+          <>
+            <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+            {/* Page titles are set in DemiBold: the one weight worth fetching before first paint. */}
+            <link rel="preload" href="/fonts/bdo-grotesk/BDOGrotesk-DemiBold.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+          </>
+        ) : null}
       </head>
       <body>
-        <Providers surface={surface} sessionHint={sessionHint}>{children}</Providers>
+        {children}
+        {surface === "public" ? <JsonLd nonce={nonce} graph={[organizationLd(), websiteLd()]} /> : null}
+        {surface !== "embed" ? <script nonce={nonce} dangerouslySetInnerHTML={{ __html: WEBMCP_SCRIPT }} /> : null}
       </body>
     </html>
   );

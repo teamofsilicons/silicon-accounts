@@ -20,7 +20,7 @@ interface Sample {
 }
 
 const SAMPLES: Sample[] = [
-  { name: "Briefcase", note: "Default look: card, squircles, Geist", title: "Sign in to Briefcase", branding: {} },
+  { name: "Briefcase", note: "Default look: card, squircles, the Silicon faces", title: "Sign in to Briefcase", branding: {} },
   {
     name: "Acme Notes",
     note: "Dark, Fraunces headings, radius 28, split, grain",

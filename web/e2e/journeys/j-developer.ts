@@ -23,7 +23,8 @@ export const journey: Journey = {
 
     // Signing in: the developer site's own sign-in card, then the account site's hosted pages, then back.
     await signInOnDeveloper(env, page, owner);
-    results.check("signed in, the developer site opens on the apps the Carbon owns", page.url() === `${env.developer}/`, page.url());
+    // The developer site's "/" is its public home page now; a signed-in visit opens the apps at /apps.
+    results.check("signed in, the developer site opens on the apps the Carbon owns", [`${env.developer}/`, `${env.developer}/apps`].includes(page.url()), page.url());
     const list = page.getByRole("list", { name: "Your apps" });
     await list.waitFor({ timeout: 30_000 });
     await sleep(600);

@@ -1,11 +1,13 @@
 "use client";
 
 /**
- * /device: approve a CLI sign-in (the device flow). `silicon-accounts login` prints a code and this address; a signed-in
- * Carbon opens it, checks that the code matches the terminal, and approves or denies. Signed out, the page first
- * sends the visitor to sign in and comes back here with the code.
+ * /device: approve a terminal sign-in (the device flow). `silicon-accounts login`, or an app's own command-line tool,
+ * prints a code and this address; a signed-in Carbon opens it, checks that the code matches the terminal, sees which
+ * app is asking and what it will see, and approves or denies. Signed out, the page first sends the visitor to sign in
+ * and comes back here with the code. An app's tool is shown in the app's own look (its branding, logo and name, with
+ * "Powered by Silicon Accounts"); the silicon-accounts CLI's sign-in in the Silicon Accounts look.
  *
- *   GET  /v1/device/{user_code}           what is asking (client label, times, status)
+ *   GET  /v1/device/{user_code}           what is asking (client label, the app and its scopes, times, status)
  *   POST /v1/device/{user_code}/approve   the CLI's next poll receives tokens for this Carbon
  *   POST /v1/device/{user_code}/deny      the CLI's next poll gets access_denied
  */
@@ -15,7 +17,7 @@ import { Alert } from "@/components/arc/alert/alert";
 import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
 import { ApiError } from "@/lib/api/errors";
-import type { AccountSummary } from "@/lib/api/types";
+import type { AccountSummary, DeviceRequest } from "@/lib/api/types";
 import { formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useDecideDevice, useDeviceRequest } from "@/lib/query/auth";
@@ -23,7 +25,7 @@ import { useSession } from "@/lib/query/session";
 import { describe } from "./flow/errors";
 import { useHydrated, useNow } from "./flow/hooks";
 import { HostedFrame } from "./flow/hosted-frame";
-import { SILICON_ACCOUNTS } from "./flow/model";
+import { SILICON_ACCOUNTS, type FrameApp } from "./flow/model";
 import { StepMorph } from "./flow/morph";
 import { AccountRow, StepHeading, SuccessMark } from "./flow/parts";
 import { ArrivalScope, LoadingCard } from "./flow/problem";
@@ -40,6 +42,34 @@ export function normalizeUserCode(input: string): string | null {
 function shapeTyping(input: string): string {
   const raw = input.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
   return raw.length > 4 ? `${raw.slice(0, 4)}-${raw.slice(4)}` : raw;
+}
+
+/** What each scope an app's tool asks for lets it see, in the Carbon's words (openid comes with the profile). */
+const SCOPE_WORDS: Record<string, string> = {
+  profile: "Your name, id, uuid and profile photo",
+  email: "Your email address",
+  phone: "Your phone number",
+  dob: "Your date of birth",
+  timezone: "Your timezone",
+  offline_access: "Staying signed in until you sign it out",
+};
+
+/** The lines "What it will see" lists: the profile first, unknown scopes as they are named. */
+export function scopeLines(scopes: readonly string[] | undefined): string[] {
+  const list = scopes?.length ? scopes : ["profile"];
+  const wanted = new Set(list.filter(scope => scope !== "openid"));
+  wanted.add("profile");
+  const order = ["profile", "email", "phone", "dob", "timezone", "offline_access"];
+  const known = order.filter(scope => wanted.has(scope)).map(scope => SCOPE_WORDS[scope]!);
+  const unknown = [...wanted].filter(scope => !order.includes(scope)).map(scope => `Its "${scope}" access`);
+  return [...known, ...unknown];
+}
+
+/** The app an app's own tool signs into (null for the silicon-accounts CLI, whose sign-in is first party). */
+export function deviceApp(request: DeviceRequest | null | undefined): FrameApp | null {
+  const app = request?.app;
+  if (!app || request?.first_party) return null;
+  return { app_id: app.app_id, name: app.name, logo_url: app.logo_url ?? null, logo_dark_url: app.logo_dark_url ?? null, branding: app.branding ?? null, copy: app.copy ?? null };
 }
 
 const VIEWS = ["loading", "enter", "review", "approved", "already-approved", "denied", "expired", "used", "unknown", "failed", "silicon", "offline"] as const;
@@ -167,6 +197,10 @@ function DeviceApproval() {
   })();
 
   const signedInAs = account ? <SignedInAs account={account} onSwitch={switchAccount} /> : null;
+  // An app's own tool: the page takes the app's look and names it; the silicon-accounts CLI keeps ours.
+  const app = deviceApp(req);
+  const tool = app ? `${app.name}'s command-line tool` : "the silicon-accounts CLI";
+  const again = app ? <>Start the sign-in again in your terminal for a new code.</> : <>Run <code className={flow.mono}>silicon-accounts login</code> again in your terminal for a new one.</>;
 
   const render = (current: string) => {
     switch (current) {
@@ -199,15 +233,25 @@ function DeviceApproval() {
         return req ? (
           <>
             <StepHeading
-              title="Approve this sign-in?"
-              description={<>A terminal is asking to sign in to Silicon Accounts as you. Approve it only if you just ran <code className={flow.mono}>silicon-accounts login</code> yourself.</>}
+              title={app ? `Sign in to ${app.name}?` : "Approve this sign-in?"}
+              description={app
+                ? <>{tool} is asking to sign in to {app.name} as you. Approve it only if you just started this sign-in in your terminal yourself.</>
+                : <>A terminal is asking to sign in to Silicon Accounts as you. Approve it only if you just ran <code className={flow.mono}>silicon-accounts login</code> yourself.</>}
             />
             <div data-sq="surface" className={styles.codeCard}>
               <span className={styles.codeLabel}>Check that your terminal shows</span>
               <span className={styles.code} aria-label={`Code ${req.user_code.split("").join(" ")}`}>{req.user_code}</span>
             </div>
+            {app ? (
+              <section className={styles.sees} aria-labelledby="device-sees">
+                <h2 id="device-sees" className={styles.seesTitle}>{app.name} will see</h2>
+                <ul className={styles.seesList}>
+                  {scopeLines(req.scopes).map(line => <li key={line}>{line}</li>)}
+                </ul>
+              </section>
+            ) : null}
             <dl className={styles.facts}>
-              <div><dt>Asking</dt><dd>{req.client_label ?? "The silicon-accounts CLI"}</dd></div>
+              <div><dt>Asking</dt><dd>{req.client_label ?? (app ? `${app.name}'s command-line tool` : "The silicon-accounts CLI")}</dd></div>
               <div><dt>Started</dt><dd>{now ? formatRelative(req.created_at, now) : "just now"}</dd></div>
               <div><dt>Code expires</dt><dd>{expiresText}</dd></div>
             </dl>
@@ -226,7 +270,9 @@ function DeviceApproval() {
             {account ? <SuccessMark name={account.display_name} photo={account.pfp_url} /> : null}
             <StepHeading
               title="Your terminal is signed in"
-              description={<>Go back to your terminal: <code className={flow.mono}>accounts</code> is now signed in as <span className={flow.mono}>{account?.id ?? "you"}</span>. You can close this tab.</>}
+              description={app
+                ? <>Go back to your terminal: {tool} is now signed in to {app.name} as <span className={flow.mono}>{account?.id ?? "you"}</span>. You can close this tab.</>
+                : <>Go back to your terminal: <code className={flow.mono}>silicon-accounts</code> is now signed in as <span className={flow.mono}>{account?.id ?? "you"}</span>. You can close this tab.</>}
             />
           </div>
         );
@@ -235,7 +281,7 @@ function DeviceApproval() {
           <>
             <StepHeading
               title="This sign-in was already approved"
-              description={<>Someone approved this code before this page loaded (perhaps you, in another tab), so the terminal signs in as the account that approved it. If you did not expect that, run <code className={flow.mono}>silicon-accounts login</code> again in your terminal for a new code.</>}
+              description={<>Someone approved this code before this page loaded (perhaps you, in another tab), so the terminal signs in as the account that approved it. If you did not expect that, {app ? "start the sign-in again in your terminal for a new code." : <>run <code className={flow.mono}>silicon-accounts login</code> again in your terminal for a new code.</>}</>}
             />
             <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter another code</Button>
           </>
@@ -250,14 +296,14 @@ function DeviceApproval() {
       case "expired":
         return (
           <>
-            <StepHeading title="This code expired" description={<>Codes work for 10 minutes. Run <code className={flow.mono}>silicon-accounts login</code> again in your terminal for a new one.</>} />
+            <StepHeading title="This code expired" description={<>Codes work for 10 minutes. {again}</>} />
             <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter another code</Button>
           </>
         );
       case "used":
         return (
           <>
-            <StepHeading title="This code was already used" description={<>A terminal already signed in with it, and each code works once. Run <code className={flow.mono}>silicon-accounts login</code> again in your terminal if you need a new sign-in.</>} />
+            <StepHeading title="This code was already used" description={<>A terminal already signed in with it, and each code works once. {app ? "Start the sign-in again in your terminal if you need a new one." : <>Run <code className={flow.mono}>silicon-accounts login</code> again in your terminal if you need a new sign-in.</>}</>} />
             <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter another code</Button>
           </>
         );
@@ -286,9 +332,15 @@ function DeviceApproval() {
   };
 
   return (
-    <HostedFrame app={SILICON_ACCOUNTS} site title="Approve a sign-in" poweredBy={false}>
-      <StepMorph view={view} order={VIEWS}>{render}</StepMorph>
-    </HostedFrame>
+    app ? (
+      <HostedFrame app={app} title={`Sign in to ${app.name}`} hideName>
+        <StepMorph view={view} order={VIEWS}>{render}</StepMorph>
+      </HostedFrame>
+    ) : (
+      <HostedFrame app={SILICON_ACCOUNTS} site title="Approve a sign-in" poweredBy={false}>
+        <StepMorph view={view} order={VIEWS}>{render}</StepMorph>
+      </HostedFrame>
+    )
   );
 }
 

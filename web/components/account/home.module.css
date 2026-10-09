@@ -1,0 +1,6 @@
+/* "/" when the session ended while the tab was open: one calm card in the middle of the page. */
+.signedOut { display: grid; min-height: 100dvh; place-items: center; padding: var(--gutter); }
+.card { --sq-r: var(--radius-surface); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; width: min(100%, 460px); gap: var(--space-4); border: 1px solid var(--sq-stroke); padding: clamp(24px, 5vw, 40px); background: var(--sq-fill); box-shadow: var(--shadow-raised); }
+.title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 600; letter-spacing: var(--tracking-display); line-height: 1.05; }
+.text { margin: 0; color: var(--text-secondary); line-height: 1.6; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin-top: var(--space-2); }

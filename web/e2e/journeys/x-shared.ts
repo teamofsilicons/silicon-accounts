@@ -50,7 +50,9 @@ export const journey: Journey = {
     results.check("staying keeps the developer site's session", (await developerApi(env, page, "/me")).status === 200);
     await page.getByRole("navigation", { name: "Developer site" }).getByRole("link", { name: "Apps", exact: true }).click();
     await leave.getByRole("button", { name: "Leave, keep the draft" }).click({ timeout: 5_000 });
-    await page.waitForURL(`${env.developer}/`, { timeout: 10_000 });
+    // The developer site's apps live at /apps now ("/" is its public home page).
+    const appsList = (url: URL) => url.href === `${env.developer}/` || url.href === `${env.developer}/apps`;
+    await page.waitForURL(appsList, { timeout: 10_000 });
     await page.getByRole("button", { name: "Return" }).click({ timeout: 5_000 });
     await page.waitForURL(pages, { timeout: 10_000 });
     await title.waitFor({ timeout: 10_000 });
@@ -61,8 +63,8 @@ export const journey: Journey = {
     await sleep(300);
     await page.keyboard.press("Enter");
     await leave.getByRole("button", { name: "Discard and leave" }).click({ timeout: 5_000 });
-    await page.waitForURL(`${env.developer}/`, { timeout: 10_000 });
-    results.check("Discard and leave goes on", page.url() === `${env.developer}/`);
+    await page.waitForURL(appsList, { timeout: 10_000 });
+    results.check("Discard and leave goes on", appsList(new URL(page.url())));
     const missing = await page.goto(`${env.developer}/apps/briefcase/no-such-tab`);
     results.check("an unknown tab of an app answers 404 with the developer site's not-found page", missing?.status() === 404 && (await page.getByText("Nothing lives at this address").isVisible()), String(missing?.status()));
     await page.goto(`${env.site}/silicons`);
@@ -152,7 +154,7 @@ export const journey: Journey = {
       const style = getComputedStyle(document.documentElement);
       return [style.getPropertyValue("--text-muted"), style.getPropertyValue("--text-secondary"), style.getPropertyValue("--accent-strong")].map(value => value.trim().toUpperCase());
     });
-    results.check("dark tokens: muted #B8B3AB, secondary #C2BDB5, accent-strong #93B8F1 (4.5:1 on their tracks)", JSON.stringify(tokens) === JSON.stringify(["#B8B3AB", "#C2BDB5", "#93B8F1"]), tokens.join(" "));
+    results.check("dark tokens: muted #9BA4B4, secondary #C2C8D3, accent-strong #A8C8F8 (the Silicon look: 6.4:1, 9.6:1 and 10.2:1 at worst)", JSON.stringify(tokens) === JSON.stringify(["#9BA4B4", "#C2C8D3", "#A8C8F8"]), tokens.join(" "));
     // 7. The account site's old /developer addresses lead to the developer site (a 307, the tab renamed where it moved).
     const moved = await fetch(`${env.site}/developer/briefcase/branding?from=e2e`, { redirect: "manual" });
     results.check("/developer/briefcase/branding on the account site answers 307 to the developer site", moved.status === 307 && (moved.headers.get("location") ?? "").startsWith(`${env.developer}/apps/briefcase/branding`), `${moved.status} ${moved.headers.get("location")}`);

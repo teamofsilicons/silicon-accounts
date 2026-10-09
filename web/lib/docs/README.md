@@ -19,7 +19,7 @@ it first.
 | `/docs/start`, `/docs/learn`, `/docs/reference` | the group's pages, with their descriptions |
 | `/docs/<path>.md`, `/docs/index.md`, `/docs.md` | the Markdown as written (static files in `public/docs`) |
 | `/docs/search-index.json` | the search index the docs search loads |
-| `/llms.txt`, `/llms-full.txt` | llmstxt.org files, with links on the origin the request came to (or `ACCOUNTS_PUBLIC_URL`) |
+| `/llms.txt`, `/llms-full.txt` | gone from this renderer (2026-10-09): the site serves the Carbon's `web/llms/` files there (web/README.md, "Agent entry points"); `lib/docs/llms.ts` is unused source |
 
 ## Writing a page
 
@@ -67,7 +67,7 @@ only checks and fails on any problem; `pnpm build:docs --watch` rebuilds on ever
 | `lib/docs/search-index.ts`, `lib/docs/search.ts` | the search index (server) and ranking (browser) |
 | `lib/docs/llms.ts` | `/llms.txt` and `/llms-full.txt` |
 | `components/docs/` | the frame, navigation, search, contents, article, Markdown and code block components |
-| `app/(docs)/` | the routes |
+| `app/(app)/(docs)/` | the routes |
 
 The parser was checked against markdown-it on every page of the docs (identical output, apart from the alerts and the
 dropped comments) and the highlighter on every code block (lossless).

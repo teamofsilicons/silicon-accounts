@@ -19,7 +19,7 @@ import type { FrameApp } from "./model";
 import styles from "./flow.module.css";
 
 /** The Silicon Accounts mark, for the account site's own sign-in (the first-party app has no logo of its own). */
-const SILICON_ACCOUNTS_MARK = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="#1F5FB8" d="M32 0c19.6 0 25.4 1.4 28.6 3.4C62.6 6.6 64 12.4 64 32s-1.4 25.4-3.4 28.6C57.4 62.6 51.6 64 32 64S6.6 62.6 3.4 60.6C1.4 57.4 0 51.6 0 32S1.4 6.6 3.4 3.4C6.6 1.4 12.4 0 32 0Z"/><circle cx="32" cy="25" r="9" fill="#FFFDF9"/><path fill="#FFFDF9" d="M15 49c2.6-8 9.2-12.5 17-12.5S46.4 41 49 49c-4.6 3-10.4 4.6-17 4.6S19.6 52 15 49Z"/></svg>')}`;
+const SILICON_ACCOUNTS_MARK = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="#1F5FB8" d="M32 0c19.6 0 25.4 1.4 28.6 3.4C62.6 6.6 64 12.4 64 32s-1.4 25.4-3.4 28.6C57.4 62.6 51.6 64 32 64S6.6 62.6 3.4 60.6C1.4 57.4 0 51.6 0 32S1.4 6.6 3.4 3.4C6.6 1.4 12.4 0 32 0Z"/><circle cx="32" cy="25" r="9" fill="#FFFFFF"/><path fill="#FFFFFF" d="M15 49c2.6-8 9.2-12.5 17-12.5S46.4 41 49 49c-4.6 3-10.4 4.6-17 4.6S19.6 52 15 49Z"/></svg>')}`;
 
 /** The paint theme of a branding for this visitor: the app's forced theme, else the visitor's own. */
 export function usePaint(app: FrameApp | null, site: boolean): PaintTheme {
@@ -132,7 +132,7 @@ export function HostedFrame({ app, site: siteProp, title, subtitle, children, fo
     <div className={styles.hosted} data-paint={paint} data-layout={layout} data-site={site || undefined}>
       {site ? (
         // Silicon Accounts itself: the site's own brand tokens (styles/tokens.css), in the card layout.
-        <div className={`sa-brand ${styles.scope}`} data-layout="card" data-bg="plain" data-density="comfortable">{stage}</div>
+        <div className={`sa-brand ${styles.scope}`} data-layout="card" data-bg="plain" data-density="comfortable" data-look="silicon">{stage}</div>
       ) : (
         <BrandingScope branding={branding} theme={paint} className={styles.scope} onFontsReady={() => setFontsLoaded(true)}>
           {stage}

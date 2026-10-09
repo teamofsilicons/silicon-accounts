@@ -8,10 +8,14 @@
  */
 import type { AppPublic, Branding, FlowView, Palette, ThemeMode } from "../api/types";
 import { legibleTint, mixHex, mixOklab } from "./contrast";
-import { LIMITS, normalizeBranding } from "./defaults";
+import { LIMITS, isSiliconLook, normalizeBranding } from "./defaults";
 import { FONT_STACKS } from "./fonts";
 
 export type PaintTheme = "light" | "dark";
+
+/** The site's faces (styles/tokens.css), for the Silicon Accounts look: BDO Grotesk headings, SF Pro system text. */
+const SILICON_DISPLAY = '"BDO Grotesk", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif';
+const SILICON_BODY = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "BDO Grotesk", system-ui, sans-serif';
 
 /** The theme a branded page should paint: the branding's forced theme, else the visitor's theme. */
 export function resolveBrandTheme(mode: ThemeMode | undefined, visitorTheme: PaintTheme): PaintTheme {
@@ -76,6 +80,7 @@ export function brandingVariables(input: Branding | Partial<Branding> | null | u
   const dark = theme === "dark";
   const radius = branding.radius;
   const compact = branding.density === "compact";
+  const silicon = isSiliconLook(branding);
   const vars: Record<string, string> = {
     "--background": p.background,
     "--surface": p.surface,
@@ -114,8 +119,9 @@ export function brandingVariables(input: Branding | Partial<Branding> | null | u
     "--radius-control": px(radius),
     "--radius-panel": px(radius * (26 / 18)),
     "--radius-surface": px(radius * (34 / 18)),
-    "--font-body": FONT_STACKS[branding.font_family],
-    "--font-display": FONT_STACKS[branding.heading_font_family ?? branding.font_family],
+    // The Silicon Accounts look takes the site's own faces (styles/tokens.css); an app's choice is used as it is.
+    "--font-body": silicon ? SILICON_BODY : FONT_STACKS[branding.font_family],
+    "--font-display": silicon ? SILICON_DISPLAY : FONT_STACKS[branding.heading_font_family ?? branding.font_family],
     "--brand-logo-height": px(branding.logo_height),
     "--brand-pad": compact ? "24px" : "32px",
     "--brand-gap": compact ? "12px" : "16px",
@@ -140,6 +146,8 @@ export function brandingAttributes(input: Branding | Partial<Branding> | null | 
     "data-bg": branding.background_style === "image" && !cssUrl(branding.background_image_url) ? "plain" : branding.background_style,
     "data-button-style": branding.button_style,
     "data-density": branding.density,
+    // styles/branding.css sets the Silicon Accounts look's heading weight from this.
+    ...(isSiliconLook(branding) ? { "data-look": "silicon" } : {}),
   };
 }
 
