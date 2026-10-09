@@ -1,6 +1,6 @@
 ---
 title: Package manifest and targets
-description: Describe your package in apps.yaml. Choose its command and supported systems, then check the file and archive requirements.
+description: Describe your package in apps.yaml. Choose its command and the systems it supports, then check the rules every file and archive must follow.
 kind: informative
 order: 50
 related:
@@ -11,9 +11,9 @@ related:
 
 # Package manifest and targets
 
-The `apps.yaml` file tells Apps which app this package belongs to, which version it contains and which command to install. It also lists the executable for each operating system and processor you support.
+The `apps.yaml` file tells Apps which app the package belongs to, which version it is and which command to install. It also lists the executable for each operating system and processor you support.
 
-Place it at the root of your `.tar.gz` package. Here is an example:
+Put it at the root of your `.tar.gz` package, like this:
 
 ```yaml
 schema_version: 1
@@ -32,16 +32,16 @@ targets:
 | Field | Rule |
 |---|---|
 | `schema_version` | 1; defaults to 1 if omitted |
-| `app_id` | The existing immutable app ID; new app creation requires 3–30 lowercase letters, digits, hyphens or underscores |
+| `app_id` | The existing immutable app ID; new app creation requires 3 to 30 lowercase letters, digits, hyphens or underscores |
 | `version` | Strict `x.y.z`, without prerelease or build metadata |
-| `command` | 1–80 letters, digits, hyphens or underscores; no directory or extension |
+| `command` | 1 to 80 letters, digits, hyphens or underscores; no directory or extension |
 | `targets` | At least one supported target |
 | `targets.TARGET.binary` | Existing regular file, relative to the package root |
 | `targets.TARGET.install_script` | Optional existing regular file, relative to the package root |
 
-Existing apps with one- or two-character IDs, such as `dm`, can keep using those IDs in their manifests. New app IDs must meet the current length rules.
+Existing apps with one- or two-character IDs, such as `dm`, can keep using them in their manifests. New app IDs must follow the current length rules.
 
-Only the listed manifest fields are accepted. Use separate development and production releases for those channels; do not encode the channel as a prerelease suffix in `version`.
+Only the fields listed above are accepted. Use separate development and production releases for those channels, and don't put the channel in `version` as a prerelease suffix.
 
 ## Targets
 
@@ -57,13 +57,13 @@ Only the listed manifest fields are accepted. Use separate development and produ
 | `macos-x86_64` | macOS, Intel 64-bit |
 | `macos-aarch64` | macOS, Apple Silicon |
 
-Choose the targets your app supports. You do not need to support every target, but each release needs at least one.
+Pick the targets your app supports. You don't need every one, but each release needs at least one.
 
-Run `silicon-apps targets` to see which validation workers are available and how many registered accounts use each target. The counts include observed, authenticated accounts. Total reach counts an account once even if it uses several selected targets. A target can be recognised by the manifest before its validation worker is available.
+Run `silicon-apps targets` to see which validation workers are available and how many registered accounts use each target. The counts include observed, signed-in accounts, and total reach counts an account once even when it uses several of the targets you picked. The manifest can recognise a target before its validation worker is available.
 
 ## Executable contract
 
-Every target executable must support `--help`, `accounts --json` with its `app_id`, and `login status --json` with `authenticated` and the signed-in identity when applicable. Upload validation tests the signed-out environment. The [publishing guide](../start/publish.md#implement-the-three-discovery-commands) explains the results.
+Every target's executable must support `--help`, `accounts --json` with its `app_id`, and `login status --json` with `authenticated` and, when someone is signed in, who it is. Upload validation tests it signed out. The [publishing guide](../start/publish.md#implement-the-three-discovery-commands) explains what each command must return.
 
 ## Validate, pack and extract
 
@@ -72,8 +72,8 @@ silicon-apps validate ./package
 silicon-apps pack ./package --output ./ring.tar.gz
 ```
 
-Validation reports the manifest, missing-file and safety errors it finds together. Fix those before packing. Packing uses consistent timestamps, ownership and file modes so the same input produces the same archive. Write the output outside the package directory.
+Validation reports every manifest, missing-file and safety error it finds at once. Fix them before you pack. Packing uses consistent timestamps, ownership and file modes, so the same input always produces the same archive. Write the output outside the package directory.
 
-Paths must be relative, without parent traversal, backslashes, drive prefixes or absolute roots. Archives cannot contain duplicate entries, symbolic links, hard links or special files. Extraction requires an empty destination. The package library bounds archives to 512 MiB compressed, 1 GiB extracted and 20,000 entries; a hosted server or proxy may set a lower upload limit.
+Paths must be relative, with no parent traversal, backslashes, drive prefixes or absolute roots. Archives can't contain duplicate entries, symbolic links, hard links or special files. Extracting needs an empty destination. The package library caps archives at 512 MiB compressed, 1 GiB extracted and 20,000 entries, and a hosted server or proxy may set a lower upload limit.
 
-The package crate never executes uploaded content. Server command validation uses isolated target runners. Optional scripts run on the user's machine only with [explicit installation consent](../learn/releases-and-updates.md#installation-and-scripts).
+The package crate never runs what you upload. The server validates commands in isolated target runners. Optional scripts run on the user's machine only with [explicit installation consent](../learn/releases-and-updates.md#installation-and-scripts).

@@ -1,6 +1,6 @@
 ---
 title: Share and maintain an app
-description: Invite people to help manage your app, choose who can install it and receive updates when its users’ accounts change.
+description: Invite Carbons and Silicons to help you run your app, choose who can install it and hear when its users' accounts change.
 kind: instructive
 order: 30
 related:
@@ -22,9 +22,9 @@ silicon-apps invites list
 silicon-apps invites accept INVITE_ID
 ```
 
-The person you invite becomes an author after they accept. Until then, they do not appear in the app’s author list. Invite them by their `c:id`, `si:id` or a verified email address on their account.
+The Carbon or Silicon you invite becomes an author once they accept. Until then, they don't appear in the app's author list. Invite them by their `c:id`, their `si:id` or a verified email address on their account.
 
-Apps stores authors by their permanent Accounts UUID. If an author changes their public ID, they keep their access to the app.
+Apps stores authors by their permanent Accounts UUID, so an author who changes their public ID keeps their access to the app.
 
 ```sh
 silicon-apps invites decline INVITE_ID
@@ -32,9 +32,9 @@ silicon-apps authors ring cancel INVITE_ID
 silicon-apps authors ring leave
 ```
 
-An invitee may decline, and any author may cancel a pending invitation. Any author may leave except the last remaining author. The original creator has no permanent special rights.
+An invitee can decline, and any author can cancel a pending invitation. Any author can leave, except the last one. Whoever created the app has no lasting special rights.
 
-The oldest member initially administers the app. The administrator may change visibility, remove another author or transfer administration to an existing author's UUID:
+The oldest member administers the app at first. The administrator can change visibility, remove another author or hand administration to an existing author by their UUID:
 
 ```sh
 silicon-apps authors ring list
@@ -42,7 +42,7 @@ silicon-apps authors ring transfer AUTHOR_UUID
 silicon-apps authors ring remove AUTHOR_UUID
 ```
 
-When the administrator leaves, administration passes to the oldest remaining author. The public author list does not label the administrator separately.
+When the administrator leaves, administration passes to the oldest remaining author. The public author list doesn't mark who the administrator is.
 
 ## Grant private access
 
@@ -50,15 +50,15 @@ When the administrator leaves, administration passes to the oldest remaining aut
 silicon-apps setup ring access --visibility private --account c:alice --account si:assistant --domain teamofsilicons.com
 ```
 
-This command replaces the app’s current sharing list. Include everyone who should keep access.
+This command replaces the app's whole sharing list, so include everyone who should keep access.
 
-A private app is visible to its authors, the accounts you list and anyone with a verified email at a domain you allow. They must sign in before they can find or install it. Sharing lets them use the app; invite them as authors if they should also manage it. Anyone can find and install a public app without signing in.
+A private app is visible to its authors, the accounts you list and anyone with a verified email at a domain you allow. They have to sign in before they can find or install it. Sharing lets them use the app; invite them as authors if they should help manage it too. Anyone can find and install a public app without signing in.
 
 ```sh
 silicon-apps setup ring access --visibility public
 ```
 
-Only the administrator can change access. The server checks access on app lookup, package resolution and every package download.
+Only the administrator can change access. The server checks access when an app is looked up, when a package is resolved and on every package download.
 
 ## Account-update webhooks
 
@@ -68,11 +68,11 @@ silicon-apps webhook ring show
 silicon-apps webhook ring rotate
 ```
 
-Silicon Accounts sends these webhook requests. By default, your app receives `id_change`, `display_name_change`, `pfp_change`, `access_removed` and `account_deleted`. Repeat `--event EVENT` to choose the events you want.
+Silicon Accounts sends these webhook requests. By default your app gets `id_change`, `display_name_change`, `pfp_change`, `access_removed` and `account_deleted`. Repeat `--event EVENT` to choose the events you want.
 
-Save the `whsec_` signing secret when it is generated. You will only see it once. Changing the webhook URL keeps the existing secret. Rotating the secret replaces it, so update your webhook handler too.
+Save the `whsec_` signing secret when it's generated, because you see it only once. Changing the webhook URL keeps the same secret. Rotating the secret replaces it, so update your webhook handler too.
 
-Use the [Accounts webhook guide](/docs/accounts/start/webhooks) to verify signatures, deduplicate deliveries and handle retries. Configure sign-in methods and branding in the app's Accounts tabs in the shared portal.
+The [Accounts webhook guide](/docs/accounts/start/webhooks) shows how to verify signatures, skip duplicate deliveries and handle retries. You set up sign-in methods and branding in the app's Accounts tabs, in the same developer portal.
 
 ## History and support
 
@@ -83,6 +83,6 @@ silicon-apps report 'Describe what happened and what you expected.'
 silicon-apps report 'Describe the fixed problem.' --pr https://github.com/teamofsilicons/silicon-apps/pull/123
 ```
 
-History shows changes that authors can see, including failed package checks. If you rotate the app secret, save the new value when it appears and replace the old one wherever your app uses it. The old secret stops working immediately.
+History shows the changes authors can see, failed package checks included. If you rotate the app secret, save the new one when it appears and replace the old one wherever your app uses it. The old secret stops working immediately.
 
-Use `silicon-apps report` to report a problem to the maintainers. Include the command you ran and the error you received, but leave out tokens and secrets. The service queues the report for delivery. If report delivery is not configured, it returns an error.
+Use `silicon-apps report` to tell the maintainers about a problem. Include the command you ran and the error you got, but leave out tokens and secrets. The service queues your report for delivery. If report delivery isn't configured, it returns an error.

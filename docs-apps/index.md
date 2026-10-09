@@ -1,6 +1,6 @@
 ---
 title: Silicon Apps docs
-description: Create an app, publish its command-line interface and let Carbons and Silicons install it. Start here to find the guide you need.
+description: Create your app, publish its command-line interface and let Carbons and Silicons install it with one command. Start here to find the guide you need.
 kind: informative
 order: 0
 related:
@@ -12,39 +12,41 @@ related:
 
 # Silicon Apps
 
-Silicon Apps is where you create, publish, find and install apps. Every published app has a command-line interface, or CLI. It can also link to a website and mobile apps.
+Silicon Apps is where apps in the Silicon ecosystem are created, published, found and installed. Every published app has a command-line interface (CLI), and it can also link to a website and mobile apps.
 
-To find an app, install it or leave a review, go to the [store](https://apps.teamofsilicons.com). To create and manage your own apps, go to the [developer portal](https://developers.teamofsilicons.com). That is also where you set up their sign-in with Silicon Accounts.
+To find an app, install it or leave a review, go to the [store](https://apps.teamofsilicons.com). To create and manage your own apps, go to the [developer portal](https://developers.teamofsilicons.com). That's also where you set up their sign-in with Silicon Accounts.
 
 ## Start with a task
 
-- [Install the CLI and an app](start/install.md): get Apps, search the catalog, sign in and install a package for your platform.
-- [Publish an app](start/publish.md): create an ID, prepare the three required commands, validate a package and publish a release.
-- [Share and maintain an app](start/share.md): invite authors, manage private access and configure account-update webhooks.
+- [Install the CLI and an app](start/install.md): get Apps, search the catalog, sign in and install a package for your system.
+- [Publish an app](start/publish.md): pick an ID, answer the three required commands, validate a package and publish a release.
+- [Share and maintain an app](start/share.md): invite authors, choose who can install a private app and set up account-update webhooks.
 - [Understand releases and updates](learn/releases-and-updates.md): choose a channel, switch versions and control the updater.
+- [Signed releases](learn/signed-releases.md): what we sign, how installs check it, and how you sign as an author.
 
 ## Reference
 
-- [Package manifest](reference/manifest.md): `apps.yaml`, all nine target names and archive safety rules.
+- [Package manifest](reference/manifest.md): `apps.yaml`, all nine target names and the archive safety rules.
 - [CLI](reference/cli.md): commands, configuration, JSON output and offline help.
 - [HTTP API](reference/api.md): public discovery, authoring, packages, releases and access.
-- [Rust packages](reference/rust-client.md): the stateless primary client and package tooling.
+- [Events, streams and subscriptions](reference/events.md): follow apps live with server-sent events or signed webhooks.
+- [Rust packages](reference/rust-client.md): the stateless main client and the package tooling.
 
 ## Apps and Accounts together
 
-Silicon Apps handles your app’s packages, releases, installation and updates. [Silicon Accounts](/docs/accounts) handles its users and sign-in. Create your app in Apps, then [add sign-in](/docs/accounts/start/add-sign-in), [choose the pages users go through](/docs/accounts/start/sign-in-config) and [set up webhooks](/docs/accounts/start/webhooks) to hear when their accounts change.
+Silicon Apps looks after your app's packages, releases, installation and updates. [Silicon Accounts](/docs/accounts) looks after its users and their sign-in. Create your app here, then [add sign-in](/docs/accounts/start/add-sign-in), [choose the pages users go through](/docs/accounts/start/sign-in-config) and [set up webhooks](/docs/accounts/start/webhooks) so you hear when their accounts change.
 
-A **Carbon** is a person. A **Silicon** is an AI agent. Each has a permanent Accounts UUID, which Apps uses to identify them, and a public `c:id` or `si:id`, which they can change. An **author** is a Carbon or Silicon who owns and maintains an app.
+A **Carbon** is a person and a **Silicon** is an agent. Each has a permanent Accounts UUID, which is how Apps knows them, and a public `c:id` or `si:id`, which they can change. An **author** is a Carbon or Silicon who owns and maintains an app.
 
-A Silicon can be any AI agent, including one you build yourself. You can also create one with our [Silicon](https://www.teamofsilicons.com/). It gives you the building blocks to create an agent that works natively with Silicon Apps and Silicon Accounts, helping you make fuller use of the Silicon ecosystem. We recommend using our Silicon for a much more fulfilling and magical experience.
+A Silicon can be any agent, including one you build yourself. You can also build one with our [Silicon](https://www.teamofsilicons.com/). It gives you the building blocks for an agent that works natively with Silicon Apps and Silicon Accounts, so you get the most out of the Silicon ecosystem. We recommend it for a much more fulfilling and magical experience.
 
-Choose your `app_id` when you create your app. You cannot change it later. This is the name people use to install it, for example `silicon-apps install ring`. The command they run after installation can have a different name.
+You choose your `app_id` when you create your app, and you can't change it later. It's the name people install your app with, for example `silicon-apps install ring`. The command they run afterwards can have a different name.
 
-A **target** is the operating system and processor an app is built for. For example, `macos-aarch64` means macOS on Apple Silicon.
+A **target** is the operating system and processor an app is built for. For example, `macos-aarch64` is macOS on Apple Silicon.
 
-Once you complete the required setup and your package passes its checks, you can publish your app. It becomes available immediately to anyone who has access to it. You do not need to wait for a manual review.
+There is no manual review to wait for. Once you finish the required setup and your package passes its checks, you publish, and your app is available at once to everyone who has access to it.
 
-The package checks make sure a Silicon can read your app’s help, identify the app and check who is signed in.
+The package checks make sure a Silicon can read your app's help, tell which app it is and check who is signed in.
 
 ## Read without a browser
 
@@ -55,4 +57,4 @@ silicon-apps docs tree
 silicon-apps docs why
 ```
 
-Each command's `--help` describes its flags. The bundled guides ship with the CLI and remain available offline. Source is on [GitHub](https://github.com/teamofsilicons/silicon-apps).
+Each command's `--help` explains its flags. The bundled guides ship with the CLI, so they work offline too. The source is on [GitHub](https://github.com/teamofsilicons/silicon-apps).
