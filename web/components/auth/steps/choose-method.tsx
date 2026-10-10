@@ -11,8 +11,8 @@
  * Google and Apple first show the Opening page (steps/opening.tsx), and this page only when they come back.
  */
 import { useEffect, useState } from "react";
-import { Alert } from "@/components/arc/alert/alert";
-import { Button } from "@/components/arc/button/button";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Button } from "@/components/silicon-ui/button/button";
 import type { ApiError } from "@/lib/api/errors";
 import type { FlowController } from "../flow/controller";
 import { useFinePointer } from "../flow/hooks";

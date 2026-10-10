@@ -18,8 +18,8 @@
  * and a visitor whose timezone belongs to such a country starts there with the calling code filled in.
  */
 import { useEffect, useRef, useState } from "react";
-import { Input } from "@/components/arc/input/input";
-import { PHONE_COUNTRIES, PhoneInput, parsePhoneNumber, type PhoneCountry } from "@/components/arc/phone-input/phone-input";
+import { Input } from "@/components/silicon-ui/input/input";
+import { PHONE_COUNTRIES, PhoneInput, parsePhoneNumber, type PhoneCountry } from "@/components/silicon-ui/phone-input/phone-input";
 import { E164_MAX_DIGITS, E164_MIN_DIGITS, callingCodeOf, callingCountry, countriesOf, guessCountry, isCallingCodePrefix } from "./phone-data";
 import styles from "./phone-field.module.css";
 

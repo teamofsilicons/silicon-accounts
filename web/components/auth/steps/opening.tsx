@@ -17,7 +17,7 @@
  * full.
  */
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties } from "react";
-import { Button } from "@/components/arc/button/button";
+import { Button } from "@/components/silicon-ui/button/button";
 import type { FlowController } from "../flow/controller";
 import { appSubtitle, autoStartClaimed, claimAutoStart, intentOf, openingTitle, providerName, type HostedFlow } from "../flow/model";
 import { AppleMark, FlowAlert, GoogleMark, StepHeading, useStepErrors } from "../flow/parts";

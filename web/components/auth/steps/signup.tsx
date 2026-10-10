@@ -9,10 +9,10 @@
  */
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ImageUp, LoaderCircle, Mail, Smartphone } from "lucide-react";
-import { Avatar } from "@/components/arc/avatar/avatar";
-import { Button } from "@/components/arc/button/button";
-import { Combobox } from "@/components/arc/combobox/combobox";
-import { Input } from "@/components/arc/input/input";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Combobox } from "@/components/silicon-ui/combobox/combobox";
+import { Input } from "@/components/silicon-ui/input/input";
 import type { ApiError } from "@/lib/api/errors";
 import type { FlowSignup, SignupSubmit } from "@/lib/api/types";
 import { formatTime } from "@/lib/format";

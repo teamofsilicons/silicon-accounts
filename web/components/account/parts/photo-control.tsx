@@ -9,10 +9,10 @@
  */
 import { useEffect, useId, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { Camera, ImageUp, LoaderCircle } from "lucide-react";
-import { Avatar } from "@/components/arc/avatar/avatar";
-import { Button } from "@/components/arc/button/button";
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popover/popover";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
+import { Button } from "@/components/silicon-ui/button/button";
+import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/silicon-ui/popover/popover";
 import { describeError, isDefaultPhoto, PHOTO_ACCEPT, photoProblem } from "./common";
 import { FitPrompt } from "./fit-prompt";
 import styles from "./photo.module.css";

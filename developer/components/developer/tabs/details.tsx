@@ -11,10 +11,10 @@
  */
 import { useState } from "react";
 import { ArrowRight, History, Lock } from "lucide-react";
-import { Badge } from "@/components/arc/badge/badge";
-import { Button } from "@/components/arc/button/button";
-import { Checkbox } from "@/components/arc/checkbox/checkbox";
-import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Checkbox } from "@/components/silicon-ui/checkbox/checkbox";
+import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
 import { Section } from "@/components/foundation/layout/layout";
 import { useTheme } from "@/components/foundation/theme/use-theme";
 import type { ContactField } from "@/lib/api/types";

@@ -2,7 +2,7 @@
 
 /** A value to copy somewhere else: a callback URL, an app id, a URL to paste into a provider's console. */
 import type { ReactNode } from "react";
-import { CopyButton } from "@/components/arc/copy-button/copy-button";
+import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
 import styles from "./parts.module.css";
 
 export interface CopyFieldProps {

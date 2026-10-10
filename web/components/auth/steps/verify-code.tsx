@@ -4,7 +4,7 @@
  * verify_code: the 6 digit code that was sent to an email or phone. The code is checked as soon as the last digit
  * lands; "Change" goes back to send it somewhere else; "Resend code" waits for the server's resend time.
  */
-import { Button } from "@/components/arc/button/button";
+import { Button } from "@/components/silicon-ui/button/button";
 import type { ApiError } from "@/lib/api/errors";
 import type { FlowController } from "../flow/controller";
 import { useFinePointer, useNow } from "../flow/hooks";

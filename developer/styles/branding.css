@@ -173,3 +173,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) { .sa-brand { transition: none; } }
+
+/* Silicon UI paints its own controls; retain configured hosted soft/outline fills. */
+.sa-brand.sa-brand:is([data-button-style="soft"], [data-button-style="outline"]) [data-variant="primary"] { background: var(--sq-fill); border-color: var(--sq-stroke); }

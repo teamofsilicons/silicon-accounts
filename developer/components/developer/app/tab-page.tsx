@@ -10,9 +10,9 @@
  */
 import { Component, Suspense, createElement, use, useState, type ComponentType, type ReactNode, type ReactPromise } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Alert } from "@/components/arc/alert/alert";
-import { Button } from "@/components/arc/button/button";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Button } from "@/components/silicon-ui/button/button";
+import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { DEVELOPER_TAB_LABELS, type DeveloperTab } from "@/lib/navigation";
 

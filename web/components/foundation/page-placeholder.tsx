@@ -4,7 +4,7 @@
  */
 import type { ReactNode } from "react";
 import { CircleDashed } from "lucide-react";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
 import { Page, PageHeader, Surface } from "@/components/foundation/layout/layout";
 
 export interface PagePlaceholderProps {

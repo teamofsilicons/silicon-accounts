@@ -8,12 +8,12 @@
  */
 import { useState } from "react";
 import { Cpu, Plus } from "lucide-react";
-import { Alert } from "@/components/arc/alert/alert";
-import { Avatar } from "@/components/arc/avatar/avatar";
-import { Badge } from "@/components/arc/badge/badge";
-import { Button } from "@/components/arc/button/button";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
-import { TextMorph } from "@/components/arc/text-morph/text-morph";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { Button } from "@/components/silicon-ui/button/button";
+import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
+import { TextMorph } from "@/components/silicon-ui/text-morph/text-morph";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader, Section } from "@/components/foundation/layout/layout";
 import type { ManagedSilicon, SiliconCreated } from "@/lib/api/types";

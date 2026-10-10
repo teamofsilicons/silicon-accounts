@@ -8,14 +8,14 @@
  */
 import { useState } from "react";
 import { ArrowRight, Code, Monitor, Smartphone, SquareTerminal, Trash2 } from "lucide-react";
-import { Alert } from "@/components/arc/alert/alert";
-import { Avatar } from "@/components/arc/avatar/avatar";
-import { Badge } from "@/components/arc/badge/badge";
-import { Button } from "@/components/arc/button/button";
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
-import { HoldToConfirm } from "@/components/arc/hold-to-confirm/hold-to-confirm";
-import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
-import { Switch } from "@/components/arc/switch/switch";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { Button } from "@/components/silicon-ui/button/button";
+import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
+import { HoldToConfirm } from "@/components/silicon-ui/hold-to-confirm/hold-to-confirm";
+import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
+import { Switch } from "@/components/silicon-ui/switch/switch";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader, Section, SettingsGroup, SettingsRow } from "@/components/foundation/layout/layout";

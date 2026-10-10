@@ -4,8 +4,8 @@
  * The branding runtime: the same mini sign-in card painted with four apps' branding (values like testkit's fake apps),
  * each with the un-removable "Powered by Silicon Accounts" line outside the branded subtree.
  */
-import { Button } from "@/components/arc/button/button";
-import { Input } from "@/components/arc/input/input";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Input } from "@/components/silicon-ui/input/input";
 import { BrandAside, BrandingScope, BrandPanel, BrandStage, PoweredBy } from "@/components/foundation/branding/branding";
 import { useTheme } from "@/components/foundation/theme/use-theme";
 import type { Branding } from "@/lib/api/types";

@@ -2,7 +2,7 @@
  * IANA time zones for pickers (Arc Combobox options): every zone the browser knows, labelled with its current UTC
  * offset and searchable by city, region and offset ("kolkata", "+05:30", "india").
  */
-import type { ComboboxOption } from "@/components/arc/combobox/combobox";
+import type { ComboboxOption } from "@/components/silicon-ui/combobox/combobox";
 
 /** "+05:30" for a zone at a moment (now by default). */
 export function utcOffset(timeZone: string, at: Date = new Date()): string {

@@ -9,10 +9,10 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Eye, EyeOff, KeyRound } from "lucide-react";
-import { Button } from "@/components/arc/button/button";
-import { CopyButton } from "@/components/arc/copy-button/copy-button";
-import { SlotText } from "@/components/arc/slot-text/slot-text";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import { Button } from "@/components/silicon-ui/button/button";
+import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
+import { SlotText } from "@/components/silicon-ui/slot-text/slot-text";
+import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
 import { bringIntoView } from "./focus";
 import { revealValue, type SecretSlot } from "./reveals";
 import styles from "./parts.module.css";

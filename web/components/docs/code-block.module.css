@@ -1,4 +1,4 @@
-/* Docs code blocks: Arc's code-block anatomy and colour roles (components/arc/code-block), sized for reading. */
+/* Docs code blocks: Arc's code-block anatomy and colour roles (components/silicon-ui/code-block), sized for reading. */
 .block {
   --sq-r: var(--radius-control);
   --sq-fill: var(--surface);

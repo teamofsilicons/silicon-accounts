@@ -7,7 +7,7 @@
  */
 import { useState } from "react";
 import { Check, Lock } from "lucide-react";
-import { Button } from "@/components/arc/button/button";
+import { Button } from "@/components/silicon-ui/button/button";
 import type { ApiError } from "@/lib/api/errors";
 import type { ActionResult, FlowController } from "../flow/controller";
 import type { HostedFlow } from "../flow/model";

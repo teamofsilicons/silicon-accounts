@@ -6,7 +6,7 @@
  */
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { CopyButton } from "@/components/arc/copy-button/copy-button";
+import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
 import styles from "./code-block.module.css";
 
 export function CodeActions({ code, label }: { code: string; label: string }) {

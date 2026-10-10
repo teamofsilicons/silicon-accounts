@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { ArrowRight, Copy, KeyRound, LogOut, Pencil, Settings, Trash2 } from "lucide-react";
-import { ActionButton } from "@/components/arc/action-button/action-button";
-import { Button } from "@/components/arc/button/button";
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
-import { CopyButton } from "@/components/arc/copy-button/copy-button";
-import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu";
-import { HoldToConfirm } from "@/components/arc/hold-to-confirm/hold-to-confirm";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popover/popover";
-import { ThemeSwitch } from "@/components/arc/theme-switch/theme-switch";
-import { Tooltip } from "@/components/arc/tooltip/tooltip";
+import { ActionButton } from "@/components/silicon-ui/action-button/action-button";
+import { Button } from "@/components/silicon-ui/button/button";
+import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
+import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
+import { DropdownMenu } from "@/components/silicon-ui/dropdown-menu/dropdown-menu";
+import { HoldToConfirm } from "@/components/silicon-ui/hold-to-confirm/hold-to-confirm";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/silicon-ui/popover/popover";
+import { ThemeSwitch } from "@/components/silicon-ui/theme-switch/theme-switch";
+import { Tooltip } from "@/components/silicon-ui/tooltip/tooltip";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { useTheme } from "@/components/foundation/theme/use-theme";
 import { Specimen, Specimens, kitchenStyles as styles } from "../specimen";

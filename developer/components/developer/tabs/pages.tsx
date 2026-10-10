@@ -10,15 +10,15 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { History, RotateCcw, Upload } from "lucide-react";
-import { Badge } from "@/components/arc/badge/badge";
-import { Button } from "@/components/arc/button/button";
-import { ColorPicker } from "@/components/arc/color-picker/color-picker";
-import { Input } from "@/components/arc/input/input";
-import { Textarea } from "@/components/arc/textarea/textarea";
-import { RadioCards, type RadioCardOption } from "@/components/arc/radio-cards/radio-cards";
-import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
-import { Select } from "@/components/arc/select/select";
-import { Switch } from "@/components/arc/switch/switch";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { Button } from "@/components/silicon-ui/button/button";
+import { ColorPicker } from "@/components/silicon-ui/color-picker/color-picker";
+import { Input } from "@/components/silicon-ui/input/input";
+import { Textarea } from "@/components/silicon-ui/textarea/textarea";
+import { RadioCards, type RadioCardOption } from "@/components/silicon-ui/radio-cards/radio-cards";
+import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
+import { Select } from "@/components/silicon-ui/select/select";
+import { Switch } from "@/components/silicon-ui/switch/switch";
 import { useTheme } from "@/components/foundation/theme/use-theme";
 import type { BrandFont, BrandLayout, Palette } from "@/lib/api/types";
 import { resolveBrandTheme, type PaintTheme } from "@/lib/branding/apply";

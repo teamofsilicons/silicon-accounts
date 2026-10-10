@@ -14,7 +14,7 @@
  * text now; the save bar calls it before saving, so ⌘S never saves without what is still being typed.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type FormEvent, type KeyboardEvent } from "react";
-import { TagInput } from "@/components/arc/tag-input/tag-input";
+import { TagInput } from "@/components/silicon-ui/tag-input/tag-input";
 import { plural } from "@/lib/format";
 import styles from "./parts.module.css";
 

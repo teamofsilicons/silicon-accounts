@@ -11,9 +11,9 @@
  */
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Check, FileKey, Undo2 } from "lucide-react";
-import { Button } from "@/components/arc/button/button";
-import { Input } from "@/components/arc/input/input";
-import { Textarea } from "@/components/arc/textarea/textarea";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Input } from "@/components/silicon-ui/input/input";
+import { Textarea } from "@/components/silicon-ui/textarea/textarea";
 import { moveFocusMemory } from "./focus-return";
 import styles from "./parts.module.css";
 

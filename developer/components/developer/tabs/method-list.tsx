@@ -8,8 +8,8 @@
 import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { Reorder, useDragControls, useReducedMotion } from "motion/react";
 import { GripVertical } from "lucide-react";
-import { Switch } from "@/components/arc/switch/switch";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import { Switch } from "@/components/silicon-ui/switch/switch";
+import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
 import type { SigninMethod } from "@/lib/api/types";
 import { METHOD_DESCRIPTION, METHOD_LABEL } from "../lib/labels";
 import { MethodMark } from "../parts/provider-marks";

@@ -2,7 +2,7 @@
  * Words for the developer area: methods, statuses, sources, webhook events and import outcomes. One word per concept,
  * the same words the API and the CLI use.
  */
-import type { BadgeTone } from "@/components/arc/badge/badge";
+import type { BadgeTone } from "@/components/silicon-ui/badge/badge";
 import type { AppSource, AppStatus, DeliveryStatus, ImportOutcome, MembershipSource, SigninMethod } from "@/lib/api/types";
 
 export const METHOD_LABEL: Record<SigninMethod, string> = { google: "Google", apple: "Apple", email: "Email", phone: "Phone" };

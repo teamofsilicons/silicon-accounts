@@ -5,8 +5,8 @@
  * same settings: whose changes touch what, and the two ways out), a newer version that arrived without touching this
  * tab's changes (what changed underneath), settings that need fixing (each named), or any other failure.
  */
-import { Alert } from "@/components/arc/alert/alert";
-import { Button } from "@/components/arc/button/button";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Button } from "@/components/silicon-ui/button/button";
 import { pathLabel, type SectionKey } from "../lib/config";
 import { useEditor, type ConfigEditor } from "../lib/editor";
 import { returnFocusIfLost } from "./focus-return";

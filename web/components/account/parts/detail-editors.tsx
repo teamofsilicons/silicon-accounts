@@ -8,16 +8,16 @@
  * On a page they open in a popover from a small "Change" button (TimezoneEditor, DobEditor). Inside a modal drawer they
  * are shown inline instead (InlineEditor with TimezoneForm or PhotoUrlForm): a phone-wide drawer has no room beside the
  * row, and a layer opened from a modal layer is easy to lose. Escape in an open timezone list or calendar closes just
- * that list or calendar; the next Escape closes the popover (components/arc/lib/escape.ts).
+ * that list or calendar; the next Escape closes the popover (components/silicon-ui/lib/escape.ts).
  */
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Avatar } from "@/components/arc/avatar/avatar";
-import { Button } from "@/components/arc/button/button";
-import { Combobox } from "@/components/arc/combobox/combobox";
-import { DatePicker } from "@/components/arc/date-picker/date-picker";
-import { Input } from "@/components/arc/input/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/arc/popover/popover";
-import { Select } from "@/components/arc/select/select";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Combobox } from "@/components/silicon-ui/combobox/combobox";
+import { DatePicker } from "@/components/silicon-ui/date-picker/date-picker";
+import { Input } from "@/components/silicon-ui/input/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/silicon-ui/popover/popover";
+import { Select } from "@/components/silicon-ui/select/select";
 import { timezoneOptions } from "@/lib/timezones";
 import { describeError } from "./common";
 import partStyles from "./parts.module.css";

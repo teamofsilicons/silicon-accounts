@@ -8,9 +8,9 @@
  */
 import { useRef, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
-import { Button } from "@/components/arc/button/button";
-import { Input } from "@/components/arc/input/input";
-import { OtpInput } from "@/components/arc/otp-input/otp-input";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Input } from "@/components/silicon-ui/input/input";
+import { OtpInput } from "@/components/silicon-ui/otp-input/otp-input";
 import { PhoneField, type PhoneFieldValue } from "@/components/foundation/phone-field/phone-field";
 import { ApiError } from "@/lib/api/errors";
 import type { ContactChallenge } from "@/lib/api/types";

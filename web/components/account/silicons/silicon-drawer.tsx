@@ -8,23 +8,23 @@
  * The drawer is modal, so focus never falls out of it: whenever a control replaces itself (a form becoming a waiting
  * card, a "Removed" button folding away, a stored secret closing), focus moves to what took its place. Escape closes
  * the drawer, except while a control inside has something of its own to close first (the timezone list, a name being
- * edited, a confirm question): Arc's layers handle that themselves (components/arc/lib/escape.ts).
+ * edited, a confirm question): Arc's layers handle that themselves (components/silicon-ui/lib/escape.ts).
  */
 import { useRef, useState, type FormEvent, type ReactNode, type Ref } from "react";
 import { animate } from "motion/react";
 import { ArrowRight, ImageUp, LoaderCircle, Mail, RefreshCw, Trash2 } from "lucide-react";
-import { Avatar } from "@/components/arc/avatar/avatar";
-import { Badge } from "@/components/arc/badge/badge";
-import { Button } from "@/components/arc/button/button";
-import { Checkbox } from "@/components/arc/checkbox/checkbox";
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
-import { CopyButton } from "@/components/arc/copy-button/copy-button";
-import { Drawer, DrawerContent } from "@/components/arc/drawer/drawer";
-import { HoldToConfirm } from "@/components/arc/hold-to-confirm/hold-to-confirm";
-import { InlineEdit } from "@/components/arc/inline-edit/inline-edit";
-import { Input } from "@/components/arc/input/input";
-import { TextMorph } from "@/components/arc/text-morph/text-morph";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Checkbox } from "@/components/silicon-ui/checkbox/checkbox";
+import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
+import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
+import { Drawer, DrawerContent } from "@/components/silicon-ui/drawer/drawer";
+import { HoldToConfirm } from "@/components/silicon-ui/hold-to-confirm/hold-to-confirm";
+import { InlineEdit } from "@/components/silicon-ui/inline-edit/inline-edit";
+import { Input } from "@/components/silicon-ui/input/input";
+import { TextMorph } from "@/components/silicon-ui/text-morph/text-morph";
+import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
 import type { AccountSummary, CarbonMe, ManagedSilicon } from "@/lib/api/types";
 import { formatDate, formatRelative } from "@/lib/format";
 import { useUpdateSilicon, useUploadSiliconPhoto } from "@/lib/query/silicons";

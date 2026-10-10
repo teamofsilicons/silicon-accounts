@@ -78,7 +78,7 @@ export function brandingVariables(input: Branding | Partial<Branding> | null | u
   const branding = normalizeBranding(input as Partial<Branding>);
   const p: Palette = branding[theme];
   const dark = theme === "dark";
-  const radius = branding.radius;
+  const radius = branding.corner_style === "sharp" ? 0 : branding.radius;
   const compact = branding.density === "compact";
   const silicon = isSiliconLook(branding);
   const vars: Record<string, string> = {
@@ -117,6 +117,9 @@ export function brandingVariables(input: Branding | Partial<Branding> | null | u
     "--dot-color": mix(p.foreground, dark ? 14 : 12, "transparent"),
     "--overlay": mix(p.background, 55, "transparent"),
     "--radius-control": px(radius),
+    "--radius-container": px(radius * (26 / 18)),
+    "--radius-overlay": px(radius * (26 / 18)),
+    "--corner-shape": branding.corner_style === "squircle" ? "squircle" : "round",
     "--radius-panel": px(radius * (26 / 18)),
     "--radius-surface": px(radius * (34 / 18)),
     // The Silicon Accounts look takes the site's own faces (styles/tokens.css); an app's choice is used as it is.

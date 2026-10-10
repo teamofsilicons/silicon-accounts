@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Silicon Accounts web
 
-The account site: Next.js 16 App Router, React 19, TypeScript strict, pnpm, Arc UI in `components/arc/`, TanStack
+The account site: Next.js 16 App Router, React 19, TypeScript strict, pnpm, Silicon UI from https://ui.teamofsilicons.com in `components/silicon-ui/`, TanStack
 Query in `lib/query/`. `README.md` is the guide: topology, who owns which routes, conventions, hooks, squircles,
 branding runtime, SDK, the Arc local-edit log, the style guide and screenshots. Read it before changing anything.
 
@@ -21,6 +21,6 @@ branding runtime, SDK, the Arc local-edit log, the style guide and screenshots. 
   `proxy.ts`, `next.config.ts`) changes on purpose and with a note in README.md.
 - Data goes through the hooks in `lib/query/`; errors show the server's message and hint; mutations keep one
   Idempotency-Key per logical action.
-- Every rounded surface is a squircle: `data-sq` plus `--sq-r` / `--sq-fill` / `--sq-stroke`, never `border-radius`.
+- Custom application surfaces use squircle fallbacks; Silicon UI components use their registry corner tokens. For custom surfaces: `data-sq` plus `--sq-r` / `--sq-fill` / `--sq-stroke`, never `border-radius`.
 - Before finishing: `pnpm typecheck && pnpm lint && pnpm build`, and look at `pnpm screens --only <yours>` in both
   themes at 1440 and 390 px.

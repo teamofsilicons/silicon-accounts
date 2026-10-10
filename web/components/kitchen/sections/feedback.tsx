@@ -2,17 +2,17 @@
 
 import { useState } from "react";
 import { CircleCheck, Cpu } from "lucide-react";
-import { Alert } from "@/components/arc/alert/alert";
-import { AnimatedCounter } from "@/components/arc/animated-counter/animated-counter";
-import { Badge } from "@/components/arc/badge/badge";
-import { Button } from "@/components/arc/button/button";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
-import { MetricCard } from "@/components/arc/metric-card/metric-card";
-import { Progress } from "@/components/arc/progress/progress";
-import { Skeleton } from "@/components/arc/skeleton/skeleton";
-import { SlotText } from "@/components/arc/slot-text/slot-text";
-import { TextMorph } from "@/components/arc/text-morph/text-morph";
-import Toast from "@/components/arc/toast/toast";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { AnimatedCounter } from "@/components/silicon-ui/animated-counter/animated-counter";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { Button } from "@/components/silicon-ui/button/button";
+import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
+import { MetricCard } from "@/components/silicon-ui/metric-card/metric-card";
+import { Progress } from "@/components/silicon-ui/progress/progress";
+import { Skeleton } from "@/components/silicon-ui/skeleton/skeleton";
+import { SlotText } from "@/components/silicon-ui/slot-text/slot-text";
+import { TextMorph } from "@/components/silicon-ui/text-morph/text-morph";
+import Toast from "@/components/silicon-ui/toast/toast";
 import { ApiError } from "@/lib/api/errors";
 import { notify } from "@/lib/notify";
 import { Specimen, Specimens, kitchenStyles as styles } from "../specimen";

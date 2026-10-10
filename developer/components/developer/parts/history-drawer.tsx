@@ -7,13 +7,13 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { History, RotateCcw } from "lucide-react";
-import { Alert } from "@/components/arc/alert/alert";
-import { Badge } from "@/components/arc/badge/badge";
-import { Button } from "@/components/arc/button/button";
-import { Drawer, DrawerContent } from "@/components/arc/drawer/drawer";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
-import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
-import { Skeleton } from "@/components/arc/skeleton/skeleton";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Drawer, DrawerContent } from "@/components/silicon-ui/drawer/drawer";
+import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
+import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
+import { Skeleton } from "@/components/silicon-ui/skeleton/skeleton";
 import type { ConfigHistoryItem } from "@/lib/api/types";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { notify } from "@/lib/notify";

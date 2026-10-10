@@ -5,8 +5,8 @@
  * (lib/navigation-guard.ts). Staying gives focus back to the link or control that started the navigation.
  */
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/arc/button/button";
-import { Dialog, DialogContent } from "@/components/arc/dialog/dialog";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Dialog, DialogContent } from "@/components/silicon-ui/dialog/dialog";
 import { answerLeaveQuestion, usePendingLeaveQuestion, type PendingQuestion } from "@/lib/navigation-guard";
 import styles from "./shell.module.css";
 

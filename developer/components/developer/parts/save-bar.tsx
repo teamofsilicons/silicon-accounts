@@ -10,8 +10,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, TriangleAlert } from "lucide-react";
-import { Button } from "@/components/arc/button/button";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import { Button } from "@/components/silicon-ui/button/button";
+import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
 import type { SectionKey } from "../lib/config";
 import { useEditor, type ConfigEditor } from "../lib/editor";
 import { alertId, revealAlert } from "./editor-alerts";

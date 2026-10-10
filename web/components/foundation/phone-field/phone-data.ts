@@ -1,7 +1,7 @@
 /**
  * Every country calling code (ITU-T E.164), and a timezone → country table for guessing where a visitor is.
  *
- * The phone picker (components/arc/phone-input) formats the 49 countries it lists and knows no others. The hosted pages and the
+ * The phone picker (components/silicon-ui/phone-input) formats the 49 countries it lists and knows no others. The hosted pages and the
  * account site must take a phone number from anywhere, so this table backs the "type it with its country code" mode of
  * PhoneField (./phone-field.tsx): it tells
  * whether the digits after "+" start with a real calling code, and names the country. Only the server validates a

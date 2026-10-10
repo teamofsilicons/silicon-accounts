@@ -9,12 +9,12 @@
  */
 import { useMemo, useState, type ReactNode } from "react";
 import { History } from "lucide-react";
-import { Badge } from "@/components/arc/badge/badge";
-import { Button } from "@/components/arc/button/button";
-import { Input } from "@/components/arc/input/input";
-import { RadioCards, type RadioCardOption } from "@/components/arc/radio-cards/radio-cards";
-import { Select } from "@/components/arc/select/select";
-import { Switch } from "@/components/arc/switch/switch";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Input } from "@/components/silicon-ui/input/input";
+import { RadioCards, type RadioCardOption } from "@/components/silicon-ui/radio-cards/radio-cards";
+import { Select } from "@/components/silicon-ui/select/select";
+import { Switch } from "@/components/silicon-ui/switch/switch";
 import { Section, SettingsGroup, SettingsRow, Surface } from "@/components/foundation/layout/layout";
 import type { SigninMethod } from "@/lib/api/types";
 import { hostOfUrl, useDeveloperApp } from "../lib/context";

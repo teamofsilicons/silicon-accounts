@@ -1,7 +1,7 @@
 "use client";
 
-import { EmptyStates } from "@/components/arc/blocks/empty-states/empty-states";
-import { SignIn } from "@/components/arc/blocks/sign-in/sign-in";
+import { EmptyStates } from "@/components/silicon-ui/blocks/empty-states/empty-states";
+import { SignIn } from "@/components/silicon-ui/blocks/sign-in/sign-in";
 import { notify } from "@/lib/notify";
 import { Specimen, Specimens } from "../specimen";
 
