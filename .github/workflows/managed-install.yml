@@ -30,9 +30,9 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          curl -fsSL https://apps.teamofsilicons.com/install.sh -o install-apps.sh &&
-          bash install-apps.sh --server https://apps.teamofsilicons.com &&
-          export PATH="${SILICON_HOME:-$HOME}/.apps/bin:$PATH" &&
+          curl -fsSL https://apps.teamofsilicons.com/install.sh -o install-apps.sh
+          bash install-apps.sh --server https://apps.teamofsilicons.com
+          export PATH="${SILICON_HOME:-$HOME}/.apps/bin:$PATH"
           silicon-apps --home "${SILICON_HOME:-$HOME}" --server https://apps.teamofsilicons.com install silicon-accounts
           echo "$SILICON_HOME/.apps/bin" >> "$GITHUB_PATH"
       - name: Install both latest releases on Windows PowerShell
