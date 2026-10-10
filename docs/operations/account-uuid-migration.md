@@ -23,6 +23,14 @@ exporting the final plan and stop APIs, workers, maintenance and import writers
 before applying it. Keep application webhook receivers paused until all linked
 data has moved.
 
+Confirm that every participant belongs to this exact Accounts database and issuer.
+Short IDs can repeat in separately seeded test environments. A matching short ID
+or account kind alone does not establish identity across databases. Compare cached
+public IDs with current Accounts records and handle history, and investigate any
+missing or conflicting source before cutover. Preserve an unrelated fixture
+database separately; never invent a mapping or merge identities to make a dry run
+pass.
+
 Build the new release and apply its numbered migrations with `accounts-migrate`.
 Set `ACCOUNTS_DATABASE_URL` explicitly. This command has no default database URL.
 
