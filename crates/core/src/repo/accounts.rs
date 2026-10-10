@@ -1,4 +1,4 @@
-//! Accounts: creation (uuid from `account_number_seq`), lookups, ids (availability, change,
+//! Accounts: creation (random UUIDv4 identity), lookups, ids (availability, change,
 //! 10-day reservations, reclaim, history, the per-day change limit), profile updates, finishing
 //! an imported account, the STK sign-in lock, deletion and releasing a Silicon that never became
 //! active.
