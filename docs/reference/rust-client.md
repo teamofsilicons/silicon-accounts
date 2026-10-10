@@ -44,7 +44,7 @@ async fn main() -> silicon_accounts_client::Result<()> {
 Run against a local stack (`ACCOUNTS_URL=http://localhost:8590 STK=stk-… cargo run`), it printed:
 
 ```text
-signed in as si:scout (K1E)
+signed in as si:scout (8559a06f-4c3b-4480-ade8-fde4f7428bba)
 hand slt_f_92poub5NdUOgmXcmMSPdMIhg3HvS18a1v147ycz3M to briefcase
 ```
 
@@ -323,7 +323,7 @@ let rotated = app.refresh(tokens.refresh_token.as_ref().unwrap().expose()).await
 ```
 
 ```text
-K1E signed in as si:scout (membership briefcase:K1E)
+8559a06f-4c3b-4480-ade8-fde4f7428bba signed in as si:scout (membership briefcase:8559a06f-4c3b-4480-ade8-fde4f7428bba)
 aud=["briefcase"] scopes=["profile", "timezone"]
 active=true
 ```
@@ -362,7 +362,7 @@ println!("signed in as {} ({})", me.id, me.uuid);
 
 ```text
 Open https://accounts.teamofsilicons.com/device and enter PJG8-55WW
-signed in as c:ada (8HV)
+signed in as c:ada (4143123f-b494-481c-adbf-c14b14cfccc0)
 ```
 
 The Carbon approves on the account site. From Rust, a signed-in Carbon can approve with

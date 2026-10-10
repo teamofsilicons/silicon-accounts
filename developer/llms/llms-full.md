@@ -12,6 +12,8 @@ What's in here, in order (every chapter is an `#` heading you can search for):
 - FAQ.
 - The reference: Silicon Apps in full, then Silicon Accounts in full. Every command, endpoint, field, event, error and limit, chapter by chapter.
 
+Account UUIDs in examples are illustrative canonical UUIDv4 values. Replace them with UUIDs returned for your accounts; public `c:id` and `si:id` handles remain separate and mutable.
+
 # At a glance
 
 ## What we are
@@ -118,7 +120,7 @@ Every package still has to answer `accounts --json` and `login status --json`. F
 ## Rules that hold everywhere
 
 So you don't have to look them up again:
-- Store an account's `uuid`, never its c:id or si:id. The uuid never changes; the ids can. Despite its name, a uuid is not an RFC 4122 UUID: it's a short, case-sensitive id made of letters and digits, like `a8K`, so `a8K` and `A8k` are two different accounts. It is the `sub` of every token we issue, so the subject your OIDC library gives you is the uuid. Store it as case-sensitive text.
+- Store an account's `uuid`, never its c:id or si:id. The uuid never changes; the ids can. An account UUID is a standard 128-bit (16-byte) UUIDv4, serialized as 36 lowercase characters with hyphens. It is the `sub` of every token we issue, so the subject your OIDC library gives you is the uuid. Store it in a UUID column or as canonical text and compare the canonical value exactly.
 - Errors from both APIs look like `{"error": {"code", "message", "hint", "details"}}`. The `code` is the contract, the `message` and `hint` are for reading, and `hint` or `details` may be missing when there is nothing to add. The OAuth token, revoke and introspect endpoints answer in the RFC 6749 shape (`error`, `error_description`) instead, because every OAuth library expects it. Proof verification always answers `200` with `valid: true` or `valid: false`.
 - Retries are safe with an `Idempotency-Key` header, but the two services treat it differently, so check which one you're calling:
   - Silicon Apps requires one on every `POST`, `PUT`, `PATCH` and `DELETE` under `/v1`, except `/v1/auth/*`: 8 to 200 visible ASCII characters, no spaces. The same key on a different method, path or body is `409 conflict`. A response that carried a secret replays for 10 minutes only, then `409 secret_replay_expired`.
@@ -136,7 +138,7 @@ So you don't have to look them up again:
 
 `Custodian` - The Carbon responsible for a Silicon. Every Silicon always has exactly one.
 
-`uuid` - The permanent id of an account, for example `a8K`. It never changes and is never reused. It is not an RFC 4122 UUID: it's short, made of letters and digits, and case-sensitive (`a8K` and `A8k` are different accounts). We kept the name because it does the same job. It's the `sub` in every token and in OpenID Connect.
+`uuid` - The permanent id of an account, for example `5deba331-f322-4703-92ea-6aea48c7b2b7`. It never changes and is never reused. It is a standard 128-bit (16-byte) UUIDv4, serialized as 36 lowercase characters with hyphens. It's the `sub` in every token and in OpenID Connect.
 
 `c:id` / `si:id` - The public id people see and type. It can change; the old one stays reserved for 10 days.
 
@@ -146,7 +148,7 @@ So you don't have to look them up again:
 
 `Author` - A Carbon or Silicon who owns an app. An app can have many authors with the same rights, except that the oldest one also administers it (visibility, sharing, removing authors; `## The administrator` in `# Authors and access`). Any of them can manage the app's sign-in.
 
-`Membership` - An account's relationship with an app, written `{app_id}:{uuid}`, for example `briefcase:a8K`.
+`Membership` - An account's relationship with an app, written `{app_id}:{uuid}`, for example `briefcase:5deba331-f322-4703-92ea-6aea48c7b2b7`.
 
 `STK` - A Silicon's password, for example `stk-3f9a1c7e5b2d`. Your app never sees it.
 
@@ -171,7 +173,7 @@ So you don't have to look them up again:
 | Custodian | the accountable owner of a service account |
 | STK | a service account's password; keys (Ed25519) can replace it |
 | SLT | a one-time, audience-bound token exchanged with a custom OAuth grant (`urn:silicon:params:oauth:grant-type:slt`) |
-| uuid | the stable subject identifier (`sub`), a short case-sensitive string, not an RFC 4122 UUID |
+| uuid | the stable subject identifier (`sub`), a standard 128-bit UUIDv4 in canonical lowercase, hyphenated form |
 | c:id / si:id | a changeable username (`preferred_username`) |
 | Membership | a user's link to one client app |
 | App verification | client authentication between two services, scoped to one audience (what the OAuth `client_credentials` grant does elsewhere) |
@@ -724,7 +726,7 @@ Why build here: Silicons find your app in the store or with `silicon-apps search
 `Target` - the operating system and processor a package is built for, for example `macos-aarch64` for macOS on Apple Silicon.
 `the Team` - Team of Silicons, the people who run Silicon Apps and Silicon Accounts. It is not a kind of account: every account here is personal.
 
-Every Carbon and Silicon has a permanent Accounts `uuid` and a public `c:id` or `si:id` that they can change. Despite its name, the `uuid` is not an RFC 4122 UUID: it is a short, case-sensitive account id like `8HV`, the `sub` of every token. We store authors, invitees and reviewers by their uuid, so changing a public ID never costs anyone their access.
+Every Carbon and Silicon has a permanent Accounts `uuid` and a public `c:id` or `si:id` that they can change. The `uuid` is a standard 128-bit (16-byte) UUIDv4 in canonical lowercase, hyphenated form. It is the `sub` of account tokens. We store authors, invitees and reviewers by their uuid, so changing a public ID never costs anyone their access.
 
 ## Read it without a browser
 
@@ -1908,7 +1910,7 @@ Event types come in groups:
 `GET /v1/capabilities` lists every type. Anyone who can see an app can get its `app.published`, `release.created`, `release.promoted` and `release.withdrawn`; everything else is for its authors.
 
 ```json
-{"seq":42,"id":"7d0c...","type":"release.promoted","app_id":"briefcase","actor_uuid":"8HV","occurred_at":"2026-10-09T10:15:00Z","data":{"id":"...","channel":"production","version":"1.4.0","package_ids":["..."]}}
+{"seq":42,"id":"7d0c...","type":"release.promoted","app_id":"briefcase","actor_uuid":"4143123f-b494-481c-adbf-c14b14cfccc0","occurred_at":"2026-10-09T10:15:00Z","data":{"id":"...","channel":"production","version":"1.4.0","package_ids":["..."]}}
 ```
 
 `seq` is the event's place in the log; use it to resume. Filter with `types`: exact types, a group or everything, like `?types=release.promoted,package.*` or `?types=*`. An unknown type is `400 unknown_event_type`, listing the known ones.
@@ -1979,7 +1981,7 @@ x-apps-subscription-id: sub_...
 x-apps-timestamp: 1791540900
 x-apps-signature: v1=5f1c...
 
-{"actor_uuid":"8HV","app_id":"briefcase","data":{...},"event_id":"7d0c...","occurred_at":"2026-10-09T10:15:00Z","seq":42,"subscription_id":"sub_...","type":"release.promoted"}
+{"actor_uuid":"4143123f-b494-481c-adbf-c14b14cfccc0","app_id":"briefcase","data":{...},"event_id":"7d0c...","occurred_at":"2026-10-09T10:15:00Z","seq":42,"subscription_id":"sub_...","type":"release.promoted"}
 ```
 
 These follow the same rules as Silicon Accounts webhooks (`# Webhooks`), with `X-Apps-` headers:
@@ -2085,7 +2087,7 @@ Silicon Accounts is the account system of the Silicon ecosystem. Every Carbon (a
 
 There are only personal accounts here, with no organizations, groups or shared team accounts. An account is never shared: `c:shubham` belongs to Shubham, `si:head_of_growth` belongs to that Silicon. The only link between two accounts is a Silicon's custodian, the one Carbon responsible for it. Your app only ever gets what the account chooses to share with it. (When these docs say "the Team", they mean Team of Silicons, the people who run Silicon Accounts and Silicon Apps, not a kind of account.)
 
-Every account is known by a `uuid`. Despite the name it is not an RFC 4122 UUID: it is a short, case-sensitive account id like `8HV`, and it is the `sub` of every token, the OIDC subject. It never changes, so it is what your app stores.
+Every account is known by a `uuid`. It is a standard 128-bit (16-byte) UUIDv4 in canonical lowercase, hyphenated form, and it is the `sub` of account tokens, the OIDC subject. It never changes, so it is what your app stores.
 
 You can reach us three ways, and they all do the same things:
 - the `silicon-accounts` CLI. Install it with `silicon-apps install silicon-accounts` (Silicon Apps keeps it updated), or build it from source with `cargo install silicon-accounts-cli`.
@@ -2123,7 +2125,7 @@ Every account has these fields:
 
 | field | what it is |
 |---|---|
-| `uuid` | The permanent identifier, for example `8HV`: a short, case-sensitive id, not an RFC 4122 UUID. It never changes, is never reused, and is the `sub` of every token. Your app stores this. |
+| `uuid` | The permanent identifier, for example `4143123f-b494-481c-adbf-c14b14cfccc0`: a standard 128-bit (16-byte) UUIDv4, serialized as 36 lowercase characters with hyphens. It never changes, is never reused, and is the `sub` of every token. Your app stores this. |
 | `kind` | `carbon` or `silicon`. |
 | `id` | The public id people see and type: `c:shubham`, `si:scout`. Unique, changeable, case-insensitive (stored lowercase). `null` once the account is deleted. |
 | `display_name` | 1 to 100 characters, no control characters (newlines, tabs). |
@@ -2237,21 +2239,21 @@ Every account has a permanent `uuid` and a public `c:id` or `si:id`. Store the u
 
 | identifier | example | changes? | use it for |
 |---|---|---|---|
-| uuid | `8HV` | never, and never reused | storing, joining, everything your app keeps |
+| uuid | `4143123f-b494-481c-adbf-c14b14cfccc0` | never, and never reused | storing, joining, everything your app keeps |
 | c:id | `c:shubham` | yes | showing and typing a Carbon |
 | si:id | `si:scout` | yes | showing and typing a Silicon |
 | app id | `briefcase` | no | naming an app |
-| membership id | `briefcase:8HV` | no | an account's membership with one app |
+| membership id | `briefcase:4143123f-b494-481c-adbf-c14b14cfccc0` | no | an account's membership with one app |
 
 ## The uuid
 
-Despite its name, a uuid is not an RFC 4122 UUID, so don't validate it as one or store it in a UUID column. Keep it as case-sensitive text. A uuid is made of `a-z`, `A-Z` and `0-9`, and it is case-sensitive: `a8K` and `A8k` are two different accounts. It starts at 3 characters, and once all 238,328 three-character uuids (62 cubed) are issued, new accounts get 4 characters, and so on. They come from a counter passed through a fixed permutation, which is why uuids issued one after another (`8HV`, `K1E`, `nln`) look random and are still guaranteed unique.
+Accounts generates random UUIDv4 values: 128 bits (16 bytes), serialized as 36 lowercase characters with hyphens. Store them in a UUID column or as canonical text. The database enforces uniqueness. The coordinated migration replaces older short identifiers once across Accounts and linked app data; retired IDs remain only in migration and historical audit records, never as authentication aliases. Old sessions end at cutover and require a fresh sign-in.
 
 - A uuid never changes. Changing an id, transferring a Silicon or editing a profile leaves it alone.
 - A uuid is never reused, even after the account is deleted, so a stale record in your app can never end up pointing at someone else.
 - A uuid is not a secret. It is the `sub` of every token and appears in every webhook; knowing one grants nothing.
 
-To get the current id of a uuid, run `silicon-accounts lookup 8HV`, or call `GET /v1/accounts/{uuid}` (or `GET /v1/accounts/by-id/{id}`) with your app's credentials or an account's bearer token.
+To get the current id of a uuid, run `silicon-accounts lookup 4143123f-b494-481c-adbf-c14b14cfccc0`, or call `GET /v1/accounts/{uuid}` (or `GET /v1/accounts/by-id/{id}`) with your app's credentials or an account's bearer token.
 
 ## The c:id and si:id
 
@@ -2296,9 +2298,9 @@ Deleting an account reserves its id for 10 days in the same way. A Silicon that 
 
 ## Membership ids
 
-An account's membership with an app is `{app_id}:{uuid}`, for example `briefcase:8HV`, for Carbons and Silicons alike. App ids are made by Silicon Apps (3 to 30 characters of `a-z`, `0-9`, `-` and `_`; a few older ids like `dm` are shorter) and never change; uuids never change; so a membership id is stable for the whole life of the account.
+An account's membership with an app is `{app_id}:{uuid}`, for example `briefcase:4143123f-b494-481c-adbf-c14b14cfccc0`, for Carbons and Silicons alike. App ids are made by Silicon Apps (3 to 30 characters of `a-z`, `0-9`, `-` and `_`; a few older ids like `dm` are shorter) and never change; uuids never change; so a membership id is stable for the whole life of the account.
 
-You will see it wherever your app meets an account: `membership_id` and `account.membership_id` in token responses, the `mid` claim of access tokens, your user base, and `data.membership_id` in webhooks. Our own sign-ins use the app id `silicon-accounts`, so a Silicon signed in to Silicon Accounts itself reports `silicon-accounts:8HV`.
+You will see it wherever your app meets an account: `membership_id` and `account.membership_id` in token responses, the `mid` claim of access tokens, your user base, and `data.membership_id` in webhooks. Our own sign-ins use the app id `silicon-accounts`, so a Silicon signed in to Silicon Accounts itself reports `silicon-accounts:4143123f-b494-481c-adbf-c14b14cfccc0`.
 
 ## What to store
 
@@ -2332,14 +2334,14 @@ A Silicon signed in to `briefcase` with the `timezone` scope:
 
 ```json
 {
-  "uuid": "1Nx",
-  "membership_id": "briefcase:1Nx",
+  "uuid": "0b697a57-a348-442a-99a4-c6a11c0f2b5c",
+  "membership_id": "briefcase:0b697a57-a348-442a-99a4-c6a11c0f2b5c",
   "kind": "silicon",
   "id": "si:scout",
   "display_name": "Scout",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=1Nx",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=0b697a57-a348-442a-99a4-c6a11c0f2b5c",
   "timezone": "Asia/Kolkata",
-  "custodian": {"uuid": "ptO", "id": "c:grace-hopper"},
+  "custodian": {"uuid": "d6393ce9-6e58-4e52-b7da-e65c5d47322b", "id": "c:grace-hopper"},
   "updated_at": "2026-10-07T02:56:54.507Z",
   "version": 1
 }
@@ -2453,12 +2455,12 @@ Public, 120 requests per minute per IP. `?id=` is the full id with its prefix. A
 
 ## `GET /v1/accounts/{uuid}` and `GET /v1/accounts/by-id/{id}`
 
-The current public identity of an account. The two routes together allow 600 lookups per minute per app or per account, because uuids are short and densely allocated, and without a limit one caller could walk every account. `by-id` only matches current ids.
+The current public identity of an account. The two routes together allow 600 lookups per minute per app or per account, to bound directory access and protect the service. `by-id` only matches current ids.
 
 A signed-in Carbon or Silicon gets the account summary, and for a Silicon its custodian's summary too. An app gets only the public identity, and a Silicon's custodian as `{uuid, id}`, the way apps see a custodian everywhere. A display name and photo are details an account shares by signing in to your app, so read them from your user base (`GET /v1/apps/{app_id}/users/{uuid}`):
 
 ```json
-{ "uuid": "K1E", "kind": "silicon", "id": "si:scout", "status": "active", "custodian": { "uuid": "8HV", "id": "c:ada" } }
+{ "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba", "kind": "silicon", "id": "si:scout", "status": "active", "custodian": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "id": "c:ada" } }
 ```
 
 For a self-created Silicon still waiting for its custodian to accept, `custodian` is `null` in both views.
@@ -2603,7 +2605,7 @@ You need three things:
 - `redirect_uris` - the addresses we are allowed to send a browser back to. Nothing works until you register at least one.
 - `allowed_origins` - only if you put the sign-in buttons in an iframe.
 
-We accept every app id Silicon Apps creates: 3 to 30 characters of `a-z`, `0-9`, `-` and `_`, never a `:`, and never changed once made (older ids such as `dm` keep working). That is why a membership id like `briefcase:ptO` stays the same for the life of the account.
+We accept every app id Silicon Apps creates: 3 to 30 characters of `a-z`, `0-9`, `-` and `_`, never a `:`, and never changed once made (older ids such as `dm` keep working). That is why a membership id like `briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b` stays the same for the life of the account.
 
 By default your app is a confidential client, so swapping a code needs your secret, and a single-page app sends the code to a server it controls and swaps it there. The one exception is your own command-line or desktop tool, which can't keep a secret: turn on `device_flow` or `public_client` for it (see "Sign people into your CLI" below).
 
@@ -2684,13 +2686,13 @@ Your app authenticates with HTTP Basic (`client_secret_basic`) or with `client_i
 ```json
 {"access_token": "eyJ0eXAiOiJKV1QiLCJhbGci…", "token_type": "Bearer", "expires_in": 1800,
  "refresh_token": "sar_C81QHHts0NsCxSaoG5BBIdacrQ_jg9XqJXk-bD3MVX4", "refresh_token_expires_at": "2029-03-25T02:56:36.117Z",
- "scope": "profile email", "membership_id": "briefcase:ptO",
- "account": {"uuid": "ptO", "membership_id": "briefcase:ptO", "kind": "carbon", "id": "c:grace-hopper",
-   "display_name": "Grace Hopper", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=ptO",
+ "scope": "profile email", "membership_id": "briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b",
+ "account": {"uuid": "d6393ce9-6e58-4e52-b7da-e65c5d47322b", "membership_id": "briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b", "kind": "carbon", "id": "c:grace-hopper",
+   "display_name": "Grace Hopper", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=d6393ce9-6e58-4e52-b7da-e65c5d47322b",
    "email": "grace.hopper@example.com", "email_verified": true, "updated_at": "2026-10-07T02:56:29.875Z", "version": 1}}
 ```
 
-Store your user against `account.uuid` (or `membership_id`, which is `{app_id}:{uuid}`, here `briefcase:ptO`). Never store them against `account.id`. `c:grace-hopper` can become `c:grace` tomorrow, your webhook hears `account.id_changed` when it does (see `# Webhooks`), and 10 days later the old id is free for someone else.
+Store your user against `account.uuid` (or `membership_id`, which is `{app_id}:{uuid}`, here `briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b`). Never store them against `account.id`. `c:grace-hopper` can become `c:grace` tomorrow, your webhook hears `account.id_changed` when it does (see `# Webhooks`), and 10 days later the old id is free for someone else.
 
 If we refuse the swap, you get an RFC 6749 error with an exact `error_description`:
 
@@ -3674,7 +3676,7 @@ Its claims are `iss`, `sub`, `aud`, `exp`, `iat`, `auth_time`, `nonce`, `name`, 
 ```json
 {
   "iss": "https://accounts.teamofsilicons.com",
-  "sub": "a8K",
+  "sub": "5deba331-f322-4703-92ea-6aea48c7b2b7",
   "aud": "briefcase",
   "exp": 1791343596,
   "iat": 1791341796,
@@ -3682,7 +3684,7 @@ Its claims are `iss`, `sub`, `aud`, `exp`, `iat`, `auth_time`, `nonce`, `name`, 
   "jti": "01a1144a-9b1a-77ca-b0e4-fabbb9b6c3a5",
   "kind": "carbon",
   "id": "c:shubham",
-  "mid": "briefcase:a8K",
+  "mid": "briefcase:5deba331-f322-4703-92ea-6aea48c7b2b7",
   "fid": "01a1144a-9b18-71e4-a5ab-14d69759855c",
   "scope": "profile email openid"
 }
@@ -3692,7 +3694,7 @@ Its claims are `iss`, `sub`, `aud`, `exp`, `iat`, `auth_time`, `nonce`, `name`, 
 - `aud` - your app_id. Refuse any other. Tokens of the `silicon-accounts` CLI have `aud: "silicon-accounts"`, and the developer platform's have `aud: "developer"`.
 - `kind` - `carbon` or `silicon`.
 - `id` - the c:id or si:id when the token was issued. It may have changed since, so show it but never key on it.
-- `mid` - the membership id, `{app_id}:{uuid}`, for example `briefcase:a8K`.
+- `mid` - the membership id, `{app_id}:{uuid}`, for example `briefcase:5deba331-f322-4703-92ea-6aea48c7b2b7`.
 - `fid` - the token family, which is the sign-in this token belongs to.
 - `scope` - what was granted, space-separated.
 
@@ -3749,8 +3751,8 @@ Every grant your app uses (a code, a Silicon's short-lived token, a device code,
   "refresh_token_expires_at": "2029-03-25T02:56:36.117Z",
   "scope": "profile email openid",
   "id_token": "eyJ0eXAiOiJKV1QiLCJhbGci…",
-  "membership_id": "briefcase:a8K",
-  "account": { "uuid": "a8K", "id": "c:shubham", "…": "…" }
+  "membership_id": "briefcase:5deba331-f322-4703-92ea-6aea48c7b2b7",
+  "account": { "uuid": "5deba331-f322-4703-92ea-6aea48c7b2b7", "id": "c:shubham", "…": "…" }
 }
 ```
 
@@ -3865,10 +3867,10 @@ silicon-accounts app token introspect "$ACCESS_TOKEN"    # exits 0 when active, 
 
 ```json
 {
-  "active": true, "iss": "https://accounts.teamofsilicons.com", "sub": "a8K", "aud": "briefcase",
+  "active": true, "iss": "https://accounts.teamofsilicons.com", "sub": "5deba331-f322-4703-92ea-6aea48c7b2b7", "aud": "briefcase",
   "client_id": "briefcase", "exp": 1791343603, "iat": 1791341803, "nbf": 1791341803,
   "jti": "01a1144a-b941-7705-99bc-1f9792d04d22", "kind": "carbon", "id": "c:shubham",
-  "username": "c:shubham", "membership_id": "briefcase:a8K",
+  "username": "c:shubham", "membership_id": "briefcase:5deba331-f322-4703-92ea-6aea48c7b2b7",
   "scope": "profile email openid", "token_type": "access_token"
 }
 ```
@@ -3895,7 +3897,7 @@ silicon-accounts app userinfo "$ACCESS_TOKEN"
 | `invalid_authorization` | `/v1/userinfo takes Authorization: Bearer <access token>; the 'Basic' scheme is not accepted here.` |
 | `invalid_token` | `The access token expired at … (access tokens last 30 minutes).` (with `details.expired_at`), or `The bearer token must be an access token (a JWT starting with eyJ), but this is a refresh token.` |
 | `token_revoked` | `The sign-in behind this access token was revoked at … (app_revoked).` The reasons are the same list as for refresh. |
-| `account_deleted` | `The account a8K was deleted.` |
+| `account_deleted` | `The account 5deba331-f322-4703-92ea-6aea48c7b2b7 was deleted.` |
 | `access_removed` | The account removed your app's access. |
 | `membership_inactive` | The membership isn't active. |
 | `app_disabled` | `This access token was issued to the app 'briefcase', which is disabled, so it can't read accounts right now.` |
@@ -4098,7 +4100,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" \
   -d silicon=si:scout
 ```
 
-The answer is the usual token response for a first-party session (`membership_id` like `silicon-accounts:b97`), plus `"issued_token_type": "urn:ietf:params:oauth:token-type:access_token"`.
+The answer is the usual token response for a first-party session (`membership_id` like `silicon-accounts:7700120d-a627-4ac8-abb2-ea7620bfa16e`), plus `"issued_token_type": "urn:ietf:params:oauth:token-type:access_token"`.
 
 What we check, in this order:
 1) The token is a JWT signed with `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384` or `EdDSA` (never `none` or a shared secret), and its `iss` is an issuer the Silicon trusts. Nothing is fetched for an issuer no trust names.
@@ -4376,7 +4378,7 @@ silicon-accounts silicon create --id si:scout --custodian c:saket --wait
 ```
 
 ```text
-Created si:scout (8HV). It can sign in once c:saket accepts being its custodian.
+Created si:scout (4143123f-b494-481c-adbf-c14b14cfccc0). It can sign in once c:saket accepts being its custodian.
 Custodian request 01a11433-097f-71b5-9ab2-9fbf26649772 expires 2026-10-21T02:30:51Z (in 13d).
 
 STK (shown once, store it now): stk-59e5f08f3bbe
@@ -4443,7 +4445,7 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons \
 
 ```json
 {
-  "silicon": { "uuid": "K1E", "kind": "silicon", "id": "si:ledger", "status": "pending_custodian", "custodian": null, "...": "..." },
+  "silicon": { "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba", "kind": "silicon", "id": "si:ledger", "status": "pending_custodian", "custodian": null, "...": "..." },
   "stk": "stk-08708e31e274",
   "request": { "id": "01a11434-d064-7378-81da-3da681e7b6b8", "kind": "initial", "status": "pending",
                "custodian": "s***@example.com", "expires_at": "2026-10-21T02:32:47.969Z" },
@@ -4522,7 +4524,7 @@ You sign in once; the CLI keeps the session in `{home}/.accounts/session.json` (
 
 `silicon-accounts login status --json` tells a script where it stands: `authenticated`, `kind`, `id`, `uuid`, `display_name`, `expires_at`, `refresh_expires_at`, `url` and `verified` (whether we confirmed the session just now; `--offline` only reads the stored file). Signed out it reports `{"authenticated":false}`.
 
-Over HTTP, `POST /v1/silicons/login` with `{"id":"si:scout","stk":"stk-59e5f08f3bbe","client_label":"scout on build-box"}` returns a token response with first-party tokens: audience `silicon-accounts`, `membership_id` `silicon-accounts:8HV`, `scope: "profile"`, and your `account` with its `custodian: {uuid, id}`. These act on your own account and are not for apps. `client_label` (up to 100 characters) names the sign-in in `silicon-accounts sessions list`. Refresh them at `POST /v1/oauth/token` with `grant_type=refresh_token` and `client_id=silicon-accounts`; lifetimes and refresh rotation are in `# Tokens and sessions`.
+Over HTTP, `POST /v1/silicons/login` with `{"id":"si:scout","stk":"stk-59e5f08f3bbe","client_label":"scout on build-box"}` returns a token response with first-party tokens: audience `silicon-accounts`, `membership_id` `silicon-accounts:4143123f-b494-481c-adbf-c14b14cfccc0`, `scope: "profile"`, and your `account` with its `custodian: {uuid, id}`. These act on your own account and are not for apps. `client_label` (up to 100 characters) names the sign-in in `silicon-accounts sessions list`. Refresh them at `POST /v1/oauth/token` with `grant_type=refresh_token` and `client_id=silicon-accounts`; lifetimes and refresh rotation are in `# Tokens and sessions`.
 
 | Code                                      | Status | CLI exit | Why                                                                                          |
 | ----------------------------------------- | ------ | -------- | -------------------------------------------------------------------------------------------- |
@@ -4602,10 +4604,10 @@ curl -s -u "remind:$REMIND_APP_SECRET" https://accounts.teamofsilicons.com/v1/oa
 {
   "access_token": "eyJ0eXAi...", "token_type": "Bearer", "expires_in": 1800,
   "refresh_token": "sar_lpYj7WW...", "refresh_token_expires_at": "2029-03-25T02:31:52.745Z",
-  "scope": "profile timezone", "membership_id": "remind:8HV",
-  "account": { "uuid": "8HV", "membership_id": "remind:8HV", "kind": "silicon", "id": "si:scout",
-               "display_name": "Scout", "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8HV",
-               "timezone": "Europe/Berlin", "custodian": { "uuid": "zQo", "id": "c:saket" },
+  "scope": "profile timezone", "membership_id": "remind:4143123f-b494-481c-adbf-c14b14cfccc0",
+  "account": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "membership_id": "remind:4143123f-b494-481c-adbf-c14b14cfccc0", "kind": "silicon", "id": "si:scout",
+               "display_name": "Scout", "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=4143123f-b494-481c-adbf-c14b14cfccc0",
+               "timezone": "Europe/Berlin", "custodian": { "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "id": "c:saket" },
                "updated_at": "2026-10-07T02:31:16.356Z", "version": 2 }
 }
 ```
@@ -4768,9 +4770,9 @@ It's an RS256 OpenID Connect ID token signed with the RSA key in our JWKS (`http
 
 ```json
 {
-  "iss": "https://accounts.teamofsilicons.com", "sub": "b97", "aud": "sts.amazonaws.com",
+  "iss": "https://accounts.teamofsilicons.com", "sub": "7700120d-a627-4ac8-abb2-ea7620bfa16e", "aud": "sts.amazonaws.com",
   "iat": 1791522701, "nbf": 1791522701, "exp": 1791523001, "jti": "01a11f13-013f-7050-b4c5-acd4ef2eea84",
-  "kind": "silicon", "si_id": "si:scout", "custodian": "zQo", "token_use": "identity"
+  "kind": "silicon", "si_id": "si:scout", "custodian": "6667d4b4-7c57-45de-b2c3-94185db3e175", "token_use": "identity"
 }
 ```
 
@@ -4876,7 +4878,7 @@ Decline any Silicon you don't know. Accepting makes you answerable for it: you h
 silicon-accounts silicon create --id si:mapper --display-name Mapper --timezone UTC
 ```
 
-It answers `Created si:mapper (BYP) with you, c:saket, as its custodian. It can sign in right away.` and prints the STK once. Save the STK and pass it to your Silicon over a private channel; it won't be shown again. To choose it yourself, pipe it in (`openssl rand -hex 16 | silicon-accounts silicon create --id si:archivist --stk-stdin`), and the CLI won't print it back. `--webhook https://...` sets the Silicon's webhook; save its signing secret too, it's shown once. Retrying with the same `--idempotency-key` within 10 minutes returns the original response, generated STK included.
+It answers `Created si:mapper (ef385ebe-1123-4be6-aa17-a8c1f6753aa6) with you, c:saket, as its custodian. It can sign in right away.` and prints the STK once. Save the STK and pass it to your Silicon over a private channel; it won't be shown again. To choose it yourself, pipe it in (`openssl rand -hex 16 | silicon-accounts silicon create --id si:archivist --stk-stdin`), and the CLI won't print it back. `--webhook https://...` sets the Silicon's webhook; save its signing secret too, it's shown once. Retrying with the same `--idempotency-key` within 10 minutes returns the original response, generated STK included.
 
 A Silicon you create always gets you as its custodian, so leave `--custodian` out or name yourself; naming someone else fails with exit `2`. If another Carbon should be the custodian, let them create it, or add `--self-create` to send the Silicon's own request, which they then accept.
 
@@ -5099,10 +5101,10 @@ A Silicon view, the way its custodian sees it, is the Silicon's Me plus `pending
 
 ```json
 {
-  "uuid": "K1E", "kind": "silicon", "id": "si:scout", "display_name": "Scout",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=K1E", "dob": "2026-10-07",
+  "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba", "kind": "silicon", "id": "si:scout", "display_name": "Scout",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8559a06f-4c3b-4480-ade8-fde4f7428bba", "dob": "2026-10-07",
   "timezone": "Asia/Kolkata", "status": "active", "created_at": "...", "updated_at": "...", "version": 1,
-  "custodian": { "uuid": "zQo", "kind": "carbon", "id": "c:saket", "display_name": "Saket", "pfp_url": "...", "status": "active" },
+  "custodian": { "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "kind": "carbon", "id": "c:saket", "display_name": "Saket", "pfp_url": "...", "status": "active" },
   "webhook_url": null, "stk_rotated_at": "...", "pending_transfer": null
 }
 ```
@@ -5190,7 +5192,7 @@ The Silicon's own routes (`/v1/me/webhook...`) and the custodian's (`/v1/me/sili
 
 ## The custodian's routes
 
-These take a Carbon's token. `{uuid}` is the Silicon's uuid or its current si:id (`/v1/me/silicons/K1E` and `/v1/me/silicons/si:scout` are the same Silicon). A Silicon you aren't custodian of is `404 silicon_not_found`.
+These take a Carbon's token. `{uuid}` is the Silicon's uuid or its current si:id (`/v1/me/silicons/8559a06f-4c3b-4480-ade8-fde4f7428bba` and `/v1/me/silicons/si:scout` are the same Silicon). A Silicon you aren't custodian of is `404 silicon_not_found`.
 
 | Route                                    | Body                                                    | Answer                                     | Errors and notes                                                                                                |
 | ---------------------------------------- | ------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
@@ -5353,12 +5355,12 @@ A valid proof answers `200`:
   "expires_at": "2026-10-07T02:43:13.274Z",
   "issuing_app": { "app_id": "dm", "name": "DM" },
   "receiving_app": { "app_id": "briefcase", "name": "Briefcase" },
-  "user": { "uuid": "8HV", "id": "si:scout", "kind": "silicon", "membership_id": "dm:8HV" },
+  "user": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "id": "si:scout", "kind": "silicon", "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0" },
   "scopes": ["files.write"]
 }
 ```
 
-Here `dm` may act at `briefcase` for the Silicon `si:scout` (uuid `8HV`) with the scope `files.write`, until 02:43:13 UTC. An App verification proof has `"kind": "app_verification"` and `"user": null`.
+Here `dm` may act at `briefcase` for the Silicon `si:scout` (uuid `4143123f-b494-481c-adbf-c14b14cfccc0`) with the scope `files.write`, until 02:43:13 UTC. An App verification proof has `"kind": "app_verification"` and `"user": null`.
 
 Anything else answers `200` with exactly:
 
@@ -5433,7 +5435,7 @@ ACCOUNTS_APP_ID=briefcase ACCOUNTS_APP_SECRET="$BRIEFCASE_APP_SECRET" \
   silicon-accounts app proof verify sap__tiKwGp_1rNr-6XGJJmGj1YPf7SsUVNNmxvPqBDaVa0
 ```
 
-It prints `valid: User verification proof from dm for briefcase, on behalf of si:scout_two (8HV), scopes files.write files.read, until 2026-10-07T03:12:16Z (in 29m)`.
+It prints `valid: User verification proof from dm for briefcase, on behalf of si:scout_two (4143123f-b494-481c-adbf-c14b14cfccc0), scopes files.write files.read, until 2026-10-07T03:12:16Z (in 29m)`.
 
 The exit code is `0` when the proof is valid and `2` when it isn't, so `silicon-accounts app proof verify "$TOKEN" && ...` fails closed in your scripts. `3` means your app's credentials were refused, `1` means we couldn't be reached. A command-line mistake also exits `2`, and so does running it as one of the app's authors without the app secret, since verifying needs the app's own credentials. Add `--json` to tell them apart: a checked proof prints `{"valid": ...}`, a failure prints `{"error": {...}}`. Pass `-` instead of the token to read it from stdin, which keeps it out of your shell history and the process list.
 
@@ -5476,7 +5478,7 @@ Send an `Idempotency-Key`, unique per request, so a retry gets the same proof ba
   "proof_token": "sap_OMGtGwcBe5QgGJng3SIp0yGOh1nxefxCufefPXqr7dk", "expires_at": "2026-10-07T02:43:13.274Z",
   "proof_refresh_token": "sapr_i4mi1RhAyCA0lC2A2y09yuftwYQheM5rusxeBeo0IZg", "refresh_expires_at": "2029-03-25T02:33:08.110Z",
   "issuing_app": "dm", "receiving_app": "briefcase",
-  "user": { "uuid": "8HV", "id": "si:scout", "kind": "silicon", "membership_id": "dm:8HV" },
+  "user": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "id": "si:scout", "kind": "silicon", "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0" },
   "scopes": ["files.write"]
 }
 ```
@@ -5661,7 +5663,7 @@ An item of `GET /v1/apps/{app_id}/proofs`:
 ```json
 {
   "proof_id": "01a11438-f6ef-75f2-86a0-091d4d1b9b37", "kind": "user_verification", "receiving_app": "briefcase",
-  "user": { "uuid": "8HV", "kind": "carbon", "id": "c:ada", "display_name": "Ada King", "pfp_url": "...", "status": "active" },
+  "user": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "kind": "carbon", "id": "c:ada", "display_name": "Ada King", "pfp_url": "...", "status": "active" },
   "scopes": ["files.write"], "status": "revoked", "access_ttl_seconds": 600,
   "created_at": "2026-10-07T02:37:19.983Z", "expires_at": "2029-03-25T02:37:19.930Z",
   "token_expires_at": "2026-10-07T02:47:19.983Z", "last_refreshed_at": "2026-10-07T02:37:31.553Z",
@@ -5914,7 +5916,7 @@ retry: 5000
 
 id: 01a11e46-8684-715b-b2ac-c80931069cf7
 event: silicon.updated
-data: {"app_id":null,"data":{"changed":["display_name"],"id":"si:streamer","silicon":{"...":"..."},"uuid":"8HV"},"event_id":"01a11e46-8684-715b-b2ac-c80931069cf7","occurred_at":"2026-10-09T01:28:20.129Z","silicon":"8HV","type":"silicon.updated"}
+data: {"app_id":null,"data":{"changed":["display_name"],"id":"si:streamer","silicon":{"...":"..."},"uuid":"4143123f-b494-481c-adbf-c14b14cfccc0"},"event_id":"01a11e46-8684-715b-b2ac-c80931069cf7","occurred_at":"2026-10-09T01:28:20.129Z","silicon":"4143123f-b494-481c-adbf-c14b14cfccc0","type":"silicon.updated"}
 
 : heartbeat
 ```
@@ -5956,8 +5958,8 @@ Our stream's limits are in the table under `## The event stream endpoint` in `# 
 ```json
 {"app_id": "briefcase", "type": "silicon.custodian_changed", "silicon": null,
  "event_id": "01a11436-d5e4-7794-842d-4efffcc475b0", "occurred_at": "2026-10-07T02:35:00.452Z",
- "data": {"uuid": "K1E", "membership_id": "briefcase:K1E",
-          "from": {"uuid": "zQo", "id": "c:saket"}, "to": {"uuid": "8HV", "id": "c:ada"}}}
+ "data": {"uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba", "membership_id": "briefcase:8559a06f-4c3b-4480-ade8-fde4f7428bba",
+          "from": {"uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "id": "c:saket"}, "to": {"uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "id": "c:ada"}}}
 ```
 
 A Silicon's `account` in `account.updated` always includes its `custodian` (`uuid`, `id`). Here is an `account.updated` at an app with the `email` scope:
@@ -5967,10 +5969,10 @@ A Silicon's `account` in `account.updated` always includes its `custodian` (`uui
   "app_id": "briefcase", "type": "account.updated", "silicon": null,
   "event_id": "01a11439-6984-76e3-bb75-728e0ebd396b", "occurred_at": "2026-10-07T02:37:49.316Z",
   "data": {
-    "uuid": "BYP", "membership_id": "briefcase:BYP", "changed": ["display_name"],
+    "uuid": "ef385ebe-1123-4be6-aa17-a8c1f6753aa6", "membership_id": "briefcase:ef385ebe-1123-4be6-aa17-a8c1f6753aa6", "changed": ["display_name"],
     "account": {
-      "uuid": "BYP", "membership_id": "briefcase:BYP", "kind": "carbon", "id": "c:ada-docs-69243",
-      "display_name": "Ada Lovelace", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=BYP",
+      "uuid": "ef385ebe-1123-4be6-aa17-a8c1f6753aa6", "membership_id": "briefcase:ef385ebe-1123-4be6-aa17-a8c1f6753aa6", "kind": "carbon", "id": "c:ada-docs-69243",
+      "display_name": "Ada Lovelace", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=ef385ebe-1123-4be6-aa17-a8c1f6753aa6",
       "email": "ada.docs.1791340669243@example.test", "email_verified": true,
       "updated_at": "2026-10-07T02:37:49.315Z", "version": 2
     }
@@ -6386,7 +6388,7 @@ The columns are the ones we give, and they're the same for every app. You can't 
 
 ## Memberships
 
-An account's membership with your app is `{app_id}:{uuid}`, for example `briefcase:8HV`. It looks the same for Carbons and Silicons.
+An account's membership with your app is `{app_id}:{uuid}`, for example `briefcase:4143123f-b494-481c-adbf-c14b14cfccc0`. It looks the same for Carbons and Silicons.
 
 Always store the `uuid` (or the `membership_id`). Never key anything on the c:id or si:id: `c:shubham` can become `c:shubham-k` tomorrow, but the uuid never changes.
 
@@ -6406,7 +6408,7 @@ Each member also has a `source`: `signin` (the hosted sign-in), `slt` (a Silicon
 | Field | What it is |
 |---|---|
 | `membership_id` | `{app_id}:{uuid}` |
-| `uuid` | the account's permanent id (case-sensitive) |
+| `uuid` | the account's permanent 128-bit UUIDv4, in canonical lowercase, hyphenated form |
 | `kind` | `carbon` or `silicon` |
 | `id` | the current c:id or si:id; `null` once deleted |
 | `display_name`, `pfp_url` | always the account's own |
@@ -6438,7 +6440,7 @@ From the CLI:
 ```sh
 silicon-accounts app users --status imported   # imported members who haven't signed into your app yet
 silicon-accounts app users --q shubham         # search id, display name, email, phone and external id
-silicon-accounts app user 8HV                  # one member, with its last sign-ins
+silicon-accounts app user 4143123f-b494-481c-adbf-c14b14cfccc0                  # one member, with its last sign-ins
 silicon-accounts app show                      # the app, its sign-in setup and these stats
 ```
 
@@ -6641,7 +6643,7 @@ A second import of the same Carbon keeps what you stored the first time. Only `u
 |---|---|
 | `row_number` | the 1-based data row; the CSV header doesn't count, and a quoted newline doesn't start a row |
 | `outcome` | what happened |
-| `account_uuid` | the account the row is now linked to; store it with your record (the membership id is `{app_id}:{account_uuid}`, for example `legacy-crm:gYJ`) |
+| `account_uuid` | the account the row is now linked to; store it with your record (the membership id is `{app_id}:{account_uuid}`, for example `legacy-crm:1229ed76-7fd6-4a65-b2b2-d430e4d221c5`) |
 | `id` | the account's c:id when the row was processed |
 | `messages` | `{level, code, message, field?}`, in the order they came up |
 | `input` | the row as you sent it (import columns only), plus `_ignored_columns`, `_ignored_count` and `_extra_cells` when it had them |
@@ -6848,7 +6850,7 @@ A new request answers `201`:
 ```json
 {
   "request": {
-    "request_id": "01928c7e-3b7a-7c4e-9a51-2f3d4c5b6a79", "account_uuid": "zQo",
+    "request_id": "01928c7e-3b7a-7c4e-9a51-2f3d4c5b6a79", "account_uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175",
     "context_app": {"app_id": "briefcase", "name": "Briefcase", "logo_url": null},
     "reason": "I need authorization on my own domain for my app.", "status": "pending",
     "submitted_at": "2026-10-08T12:00:00.000Z", "response_expected_by": "2026-10-10T12:00:00.000Z", "reviewed_at": null
@@ -6868,7 +6870,7 @@ Errors: 422 `validation_failed`, 401 for a missing or unsuitable sign-in, and 40
 ## Users and imports
 
 - `GET /v1/apps/{app_id}/users` - every member. Query: `q` (matches the uuid exactly, the id, the display name, `external_id`, the emails and phones you imported, and the primary email or phone only where you were granted that scope), `status` (`active`, `imported`, `access_removed`, `deleted`), `kind` (`carbon`, `silicon`), `source` (`signin`, `slt`, `import`), `limit`, `cursor`. An unknown `status`, `kind` or `source` is 400 `invalid_query`.
-- `GET /v1/apps/{app_id}/users/{uuid}` - one member, plus `history`: its last 20 sign-ins at your app (`at`, `method` such as `email`, `session`, `slt`, or `slt_public_client` when your tool exchanged a Silicon's SLT with no secret, `outcome` such as `success` or `new_account`), without IP addresses. A Silicon's entry has no `custodian`. 404 `user_not_found`; uuids are case-sensitive.
+- `GET /v1/apps/{app_id}/users/{uuid}` - one member, plus `history`: its last 20 sign-ins at your app (`at`, `method` such as `email`, `session`, `slt`, or `slt_public_client` when your tool exchanged a Silicon's SLT with no secret, `outcome` such as `success` or `new_account`), without IP addresses. A Silicon's entry has no `custodian`. 404 `user_not_found`; use the canonical lowercase UUIDv4 returned by Accounts.
 - `POST /v1/apps/{app_id}/imports` - start an import. Idempotent. `Content-Type: text/csv` (or `application/csv`) with options as query parameters, or `application/json` `{"rows": [...], "options": {...}}`. Answers `202 {"job": ImportJob}`.
 - `GET /v1/apps/{app_id}/imports` - your import jobs, newest first, paginated.
 - `GET /v1/apps/{app_id}/imports/{job_id}` - one `{"job": ImportJob}`. 404 `import_not_found`.
@@ -7002,7 +7004,7 @@ A fourth cookie, `sa_telemetry=off`, isn't a credential: it opts the browser out
 - Wrong codes are counted per address, across every flow, the CLI, the account site and the requirement step. The 10th wrong code in a row locks every code for that address for 60 seconds, and starting new flows doesn't buy more guesses.
 - At most 10 codes go to one address per 10 minutes, and 30 per network.
 - 10 wrong STKs in a row lock that Silicon's sign-in for 60 seconds, with at most 60 sign-in attempts per network per minute, counted before anything is checked, across `POST /v1/silicons/login` and key assertions at the token endpoint (`jwt-bearer`). Signing in with a key is never locked out, because a signature can't be guessed, and each assertion works once.
-- Lookups by uuid are limited to 600 per minute per caller. uuids look random, but they're short and handed out densely (238,328 three-character values, used up before we move to four), so without a limit one caller could walk every account.
+- Lookups by uuid are limited to 600 per minute per caller to bound directory access and protect the service. UUIDv4 identifiers are not secrets and do not confer access.
 
 Our answers never tell a caller more than they already know:
 - Silicon sign-in answers `invalid_credentials` the same way, in the same time, for an unknown si:id and a wrong STK.
@@ -7239,7 +7241,7 @@ silicon-accounts login status --json                                         # r
 ```
 
 ```json
-{"authenticated": true, "display_name": "Scout", "id": "si:scout", "kind": "silicon", "uuid": "8HV",
+{"authenticated": true, "display_name": "Scout", "id": "si:scout", "kind": "silicon", "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
  "expires_at": "2026-10-07T03:01:30.006Z", "refresh_expires_at": "2029-03-25T02:31:29.998Z",
  "url": "https://accounts.teamofsilicons.com", "verified": true}
 ```
@@ -7479,7 +7481,7 @@ List commands take `--limit <N>` (rows per page, at most 200) and `--cursor <CUR
 
 - `silicon-accounts id available <ID> [--for <SILICON>]` - can this c:id or si:id be taken? Exit `0` available, `5` taken or reserved, `2` invalid. Signed in, an id reserved for you after a change shows as reclaimable. As a custodian, add `--for si:scout` to ask on behalf of one of your Silicons.
 - `silicon-accounts id change <NEW_ID>` - change your own c:id or si:id (the prefix is added if you leave it out). Your old id stays reserved for you for 10 days, and apps you signed into get `account.id_changed`. They key on your uuid, so nothing breaks.
-- `silicon-accounts lookup <TARGET>` - look up an account by uuid (`a8K`) or id (`c:shubham`). With your session it shows the uuid, id, kind, display name, photo, status and a Silicon's custodian. When you aren't signed in it uses the app credentials and shows what an app sees: uuid, kind, id, status and a Silicon's custodian as `{uuid, id}`, with no display name or photo. Only current ids resolve, so store uuids, not ids.
+- `silicon-accounts lookup <TARGET>` - look up an account by uuid (`5deba331-f322-4703-92ea-6aea48c7b2b7`) or id (`c:shubham`). With your session it shows the uuid, id, kind, display name, photo, status and a Silicon's custodian. When you aren't signed in it uses the app credentials and shows what an app sees: uuid, kind, id, status and a Silicon's custodian as `{uuid, id}`, with no display name or photo. Only current ids resolve, so store uuids, not ids.
 - `silicon-accounts profile show` - your full profile, same as `whoami`.
 - `silicon-accounts profile set` - only the flags you pass change: `--display-name <NAME>` (1 to 100 characters), `--timezone <TZ>` (IANA, for example `Asia/Kolkata`), `--dob <YYYY-MM-DD>` (Carbons only; a Silicon's date of birth is the day it was created), `--pfp-url <URL>` (https), `--photo <FILE>` (PNG, JPEG, WebP or GIF, at most 2 MB), `--reset-photo` (back to the default). Apps that can see a changed field get `account.updated`.
 - `silicon-accounts email list|add|verify|primary|remove` - a Carbon's emails: up to 10, and any of them signs them in. `email add <EMAIL>` sends a 6 digit code valid for 10 minutes and asks for it in a terminal; otherwise it prints a challenge id for `email verify <CHALLENGE_ID> <CODE>`. `email primary <EMAIL>` tells apps with the email scope. `email remove <EMAIL>` works on any email but the primary, so make another one primary first.
@@ -7773,7 +7775,7 @@ match app_b.verify_proof(&proof_token).await? {
 - `AccountKind` - `Carbon` or `Silicon`; `AccountKind::of_id("si:scout")`.
 - `WaitOptions` - `custodian_default()` (5 s doubling to 60 s, for up to 14 days), `fixed(d)`, `backoff(initial, max)`, `.with_timeout(Some(d))`. Each poll reaches `on_event` as `WaitEvent::Polled(status)`; transient errors (network, 5xx, 429) arrive as `WaitEvent::TransientError` and are retried.
 
-Store the account `uuid` or the membership id `{app_id}:{uuid}` (`briefcase:a8K`). The `c:` / `si:` id is for showing: it changes, and your app hears about it through `account.id_changed`.
+Store the account `uuid` or the membership id `{app_id}:{uuid}` (`briefcase:5deba331-f322-4703-92ea-6aea48c7b2b7`). The `c:` / `si:` id is for showing: it changes, and your app hears about it through `account.id_changed`.
 
 ## Webhooks, local verification and PKCE
 
@@ -8031,7 +8033,7 @@ Some codes come back in `flow.error` (and in `?error=` on your redirect URI) ins
 | Code | Status | Cause and fix |
 |---|---|---|
 | `config_version_conflict` | 409 | the sign-in setup changed since the version you sent (`details.current_version`, `expected_version`): re-read, re-apply, resend |
-| `user_not_found` | 404 | the uuid isn't in this app's user base (uuids are case-sensitive) |
+| `user_not_found` | 404 | the uuid isn't in this app's user base (use the canonical lowercase UUIDv4 returned by Accounts) |
 | `import_not_found` | 404 | no such import job for this app |
 | `delivery_not_found` | 404 | no such webhook delivery for this app, or for this Silicon (`/v1/me/webhook/deliveries…`) |
 | `unknown_columns` | 422 | the import has columns we don't keep (`details.unknown_columns`, `allowed_columns`); remove them or set `ignore_unknown_columns` |
@@ -8211,7 +8213,7 @@ Access tokens last 30 minutes, refresh tokens 900 days from the sign-in, authori
 |---|---|
 | Handle (after `c:` / `si:`) | 3 to 30 characters of `a-z 0-9 - _`, case-insensitive (contract) |
 | Reserved words | `admin`, `administrator`, `root`, `system`, `support`, `help`, `security`, `silicon-accounts`, `account`, `silicon`, `silicons`, `carbon`, `carbons`, `api`, `www`, `mail`, `null`, `undefined`, `me`, `owner`, `staff` |
-| uuid | `a-z A-Z 0-9`, case-sensitive (not an RFC 4122 UUID); 3 characters, then 4 once every 3 character uuid is used (contract); never reused |
+| uuid | 128 bits (16 bytes), UUIDv4; 36 lowercase characters with hyphens in canonical form; never reused |
 | App id | 3 to 30 characters of `a-z 0-9 - _`, as Silicon Apps creates them (`my_app`, `2fa-tool`); older ids of 2 to 40 characters of `a-z 0-9 -` starting with a letter (`dm`) keep working |
 | Emails / phones per Carbon | 10 / 10 (contract) |
 | Display name | 1 to 100 characters, no control characters |

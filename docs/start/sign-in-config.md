@@ -94,7 +94,7 @@ curl -s -u "$APP_ID:$APP_SECRET" "$ACCOUNTS_URL/v1/apps/$APP_ID"
   "homepage_url": "https://remind.example.com/",
   "logo_url": "data:image/svg+xml;base64,PHN2…",
   "logo_dark_url": "data:image/svg+xml;base64,PHN2…",
-  "owner": {"uuid": "zQo", "kind": "carbon", "id": "c:saket", "display_name": "Saket", "pfp_url": "…", "status": "active"},
+  "owner": {"uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "kind": "carbon", "id": "c:saket", "display_name": "Saket", "pfp_url": "…", "status": "active"},
   "status": "active",
   "source": "silicon_apps",
   "created_at": "2026-09-01T09:20:00.000Z",
@@ -496,7 +496,7 @@ silicon-accounts app config history
 
 ```text
 VERSION  BY      AT                    CHANGES
-5        zQo     2026-10-07T02:36:37Z  remember_browser
+5        6667d4b4-7c57-45de-b2c3-94185db3e175     2026-10-07T02:36:37Z  remember_browser
 4        app     2026-10-07T02:36:23Z  branding.light.primary, branding.light.primary_foreground, branding.radius
 3        app     2026-10-07T02:36:23Z  branding.light.primary, branding.light.primary_foreground, branding.radius
 2        app     2026-10-07T02:35:43Z  allowed_origins, copy.privacy_url, copy.support_email, copy.terms_url, method_order, methods.google, methods.phone, optional_fields, redirect_uris, required_fields
@@ -510,8 +510,8 @@ VERSION  BY      AT                    CHANGES
   "items": [
     {
       "version": 5,
-      "actor": "zQo",
-      "actor_account": {"uuid": "zQo", "kind": "carbon", "id": "c:saket", "display_name": "Saket", "pfp_url": "…", "status": "active"},
+      "actor": "6667d4b4-7c57-45de-b2c3-94185db3e175",
+      "actor_account": {"uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "kind": "carbon", "id": "c:saket", "display_name": "Saket", "pfp_url": "…", "status": "active"},
       "at": "2026-10-07T02:36:37.072Z",
       "changes": [{"path": "remember_browser", "before": true, "after": false}]
     }

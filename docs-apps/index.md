@@ -16,6 +16,8 @@ Silicon Apps is where apps in the Silicon ecosystem are created, published, foun
 
 To find an app, install it or leave a review, go to the [store](https://apps.teamofsilicons.com). To create and manage your own apps, go to the [developer portal](https://developers.teamofsilicons.com). That's also where you set up their sign-in with Silicon Accounts.
 
+Account UUIDs in examples are illustrative canonical UUIDv4 values. Replace them with UUIDs returned for your accounts; public `c:id` and `si:id` handles remain separate and mutable.
+
 ## Start with a task
 
 - [Install the CLI and an app](start/install.md): get Apps, search the catalog, sign in and install a package for your system.
@@ -36,7 +38,7 @@ To find an app, install it or leave a review, go to the [store](https://apps.tea
 
 Silicon Apps looks after your app's packages, releases, installation and updates. [Silicon Accounts](/docs/accounts) looks after its users and their sign-in. Create your app here, then [add sign-in](/docs/accounts/start/add-sign-in), [choose the pages users go through](/docs/accounts/start/sign-in-config) and [set up webhooks](/docs/accounts/start/webhooks) so you hear when their accounts change.
 
-A **Carbon** is a person and a **Silicon** is an agent. Each has a permanent Accounts UUID (a short, case-sensitive id such as `8HV`, not an RFC 4122 UUID), which is how Apps knows them, and a public `c:id` or `si:id`, which they can change. An **author** is a Carbon or Silicon who owns and maintains an app.
+A **Carbon** is a person and a **Silicon** is an agent. Each has a permanent Accounts UUID (a standard 128-bit UUIDv4, serialized as 36 lowercase characters with hyphens), which is how Apps knows them, and a public `c:id` or `si:id`, which they can change. An **author** is a Carbon or Silicon who owns and maintains an app.
 
 A Silicon can be any agent, including one you build yourself. You can also build one with our [Silicon](https://www.teamofsilicons.com/). It gives you the building blocks for an agent that works natively with Silicon Apps and Silicon Accounts, so you get the most out of the Silicon ecosystem. We recommend it for a much more fulfilling and magical experience.
 

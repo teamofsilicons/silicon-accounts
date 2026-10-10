@@ -38,14 +38,14 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" -u "$APP_ID:$APP_SECRET" \
   "refresh_token_expires_at": "2029-03-25T02:33:02.302Z",
   "scope": "profile email timezone openid",
   "id_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSIsImtpZCI6ImRldi0xIn0.eyJpc3Mi…",
-  "membership_id": "briefcase:8HV",
+  "membership_id": "briefcase:4143123f-b494-481c-adbf-c14b14cfccc0",
   "account": {
-    "uuid": "8HV",
-    "membership_id": "briefcase:8HV",
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
+    "membership_id": "briefcase:4143123f-b494-481c-adbf-c14b14cfccc0",
     "kind": "carbon",
     "id": "c:ada",
     "display_name": "Ada Lovelace",
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=8HV",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=4143123f-b494-481c-adbf-c14b14cfccc0",
     "email": "ada@example.test",
     "email_verified": true,
     "timezone": "Asia/Kolkata",
@@ -279,16 +279,16 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" -u "$APP_ID:$APP_SECRET" \
   "refresh_token": "sar_…",
   "refresh_token_expires_at": "2029-03-25T02:33:57.696Z",
   "scope": "profile timezone",
-  "membership_id": "briefcase:K1E",
+  "membership_id": "briefcase:8559a06f-4c3b-4480-ade8-fde4f7428bba",
   "account": {
-    "uuid": "K1E",
-    "membership_id": "briefcase:K1E",
+    "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
+    "membership_id": "briefcase:8559a06f-4c3b-4480-ade8-fde4f7428bba",
     "kind": "silicon",
     "id": "si:scout",
     "display_name": "Scout",
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=K1E",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8559a06f-4c3b-4480-ade8-fde4f7428bba",
     "timezone": "Asia/Kolkata",
-    "custodian": { "uuid": "zQo", "id": "c:saket" },
+    "custodian": { "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "id": "c:saket" },
     "updated_at": "2026-10-07T02:33:40.817Z",
     "version": 1
   }
@@ -401,8 +401,8 @@ The answer is the usual [token response](#the-token-response), plus `issued_toke
   "refresh_token": "sar_Wm1kO3n2...",
   "refresh_token_expires_at": "2026-10-09T05:41:27.204Z",
   "scope": "profile",
-  "membership_id": "silicon-accounts:b97",
-  "account": { "uuid": "b97", "kind": "silicon", "id": "si:scout", "...": "..." },
+  "membership_id": "silicon-accounts:7700120d-a627-4ac8-abb2-ea7620bfa16e",
+  "account": { "uuid": "7700120d-a627-4ac8-abb2-ea7620bfa16e", "kind": "silicon", "id": "si:scout", "...": "..." },
   "issued_token_type": "urn:ietf:params:oauth:token-type:access_token"
 }
 ```
@@ -461,7 +461,7 @@ The access token's claims (first-party tokens have `aud: "silicon-accounts"`):
 ```json
 {
   "iss": "https://accounts.teamofsilicons.com",
-  "sub": "8HV",
+  "sub": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "aud": "briefcase",
   "exp": 1791342182,
   "iat": 1791340382,
@@ -469,7 +469,7 @@ The access token's claims (first-party tokens have `aud: "silicon-accounts"`):
   "jti": "01a11435-086d-7380-97bc-50f5ff0c33b3",
   "kind": "carbon",
   "id": "c:ada",
-  "mid": "briefcase:8HV",
+  "mid": "briefcase:4143123f-b494-481c-adbf-c14b14cfccc0",
   "fid": "01a11435-0864-723d-86b3-c15a7345c088",
   "scope": "profile email timezone openid"
 }
@@ -486,14 +486,14 @@ The `id_token`'s claims (header `{"alg":"EdDSA","kid":"…"}`):
 ```json
 {
   "iss": "https://accounts.teamofsilicons.com",
-  "sub": "8HV",
+  "sub": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "aud": "briefcase",
   "exp": 1791342182,
   "iat": 1791340382,
   "auth_time": 1791340371,
   "nonce": "n-456",
   "name": "Ada Lovelace",
-  "picture": "https://iris.teamofsilicons.com/pfp/carbon?id=8HV",
+  "picture": "https://iris.teamofsilicons.com/pfp/carbon?id=4143123f-b494-481c-adbf-c14b14cfccc0",
   "preferred_username": "c:ada",
   "email": "ada@example.test",
   "email_verified": true,
@@ -565,7 +565,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/introspect" -u "$APP_ID:$APP_SECRET" -d 
 {
   "active": true,
   "iss": "https://accounts.teamofsilicons.com",
-  "sub": "8HV",
+  "sub": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "aud": "briefcase",
   "client_id": "briefcase",
   "exp": 1791342204,
@@ -575,7 +575,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/oauth/introspect" -u "$APP_ID:$APP_SECRET" -d 
   "kind": "carbon",
   "id": "c:ada",
   "username": "c:ada",
-  "membership_id": "briefcase:8HV",
+  "membership_id": "briefcase:4143123f-b494-481c-adbf-c14b14cfccc0",
   "scope": "profile email timezone openid",
   "token_type": "access_token"
 }
@@ -596,20 +596,20 @@ curl -s "$ACCOUNTS_URL/v1/userinfo" -H "Authorization: Bearer $ACCESS_TOKEN"
 
 ```json
 {
-  "uuid": "8HV",
-  "membership_id": "briefcase:8HV",
+  "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
+  "membership_id": "briefcase:4143123f-b494-481c-adbf-c14b14cfccc0",
   "kind": "carbon",
   "id": "c:ada",
   "display_name": "Ada Lovelace",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=8HV",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=4143123f-b494-481c-adbf-c14b14cfccc0",
   "email": "ada@example.test",
   "email_verified": true,
   "timezone": "Asia/Kolkata",
   "updated_at": "2026-10-07T02:32:51.018Z",
   "version": 1,
-  "sub": "8HV",
+  "sub": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "name": "Ada Lovelace",
-  "picture": "https://iris.teamofsilicons.com/pfp/carbon?id=8HV",
+  "picture": "https://iris.teamofsilicons.com/pfp/carbon?id=4143123f-b494-481c-adbf-c14b14cfccc0",
   "zoneinfo": "Asia/Kolkata"
 }
 ```

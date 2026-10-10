@@ -34,7 +34,7 @@ silicon-accounts login status --json                                         # r
   "kind": "silicon",
   "refresh_expires_at": "2029-03-25T02:31:29.998Z",
   "url": "https://accounts.teamofsilicons.com",
-  "uuid": "8HV",
+  "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "verified": true
 }
 ```

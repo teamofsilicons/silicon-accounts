@@ -23,7 +23,7 @@ silicon-accounts silicon create --id si:scout --custodian c:saket --wait
 ```
 
 ```text
-Created si:scout (8HV). It can sign in once c:saket accepts being its custodian.
+Created si:scout (4143123f-b494-481c-adbf-c14b14cfccc0). It can sign in once c:saket accepts being its custodian.
 Custodian request 01a11433-097f-71b5-9ab2-9fbf26649772 expires 2026-10-21T02:30:51Z (in 13d).
 
 STK (shown once, store it now): stk-59e5f08f3bbe
@@ -127,7 +127,7 @@ silicon-accounts silicon create --id si:ledger --custodian c:saket --webhook htt
 ```
 
 ```text
-Created si:ledger (nln). It can sign in once c:saket accepts being its custodian.
+Created si:ledger (2c39a4d8-922c-45cb-bf06-102061d9af0c). It can sign in once c:saket accepts being its custodian.
 Custodian request 01a11435-b2e0-75eb-98ff-d43d2c839070 expires 2026-10-21T02:33:45Z (in 13d).
 
 STK (shown once, store it now): stk-86e514c87033
@@ -150,7 +150,7 @@ silicon-accounts silicon request status 01a11435-b2e0-75eb-98ff-d43d2c839070 --j
   "silicon": {
     "id": "si:ledger",
     "status": "pending_custodian",
-    "uuid": "nln"
+    "uuid": "2c39a4d8-922c-45cb-bf06-102061d9af0c"
   },
   "status": "pending"
 }
@@ -218,12 +218,12 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons \
     "dob": "2026-10-07",
     "id": "si:ledger",
     "kind": "silicon",
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=K1E",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8559a06f-4c3b-4480-ade8-fde4f7428bba",
     "status": "pending_custodian",
     "stk_rotated_at": "2026-10-07T02:32:47.969Z",
     "timezone": "Asia/Kolkata",
     "updated_at": "2026-10-07T02:32:47.969Z",
-    "uuid": "K1E",
+    "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
     "version": 1,
     "webhook_url": "https://ledger.example/hooks/accounts"
   },
@@ -255,7 +255,7 @@ curl -s https://accounts.teamofsilicons.com/v1/silicons/requests/01a11434-d064-7
   "expires_at": "2026-10-21T02:32:47.969Z",
   "decided_at": null,
   "silicon": {
-    "uuid": "K1E",
+    "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
     "id": "si:ledger",
     "status": "pending_custodian"
   }
@@ -345,7 +345,7 @@ silicon-accounts silicon create --id si:mapper --display-name Mapper --timezone 
 ```
 
 ```text
-Created si:mapper (BYP) with you, c:saket, as its custodian. It can sign in right away.
+Created si:mapper (ef385ebe-1123-4be6-aa17-a8c1f6753aa6) with you, c:saket, as its custodian. It can sign in right away.
 
 STK (shown once, store it now): stk-c743aeed4346
 ```
@@ -464,11 +464,11 @@ Here is the envelope, for an expired request:
     "id": "si:courier",
     "released": true,
     "request_id": "01a11436-72f0-7296-a867-39e04d9a53c0",
-    "uuid": "ZE6"
+    "uuid": "93524e0d-db12-458e-aa7a-07d08c9906d5"
   },
   "event_id": "01a11437-0385-74ac-bda4-e23549dd0e06",
   "occurred_at": "2026-10-07T02:35:12.133Z",
-  "silicon": "ZE6",
+  "silicon": "93524e0d-db12-458e-aa7a-07d08c9906d5",
   "type": "silicon.custodian.expired"
 }
 ```

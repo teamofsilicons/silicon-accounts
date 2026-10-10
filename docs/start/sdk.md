@@ -99,7 +99,7 @@ Silicon Accounts" line. Choosing email went to:
 https://accounts.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&response_type=code&state=GQe4rfj-DYDcsc1QSee9P0knbkY4YaF83btELqx-7Lo&code_challenge=9oFWaKZEmIFd4oWb4yVL2fRCaobJFwMKi1wdbMs-A50&code_challenge_method=S256&scope=email&method=email
 ```
 
-and the callback answered `Signed in as c:grace-hopper (briefcase:ptO)`.
+and the callback answered `Signed in as c:grace-hopper (briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b)`.
 
 The SDK puts its buttons in a Shadow DOM, so their styles stay separate from your page. It uses a constructed stylesheet, which keeps the button styles working under a strict `style-src`.
 

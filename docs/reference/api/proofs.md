@@ -33,7 +33,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/proofs/verify" -u "briefcase:$BRIEFCASE_SECRET
   "expires_at": "2026-10-07T02:47:19.983Z",
   "issuing_app": { "app_id": "dm", "name": "DM" },
   "receiving_app": { "app_id": "briefcase", "name": "Briefcase" },
-  "user": { "uuid": "8HV", "id": "c:ada", "kind": "carbon", "membership_id": "dm:8HV" },
+  "user": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "id": "c:ada", "kind": "carbon", "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0" },
   "scopes": ["files.write"]
 }
 ```
@@ -64,7 +64,7 @@ Request bodies refuse unknown fields, and proof responses are `Cache-Control: no
   "refresh_expires_at": "2029-03-25T02:37:19.930Z",
   "issuing_app": "dm",
   "receiving_app": "briefcase",
-  "user": { "uuid": "8HV", "id": "c:ada", "kind": "carbon", "membership_id": "dm:8HV" },
+  "user": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "id": "c:ada", "kind": "carbon", "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0" },
   "scopes": ["files.write"]
 }
 ```
@@ -214,7 +214,7 @@ Only the issuing app can revoke. Send one of `{"proof_id"}`, `{"proof_token"}` o
       "proof_id": "01a11438-f6ef-75f2-86a0-091d4d1b9b37",
       "kind": "user_verification",
       "receiving_app": "briefcase",
-      "user": { "uuid": "8HV", "kind": "carbon", "id": "c:ada", "display_name": "Ada King", "pfp_url": "…", "status": "active" },
+      "user": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "kind": "carbon", "id": "c:ada", "display_name": "Ada King", "pfp_url": "…", "status": "active" },
       "scopes": ["files.write"],
       "status": "revoked",
       "access_ttl_seconds": 600,

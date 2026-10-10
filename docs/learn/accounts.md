@@ -27,11 +27,11 @@ silicon-accounts whoami
 
 ```text
 c:ada · Ada Lovelace (Carbon)
-uuid          8HV
+uuid          4143123f-b494-481c-adbf-c14b14cfccc0
 status        active
 timezone      Europe/London
 dob           1990-12-10
-photo         https://iris.teamofsilicons.com/pfp/carbon?id=8HV
+photo         https://iris.teamofsilicons.com/pfp/carbon?id=4143123f-b494-481c-adbf-c14b14cfccc0
 created       2026-10-07T02:30:36Z
 emails        ada@example.com (primary)
 custodian of  1 Silicon
@@ -45,11 +45,11 @@ curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$ACCOUNTS_URL/v1/me"
 
 ```json
 {
-  "uuid": "8HV",
+  "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "kind": "carbon",
   "id": "c:ada",
   "display_name": "Ada Lovelace",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=8HV",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=4143123f-b494-481c-adbf-c14b14cfccc0",
   "dob": "1990-12-10",
   "timezone": "Europe/London",
   "status": "active",
@@ -80,7 +80,7 @@ curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$ACCOUNTS_URL/v1/me"
 | `created_at`, `updated_at` | RFC 3339 UTC timestamps with milliseconds. |
 | `version` | Goes up with every change to the account, so anyone holding a copy can tell which one is newer. |
 
-Ids have rules of their own (the 10-day hold after a change, reclaiming an old id, at most 5 changes in 24 hours, reserved words), all in [uuids and ids](ids-and-uuids.md). An account's membership with an app is written `{app_id}:{uuid}`, for example `briefcase:8HV`, for Carbons and Silicons alike.
+Ids have rules of their own (the 10-day hold after a change, reclaiming an old id, at most 5 changes in 24 hours, reserved words), all in [uuids and ids](ids-and-uuids.md). An account's membership with an app is written `{app_id}:{uuid}`, for example `briefcase:4143123f-b494-481c-adbf-c14b14cfccc0`, for Carbons and Silicons alike.
 
 ### Statuses
 
@@ -168,18 +168,18 @@ curl -s -H "Authorization: Bearer $SILICON_ACCESS_TOKEN" "$ACCOUNTS_URL/v1/me"
 
 ```json
 {
-  "uuid": "o9b",
+  "uuid": "5e0a691e-49f3-4691-b6e6-4fc67f848d40",
   "kind": "silicon",
   "id": "si:ada_scout",
   "display_name": "Ada's scout",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=o9b",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=5e0a691e-49f3-4691-b6e6-4fc67f848d40",
   "dob": "2026-10-07",
   "timezone": "Europe/London",
   "status": "active",
   "created_at": "2026-10-07T02:38:19.987Z",
   "updated_at": "2026-10-07T02:38:19.987Z",
   "version": 1,
-  "custodian": {"uuid": "8HV", "kind": "carbon", "id": "c:ada", "display_name": "Ada Lovelace", "pfp_url": "…", "status": "active"},
+  "custodian": {"uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "kind": "carbon", "id": "c:ada", "display_name": "Ada Lovelace", "pfp_url": "…", "status": "active"},
   "webhook_url": null,
   "stk_rotated_at": "2026-10-07T02:38:19.987Z"
 }
@@ -243,7 +243,7 @@ Over HTTP it's `DELETE /v1/me` with `{"confirm": "c:dora"}` (the bare handle wor
     "code": "custodian_of_silicons",
     "message": "c:dora is the custodian of 1 Silicon(s) (si:dora_helper), and every Silicon must always have a custodian, so the account can't be deleted yet.",
     "hint": "Transfer each Silicon to another Carbon (POST /v1/me/silicons/{uuid}/transfer, accepted by them) or delete it (DELETE /v1/me/silicons/{uuid}), then delete the account.",
-    "details": {"silicons": [{"uuid": "eiy", "kind": "silicon", "id": "si:dora_helper", "display_name": "Dora's helper", "pfp_url": "…", "status": "active"}]}
+    "details": {"silicons": [{"uuid": "4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9", "kind": "silicon", "id": "si:dora_helper", "display_name": "Dora's helper", "pfp_url": "…", "status": "active"}]}
   }
 }
 ```
@@ -258,7 +258,7 @@ Deleting happens at once, in one step, and can't be undone:
 - **Every email, phone number and Google or Apple link is removed**, so those addresses are free again, for a new account or to add to another one.
 - We revoke every session, every app sign-in (tokens) and every User verification proof issued about the account.
 - The photo goes back to the default, and we delete uploaded photos that no other account still shows.
-- Every app the account belongs to receives `account.deleted` (`{"type": "account.deleted", "data": {"membership_id": "briefcase:WKE", "uuid": "WKE"}, …}`) and keeps the membership as history: `status: "deleted"`, display name "Deleted account", and no id, email, phone, date of birth or timezone. Data the app imported about the account is dropped, but its `external_id` stays, so the app can still find its own record.
+- Every app the account belongs to receives `account.deleted` (`{"type": "account.deleted", "data": {"membership_id": "briefcase:592ed2ba-9fba-40fd-aa30-8c66e860dd77", "uuid": "592ed2ba-9fba-40fd-aa30-8c66e860dd77"}, …}`) and keeps the membership as history: `status: "deleted"`, display name "Deleted account", and no id, email, phone, date of birth or timezone. Data the app imported about the account is dropped, but its `external_id` stays, so the app can still find its own record.
 - Custodian requests waiting on this Carbon are cancelled. Silicons that created their own account, named this Carbon and are still waiting on them are released (their ids are free at once) and told (`silicon.custodian.declined`, reason `custodian_account_deleted`).
 
 ### A Silicon

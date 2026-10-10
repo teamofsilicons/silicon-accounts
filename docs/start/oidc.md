@@ -96,14 +96,14 @@ After a sign-in, the callback shows the validated claims and the userinfo:
 {
   "claims": {
     "iss": "https://accounts.teamofsilicons.com",
-    "sub": "aQm",
+    "sub": "049acc16-61c0-443b-ab27-f3f9a1d750ee",
     "aud": "briefcase",
     "exp": 1791343503,
     "iat": 1791341703,
     "auth_time": 1791341703,
     "nonce": "BrXP_yF6jiGsOrcQmOMyAjZVLpSITuhaZwekxsvD8WM",
     "name": "Oidc3 Docs",
-    "picture": "https://iris.teamofsilicons.com/pfp/carbon?id=aQm",
+    "picture": "https://iris.teamofsilicons.com/pfp/carbon?id=049acc16-61c0-443b-ab27-f3f9a1d750ee",
     "preferred_username": "c:oidc3-docs",
     "email": "oidc3-docs@example.test",
     "email_verified": true
@@ -114,13 +114,13 @@ After a sign-in, the callback shows the validated claims and the userinfo:
     "email_verified": true,
     "id": "c:oidc3-docs",
     "kind": "carbon",
-    "membership_id": "briefcase:aQm",
+    "membership_id": "briefcase:049acc16-61c0-443b-ab27-f3f9a1d750ee",
     "name": "Oidc3 Docs",
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=aQm",
-    "picture": "https://iris.teamofsilicons.com/pfp/carbon?id=aQm",
-    "sub": "aQm",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=049acc16-61c0-443b-ab27-f3f9a1d750ee",
+    "picture": "https://iris.teamofsilicons.com/pfp/carbon?id=049acc16-61c0-443b-ab27-f3f9a1d750ee",
+    "sub": "049acc16-61c0-443b-ab27-f3f9a1d750ee",
     "updated_at": "2026-10-07T02:55:03.809Z",
-    "uuid": "aQm",
+    "uuid": "049acc16-61c0-443b-ab27-f3f9a1d750ee",
     "version": 1
   }
 }
@@ -203,7 +203,7 @@ again with every refresh of that sign-in.
 | Claim | Value |
 |---|---|
 | `iss` | `https://accounts.teamofsilicons.com` |
-| `sub` | The account's `uuid`: permanent, the same in every token and webhook. Key your user on it. Despite its name it isn't an RFC 4122 UUID: it's a short, case-sensitive string such as `aQm`, so store it as text and compare it exactly. |
+| `sub` | The account's `uuid`: permanent, the same in every token and webhook. Key your user on it. It is a standard 128-bit (16-byte) UUIDv4, serialized as 36 lowercase characters with hyphens. Store it in a UUID column or as canonical text and compare it exactly. |
 | `aud` | Your app id. |
 | `exp`, `iat` | Same lifetime as the access token: 30 minutes. |
 | `auth_time` | When the Carbon last proved who they are in this browser (a code, Google, Apple). "Continue as …" and `prompt=none` keep the earlier time, so `auth_time` can be well before `iat`. |

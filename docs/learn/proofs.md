@@ -33,7 +33,7 @@ POST /v1/proofs/user-verification     (as dm)         {"subject_token":"eyJ…",
 
 # dm calls briefcase with "Authorization: Proof sap_OMGt…"; briefcase asks Silicon Accounts
 POST /v1/proofs/verify  (as briefcase)  {"proof_token":"sap_OMGt…"}
-→ 200 {"valid":true,"kind":"user_verification","issuing_app":{"app_id":"dm",…},"user":{"uuid":"8HV","id":"si:scout",…},"scopes":["files.write"],…}
+→ 200 {"valid":true,"kind":"user_verification","issuing_app":{"app_id":"dm",…},"user":{"uuid":"4143123f-b494-481c-adbf-c14b14cfccc0","id":"si:scout",…},"scopes":["files.write"],…}
 
 # the same token, checked by remind, which the proof doesn't name
 POST /v1/proofs/verify  (as remind)     {"proof_token":"sap_OMGt…"}
@@ -102,7 +102,7 @@ A valid answer tells the receiving app everything it needs:
   "expires_at": "2026-10-07T02:43:13.274Z",
   "issuing_app": { "app_id": "dm", "name": "DM" },
   "receiving_app": { "app_id": "briefcase", "name": "Briefcase" },
-  "user": { "uuid": "8HV", "id": "si:scout", "kind": "silicon", "membership_id": "dm:8HV" },
+  "user": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "id": "si:scout", "kind": "silicon", "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0" },
   "scopes": ["files.write"]
 }
 ```

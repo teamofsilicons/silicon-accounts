@@ -45,7 +45,7 @@ curl -s -u "dm:$DM_APP_SECRET" \
   "receiving_app": "briefcase",
   "refresh_expires_at": "2029-03-25T02:33:08.110Z",
   "scopes": ["files.write"],
-  "user": { "id": "si:scout", "kind": "silicon", "membership_id": "dm:8HV", "uuid": "8HV" }
+  "user": { "id": "si:scout", "kind": "silicon", "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0", "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0" }
 }
 ```
 
@@ -58,7 +58,7 @@ curl -X POST https://briefcase.example/api/files \
   -d '{"filename":"notes.txt"}'
 ```
 
-Every response on this page is real, from a local Silicon Accounts stack. There the account was the Silicon `si:scout`, signed into `dm` with a short-lived token. It works the same way for a Carbon.
+The responses on this page were recorded from a local Silicon Accounts stack; account UUIDs have been normalized to illustrative UUIDv4 values. There the account was the Silicon `si:scout`, signed into `dm` with a short-lived token. It works the same way for a Carbon.
 
 ## Before you start
 
@@ -125,7 +125,7 @@ You get `200 OK` with the same shape and the same `proof_id`, a new `proof_token
   "receiving_app": "briefcase",
   "refresh_expires_at": "2029-03-25T02:33:08.110Z",
   "scopes": ["files.write"],
-  "user": { "id": "si:scout", "kind": "silicon", "membership_id": "dm:8HV", "uuid": "8HV" }
+  "user": { "id": "si:scout", "kind": "silicon", "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0", "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0" }
 }
 ```
 
@@ -177,11 +177,11 @@ curl -s -u "dm:$DM_APP_SECRET" \
       "kind": "user_verification",
       "receiving_app": "briefcase",
       "user": {
-        "uuid": "eiy",
+        "uuid": "4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9",
         "kind": "silicon",
         "id": "si:courier",
         "display_name": "Courier",
-        "pfp_url": "http://127.0.0.1:8825/pfp/silicon?id=eiy",
+        "pfp_url": "http://127.0.0.1:8825/pfp/silicon?id=4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9",
         "status": "active"
       },
       "scopes": ["files.write"],
@@ -333,7 +333,7 @@ App commands take the app's credentials from `--app-id` and `--app-secret-stdin`
 ```
 $ export ACCOUNTS_APP_ID=dm ACCOUNTS_APP_SECRET=…
 $ printf '%s' "$ACCESS_TOKEN" | silicon-accounts app proof user-verification --subject-token - --to briefcase --scope files.write --ttl 600
-User verification proof 01a1143d-7cf0-72cb-a6aa-92936511127a from dm for briefcase on behalf of si:scout_two (8HV).
+User verification proof 01a1143d-7cf0-72cb-a6aa-92936511127a from dm for briefcase on behalf of si:scout_two (4143123f-b494-481c-adbf-c14b14cfccc0).
 proof token    sap_b-W-7LIru72TQVEMyH_9LikGdngf7TdEcGEupmQmI0o
 expires        2026-10-07T02:52:16Z (in 9m)
 refresh token  sapr_LkCj5s0_zZDrJTnHIAQpGAzP0ulTCBcMWzNO2m6B0zc

@@ -22,8 +22,8 @@ This page covers which fields you get, how required and optional details are sha
 
 | Identifier | Example | Changes? | Use it for |
 |---|---|---|---|
-| `uuid` | `ptO` | Never, and never reused, even after the account is deleted | The key of your user record |
-| `membership_id` | `briefcase:ptO` | Never (`{app_id}:{uuid}`) | A key that also says which app, when you store several apps' users together |
+| `uuid` | `d6393ce9-6e58-4e52-b7da-e65c5d47322b` | Never, and never reused, even after the account is deleted | The key of your user record |
+| `membership_id` | `briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b` | Never (`{app_id}:{uuid}`) | A key that also says which app, when you store several apps' users together |
 | `id` | `c:grace-hopper`, `si:scout` | Yes, whenever the account renames itself | Showing who someone is |
 
 The `c:`/`si:` id can change at any time, and 10 days after a change the old id is free for someone else to take. Key anything on it and one day you'll attach one account's data to another. When an id changes, your webhook hears about it:
@@ -31,7 +31,7 @@ The `c:`/`si:` id can change at any time, and 10 days after a change the old id 
 ```json
 {
   "app_id": "briefcase",
-  "data": {"kind": "carbon", "membership_id": "briefcase:nln", "new_id": "c:lin", "old_id": "c:lin-docs", "uuid": "nln"},
+  "data": {"kind": "carbon", "membership_id": "briefcase:2c39a4d8-922c-45cb-bf06-102061d9af0c", "new_id": "c:lin", "old_id": "c:lin-docs", "uuid": "2c39a4d8-922c-45cb-bf06-102061d9af0c"},
   "event_id": "01a1143a-b090-7231-a677-dfc98fc003cd",
   "occurred_at": "2026-10-07T02:39:13.040Z",
   "silicon": null,
@@ -58,12 +58,12 @@ Here's a Carbon and a Silicon after the same kind of sign-in:
 
 ```json
 {
-  "uuid": "ptO",
-  "membership_id": "briefcase:ptO",
+  "uuid": "d6393ce9-6e58-4e52-b7da-e65c5d47322b",
+  "membership_id": "briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b",
   "kind": "carbon",
   "id": "c:grace-hopper",
   "display_name": "Grace Hopper",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=ptO",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=d6393ce9-6e58-4e52-b7da-e65c5d47322b",
   "email": "grace.hopper@example.com",
   "email_verified": true,
   "updated_at": "2026-10-07T02:56:29.875Z",
@@ -73,14 +73,14 @@ Here's a Carbon and a Silicon after the same kind of sign-in:
 
 ```json
 {
-  "uuid": "1Nx",
-  "membership_id": "briefcase:1Nx",
+  "uuid": "0b697a57-a348-442a-99a4-c6a11c0f2b5c",
+  "membership_id": "briefcase:0b697a57-a348-442a-99a4-c6a11c0f2b5c",
   "kind": "silicon",
   "id": "si:scout",
   "display_name": "Scout",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=1Nx",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=0b697a57-a348-442a-99a4-c6a11c0f2b5c",
   "timezone": "Asia/Kolkata",
-  "custodian": {"uuid": "ptO", "id": "c:grace-hopper"},
+  "custodian": {"uuid": "d6393ce9-6e58-4e52-b7da-e65c5d47322b", "id": "c:grace-hopper"},
   "updated_at": "2026-10-07T02:56:54.507Z",
   "version": 1
 }
@@ -129,8 +129,8 @@ silicon-accounts app users                 # or: curl -u "${ACCOUNTS_APP_ID}:${A
 ```text
 UUID  ID             NAME         STATUS  SOURCE  CONTACT                   LAST SIGN-IN
 ywD   c:oidc2-docs   Oidc2 Docs   active  signin  oidc2-docs@example.test   2026-10-07T02:45:17Z
-sV0   si:scout-docs  Scout        active  slt                               2026-10-07T02:51:57Z
-nln   c:lin          Lin Okafor   active  signin  lin-docs@example.test     2026-10-07T02:53:34Z
+0957b636-4137-4fbc-9fd4-00e43a80000e   si:scout-docs  Scout        active  slt                               2026-10-07T02:51:57Z
+2c39a4d8-922c-45cb-bf06-102061d9af0c   c:lin          Lin Okafor   active  signin  lin-docs@example.test     2026-10-07T02:53:34Z
 ```
 
 One entry of `GET /v1/apps/{app_id}/users/{uuid}`:
@@ -150,12 +150,12 @@ One entry of `GET /v1/apps/{app_id}/users/{uuid}`:
   "id": "si:scout-docs",
   "kind": "silicon",
   "last_signed_in_at": "2026-10-07T02:38:22.865Z",
-  "membership_id": "briefcase:sV0",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=sV0",
+  "membership_id": "briefcase:0957b636-4137-4fbc-9fd4-00e43a80000e",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=0957b636-4137-4fbc-9fd4-00e43a80000e",
   "source": "slt",
   "status": "active",
   "timezone": "Asia/Kolkata",
-  "uuid": "sV0"
+  "uuid": "0957b636-4137-4fbc-9fd4-00e43a80000e"
 }
 ```
 

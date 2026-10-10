@@ -33,18 +33,18 @@ A valid proof answers `200` with everything you need to decide:
   "expires_at": "2026-10-07T02:43:13.274Z",
   "issuing_app": { "app_id": "dm", "name": "DM" },
   "receiving_app": { "app_id": "briefcase", "name": "Briefcase" },
-  "user": { "uuid": "8HV", "id": "si:scout", "kind": "silicon", "membership_id": "dm:8HV" },
+  "user": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "id": "si:scout", "kind": "silicon", "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0" },
   "scopes": ["files.write"]
 }
 ```
 
-Here the app `dm` may act at `briefcase` for the Silicon `si:scout` (uuid `8HV`), with the scope `files.write`, until 02:43:13 UTC. Anything else answers `200` with exactly this:
+Here the app `dm` may act at `briefcase` for the Silicon `si:scout` (uuid `4143123f-b494-481c-adbf-c14b14cfccc0`), with the scope `files.write`, until 02:43:13 UTC. Anything else answers `200` with exactly this:
 
 ```json
 {"valid": false, "expires_at": null}
 ```
 
-Like every response on this page, these are real answers from a local Silicon Accounts stack.
+Like every response on this page, these answers were recorded from a local Silicon Accounts stack; account UUIDs have been normalized to illustrative UUIDv4 values.
 
 ## Steps
 
@@ -96,7 +96,7 @@ createServer(async (req, res) => {
 }).listen(3000);
 ```
 
-On the local stack, a valid User verification proof from `dm` got `201 {"saved_for":"eiy","via":"dm"}`, and the same endpoint answered `403` for a revoked proof and for `sap_nope`.
+On the local stack, a valid User verification proof from `dm` got `201 {"saved_for":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9","via":"dm"}`, and the same endpoint answered `403` for a revoked proof and for `sap_nope`.
 
 ## In Rust
 
@@ -138,7 +138,7 @@ async fn main() -> Result<(), BoxError> {
 }
 ```
 
-`verify_proof` returns `ProofVerification::Invalid` for every `{"valid": false}` answer, and an `Err` only when the request itself failed (bad credentials, network). On the local stack, `check_proof` returned `Some("eiy")` for a valid User verification proof from `dm`, `None` for the same proof with the scope `files.delete`, `None` when `remind` checked it, and `Some("commit")` for an App verification proof from `commit`. For `sap_nope`, the program printed `refuse the call`.
+`verify_proof` returns `ProofVerification::Invalid` for every `{"valid": false}` answer, and an `Err` only when the request itself failed (bad credentials, network). On the local stack, `check_proof` returned `Some("4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9")` for a valid User verification proof from `dm`, `None` for the same proof with the scope `files.delete`, `None` when `remind` checked it, and `Some("commit")` for an App verification proof from `commit`. For `sap_nope`, the program printed `refuse the call`.
 
 ## With the CLI
 
@@ -148,7 +148,7 @@ ACCOUNTS_APP_ID=briefcase ACCOUNTS_APP_SECRET="$BRIEFCASE_APP_SECRET" \
 ```
 
 ```
-valid: User verification proof from dm for briefcase, on behalf of si:scout_two (8HV), scopes files.write files.read, until 2026-10-07T03:12:16Z (in 29m)
+valid: User verification proof from dm for briefcase, on behalf of si:scout_two (4143123f-b494-481c-adbf-c14b14cfccc0), scopes files.write files.read, until 2026-10-07T03:12:16Z (in 29m)
 ```
 
 It exits `0` when the proof is valid and `2` when it isn't, so `silicon-accounts app proof verify "$TOKEN" && …` works in scripts and fails closed. Any other exit code means the check itself didn't happen: `3` when your app's credentials were refused (wrong secret, disabled app), and `1` when we couldn't be reached. A command-line mistake also exits `2`, and that includes running it as the app's owner without the app secret, because verifying needs the app's own credentials. To tell them apart, add `--json`: a checked proof prints our answer (`{"valid": …}`), and a failure prints `{"error": {…}}`. Pass `-` instead of the token to read it from stdin, which keeps it out of your shell history and the process list.

@@ -30,7 +30,7 @@ curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" \
 {"events":null,"secret":"whsec_W1R3u9l25YmDv906DMbhc4REXN-rdU9Bio7vVGFFJQ8","url":"https://briefcase.example/webhooks/accounts"}
 ```
 
-We captured the responses on this page from a local Silicon Accounts stack; only the webhook URLs are shown as this example's `https` URL. Every delivery looks like this one. It is also a test vector: its secret was `whsec_7ex-O5r8O_UITcSX_bYEmzre7Lu_RXN1XFFBA9Ozif0`.
+We captured the responses on this page from a local Silicon Accounts stack. Account UUIDs outside signed test vectors are normalized to illustrative UUIDv4 values; webhook URLs use this example's `https` URL. Every delivery looks like this one. It is also a test vector: its secret was `whsec_7ex-O5r8O_UITcSX_bYEmzre7Lu_RXN1XFFBA9Ozif0`.
 
 ```http
 POST /webhooks/accounts HTTP/1.1
@@ -274,7 +274,7 @@ async fn main() {
 }
 ```
 
-Against the local stack this printed `ping 01a11440-c0d4-73dd-b84b-c339d835a6cd`, `8HV changed ["display_name"] (version 5)` and `8HV is now si:scout_three` for real deliveries, and refused a forged one and a stale one:
+Against the local stack this printed `ping 01a11440-c0d4-73dd-b84b-c339d835a6cd`, `4143123f-b494-481c-adbf-c14b14cfccc0 changed ["display_name"] (version 5)` and `4143123f-b494-481c-adbf-c14b14cfccc0 is now si:scout_three` for real deliveries, and refused a forged one and a stale one:
 
 ```
 refused a webhook: The webhook signature does not match the body. Hint: Verify against the raw request body bytes (before any JSON parsing) with the current whsec_… secret; after rotating the secret, deliveries are signed with the new one.

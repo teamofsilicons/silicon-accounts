@@ -780,13 +780,13 @@ silicon-accounts lookup [OPTIONS] <TARGET>
 
 | argument or option | meaning |
 |---|---|
-| `<TARGET>` | A uuid (a8K) or an id (c:saket, si:scout) |
+| `<TARGET>` | A uuid (5deba331-f322-4703-92ea-6aea48c7b2b7) or an id (c:saket, si:scout) |
 
 Examples, as `--help` prints them:
 
 ```text
 silicon-accounts lookup c:saket
-silicon-accounts lookup a8K --json
+silicon-accounts lookup 5deba331-f322-4703-92ea-6aea48c7b2b7 --json
 ```
 
 ### `silicon-accounts profile`
@@ -2342,7 +2342,7 @@ them, and the other statuses leave them out ([What apps see](../learn/what-apps-
 ```text
 $ silicon-accounts app users --status deleted
 UUID  ID  NAME             STATUS   SOURCE  CONTACT  LAST SIGN-IN
-K1E       Deleted account  deleted  slt              2026-10-07T05:22:30Z
+8559a06f-4c3b-4480-ade8-fde4f7428bba       Deleted account  deleted  slt              2026-10-07T05:22:30Z
 ```
 
 #### `silicon-accounts app user`

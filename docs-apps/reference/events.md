@@ -35,7 +35,7 @@ Anyone who can see an app can receive its `app.published`, `release.created`, `r
 Each event looks like this:
 
 ```json
-{"seq":42,"id":"7d0c…","type":"release.promoted","app_id":"briefcase","actor_uuid":"8HV…","occurred_at":"2026-10-09T10:15:00Z","data":{"id":"…","channel":"production","version":"1.4.0","package_ids":["…"]}}
+{"seq":42,"id":"7d0c…","type":"release.promoted","app_id":"briefcase","actor_uuid":"4143123f-b494-481c-adbf-c14b14cfccc0","occurred_at":"2026-10-09T10:15:00Z","data":{"id":"…","channel":"production","version":"1.4.0","package_ids":["…"]}}
 ```
 
 `seq` is the event's place in the log, and you use it to resume.
@@ -118,7 +118,7 @@ x-apps-subscription-id: sub_…
 x-apps-timestamp: 1791540900
 x-apps-signature: v1=5f1c…
 
-{"actor_uuid":"8HV…","app_id":"briefcase","data":{…},"event_id":"7d0c…","occurred_at":"2026-10-09T10:15:00Z","seq":42,"subscription_id":"sub_…","type":"release.promoted"}
+{"actor_uuid":"4143123f-b494-481c-adbf-c14b14cfccc0","app_id":"briefcase","data":{…},"event_id":"7d0c…","occurred_at":"2026-10-09T10:15:00Z","seq":42,"subscription_id":"sub_…","type":"release.promoted"}
 ```
 
 We follow the same rules as [Silicon Accounts webhooks](/docs/accounts/learn/webhooks):

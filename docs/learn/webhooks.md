@@ -18,6 +18,8 @@ Webhooks tell your app about those changes, so you don't have to keep asking us 
 
 This page explains how it all works and lists every event with a real payload. To set up a receiver, follow [Receive webhooks](../start/webhooks.md).
 
+This captured delivery predates the coordinated UUID migration. Its signed bytes and short account ID are preserved as historical evidence. Current account UUIDs use the canonical UUIDv4 format described in [Ids and uuids](ids-and-uuids.md).
+
 Here is what reached `dm`'s endpoint 0.7 seconds after the Silicon `si:scout`, a member of `dm`, changed its id (captured from a local stack):
 
 ```http
@@ -252,7 +254,7 @@ retry: 5000
 
 id: 01a11e46-8684-715b-b2ac-c80931069cf7
 event: silicon.updated
-data: {"app_id":null,"data":{"changed":["display_name"],"id":"si:streamer","silicon":{"…":"…"},"uuid":"8HV"},"event_id":"01a11e46-8684-715b-b2ac-c80931069cf7","occurred_at":"2026-10-09T01:28:20.129Z","silicon":"8HV","type":"silicon.updated"}
+data: {"app_id":null,"data":{"changed":["display_name"],"id":"si:streamer","silicon":{"…":"…"},"uuid":"4143123f-b494-481c-adbf-c14b14cfccc0"},"event_id":"01a11e46-8684-715b-b2ac-c80931069cf7","occurred_at":"2026-10-09T01:28:20.129Z","silicon":"4143123f-b494-481c-adbf-c14b14cfccc0","type":"silicon.updated"}
 
 : heartbeat
 ```
@@ -285,7 +287,7 @@ How the stream fits with webhooks:
 
 ## App events
 
-We captured the payloads below from a local stack. Only photo URLs (`https://iris.teamofsilicons.com/…`, served by a stand-in locally) and webhook URLs are shown in their production form. `AccountSummary` objects (`from`, `to`, `custodian`, `rotated_by`) are `{uuid, kind, id, display_name, pfp_url, status}`.
+We captured the payloads below from a local stack and normalized account UUIDs to illustrative UUIDv4 values. Photo URLs (`https://iris.teamofsilicons.com/…`, served by a stand-in locally) and webhook URLs are shown in their production form. `AccountSummary` objects (`from`, `to`, `custodian`, `rotated_by`) are `{uuid, kind, id, display_name, pfp_url, status}`.
 
 ### account.id_changed
 
@@ -296,10 +298,10 @@ Sent to every app with a live membership when an account's `c:` or `si:` id chan
   "app_id": "dm",
   "data": {
     "kind": "silicon",
-    "membership_id": "dm:8HV",
+    "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0",
     "new_id": "si:scout_two",
     "old_id": "si:scout",
-    "uuid": "8HV"
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0"
   },
   "event_id": "01a11437-7425-7016-b4cf-b336b9779be8",
   "occurred_at": "2026-10-07T02:35:40.965Z",
@@ -326,15 +328,15 @@ A Carbon at `briefcase`, which has the `email` scope but not `timezone` (the Car
       "email_verified": true,
       "id": "c:ada-docs-69243",
       "kind": "carbon",
-      "membership_id": "briefcase:BYP",
-      "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=BYP",
+      "membership_id": "briefcase:ef385ebe-1123-4be6-aa17-a8c1f6753aa6",
+      "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=ef385ebe-1123-4be6-aa17-a8c1f6753aa6",
       "updated_at": "2026-10-07T02:37:49.315Z",
-      "uuid": "BYP",
+      "uuid": "ef385ebe-1123-4be6-aa17-a8c1f6753aa6",
       "version": 2
     },
     "changed": ["display_name"],
-    "membership_id": "briefcase:BYP",
-    "uuid": "BYP"
+    "membership_id": "briefcase:ef385ebe-1123-4be6-aa17-a8c1f6753aa6",
+    "uuid": "ef385ebe-1123-4be6-aa17-a8c1f6753aa6"
   },
   "event_id": "01a11439-6984-76e3-bb75-728e0ebd396b",
   "occurred_at": "2026-10-07T02:37:49.316Z",
@@ -350,20 +352,20 @@ A Silicon at `dm`, which has the `timezone` scope. A Silicon's `account` always 
   "app_id": "dm",
   "data": {
     "account": {
-      "custodian": { "id": "c:shubham", "uuid": "b97" },
+      "custodian": { "id": "c:shubham", "uuid": "7700120d-a627-4ac8-abb2-ea7620bfa16e" },
       "display_name": "Scout Two",
       "id": "si:scout",
       "kind": "silicon",
-      "membership_id": "dm:8HV",
-      "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8HV",
+      "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0",
+      "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=4143123f-b494-481c-adbf-c14b14cfccc0",
       "timezone": "Europe/Berlin",
       "updated_at": "2026-10-07T02:35:40.943Z",
-      "uuid": "8HV",
+      "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
       "version": 2
     },
     "changed": ["display_name", "timezone"],
-    "membership_id": "dm:8HV",
-    "uuid": "8HV"
+    "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0",
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0"
   },
   "event_id": "01a11437-7412-7700-ba3d-c878bf8a1125",
   "occurred_at": "2026-10-07T02:35:40.946Z",
@@ -381,7 +383,7 @@ Sent to every app with a live membership when an account is deleted (a Carbon de
 ```json
 {
   "app_id": "dm",
-  "data": { "membership_id": "dm:8HV", "uuid": "8HV" },
+  "data": { "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0", "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0" },
   "event_id": "01a11441-269a-710e-9d0e-622510b0b111",
   "occurred_at": "2026-10-07T02:46:16.474Z",
   "silicon": null,
@@ -406,7 +408,7 @@ Sent to one app when the account's sign-in there ends but the account doesn't le
 ```json
 {
   "app_id": "dm",
-  "data": { "membership_id": "dm:8HV", "reason": "stk_rotated", "uuid": "8HV" },
+  "data": { "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0", "reason": "stk_rotated", "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0" },
   "event_id": "01a11437-408f-735e-bfd6-949757ccb918",
   "occurred_at": "2026-10-07T02:35:27.759Z",
   "silicon": null,
@@ -423,7 +425,7 @@ Sent to one app when the account removes its access (on the account site, with `
 ```json
 {
   "app_id": "dm",
-  "data": { "membership_id": "dm:8HV", "uuid": "8HV" },
+  "data": { "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0", "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0" },
   "event_id": "01a11436-fd04-76e8-ac15-b23419c9fd2c",
   "occurred_at": "2026-10-07T02:35:10.468Z",
   "silicon": null,
@@ -441,10 +443,10 @@ Sent to every app with a live membership with a Silicon when a transfer of that 
 {
   "app_id": "dm",
   "data": {
-    "from": { "id": "c:shubham", "uuid": "b97" },
-    "membership_id": "dm:8HV",
-    "to": { "id": "c:saket", "uuid": "zQo" },
-    "uuid": "8HV"
+    "from": { "id": "c:shubham", "uuid": "7700120d-a627-4ac8-abb2-ea7620bfa16e" },
+    "membership_id": "dm:4143123f-b494-481c-adbf-c14b14cfccc0",
+    "to": { "id": "c:saket", "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175" },
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0"
   },
   "event_id": "01a11437-b7b6-710f-8d77-ee77b9b184ab",
   "occurred_at": "2026-10-07T02:35:58.262Z",
@@ -461,7 +463,7 @@ Sent when the app asks for a test (`POST /v1/apps/{app_id}/webhook/test`). `data
 
 ## Silicon events
 
-Sent to a Silicon's own webhook about its own account. The same Silicon (`si:scout`, uuid `8HV`) shows up in most examples, and `silicon` is the Silicon's own view of its account, as `GET /v1/me` returns it.
+Sent to a Silicon's own webhook about its own account. The same Silicon (`si:scout`, uuid `4143123f-b494-481c-adbf-c14b14cfccc0`) shows up in most examples, and `silicon` is the Silicon's own view of its account, as `GET /v1/me` returns it.
 
 ### silicon.created
 
@@ -479,29 +481,29 @@ Sent when the account is created with a webhook URL. `data`: `uuid`, `id`, `stat
         "display_name": "Shubham",
         "id": "c:shubham",
         "kind": "carbon",
-        "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=b97",
+        "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=7700120d-a627-4ac8-abb2-ea7620bfa16e",
         "status": "active",
-        "uuid": "b97"
+        "uuid": "7700120d-a627-4ac8-abb2-ea7620bfa16e"
       },
       "display_name": "Scout",
       "dob": "2026-10-07",
       "id": "si:scout",
       "kind": "silicon",
-      "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8HV",
+      "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=4143123f-b494-481c-adbf-c14b14cfccc0",
       "status": "active",
       "stk_rotated_at": "2026-10-07T02:32:38.792Z",
       "timezone": "Asia/Kolkata",
       "updated_at": "2026-10-07T02:32:38.792Z",
-      "uuid": "8HV",
+      "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
       "version": 1,
       "webhook_url": "https://scout.example/hooks/accounts"
     },
     "status": "active",
-    "uuid": "8HV"
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0"
   },
   "event_id": "01a11434-ac8b-73cb-9eac-d302489a7bba",
   "occurred_at": "2026-10-07T02:32:38.795Z",
-  "silicon": "8HV",
+  "silicon": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "type": "silicon.created"
 }
 ```
@@ -522,18 +524,18 @@ The Carbon accepted the custodian request, so the Silicon is `active` and can si
       "display_name": "Shubham",
       "id": "c:shubham",
       "kind": "carbon",
-      "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=b97",
+      "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=7700120d-a627-4ac8-abb2-ea7620bfa16e",
       "status": "active",
-      "uuid": "b97"
+      "uuid": "7700120d-a627-4ac8-abb2-ea7620bfa16e"
     },
     "id": "si:ranger",
     "request_id": "01a11438-2397-7648-b87c-3175d45ea79b",
-    "silicon": { "id": "si:ranger", "status": "active", "uuid": "K1E", "version": 2, "…": "the Silicon's own view, as in silicon.created" },
-    "uuid": "K1E"
+    "silicon": { "id": "si:ranger", "status": "active", "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba", "version": 2, "…": "the Silicon's own view, as in silicon.created" },
+    "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba"
   },
   "event_id": "01a11438-4ae2-7786-af52-8bced48fb6f4",
   "occurred_at": "2026-10-07T02:36:35.938Z",
-  "silicon": "K1E",
+  "silicon": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
   "type": "silicon.custodian.accepted"
 }
 ```
@@ -552,11 +554,11 @@ The Carbon declined (`reason: "declined"`), or deleted their account before answ
     "reason": "declined",
     "released": true,
     "request_id": "01a11438-249c-77e1-ab32-4baff6361274",
-    "uuid": "nln"
+    "uuid": "2c39a4d8-922c-45cb-bf06-102061d9af0c"
   },
   "event_id": "01a11438-4aec-767f-b892-61721f81f63e",
   "occurred_at": "2026-10-07T02:36:35.948Z",
-  "silicon": "nln",
+  "silicon": "2c39a4d8-922c-45cb-bf06-102061d9af0c",
   "type": "silicon.custodian.declined"
 }
 ```
@@ -574,11 +576,11 @@ Nobody accepted within 14 days, so the account is released as for a decline. `da
     "id": "si:loner",
     "released": true,
     "request_id": "01a11438-259b-7485-850b-96b399e89ad8",
-    "uuid": "ZE6"
+    "uuid": "93524e0d-db12-458e-aa7a-07d08c9906d5"
   },
   "event_id": "01a11438-9a44-7747-a763-eee70962766c",
   "occurred_at": "2026-10-07T02:36:56.260Z",
-  "silicon": "ZE6",
+  "silicon": "93524e0d-db12-458e-aa7a-07d08c9906d5",
   "type": "silicon.custodian.expired"
 }
 ```
@@ -596,11 +598,11 @@ The Silicon's details changed (by itself or its custodian). `data`: `uuid`, `id`
     "changed": ["display_name", "timezone"],
     "id": "si:scout",
     "silicon": { "display_name": "Scout Two", "timezone": "Europe/Berlin", "version": 2, "…": "the Silicon's own view" },
-    "uuid": "8HV"
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0"
   },
   "event_id": "01a11437-7413-7103-8af0-afdb2ed94bde",
   "occurred_at": "2026-10-07T02:35:40.947Z",
-  "silicon": "8HV",
+  "silicon": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "type": "silicon.updated"
 }
 ```
@@ -612,10 +614,10 @@ The Silicon's si:id changed. `data`: `uuid`, `old_id`, `new_id`.
 ```json
 {
   "app_id": null,
-  "data": { "new_id": "si:scout_two", "old_id": "si:scout", "uuid": "8HV" },
+  "data": { "new_id": "si:scout_two", "old_id": "si:scout", "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0" },
   "event_id": "01a11437-7425-7016-b4cf-b3381cf4f1d6",
   "occurred_at": "2026-10-07T02:35:40.965Z",
-  "silicon": "8HV",
+  "silicon": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "type": "silicon.id_changed"
 }
 ```
@@ -636,15 +638,15 @@ The custodian rotated the STK. The old STK stopped working, and every session of
       "display_name": "Shubham",
       "id": "c:shubham",
       "kind": "carbon",
-      "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=b97",
+      "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=7700120d-a627-4ac8-abb2-ea7620bfa16e",
       "status": "active",
-      "uuid": "b97"
+      "uuid": "7700120d-a627-4ac8-abb2-ea7620bfa16e"
     },
-    "uuid": "8HV"
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0"
   },
   "event_id": "01a11437-4090-777f-bcd0-544d99aef91b",
   "occurred_at": "2026-10-07T02:35:27.760Z",
-  "silicon": "8HV",
+  "silicon": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "type": "silicon.stk_rotated"
 }
 ```
@@ -662,12 +664,12 @@ custodian. `data`: `uuid`, `id`, `federation` (the trust: `id`, `name`, `issuer`
 {
   "app_id": null,
   "data": {
-    "by": { "id": "c:saket", "uuid": "zQo", "…": "an AccountSummary" },
+    "by": { "id": "c:saket", "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "…": "an AccountSummary" },
     "federation": {
       "audience": "https://accounts.teamofsilicons.com",
       "conditions": { "ref": "refs/heads/main", "repository": "acme/scout" },
       "created_at": "2026-10-09T05:11:19.993Z",
-      "created_by": "zQo",
+      "created_by": "6667d4b4-7c57-45de-b2c3-94185db3e175",
       "id": "01a11f12-acbc-776e-bfee-b26bd64e2d7a",
       "issuer": "https://token.actions.githubusercontent.com",
       "last_used_at": null,
@@ -675,11 +677,11 @@ custodian. `data`: `uuid`, `id`, `federation` (the trust: `id`, `name`, `issuer`
       "revoked_at": null
     },
     "id": "si:scout",
-    "uuid": "b97"
+    "uuid": "7700120d-a627-4ac8-abb2-ea7620bfa16e"
   },
   "event_id": "01a11f12-acbe-76d7-a089-ac9161c17646",
   "occurred_at": "2026-10-09T05:11:19.998Z",
-  "silicon": "b97",
+  "silicon": "7700120d-a627-4ac8-abb2-ea7620bfa16e",
   "type": "silicon.federation.added"
 }
 ```
@@ -704,14 +706,14 @@ A transfer was accepted, so the Silicon has a new custodian. `data`: `uuid`, `id
 {
   "app_id": null,
   "data": {
-    "from": { "id": "c:shubham", "uuid": "b97", "…": "an AccountSummary" },
+    "from": { "id": "c:shubham", "uuid": "7700120d-a627-4ac8-abb2-ea7620bfa16e", "…": "an AccountSummary" },
     "id": "si:scout_two",
-    "to": { "id": "c:saket", "uuid": "zQo", "…": "an AccountSummary" },
-    "uuid": "8HV"
+    "to": { "id": "c:saket", "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "…": "an AccountSummary" },
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0"
   },
   "event_id": "01a11437-b7b6-710f-8d77-ee792aa3db14",
   "occurred_at": "2026-10-07T02:35:58.262Z",
-  "silicon": "8HV",
+  "silicon": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "type": "silicon.custodian.changed"
 }
 ```
