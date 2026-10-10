@@ -102,3 +102,32 @@ traffic, recover a failed cutover by restoring the coordinated backups of all
 participants and restarting the previous release together. Once new traffic has
 written data, prefer fixing forward; restoring an earlier backup would discard
 those writes. Keep the export and migration ledger with the release evidence.
+
+## Local cutover verification, 2026-10-10
+
+Applied this operation to the isolated local stack on PostgreSQL port 5460, with
+all writers stopped and coordinated backups saved. One persisted 211-row map
+(SHA-256 `750423f3117e11f5eb42025b457ff0f1bf42bd463c31b7e106d9cd10978ca4d9`)
+was consumed by Accounts, Apps, Briefcase, DM, Commit, Waveform, Remind, Hook,
+Extend and MCPort, including local MCPort daemon state and retained test stores.
+Every consumer completed dry-run, apply and a repeat with no changes.
+
+Accounts migrated all 211 source identities, including five deleted accounts.
+Comparing a restored backup confirmed that profile and encrypted account fields,
+public handles and all 285 historical event payloads were preserved. All custody
+references matched the shared map. The replay reported 211 already-applied rows
+and no mutations. Old sessions failed and fresh sign-ins returned the mapped
+UUIDs; newly created accounts also received canonical UUIDv4 values.
+
+Current-source Rust workspace tests and focused migration/authentication/event
+regressions passed, including already-standard UUID preservation and retired-event
+queue starvation. Strict production library/binary clippy passed. The web passed
+26 tests, typecheck, lint, build and reviewed activity-page screenshots at desktop
+and mobile sizes in both themes. All-target strict clippy remains blocked by
+pre-existing `unwrap_used` violations in unrelated tests.
+
+This is local verification only. Existing fixtures from a different, reset
+Accounts namespace were preserved offline with their keys rather than being
+matched by coincidentally equal short IDs. Production backups, identity provenance,
+Interface/fleet/Ting and external subject-based trust rules must be verified for
+the production cutover. Nothing was pushed, published or deployed.
