@@ -70,7 +70,7 @@
 .resultCopy strong { font-size: var(--text-sm); font-weight: 500; }
 .resultCopy small { color: var(--text-muted); font-size: var(--text-xs); }
 .shortcut { min-width: 18px; height: 18px; padding: 0 4px; border-color: transparent; border-radius: var(--radius-detail); font-size: 11px; }
-.activeResult 
+.activeResult .itemIcon { color: var(--foreground); }
 .empty { display: grid; justify-items: center; gap: 4px; padding: 26px 12px 28px; text-align: center; }
 .empty > span { display: grid; width: 32px; height: 32px; place-items: center; margin-bottom: 5px; color: var(--text-muted); }
 .empty strong { font-size: var(--text-sm); font-weight: 500; }

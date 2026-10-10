@@ -409,7 +409,7 @@ export function UserMenu({ user, status: statusProp, defaultStatus = "available"
 
   return <span ref={rootRef} className={styles.root}>
     <button ref={setTriggerRef} id={triggerId} type="button" className={[styles.trigger, className].filter(Boolean).join(" ")} data-state={open ? "open" : "closed"} data-name={showName || undefined}
-      aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} aria-label={`Account menu, ${user.name}${showStatus ? `, ${statusLabel(status)}` : ""}`}
+      aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} aria-label={`Account menu, ${user.name}, ${user.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join("")}${showStatus ? `, ${statusLabel(status)}` : ""}`}
       onClick={onTriggerClick} onKeyDown={onTriggerKeyDown}>
       <Face user={user} status={showStatus ? status : undefined} size="sm" />
       {showName && <><span className={styles.triggerName}>{user.name}</span><ChevronDown className={styles.chevron} size={16} strokeWidth={1.75} aria-hidden="true" /></>}
