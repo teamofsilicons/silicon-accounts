@@ -131,12 +131,12 @@ async fn migrated_history_cannot_be_replayed_or_claimed_for_delivery() {
         );
     }
     // Even if an operator accidentally requeues one, the worker cannot send it.
-    sqlx::query("update webhook_deliveries set status='pending' where id=any($1)")
+    sqlx::query("update webhook_deliveries set status='pending',next_attempt_at=now()-interval '1 day' where id=any($1)")
         .bind(deliveries.iter().map(|d| d.0).collect::<Vec<_>>())
         .execute(&ctx.state.db)
         .await
         .expect("simulate accidental replay");
-    let claimed = accounts_worker::webhooks::claim_due(&ctx.state.db, 100, 60)
+    let claimed = accounts_worker::webhooks::claim_due(&ctx.state.db, 1, 60)
         .await
         .expect("claim");
     assert!(!claimed.is_empty(), "fresh reconciled state still delivers");

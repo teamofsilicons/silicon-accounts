@@ -138,12 +138,13 @@ pub async fn claim_due(
 ) -> ApiResult<Vec<ClaimedDelivery>> {
     Ok(sqlx::query_as::<_, ClaimedDelivery>(
         "with due as ( \
-           select id from webhook_deliveries \
-            where status = 'pending' and next_attempt_at <= now() \
-              and (locked_until is null or locked_until <= now()) \
-            order by next_attempt_at, created_at \
+           select d.id from webhook_deliveries d join webhook_events e on e.event_id=d.event_id \
+            where d.status = 'pending' and d.next_attempt_at <= now() \
+              and (d.locked_until is null or d.locked_until <= now()) \
+              and e.identity_migrated_at is null \
+            order by d.next_attempt_at, d.created_at \
             limit $1 \
-            for update skip locked) \
+            for update of d skip locked) \
          update webhook_deliveries d set locked_until = now() + make_interval(secs => $2) \
            from due, webhook_events e \
           where d.id = due.id and e.event_id = d.event_id and e.identity_migrated_at is null \
