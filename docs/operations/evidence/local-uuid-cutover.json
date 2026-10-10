@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-10",
+  "environment": "isolated local stack; PostgreSQL5460; no production writes",
+  "mapping_rows": 211,
+  "mapping_sha256": "750423f3117e11f5eb42025b457ff0f1bf42bd463c31b7e106d9cd10978ca4d9",
+  "dry_apply_replay": "passed",
+  "retention": {
+    "accounts": 211,
+    "deleted_accounts": 5,
+    "all_profile_and_encrypted_fields_preserved": true,
+    "historical_event_payloads_preserved": 285,
+    "provider_bindings_preserved": 0,
+    "all_custody_references_mapped": true
+  },
+  "validation": {
+    "workspace_tests": "passed",
+    "focused_core_migration_tests": 2,
+    "focused_server_migration_tests": 2,
+    "production_lib_bins_clippy": "passed",
+    "all_target_clippy": "pre-existing unrelated unwrap_used violations",
+    "web_tests": 26,
+    "web_typecheck_lint_build": "passed",
+    "reviewed_theme_viewport_screenshots": 4
+  }
+}
