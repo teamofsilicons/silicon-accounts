@@ -465,7 +465,7 @@ pub async fn apply(pool: &PgPool, expected: &[Mapping], commit: bool) -> Result<
         .await?;
     }
     // A rollback to the short-ID allocator must fail instead of creating new legacy subjects.
-    execute(&mut tx,"alter table accounts add constraint accounts_standard_uuid check(uuid ~ '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')".into()).await?;
+    execute(&mut tx,"alter table accounts add constraint accounts_standard_uuid check(uuid ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')".into()).await?;
     for new_uuid in reconcile {
         sqlx::query("update accounts set version=version+1,updated_at=now() where uuid=$1")
             .bind(&new_uuid)

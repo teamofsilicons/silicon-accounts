@@ -20,6 +20,8 @@ async fn cutover_is_atomic_repeatable_and_preserves_identity_links_secrets_and_h
     legacy(&ctx, "Si2", "silicon", Some("Ab1"), false).await;
     legacy(&ctx, "De3", "carbon", None, true).await;
     let already_standard = ctx.carbon().await;
+    let existing_v7 = Uuid::now_v7().to_string();
+    legacy(&ctx, &existing_v7, "carbon", None, true).await;
     let (app, _) = ctx.app("uuid").await;
     ctx.set_app_webhook(&app.app_id, "http://127.0.0.1:9999/receive")
         .await;
@@ -142,6 +144,13 @@ async fn cutover_is_atomic_repeatable_and_preserves_identity_links_secrets_and_h
             .expect("UUID migration fixture")
             .is_none(),
         "old subject cannot authenticate"
+    );
+    assert!(
+        accounts::get(&mut conn, &existing_v7)
+            .await
+            .expect("existing standard UUID")
+            .is_some(),
+        "valid preexisting UUIDs retain their identity regardless of version"
     );
     let silicon = accounts::get(&mut conn, new("Si2"))
         .await
