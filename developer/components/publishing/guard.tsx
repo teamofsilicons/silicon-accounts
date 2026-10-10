@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Alert } from "@/components/arc/alert/alert";
-import { Button } from "@/components/arc/button/button";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Button } from "@/components/silicon-ui/button/button";
 import { useNavigationGuard } from "@/lib/navigation-guard";
 import { draftSnapshot, flushPendingSaves, hasPendingSaves, pendingDrafts, subscribeDrafts } from "./api";
 import "./publishing.css";

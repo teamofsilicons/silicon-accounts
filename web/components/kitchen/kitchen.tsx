@@ -9,7 +9,7 @@
  *   /__kitchen?squircle=fallback   the SVG-path squircles Firefox gets, in a browser with corner-shape
  */
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
-import { ThemeSwitch } from "@/components/arc/theme-switch/theme-switch";
+import { ThemeSwitch } from "@/components/silicon-ui/theme-switch/theme-switch";
 import { BrandMark } from "@/components/foundation/shell/brand-mark";
 import { useTheme } from "@/components/foundation/theme/use-theme";
 import { Actions } from "./sections/actions";

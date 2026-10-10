@@ -8,8 +8,8 @@
  */
 import Link from "next/link";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
-import buttonStyles from "@/components/arc/button/button.module.css";
-import type { ButtonSize, ButtonVariant } from "@/components/arc/button/button";
+import buttonStyles from "@/components/silicon-ui/button/button.module.css";
+import type { ButtonSize, ButtonVariant } from "@/components/silicon-ui/button/button";
 import styles from "./button-link.module.css";
 
 export interface ButtonLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
@@ -25,7 +25,7 @@ export function ButtonLink({ href, variant = "primary", size = "md", external, c
   const classes = [buttonStyles.button, buttonStyles[variant], buttonStyles[size], styles.link, className].filter(Boolean).join(" ");
   const content = <span className={styles.content}>{children}</span>;
   if (external) {
-    return <a {...rest} href={href} data-sq="surface" data-variant={variant} className={classes}>{content}</a>;
+    return <a {...rest} href={href} data-variant={variant} className={classes}>{content}</a>;
   }
-  return <Link {...rest} href={href} data-sq="surface" data-variant={variant} className={classes}>{content}</Link>;
+  return <Link {...rest} href={href} data-variant={variant} className={classes}>{content}</Link>;
 }

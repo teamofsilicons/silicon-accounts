@@ -11,10 +11,10 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import calendarStyles from "@/components/arc/calendar/calendar.module.css";
-import { Calendar } from "@/components/arc/calendar/calendar";
-import pickerStyles from "@/components/arc/date-picker/date-picker.module.css";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import calendarStyles from "@/components/silicon-ui/calendar/calendar.module.css";
+import { Calendar } from "@/components/silicon-ui/calendar/calendar";
+import pickerStyles from "@/components/silicon-ui/date-picker/date-picker.module.css";
+import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
 import { FieldNote } from "./parts";
 import styles from "./dob-field.module.css";
 

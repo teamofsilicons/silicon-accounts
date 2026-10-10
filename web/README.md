@@ -15,7 +15,7 @@ dock's Developer item, the landing page's footer and the apps page lead to `deve
 > tsconfig.json and eslint skip them (one line each) until they are rewritten. The end-to-end walk (`e2e/`) is current
 > with v2 and type-checked and linted with the rest of the site; `pnpm screens` is current.
 
-Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Arc UI installed with the shadcn
+Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Silicon UI installed from its registry with the shadcn
 CLI, TanStack Query for data. The product contract is `understanding/UNDERSTANDING.md`; nothing here overrides it.
 
 ```
@@ -114,7 +114,7 @@ shared parts and a first version of each route; each area's builder owns its rou
 | web-auth | `/sign-in`, `/authorize`, `/authorize/flow/[id]`, `/device`, `/embed/v1/buttons` (polish) | `app/(app)/(auth)/`, `components/auth/` |
 | legacy web-docs | former docs routes redirect through `proxy.ts`; the old renderer and generated build remain temporarily as source, while `developer/` owns the public docs | `app/(app)/(docs)/`, `components/docs/`, `lib/docs/` (guide: `lib/docs/README.md`), `lib/docs-redirects.ts` |
 | foundation | root layout, providers, shell, dock, command palette, theme, squircles, branding runtime, API client and hooks, SDK, `proxy.ts`, `/__kitchen`, screens | `app/layout.tsx`, `components/foundation/`, `components/kitchen/`, `lib/`, `styles/`, `sdk/`, `scripts/` |
-| Arc UI | the installed components (local edits below) | `components/arc/` |
+| Silicon UI | the installed components (local edits below) | `components/silicon-ui/` |
 
 `app/(app)/layout.tsx` mounts the client providers for everything under it (one query cache across the account pages
 and the hosted pages); the root layout and the public landing load none. `app/(app)/(shell)/layout.tsx` wraps the
@@ -269,7 +269,7 @@ someone clicked sign-in while the buttons were still loading. The cut can come b
 `network_error`) or after its headers, while the body is still on its way (the status says 200, reading the body
 fails: it used to read "could not be loaded (HTTP 200)"); both are tried again.
 
-## Arc UI
+## Previous Arc installation (historical)
 
 Installed with the shadcn CLI from the `@uiarc` registry (`components.json`), every free item: React components with
 CSS modules, Motion and Radix. They are local source: edit them in place, and do not re-add one with `--overwrite`
@@ -312,7 +312,7 @@ All edits are of four kinds, and keep Arc's look and motion:
 | switch, segmented-control, timeline, inline-edit | keyboard focus (web-account fix round): an off switch's track takes the hover fill and an inner accent edge, an on track's fill deepens a step; the selected segment's highlight takes an accent edge (another segment, the hover ink and a soft fill); a timeline row's button and inline-edit's text take their hover fill on every device |
 | date-picker, user-menu | keyboard focus (integration round): the date picker's trigger edge takes the text colour, as inputs do; the user menu's trigger takes its hover fill and an inner edge |
 | combobox | behaviour: focus alone no longer opens the list (typing, ArrowDown/ArrowUp or a click do), the list closes when focus leaves the field, and the listbox is `tabIndex={-1}` (no Tab stop). The hosted pages' `ComboboxField` wrapper and the account editors' "focus the panel first" workaround are gone. Keyboard focus (web-auth fix round): the clear button takes its hover fill and ink with an inner edge (its ring was `--focus-ring`, transparent site-wide, so Tab to it changed nothing) |
-| dialog, drawer, bottom-sheet, popover | behaviour: Escape inside the layer goes first to an open Combobox list, DatePicker calendar, InlineEdit being edited or ConfirmMorph question, and only the next Escape closes the layer (`components/arc/lib/escape.ts`: each layer passes its `onEscapeKeyDown` through `layerEscape` and marks its panel `data-escape-layer`). The account area's `parts/escape.ts` spread is gone |
+| dialog, drawer, bottom-sheet, popover | behaviour: Escape inside the layer goes first to an open Combobox list, DatePicker calendar, InlineEdit being edited or ConfirmMorph question, and only the next Escape closes the layer (`components/silicon-ui/lib/escape.ts`: each layer passes its `onEscapeKeyDown` through `layerEscape` and marks its panel `data-escape-layer`). The account area's `parts/escape.ts` spread is gone |
 | phone-input | behaviour: a whole international number typed after "+" (which opens the country search) moves into the number field under its country once it has more digits than a calling code ("+1 202 5…" → United States, 202 5…) |
 | timeline | behaviour: only rows newer than every row shown are fresh (slide in, announced as "New update: …"); older rows added below by "Show older" join quietly |
 | otp-input | the field never grows past its container (`minmax(0, 1fr)`, `min-width: 0` on the row), so six cells shrink at 320 px instead of sticking out |
@@ -323,7 +323,7 @@ All edits are of four kinds, and keep Arc's look and motion:
 | hold-to-confirm | the fill's copy of the label (aria-hidden, clipped away at rest) is drawn by `::before` from `data-text`: as text it doubled the button's words ("Hold to delete your accountHold to delete your account"), which failed WCAG 2.5.3 against its name |
 | command-palette | behaviour: results are not Tab stops (the search field drives them through aria-activedescendant, the arrow keys and Enter); a broken selector had left "No matching actions" unstyled |
 | sortable-data-table, file-dropzone, tabs | squircle: the sort button (no radius in its header cell, a pill on phones), the dropzone's paper sheets and the tab triggers (native only, `data-sq-native`: the sheets draw their lines with `::before`/`::after`, the triggers paint only the focus fill) |
-| dialog, drawer, bottom-sheet | behaviour (web-foundation fix round): closing puts focus back on what opened the layer, Trigger or not (WCAG 2.4.3). Radix returns it only to its own `<Dialog.Trigger>`, and the account site opens its layers from controlled state, so focus fell to `<body>` (Change id, Create a Silicon). `components/arc/lib/return-focus.ts` (`useReturnFocus`) remembers the focused element in an insertion effect when `open` turns true (before an `autoFocus` field or Radix moves focus) and restores it in `onCloseAutoFocus`; a caller's own `onCloseAutoFocus` that calls `preventDefault()` still wins, and focus that already moved on outside the layer stays where it is. The shell's ⌘K palette (`command-menu.tsx`) uses the same hook |
+| dialog, drawer, bottom-sheet | behaviour (web-foundation fix round): closing puts focus back on what opened the layer, Trigger or not (WCAG 2.4.3). Radix returns it only to its own `<Dialog.Trigger>`, and the account site opens its layers from controlled state, so focus fell to `<body>` (Change id, Create a Silicon). `components/silicon-ui/lib/return-focus.ts` (`useReturnFocus`) remembers the focused element in an insertion effect when `open` turns true (before an `autoFocus` field or Radix moves focus) and restores it in `onCloseAutoFocus`; a caller's own `onCloseAutoFocus` that calls `preventDefault()` still wins, and focus that already moved on outside the layer stays where it is. The shell's ⌘K palette (`command-menu.tsx`) uses the same hook |
 | command-palette | the "Esc" button is named "Esc, close the command palette" (its visible word was missing from its name, WCAG 2.5.3) with `aria-keyshortcuts`; it, the clear button, the ⌘K and shortcut keys and the result highlight are squircles (`--sq-r` 7 px / 5 px / 8 px) |
 | calendar | keyboard focus (web-foundation fix round): a day takes the hover fill under an inner accent edge, the selected day's disc deepens and takes an inner paper edge, the month arrows and Today their hover fill and an inner accent edge (an arrow that cannot move brightens a little); days of the next and previous month are no longer dimmed below 4.5:1 (they stay choosable, so they keep `--text-muted`) |
 | checkbox | a caller's `aria-describedby` is kept beside the description's id instead of being replaced by it (the hosted details page describes each optional detail's box by the value it would share); "Checkbox" is the fallback name only when neither a label nor `aria-labelledby` names the box |
@@ -514,7 +514,7 @@ The shared account navigation, phone sheet and command palette call `/proofs` **
 The account site, the hosted pages' default look and the developer site (`developer/`) are one family now (shared
 brief: fonts SF Pro and BDO Grotesk; light #F7F8FA / #292929, dark #02040A / #F7F8FA, brand blue #1F5FB8).
 
-- **Type and colour** (`styles/fonts.css`, `styles/tokens.css`, `components/arc/foundation.css`): the developer site's
+- **Type and colour** (`styles/fonts.css`, `styles/tokens.css`, `components/silicon-ui/foundation.css`): the developer site's
   tokens exactly. BDO Grotesk (SIL OFL 1.1, `public/fonts/bdo-grotesk/` with its OFL.txt, `font-display: swap`, only
   DemiBold preloaded) is the display face; text asks for the system face first (SF Pro on Apple devices; its licence
   does not allow serving it), mono is the system mono stack. Page titles, the identity name and counters are BDO
@@ -601,3 +601,9 @@ without the setting Next rewrites an internal path (the signed-out `/` to `/land
 and the request fails against the plain HTTP listener. `pnpm build && pnpm test:production-routing` runs the deployed
 entry point with those headers and checks the landing, the agent files and `/sign-in` (and that neither page registers
 tools in the browser).
+
+## Silicon UI registry (2026-10-10)
+
+Components and their CSS now come from https://ui.teamofsilicons.com/r/{name}.json, with `silicon-foundation` imported once at the root. `components/silicon-ui/registry-manifest.json` records every upstream source checksum. The registry supplies native squircle geometry, semantic spacing and visible keyboard focus. Application tokens retain the configured brand colors. Local adaptations retain dialog focus return and nested Escape priority, combobox keyboard behavior, whole international phone-number entry, and timeline pagination announcements; they live beside the registry source and must survive future updates. Existing custom application surfaces retain their squircle fallback. Historical Arc notes above describe these original application adaptations.
+
+Silicon UI local keyboard fix: ConfirmMorph preserves its pointer re-arming delay, but a separate keyboard activation can confirm immediately. This retains the established revocation flow and is covered by the developer app-verification keyboard regression. Hosted branding also maps round/sharp/squircle corners to Silicon UI tokens and keeps soft/outline primary actions.

@@ -9,12 +9,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound } from "lucide-react";
-import { Alert } from "@/components/arc/alert/alert";
-import { AnimatedCounter } from "@/components/arc/animated-counter/animated-counter";
-import { Badge } from "@/components/arc/badge/badge";
-import { Button } from "@/components/arc/button/button";
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { AnimatedCounter } from "@/components/silicon-ui/animated-counter/animated-counter";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { Button } from "@/components/silicon-ui/button/button";
+import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
+import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader, Section } from "@/components/foundation/layout/layout";
 import type { CarbonMe, EmailView, IdentityView, Meta, PhoneView, Provider } from "@/lib/api/types";

@@ -2,7 +2,7 @@
 
 /** An app's logo as a squircle (Arc's Avatar), with its initials while the logo loads or when it has none. */
 import { publishingMediaUrl } from "@/lib/apps-media";
-import { Avatar } from "@/components/arc/avatar/avatar";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
 import styles from "./parts.module.css";
 
 export type AppIconSize = 24 | 32 | 40 | 48 | 56 | 64;

@@ -11,7 +11,7 @@
  */
 import { ChevronDown, Copy, Check } from "lucide-react";
 import { highlight, languageLabel } from "@/lib/docs/highlight";
-import copyStyles from "@/components/arc/copy-button/copy-button.module.css";
+import copyStyles from "@/components/silicon-ui/copy-button/copy-button.module.css";
 import styles from "./code-block.module.css";
 
 const LONG_LINES = 30;
@@ -24,7 +24,7 @@ function titleFrom(meta: string): string | null {
 /** Arc's icon-only copy button, as markup: the island swaps data-state between idle and copied. */
 export function CopyCode({ label }: { label: string }) {
   return (
-    <button type="button" className={`${copyStyles.button} ${copyStyles.iconOnly} ${copyStyles.plain} ${styles.copy}`} data-sq="surface" data-copy="" data-js-only="" data-state="idle" aria-label={label} data-label={label}>
+    <button type="button" className={`${copyStyles.button} ${copyStyles.iconOnly} ${copyStyles.plain} ${styles.copy}`} data-copy="" data-js-only="" data-state="idle" aria-label={label} data-label={label}>
       <span className={styles.copyIcon} aria-hidden="true">
         <Copy size={16} strokeWidth={1.75} data-icon="idle" />
         <Check size={16} strokeWidth={1.75} data-icon="copied" />

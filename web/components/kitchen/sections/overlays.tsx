@@ -1,12 +1,12 @@
 "use client";
 
 import { Cpu, LayoutGrid, ShieldCheck } from "lucide-react";
-import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
-import { Button } from "@/components/arc/button/button";
-import { CommandPalette } from "@/components/arc/command-palette/command-palette";
-import { Dialog, DialogClose, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog";
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/arc/drawer/drawer";
-import { Input } from "@/components/arc/input/input";
+import { BottomSheet } from "@/components/silicon-ui/bottom-sheet/bottom-sheet";
+import { Button } from "@/components/silicon-ui/button/button";
+import { CommandPalette } from "@/components/silicon-ui/command-palette/command-palette";
+import { Dialog, DialogClose, DialogContent, DialogTrigger } from "@/components/silicon-ui/dialog/dialog";
+import { Drawer, DrawerContent, DrawerTrigger } from "@/components/silicon-ui/drawer/drawer";
+import { Input } from "@/components/silicon-ui/input/input";
 import { DescriptionItem, DescriptionList } from "@/components/foundation/layout/layout";
 import { notify } from "@/lib/notify";
 import { Specimen, Specimens, kitchenStyles as styles } from "../specimen";

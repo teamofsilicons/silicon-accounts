@@ -7,7 +7,7 @@
  * in the Carbon's words, what to do next, and keeps the exact code and reason for the app's developers.
  */
 import { useRef, useState, type ReactNode } from "react";
-import { Button } from "@/components/arc/button/button";
+import { Button } from "@/components/silicon-ui/button/button";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import type { ApiError } from "@/lib/api/errors";

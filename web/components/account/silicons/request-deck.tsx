@@ -9,10 +9,10 @@
 import { useRef, useState, type CSSProperties } from "react";
 import { animate } from "motion/react";
 import { ArrowRight } from "lucide-react";
-import { Avatar } from "@/components/arc/avatar/avatar";
-import { Button } from "@/components/arc/button/button";
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
+import { Button } from "@/components/silicon-ui/button/button";
+import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
+import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
 import type { CustodianRequest } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
 import { durationText, msUntil, reportFailure } from "../parts/common";

@@ -11,7 +11,7 @@
  */
 import { useEffect, useId, useState, type CSSProperties, type Ref } from "react";
 import { Check, CircleAlert, LoaderCircle } from "lucide-react";
-import { Input } from "@/components/arc/input/input";
+import { Input } from "@/components/silicon-ui/input/input";
 import { describeError, readableTimes } from "./common";
 import { useIdCheckQuery } from "./queries";
 import styles from "./parts.module.css";

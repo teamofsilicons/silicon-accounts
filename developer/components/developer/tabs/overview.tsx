@@ -7,9 +7,9 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { ArrowRight, CircleAlert, Code, KeyRound, ListChecks, Palette, ShieldCheck, Upload, Users, Webhook, Workflow } from "lucide-react";
-import { Badge } from "@/components/arc/badge/badge";
-import { CopyButton } from "@/components/arc/copy-button/copy-button";
-import { MetricCard } from "@/components/arc/metric-card/metric-card";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
+import { MetricCard } from "@/components/silicon-ui/metric-card/metric-card";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { DescriptionItem, DescriptionList, Section, Surface } from "@/components/foundation/layout/layout";
 import { FIELD_LABELS, formatCount, formatDate, plural } from "@/lib/format";

@@ -7,17 +7,17 @@
  */
 import { useEffect, useId, useMemo, useState, type MouseEvent } from "react";
 import { Users } from "lucide-react";
-import { Alert } from "@/components/arc/alert/alert";
-import { Avatar } from "@/components/arc/avatar/avatar";
-import { Badge } from "@/components/arc/badge/badge";
-import { Button } from "@/components/arc/button/button";
-import { CopyButton } from "@/components/arc/copy-button/copy-button";
-import { Drawer, DrawerContent } from "@/components/arc/drawer/drawer";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
-import { FilterToolbar, type FilterChip, type FilterField } from "@/components/arc/filter-toolbar/filter-toolbar";
-import { SearchField } from "@/components/arc/search-field/search-field";
-import { Skeleton } from "@/components/arc/skeleton/skeleton";
-import { SortableDataTable, type DataColumn } from "@/components/arc/sortable-data-table/sortable-data-table";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { Button } from "@/components/silicon-ui/button/button";
+import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
+import { Drawer, DrawerContent } from "@/components/silicon-ui/drawer/drawer";
+import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
+import { FilterToolbar, type FilterChip, type FilterField } from "@/components/silicon-ui/filter-toolbar/filter-toolbar";
+import { SearchField } from "@/components/silicon-ui/search-field/search-field";
+import { Skeleton } from "@/components/silicon-ui/skeleton/skeleton";
+import { SortableDataTable, type DataColumn } from "@/components/silicon-ui/sortable-data-table/sortable-data-table";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { DescriptionItem, DescriptionList, Surface } from "@/components/foundation/layout/layout";
 import type { AccountKind, AppUser, AppUserStatus, MembershipSource } from "@/lib/api/types";

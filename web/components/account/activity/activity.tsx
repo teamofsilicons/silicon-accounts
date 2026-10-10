@@ -9,11 +9,11 @@
  */
 import { useRef, useState, type ReactNode } from "react";
 import { AtSign, Cpu, History, LayoutGrid, LockKeyhole, LogIn, ShieldCheck } from "lucide-react";
-import { Alert } from "@/components/arc/alert/alert";
-import { Button } from "@/components/arc/button/button";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
-import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
-import { Timeline, type TimelineEvent } from "@/components/arc/timeline/timeline";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Button } from "@/components/silicon-ui/button/button";
+import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
+import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
+import { Timeline, type TimelineEvent } from "@/components/silicon-ui/timeline/timeline";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader } from "@/components/foundation/layout/layout";
 import { useTheme } from "@/components/foundation/theme/use-theme";

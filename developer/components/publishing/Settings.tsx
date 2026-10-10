@@ -1,5 +1,5 @@
 "use client";
-import { Switch } from "@/components/arc/switch/switch";
+import { Switch } from "@/components/silicon-ui/switch/switch";
 import { Page, PageHeader, Section, SettingsRow } from "@/components/foundation/layout/layout";
 import { useTelemetryEnabled } from "@/lib/query/session";
 export function DeveloperSettings() {

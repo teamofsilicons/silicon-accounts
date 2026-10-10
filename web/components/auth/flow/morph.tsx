@@ -10,7 +10,7 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { AnimatePresence, animate, motion, useIsPresent, useMotionValue, useReducedMotion, type AnimationPlaybackControls, type Variants } from "motion/react";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
 import styles from "./flow.module.css";
 
 const { blur, duration, ease, spring } = motionTokens;

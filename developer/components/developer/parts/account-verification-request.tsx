@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Alert } from "@/components/arc/alert/alert";
-import { Badge } from "@/components/arc/badge/badge";
-import { Button } from "@/components/arc/button/button";
-import { Dialog, DialogContent } from "@/components/arc/dialog/dialog";
-import { Skeleton } from "@/components/arc/skeleton/skeleton";
-import { Textarea } from "@/components/arc/textarea/textarea";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Dialog, DialogContent } from "@/components/silicon-ui/dialog/dialog";
+import { Skeleton } from "@/components/silicon-ui/skeleton/skeleton";
+import { Textarea } from "@/components/silicon-ui/textarea/textarea";
 import { Section, Surface } from "@/components/foundation/layout/layout";
 import { MAX_VERIFICATION_REASON, verificationReasonProblem } from "@/lib/account-verification";
 import { ApiError } from "@/lib/api/errors";

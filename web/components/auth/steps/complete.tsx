@@ -12,7 +12,7 @@
 import { useEffect, useState } from "react";
 import { useReducedMotion } from "motion/react";
 import { ArrowRight } from "lucide-react";
-import { Alert } from "@/components/arc/alert/alert";
+import { Alert } from "@/components/silicon-ui/alert/alert";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { appHome, destinationName, firstName, markRedirected, redirectError, safeRedirect, wasRedirected, type HostedFlow } from "../flow/model";
 import { StepHeading, SuccessMark } from "../flow/parts";

@@ -20,7 +20,10 @@ def run(app, *args):
 
 versions = {}
 for app in ['silicon-apps', 'silicon-accounts']:
-    request = urllib.request.Request(f'https://api.github.com/repos/teamofsilicons/{app}/releases/latest', headers={'User-Agent': 'Silicon-managed-install-verification'})
+    headers = {'User-Agent': 'Silicon-managed-install-verification'}
+    if os.environ.get('GH_TOKEN'):
+        headers['Authorization'] = 'Bearer ' + os.environ['GH_TOKEN']
+    request = urllib.request.Request(f'https://api.github.com/repos/teamofsilicons/{app}/releases/latest', headers=headers)
     with urllib.request.urlopen(request) as response:
         versions[app] = json.load(response)['tag_name'].removeprefix('v')
     assert run(app, '--version').strip() == f'{app} {versions[app]}'

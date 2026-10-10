@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Accordion } from "@/components/arc/accordion/accordion";
-import { Button } from "@/components/arc/button/button";
-import { Pagination } from "@/components/arc/pagination/pagination";
-import { ScrollArea } from "@/components/arc/scroll-area/scroll-area";
-import { Stepper } from "@/components/arc/stepper/stepper";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/arc/tabs/tabs";
-import { Timeline, type TimelineEvent } from "@/components/arc/timeline/timeline";
+import { Accordion } from "@/components/silicon-ui/accordion/accordion";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Pagination } from "@/components/silicon-ui/pagination/pagination";
+import { ScrollArea } from "@/components/silicon-ui/scroll-area/scroll-area";
+import { Stepper } from "@/components/silicon-ui/stepper/stepper";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/silicon-ui/tabs/tabs";
+import { Timeline, type TimelineEvent } from "@/components/silicon-ui/timeline/timeline";
 import { formatRelative } from "@/lib/format";
 import { HOUR, SAMPLE_APPS, SAMPLE_NOW } from "../samples";
 import { Specimen, Specimens, kitchenStyles as styles } from "../specimen";

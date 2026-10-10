@@ -18,12 +18,12 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "motion/react";
 import { Lock, Mail, Phone, Smartphone } from "lucide-react";
-import { Avatar } from "@/components/arc/avatar/avatar";
-import { Button } from "@/components/arc/button/button";
-import { Checkbox } from "@/components/arc/checkbox/checkbox";
-import { Input } from "@/components/arc/input/input";
-import { OtpInput } from "@/components/arc/otp-input/otp-input";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Checkbox } from "@/components/silicon-ui/checkbox/checkbox";
+import { Input } from "@/components/silicon-ui/input/input";
+import { OtpInput } from "@/components/silicon-ui/otp-input/otp-input";
+import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
 import { BrandAside, BrandPanel, BrandStage, BrandingScope, PoweredBy } from "@/components/foundation/branding/branding";
 import type { Branding, ContactField } from "@/lib/api/types";
 import { brandLogo, type PaintTheme } from "@/lib/branding/apply";

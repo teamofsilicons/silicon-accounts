@@ -7,7 +7,7 @@
  */
 import { useEffect } from "react";
 import { RotateCcw } from "lucide-react";
-import buttonStyles from "@/components/arc/button/button.module.css";
+import buttonStyles from "@/components/silicon-ui/button/button.module.css";
 import linkStyles from "@/components/foundation/button-link.module.css";
 import styles from "./status-page.module.css";
 

@@ -147,7 +147,7 @@ checking pages with curl or a browser without the hosted sign-in.
 | Agent files | `/llms.txt`, `/llms-full.txt`, `/robots.txt`, `/sitemap.xml`, `/.well-known/agent.json`, `/.well-known/security.txt`, `/openapi.json`, `/manifest.webmanifest` | `app/<file>/route.ts`, `lib/agent/`, `llms/` (the Carbon's own text) |
 | Status | public `/status` and its JSON twin `/status.json` | `app/(public)/status/`, `app/status.json/`, `components/status/`, `lib/status.ts` |
 | Public JSON API | `/api/docs`, `/api/docs/search`, `/api/docs/pages`, `/api/docs/pages/{product}/{path}` | `app/api/docs/`, `lib/docs/api.ts`, `lib/server/rate-limit.ts` |
-| Copied from `web/` and adapted | Arc UI, the foundation (layout, branding runtime, squircles, theme, providers), the API client and hooks | `components/arc/`, `components/foundation/`, `lib/` |
+| Copied from `web/` and adapted | Arc UI, the foundation (layout, branding runtime, squircles, theme, providers), the API client and hooks | `components/silicon-ui/`, `components/foundation/`, `lib/` |
 
 The copied parts started as `web/`'s and are now this app's own: change them here, with the same rules (squircles,
 tokens, Carbons/Silicons vocabulary, errors in the server's words). `lib/api/http.ts` maps the API's paths onto the BFF
@@ -263,6 +263,12 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
   fields show the palette the hosted pages paint, so saving the Pages tab of an app that kept the warm defaults stores
   the new ones.
 - Arc's local edits here (beyond `web/README.md`'s list): layers opened from plain state (no Radix Trigger: the dialogs,
-  drawers and the ⌘K palette) return focus to what opened them (`components/arc/lib/return-focus.ts`); radio cards,
+  drawers and the ⌘K palette) return focus to what opened them (`components/silicon-ui/lib/return-focus.ts`); radio cards,
   the colour picker, accordions, chip groups, code blocks and copy fields show keyboard focus in fills and edges; the
   palette's Esc button is named "Esc: close the command palette"; badge tints are opaque (every tone 4.5:1 at 11 px).
+
+## Silicon UI registry (2026-10-10)
+
+Components and their CSS now come from https://ui.teamofsilicons.com/r/{name}.json, with `silicon-foundation` imported once at the root. `components/silicon-ui/registry-manifest.json` records every upstream source checksum. The registry supplies native squircle geometry, semantic spacing and visible keyboard focus. Application tokens retain the configured brand colors. Local adaptations retain dialog focus return and nested Escape priority, combobox keyboard behavior, whole international phone-number entry, and timeline pagination announcements; they live beside the registry source and must survive future updates. Existing custom application surfaces retain their squircle fallback. Historical Arc notes above describe these original application adaptations.
+
+Silicon UI local keyboard fix: ConfirmMorph preserves its pointer re-arming delay, but a separate keyboard activation can confirm immediately. This retains the established revocation flow and is covered by the developer app-verification keyboard regression. Hosted branding also maps round/sharp/squircle corners to Silicon UI tokens and keeps soft/outline primary actions.

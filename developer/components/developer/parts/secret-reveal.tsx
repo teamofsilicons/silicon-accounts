@@ -7,9 +7,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Eye, EyeOff, KeyRound } from "lucide-react";
-import { Button } from "@/components/arc/button/button";
-import { CopyButton } from "@/components/arc/copy-button/copy-button";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import { Button } from "@/components/silicon-ui/button/button";
+import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
+import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
 import styles from "./parts.module.css";
 
 export interface SecretItem {

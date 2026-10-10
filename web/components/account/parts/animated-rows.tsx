@@ -10,7 +10,7 @@
  */
 import type { ReactNode, Ref } from "react";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
-import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
 
 export interface AnimatedRowsProps<T> {
   items: T[];

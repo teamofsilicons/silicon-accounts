@@ -49,6 +49,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Silicon Accounts installation failed' }
           Join-Path $siliconHome '.apps\bin' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Verify the managed records and public commands
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: python scripts/verify-managed-install.py
       - name: Stop the temporary updater

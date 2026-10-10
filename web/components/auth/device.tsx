@@ -13,9 +13,9 @@
  */
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Alert } from "@/components/arc/alert/alert";
-import { Button } from "@/components/arc/button/button";
-import { Input } from "@/components/arc/input/input";
+import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Button } from "@/components/silicon-ui/button/button";
+import { Input } from "@/components/silicon-ui/input/input";
 import { ApiError } from "@/lib/api/errors";
 import type { AccountSummary, DeviceRequest } from "@/lib/api/types";
 import { formatRelative } from "@/lib/format";

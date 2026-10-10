@@ -6,7 +6,7 @@
  * check runs with `for=<its uuid>`, so an id still reserved for that Silicon comes back as one it can take back.
  */
 import { useState, type FormEvent, type Ref } from "react";
-import { Button } from "@/components/arc/button/button";
+import { Button } from "@/components/silicon-ui/button/button";
 import { ApiError } from "@/lib/api/errors";
 import { describeError } from "./common";
 import { IdField, useIdCheck, type IdPrefix } from "./id-field";

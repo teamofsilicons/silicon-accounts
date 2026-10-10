@@ -7,8 +7,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Menu } from "lucide-react";
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/arc/drawer/drawer";
-import { ThemeSwitch } from "@/components/arc/theme-switch/theme-switch";
+import { Drawer, DrawerContent, DrawerTrigger } from "@/components/silicon-ui/drawer/drawer";
+import { ThemeSwitch } from "@/components/silicon-ui/theme-switch/theme-switch";
 import { BrandMark } from "@/components/foundation/shell/brand-mark";
 import { useTheme } from "@/components/foundation/theme/use-theme";
 import { DOCS_BASE } from "@/lib/docs/site";

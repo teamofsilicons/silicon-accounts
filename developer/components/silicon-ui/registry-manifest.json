@@ -1,0 +1,814 @@
+{
+  "registry": "https://ui.teamofsilicons.com/r/{name}.json",
+  "retrieved": "2026-10-10",
+  "files": [
+    {
+      "file": "blocks/empty-states/empty-states.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/empty-states.json",
+      "sha256": "5c24e909420b3874ca455d0f6364939de5f1700b17cfad3a1ae2f72a665a902c"
+    },
+    {
+      "file": "blocks/empty-states/empty-states.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/empty-states.json",
+      "sha256": "12b5ed1ec819111a321d29ce98ca71d81797ad8fcd675aa1d98195431869b36f"
+    },
+    {
+      "file": "blocks/empty-states/empty-states-art.ts",
+      "registry": "https://ui.teamofsilicons.com/r/empty-states.json",
+      "sha256": "86c5c3d7630416831fd884f58e657f15ae36c9e8ccac21cdae06e1f1d79a7e2b"
+    },
+    {
+      "file": "button/button.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/empty-states.json",
+      "sha256": "6a56d78cb75a6fd5f5cfdd03be8b02bf96f0bc96790d3c81abeee10e089fecec"
+    },
+    {
+      "file": "button/button.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/empty-states.json",
+      "sha256": "a3145c8c73560ac8ec6c793601c709f0744d33a6acf724eb8c6b74fb5067c43a"
+    },
+    {
+      "file": "button/button.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/button.json",
+      "sha256": "6a56d78cb75a6fd5f5cfdd03be8b02bf96f0bc96790d3c81abeee10e089fecec"
+    },
+    {
+      "file": "button/button.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/button.json",
+      "sha256": "a3145c8c73560ac8ec6c793601c709f0744d33a6acf724eb8c6b74fb5067c43a"
+    },
+    {
+      "file": "motion-tokens.ts",
+      "registry": "https://ui.teamofsilicons.com/r/silicon-motion-tokens.json",
+      "sha256": "13af43b57ed38e5b72cfc06ff0ccc39b0593721f04840e73532893593cc61491"
+    },
+    {
+      "file": "lib/motion-tokens.ts",
+      "registry": "https://ui.teamofsilicons.com/r/silicon-motion-tokens.json",
+      "sha256": "bec65d2e1b180dd3c574edc60cf84e0fa336e7ff8640eba0c70bcf0ae765fb8a"
+    },
+    {
+      "file": "blocks/sign-in/sign-in.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "b8b1e81ea051fddaea86179eb3e01af7f5c5d47351cb1f7630ded9f72418f406"
+    },
+    {
+      "file": "blocks/sign-in/sign-in.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "7afbdeac2bf699f9d9fb700ea895761f8b95b7bb72c8c873ca9e3940f4bade28"
+    },
+    {
+      "file": "lib/media.ts",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "765732e3b5112fcff330137ab9a8c63c641d5662f1dddba5cc8abf2bb02ffdb0"
+    },
+    {
+      "file": "otp-input/otp-input.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "9b7c948a73d93c2d31f1c031b70ba62c969689fe4625d1762d1e4418c39f30bf"
+    },
+    {
+      "file": "otp-input/otp-input.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "4bcfd659a2d6597f558ae2d02214c1dabfcbc795fca8a664b1abda369a872640"
+    },
+    {
+      "file": "input/input.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "16a4e761b51482e9c066f284a38171085e71ae390e4b26f9f0c18dd8af21c8f2"
+    },
+    {
+      "file": "input/input.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "da9aa5e0863ccaa5377aa4307f6063b542a5da201ef6653a37c4f7e46f2cce01"
+    },
+    {
+      "file": "button/button.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "6a56d78cb75a6fd5f5cfdd03be8b02bf96f0bc96790d3c81abeee10e089fecec"
+    },
+    {
+      "file": "button/button.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "a3145c8c73560ac8ec6c793601c709f0744d33a6acf724eb8c6b74fb5067c43a"
+    },
+    {
+      "file": "avatar/avatar.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "0c6199133b971d92a1fdc75c1474f20446f9611ade3d11252b9f005efa4d2380"
+    },
+    {
+      "file": "avatar/avatar.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "21be5f6428c89355e4b3915a70dcd65102c06e0680bbbf8e0d41a38d4e301dcf"
+    },
+    {
+      "file": "lib/silicon-provider.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/sign-in.json",
+      "sha256": "fdfe0efa7f034006c40f1b6f3af39a3d5541b99eff9f5855719128e4476b7e09"
+    },
+    {
+      "file": "otp-input/otp-input.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/otp-input.json",
+      "sha256": "9b7c948a73d93c2d31f1c031b70ba62c969689fe4625d1762d1e4418c39f30bf"
+    },
+    {
+      "file": "otp-input/otp-input.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/otp-input.json",
+      "sha256": "4bcfd659a2d6597f558ae2d02214c1dabfcbc795fca8a664b1abda369a872640"
+    },
+    {
+      "file": "input/input.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/input.json",
+      "sha256": "16a4e761b51482e9c066f284a38171085e71ae390e4b26f9f0c18dd8af21c8f2"
+    },
+    {
+      "file": "input/input.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/input.json",
+      "sha256": "da9aa5e0863ccaa5377aa4307f6063b542a5da201ef6653a37c4f7e46f2cce01"
+    },
+    {
+      "file": "avatar/avatar.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/avatar.json",
+      "sha256": "0c6199133b971d92a1fdc75c1474f20446f9611ade3d11252b9f005efa4d2380"
+    },
+    {
+      "file": "avatar/avatar.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/avatar.json",
+      "sha256": "21be5f6428c89355e4b3915a70dcd65102c06e0680bbbf8e0d41a38d4e301dcf"
+    },
+    {
+      "file": "lib/silicon-provider.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/avatar.json",
+      "sha256": "fdfe0efa7f034006c40f1b6f3af39a3d5541b99eff9f5855719128e4476b7e09"
+    },
+    {
+      "file": "foundation.css",
+      "registry": "https://ui.teamofsilicons.com/r/silicon-foundation.json",
+      "sha256": "28e3780a68f2caa28f7b961ba4c7825f681db45bb2f421828b9a4983388451d0"
+    },
+    {
+      "file": "text-morph/text-morph.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/text-morph.json",
+      "sha256": "24b6559369ab4e5ca84e4465f3c9e4a973f3c259e90a539f8778c0cc0b9042c2"
+    },
+    {
+      "file": "text-morph/text-morph.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/text-morph.json",
+      "sha256": "bd51e5ba739e7b7272ad4b46fb500617aaaefb2ae4303010edaea6057f975989"
+    },
+    {
+      "file": "badge/badge.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/badge.json",
+      "sha256": "3c55d03480156cd7636e171ce8649ddc9616db7484dea50063d8b589810c4aad"
+    },
+    {
+      "file": "badge/badge.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/badge.json",
+      "sha256": "a609ce19faf31ce4624cbd1aad5b2d8a771f3087a074152c876c2a8a25c7e14d"
+    },
+    {
+      "file": "json-viewer/json-viewer.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/json-viewer.json",
+      "sha256": "993dde4169d8bfc53e44b678d3e4b0510470a2ee881548ced01cfe9988ef8866"
+    },
+    {
+      "file": "json-viewer/json-viewer.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/json-viewer.json",
+      "sha256": "90137b8e11c8c547311d057533a34d580073e652dc2fef205465bdc384bf2032"
+    },
+    {
+      "file": "timeline/timeline.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/timeline.json",
+      "sha256": "71d91894d8337d7b163bb8b011fdc8d47039ae53e90b9e03afc01d845f76870c"
+    },
+    {
+      "file": "timeline/timeline.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/timeline.json",
+      "sha256": "272ec6656624a9ee14a82d3588bae097eb9f7ede795d96f41618e335a162889e"
+    },
+    {
+      "file": "theme-switch/theme-switch.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/theme-switch.json",
+      "sha256": "ab77cf084065de4d4ad6a25d972c5242e39a704142b285f1ce56b7d82c22dafd"
+    },
+    {
+      "file": "theme-switch/theme-switch.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/theme-switch.json",
+      "sha256": "06a1dae8e1608c3c1077ada74b8632a868fdf398e017b3589b429b747fa0a2c5"
+    },
+    {
+      "file": "button/button.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/theme-switch.json",
+      "sha256": "6a56d78cb75a6fd5f5cfdd03be8b02bf96f0bc96790d3c81abeee10e089fecec"
+    },
+    {
+      "file": "button/button.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/theme-switch.json",
+      "sha256": "a3145c8c73560ac8ec6c793601c709f0744d33a6acf724eb8c6b74fb5067c43a"
+    },
+    {
+      "file": "search-field/search-field.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/search-field.json",
+      "sha256": "d93a8d0778c83d33793bf3fe7e5b206a5d0c6e50948b83f39777b89899392d93"
+    },
+    {
+      "file": "search-field/search-field.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/search-field.json",
+      "sha256": "f4c18a35d6c2c7cc8fb9dd9600a18916ac0ea327d61e9dac0b6c5ad4d36715e2"
+    },
+    {
+      "file": "color-picker/color-picker.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/color-picker.json",
+      "sha256": "621d6f4a3feef414f8c506163ced908e3d4be37b66b1572debf229f7e9b6c3e1"
+    },
+    {
+      "file": "color-picker/color-picker.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/color-picker.json",
+      "sha256": "50869193400fdceaf6105b3789a2951866d39ab8f446c977041ce565201163f9"
+    },
+    {
+      "file": "text-morph/text-morph.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/color-picker.json",
+      "sha256": "24b6559369ab4e5ca84e4465f3c9e4a973f3c259e90a539f8778c0cc0b9042c2"
+    },
+    {
+      "file": "text-morph/text-morph.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/color-picker.json",
+      "sha256": "bd51e5ba739e7b7272ad4b46fb500617aaaefb2ae4303010edaea6057f975989"
+    },
+    {
+      "file": "radio-cards/radio-cards.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/radio-cards.json",
+      "sha256": "82084be52a5d5f9def1d517f3bcdbf8c26f046afc25b93d5dd8ff32543f8a8d4"
+    },
+    {
+      "file": "radio-cards/radio-cards.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/radio-cards.json",
+      "sha256": "0f5f56ef275dcf1b71390a9547d5e4f9a2317baec8b8d3a5b55f342ff15eb2cb"
+    },
+    {
+      "file": "hold-to-confirm/hold-to-confirm.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/hold-to-confirm.json",
+      "sha256": "1d5905798dedde34e7bad029e1287a7a1620337fae3dfc3bd0d03101d06580ed"
+    },
+    {
+      "file": "hold-to-confirm/hold-to-confirm.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/hold-to-confirm.json",
+      "sha256": "2c4f11b5a2a5405ba4e7a911d5ef97e805d6621ec04e098142b9554095c4eae8"
+    },
+    {
+      "file": "select/select.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/select.json",
+      "sha256": "fb27423f88a741b87d4f15dd8d87d1e523831dd889b4ac1d6029559a33cf53fb"
+    },
+    {
+      "file": "select/select.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/select.json",
+      "sha256": "9e50140a4dad0dacc6508d09632cbef964c00abad2ed4febf594f508741a4170"
+    },
+    {
+      "file": "lib/menu-highlight.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/select.json",
+      "sha256": "e05dbfb0537d97d725ae1f615795195385f3e624863334fa827a8b91fb10e075"
+    },
+    {
+      "file": "tag-input/tag-input.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/tag-input.json",
+      "sha256": "c17d9903f365a2901676d09692d93a283367825ae0aa53deb00d942e8440472c"
+    },
+    {
+      "file": "tag-input/tag-input.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/tag-input.json",
+      "sha256": "64fe7064d317e654e415418b80e8b38e869c8600409b14cbb08d81214600755c"
+    },
+    {
+      "file": "radio-group/radio-group.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/radio-group.json",
+      "sha256": "b64932d460b1366d5bd057af9bb372003380da8afb3ec306754fafa025d8a3eb"
+    },
+    {
+      "file": "radio-group/radio-group.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/radio-group.json",
+      "sha256": "f97d2569d830fb2d797270c85a90333cf5eacff7a86b32ca4bd9d03860024532"
+    },
+    {
+      "file": "bottom-sheet/bottom-sheet.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/bottom-sheet.json",
+      "sha256": "c31e59f706c6da72acf78737c842fc58bf1e42d75002b89103914308d689d3f3"
+    },
+    {
+      "file": "bottom-sheet/bottom-sheet.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/bottom-sheet.json",
+      "sha256": "c6216f21350e8d0d74ca438a747c71d3c23085028d529a91ab48da0fcee4415e"
+    },
+    {
+      "file": "user-menu/user-menu.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/user-menu.json",
+      "sha256": "ea41adfd5ef81396d4044a8d9d06759cd4628adcb7cd4e74c6cc6dfb98313c8f"
+    },
+    {
+      "file": "user-menu/user-menu.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/user-menu.json",
+      "sha256": "017af779f8a756260e9141e0477149b8a94b1c58f4867f0a5ba674930d6742b1"
+    },
+    {
+      "file": "avatar-group/avatar-group.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/avatar-group.json",
+      "sha256": "937f6581c5fc0f3f4e52c357ac6c59cb1a4bcba7221ddebf32d944219fcec62a"
+    },
+    {
+      "file": "avatar-group/avatar-group.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/avatar-group.json",
+      "sha256": "d13756583ef87a10bbccdc2103898b5a474e3441be5ac65350771db548e21172"
+    },
+    {
+      "file": "avatar/avatar.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/avatar-group.json",
+      "sha256": "0c6199133b971d92a1fdc75c1474f20446f9611ade3d11252b9f005efa4d2380"
+    },
+    {
+      "file": "avatar/avatar.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/avatar-group.json",
+      "sha256": "21be5f6428c89355e4b3915a70dcd65102c06e0680bbbf8e0d41a38d4e301dcf"
+    },
+    {
+      "file": "lib/silicon-provider.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/avatar-group.json",
+      "sha256": "fdfe0efa7f034006c40f1b6f3af39a3d5541b99eff9f5855719128e4476b7e09"
+    },
+    {
+      "file": "switch/switch.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/switch.json",
+      "sha256": "6ab95cb9c0aaa80599cdc0605abf959a20f5030fe4ecdf57f6894274a9c5d73b"
+    },
+    {
+      "file": "switch/switch.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/switch.json",
+      "sha256": "a0b31dafda3a33e36172e7c74599e152299df3e39b8d87d791e2acb7e5d5f45e"
+    },
+    {
+      "file": "sortable-data-table/sortable-data-table.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/sortable-data-table.json",
+      "sha256": "90350cd5d18abdd5fced97289482604fb48f2dfcf61ce82168697d7cef51e085"
+    },
+    {
+      "file": "sortable-data-table/sortable-data-table.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/sortable-data-table.json",
+      "sha256": "b76a7b030eaaabf9955e2c447bf4443ed9f1ed3970d583f682fca2634a5f7c8e"
+    },
+    {
+      "file": "scroll-area/scroll-area.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/scroll-area.json",
+      "sha256": "82c53c56af335d0a6d808ecd4cbb3c97e8fa83ca56ccd35f71605ae8dd8b0891"
+    },
+    {
+      "file": "scroll-area/scroll-area.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/scroll-area.json",
+      "sha256": "275b47a6a9ea43de1894d745dfd94cb99cfbe68115b25f641cb0a8704ec3fcdb"
+    },
+    {
+      "file": "date-picker/date-picker.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/date-picker.json",
+      "sha256": "996d6b6703f7478c9ce286a3bbcd49a10aac0cb489b0d8915dfd89dad9c4efb8"
+    },
+    {
+      "file": "date-picker/date-picker.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/date-picker.json",
+      "sha256": "29a3fc456feff03c261d4f216b6c8eba7110270917478aca313cb68348e07986"
+    },
+    {
+      "file": "calendar/calendar.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/date-picker.json",
+      "sha256": "cf09873e5d895e46129159e62f7e494f448cfd247aaddd6c9a54de45a5d6c108"
+    },
+    {
+      "file": "lib/use-today.ts",
+      "registry": "https://ui.teamofsilicons.com/r/date-picker.json",
+      "sha256": "069a833b34cb103040013346c07ad453d235da1096ea011d2c50bd148029a3af"
+    },
+    {
+      "file": "calendar/calendar.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/date-picker.json",
+      "sha256": "e91b14368da4704ea62572227296876c81f909b2915c85721bb63eee56dd86f0"
+    },
+    {
+      "file": "calendar/calendar.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/calendar.json",
+      "sha256": "cf09873e5d895e46129159e62f7e494f448cfd247aaddd6c9a54de45a5d6c108"
+    },
+    {
+      "file": "lib/use-today.ts",
+      "registry": "https://ui.teamofsilicons.com/r/calendar.json",
+      "sha256": "069a833b34cb103040013346c07ad453d235da1096ea011d2c50bd148029a3af"
+    },
+    {
+      "file": "calendar/calendar.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/calendar.json",
+      "sha256": "e91b14368da4704ea62572227296876c81f909b2915c85721bb63eee56dd86f0"
+    },
+    {
+      "file": "morph-select/morph-select.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/morph-select.json",
+      "sha256": "e6919543ac6d1cd7414e72ef1e4354424ef178ea5612fd274c6562e60d9190eb"
+    },
+    {
+      "file": "morph-select/morph-select.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/morph-select.json",
+      "sha256": "ed0cc1cef7a0e76e51a05b75cd1fccb991fde87dfe5a4d6cca068d7c137f176c"
+    },
+    {
+      "file": "textarea/textarea.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/textarea.json",
+      "sha256": "1ed43b87e45b04180f1c6b8b3b7543e071bed3a6fcb2033e98015c77a8b7135a"
+    },
+    {
+      "file": "textarea/textarea.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/textarea.json",
+      "sha256": "b501f42dec62067fbf5e492d5e40164315e1d97460c8f5908da963be05cbdf14"
+    },
+    {
+      "file": "command-palette/command-palette.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/command-palette.json",
+      "sha256": "2a4bd0804f3be91c9bf3f900c6dc0e2f0c889ff5f37863cfcbc81fe7931f7dca"
+    },
+    {
+      "file": "command-palette/command-palette.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/command-palette.json",
+      "sha256": "1d768c28b1f618555fdc54f318456682a65c679bc0a4e2b5a5fea223cf172b60"
+    },
+    {
+      "file": "phone-input/phone-input.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/phone-input.json",
+      "sha256": "e1130be3b8aea675646bf99483a5c88d5897bfd4b8c5f629bac2d0a53868e816"
+    },
+    {
+      "file": "phone-input/phone-input.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/phone-input.json",
+      "sha256": "c870bc94daef3f3723fbc4edd3a0c08963e4b3d0674c31092141920f5b6a8e5b"
+    },
+    {
+      "file": "popover/popover.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/popover.json",
+      "sha256": "c564d1974bc55e805cb92e37ab0d5dbf48b46429353981985f50adab2c93ff4c"
+    },
+    {
+      "file": "popover/popover.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/popover.json",
+      "sha256": "21bb1a2ffdb50369ce83a21705ebbd8b0909ecafd0a409747dc191af89bd57f4"
+    },
+    {
+      "file": "dialog/dialog.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/dialog.json",
+      "sha256": "eb84a7eb2ac864dc07f2825eab252eac78e9c6b889d0e9f00bf6b2b799975ade"
+    },
+    {
+      "file": "dialog/dialog.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/dialog.json",
+      "sha256": "40ac3ebefc883a04e4c5249026f1fd1eedf1e97baeac3954ad8b2a34b9cc74c0"
+    },
+    {
+      "file": "combobox/combobox.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/combobox.json",
+      "sha256": "12ae9a73956f4d4854259396fd377aa63321db18198e8816db5b1791ff9a56b7"
+    },
+    {
+      "file": "combobox/combobox.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/combobox.json",
+      "sha256": "a7d26050871fe868d5ffa246863baca4060ddae1a22bf310fac4ab71e4146912"
+    },
+    {
+      "file": "chip-group/chip-group.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/chip-group.json",
+      "sha256": "18bd79ee819c6546b6f538bc1df5b2645e07093cb8eeb3637939087cd81b7bfd"
+    },
+    {
+      "file": "chip-group/chip-group.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/chip-group.json",
+      "sha256": "aa5ff8de386861f5da01798ad8b233d090c9d9df1c38aaa36515230015ceb475"
+    },
+    {
+      "file": "confirm-morph/confirm-morph.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/confirm-morph.json",
+      "sha256": "151698eb1a316e38985d748f8e23b4e04d948a19a66212ef26de0b09fab2b563"
+    },
+    {
+      "file": "confirm-morph/confirm-morph.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/confirm-morph.json",
+      "sha256": "e95d1e0e092eec0025a40e64ce8d41d5d1ec70f29b2a03c92b72812072ea0ba8"
+    },
+    {
+      "file": "empty-state/empty-state.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/empty-state.json",
+      "sha256": "e99e39c02b03e77738e8e8a69d12f24b6e9d5b3b66f12f1425cec32700fa69ef"
+    },
+    {
+      "file": "empty-state/empty-state.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/empty-state.json",
+      "sha256": "dd71c2b16a7b14eabce882e92cd6b2d43af4caf8875201f137408fd0cf0a0912"
+    },
+    {
+      "file": "stepper/stepper.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/stepper.json",
+      "sha256": "7b4034915b0902b16e6dd2e54dfae4ce40fd9b2d4fd09e736f9e196d97fc6c17"
+    },
+    {
+      "file": "stepper/stepper.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/stepper.json",
+      "sha256": "17585812e74d539084c96f816c74f5d699372144daba3c9c30d3780263cdd741"
+    },
+    {
+      "file": "toast-stack/toast-stack.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/toast-stack.json",
+      "sha256": "ba422f5d6e330c49b9f2a110af7cf91e46e20697490ef7f103909e982adde49a"
+    },
+    {
+      "file": "toast-stack/toast-stack.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/toast-stack.json",
+      "sha256": "388d56c3760c9623db743eeed2664bc7aef60843ee86da0012f4b3fb98d48ded"
+    },
+    {
+      "file": "dropdown-menu/dropdown-menu.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/dropdown-menu.json",
+      "sha256": "a9328261e68bfc45efa73496f435d09d6221c0cc6a3387e7b3496f1b34ccd9a4"
+    },
+    {
+      "file": "dropdown-menu/dropdown-menu.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/dropdown-menu.json",
+      "sha256": "8c06dab6ae7107cf03ef39a4c841d30848aed69401f7818379b1dc400a6678ca"
+    },
+    {
+      "file": "lib/menu-highlight.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/dropdown-menu.json",
+      "sha256": "e05dbfb0537d97d725ae1f615795195385f3e624863334fa827a8b91fb10e075"
+    },
+    {
+      "file": "checkbox/checkbox.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/checkbox.json",
+      "sha256": "4759251a0b2a83320cb4078e840f61481a23be0b38b9aa7c077c2e85e6dde00d"
+    },
+    {
+      "file": "checkbox/checkbox.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/checkbox.json",
+      "sha256": "7419398bebfa991b9b94f368a591a4b4a2c25569f77fda3967e9813d2dadc8c9"
+    },
+    {
+      "file": "filter-toolbar/filter-toolbar.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/filter-toolbar.json",
+      "sha256": "90fbd7b5dfca993bb6992cda514d7c17df406fcf63ecf2c04712a20c538ed1db"
+    },
+    {
+      "file": "filter-toolbar/filter-toolbar.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/filter-toolbar.json",
+      "sha256": "66e3d1ce60b7ac1cffc9757bbeaf927778ca3dafbec7db737300c8447c8c9ff9"
+    },
+    {
+      "file": "action-button/action-button.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/action-button.json",
+      "sha256": "eddf6e4913d26db3833aa9e554e3458e460aebc3887d33b87aadaabeddd3dc05"
+    },
+    {
+      "file": "action-button/action-button.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/action-button.json",
+      "sha256": "49d38127f177d07562f1f302a85b50f356faaba5f6e0df7283033c9a5cf1ee87"
+    },
+    {
+      "file": "text-morph/text-morph.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/action-button.json",
+      "sha256": "24b6559369ab4e5ca84e4465f3c9e4a973f3c259e90a539f8778c0cc0b9042c2"
+    },
+    {
+      "file": "text-morph/text-morph.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/action-button.json",
+      "sha256": "bd51e5ba739e7b7272ad4b46fb500617aaaefb2ae4303010edaea6057f975989"
+    },
+    {
+      "file": "toast/toast.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/toast.json",
+      "sha256": "cc68a59e0db6f1f1a0c1b8ec6aaa7638c08be7e13367b370f8d3f44accddba7f"
+    },
+    {
+      "file": "toast/toast.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/toast.json",
+      "sha256": "a0ca6bdec2e2edc4bf6e86c4a94b1ad11c1557796e2554329b9b96a0ce478150"
+    },
+    {
+      "file": "skeleton/skeleton.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/skeleton.json",
+      "sha256": "73b97715698fa54f6f0eaeefb6a8d795977297dd998439d1e595361e5da6d3b5"
+    },
+    {
+      "file": "skeleton/skeleton.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/skeleton.json",
+      "sha256": "0238d0613c058cd254a9640a5b6ef3d495bf1ba61f3352809dc6ee36fc8b9339"
+    },
+    {
+      "file": "inline-edit/inline-edit.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/inline-edit.json",
+      "sha256": "7040d60275c468ae819f9de96a4cf6e41d9c639fdeefe866953466afd15addb4"
+    },
+    {
+      "file": "inline-edit/inline-edit.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/inline-edit.json",
+      "sha256": "425a690a30984efd60ee181b4252bf870a8a54d682dc2d052ea3f0b1a124cf43"
+    },
+    {
+      "file": "accordion/accordion.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/accordion.json",
+      "sha256": "4d24d519b511812da9dd2b5e2c7d696c0f849ac9ea391480927acf5cfaa3a977"
+    },
+    {
+      "file": "accordion/accordion.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/accordion.json",
+      "sha256": "829b583169a8f969b6015718f6d4385e1a4ac8aa903b485d6aec179e97aae749"
+    },
+    {
+      "file": "alert/alert.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/alert.json",
+      "sha256": "ddcd481e2ebc6a1cbf6f053d6de1817d5dfd40b347e0bea561cc9fda2ea54950"
+    },
+    {
+      "file": "alert/alert.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/alert.json",
+      "sha256": "79c62cf3ae3b3861e8c8c42fdaef29381986ef68828d031855abc3d8a4176abc"
+    },
+    {
+      "file": "slot-text/slot-text.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/slot-text.json",
+      "sha256": "35ec44001e89ebdd707deb9a9bbbf1ebf099bc7728325e03f9754035d9e1fbc5"
+    },
+    {
+      "file": "slot-text/slot-text.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/slot-text.json",
+      "sha256": "d72527fa79c320f29b9502891e5b04e12aa044bcd77754e598811853872b09a8"
+    },
+    {
+      "file": "progress/progress.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/progress.json",
+      "sha256": "53f96b8e42315c9c261338bd96f74d74f6db22b5de935ae3ec02e20cfb64ae1e"
+    },
+    {
+      "file": "progress/progress.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/progress.json",
+      "sha256": "8fc0e42d8215308e342ae246a63ac1abdd1d6fafa6f184c1e94b06ec1d8bfda5"
+    },
+    {
+      "file": "segmented-control/segmented-control.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/segmented-control.json",
+      "sha256": "9e1a4bc135246c86ed2d8875a3a1266490aa38a3d7800759db630e700188e840"
+    },
+    {
+      "file": "segmented-control/segmented-control.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/segmented-control.json",
+      "sha256": "a24527f19d8dc8036c24bfbd6208eeeff74f307ac6776bfcdb5b1a15d4cd9fd2"
+    },
+    {
+      "file": "copy-button/copy-button.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/copy-button.json",
+      "sha256": "a6faac2922a48cc05ec72650ed63aee9b3871446df683cb7de6790f9bb19744a"
+    },
+    {
+      "file": "copy-button/copy-button.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/copy-button.json",
+      "sha256": "ad6821f03dd1b3bd76f688a2f80fb3f0e64362da54bdf2aeec599f0d5db55c0c"
+    },
+    {
+      "file": "lib/use-copy-feedback.ts",
+      "registry": "https://ui.teamofsilicons.com/r/copy-button.json",
+      "sha256": "88d0ae55bb3e241f529912a4802bbf014e4ba437025acc90ab13e012702273c5"
+    },
+    {
+      "file": "code-block/code-block.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/code-block.json",
+      "sha256": "af1c47e8f90e1287c4f26c30354250746809ddb97a3a4a30f8d83f0260c59379"
+    },
+    {
+      "file": "code-block/code-block.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/code-block.json",
+      "sha256": "ac449f0606eaa842d2770d9337dd810d278339cb6feee672e64d2c245289c72e"
+    },
+    {
+      "file": "copy-button/copy-button.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/code-block.json",
+      "sha256": "a6faac2922a48cc05ec72650ed63aee9b3871446df683cb7de6790f9bb19744a"
+    },
+    {
+      "file": "copy-button/copy-button.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/code-block.json",
+      "sha256": "ad6821f03dd1b3bd76f688a2f80fb3f0e64362da54bdf2aeec599f0d5db55c0c"
+    },
+    {
+      "file": "lib/use-copy-feedback.ts",
+      "registry": "https://ui.teamofsilicons.com/r/code-block.json",
+      "sha256": "88d0ae55bb3e241f529912a4802bbf014e4ba437025acc90ab13e012702273c5"
+    },
+    {
+      "file": "file-dropzone/file-dropzone.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/file-dropzone.json",
+      "sha256": "f160c1e56d39307af6bb0b9ad56a36ea3acef46b7b006218d2b26b1ce1ae0a24"
+    },
+    {
+      "file": "file-dropzone/file-dropzone.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/file-dropzone.json",
+      "sha256": "bd2ef00373ef83bace5418cdee06971c5d98def62306a8db7b9be06a7fe23ad4"
+    },
+    {
+      "file": "card/card.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/card.json",
+      "sha256": "2ab2e99cb316f0316f5b5e0a6cc205fa0e86fb25cf9b4def13a693b581bf9611"
+    },
+    {
+      "file": "card/card.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/card.json",
+      "sha256": "9ea8e95fbf4ae730dea46f7ccd8d897e856f60c3f4e444dbd06ef829c934f87b"
+    },
+    {
+      "file": "tooltip/tooltip.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/tooltip.json",
+      "sha256": "25ad5ea2b707da617e055f0c2fd9bcf8776775ad658e67f3e9176f3030855f9b"
+    },
+    {
+      "file": "tooltip/tooltip.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/tooltip.json",
+      "sha256": "b2b1ccc40ff42c37c52fec542f268ce9efe7313f3a44fe8d64f44345359f91c0"
+    },
+    {
+      "file": "pagination/pagination.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/pagination.json",
+      "sha256": "c687e93ea563bd39d470dda1ba8b9ef9ad0b8132fc1593eb8361f3641d955a7e"
+    },
+    {
+      "file": "pagination/pagination.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/pagination.json",
+      "sha256": "2d3d92e0ef642cc9ced3c40aed7fd7785d400e37cbbb323960f565af624cbbc4"
+    },
+    {
+      "file": "drawer/drawer.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/drawer.json",
+      "sha256": "eca310cb947c8da843f1128a77a2683c4e031519081da8c08d7ee405e5bbd87a"
+    },
+    {
+      "file": "drawer/drawer.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/drawer.json",
+      "sha256": "715950296b26bcdb9afbc3a3a776f097608f6f71a885bab2251d2d232494452c"
+    },
+    {
+      "file": "animated-counter/animated-counter.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/animated-counter.json",
+      "sha256": "2542f8bcd8a413c7a846d440d917a3c11a77f4e016014dfdd242c4549df01750"
+    },
+    {
+      "file": "animated-counter/animated-counter.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/animated-counter.json",
+      "sha256": "e9027ce1d678fbfe36b76e4a4cd88fa2161b8f281f895bf055f8dff5e2e259ce"
+    },
+    {
+      "file": "metric-card/metric-card.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/metric-card.json",
+      "sha256": "ac550e49b6e9f680f32a694dd27cb42597795465d4709f2418230fbbde865906"
+    },
+    {
+      "file": "metric-card/metric-card.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/metric-card.json",
+      "sha256": "c3eb1202d51888dcaf55fb37f0b6700924818c95e914029efe4b710c6de19c2b"
+    },
+    {
+      "file": "animated-counter/animated-counter.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/metric-card.json",
+      "sha256": "2542f8bcd8a413c7a846d440d917a3c11a77f4e016014dfdd242c4549df01750"
+    },
+    {
+      "file": "animated-counter/animated-counter.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/metric-card.json",
+      "sha256": "e9027ce1d678fbfe36b76e4a4cd88fa2161b8f281f895bf055f8dff5e2e259ce"
+    },
+    {
+      "file": "tabs/tabs.tsx",
+      "registry": "https://ui.teamofsilicons.com/r/tabs.json",
+      "sha256": "3b0aaf6f0c41ce486e697ee3c9c86ce874fb2a22b1dab433226027de7858af0a"
+    },
+    {
+      "file": "tabs/tabs.module.css",
+      "registry": "https://ui.teamofsilicons.com/r/tabs.json",
+      "sha256": "39695e1a12e3bb63329298dacb50c7c55a732c83accfab9206fe17eef909b204"
+    }
+  ],
+  "adapted_behavior": [
+    "bottom-sheet/bottom-sheet.tsx",
+    "dialog/dialog.tsx",
+    "drawer/drawer.tsx",
+    "popover/popover.tsx",
+    "combobox/combobox.tsx",
+    "phone-input/phone-input.tsx",
+    "timeline/timeline.tsx",
+    "confirm-morph/confirm-morph.tsx"
+  ],
+  "application_helpers": [
+    "return-focus.ts",
+    "escape.ts"
+  ],
+  "style_adaptations": [
+    "primary action branding",
+    "primary data-variant for hosted branding"
+  ]
+}

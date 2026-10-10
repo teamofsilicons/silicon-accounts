@@ -85,3 +85,19 @@ describe("the Silicon Accounts look", () => {
     }
   });
 });
+
+
+describe("Silicon UI hosted corner tokens", () => {
+  it("keeps sharp controls sharp even when the saved radius is nonzero", () => {
+    const vars = brandingVariables({ ...DEFAULT_BRANDING, corner_style: "sharp", radius: 18 }, "light");
+    for (const token of ["--radius-control", "--radius-container", "--radius-overlay"]) assert.equal(vars[token], "0px");
+    assert.equal(vars["--corner-shape"], "round");
+  });
+  it("keeps rounded and squircle branding distinct on registry controls", () => {
+    for (const corner_style of ["rounded", "squircle"] as const) {
+      const vars = brandingVariables({ ...DEFAULT_BRANDING, corner_style, radius: 18 }, "light");
+      assert.equal(vars["--radius-control"], "18px");
+      assert.equal(vars["--corner-shape"], corner_style === "rounded" ? "round" : "squircle");
+    }
+  });
+});

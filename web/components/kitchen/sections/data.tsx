@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Avatar } from "@/components/arc/avatar/avatar";
-import { Badge } from "@/components/arc/badge/badge";
-import { CodeBlock } from "@/components/arc/code-block/code-block";
-import { FilterToolbar, type FilterChip, type FilterField } from "@/components/arc/filter-toolbar/filter-toolbar";
-import { JsonViewer } from "@/components/arc/json-viewer/json-viewer";
-import { SortableDataTable, type DataColumn } from "@/components/arc/sortable-data-table/sortable-data-table";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
+import { Badge } from "@/components/silicon-ui/badge/badge";
+import { CodeBlock } from "@/components/silicon-ui/code-block/code-block";
+import { FilterToolbar, type FilterChip, type FilterField } from "@/components/silicon-ui/filter-toolbar/filter-toolbar";
+import { JsonViewer } from "@/components/silicon-ui/json-viewer/json-viewer";
+import { SortableDataTable, type DataColumn } from "@/components/silicon-ui/sortable-data-table/sortable-data-table";
 import { formatRelative } from "@/lib/format";
 import { HOUR, portrait, SAMPLE_NOW } from "../samples";
 import { Specimen, Specimens, Wide, kitchenStyles as styles } from "../specimen";
