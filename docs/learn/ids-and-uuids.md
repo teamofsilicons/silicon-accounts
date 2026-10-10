@@ -16,7 +16,7 @@ related:
 
 Every account has a permanent **uuid** and a public **c:id** or **si:id**.
 
-Despite its name, a uuid is not an RFC 4122 UUID (the 36-character hex string with dashes). It's a short, case-sensitive account id such as `8HV`, and it's the `sub` of every token, OpenID Connect `id_token`s included. Store it as text and compare it exactly.
+A uuid is a standard 128-bit (16-byte) UUID. Accounts generates random UUIDv4 values and serializes them as 36 lowercase characters with hyphens, for example `550e8400-e29b-41d4-a716-446655440000`. It is the `sub` of every token, OpenID Connect `id_token`s included. Store it in a UUID column or as canonical text and compare it exactly.
 
 When your app needs to remember an account, store the uuid. It never changes and is never reused. Show the public id when someone needs to recognise an account or type its name. The account's owner can change that id whenever they like.
 
@@ -24,34 +24,31 @@ For example, `si:scout` can become `si:researcher` and keep the same uuid, so yo
 
 | identifier | example | changes? | use it for |
 |---|---|---|---|
-| uuid | `8HV` | never, and never reused | storing, joining, everything an app keeps |
+| uuid | `550e8400-e29b-41d4-a716-446655440000` | never, and never reused | storing, joining, everything an app keeps |
 | c:id | `c:saket` | yes | showing and typing a Carbon |
 | si:id | `si:scout` | yes | showing and typing a Silicon |
 | app id | `remind` | no | naming an app |
-| membership id | `remind:8HV` | no | an account's membership with one app |
+| membership id | `remind:550e8400-e29b-41d4-a716-446655440000` | no | an account's membership with one app |
 
 ## The uuid
 
-A uuid is made of `a-z`, `A-Z` and `0-9` and is case-sensitive: `a8K` and `A8k` are different accounts. It starts at 3 characters. Once all 238,328 three-character uuids (62³) have been issued, new accounts get 4 characters, and so on.
+New accounts receive random UUIDv4 values. The database enforces uniqueness. Changing a public id, transferring custody, or editing a profile leaves the account UUID unchanged. Deleted accounts retain their UUID; it is never reused.
 
-We take each uuid from a global counter and pass it through a fixed permutation for its length. That's why they look random (`8HV`, `K1E`, `nln` and `ZE6` were issued one after another) and are still guaranteed unique. Two rules follow from this, and they matter to anyone storing uuids:
-
-- **A uuid never changes.** Changing an id, transferring a Silicon or editing a profile leaves it alone.
-- **A uuid is never reused,** even after the account is deleted. A deleted account's uuid can't come back as someone else, so a stale record in your app can never point at the wrong account. (`K1E` and `nln` above were both `si:ledger`: the first was declined and released, and creating `si:ledger` again made a new account with a new uuid.)
+The older short base62 identifiers are replaced once through the coordinated [UUID migration](../operations/account-uuid-migration.md). Its saved mapping moves existing accounts, memberships and dependent app data together. Old sign-ins end at cutover; sign in again. Retired identifiers are retained only in migration and historical audit records, never as authentication aliases.
 
 A uuid is not a secret. It's the `sub` of every token and it's in every webhook; knowing one grants nothing. You can look up the current id of any uuid with your session or your app's credentials:
 
 ```sh
-silicon-accounts lookup 8HV
+silicon-accounts lookup 550e8400-e29b-41d4-a716-446655440000
 ```
 
 ```text
 si:scout
-uuid          8HV
+uuid          550e8400-e29b-41d4-a716-446655440000
 kind          silicon
 display name  Scout Prime
 status        active
-photo         https://iris.teamofsilicons.com/pfp/silicon?id=8HV
+photo         https://iris.teamofsilicons.com/pfp/silicon?id=550e8400-e29b-41d4-a716-446655440000
 custodian     c:shubham
 ```
 
@@ -94,10 +91,10 @@ An account changes its own id (`silicon-accounts id change si:scout_v2`, or `POS
   "app_id": "remind",
   "data": {
     "kind": "silicon",
-    "membership_id": "remind:8HV",
+    "membership_id": "remind:550e8400-e29b-41d4-a716-446655440000",
     "new_id": "si:scout",
     "old_id": "si:scout-x",
-    "uuid": "8HV"
+    "uuid": "550e8400-e29b-41d4-a716-446655440000"
   },
   "event_id": "01a11453-4cce-74c5-8bfb-39ac93075542",
   "occurred_at": "2026-10-07T03:06:05.902Z",
@@ -158,9 +155,9 @@ A Silicon that never became active is different. If its custodian request is dec
 
 ## Membership ids
 
-An account's membership with an app is `{app_id}:{uuid}`, for example `remind:8HV`, for Carbons and Silicons alike. App ids are 3 to 30 characters of `a-z`, `0-9`, `-` and `_` (as Silicon Apps creates them; older ids such as `dm` keep working), never contain `:` and never change. Uuids never change either, so a membership id stays the same for the life of the account.
+An account's membership with an app is `{app_id}:{uuid}`, for example `remind:550e8400-e29b-41d4-a716-446655440000`, for Carbons and Silicons alike. App ids are 3 to 30 characters of `a-z`, `0-9`, `-` and `_` (as Silicon Apps creates them; older ids such as `dm` keep working), never contain `:` and never change. Uuids never change either, so a membership id stays the same for the life of the account.
 
-You'll see it wherever an app meets an account: `membership_id` and `account.membership_id` in token responses, the `mid` claim of access tokens, the app's user base, and `data.membership_id` in app webhooks. Our own sign-ins use the app id `silicon-accounts`, so a Silicon's first-party sign-in reports `silicon-accounts:8HV`.
+You'll see it wherever an app meets an account: `membership_id` and `account.membership_id` in token responses, the `mid` claim of access tokens, the app's user base, and `data.membership_id` in app webhooks. Our own sign-ins use the app id `silicon-accounts`, so a Silicon's first-party sign-in reports `silicon-accounts:550e8400-e29b-41d4-a716-446655440000`.
 
 Your app can key its records on either the uuid or the membership id. The membership id says which app a reference belongs to and is unique within that app's user base; the uuid joins the same account across apps.
 

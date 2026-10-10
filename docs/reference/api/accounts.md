@@ -120,9 +120,9 @@ Errors: 400 `invalid_query` (no `id`), 401 `unauthenticated` (`for` without a se
 ## `GET /v1/accounts/{uuid}` and `GET /v1/accounts/by-id/{id}`
 
 The current public identity of an account. **app or account**. Both routes together allow 600
-lookups per minute per app or per account. The limit is there because uuids are short and densely
-allocated (238,328 three-character values are used before any 4-character one), so without it one
-caller could walk every account. `by-id` matches current ids only.
+lookups per minute per app or per account. New account UUIDs are canonical UUIDv4 values; the
+limit bounds directory scraping and resource use. `by-id` matches current public ids only.
+Retired short UUIDs do not resolve after the coordinated migration.
 
 A signed-in Carbon or Silicon gets the account summary, and for a Silicon its custodian's
 summary too:

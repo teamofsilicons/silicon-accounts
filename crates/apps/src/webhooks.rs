@@ -679,8 +679,8 @@ fn replayable_sql() -> String {
         .collect::<Vec<_>>()
         .join(", ");
     format!(
-        "coalesce(e.account_uuid is null or e.type in ({types}) \
-           or (m.status in ('active', 'imported') and a.status <> 'deleted'), false)"
+        "(e.identity_migrated_at is null and coalesce(e.account_uuid is null or e.type in ({types}) \
+           or (m.status in ('active', 'imported') and a.status <> 'deleted'), false))"
     )
 }
 
@@ -794,6 +794,7 @@ fn parse_replay(body: &ReplayBody) -> ApiResult<ReplaySelection> {
 
 #[derive(Debug, sqlx::FromRow)]
 struct ReplayCandidate {
+    identity_migrated: bool,
     id: Uuid,
     event_id: Uuid,
     event_type: String,
@@ -816,7 +817,7 @@ async fn run_replay(
         .await?
         .ok_or_else(|| webhook_not_set(app_id))?;
     const CANDIDATES: &str = "select d.id, d.event_id, e.type as event_type, e.account_uuid, d.status, \
-           m.status as membership_status, a.status as account_status \
+           m.status as membership_status, a.status as account_status, e.identity_migrated_at is not null as identity_migrated \
          from webhook_deliveries d join webhook_events e on e.event_id = d.event_id \
          left join memberships m on m.app_id = d.target_id and m.account_uuid = e.account_uuid \
          left join accounts a on a.uuid = e.account_uuid \
@@ -861,6 +862,12 @@ async fn run_replay(
             }));
             continue;
         };
+        if c.identity_migrated {
+            withheld += 1;
+            skipped.push(json!({"delivery_id":c.id,"event_id":c.event_id,"reason":"account_uuid_migrated",
+                "message":"This historical event was superseded by fresh account state during UUID migration."}));
+            continue;
+        }
         if c.status == "pending" {
             skipped.push(json!({
                 "delivery_id": c.id, "event_id": c.event_id, "type": c.event_type, "reason": "already_pending",

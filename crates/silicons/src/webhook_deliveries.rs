@@ -512,7 +512,7 @@ fn webhook_not_set(silicon: &Account, caller: Caller<'_>) -> ApiError {
 /// A delivery of the Silicon `$1` that a replay may re-queue, row-locked by the query using it.
 macro_rules! candidate_select {
     () => {
-        "select d.id, d.event_id, e.type as event_type, d.status \
+        "select d.id, d.event_id, e.type as event_type, d.status, e.identity_migrated_at is not null as identity_migrated \
          from webhook_deliveries d join webhook_events e on e.event_id = d.event_id \
          where d.target_kind = 'silicon' and d.target_id = $1 "
     };
@@ -521,6 +521,7 @@ macro_rules! candidate_select {
 /// A delivery a replay request named (or picked by status).
 #[derive(Debug, sqlx::FromRow)]
 struct Candidate {
+    identity_migrated: bool,
     id: Uuid,
     event_id: Uuid,
     event_type: String,
@@ -559,7 +560,7 @@ async fn replay(
             let rows = sqlx::query_as::<_, Candidate>(concat!(
                 candidate_select!(),
                 "and d.status = 'failed' and ($2::timestamptz is null or d.created_at >= $2) \
-                 and e.type <> 'ping' order by d.created_at, d.id limit $3 for update of d"
+                 and e.type <> 'ping' and e.identity_migrated_at is null order by d.created_at, d.id limit $3 for update of d"
             ))
             .bind(&silicon.uuid)
             .bind(since)
@@ -582,6 +583,12 @@ async fn replay(
             }));
             continue;
         };
+        if c.identity_migrated {
+            pings += 1;
+            skipped.push(json!({"delivery_id":c.id,"event_id":c.event_id,"reason":"account_uuid_migrated",
+                "message":"This historical event was superseded by fresh account state during UUID migration."}));
+            continue;
+        }
         if c.status == "pending" {
             skipped.push(json!({
                 "delivery_id": c.id, "event_id": c.event_id, "type": c.event_type, "reason": "already_pending",
@@ -622,7 +629,7 @@ async fn replay(
         ReplaySelection::Ids(_) => (0, pings),
         ReplaySelection::Failed { since } => {
             sqlx::query_as::<_, (i64, i64)>(
-                "select count(*) filter (where e.type <> 'ping'), count(*) filter (where e.type = 'ping') \
+                "select count(*) filter (where e.type <> 'ping' and e.identity_migrated_at is null), count(*) filter (where e.type = 'ping' or e.identity_migrated_at is not null) \
                  from webhook_deliveries d join webhook_events e on e.event_id = d.event_id \
                  where d.target_kind = 'silicon' and d.target_id = $1 and d.status = 'failed' \
                    and ($2::timestamptz is null or d.created_at >= $2)",

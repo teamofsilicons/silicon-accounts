@@ -130,7 +130,7 @@ Our answers are shaped so they don't reveal more than the caller already knows:
 - `POST /v1/oauth/revoke` answers 200 for any token, and introspection answers `{"active": false}` for any token that isn't the caller's.
 - `POST /v1/proofs/verify` answers exactly `{"valid": false, "expires_at": null}` for every invalid case.
 - A custodian asking about another Carbon's Silicon gets `silicon_not_found`, never "not yours".
-- Lookups by uuid are limited to 600 per minute per caller. Uuids look random, but they're short and densely handed out (238,328 three-character values, all used before any longer ones), so without a limit one caller could walk every account.
+- Lookups by uuid are limited to 600 per minute per caller. Account UUIDs are random 128-bit UUIDv4 values; the lookup limit still bounds directory scraping and resource use. Possession of a UUID grants no access.
 
 ## Tokens end when they should
 

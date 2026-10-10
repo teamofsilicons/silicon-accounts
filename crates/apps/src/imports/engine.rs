@@ -44,7 +44,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use accounts_core::ids::{AccountId, handle_base, uuid_for_number, validate_handle, with_suffix};
+use accounts_core::ids::{AccountId, handle_base, new_account_uuid, validate_handle, with_suffix};
 use accounts_core::models::AccountKind;
 use accounts_core::repo::is_unique_violation;
 use accounts_core::{ApiError, ApiResult, normalize};
@@ -1057,7 +1057,7 @@ async fn write(
         let mut m_profile = Vec::with_capacity(creates.len());
         for (c, n) in creates.iter_mut().zip(numbers) {
             let p = &rows[c.idx].1;
-            let uuid = uuid_for_number(n as u64);
+            let uuid = new_account_uuid();
             let handle = c
                 .handle
                 .as_ref()

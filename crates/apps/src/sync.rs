@@ -416,15 +416,11 @@ fn validate(state: &AppState, apps: &[SiliconAppsApp]) -> Result<Vec<ValidApp>, 
             None => None,
         };
         let owner_uuid = match opt(&a.owner_uuid) {
-            Some(u)
-                if (3..=16).contains(&u.len()) && u.bytes().all(|b| b.is_ascii_alphanumeric()) =>
-            {
-                Some(u)
-            }
+            Some(u) if accounts_core::ids::is_account_uuid(&u) => Some(u),
             Some(_) => {
                 f.add(
                     at("owner_uuid"),
-                    "must be an account uuid: 3 to 16 letters and digits, like a8K",
+                    "must be a canonical account UUID, like 550e8400-e29b-41d4-a716-446655440000",
                 );
                 None
             }

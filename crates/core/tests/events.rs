@@ -379,9 +379,11 @@ async fn a_custodians_new_id_reaches_its_silicons_apps() {
     .await;
 
     let mut conn = ctx.conn().await;
-    let new_id =
-        accounts_core::ids::AccountId::parse(&format!("c:renamed-{}", carbon.uuid.to_lowercase()))
-            .expect("id");
+    let new_id = accounts_core::ids::AccountId::parse(&format!(
+        "c:renamed-{}",
+        carbon.uuid.chars().take(8).collect::<String>()
+    ))
+    .expect("id");
     let change =
         accounts_core::repo::accounts::change_id(&mut conn, &carbon.uuid, &new_id, &carbon.uuid)
             .await

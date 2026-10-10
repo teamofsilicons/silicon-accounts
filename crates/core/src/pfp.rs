@@ -6,6 +6,12 @@
 
 use uuid::Uuid;
 
+const QUERY_VALUE: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'_')
+    .remove(b'.')
+    .remove(b'~');
+
 use crate::config::Settings;
 use crate::models::AccountKind;
 
@@ -16,7 +22,7 @@ pub fn default_pfp_url(iris_base_url: &str, kind: AccountKind, uuid: &str) -> St
     format!(
         "{base}/pfp/{}?id={}",
         kind.as_str(),
-        percent_encoding::utf8_percent_encode(uuid, percent_encoding::NON_ALPHANUMERIC)
+        percent_encoding::utf8_percent_encode(uuid, QUERY_VALUE,)
     )
 }
 

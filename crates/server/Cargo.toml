@@ -23,7 +23,13 @@ path = "src/bin/accounts_migrate.rs"
 name = "accounts-seed"
 path = "src/bin/accounts_seed.rs"
 
+[[bin]]
+name = "accounts-migrate-uuids"
+path = "src/bin/accounts_migrate_uuids.rs"
+
 [dependencies]
+anyhow.workspace = true
+clap.workspace = true
 silicon-accounts-core.workspace = true
 silicon-accounts-auth.workspace = true
 silicon-accounts-oauth.workspace = true

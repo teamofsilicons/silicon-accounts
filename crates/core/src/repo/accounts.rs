@@ -1,4 +1,4 @@
-//! Accounts: creation (uuid from `account_number_seq`), lookups, ids (availability, change,
+//! Accounts: creation (random UUIDv4 identity), lookups, ids (availability, change,
 //! 10-day reservations, reclaim, history, the per-day change limit), profile updates, finishing
 //! an imported account, the STK sign-in lock, deletion and releasing a Silicon that never became
 //! active.
@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::config::Settings;
 use crate::error::{ApiError, ApiResult};
-use crate::ids::{AccountId, IdError, handle_candidates, uuid_for_number};
+use crate::ids::{AccountId, IdError, handle_candidates, new_account_uuid};
 use crate::models::{Account, AccountField, AccountKind, AccountStatus, ActorKind, VerifiedVia};
 use crate::repo::contacts::{self, ContactKind};
 use crate::repo::{audit, is_unique_violation};
@@ -262,7 +262,7 @@ pub async fn create_carbon(
     let number: i64 = sqlx::query_scalar("select nextval('account_number_seq')")
         .fetch_one(&mut *tx)
         .await?;
-    let uuid = uuid_for_number(number as u64);
+    let uuid = new_account_uuid();
     let pfp = new.pfp_url.clone().unwrap_or_else(|| {
         crate::pfp::default_pfp_url(&settings.iris_base_url, AccountKind::Carbon, &uuid)
     });
@@ -325,7 +325,7 @@ pub async fn create_silicon(
     let number: i64 = sqlx::query_scalar("select nextval('account_number_seq')")
         .fetch_one(&mut *tx)
         .await?;
-    let uuid = uuid_for_number(number as u64);
+    let uuid = new_account_uuid();
     let pfp = new.pfp_url.clone().unwrap_or_else(|| {
         crate::pfp::default_pfp_url(&settings.iris_base_url, AccountKind::Silicon, &uuid)
     });

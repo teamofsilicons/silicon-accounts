@@ -45,6 +45,7 @@ pub mod silicon_keys;
 pub mod state;
 pub mod telemetry;
 pub mod timefmt;
+pub mod uuid_migration;
 pub mod views;
 
 #[cfg(feature = "test-support")]

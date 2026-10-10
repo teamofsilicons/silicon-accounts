@@ -3,7 +3,7 @@
 from pathlib import Path
 import hashlib,json,shutil,subprocess,tarfile
 p=Path('.dev/production');bundle=p/'bundle';bundle.mkdir(exist_ok=True);(bundle/'bin').mkdir(exist_ok=True)
-for binary in ['accounts-api','accounts-migrate']:
+for binary in ['accounts-api','accounts-migrate','accounts-migrate-uuids']:
     shutil.copy2(Path('target/aarch64-unknown-linux-gnu/release')/binary,bundle/'bin'/binary)
 for app in ['web','developer']:
     dest=bundle/app
