@@ -25,7 +25,7 @@ Preserve all unrelated DNS records.
 
 1. Run workspace tests and both frontend checks. Build API and migration binaries
    using `cargo zigbuild --locked --release --target aarch64-unknown-linux-gnu.2.34
-   -p silicon-accounts-server --bin accounts-api --bin accounts-migrate`.
+   -p silicon-accounts-server --bin accounts-api --bin accounts-migrate --bin accounts-migrate-uuids`.
 2. Build `web` with `ACCOUNTS_API_URL=http://127.0.0.1:8589` and the production
    public/developer URLs. Build `developer`. Download Node 24.21.0 ARM64 and Caddy
    2.11.7 ARM64 from official releases, verify upstream checksums, and place archives
@@ -56,3 +56,8 @@ web, developer and Caddy services. Never roll back code blindly after a migratio
 For database recovery, stop writers, restore a selected dump to a new database,
 validate it, then deliberately change the configured database URL. Retain the old
 database until verification completes.
+
+The standard account UUID cutover is a separate offline operation. Follow
+[the coordinated UUID runbook](../docs/operations/account-uuid-migration.md); the
+installer applies only additive schema migrations and never backfills identities
+automatically.

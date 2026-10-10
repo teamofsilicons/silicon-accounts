@@ -3033,6 +3033,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "cookie",
+ "csv",
  "dotenvy",
  "ed25519-dalek",
  "futures",
@@ -3104,9 +3105,11 @@ dependencies = [
 name = "silicon-accounts-server"
 version = "0.4.0"
 dependencies = [
+ "anyhow",
  "axum",
  "base64 0.22.1",
  "bytes",
+ "clap",
  "dotenvy",
  "ed25519-dalek",
  "futures",

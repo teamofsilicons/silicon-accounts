@@ -197,8 +197,8 @@ function accountValue(uuid: string, ctx: DetailContext): ReactNode {
   if (ctx.me && uuid === ctx.me.uuid) return ctx.me.id ? `You (${ctx.me.id})` : "You";
   const marker = MARKERS[uuid];
   if (marker) return marker;
-  // Account uuids are 3 to 12 letters and digits; anything else is a marker this page does not know yet.
-  if (!/^[A-Za-z0-9]{3,12}$/.test(uuid)) return inWords(uuid);
+  // Standard UUIDs and pre-migration history references can identify an account.
+  if (!/^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[A-Za-z0-9]{3,12})$/.test(uuid)) return inWords(uuid);
   const known = ctx.siliconId(uuid);
   if (known) return mono(known);
   return <AccountRef uuid={uuid} />;

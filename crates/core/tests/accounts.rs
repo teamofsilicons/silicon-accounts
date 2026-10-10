@@ -1,7 +1,7 @@
 //! Accounts: creation and the uuid sequence, id changes with 10-day reservations and reclaim,
 //! availability, suggestions, profile updates, deletion and release.
 
-use accounts_core::ids::{AccountId, uuid_for_number};
+use accounts_core::ids::{AccountId, is_standard_account_uuid};
 use accounts_core::models::{AccountField, AccountKind, AccountStatus, VerifiedVia};
 use accounts_core::repo::accounts::{self, NewCarbon, NewContact, ProfileUpdate};
 use accounts_core::test_support::{CarbonSpec, TestContext};
@@ -12,15 +12,16 @@ fn carbon_id(h: &str) -> AccountId {
 }
 
 #[tokio::test]
-async fn creation_takes_uuids_from_the_sequence_in_order() {
+async fn creation_uses_random_standard_uuids_and_retains_private_sequence_order() {
     let ctx = TestContext::new().await;
     let a = ctx.carbon().await;
     let b = ctx.carbon().await;
     assert_eq!(a.number, 0);
-    assert_eq!(a.uuid, uuid_for_number(0));
+    assert!(is_standard_account_uuid(&a.uuid));
     assert_eq!(b.number, 1);
-    assert_eq!(b.uuid, uuid_for_number(1));
-    assert_eq!(a.uuid.len(), 3);
+    assert!(is_standard_account_uuid(&b.uuid));
+    assert_ne!(a.uuid, b.uuid);
+    assert_eq!(a.uuid.len(), 36);
     assert_eq!(a.status, AccountStatus::Active);
     assert_eq!(a.version, 1);
     assert_eq!(
@@ -738,7 +739,10 @@ async fn ids_change_at_most_five_times_a_day() {
         accounts::change_id(
             &mut conn,
             &c.uuid,
-            &carbon_id(&format!("hop-{i}-{}", c.uuid.to_lowercase())),
+            &carbon_id(&format!(
+                "hop-{i}-{}",
+                c.uuid.chars().take(8).collect::<String>()
+            )),
             &c.uuid,
         )
         .await

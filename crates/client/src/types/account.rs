@@ -83,7 +83,7 @@ impl FromStr for AccountKind {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct AccountSummary {
-    /// Permanent account identifier (base62, case-sensitive). Store this, not the id.
+    /// Permanent128-bit UUID, represented as lowercase hyphenated text. Store this, not the public id.
     pub uuid: String,
     /// Carbon or Silicon.
     pub kind: AccountKind,

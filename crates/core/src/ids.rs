@@ -1,11 +1,8 @@
 //! Account identifiers.
 //!
-//! - **uuid**: permanent, case-sensitive base62 (`a-z A-Z 0-9`). [`uuid_for_number`] maps the
-//!   global sequence number `n` (from `account_number_seq`) to a uuid: tier `k` (length) is the
-//!   smallest `k ≥ 3` with `n < Σ_{j=3..k} 62^j`; `i` is `n` minus the sizes of the smaller tiers;
-//!   the uuid is `(i·A_k + B_k) mod 62^k` written as exactly `k` base62 digits. `A_k` is odd and not
-//!   divisible by 31, so the map is a bijection on each tier: unique, never reused, random-looking,
-//!   and each length is exhausted before the next starts. The constants below are fixed forever.
+//! - **uuid**: a random RFC 9562 UUIDv4 (128 bits / 16 bytes), emitted as lowercase
+//!   hyphenated text. [`new_account_uuid`] creates it. The former base62 sequence
+//!   helpers remain only for upgrade inventory; no account creation uses them.
 //! - **id**: `c:{handle}` (Carbon) / `si:{handle}` (Silicon), handle `[a-z0-9_-]{3,30}`,
 //!   case-insensitive (stored lowercase). [`AccountId::parse`] explains precisely why an input is
 //!   not a valid id.
@@ -46,7 +43,7 @@ fn digit_value(c: u8) -> Option<u128> {
         .map(|p| p as u128)
 }
 
-/// The uuid for sequence number `n` (see module docs).
+/// Legacy base62 identifier for sequence number `n`; only for upgrade inventory.
 pub fn uuid_for_number(n: u64) -> String {
     let mut offset: u128 = 0;
     let n = n as u128;
@@ -126,9 +123,28 @@ fn mod_inverse(a: u128, m: u128) -> Option<u128> {
     Some(old_s.rem_euclid(m as i128) as u128)
 }
 
-/// True when `s` looks like an account uuid (3+ base62 characters).
+/// Creates a random128-bit account UUID, represented in canonical lowercase form.
+pub fn new_account_uuid() -> String {
+    uuid::Uuid::new_v4().hyphenated().to_string()
+}
+
+/// Canonical UUIDs and legacy identifiers accepted during the coordinated upgrade.
+/// Legacy values resolve only while their account has not been migrated.
 pub fn is_account_uuid(s: &str) -> bool {
-    s.len() >= 3 && s.len() <= 12 && s.bytes().all(|c| c.is_ascii_alphanumeric())
+    is_standard_account_uuid(s) || is_legacy_account_uuid(s)
+}
+
+/// Whether this is a canonical lowercase hyphenated RFC UUID.
+pub fn is_standard_account_uuid(s: &str) -> bool {
+    s.len() == 36
+        && uuid::Uuid::parse_str(s).is_ok_and(|id| {
+            id.hyphenated().to_string() == s && id.get_variant() == uuid::Variant::RFC4122
+        })
+}
+
+/// The retired case-sensitive base62 format, used only at upgrade boundaries.
+pub fn is_legacy_account_uuid(s: &str) -> bool {
+    (3..=12).contains(&s.len()) && s.bytes().all(|c| c.is_ascii_alphanumeric())
 }
 
 /// `{app_id}:{uuid}`.
@@ -623,6 +639,28 @@ mod tests {
                 .expect_err("bad")
                 .contains("3-30 characters")
         );
+    }
+
+    #[test]
+    fn new_account_identifiers_are_random_canonical_128_bit_uuid_v4() {
+        let mut issued = HashSet::new();
+        for _ in 0..1000 {
+            let text = new_account_uuid();
+            let uuid = uuid::Uuid::parse_str(&text).expect("real UUID");
+            assert_eq!(uuid.as_bytes().len(), 16);
+            assert_eq!(uuid.get_version_num(), 4);
+            assert!(is_standard_account_uuid(&text));
+            assert!(issued.insert(text));
+        }
+        assert!(!is_standard_account_uuid("a8K"));
+        assert!(!is_standard_account_uuid(
+            "550E8400-E29B-41D4-A716-446655440000"
+        ));
+        assert!(!is_standard_account_uuid(
+            "550e8400e29b41d4a716446655440000"
+        ));
+        assert!(is_account_uuid("a8K"));
+        assert!(!is_account_uuid("a-b"));
     }
 
     #[test]

@@ -19256,10 +19256,10 @@
       },
       "AccountUuid": {
         "type": "string",
-        "pattern": "^[A-Za-z0-9]{3,}$",
-        "description": "An account's permanent uuid: case-sensitive letters and digits, 3 characters, then 4 once every 3-character uuid is used. Never reused. Key on it.",
+        "pattern": "^([A-Za-z0-9]{3,12}|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$",
+        "description": "Permanent 128-bit account UUID, generated as UUIDv4 and serialized as 36 lowercase characters with hyphens. Legacy short IDs remain readable only until their coordinated migration; retired IDs are never authentication aliases.",
         "examples": [
-          "8HV"
+          "550e8400-e29b-41d4-a716-446655440000"
         ]
       },
       "AccountId": {

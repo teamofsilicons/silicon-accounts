@@ -69,7 +69,7 @@ curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$ACCOUNTS_URL/v1/me"
 
 | field | what it is |
 |---|---|
-| `uuid` | The permanent identifier: `a-z`, `A-Z`, `0-9`, case-sensitive, 3 characters to start with and longer once those run out. It never changes and is never reused, even after the account is deleted. Apps store this. |
+| `uuid` | The permanent identifier: a random 128-bit UUIDv4, written as 36 lowercase hexadecimal characters with hyphens. Apps store this. Existing short identifiers move once through the coordinated [UUID migration](../operations/account-uuid-migration.md); UUIDs are never reused, even after deletion. |
 | `kind` | `carbon` or `silicon`. |
 | `id` | The public id Carbons and Silicons see and type: `c:ada` for a Carbon, `si:scout` for a Silicon. Unique, changeable, case-insensitive (stored lowercase). `null` once the account is deleted. |
 | `display_name` | 1 to 100 characters, no control characters (newlines, tabs). |

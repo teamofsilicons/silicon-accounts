@@ -100,7 +100,7 @@ sign in once per job and reuse the session, not sign in once per command.
 | What | Limit |
 |---|---|
 | Handle (after `c:` / `si:`) | 3 to 30 characters of `a-z 0-9 - _`, case-insensitive (**contract**); reserved words: `admin`, `administrator`, `root`, `system`, `support`, `help`, `security`, `silicon-accounts`, `account`, `silicon`, `silicons`, `carbon`, `carbons`, `api`, `www`, `mail`, `null`, `undefined`, `me`, `owner`, `staff` |
-| uuid | `a-z A-Z 0-9`, case-sensitive; 3 characters, then 4 once every 3-character uuid is used (**contract**); never reused |
+| uuid | Random UUIDv4: 128 bits (16 bytes), serialized as 36 lowercase hexadecimal characters with hyphens; never reused |
 | App id | 3 to 30 characters of `a-z 0-9 - _`, as Silicon Apps creates them (`my_app`, `2fa-tool`); older ids of 2 to 40 characters of `a-z 0-9 -` starting with a letter (`dm`) keep working |
 | Emails per Carbon / phones per Carbon | 10 / 10 (**contract**) |
 | Display name | 1 to 100 characters, no control characters |

@@ -340,10 +340,12 @@ impl Feed {
     /// The SQL condition on `webhook_events e` selecting this feed (`$1` = [`Feed::key`]).
     fn condition(&self) -> &'static str {
         match self {
-            Feed::App { .. } => "e.subscription_id = $1::uuid",
-            Feed::Silicon { .. } => "e.target_kind = 'silicon' and e.target_id = $1",
+            Feed::App { .. } => "e.identity_migrated_at is null and e.subscription_id = $1::uuid",
+            Feed::Silicon { .. } => {
+                "e.identity_migrated_at is null and e.target_kind = 'silicon' and e.target_id = $1"
+            }
             Feed::Custodian { .. } => {
-                "e.target_kind = 'silicon' and e.target_id in \
+                "e.identity_migrated_at is null and e.target_kind = 'silicon' and e.target_id in \
                  (select a.uuid::text from accounts a where a.kind = 'silicon' and a.custodian_uuid = $1)"
             }
         }

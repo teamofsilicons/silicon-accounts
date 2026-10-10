@@ -146,7 +146,7 @@ pub async fn claim_due(
             for update skip locked) \
          update webhook_deliveries d set locked_until = now() + make_interval(secs => $2) \
            from due, webhook_events e \
-          where d.id = due.id and e.event_id = d.event_id \
+          where d.id = due.id and e.event_id = d.event_id and e.identity_migrated_at is null \
          returning d.id, d.event_id, e.type as event_type, d.target_kind, d.target_id, d.url, d.attempts, \
                    d.manual_replays, d.created_at, d.requeued_at, d.locked_until as lease, e.payload",
     )

@@ -292,7 +292,7 @@ pub(crate) async fn by_uuid(
         }
         return Err(ApiError::bad_request(
             "invalid_uuid",
-            format!("'{shown}' is not an account uuid: uuids are 3 to 12 characters of a-z, A-Z and 0-9."),
+            format!("'{shown}' is not an account uuid: use a canonical UUID such as 550e8400-e29b-41d4-a716-446655440000."),
         )
         .hint("uuids are case-sensitive; copy them exactly (for example from membership ids, which are {app_id}:{uuid})."));
     }
