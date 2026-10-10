@@ -35,7 +35,7 @@ curl -s "$ACCOUNTS_URL/v1/apps/$APP_ID" -u "$APP_ID:$APP_SECRET"
   "logo_url": "data:image/svg+xml;base64,…",
   "logo_dark_url": "data:image/svg+xml;base64,…",
   "homepage_url": "http://127.0.0.1:8593/briefcase/",
-  "owner": { "uuid": "zQo", "kind": "carbon", "id": "c:saket", "display_name": "Saket", "pfp_url": "…", "status": "active" },
+  "owner": { "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "kind": "carbon", "id": "c:saket", "display_name": "Saket", "pfp_url": "…", "status": "active" },
   "status": "active",
   "source": "fake",
   "created_at": "2026-09-01T09:00:00.000Z",
@@ -93,7 +93,7 @@ A new request returns **201**:
 {
   "request": {
     "request_id": "01928c7e-3b7a-7c4e-9a51-2f3d4c5b6a79",
-    "account_uuid": "zQo",
+    "account_uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175",
     "context_app": {"app_id": "briefcase", "name": "Briefcase", "logo_url": null},
     "reason": "I need authorization on my own domain for my app.",
     "status": "pending",
@@ -264,8 +264,8 @@ Every account that signed into the app or was imported. You can filter with:
 {
   "items": [
     {
-      "membership_id": "briefcase:8HV",
-      "uuid": "8HV",
+      "membership_id": "briefcase:4143123f-b494-481c-adbf-c14b14cfccc0",
+      "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
       "kind": "carbon",
       "id": "c:ada",
       "display_name": "Ada King",
@@ -301,8 +301,8 @@ no IP addresses).
 
 ```json
 {
-  "uuid": "8HV",
-  "membership_id": "briefcase:8HV",
+  "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
+  "membership_id": "briefcase:4143123f-b494-481c-adbf-c14b14cfccc0",
   "status": "active",
   "…": "…",
   "history": [
@@ -312,7 +312,7 @@ no IP addresses).
 }
 ```
 
-404 `user_not_found`. Uuids are case-sensitive, so `8hv` is not `8HV`.
+404 `user_not_found`. Use the canonical lowercase UUIDv4 returned by Accounts.
 
 ## Imports
 
@@ -392,7 +392,7 @@ Every row's outcome, in file order. You can filter with `outcome` (`pending`, `c
     {
       "row_number": 1,
       "outcome": "created",
-      "account_uuid": "ZE6",
+      "account_uuid": "93524e0d-db12-458e-aa7a-07d08c9906d5",
       "id": "c:grace",
       "messages": [],
       "input": { "external_id": "u-1", "email": "grace@example.test", "display_name": "Grace Hopper", "username": "grace", "timezone": "America/New_York" }

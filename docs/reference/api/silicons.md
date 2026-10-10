@@ -61,11 +61,11 @@ When a custodian reads a Silicon (`/v1/me/silicons…`), they get the Silicon's 
 
 ```json
 {
-  "uuid": "K1E",
+  "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
   "kind": "silicon",
   "id": "si:scout",
   "display_name": "Scout",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=K1E",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8559a06f-4c3b-4480-ade8-fde4f7428bba",
   "dob": "2026-10-07",
   "timezone": "Asia/Kolkata",
   "status": "active",
@@ -73,8 +73,8 @@ When a custodian reads a Silicon (`/v1/me/silicons…`), they get the Silicon's 
   "updated_at": "2026-10-07T02:33:40.817Z",
   "version": 1,
   "custodian": {
-    "uuid": "zQo", "kind": "carbon", "id": "c:saket", "display_name": "Saket",
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=zQo", "status": "active"
+    "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "kind": "carbon", "id": "c:saket", "display_name": "Saket",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=6667d4b4-7c57-45de-b2c3-94185db3e175", "status": "active"
   },
   "webhook_url": null,
   "stk_rotated_at": "2026-10-07T02:33:40.817Z",
@@ -89,9 +89,9 @@ A custodian request (`kind` is `initial` for a self-created Silicon, `transfer` 
   "id": "01a11436-bf74-74fa-a716-6e431d8a9ed6",
   "kind": "transfer",
   "status": "pending",
-  "silicon": { "uuid": "K1E", "kind": "silicon", "id": "si:scout", "display_name": "Scout", "pfp_url": "…", "status": "active" },
-  "from": { "uuid": "zQo", "kind": "carbon", "id": "c:saket", "display_name": "Saket", "pfp_url": "…", "status": "active" },
-  "to": { "uuid": "8HV", "kind": "carbon", "id": "c:ada", "display_name": "Ada Lovelace", "pfp_url": "…", "status": "active" },
+  "silicon": { "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba", "kind": "silicon", "id": "si:scout", "display_name": "Scout", "pfp_url": "…", "status": "active" },
+  "from": { "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "kind": "carbon", "id": "c:saket", "display_name": "Saket", "pfp_url": "…", "status": "active" },
+  "to": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "kind": "carbon", "id": "c:ada", "display_name": "Ada Lovelace", "pfp_url": "…", "status": "active" },
   "created_at": "2026-10-07T02:34:54.707Z",
   "expires_at": "2026-10-21T02:34:54.707Z",
   "decided_at": null
@@ -130,11 +130,11 @@ curl -s -X POST "$ACCOUNTS_URL/v1/silicons" -H 'Content-Type: application/json' 
 ```json
 {
   "silicon": {
-    "uuid": "nln",
+    "uuid": "2c39a4d8-922c-45cb-bf06-102061d9af0c",
     "kind": "silicon",
     "id": "si:herald",
     "display_name": "Herald",
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=nln",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=2c39a4d8-922c-45cb-bf06-102061d9af0c",
     "dob": "2026-10-07",
     "timezone": "UTC",
     "status": "pending_custodian",
@@ -200,7 +200,7 @@ Poll it (start at 5 seconds and double up to 60; that is plenty), or set a webho
   "created_at": "2026-10-07T02:34:08.658Z",
   "expires_at": "2026-10-21T02:34:08.658Z",
   "decided_at": "2026-10-07T02:34:19.117Z",
-  "silicon": { "uuid": "nln", "id": "si:herald", "status": "active" }
+  "silicon": { "uuid": "2c39a4d8-922c-45cb-bf06-102061d9af0c", "id": "si:herald", "status": "active" }
 }
 ```
 
@@ -290,7 +290,7 @@ assertion for every sign-in. **account**: the Silicon itself or its custodian; a
   "algorithm": "EdDSA",
   "public_key": "FkOL8HqIxUoZLDhATDfAdnsv4RRZCC21pA74lLsCybk",
   "fingerprint": "SHA256:Kq5c…",
-  "created_by": "K1E",
+  "created_by": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
   "created_at": "2026-10-09T02:10:00.000Z",
   "last_used_at": null,
   "revoked_at": null
@@ -348,7 +348,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/silicons/si:scout/federations" -H "Authorizati
   "issuer": "https://token.actions.githubusercontent.com",
   "audience": "https://accounts.teamofsilicons.com",
   "conditions": { "ref": "refs/heads/main", "repository": "acme/scout" },
-  "created_by": "zQo",
+  "created_by": "6667d4b4-7c57-45de-b2c3-94185db3e175",
   "created_at": "2026-10-09T05:11:19.993Z",
   "last_used_at": null,
   "revoked_at": null
@@ -410,7 +410,7 @@ allows one.
 
 ```json
 {
-  "silicon": { "uuid": "b97", "id": "si:scout" },
+  "silicon": { "uuid": "7700120d-a627-4ac8-abb2-ea7620bfa16e", "id": "si:scout" },
   "audiences": ["sts.amazonaws.com", "api://AzureADTokenExchange"]
 }
 ```
@@ -435,7 +435,7 @@ and event stream get `silicon.identity_audiences.changed`.
   "identity_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6Imp0eWc5Q3h4d2ZZ...",
   "token_type": "urn:ietf:params:oauth:token-type:id_token",
   "issuer": "https://accounts.teamofsilicons.com",
-  "subject": "b97",
+  "subject": "7700120d-a627-4ac8-abb2-ea7620bfa16e",
   "audience": "sts.amazonaws.com",
   "jti": "01a11f13-013f-7050-b4c5-acd4ef2eea84",
   "kid": "jtyg9CxxwfY7YxYO9Gj68RfBX-6ouKX882NNGHAvMck",
@@ -568,7 +568,7 @@ curl -s "$ACCOUNTS_URL/v1/me/webhook/deliveries?status=failed&limit=20" \
       "id": "01a11744-e17f-7540-ae01-473546d7b233",
       "event_id": "01a11744-e17f-7540-ae01-47342cdeb80f",
       "type": "silicon.updated",
-      "account_uuid": "K1E",
+      "account_uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
       "url": "https://scout.example/hooks",
       "status": "failed",
       "attempts": 2,
@@ -618,10 +618,10 @@ The `silicon.updated` from above, after a replay:
   "manual_replays": 1,
   "payload": {
     "app_id": null,
-    "data": { "changed": ["display_name"], "id": "si:scout", "silicon": { "…": "your Me at that moment" }, "uuid": "K1E" },
+    "data": { "changed": ["display_name"], "id": "si:scout", "silicon": { "…": "your Me at that moment" }, "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba" },
     "event_id": "01a11744-e17f-7540-ae01-47342cdeb80f",
     "occurred_at": "2026-10-07T16:49:12.575Z",
-    "silicon": "K1E",
+    "silicon": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
     "type": "silicon.updated"
   },
   "payload_redacted": false,
@@ -718,7 +718,7 @@ Replay it once you set a URL again. Every replay goes in your history (`GET /v1/
 ## The custodian's side
 
 **account (Carbon).** These are for you as a custodian. `{uuid}` is the Silicon's uuid or its
-current si:id, so `/v1/me/silicons/K1E` and `/v1/me/silicons/si:scout` are the same Silicon. A
+current si:id, so `/v1/me/silicons/8559a06f-4c3b-4480-ade8-fde4f7428bba` and `/v1/me/silicons/si:scout` are the same Silicon. A
 Silicon you aren't custodian of is 404 `silicon_not_found`, so other Carbons' Silicons are never
 revealed.
 
@@ -735,7 +735,7 @@ The body has `id` and `display_name` (required), and `timezone`, `pfp_url`, `stk
 
 ```json
 {
-  "silicon": { "uuid": "K1E", "id": "si:scout", "status": "active", "custodian": { "id": "c:saket", "…": "…" }, "pending_transfer": null, "…": "…" },
+  "silicon": { "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba", "id": "si:scout", "status": "active", "custodian": { "id": "c:saket", "…": "…" }, "pending_transfer": null, "…": "…" },
   "stk": "stk-2925d1f735d0",
   "webhook_secret": null
 }
@@ -795,7 +795,7 @@ Replays the Silicon's deliveries, with the same body, rules and answer as
 [`POST /v1/me/webhook/replay`](#post-v1mewebhookreplay). **Idempotent** (24 hours).
 
 ```sh
-curl -s -X POST "$ACCOUNTS_URL/v1/me/silicons/K1E/webhook/replay" \
+curl -s -X POST "$ACCOUNTS_URL/v1/me/silicons/8559a06f-4c3b-4480-ade8-fde4f7428bba/webhook/replay" \
   -H "Authorization: Bearer $CARBON_TOKEN" -H 'Content-Type: application/json' \
   -H "Idempotency-Key: $(uuidgen)" -d '{"status":"failed"}'
 ```
@@ -866,7 +866,7 @@ The apps the Silicon signed into, most recently used first, with the same items 
   "items": [
     {
       "app": { "app_id": "briefcase", "name": "Briefcase", "logo_url": "…", "logo_dark_url": null, "homepage_url": "…" },
-      "membership_id": "briefcase:K1E",
+      "membership_id": "briefcase:8559a06f-4c3b-4480-ade8-fde4f7428bba",
       "status": "active",
       "source": "slt",
       "granted_scopes": ["profile"],

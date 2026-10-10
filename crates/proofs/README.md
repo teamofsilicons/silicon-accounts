@@ -46,7 +46,7 @@ Issued proof (User verification; App verification has the same shape with `"kind
 {"proof_id":"0192…","kind":"user_verification","proof_token":"sap_…","expires_at":"2026-10-06T12:30:00.000Z",
  "proof_refresh_token":"sapr_…","refresh_expires_at":"2029-03-24T12:00:00.000Z",
  "issuing_app":"dm","receiving_app":"briefcase",
- "user":{"uuid":"a8K","id":"c:saket","kind":"carbon","membership_id":"dm:a8K"},"scopes":["files.write"]}
+ "user":{"uuid":"5deba331-f322-4703-92ea-6aea48c7b2b7","id":"c:saket","kind":"carbon","membership_id":"dm:5deba331-f322-4703-92ea-6aea48c7b2b7"},"scopes":["files.write"]}
 ```
 
 Lifetimes are absolute timestamps only (no relative `expires_in`): an `Idempotency-Key` retry
@@ -62,7 +62,7 @@ account's current id):
 ```json
 {"valid":true,"proof_id":"0192…","kind":"user_verification","expires_at":"2026-10-06T12:30:00.000Z",
  "issuing_app":{"app_id":"dm","name":"DM"},"receiving_app":{"app_id":"briefcase","name":"Briefcase"},
- "user":{"uuid":"a8K","id":"c:saket","kind":"carbon","membership_id":"dm:a8K"},"scopes":["files.write"]}
+ "user":{"uuid":"5deba331-f322-4703-92ea-6aea48c7b2b7","id":"c:saket","kind":"carbon","membership_id":"dm:5deba331-f322-4703-92ea-6aea48c7b2b7"},"scopes":["files.write"]}
 ```
 
 A proof verifies only when: the token is a known, unexpired proof token; the proof is not

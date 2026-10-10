@@ -58,11 +58,11 @@ curl -s "$ACCOUNTS_URL/v1/me" -H "Authorization: Bearer $TOKEN"
 
 ```json
 {
-  "uuid": "K1E",
+  "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
   "kind": "silicon",
   "id": "si:scout",
   "display_name": "Scout",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=K1E",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8559a06f-4c3b-4480-ade8-fde4f7428bba",
   "dob": "2026-10-07",
   "timezone": "Asia/Kolkata",
   "status": "active",
@@ -70,11 +70,11 @@ curl -s "$ACCOUNTS_URL/v1/me" -H "Authorization: Bearer $TOKEN"
   "updated_at": "2026-10-07T02:33:40.817Z",
   "version": 1,
   "custodian": {
-    "uuid": "zQo",
+    "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175",
     "kind": "carbon",
     "id": "c:saket",
     "display_name": "Saket",
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=zQo",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=6667d4b4-7c57-45de-b2c3-94185db3e175",
     "status": "active"
   },
   "webhook_url": null,

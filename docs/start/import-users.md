@@ -303,7 +303,7 @@ curl -s -u "$APP_ID:$APP_SECRET" \
 {
   "items": [
     {
-      "account_uuid": "gYJ",
+      "account_uuid": "1229ed76-7fd6-4a65-b2b2-d430e4d221c5",
       "id": "c:priya-2",
       "input": {
         "display_name": "Tomás Silva",
@@ -349,7 +349,7 @@ Rows come back in file order. Filter them with any of:
 |---|---|
 | `row_number` | 1-based data row; the CSV header doesn't count, and a quoted newline doesn't start a row. |
 | `outcome` | What happened (table below). `pending` while the job hasn't reached the row. |
-| `account_uuid` | The account the row is now linked to. **Store it** with your record: the uuid never changes, while the `c:id` can. The membership id is `{app_id}:{account_uuid}` (`legacy-crm:gYJ`). |
+| `account_uuid` | The account the row is now linked to. **Store it** with your record: the uuid never changes, while the `c:id` can. The membership id is `{app_id}:{account_uuid}` (`legacy-crm:1229ed76-7fd6-4a65-b2b2-d430e4d221c5`). |
 | `id` | The account's current `c:id` when the row was processed (assigned for new accounts). |
 | `messages` | `{level, code, message, field?}` in the order they arose. |
 | `input` | The row as you sent it (only import columns), plus `_ignored_columns`, `_ignored_count` and `_extra_cells` when the row had them. |
@@ -410,7 +410,7 @@ Here is what the flow returned for row 1 of the walkthrough above (`signup` in t
   "finishing_import": true,
   "id": "c:kofi",
   "imported_by": { "app_id": "legacy-crm", "name": "Legacy CRM" },
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=p1y",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=28cf00b1-7120-4a8e-9e50-ea7a6a4a75b6",
   "phone": null,
   "provider": null,
   "provider_pfp_url": null,
@@ -421,7 +421,7 @@ Here is what the flow returned for row 1 of the walkthrough above (`signup` in t
 And the account your app got back after the code exchange:
 
 ```json
-{"uuid": "p1y", "membership_id": "legacy-crm:p1y", "kind": "carbon", "id": "c:kofi", "display_name": "Kofi Mensah", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=p1y", "email": "kofi@example.com", "email_verified": true, "updated_at": "2026-10-07T02:45:33.959Z", "version": 2}
+{"uuid": "28cf00b1-7120-4a8e-9e50-ea7a6a4a75b6", "membership_id": "legacy-crm:28cf00b1-7120-4a8e-9e50-ea7a6a4a75b6", "kind": "carbon", "id": "c:kofi", "display_name": "Kofi Mensah", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=28cf00b1-7120-4a8e-9e50-ea7a6a4a75b6", "email": "kofi@example.com", "email_verified": true, "updated_at": "2026-10-07T02:45:33.959Z", "version": 2}
 ```
 
 Things to know:

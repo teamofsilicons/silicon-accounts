@@ -31,8 +31,8 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
   "refresh_token_expires_at": "2029-03-25T02:56:36.117Z",
   "scope": "profile email openid",
   "id_token": "eyJ0eXAiOiJKV1QiLCJhbGci…",
-  "membership_id": "briefcase:ptO",
-  "account": { "uuid": "ptO", "id": "c:grace-hopper", "…": "…" }
+  "membership_id": "briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b",
+  "account": { "uuid": "d6393ce9-6e58-4e52-b7da-e65c5d47322b", "id": "c:grace-hopper", "…": "…" }
 }
 ```
 
@@ -121,8 +121,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 ```text
-si:scout (Silicon) signed in, membership briefcase:1Nx
-custodian: c:grace-hopper (ptO)
+si:scout (Silicon) signed in, membership briefcase:0b697a57-a348-442a-99a4-c6a11c0f2b5c
+custodian: c:grace-hopper (d6393ce9-6e58-4e52-b7da-e65c5d47322b)
 ```
 
 The same token a second time:
@@ -284,7 +284,7 @@ An access token carries these claims:
 ```json
 {
   "iss": "https://accounts.teamofsilicons.com",
-  "sub": "ptO",
+  "sub": "d6393ce9-6e58-4e52-b7da-e65c5d47322b",
   "aud": "briefcase",
   "exp": 1791343596,
   "iat": 1791341796,
@@ -292,7 +292,7 @@ An access token carries these claims:
   "jti": "01a1144a-9b1a-77ca-b0e4-fabbb9b6c3a5",
   "kind": "carbon",
   "id": "c:grace-hopper",
-  "mid": "briefcase:ptO",
+  "mid": "briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b",
   "fid": "01a1144a-9b18-71e4-a5ab-14d69759855c",
   "scope": "profile email openid"
 }
@@ -337,7 +337,7 @@ signature, `exp`/`nbf` (with 30 seconds of leeway) and `aud`. See the
 isn't:
 
 ```text
-valid: c:lin-docs (nln) for briefcase, expires 2026-10-07T03:08:37Z (in 29m)
+valid: c:lin-docs (2c39a4d8-922c-45cb-bf06-102061d9af0c) for briefcase, expires 2026-10-07T03:08:37Z (in 29m)
 ```
 
 **Introspection** asks us whether a token of your app is live right now:
@@ -357,10 +357,10 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/i
   "iss": "https://accounts.teamofsilicons.com",
   "jti": "01a1144a-b941-7705-99bc-1f9792d04d22",
   "kind": "carbon",
-  "membership_id": "briefcase:ptO",
+  "membership_id": "briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b",
   "nbf": 1791341803,
   "scope": "profile email openid",
-  "sub": "ptO",
+  "sub": "d6393ce9-6e58-4e52-b7da-e65c5d47322b",
   "token_type": "access_token",
   "username": "c:grace-hopper"
 }
@@ -391,13 +391,13 @@ curl -s "$ACCOUNTS_URL/v1/userinfo" -H "Authorization: Bearer $ACCESS_TOKEN"
   "email_verified": true,
   "id": "c:grace-hopper",
   "kind": "carbon",
-  "membership_id": "briefcase:ptO",
+  "membership_id": "briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b",
   "name": "Grace Hopper",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=ptO",
-  "picture": "https://iris.teamofsilicons.com/pfp/carbon?id=ptO",
-  "sub": "ptO",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=d6393ce9-6e58-4e52-b7da-e65c5d47322b",
+  "picture": "https://iris.teamofsilicons.com/pfp/carbon?id=d6393ce9-6e58-4e52-b7da-e65c5d47322b",
+  "sub": "d6393ce9-6e58-4e52-b7da-e65c5d47322b",
   "updated_at": "2026-10-07T02:56:29.875Z",
-  "uuid": "ptO",
+  "uuid": "d6393ce9-6e58-4e52-b7da-e65c5d47322b",
   "version": 1
 }
 ```
@@ -414,7 +414,7 @@ that OIDC libraries understand:
 | `invalid_authorization` | `/v1/userinfo takes Authorization: Bearer <access token>; the 'Basic' scheme is not accepted here.` |
 | `invalid_token` | `The access token expired at 2026-10-07T03:09:20.000Z (access tokens last 30 minutes).` (with `details.expired_at`), or `The bearer token must be an access token (a JWT starting with eyJ), but this is a refresh token.` |
 | `token_revoked` | `The sign-in behind this access token was revoked at 2026-10-07T02:36:22.408Z (app_revoked).` The reason is the same list as for refresh. |
-| `account_deleted` | `The account ptO was deleted.` |
+| `account_deleted` | `The account d6393ce9-6e58-4e52-b7da-e65c5d47322b was deleted.` |
 | `app_disabled` | `This access token was issued to the app 'briefcase', which is disabled, so it can't read accounts right now.` |
 
 ## Revoke: sign the account out of your app

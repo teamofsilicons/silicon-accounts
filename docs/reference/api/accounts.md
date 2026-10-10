@@ -26,11 +26,11 @@ curl -s "$ACCOUNTS_URL/v1/me" -H "Authorization: Bearer $TOKEN"
 
 ```json
 {
-  "uuid": "zQo",
+  "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175",
   "kind": "carbon",
   "id": "c:saket",
   "display_name": "Saket",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=zQo",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=6667d4b4-7c57-45de-b2c3-94185db3e175",
   "dob": "2008-10-07",
   "timezone": "UTC",
   "status": "active",
@@ -95,12 +95,12 @@ curl -s "$ACCOUNTS_URL/v1/ids/available?id=c:saket"
 is available, or when it has no prefix. When you are signed in, an id reserved for **you** is
 `available: true, reclaimable: true`.
 
-A custodian adds `&for=<uuid or si:id>` to ask for one of its Silicons. Here the Silicon `K1E`
+A custodian adds `&for=<uuid or si:id>` to ask for one of its Silicons. Here the Silicon `8559a06f-4c3b-4480-ade8-fde4f7428bba`
 was renamed from `si:scout` to `si:scout-two`, and its custodian asks whether it can take
 `si:scout` back:
 
 ```sh
-curl -s "$ACCOUNTS_URL/v1/ids/available?id=si:scout&for=K1E" -H "Authorization: Bearer $CARBON_TOKEN"
+curl -s "$ACCOUNTS_URL/v1/ids/available?id=si:scout&for=8559a06f-4c3b-4480-ade8-fde4f7428bba" -H "Authorization: Bearer $CARBON_TOKEN"
 ```
 
 ```json
@@ -128,20 +128,20 @@ A signed-in Carbon or Silicon gets the account summary, and for a Silicon its cu
 summary too:
 
 ```sh
-curl -s "$ACCOUNTS_URL/v1/accounts/K1E" -H "Authorization: Bearer $TOKEN"
+curl -s "$ACCOUNTS_URL/v1/accounts/8559a06f-4c3b-4480-ade8-fde4f7428bba" -H "Authorization: Bearer $TOKEN"
 ```
 
 ```json
 {
-  "uuid": "K1E",
+  "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
   "kind": "silicon",
   "id": "si:scout",
   "display_name": "Scout",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=K1E",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8559a06f-4c3b-4480-ade8-fde4f7428bba",
   "status": "active",
   "custodian": {
-    "uuid": "8HV", "kind": "carbon", "id": "c:ada", "display_name": "Ada King",
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=8HV", "status": "active"
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "kind": "carbon", "id": "c:ada", "display_name": "Ada King",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=4143123f-b494-481c-adbf-c14b14cfccc0", "status": "active"
   }
 }
 ```
@@ -151,11 +151,11 @@ see a custodian everywhere. A display name and photo are details an account shar
 to your app, so read them from your [user base](apps.md#get-v1appsapp_idusersuuid):
 
 ```sh
-curl -s "$ACCOUNTS_URL/v1/accounts/K1E" -u "$APP_ID:$APP_SECRET"
+curl -s "$ACCOUNTS_URL/v1/accounts/8559a06f-4c3b-4480-ade8-fde4f7428bba" -u "$APP_ID:$APP_SECRET"
 ```
 
 ```json
-{ "uuid": "K1E", "kind": "silicon", "id": "si:scout", "status": "active", "custodian": { "uuid": "8HV", "id": "c:ada" } }
+{ "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba", "kind": "silicon", "id": "si:scout", "status": "active", "custodian": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "id": "c:ada" } }
 ```
 
 For a self-created Silicon still waiting for its custodian to accept, `custodian` is `null` in
@@ -255,7 +255,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/me/photo" -H "Authorization: Bearer $TOKEN" \
     "width": 64,
     "height": 64
   },
-  "me": { "uuid": "8HV", "pfp_url": "https://accounts.teamofsilicons.com/v1/photos/01a11437-…", "…": "…" }
+  "me": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "pfp_url": "https://accounts.teamofsilicons.com/v1/photos/01a11437-…", "…": "…" }
 }
 ```
 
@@ -389,7 +389,7 @@ The apps you signed into, most recently used first. Filter with
   "items": [
     {
       "app": { "app_id": "briefcase", "name": "Briefcase", "logo_url": "data:image/svg+xml;base64,…", "logo_dark_url": "data:image/svg+xml;base64,…", "homepage_url": "http://127.0.0.1:8593/briefcase/" },
-      "membership_id": "briefcase:K1E",
+      "membership_id": "briefcase:8559a06f-4c3b-4480-ade8-fde4f7428bba",
       "status": "active",
       "source": "slt",
       "granted_scopes": ["profile", "timezone"],
@@ -481,11 +481,11 @@ Everything that happened to the account, newest first. Filter with
       "app": null,
       "meta": {
         "action": "account.phone.added",
-        "actor_id": "8HV",
+        "actor_id": "4143123f-b494-481c-adbf-c14b14cfccc0",
         "actor_kind": "account",
         "details": { "phone": "+919876543210", "primary": true },
         "ip": "127.0.0.1",
-        "target_id": "8HV",
+        "target_id": "4143123f-b494-481c-adbf-c14b14cfccc0",
         "target_kind": "account"
       }
     }
@@ -534,8 +534,8 @@ lists them). Every Silicon must have a custodian, so transfer or delete each one
     "hint": "Transfer each Silicon to another Carbon (POST /v1/me/silicons/{uuid}/transfer, accepted by them) or delete it (DELETE /v1/me/silicons/{uuid}), then delete the account.",
     "details": {
       "silicons": [
-        { "uuid": "K1E", "kind": "silicon", "id": "si:scout", "display_name": "Scout the Second", "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=K1E", "status": "active" },
-        { "uuid": "nln", "kind": "silicon", "id": "si:herald", "display_name": "Herald", "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=nln", "status": "active" }
+        { "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba", "kind": "silicon", "id": "si:scout", "display_name": "Scout the Second", "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8559a06f-4c3b-4480-ade8-fde4f7428bba", "status": "active" },
+        { "uuid": "2c39a4d8-922c-45cb-bf06-102061d9af0c", "kind": "silicon", "id": "si:herald", "display_name": "Herald", "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=2c39a4d8-922c-45cb-bf06-102061d9af0c", "status": "active" }
       ]
     }
   }

@@ -165,7 +165,7 @@ retry: 5000
 
 id: 01a11e45-ed2c-70ad-9042-652eb141059c
 event: account.updated
-data: {"app_id":"briefcase","data":{"account":{"display_name":"Saket Streamed","…":"…","version":2},"changed":["display_name"],"membership_id":"briefcase:zQo","uuid":"zQo"},"event_id":"01a11e45-ed2c-70ad-9042-652eb141059c","occurred_at":"2026-10-09T01:27:41.612Z","silicon":null,"type":"account.updated"}
+data: {"app_id":"briefcase","data":{"account":{"display_name":"Saket Streamed","…":"…","version":2},"changed":["display_name"],"membership_id":"briefcase:6667d4b4-7c57-45de-b2c3-94185db3e175","uuid":"6667d4b4-7c57-45de-b2c3-94185db3e175"},"event_id":"01a11e45-ed2c-70ad-9042-652eb141059c","occurred_at":"2026-10-09T01:27:41.612Z","silicon":null,"type":"account.updated"}
 
 id: 01a11e45-eec2-774a-83b0-138146e4f988
 event: ping
@@ -236,7 +236,7 @@ account site), but no app receives those.
 Real payloads:
 
 ```json
-{"app_id":"briefcase","data":{"kind":"carbon","membership_id":"briefcase:8HV","new_id":"c:ada","old_id":"c:ada-king","uuid":"8HV"},"event_id":"01a11437-268d-7445-9b2c-66cae5aa217e","occurred_at":"2026-10-07T02:35:21.101Z","silicon":null,"type":"account.id_changed"}
+{"app_id":"briefcase","data":{"kind":"carbon","membership_id":"briefcase:4143123f-b494-481c-adbf-c14b14cfccc0","new_id":"c:ada","old_id":"c:ada-king","uuid":"4143123f-b494-481c-adbf-c14b14cfccc0"},"event_id":"01a11437-268d-7445-9b2c-66cae5aa217e","occurred_at":"2026-10-07T02:35:21.101Z","silicon":null,"type":"account.id_changed"}
 ```
 
 ```json
@@ -247,11 +247,11 @@ Real payloads:
   "occurred_at": "2026-10-07T02:35:57.589Z",
   "silicon": null,
   "data": {
-    "uuid": "8HV",
-    "membership_id": "briefcase:8HV",
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
+    "membership_id": "briefcase:4143123f-b494-481c-adbf-c14b14cfccc0",
     "changed": ["pfp_url"],
     "account": {
-      "uuid": "8HV", "membership_id": "briefcase:8HV", "kind": "carbon", "id": "c:ada",
+      "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "membership_id": "briefcase:4143123f-b494-481c-adbf-c14b14cfccc0", "kind": "carbon", "id": "c:ada",
       "display_name": "Ada King",
       "pfp_url": "https://accounts.teamofsilicons.com/v1/photos/01a11437-b512-76e4-ae95-3378b29e547e",
       "email": "ada.work@example.test", "email_verified": true, "timezone": "Europe/London",
@@ -262,19 +262,19 @@ Real payloads:
 ```
 
 ```json
-{"app_id":"briefcase","data":{"membership_id":"briefcase:K1E","reason":"stk_rotated","uuid":"K1E"},"event_id":"01a11436-a472-77fb-9f8a-531883a5593a","occurred_at":"2026-10-07T02:34:47.794Z","silicon":null,"type":"membership.signed_out"}
+{"app_id":"briefcase","data":{"membership_id":"briefcase:8559a06f-4c3b-4480-ade8-fde4f7428bba","reason":"stk_rotated","uuid":"8559a06f-4c3b-4480-ade8-fde4f7428bba"},"event_id":"01a11436-a472-77fb-9f8a-531883a5593a","occurred_at":"2026-10-07T02:34:47.794Z","silicon":null,"type":"membership.signed_out"}
 ```
 
 ```json
-{"app_id":"dm","data":{"membership_id":"dm:8HV","uuid":"8HV"},"event_id":"01a11439-add3-70e3-94f6-c83b54963a6a","occurred_at":"2026-10-07T02:38:06.803Z","silicon":null,"type":"membership.access_removed"}
+{"app_id":"dm","data":{"membership_id":"dm:4143123f-b494-481c-adbf-c14b14cfccc0","uuid":"4143123f-b494-481c-adbf-c14b14cfccc0"},"event_id":"01a11439-add3-70e3-94f6-c83b54963a6a","occurred_at":"2026-10-07T02:38:06.803Z","silicon":null,"type":"membership.access_removed"}
 ```
 
 ```json
-{"app_id":"commit","data":{"membership_id":"commit:BYP","uuid":"BYP"},"event_id":"01a1143b-35a8-7121-97de-065d4a6180e9","occurred_at":"2026-10-07T02:39:47.112Z","silicon":null,"type":"account.deleted"}
+{"app_id":"commit","data":{"membership_id":"commit:ef385ebe-1123-4be6-aa17-a8c1f6753aa6","uuid":"ef385ebe-1123-4be6-aa17-a8c1f6753aa6"},"event_id":"01a1143b-35a8-7121-97de-065d4a6180e9","occurred_at":"2026-10-07T02:39:47.112Z","silicon":null,"type":"account.deleted"}
 ```
 
 ```json
-{"app_id":"briefcase","data":{"from":{"id":"c:saket","uuid":"zQo"},"membership_id":"briefcase:K1E","to":{"id":"c:ada","uuid":"8HV"},"uuid":"K1E"},"event_id":"01a11436-d5e4-7794-842d-4efffcc475b0","occurred_at":"2026-10-07T02:35:00.452Z","silicon":null,"type":"silicon.custodian_changed"}
+{"app_id":"briefcase","data":{"from":{"id":"c:saket","uuid":"6667d4b4-7c57-45de-b2c3-94185db3e175"},"membership_id":"briefcase:8559a06f-4c3b-4480-ade8-fde4f7428bba","to":{"id":"c:ada","uuid":"4143123f-b494-481c-adbf-c14b14cfccc0"},"uuid":"8559a06f-4c3b-4480-ade8-fde4f7428bba"},"event_id":"01a11436-d5e4-7794-842d-4efffcc475b0","occurred_at":"2026-10-07T02:35:00.452Z","silicon":null,"type":"silicon.custodian_changed"}
 ```
 
 ## Silicon events
@@ -304,35 +304,35 @@ Real payloads (`silicon` objects shortened). First a self-created Silicon's `sil
 then one created by its custodian:
 
 ```json
-{"app_id":null,"data":{"id":"si:echo","request":{"custodian":"c:saket","expires_at":"2026-10-21T02:42:16.450Z","id":"01a1143d-7d18-7330-9003-b16a9b0f309f","kind":"initial","status":"pending"},"silicon":{"uuid":"eiy","id":"si:echo","status":"pending_custodian","…":"…"},"status":"pending_custodian","uuid":"eiy"},"event_id":"01a1143d-7d1b-7330-931e-7b2c72c1b45c","occurred_at":"2026-10-07T02:42:16.475Z","silicon":"eiy","type":"silicon.created"}
+{"app_id":null,"data":{"id":"si:echo","request":{"custodian":"c:saket","expires_at":"2026-10-21T02:42:16.450Z","id":"01a1143d-7d18-7330-9003-b16a9b0f309f","kind":"initial","status":"pending"},"silicon":{"uuid":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9","id":"si:echo","status":"pending_custodian","…":"…"},"status":"pending_custodian","uuid":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9"},"event_id":"01a1143d-7d1b-7330-931e-7b2c72c1b45c","occurred_at":"2026-10-07T02:42:16.475Z","silicon":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9","type":"silicon.created"}
 ```
 
 ```json
-{"app_id":null,"data":{"id":"si:scout","request":null,"silicon":{"uuid":"8HV","id":"si:scout","status":"active","custodian":{"id":"c:saket","uuid":"zQo","…":"…"},"…":"…"},"status":"active","uuid":"8HV"},"event_id":"01a114cb-2ded-7688-b1da-7b30b047ea8e","occurred_at":"2026-10-07T05:17:02.317Z","silicon":"8HV","type":"silicon.created"}
+{"app_id":null,"data":{"id":"si:scout","request":null,"silicon":{"uuid":"4143123f-b494-481c-adbf-c14b14cfccc0","id":"si:scout","status":"active","custodian":{"id":"c:saket","uuid":"6667d4b4-7c57-45de-b2c3-94185db3e175","…":"…"},"…":"…"},"status":"active","uuid":"4143123f-b494-481c-adbf-c14b14cfccc0"},"event_id":"01a114cb-2ded-7688-b1da-7b30b047ea8e","occurred_at":"2026-10-07T05:17:02.317Z","silicon":"4143123f-b494-481c-adbf-c14b14cfccc0","type":"silicon.created"}
 ```
 
 ```json
-{"app_id":null,"data":{"custodian":{"display_name":"Saket","id":"c:saket","kind":"carbon","pfp_url":"https://iris.teamofsilicons.com/pfp/carbon?id=zQo","status":"active","uuid":"zQo"},"id":"si:echo","request_id":"01a1143d-7d18-7330-9003-b16a9b0f309f","silicon":{"uuid":"eiy","status":"active","…":"…"},"uuid":"eiy"},"event_id":"01a1143d-7d9f-758c-b2b1-1184f4114851","occurred_at":"2026-10-07T02:42:16.607Z","silicon":"eiy","type":"silicon.custodian.accepted"}
+{"app_id":null,"data":{"custodian":{"display_name":"Saket","id":"c:saket","kind":"carbon","pfp_url":"https://iris.teamofsilicons.com/pfp/carbon?id=6667d4b4-7c57-45de-b2c3-94185db3e175","status":"active","uuid":"6667d4b4-7c57-45de-b2c3-94185db3e175"},"id":"si:echo","request_id":"01a1143d-7d18-7330-9003-b16a9b0f309f","silicon":{"uuid":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9","status":"active","…":"…"},"uuid":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9"},"event_id":"01a1143d-7d9f-758c-b2b1-1184f4114851","occurred_at":"2026-10-07T02:42:16.607Z","silicon":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9","type":"silicon.custodian.accepted"}
 ```
 
 ```json
-{"app_id":null,"data":{"custodian":"c:saket","decided_at":"2026-10-07T02:42:44.216Z","id":"si:nova","reason":"declined","released":true,"request_id":"01a1143d-e94b-7455-a2fd-241a6ae9f45e","uuid":"QCh"},"event_id":"…","occurred_at":"2026-10-07T02:42:44.216Z","silicon":"QCh","type":"silicon.custodian.declined"}
+{"app_id":null,"data":{"custodian":"c:saket","decided_at":"2026-10-07T02:42:44.216Z","id":"si:nova","reason":"declined","released":true,"request_id":"01a1143d-e94b-7455-a2fd-241a6ae9f45e","uuid":"88a2b25a-8ee5-4c8e-a575-42602dc199d8"},"event_id":"…","occurred_at":"2026-10-07T02:42:44.216Z","silicon":"88a2b25a-8ee5-4c8e-a575-42602dc199d8","type":"silicon.custodian.declined"}
 ```
 
 ```json
-{"app_id":null,"data":{"changed":["display_name"],"id":"si:echo","silicon":{"uuid":"eiy","display_name":"Echo One","version":3,"…":"…"},"uuid":"eiy"},"event_id":"01a1143d-7dfa-75d9-8f5e-0c3c5876ffd6","occurred_at":"2026-10-07T02:42:16.698Z","silicon":"eiy","type":"silicon.updated"}
+{"app_id":null,"data":{"changed":["display_name"],"id":"si:echo","silicon":{"uuid":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9","display_name":"Echo One","version":3,"…":"…"},"uuid":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9"},"event_id":"01a1143d-7dfa-75d9-8f5e-0c3c5876ffd6","occurred_at":"2026-10-07T02:42:16.698Z","silicon":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9","type":"silicon.updated"}
 ```
 
 ```json
-{"app_id":null,"data":{"new_id":"si:echo-one","old_id":"si:echo","uuid":"eiy"},"event_id":"01a1143d-7e29-76bc-a646-50397eab42e7","occurred_at":"2026-10-07T02:42:16.745Z","silicon":"eiy","type":"silicon.id_changed"}
+{"app_id":null,"data":{"new_id":"si:echo-one","old_id":"si:echo","uuid":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9"},"event_id":"01a1143d-7e29-76bc-a646-50397eab42e7","occurred_at":"2026-10-07T02:42:16.745Z","silicon":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9","type":"silicon.id_changed"}
 ```
 
 ```json
-{"app_id":null,"data":{"id":"si:echo-one","rotated_at":"2026-10-07T02:42:20.723Z","rotated_by":{"display_name":"Saket","id":"c:saket","kind":"carbon","pfp_url":"https://iris.teamofsilicons.com/pfp/carbon?id=zQo","status":"active","uuid":"zQo"},"uuid":"eiy"},"event_id":"01a1143d-8db7-7030-a305-00dc3e594952","occurred_at":"2026-10-07T02:42:20.727Z","silicon":"eiy","type":"silicon.stk_rotated"}
+{"app_id":null,"data":{"id":"si:echo-one","rotated_at":"2026-10-07T02:42:20.723Z","rotated_by":{"display_name":"Saket","id":"c:saket","kind":"carbon","pfp_url":"https://iris.teamofsilicons.com/pfp/carbon?id=6667d4b4-7c57-45de-b2c3-94185db3e175","status":"active","uuid":"6667d4b4-7c57-45de-b2c3-94185db3e175"},"uuid":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9"},"event_id":"01a1143d-8db7-7030-a305-00dc3e594952","occurred_at":"2026-10-07T02:42:20.727Z","silicon":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9","type":"silicon.stk_rotated"}
 ```
 
 ```json
-{"app_id":null,"data":{"from":{"id":"c:saket","uuid":"zQo","…":"…"},"id":"si:echo-one","to":{"id":"c:ada","uuid":"8HV","…":"…"},"uuid":"eiy"},"event_id":"…","occurred_at":"…","silicon":"eiy","type":"silicon.custodian.changed"}
+{"app_id":null,"data":{"from":{"id":"c:saket","uuid":"6667d4b4-7c57-45de-b2c3-94185db3e175","…":"…"},"id":"si:echo-one","to":{"id":"c:ada","uuid":"4143123f-b494-481c-adbf-c14b14cfccc0","…":"…"},"uuid":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9"},"event_id":"…","occurred_at":"…","silicon":"4984e3d7-b44d-48e0-95a0-bfd5a2ae9dd9","type":"silicon.custodian.changed"}
 ```
 
 A self-created Silicon's `silicon.created` can arrive before the Silicon has stored the

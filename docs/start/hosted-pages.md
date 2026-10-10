@@ -103,14 +103,14 @@ Run it, open `http://localhost:3000` and sign in. A first-time Carbon goes throu
 code, sign-up and the details page (what's shared with your app), and then the callback shows:
 
 ```text
-Signed in as c:grace-hopper (briefcase:ptO)
+Signed in as c:grace-hopper (briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b)
 {
-  "uuid": "ptO",
-  "membership_id": "briefcase:ptO",
+  "uuid": "d6393ce9-6e58-4e52-b7da-e65c5d47322b",
+  "membership_id": "briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b",
   "kind": "carbon",
   "id": "c:grace-hopper",
   "display_name": "Grace Hopper",
-  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=ptO",
+  "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=d6393ce9-6e58-4e52-b7da-e65c5d47322b",
   "email": "grace.hopper@example.com",
   "email_verified": true,
   "updated_at": "2026-10-07T02:56:29.875Z",
@@ -209,12 +209,12 @@ silicon-accounts app token exchange --code "$CODE" --redirect-uri http://localho
 ```
 
 ```text
-Exchanged the code for c:grace-hopper (ptO).
+Exchanged the code for c:grace-hopper (d6393ce9-6e58-4e52-b7da-e65c5d47322b).
 access token   eyJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSIsImtpZCI6…
 expires in     1800s
 refresh token  sar_3tEv-OkGuQ6YLovqTGtzbvTAa-jlOCF7YVh7PJrsK3U
 scope          profile email
-membership     briefcase:ptO
+membership     briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b
 ```
 
 Add `--json` to get the full token response on stdout.
@@ -455,8 +455,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```text
 Open this address, sign in, then paste the address you land on:
 https://accounts.teamofsilicons.com/authorize?response_type=code&app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&state=kSj2dTMJ88E92lB_sXVv7mOHHasuEn5c&code_challenge=_Xwad6JJcE34Gs9gJVVlSABhLnAnsFCd6kYOXrAag5c&code_challenge_method=S256&scope=email
-signed in: c:lin (uuid nln, membership briefcase:nln)
-local check: sub nln scopes ["profile", "email"]
+signed in: c:lin (uuid 2c39a4d8-922c-45cb-bf06-102061d9af0c, membership briefcase:2c39a4d8-922c-45cb-bf06-102061d9af0c)
+local check: sub 2c39a4d8-922c-45cb-bf06-102061d9af0c scopes ["profile", "email"]
 introspection: active true
 userinfo: Lin Okafor Some("lin-docs@example.test")
 refreshed: expires in 1800 s

@@ -128,7 +128,7 @@ jobs:
 
 ```text
 Signed in as si:scout (Scout), a Silicon.
-uuid          b97
+uuid          7700120d-a627-4ac8-abb2-ea7620bfa16e
 url           https://accounts.teamofsilicons.com
 access token  2026-10-09T05:46:35Z (in 30m) (refreshed automatically)
 session ends  2026-10-09T05:46:35Z (in 30m)
@@ -286,7 +286,7 @@ you pass `--ttl` (60 to 3600). Its claims:
 ```json
 {
   "iss": "https://accounts.teamofsilicons.com",
-  "sub": "b97",
+  "sub": "7700120d-a627-4ac8-abb2-ea7620bfa16e",
   "aud": "sts.amazonaws.com",
   "iat": 1791522701,
   "nbf": 1791522701,
@@ -294,7 +294,7 @@ you pass `--ttl` (60 to 3600). Its claims:
   "jti": "01a11f13-013f-7050-b4c5-acd4ef2eea84",
   "kind": "silicon",
   "si_id": "si:scout",
-  "custodian": "zQo",
+  "custodian": "6667d4b4-7c57-45de-b2c3-94185db3e175",
   "token_use": "identity"
 }
 ```

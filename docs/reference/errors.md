@@ -295,7 +295,7 @@ outside the app's `google.hosted_domain`), `signup_expired`, `session_changed` (
 | Code | Status | Cause and fix |
 |---|---|---|
 | `config_version_conflict` | 409 | the sign-in setup changed since the version you sent (`details.current_version`): re-read, re-apply, resend |
-| `user_not_found` | 404 | the uuid isn't in this app's user base (uuids are case-sensitive) |
+| `user_not_found` | 404 | the uuid isn't in this app's user base (use the canonical lowercase UUIDv4 returned by Accounts) |
 | `import_not_found` | 404 | no such import job for this app |
 | `delivery_not_found` | 404 | no such webhook delivery for this app, or for this Silicon (`/v1/me/webhook/deliveries…`) |
 | `unknown_columns` | 422 | the import has columns Silicon Accounts doesn't keep (`details.unknown_columns`, `allowed_columns`); remove them or set `ignore_unknown_columns` |

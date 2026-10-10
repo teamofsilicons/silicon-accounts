@@ -133,7 +133,7 @@ reports its height, 264 px here. Choosing email took the window to:
 https://accounts.teamofsilicons.com/authorize?app_id=briefcase&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&state=-V6HjsnYz78--44vVIH-TCym7jQBur7OcUCSaIcU7Ek&code_challenge=fo6rK7yEC-w7zkC04MxhbnUMyDW0ZPoAbQyKoiMdtTM&code_challenge_method=S256&scope=email&method=email
 ```
 
-and after the sign-in, the callback answered `Signed in as c:grace-hopper (briefcase:ptO)`.
+and after the sign-in, the callback answered `Signed in as c:grace-hopper (briefcase:d6393ce9-6e58-4e52-b7da-e65c5d47322b)`.
 Your app's Embed tab on developers.teamofsilicons.com prints this iframe for your own app id
 and redirect URIs, with a live preview.
 

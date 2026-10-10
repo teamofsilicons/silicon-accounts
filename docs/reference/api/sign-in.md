@@ -102,8 +102,8 @@ Every flow endpoint answers with this view of the flow. Here it is on a details 
   },
   "methods": ["google", "apple", "email", "phone"],
   "signed_in_as": {
-    "uuid": "8HV", "kind": "carbon", "id": "c:ada", "display_name": "Ada Lovelace",
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=8HV", "status": "active"
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "kind": "carbon", "id": "c:ada", "display_name": "Ada Lovelace",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=4143123f-b494-481c-adbf-c14b14cfccc0", "status": "active"
   },
   "challenge": null,
   "signup": null,
@@ -465,7 +465,7 @@ To remove a link, use [`DELETE /v1/me/identities/{provider}/{subject}`](accounts
 ```json
 {
   "account": {
-    "uuid": "8HV", "kind": "carbon", "id": "c:ada", "display_name": "Ada King",
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "kind": "carbon", "id": "c:ada", "display_name": "Ada King",
     "pfp_url": "https://accounts.teamofsilicons.com/v1/photos/01a11437-b512-76e4-ae95-3378b29e547e",
     "status": "active"
   },

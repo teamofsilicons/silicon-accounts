@@ -90,7 +90,7 @@ silicon-accounts silicon create --id si:mapper --display-name Mapper --timezone 
 ```
 
 ```text
-Created si:mapper (BYP) with you, c:saket, as its custodian. It can sign in right away.
+Created si:mapper (ef385ebe-1123-4be6-aa17-a8c1f6753aa6) with you, c:saket, as its custodian. It can sign in right away.
 
 STK (shown once, store it now): stk-c743aeed4346
 ```
@@ -112,8 +112,8 @@ silicon-accounts silicon list
 
 ```text
 SILICON    NAME    STATUS    UUID
-si:scout   Scout   active    8HV
-si:mapper  Mapper  active    BYP
+si:scout   Scout   active    4143123f-b494-481c-adbf-c14b14cfccc0
+si:mapper  Mapper  active    ef385ebe-1123-4be6-aa17-a8c1f6753aa6
 ```
 
 ```sh
@@ -122,11 +122,11 @@ silicon-accounts silicon show si:scout
 
 ```text
 si:scout · Scout Prime (Silicon)
-uuid         8HV
+uuid         4143123f-b494-481c-adbf-c14b14cfccc0
 status       active
 timezone     Asia/Kolkata
 dob          2026-10-07
-photo        https://iris.teamofsilicons.com/pfp/silicon?id=8HV
+photo        https://iris.teamofsilicons.com/pfp/silicon?id=4143123f-b494-481c-adbf-c14b14cfccc0
 created      2026-10-07T02:30:51Z
 custodian    c:saket (Saket)
 webhook      https://scout.example/hooks/accounts
@@ -295,20 +295,20 @@ The Silicon's webhook gets `silicon.custodian.changed`:
 {
   "app_id": null,
   "data": {
-    "from": {"display_name": "Saket", "id": "c:saket", "kind": "carbon", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=zQo", "status": "active", "uuid": "zQo"},
+    "from": {"display_name": "Saket", "id": "c:saket", "kind": "carbon", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=6667d4b4-7c57-45de-b2c3-94185db3e175", "status": "active", "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175"},
     "id": "si:scout",
-    "to": {"display_name": "Shubham", "id": "c:shubham", "kind": "carbon", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=b97", "status": "active", "uuid": "b97"},
-    "uuid": "8HV"
+    "to": {"display_name": "Shubham", "id": "c:shubham", "kind": "carbon", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=7700120d-a627-4ac8-abb2-ea7620bfa16e", "status": "active", "uuid": "7700120d-a627-4ac8-abb2-ea7620bfa16e"},
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0"
   },
   "event_id": "01a11439-2487-76f6-953a-dcddd55477ce",
   "occurred_at": "2026-10-07T02:37:31.655Z",
-  "silicon": "8HV",
+  "silicon": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "type": "silicon.custodian.changed"
 }
 ```
 
 Every app the Silicon signed into gets `silicon.custodian_changed`, whose `from` and `to` hold only
-each custodian's `uuid` and `id` (`{"uuid": "zQo", "id": "c:saket"}`): an app never sees a
+each custodian's `uuid` and `id` (`{"uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175", "id": "c:saket"}`): an app never sees a
 custodian's name, photo, kind or status, not even in a replay.
 And every transfer stays in the Silicon's history (`silicon-accounts history --kind custodian`, run as the
 Silicon):
@@ -351,7 +351,7 @@ silicon-accounts delete-account --confirm c:saket --json
     "code": "custodian_of_silicons",
     "details": {
       "silicons": [
-        {"display_name": "Mapper", "id": "si:mapper-5", "kind": "silicon", "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=BYP", "status": "active", "uuid": "BYP"}
+        {"display_name": "Mapper", "id": "si:mapper-5", "kind": "silicon", "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=ef385ebe-1123-4be6-aa17-a8c1f6753aa6", "status": "active", "uuid": "ef385ebe-1123-4be6-aa17-a8c1f6753aa6"}
       ]
     },
     "exit_code": 5,
@@ -407,18 +407,18 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/me/silicons \
 {
   "silicon": {
     "created_at": "2026-10-07T02:49:24.009Z",
-    "custodian": {"display_name": "Shubham", "id": "c:shubham", "kind": "carbon", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=b97", "status": "active", "uuid": "b97"},
+    "custodian": {"display_name": "Shubham", "id": "c:shubham", "kind": "carbon", "pfp_url": "https://iris.teamofsilicons.com/pfp/carbon?id=7700120d-a627-4ac8-abb2-ea7620bfa16e", "status": "active", "uuid": "7700120d-a627-4ac8-abb2-ea7620bfa16e"},
     "display_name": "Keeper",
     "dob": "2026-10-07",
     "id": "si:keeper",
     "kind": "silicon",
     "pending_transfer": null,
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=5fJ",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=e21356d7-5a98-46aa-aaff-238f4c8aa437",
     "status": "active",
     "stk_rotated_at": "2026-10-07T02:49:24.009Z",
     "timezone": "UTC",
     "updated_at": "2026-10-07T02:49:24.009Z",
-    "uuid": "5fJ",
+    "uuid": "e21356d7-5a98-46aa-aaff-238f4c8aa437",
     "version": 1,
     "webhook_url": null
   },

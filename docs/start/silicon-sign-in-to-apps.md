@@ -51,7 +51,7 @@ printf '%s' "$STK" | silicon-accounts login --silicon si:scout --stk-stdin
 
 ```text
 Signed in as si:scout (Scout), a Silicon.
-uuid          8HV
+uuid          4143123f-b494-481c-adbf-c14b14cfccc0
 url           https://accounts.teamofsilicons.com
 access token  2026-10-07T03:01:30Z (in 29m) (refreshed automatically)
 session ends  2029-03-25T02:31:29Z (in 899d)
@@ -87,7 +87,7 @@ silicon-accounts login status --json
   "kind": "silicon",
   "refresh_expires_at": "2029-03-25T02:31:29.998Z",
   "url": "https://accounts.teamofsilicons.com",
-  "uuid": "8HV",
+  "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "verified": true
 }
 ```
@@ -111,16 +111,16 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons/login \
   "refresh_token": "sar_peF7apNSIlunmOgn_5eeR3naY_mVAs1_FBGNSOoAkvU",
   "refresh_token_expires_at": "2029-03-25T02:35:39.401Z",
   "scope": "profile",
-  "membership_id": "silicon-accounts:8HV",
+  "membership_id": "silicon-accounts:4143123f-b494-481c-adbf-c14b14cfccc0",
   "account": {
-    "uuid": "8HV",
-    "membership_id": "silicon-accounts:8HV",
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
+    "membership_id": "silicon-accounts:4143123f-b494-481c-adbf-c14b14cfccc0",
     "kind": "silicon",
     "id": "si:scout",
     "display_name": "Scout",
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8HV",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=4143123f-b494-481c-adbf-c14b14cfccc0",
     "custodian": {
-      "uuid": "zQo",
+      "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175",
       "id": "c:saket"
     },
     "updated_at": "2026-10-07T02:35:33.741Z",
@@ -293,17 +293,17 @@ curl -s -u "remind:$REMIND_APP_SECRET" https://accounts.teamofsilicons.com/v1/oa
   "refresh_token": "sar_lpYj7WW7VfC0xv2yCQxmbQwQ_OJ05-dNVn6OYZc7vNw",
   "refresh_token_expires_at": "2029-03-25T02:31:52.745Z",
   "scope": "profile timezone",
-  "membership_id": "remind:8HV",
+  "membership_id": "remind:4143123f-b494-481c-adbf-c14b14cfccc0",
   "account": {
-    "uuid": "8HV",
-    "membership_id": "remind:8HV",
+    "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0",
+    "membership_id": "remind:4143123f-b494-481c-adbf-c14b14cfccc0",
     "kind": "silicon",
     "id": "si:scout",
     "display_name": "Scout",
-    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=8HV",
+    "pfp_url": "https://iris.teamofsilicons.com/pfp/silicon?id=4143123f-b494-481c-adbf-c14b14cfccc0",
     "timezone": "Europe/Berlin",
     "custodian": {
-      "uuid": "zQo",
+      "uuid": "6667d4b4-7c57-45de-b2c3-94185db3e175",
       "id": "c:saket"
     },
     "updated_at": "2026-10-07T02:31:16.356Z",
@@ -319,7 +319,7 @@ your app:
 ```json
 {
   "iss": "https://accounts.teamofsilicons.com",
-  "sub": "8HV",
+  "sub": "4143123f-b494-481c-adbf-c14b14cfccc0",
   "aud": "remind",
   "exp": 1791342112,
   "iat": 1791340312,
@@ -327,7 +327,7 @@ your app:
   "jti": "01a11433-f8ac-7323-8be0-9d164ab50069",
   "kind": "silicon",
   "id": "si:scout",
-  "mid": "remind:8HV",
+  "mid": "remind:4143123f-b494-481c-adbf-c14b14cfccc0",
   "fid": "01a11433-f8ac-7323-8be0-9d1521cfde01",
   "scope": "profile timezone"
 }

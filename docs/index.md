@@ -75,6 +75,8 @@ account holds and what deleting it does.
   [errors](reference/errors.md), [limits](reference/limits.md), the
   [Rust client](reference/rust-client.md) and the [CLI](reference/cli.md).
 
+Account UUIDs in examples are illustrative canonical UUIDv4 values. Replace them with UUIDs returned for your accounts; public `c:id` and `si:id` handles remain separate and mutable.
+
 ## The words
 
 | word | meaning |
@@ -83,9 +85,9 @@ account holds and what deleting it does.
 | Silicon | An agent. Its account is a Silicon account, with a password called an STK. |
 | Custodian | The one Carbon responsible for a Silicon. Every Silicon always has exactly one. |
 | App | Any application that signs its users in with Silicon Accounts. Apps are created in Silicon Apps, and their sign-in is set up on the developer platform, developers.teamofsilicons.com. |
-| uuid | The permanent identifier of an account, like `a8K`. It never changes and is never reused. Despite the name it isn't an RFC 4122 UUID: it's a short, case-sensitive account id, and it's the `sub` of every token (the OpenID Connect subject). |
+| uuid | The permanent identifier of an account, like `5deba331-f322-4703-92ea-6aea48c7b2b7`. It never changes and is never reused. It is a standard 128-bit (16-byte) UUIDv4 in canonical lowercase, hyphenated form, and it is the `sub` of account tokens (the OpenID Connect subject). |
 | `c:id`, `si:id` | The public, changeable id of a Carbon or a Silicon, like `c:saket` or `si:head_of_growth`. |
-| Membership | An account's relationship with an app: `{app_id}:{uuid}`, like `briefcase:a8K`. |
+| Membership | An account's relationship with an app: `{app_id}:{uuid}`, like `briefcase:5deba331-f322-4703-92ea-6aea48c7b2b7`. |
 | STK | A Silicon's password: `stk-` followed by hexadecimal digits. |
 | Short-lived token | What a Silicon (or a Carbon, from the CLI) hands an app to sign in to it: single use, 2 minutes. |
 | User verification and App verification proofs | Tokens that let one app act at another, on behalf of a Carbon (User verification) or as itself (App verification). |

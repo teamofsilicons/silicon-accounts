@@ -107,7 +107,7 @@ async fn change_my_id(
 | `state` | shared state | `AppState { db, settings, keys, http, sender, app_cache, telemetry, federation, identity_key }` (+ `identity_signer()`, `with_identity_key`), `Keys { pepper, keyring, jwt, stk }` |
 | `db` | pool + embedded migrations | `connect`, `connect_url`, `migrate` → `MigrationReport`, `pending_migrations`, `ping`, `MIGRATOR` |
 | `error` | API errors | `ApiError`, `ApiResult`, `FieldErrors`, `OAuthError` |
-| `ids` | uuid scramble, `c:`/`si:` ids, suggestions | `uuid_for_number`, `number_for_uuid`, `AccountId`, `IdError`, `validate_handle`, `handle_candidates`, `pick_available`, `membership_id`, `validate_app_id` |
+| `ids` | UUIDv4 generation, legacy identifier parsing, `c:`/`si:` ids, suggestions | `new_account_uuid`, `is_account_uuid`, `is_standard_account_uuid`, `uuid_for_number`, `number_for_uuid`, `AccountId`, `IdError`, `validate_handle`, `handle_candidates`, `pick_available`, `membership_id`, `validate_app_id` |
 | `crypto` | tokens, pepper, keyring, STK, PKCE, codes, signatures | `random_token` + `prefix::*`, `Pepper`, `Keyring`, `stk::{generate, normalize, StkHasher}` (`hash_async`, `verify_async`, `burn_async` on the blocking pool), `pkce::*`, `generate_otp`, `generate_user_code`, `normalize_user_code`, `webhook_signature`, `verify_webhook_signature`, `describe_token`, `constant_time_eq` |
 | `jwt` | Ed25519 JWTs | `JwtKeys` (`sign_access`, `verify_access`, `verify_access_ignoring_expiry` (revocation only), `sign_id_token`, `verify`, `jwks`), `AccessClaims`, `IdTokenClaims`, `parse_private_key` |
 | `models` | enums + rows + sign-in config | `Account`, `App`, `Membership`, `AccountKind`, `AccountStatus`, `Scope`, `ContactField`, `Method`, `TokenOrigin`, `OtpPurpose`, `AccountField`, `SigninConfig`, `Branding`, … |
@@ -188,9 +188,11 @@ Responses always echo `X-Request-Id` (install `http::request_id::middleware`, th
 
 ## ids
 
-- `uuid_for_number(n)` / `number_for_uuid(s)`: the tiered scramble from the spec; tier-3 starts
-  at `uuid_for_number(0) == "zQo"`. The constants are fixed forever. `create_carbon/silicon` call it
-  with `nextval('account_number_seq')`; nobody else needs to.
+- `new_account_uuid()` generates a random 128-bit (16-byte) UUIDv4 in canonical lowercase,
+  hyphenated form. Account creation uses it; database constraints enforce uniqueness.
+- `uuid_for_number(n)` / `number_for_uuid(s)` retain the old base62 mapping for historical
+  migration work only. `is_account_uuid` accepts legacy input during a coordinated upgrade;
+  migrated identifiers are retired and never become authentication aliases.
 - `AccountId::parse("C:Saket")` → `c:saket`; `AccountId::parse_for_kind("scout", AccountKind::Silicon)`
   → `si:scout` (a bare handle gets the prefix; the wrong prefix is an error). The handle is checked
   as written: only ASCII letters, digits, `-` and `_` (no Unicode case folding: `c:\u{212A}elvin`
@@ -650,7 +652,8 @@ cargo run -p silicon-accounts-server --bin accounts-migrate  # applies migration
 
 - `memberships.granted_scopes`, `token_families.scopes` etc. are `text[]`: bind `Vec<String>`
   (`scope_strings`) and read `Vec<String>` (`scopes_from_strings`).
-- Account uuids are case-sensitive (`text collate "C"`); ids (`c:`/`si:`) are stored lowercase.
+- Account UUIDs use canonical lowercase, hyphenated UUIDv4 text (`text collate "C"`); public ids
+  (`c:`/`si:`) are normalized separately and stored lowercase.
 - `c:saket` and `si:saket` are different ids; reserved words apply to both.
 - The first-party apps `silicon-accounts` and `developer` (migration 0005) exist after migration; their
   redirect rules are applied in code (`SigninConfig::effective` + `redirect_allowed`: any URL on
