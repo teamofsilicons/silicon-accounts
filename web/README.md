@@ -153,8 +153,9 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   and nothing is cached (gcTime 0), so the page that shows the secret holds the only copy. `useCreateSilicon`,
   `useRotateStk`, `useSetSiliconWebhook`, `useSetOwnWebhook`, `useSetWebhook`, `useRotateWebhookSecret` and
   `useCreateAppVerification` are secret mutations.
-- **Telemetry.** Opted in by default; turning it off (settings) sends `X-Accounts-Telemetry: off` on every API call
-  from the first request on, and sets the `sa_telemetry=off` cookie for requests without headers.
+- **Telemetry (off since 2026-10-11).** The site records none and has no setting: `lib/telemetry.ts` sends
+  `X-Accounts-Telemetry: off` on every API call from the first request on, and sets the `sa_telemetry=off` cookie for
+  requests without headers (photos, the hosted sign-in pages). The silicon-accounts CLI keeps its own switch.
 - **Navigation.** `lib/navigation.ts` has every path and the dock's sections. Page changes use View Transitions
   (`router.push(href, { transitionTypes: ["page-forward"] })`); the dock morphs its highlight.
 - **Unsaved work** asks before it is lost through the navigation guard (`lib/navigation-guard.ts`): a page registers
@@ -177,7 +178,7 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
 
 | File | Hooks |
 | --- | --- |
-| `session.ts` | `useSession`, `useMe`, `useMeta`, `useDeveloperUrl` (the developer site's address from the meta), `useSignOut`, `useRefreshSession`, `useTelemetryEnabled`, the first-party sign-in round trip (`beginSignIn` → /sign-in → `firstPartySignInUrl` → back to /sign-in, which reads `savedSignInReturn` / `forgetSignInReturn`; the home page never reads a code or error from its address), `sameSitePath`, `safeReturnPath` |
+| `session.ts` | `useSession`, `useMe`, `useMeta`, `useDeveloperUrl` (the developer site's address from the meta), `useSignOut`, `useRefreshSession`, the first-party sign-in round trip (`beginSignIn` → /sign-in → `firstPartySignInUrl` → back to /sign-in, which reads `savedSignInReturn` / `forgetSignInReturn`; the home page never reads a code or error from its address), `sameSitePath`, `safeReturnPath` |
 | `account.ts` | profile (`useUpdateProfile`, `useUploadPhoto`, `useRemovePhoto`, `useChangeId`, `useIdAvailability`, `useDeleteAccount`), emails, phones, identities, apps (`useMyApps`, `useRemoveAppAccess`), sessions, history, proofs, the Carbon's own webhook |
 | `silicons.ts` | `useSilicons`, `useSilicon`, create, update, change id, photo, `useRotateStk`, webhook, transfer, delete, custodian requests |
 | `auth.ts` | `useCreateFlow`, `useFlow`, `useFlowAction`, `useRefreshFlow`, `useDeviceRequest`, `useDecideDevice` (the hosted flow's own actions, details and review included, are in `components/auth/flow/controller.ts`) |

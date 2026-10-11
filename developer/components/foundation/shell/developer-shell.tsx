@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * The developer site's frame for signed-in pages: a calm top bar (the brand, Apps, Docs, search, theme and the account
- * menu), the page, the ⌘K palette and page transitions. It also guards every page: a visitor without a session goes to
+ * The developer site's frame for signed-in pages: a calm top bar (the wordmark, the console's pages in one pill, the
+ * docs as a quiet link, search and the account menu; the site is light only, so no theme switch), the page, the ⌘K palette and page transitions. It also guards every page: a visitor without a session goes to
  * the hosted sign-in and comes back to the page they asked for. The public pages (the home page and the docs) have their
  * own server-rendered frame (components/site, components/docs/docs-frame.tsx).
  *
@@ -13,19 +13,16 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ViewTransition, useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
-import { Settings, ShieldCheck, Mail, BookOpen, Boxes, CircleUserRound, LogOut, Monitor, Moon, Search, Sun } from "lucide-react";
+import { ArrowUpRight, ShieldCheck, Mail, BookOpen, Boxes, CircleUserRound, LogOut, Search } from "lucide-react";
 import { Alert } from "@/components/silicon-ui/alert/alert";
 import { Button } from "@/components/silicon-ui/button/button";
-import { ThemeSwitch } from "@/components/silicon-ui/theme-switch/theme-switch";
 import { UserMenu, type UserMenuUser } from "@/components/silicon-ui/user-menu/user-menu";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
-import { useTheme, type ThemePreference } from "@/components/foundation/theme/use-theme";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
 import { navigationType, paths } from "@/lib/navigation";
 import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
 import { beginSignIn, useMeta, useSession, useSignOut } from "@/lib/query/session";
-import { changeTheme } from "@/lib/theme";
 import { PublishingGuard } from "@/components/publishing/guard";
 import { BrandMark } from "./brand-mark";
 import { CommandMenu } from "./command-menu";
@@ -66,7 +63,6 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
   const { status, me, error, refetch } = useSession();
   const meta = useMeta();
   const { signOut } = useSignOut();
-  const { theme, preference, change } = useTheme();
   const paletteOpen = useCommandPaletteOpen();
   const isApple = useSyncExternalStore(subscribeNothing, detectApple, () => false);
   const accountsUrl = accountsUrlOf(meta.data?.public_url);
@@ -116,12 +112,8 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
     { id: "go.apps", label: "Your apps", description: "Every app you own", group: "Go to", icon: <Boxes size={16} strokeWidth={1.75} />, keywords: ["apps", "home"], run: () => void go(paths.home) },
     { id: "go.app-verification", label: "App verification", description: "Issued tokens and history across your apps", group: "Go to", icon: <ShieldCheck size={16} />, keywords: ["verification", "token", "proof", "app-verification", "history"], run: () => void go(paths.appVerification()) },
     { id: "go.invitations", label: "Author invitations", group: "Go to", icon: <Mail size={16} />, keywords: ["invite", "author"], run: () => void go(paths.invitations) },
-    { id: "go.settings", label: "Developer settings", group: "Go to", icon: <Settings size={16} />, keywords: ["telemetry", "preferences"], run: () => void go(paths.settings) },
     { id: "go.docs", label: "Developer docs", description: "Accounts and Apps guides", group: "Go to", icon: <BookOpen size={16} strokeWidth={1.75} />, keywords: ["docs", "help", "guide"], run: () => void go(docsUrl) },
     { id: "go.account", label: "Your account", description: "Opens accounts.teamofsilicons.com in a new tab", group: "Go to", icon: <CircleUserRound size={16} strokeWidth={1.75} />, keywords: ["account", "profile"], run: () => openExternal(accountsUrl) },
-    { id: "theme.light", label: "Use the light theme", group: "Appearance", icon: <Sun size={16} strokeWidth={1.75} />, keywords: ["theme", "light"], run: () => changeTheme("light", null) },
-    { id: "theme.dark", label: "Use the dark theme", group: "Appearance", icon: <Moon size={16} strokeWidth={1.75} />, keywords: ["theme", "dark", "night"], run: () => changeTheme("dark", null) },
-    { id: "theme.system", label: "Match the device theme", group: "Appearance", icon: <Monitor size={16} strokeWidth={1.75} />, keywords: ["theme", "system", "auto"], run: () => changeTheme("system", null) },
     { id: "account.signout", label: "Sign out", description: "Sign this browser out of the developer site", group: "Account", icon: <LogOut size={16} strokeWidth={1.75} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
   ], [go, doSignOut, docsUrl, accountsUrl, openExternal]);
 
@@ -150,40 +142,39 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
             void go(paths.home, event.currentTarget);
           }}>
             <BrandMark />
-            <span className={styles.brandText}>Silicon <span className={styles.brandMuted}>Developer</span></span>
+            <span className={styles.brandText}>Silicon Developer</span>
           </Link>
-          <nav className={styles.nav} aria-label="Developer site">
+          <nav className={styles.nav} aria-label="Developer site" data-sq="surface">
             <Link href={paths.home} data-sq="surface" className={styles.navLink} aria-current={onApps ? "page" : undefined} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
               if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
               event.preventDefault();
               void go(paths.home, event.currentTarget);
             }}>Apps</Link>
             <Link href={paths.appVerification()} data-sq="surface" className={styles.navLink} aria-current={pathname === paths.appVerification() ? "page" : undefined}>App verification</Link>
-            <Link href={paths.invitations} data-sq="surface" className={styles.navLink}>Invitations</Link>
-            <a href={docsUrl} data-sq="surface" className={styles.navLink}>Docs</a>
+            <Link href={paths.invitations} data-sq="surface" className={styles.navLink} aria-current={pathname === paths.invitations ? "page" : undefined}>Invitations</Link>
           </nav>
         </div>
         <div className={styles.topEnd}>
+          {/* The docs are the public pages, outside the console: a quiet link, not one of its pages. */}
+          <a href={docsUrl} data-sq="surface" className={styles.docsLink}>
+            Docs
+            <ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
+          </a>
           <button data-sq="surface" type="button" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}>
             <Search size={16} strokeWidth={1.75} aria-hidden="true" />
             <span className={styles.searchLabel}>Search and jump</span>
             <kbd data-sq="surface">{isApple ? "⌘ K" : "Ctrl K"}</kbd>
           </button>
-          <span className={styles.tool}>
-            <ThemeSwitch theme={theme} variant="eclipse" iconOnly onThemeChange={(next, _variant, trigger) => change(next, trigger)} />
-          </span>
           {user ? (
             <UserMenu
               user={user}
-              theme={preference}
-              onThemeChange={(next: ThemePreference) => change(next, null)}
+              showTheme={false}
               onSignOut={menuSignOut}
               align="end"
               items={[
                 { label: "Your account", icon: <CircleUserRound size={16} strokeWidth={1.75} />, onSelect: () => openExternal(accountsUrl) },
                 { label: "App verification", icon: <ShieldCheck size={16} />, onSelect: () => void go(paths.appVerification()) },
                 { label: "Author invitations", icon: <Mail size={16} />, onSelect: () => void go(paths.invitations) },
-                { label: "Developer settings", icon: <Settings size={16} />, onSelect: () => void go(paths.settings) },
                 { label: "Docs", icon: <BookOpen size={16} strokeWidth={1.75} />, onSelect: () => void go(docsUrl) },
                 { label: "Search and jump", icon: <Search size={16} strokeWidth={1.75} />, keys: isApple ? ["⌘", "K"] : ["Ctrl", "K"], onSelect: openCommandPalette },
               ]}

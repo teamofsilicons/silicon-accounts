@@ -1,6 +1,6 @@
 /**
  * The root layout of developers.teamofsilicons.com: <html> and <body>, the site's faces and tokens over Arc's
- * foundation, the no-flash theme boot script (inline, with the request's CSP nonce), and the Organization and WebSite
+ * foundation, the light-only boot script (inline, with the request's CSP nonce), and the Organization and WebSite
  * JSON-LD every page carries. It ships no client code of its own: the public pages (the home page and the docs) stay
  * server-rendered HTML with a few small islands, and the signed-in portal mounts its providers in app/(shell)/layout.tsx.
  * Every page renders per request (the nonce changes each time).
@@ -39,10 +39,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F8FA" },
-    { media: "(prefers-color-scheme: dark)", color: "#02040A" },
-  ],
+  themeColor: "#FFFDF9",
+  colorScheme: "light",
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
@@ -51,8 +49,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en" className={brandFontVariables} data-surface="site" suppressHydrationWarning>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-        {/* Page titles are set in DemiBold: the one weight worth fetching before first paint. */}
-        <link rel="preload" href="/fonts/bdo-grotesk/BDOGrotesk-DemiBold.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        {/* Every face the first paint uses, fetched with the page so text never paints in a fallback first (styles/fonts.css). */}
+        <link rel="preload" href="/fonts/bdo-grotesk/BDOGrotesk-Regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/bdo-grotesk/BDOGrotesk-Medium.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/hedvig-letters-serif/HedvigLettersSerif-Regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/geist-pixel/GeistPixel-Square.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
       <body>
         {children}

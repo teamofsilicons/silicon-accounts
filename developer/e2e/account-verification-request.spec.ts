@@ -141,7 +141,7 @@ test("dialog keyboard focus restores on cancel and BFF rejects unauthenticated r
   expect((await request.post("/api/accounts/apps/test-app/account-verification-request", { headers: { Origin: `http://127.0.0.1:${process.env.E2E_PORT || 8620}` }, data: { reason: "Unsigned request" } })).status()).toBe(401);
 });
 
-for (const width of [320, 1440]) test(`account verification form and receipt fit ${width}px in both themes`, async ({ page }) => {
+for (const width of [320, 1440]) test(`account verification form and receipt fit ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 });
   await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
   let saved: AccountVerificationRequest | null = null;
@@ -151,12 +151,9 @@ for (const width of [320, 1440]) test(`account verification form and receipt fit
   });
   const dialog = await openRequest(page);
   await dialog.getByRole("textbox", { name: "Reason" }).fill("We want customers to sign in at login.ourapp.com while keeping Silicon Accounts as our identity provider.");
-  for (const theme of ["light", "dark"] as const) {
-    await page.emulateMedia({ colorScheme: theme });
-    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
-    await page.screenshot({ path: `/tmp/silicon-account-verification-form-${width}-${theme}.png` });
-  }
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
+  await page.screenshot({ path: `/tmp/silicon-account-verification-form-${width}.png` });
   await dialog.getByRole("button", { name: "Submit request", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   const section = page.locator("#signin-account-verification");

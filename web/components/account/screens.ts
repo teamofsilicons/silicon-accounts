@@ -135,7 +135,7 @@ const shown: ScreenSpec[] = [
   { name: "account-activity", path: "/activity" },
   { name: "account-activity-open", path: "/activity", prepare: async page => { await page.locator("[data-timeline-trigger]").first().click(); await wait(page, 900); } },
 
-  // Settings: theme, telemetry, sessions, and deleting blocked by the Silicons in your care; then free to delete.
+  // Settings: sessions, and deleting blocked by the Silicons in your care; then free to delete.
   { name: "account-settings", path: "/settings" },
   { name: "account-settings-signout", path: "/settings", prepare: async page => { await page.getByRole("button", { name: "Sign out", exact: true }).nth(1).click(); await wait(page, 600); } },
   { name: "account-settings-deletable", path: "/settings", routes: [["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, custodian_of: 0 } })]] },

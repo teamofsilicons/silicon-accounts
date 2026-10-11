@@ -24,7 +24,7 @@ export async function signInStateAtAccounts(token: string, headers: Record<strin
   let response: Response;
   try {
     response = await fetch(`${accountsApiUrl()}/v1/session`, {
-      headers: { ...headers, Accept: "application/json", Authorization: `Bearer ${token}` },
+      headers: { ...headers, Accept: "application/json", "X-Accounts-Telemetry": "off", Authorization: `Bearer ${token}` },
       cache: "no-store",
       redirect: "manual",
       signal: AbortSignal.timeout(15_000),

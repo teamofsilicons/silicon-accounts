@@ -4,7 +4,6 @@ const RESOURCE = "[A-Za-z0-9_-]+";
 const routes: [string, RegExp][] = [
   ["GET HEAD", /^me$/],
   ["GET HEAD", /^targets$/],
-  ["POST", /^telemetry$/],
   ["GET HEAD POST", /^apps$/],
   ["GET HEAD", new RegExp(`^apps/availability/${APP}$`)],
   ["GET HEAD PATCH", new RegExp(`^apps/${APP}$`)],

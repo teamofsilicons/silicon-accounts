@@ -1,22 +1,21 @@
 /**
- * The public pages' header (server-rendered): the brand, the main navigation, search, the theme switch, and Sign in
- * (or Your apps once signed in). Below 900 px the navigation moves into a menu: a native popover, so it opens, closes
- * on Escape or an outside tap, and keeps focus without any script of ours (its close button carries autofocus, so opening
- * it moves focus into it, and closing it gives focus back to the menu button). Links are plain links: every public page is
- * a full HTML document.
+ * The public pages' header (server-rendered), as on Silicon Writings and the Silicon Apps store: the wordmark on the
+ * left, the docs in one floating pill (the current part sits on a beige fill), search, and Sign in (or Your apps once
+ * signed in). Below 640 px the navigation moves into a menu: a native popover, so it opens, closes on Escape or an
+ * outside tap, and keeps focus without any script of ours (its close button carries autofocus, so opening it moves
+ * focus into it, and closing it gives focus back to the menu button). Links are plain links: every public page is a
+ * full HTML document.
  */
 import type { ReactNode } from "react";
 import { Menu, Search, X } from "lucide-react";
 import { BrandMark } from "./brand";
 import { Action } from "./action";
-import { ThemeToggle } from "./theme-controls";
 import styles from "./site.module.css";
 
 const NAV: Array<{ href: string; label: string }> = [
   { href: "/docs", label: "Docs" },
   { href: "/docs/apps", label: "Silicon Apps" },
   { href: "/docs/accounts", label: "Silicon Accounts" },
-  { href: "/#for-silicons", label: "For Silicons" },
 ];
 
 /**
@@ -25,7 +24,7 @@ const NAV: Array<{ href: string; label: string }> = [
  */
 function currentOf(href: string, path: string): "page" | "true" | undefined {
   if (href === path) return "page";
-  const inside = (candidate: string) => !candidate.includes("#") && candidate !== "/" && path.startsWith(`${candidate}/`);
+  const inside = (candidate: string) => candidate !== "/" && path.startsWith(`${candidate}/`);
   if (!inside(href)) return undefined;
   return NAV.some(other => other.href !== href && other.href.startsWith(`${href}/`) && (other.href === path || inside(other.href))) ? undefined : "true";
 }
@@ -50,10 +49,10 @@ export function SiteHeader({ path, signedIn, search, menu, wide = false }: SiteH
       <div className={styles.bar}>
         <a href="/" className={styles.brand} data-sq="surface" aria-label="Silicon Developer, home">
           <BrandMark className={styles.brandMark} />
-          <span className={styles.brandText} aria-hidden="true">Silicon <span className={styles.brandMuted}>Developer</span></span>
+          <span className={styles.brandText} aria-hidden="true">Silicon Developer</span>
         </a>
         <nav className={styles.nav} aria-label="Main">
-          <ul role="list" className={styles.navList}>
+          <ul role="list" className={styles.navList} data-sq="surface">
             {NAV.map(item => (
               <li key={item.href}>
                 <a href={item.href} className={styles.navLink} data-sq="surface" aria-current={currentOf(item.href, path)}>{item.label}</a>
@@ -67,8 +66,7 @@ export function SiteHeader({ path, signedIn, search, menu, wide = false }: SiteH
               <Search size={17} strokeWidth={1.75} aria-hidden="true" />
             </a>
           )}
-          <ThemeToggle />
-          <Action href={account.href} size="sm" className={styles.account}>{account.label}</Action>
+          <Action href={account.href} size="sm" variant="secondary" className={`${styles.account} ${styles.signIn}`}>{account.label}</Action>
           <button type="button" className={`${styles.iconButton} ${styles.menuButton}`} data-sq="surface" popoverTarget="site-menu" aria-label="Open the menu">
             <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>

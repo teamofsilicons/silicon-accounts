@@ -1,3 +1,6 @@
-import { DeveloperSettings } from "@/components/publishing/Settings";
-export const metadata = {title: "Developer settings"};
-export default DeveloperSettings;
+/** /settings held only the telemetry choice, and the developer site records no telemetry now: old links go to the apps. */
+import { redirect } from "next/navigation";
+
+export default function Settings(): never {
+  redirect("/apps");
+}

@@ -32,11 +32,11 @@ export function Choices() {
         <RadioCards aria-label="Layout" layout="list" value={layout} onValueChange={setLayout} options={[{ value: "card", label: "Card", description: "A centred card", meta: "Default" }, { value: "split", label: "Split", description: "Your side and the form" }, { value: "minimal", label: "Minimal", description: "No card chrome" }]} />
       </Specimen>
       <Specimen title="Settings rows and description lists (layout primitives)">
-        <SettingsGroup label="Telemetry">
-          <SettingsRow label="Send telemetry" description="Context-rich events help us fix problems. Opted in by default.">
+        <SettingsGroup label="Notifications">
+          <SettingsRow label="Email me about new sign-ins" description="A short note whenever a new browser or terminal signs in.">
             {ids => <Switch aria-labelledby={ids.labelId} aria-describedby={ids.descriptionId} defaultChecked />}
           </SettingsRow>
-          <SettingsRow label="Theme" description="Light, dark or match the device.">
+          <SettingsRow label="Default sign-in method" description="What the sign-in page offers first.">
             <Button size="sm" variant="secondary">Change</Button>
           </SettingsRow>
         </SettingsGroup>

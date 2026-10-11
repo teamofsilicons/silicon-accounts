@@ -136,7 +136,7 @@ checking pages with curl or a browser without the hosted sign-in.
 | Area | Routes | Code |
 | --- | --- | --- |
 | BFF | `/auth/*`, `/api/accounts/*` | `app/auth/`, `app/api/`, `lib/server/` (config, seal, session) |
-| Shell | every signed-in page: the top bar (brand, Apps, Docs, ⌘K, theme, account menu), the sign-in gate, page transitions | `app/(shell)/layout.tsx`, `components/foundation/shell/` |
+| Shell | every signed-in page: the top bar (wordmark, Apps / App verification / Invitations in one pill, Docs, ⌘K, account menu), the sign-in gate, page transitions | `app/(shell)/layout.tsx`, `components/foundation/shell/` |
 | Sign-in | `/sign-in` (the front door and where failed sign-ins land) | `app/sign-in/`, `components/sign-in/` |
 | Public home page | `/` for anyone not signed in (a signed-in browser is sent on to `/apps` by `proxy.ts`, from the sealed cookie alone) | `app/(public)/page.tsx`, `components/home/`, `components/site/` |
 | Apps home | `/apps` (owned and authored apps; “New app” registers it through Apps and shows the secret once) | `components/developer/home/` |
@@ -155,7 +155,7 @@ tokens, Carbons/Silicons vocabulary, errors in the server's words). `lib/api/htt
 
 ## Unified documentation
 
-`/docs` is public and combines Silicon Apps and Silicon Accounts in the public site's frame (server-rendered HTML; see "The public site" below). The documentation engine was copied from `web/` and adapted here: the repository's `docs/` maps to `/docs/accounts`, `docs-apps/` maps to `/docs/apps`, and `lib/docs/landing.md` is the common landing page. Existing page bodies and heading anchors are preserved. Each product has its own navigation, related pages, and previous/next sequence; one search covers both and labels every result by product. Docs keyboard search owns ⌘K/Ctrl-K and `/`, while the portal's command palette remains available elsewhere. Theme switching and the docs menu stay available on small screens.
+`/docs` is public and combines Silicon Apps and Silicon Accounts in the public site's frame (server-rendered HTML; see "The public site" below). The documentation engine was copied from `web/` and adapted here: the repository's `docs/` maps to `/docs/accounts`, `docs-apps/` maps to `/docs/apps`, and `lib/docs/landing.md` is the common landing page. Existing page bodies and heading anchors are preserved. Each product has its own navigation, related pages, and previous/next sequence; one search covers both and labels every result by product. Docs keyboard search owns ⌘K/Ctrl-K and `/`, while the portal's command palette remains available elsewhere. The docs menu stays available on small screens (the header's menu button shows below 1024 px on docs pages).
 
 `pnpm build:docs` bundles all content and emits the original Markdown into `public/docs/<product>/…`; `pnpm dev`, `pnpm typecheck`, and `pnpm build` run it first. `pnpm build:docs --check` validates front matter, page links and anchors. Override source directories with `ACCOUNTS_DOCS_DIR` and `APPS_DOCS_DIR`. `pnpm build:docs --watch` updates the bundle while authoring. The standalone deployment needs generated `public/` and `.next/static` beside its server, as the deployment installer already supplies; it never needs source Markdown at runtime.
 
@@ -168,16 +168,25 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
 `/`, `/docs/**` and the agent files are for anyone, people, crawlers and Silicons, and stay as close to HTML as possible:
 
 - **Server-rendered, plain links.** The pages are React Server Components; their links are plain `<a>` elements (a public
-  page is a full document: no client router state, nothing prefetched). The only client code is three small islands:
-  the theme switch and the footer's theme choice (`components/site/theme-controls.tsx`), the docs search
+  page is a full document: no client router state, nothing prefetched). The only client code is two small islands:
+  the docs search
   (`components/docs/docs-search.tsx`, a native `<dialog>`; its trigger is a link to the server-rendered `/docs/search`,
   so search works without script; Tab and Shift+Tab cycle inside it while it is open, and its Esc button is named
   "Esc: close the search"), and one behaviour island (`components/site/enhancer.tsx`: copy buttons, "Show all lines",
-  "On this page" marking, keeping the sidebar's current page in view). The header's menu below 900 px is a native
+  "On this page" marking, keeping the sidebar's current page in view). The header's menu below 640 px (1024 px on docs pages) is a native
   popover whose close button carries `autofocus`, so opening it moves focus into it and Escape gives focus back to the
-  menu button; the footer's theme choice shows keyboard focus as an accent edge. The portal's providers, query client, motion library and Radix layers load only under `app/(shell)` and
+  menu button. The portal's providers, query client, motion library and Radix layers load only under `app/(shell)` and
   `/sign-in`.
-- **One look, two modes.** `styles/tokens.css` (light: `#F7F8FA` / `#292929`; dark: `#02040A` / `#F7F8FA`; brand blue
+- **Since 2026-10-11: one look, light only.** The public pages and the console share the look of Silicon Writings and
+  the Silicon Apps store: cream paper `#FFFDF9`, ink `#1E1E1C`, blue serif titles (Hedvig Letters Serif), BDO Grotesk
+  text, the Geist Pixel wordmark beside the braces glyph in ink, one-line footer. The boot script pins light; there is no
+  theme switch. The home page is one calm column with Sign in as its one main action and Read the docs beside it, and no
+  FAQ. The icons and `og.png` come from `scripts/brand` (`node scripts/brand/render.mjs`). The notes below on two modes
+  describe the earlier look.
+- **No telemetry (2026-10-11).** The `/api/*` proxy and the sign-in routes send `X-Accounts-Telemetry: off` and
+  `X-Apps-Telemetry: off` on every call, whatever the browser sends; the Apps proxy refuses `POST /telemetry`; `/settings`
+  (it held only the telemetry choice) redirects to `/apps`.
+- **One look, two modes (before 2026-10-11).** `styles/tokens.css` (light: `#F7F8FA` / `#292929`; dark: `#02040A` / `#F7F8FA`; brand blue
   `#1F5FB8` for buttons and fills; every text token measured at 4.5:1 or more), BDO Grotesk self-hosted from
   `public/fonts/bdo-grotesk/` (`styles/fonts.css`, SIL OFL 1.1) for display and as the text face where the system has no
   SF Pro. Light, dark or the system's, nothing else. `app/fonts.ts` keeps three Google faces only for apps' branded

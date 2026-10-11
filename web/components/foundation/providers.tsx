@@ -3,7 +3,7 @@
 /**
  * Everything every page shares, mounted once by the root layout: the TanStack Query client (errors toast with message
  * and hint; a 401 marks the session gone), the Arc toast stack, and the squircle runtime for browsers without
- * corner-shape. Importing lib/telemetry here applies the stored telemetry choice before any query runs.
+ * corner-shape. Importing lib/telemetry here opts the browser out of telemetry before any query runs.
  */
 import "@/lib/telemetry";
 import { useEffect, useState, type ReactNode } from "react";

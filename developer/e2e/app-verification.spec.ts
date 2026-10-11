@@ -191,8 +191,6 @@ for (const width of [320, 768, 1024, 1440]) test(`verification history fits ${wi
   await expect(page.getByText("Derived from event time and recorded lifetime")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
   if (width === 320 || width === 1440) {
-    await page.screenshot({ path: `/tmp/silicon-app-verification-${width}-dark.png`, fullPage: true });
-    await page.emulateMedia({ colorScheme: "light" });
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
     await page.screenshot({ path: `/tmp/silicon-app-verification-${width}-light.png`, fullPage: true });

@@ -24,7 +24,7 @@ const PREFIX = "/api/accounts/";
 /** Refresh this long before the access token expires. */
 const EARLY_REFRESH_MS = 60_000;
 /** Request headers passed on to the API (everything else, cookies included, stays here). */
-const FORWARD = ["accept", "content-type", "idempotency-key", "x-accounts-telemetry"];
+const FORWARD = ["accept", "content-type", "idempotency-key"];
 /** Response headers passed back. */
 const BACK = ["content-type", "retry-after", "x-request-id", "content-disposition"];
 
@@ -46,6 +46,8 @@ async function call(request: NextRequest, path: string, body: ArrayBuffer | unde
     const value = request.headers.get(name);
     if (value) headers[name] = value;
   }
+  // The developer site records no telemetry: every call tells Silicon Accounts not to.
+  headers["X-Accounts-Telemetry"] = "off";
   if (token) headers.Authorization = `Bearer ${token}`;
   return fetch(`${accountsApiUrl()}/${path}${request.nextUrl.search}`, {
     method: request.method,

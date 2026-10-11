@@ -7,13 +7,12 @@
  * revokes the sign-in and clears the cookie) and starting a sign-in (`/auth/sign-in`, a full navigation to the hosted
  * sign-in on the accounts site).
  */
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useState } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "../api/endpoints";
 import { ApiError } from "../api/errors";
 import type { Me } from "../api/types";
 import { paths } from "../navigation";
-import { setTelemetryEnabled, subscribeTelemetry, telemetryEnabled } from "../telemetry";
 import { isSignedOutError } from "./client";
 import { queryKeys } from "./keys";
 
@@ -96,12 +95,6 @@ export function useSignOut(): { signOut: () => Promise<void>; pending: boolean }
 export function useRefreshSession(): () => Promise<void> {
   const client = useQueryClient();
   return useCallback(() => client.invalidateQueries({ queryKey: queryKeys.me.view }), [client]);
-}
-
-/** This browser's telemetry choice (opted in by default) and a setter that remembers it. */
-export function useTelemetryEnabled(): [boolean, (enabled: boolean) => void] {
-  const enabled = useSyncExternalStore(subscribeTelemetry, telemetryEnabled, () => true);
-  return [enabled, setTelemetryEnabled];
 }
 
 /**

@@ -122,10 +122,12 @@ export function PoweredBy({ theme, overlay, className }: PoweredByProps) {
   return (
     <div className={cx(styles.powered, overlay && styles.overlay, theme === "dark" && styles.dark, className)} data-powered-by="">
       <p className={styles.pill}>
-        <svg className={styles.mark} viewBox="0 0 64 64" aria-hidden="true">
-          <path fill="#1F5FB8" d="M32 0c19.6 0 25.4 1.4 28.6 3.4C62.6 6.6 64 12.4 64 32s-1.4 25.4-3.4 28.6C57.4 62.6 51.6 64 32 64S6.6 62.6 3.4 60.6C1.4 57.4 0 51.6 0 32S1.4 6.6 3.4 3.4C6.6 1.4 12.4 0 32 0Z" />
-          <circle cx="32" cy="25" r="9" fill="#FFFFFF" />
-          <path fill="#FFFFFF" d="M15 49c2.6-8 9.2-12.5 17-12.5S46.4 41 49 49c-4.6 3-10.4 4.6-17 4.6S19.6 52 15 49Z" />
+        <svg className={styles.mark} viewBox="0 0 200 200" aria-hidden="true">
+          <rect width="200" height="200" rx="48" fill="#EDE8E0" />
+          <g transform="translate(100 100) scale(1.3) translate(-100.46 -99.5)">
+            <circle cx="126.42" cy="99.5" r="29.5" fill="#181818" />
+            <rect x="45" y="74.72" width="49.56" height="49.56" rx="4.72" fill="#181818" />
+          </g>
         </svg>
         <span>Powered by <a href={POWERED_BY_HREF} target="_blank" rel="noopener">Silicon Accounts</a></span>
       </p>

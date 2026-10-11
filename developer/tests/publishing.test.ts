@@ -30,3 +30,7 @@ test("private Apps media remains on the authenticated developer BFF origin", asy
   assert.equal(publishingMediaUrl("https://apps.teamofsilicons.com/v1/apps/my_app/media/digest"), "/api/apps/apps/my_app/media/digest");
   assert.equal(publishingMediaUrl("https://images.example/logo.png"), "https://images.example/logo.png");
 });
+
+test("the developer site sends no telemetry: the Apps proxy refuses POST /telemetry", () => {
+  assert.equal(proxyRoute("telemetry", "POST"), null);
+});

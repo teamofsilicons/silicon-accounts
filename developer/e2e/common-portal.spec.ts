@@ -62,15 +62,9 @@ test("the live BFF rejects store operations and unsigned management before upstr
   expect((await request.post("/api/apps/apps/test-app/packages/linux-x86_64", {headers: {Origin: `http://127.0.0.1:${process.env.E2E_PORT || 8620}`}, data: "not-authenticated"})).status()).toBe(401);
 });
 
-test("shared telemetry preference persists and applies to publishing requests", async ({ page }) => {
-  const changes = await mock(page, true);
+test("there is no telemetry setting: /settings goes to the apps", async ({ page }) => {
+  await mock(page, true);
   await page.goto("/settings");
-  await page.getByRole("switch", {name: "Share usage telemetry"}).click();
-  await expect(page.getByRole("switch", {name: "Share usage telemetry"})).not.toBeChecked();
-  await page.goto("/apps/test-app/publishing");
-  await page.getByLabel("App name", {exact: true}).fill("Telemetry preference applied");
-  await page.getByRole("button", {name: "2 Access Required"}).click();
-  expect(changes.find(change => change.body.name === "Telemetry preference applied")?.headers["x-apps-telemetry"]).toBe("off");
-  await page.goto("/settings");
-  await expect(page.getByRole("switch", {name: "Share usage telemetry"})).not.toBeChecked();
+  await expect(page).toHaveURL(/\/apps$/);
+  await expect(page.getByRole("switch", {name: /telemetry/i})).toHaveCount(0);
 });

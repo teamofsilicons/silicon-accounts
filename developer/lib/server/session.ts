@@ -160,7 +160,7 @@ async function tokenCall(form: Record<string, string>, headers: Record<string, s
   try {
     response = await fetch(`${accountsApiUrl()}/v1/oauth/token`, {
       method: "POST",
-      headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json", "X-Accounts-Telemetry": "off" },
       body: new URLSearchParams(form).toString(),
       cache: "no-store",
       signal: AbortSignal.timeout(20_000),
@@ -228,7 +228,7 @@ export async function revokeSession(session: StoredSession, headers: Record<stri
   try {
     await fetch(`${accountsApiUrl()}/v1/oauth/revoke`, {
       method: "POST",
-      headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json", "X-Accounts-Telemetry": "off" },
       body: new URLSearchParams({ token: session.rt, client_id: DEVELOPER_APP_ID }).toString(),
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
