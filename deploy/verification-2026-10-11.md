@@ -25,3 +25,12 @@ Install SSM `1ff6509a-095b-498f-bf60-ab4dca524f54` verified the archive SHA-256 
 Public checks: `developers.teamofsilicons.com/llms-full.txt` no longer lists `tags=` and carries the new line; the
 Apps API reference page says the same; developer `/`, `/docs`, `/llms.txt`, `/status` 200; accounts `/`, `/readyz`,
 `/v1/meta` (version 0.5.0), `/llms.txt` 200.
+
+## Accounts 45fa28c: llms.md tag line
+
+PR #7: `developer/llms/llms.md` now says tags help people find an app when they search (edited at the Carbon's
+request). Docs only; same binaries and web build as 38fab27, developer site rebuilt (typecheck, lint, 39 tests).
+Archive `releases/45fa28c38a1d5c379cac484c53329559ff22da6e.tar.gz`, SHA-256
+`410f9f63e6e8fac887536e5e52c6d19a390c4b624655fdc288b0c495fd8878c4`, S3 version `P1128mkxYgRPTZshix81MxITOYmZgwv7`.
+Install SSM `a21c1ab8-67cc-4e3f-9385-7727163e3638`: nothing to migrate, readiness passed, four services active.
+Live: `developers.teamofsilicons.com/llms.txt` carries the new line and not the old one.
