@@ -34,3 +34,29 @@ Archive `releases/45fa28c38a1d5c379cac484c53329559ff22da6e.tar.gz`, SHA-256
 `410f9f63e6e8fac887536e5e52c6d19a390c4b624655fdc288b0c495fd8878c4`, S3 version `P1128mkxYgRPTZshix81MxITOYmZgwv7`.
 Install SSM `a21c1ab8-67cc-4e3f-9385-7727163e3638`: nothing to migrate, readiness passed, four services active.
 Live: `developers.teamofsilicons.com/llms.txt` carries the new line and not the old one.
+
+## Accounts 37d5688: Writings look, light only, no telemetry (account and developer sites)
+
+PR #8, at the Carbon's request. Account site: the look of Silicon Writings and the Silicon Apps store (cream paper,
+ink, blue serif titles, Geist Pixel wordmark, fonts preloaded with `font-display: block`), light only, the new Silicon
+Accounts mark everywhere (icons, favicon, og.png, hosted first-party sign-in, Powered by, SDK), the dock trimmed to
+this site's six sections (Developers and Docs moved to the top row, the phone sheet's foot and the palette), a calm
+one-column landing page without FAQ, and no telemetry (`X-Accounts-Telemetry: off` on every call, `sa_telemetry=off`
+always set, no setting). Developer site: the same look, light only; the home page's hero is Sign in plus Read the docs
+(was five buttons), no FAQ; console pages in one pill; no telemetry (the `/api` proxy and sign-in routes send both
+opt-out headers, `POST /telemetry` refused, `/settings` redirects to `/apps`). No Rust, migration, installer or packager
+change since 45fa28c; same binaries.
+
+Preflight: web typecheck, lint, 28 tests, build, screenshots at 1440 and 390; developer typecheck, lint, 40 tests, e2e
+61 passed, build. Archive `releases/37d5688f08d1e22168cce6c4f1239e9edda321f3.tar.gz`, 154934364 bytes, SHA-256
+`46932a17f6f54a10c083ff1f1f0ac4275de66cd99de2e7fcf0c92b61dff3ed03`, S3 version `kacUD1lnKMPxiEyHhfdKm6BsSKyUooOR`; its
+`install.py` matches the committed one. Before: `current` was `releases/45fa28c…`.
+
+Install SSM `3f4824e6-bdb3-48f3-bfa9-cb2bf92878ba`: nothing to migrate (20 applied, latest 0020), readiness passed,
+`current` is `releases/37d5688…`, four services active.
+
+Live: accounts `/`, `/readyz`, `/settings`, `/icon.svg`, `/og.png` 200, the new landing copy present, `icon.svg`
+byte-identical to the repository; developer `/`, `/docs`, `/status`, `/llms.txt` 200, the hero has one primary and one
+secondary action, no theme switch or FAQPage, `og.png` byte-identical; `/settings` redirects to `/apps`. A headless
+browser loaded both home pages with BDO Grotesk, Hedvig Letters Serif and Geist Pixel Square, `data-theme="light"`,
+and no console errors.
