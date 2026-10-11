@@ -183,6 +183,13 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
   theme switch. The home page is one calm column with Sign in as its one main action and Read the docs beside it, and no
   FAQ. The icons and `og.png` come from `scripts/brand` (`node scripts/brand/render.mjs`). The notes below on two modes
   describe the earlier look.
+- **App marks and icons (2026-10-11).** `components/developer/parts/app-icon.tsx` draws an app as the store does: its
+  logo in a 24% squircle with a one-pixel line, or the first letter past "Silicon" in the serif on beige. On an app's
+  page the mark offers "Upload" on hover or focus (Silicon Apps apps): the file becomes a data: URL (SVG as drawn, other
+  images as a 256 px PNG) and goes to `PATCH /api/apps/apps/{id}` as `logo`; Silicon Apps passes it to Silicon Accounts
+  as it saves, so the store, this site and the sign-in pages all show it. The picker's file field is made only on click.
+  The site's own mark is the Carbon's "</>" (`components/site/brand.tsx`, `scripts/brand`). Filled buttons are the calm
+  blue (`--primary` #1F5CB1).
 - **No telemetry (2026-10-11).** The `/api/*` proxy and the sign-in routes send `X-Accounts-Telemetry: off` and
   `X-Apps-Telemetry: off` on every call, whatever the browser sends; the Apps proxy refuses `POST /telemetry`; `/settings`
   (it held only the telemetry choice) redirects to `/apps`.

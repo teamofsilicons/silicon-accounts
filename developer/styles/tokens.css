@@ -12,7 +12,7 @@
  * lowest pairs are light --text-muted #6B675F (5.0:1 on --surface-muted) and dark --text-muted #9A958A (5.6:1).
  * --text-faint is for decoration only (rules, separators), never for text.
  *   --accent-ink   accent-coloured text. #1F5CB1 on the dark page is 2.9:1, so dark uses a lighter blue.
- *   --primary*     the filled button: ink on paper (light), paper on ink (dark).
+ *   --primary*     the filled button: the calm blue under white text (6.4:1) in light, paper on ink in dark.
  */
 :root, [data-theme="light"] {
   color-scheme: light;
@@ -37,10 +37,10 @@
   --accent-foreground: #FFFFFF;
   --accent-ink: #1F5CB1;
 
-  --primary: #1E1E1C;
-  --primary-hover: #33322F;
-  --primary-pressed: #000000;
-  --primary-foreground: #FFFDF9;
+  --primary: #1F5CB1;
+  --primary-hover: #1A4F99;
+  --primary-pressed: #164383;
+  --primary-foreground: #FFFFFF;
 
   --control-on: #1F5CB1;
   --control-glyph: #FFFFFF;
