@@ -1752,11 +1752,11 @@ A successful response is the object itself, with no wrapper. Every error, unknow
 | `GET /v1/targets?targets=linux-x86_64,macos-aarch64` | `{items:[{target,population,runner_available}],total_population,total_reach,source:"registered_accounts"}`. `runner_available` says a worker is configured, not that it answers; today it is `true` for the four Linux targets and `false` for Windows and macOS. `GET /v1/capabilities` probes it live. |
 | `POST /v1/platforms` | Body `{target}`. Records the signed-in account's platform. A signed-in install receipt registers its target too. |
 | `GET /v1/apps/availability/{app_id}` | `{available}`. Invalid IDs are `false`. |
-| `GET /v1/apps?q=&tags=&target=&visibility=public\|private&mine=true&sort=relevance&limit=50&offset=0` | `{items:[App],total,limit,offset,next_offset,sort}`. Published apps you can access; `mine=true` needs auth and includes drafts. See below. |
+| `GET /v1/apps?q=&target=&visibility=public\|private&mine=true&sort=relevance&limit=50&offset=0` | `{items:[App],total,limit,offset,next_offset,sort}`. Published apps you can access; `mine=true` needs auth and includes drafts. See below. |
 | `GET /v1/apps/{app_id}` | `App`. Drafts are only visible to authors. |
 
 Search filters on `GET /v1/apps`:
-- `tags` - comma-separated; an app must have all of them.
+- `q` also matches tags. Tags are never a filter of their own: a request with `tags` answers 400 and points to `q`.
 - `target` - only apps whose current release has a package for that target.
 - `sort` - `relevance` (the default), `rating`, `installs`, `name`, `updated` or `newest`.
 - `limit` - 1 to 100. `next_offset` is `null` on the last page.
