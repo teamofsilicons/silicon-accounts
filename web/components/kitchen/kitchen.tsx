@@ -4,14 +4,12 @@
  * /__kitchen: the style guide (development builds and screenshot runs only). Every installed Arc component in the
  * Silicon Accounts brand with squircles, the account shell's building blocks, the branding runtime and the embed.
  *
- *   /__kitchen                     in the page theme (the switch top right; screenshots run both themes)
+ *   /__kitchen                     in the page theme (light: the site has one)
  *   /__kitchen?compare=1           every specimen in a light and a dark pane side by side
  *   /__kitchen?squircle=fallback   the SVG-path squircles Firefox gets, in a browser with corner-shape
  */
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
-import { ThemeSwitch } from "@/components/silicon-ui/theme-switch/theme-switch";
 import { BrandMark } from "@/components/foundation/shell/brand-mark";
-import { useTheme } from "@/components/foundation/theme/use-theme";
 import { Actions } from "./sections/actions";
 import { Blocks } from "./sections/blocks";
 import { Brandings } from "./sections/branding";
@@ -54,7 +52,6 @@ function withParam(search: string, key: string, value: string | null): string {
 }
 
 export function Kitchen() {
-  const { theme, change } = useTheme();
   const page = useRef<HTMLDivElement>(null);
   // The query only matters after hydration (the server renders the default view).
   const search = useSyncExternalStore(subscribeNothing, readSearch, () => "");
@@ -77,8 +74,7 @@ export function Kitchen() {
     <CompareContext.Provider value={compare}>
       <div ref={page} className={styles.page} data-compare={compare || undefined}>
         <header className={styles.top}>
-          <span className={styles.brand}><BrandMark /><span>Silicon <span className={styles.muted}>Accounts</span></span></span>
-          <ThemeSwitch theme={theme} variant="eclipse" iconOnly onThemeChange={(next, _variant, trigger) => change(next, trigger)} />
+          <span className={styles.brand}><BrandMark /><span>Silicon Accounts</span></span>
         </header>
         <header className={styles.header}>
           <h1 className={styles.title}>Style guide</h1>

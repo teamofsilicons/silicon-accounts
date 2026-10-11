@@ -113,13 +113,6 @@ export function applicationLd(): Json {
   };
 }
 
-export function faqLd(entries: Array<{ question: string; answer: string }>): Json {
-  return {
-    "@type": "FAQPage",
-    mainEntity: entries.map(entry => ({ "@type": "Question", name: entry.question, acceptedAnswer: { "@type": "Answer", text: entry.answer } })),
-  };
-}
-
 /** One <script type="application/ld+json"> with a @graph. `<` is escaped so no string can close the script. */
 export function JsonLd({ graph, nonce }: { graph: Json[]; nonce?: string }) {
   const body = JSON.stringify({ "@context": "https://schema.org", "@graph": graph }).replace(/</g, "\\u003c");

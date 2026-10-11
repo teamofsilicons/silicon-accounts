@@ -19,14 +19,15 @@
 .crumbs a:hover { color: var(--foreground); }
 .crumbs a:focus-visible { outline: none; background: none; box-shadow: none; color: var(--foreground); text-decoration: underline; text-underline-offset: .22em; }
 .eyebrow { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+/* The page title: a blue serif, as on Silicon Writings. */
 .title {
   margin: 0;
-  color: var(--foreground);
-  font-family: var(--font-display);
-  font-size: clamp(2.125rem, 1.6rem + 2vw, 3rem);
-  font-weight: 600;
-  letter-spacing: var(--tracking-display);
-  line-height: 1.06;
+  color: var(--accent-ink);
+  font-family: var(--font-serif);
+  font-size: clamp(2.125rem, 1.6rem + 2vw, 2.875rem);
+  font-weight: 400;
+  letter-spacing: -.01em;
+  line-height: 1.2;
   text-wrap: balance;
 }
 .keep { white-space: nowrap; }
@@ -57,7 +58,7 @@
 .tocInline { display: none; }
 
 /* Related pages and cards. */
-.sectionTitle { margin: 0 0 var(--space-4); color: var(--foreground); font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
+.sectionTitle { margin: 0 0 var(--space-4); color: var(--foreground); font-family: var(--font-serif); font-size: 1.5rem; font-weight: 400; letter-spacing: -.005em; line-height: 1.25; }
 .related { margin-top: var(--space-6); padding-top: var(--space-8); border-top: 1px solid var(--border-subtle); }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: var(--space-3); }
 .card {

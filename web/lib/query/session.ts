@@ -6,7 +6,7 @@
  * (/sign-in?return_to=… → /authorize?app_id=silicon-accounts → back to /sign-in?code&state, which restores the saved path;
  * components/auth/sign-in.tsx). A code or error counts as a return only when this browser saved its state.
  */
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useState } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api, authorizeUrl } from "../api/endpoints";
 import { ApiError } from "../api/errors";
@@ -14,7 +14,6 @@ import type { BrowserSession, FlowIntent, FlowPrompt, Me, SigninMethod } from ".
 import { browserTimezone } from "../format";
 import { developerSiteUrl, paths } from "../navigation";
 import { modernTimezone } from "../timezones";
-import { setTelemetryEnabled, subscribeTelemetry, telemetryEnabled } from "../telemetry";
 import { queryKeys } from "./keys";
 
 export type SessionStatus = "loading" | "signed_in" | "signed_out" | "error";
@@ -104,16 +103,6 @@ export function useSignOut(): { signOut: () => Promise<void>; pending: boolean }
 export function useRefreshSession(): () => Promise<void> {
   const client = useQueryClient();
   return useCallback(() => client.invalidateQueries({ queryKey: queryKeys.session }), [client]);
-}
-
-/* ------------------------------------------------------------------------------------------------------------------ */
-/* Telemetry choice                                                                                                    */
-/* ------------------------------------------------------------------------------------------------------------------ */
-
-/** This browser's telemetry choice (opted in by default) and a setter that remembers it. */
-export function useTelemetryEnabled(): [boolean, (enabled: boolean) => void] {
-  const enabled = useSyncExternalStore(subscribeTelemetry, telemetryEnabled, () => true);
-  return [enabled, setTelemetryEnabled];
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */

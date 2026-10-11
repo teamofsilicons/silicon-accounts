@@ -1,4 +1,4 @@
-/* The account site's frame: a quiet top row, the page, and the dock. */
+/* The account site's frame: a quiet top row (the wordmark, the other sites, search), the page, and the dock. */
 .shell { position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; }
 /* While the shell is up, what focus (Tab) or an in-page jump brings into view stops clear of the floating dock and the
    phone bar (WCAG 2.4.11): the browser scrolls a control near the bottom up above them instead of leaving it under.
@@ -11,7 +11,7 @@
   display: flex;
   width: 100%;
   max-width: var(--page-max);
-  height: 68px;
+  height: 64px;
   flex: none;
   align-items: center;
   justify-content: space-between;
@@ -20,13 +20,22 @@
   padding: 0 var(--gutter);
 }
 /* The padding (taken back by the negative margin, so nothing moves) gives keyboard focus a soft fill to show in. */
-.brand { --sq-r: 12px; --sq-fill: transparent; display: inline-flex; min-width: 0; align-items: center; gap: 10px; margin: -6px -10px; padding: 6px 10px; background: var(--sq-fill); color: var(--foreground); font-family: var(--font-display); font-size: 1rem; font-weight: 600; letter-spacing: -.015em; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+/* The wordmark as on Silicon Writings and Silicon Apps: the bare glyph in ink, the name in the pixel face. */
+.brand { --sq-r: 10px; --sq-fill: transparent; display: inline-flex; min-width: 0; align-items: center; gap: 10px; margin: -6px -8px; padding: 6px 8px; background: var(--sq-fill); color: var(--foreground); font-family: var(--font-pixel); font-size: 1.0625rem; letter-spacing: 0; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
 .brand:hover { color: var(--foreground); }
 .brand:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
-.brandMark { --sq-r: 9px; display: grid; width: 28px; height: 28px; flex: none; place-items: center; background: var(--primary); color: var(--primary-foreground); }
-.brandMark svg { width: 18px; height: 18px; }
+.brandMark { display: grid; height: 22px; flex: none; place-items: center; color: var(--foreground); }
+.brandMark svg { width: auto; height: 13px; }
 .brandText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.brandMuted { color: var(--text-secondary); font-weight: 500; }
+
+.topEnd { display: flex; min-width: 0; align-items: center; gap: var(--space-3); }
+/* The developer site and its docs: plain words with an arrow, quieter than anything of this site. */
+.elsewhere { display: flex; align-items: center; gap: 2px; }
+.elsewhereLink { --sq-r: 8px; --sq-fill: transparent; display: inline-flex; height: 32px; align-items: center; gap: 3px; padding: 0 10px; background: var(--sq-fill); color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
+.elsewhereLink svg { flex: none; color: var(--text-muted); }
+.elsewhereLink:hover, .elsewhereLink:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
+/* Phones: the other sites are at the foot of the navigation sheet, so the top row keeps only the wordmark. */
+@media (max-width: 639px) { .elsewhere { display: none; } }
 
 .search {
   --sq-r: var(--radius-pill);
@@ -73,7 +82,7 @@
 @keyframes palette-fade-out { to { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .search { transition: none; }
+  .search, .elsewhereLink { transition: none; }
   .paletteOverlay[data-state="open"] { animation-duration: var(--duration-instant); }
 }
 

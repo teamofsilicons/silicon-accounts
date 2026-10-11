@@ -3,7 +3,6 @@
 import { ApiError as SharedApiError } from "@/lib/api/errors";
 import { useQuery } from "@tanstack/react-query";
 import { beginSignIn } from "@/lib/query/session";
-import { telemetryEnabled } from "@/lib/telemetry";
 import { useCallback, useEffect, useRef, useState } from "react";
 export class ApiError extends SharedApiError {
   constructor(status: number, body: {error?: {code?: string; message?: string; hint?: string; details?: unknown}}) {
@@ -24,8 +23,6 @@ export async function api<T>(
 ): Promise<T> {
   const method = options.method || "GET";
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (!telemetryEnabled())
-    headers["X-Apps-Telemetry"] = "off";
   if (method !== "GET")
     headers["Idempotency-Key"] = options.key || crypto.randomUUID();
   let body: BodyInit | undefined;

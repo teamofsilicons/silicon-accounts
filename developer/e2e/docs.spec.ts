@@ -222,21 +222,26 @@ test("the home page is server-rendered, semantic and described for search and ag
   const response = await request.get("/");
   expect(response.status()).toBe(200);
   const html = await response.text();
-  for (const text of ["Build apps for Carbons and Silicons", "Silicon Apps", "Silicon Accounts", "App verification", "User verification", "Why build on us", "Does a Silicon need a Carbon?", "/api/docs/search"]) expect(html, text).toContain(text);
+  for (const text of ["Build apps for Carbons and Silicons", "Silicon Apps", "Silicon Accounts", "App verification", "User verification", "Why build here", "For Silicons", "/api/docs/search"]) expect(html, text).toContain(text);
   expect(html).not.toMatch(/MCP server|\/mcp\b|#mcp/);
-  for (const tag of ["<header", "<nav", "<main", "<section", "<footer", "<h1", "<details"]) expect(html, tag).toContain(tag);
+  for (const tag of ["<header", "<nav", "<main", "<section", "<footer", "<h1"]) expect(html, tag).toContain(tag);
   expect(html.match(/<h1[\s>]/g)?.length).toBe(1);
   for (const meta of ['<link rel="canonical" href="https://developers.teamofsilicons.com"/>', 'property="og:site_name" content="Silicon Developer"', 'property="og:url"', 'property="og:type" content="website"', 'property="og:title"', 'property="og:description"', 'property="og:image" content="https://developers.teamofsilicons.com/og.png"', 'name="twitter:card" content="summary_large_image"', 'content="index, follow"']) expect(html, meta).toContain(meta);
   for (const action of ['href="/docs"', 'href="/docs/apps/start/publish"', 'href="/docs/accounts/start/add-sign-in"', 'href="/sign-in"']) expect(html, action).toContain(action);
+  // One main action (Sign in) and the docs beside it, nothing else as a button in the hero.
+  const hero = html.slice(html.indexOf("<h1"), html.indexOf('id="silicon-apps"'));
+  expect(hero.match(/data-variant="primary"/g)?.length).toBe(1);
+  expect(hero.match(/data-variant="/g)?.length).toBe(2);
   expect(html).not.toContain("modelContext");
   const graphs = [...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)].map(match => JSON.parse(match[1]!));
   const types = graphs.flatMap(graph => graph["@graph"].map((node: { "@type": string }) => node["@type"]));
-  expect(types).toEqual(expect.arrayContaining(["Organization", "WebSite", "WebPage", "FAQPage"]));
+  expect(types).toEqual(expect.arrayContaining(["Organization", "WebSite", "WebPage"]));
+  expect(types).not.toContain("FAQPage");
   const website = graphs.flatMap(graph => graph["@graph"]).find((node: { "@type": string }) => node["@type"] === "WebSite");
   expect(website.potentialAction.target.urlTemplate).toBe("https://developers.teamofsilicons.com/docs/search?q={search_term_string}");
 });
 
-for (const width of [320, 1440]) test(`the home page and docs fit ${width}px and navigation works in both themes`, async ({ page }) => {
+for (const width of [320, 1440]) test(`the home page and docs fit ${width}px, navigation works, and the site stays light`, async ({ page }) => {
   await mock(page);
   await page.setViewportSize({ width, height: 1000 });
   await page.emulateMedia({ reducedMotion: "reduce", colorScheme: "light" });
@@ -251,16 +256,16 @@ for (const width of [320, 1440]) test(`the home page and docs fit ${width}px and
     await expect(menu).toBeHidden();
     await page.goto("/docs/apps/start/install");
   }
-  for (const theme of ["light", "dark"] as const) {
-    if (theme === "dark") await page.getByRole("button", { name: "Switch to dark mode", exact: true }).click();
-    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
-    await page.screenshot({ path: `test-results/silicon-docs-${width}-${theme}.png`, fullPage: true });
-  }
-  await page.goto("/");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
-  await page.getByRole("button", { name: "Light", exact: true }).click();
+  // Light only: no theme switch anywhere, and a dark device still gets the light site.
+  await expect(page.getByRole("button", { name: /Switch to (dark|light) mode/ })).toHaveCount(0);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
+  await page.screenshot({ path: `test-results/silicon-docs-${width}.png`, fullPage: true });
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByRole("link", { name: "Sign in", exact: true }).first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
   await page.screenshot({ path: `test-results/silicon-home-${width}.png`, fullPage: true });
 });

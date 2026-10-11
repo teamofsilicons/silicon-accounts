@@ -13,7 +13,6 @@ export const paths = {
   site: "/",
   signIn: "/sign-in",
   docs: "/docs",
-  settings: "/settings",
   invitations: "/invitations",
   appVerification: (appId?: string) => `/app-verification${appId ? `?app_id=${encodeURIComponent(appId)}` : ""}`,
   /** The apps home. */

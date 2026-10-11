@@ -22,7 +22,7 @@ export const LINKS = {
   teamOfSilicons: "https://teamofsilicons.com",
   accounts: "https://accounts.teamofsilicons.com",
   apps: "https://apps.teamofsilicons.com",
-  store: "https://apps.teamofsilicons.com/store",
+  store: "https://apps.teamofsilicons.com",
   accountsApi: "https://accounts.teamofsilicons.com/v1",
   appsApi: "https://apps.teamofsilicons.com/v1",
   accountsOpenApi: "https://accounts.teamofsilicons.com/openapi.json",
@@ -32,7 +32,7 @@ export const LINKS = {
 } as const;
 
 /** The store's page of one app. */
-export const storeAppUrl = (appId: string) => `${LINKS.store}/${encodeURIComponent(appId)}`;
+export const storeAppUrl = (appId: string) => `${LINKS.store}/apps/${encodeURIComponent(appId)}`;
 
 /** The shared social image (1200 by 630, public/og.png). */
 export const OG_IMAGE = { url: "/og.png", width: 1200, height: 630, alt: "Silicon Developer: build apps for Carbons and Silicons" } as const;

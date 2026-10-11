@@ -1,14 +1,13 @@
 /**
  * /: the public home page (components/home). A signed-in browser never sees it: proxy.ts sends it on to its apps at
- * /apps. Server-rendered; its only script is the header's theme switch and the copy buttons.
+ * /apps. Server-rendered; its only script is the copy buttons.
  */
 import type { Metadata } from "next";
 import { HomePage } from "@/components/home/home-page";
-import { FAQ, plainAnswer } from "@/components/home/faq";
 import { Enhancer } from "@/components/site/enhancer";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
-import { JsonLd, faqLd, pageMetadata } from "@/lib/seo";
+import { JsonLd, pageMetadata } from "@/lib/seo";
 import { isSignedIn } from "@/lib/server/signed-in";
 import { CANONICAL_ORIGIN, LINKS, ORGANIZATION, SITE_DESCRIPTION } from "@/lib/site";
 
@@ -46,7 +45,6 @@ export default async function Page() {
               { "@type": "SoftwareApplication", name: "Silicon Accounts", applicationCategory: "DeveloperApplication", operatingSystem: "Web, Linux, Windows, macOS", url: LINKS.accounts, description: "Sign-in for Carbons and Silicons: Google, Apple, email, phone and short-lived tokens, with App verification and User verification.", license: MIT_LICENSE, sameAs: [LINKS.accountsGithub], publisher: { "@type": "Organization", name: ORGANIZATION.name, url: ORGANIZATION.url } },
             ],
           },
-          faqLd(FAQ.map(faq => ({ question: faq.question, answer: plainAnswer(faq) }))),
         ]}
       />
     </>

@@ -1,8 +1,7 @@
 "use client";
 
 /**
- * /settings: how the site looks, whether this browser shares usage telemetry, every browser and terminal signed in to
- * this account (sign any of them out), signing out here, and deleting the account. A Carbon who is custodian of a
+ * /settings: every browser and terminal signed in to this account (sign any of them out), signing out here, and deleting the account. A Carbon who is custodian of a
  * Silicon cannot delete their account until every Silicon has another custodian or is deleted, because a Silicon
  * always has exactly one.
  */
@@ -14,12 +13,9 @@ import { Badge } from "@/components/silicon-ui/badge/badge";
 import { Button } from "@/components/silicon-ui/button/button";
 import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
 import { HoldToConfirm } from "@/components/silicon-ui/hold-to-confirm/hold-to-confirm";
-import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
-import { Switch } from "@/components/silicon-ui/switch/switch";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
-import { Page, PageHeader, Section, SettingsGroup, SettingsRow } from "@/components/foundation/layout/layout";
-import { useTheme, type ThemePreference } from "@/components/foundation/theme/use-theme";
+import { Page, PageHeader, Section } from "@/components/foundation/layout/layout";
 import { ApiError } from "@/lib/api/errors";
 import { SESSION_ORIGINS } from "@/lib/api/labels";
 import type { AccountSummary, SessionInfo } from "@/lib/api/types";
@@ -27,18 +23,12 @@ import { formatDate, formatRelative, plural } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { notifyError } from "@/lib/notify";
 import { useDeleteAccount } from "@/lib/query/account";
-import { useMe, useSignOut, useTelemetryEnabled } from "@/lib/query/session";
+import { useMe, useSignOut } from "@/lib/query/session";
 import { AnimatedRows } from "../parts/animated-rows";
 import { asCarbon, asSilicon, describeError, useNow } from "../parts/common";
 import { focusAfterRemoval, pageMain } from "../parts/focus";
 import { useEverySession, useEverySilicon, useSetMeView, useSignOutSession } from "../parts/queries";
 import styles from "./settings.module.css";
-
-const THEMES: Array<{ value: ThemePreference; label: string }> = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "system", label: "Device" },
-];
 
 /**
  * The account is gone. DELETE /v1/me already ended every session of it and cleared this browser's session cookie, so
@@ -71,8 +61,6 @@ export function Settings() {
   const now = useNow(60_000);
   const me = useMe();
   const sessions = useEverySession();
-  const { preference, change } = useTheme();
-  const [telemetryEnabled, setTelemetryEnabled] = useTelemetryEnabled();
   const { signOut, pending: signingOut } = useSignOut();
   const revoke = useSignOutSession();
 
@@ -100,33 +88,8 @@ export function Settings() {
 
   return (
     <Page width="narrow">
-      <PageHeader title="Settings" description="How this site looks, what this browser shares, where you are signed in, and your account." />
+      <PageHeader title="Settings" description="Where you are signed in, and your account." />
 
-      <Section title="Appearance">
-        <SettingsGroup>
-          <SettingsRow label="Theme" description="Light, dark, or whatever your device is set to.">
-            <SegmentedControl label="Theme" options={THEMES} value={preference} onValueChange={value => change(value as ThemePreference, null)} />
-          </SettingsRow>
-        </SettingsGroup>
-      </Section>
-
-      <Section title="Privacy">
-        <SettingsGroup>
-          <SettingsRow
-            label="Share usage telemetry"
-            description={<>Usage events go to Space Station: a request&apos;s route, result and timing, or a step such as a Silicon being created. They never carry your id, email, phone number or tokens, and they show what is slow or broken. Turned off, nothing this browser asks for is recorded: every request it makes, photo loads and sign-in pages included, carries the choice. Work Silicon Accounts does later on its own, such as delivering webhooks, still reports, without personal details. The silicon-accounts CLI has its own switch: <code className={styles.code}>silicon-accounts config telemetry off</code>.</>}
-          >
-            {ids => (
-              <Switch
-                checked={telemetryEnabled}
-                onCheckedChange={setTelemetryEnabled}
-                aria-labelledby={ids.labelId}
-                aria-describedby={ids.descriptionId}
-              />
-            )}
-          </SettingsRow>
-        </SettingsGroup>
-      </Section>
 
       <Section title="Where you are signed in" description="Browsers, terminals and the developer platform signed in to Silicon Accounts. Signing one out ends that session at once; apps you signed into keep their own sessions.">
         {sessions.error && !sessions.data ? (

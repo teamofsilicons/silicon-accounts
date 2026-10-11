@@ -11,7 +11,7 @@
   display: flex;
   width: 100%;
   max-width: var(--page-max);
-  height: 68px;
+  height: 64px;
   flex: none;
   align-items: center;
   justify-content: space-between;
@@ -20,29 +20,31 @@
   padding: 0 var(--gutter);
 }
 /* The padding (taken back by the negative margin, so nothing moves) gives keyboard focus a soft fill to show in. */
-.brand { --sq-r: 12px; --sq-fill: transparent; display: inline-flex; min-width: 0; align-items: center; gap: 10px; margin: -6px -10px; padding: 6px 10px; background: var(--sq-fill); color: var(--foreground); font-family: var(--font-display); font-size: 1rem; font-weight: 600; letter-spacing: -.015em; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+/* The wordmark as on Silicon Writings and Silicon Apps: the bare glyph in ink, the name in the pixel face. */
+.brand { --sq-r: 10px; --sq-fill: transparent; display: inline-flex; min-width: 0; align-items: center; gap: 9px; margin: -6px -8px; padding: 6px 8px; background: var(--sq-fill); color: var(--foreground); font-family: var(--font-pixel); font-size: 1.0625rem; letter-spacing: 0; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
 .brand:hover { color: var(--foreground); }
 .brand:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
-.brandMark { --sq-r: 9px; display: grid; width: 28px; height: 28px; flex: none; place-items: center; background: var(--primary); color: var(--primary-foreground); }
-.brandMark svg { width: 18px; height: 18px; }
+.brandMark { display: grid; width: 22px; height: 22px; flex: none; place-items: center; color: var(--foreground); }
+.brandMark svg { width: 22px; height: 22px; }
 .brandText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.brandMuted { color: var(--text-secondary); font-weight: 500; }
 
 .topStart { display: flex; min-width: 0; align-items: center; gap: var(--space-6); }
 .topEnd { display: flex; flex: none; align-items: center; gap: var(--space-2); }
-.nav { display: flex; align-items: center; gap: 2px; }
-.navLink { --sq-r: 10px; --sq-fill: transparent; display: inline-flex; height: 32px; align-items: center; gap: 2px; padding: 0 10px; background: var(--sq-fill); color: var(--text-secondary); font-size: var(--text-sm); font-weight: 500; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
+/* The console's pages in one floating pill, as the store's header: the current page sits on the beige fill. The radii
+   are concentric (pill 11 px = page 8 px + its 3 px inset). */
+.nav { --sq-r: 11px; --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.navLink { --sq-r: 8px; --sq-fill: transparent; display: inline-flex; height: 28px; align-items: center; gap: 2px; padding: 0 10px; background: var(--sq-fill); color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
 .navLink:hover { --sq-fill: var(--surface-muted); color: var(--foreground); }
 .navLink:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
-.navLink[aria-current="page"] { color: var(--foreground); }
-.tool { display: inline-flex; align-items: center; }
-.tool > button[aria-pressed] { --sq-fill: transparent; --sq-stroke: transparent; color: var(--text-secondary); }
-@media (hover: hover) and (pointer: fine) { .tool > button[aria-pressed]:hover:not(:disabled) { --sq-fill: var(--surface-muted); --sq-stroke: transparent; color: var(--foreground); box-shadow: none; } }
-.tool > button[aria-pressed]:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
+.navLink[aria-current="page"] { --sq-fill: var(--surface-pressed); color: var(--foreground); }
+/* The docs: plain words with an arrow, quieter than the console's own pages. */
+.docsLink { --sq-r: 8px; --sq-fill: transparent; display: inline-flex; height: 32px; align-items: center; gap: 3px; padding: 0 10px; background: var(--sq-fill); color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
+.docsLink svg { flex: none; color: var(--text-muted); }
+.docsLink:hover, .docsLink:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
 .searchLabel { white-space: nowrap; }
+/* Narrow windows: the pages and the docs live in the account menu (and the palette). */
 @media (max-width: 900px) {
-  .nav { display: none; }
-  .tool { display: none; }
+  .nav, .docsLink { display: none; }
 }
 
 .search {
