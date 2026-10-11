@@ -59,7 +59,6 @@ export const journeys: Journey[] = [
         ACCOUNTS_JWT_PRIVATE_KEY: key32(),
         ACCOUNTS_JWT_KEY_ID: `ssrf-${tag()}`,
         ACCOUNTS_PUBLIC_URL: publicUrl,
-        ACCOUNTS_TELEMETRY_ENABLED: "false",
       };
       const db = await freshDatabase(env, "sec_prod");
       let server: ReturnType<typeof runBinary> | null = null;

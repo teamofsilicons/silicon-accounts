@@ -32,7 +32,7 @@ pub fn is_asset_path(path: &str) -> bool {
     path.starts_with("/assets/")
 }
 
-/// True for liveness / readiness probes (kept out of request logs and telemetry).
+/// True for liveness / readiness probes (logged at debug level only).
 pub fn is_health_path(path: &str) -> bool {
     path == "/healthz" || path == "/readyz"
 }

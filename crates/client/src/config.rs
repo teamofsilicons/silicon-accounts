@@ -13,9 +13,10 @@ use crate::error::{Error, Result};
 /// |---|---|
 /// | `ACCOUNTS_URL` | Silicon Accounts URL (default `https://accounts.teamofsilicons.com`) |
 /// | `ACCOUNTS_APP_ID` / `ACCOUNTS_APP_SECRET` | app credentials |
-/// | `ACCOUNTS_TELEMETRY` | `0`, `off`, `false` or `no` disables telemetry |
 /// | `ACCOUNTS_TIMEOUT_SECONDS` | request timeout (default 30) |
 /// | `ACCOUNTS_ALLOW_INSECURE_HTTP` | `1` allows plain http to hosts other than this machine |
+///
+/// Silicon Accounts records no telemetry: `ACCOUNTS_TELEMETRY` is ignored.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Config {
     /// Silicon Accounts URL.
@@ -24,7 +25,11 @@ pub struct Config {
     pub app_id: Option<String>,
     /// App secret, when acting as an app.
     pub app_secret: Option<String>,
-    /// Telemetry on/off.
+    /// Ignored: Silicon Accounts records no telemetry. Always false unless set by hand.
+    #[deprecated(
+        since = "0.6.0",
+        note = "Silicon Accounts records no telemetry; this field is ignored"
+    )]
     pub telemetry: bool,
     /// Request timeout.
     pub timeout: Duration,
@@ -38,19 +43,19 @@ impl std::fmt::Debug for Config {
             .field("base_url", &self.base_url)
             .field("app_id", &self.app_id)
             .field("app_secret", &self.app_secret.as_ref().map(|_| "…"))
-            .field("telemetry", &self.telemetry)
             .field("timeout", &self.timeout)
             .finish_non_exhaustive()
     }
 }
 
 impl Default for Config {
+    #[allow(deprecated)]
     fn default() -> Self {
         Self {
             base_url: DEFAULT_BASE_URL.to_owned(),
             app_id: None,
             app_secret: None,
-            telemetry: true,
+            telemetry: false,
             timeout: Duration::from_secs(30),
             allow_insecure_http: false,
         }
@@ -81,14 +86,6 @@ impl Config {
         }
         config.app_id = get("ACCOUNTS_APP_ID");
         config.app_secret = get("ACCOUNTS_APP_SECRET");
-        if let Some(value) = get("ACCOUNTS_TELEMETRY") {
-            config.telemetry = parse_flag(&value).ok_or_else(|| {
-                Error::invalid_input(
-                    format!("ACCOUNTS_TELEMETRY is `{value}`, which is not on or off."),
-                    "Set it to 1/on/true or 0/off/false.",
-                )
-            })?;
-        }
         if let Some(value) = get("ACCOUNTS_TIMEOUT_SECONDS") {
             let seconds: u64 = value.parse().map_err(|_| {
                 Error::invalid_input(
@@ -109,7 +106,6 @@ impl Config {
         AccountsClient::builder()
             .base_url(&self.base_url)
             .timeout(self.timeout)
-            .telemetry(self.telemetry)
             .allow_insecure_http(self.allow_insecure_http)
             .build()
     }

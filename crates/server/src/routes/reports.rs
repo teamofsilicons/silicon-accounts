@@ -156,18 +156,6 @@ pub async fn create(
             delivery::spawn_deliver(&state, id);
         }
         tracing::info!(%report_id, signed_in = auth.is_some(), has_pr = pr_url.is_some(), "bug report queued");
-        state.telemetry.record_progress(
-            "api",
-            "report",
-            "report.submitted",
-            Some(1.0),
-            json!({
-                "signed_in": auth.is_some(),
-                "account_kind": auth.as_ref().map(|a| a.kind()),
-                "has_pr": pr_url.is_some(),
-                "recipients": recipients.len(),
-            }),
-        );
         Ok((
             StatusCode::CREATED,
             json!({

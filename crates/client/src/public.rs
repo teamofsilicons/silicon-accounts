@@ -1,5 +1,5 @@
 //! Endpoints that need no account or app credentials: meta, id availability, keys,
-//! Silicon login and self-create, CLI sign-in for Carbons, reports, telemetry.
+//! Silicon login and self-create, CLI sign-in for Carbons, reports.
 
 use reqwest::Method;
 use serde_json::json;
@@ -11,7 +11,7 @@ use crate::session::AccountSession;
 use crate::types::{
     AppPublic, CliLoginChallenge, Contact, CustodianRequestStatus, DeviceAuthorization, DevicePoll,
     IdAvailability, Jwks, Meta, OidcDiscovery, ReportReceipt, SiliconSelfCreate,
-    SiliconSelfCreated, TelemetryEvent, TokenResponse,
+    SiliconSelfCreated, TokenResponse,
 };
 
 /// The OAuth grant type for exchanging a short-lived token.
@@ -542,37 +542,13 @@ impl AccountsClient {
         .await
     }
 
-    /// `POST /v1/telemetry/events`. Does nothing when telemetry is disabled.
-    pub async fn send_telemetry(&self, events: &[TelemetryEvent]) -> Result<()> {
-        if !self.telemetry_enabled() || events.is_empty() {
-            return Ok(());
-        }
-        if events.len() > 50 {
-            return Err(Error::invalid_input(
-                format!(
-                    "A telemetry batch holds at most 50 events; this one has {}.",
-                    events.len()
-                ),
-                "Split the events into batches of 50.",
-            ));
-        }
-        if let Some(bad) = events.iter().find(|e| !e.has_valid_name()) {
-            return Err(Error::invalid_input(
-                format!(
-                    "The telemetry event name `{}` does not match ^[a-z0-9_.]{{1,64}}$.",
-                    bad.name
-                ),
-                "Use lowercase letters, digits, `_` and `.` only.",
-            ));
-        }
-        let body = json!({ "events": events });
-        let request = Request::new(
-            Method::POST,
-            self.endpoint(&["v1", "telemetry", "events"]),
-            Auth::None,
-        )
-        .json(&body)?
-        .timeout(std::time::Duration::from_secs(3));
-        self.execute(request).await.map(|_| ())
+    /// Does nothing and sends nothing: Silicon Accounts records no telemetry.
+    #[deprecated(
+        since = "0.6.0",
+        note = "Silicon Accounts records no telemetry; this sends nothing"
+    )]
+    #[allow(deprecated)]
+    pub async fn send_telemetry(&self, _events: &[crate::types::TelemetryEvent]) -> Result<()> {
+        Ok(())
     }
 }

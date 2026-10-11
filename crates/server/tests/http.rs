@@ -644,222 +644,35 @@ async fn signed_in_reports_are_idempotent_and_audited() {
     assert_eq!(audited, 1);
 }
 
+/// Silicon Accounts records no telemetry: the old client route is gone (404, so the CLI that
+/// used it moves on), and the opt-out header and cookie the other Silicon apps and older
+/// clients send are accepted and ignored.
 #[tokio::test]
-async fn telemetry_accepts_cli_events_and_rejects_bad_ones() {
+async fn telemetry_is_gone_and_its_opt_out_is_ignored() {
     let ctx = TestContext::new().await;
-    let batch = json!({"events": [
-        {"source": "cli", "step": "silicon-accounts login status", "name": "cli.command", "progress": 1.0,
-         "data": {"outcome": "ok", "exit_code": 0}},
-        {"source": "cli", "step": "login.device.approved", "name": "cli.step", "progress": 0.9, "data": {}},
-        {"source": "cli", "step": "login.code.sent", "name": "cli.step"}
-    ]});
-    let r = send(&ctx, Req::post("/v1/telemetry/events").json(batch.clone())).await;
-    assert_eq!(r.status, 202, "{:?}", r.json);
-    assert_eq!(r.json, json!({"accepted": 3, "forwarded": false}));
+    let batch = json!({"events": [{"source": "cli", "step": "login.done", "name": "cli.step"}]});
+    let r = send(&ctx, Req::post("/v1/telemetry/events").json(batch)).await;
+    assert_eq!(r.status, 404, "{}", r.json);
 
-    let r = send(
-        &ctx,
-        Req::post("/v1/telemetry/events")
-            .header("x-accounts-telemetry", "off")
-            .json(batch),
-    )
-    .await;
-    assert_eq!(r.status, 202);
-    assert_eq!(r.json["forwarded"], false);
-
-    let r = send(
-        &ctx,
-        Req::post("/v1/telemetry/events").json(json!({"events": [
-            {"source": "cli", "step": "x", "name": "Bad Name"}
-        ]})),
-    )
-    .await;
-    assert_eq!(r.status, 422);
-    assert!(r.json["error"]["details"]["fields"]["events[0].name"].is_string());
-
-    let many: Vec<Value> = (0..51)
-        .map(|_| json!({"source": "cli", "step": "x", "name": "cli.step"}))
-        .collect();
-    let r = send(
-        &ctx,
-        Req::post("/v1/telemetry/events").json(json!({"events": many})),
-    )
-    .await;
-    assert_eq!(r.status, 422);
-    assert!(r.json["error"]["details"]["fields"]["events"].is_string());
-
-    let r = send(&ctx, Req::post("/v1/telemetry/events").json(json!({}))).await;
-    assert_eq!(r.status, 422, "events is required");
-}
-
-/// Names of the captured telemetry events (and empties the sink).
-fn drain(sink: &accounts_core::telemetry::CapturedEvents) -> Vec<String> {
-    let mut events = sink.lock().expect("sink");
-    let names = events
-        .iter()
-        .map(|e| e["event"].as_str().unwrap_or_default().to_string())
-        .collect();
-    events.clear();
-    names
-}
-
-#[tokio::test]
-async fn telemetry_opt_out_covers_every_event_of_the_request() {
-    let mut ctx = TestContext::new().await;
-    let (telemetry, sink) = accounts_core::telemetry::Telemetry::capturing();
-    ctx.state.telemetry = telemetry;
     let carbon = ctx.carbon().await;
     let token = ctx.first_party_tokens(&carbon).await.access_token;
-    let rename = |name: &str| {
-        Req::patch("/v1/me")
-            .bearer(&token)
-            .json(json!({"display_name": name}))
-    };
-
-    // Opted in: the request event and the event the handler records.
-    let r = send(&ctx, rename("Telemetry One")).await;
-    assert_eq!(r.status, 200, "{}", r.json);
-    let events = drain(&sink);
-    assert!(
-        events.contains(&"http.request".to_string())
-            && events.contains(&"account.profile.updated".to_string()),
-        "{events:?}"
-    );
-
-    // X-Accounts-Telemetry: off drops both.
-    let r = send(
-        &ctx,
-        rename("Telemetry Two").header("x-accounts-telemetry", "off"),
-    )
-    .await;
-    assert_eq!(r.status, 200);
-    assert_eq!(drain(&sink), Vec::<String>::new());
-
-    // So does the account site's cookie, even next to a Bearer token.
-    let r = send(
-        &ctx,
-        rename("Telemetry Three").header("cookie", "sa_telemetry=off"),
-    )
-    .await;
-    assert_eq!(r.status, 200);
-    assert_eq!(drain(&sink), Vec::<String>::new());
-
-    // Client events are not forwarded for an opted-out caller either.
-    let batch = json!({"events": [{"source": "cli", "step": "login.done", "name": "cli.step"}]});
-    let r = send(
-        &ctx,
-        Req::post("/v1/telemetry/events")
-            .header("cookie", "sa_telemetry=off")
-            .json(batch.clone()),
-    )
-    .await;
-    assert_eq!(r.status, 202);
-    assert_eq!(r.json["forwarded"], false);
-    assert_eq!(drain(&sink), Vec::<String>::new());
-    let r = send(&ctx, Req::post("/v1/telemetry/events").json(batch)).await;
-    assert_eq!(r.json["forwarded"], true);
-    assert!(drain(&sink).contains(&"cli.step".to_string()));
-
-    // Background work (outside any request) is the service's own and keeps reporting.
-    ctx.state
-        .telemetry
-        .record("worker", "test", "worker.event", json!({}));
-    assert_eq!(drain(&sink), vec!["worker.event".to_string()]);
-}
-
-/// Client telemetry reaches Space Station cut down to what the CLI reports, word for word:
-/// identifiers and free text a client adds are dropped or forwarded as `other`, whatever their
-/// shape, and events that aren't the CLI's are not forwarded at all.
-#[tokio::test]
-async fn telemetry_forwards_only_known_fields_in_their_shapes() {
-    let mut ctx = TestContext::new().await;
-    let (telemetry, sink) = accounts_core::telemetry::Telemetry::capturing();
-    ctx.state.telemetry = telemetry;
-    let batch = json!({"events": [
-        {"source": "cli", "step": "app webhook set", "name": "cli.command", "progress": 1.0,
-         "data": {
-            "command": "app webhook set", "cli_version": "0.4.0", "os": "macos", "arch": "aarch64",
-            "outcome": "error", "exit_code": 4, "error_code": "webhook_not_set", "duration_ms": 812,
-            "json": true, "account_kind": "carbon",
-            // Never forwarded: identifiers, free text, unknown fields, wrong shapes.
-            "email": "saket@example.com", "uuid": "zQo", "id": "c:saket", "message": "it broke for Saket",
-            "path": "/Users/saket/.silicon", "nested": {"token": "sat_secret"},
-            "exit_code_text": "four", "app": "briefcase"
-         }},
-        {"source": "cli", "step": "login.slt.issued", "name": "cli.step", "progress": 1.0,
-         "data": {"app": "briefcase", "command": "login", "kind": "silicon"}},
-        {"source": "cli", "step": "login.federated.started", "name": "cli.step", "progress": 0.3,
-         "data": {"source": "@/home/runner/work/token.jwt", "command": "login"}},
-        {"source": "cli", "step": "login.done", "name": "cli.step",
-         "data": {"method": "device", "kind": "Saket's laptop", "os": "Saket's Mac", "command": "login --as saket@example.com",
-                  "cli_version": "0.4.0; rm -rf /", "duration_ms": -5, "error_code": null}},
-        {"source": "cli", "step": "signed in as saket@example.com", "name": "cli.step", "data": {}},
-        // Identifiers in the shape of the CLI's words: a step name, a command path, a code.
-        {"source": "cli", "step": "login.saket_example_com", "name": "cli.step", "progress": 0.4155550100,
-         "data": {"command": "saket example com", "os": "saket", "arch": "saket_laptop",
-                  "error_code": "saket_example_com"}},
-        {"source": "cli", "step": "login as saket", "name": "cli.command", "data": {}},
-        // Not the CLI's events: not forwarded.
-        {"source": "saket.example.com", "step": "login.done", "name": "cli.step", "data": {}},
-        {"source": "cli", "step": "login.done", "name": "saket.example.com", "data": {}}
-    ]});
-    let r = send(&ctx, Req::post("/v1/telemetry/events").json(batch)).await;
-    assert_eq!(r.status, 202, "{}", r.json);
-    assert_eq!(r.json, json!({"accepted": 9, "forwarded": true}));
-    let events: Vec<Value> = sink
-        .lock()
-        .expect("sink")
-        .iter()
-        .filter(|e| e["context"]["reported_by"] == "client")
-        .cloned()
-        .collect();
-    assert_eq!(events.len(), 7, "{events:?}");
-    assert_eq!(events[0]["step"], "app webhook set");
-    assert_eq!(
-        events[0]["context"],
-        json!({
-            "command": "app webhook set", "cli_version": "0.4.0", "os": "macos", "arch": "aarch64",
-            "outcome": "error", "exit_code": 4, "error_code": "webhook_not_set", "duration_ms": 812,
-            "json": true, "account_kind": "carbon", "reported_by": "client",
-        })
-    );
-    // An app id only on the short-lived-token step.
-    assert_eq!(
-        events[1]["context"],
-        json!({"app": "briefcase", "command": "login", "kind": "silicon", "reported_by": "client"})
-    );
-    // The token source can name a file: dropped.
-    assert_eq!(
-        events[2]["context"],
-        json!({"command": "login", "reported_by": "client"})
-    );
-    // Known fields with values of another shape are dropped, or forwarded as `other`.
-    assert_eq!(
-        events[3]["context"],
-        json!({"method": "device", "os": "other", "command": "other", "error_code": null, "reported_by": "client"})
-    );
-    // A step that is none of the CLI's is not forwarded as written, whatever its shape.
-    assert_eq!(events[4]["step"], "other");
-    assert_eq!(events[5]["step"], "other");
-    assert_eq!(
-        events[5]["context"],
-        json!({"command": "other", "os": "other", "arch": "other", "error_code": "other", "reported_by": "client"})
-    );
-    assert_eq!(events[6]["step"], "other");
-    let text = serde_json::to_string(&events).expect("json");
-    for leaked in [
-        "saket",
-        "Saket",
-        "zQo",
-        "sat_secret",
-        "/home/runner",
-        "rm -rf",
-        "415555",
+    for (header, value) in [
+        ("x-accounts-telemetry", "off"),
+        ("x-accounts-telemetry", "on"),
+        ("x-accounts-telemetry", "not-a-flag"),
+        ("cookie", "sa_telemetry=off"),
     ] {
-        assert!(
-            !text.contains(leaked),
-            "{leaked} reached Space Station: {text}"
-        );
+        let r = send(
+            &ctx,
+            Req::patch("/v1/me")
+                .bearer(&token)
+                .header(header, value)
+                .json(json!({"display_name": "Quiet"})),
+        )
+        .await;
+        assert_eq!(r.status, 200, "{header}: {value}: {}", r.json);
+        let r = send(&ctx, Req::get("/v1/meta").header(header, value)).await;
+        assert_eq!(r.status, 200, "{header}: {value}: {}", r.json);
     }
 }
 

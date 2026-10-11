@@ -84,6 +84,5 @@ instance, e.g. a local one at `http://localhost:8590` (the account site, which f
   checked), 3 sign-in required or refused, 4 not found, 5 conflict, 6 rate limited or
   locked. See `silicon-accounts docs troubleshooting`.
 
-Telemetry (command, outcome, timing; never tokens, ids or contact details) is on by
-default; turn it off with `silicon-accounts config telemetry off` or `ACCOUNTS_TELEMETRY=0`.
+Silicon Accounts records no telemetry.
 Updates are handled by Silicon Apps; the CLI never updates itself.

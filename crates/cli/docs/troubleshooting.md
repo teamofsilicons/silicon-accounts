@@ -43,7 +43,7 @@ on stdout instead. Quote the request id when you report a bug.
 ## Signed in to the wrong place?
 
 ```sh
-silicon-accounts config get        # url, home, telemetry, app and where each value comes from
+silicon-accounts config get        # url, home, app and where each value comes from
 silicon-accounts login status --json
 ```
 

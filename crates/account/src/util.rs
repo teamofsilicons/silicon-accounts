@@ -3,7 +3,7 @@
 use accounts_core::models::ActorKind;
 use accounts_core::repo::audit::{self, AuditEntry};
 use accounts_core::repo::idempotency;
-use accounts_core::{ApiError, ApiResult, AppState};
+use accounts_core::{ApiError, ApiResult};
 use serde::Serialize;
 use serde_json::{Value, json};
 use sqlx::PgConnection;
@@ -39,12 +39,6 @@ pub(crate) async fn audit_self(
         },
     )
     .await
-}
-
-/// Records a telemetry event about an account action (a no-op unless Space Station is
-/// configured). `context` must never hold personal data: no ids, uuids, emails or numbers.
-pub(crate) fn track(state: &AppState, step: &str, name: &str, context: Value) {
-    state.telemetry.record("api.account", step, name, context);
 }
 
 /// `{"items":[...],"next_cursor":null}` for lists that always fit in one page.

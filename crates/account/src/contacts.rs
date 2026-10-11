@@ -29,7 +29,7 @@ use serde_json::{Value, json};
 use sqlx::PgConnection;
 use uuid::Uuid;
 
-use crate::util::{audit_self, idem_scope, single_page, track, ts};
+use crate::util::{audit_self, idem_scope, single_page, ts};
 
 /// Attempts to add an email or phone number (both kinds together) per account: 20 per 10
 /// minutes. Every attempt counts, including those answered 409 or 422.
@@ -144,12 +144,6 @@ async fn add(
         .await?;
         tx.commit().await?;
         delivery::spawn_deliver(state, message_id);
-        track(
-            state,
-            kind.code(),
-            "account.contact.code_sent",
-            json!({ "channel": kind.code() }),
-        );
         let ch = &created.challenge;
         Ok((
             StatusCode::CREATED,
@@ -267,12 +261,6 @@ async fn verify(
         .await?;
         let body = list_body(&mut tx, kind, me.uuid()).await?;
         tx.commit().await?;
-        track(
-            state,
-            kind.code(),
-            "account.contact.added",
-            json!({ "channel": kind.code(), "primary": outcome.became_primary }),
-        );
         Ok((StatusCode::OK, body))
     })
     .await
@@ -307,14 +295,6 @@ async fn make_primary(
     }
     let body = list_body(&mut tx, kind, me.uuid()).await?;
     tx.commit().await?;
-    if changed {
-        track(
-            state,
-            kind.code(),
-            "account.contact.primary_changed",
-            json!({ "channel": kind.code() }),
-        );
-    }
     Ok(Json(body))
 }
 
@@ -343,12 +323,6 @@ async fn remove(
     .await?;
     let body = list_body(&mut tx, kind, me.uuid()).await?;
     tx.commit().await?;
-    track(
-        state,
-        kind.code(),
-        "account.contact.removed",
-        json!({ "channel": kind.code() }),
-    );
     Ok(Json(body))
 }
 

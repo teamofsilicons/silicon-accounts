@@ -26,9 +26,8 @@
 use std::time::Duration;
 
 use accounts_core::config::DeliveryMode;
-use accounts_core::delivery::{self, DeliveryOutcome, MAX_ATTEMPTS, OutboundMessage};
+use accounts_core::delivery::{self, DeliveryOutcome, OutboundMessage};
 use accounts_core::{ApiResult, AppState};
-use serde_json::json;
 use tokio::time::Instant;
 
 use crate::Shutdown;
@@ -75,7 +74,7 @@ pub enum SendResult {
 }
 
 impl SendResult {
-    /// Short label for logs and telemetry event names (`message.<label>`).
+    /// Short label of the result (`sent`, `retrying`, `abandoned`…).
     pub fn label(&self) -> &'static str {
         match self {
             SendResult::Done(DeliveryOutcome::Sent { .. }) => "sent",
@@ -86,20 +85,6 @@ impl SendResult {
             SendResult::Abandoned => "abandoned",
             SendResult::Error(_) => "error",
         }
-    }
-}
-
-/// Telemetry progress of a message after an attempt: 1.0 once it is settled (sent, failed for
-/// good, nothing to do), otherwise the share of its [`MAX_ATTEMPTS`] attempts used so far
-/// (`attempts` counts the current one), capped below 1.0.
-pub fn progress(result: &SendResult, attempts: i32) -> f64 {
-    match result {
-        SendResult::Done(
-            DeliveryOutcome::Sent { .. }
-            | DeliveryOutcome::Failed { .. }
-            | DeliveryOutcome::Skipped,
-        ) => 1.0,
-        _ => (f64::from(attempts.max(0)) / f64::from(MAX_ATTEMPTS)).min(0.99),
     }
 }
 
@@ -160,14 +145,14 @@ pub async fn send_due_within(state: &AppState, budget: Duration) -> ApiResult<Se
     Ok(summary)
 }
 
-/// Sends one claimed message through core, bounded by `deadline`; logs and records telemetry.
+/// Sends one claimed message through core, bounded by `deadline`, and logs what went wrong.
 pub async fn send_claimed(state: &AppState, msg: OutboundMessage, deadline: Instant) -> SendResult {
     let sent = tokio::time::timeout_at(
         deadline,
         delivery::deliver_claimed(&state.db, state.sender.as_ref(), &state.settings, &msg),
     )
     .await;
-    let result = match sent {
+    match sent {
         Ok(Ok(outcome)) => SendResult::Done(outcome),
         Ok(Err(e)) => {
             // The claim pushed next_attempt_at 60 s ahead, so the message is retried then.
@@ -183,21 +168,7 @@ pub async fn send_claimed(state: &AppState, msg: OutboundMessage, deadline: Inst
             );
             SendResult::Abandoned
         }
-    };
-    state.telemetry.record_progress(
-        "worker",
-        "message_send",
-        &format!("message.{}", result.label()),
-        Some(progress(&result, msg.attempts)),
-        json!({
-            "channel": msg.channel,
-            "purpose": msg.purpose,
-            "attempt": msg.attempts,
-            "max_attempts": MAX_ATTEMPTS,
-            "sender": state.sender.name(),
-        }),
-    );
-    result
+    }
 }
 
 /// The message loop: sends until `shutdown` triggers, then lets the sends in flight finish.
@@ -250,22 +221,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn progress_is_settled_or_a_share_of_the_attempts() {
+    fn labels_name_the_result() {
         let sent = SendResult::Done(DeliveryOutcome::Sent {
             provider_message_id: "x".into(),
         });
-        assert_eq!(progress(&sent, 3), 1.0);
-        let failed = SendResult::Done(DeliveryOutcome::Failed {
-            error: "bad address".into(),
-        });
-        assert_eq!(progress(&failed, 1), 1.0);
+        assert_eq!(sent.label(), "sent");
         let retrying = SendResult::Done(DeliveryOutcome::Retrying {
             next_attempt_at: time::OffsetDateTime::now_utc(),
             error: "503".into(),
         });
-        assert_eq!(progress(&retrying, 2), 0.25);
-        assert_eq!(progress(&SendResult::Abandoned, 1), 0.125);
-        assert_eq!(progress(&SendResult::Error("db".into()), 8), 0.99);
         assert_eq!(retrying.label(), "retrying");
         assert_eq!(SendResult::Abandoned.label(), "abandoned");
     }

@@ -102,7 +102,7 @@ export const journeys: Journey[] = [
     async run(ctx) {
       const { env, results } = ctx;
       const port = sparePort(env, 6);
-      const server = runBinary(env, "accounts-api", { ACCOUNTS_BIND_ADDR: `127.0.0.1:${port}`, ACCOUNTS_COOKIE_SECURE: "true", ACCOUNTS_WORKER_ENABLED: "false", ACCOUNTS_TELEMETRY_ENABLED: "false" }, { stackEnv: true });
+      const server = runBinary(env, "accounts-api", { ACCOUNTS_BIND_ADDR: `127.0.0.1:${port}`, ACCOUNTS_COOKIE_SECURE: "true", ACCOUNTS_WORKER_ENABLED: "false" }, { stackEnv: true });
       try {
         const readyMs = await waitReady(`http://127.0.0.1:${port}/readyz`, server);
         results.metric("secure-cookie accounts-api ready after", readyMs);

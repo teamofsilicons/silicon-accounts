@@ -1,5 +1,6 @@
 """Exercise immutable release preparation without AWS/systemd side effects."""
 import ast
+import contextlib
 import hashlib
 import io
 import os
@@ -10,10 +11,13 @@ import unittest
 
 # install.py remains an executable operator script. Load just its pure helper.
 source = ast.parse(Path(__file__).with_name('install.py').read_text())
-function = next(node for node in source.body if isinstance(node, ast.FunctionDef) and node.name == 'prepare_release')
+wanted = [node for node in source.body
+          if (isinstance(node, ast.FunctionDef) and node.name in ('prepare_release', 'api_environment'))
+          or (isinstance(node, ast.Assign) and any(getattr(t, 'id', None) == 'RETIRED' for t in node.targets))]
 namespace = {'hashlib': hashlib, 'os': os, 'tarfile': tarfile}
-exec(compile(ast.Module(body=[function], type_ignores=[]), 'install.py', 'exec'), namespace)
+exec(compile(ast.Module(body=wanted, type_ignores=[]), 'install.py', 'exec'), namespace)
 prepare_release = namespace['prepare_release']
+api_environment = namespace['api_environment']
 
 
 class ReleaseTests(unittest.TestCase):
@@ -41,6 +45,21 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'differs'):
                 prepare_release(archive, release)
             self.assertEqual(executable.read_bytes(), b'changed')
+
+
+class EnvironmentTests(unittest.TestCase):
+    def test_retired_telemetry_keys_never_reach_the_api_environment(self):
+        secret = {
+            'ACCOUNTS_PUBLIC_URL': 'https://accounts.example',
+            'ACCOUNTS_TELEMETRY_ENABLED': 'true',
+            'ACCOUNTS_TELEMETRY_TABLE_KEY': 'old-key',
+            'DEVELOPER_SESSION_SECRET': 'developer-only',
+        }
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            api = api_environment(secret)
+        self.assertEqual(api, {'ACCOUNTS_PUBLIC_URL': 'https://accounts.example'})
+        self.assertIn('ACCOUNTS_TELEMETRY_TABLE_KEY', printed.getvalue())
+        self.assertNotIn('old-key', printed.getvalue())
 
 
 if __name__ == '__main__':

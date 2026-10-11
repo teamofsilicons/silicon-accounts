@@ -4,7 +4,8 @@ The shared foundation of the Silicon Accounts service. Every server crate (auth,
 silicons, apps, proofs, worker, server) builds on it, and feature crates never depend on each
 other. Everything shared lives here: configuration, the database and migrations, the API error
 shape, account ids and uuids, cryptography, JWTs, models, views, input normalization,
-repositories, webhook events, email/SMS delivery, telemetry and the HTTP extractors.
+repositories, webhook events, email/SMS delivery, logging and the HTTP extractors. Silicon
+Accounts records no telemetry.
 
 Contract: `understanding/UNDERSTANDING.md`. Build spec: `00-overview.md`, `01-schema.sql`, `02-api.md`.
 
@@ -103,8 +104,8 @@ async fn change_my_id(
 
 | module | what | key items |
 |---|---|---|
-| `config` | `ACCOUNTS_*` settings, dev defaults, production refusals | `Settings::from_env`, `Settings::for_tests`, `Settings::from_lookup`, `VARIABLES`, `DEV_*` |
-| `state` | shared state | `AppState { db, settings, keys, http, sender, app_cache, telemetry, federation, identity_key }` (+ `identity_signer()`, `with_identity_key`), `Keys { pepper, keyring, jwt, stk }` |
+| `config` | `ACCOUNTS_*` settings, dev defaults, production refusals | `Settings::from_env`, `Settings::for_tests`, `Settings::from_lookup`, `VARIABLES`, `RETIRED_VARIABLES` + `retired_variables_set` (old telemetry variables `accounts-api` warns about at boot), `DEV_*` |
+| `state` | shared state | `AppState { db, settings, keys, http, sender, app_cache, federation, identity_key }` (+ `identity_signer()`, `with_identity_key`), `Keys { pepper, keyring, jwt, stk }` |
 | `db` | pool + embedded migrations | `connect`, `connect_url`, `migrate` → `MigrationReport`, `pending_migrations`, `ping`, `MIGRATOR` |
 | `error` | API errors | `ApiError`, `ApiResult`, `FieldErrors`, `OAuthError` |
 | `ids` | UUIDv4 generation, legacy identifier parsing, `c:`/`si:` ids, suggestions | `new_account_uuid`, `is_account_uuid`, `is_standard_account_uuid`, `uuid_for_number`, `number_for_uuid`, `AccountId`, `IdError`, `validate_handle`, `handle_candidates`, `pick_available`, `membership_id`, `validate_app_id` |
@@ -135,7 +136,7 @@ async fn change_my_id(
 | `silicon_keys` | Silicon key credentials | `parse_public_key`, `PublicKey::fingerprint`, `read_assertion`, `Assertion::signed_by`, `sign_in` (assertion to first-party tokens), `SiliconKey`, `audiences` |
 | `events` | webhooks and the event stream | `APP_UPDATE_CHOICES`, `DEFAULT_UPDATES`, `APP_EVENT_TYPES`, `SILICON_EVENT_TYPES`, `event_types_for_updates`, `ping_subscription`, `notify_id_changed`, `notify_profile_updated`, `account_deleted`, `membership_signed_out`, `signed_out_for_families`, `membership_access_removed`, `notify_custodian_changed`, `silicon_custodian_declined`, `silicon_custodian_expired`, `emit_to_app`, `emit_to_silicon`, `ping_app`, `ping_silicon`, `current_url`, `current_secret`, `new_webhook_secret`, `retry_delay_seconds`, `signout_reason::*`, `declined_reason::*`, header constants |
 | `delivery` | email/SMS | `enqueue`, `enqueue_otp`, `spawn_deliver`, `deliver_now`, `claim_due`, `deliver_claimed` (claim-checked), `CLAIM_SECONDS`, `Sender`, `PostmarkSender`, `TwilioSender`, `LocalSender`, `templates::*`, `extract_code` |
-| `telemetry` | Space Station + logs | `Telemetry::record`, `record_progress`, `Telemetry::capturing` (tests), `request_opts_out(&headers)` (`X-Accounts-Telemetry: off` or cookie `sa_telemetry=off`), `with_request_opt_out` (the server wraps each request; every event recorded inside an opted-out request is dropped), `init_logging` |
+| `logging` | process logs | `init_logging` (JSON lines in production) |
 | `http` | extractors and helpers | `AccountAuth`, `CarbonAuth`, `SiliconAuth`, `AppAuth`, `AppOrOwner`, `authenticate_client`, `ClientMeta`, `IdempotencyKey`, `Json`, `Query`, `Path`, `parse_form_or_json`, `check_origin`, `cookies::*`, `pagination::*`, `request_id::middleware` |
 | `test_support` (feature) | tests | `TestContext`, `TestDb`, `Req`, `call`, factories |
 
@@ -161,7 +162,7 @@ Useful methods: `settings.issuer()`, `settings.url("/v1/photos/x")`, `settings.p
 `secrecy::SecretString` (`use accounts_core::secrecy::ExposeSecret;`).
 
 `AppState::new(settings, pool)` builds keys, the shared `reqwest::Client` (10 s timeout, no
-redirects), the sender for the delivery mode, the app credential cache and telemetry.
+redirects), the sender for the delivery mode and the app credential cache.
 `state.keys.pepper`, `state.keys.keyring`, `state.keys.jwt`, `state.keys.stk` (Argon2id params).
 
 ## error
@@ -520,7 +521,7 @@ and carries the failure streak and cooldown. `challenge.masked_destination()`,
 - `rate_limit::enforce(&mut conn, &rate_limit::bucket("ids_available:ip", ip), rate_limit::limits::IDS_AVAILABLE_PER_IP, "id lookups from this network")`
   → 429 with `Retry-After`. Limits: `IDS_AVAILABLE_PER_IP` 120/min, `SILICON_SELF_CREATE_PER_IP`
   10/h, `REPORTS_PER_IP` 5/h, `OTP_SEND_PER_IP` 30/10 min (applied by `otp::send`),
-  `SILICON_LOGIN_PER_IP` 60/min (bucket `SILICON_LOGIN_BUCKET`, shared by `POST /v1/silicons/login` and the jwt-bearer grant), `TELEMETRY_PER_IP` 120/min. Use `enforce_pool` outside transactions.
+  `SILICON_LOGIN_PER_IP` 60/min (bucket `SILICON_LOGIN_BUCKET`, shared by `POST /v1/silicons/login` and the jwt-bearer grant). Use `enforce_pool` outside transactions.
   `peek` answers without counting (refuse a flood before any work, count successes only);
   `take(&mut tx, bucket, n, limit)` takes `n` at once (weighted budgets such as imported rows).
 - `idempotency::run(&state, key.as_deref(), &scope, &body, secret_bearing, || async { Ok((status, json)) })`
@@ -637,7 +638,7 @@ async fn my_endpoint() {
 ```
 
 The test state uses `Settings::for_tests()` (environment `test`, local delivery, dev keys, worker
-off, telemetry off) and fast Argon2 parameters. Databases live on `ACCOUNTS_TEST_ADMIN_URL`
+off) and fast Argon2 parameters. Databases live on `ACCOUNTS_TEST_ADMIN_URL`
 (default `postgres://postgres@127.0.0.1:5444/postgres`; start it with `scripts/dev-db.sh`).
 
 ## Commands

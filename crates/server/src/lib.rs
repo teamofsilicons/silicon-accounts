@@ -3,11 +3,11 @@
 //! Composes the Silicon Accounts service:
 //!
 //! - [`build_router`]: every feature crate's router (auth, oauth, account, silicons, apps,
-//!   proofs, worker) plus the server's own endpoints ([`routes`]: health, meta, reports,
-//!   telemetry, dev outbox), the account site and its embed/SDK files ([`web`]), the fallback
-//!   (JSON 404 for unknown API routes, the site for everything else), all wrapped in the
-//!   middleware stack ([`middleware`]: request ids, logging + Space Station telemetry, security
-//!   headers, CORS, JSON errors, body limits, time budgets, panic recovery).
+//!   proofs, worker) plus the server's own endpoints ([`routes`]: health, meta, reports, dev
+//!   outbox), the account site and its embed/SDK files ([`web`]), the fallback (JSON 404 for
+//!   unknown API routes, the site for everything else), all wrapped in the middleware stack
+//!   ([`middleware`]: request ids, logging, security headers, CORS, JSON errors, body limits,
+//!   time budgets, panic recovery). Silicon Accounts records no telemetry.
 //! - [`spawn_background`]: every crate's background tasks, with a graceful stop for the worker.
 //! - [`first_party::sync_developer_app`]: at start-up, the stored redirect URI of the developer
 //!   platform's first-party app follows `ACCOUNTS_DEVELOPER_URL`.

@@ -14,8 +14,6 @@ jobs:
         os: [ubuntu-24.04, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
-    env:
-      ACCOUNTS_TELEMETRY: '0'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

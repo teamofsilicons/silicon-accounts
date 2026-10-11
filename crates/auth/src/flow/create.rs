@@ -15,7 +15,6 @@ use accounts_core::{ApiError, ApiResult, AppState};
 use axum::extract::State;
 use axum::http::{HeaderMap, Method as HttpMethod, StatusCode};
 use serde::Deserialize;
-use serde_json::json;
 
 use super::browser;
 use super::details::{self, Plan, Standing};
@@ -24,7 +23,7 @@ use super::next;
 use super::signup;
 use super::view::{self, ViewContext};
 use super::{FlowApp, FlowResponse};
-use crate::util::{telemetry, with_query};
+use crate::util::with_query;
 
 /// Flows a single network may start per minute (abuse guard; generous for shared NATs).
 pub const FLOW_CREATE_PER_IP: Limit = Limit::new(300, 60);
@@ -439,20 +438,6 @@ pub async fn create_flow(
     )
     .await?;
     tx.commit().await?;
-    telemetry(
-        &state,
-        "flow.created",
-        Some(0.1),
-        json!({
-            "app_id": app_id,
-            "step": flow.step.as_str(),
-            "prompt": prompt.to_stored(),
-            "pkce": code_challenge_method,
-            "openid": flow.wants_openid(),
-            "method_hint": method_hint.map(|m| m.as_str()),
-            "intent": intent.as_str(),
-        }),
-    );
     Ok(FlowResponse {
         status: StatusCode::CREATED,
         view,

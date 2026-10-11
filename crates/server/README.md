@@ -83,7 +83,6 @@ once with `stream.closed` (`server_restarting`), so clients reconnect elsewhere 
 | `GET /readyz` | `200 {"database":"ok"}`, or `503` with an error object |
 | `GET /v1/meta` | name, version, environment, public URL, Silicon Apps URL, docs URL (`docs_url`, ACCOUNTS_DOCS_URL, default `https://developers.teamofsilicons.com/docs/accounts`), developer platform (`developer_url`, ACCOUNTS_DEVELOPER_URL, default `https://developers.teamofsilicons.com`, `http://localhost:8600` outside production), managed providers, delivery mode |
 | `POST /v1/reports` | bug report (optional session; 5/hour per IP; message 1..10000 chars; `pr_url` https; `Idempotency-Key`) mailed to every `ACCOUNTS_REPORT_RECIPIENTS` address → `201 {"report_id","status":"queued","recipients":3}` |
-| `POST /v1/telemetry/events` | ≤ 50 events named `^[a-z0-9_.]{1,64}$` (the CLI sends `cli.command` / `cli.step`), forwarded to Space Station unless the caller opted out (`X-Accounts-Telemetry: off` or the cookie `sa_telemetry=off`), cut down to the CLI's own words (`routes/telemetry/lists.rs`): only `source` `cli` events, `step`, `command`, `os`, `arch` and `error_code` as listed words or `other`, the other known `data` fields in their shapes, nothing else → `202 {"accepted","forwarded"}` |
 | `GET /openapi.json`, `GET /v1/openapi.json` | the OpenAPI 3.1 document (`openapi.json` in this crate, served without indentation; `tests/discovery.rs` keeps it equal to the routes) |
 | `GET /.well-known/agent.json` | the A2A agent card |
 | `GET /v1/capabilities[?require=a,b]` | what this deployment supports; 422 `capabilities_missing` when a required one isn't |
@@ -110,13 +109,10 @@ once with `stream.closed` (`server_restarting`), so clients reconnect elsewhere 
    most 52 MB of any body under the original `Content-Length`, and must still get the 413), the
    route's time budget, 5 s without data; past those, and after a time-budget 503, the answer
    carries `Connection: close`. HTTP/1 only (HTTP/2 resets an unread stream on its own).
-3. **Observe**: one log line per request inside a span carrying the request id; a Space Station
-   `http.request` event (source `api`, step `"{METHOD} {route template}"`, progress 1.0; route
-   template, method, status, duration — never raw paths or query strings). Health probes and
-   static files are skipped. A request that opted out (`X-Accounts-Telemetry: off`, or the
-   account site's cookie `sa_telemetry=off`) runs inside core's
-   `telemetry::with_request_opt_out`: neither this event nor any event its handler records is
-   sent.
+3. **Observe**: one log line per request inside a span carrying the request id (route template,
+   method, status, duration — never raw paths or query strings); health probes log at debug
+   level. Silicon Accounts records no telemetry: the `X-Accounts-Telemetry` header and the
+   `sa_telemetry` cookie older clients send are accepted and ignored.
 4. **Policy**: `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS when cookies are secure;
    HTML gets the site CSP (`frame-ancestors 'none'`) + `X-Frame-Options: DENY`; JSON gets
    `default-src 'none'` and, under `/v1`, `Cache-Control: no-store` unless the handler set one.
@@ -143,13 +139,12 @@ Static files: `/assets/*` (content-hashed) are `public, max-age=31536000, immuta
 asset is a 404, never the HTML; other build files are `no-cache`; dotfiles are never served;
 text is gzip-compressed when accepted (API JSON is not compressed).
 
-## Telemetry
+## No telemetry
 
-Every Space Station event carries source, step and progress: `http.request` (1.0),
-`report.submitted` (1.0), `api.started` / `api.stopped` (1.0), plus the worker's events (see
-its README) and client events forwarded by `POST /v1/telemetry/events` (their own progress).
-Nothing a request records is sent when that request opted out (header or cookie, see
-Middleware); background work keeps reporting.
+Silicon Accounts records no telemetry. `POST /v1/telemetry/events` is gone (404; the released
+CLI ignores the answer). `ACCOUNTS_TELEMETRY_ENABLED`, `ACCOUNTS_TELEMETRY_TABLE_KEY`,
+`SPACE_STATION_HOME` and `SPACE_STATION_URL` are retired: `accounts-api` ignores them and logs a
+warning at boot for each one still set.
 
 ## Tests
 
@@ -161,7 +156,7 @@ Driven in-process through `build_router` (tower `oneshot`) against a throwaway d
 endpoints, security headers, CORS, the SPA/static/embed/SDK serving, every body-limit class
 (64 KB, 2 MB photos — all three routes, 512 KB sign-in config, 5 MB sync, 50 MB imports —
 declared and streamed), every time budget, RFC 6749 errors on the OAuth endpoints, panics,
-background start/stop, the telemetry opt-out covering handler events, and a custodian's Silicon
+background start/stop, the removed telemetry route and the ignored opt-out, and a custodian's Silicon
 photo plus the history entries that name the Silicon.
 
 `tests/early_answers.rs` serves the router on a real socket and talks raw HTTP/1.1 to it, the way

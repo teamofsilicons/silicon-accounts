@@ -12,7 +12,6 @@ use crate::crypto::{CryptoError, Keyring, Pepper};
 use crate::delivery::Sender;
 use crate::jwt::{JwtError, JwtKeys};
 use crate::repo::apps::AppCredentialCache;
-use crate::telemetry::Telemetry;
 
 /// Key material derived from settings.
 #[derive(Clone, Debug)]
@@ -75,7 +74,6 @@ pub struct AppState {
     pub sender: Arc<dyn Sender>,
     /// 60 s cache of verified app credentials.
     pub app_cache: AppCredentialCache,
-    pub telemetry: Telemetry,
     /// Fetches trusted OIDC issuers' keys (SSRF-guarded) and caches them.
     pub federation: crate::federation::FederationClient,
     /// The RS256 key of identity tokens, loaded from (or made in) the database on first use.
@@ -110,7 +108,6 @@ impl AppState {
         let keys = Keys::from_settings(&settings)?;
         let http = build_http_client()?;
         let sender = crate::delivery::sender_from_settings(&settings, &http);
-        let telemetry = Telemetry::from_settings(&settings);
         let federation =
             crate::federation::FederationClient::new(settings.federation_allow_loopback)
                 .map_err(StartupError::Http)?;
@@ -121,7 +118,6 @@ impl AppState {
             http,
             sender,
             app_cache: AppCredentialCache::new(),
-            telemetry,
             federation,
             identity_key: crate::identity_tokens::IdentityKeyCell::new(),
         })

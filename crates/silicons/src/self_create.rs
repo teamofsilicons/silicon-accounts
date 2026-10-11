@@ -278,14 +278,6 @@ async fn self_create(
         delivery::spawn_deliver(state, message_id);
     }
     tracing::info!(silicon = %silicon.uuid, id = ?silicon.handle, request = %request.id, "Silicon created its own account");
-    state.telemetry.record(
-        "api",
-        "silicon.self_create",
-        "silicon_self_created",
-        json!({"named_by": if recipient.to_email().is_some() { "email" } else { "id" },
-               "custodian_has_account": recipient.account.is_some(), "webhook": webhook_url.is_some(),
-               "stk_generated": new_stk.generated}),
-    );
 
     let mut conn = state.db.acquire().await?;
     let view = load_me(&mut conn, &silicon).await?;

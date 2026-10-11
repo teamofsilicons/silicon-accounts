@@ -117,15 +117,7 @@ All of it stays. When an app loses access to an account, or the account is delet
 
 ### Telemetry
 
-We send usage events to Space Station, the Team's own telemetry service. This is what reaches it, after our allow-list:
-
-- one event per API request: the route template (never the raw path or query string), the method, the status, the outcome, the duration and the request id;
-- each token grant: the grant type, the app id, the error code if it failed, and the duration;
-- the steps of hosted sign-ins: the app id, the method or provider, the step reached and the error code;
-- background work: webhook delivery outcomes, imports, reports, sweeps and the service starting;
-- from the `silicon-accounts` CLI, always through our API and never straight to Space Station: the command and step (as one of the CLI's own names, else `other`), the outcome, exit code, error code and duration, whether `--json` was on, the account kind, a few flags and counts, and the CLI version, operating system and architecture. An app id is kept only on the step that gets a short-lived token for that app. Nothing else gets through: no email, name, id, uuid, path or token.
-
-Every event also names the service, its environment and version. You can turn it off for everything you do: send `X-Accounts-Telemetry: off` on a request, flip the telemetry switch in the account site's settings, or run `silicon-accounts config telemetry off` (or set `ACCOUNTS_TELEMETRY=0`). Work we do later in the background still reports its outcome, because no request of yours is attached to it. [Telemetry](security.md#telemetry) has the details.
+Silicon Accounts records no telemetry. Our server's own logs keep each request's route template (never the raw path or query string), method, status and duration.
 
 ## Silicon Apps
 
@@ -174,7 +166,7 @@ So something deleted from a database can still be in a backup until that backup 
 | Postmark | The address, subject and text of every email Silicon Accounts sends: verification codes, custodian requests, reports to the Team, and Silicon Apps' invitations and reports, which Silicon Apps sends through us. | Whenever we email. |
 | Twilio | The phone number and text of every SMS (verification codes). | Whenever we text. |
 | Google and Apple | Your sign-in with them. We get back your subject at that provider, your email, whether it's verified, and your name (from Google, also a photo address) to suggest on the sign-up page. | Only when a Carbon signs in with Google or Apple. If the app set up its own Google or Apple client, the sign-in goes through that client. |
-| Space Station | The telemetry described above. It's run by the Team. | Unless you turn it off. |
+| Space Station | The telemetry Silicon Apps records, described above. It's run by the Team. | Unless you turn it off. |
 | Iris | The address of a default profile photo carries the account's uuid, so whoever shows that photo asks Iris for it. It's run by the Team. | Whenever a default photo is shown. |
 | GitHub | The download of `silicon-apps` itself by the install script. Every app after that, and every update, comes from us. | When you run `install.sh` or `install.ps1`. |
 
@@ -245,7 +237,7 @@ An account's last 20 sign-ins to your app (time, method and outcome, never an IP
 ## Related
 
 - [Accounts](accounts.md): what an account holds and every rule of deleting one.
-- [Security](security.md): how credentials are stored, telemetry in full, and how we run the service.
+- [Security](security.md): how credentials are stored and how we run the service.
 - [What your app sees about an account](what-apps-see.md): what each scope shares, and the user base.
 - [How imports work](imports.md): what an import creates and keeps.
 - [Limits](../reference/limits.md#retention): the retention schedule with every other limit.

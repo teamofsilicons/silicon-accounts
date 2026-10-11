@@ -58,7 +58,6 @@ Every command takes these, before or after the command name.
 | `ACCOUNTS_SILICON_KEY` | a Silicon's private key file for `silicon-accounts login`, instead of the STK (see `silicon-accounts silicon keys`) |
 | `ACCOUNTS_APP_ID` | the app for `silicon-accounts app …` |
 | `ACCOUNTS_APP_SECRET` | that app's secret |
-| `ACCOUNTS_TELEMETRY` | `0`, `false`, `no` or `off` turns telemetry off; `1`, `true`, `yes` or `on` turns it on; beats the config file |
 | `ACCOUNTS_NO_BROWSER` | any value but `0` or empty: never open a browser (the device sign-in prints its URL instead) |
 | `ACCOUNTS_TIMEOUT_SECONDS` | request timeout in whole seconds (default 30, at least 1) |
 | `ACCOUNTS_ALLOW_INSECURE_HTTP` | `1` allows plain `http://` to hosts other than this machine |
@@ -114,7 +113,7 @@ forgets the configured one.
 |---|---|
 | `session.json` | the signed-in account, its access and refresh tokens and the URL they belong to |
 | `session.lock` | the lock held while a session is refreshed or stored |
-| `config.json` | `url`, `telemetry` and `app` |
+| `config.json` | `url` and `app` |
 | `apps/<app_id>.json` | an app secret stored by `silicon-accounts app use <app_id> --secret-stdin` |
 | `requests/<request-id>.json` | the `sarq_` polling token of a Silicon self-created from this home |
 | `login-challenge.json` | a code sign-in waiting for its code |
@@ -248,34 +247,10 @@ itself, for problems it finds without asking the service:
 
 ## Telemetry
 
-While a command runs, the CLI buffers a few events. When the command ends, it sends them to
-`POST /v1/telemetry/events`, waiting at most 1.5 seconds, and the service forwards them to Space
-Station. Each event has `source: "cli"`, a `step`, a `progress` from 0 to 1, a `name` and a
-`data` object:
-
-- `cli.step` events for steps of multi-step flows: `login.silicon.started`,
-  `login.silicon_key.started`, `login.federated.started`, `login.code.sent`,
-  `login.device.code_shown`, `login.device.approved`, `login.done`, `login.slt.issued`,
-  `session.refreshed`, `session.reexchanged`, `silicon.create.custodian`,
-  `silicon.create.requested`, `silicon.create.accepted`, `token.identity.issued`,
-  `app.import.started`;
-- one `cli.command` event per command with `outcome`, `exit_code`, `error_code`, `duration_ms`,
-  `json` and `account_kind`.
-
-Every `data` also carries `command`, `cli_version`, `os` and `arch`. Tokens, STKs, secrets,
-account ids and uuids, and contact details are never sent; the only identifier is the app id in
-`login.slt.issued`. Nothing is sent when a command never contacted the service or couldn't reach
-it.
-
-The service checks every event again before it forwards anything: only the CLI's step names,
-command paths and known `data` fields, each in its known shape, reach Space Station, and anything
-else is dropped or sent as `other` ([the rules](api/service.md#post-v1telemetryevents)). The
-`source` that `login.federated.started` reports (where the CI token came from) is one of the
-fields dropped.
-
-Telemetry is on by default. `silicon-accounts config telemetry off` (or `ACCOUNTS_TELEMETRY=0`)
-turns it off, and then every request to the service also carries `X-Accounts-Telemetry: off`, so
-the service records no telemetry about those requests either.
+Silicon Accounts records no telemetry: the CLI sends no events. `silicon-accounts config telemetry …`
+(and `config get|set|unset telemetry`) still exits 0 so old scripts keep working, changes nothing
+and prints `Telemetry was removed from Silicon Accounts; there is nothing to turn on or off.`
+(`{"telemetry": false, "message": "…"}` with `--json`).
 
 ## Bug reports
 
@@ -557,15 +532,13 @@ As `silicon-accounts --help` prints it:
       app subscription test <ID>            Queue a test `ping` on a subscription
     app lookup <TARGET>                     Look up an account by uuid or id with the app's
                                             credentials
-  config                                    CLI settings: home directory, URL, telemetry
+  config                                    CLI settings: home directory, URL, app
     config home [DIR]                       Show or set the home directory that holds .accounts/
                                             (errors if it is not a directory)
     config get [KEY]                        Show settings and where each value comes from
-    config set <KEY> <VALUE>                Set a setting in config.json: url <URL> or telemetry
-                                            on|off
-    config unset <KEY>                      Remove a setting from config.json: url, telemetry or
-                                            app
-    config telemetry <STATE>                Turn telemetry on or off (it is on by default)
+    config set <KEY> <VALUE>                Set a setting in config.json: url <URL> or app
+                                            <APP_ID>
+    config unset <KEY>                      Remove a setting from config.json: url or app
   report <MESSAGE>                          Report a bug to the Silicon Accounts maintainers,
                                             optionally with the PR that fixes it
   docs [TOPIC]                              Read the bundled docs (guides for Silicons, Carbons
@@ -2962,7 +2935,7 @@ Also takes the [app credentials options](#silicon-accounts-app) and the [global 
 
 ### `silicon-accounts config`
 
-CLI settings: home directory, URL, telemetry.
+CLI settings: home directory, URL, app.
 
 Settings live in `{home}/.accounts/config.json`. Highly configurable with sensible defaults: flags win over environment variables, which win over the config file.
 
@@ -2974,9 +2947,8 @@ silicon-accounts config [OPTIONS] <COMMAND>
 |---|---|
 | [`home`](#silicon-accounts-config-home) | Show or set the home directory that holds .accounts/ (errors if it is not a directory) |
 | [`get`](#silicon-accounts-config-get) | Show settings and where each value comes from |
-| [`set`](#silicon-accounts-config-set) | Set a setting in config.json: url `<URL>` or telemetry on\|off |
-| [`unset`](#silicon-accounts-config-unset) | Remove a setting from config.json: url, telemetry or app |
-| [`telemetry`](#silicon-accounts-config-telemetry) | Turn telemetry on or off (it is on by default) |
+| [`set`](#silicon-accounts-config-set) | Set a setting in config.json: url `<URL>` or app `<APP_ID>` |
+| [`unset`](#silicon-accounts-config-unset) | Remove a setting from config.json: url or app |
 
 Examples, as `--help` prints them:
 
@@ -2984,7 +2956,7 @@ Examples, as `--help` prints them:
 silicon-accounts config get
 silicon-accounts config home /srv/scout
 silicon-accounts config set url http://127.0.0.1:8590
-silicon-accounts config telemetry off
+silicon-accounts config set app briefcase
 ```
 
 #### `silicon-accounts config home`
@@ -3020,11 +2992,11 @@ silicon-accounts config get [OPTIONS] [KEY]
 
 | argument or option | meaning |
 |---|---|
-| `[KEY]` | One key: url, telemetry, home, app |
+| `[KEY]` | One key: url, home, app |
 
 #### `silicon-accounts config set`
 
-Set a setting in config.json: url `<URL>` or telemetry on|off
+Set a setting in config.json: url `<URL>` or app `<APP_ID>`
 
 ```text
 silicon-accounts config set [OPTIONS] <KEY> <VALUE>
@@ -3032,12 +3004,12 @@ silicon-accounts config set [OPTIONS] <KEY> <VALUE>
 
 | argument or option | meaning |
 |---|---|
-| `<KEY>` | url or telemetry |
+| `<KEY>` | url or app |
 | `<VALUE>` | The value |
 
 #### `silicon-accounts config unset`
 
-Remove a setting from config.json: url, telemetry or app
+Remove a setting from config.json: url or app
 
 ```text
 silicon-accounts config unset [OPTIONS] <KEY>
@@ -3045,21 +3017,7 @@ silicon-accounts config unset [OPTIONS] <KEY>
 
 | argument or option | meaning |
 |---|---|
-| `<KEY>` | url, telemetry or app |
-
-#### `silicon-accounts config telemetry`
-
-Turn telemetry on or off (it is on by default).
-
-Telemetry sends self-contained events about CLI steps (command, outcome, timing; never tokens, ids or contact details). ACCOUNTS_TELEMETRY=0 also turns it off.
-
-```text
-silicon-accounts config telemetry [OPTIONS] <STATE>
-```
-
-| argument or option | meaning |
-|---|---|
-| `<STATE>` | on or off [possible values: on, off] |
+| `<KEY>` | url or app |
 
 ### `silicon-accounts report`
 

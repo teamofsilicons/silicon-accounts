@@ -6,8 +6,8 @@
 //!    an upload), so a client or proxy still uploading gets the answer instead of a reset
 //!    connection. With `Expect: 100-continue` it wraps the answer's body itself, so it sits
 //!    outside every layer that might read an answer's body.
-//! 3. [`observe`] — one log line per request (inside a span carrying the request id) and a
-//!    Space Station `http.request` event with the route template, method, status and duration.
+//! 3. [`observe`] — one log line per request (inside a span carrying the request id) with the
+//!    route template, method, status and duration. Silicon Accounts records no telemetry.
 //! 4. [`policy`] — security headers + CSP, CORS (`*` only for an app's public config, the SDK
 //!    and discovery; no CORS headers anywhere else), and JSON bodies for error responses that
 //!    were produced as plain text (405s, framework rejections).
@@ -71,10 +71,7 @@ pub fn apply(router: Router<AppState>, state: &AppState, policy: Policy) -> Rout
             state.clone(),
             policy::response_policy,
         ))
-        .layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            observe::observe,
-        ))
+        .layer(axum::middleware::from_fn(observe::observe))
         .layer(axum::middleware::from_fn_with_state(
             policy.timeouts,
             linger::linger,

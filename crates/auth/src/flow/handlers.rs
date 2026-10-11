@@ -12,7 +12,6 @@ use axum::extract::State;
 use axum::http::{HeaderMap, Method as HttpMethod};
 use cookie::Cookie;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sqlx::PgConnection;
 
 use super::browser::{self, BrowserAccount};
@@ -20,7 +19,6 @@ use super::model::{self, Flow, FlowError, Pending, Step};
 use super::signup::{self, NewSignupSession};
 use super::view::{self, ViewContext};
 use super::{FlowApp, FlowResponse, details, load_bound, next};
-use crate::util::telemetry;
 
 /// Builds the response view for a flow.
 async fn respond(
@@ -306,12 +304,6 @@ pub async fn continue_as(
     )
     .await?;
     tx.commit().await?;
-    telemetry(
-        &state,
-        "flow.continued",
-        Some(0.5),
-        json!({"app_id": fa.app.app_id, "next_step": flow.step.as_str()}),
-    );
     Ok(response)
 }
 
@@ -488,12 +480,6 @@ async fn send_signin_code(
     let response = respond(&mut tx, state, meta, None, &flow, &fa, Vec::new()).await?;
     tx.commit().await?;
     delivery::spawn_deliver(state, message_id);
-    telemetry(
-        state,
-        "flow.code_sent",
-        Some(0.3),
-        json!({"app_id": fa.app.app_id, "channel": channel.as_str()}),
-    );
     Ok(response)
 }
 
@@ -558,12 +544,6 @@ pub async fn resend_code(
     let response = respond(&mut tx, &state, &meta, None, &flow, &fa, Vec::new()).await?;
     tx.commit().await?;
     delivery::spawn_deliver(&state, message_id);
-    telemetry(
-        &state,
-        "flow.code_resent",
-        Some(0.3),
-        json!({"app_id": fa.app.app_id, "channel": previous.channel.as_str(), "purpose": previous.purpose.as_str()}),
-    );
     Ok(response)
 }
 
@@ -742,12 +722,6 @@ pub async fn verify_code(
     )
     .await?;
     tx.commit().await?;
-    telemetry(
-        &state,
-        "flow.code_verified",
-        Some(0.5),
-        json!({"app_id": fa.app.app_id, "channel": method, "next_step": flow.step.as_str()}),
-    );
     Ok(response)
 }
 

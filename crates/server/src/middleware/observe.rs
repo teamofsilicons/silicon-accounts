@@ -1,37 +1,23 @@
-//! Request logging and Space Station telemetry.
+//! Request logging. Silicon Accounts records no telemetry.
 //!
 //! Each request runs inside a `request` span (method, route, request id), so every log line a
-//! handler writes carries the request id. When it finishes, one line is logged and one
-//! self-contained `http.request` event goes to Space Station: source `api`, step
-//! `"{METHOD} {route template}"`, progress 1.0 (the request is answered), and the method,
-//! route, status, outcome and duration.
-//! Only route templates are recorded (`/v1/flows/{id}/verify`), never raw paths or query
-//! strings, which can carry ids and OAuth codes. Health probes and static files are skipped.
+//! handler writes carries the request id. When it finishes, one line is logged with the method,
+//! the route template, the status and the duration. Only route templates are logged
+//! (`/v1/flows/{id}/verify`), never raw paths or query strings, which can carry ids and OAuth
+//! codes. Health probes log at debug level.
 //!
-//! A request that opted out (`X-Accounts-Telemetry: off`, or the account site's cookie
-//! `sa_telemetry=off`) runs inside core's `telemetry::with_request_opt_out`, so neither this
-//! event nor any event its handler records reaches Space Station.
+//! The `X-Accounts-Telemetry` header and the `sa_telemetry` cookie that older clients and the
+//! other Silicon apps send are accepted and ignored.
 
 use std::time::Instant;
 
-use accounts_core::AppState;
 use accounts_core::http::RequestId;
-use axum::extract::{MatchedPath, Request, State};
+use axum::extract::{MatchedPath, Request};
 use axum::middleware::Next;
 use axum::response::Response;
-use serde_json::json;
 use tracing::Instrument as _;
 
 use crate::paths;
-
-/// Header with which callers opt out of telemetry.
-pub const TELEMETRY_HEADER: &str = accounts_core::telemetry::OPT_OUT_HEADER;
-
-/// True when the request opted out of telemetry (`X-Accounts-Telemetry: off`, or the cookie
-/// `sa_telemetry=off`).
-pub fn opted_out(headers: &axum::http::HeaderMap) -> bool {
-    accounts_core::telemetry::request_opts_out(headers)
-}
 
 /// The route label: the matched template, or what kind of unmatched request it was.
 fn route_label(matched: Option<&MatchedPath>, path: &str) -> String {
@@ -43,8 +29,8 @@ fn route_label(matched: Option<&MatchedPath>, path: &str) -> String {
     }
 }
 
-/// Logs the request and records the telemetry event.
-pub async fn observe(State(state): State<AppState>, req: Request, next: Next) -> Response {
+/// Logs the request.
+pub async fn observe(req: Request, next: Next) -> Response {
     let started = Instant::now();
     let method = req.method().clone();
     let path = req.uri().path().to_owned();
@@ -55,13 +41,8 @@ pub async fn observe(State(state): State<AppState>, req: Request, next: Next) ->
         .map(|r| r.0.clone())
         .unwrap_or_default();
     let quiet = paths::is_health_path(&path);
-    let opted_out = opted_out(req.headers());
-    let record = !quiet && !opted_out && !paths::is_asset_path(&path) && route != "(account site)";
     let span = tracing::info_span!("request", %method, route = %route, request_id = %request_id);
-    // Every event the handler records is dropped too when the caller opted out.
-    let response =
-        accounts_core::telemetry::with_request_opt_out(opted_out, next.run(req).instrument(span))
-            .await;
+    let response = next.run(req).instrument(span).await;
     let status = response.status().as_u16();
     let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
     if quiet {
@@ -71,46 +52,12 @@ pub async fn observe(State(state): State<AppState>, req: Request, next: Next) ->
     } else {
         tracing::info!(%method, %route, status, duration_ms, %request_id, "request");
     }
-    if record {
-        let outcome = match status {
-            500.. => "server_error",
-            400..=499 => "client_error",
-            _ => "ok",
-        };
-        state.telemetry.record_progress(
-            "api",
-            &format!("{method} {route}"),
-            "http.request",
-            Some(1.0),
-            json!({
-                "method": method.as_str(),
-                "route": route,
-                "status": status,
-                "outcome": outcome,
-                "duration_ms": duration_ms,
-                "request_id": request_id,
-            }),
-        );
-    }
     response
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::http::HeaderMap;
-
-    #[test]
-    fn opt_out_header_and_cookie() {
-        let mut h = HeaderMap::new();
-        assert!(!opted_out(&h));
-        h.insert(TELEMETRY_HEADER, "OFF".parse().expect("hv"));
-        assert!(opted_out(&h));
-        h.insert(TELEMETRY_HEADER, "on".parse().expect("hv"));
-        assert!(!opted_out(&h));
-        h.insert("cookie", "sa_telemetry=off".parse().expect("hv"));
-        assert!(opted_out(&h));
-    }
 
     #[test]
     fn labels_never_carry_raw_paths() {

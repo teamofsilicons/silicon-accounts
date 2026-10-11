@@ -12,7 +12,6 @@ use axum::extract::rejection::BytesRejection;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 use crate::grants;
 use crate::params::{opt, parse_body};
@@ -110,7 +109,7 @@ impl Grant {
     }
 }
 
-/// What a request was, for logs and telemetry (never secrets).
+/// What a request was, for logs (never secrets).
 #[derive(Default)]
 pub(crate) struct Trace {
     grant: Option<&'static str>,
@@ -133,22 +132,10 @@ pub(crate) async fn token(
     match result {
         Ok(tokens) => {
             tracing::debug!(grant = ?trace.grant, app_id = ?trace.app_id, duration_ms, "tokens issued");
-            state.telemetry.record(
-                "oauth",
-                "token",
-                "token_issued",
-                json!({"grant_type": trace.grant, "app_id": trace.app_id, "duration_ms": duration_ms}),
-            );
             no_store(StatusCode::OK, &tokens)
         }
         Err(e) => {
-            tracing::debug!(grant = ?trace.grant, app_id = ?trace.app_id, error = %e.error, "token request refused");
-            state.telemetry.record(
-                "oauth",
-                "token",
-                "token_refused",
-                json!({"grant_type": trace.grant, "app_id": trace.app_id, "error": e.error, "duration_ms": duration_ms}),
-            );
+            tracing::debug!(grant = ?trace.grant, app_id = ?trace.app_id, error = %e.error, duration_ms, "token request refused");
             let mut response = oauth_error(e);
             if let Some(seconds) = trace.retry_after
                 && let Ok(v) = axum::http::HeaderValue::from_str(&seconds.to_string())

@@ -572,7 +572,6 @@ pub async fn stream(
         close_reason: None,
         sent: 0,
         timing,
-        opted_out: accounts_core::telemetry::request_opts_out(&headers),
         _permit: permit,
     };
     let sse = Sse::new(into_stream(st)).keep_alive(
@@ -667,7 +666,6 @@ struct StreamState {
     close_reason: Option<Close>,
     sent: u64,
     timing: Timing,
-    opted_out: bool,
     _permit: Permit,
 }
 
@@ -682,24 +680,6 @@ impl Drop for StreamState {
             seconds,
             "event stream closed"
         );
-        if !self.opted_out {
-            let mut context = json!({
-                "feed": self.feed.kind(),
-                "reason": reason,
-                "events_sent": self.sent,
-                "duration_seconds": seconds,
-            });
-            if let Feed::App { app_id, .. } = &self.feed {
-                context["app_id"] = json!(app_id);
-            }
-            self.state.telemetry.record_progress(
-                "api",
-                "GET /v1/events/stream",
-                "events.stream_closed",
-                Some(1.0),
-                context,
-            );
-        }
     }
 }
 

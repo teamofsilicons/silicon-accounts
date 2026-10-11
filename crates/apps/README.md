@@ -241,8 +241,8 @@ the processor; a job left `running` by a dead process is resumed after its last 
 (each resume is recorded as audit `app.import.resumed` before it runs; after 2 resumes the job is
 marked `failed` instead, so a job that keeps killing its worker can't crash-loop the server); a
 uniqueness race (concurrent sign-up/import) or deadlock rolls the chunk's writes back to a
-savepoint and redoes the rows one by one with fresh checks. Telemetry:
-`import.started|resumed|progress|completed|failed` (ids and counts only).
+savepoint and redoes the rows one by one with fresh checks. Each job logs its start, completion
+or failure (ids and counts only).
 
 ## Webhook replay and lost access
 

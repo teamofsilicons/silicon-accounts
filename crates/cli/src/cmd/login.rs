@@ -190,11 +190,6 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
         ctx.save_session(&session)?;
     }
     let _ = home::remove_file(&ctx.home()?.file("login-challenge.json"));
-    ctx.telemetry.step(
-        "login.done",
-        1.0,
-        json!({ "method": method, "kind": session.kind.as_str() }),
-    );
 
     if let Some(previous) = previous
         && previous.refresh_token != session.refresh_token
@@ -314,7 +309,6 @@ async fn silicon_login(
     };
     let stk = util::normalize_stk(&stk)?;
     let client = ctx.client()?;
-    ctx.telemetry.step("login.silicon.started", 0.3, json!({}));
     Ok(client.silicon_login(&id, &stk, Some(label)).await?)
 }
 
@@ -333,8 +327,6 @@ async fn key_login(
     }
     let key = silicon_accounts_client::SiliconSigningKey::from_file(file)?;
     let client = ctx.client()?;
-    ctx.telemetry
-        .step("login.silicon_key.started", 0.3, json!({}));
     Ok(client
         .silicon_login_with_key(&id, &key, None, Some(label))
         .await?)
@@ -377,11 +369,6 @@ async fn federated_login(
     if matches!(source, TokenSource::Literal(_)) {
         ctx.out.warn("Passing a token as an argument exposes it to other processes; prefer env:VAR or @file.");
     }
-    ctx.telemetry.step(
-        "login.federated.started",
-        0.3,
-        json!({ "source": source.describe() }),
-    );
     let token = source.read().await?;
     let tokens = client.exchange_federated_token(&id, token.expose()).await?;
     let stored = source
@@ -473,8 +460,6 @@ async fn code_login(ctx: &Ctx, args: &LoginArgs, label: &str) -> CliResult<CodeL
     }
 
     let challenge = client.cli_login_start(&contact).await?;
-    ctx.telemetry
-        .step("login.code.sent", 0.4, json!({ "channel": method }));
     let stored = StoredChallenge {
         challenge_id: challenge.challenge_id.clone(),
         contact: key,
@@ -544,11 +529,6 @@ async fn device_login(ctx: &Ctx, args: &LoginArgs, label: &str) -> CliResult<Tok
     let expires_at = OffsetDateTime::now_utc()
         + time::Duration::seconds(i64::try_from(device.expires_in).unwrap_or(600));
     let opened = !args.no_browser && util::open_browser(device.browser_url());
-    ctx.telemetry.step(
-        "login.device.code_shown",
-        0.3,
-        json!({ "browser_opened": opened }),
-    );
     let browser_note = if opened {
         "Your browser was opened; confirm the code there.".to_owned()
     } else {
@@ -598,7 +578,6 @@ async fn device_login(ctx: &Ctx, args: &LoginArgs, label: &str) -> CliResult<Tok
             ));
         }
     };
-    ctx.telemetry.step("login.device.approved", 0.9, json!({}));
     Ok(tokens)
 }
 
@@ -610,8 +589,6 @@ pub async fn short_lived_token(
 ) -> CliResult<Outcome> {
     let app_id = app_id.trim().to_owned();
     let slt = crate::with_session!(ctx, |s| s.short_lived_token(&app_id))?;
-    ctx.telemetry
-        .step("login.slt.issued", 1.0, json!({ "app": app_id }));
     ctx.out.notice(&format!(
         "Short-lived token for {} as {}: single use, valid {}. The app exchanges it with grant_type=urn:silicon:params:oauth:grant-type:slt.",
         slt.app_id,
@@ -715,7 +692,6 @@ pub async fn logout(ctx: &Ctx) -> CliResult<Outcome> {
                 "silicon-accounts-cli/{}",
                 env!("CARGO_PKG_VERSION")
             ))
-            .telemetry(ctx.telemetry_setting().0)
             .allow_insecure_http(true)
             .build();
         match client {

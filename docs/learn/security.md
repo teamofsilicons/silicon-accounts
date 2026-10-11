@@ -95,7 +95,7 @@ The account site uses three cookies, all `HttpOnly; SameSite=Lax; Path=/`. In pr
 | `sa_flow` | binds a hosted sign-in to the browser that started it | 60 minutes |
 | `sa_signup` | binds a sign-up to the browser that verified the address | 48 hours |
 
-`HttpOnly` keeps them away from page scripts. `SameSite=Lax` sends them on top-level navigations (a provider redirecting back is one), but not on cross-site POSTs, images or fetches. A fourth cookie, `sa_telemetry=off`, isn't a credential: it opts the browser out of telemetry.
+`HttpOnly` keeps them away from page scripts. `SameSite=Lax` sends them on top-level navigations (a provider redirecting back is one), but not on cross-site POSTs, images or fetches. The site may also set `sa_telemetry=off`. It isn't a credential, and the service ignores it: Silicon Accounts records no telemetry.
 
 Apps never see these cookies and never need them, because they run on another origin. Apps and Silicons authenticate with HTTP Basic (app secret) or Bearer tokens.
 
@@ -216,8 +216,7 @@ database copy reveals nothing. Our API refuses an identity token as a bearer tok
 ## What is never logged
 
 - Tokens, codes, STKs, secrets and `Authorization` headers are never written to logs or audit records. Types that carry them print redacted (`Secret(sar_…)`), in the service and in the Rust client.
-- Request logs and telemetry record the **route template** (`/v1/flows/{id}/verify`), method, status and duration. They leave out the raw path and query string, which can contain ids and OAuth codes.
-- Telemetry is opt-out per request: `X-Accounts-Telemetry: off` (or the cookie `sa_telemetry=off`) drops every event the request would cause. The CLI's telemetry never includes tokens, ids or contact details. [Telemetry](#telemetry) has the whole list.
+- Request logs record the **route template** (`/v1/flows/{id}/verify`), method, status and duration. They leave out the raw path and query string, which can contain ids and OAuth codes.
 - 5xx answers never describe internals; they carry a request id for you to quote instead.
 - History rows another actor wrote into an account's history (a custodian, an app, the service) hide the IP address and mask email addresses and phone numbers.
 - Database URLs are printed with the password masked.
@@ -230,38 +229,9 @@ Behind a load balancer, the API trusts `X-Forwarded-For` only when `ACCOUNTS_TRU
 
 ## Telemetry
 
-Silicon Accounts sends usage events to Space Station, the event service Team of Silicons runs for
-its own products. Each event names the service, its environment and version, and what happened:
-
-- one event per API request: the route template (never the raw path or query string), the
-  method, the status, the outcome and the duration;
-- token grants: the grant type, the app id, the error if any, and the duration;
-- the steps of hosted sign-ins;
-- whether a Silicon signed in or created itself (yes or no, nothing about which one);
-- webhook delivery outcomes, imports, reports and the service starting up;
-- events a client sends to `POST /v1/telemetry/events` (at most 50 per call, 8 KB of `data`,
-  120 calls a minute from one address), marked `reported_by: "client"`. The `silicon-accounts`
-  CLI uses it, as [Use the CLI](../start/cli.md#telemetry) describes. We forward only what the CLI
-  reports, word for word: only events from `source` `cli` named `cli.command` or `cli.step`; the
-  step as one of the CLI's step names or command paths, else `other`; and in `data` only the
-  CLI's known fields, as a flag, a bounded number, one of a few fixed words or a release version,
-  with `command`, `os`, `arch` and `error_code` as one of the words the CLI uses, else `other`.
-  An app id is kept only on the step that gets a short-lived token for that app. Everything else
-  is dropped, so nothing a client makes up (an email, a name, a path, an id) reaches Space
-  Station, whatever its shape.
-
-You can turn it off for anything you do:
-
-- **On a request:** send `X-Accounts-Telemetry: off` (`0`, `false` and `no` work too). Every event
-  that request would cause is dropped.
-- **In a browser:** the telemetry switch in the account site's settings sets the cookie
-  `sa_telemetry=off`, with the same effect for every request from that browser.
-- **In the CLI:** `silicon-accounts config telemetry off`, or `ACCOUNTS_TELEMETRY=0` for one
-  process. The CLI then sends no events and adds the header to every request.
-
-Work we do later in the background (webhook deliveries, imports, sweeps) still reports its
-outcome, because no request of yours is attached to it. Silicon Apps has its own telemetry setting
-(`silicon-apps config telemetry off`).
+Silicon Accounts records no telemetry, in the service, the `silicon-accounts` CLI or the Rust
+client. The `X-Accounts-Telemetry` header and the `sa_telemetry` cookie that older clients send
+are accepted and ignored.
 
 ## Your sign-in controls your Silicons
 

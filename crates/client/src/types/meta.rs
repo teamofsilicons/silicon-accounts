@@ -203,9 +203,10 @@ pub struct ReportReceipt {
     pub recipients: u64,
 }
 
-/// One telemetry event for `POST /v1/telemetry/events`. Keep events self-contained: say
-/// where they come from (`source`), which `step` of a flow they describe and how far the
-/// flow got (`progress`, 0.0..=1.0). Never put secrets or personal data in `data`.
+/// A telemetry event, kept so code that names it still builds. Silicon Accounts records no
+/// telemetry: [`AccountsClient::send_telemetry`](crate::AccountsClient::send_telemetry) sends
+/// nothing.
+#[deprecated(since = "0.6.0", note = "Silicon Accounts records no telemetry")]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TelemetryEvent {
     /// Where the event comes from, e.g. `cli`.
@@ -222,6 +223,7 @@ pub struct TelemetryEvent {
     pub data: Value,
 }
 
+#[allow(deprecated)]
 impl TelemetryEvent {
     /// True when `name` matches the service's allowlist pattern `^[a-z0-9_.]{1,64}$`.
     pub fn has_valid_name(&self) -> bool {

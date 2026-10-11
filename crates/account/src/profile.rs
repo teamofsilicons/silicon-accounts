@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use time::Date;
 
-use crate::util::{audit_self, idem_scope, json_type, track};
+use crate::util::{audit_self, idem_scope, json_type};
 
 /// `GET /v1/me` — the full own view (Carbon: emails, phones, identities, custodian_of;
 /// Silicon: custodian, webhook_url, stk_rotated_at).
@@ -251,14 +251,6 @@ pub(crate) async fn patch_me(
             .await?;
         }
         tx.commit().await?;
-        if !changed.is_empty() {
-            track(
-                &state,
-                "profile",
-                "account.profile.updated",
-                json!({ "kind": me.kind(), "changed": changed }),
-            );
-        }
         let mut conn = state.db.acquire().await?;
         let view = views::load_me(&mut conn, &account).await?;
         Ok((StatusCode::OK, serde_json::to_value(view)?))
@@ -323,14 +315,6 @@ pub(crate) async fn change_id(
             .await?;
         }
         tx.commit().await?;
-        if change.changed {
-            track(
-                &state,
-                "id",
-                "account.id.changed",
-                json!({ "kind": me.kind(), "reclaimed": change.reclaimed }),
-            );
-        }
         let mut conn = state.db.acquire().await?;
         let view = views::load_me(&mut conn, &change.account).await?;
         Ok((StatusCode::OK, serde_json::to_value(view)?))

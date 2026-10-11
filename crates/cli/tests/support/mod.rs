@@ -29,6 +29,7 @@ pub struct MockState {
     pub requests: Vec<(String, String, Option<String>, String)>,
     /// (method, path, query)
     pub queries: Vec<(String, String, String)>,
+    /// Anything an older CLI would have sent to the removed telemetry route (must stay empty).
     pub telemetry_batches: Vec<Value>,
     /// The Silicon's currently valid access and refresh tokens (rotated on refresh).
     pub access_token: String,
@@ -870,7 +871,6 @@ impl Env {
             cmd.env_remove(var);
         }
         cmd.env("HOME", self.home.path())
-            .env("ACCOUNTS_TELEMETRY", "0")
             .env("ACCOUNTS_NO_BROWSER", "1")
             .env("NO_COLOR", "1")
             .env("HOSTNAME", "test-host");
@@ -896,7 +896,6 @@ impl Env {
             cmd.env_remove(var);
         }
         cmd.env("HOME", self.home.path())
-            .env("ACCOUNTS_TELEMETRY", "0")
             .env("ACCOUNTS_NO_BROWSER", "1")
             .env("NO_COLOR", "1")
             .env("HOSTNAME", "test-host")

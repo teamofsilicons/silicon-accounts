@@ -1,9 +1,8 @@
 //! Small helpers shared by the handlers.
 
+use accounts_core::ApiResult;
 use accounts_core::crypto::{Keyring, b64url, b64url_decode};
-use accounts_core::{ApiResult, AppState};
 use axum::http::{HeaderMap, HeaderValue, header};
-use serde_json::Value;
 
 /// Prefix of keyring-encrypted values stored in text columns.
 const ENC_PREFIX: &str = "enc1:";
@@ -58,13 +57,6 @@ pub fn with_query(base: &str, params: &[(&str, Option<&str>)]) -> String {
 pub fn no_store(headers: &mut HeaderMap) {
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
-}
-
-/// Records a sign-in telemetry event (never with emails, phones, codes or tokens).
-pub fn telemetry(state: &AppState, event: &str, progress: Option<f64>, data: Value) {
-    state
-        .telemetry
-        .record_progress("accounts-api", "signin", event, progress, data);
 }
 
 #[cfg(test)]

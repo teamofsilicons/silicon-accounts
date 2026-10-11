@@ -39,7 +39,7 @@ pub struct CliErrorBody {
     pub status: Option<u16>,
     pub request_id: Option<String>,
     pub details: Option<Value>,
-    /// The service could not be reached (telemetry is skipped).
+    /// The service could not be reached.
     pub transport: bool,
 }
 

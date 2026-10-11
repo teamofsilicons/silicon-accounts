@@ -40,7 +40,6 @@ fn run() -> i32 {
         Ok(cli) => cli,
         Err(err) => return clap_error(&err, wants_json),
     };
-    let path = tree::command_path(&matches);
     let output = Output {
         json: cli.global.json,
         quiet: cli.global.quiet,
@@ -62,7 +61,6 @@ fn run() -> i32 {
     };
     runtime.block_on(async move {
         let ctx = Ctx::new(cli.global.clone());
-        ctx.telemetry.set_command(&path);
         let result = match cli.command {
             None => Ok(Outcome::new(tree::json_tree(), tree::root_long_help())),
             Some(command) => cmd::run(&ctx, command).await,
@@ -70,17 +68,14 @@ fn run() -> i32 {
         match result {
             Ok(outcome) => {
                 // A result stdout could not take is a failure, unless the command already failed.
-                let exit = if ctx.out.outcome(&outcome) || outcome.exit != 0 {
+                if ctx.out.outcome(&outcome) || outcome.exit != 0 {
                     outcome.exit
                 } else {
                     EXIT_FAILURE
-                };
-                ctx.flush_telemetry(exit, None).await;
-                exit
+                }
             }
             Err(err) => {
                 ctx.out.error(&err);
-                ctx.flush_telemetry(err.exit, Some(&err)).await;
                 err.exit
             }
         }

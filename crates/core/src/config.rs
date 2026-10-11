@@ -87,8 +87,6 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_PUBLIC_URL",
     "ACCOUNTS_REPORT_RECIPIENTS",
     "ACCOUNTS_SILICON_APPS_URL",
-    "ACCOUNTS_TELEMETRY_ENABLED",
-    "ACCOUNTS_TELEMETRY_TABLE_KEY",
     "ACCOUNTS_TOKEN_PEPPER",
     "ACCOUNTS_TRUST_FORWARDED_FOR",
     "ACCOUNTS_TWILIO_ACCOUNT_SID",
@@ -100,6 +98,25 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_WEB_DIST",
     "ACCOUNTS_WORKER_ENABLED",
 ];
+
+/// Variables the service no longer reads. Silicon Accounts records no telemetry, so the old
+/// telemetry settings do nothing; `accounts-api` warns at boot when one is still set, so the
+/// deployment can drop it.
+pub const RETIRED_VARIABLES: &[&str] = &[
+    "ACCOUNTS_TELEMETRY_ENABLED",
+    "ACCOUNTS_TELEMETRY_TABLE_KEY",
+    "SPACE_STATION_HOME",
+    "SPACE_STATION_URL",
+];
+
+/// The [`RETIRED_VARIABLES`] that `lookup` finds set (an empty value counts as set).
+pub fn retired_variables_set(lookup: impl Fn(&str) -> Option<String>) -> Vec<&'static str> {
+    RETIRED_VARIABLES
+        .iter()
+        .copied()
+        .filter(|var| lookup(var).is_some())
+        .collect()
+}
 
 /// Where the service runs. Production enables every safety check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -292,10 +309,6 @@ pub struct Settings {
     pub internal_token: Option<SecretString>,
     /// ACCOUNTS_REPORT_RECIPIENTS.
     pub report_recipients: Vec<String>,
-    /// ACCOUNTS_TELEMETRY_ENABLED.
-    pub telemetry_enabled: bool,
-    /// ACCOUNTS_TELEMETRY_TABLE_KEY (missing = telemetry silently disabled).
-    pub telemetry_table_key: Option<SecretString>,
     /// ACCOUNTS_WORKER_ENABLED.
     pub worker_enabled: bool,
     /// ACCOUNTS_WEBHOOK_ALLOW_PRIVATE (allow http and private/loopback webhook targets).
@@ -569,8 +582,6 @@ impl Settings {
                 "shubhastro2@gmail.com".into(),
                 "bugs@teamofsilicons.com".into(),
             ],
-            telemetry_enabled: true,
-            telemetry_table_key: None,
             worker_enabled: true,
             webhook_allow_private: !prod,
             federation_allow_loopback: false,
@@ -582,12 +593,11 @@ impl Settings {
     }
 
     /// Settings for tests: environment `test`, local delivery, dev keys, dev outbox exposed,
-    /// worker disabled, telemetry off. Override fields as needed.
+    /// worker disabled. Override fields as needed.
     pub fn for_tests() -> Settings {
         let mut s = Settings::defaults(Environment::Test);
         s.expose_dev_outbox = true;
         s.worker_enabled = false;
-        s.telemetry_enabled = false;
         s.log_filter = "warn".into();
         s
     }
@@ -891,8 +901,6 @@ impl Settings {
                 );
             }
         }
-        s.telemetry_enabled = r.bool("ACCOUNTS_TELEMETRY_ENABLED", true);
-        s.telemetry_table_key = r.secret("ACCOUNTS_TELEMETRY_TABLE_KEY");
         s.worker_enabled = r.bool("ACCOUNTS_WORKER_ENABLED", true);
         s.webhook_allow_private = r.bool("ACCOUNTS_WEBHOOK_ALLOW_PRIVATE", !prod);
         s.federation_allow_loopback = r.bool("ACCOUNTS_FEDERATION_ALLOW_LOOPBACK", false);
@@ -1275,6 +1283,33 @@ mod tests {
                 .contains("exactly 32")
         );
         assert!(decode_key32(DEV_TOKEN_PEPPER).is_ok());
+    }
+
+    #[test]
+    fn retired_variables_are_found_and_never_read() {
+        for var in RETIRED_VARIABLES {
+            assert!(!VARIABLES.contains(var), "{var} is both read and retired");
+        }
+        let set: HashMap<&str, &str> = [
+            ("ACCOUNTS_TELEMETRY_ENABLED", "true"),
+            ("SPACE_STATION_HOME", ""),
+            ("ACCOUNTS_PUBLIC_URL", "http://localhost:8590"),
+        ]
+        .into_iter()
+        .collect();
+        let lookup = |k: &str| set.get(k).map(|v| (*v).to_owned());
+        assert_eq!(
+            retired_variables_set(lookup),
+            vec!["ACCOUNTS_TELEMETRY_ENABLED", "SPACE_STATION_HOME"]
+        );
+        // A deployment that still sets them starts as before.
+        let with_old = |k: &str| match k {
+            "ACCOUNTS_TELEMETRY_ENABLED" => Some("true".to_owned()),
+            "ACCOUNTS_TELEMETRY_TABLE_KEY" => Some("old-key".to_owned()),
+            _ => None,
+        };
+        assert!(Settings::from_lookup(with_old).is_ok());
+        assert!(retired_variables_set(|_| None).is_empty());
     }
 
     #[test]

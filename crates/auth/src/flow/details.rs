@@ -64,7 +64,6 @@ use super::model::{self, Flow, Step};
 use super::next::{self, Grant};
 use super::view::{self, ChallengeView, ViewContext};
 use super::{FlowApp, FlowResponse, browser, load_bound};
-use crate::util::telemetry;
 
 // ----------------------------------------------------------------------------- limits
 
@@ -1066,12 +1065,6 @@ pub async fn add_detail(
     let response = respond(&mut tx, &state, &meta, &flow, &fa).await?;
     tx.commit().await?;
     delivery::spawn_deliver(&state, message_id);
-    telemetry(
-        &state,
-        "flow.detail_code_sent",
-        Some(0.75),
-        json!({"app_id": fa.app.app_id, "field": field.as_str(), "step": step.id}),
-    );
     Ok(response)
 }
 
@@ -1177,12 +1170,6 @@ pub async fn verify_detail(
     model::save(&mut tx, &flow).await?;
     let response = respond(&mut tx, &state, &meta, &flow, &fa).await?;
     tx.commit().await?;
-    telemetry(
-        &state,
-        "flow.detail_added",
-        Some(0.8),
-        json!({"app_id": fa.app.app_id, "field": kind.code()}),
-    );
     Ok(response)
 }
 
@@ -1293,17 +1280,6 @@ pub async fn continue_details(
     }
     let response = respond(&mut tx, &state, &meta, &flow, &fa).await?;
     tx.commit().await?;
-    telemetry(
-        &state,
-        "flow.details_continued",
-        Some(0.85),
-        json!({
-            "app_id": fa.app.app_id,
-            "step": step.id,
-            "shared": ticked.iter().map(ContactField::as_str).collect::<Vec<_>>(),
-            "next_step": flow.step.as_str(),
-        }),
-    );
     Ok(response)
 }
 
@@ -1404,12 +1380,6 @@ pub async fn review(
     model::save(&mut tx, &flow).await?;
     let response = respond(&mut tx, &state, &meta, &flow, &fa).await?;
     tx.commit().await?;
-    telemetry(
-        &state,
-        "flow.reviewed",
-        Some(1.0),
-        json!({"app_id": fa.app.app_id, "approve": body.approve}),
-    );
     Ok(response)
 }
 

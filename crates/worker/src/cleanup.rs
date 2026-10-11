@@ -171,7 +171,7 @@ pub async fn run_once(state: &AppState) -> CleanupReport {
     r
 }
 
-fn log_and_record(state: &AppState, report: &CleanupReport) {
+fn log_report(report: &CleanupReport) {
     if report.errors.is_empty() {
         if report.total() > 0 {
             tracing::info!(
@@ -193,13 +193,6 @@ fn log_and_record(state: &AppState, report: &CleanupReport) {
     } else {
         tracing::error!(errors = ?report.errors, deleted = report.total(), "cleanup steps failed; the next sweep retries them");
     }
-    state.telemetry.record_progress(
-        "worker",
-        "cleanup",
-        "cleanup.swept",
-        Some(1.0),
-        serde_json::to_value(report).unwrap_or_default(),
-    );
 }
 
 /// The cleanup loop: a sweep shortly after start, then every [`INTERVAL`], until `shutdown`.
@@ -209,7 +202,7 @@ pub async fn run(state: AppState, mut shutdown: Shutdown) {
     }
     loop {
         let report = run_once(&state).await;
-        log_and_record(&state, &report);
+        log_report(&report);
         if !shutdown.sleep(INTERVAL).await {
             break;
         }

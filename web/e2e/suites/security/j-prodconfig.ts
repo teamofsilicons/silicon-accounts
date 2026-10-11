@@ -46,7 +46,6 @@ const accountsApi: Journey = {
       ACCOUNTS_POSTMARK_SERVER_TOKEN: credentials.messaging.postmark.server_token,
       ACCOUNTS_POSTMARK_API_URL: `${env.messaging}/postmark`,
       ACCOUNTS_WORKER_ENABLED: "false",
-      ACCOUNTS_TELEMETRY_ENABLED: "false",
     };
 
     /** Runs the binary until it exits (it must, within 20 s) and reports what it said. */

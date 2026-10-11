@@ -34,7 +34,7 @@ use sqlx::PgConnection;
 use super::FlowApp;
 use super::details;
 use super::model::{Flow, FlowError, Step};
-use crate::util::{encrypt_text, telemetry, with_query};
+use crate::util::{encrypt_text, with_query};
 
 /// What a returning Carbon's grant must cover without showing a page: profile + required
 /// details + details the `scope` parameter asks for.
@@ -161,17 +161,6 @@ pub async fn complete(
         &[("code", Some(&code)), ("state", flow.state.as_deref())],
     );
     finish(state, flow, Step::Complete, &redirect)?;
-    telemetry(
-        state,
-        "flow.completed",
-        Some(1.0),
-        json!({
-            "app_id": fa.app.app_id,
-            "method": flow.extras.auth_method,
-            "new_account": flow.extras.new_account,
-            "scopes": accounts_core::models::scopes_to_string(&scopes),
-        }),
-    );
     Ok(())
 }
 
@@ -207,12 +196,6 @@ pub async fn decline(
         "The Carbon declined to share their details with the app.",
     );
     finish(state, flow, Step::Complete, &redirect)?;
-    telemetry(
-        state,
-        "flow.declined",
-        Some(1.0),
-        json!({"app_id": fa.app.app_id}),
-    );
     Ok(())
 }
 
@@ -220,12 +203,6 @@ pub async fn decline(
 /// `failed`, the error on the flow and `redirect_to = redirect_uri?error=…&state=…`.
 pub fn fail(state: &AppState, flow: &mut Flow, error: FlowError) -> ApiResult<()> {
     let redirect = error_redirect(flow, &error.code, &error.message);
-    telemetry(
-        state,
-        "flow.failed",
-        Some(1.0),
-        json!({"app_id": flow.app_id, "error": error.code}),
-    );
     flow.extras.error = Some(error);
     finish(state, flow, Step::Failed, &redirect)
 }

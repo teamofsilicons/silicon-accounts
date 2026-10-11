@@ -10,10 +10,10 @@ use axum::http::{HeaderMap, Method as HttpMethod};
 use axum::response::{IntoResponse, Response};
 use serde_json::json;
 
-use super::{ProviderClient, callback_url, endpoints, resolve_client};
+use super::{callback_url, endpoints, resolve_client};
 use crate::flow::model::{self, ProviderLeg, Step};
 use crate::flow::{FlowApp, load_bound};
-use crate::util::{encrypt_text, no_store, telemetry};
+use crate::util::{encrypt_text, no_store};
 
 /// The `state` sent to the provider: `{flow_id}.{secret}`. The flow id finds the flow at the
 /// callback (Apple's form_post carries no cookies); the secret proves the callback answers this
@@ -54,15 +54,9 @@ pub async fn start_provider(
     )?;
     let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
     fa.ensure_active()?;
-    let (url, client) = begin_leg(&mut tx, &state, &mut flow, &fa, provider).await?;
+    let url = begin_leg(&mut tx, &state, &mut flow, &fa, provider).await?;
     model::save(&mut tx, &flow).await?;
     tx.commit().await?;
-    telemetry(
-        &state,
-        "flow.provider_started",
-        Some(0.3),
-        json!({"app_id": fa.app.app_id, "provider": provider.as_str(), "mode": client.mode.as_str()}),
-    );
     let mut response = Json(json!({ "authorize_url": url })).into_response();
     no_store(response.headers_mut());
     Ok(response)
@@ -71,7 +65,7 @@ pub async fn start_provider(
 /// Starts the provider leg of `flow` (the caller saves the flow): checks the method is enabled
 /// for the app, resolves its client (managed or bring-your-own), builds the provider's
 /// authorize URL (state bound to the flow, nonce, PKCE S256 for Google, `form_post` for Apple)
-/// and records the leg on the flow. Returns the URL and the client.
+/// and records the leg on the flow. Returns the URL.
 ///
 /// Errors: 403 `method_not_enabled`, 503 `provider_not_configured`.
 pub(crate) async fn begin_leg(
@@ -80,7 +74,7 @@ pub(crate) async fn begin_leg(
     flow: &mut model::Flow,
     fa: &FlowApp,
     provider: Provider,
-) -> ApiResult<(String, ProviderClient)> {
+) -> ApiResult<String> {
     let method = match provider {
         Provider::Google => Method::Google,
         Provider::Apple => Method::Apple,
@@ -142,7 +136,7 @@ pub(crate) async fn begin_leg(
         client_id: client.client_id.clone(),
         parked: None,
     });
-    Ok((url.to_string(), client))
+    Ok(url.to_string())
 }
 
 #[cfg(test)]

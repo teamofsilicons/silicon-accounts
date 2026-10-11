@@ -1388,22 +1388,13 @@ export interface MyProof {
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
-/* Reports, telemetry, dev outbox, Silicon Apps sync                                                                   */
+/* Reports, dev outbox, Silicon Apps sync                                                                              */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
 export interface ReportReceipt {
   report_id: string;
   status: "queued";
   recipients: number;
-}
-
-export interface TelemetryEvent {
-  source: string;
-  step: string;
-  /** `^[a-z0-9_.]{1,64}$`. */
-  name: string;
-  progress?: number;
-  data?: Record<string, unknown>;
 }
 
 export interface OutboxMessage {

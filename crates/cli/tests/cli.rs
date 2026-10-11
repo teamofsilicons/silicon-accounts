@@ -584,48 +584,58 @@ fn id_availability_and_report() {
 }
 
 #[test]
-fn telemetry_is_sent_unless_opted_out() {
+fn telemetry_is_never_sent_and_its_commands_are_no_ops() {
+    const REMOVED: &str =
+        "Telemetry was removed from Silicon Accounts; there is nothing to turn on or off.";
     let mock = Mock::start();
     let env = Env::new();
-    // Opted out (the default for these tests): nothing is sent.
-    env.cmd()
-        .args(["--url", &mock.url, "id", "available", "c:free"])
-        .assert()
-        .success();
-    assert!(mock.telemetry().is_empty());
-
-    // Opted in: one self-contained event per command, with source, step and progress.
+    // Even with the old opt-in variable set, nothing is sent.
     env.cmd()
         .env("ACCOUNTS_TELEMETRY", "1")
         .args(["--url", &mock.url, "id", "available", "c:free"])
         .assert()
         .success();
-    let batches = mock.telemetry();
-    assert_eq!(batches.len(), 1);
-    let event = &batches[0]["events"][0];
-    assert_eq!(event["source"], "cli");
-    assert_eq!(event["name"], "cli.command");
-    assert_eq!(event["step"], "id available");
-    assert_eq!(event["progress"], 1.0);
-    assert_eq!(event["data"]["outcome"], "ok");
+    assert!(mock.telemetry().is_empty());
+    assert!(mock.requests("POST", "/v1/telemetry/events").is_empty());
+
+    // The old commands still succeed, change nothing and say so.
+    for args in [
+        vec!["config", "telemetry", "off"],
+        vec!["config", "telemetry", "on"],
+        vec!["config", "telemetry"],
+        vec!["config", "set", "telemetry", "on"],
+        vec!["config", "unset", "telemetry"],
+        vec!["config", "get", "telemetry"],
+    ] {
+        env.cmd()
+            .args(&args)
+            .assert()
+            .success()
+            .stdout(format!("{REMOVED}\n"));
+        let output = env.cmd().arg("--json").args(&args).output().unwrap();
+        assert!(output.status.success(), "{args:?}");
+        let body: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(body["telemetry"], false, "{args:?}");
+        assert_eq!(body["message"], REMOVED, "{args:?}");
+    }
     assert!(
-        !event.to_string().contains("c:free"),
-        "telemetry must not carry ids"
+        !env.home.path().join(".accounts/config.json").exists(),
+        "the no-ops must not write config.json"
     );
 
-    // `silicon-accounts config telemetry off` is respected without the env var.
-    let env2 = Env::new();
-    env2.cmd()
-        .env_remove("ACCOUNTS_TELEMETRY")
-        .args(["config", "telemetry", "off"])
+    // `config get` no longer lists it, and the command is hidden from help.
+    let output = env
+        .cmd()
+        .args(["--json", "config", "get"])
+        .output()
+        .unwrap();
+    let all: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(all.get("telemetry").is_none(), "{all}");
+    env.cmd()
+        .args(["config", "--help"])
         .assert()
-        .success();
-    env2.cmd()
-        .env_remove("ACCOUNTS_TELEMETRY")
-        .args(["--url", &mock.url, "id", "available", "c:free"])
-        .assert()
-        .success();
-    assert_eq!(mock.telemetry().len(), 1);
+        .success()
+        .stdout(predicate::str::contains("telemetry").not());
 }
 
 #[test]

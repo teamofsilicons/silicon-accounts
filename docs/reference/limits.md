@@ -61,7 +61,6 @@ sign in once per job and reuse the session, not sign in once per command.
 | Photo uploads | 20 per hour; 20 per hour | account; sign-up |
 | Imports | 60 requests per hour (dry runs and refused files count); 2,000,000 rows per 24 hours | app |
 | Bug reports (`POST /v1/reports`) | 5 per hour | IP |
-| Telemetry (`POST /v1/telemetry/events`) | 120 requests per minute | IP |
 
 ## Lockouts
 
@@ -122,7 +121,6 @@ sign in once per job and reuse the session, not sign in once per command.
 | Proof scopes | 20 per proof, each 1 to 100 characters of `A-Z a-z 0-9 _ . : / -` |
 | App verification receiving apps | exactly 1 per proof |
 | Report message | 1 to 10,000 characters; `pr_url` https |
-| Telemetry batch | 50 events; `name` `^[a-z0-9_.]{1,64}$`; `source` 64 characters; `step` 200 characters; `data` 8 KB |
 | Sign-in history shown to an app per member | the last 20 |
 
 ## Webhooks and messages

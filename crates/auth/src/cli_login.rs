@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::util::{no_store, telemetry};
+use crate::util::no_store;
 
 /// Lookups a network may make per 10 minutes (sends are also limited by the OTP rules).
 pub const CLI_LOGIN_START_PER_IP: Limit = Limit::new(60, 600);
@@ -121,12 +121,6 @@ pub async fn start(
     .await?;
     tx.commit().await?;
     delivery::spawn_deliver(&state, message_id);
-    telemetry(
-        &state,
-        "cli_login.code_sent",
-        Some(0.5),
-        json!({"channel": channel.as_str()}),
-    );
     let mut response = axum::Json(json!({
         "challenge_id": created.challenge.id,
         "destination": created.challenge.masked_destination(),
@@ -255,12 +249,6 @@ pub async fn verify(
     )
     .await?;
     tx.commit().await?;
-    telemetry(
-        &state,
-        "cli_login.completed",
-        Some(1.0),
-        json!({"channel": kind.code()}),
-    );
     let mut response = axum::Json(tokens).into_response();
     no_store(response.headers_mut());
     Ok(response)

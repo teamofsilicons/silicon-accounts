@@ -18,7 +18,7 @@ use serde_json::json;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::util::{END_OF_TIME, audit_self, clip, from_micros, to_micros, track};
+use crate::util::{END_OF_TIME, audit_self, clip, from_micros, to_micros};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ListQuery {
@@ -361,12 +361,6 @@ pub(crate) async fn revoke(
     )
     .await?;
     tx.commit().await?;
-    track(
-        &state,
-        "sessions",
-        "account.session.revoked",
-        json!({ "kind": kind, "own": me.session_id() == Some(id) || me.family_id() == Some(id) }),
-    );
     let mut response = StatusCode::NO_CONTENT.into_response();
     if me.session_id() == Some(id) {
         append_cookie(

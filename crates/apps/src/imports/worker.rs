@@ -106,12 +106,6 @@ pub async fn run_pending_jobs(state: &AppState) -> ApiResult<usize> {
                     run_guarded(state, conn, job).await;
                 } else {
                     tracing::error!(job_id = %id, app_id = %job.app_id, "an import job stopped its worker too often; marked failed");
-                    state.telemetry.record(
-                        "accounts-api",
-                        "import",
-                        "import.failed",
-                        serde_json::json!({"job_id": id, "app_id": job.app_id, "code": "worker_stopped_repeatedly"}),
-                    );
                     release(conn, id).await;
                 }
                 done += 1;
@@ -254,12 +248,6 @@ async fn run_job(state: &AppState, conn: &mut PgConnection, job: JobRecord) {
     let id = job.id;
     if let Err(e) = process_job(state, conn, &job).await {
         tracing::error!(job_id = %id, app_id = %job.app_id, error = %e, "import job failed");
-        state.telemetry.record(
-            "accounts-api",
-            "import",
-            "import.failed",
-            serde_json::json!({"job_id": id, "app_id": job.app_id, "code": e.code, "status": e.status.as_u16()}),
-        );
         let reason = e.message.clone();
         let _ = sqlx::query(
             "update import_jobs set status = 'failed', finished_at = now(), error = $2 where id = $1",
@@ -290,30 +278,11 @@ async fn process_job(state: &AppState, conn: &mut PgConnection, job: &JobRecord)
         .await?;
     let mut st = rebuild_state(conn, &ctx).await?;
     let started = std::time::Instant::now();
-    let total = job.total_rows.max(1) as f64;
-    let event = |name: &str, progress: f64, extra: serde_json::Value| {
-        // Ids and counts only: never row data.
-        let mut data = serde_json::json!({
-            "job_id": job.id, "app_id": job.app_id, "format": job.format, "dry_run": ctx.options.dry_run,
-            "total_rows": job.total_rows,
-        });
-        if let (Some(d), Some(e)) = (data.as_object_mut(), extra.as_object()) {
-            d.extend(e.clone());
-        }
-        state
-            .telemetry
-            .record_progress("accounts-api", "import", name, Some(progress), data);
-    };
-    event(
-        if st.last_row > 0 {
-            "import.resumed"
-        } else {
-            "import.started"
-        },
-        f64::from(st.last_row) / total,
-        serde_json::json!({}),
+    tracing::info!(
+        job_id = %job.id, app_id = %job.app_id, total_rows = job.total_rows,
+        resumed_after_row = st.last_row, dry_run = ctx.options.dry_run,
+        "import job started"
     );
-    let mut reported_tenth = (f64::from(st.last_row) / total * 10.0) as i64;
     loop {
         let chunk: Vec<(i32, Value)> = sqlx::query_as(
             "select row_number, input from import_job_rows where job_id = $1 and row_number > $2 \
@@ -331,19 +300,7 @@ async fn process_job(state: &AppState, conn: &mut PgConnection, job: &JobRecord)
         let mut attempt = 0;
         loop {
             match process_chunk(conn, &ctx, &mut st, &chunk).await {
-                Ok(()) => {
-                    // One progress event per 10% (a 100k-row job has 200 chunks).
-                    let tenth = (f64::from(st.last_row) / total * 10.0) as i64;
-                    if tenth > reported_tenth && tenth < 10 {
-                        reported_tenth = tenth;
-                        event(
-                            "import.progress",
-                            f64::from(st.last_row) / total,
-                            serde_json::json!({"processed_rows": st.last_row}),
-                        );
-                    }
-                    break;
-                }
+                Ok(()) => break,
                 Err(e) if e.is_server_error() && attempt < 2 => {
                     attempt += 1;
                     tracing::warn!(job_id = %job.id, rows = %format!("{first}-{last}"), error = %e, "retrying an import chunk");
@@ -378,15 +335,10 @@ async fn process_job(state: &AppState, conn: &mut PgConnection, job: &JobRecord)
     .bind(serde_json::to_value(st.counts)?)
     .execute(&mut *conn)
     .await?;
-    let elapsed_ms = started.elapsed().as_millis().max(1) as f64;
-    event(
-        "import.completed",
-        1.0,
-        serde_json::json!({
-            "counts": st.counts,
-            "duration_ms": elapsed_ms as u64,
-            "rows_per_second": (f64::from(job.total_rows) * 1000.0 / elapsed_ms).round(),
-        }),
+    tracing::info!(
+        job_id = %job.id, app_id = %job.app_id, total_rows = job.total_rows,
+        duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+        "import job completed"
     );
     let (actor_kind, actor_id) = if job.created_by == "app" {
         (ActorKind::App, job.app_id.clone())

@@ -4,7 +4,8 @@
 //! server). Feature crates only use what this crate exposes, so all shared domain rules live
 //! here: configuration, database access and migrations, the API error shape, account ids and
 //! uuids, cryptography, JWTs, domain models, API views, input normalization, repositories,
-//! webhook events, outbound email/SMS, telemetry and the HTTP extractors.
+//! webhook events, outbound email/SMS, logging and the HTTP extractors. Silicon Accounts records
+//! no telemetry.
 //!
 //! Start with `crates/core/README.md`: it maps every module and shows the exact functions to
 //! call for each job.
@@ -20,8 +21,8 @@
 //!   challenges and their cooldowns, sign-up sessions, reservations, rate limits) are stamped and
 //!   compared with Postgres `now()`, so tests can time-travel by editing rows and the API nodes'
 //!   clocks don't matter for them. A JWT's own `exp`/`nbf` are checked with the node's clock
-//!   (30 s leeway on `nbf`), as JWTs are; timestamps written into payloads (`occurred_at`) and
-//!   telemetry also use the node's clock.
+//!   (30 s leeway on `nbf`), as JWTs are; timestamps written into payloads (`occurred_at`) also
+//!   use the node's clock.
 
 pub mod access;
 pub mod config;
@@ -36,6 +37,7 @@ pub mod identity_tokens;
 pub mod ids;
 pub mod image;
 pub mod jwt;
+pub mod logging;
 pub mod models;
 pub mod normalize;
 pub mod pfp;
@@ -43,7 +45,6 @@ pub mod photo_upload;
 pub mod repo;
 pub mod silicon_keys;
 pub mod state;
-pub mod telemetry;
 pub mod timefmt;
 pub mod uuid_migration;
 pub mod views;

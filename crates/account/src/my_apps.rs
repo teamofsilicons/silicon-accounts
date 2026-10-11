@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use time::OffsetDateTime;
 
-use crate::util::{END_OF_TIME, audit_self, clip, from_micros, to_micros, track};
+use crate::util::{END_OF_TIME, audit_self, clip, from_micros, to_micros};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ListQuery {
@@ -241,15 +241,5 @@ pub(crate) async fn remove_access(
     )
     .await?;
     tx.commit().await?;
-    track(
-        &state,
-        "apps",
-        "account.app_access.removed",
-        json!({
-            "kind": me.kind(),
-            "revoked_sessions": removed.revoked_families,
-            "revoked_proofs": removed.revoked_proofs,
-        }),
-    );
     Ok(StatusCode::NO_CONTENT)
 }

@@ -17,7 +17,7 @@ import type {
   UserVerificationRequest, OidcDiscovery, OutboxMessage, OwnedApp, Page, PageQuery, PhoneView, PhotoUploaded, ProfileUpdate,
   ProofRevokeRequest, ProofVerification, ReplayRequest, ReplayResult, ReportReceipt, SessionInfo, ShortLivedToken,
   SigninConfigPatch, SiliconAppsApp, SiliconCreated, SiliconPhotoUploaded, SiliconSelfCreate, SiliconSelfCreated,
-  SiliconWebhook, SiliconWebhookTestQueued, SignupPhoto, SignupSubmit, StkRotated, TelemetryEvent, TokenRequest, TokenResponse,
+  SiliconWebhook, SiliconWebhookTestQueued, SignupPhoto, SignupSubmit, StkRotated, TokenRequest, TokenResponse,
   TransferRequest, UpdateSilicon, UserInfo, WebhookDelivery, WebhookDeliveryDetail, WebhookTestQueued,
 } from "./types";
 
@@ -403,17 +403,12 @@ export const oauth = {
   userinfo: (accessToken: string) => request<UserInfo>("/v1/userinfo", { auth: { bearer: accessToken } }),
 };
 
-/* ---------------------------------------- reports, telemetry, dev, internal ---------------------------------------- */
+/* ---------------------------------------- reports, dev, internal ---------------------------------------- */
 
 export const reports = {
   /** `POST /v1/reports` (201): mailed to the Silicon Accounts maintainers (5/hour per network). pr_url must be https. */
   create: (message: string, prUrl?: string, options?: CallOptions) =>
     request<ReportReceipt>("/v1/reports", { method: "POST", body: { message, pr_url: prUrl }, idempotencyKey: options?.idempotencyKey, signal: options?.signal, quiet401: true }),
-};
-
-export const telemetry = {
-  /** `POST /v1/telemetry/events` (202, ≤ 50 events). The opt-out header from lib/telemetry.ts rides along automatically. */
-  send: (events: TelemetryEvent[]) => request<null>("/v1/telemetry/events", { method: "POST", body: { events }, quiet401: true }),
 };
 
 export const devOutbox = {
@@ -427,7 +422,7 @@ export const internal = {
 };
 
 /** Everything, as one object: `api.me.get()`, `api.flows.verify(id, code)`… */
-export const api = { meta, ids, accounts, flows, session, device, cliLogin, me, silicons, apps, proofs, oauth, reports, telemetry, devOutbox, internal };
+export const api = { meta, ids, accounts, flows, session, device, cliLogin, me, silicons, apps, proofs, oauth, reports, devOutbox, internal };
 export type Api = typeof api;
 
 /** Narrowing helper: the Carbon view of Me (throws a precise error for a Silicon). */

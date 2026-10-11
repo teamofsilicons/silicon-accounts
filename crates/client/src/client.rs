@@ -28,8 +28,16 @@ pub const DEVELOPER_APP_ID: &str = "developer";
 /// This crate's version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Header sent on every request when telemetry is disabled.
-pub const TELEMETRY_HEADER: &str = "X-Accounts-Telemetry";
+/// The telemetry opt-out header. Silicon Accounts records no telemetry and ignores it; this
+/// client still sends `X-Accounts-Telemetry: off` on every request so a deployment that predates
+/// the removal records nothing either.
+#[deprecated(
+    since = "0.6.0",
+    note = "Silicon Accounts records no telemetry; the service accepts and ignores this header"
+)]
+pub const TELEMETRY_HEADER: &str = OPT_OUT_HEADER;
+/// See [`TELEMETRY_HEADER`].
+const OPT_OUT_HEADER: &str = "X-Accounts-Telemetry";
 /// Header carrying the idempotency key of a mutating request.
 pub const IDEMPOTENCY_HEADER: &str = "Idempotency-Key";
 /// Header set by the service when it replayed a stored response for an idempotency key.
@@ -48,7 +56,6 @@ pub struct ClientBuilder {
     timeout: Duration,
     connect_timeout: Duration,
     user_agent: Option<String>,
-    telemetry: bool,
     allow_insecure_http: bool,
     max_retries: u32,
 }
@@ -60,7 +67,6 @@ impl Default for ClientBuilder {
             timeout: DEFAULT_TIMEOUT,
             connect_timeout: DEFAULT_CONNECT_TIMEOUT,
             user_agent: None,
-            telemetry: true,
             allow_insecure_http: false,
             max_retries: DEFAULT_MAX_RETRIES,
         }
@@ -92,10 +98,13 @@ impl ClientBuilder {
         self
     }
 
-    /// When false, every request carries `X-Accounts-Telemetry: off` and
-    /// [`AccountsClient::send_telemetry`] sends nothing. Default true.
-    pub fn telemetry(mut self, enabled: bool) -> Self {
-        self.telemetry = enabled;
+    /// Does nothing: Silicon Accounts records no telemetry, so there is nothing to turn on or
+    /// off.
+    #[deprecated(
+        since = "0.6.0",
+        note = "Silicon Accounts records no telemetry; there is nothing to turn on or off"
+    )]
+    pub fn telemetry(self, _enabled: bool) -> Self {
         self
     }
 
@@ -136,7 +145,6 @@ impl ClientBuilder {
             base,
             http,
             timeout: self.timeout,
-            telemetry: self.telemetry,
             max_retries: self.max_retries,
         })
     }
@@ -213,7 +221,6 @@ pub struct AccountsClient {
     base: Url,
     http: reqwest::Client,
     timeout: Duration,
-    telemetry: bool,
     max_retries: u32,
 }
 
@@ -222,7 +229,6 @@ impl fmt::Debug for AccountsClient {
         f.debug_struct("AccountsClient")
             .field("base_url", &self.base.as_str())
             .field("timeout", &self.timeout)
-            .field("telemetry", &self.telemetry)
             .finish_non_exhaustive()
     }
 }
@@ -244,9 +250,13 @@ impl AccountsClient {
         self
     }
 
-    /// Returns a copy with telemetry enabled or disabled (`X-Accounts-Telemetry: off`).
-    pub fn with_telemetry(mut self, enabled: bool) -> Self {
-        self.telemetry = enabled;
+    /// Does nothing: Silicon Accounts records no telemetry, so there is nothing to turn on or
+    /// off.
+    #[deprecated(
+        since = "0.6.0",
+        note = "Silicon Accounts records no telemetry; there is nothing to turn on or off"
+    )]
+    pub fn with_telemetry(self, _enabled: bool) -> Self {
         self
     }
 
@@ -255,9 +265,10 @@ impl AccountsClient {
         &self.base
     }
 
-    /// Whether telemetry is enabled.
+    /// Always false: Silicon Accounts records no telemetry.
+    #[deprecated(since = "0.6.0", note = "Silicon Accounts records no telemetry")]
     pub fn telemetry_enabled(&self) -> bool {
-        self.telemetry
+        false
     }
 
     /// Builds `{base}/{segments…}` with every segment percent-encoded.
@@ -340,9 +351,8 @@ impl AccountsClient {
             Auth::Bearer(token) => builder.bearer_auth(token),
             Auth::Basic { username, password } => builder.basic_auth(username, Some(password)),
         };
-        if !self.telemetry {
-            builder = builder.header(TELEMETRY_HEADER, "off");
-        }
+        // Silicon Accounts records no telemetry; the opt-out keeps an older deployment quiet too.
+        builder = builder.header(OPT_OUT_HEADER, "off");
         if let Some(key) = request.idempotency_key {
             builder = builder.header(IDEMPOTENCY_HEADER, key);
         }
