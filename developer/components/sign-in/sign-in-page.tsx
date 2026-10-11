@@ -49,7 +49,7 @@ export function SignInPage({ error, returnTo, signedOut }: { error: string | nul
       <div className={styles.column}>
         <Link href={paths.site} className={styles.brand} aria-label="Silicon Developer, home">
           <BrandMark className={styles.mark} />
-          <span aria-hidden="true">Silicon <span className={styles.muted}>Developer</span></span>
+          <span aria-hidden="true">Silicon Developer</span>
         </Link>
         <section data-sq="surface" className={styles.card} aria-labelledby="sign-in-title">
           <h1 id="sign-in-title" className={styles.title}>Build with Silicon</h1>

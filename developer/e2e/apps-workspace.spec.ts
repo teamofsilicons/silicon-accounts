@@ -61,3 +61,18 @@ test("a sign-in that really ended still goes to the sign-in card, once", async (
   expect(visits.filter(path => path === "/sign-in")).toHaveLength(1);
   expect(visits.at(-1)).toBe("/sign-in");
 });
+
+test("hovering the app's mark offers Upload, and the icon saves to Silicon Apps as a data: URL", async ({ page }) => {
+  const changes = await mock(page, true);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/apps/test-app");
+  const upload = page.getByRole("button", { name: /Upload an icon for/ });
+  await upload.hover();
+  await expect(upload.getByText("Upload", { exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/app-header-upload.png", clip: { x: 0, y: 0, width: 1440, height: 360 } });
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#1F5CB1"/></svg>';
+  const chooser = page.waitForEvent("filechooser");
+  await upload.click();
+  await (await chooser).setFiles({ name: "icon.svg", mimeType: "image/svg+xml", buffer: Buffer.from(svg) });
+  await expect.poll(() => changes.find(change => change.path === "/apps/test-app" && typeof change.body.logo === "string")?.body.logo).toMatch(/^data:image\/svg\+xml;base64,/);
+});

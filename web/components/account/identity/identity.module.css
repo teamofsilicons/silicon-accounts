@@ -4,7 +4,12 @@
 .alertAction { display: block; margin-top: var(--space-3); }
 
 /* ------------------------------------------------- front of the card ------------------------------------------------- */
-.face { display: grid; min-width: 0; gap: var(--space-6); }
+.face { position: relative; display: grid; min-width: 0; gap: var(--space-6); }
+/* Details on the front and Back on the back: the same corner of the card, so turning it over and back is one place. */
+.turn.turn { position: absolute; z-index: 1; top: 0; right: 0; }
+/* The name and the back's title leave room for it. */
+.who, .backHead { padding-right: 104px; }
+@media (max-width: 480px) { .who { padding-right: 0; padding-top: 44px; } }
 .who { display: flex; min-width: 0; align-items: center; gap: var(--space-6); }
 .names { display: grid; min-width: 0; flex: 1; gap: var(--space-2); }
 /* The display name is an inline editor set in the display face: the editor keeps its metrics while editing. */

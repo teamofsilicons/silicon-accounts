@@ -1,8 +1,8 @@
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
 <style>
-.bg { fill: #EDE8E0; } .ink { stroke: #181818; }
-@media (prefers-color-scheme: dark) { .bg { fill: #181818; } .ink { stroke: #EDE8E0; } }
+.bg { fill: #EDE8E0; } .ink { fill: #181818; }
+@media (prefers-color-scheme: dark) { .bg { fill: #181818; } .ink { fill: #EDE8E0; } }
 </style>
 <rect class="bg" width="200" height="200"/>
-<g fill="none" class="ink" stroke-width="5.4" stroke-linecap="round" stroke-linejoin="round" transform="translate(100 100) scale(2.9) translate(-32 -32)"><path d="M25 16c-5 0-7 2.5-7 7v4.5c0 2.5-1.5 4.5-4 4.5 2.5 0 4 2 4 4.5V41c0 4.5 2 7 7 7"/><path d="M39 16c5 0 7 2.5 7 7v4.5c0 2.5 1.5 4.5 4 4.5-2.5 0-4 2-4 4.5V41c0 4.5-2 7-7 7"/></g>
+<path class="ink" d="M43.516 105.588V99.792L77.116 114.156V125.412L38.98 108.108V97.272L77.116 79.968V91.224L43.516 105.588ZM84.1366 136.08L104.129 65.352H115.301L95.2246 136.08H84.1366ZM155.925 105.588L122.409 91.224V79.968L160.545 97.272V108.108L122.409 125.412V114.156L155.925 99.792V105.588Z"/>
 </svg>

@@ -294,6 +294,8 @@ All edits are of four kinds, and keep Arc's look and motion:
   `--primary-foreground` (Arc fills them with the foreground colour or the accent).
 - **Keyboard focus:** controls Arc left without any visible keyboard position get one, in fills and edges (never
   rings), so every control passes WCAG 2.4.7.
+- **Profile photos (2026-10-11):** `avatar` and the user menu's portrait are 30% squircles (`corner-shape: squircle`),
+  not circles, as the Carbon asked: every pfp on the site is a squircle, like the store's.
 - **Behaviour** (integration round): keyboard and layer rules Arc got wrong, fixed where they live so no area needs a
   wrapper: the Combobox follows the WAI-ARIA combobox pattern, Escape inside a layer goes to the open control first,
   PhoneInput takes a whole number typed after "+", the Timeline announces only news, OTP cells fit narrow containers.

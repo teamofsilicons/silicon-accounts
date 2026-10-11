@@ -1,13 +1,31 @@
 /* Shared parts of the developer area: app icons, copy fields, tag fields, the save bar, secrets, sliders, history. */
 
-/* App icon sizes on top of Arc's Avatar (doubled class so it wins over the avatar's own size). */
-.appIcon.appIcon { --sq-r: 26%; }
-.icon24.icon24 { width: 24px; height: 24px; font-size: 9px; }
-.icon32.icon32 { width: 32px; height: 32px; font-size: 11px; }
-.icon40.icon40 { width: 40px; height: 40px; font-size: var(--text-xs); }
-.icon48.icon48 { width: 48px; height: 48px; font-size: var(--text-sm); }
-.icon56.icon56 { width: 56px; height: 56px; font-size: var(--text-base); }
-.icon64.icon64 { width: 64px; height: 64px; font-size: var(--text-lg); }
+/* App marks, as the Silicon Apps store draws them: the logo in a squircle with a one-pixel line, or the app's letter in
+   the serif on quiet beige. */
+.appIcon { --sq-r: 24%; position: relative; display: inline-grid; flex: none; place-items: center; overflow: hidden; background: var(--surface-pressed); color: var(--text-secondary); }
+.appIcon[data-logo] { background: var(--surface); }
+.appIcon::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 9%, transparent); pointer-events: none; }
+.appIcon img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.monogram { padding-top: .08em; font-family: var(--font-serif); font-weight: 400; line-height: 1; }
+.icon24 { width: 24px; height: 24px; font-size: 13px; }
+.icon32 { width: 32px; height: 32px; font-size: 17px; }
+.icon40 { width: 40px; height: 40px; font-size: 20px; }
+.icon48 { width: 48px; height: 48px; font-size: 24px; }
+.icon56 { width: 56px; height: 56px; font-size: 28px; }
+.icon64 { width: 64px; height: 64px; font-size: 32px; }
+
+/* The mark with "Upload" over it on hover or focus. */
+.iconUpload { position: relative; display: inline-grid; flex: none; justify-items: start; gap: var(--space-2); }
+.iconUploadButton { --sq-r: 24%; position: relative; display: grid; overflow: hidden; padding: 0; border: 0; background: none; cursor: pointer; }
+.iconUploadButton:disabled { cursor: progress; }
+.iconUploadHint { position: absolute; inset: 0; z-index: 1; display: grid; place-content: center; justify-items: center; gap: 2px; background: color-mix(in oklab, var(--foreground) 62%, transparent); color: var(--background); font-size: 11px; font-weight: 500; line-height: 1.1; text-align: center; opacity: 0; transition: opacity var(--duration-fast) var(--ease-standard); }
+.iconUploadButton:hover .iconUploadHint, .iconUploadButton:focus-visible .iconUploadHint, .iconUploadHint[data-busy] { opacity: 1; }
+.iconUploadButton:focus-visible { outline: none; }
+.iconUploadButton:focus-visible::after { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 2px var(--accent); }
+.iconUploadSpinner { animation: icon-spin 900ms linear infinite; }
+.iconUploadError { max-width: 16rem; color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
+@keyframes icon-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .iconUploadHint { transition: none; } .iconUploadSpinner { animation: none; } }
 
 /* A value to copy. */
 .copyField { display: grid; min-width: 0; gap: var(--space-2); }

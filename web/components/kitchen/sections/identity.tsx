@@ -49,7 +49,7 @@ export function Identity() {
                   <IdentityField label="Id" value="c:ada" mono copyLabel="Copy id" />
                   <IdentityField label="Local time" value="Europe/London"><LiveClock timeZone="Europe/London" /></IdentityField>
                 </div>
-                <StampRow apps={SAMPLE_APPS.map(app => ({ name: app.name, logoUrl: app.logo, seed: app.app_id }))} max={5} />
+                <StampRow apps={[...SAMPLE_APPS.slice(0, 3).map(app => ({ name: app.name, logoUrl: app.logo, seed: app.app_id })), ...["Silicon Hook", "Silicon MCPort", "Silicon Extend", "Silicon Remind", "Silicon Waveform", "Silicon Writings"].map(name => ({ name, logoUrl: null, seed: name }))]} max={8} />
               </div>
             }
             back={

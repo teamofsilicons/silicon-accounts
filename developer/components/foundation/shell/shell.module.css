@@ -24,8 +24,8 @@
 .brand { --sq-r: 10px; --sq-fill: transparent; display: inline-flex; min-width: 0; align-items: center; gap: 9px; margin: -6px -8px; padding: 6px 8px; background: var(--sq-fill); color: var(--foreground); font-family: var(--font-pixel); font-size: 1.0625rem; letter-spacing: 0; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
 .brand:hover { color: var(--foreground); }
 .brand:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
-.brandMark { display: grid; width: 22px; height: 22px; flex: none; place-items: center; color: var(--foreground); }
-.brandMark svg { width: 22px; height: 22px; }
+.brandMark { display: grid; height: 22px; flex: none; place-items: center; color: var(--foreground); }
+.brandMark svg { width: auto; height: 14px; }
 .brandText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .topStart { display: flex; min-width: 0; align-items: center; gap: var(--space-6); }

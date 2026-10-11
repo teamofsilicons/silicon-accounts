@@ -62,9 +62,11 @@ export function Identity() {
     { id: "identity.change-id", label: "Change your id", description: "Pick a new id; the old one stays reserved for you for 10 days", group: "Identity", icon: <AtSign size={16} strokeWidth={1.75} />, keywords: ["id", "handle", "username", "rename"], run: () => setChangingId(true) },
   ], []);
 
+  // Apps with a logo of their own come first; the rest follow as their letter, in the order the service gave.
   const stamps: StampProps[] = (apps.data?.items ?? [])
     .filter(item => item.status === "active")
-    .map(item => ({ name: item.app.name, logoUrl: appLogo(item.app, theme), seed: item.app.app_id, href: `${paths.apps}#app-${item.app.app_id}` }));
+    .map(item => ({ name: item.app.name, logoUrl: appLogo(item.app, theme), seed: item.app.app_id, href: `${paths.apps}#app-${item.app.app_id}` }))
+    .sort((a, b) => Number(!a.logoUrl) - Number(!b.logoUrl));
 
   const account = me.data;
   return (
@@ -154,6 +156,11 @@ function Front({ me, stamps, appsLoading, appsFailed, onRetryApps, reserved, onC
   };
   return (
     <div className={styles.face}>
+      {/* In the same place as the back's Back button, so the card turns over under the pointer and back again. */}
+      <Button variant="secondary" size="sm" className={styles.turn} onClick={card.toggle}>
+        Details
+        <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
+      </Button>
       <div className={styles.who}>
         <PhotoControl
           name={me.display_name}
@@ -209,10 +216,6 @@ function Front({ me, stamps, appsLoading, appsFailed, onRetryApps, reserved, onC
         ) : (
           <span className={styles.noStamps}>Apps you sign into get a stamp here.</span>
         )}
-        <Button variant="secondary" size="sm" onClick={card.toggle}>
-          Details
-          <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
-        </Button>
       </div>
     </div>
   );
@@ -236,11 +239,11 @@ function Back({ me }: { me: Me }) {
     <div className={styles.face}>
       <div className={styles.backHead}>
         <h2 className={styles.backTitle}>Details</h2>
-        <Button variant="ghost" size="sm" onClick={card.toggle}>
-          <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />
-          Back
-        </Button>
       </div>
+      <Button variant="secondary" size="sm" className={styles.turn} onClick={card.toggle}>
+        <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+        Back
+      </Button>
       <dl className={styles.details}>
         {carbon ? (
           <>

@@ -46,7 +46,8 @@ import { SECTIONS, SECTION_KEYS, type SectionKey } from "../lib/config";
 import { obtainEditor, releaseEditor, retainEditor, useEditor } from "../lib/editor";
 import { announceKeptDraft, draftSections, forgetKeptDraft } from "../lib/kept-drafts";
 import { SOURCE_LABEL, appStatus } from "../lib/labels";
-import { AppIcon } from "../parts/app-icon";
+import { AppIcon, AppIconUpload } from "../parts/app-icon";
+import { api as appsApi } from "@/components/publishing/api";
 import { DeveloperTabPage, preloadTabs } from "./tab-page";
 import { developerDocumentTitle } from "./titles";
 import styles from "./app.module.css";
@@ -285,7 +286,19 @@ function Loaded({ appId, app, meta }: { appId: string; app: AppDetail; meta: Met
       <header className={styles.header}>
         <Link href={paths.developer} className={styles.back}><ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />Your apps</Link>
         <div className={styles.identity}>
-          <AppIcon name={app.name} src={app.logo_url} size={64} decorative />
+          {app.source === "silicon_apps" ? (
+            // The logo lives in Silicon Apps, which passes it on to Silicon Accounts as it saves: the store, this page and
+            // every sign-in page show the new icon at once.
+            <AppIconUpload name={app.name} src={app.logo_url} size={64} onUpload={async logo => {
+              await appsApi(`/apps/${appId}`, { method: "PATCH", body: { logo, logo_alt: `${app.name} logo` } });
+              await Promise.all([
+                client.invalidateQueries({ queryKey: queryKeys.app.detail(appId) }),
+                client.invalidateQueries({ queryKey: queryKeys.me.ownedApps }),
+              ]);
+            }} />
+          ) : (
+            <AppIcon name={app.name} src={app.logo_url} size={64} decorative />
+          )}
           <div className={styles.identityText}>
             <h1 className={styles.title}>{app.name}</h1>
             <div className={styles.facts}>

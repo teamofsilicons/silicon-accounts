@@ -2,7 +2,9 @@
 
 /**
  * The identity card (the account site's home): a squircle "passport" on warm paper with grain, that tilts very slightly
- * toward the pointer (≤ 3°) and flips in 3D to show its back. Content is the page's: pass `front` and `back`.
+ * toward the pointer (≤ 3°) and flips in 3D to show its back. Content is the page's: pass `front` and `back`. A click
+ * anywhere on a face that is not a control (a button, link, field or its label) flips it too; keyboard users have the
+ * face's own button.
  *
  *   <IdentityCard label="Identity card of c:saket" front={<Front />} back={<Back />} />
  *   // inside either face:
@@ -11,7 +13,7 @@
  * Also exported: IdentityField (label, value, copy), Stamp / StampRow (apps the account carries), LiveClock (time in a
  * zone, rolling digits).
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { animate, useReducedMotion, type AnimationPlaybackControls } from "motion/react";
 import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
 import { SlotText } from "@/components/silicon-ui/slot-text/slot-text";
@@ -22,6 +24,8 @@ import styles from "./identity-card.module.css";
 
 const cx = (...names: Array<string | false | null | undefined>) => names.filter(Boolean).join(" ");
 
+/** What a click on the card leaves alone: controls, fields, their labels, popovers and dialogs opened from the card. */
+const INTERACTIVE = "a, button, input, textarea, select, label, summary, [role='button'], [role='menuitem'], [role='option'], [role='dialog'], [role='slider'], [contenteditable], [data-no-flip]";
 const MAX_TILT = 3;
 const FLIP = { type: "spring", visualDuration: 0.62, bounce: 0.12 } as const;
 
@@ -152,15 +156,24 @@ export function IdentityCard({ front, back, label, flipped: flippedProp, default
 
   const context = useMemo<IdentityCardContextValue>(() => ({ flipped, setFlipped, toggle: () => setFlipped(!flipped) }), [flipped, setFlipped]);
 
+  /** A plain click on the face's paper flips the card; clicks on controls, and the end of a text selection, do not. */
+  const flipFromPaper = (event: ReactMouseEvent<HTMLElement>) => {
+    if (event.button !== 0 || event.defaultPrevented) return;
+    const target = event.target as HTMLElement;
+    if (target.closest(INTERACTIVE)) return;
+    if (window.getSelection()?.toString()) return;
+    setFlipped(!flipped);
+  };
+
   return (
     <IdentityCardContext.Provider value={context}>
       <div ref={sceneRef} className={cx(styles.scene, className)} data-identity-card="" data-reduced={reduced || undefined} data-settled={defaultFlipped ? "back" : "front"}>
         <div className={styles.card}>
-          <section ref={frontRef} data-sq="surface" className={styles.face} aria-label={label} aria-hidden={flipped || undefined} inert={flipped} data-hidden={flipped || undefined}>
+          <section ref={frontRef} data-sq="surface" className={styles.face} aria-label={label} aria-hidden={flipped || undefined} inert={flipped} data-hidden={flipped || undefined} onClick={flipFromPaper}>
             <CardDecor />
             {front}
           </section>
-          <section ref={backRef} data-sq="surface" className={cx(styles.face, styles.back)} aria-label={`${label}, details`} aria-hidden={!flipped || undefined} inert={!flipped} data-hidden={!flipped || undefined}>
+          <section ref={backRef} data-sq="surface" className={cx(styles.face, styles.back)} aria-label={`${label}, details`} aria-hidden={!flipped || undefined} inert={!flipped} data-hidden={!flipped || undefined} onClick={flipFromPaper}>
             <CardDecor />
             {back}
           </section>
@@ -210,42 +223,52 @@ export interface StampProps {
   /** The app's name (tooltip and accessible name). */
   name: string;
   logoUrl?: string | null;
-  /** A stable key (the app id) decides the angle, so a stamp always lands the same way. */
+  /** The app id: a stable key. */
   seed: string;
   href?: string;
   size?: number;
 }
 
-function angleFor(seed: string): number {
-  let hash = 0;
-  for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) | 0;
-  return ((Math.abs(hash) % 13) - 6) * 1.1;
+/**
+ * The letter on an app without a logo, as the Silicon Apps store draws it: the first letter of its own name, past a
+ * leading "Silicon" (most apps here are "Silicon Something", and a row of S tiles tells them apart from nothing).
+ */
+export function monogramOf(name: string): string {
+  const own = name.trim().replace(/^silicon\s+(?=\S)/i, "") || name;
+  const letter = [...own].find(char => /\p{L}|\p{N}/u.test(char));
+  return (letter ?? "?").toUpperCase();
 }
 
-/** One app the account carries, pressed onto the card at a slight angle that straightens on hover. */
-export function Stamp({ name, logoUrl, seed, href, size = 40 }: StampProps) {
-  const initials = name.split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase() ?? "").join("");
-  const style = { "--stamp-angle": `${angleFor(seed)}deg`, "--stamp-size": `${size}px` } as CSSProperties;
-  const content = (
-    <span data-sq="clip" className={styles.stampInner}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- app logos are arbitrary https or data URLs, shown as is. */}
-      {logoUrl ? <img src={logoUrl} alt="" decoding="async" referrerPolicy="no-referrer" /> : initials}
-    </span>
-  );
+/**
+ * One app the account carries, drawn as on the Silicon Apps store: its logo in a squircle with a one-pixel line, or
+ * its letter in the serif on quiet beige. It lifts a little on hover.
+ */
+export function Stamp({ name, logoUrl, href, size = 40 }: StampProps) {
+  const [broken, setBroken] = useState<string | null>(null);
+  const logo = logoUrl && broken !== logoUrl ? logoUrl : null;
+  const style = { "--stamp-size": `${size}px` } as CSSProperties;
+  const content = logo
+    // eslint-disable-next-line @next/next/no-img-element -- app logos are arbitrary https or data URLs, shown as is.
+    ? <img src={logo} alt="" decoding="async" referrerPolicy="no-referrer" onError={() => setBroken(logo)} />
+    : <span className={styles.monogram} aria-hidden="true">{monogramOf(name)}</span>;
   return (
     <Tooltip content={name}>
       {href
-        ? <a href={href} data-sq="surface" className={styles.stamp} style={style} aria-label={name}>{content}</a>
-        : <span data-sq="surface" className={styles.stamp} style={style} role="img" aria-label={name} tabIndex={0}>{content}</span>}
+        ? <a href={href} data-sq="clip" className={styles.stamp} data-logo={logo ? "" : undefined} style={style} aria-label={name}>{content}</a>
+        : <span data-sq="clip" className={styles.stamp} data-logo={logo ? "" : undefined} style={style} role="img" aria-label={name} tabIndex={0}>{content}</span>}
     </Tooltip>
   );
 }
 
-/** A row of stamps; past `max` the rest fold into a "+N" mark. */
+/**
+ * A row of stamps. Past `max` the rest fold into a "+N" button that opens them in place; it stays where it is as "Less",
+ * so focus never jumps and one more press folds them away again.
+ */
 export function StampRow({ apps, max = 8, label = "Apps", className }: { apps: StampProps[]; max?: number; label?: string; className?: string }) {
   const reduced = useReducedMotion() ?? false;
-  const shown = apps.slice(0, max);
-  const rest = Math.max(0, apps.length - shown.length);
+  const [open, setOpen] = useState(false);
+  const shown = open ? apps : apps.slice(0, max);
+  const rest = Math.max(0, apps.length - max);
   const rowRef = useRef<HTMLDivElement>(null);
   const pressed = useRef(false);
   useEffect(() => {
@@ -254,13 +277,26 @@ export function StampRow({ apps, max = 8, label = "Apps", className }: { apps: S
     pressed.current = true;
     // The stamps press onto the card one after another the first time the card shows.
     Array.from(row.children).forEach((child, index) => {
-      animate(child as HTMLElement, { opacity: [0, 1], scale: [1.18, 1] }, { type: "spring", visualDuration: 0.34, bounce: 0.18, delay: 0.12 + index * 0.045 });
+      animate(child as HTMLElement, { opacity: [0, 1], scale: [1.12, 1] }, { type: "spring", visualDuration: 0.34, bounce: 0.18, delay: 0.12 + index * 0.045 });
     });
   }, [reduced]);
+  const toggle = () => {
+    const opening = !open;
+    setOpen(opening);
+    if (!opening || reduced) return;
+    requestAnimationFrame(() => {
+      const added = Array.from(rowRef.current?.children ?? []).slice(max, max + rest) as HTMLElement[];
+      added.forEach((child, index) => animate(child, { opacity: [0, 1], scale: [0.9, 1] }, { type: "spring", visualDuration: 0.28, bounce: 0.12, delay: index * 0.03 }));
+    });
+  };
   return (
     <div ref={rowRef} className={cx(styles.stamps, className)} role="list" aria-label={label}>
       {shown.map(app => <span key={app.seed} role="listitem"><Stamp {...app} /></span>)}
-      {rest > 0 ? <span role="listitem" data-sq="surface" className={styles.more}>+{rest}</span> : null}
+      {rest > 0 ? (
+        <span role="listitem">
+          <button type="button" data-sq="surface" className={styles.more} onClick={toggle} aria-expanded={open} aria-label={open ? "Show fewer apps" : `Show ${rest} more ${rest === 1 ? "app" : "apps"}`}>{open ? "Less" : `+${rest}`}</button>
+        </span>
+      ) : null}
     </div>
   );
 }
