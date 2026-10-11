@@ -4,8 +4,9 @@
  *   icon.svg         → public/icon-192.png, icon-512.png and favicon.ico (16, 32 and 48 px)
  *   maskable.svg     → public/icon-maskable-512.png (full bleed, for the web manifest)
  *   apple.svg        → public/apple-touch-icon.png (180 px)
- * public/icon.svg is icon.svg as is. The same pipeline as the developer site's developer/scripts/brand, with the Silicon
- * Accounts mark (a person on the brand-blue squircle). Run it after changing any source: pnpm brand
+ * public/icon.svg is icon.svg as is: the Silicon Accounts mark (a rounded square beside a circle, #181818 on cream
+ * #EDE8E0), which swaps to cream on #181818 when the browser is dark. The PNGs draw the light colours. Run it after
+ * changing any source: pnpm brand
  */
 import { readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";

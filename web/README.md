@@ -72,8 +72,10 @@ RSC, `HEAD` and static Markdown requests. `/docs` goes to the shared `/docs` lan
 `/docs/accounts/<path>`; `/docs.md` goes to `/docs/accounts/index.md`. The old `/docs/search-index.json` goes to the
 shared endpoint at the same path (`/llms.txt` and `/llms-full.txt` are this site's own now). Queries are preserved, and browsers inherit the
 original fragment because `Location` does not replace it. Unknown deep paths reach the developer site's docs 404.
-The account dock, phone sheet, command palette and signed-out landing link directly to its `/docs`, using
-`developer_url` rather than an obsolete account-site docs address. Account pages, API rewrites, hosted sign-in and
+The account shell's top row, the phone sheet's foot, the command palette ("Other sites") and the signed-out landing
+link directly to the developer site and its `/docs` (`ELSEWHERE` in `lib/navigation.ts`), using `developer_url` rather
+than an obsolete account-site docs address. They are never dock sections: the dock holds only this site's six pages
+(number keys 1 to 6). Account pages, API rewrites, hosted sign-in and
 the embed remain on the Accounts origin.
 
 The embed page `/embed/v1/buttons` is the one page other sites may frame: `proxy.ts` reads the app's
@@ -128,11 +130,14 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   the API, the SDK, the embed. Errors say what happened and what to do next, in the server's words when it sent them
   (`message` + `hint`).
 - **Styling.** CSS modules next to each component, tokens from `styles/tokens.css` (the brand mapped onto Arc's
-  semantic roles, light and dark), no Tailwind. Filled primary actions use `--primary*` (brand blue with light text,
-  readable in both themes); `--accent` is for indicators, `--accent-ink` for accent-coloured text.
-- **Themes.** `lib/theme.ts` + `useTheme()` (`components/foundation/theme/use-theme.ts`); light, dark or device,
-  stored per browser, painted before first paint by the nonce'd boot script (no flash). Change it with
-  `change(next, triggerElement)` for the eclipse transition from the switch.
+  semantic roles), no Tailwind. The look is Silicon Writings' and the Silicon Apps store's: cream paper `#FFFDF9`, ink
+  `#1E1E1C`, Hedvig Letters Serif for titles (page titles in `--accent-ink` blue), BDO Grotesk for text, Geist Pixel for
+  the wordmark and small labels, the current item on the beige `--surface-pressed`. Filled primary actions use
+  `--primary*`; `--accent` is for indicators, `--accent-ink` for accent-coloured text.
+- **Theme (2026-10-11).** The site is light only. `lib/theme.ts` keeps its exports so callers compile, but the boot
+  script pins `data-theme="light"` and clears any stored choice; there is no theme switch anywhere (dock, user menu,
+  Settings, palette, public header and footer). The dark tokens in `styles/tokens.css` stay for branded subtrees: an
+  app's hosted page that forces its dark look still paints dark.
 - **Data.** Never `fetch` the API from components: use the hooks in `lib/query/` (or `api` from `lib/api` inside
   them). Errors are `ApiError` (`status`, `code`, `message`, `hint`, `requestId`, `retryAfter`, `lockedUntil`,
   `redirectTo`). Failed mutations toast message + hint unless `meta: { toast: false }` (show those inline); failed
@@ -538,14 +543,17 @@ brief: fonts SF Pro and BDO Grotesk; light #F7F8FA / #292929, dark #02040A / #F7
   (`app`, `first_party`, `scopes`); an app's own command-line tool is shown in the app's look ("Sign in to {app}?",
   what it will see, "Powered by"), the silicon-accounts CLI keeps the Silicon Accounts look.
 
-### The public landing page (2026-10-09)
+### The public landing page (2026-10-09, redesigned 2026-10-11)
 
-`/` for anyone not signed in is `components/landing/` (server components only: the header's theme switch and the
-copy buttons are the islands, `components/site/theme-controls.tsx` and `enhancer.tsx`). It sells Silicon Accounts to
-Silicons (an identity of their own, no browser, the exact commands, "Create your Silicon account") and to Carbons (one
-account, no passwords, see and remove apps, look after Silicons, revoke User verifications), answers questions
-(FAQPage JSON-LD) and points app builders to the developer site once. The header, footer, action links and code
-blocks are the developer site's (`components/site/`, the same CSS).
+`/` for anyone not signed in is `components/landing/` (server components only: the copy buttons are the one island,
+`components/site/enhancer.tsx`). Since 2026-10-11 it is one calm column in the store's style: a pixel kicker over a
+blue serif title, one primary action ("Create your account") and a quiet link for Silicons, then For Silicons (the
+three commands), For Carbons (a plain list), Without a browser (what a Silicon can read or call) and one closing line
+for app builders. No FAQ, no illustration. The header is the wordmark, Docs and Sign in; the footer is one quiet line.
+The mark (a rounded square beside a circle) is drawn in `components/foundation/shell/brand-mark.tsx`; the icons and
+`og.png` come from `scripts/brand` (`pnpm brand`).
+
+The notes below describe the 2026-10-09 layout; the redesign replaced its header menu, theme choice, FAQ and cards.
 
 Keyboard (2026-10-09, from the ux-audit suite): the header menu's close button carries `autofocus`, so opening the
 native popover moves focus into it and Escape returns it to the menu button; the footer's theme choice shows keyboard

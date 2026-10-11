@@ -5,7 +5,7 @@ import { NextRequest } from "next/server";
 import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { config, proxy } from "../proxy";
 import { developerDocsPath } from "../lib/docs-redirects";
-import { developerDocsUrl, SECTIONS, sectionHref } from "../lib/navigation";
+import { developerDocsUrl, ELSEWHERE, SECTIONS } from "../lib/navigation";
 
 const cases = [
   ["/docs", "/docs"],
@@ -112,10 +112,13 @@ test("account and hosted sign-in routes retain their CSP response without a docs
 });
 
 test("site navigation links directly to shared documentation on the configured developer site", () => {
-  const section = SECTIONS.find(section => section.key === "docs");
-  assert.ok(section);
-  assert.equal(section.external, true);
-  assert.equal(sectionHref(section, "http://localhost:8600"), "http://localhost:8600/docs");
+  // The other sites are not dock sections: the dock holds only this site's pages.
+  assert.equal(SECTIONS.some(section => /^https?:/.test(section.href)), false);
+  const docs = ELSEWHERE.find(site => site.key === "docs");
+  const developer = ELSEWHERE.find(site => site.key === "developer");
+  assert.ok(docs && developer);
+  assert.equal(docs.href("http://localhost:8600"), "http://localhost:8600/docs");
+  assert.equal(developer.href("http://localhost:8600"), "http://localhost:8600");
   assert.equal(developerDocsUrl("https://developers.example.test/portal/"), "https://developers.example.test/portal/docs");
   assert.equal(developerDocsUrl(), "https://developers.teamofsilicons.com/docs");
 });

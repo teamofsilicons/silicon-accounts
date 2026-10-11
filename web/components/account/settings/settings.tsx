@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /settings: how the site looks, whether this browser shares usage telemetry, every browser and terminal signed in to
+ * /settings: whether this browser shares usage telemetry, every browser and terminal signed in to
  * this account (sign any of them out), signing out here, and deleting the account. A Carbon who is custodian of a
  * Silicon cannot delete their account until every Silicon has another custodian or is deleted, because a Silicon
  * always has exactly one.
@@ -14,12 +14,10 @@ import { Badge } from "@/components/silicon-ui/badge/badge";
 import { Button } from "@/components/silicon-ui/button/button";
 import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
 import { HoldToConfirm } from "@/components/silicon-ui/hold-to-confirm/hold-to-confirm";
-import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
 import { Switch } from "@/components/silicon-ui/switch/switch";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader, Section, SettingsGroup, SettingsRow } from "@/components/foundation/layout/layout";
-import { useTheme, type ThemePreference } from "@/components/foundation/theme/use-theme";
 import { ApiError } from "@/lib/api/errors";
 import { SESSION_ORIGINS } from "@/lib/api/labels";
 import type { AccountSummary, SessionInfo } from "@/lib/api/types";
@@ -33,12 +31,6 @@ import { asCarbon, asSilicon, describeError, useNow } from "../parts/common";
 import { focusAfterRemoval, pageMain } from "../parts/focus";
 import { useEverySession, useEverySilicon, useSetMeView, useSignOutSession } from "../parts/queries";
 import styles from "./settings.module.css";
-
-const THEMES: Array<{ value: ThemePreference; label: string }> = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "system", label: "Device" },
-];
 
 /**
  * The account is gone. DELETE /v1/me already ended every session of it and cleared this browser's session cookie, so
@@ -71,7 +63,6 @@ export function Settings() {
   const now = useNow(60_000);
   const me = useMe();
   const sessions = useEverySession();
-  const { preference, change } = useTheme();
   const [telemetryEnabled, setTelemetryEnabled] = useTelemetryEnabled();
   const { signOut, pending: signingOut } = useSignOut();
   const revoke = useSignOutSession();
@@ -100,15 +91,7 @@ export function Settings() {
 
   return (
     <Page width="narrow">
-      <PageHeader title="Settings" description="How this site looks, what this browser shares, where you are signed in, and your account." />
-
-      <Section title="Appearance">
-        <SettingsGroup>
-          <SettingsRow label="Theme" description="Light, dark, or whatever your device is set to.">
-            <SegmentedControl label="Theme" options={THEMES} value={preference} onValueChange={value => change(value as ThemePreference, null)} />
-          </SettingsRow>
-        </SettingsGroup>
-      </Section>
+      <PageHeader title="Settings" description="What this browser shares, where you are signed in, and your account." />
 
       <Section title="Privacy">
         <SettingsGroup>

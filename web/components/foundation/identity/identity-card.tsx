@@ -175,14 +175,6 @@ function CardDecor() {
     <>
       <span className={styles.grain} aria-hidden="true" />
       <span className={styles.sheen} aria-hidden="true" />
-      <span data-sq="surface" className={styles.inset} aria-hidden="true" />
-      <svg className={styles.seal} viewBox="0 0 200 200" fill="none" stroke="currentColor" aria-hidden="true">
-        <circle cx="100" cy="100" r="96" strokeWidth="1.5" />
-        <circle cx="100" cy="100" r="84" strokeWidth="1" strokeDasharray="2 5" />
-        <circle cx="100" cy="100" r="70" strokeWidth="1" />
-        <circle cx="100" cy="100" r="44" strokeWidth="1" strokeDasharray="1 4" />
-        <path d="M100 30v140M30 100h140M50.5 50.5l99 99M149.5 50.5l-99 99" strokeWidth=".75" strokeDasharray="1 6" />
-      </svg>
     </>
   );
 }

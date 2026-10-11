@@ -1,19 +1,10 @@
 /**
- * The public pages' footer (server-rendered), as on the developer site: the account, everything a Silicon can read or
- * call here, the rest of the ecosystem (the developer site, its docs and its status page by the address GET /v1/meta
- * names), the open source line (MIT, with the code on GitHub), and the theme choice (System, Light, Dark).
+ * The public pages' footer (server-rendered), one quiet line as on Silicon Writings and Silicon Apps: the copyright in
+ * the pixel face and a few links (the developer site and its docs by the address GET /v1/meta names, what a Silicon
+ * can read here, the store, the service status and the code, MIT).
  */
-import { ArrowUpRight } from "lucide-react";
 import { LINKS } from "@/lib/site";
-import { BrandMark } from "./brand";
-import { ThemePicker } from "./theme-controls";
 import styles from "./site.module.css";
-
-interface FooterLink {
-  href: string;
-  label: string;
-  external?: boolean;
-}
 
 export interface SiteFooterProps {
   /** The developer site (GET /v1/meta `developer_url`). */
@@ -21,80 +12,27 @@ export interface SiteFooterProps {
 }
 
 export function SiteFooter({ developerUrl }: SiteFooterProps) {
-  const columns: Array<{ id: string; title: string; links: FooterLink[] }> = [
-    {
-      id: "footer-account",
-      title: "Your account",
-      links: [
-        { href: "/sign-in?intent=signup", label: "Sign up" },
-        { href: "/sign-in", label: "Sign in" },
-        { href: "/#for-silicons", label: "For Silicons" },
-        { href: "/#for-carbons", label: "For Carbons" },
-        { href: "/#faq", label: "Questions" },
-      ],
-    },
-    {
-      id: "footer-agents",
-      title: "For agents",
-      links: [
-        { href: "/llms.txt", label: "llms.txt" },
-        { href: "/llms-full.txt", label: "llms-full.txt" },
-        { href: "/openapi.json", label: "OpenAPI" },
-        { href: "/.well-known/agent.json", label: "Agent card" },
-        { href: "/.well-known/openid-configuration", label: "OpenID configuration" },
-      ],
-    },
-    {
-      id: "footer-ecosystem",
-      title: "Ecosystem",
-      links: [
-        { href: developerUrl, label: "Developer site", external: true },
-        { href: `${developerUrl}/docs`, label: "Docs", external: true },
-        { href: `${developerUrl}/status`, label: "Service status", external: true },
-        { href: LINKS.store, label: "Silicon Apps store", external: true },
-        { href: LINKS.teamOfSilicons, label: "Team of Silicons", external: true },
-        { href: LINKS.accountsGithub, label: "Silicon Accounts on GitHub", external: true },
-      ],
-    },
+  const links: Array<{ href: string; label: string; external?: boolean }> = [
+    { href: `${developerUrl}/docs/accounts`, label: "Add Silicon Accounts to your app", external: true },
+    { href: "/llms.txt", label: "llms.txt" },
+    { href: "/openapi.json", label: "API" },
+    { href: LINKS.store, label: "Silicon Apps", external: true },
+    { href: `${developerUrl}/status`, label: "Status", external: true },
+    { href: LINKS.accountsGithub, label: "GitHub", external: true },
   ];
   return (
     <footer className={styles.footer}>
       <div className={styles.footerInner}>
-        <div className={styles.footerTop}>
-          <div className={styles.footerIntro}>
-            <a href="/" className={styles.footerBrand}>
-              <BrandMark className={styles.brandMark} />
-              <span>Silicon Accounts</span>
-            </a>
-            <p className={styles.tagline}>
-              One account for every Carbon and Silicon. Sign into every app as yourself, and look after the Silicons in your care.
-            </p>
-          </div>
-          <nav className={styles.columns} aria-label="Footer">
-            {columns.map(column => (
-              <section key={column.id} className={styles.column} aria-labelledby={column.id}>
-                <h2 id={column.id}>{column.title}</h2>
-                <ul role="list">
-                  {column.links.map(link => (
-                    <li key={link.label}>
-                      <a href={link.href} className={styles.footerLink} rel={link.external ? "noopener" : undefined}>
-                        {link.label}
-                        {link.external ? <ArrowUpRight size={13} strokeWidth={1.75} aria-hidden="true" className={styles.externalIcon} /> : null}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+        <p className={styles.copyright}>© {new Date().getFullYear()} Team of Silicons</p>
+        <nav aria-label="Footer">
+          <ul role="list" className={styles.footerLinks}>
+            {links.map(link => (
+              <li key={link.label}>
+                <a href={link.href} className={styles.footerLink} rel={link.external ? "noopener" : undefined}>{link.label}</a>
+              </li>
             ))}
-          </nav>
-        </div>
-        <div className={styles.footerBottom}>
-          <p className={styles.copyright}>
-            © {new Date().getFullYear()} Team of Silicons. Silicon Accounts is{" "}
-            <a href={LINKS.accountsGithub} rel="noopener">open source (MIT)</a>.
-          </p>
-          <ThemePicker />
-        </div>
+          </ul>
+        </nav>
       </div>
     </footer>
   );

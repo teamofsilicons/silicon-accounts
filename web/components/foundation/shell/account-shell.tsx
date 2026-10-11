@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The account site's frame for signed-in pages: the top row (brand, search), the page, the floating dock, the ⌘K
+ * The account site's frame for signed-in pages: the top row (brand, the other sites, search), the page, the floating dock, the ⌘K
  * palette, number-key section shortcuts and page transitions. It also guards the account routes: visitors without a
  * session are sent to sign in and come back to the page they asked for. At "/" a signed-out visitor sees the landing
  * page, rendered bare (without the shell).
@@ -13,14 +13,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ViewTransition, useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
-import { LogOut, Monitor, Moon, Search, Settings as SettingsIcon, Sun, SwatchBook } from "lucide-react";
+import { ArrowUpRight, LogOut, Search, Settings as SettingsIcon, SwatchBook } from "lucide-react";
 import { Alert } from "@/components/silicon-ui/alert/alert";
 import { Button } from "@/components/silicon-ui/button/button";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { SkipLink } from "@/components/foundation/layout/layout";
-import { changeTheme } from "@/lib/theme";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
-import { SECTIONS, navigationType, paths, sectionFor, sectionHref } from "@/lib/navigation";
+import { ELSEWHERE, SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
 import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
 import { beginSignIn, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
@@ -136,21 +135,30 @@ export function AccountShell({ children }: { children: ReactNode }) {
         group: "Go to",
         shortcut: section.shortcut,
         icon: <Icon size={16} strokeWidth={1.75} />,
-        keywords: section.external ? [section.key, "apps", "sign-in setup", "developer site", "open"] : [section.key, "go", "open"],
-        run: () => void go(sectionHref(section, developerUrl)),
+        keywords: [section.key, "go", "open"],
+        run: () => void go(section.href),
       };
     }),
-    { id: "go.settings", label: "Settings", description: "Theme, telemetry, sessions and your account", group: "Go to", icon: <SettingsIcon size={16} strokeWidth={1.75} />, keywords: ["preferences", "delete", "sessions"], run: () => void go(paths.settings) },
-    { id: "theme.light", label: "Use the light theme", group: "Appearance", icon: <Sun size={16} strokeWidth={1.75} />, keywords: ["theme", "light", "appearance"], run: () => changeTheme("light", null) },
-    { id: "theme.dark", label: "Use the dark theme", group: "Appearance", icon: <Moon size={16} strokeWidth={1.75} />, keywords: ["theme", "dark", "appearance", "night"], run: () => changeTheme("dark", null) },
-    { id: "theme.system", label: "Match the device theme", group: "Appearance", icon: <Monitor size={16} strokeWidth={1.75} />, keywords: ["theme", "system", "auto", "appearance"], run: () => changeTheme("system", null) },
+    { id: "go.settings", label: "Settings", description: "Telemetry, sessions and your account", group: "Go to", icon: <SettingsIcon size={16} strokeWidth={1.75} />, keywords: ["preferences", "delete", "sessions"], run: () => void go(paths.settings) },
+    ...ELSEWHERE.map(site => {
+      const Icon = site.icon;
+      return {
+        id: `elsewhere.${site.key}`,
+        label: site.label,
+        description: site.description,
+        group: "Other sites",
+        icon: <Icon size={16} strokeWidth={1.75} />,
+        keywords: site.key === "developer" ? ["developer", "build", "apps", "sign-in setup", "client"] : ["docs", "documentation", "help", "guide", "api"],
+        run: () => void go(site.href(developerUrl)),
+      };
+    }),
     ...(process.env.NODE_ENV !== "production"
       ? [{ id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={1.75} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) }]
       : []),
     { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={1.75} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
   ], [go, doSignOut, developerUrl]);
 
-  // ⌘K toggles the palette; 1 to 8 jump to sections (never while typing or with a layer open).
+  // ⌘K toggles the palette; 1 to 6 jump to sections (never while typing or with a layer open).
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
@@ -166,11 +174,11 @@ export function AccountShell({ children }: { children: ReactNode }) {
       if (!section || status !== "signed_in") return;
       event.preventDefault();
       const from = event.target instanceof HTMLElement && event.target !== document.body ? event.target : null;
-      void go(sectionHref(section, developerUrl), from);
+      void go(section.href, from);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [go, paletteOpen, status, developerUrl]);
+  }, [go, paletteOpen, status]);
 
   const account = useMemo<DockAccount | null>(() => {
     const summary = session?.account;
@@ -194,13 +202,31 @@ export function AccountShell({ children }: { children: ReactNode }) {
           void go(paths.home, event.currentTarget);
         }}>
           <BrandMark />
-          <span className={styles.brandText}>Silicon <span className={styles.brandMuted}>Accounts</span></span>
+          <span className={styles.brandText}>Silicon Accounts</span>
         </Link>
-        <button data-sq="surface" type="button" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}>
-          <Search size={16} strokeWidth={1.75} aria-hidden="true" />
-          <span>Search and jump</span>
-          <kbd data-sq="surface">{isApple ? "⌘ K" : "Ctrl K"}</kbd>
-        </button>
+        <span className={styles.topEnd}>
+          {/* The other sites, quiet and out of the dock: full navigations after the page's guards. */}
+          <nav className={styles.elsewhere} aria-label="Other sites">
+            {ELSEWHERE.map(site => {
+              const href = site.href(developerUrl);
+              return (
+                <a key={site.key} href={href} data-sq="surface" className={styles.elsewhereLink} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
+                  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  event.preventDefault();
+                  void go(href, event.currentTarget);
+                }}>
+                  {site.label}
+                  <ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
+                </a>
+              );
+            })}
+          </nav>
+          <button data-sq="surface" type="button" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}>
+            <Search size={16} strokeWidth={1.75} aria-hidden="true" />
+            <span>Search and jump</span>
+            <kbd data-sq="surface">{isApple ? "⌘ K" : "Ctrl K"}</kbd>
+          </button>
+        </span>
       </header>
       <main id="main" className={styles.main} tabIndex={-1}>{content}</main>
       <Dock

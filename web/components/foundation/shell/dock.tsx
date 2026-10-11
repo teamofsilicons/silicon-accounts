@@ -5,21 +5,18 @@
  * opens the same sections in a bottom sheet. One highlight glides between sections on the morph spring while the
  * active section's label opens and the previous one closes, all on the same spring so they stay in step.
  *
- * Developer is another site (developers.teamofsilicons.com, from GET /v1/meta): a plain link that leaves the account
- * site (after the page's navigation guards), marked with an arrow, and never the active section.
+ * Only this site's sections live here. The developer site and its docs are other sites (lib/navigation.ts ELSEWHERE):
+ * quiet links in the top row, and at the foot of the phone sheet. The site is light only, so there is no theme switch.
  */
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { animate, useReducedMotion, type AnimationPlaybackControls } from "motion/react";
 import { ArrowUpRight, ChevronUp, Search, Settings } from "lucide-react";
 import { BottomSheet } from "@/components/silicon-ui/bottom-sheet/bottom-sheet";
-import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
-import { ThemeSwitch } from "@/components/silicon-ui/theme-switch/theme-switch";
 import { Tooltip } from "@/components/silicon-ui/tooltip/tooltip";
 import { UserMenu, type UserMenuUser } from "@/components/silicon-ui/user-menu/user-menu";
 import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
-import { useTheme, type ThemePreference } from "@/components/foundation/theme/use-theme";
-import { SECTIONS, sectionHref, type SectionKey } from "@/lib/navigation";
+import { ELSEWHERE, SECTIONS, type SectionKey } from "@/lib/navigation";
 import { GUARDED_NAVIGATION } from "@/lib/navigation-guard";
 import { useDeveloperUrl } from "@/lib/query/session";
 import styles from "./dock.module.css";
@@ -61,8 +58,6 @@ export function Dock(props: DockProps) {
 }
 
 function FullDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, onOpenPalette, isApple }: DockProps) {
-  const { theme, preference, change } = useTheme();
-  const developerUrl = useDeveloperUrl();
   const reduced = useReducedMotion() ?? false;
   const listRef = useRef<HTMLUListElement>(null);
   const highlightRef = useRef<HTMLSpanElement>(null);
@@ -160,7 +155,7 @@ function FullDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, o
         {SECTIONS.map((section, index) => {
           const current = section.key === activeKey;
           const Icon = section.icon;
-          const href = sectionHref(section, developerUrl);
+          const href = section.href;
           const inner = (
             <>
               <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
@@ -190,47 +185,32 @@ function FullDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, o
               onNavigate(href, event.currentTarget);
             },
           };
-          const link = section.external ? (
-            // Another site: a plain link (a full navigation), named as the site it opens.
-            <a {...shared} aria-label={`${section.label} site`} data-external="">{inner}</a>
-          ) : (
-            <Link {...shared} aria-current={current ? "page" : undefined} aria-label={section.label}>{inner}</Link>
-          );
-          const tip = section.external ? `${section.label} site ↗  ${section.shortcut}` : `${section.label}  ${section.shortcut}`;
-          return <li key={section.key}>{current ? link : <Tooltip content={tip}>{link}</Tooltip>}</li>;
+          const link = <Link {...shared} aria-current={current ? "page" : undefined} aria-label={section.label}>{inner}</Link>;
+          return <li key={section.key}>{current ? link : <Tooltip content={`${section.label}  ${section.shortcut}`}>{link}</Tooltip>}</li>;
         })}
       </ul>
-      <span className={styles.separator} aria-hidden="true" />
-      <span className={styles.tool}>
-        <ThemeSwitch theme={theme} variant="eclipse" iconOnly onThemeChange={(next, _variant, trigger) => change(next, trigger)} />
-      </span>
       {account ? (
-        <span className={styles.tool}>
-          <UserMenu
-            user={account}
-            theme={preference}
-            onThemeChange={(next: ThemePreference) => change(next, null)}
-            onSignOut={onSignOut}
-            align="end"
-            items={[
-              { label: "Settings", icon: <Settings size={16} strokeWidth={1.75} />, onSelect: onOpenSettings },
-              { label: "Search and jump", icon: <Search size={16} strokeWidth={1.75} />, keys: isApple ? ["⌘", "K"] : ["Ctrl", "K"], onSelect: onOpenPalette },
-            ]}
-          />
-        </span>
+        <>
+          <span className={styles.separator} aria-hidden="true" />
+          <span className={styles.tool}>
+            <UserMenu
+              user={account}
+              showTheme={false}
+              onSignOut={onSignOut}
+              align="end"
+              items={[
+                { label: "Settings", icon: <Settings size={16} strokeWidth={1.75} />, onSelect: onOpenSettings },
+                { label: "Search and jump", icon: <Search size={16} strokeWidth={1.75} />, keys: isApple ? ["⌘", "K"] : ["Ctrl", "K"], onSelect: onOpenPalette },
+              ]}
+            />
+          </span>
+        </>
       ) : null}
     </nav>
   );
 }
 
-const themeOptions: { value: ThemePreference; label: string }[] = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "system", label: "Device" },
-];
-
 function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, onOpenPalette }: DockProps) {
-  const { preference, change } = useTheme();
   const developerUrl = useDeveloperUrl();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -254,7 +234,7 @@ function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings
         <ul className={styles.sheetList} role="list">
           {SECTIONS.map(section => {
             const Icon = section.icon;
-            const href = sectionHref(section, developerUrl);
+            const href = section.href;
             const shared = {
               href,
               "data-sq": "surface",
@@ -273,27 +253,36 @@ function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings
               <>
                 <span className={styles.sheetIcon} aria-hidden="true"><Icon size={20} strokeWidth={1.75} /></span>
                 <span className={styles.sheetText}>
-                  <span className={styles.sheetLabel}>
-                    {section.external ? `${section.label} site` : section.label}
-                    {section.external ? <ArrowUpRight className={styles.externalMark} size={14} strokeWidth={1.75} aria-hidden="true" /> : null}
-                  </span>
+                  <span className={styles.sheetLabel}>{section.label}</span>
                   <span className={styles.sheetDescription}>{section.description}</span>
                 </span>
               </>
             );
             return (
               <li key={section.key}>
-                {section.external ? (
-                  <a {...shared} data-external="">{inner}</a>
-                ) : (
-                  <Link {...shared} aria-current={section.key === activeKey ? "page" : undefined}>{inner}</Link>
-                )}
+                <Link {...shared} aria-current={section.key === activeKey ? "page" : undefined}>{inner}</Link>
               </li>
             );
           })}
         </ul>
         <div className={styles.sheetFooter}>
-          <SegmentedControl label="Theme" options={themeOptions} value={preference} onValueChange={value => change(value as ThemePreference, null)} />
+          {/* The other sites: quiet links (full navigations, after the page's guards), not sections. */}
+          <nav className={styles.elsewhere} aria-label="Other sites">
+            {ELSEWHERE.map(site => {
+              const href = site.href(developerUrl);
+              return (
+                <a key={site.key} href={href} className={styles.elsewhereLink} data-sq="surface" data-external="" {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
+                  if (!plainClick(event)) return;
+                  event.preventDefault();
+                  setOpen(false);
+                  onNavigate(href, menuButton.current);
+                }}>
+                  {site.label}
+                  <ArrowUpRight className={styles.externalMark} size={14} strokeWidth={1.75} aria-hidden="true" />
+                </a>
+              );
+            })}
+          </nav>
           <button data-sq="surface" type="button" className={styles.iconButton} aria-label="Settings" onClick={() => { setOpen(false); onOpenSettings(); }}>
             <Settings size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -305,8 +294,7 @@ function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings
       {account ? (
         <UserMenu
           user={account}
-          theme={preference}
-          onThemeChange={(next: ThemePreference) => change(next, null)}
+          showTheme={false}
           onSignOut={onSignOut}
           items={[{ label: "Settings", icon: <Settings size={16} strokeWidth={1.75} />, onSelect: onOpenSettings }]}
         />
