@@ -16,6 +16,14 @@ def env(path, values):
         return '"'+v.replace('\\','\\\\').replace('"','\\"')+'"'
     write(path,''.join(k+'='+quote(str(v))+'\n' for k,v in values.items()),0o600)
 
+# Silicon Accounts records no telemetry: these keys do nothing now (accounts-api warns when one is set).
+RETIRED=('ACCOUNTS_TELEMETRY_ENABLED','ACCOUNTS_TELEMETRY_TABLE_KEY')
+
+def api_environment(secret):
+    # Every ACCOUNTS_* key of the secret except the retired ones, which never reach the host.
+    for k in sorted(k for k in secret if k in RETIRED):print('Skipping retired '+k+'; remove it from the secret')
+    return {k:v for k,v in secret.items() if k.startswith('ACCOUNTS_') and k not in RETIRED}
+
 def healthy(url):
     for _ in range(45):
         try:
@@ -72,7 +80,7 @@ assert developer_url.scheme=='https' and developer_url.path in ('','/') and not 
 assert developer_url.hostname and re.fullmatch(r'[a-z0-9.-]+',developer_url.hostname)
 assert s['ACCOUNTS_DEVELOPER_URL'].rstrip('/')==s['DEVELOPER_PUBLIC_URL'].rstrip('/')
 run('install','-d','-m','700','/etc/accounts')
-api={k:v for k,v in s.items() if k.startswith('ACCOUNTS_')}
+api=api_environment(s)
 env('/etc/accounts/api.env',api)
 common={k:s[k] for k in ['ACCOUNTS_API_URL','ACCOUNTS_PUBLIC_URL','ACCOUNTS_DEVELOPER_URL']}
 common.update(NODE_ENV='production',NEXT_TELEMETRY_DISABLED='1',HOSTNAME='127.0.0.1')

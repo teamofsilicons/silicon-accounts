@@ -1,15 +1,13 @@
 //! Per-invocation context: resolved home, settings, the client, the stored session (with
-//! automatic refresh), app credentials and telemetry.
+//! automatic refresh) and app credentials. The CLI records no telemetry.
 
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::OnceCell;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
 use silicon_accounts_client::{
-    AccountKind, AccountsClient, AppClient, DEFAULT_BASE_URL, Me, TelemetryEvent, TokenResponse,
-    parse_flag,
+    AccountKind, AccountsClient, AppClient, DEFAULT_BASE_URL, Me, TokenResponse, parse_flag,
 };
 use time::OffsetDateTime;
 
@@ -26,6 +24,8 @@ const REFRESH_MARGIN: time::Duration = time::Duration::seconds(60);
 pub struct FileConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    /// Never read: Silicon Accounts records no telemetry. Written as `false` so an older
+    /// silicon-accounts reading this home sends nothing either.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub telemetry: Option<bool>,
     /// The app chosen with `silicon-accounts app use`.
@@ -177,63 +177,14 @@ fn normalize_url(url: &str) -> String {
     url.trim().trim_end_matches('/').to_owned()
 }
 
-/// Telemetry buffered during a command and sent once at the end.
-#[derive(Debug)]
-pub struct Telemetry {
-    events: RefCell<Vec<TelemetryEvent>>,
-    command: RefCell<String>,
-    started: Instant,
-}
-
-impl Telemetry {
-    fn new() -> Self {
-        Self {
-            events: RefCell::new(Vec::new()),
-            command: RefCell::new(String::new()),
-            started: Instant::now(),
-        }
-    }
-
-    pub fn set_command(&self, path: &str) {
-        *self.command.borrow_mut() = path.to_owned();
-    }
-
-    /// Records a step of a multi-step flow (`login.device.code_shown`, progress 0.3…).
-    pub fn step(&self, step: &str, progress: f64, data: Value) {
-        let mut events = self.events.borrow_mut();
-        if events.len() < 40 {
-            events.push(TelemetryEvent {
-                source: "cli".to_owned(),
-                step: step.to_owned(),
-                name: "cli.step".to_owned(),
-                progress: Some(progress.clamp(0.0, 1.0)),
-                data: with_context(data, &self.command.borrow()),
-            });
-        }
-    }
-}
-
-fn with_context(mut data: Value, command: &str) -> Value {
-    if !data.is_object() {
-        data = json!({});
-    }
-    data["command"] = json!(command);
-    data["cli_version"] = json!(env!("CARGO_PKG_VERSION"));
-    data["os"] = json!(std::env::consts::OS);
-    data["arch"] = json!(std::env::consts::ARCH);
-    data
-}
-
 /// Everything a command needs.
 pub struct Ctx {
     pub out: Output,
     pub global: GlobalArgs,
-    pub telemetry: Telemetry,
     home: OnceCell<Home>,
     config: OnceCell<FileConfig>,
     url: OnceCell<(String, UrlSource)>,
     client: OnceCell<AccountsClient>,
-    network_used: Cell<bool>,
 }
 
 impl Ctx {
@@ -244,12 +195,10 @@ impl Ctx {
                 quiet: global.quiet,
             },
             global,
-            telemetry: Telemetry::new(),
             home: OnceCell::new(),
             config: OnceCell::new(),
             url: OnceCell::new(),
             client: OnceCell::new(),
-            network_used: Cell::new(false),
         }
     }
 
@@ -274,7 +223,11 @@ impl Ctx {
 
     pub fn save_config(&self, config: &FileConfig) -> CliResult<PathBuf> {
         let path = self.home()?.file("config.json");
-        home::write_json(&path, config)?;
+        let config = FileConfig {
+            telemetry: Some(false),
+            ..config.clone()
+        };
+        home::write_json(&path, &config)?;
         Ok(path)
     }
 
@@ -320,32 +273,15 @@ impl Ctx {
         Ok((DEFAULT_BASE_URL.to_owned(), UrlSource::Default))
     }
 
-    /// Telemetry on/off and why: ACCOUNTS_TELEMETRY > config.json > on.
-    pub fn telemetry_setting(&self) -> (bool, &'static str) {
-        if let Ok(value) = std::env::var("ACCOUNTS_TELEMETRY")
-            && let Some(flag) = parse_flag(&value)
-        {
-            return (flag, "env:ACCOUNTS_TELEMETRY");
-        }
-        match self.config().ok().and_then(|c| c.telemetry) {
-            Some(flag) => (flag, "config"),
-            None => (true, "default"),
-        }
-    }
-
     pub fn client(&self) -> CliResult<&AccountsClient> {
         if let Some(client) = self.client.get() {
-            self.network_used.set(true);
             return Ok(client);
         }
         let (url, _) = self.url()?;
-        let mut builder = AccountsClient::builder()
-            .base_url(&url)
-            .user_agent(format!(
-                "silicon-accounts-cli/{}",
-                env!("CARGO_PKG_VERSION")
-            ))
-            .telemetry(self.telemetry_setting().0);
+        let mut builder = AccountsClient::builder().base_url(&url).user_agent(format!(
+            "silicon-accounts-cli/{}",
+            env!("CARGO_PKG_VERSION")
+        ));
         if let Ok(value) = std::env::var("ACCOUNTS_ALLOW_INSECURE_HTTP") {
             builder = builder.allow_insecure_http(parse_flag(&value).unwrap_or(false));
         }
@@ -359,7 +295,6 @@ impl Ctx {
             builder = builder.timeout(Duration::from_secs(seconds.max(1)));
         }
         let client = builder.build()?;
-        self.network_used.set(true);
         Ok(self.client.get_or_init(|| client))
     }
 
@@ -505,7 +440,6 @@ impl Ctx {
                         .clone_from(&account.display_name);
                 }
                 self.save_session(&session)?;
-                self.telemetry.step("session.refreshed", 1.0, json!({}));
                 Ok(session)
             }
             Err(err) if err.is_unauthenticated() => {
@@ -559,7 +493,6 @@ impl Ctx {
                     tokens.refresh_token.as_ref().map(|t| t.expose().to_owned());
                 session.refresh_expires_at = tokens.refresh_token_expires_at;
                 self.save_session(&session)?;
-                self.telemetry.step("session.reexchanged", 1.0, json!({}));
                 Ok(session)
             }
             Err(err) if err.is_unauthenticated() || err.as_oauth().is_some() => {
@@ -726,44 +659,6 @@ impl Ctx {
 
     pub fn load_app(&self, app_id: &str) -> CliResult<Option<StoredApp>> {
         home::read_json(&self.app_path(app_id)?)
-    }
-
-    // ---- telemetry ----------------------------------------------------------------------
-
-    /// Sends the buffered steps plus a final `cli.command` event. Never fails the command
-    /// and waits at most 1.5 s.
-    pub async fn flush_telemetry(&self, exit: i32, error: Option<&CliError>) {
-        if !self.network_used.get()
-            || !self.telemetry_setting().0
-            || error.is_some_and(|e| e.transport)
-        {
-            return;
-        }
-        let Some(client) = self.client.get() else {
-            return;
-        };
-        let command = self.telemetry.command.borrow().clone();
-        let mut events = self.telemetry.events.borrow().clone();
-        let kind = self.load_session().ok().flatten().map(|s| s.kind.as_str());
-        events.push(TelemetryEvent {
-            source: "cli".to_owned(),
-            step: command.clone(),
-            name: "cli.command".to_owned(),
-            progress: Some(1.0),
-            data: with_context(
-                json!({
-                    "outcome": if exit == 0 { "ok" } else { "error" },
-                    "exit_code": exit,
-                    "error_code": error.map(|e| e.code.clone()),
-                    "duration_ms": u64::try_from(self.telemetry.started.elapsed().as_millis()).unwrap_or(u64::MAX),
-                    "json": self.global.json,
-                    "account_kind": kind,
-                }),
-                &command,
-            ),
-        });
-        let _ =
-            tokio::time::timeout(Duration::from_millis(1500), client.send_telemetry(&events)).await;
     }
 }
 

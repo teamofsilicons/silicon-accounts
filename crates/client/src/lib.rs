@@ -61,9 +61,11 @@ mod wait;
 mod webhook;
 
 pub use app::{AppClient, MAX_IMPORT_BYTES};
+#[allow(deprecated)]
+pub use client::TELEMETRY_HEADER;
 pub use client::{
     AccountsClient, ClientBuilder, DEFAULT_BASE_URL, DEVELOPER_APP_ID, FIRST_PARTY_APP_ID,
-    IDEMPOTENCY_HEADER, IDEMPOTENT_REPLAYED_HEADER, REQUEST_ID_HEADER, TELEMETRY_HEADER, VERSION,
+    IDEMPOTENCY_HEADER, IDEMPOTENT_REPLAYED_HEADER, REQUEST_ID_HEADER, VERSION,
 };
 pub use config::{Config, parse_flag};
 pub use error::{ApiError, Error, OAuthError, Result, TokenError, WebhookError};

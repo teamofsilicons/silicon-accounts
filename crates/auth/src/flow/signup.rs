@@ -52,7 +52,6 @@ use super::model::{self, Flow, Step};
 use super::view::{self, ViewContext};
 use super::{FlowApp, FlowResponse, load_bound, next};
 use crate::suggest;
-use crate::util::telemetry;
 
 /// Sign-up sessions last 48 hours (UNDERSTANDING.md "Sign up").
 pub const SIGNUP_TTL_HOURS: i64 = 48;
@@ -665,17 +664,6 @@ pub async fn submit_signup(
     )
     .await?;
     tx.commit().await?;
-    telemetry(
-        &state,
-        "flow.signup_completed",
-        Some(0.7),
-        json!({
-            "app_id": fa.app.app_id,
-            "method": session.method(),
-            "finishing_import": session.claim_account_uuid.is_some(),
-            "next_step": flow.step.as_str(),
-        }),
-    );
     let mut cookies: Vec<Cookie<'static>> = signed.cookie.into_iter().collect();
     cookies.push(clear_cookie(&state.settings, SIGNUP_COOKIE));
     Ok(FlowResponse::ok(view, cookies))
@@ -720,16 +708,6 @@ pub async fn upload_signup_photo(
     let photo_id = photos::insert_for_signup(&mut tx, session.id, &upload).await?;
     tx.commit().await?;
     let pfp_url = accounts_core::pfp::photo_url(&state.settings, photo_id);
-    telemetry(
-        &state,
-        "flow.signup_photo_uploaded",
-        Some(0.6),
-        json!({
-            "app_id": fa.app.app_id,
-            "content_type": upload.info.kind.mime(),
-            "bytes": upload.bytes.len(),
-        }),
-    );
     let mut response = (
         StatusCode::CREATED,
         axum::Json(json!({ "pfp_url": pfp_url, "photo": upload.view(photo_id) })),

@@ -40,7 +40,6 @@ def main():
         for name in ('APPS_TOKEN', 'ACCOUNTS_URL', 'APPS_TELEMETRY_KEY', 'APPS_TELEMETRY_TABLE_KEY'):
             environment.pop(name, None)
         environment['ACCOUNTS_HOME'] = str(home)
-        environment['ACCOUNTS_TELEMETRY'] = '0'
         environment['SILICON_HOME'] = str(home)
         environment['ACCOUNTS_URL'] = 'http://127.0.0.1:9'
         command_results = []

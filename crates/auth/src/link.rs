@@ -34,7 +34,7 @@ use serde_json::json;
 use crate::flow::FlowApp;
 use crate::flow::model::{self, LinkIntent, NewFlow, Prompt};
 use crate::providers::start::{begin_leg, unknown_provider};
-use crate::util::{no_store, telemetry};
+use crate::util::no_store;
 
 /// Connections a Carbon may start per hour (each one opens a provider sign-in).
 pub const LINKS_PER_ACCOUNT: Limit = Limit::new(30, 3600);
@@ -158,15 +158,9 @@ pub async fn start_link(
         account_uuid: me.uuid().to_string(),
         return_to: return_to.clone(),
     });
-    let (authorize_url, client) = begin_leg(&mut tx, &state, &mut flow, &fa, provider).await?;
+    let authorize_url = begin_leg(&mut tx, &state, &mut flow, &fa, provider).await?;
     model::save(&mut tx, &flow).await?;
     tx.commit().await?;
-    telemetry(
-        &state,
-        "identity.link_started",
-        Some(0.2),
-        json!({"provider": provider.as_str(), "mode": client.mode.as_str()}),
-    );
     let mut response = (
         StatusCode::CREATED,
         axum::Json(json!({

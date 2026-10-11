@@ -316,12 +316,6 @@ pub async fn login(
     .await?;
     record_attempt(&mut tx, &meta, Some(&account.uuid), audit::outcome::SUCCESS).await?;
     tx.commit().await?;
-    state.telemetry.record(
-        "api",
-        "silicon.login",
-        "silicon_signed_in",
-        serde_json::json!({"labelled": body.client_label.is_some()}),
-    );
     Ok(Json(response))
 }
 

@@ -203,11 +203,11 @@ pub enum Commands {
     #[command(after_long_help = APP_EXAMPLES)]
     App(AppArgs),
 
-    /// CLI settings: home directory, URL, telemetry.
+    /// CLI settings: home directory, URL, app.
     ///
     /// Settings live in {home}/.accounts/config.json. Highly configurable with sensible defaults: flags win over environment variables, which win over the config file.
     #[command(
-        after_long_help = "Examples:\n  silicon-accounts config get\n  silicon-accounts config home /srv/scout\n  silicon-accounts config set url http://127.0.0.1:8590\n  silicon-accounts config telemetry off"
+        after_long_help = "Examples:\n  silicon-accounts config get\n  silicon-accounts config home /srv/scout\n  silicon-accounts config set url http://127.0.0.1:8590\n  silicon-accounts config set app briefcase"
     )]
     Config(ConfigArgs),
 
@@ -1801,34 +1801,29 @@ pub enum ConfigCommand {
     },
     /// Show settings and where each value comes from.
     Get {
-        /// One key: url, telemetry, home, app.
+        /// One key: url, home, app.
         key: Option<String>,
     },
-    /// Set a setting in config.json: url <URL> or telemetry on|off.
+    /// Set a setting in config.json: url <URL> or app <APP_ID>.
     Set {
-        /// url or telemetry.
+        /// url or app.
         key: String,
         /// The value.
         value: String,
     },
-    /// Remove a setting from config.json: url, telemetry or app.
+    /// Remove a setting from config.json: url or app.
     Unset {
-        /// url, telemetry or app.
+        /// url or app.
         key: String,
     },
-    /// Turn telemetry on or off (it is on by default).
-    ///
-    /// Telemetry sends self-contained events about CLI steps (command, outcome, timing; never tokens, ids or contact details). ACCOUNTS_TELEMETRY=0 also turns it off.
+    /// Kept so existing scripts still succeed: Silicon Accounts records no telemetry, so this
+    /// changes nothing and says so.
+    #[command(hide = true)]
     Telemetry {
-        /// on or off.
-        state: OnOff,
+        /// Ignored (older versions took on or off).
+        #[arg(num_args = 0.., allow_hyphen_values = true, trailing_var_arg = true)]
+        args: Vec<String>,
     },
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
-pub enum OnOff {
-    On,
-    Off,
 }
 
 #[derive(Debug, Args)]

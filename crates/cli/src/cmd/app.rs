@@ -712,11 +712,6 @@ async fn run_import(ctx: &Ctx, app: &AppClient<'_>, args: ImportArgs) -> CliResu
                 .clone()
                 .unwrap_or_else(util::idempotency_key);
             let job = app.start_import(&input, &options, Some(&key)).await?;
-            ctx.telemetry.step(
-                "app.import.started",
-                0.1,
-                json!({ "dry_run": args.dry_run, "format": job.format }),
-            );
             if !args.wait {
                 let dry = if job.dry_run || args.dry_run {
                     " as a dry run: nothing will be written"

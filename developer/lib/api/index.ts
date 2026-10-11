@@ -17,7 +17,7 @@ export {
   type RequestOptions, type ApiConfig, type HttpMethod, type QueryValue,
 } from "./http";
 export {
-  api, meta, ids, accounts, flows, session, device, cliLogin, me, silicons, apps, proofs, oauth, reports, telemetry,
+  api, meta, ids, accounts, flows, session, device, cliLogin, me, silicons, apps, proofs, oauth, reports,
   devOutbox, internal, authorizeUrl, carbonOnly, type Api, type AppCredentials, type CallOptions,
 } from "./endpoints";
 export { PROOF_REVOKE_REASONS, proofRevokeReason, SESSION_ORIGINS } from "./labels";

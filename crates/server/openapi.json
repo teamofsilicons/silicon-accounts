@@ -66,7 +66,7 @@
     },
     {
       "name": "Service",
-      "description": "Health, deployment metadata, bug reports, telemetry, the SDK and the sign-in iframe."
+      "description": "Health, deployment metadata, bug reports, the SDK and the sign-in iframe."
     },
     {
       "name": "Discovery",
@@ -18371,70 +18371,6 @@
         }
       }
     },
-    "/v1/telemetry/events": {
-      "post": {
-        "tags": [
-          "Service"
-        ],
-        "operationId": "sendTelemetry",
-        "summary": "Client telemetry",
-        "description": "Forwarded to Space Station, cut down to what the silicon-accounts CLI reports, word for word, so no identifier or free text is forwarded whatever its shape. Only the CLI's events are forwarded (`source` `cli`, `name` `cli.command` or `cli.step`); others are accepted and dropped. `step` is forwarded only as one of the CLI's step names or command paths, else as `other`, and `progress` to the hundredth. `data` keeps only the known fields: `cli_version` (a release version), `outcome`, `exit_code`, `duration_ms` (a day at most), `json`, `account_kind`, `kind`, `method`, `channel`, `browser_opened`, `dry_run`, `format`, `ttl_seconds` (a day at most), `wait`, `webhook`, `signed_in`, `app` / `app_id` on the `login.slt.issued` step, and `command`, `os`, `arch` and `error_code` as one of the words the CLI uses, else `other`. Everything else is dropped. At most 50 events. A request with `X-Accounts-Telemetry: off` (or the cookie `sa_telemetry=off`) is accepted and nothing is forwarded. 120 requests per IP per minute.",
-        "security": [],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AccountsVersionHeader"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TelemetryBatch"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Accepted.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TelemetryAccepted"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "413": {
-            "$ref": "#/components/responses/PayloadTooLarge"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
-          }
-        }
-      }
-    },
     "/embed/v1/buttons": {
       "get": {
         "tags": [
@@ -24968,66 +24904,6 @@
           },
           "recipients": {
             "type": "integer"
-          }
-        }
-      },
-      "TelemetryBatch": {
-        "type": "object",
-        "required": [
-          "events"
-        ],
-        "properties": {
-          "events": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "source",
-                "step",
-                "name"
-              ],
-              "properties": {
-                "source": {
-                  "type": "string",
-                  "description": "1 to 64 characters of a-z 0-9 _ . -. Only `cli` is forwarded."
-                },
-                "step": {
-                  "type": "string",
-                  "description": "1 to 200 printable characters. Forwarded only as one of the CLI's step names (`login.device.approved`) or command paths (`app webhook set`); anything else is forwarded as `other`."
-                },
-                "name": {
-                  "type": "string",
-                  "pattern": "^[a-z0-9_.]{1,64}$",
-                  "description": "Only `cli.command` and `cli.step` are forwarded."
-                },
-                "progress": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                },
-                "data": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "description": "At most 8 KB; never secrets. Only the known fields listed on the operation are forwarded, each only in its shape or as one of its words; the rest is dropped."
-                }
-              }
-            },
-            "maxItems": 50
-          }
-        }
-      },
-      "TelemetryAccepted": {
-        "type": "object",
-        "required": [
-          "accepted",
-          "forwarded"
-        ],
-        "properties": {
-          "accepted": {
-            "type": "integer"
-          },
-          "forwarded": {
-            "type": "boolean"
           }
         }
       },

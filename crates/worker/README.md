@@ -66,12 +66,9 @@ challenges 1 day after expiry; expired idempotency keys; id reservations 1 day a
 sign-up sessions 7 days after expiry or use; rate-limit windows older than a day. Retention matches
 the owning crates' own sweeps. History is never deleted.
 
-## Telemetry
+## Logs
 
-Space Station events carry source `worker`, a step and a progress: `webhook.<outcome>` (1.0 once
-delivered or failed for good, else the share of the 72 h retry window used),
-`message.<outcome>` (1.0 once sent or failed, else the share of the 8 attempts used),
-`cleanup.swept` (1.0).
+Every delivery, send and sweep is logged on the host. The worker records no telemetry.
 
 ## Tests
 

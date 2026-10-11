@@ -298,6 +298,8 @@ async fn waits_for_device_approval() {
 
 #[tokio::test]
 async fn idempotency_keys_and_telemetry_opt_out_are_sent() {
+    // Silicon Accounts records no telemetry; every request still says `off` so an older
+    // deployment records nothing either.
     let mock = Mock::start().await;
     mock.on(
         "POST",
@@ -311,7 +313,6 @@ async fn idempotency_keys_and_telemetry_opt_out_are_sent() {
     );
     let client = AccountsClient::builder()
         .base_url(&mock.url)
-        .telemetry(false)
         .build()
         .unwrap();
     let created = client
@@ -355,8 +356,27 @@ async fn idempotency_keys_and_telemetry_opt_out_are_sent() {
         .unwrap_err();
     assert_eq!(err.code(), "invalid_input");
     assert!(mock.requests_to("POST", "/v1/me/silicons").is_empty());
+}
 
-    // Telemetry is not sent at all when disabled.
+/// The telemetry API is kept as deprecated no-ops: it builds, sends nothing and never turns the
+/// opt-out header off.
+#[tokio::test]
+#[allow(deprecated)]
+async fn telemetry_api_is_a_deprecated_no_op() {
+    let mock = Mock::start().await;
+    mock.on("POST", "/v1/telemetry/events", Reply::empty(202));
+    mock.on(
+        "GET",
+        "/v1/meta",
+        Reply::json(200, json!({"service": "silicon-accounts"})),
+    );
+    let client = AccountsClient::builder()
+        .base_url(&mock.url)
+        .telemetry(true)
+        .build()
+        .unwrap()
+        .with_telemetry(true);
+    assert!(!client.telemetry_enabled());
     let event = silicon_accounts_client::TelemetryEvent {
         source: "cli".into(),
         step: "test".into(),
@@ -364,18 +384,15 @@ async fn idempotency_keys_and_telemetry_opt_out_are_sent() {
         progress: Some(1.0),
         data: serde_json::Value::Null,
     };
-    client
-        .send_telemetry(std::slice::from_ref(&event))
-        .await
-        .unwrap();
+    client.send_telemetry(&[event]).await.unwrap();
     assert!(mock.requests_to("POST", "/v1/telemetry/events").is_empty());
-    mock.on("POST", "/v1/telemetry/events", Reply::empty(202));
-    let enabled = AccountsClient::new(&mock.url).unwrap();
-    enabled.send_telemetry(&[event]).await.unwrap();
+    let _ = client.meta().await;
+    let sent = &mock.requests_to("GET", "/v1/meta")[0];
     assert_eq!(
-        mock.requests_to("POST", "/v1/telemetry/events")[0].json()["events"][0]["name"],
-        "cli.test"
+        sent.header(silicon_accounts_client::TELEMETRY_HEADER),
+        Some("off")
     );
+    assert!(!silicon_accounts_client::Config::default().telemetry);
 }
 
 #[tokio::test]

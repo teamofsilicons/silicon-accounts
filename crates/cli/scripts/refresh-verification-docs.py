@@ -13,7 +13,7 @@ import sys
 root = Path(__file__).resolve().parents[3]
 binary = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root / "target/debug/silicon-accounts"
 reference = root / "docs/reference/cli.md"
-env = {**os.environ, "NO_COLOR": "1", "ACCOUNTS_TELEMETRY": "0"}
+env = {**os.environ, "NO_COLOR": "1"}
 
 def help_for(*args):
     return subprocess.check_output([str(binary), *args, "--help"], env=env, text=True)

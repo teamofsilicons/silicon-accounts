@@ -41,8 +41,6 @@ pub mod limits {
     /// at either endpoint counts against the one limit, so moving between them buys no extra
     /// attempts. A brute-force speed bump on top of the per-Silicon lockout.
     pub const SILICON_LOGIN_PER_IP: Limit = Limit::new(60, 60);
-    /// `POST /v1/telemetry/events`: 120 per minute per IP.
-    pub const TELEMETRY_PER_IP: Limit = Limit::new(120, 60);
 }
 
 /// The bucket name of [`limits::SILICON_LOGIN_PER_IP`] (keyed by IP with [`bucket`]).

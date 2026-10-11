@@ -94,15 +94,17 @@ Exchanging a short-lived token needs app briefcase's own credentials (app_id + a
 | `.timeout(d)` | 30 s | whole request |
 | `.connect_timeout(d)` | 10 s | |
 | `.user_agent("my-app/1.2")` | No custom prefix | prepended to `silicon-accounts-client/<version>` |
-| `.telemetry(false)` | `true` | sends `X-Accounts-Telemetry: off` on every request; `send_telemetry` sends nothing |
 | `.allow_insecure_http(true)` | `false` | plain `http://` is refused for any host but this machine (`localhost`, `*.localhost`, loopback IPs): STKs and tokens would travel unencrypted |
 | `.max_retries(n)` | 2 | retries, with backoff, after a 502/503/504 or a timeout only for GET requests and requests carrying an idempotency key (safe to repeat); any request is retried when the connection never opened |
 
-`client.with_timeout(d)` and `client.with_telemetry(on)` return adjusted copies.
+`client.with_timeout(d)` returns an adjusted copy.
+
+Silicon Accounts records no telemetry. `.telemetry(on)`, `client.with_telemetry(on)`,
+`telemetry_enabled()`, `send_telemetry(..)`, `TelemetryEvent`, `TELEMETRY_HEADER` and
+`Config::telemetry` remain as deprecated no-ops, so code written for 0.5 still builds.
 
 `Config::from_env()` reads these, when you want it to: `ACCOUNTS_URL`, `ACCOUNTS_APP_ID`,
-`ACCOUNTS_APP_SECRET`, `ACCOUNTS_TELEMETRY` (`0`/`off`/`false`/`no` turn it off),
-`ACCOUNTS_TIMEOUT_SECONDS` (default 30) and `ACCOUNTS_ALLOW_INSECURE_HTTP` (`1` allows plain
+`ACCOUNTS_APP_SECRET`, `ACCOUNTS_TIMEOUT_SECONDS` (default 30) and `ACCOUNTS_ALLOW_INSECURE_HTTP` (`1` allows plain
 http). Then call `config.client()?`, and `config.app_client(&client)` for an `AppClient` when both
 app variables are set.
 
@@ -140,13 +142,12 @@ let client = AccountsClient::builder()
 | `refresh_public_client(client_id, refresh_token)`, `revoke_public_client(client_id, token)` | `POST /v1/oauth/token` / `revoke` for `silicon-accounts` or `developer` | `TokenResponse` / `()` |
 | `exchange_slt_public_client(app_id, slt)` | `POST /v1/oauth/token`, SLT grant with `client_id` alone (an app with `public_client` on: its own command-line or desktop tool) | `TokenResponse`; the sign-in is recorded with method `slt_public_client` |
 | `report(message, pr_url, access_token, idempotency_key)` | `POST /v1/reports` | `ReportReceipt` |
-| `send_telemetry(&[TelemetryEvent])` | `POST /v1/telemetry/events` (3-second timeout) | `()`; nothing when telemetry is off |
 | `with_token(access_token)` | No request | `AccountSession` |
 | `as_app(app_id, app_secret)` | No request | `AppClient` |
 
 `Contact` is `Contact::Email(String)` or `Contact::Phone { phone, country: Option<String> }`.
 Where a rule can be checked locally (an empty STK, a code that isn't 6 digits, a report over
-10,000 characters, more than 50 telemetry events), the input is checked before sending and fails
+10,000 characters), the input is checked before sending and fails
 with `Error::InvalidInput`.
 
 ## `AccountSession`
@@ -534,7 +535,7 @@ most 30 minutes. Call `introspect` when you need to know at once.
 `DEFAULT_BASE_URL` (`https://accounts.teamofsilicons.com`), `FIRST_PARTY_APP_ID` (`silicon-accounts`),
 `DEVELOPER_APP_ID` (`developer`),
 `VERSION`, `SLT_GRANT_TYPE` (`urn:silicon:params:oauth:grant-type:slt`),
-`DEVICE_CODE_GRANT_TYPE` (`urn:ietf:params:oauth:grant-type:device_code`), `TELEMETRY_HEADER`,
+`DEVICE_CODE_GRANT_TYPE` (`urn:ietf:params:oauth:grant-type:device_code`),
 `IDEMPOTENCY_HEADER`, `IDEMPOTENT_REPLAYED_HEADER`, `REQUEST_ID_HEADER`.
 
 ## Identifiers

@@ -37,6 +37,10 @@ Preserve all unrelated DNS records.
    The installer retains a database dump before migration, migrates, switches the
    release symlink, starts services, and checks local readiness. Secrets must never
    appear in SSM commands or output.
+   Silicon Accounts records no telemetry: the installer leaves the retired
+   `ACCOUNTS_TELEMETRY_ENABLED` and `ACCOUNTS_TELEMETRY_TABLE_KEY` out of
+   `/etc/accounts/api.env` (printing their names) if the secret still holds them;
+   remove them from the secret.
 5. Verify public HTTPS, `/readyz`, `/v1/meta`, discovery, developer authentication
    redirect and real provider flows. Provider console callbacks must include
    `https://accounts.teamofsilicons.com/v1/oauth/callback/google` and `/apple`.

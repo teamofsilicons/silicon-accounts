@@ -51,7 +51,7 @@ use crate::flow::model::{
     self, Flow, FlowError, LinkIntent, ParkedAnswer, Pending, PendingSignup, ProviderLeg, Step,
 };
 use crate::flow::{FlowApp, browser, next};
-use crate::util::{decrypt_text, encrypt_text, no_store, telemetry, with_query};
+use crate::util::{decrypt_text, encrypt_text, no_store, with_query};
 
 /// What arrives at the callback (query string or form fields).
 #[derive(Debug, Default, Deserialize)]
@@ -245,7 +245,7 @@ async fn receive(
         );
         return Ok(Next::Continue(location));
     }
-    discard(state, tx, flow, provider).await
+    discard(tx, flow, provider).await
 }
 
 /// A parked form_post answer, back with the browser's cookies.
@@ -282,7 +282,7 @@ async fn resume(
         }
     };
     if model::check_binding(state, headers, &flow).is_err() {
-        return discard(state, tx, flow, provider).await;
+        return discard(tx, flow, provider).await;
     }
     let answer: Answer =
         serde_json::from_str(&decrypt_text(&state.keys.keyring, &parked.answer_enc)?)?;
@@ -293,7 +293,6 @@ async fn resume(
 /// used up (so the same answer can't be replayed in the browser that started it) and the flow
 /// says why.
 async fn discard(
-    state: &AppState,
     mut tx: sqlx::Transaction<'static, sqlx::Postgres>,
     mut flow: Flow,
     provider: Provider,
@@ -315,12 +314,6 @@ async fn discard(
         flow_id = %flow.id,
         provider = provider.as_str(),
         "a provider answer arrived without the flow's binding cookie; discarded"
-    );
-    telemetry(
-        state,
-        "flow.provider_unbound",
-        Some(0.4),
-        json!({"app_id": flow.app_id, "provider": provider.as_str()}),
     );
     Err(ApiError::forbidden(
         "flow_not_bound",
@@ -375,16 +368,10 @@ async fn process(
     model::save(&mut tx, &flow).await?;
     tx.commit().await?;
     if !usable || early_error.is_some() {
-        if let Some(e) = &early_error {
-            telemetry(
-                state,
-                "flow.provider_failed",
-                Some(0.4),
-                json!({"app_id": flow.app_id, "provider": provider.as_str(), "error": e.code}),
-            );
-            if linking {
-                return finish_link(state, &flow_id, provider, Err(e.clone())).await;
-            }
+        if let Some(e) = &early_error
+            && linking
+        {
+            return finish_link(state, &flow_id, provider, Err(e.clone())).await;
         }
         if linking && flow.expired && !flow.step.is_terminal() {
             // A connection that ran out goes back to the account site too.
@@ -438,19 +425,6 @@ async fn process(
         next::complete_with(state, &mut flow, &redirect)?;
         model::save(&mut tx, &flow).await?;
         tx.commit().await?;
-        telemetry(
-            state,
-            "identity.link_finished",
-            Some(1.0),
-            json!({
-                "provider": provider.as_str(),
-                "outcome": match &outcome {
-                    Ok(done) if done.email_added => "linked_email_added",
-                    Ok(_) => "linked",
-                    Err(e) => e.code.as_str(),
-                },
-            }),
-        );
         return Ok(Next::Redirect(redirect));
     }
     let apple_name = answer.user.as_deref().and_then(apple_user_name);
@@ -467,22 +441,6 @@ async fn process(
     }
     model::save(&mut tx, &flow).await?;
     tx.commit().await?;
-    telemetry(
-        state,
-        "flow.provider_returned",
-        Some(0.5),
-        json!({
-            "app_id": flow.app_id,
-            "provider": provider.as_str(),
-            "mode": client.mode.as_str(),
-            "outcome": match &flow.extras.pending {
-                Some(Pending::SignIn { .. }) => "sign_in",
-                Some(Pending::Signup(p)) if p.claim_account_uuid.is_some() => "finish_import",
-                Some(Pending::Signup(_)) => "signup",
-                None => flow.extras.error.as_ref().map(|e| e.code.as_str()).unwrap_or("error"),
-            },
-        }),
-    );
     Ok(Next::Flow(flow_id))
 }
 
@@ -730,12 +688,6 @@ async fn record_error(
         && flow.extras.provider.is_none()
         && matches!(flow.step, Step::ChooseMethod | Step::VerifyCode)
     {
-        telemetry(
-            state,
-            "flow.provider_failed",
-            Some(0.4),
-            json!({"app_id": flow.app_id, "provider": provider.as_str(), "error": error.code}),
-        );
         tracing::info!(flow_id, provider = provider.as_str(), code = %error.code, reason = %error.message, "provider sign-in failed");
         flow.reset_to_choose_method();
         flow.extras.error = Some(error);

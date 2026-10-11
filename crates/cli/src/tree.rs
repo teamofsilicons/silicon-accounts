@@ -1,6 +1,6 @@
 //! The clap command, decorated with the full command tree for `silicon-accounts --help`.
 
-use clap::{ArgMatches, Command, CommandFactory};
+use clap::{Command, CommandFactory};
 use serde_json::{Value, json};
 
 use crate::cli::Cli;
@@ -30,7 +30,6 @@ pub fn command() -> Command {
         "  ACCOUNTS_SILICON_KEY            a Silicon's private key file, instead of the STK",
         "  ACCOUNTS_APP_ID                 the app for `silicon-accounts app …`",
         "  ACCOUNTS_APP_SECRET             its app secret",
-        "  ACCOUNTS_TELEMETRY=0            turn telemetry off",
         "  ACCOUNTS_NO_BROWSER=1           never open a browser",
         "  ACCOUNTS_TIMEOUT_SECONDS        request timeout (default 30)",
         "  ACCOUNTS_ALLOW_INSECURE_HTTP=1  allow plain http to hosts other than this machine",
@@ -182,17 +181,6 @@ pub fn command_help(path: &[String]) -> Option<String> {
         current = current.find_subcommand_mut(name)?;
     }
     Some(current.render_long_help().to_string())
-}
-
-/// `silicon create` from parsed matches.
-pub fn command_path(matches: &ArgMatches) -> String {
-    let mut parts = Vec::new();
-    let mut current = matches;
-    while let Some((name, sub)) = current.subcommand() {
-        parts.push(name.to_owned());
-        current = sub;
-    }
-    parts.join(" ")
 }
 
 #[cfg(test)]

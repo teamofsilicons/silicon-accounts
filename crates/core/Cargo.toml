@@ -48,7 +48,6 @@ serde_json.workspace = true
 serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
 sha2.workspace = true
-space-station.workspace = true
 sqlx.workspace = true
 subtle.workspace = true
 thiserror.workspace = true

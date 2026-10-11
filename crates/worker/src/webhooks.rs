@@ -45,7 +45,7 @@ use accounts_core::config::Settings;
 use accounts_core::events::{self, DELIVERY_TIMEOUT_SECONDS, GIVE_UP_AFTER_HOURS};
 use accounts_core::models::{AppStatus, WebhookTargetKind};
 use accounts_core::{ApiResult, AppState, crypto, normalize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use sqlx::{PgConnection, PgPool};
 use time::OffsetDateTime;
 use tokio::time::Instant;
@@ -161,33 +161,6 @@ pub async fn claim_due(
 /// [`events::retry_delay_seconds`].
 pub fn schedule_elapsed_seconds(attempts: i32) -> i64 {
     (1..=attempts.max(0)).map(events::retry_delay_seconds).sum()
-}
-
-/// Telemetry progress of a delivery after an attempt: 1.0 once it is settled (delivered, or
-/// failed for good), otherwise the share of its 72 h retry window used so far — since the event
-/// was created, or since its last replay (a replay gets a fresh window; one made before
-/// `requeued_at` existed is measured along the retry schedule) — capped below 1.0.
-pub fn delivery_progress(
-    outcome: &DeliveryOutcome,
-    d: &ClaimedDelivery,
-    now: OffsetDateTime,
-) -> f64 {
-    match outcome {
-        DeliveryOutcome::Delivered { .. } | DeliveryOutcome::Failed { .. } => 1.0,
-        DeliveryOutcome::Retrying { .. }
-        | DeliveryOutcome::LeaseLost { .. }
-        | DeliveryOutcome::Abandoned { .. } => {
-            let window = (GIVE_UP_AFTER_HOURS * 3600) as f64;
-            let used = match d.requeued_at {
-                Some(at) => (now - at).as_seconds_f64(),
-                None if d.manual_replays > 0 => {
-                    schedule_elapsed_seconds(d.attempts.saturating_add(1)) as f64
-                }
-                None => (now - d.created_at).as_seconds_f64(),
-            };
-            (used / window).clamp(0.0, 0.99)
-        }
-    }
 }
 
 /// The receiving end of a delivery as it is configured right now.
@@ -587,19 +560,17 @@ impl WebhookDeliverer {
         Ok(outcome)
     }
 
-    /// Logs the outcome and records the `webhook.<outcome>` telemetry event. `a` is `None` when
-    /// the attempt was abandoned.
+    /// Logs the outcome. `a` is `None` when the attempt was abandoned.
     fn observe(&self, d: &ClaimedDelivery, a: Option<&Attempt>, outcome: &DeliveryOutcome) {
         let status_code = a.and_then(|a| a.status_code);
         let duration_ms = a.map(|a| a.duration_ms);
-        let (name, outcome_label) = match outcome {
+        match outcome {
             DeliveryOutcome::Delivered { .. } => {
                 tracing::info!(
                     delivery_id = %d.id, event_id = %d.event_id, event_type = %d.event_type,
                     target = %describe_target(d.target_kind, &d.target_id), attempt = d.attempts + 1,
                     status = ?status_code, duration_ms = ?duration_ms, "webhook delivered"
                 );
-                ("webhook.delivered", "delivered")
             }
             DeliveryOutcome::Retrying {
                 error,
@@ -613,7 +584,6 @@ impl WebhookDeliverer {
                     next_attempt_at = %accounts_core::timefmt::format_rfc3339_ms(*next_attempt_at),
                     "webhook delivery failed; will retry"
                 );
-                ("webhook.retrying", "retrying")
             }
             DeliveryOutcome::Failed { error, .. } => {
                 tracing::warn!(
@@ -622,33 +592,16 @@ impl WebhookDeliverer {
                     status = ?status_code, error = %error,
                     "webhook delivery failed for good; it can be replayed"
                 );
-                ("webhook.failed", "failed")
             }
             DeliveryOutcome::LeaseLost { .. } => {
                 tracing::warn!(
                     delivery_id = %d.id,
                     "webhook delivery lease ran out before its result was recorded; another worker owns it now"
                 );
-                ("webhook.lease_lost", "lease_lost")
             }
             // Logged where it happened.
-            DeliveryOutcome::Abandoned { .. } => ("webhook.abandoned", "abandoned"),
-        };
-        self.state.telemetry.record_progress(
-            "worker",
-            "webhook_delivery",
-            name,
-            Some(delivery_progress(outcome, d, OffsetDateTime::now_utc())),
-            json!({
-                "outcome": outcome_label,
-                "target_kind": d.target_kind,
-                "event_type": d.event_type,
-                "attempt": d.attempts + 1,
-                "manual_replays": d.manual_replays,
-                "status_code": status_code,
-                "duration_ms": duration_ms,
-            }),
-        );
+            DeliveryOutcome::Abandoned { .. } => {}
+        }
     }
 }
 
@@ -984,48 +937,6 @@ mod tests {
             let parsed: IpAddr = ip.parse().expect(ip);
             assert!(is_deliverable_ip(parsed), "{ip} must be allowed");
         }
-    }
-
-    #[test]
-    fn delivery_progress_tracks_the_retry_window() {
-        let now = OffsetDateTime::now_utc();
-        let d = |created_hours_ago: i64, attempts: i32, manual_replays: i32| ClaimedDelivery {
-            id: Uuid::now_v7(),
-            event_id: Uuid::now_v7(),
-            event_type: "ping".into(),
-            target_kind: WebhookTargetKind::App,
-            target_id: "app".into(),
-            url: "https://hooks.example.com".into(),
-            attempts,
-            manual_replays,
-            created_at: now - time::Duration::hours(created_hours_ago),
-            requeued_at: None,
-            lease: now,
-            payload: Value::Null,
-        };
-        let retrying = DeliveryOutcome::Retrying {
-            delivery_id: Uuid::nil(),
-            status: Some(500),
-            error: "HTTP 500".into(),
-            next_attempt_at: now,
-        };
-        let delivered = DeliveryOutcome::Delivered {
-            delivery_id: Uuid::nil(),
-            status: 200,
-        };
-        assert_eq!(delivery_progress(&delivered, &d(0, 0, 0), now), 1.0);
-        assert_eq!(delivery_progress(&retrying, &d(0, 0, 0), now), 0.0);
-        assert!((delivery_progress(&retrying, &d(36, 5, 0), now) - 0.5).abs() < 1e-9);
-        assert_eq!(delivery_progress(&retrying, &d(100, 5, 0), now), 0.99);
-        // A replay of an old event starts a fresh window, from the replay...
-        let replayed = ClaimedDelivery {
-            requeued_at: Some(now - time::Duration::hours(18)),
-            ..d(100, 3, 1)
-        };
-        assert!((delivery_progress(&retrying, &replayed, now) - 0.25).abs() < 1e-9);
-        // ...or, for a replay made before the replay time was stored, along the schedule.
-        let replay = delivery_progress(&retrying, &d(100, 0, 1), now);
-        assert!(replay > 0.0 && replay < 0.01, "{replay}");
     }
 
     #[test]

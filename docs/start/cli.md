@@ -194,7 +194,7 @@ What lives there:
 | file | holds |
 |---|---|
 | `session.json` | the signed-in account and its tokens |
-| `config.json` | `url`, `telemetry` and `app` settings |
+| `config.json` | `url` and `app` settings |
 | `requests/<request-id>.json` | the polling token of each Silicon self-created from this home |
 | `apps/<app_id>.json` | an app secret stored by `silicon-accounts app use … --secret-stdin` |
 | `login-challenge.json` | a code sign-in waiting for its code |
@@ -213,7 +213,6 @@ silicon-accounts config get
 
 ```text
 url        https://accounts.teamofsilicons.com  (from default)
-telemetry  on  (from default)
 home       /srv/silicons/scout  (from SILICON_HOME)
 state dir  /srv/silicons/scout/.accounts
 app        none
@@ -223,24 +222,17 @@ version    0.4.0
 
 | command | does |
 |---|---|
-| `silicon-accounts config get [url\|telemetry\|home\|app]` | every setting with where its value comes from (`--json` gives `{"value","source"}` per key) |
+| `silicon-accounts config get [url\|home\|app]` | every setting with where its value comes from (`--json` gives `{"value","source"}` per key) |
 | `silicon-accounts config set url <URL>` | stores the URL in `config.json` |
-| `silicon-accounts config set telemetry on\|off`, `silicon-accounts config telemetry off` | stores the telemetry choice |
-| `silicon-accounts config unset url\|telemetry\|app` | removes a setting; the default applies again |
+| `silicon-accounts config unset url\|app` | removes a setting; the default applies again |
 | `silicon-accounts config home [<DIR>] [--reset]` | shows, sets or forgets the configured home |
 
 Flags win over environment variables, which win over `config.json`.
 
 ## Telemetry
 
-The CLI reports command activity to Space Station, the event service Team of Silicons runs for its own products. It never talks to Space Station directly: it sends its events to Silicon Accounts (`POST /v1/telemetry/events`, without your credentials), which forwards them. For a flow with several steps, it sends an event for each step, like `login.silicon.started`, `login.slt.issued` or `silicon.create.requested`. A final `cli.command` event records the result, the exit and error codes, the duration, the CLI version, the operating system and the architecture. It also records whether you used `--json` and whether the caller was a Carbon or a Silicon.
-
-These events don't include tokens, STKs, secrets, account ids, uuids or contact details. The only identifier they can carry is the app id a short-lived token was requested for. Silicon Accounts checks that too: it forwards only the CLI's own step names, command paths, fields and words, and anything else as `other` or not at all, so even a changed or older CLI can't send more. Commands that never contact us send no events, and the CLI waits at most 1.5 seconds to send them.
-
-Telemetry is on by default. Turn it off with `silicon-accounts config telemetry off`, or for a single
-process with `ACCOUNTS_TELEMETRY=0` (the variable beats the setting). When it's off, every request
-also carries `X-Accounts-Telemetry: off`, so the service records nothing about those requests
-either. [Security](../learn/security.md#telemetry) says what the service itself records.
+Silicon Accounts records no telemetry: the CLI sends no events. `silicon-accounts config telemetry …`
+still exits 0, so old scripts keep working; it changes nothing and says so.
 
 ## Get help
 

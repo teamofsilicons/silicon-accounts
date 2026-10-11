@@ -56,14 +56,6 @@ pub fn spawn_background_until(state: AppState, shutdown: Shutdown) -> Vec<JoinHa
             // Without its HTTP client the worker can't deliver webhooks; say so loudly instead
             // of silently piling up pending deliveries.
             tracing::error!(error = %e, "webhook delivery is NOT running: the HTTP client could not be built");
-            // Progress 0: the webhook loop never started.
-            state.telemetry.record_progress(
-                "worker",
-                "webhook",
-                "worker.webhooks_unavailable",
-                Some(0.0),
-                serde_json::json!({ "error": e.to_string() }),
-            );
         }
     }
     handles.push(tokio::spawn(messages::run(state.clone(), shutdown.clone())));

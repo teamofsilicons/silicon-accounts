@@ -473,8 +473,6 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
             webhook_url: args.webhook.clone(),
         };
         let created = with_session!(ctx, |s| s.create_silicon(&request, Some(&key)))?;
-        ctx.telemetry
-            .step("silicon.create.custodian", 1.0, json!({}));
         let mut text = format!(
             "Created {} ({}) with you, {}, as its custodian. It can sign in right away.\n",
             created.silicon.id,
@@ -524,11 +522,6 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
     };
     let client = ctx.client()?;
     let created = client.silicon_self_create(&request, Some(&key)).await?;
-    ctx.telemetry.step(
-        "silicon.create.requested",
-        0.3,
-        json!({ "wait": args.wait, "webhook": args.webhook.is_some() }),
-    );
     let (url, _) = ctx.url()?;
     let stored = StoredRequest {
         request_id: created.request.id.clone(),
@@ -652,11 +645,6 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
         }
     }
     result["signed_in"] = json!(signed_in);
-    ctx.telemetry.step(
-        "silicon.create.accepted",
-        1.0,
-        json!({ "signed_in": signed_in }),
-    );
     Ok(Outcome::new(result, text).next(
         "silicon-accounts login --app <app_id>",
         "get a short-lived token for an app",
@@ -803,7 +791,6 @@ async fn request_status(
                     "silicon-accounts-cli/{}",
                     env!("CARGO_PKG_VERSION")
                 ))
-                .telemetry(ctx.telemetry_setting().0)
                 .allow_insecure_http(true)
                 .build()?;
             &own_client

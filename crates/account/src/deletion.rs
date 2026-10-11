@@ -30,7 +30,7 @@ use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::util::{audit_self, clip, track};
+use crate::util::{audit_self, clip};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct DeleteBody {
@@ -141,16 +141,6 @@ pub(crate) async fn delete_me(
     )
     .await?;
     tx.commit().await?;
-    track(
-        &state,
-        "delete",
-        "account.deleted",
-        json!({
-            "revoked_sessions": deleted.revoked_families,
-            "revoked_proofs": deleted.revoked_proofs,
-            "released_silicons": released.len(),
-        }),
-    );
 
     Ok(no_content(&state, &me))
 }

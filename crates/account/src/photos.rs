@@ -28,7 +28,7 @@ use axum::response::{IntoResponse, Response};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::util::{audit_self, idem_scope, track};
+use crate::util::{audit_self, idem_scope};
 
 /// Largest accepted photo body: 2 MB (core's `photo_upload` rules, shared by every photo
 /// upload).
@@ -95,15 +95,6 @@ pub(crate) async fn upload(
             )
             .await?;
             tx.commit().await?;
-            track(
-                &state,
-                "photo",
-                "account.photo.uploaded",
-                json!({
-                    "kind": me.kind(), "content_type": info.kind.mime(), "bytes": upload.bytes.len(),
-                    "width": info.width, "height": info.height,
-                }),
-            );
             let mut conn = state.db.acquire().await?;
             let me_view = views::load_me(&mut conn, &account).await?;
             Ok((
@@ -152,14 +143,6 @@ pub(crate) async fn remove(
         .await?;
     }
     tx.commit().await?;
-    if !changed.is_empty() || deleted > 0 {
-        track(
-            &state,
-            "photo",
-            "account.photo.removed",
-            json!({ "kind": me.kind(), "deleted_photos": deleted }),
-        );
-    }
     let mut conn = state.db.acquire().await?;
     Ok(Json(views::load_me(&mut conn, &account).await?))
 }

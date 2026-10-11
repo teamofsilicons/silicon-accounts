@@ -269,10 +269,14 @@ let uploaded = s.set_silicon_photo("si:scout", png_bytes, "image/png", Some("pho
 ## Configuration
 
 `AccountsClient::builder()` sets the base URL, timeouts, a User-Agent product token,
-telemetry (`X-Accounts-Telemetry: off` when disabled), retries for safe requests, and
-whether plain http to non-loopback hosts is allowed (off by default). `Config::from_env`
-reads `ACCOUNTS_URL`, `ACCOUNTS_APP_ID`, `ACCOUNTS_APP_SECRET`, `ACCOUNTS_TELEMETRY`,
+retries for safe requests, and whether plain http to non-loopback hosts is allowed (off by
+default). `Config::from_env` reads `ACCOUNTS_URL`, `ACCOUNTS_APP_ID`, `ACCOUNTS_APP_SECRET`,
 `ACCOUNTS_TIMEOUT_SECONDS` and `ACCOUNTS_ALLOW_INSECURE_HTTP` when you want that.
+
+Silicon Accounts records no telemetry. `ClientBuilder::telemetry`,
+`AccountsClient::with_telemetry`, `telemetry_enabled`, `send_telemetry`, `TelemetryEvent`,
+`TELEMETRY_HEADER` and `Config::telemetry` remain as deprecated no-ops so existing code
+still builds.
 
 Secrets (`Secret`) never print in `Debug` output; call `.expose()` where a value must
 leave your program.

@@ -9,7 +9,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use serde_json::{Value, json};
 
-use crate::util::{audit_self, clip, single_page, track};
+use crate::util::{audit_self, clip, single_page};
 
 /// `GET /v1/me/identities` → `{"items":[{"provider","subject","email","created_at",
 /// "last_used_at"}],"next_cursor":null}`. `subject` is what DELETE needs.
@@ -78,11 +78,5 @@ pub(crate) async fn unlink(
     )
     .await?;
     tx.commit().await?;
-    track(
-        &state,
-        "identity",
-        "account.identity.unlinked",
-        json!({ "provider": provider }),
-    );
     Ok(StatusCode::NO_CONTENT)
 }

@@ -162,7 +162,7 @@ export interface CliResult {
 export async function cliSpawn(home: string, args: string[], opts: { stdin?: string; env?: Record<string, string> } = {}) {
   const url = await publicUrl();
   const child = spawn(CLI, ['--url', url, '--home', home, ...args], {
-    env: { ...process.env, ACCOUNTS_TELEMETRY: '0', ACCOUNTS_NO_BROWSER: '1', ...(opts.env ?? {}) },
+    env: { ...process.env, ACCOUNTS_NO_BROWSER: '1', ...(opts.env ?? {}) },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   let stdout = '';

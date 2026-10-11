@@ -176,15 +176,14 @@ apply to them. If you are a script, a Silicon or a server, always use a Bearer t
   parameter. A bad path parameter is 400 `invalid_path`.
 - **`X-Request-Id`** (optional). Send 1 to 128 characters from `A-Z a-z 0-9 - _ . :` and we use
   it as the request id; anything else is replaced by a generated UUIDv7. Every response echoes it.
-- **`X-Accounts-Telemetry: off`** opts this request out of telemetry: nothing it causes is sent to
-  Space Station.
+- **`X-Accounts-Telemetry`** is accepted and ignored: Silicon Accounts records no telemetry.
 
 ## Responses
 
 - Bodies are JSON. Timestamps are RFC 3339 in UTC with milliseconds
   (`2026-10-07T02:32:20.053Z`). Dates are `YYYY-MM-DD`.
 - Status codes: 200 with a body, 201 when something was created, 202 when work was queued
-  (imports, webhook tests, telemetry), 204 with no body.
+  (imports, webhook tests), 204 with no body.
 - Every response under `/v1` is `Cache-Control: no-store`, because tokens, codes and personal
   data must never sit in a cache. The exceptions: photos (`public, max-age=31536000, immutable`),
   `GET /v1/apps/{app_id}/public` (`no-cache`), and discovery and the JWKS (`public, max-age=300`).
@@ -545,7 +544,6 @@ event type. The endpoints that set a webhook and list or replay its deliveries a
 | `GET /readyz` | public, on `accounts-api`'s own address only | | 200 / 503 |
 | `GET /v1/meta` | public | | 200 deployment |
 | `POST /v1/reports` | public (account optional) | yes | 201 report |
-| `POST /v1/telemetry/events` | public | | 202 |
 | `GET /v1/dev/outbox` | public, development only | | 200 list |
 | `GET /v1/capabilities` | public | | 200 capabilities, 422 when a required one is missing |
 | `GET /openapi.json`, `GET /v1/openapi.json` | public | | 200 OpenAPI 3.1 document |

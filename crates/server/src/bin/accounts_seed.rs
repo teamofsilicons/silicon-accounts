@@ -87,7 +87,7 @@ async fn run(args: Args) -> Result<(), (u8, String)> {
             format!("{e}hint: accounts-seed needs the same ACCOUNTS_* configuration as accounts-api (see .env.example)."),
         )
     })?;
-    accounts_core::telemetry::init_logging(&settings);
+    accounts_core::logging::init_logging(&settings);
     let db_url = accounts_server::redact_database_url(settings.database_url.expose_secret());
     let pool = accounts_core::db::connect(&settings).await.map_err(|e| {
         (

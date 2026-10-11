@@ -1,6 +1,6 @@
 ---
 title: Service endpoints
-description: Check that we're up and what this deployment supports, send us a bug report, and find the SDK, embed, telemetry and development endpoints.
+description: Check that we're up and what this deployment supports, send us a bug report, and find the SDK, embed and development endpoints.
 kind: informative
 order: 68
 related:
@@ -11,7 +11,7 @@ related:
 
 # Service endpoints
 
-Use these to check that the service is running, see how this deployment is set up, or send us a bug report. This page also covers the SDK and embed resources, the telemetry endpoint and the development outbox.
+Use these to check that the service is running, see how this deployment is set up, or send us a bug report. This page also covers the SDK and embed resources and the development outbox. Silicon Accounts records no telemetry.
 
 ```sh
 curl -s "$ACCOUNTS_URL/v1/meta"          # which deployment answered (public origin)
@@ -89,45 +89,6 @@ curl -s -X POST "$ACCOUNTS_URL/v1/reports" -H 'Content-Type: application/json' \
 `message` is 1 to 10,000 characters, and `pr_url` must be https. Every report is emailed to each
 maintainer address. Errors: 422 `validation_failed`, 429 `rate_limited`. The CLI's
 `silicon-accounts report "…" --pr <link>` calls this endpoint.
-
-## `POST /v1/telemetry/events`
-
-Client telemetry, which we forward to Space Station. Public; 120 requests per IP per minute.
-
-```json
-{
-  "events": [
-    { "source": "cli", "step": "login.code.sent", "name": "cli.step", "progress": 0.4,
-      "data": { "channel": "email", "command": "login", "cli_version": "0.4.0", "os": "macos", "arch": "aarch64" } }
-  ]
-}
-```
-
-At most 50 events. `name` matches `^[a-z0-9_.]{1,64}$`; `source` is 1 to 64 characters of
-`a-z 0-9 _ . -`; `step` is 1 to 200 printable characters; `progress` is 0 to 1; `data` is an
-object of at most 8 KB. Answers **202** `{"accepted": 1, "forwarded": true}` (`forwarded` is
-false when nothing is forwarded for this request). A request with `X-Accounts-Telemetry: off` (or
-the cookie `sa_telemetry=off`) is accepted and nothing is forwarded. Errors: 422
-`validation_failed`, 429 `rate_limited`.
-
-We forward only what the `silicon-accounts` CLI reports, word for word, so no identifier or free
-text gets through whatever its shape:
-
-- only the CLI's events: `source` `cli`, `name` `cli.command` or `cli.step` (others are accepted
-  and dropped);
-- `step` as one of the CLI's step names or command paths, anything else as `other`; `progress`
-  rounded to the hundredth;
-- in `data`, only `cli_version` (a release version such as `0.4.0` or `0.5.0-rc.1`), `outcome`,
-  `exit_code`, `duration_ms` (a day at most), `json`, `account_kind`, `kind`, `method`,
-  `channel`, `browser_opened`, `dry_run`, `format`, `ttl_seconds` (a day at most), `wait`,
-  `webhook`, `signed_in`, each only as the CLI sends it (a flag, a count, an exit code from
-  -1000 to 1000, or one of a fixed set of words) or as `null`; `command`, `os`, `arch` and
-  `error_code` as one of the words the CLI uses, else `other`; and `app` or `app_id` (an app
-  id) only on the `login.slt.issued` step. Everything else is dropped, the `source` the CLI
-  reports for a `--federated` sign-in included.
-
-The validation and the 202 answer don't change with this filter: an event is accepted when it is
-well formed, whatever is forwarded of it.
 
 ## `GET /v1/dev/outbox`
 

@@ -2,7 +2,7 @@
 
 use serde_json::{Value, json};
 
-use crate::cli::{ConfigArgs, ConfigCommand, OnOff};
+use crate::cli::{ConfigArgs, ConfigCommand};
 use crate::ctx::{Ctx, validate_url};
 use crate::error::{CliError, CliResult, EXIT_INVALID};
 use crate::home;
@@ -14,12 +14,24 @@ pub async fn config(ctx: &Ctx, args: ConfigArgs) -> CliResult<Outcome> {
         ConfigCommand::Get { key } => get(ctx, key.as_deref()),
         ConfigCommand::Set { key, value } => set(ctx, &key, &value),
         ConfigCommand::Unset { key } => unset(ctx, &key),
-        ConfigCommand::Telemetry { state } => set(
-            ctx,
-            "telemetry",
-            if state == OnOff::On { "on" } else { "off" },
-        ),
+        ConfigCommand::Telemetry { .. } => Ok(telemetry_removed()),
     }
+}
+
+/// What `config telemetry …`, `config get|set|unset telemetry` say: kept so existing scripts
+/// still succeed (exit 0) without touching any state.
+const TELEMETRY_REMOVED: &str =
+    "Telemetry was removed from Silicon Accounts; there is nothing to turn on or off.";
+
+fn telemetry_removed() -> Outcome {
+    Outcome::new(
+        json!({ "telemetry": false, "message": TELEMETRY_REMOVED }),
+        TELEMETRY_REMOVED,
+    )
+}
+
+fn is_telemetry(key: &str) -> bool {
+    key.trim().eq_ignore_ascii_case("telemetry")
 }
 
 fn overridden_notice(ctx: &Ctx) {
@@ -96,11 +108,13 @@ fn home_command(ctx: &Ctx, dir: Option<std::path::PathBuf>, reset: bool) -> CliR
     ))
 }
 
-const KEYS: &str = "url, telemetry, home, app";
+const KEYS: &str = "url, home, app";
 
 fn get(ctx: &Ctx, key: Option<&str>) -> CliResult<Outcome> {
+    if key.is_some_and(is_telemetry) {
+        return Ok(telemetry_removed());
+    }
     let (url, url_source) = ctx.url()?;
-    let (telemetry, telemetry_source) = ctx.telemetry_setting();
     let home = ctx.home()?;
     let env_app = std::env::var("ACCOUNTS_APP_ID")
         .ok()
@@ -113,7 +127,6 @@ fn get(ctx: &Ctx, key: Option<&str>) -> CliResult<Outcome> {
     let session = ctx.load_session()?;
     let all = json!({
         "url": { "value": url, "source": url_source.key() },
-        "telemetry": { "value": telemetry, "source": telemetry_source },
         "home": { "value": home.dir.display().to_string(), "source": home.source.key(), "state_dir": home.state_dir().display().to_string() },
         "app": { "value": app, "source": app_source },
         "session": session.as_ref().map(|s| json!({ "id": s.account.id, "kind": s.kind.as_str(), "url": s.url })),
@@ -123,7 +136,7 @@ fn get(ctx: &Ctx, key: Option<&str>) -> CliResult<Outcome> {
         let key = key.trim().to_ascii_lowercase();
         let Some(value) = all
             .get(&key)
-            .filter(|_| ["url", "telemetry", "home", "app"].contains(&key.as_str()))
+            .filter(|_| ["url", "home", "app"].contains(&key.as_str()))
         else {
             return Err(CliError::invalid(
                 format!("`{key}` is not a setting."),
@@ -139,13 +152,6 @@ fn get(ctx: &Ctx, key: Option<&str>) -> CliResult<Outcome> {
     }
     let text = kv(&[
         ("url", format!("{url}  (from {})", url_source.key())),
-        (
-            "telemetry",
-            format!(
-                "{}  (from {telemetry_source})",
-                if telemetry { "on" } else { "off" }
-            ),
-        ),
         (
             "home",
             format!("{}  (from {})", home.dir.display(), home.source.describe()),
@@ -168,6 +174,9 @@ fn get(ctx: &Ctx, key: Option<&str>) -> CliResult<Outcome> {
 }
 
 fn set(ctx: &Ctx, key: &str, value: &str) -> CliResult<Outcome> {
+    if is_telemetry(key) {
+        return Ok(telemetry_removed());
+    }
     let mut config = ctx.config()?.clone();
     let key = key.trim().to_ascii_lowercase();
     let shown = match key.as_str() {
@@ -188,20 +197,6 @@ fn set(ctx: &Ctx, key: &str, value: &str) -> CliResult<Outcome> {
             }
             url
         }
-        "telemetry" => {
-            let on = silicon_accounts_client::parse_flag(value).ok_or_else(|| {
-                CliError::invalid(
-                    format!("`{value}` is not on or off."),
-                    "Use `silicon-accounts config set telemetry on` or `off`.",
-                )
-            })?;
-            config.telemetry = Some(on);
-            if on {
-                "on".to_owned()
-            } else {
-                "off".to_owned()
-            }
-        }
         "app" => {
             let app = value.trim().to_owned();
             ctx.app_path(&app)?;
@@ -217,7 +212,7 @@ fn set(ctx: &Ctx, key: &str, value: &str) -> CliResult<Outcome> {
         other => {
             return Err(CliError::invalid(
                 format!("`{other}` is not a setting you can set."),
-                "Settings: url, telemetry, app.",
+                "Settings: url, app.",
             ));
         }
     };
@@ -229,11 +224,13 @@ fn set(ctx: &Ctx, key: &str, value: &str) -> CliResult<Outcome> {
 }
 
 fn unset(ctx: &Ctx, key: &str) -> CliResult<Outcome> {
+    if is_telemetry(key) {
+        return Ok(telemetry_removed());
+    }
     let mut config = ctx.config()?.clone();
     let key = key.trim().to_ascii_lowercase();
     match key.as_str() {
         "url" => config.url = None,
-        "telemetry" => config.telemetry = None,
         "app" => config.app = None,
         "home" => {
             return Err(CliError::invalid(
@@ -244,7 +241,7 @@ fn unset(ctx: &Ctx, key: &str) -> CliResult<Outcome> {
         other => {
             return Err(CliError::invalid(
                 format!("`{other}` is not a setting."),
-                "Settings: url, telemetry, app.",
+                "Settings: url, app.",
             ));
         }
     }

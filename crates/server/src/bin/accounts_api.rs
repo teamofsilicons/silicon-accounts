@@ -46,7 +46,14 @@ async fn run() -> Result<(), (u8, String)> {
             format!("{e}hint: fix the variables above (see .env.example for every variable and its default)."),
         )
     })?;
-    accounts_core::telemetry::init_logging(&settings);
+    accounts_core::logging::init_logging(&settings);
+    // Silicon Accounts records no telemetry: the old telemetry variables do nothing now.
+    for var in accounts_core::config::retired_variables_set(|k| std::env::var(k).ok()) {
+        tracing::warn!(
+            variable = var,
+            "{var} is set but Silicon Accounts records no telemetry and ignores it; remove it from the environment"
+        );
+    }
     if let Some(dist) = &settings.web_dist
         && !dist.join("index.html").is_file()
     {
@@ -163,20 +170,7 @@ async fn run() -> Result<(), (u8, String)> {
         delivery = state.settings.delivery.as_str(),
         web_dist = ?state.settings.web_dist,
         background_tasks = background.len(),
-        telemetry = state.telemetry.is_enabled(),
         "Silicon Accounts is listening"
-    );
-    state.telemetry.record_progress(
-        "api",
-        "startup",
-        "api.started",
-        Some(1.0),
-        serde_json::json!({
-            "version": accounts_core::VERSION,
-            "worker": worker_enabled,
-            "web": state.settings.web_dist.is_some(),
-            "delivery": state.settings.delivery.as_str(),
-        }),
     );
 
     let (stop_tx, stop_rx) = watch::channel(false);
@@ -225,13 +219,6 @@ async fn run() -> Result<(), (u8, String)> {
             result
         }
     };
-    state.telemetry.record_progress(
-        "api",
-        "shutdown",
-        "api.stopped",
-        Some(1.0),
-        serde_json::json!({ "version": accounts_core::VERSION, "clean": served.is_ok() }),
-    );
-    tracing::info!("Silicon Accounts stopped");
+    tracing::info!(clean = served.is_ok(), "Silicon Accounts stopped");
     served
 }

@@ -6,7 +6,6 @@
 //! | `GET /readyz` | public | readiness: `200 {"database":"ok"}` or `503` |
 //! | `GET /v1/meta` | public | service name, version, environment, URLs (public, Silicon Apps, docs, developer platform), providers, delivery |
 //! | `POST /v1/reports` | optional session | bug report mailed to the report recipients |
-//! | `POST /v1/telemetry/events` | public | client telemetry forwarded to Space Station |
 //! | `GET /v1/dev/outbox` | public, dev only | messages recorded by the service (with OTP codes) |
 //! | `GET /openapi.json`, `GET /v1/openapi.json` | public | the OpenAPI 3.1 document |
 //! | `GET /.well-known/agent.json` | public | the A2A agent card |
@@ -14,6 +13,7 @@
 //! | `GET /v1/events/stream` | app, account or request token | account events as Server-Sent Events |
 //!
 //! Plus the fallback: JSON 404 for unknown API routes, the account site for everything else.
+//! Silicon Accounts records no telemetry: `POST /v1/telemetry/events` is gone and answers 404.
 
 use accounts_core::AppState;
 use axum::Router;
@@ -25,7 +25,6 @@ pub mod events;
 pub mod fallback;
 pub mod health;
 pub mod reports;
-pub mod telemetry;
 
 /// The server crate's routes.
 pub fn router() -> Router<AppState> {
@@ -34,7 +33,6 @@ pub fn router() -> Router<AppState> {
         .route("/readyz", get(health::readyz))
         .route("/v1/meta", get(health::meta))
         .route("/v1/reports", post(reports::create))
-        .route("/v1/telemetry/events", post(telemetry::ingest))
         .route("/v1/dev/outbox", get(dev::outbox))
         .route("/openapi.json", get(discovery::openapi))
         .route("/v1/openapi.json", get(discovery::openapi))
