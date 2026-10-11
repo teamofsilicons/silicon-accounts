@@ -60,3 +60,19 @@ byte-identical to the repository; developer `/`, `/docs`, `/status`, `/llms.txt`
 secondary action, no theme switch or FAQPage, `og.png` byte-identical; `/settings` redirects to `/apps`. A headless
 browser loaded both home pages with BDO Grotesk, Hedvig Letters Serif and Geist Pixel Square, `data-theme="light"`,
 and no console errors.
+
+## Accounts 077ce09: identity card, app marks, blue buttons, developer icon upload
+
+PR #9, at the Carbon's request. Account site: filled buttons in the calm blue; the identity card flips on a click on
+its paper and keeps Details and Back in the same top corner; app stamps drawn as the store draws apps (logo with a
+one-pixel line, or the serif letter on beige), apps with a logo first, +N opens the rest in place; profile photos are
+squircles. Developer site: the Carbon's "</>" mark; store-style app marks; the app page's mark offers Upload, which
+saves a data: URL logo to Silicon Apps (passed on to Silicon Accounts); serif blue titles, blue buttons. No Rust,
+migration, installer or packager change since 37d5688.
+
+Preflight: web typecheck, lint, 28 tests, build, screenshots; developer typecheck, lint, 40 tests, e2e 62 passed,
+build. Archive `releases/077ce09f733e5842ce880404f53b026737c30ce2.tar.gz`, 154959419 bytes, SHA-256
+`2ca105d79669df46b2103c75544487ec8a07adaafd4581db378725d27406b0d6`, S3 version `YjUnP3xiuF78Wi_548EVGjcQUdqIQunE`.
+Install SSM `9d95ea06-6319-4b93-822c-6d73b17ff8e2`: nothing to migrate, readiness passed, `current` is
+`releases/077ce09…`, four services active. Live: accounts `/`, `/readyz` and developer `/`, `/apps`, `/sign-in` 200;
+the developer `icon.svg` is byte-identical to the repository; the account site's CSS carries `--primary:#1f5cb1`.
