@@ -5,8 +5,8 @@
  *   icon.svg         → public/icon-192.png and icon-512.png (the mark on its cream tile, for installs)
  *   maskable.svg     → public/icon-maskable-512.png (full bleed, for the web manifest)
  *   apple.svg        → public/apple-touch-icon.png (180 px)
- * public/icon.svg is favicon.svg as is: the mark in #181818 on a rounded cream (#EDE8E0) tile, in light and dark
- * browsers alike. Run it after changing any source: node scripts/brand/render.mjs
+ * public/icon.svg is favicon.svg as is: the mark alone with no tile, in ink (#1E1E1C) when the browser is light and
+ * cream (#EDE8E0) when it is dark, so it reads on either tab strip; favicon.ico draws the ink. Run it after changing any source: node scripts/brand/render.mjs
  */
 import { readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";
