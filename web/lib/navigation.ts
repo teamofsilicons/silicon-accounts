@@ -1,6 +1,11 @@
 /**
- * The account site's top-level sections (the dock, the phone sheet, number-key shortcuts and the command palette all
- * read this list) and the route paths every page links to. Link with `paths`, never string literals.
+ * The account site's four pillars (the dock, the phone sheet, number-key shortcuts and the command palette all read
+ * SECTIONS) and the route paths every page links to. Link with `paths`, never string literals.
+ *
+ * The pillars follow the jobs in "Silicon Accounts Redesign Design Review": Identity (who you are), Security (your ways
+ * in), Access (apps that can act as you or see you) and Custodianship (Silicons you answer for). Pages that are part of
+ * a pillar without being its front page (Proofs, Activity) are listed under it in `includes`, so the dock marks the
+ * right pillar there, and reached from the palette (MORE_DESTINATIONS) and from links, not from the dock.
  *
  * Building apps is not part of the account site. The developer site and its docs (developers.teamofsilicons.com,
  * `developer_url` in GET /v1/meta) are ELSEWHERE: quiet links in the top row, the phone sheet's foot and the command
@@ -51,7 +56,7 @@ export const paths = {
   kitchen: "/__kitchen",
 } as const;
 
-export type SectionKey = "identity" | "sign-in" | "apps" | "silicons" | "proofs" | "activity";
+export type SectionKey = "identity" | "security" | "access" | "custodianship";
 
 export interface Section {
   key: SectionKey;
@@ -63,16 +68,22 @@ export interface Section {
   icon: LucideIcon;
   /** The number key that jumps here. */
   shortcut: string;
+  /** Other paths of this pillar (and everything under them). */
+  includes?: readonly string[];
 }
 
 export const SECTIONS: readonly Section[] = [
   { key: "identity", label: "Identity", description: "Your card: name, id, photo and details", href: paths.home, icon: IdCard, shortcut: "1" },
-  { key: "sign-in", label: "Sign-in", description: "Emails, phone numbers and Google or Apple", href: paths.signInMethods, icon: KeyRound, shortcut: "2" },
-  { key: "apps", label: "Apps", description: "Apps you signed into and what they can see", href: paths.apps, icon: LayoutGrid, shortcut: "3" },
-  { key: "silicons", label: "Silicons", description: "Silicons you are custodian of", href: paths.silicons, icon: Cpu, shortcut: "4" },
-  { key: "proofs", label: "User verification", description: "Apps acting on your behalf", href: paths.proofs, icon: ShieldCheck, shortcut: "5" },
-  { key: "activity", label: "Activity", description: "Sign-ins and changes, by day", href: paths.activity, icon: History, shortcut: "6" },
+  { key: "security", label: "Security", description: "Your ways in: emails, phone numbers and Google or Apple", href: paths.signInMethods, icon: KeyRound, shortcut: "2", includes: [paths.activity] },
+  { key: "access", label: "Access", description: "Apps you signed into, what they can see, and apps acting for you", href: paths.apps, icon: LayoutGrid, shortcut: "3", includes: [paths.proofs] },
+  { key: "custodianship", label: "Custodianship", description: "Silicons you are custodian of", href: paths.silicons, icon: Cpu, shortcut: "4" },
 ];
+
+/** Account pages that belong to a pillar but are not in the dock: reached from the command palette and from links. */
+export const MORE_DESTINATIONS = [
+  { key: "proofs", label: "User verification", description: "Apps acting on your behalf at other apps", href: paths.proofs, icon: ShieldCheck },
+  { key: "activity", label: "Activity", description: "Sign-ins and changes, by day", href: paths.activity, icon: History },
+] as const;
 
 /** Another site the account site points to: always a full navigation, marked with an arrow, never the active section. */
 export interface Elsewhere {
@@ -92,7 +103,8 @@ export const ELSEWHERE: readonly Elsewhere[] = [
 /** The section a path belongs to (Settings belongs to none: the dock shows no active section there). */
 export function sectionFor(pathname: string): Section | undefined {
   if (pathname === "/" || pathname === "") return SECTIONS[0];
-  return SECTIONS.find(section => section.href !== "/" && (pathname === section.href || pathname.startsWith(`${section.href}/`)));
+  const within = (path: string) => path !== "/" && (pathname === path || pathname.startsWith(`${path}/`));
+  return SECTIONS.find(section => within(section.href) || section.includes?.some(within));
 }
 
 export function sectionIndex(pathname: string): number {

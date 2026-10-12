@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Avatar } from "@/components/silicon-ui/avatar/avatar";
-import { AvatarGroup } from "@/components/silicon-ui/avatar-group/avatar-group";
-import { Card } from "@/components/silicon-ui/card/card";
-import { UserMenu, type UserStatus } from "@/components/silicon-ui/user-menu/user-menu";
+import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
+import { AvatarGroup } from "@teamofsilicons/silicon-ui/avatar-group";
+import { Card } from "@teamofsilicons/silicon-ui/card";
+import { UserMenu, type UserStatus } from "@teamofsilicons/silicon-ui/user-menu";
 import { IdentityCard, IdentityField, LiveClock, StampRow } from "@/components/foundation/identity/identity-card";
 import { useTheme } from "@/components/foundation/theme/use-theme";
 import { portrait, SAMPLE_APPS } from "../samples";

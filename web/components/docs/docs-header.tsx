@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Menu } from "lucide-react";
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/silicon-ui/drawer/drawer";
+import { Drawer, DrawerContent, DrawerTrigger } from "@teamofsilicons/silicon-ui/drawer";
 import { BrandMark } from "@/components/foundation/shell/brand-mark";
 import { DOCS_BASE } from "@/lib/docs/site";
 import type { NavGroup, SearchSuggestion } from "@/lib/docs/types";

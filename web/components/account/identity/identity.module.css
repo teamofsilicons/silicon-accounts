@@ -1,120 +1,68 @@
-/* Identity home: the card and a quiet column beside it. */
-.layout { display: grid; grid-template-columns: minmax(0, 640px) minmax(0, 1fr); align-items: start; gap: clamp(32px, 5vw, 72px); }
+/* Identity home: the attention strip (its own module), the card, and metric cards beside it. Tokens only. */
+.layout { display: grid; grid-template-columns: minmax(0, 640px) minmax(0, 1fr); align-items: start; gap: clamp(var(--space-block), 5vw, var(--space-stage)); }
 @media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } }
-.alertAction { display: block; margin-top: var(--space-3); }
+.alertAction { display: block; margin-top: var(--space-group); }
 
 /* ------------------------------------------------- front of the card ------------------------------------------------- */
-.face { position: relative; display: grid; min-width: 0; gap: var(--space-6); }
+.face { position: relative; display: grid; min-width: 0; gap: var(--space-section); }
 /* Details on the front and Back on the back: the same corner of the card, so turning it over and back is one place. */
 .turn.turn { position: absolute; z-index: 1; top: 0; right: 0; }
 /* The name and the back's title leave room for it. */
-.who, .backHead { padding-right: 104px; }
-@media (max-width: 480px) { .who { padding-right: 0; padding-top: 44px; } }
-.who { display: flex; min-width: 0; align-items: center; gap: var(--space-6); }
-.names { display: grid; min-width: 0; flex: 1; gap: var(--space-2); }
+.who, .backHead { padding-right: calc(var(--space-screen) + var(--space-section)); }
+@media (max-width: 480px) { .who { padding-right: 0; padding-top: calc(var(--space-block) + var(--space-group)); } }
+.who { display: flex; min-width: 0; align-items: center; gap: var(--space-section); }
+.names { display: grid; min-width: 0; flex: 1; gap: var(--space-related); }
 /* The display name is an inline editor set in the display face: the editor keeps its metrics while editing. */
-.name.name[data-variant] { --size: clamp(var(--text-3xl), 4vw, 2.75rem); --leading: round(var(--size) * 1.2, 2px); --weight: 400; --ink: var(--foreground); }
+.name.name[data-variant] { --size: clamp(var(--text-3xl), 4vw, var(--text-4xl)); --leading: round(var(--size) * 1.2, 2px); --weight: 400; --ink: var(--foreground); }
 .name > :first-child { font-family: var(--font-serif); letter-spacing: -.01em; }
 /* A long name wraps onto more lines instead of being cut off (names run to 100 characters); while it is edited the
-   field is one line again and scrolls (Arc InlineEdit marks the text layer data-layer and its root data-editing). */
+   field is one line again and scrolls (InlineEdit marks the text layer data-layer and its root data-editing). */
 .name:not([data-editing]) [data-layer] { overflow: visible; text-overflow: clip; white-space: pre-wrap; overflow-wrap: anywhere; text-wrap: balance; }
-.badges { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.badges { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-group); }
 .since { color: var(--text-secondary); font-size: var(--text-xs); }
 
-.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--space-5) var(--space-6); padding-top: var(--space-5); border-top: 1px dashed color-mix(in oklab, var(--border) 85%, transparent); }
-.field { display: grid; min-width: 0; align-content: start; gap: var(--space-1); }
-/* A long id gets the whole row; handles run to 30 characters. */
-.field[data-wide] { grid-column: 1 / -1; }
-/* The id never runs under the next field: the morph's frame is held to the space there is (the full id is in the
-   title, and Copy copies all of it). */
-.idValue { display: block; min-width: 0; max-width: 100%; overflow: hidden; font-family: var(--font-mono); font-size: calc(var(--text-sm) - .5px); font-variant-ligatures: none; letter-spacing: 0; white-space: nowrap; }
+/* Recognition only: the id, and room for its reservation note. */
+.fields { display: grid; gap: var(--space-related); padding-top: var(--space-comfort); border-top: 1px dashed color-mix(in oklab, var(--border) 85%, transparent); }
+.field { display: grid; min-width: 0; align-content: start; justify-items: start; gap: var(--space-tight); }
+/* The id never runs under the edge: the morph's frame is held to the space there is (the full id is in the title,
+   and Copy copies all of it). */
+.idValue { display: block; min-width: 0; max-width: 100%; overflow: hidden; font-family: var(--font-mono); font-size: var(--text-sm); font-variant-ligatures: none; letter-spacing: 0; white-space: nowrap; }
 .idMorph { display: block; max-width: 100%; }
+/* Placement only: the ghost button lines up with the field's text. */
+.fieldAction { margin-inline-start: calc(var(--space-group) * -1); }
 .fieldNote { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
-/* The time, then its zone; a long zone ("Los Angeles, America · UTC-07:00") wraps instead of being cut off, never inside its offset. */
-.clock { display: grid; min-width: 0; gap: 2px; }
-.zone { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
-.offset { white-space: nowrap; }
 
-.foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-inset); }
 .noStamps { color: var(--text-secondary); font-size: var(--text-sm); }
-.stampsError { display: inline-flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); color: var(--danger); font-size: var(--text-sm); line-height: var(--leading-body); }
-.stampsError button { margin-inline-start: 0; }
-.stampsSkeleton { display: inline-flex; gap: 6px; }
+.stampsError { display: inline-flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-tight) var(--space-group); color: var(--danger); font-size: var(--text-sm); line-height: var(--leading-body); }
+.stampsSkeleton { display: inline-flex; gap: var(--space-related); }
 
 /* -------------------------------------------------- back of the card -------------------------------------------------- */
-.backHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.backHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); }
 .backTitle { margin: 0; font-family: var(--font-serif); font-size: var(--text-3xl); font-weight: 400; letter-spacing: -.01em; line-height: 1.1; }
-.details { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: var(--space-5) var(--space-6); margin: 0; padding-top: var(--space-5); border-top: 1px dashed color-mix(in oklab, var(--border) 85%, transparent); }
-.details > div { display: grid; min-width: 0; align-content: start; gap: var(--space-2); font-size: var(--text-sm); }
+.details { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: var(--space-comfort) var(--space-section); margin: 0; padding-top: var(--space-comfort); border-top: 1px dashed color-mix(in oklab, var(--border) 85%, transparent); }
+.details > div { display: grid; min-width: 0; align-content: start; gap: var(--space-related); font-size: var(--text-sm); }
 .details dt { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
-.details dd { display: grid; min-width: 0; gap: var(--space-2); margin: 0; overflow-wrap: anywhere; }
-.valueLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
+.details dd { display: grid; min-width: 0; gap: var(--space-related); margin: 0; overflow-wrap: anywhere; }
+.valueLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-tight) var(--space-group); }
 .valueLine > button { margin-inline-start: 0; }
-.contact { display: inline-flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.contact { display: inline-flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-related); }
 .contactText { min-width: 0; overflow-wrap: anywhere; }
 .muted { margin: 0; color: var(--text-muted); font-size: var(--text-sm); line-height: var(--leading-body); }
-.backLink { display: inline-flex; width: fit-content; align-items: center; gap: var(--space-2); color: var(--accent-ink); font-size: var(--text-sm); text-decoration: none; }
+.backLink { display: inline-flex; width: fit-content; align-items: center; gap: var(--space-related); color: var(--accent-ink); font-size: var(--text-sm); text-decoration: none; }
 .backLink:hover, .backLink:focus-visible { color: var(--accent-strong); text-decoration: underline; outline: none; }
 
 /* ------------------------------------------------------ glance ------------------------------------------------------ */
-.glance { display: grid; min-width: 0; align-content: start; gap: var(--space-8); padding-top: var(--space-2); }
-.counts { display: grid; }
-.glanceRow { display: grid; grid-template-columns: minmax(3.5rem, auto) minmax(0, 1fr) auto; align-items: baseline; gap: var(--space-4); padding: var(--space-4) 0; border-top: 1px solid var(--border); color: var(--foreground); text-decoration: none; outline: none; }
-.glanceRow:last-child { border-bottom: 1px solid var(--border); }
-.glanceRow:hover { color: var(--foreground); }
-.glanceValue { font-family: var(--font-serif); font-size: var(--text-3xl); font-weight: 400; letter-spacing: 0; line-height: 1; font-variant-numeric: proportional-nums; }
-/* The counter keeps proportional figures, in the serif like the page title. */
-.glanceValue.glanceValue * { font-weight: 400; font-variant-numeric: proportional-nums; }
-/* The rolling counter takes the column's display serif instead of its own face and size. */
-.glanceValue > span { color: inherit; font-family: inherit; font-size: inherit; font-weight: 400; letter-spacing: 0; }
-.glanceLabel { display: grid; gap: 2px; color: var(--text-secondary); font-size: var(--text-sm); transition: color var(--duration-fast) var(--ease-standard); }
-.glanceFailed { color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
-.glanceArrow { align-self: center; color: var(--text-muted); transition: transform var(--duration-spring) var(--ease-spring), color var(--duration-fast) var(--ease-standard); }
-@media (hover: hover) and (pointer: fine) {
-  .glanceRow:hover .glanceArrow, .waiting:hover .glanceArrow { color: var(--foreground); transform: translateX(3px); }
-  .glanceRow:hover .glanceLabel { color: var(--foreground); }
-}
-.glanceRow:focus-visible .glanceLabel, .glanceRow:focus-visible .glanceArrow { color: var(--foreground); }
-.glanceRow:focus-visible .glanceArrow { transform: translateX(3px); }
-
-.waiting {
-  --sq-r: var(--radius-panel);
-  --sq-fill: var(--accent-subtle);
-  --sq-stroke: color-mix(in oklab, var(--accent) 35%, transparent);
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--sq-stroke);
-  background: var(--sq-fill);
-  color: var(--accent-ink);
-  text-decoration: none;
-  outline: none;
-}
-.waiting:hover { color: var(--accent-ink); }
-.waiting:focus-visible { --sq-stroke: var(--accent); }
-.waitingText { display: grid; min-width: 0; gap: 2px; }
-.waitingTitle { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
-.waitingMeta { color: var(--text-secondary); font-size: var(--text-xs); }
-
-.recent { display: grid; min-width: 0; gap: var(--space-3); }
-.recentHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
-.recentTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; }
-.recentAll { color: var(--accent-ink); font-size: var(--text-sm); text-decoration: none; }
-.recentAll:hover, .recentAll:focus-visible { text-decoration: underline; outline: none; }
-.recentList { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.recentItem { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: var(--space-4); padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm); }
-.recentText { min-width: 0; color: var(--foreground); overflow-wrap: anywhere; }
-.recentTime { flex: none; color: var(--text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Metric cards, each a link into its pillar. */
+.glance { display: grid; min-width: 0; align-content: start; gap: var(--space-group); }
+@media (max-width: 1000px) and (min-width: 640px) { .glance { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); } }
+.glanceLink { display: block; min-width: 0; color: inherit; text-decoration: none; transition: translate var(--duration-fast) var(--ease-standard); }
+.glanceLink:hover { color: inherit; }
+@media (hover: hover) and (pointer: fine) { .glanceLink:hover { translate: 0 calc(var(--space-tight) * -.5); } }
 
 @media (max-width: 560px) {
-  .who { flex-direction: column; align-items: flex-start; gap: var(--space-5); }
-  .fields { gap: var(--space-5) var(--space-4); }
+  .who { flex-direction: column; align-items: flex-start; gap: var(--space-comfort); }
   .foot { align-items: flex-end; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .glanceArrow, .glanceLabel { transition: none; }
-}
+@media (prefers-reduced-motion: reduce) { .glanceLink { transition: none; } }

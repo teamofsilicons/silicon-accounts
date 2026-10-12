@@ -10,7 +10,7 @@
  *   embed   /embed/v1/buttons, a transparent document inside an app's iframe (no theme boot)
  * Every page is rendered per request (the nonce changes each time), so `headers()` is fine here.
  */
-import "@/components/silicon-ui/foundation.css";
+import "@teamofsilicons/silicon-ui/styles.css";
 import "@/styles/fonts.css";
 import "@/styles/tokens.css";
 import "@/styles/squircle.css";

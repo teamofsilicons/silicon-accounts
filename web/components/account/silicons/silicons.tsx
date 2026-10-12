@@ -8,28 +8,30 @@
  */
 import { useState } from "react";
 import { Cpu, Plus } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { Avatar } from "@/components/silicon-ui/avatar/avatar";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
-import { TextMorph } from "@/components/silicon-ui/text-morph/text-morph";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
+import { TextMorph } from "@teamofsilicons/silicon-ui/text-morph";
+import { ButtonLink } from "@/components/foundation/button-link";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader, Section } from "@/components/foundation/layout/layout";
 import type { ManagedSilicon, SiliconCreated } from "@/lib/api/types";
 import { useRegisterCommands } from "@/lib/commands";
+import { paths } from "@/lib/navigation";
 import { formatRelative, plural } from "@/lib/format";
 import { useMe } from "@/lib/query/session";
+import { ATTENTION_ID } from "../attention/attention-strip";
 import { AnimatedRows } from "../parts/animated-rows";
 import { asCarbon, asSilicon, describeError, msUntil, personLabel, spanText, stkRotatedAt, useNow } from "../parts/common";
 import { handFocus, pageMain } from "../parts/focus";
 import { ListCap } from "../parts/list-cap";
-import { useEveryCustodianRequest, useEverySilicon, type Decision } from "../parts/queries";
+import { useEveryCustodianRequest, useEverySilicon } from "../parts/queries";
 import { addReveal, dismissReveal, dismissRevealsOf, usePendingReveals, type Reveal } from "../parts/reveals";
 import { SecretReveal } from "../parts/secret-reveal";
 import { stkSecret } from "../parts/stk";
 import { CreateSilicon } from "./create-silicon";
-import { RequestDeck } from "./request-deck";
 import { SiliconDrawer } from "./silicon-drawer";
 import styles from "./silicons.module.css";
 
@@ -46,8 +48,6 @@ const host = (url: string | null) => {
 const tileOf = (uuid: string) => pageMain()?.querySelector<HTMLElement>(`[role="listitem"]:not([data-leaving]) [data-silicon="${CSS.escape(uuid)}"]`);
 /** The control to fall back on when nothing more specific is left: the first tile, else Create a Silicon. */
 const fallbackFocus = () => pageMain()?.querySelector<HTMLElement>('[role="listitem"]:not([data-leaving]) [data-silicon]') ?? pageMain()?.querySelector<HTMLElement>("[data-create-silicon]");
-/** The "Your Silicons" section (focusable by script), where focus lands when the request deck has gone. */
-const siliconsSection = () => pageMain()?.querySelector<HTMLElement>("[data-your-silicons]");
 /** Ids longer than this wrap on the tile instead of morphing on one line (a 30-character handle overflows a phone). */
 const LONG_ID = 18;
 
@@ -86,14 +86,6 @@ export function Silicons() {
   };
   // Secrets of the Silicon open in the drawer show there; every other one shows on the page.
   const pageReveals = reveals.filter(item => !(drawerOpen && item.silicon === openUuid));
-
-  /**
-   * The last request was answered and the deck has gone with the focus it had: an accepted Silicon's tile takes it (once
-   * the list has it), else the start of "Your Silicons".
-   */
-  const deckEmptied = (siliconUuid: string, decision: Decision) => {
-    handFocus(pageMain(), () => (decision === "accept" ? tileOf(siliconUuid) : null) ?? siliconsSection() ?? fallbackFocus());
-  };
 
   const onCreated = (created: SiliconCreated) => {
     const item = created.silicon;
@@ -151,17 +143,12 @@ export function Silicons() {
             </div>
           ) : null}
 
-          {requests.error && !requests.data ? (
-            <Section title="Waiting for you">
-              <Alert tone="danger" title="Requests waiting for you did not load">
-                {describeError(requests.error)} A Silicon asking you to be its custodian, or a Carbon handing one to you, has 14 days before the request expires.
-                <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void requests.refetch()}>Try again</Button></span>
-              </Alert>
-            </Section>
-          ) : waiting.length ? (
-            <Section title="Waiting for you" description="Each request lasts 14 days. A declined Silicon's account is released; a declined transfer changes nothing.">
-              <RequestDeck requests={waiting} now={now} onEmptied={deckEmptied} />
-            </Section>
+          {/* Requests are answered in one place, the attention strip on the identity home; this page only points there. */}
+          {waiting.length ? (
+            <Alert tone="info" title={`${plural(waiting.length, "custodian request")} waiting for you`}>
+              Answer them on your identity page, where everything that needs your decision is in one place.
+              <span className={styles.alertAction}><ButtonLink href={`${paths.home}#${ATTENTION_ID}`} variant="secondary" size="sm">Answer them</ButtonLink></span>
+            </Alert>
           ) : null}
 
           <Section title="Your Silicons" description={silicons.data && list.length ? `${plural(list.length, "Silicon")}. Open one to manage it.` : undefined} data-your-silicons="" tabIndex={-1} className={styles.section}>

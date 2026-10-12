@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/web/node_modules/.bin/silicon-ui-check --hook",
+            "timeout": 60,
+            "statusMessage": "Checking Silicon UI rules"
+          }
+        ]
+      }
+    ]
+  }
+}

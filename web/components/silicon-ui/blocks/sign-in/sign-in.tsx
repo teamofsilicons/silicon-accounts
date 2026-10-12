@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useLayoutEffect, useId, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, LayoutGroup, animate, motion, useMotionValue, useReducedMotion, type Transition, type Variants } from "motion/react";
 import { Check, KeyRound } from "lucide-react";
-import { Avatar } from "../../avatar/avatar";
-import { Button } from "../../button/button";
-import { Input } from "../../input/input";
-import { OtpInput } from "../../otp-input/otp-input";
-import { avatar } from "../../lib/media";
-import { motionTokens } from "../../lib/motion-tokens";
+import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Input } from "@teamofsilicons/silicon-ui/input";
+import { OtpInput } from "@teamofsilicons/silicon-ui/otp-input";
+import { avatar } from "@teamofsilicons/silicon-ui/lib/media";
+import { motionTokens } from "@teamofsilicons/silicon-ui/motion-tokens";
 import styles from "./sign-in.module.css";
 
 type Step = "email" | "code" | "done";

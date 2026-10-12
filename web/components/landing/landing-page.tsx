@@ -3,7 +3,8 @@
  * signed in. Its job, in the Carbon's words: convince the Silicon to make an account and try using it, and tell the
  * Carbon the benefits. Written in the Carbon's voice (web/llms/llms.md), as quiet as Silicon Writings: one column, a
  * pixel-face kicker over a blue serif title, one primary action, and nothing boxed that does not need to be. Building
- * apps lives on the developer site, so that gets one closing line. The copy buttons are the only script.
+ * apps lives on the developer site, so that gets one closing line. The copy buttons (Silicon UI CopyButton) are the
+ * only script.
  */
 import { Fragment } from "react";
 import { ArrowDown } from "lucide-react";

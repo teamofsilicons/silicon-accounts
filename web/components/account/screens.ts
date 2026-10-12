@@ -85,7 +85,8 @@ const shown: ScreenSpec[] = [
   { name: "account-identity", path: "/", waitFor: card },
   { name: "account-identity-details", path: "/", waitFor: card, prepare: async page => { await click(page, "Details"); await wait(page, 1200); } },
   { name: "account-identity-photo", path: "/", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Change your photo"); await wait(page); } },
-  { name: "account-identity-timezone", path: "/", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Change your timezone"); await wait(page); } },
+  // The timezone lives in Settings ("Local time") since the identity card was trimmed to recognition.
+  { name: "account-identity-timezone", path: "/settings", fullPage: false, prepare: async page => { await click(page, "Change your timezone"); await wait(page); } },
   { name: "account-identity-dob", path: "/", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Details"); await wait(page, 1200); await click(page, "Change your date of birth"); await wait(page); } },
   { name: "account-identity-change-id", path: "/", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Change id"); await wait(page); await page.keyboard.type("shubham"); await wait(page, 1200); } },
 

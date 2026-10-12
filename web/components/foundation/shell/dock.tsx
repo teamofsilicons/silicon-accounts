@@ -5,25 +5,20 @@
  * opens the same sections in a bottom sheet. One highlight glides between sections on the morph spring while the
  * active section's label opens and the previous one closes, all on the same spring so they stay in step.
  *
- * Only this site's sections live here. The developer site and its docs are other sites (lib/navigation.ts ELSEWHERE):
- * quiet links in the top row, and at the foot of the phone sheet. The site is light only, so there is no theme switch.
+ * Only the account's four pillars live here (lib/navigation.ts SECTIONS), so nothing in the dock leaves the site. The
+ * tools that apply anywhere (search, the account menu, the other sites) are in the top bar (account-shell.tsx).
  */
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { animate, useReducedMotion, type AnimationPlaybackControls } from "motion/react";
-import { ArrowUpRight, ChevronUp, Search, Settings } from "lucide-react";
-import { BottomSheet } from "@/components/silicon-ui/bottom-sheet/bottom-sheet";
-import { Tooltip } from "@/components/silicon-ui/tooltip/tooltip";
-import { UserMenu, type UserMenuUser } from "@/components/silicon-ui/user-menu/user-menu";
-import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
-import { ELSEWHERE, SECTIONS, type SectionKey } from "@/lib/navigation";
+import { ChevronUp, Search } from "lucide-react";
+import { BottomSheet } from "@teamofsilicons/silicon-ui/bottom-sheet";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Tooltip } from "@teamofsilicons/silicon-ui/tooltip";
+import { motionTokens } from "@teamofsilicons/silicon-ui/motion-tokens";
+import { SECTIONS, type SectionKey } from "@/lib/navigation";
 import { GUARDED_NAVIGATION } from "@/lib/navigation-guard";
-import { useDeveloperUrl } from "@/lib/query/session";
 import styles from "./dock.module.css";
-
-export interface DockAccount extends UserMenuUser {
-  kind: "carbon" | "silicon";
-}
 
 export interface DockProps {
   activeKey: SectionKey | undefined;
@@ -33,16 +28,8 @@ export interface DockProps {
    * stays.
    */
   onNavigate: (href: string, returnFocus: HTMLElement | null) => void;
-  account: DockAccount | null;
-  /**
-   * Signs out. A promise keeps the user menu open with the item's progress until it settles; nothing returned closes
-   * the menu at once (the shell does that when a page will ask about unsaved work first, so the question is never
-   * asked over the menu).
-   */
-  onSignOut: () => void | Promise<unknown>;
-  onOpenSettings: () => void;
+  /** Opens the ⌘K palette (the phone bar's search button). */
   onOpenPalette: () => void;
-  isApple: boolean;
 }
 
 const lerp = (from: number, to: number, progress: number) => from + (to - from) * progress;
@@ -57,7 +44,7 @@ export function Dock(props: DockProps) {
   );
 }
 
-function FullDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, onOpenPalette, isApple }: DockProps) {
+function FullDock({ activeKey, onNavigate }: DockProps) {
   const reduced = useReducedMotion() ?? false;
   const listRef = useRef<HTMLUListElement>(null);
   const highlightRef = useRef<HTMLSpanElement>(null);
@@ -189,29 +176,11 @@ function FullDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, o
           return <li key={section.key}>{current ? link : <Tooltip content={`${section.label}  ${section.shortcut}`}>{link}</Tooltip>}</li>;
         })}
       </ul>
-      {account ? (
-        <>
-          <span className={styles.separator} aria-hidden="true" />
-          <span className={styles.tool}>
-            <UserMenu
-              user={account}
-              showTheme={false}
-              onSignOut={onSignOut}
-              align="end"
-              items={[
-                { label: "Settings", icon: <Settings size={16} strokeWidth={1.75} />, onSelect: onOpenSettings },
-                { label: "Search and jump", icon: <Search size={16} strokeWidth={1.75} />, keys: isApple ? ["⌘", "K"] : ["Ctrl", "K"], onSelect: onOpenPalette },
-              ]}
-            />
-          </span>
-        </>
-      ) : null}
     </nav>
   );
 }
 
-function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings, onOpenPalette }: DockProps) {
-  const developerUrl = useDeveloperUrl();
+function CompactDock({ activeKey, onNavigate, onOpenPalette }: DockProps) {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const active = SECTIONS.find(section => section.key === activeKey);
@@ -224,11 +193,11 @@ function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings
         title="Go to"
         detents={[0.62, 0.92]}
         trigger={
-          <button ref={menuButton} data-sq="surface" type="button" className={styles.menuButton} aria-haspopup="dialog" aria-expanded={open}>
+          <Button ref={menuButton} variant="secondary" className={styles.menuButton} aria-haspopup="dialog" aria-expanded={open}>
             <ActiveIcon size={18} strokeWidth={1.75} aria-hidden="true" />
             <span className={styles.menuLabel}>{active?.label ?? "Menu"}</span>
             <ChevronUp className={styles.menuChevron} size={16} strokeWidth={1.75} aria-hidden="true" />
-          </button>
+          </Button>
         }
       >
         <ul className={styles.sheetList} role="list">
@@ -265,40 +234,10 @@ function CompactDock({ activeKey, onNavigate, account, onSignOut, onOpenSettings
             );
           })}
         </ul>
-        <div className={styles.sheetFooter}>
-          {/* The other sites: quiet links (full navigations, after the page's guards), not sections. */}
-          <nav className={styles.elsewhere} aria-label="Other sites">
-            {ELSEWHERE.map(site => {
-              const href = site.href(developerUrl);
-              return (
-                <a key={site.key} href={href} className={styles.elsewhereLink} data-sq="surface" data-external="" {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
-                  if (!plainClick(event)) return;
-                  event.preventDefault();
-                  setOpen(false);
-                  onNavigate(href, menuButton.current);
-                }}>
-                  {site.label}
-                  <ArrowUpRight className={styles.externalMark} size={14} strokeWidth={1.75} aria-hidden="true" />
-                </a>
-              );
-            })}
-          </nav>
-          <button data-sq="surface" type="button" className={styles.iconButton} aria-label="Settings" onClick={() => { setOpen(false); onOpenSettings(); }}>
-            <Settings size={20} strokeWidth={1.75} aria-hidden="true" />
-          </button>
-        </div>
       </BottomSheet>
-      <button data-sq="surface" type="button" className={styles.iconButton} aria-label="Search and jump" onClick={onOpenPalette}>
+      <Button variant="ghost" aria-label="Search and jump" onClick={onOpenPalette}>
         <Search size={20} strokeWidth={1.75} aria-hidden="true" />
-      </button>
-      {account ? (
-        <UserMenu
-          user={account}
-          showTheme={false}
-          onSignOut={onSignOut}
-          items={[{ label: "Settings", icon: <Settings size={16} strokeWidth={1.75} />, onSelect: onOpenSettings }]}
-        />
-      ) : null}
+      </Button>
     </div>
   );
 }

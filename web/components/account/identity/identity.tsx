@@ -1,41 +1,42 @@
 "use client";
 
 /**
- * The identity home ("/" signed in): your identity as an object. The card carries your photo (drop a new one on it),
- * your display name (edit it in place), your id (change it; the old one stays reserved for you for 10 days), your
- * uuid, the time where you are, and a stamp for every app you have signed into. Turn it over for your emails, phone
- * numbers and date of birth. Beside it: requests waiting for you, counts that open each section, and your latest
- * activity.
+ * The identity home ("/" signed in), per "Silicon Accounts Redesign Design Review":
+ *
+ * - the attention strip, only when something needs your decision (attention/attention-strip.tsx);
+ * - the identity card. Its front is for recognition only: photo (drop a new one on it), display name (edit in place),
+ *   id (change it; the old one stays reserved for 10 days), since when, and a stamp for every app you signed into.
+ *   Turn it over for your emails and phone numbers, your date of birth (a Silicon's creation date), your uuid to copy
+ *   for support, and a Silicon's custodian, webhook and STK. Your timezone lives in Settings;
+ * - beside it, counts that lead into each pillar, as metric cards. Wayfinding only: no decisions are made there.
  */
 import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, AtSign, Inbox } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { AnimatedCounter } from "@/components/silicon-ui/animated-counter/animated-counter";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { Dialog, DialogContent } from "@/components/silicon-ui/dialog/dialog";
-import { InlineEdit } from "@/components/silicon-ui/inline-edit/inline-edit";
-import { TextMorph } from "@/components/silicon-ui/text-morph/text-morph";
+import { ArrowLeft, ArrowRight, AtSign } from "lucide-react";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { CopyButton } from "@teamofsilicons/silicon-ui/copy-button";
+import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
+import { InlineEdit } from "@teamofsilicons/silicon-ui/inline-edit";
+import { MetricCard } from "@teamofsilicons/silicon-ui/metric-card";
+import { TextMorph } from "@teamofsilicons/silicon-ui/text-morph";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
-import { IdentityCard, IdentityField, LiveClock, StampRow, useIdentityCard, type StampProps } from "@/components/foundation/identity/identity-card";
+import { IdentityCard, IdentityField, StampRow, useIdentityCard, type StampProps } from "@/components/foundation/identity/identity-card";
 import { Page, PageHeader } from "@/components/foundation/layout/layout";
 import { useTheme } from "@/components/foundation/theme/use-theme";
-import { api } from "@/lib/api/endpoints";
 import type { Me, MyApp } from "@/lib/api/types";
 import { useRegisterCommands } from "@/lib/commands";
-import { formatDate, formatPhone, formatRelative, kindNoun, plural } from "@/lib/format";
+import { formatDate, formatPhone, kindNoun } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useRemovePhoto, useUpdateProfile, useUploadPhoto } from "@/lib/query/account";
 import { useMe } from "@/lib/query/session";
-import { timezoneLabel, utcOffset } from "@/lib/timezones";
-import { appLogo, asCarbon, asSilicon, describeError, readableTimes, reasonError, stkRotatedAt, useNow } from "../parts/common";
-import { DobEditor, TimezoneEditor } from "../parts/detail-editors";
+import { AttentionStrip } from "../attention/attention-strip";
+import { appLogo, asCarbon, asSilicon, describeError, reasonError, stkRotatedAt } from "../parts/common";
+import { DobEditor } from "../parts/detail-editors";
 import { IdChangeForm } from "../parts/id-change-form";
 import { PhotoControl } from "../parts/photo-control";
-import { useChangeOwnId, useEveryApp, useEveryCustodianRequest } from "../parts/queries";
-import partStyles from "../parts/parts.module.css";
+import { useChangeOwnId, useEveryApp } from "../parts/queries";
 import styles from "./identity.module.css";
 
 const RESERVED_DAYS = 10;
@@ -71,7 +72,7 @@ export function Identity() {
   const account = me.data;
   return (
     <Page>
-      <PageHeader title="Your identity" description="One account for every app you use. Apps keep your uuid; your id is yours to change." />
+      <PageHeader title="Your identity" description="One account for every app you use. Your id is yours to change." />
       {me.error && !account ? (
         <Alert tone="danger" title="Your account did not load">
           {describeError(me.error)}
@@ -80,6 +81,8 @@ export function Identity() {
       ) : !account ? (
         <LayoutSkeleton />
       ) : (
+        <>
+        <AttentionStrip me={account} />
         <div className={styles.layout}>
           <IdentityCard
             label={`Identity card of ${account.id ?? account.display_name}`}
@@ -122,6 +125,7 @@ export function Identity() {
             </DialogContent>
           </Dialog>
         </div>
+        </>
       )}
     </Page>
   );
@@ -173,7 +177,8 @@ function Front({ me, stamps, appsLoading, appsFailed, onRetryApps, reserved, onC
           <InlineEdit as="h2" variant="title" className={styles.name} label="Display name" value={me.display_name} onSave={saveName} validate={validateName} />
           <div className={styles.badges}>
             <Badge size="sm" tone={me.status === "active" ? "success" : "warning"}>{kindNoun(me.kind)}</Badge>
-            <span className={styles.since}>since {formatDate(me.created_at)}</span>
+            {/* A Carbon's account age; for a Silicon the plain fact, its creation date (it has no birthday of its own). */}
+            <span className={styles.since}>{me.kind === "silicon" ? "Created" : "Member since"} {formatDate(me.created_at)}</span>
           </div>
         </div>
       </div>
@@ -183,33 +188,19 @@ function Front({ me, stamps, appsLoading, appsFailed, onRetryApps, reserved, onC
             {/* A very long id fades out at the edge instead of running under the next field; the title has it all. */}
             <span className={styles.idValue} title={id || undefined}><TextMorph className={styles.idMorph}>{id || "No id yet"}</TextMorph></span>
           </IdentityField>
-          <button data-sq="surface" type="button" className={partStyles.textAction} onClick={onChangeId}>Change id</button>
+          <Button variant="ghost" size="sm" className={styles.fieldAction} onClick={onChangeId}>Change id</Button>
           {reserved ? <span className={styles.fieldNote}><span className="mono">{reserved.id}</span> is reserved for you until {formatDate(reserved.until)}.</span> : null}
-        </div>
-        <div className={styles.field}>
-          <IdentityField label="uuid" value={me.uuid} mono copyLabel="Copy uuid" />
-          <span className={styles.fieldNote}>Never changes. Apps know you by it.</span>
-        </div>
-        <div className={styles.field}>
-          <IdentityField label="Local time" value={me.timezone}>
-            {/* The zone under the time wraps on narrow cards, but never inside its offset. */}
-            <span className={styles.clock}>
-              <LiveClock timeZone={me.timezone} showZone={false} />
-              <span className={styles.zone}>{timezoneLabel(me.timezone)} · <span className={styles.offset}>UTC{utcOffset(me.timezone)}</span></span>
-            </span>
-          </IdentityField>
-          <TimezoneEditor value={me.timezone} onSave={timezone => update.mutateAsync({ timezone })} />
         </div>
       </div>
       <div className={styles.foot}>
         {appsFailed ? (
           <span className={styles.stampsError} role="alert">
             <span>Your apps did not load, so their stamps are missing.</span>
-            <button data-sq="surface" type="button" className={partStyles.textAction} onClick={onRetryApps}>Try again</button>
+            <Button variant="ghost" size="sm" onClick={onRetryApps}>Try again</Button>
           </span>
         ) : appsLoading ? (
           <span className={styles.stampsSkeleton} aria-hidden="true">
-            {[0, 1, 2, 3].map(index => <SkeletonBlock key={index} width="40px" height="40px" radius="12px" index={index} />)}
+            {[0, 1, 2, 3].map(index => <SkeletonBlock key={index} width="40px" height="40px" radius="var(--radius-overlay)" index={index} />)}
           </span>
         ) : stamps.length ? (
           <StampRow apps={stamps} label="Apps you have signed into" />
@@ -265,15 +256,20 @@ function Back({ me }: { me: Me }) {
             </Row>
           </>
         ) : null}
-        <Row label="Date of birth">
+        {/* A Silicon's date of birth is the day its account was created: say that, not "date of birth". */}
+        <Row label={carbon ? "Date of birth" : "Created"}>
           <span className={styles.valueLine}>
             <span>{formatDate(me.dob)}</span>
             {carbon ? <DobEditor value={me.dob} onSave={dob => update.mutateAsync({ dob })} /> : null}
           </span>
-          {silicon ? <span className={styles.muted}>A Silicon&apos;s date of birth is the day its account was created, so it never changes.</span> : null}
         </Row>
-        <Row label="Timezone">
-          <span>{timezoneLabel(me.timezone)} · <span className={styles.offset}>UTC{utcOffset(me.timezone)}</span></span>
+        <Row label="uuid">
+          {/* For support and for apps: it never changes, but it is not who you are, so it lives on the back. */}
+          <span className={styles.valueLine}>
+            <span className={`mono ${styles.contactText}`}>{me.uuid}</span>
+            <CopyButton value={me.uuid} label="Copy uuid for support" iconOnly variant="plain" />
+          </span>
+          <span className={styles.muted}>Never changes. Apps and support know you by it.</span>
         </Row>
         {silicon ? (
           <>
@@ -297,87 +293,35 @@ function Back({ me }: { me: Me }) {
 /* Beside the card                                                                                                     */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-/** A quiet column beside the card: requests waiting for you, counts that open each section, and recent activity. */
+/**
+ * Beside the card: a metric card per pillar you can open (apps you are signed into, Silicons in your care, your ways in).
+ * Wayfinding only; decisions are made in the attention strip, and the full history is on Activity.
+ */
 function Glance({ me, apps, appsFailed }: { me: Me; apps: MyApp[] | undefined; appsFailed: boolean }) {
-  const now = useNow(30_000);
   const carbon = asCarbon(me);
-  const requests = useEveryCustodianRequest();
-  const recent = useQuery({
-    queryKey: ["me", "history", "recent"],
-    queryFn: () => api.me.history({ limit: 4 }).then(page => page.items),
-  });
-  const waiting = requests.data?.items.length ?? 0;
-  const requestsFailed = !requests.data && !!requests.error;
-  const rows: Array<{ label: string; value: number | undefined; failed?: boolean; href: string }> = [
-    { label: "Apps you are signed into", value: apps?.filter(item => item.status === "active").length, failed: appsFailed, href: paths.apps },
+  const signedInto = apps?.filter(item => item.status === "active").length;
+  const cards: Array<{ label: string; value: number | undefined; context: string; failed?: boolean; href: string }> = [
+    { label: "Apps", value: signedInto, context: "Apps you are signed into", failed: appsFailed, href: paths.apps },
     ...(carbon
       ? [
-        { label: "Silicons in your care", value: carbon.custodian_of, href: paths.silicons },
-        { label: "Emails and phone numbers", value: carbon.emails.length + carbon.phones.length, href: paths.signInMethods },
+        { label: "Silicons", value: carbon.custodian_of, context: "Silicons in your care", href: paths.silicons },
+        { label: "Ways in", value: carbon.emails.length + carbon.phones.length, context: "Emails and phone numbers you sign in with", href: paths.signInMethods },
       ]
       : []),
   ];
   return (
     <aside className={styles.glance} aria-label="At a glance">
-      {carbon && (waiting > 0 || requestsFailed) ? (
-        <Link href={paths.silicons} data-sq="surface" className={styles.waiting}>
-          <Inbox size={20} strokeWidth={1.75} aria-hidden="true" />
-          <span className={styles.waitingText}>
-            {requestsFailed ? (
-              <>
-                <span className={styles.waitingTitle}>Custodian requests did not load</span>
-                <span className={styles.waitingMeta}>A Silicon may be waiting for you. Open the Silicons page to see your requests.</span>
-              </>
-            ) : (
-              <>
-                <span className={styles.waitingTitle}>{plural(waiting, "custodian request")} waiting for you</span>
-                <span className={styles.waitingMeta}>Accept or decline them on the Silicons page.</span>
-              </>
-            )}
-          </span>
-          <ArrowRight className={styles.glanceArrow} size={16} strokeWidth={1.75} aria-hidden="true" />
+      {cards.map((card, index) => (
+        <Link key={card.label} href={card.href} className={styles.glanceLink} aria-label={card.value === undefined ? card.context : `${card.context}: ${card.value}`}>
+          {card.value !== undefined ? (
+            <MetricCard label={card.label} value={card.value} context={card.context} />
+          ) : card.failed ? (
+            <Alert tone="warning" title={`${card.label} did not load`}>Open the page to try again.</Alert>
+          ) : (
+            <SkeletonBlock width="100%" height="128px" radius="var(--radius-container)" index={index} />
+          )}
         </Link>
-      ) : null}
-      <div className={styles.counts}>
-        {rows.map((row, index) => (
-          <Link key={row.label} href={row.href} className={styles.glanceRow}>
-            <span className={styles.glanceValue}>
-              {row.value !== undefined ? <AnimatedCounter value={row.value} />
-                : row.failed ? <><span aria-hidden="true">?</span><span className="sr-only">Did not load.</span></>
-                  : <SkeletonBlock width="2ch" height="28px" radius="6px" index={index} />}
-            </span>
-            <span className={styles.glanceLabel}>
-              {row.label}
-              {row.failed && row.value === undefined ? <span className={styles.glanceFailed}>Did not load. Open the page to try again.</span> : null}
-            </span>
-            <ArrowRight className={styles.glanceArrow} size={16} strokeWidth={1.75} aria-hidden="true" />
-          </Link>
-        ))}
-      </div>
-      <section className={styles.recent} aria-labelledby="identity-recent">
-        <div className={styles.recentHead}>
-          <h2 id="identity-recent" className={styles.recentTitle}>Recent activity</h2>
-          <Link href={paths.activity} className={styles.recentAll}>All activity</Link>
-        </div>
-        {recent.error && !recent.data ? (
-          <p className={styles.muted}>Recent activity did not load. Open Activity to try again.</p>
-        ) : !recent.data ? (
-          <div className={styles.recentList}>
-            {[0, 1, 2].map(index => <SkeletonBlock key={index} width="100%" height="40px" radius="10px" index={index} />)}
-          </div>
-        ) : recent.data.length === 0 ? (
-          <p className={styles.muted}>Nothing yet. Sign-ins and changes to your account show up here.</p>
-        ) : (
-          <ol className={styles.recentList} role="list">
-            {recent.data.slice(0, 4).map(item => (
-              <li key={item.id} className={styles.recentItem}>
-                <span className={styles.recentText}>{readableTimes(item.title)}</span>
-                <time className={styles.recentTime} dateTime={item.at}>{formatRelative(item.at, now)}</time>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+      ))}
     </aside>
   );
 }
@@ -389,9 +333,9 @@ function Glance({ me, apps, appsFailed }: { me: Me; apps: MyApp[] | undefined; a
 function LayoutSkeleton() {
   return (
     <div className={styles.layout} aria-busy="true" aria-label="Loading your identity">
-      <SkeletonBlock width="min(100%, 640px)" height="392px" radius="var(--radius-surface)" />
+      <SkeletonBlock width="min(100%, 640px)" height="392px" radius="var(--radius-overlay)" />
       <div className={styles.glance}>
-        {[0, 1, 2].map(index => <SkeletonBlock key={index} width="100%" height="56px" radius="12px" index={index + 1} />)}
+        {[0, 1, 2].map(index => <SkeletonBlock key={index} width="100%" height="128px" radius="var(--radius-container)" index={index + 1} />)}
       </div>
     </div>
   );

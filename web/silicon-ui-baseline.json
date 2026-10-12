@@ -1,0 +1,127 @@
+{
+  "note": "Raw values that predate the Silicon UI checks. Counts may only go down: fix a file, then run silicon-ui-check --update-baseline.",
+  "files": {
+    "app/status-page.module.css": {
+      "font-size": 1
+    },
+    "components/account/activity/activity.module.css": {
+      "spacing": 1
+    },
+    "components/account/apps/apps.module.css": {
+      "spacing": 7
+    },
+    "components/account/home.module.css": {
+      "spacing": 1
+    },
+    "components/account/parts/parts.module.css": {
+      "spacing": 2
+    },
+    "components/account/parts/photo.module.css": {
+      "spacing": 2
+    },
+    "components/account/proofs/proofs.module.css": {
+      "spacing": 7
+    },
+    "components/account/settings/settings.module.css": {
+      "spacing": 3
+    },
+    "components/account/sign-in-methods/sign-in-methods.module.css": {
+      "spacing": 2
+    },
+    "components/account/silicons/request-deck.module.css": {
+      "spacing": 1
+    },
+    "components/account/silicons/silicon-drawer.module.css": {
+      "spacing": 3
+    },
+    "components/account/silicons/silicons.module.css": {
+      "spacing": 1
+    },
+    "components/auth/device.module.css": {
+      "spacing": 1
+    },
+    "components/auth/embed/embed.module.css": {
+      "spacing": 8,
+      "color": 8,
+      "radius": 1
+    },
+    "components/auth/flow/dob-calendar.module.css": {
+      "spacing": 10
+    },
+    "components/auth/flow/dob-date-picker.module.css": {
+      "spacing": 10
+    },
+    "components/auth/flow/dob-field.module.css": {
+      "spacing": 8
+    },
+    "components/auth/flow/flow.module.css": {
+      "spacing": 14,
+      "color": 2
+    },
+    "components/docs/code-block.module.css": {
+      "spacing": 1,
+      "color": 14
+    },
+    "components/docs/doc-article.module.css": {
+      "spacing": 16,
+      "font-size": 10
+    },
+    "components/docs/docs-frame.module.css": {
+      "spacing": 13,
+      "font-size": 1
+    },
+    "components/docs/docs-nav.module.css": {
+      "spacing": 9,
+      "font-size": 1
+    },
+    "components/docs/docs-search.module.css": {
+      "spacing": 22,
+      "font-size": 2
+    },
+    "components/docs/docs-toc.module.css": {
+      "spacing": 15,
+      "font-size": 1,
+      "radius": 2
+    },
+    "components/docs/prose.module.css": {
+      "font-size": 7,
+      "spacing": 25
+    },
+    "components/foundation/branding/powered-by.module.css": {
+      "spacing": 3,
+      "color": 8,
+      "radius": 1
+    },
+    "components/foundation/identity/identity-card.module.css": {
+      "color": 1,
+      "spacing": 4,
+      "font-size": 1
+    },
+    "components/foundation/layout/layout.module.css": {
+      "spacing": 3,
+      "font-size": 2
+    },
+    "components/foundation/providers.module.css": {
+      "spacing": 1
+    },
+    "components/kitchen/kitchen.module.css": {
+      "spacing": 11,
+      "font-size": 1
+    },
+    "components/silicon-ui/blocks/empty-states/empty-states.module.css": {
+      "spacing": 7
+    },
+    "components/silicon-ui/blocks/sign-in/sign-in.module.css": {
+      "spacing": 5
+    },
+    "components/site/code-block.module.css": {
+      "spacing": 1,
+      "font-size": 2,
+      "color": 7
+    },
+    "components/site/site.module.css": {
+      "spacing": 10,
+      "font-size": 2
+    }
+  }
+}

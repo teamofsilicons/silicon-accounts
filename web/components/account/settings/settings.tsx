@@ -1,18 +1,19 @@
 "use client";
 
 /**
- * /settings: every browser and terminal signed in to this account (sign any of them out), signing out here, and deleting the account. A Carbon who is custodian of a
+ * /settings: your local time (the timezone every date on the site is shown in), every browser and terminal signed in
+ * to this account (sign any of them out), signing out here, and deleting the account. A Carbon who is custodian of a
  * Silicon cannot delete their account until every Silicon has another custodian or is deleted, because a Silicon
  * always has exactly one.
  */
 import { useState } from "react";
-import { ArrowRight, Code, Monitor, Smartphone, SquareTerminal, Trash2 } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { Avatar } from "@/components/silicon-ui/avatar/avatar";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
-import { HoldToConfirm } from "@/components/silicon-ui/hold-to-confirm/hold-to-confirm";
+import { ArrowRight, Clock, Code, Monitor, Smartphone, SquareTerminal, Trash2 } from "lucide-react";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { ConfirmMorph } from "@teamofsilicons/silicon-ui/confirm-morph";
+import { HoldToConfirm } from "@teamofsilicons/silicon-ui/hold-to-confirm";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader, Section } from "@/components/foundation/layout/layout";
@@ -22,10 +23,12 @@ import type { AccountSummary, SessionInfo } from "@/lib/api/types";
 import { formatDate, formatRelative, plural } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { notifyError } from "@/lib/notify";
-import { useDeleteAccount } from "@/lib/query/account";
+import { useDeleteAccount, useUpdateProfile } from "@/lib/query/account";
 import { useMe, useSignOut } from "@/lib/query/session";
+import { timezoneLabel, utcOffset } from "@/lib/timezones";
 import { AnimatedRows } from "../parts/animated-rows";
 import { asCarbon, asSilicon, describeError, useNow } from "../parts/common";
+import { TimezoneEditor } from "../parts/detail-editors";
 import { focusAfterRemoval, pageMain } from "../parts/focus";
 import { useEverySession, useEverySilicon, useSetMeView, useSignOutSession } from "../parts/queries";
 import styles from "./settings.module.css";
@@ -63,6 +66,7 @@ export function Settings() {
   const sessions = useEverySession();
   const { signOut, pending: signingOut } = useSignOut();
   const revoke = useSignOutSession();
+  const updateProfile = useUpdateProfile();
 
   /**
    * Signs this browser out: the session ends on the server first, then the site starts afresh at the landing page with
@@ -88,8 +92,26 @@ export function Settings() {
 
   return (
     <Page width="narrow">
-      <PageHeader title="Settings" description="Where you are signed in, and your account." />
+      <PageHeader title="Settings" description="Your local time, where you are signed in, and your account." />
 
+      <Section title="Local time" description="Dates and times on this site, such as your activity, are shown in this timezone.">
+        {me.data ? (
+          <div data-sq="surface" className={styles.group}>
+            <div className={styles.row}>
+              <div className={styles.rowMain}>
+                <Clock size={20} strokeWidth={1.75} aria-hidden="true" />
+                <span className={styles.rowText}>
+                  <span className={styles.rowTitle}>{timezoneLabel(me.data.timezone)}</span>
+                  <span className={styles.rowMeta}>UTC{utcOffset(me.data.timezone)} · {me.data.timezone}</span>
+                </span>
+              </div>
+              <TimezoneEditor value={me.data.timezone} onSave={timezone => updateProfile.mutateAsync({ timezone })} />
+            </div>
+          </div>
+        ) : me.error ? null : (
+          <SkeletonBlock width="100%" height="72px" radius="var(--radius-container)" />
+        )}
+      </Section>
 
       <Section title="Where you are signed in" description="Browsers, terminals and the developer platform signed in to Silicon Accounts. Signing one out ends that session at once; apps you signed into keep their own sessions.">
         {sessions.error && !sessions.data ? (

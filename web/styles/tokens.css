@@ -1,5 +1,5 @@
 /*
- * The Silicon look, mapped onto Silicon UI's semantic tokens (components/silicon-ui/foundation.css, imported first): the
+ * The Silicon look, mapped onto Silicon UI's semantic tokens (@teamofsilicons/silicon-ui/styles.css, imported first): the
  * look of Silicon Writings (writings.teamofsilicons.com), teamofsilicons.com and the Silicon Apps store. Warm paper,
  * near-black ink, one calm blue, Hedvig Letters Serif for titles, BDO Grotesk for everything you read and press, and
  * Geist Pixel Square for small labels.
@@ -151,4 +151,10 @@
   --space-4: var(--space-inset); --space-5: var(--space-comfort); --space-6: 1.5rem;
   --space-8: 2rem; --space-10: 2.5rem; --space-12: 3rem; --space-16: 4rem; --space-20: 5rem; --space-24: 6rem;
   --radius-panel: 14px; --radius-surface: 18px; --radius-pill: 9999px;
+}
+
+/* Profile pictures are 30% squircles, like the store's (Silicon UI draws circles by default). */
+:root {
+  --avatar-radius: 30%;
+  --avatar-corner-shape: squircle;
 }

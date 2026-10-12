@@ -613,8 +613,47 @@ and the request fails against the plain HTTP listener. `pnpm build && pnpm test:
 entry point with those headers and checks the landing, the agent files and `/sign-in` (and that neither page registers
 tools in the browser).
 
-## Silicon UI registry (2026-10-10)
+## Silicon UI (2026-10-12)
 
-Components and their CSS now come from https://ui.teamofsilicons.com/r/{name}.json, with `silicon-foundation` imported once at the root. `components/silicon-ui/registry-manifest.json` records every upstream source checksum. The registry supplies native squircle geometry, semantic spacing and visible keyboard focus. Application tokens retain the configured brand colors. Local adaptations retain dialog focus return and nested Escape priority, combobox keyboard behavior, whole international phone-number entry, and timeline pagination announcements; they live beside the registry source and must survive future updates. Existing custom application surfaces retain their squircle fallback. Historical Arc notes above describe these original application adaptations.
+Components come from npm: `@teamofsilicons/silicon-ui` (imports like `@teamofsilicons/silicon-ui/button`), with its
+tokens loaded once in `app/layout.tsx` (`@teamofsilicons/silicon-ui/styles.css`) before `styles/tokens.css`. The 62
+copied component folders that used to live in `components/silicon-ui/` are gone; only the two copied **blocks**
+(`components/silicon-ui/blocks/`) remain, built from package components. The design system's rules and guardrails are
+documented in the library: https://github.com/teamofsilicons/silicon-ui/tree/main/docs.
 
-Silicon UI local keyboard fix: ConfirmMorph preserves its pointer re-arming delay, but a separate keyboard activation can confirm immediately. This retains the established revocation flow and is covered by the developer app-verification keyboard regression. Hosted branding also maps round/sharp/squircle corners to Silicon UI tokens and keeps soft/outline primary actions.
+- **The local edits went upstream.** Every behaviour and accessibility fix listed in "Local edits" above (focus return
+  and Escape order in layers, the combobox pattern, whole phone numbers, timeline announcements, keyboard confirm,
+  user-menu labels) is now in the library. The look is set through tokens in `styles/tokens.css`: `--primary` (brand
+  blue), `--avatar-radius: 30%` and `--avatar-corner-shape: squircle`. Hosted branding's soft and outline primary
+  buttons still key off `data-variant`, which Button and ActionButton expose.
+- **Links that look like buttons** are the library's `ButtonLink`. `components/foundation/button-link.tsx` wraps it with
+  `next/link` (and `external`); `components/site/action.tsx` is the same component for the server-rendered public pages.
+- **One exception:** the date of birth field (`components/auth/flow/dob-field.tsx`) keeps a marked local copy of the
+  date picker's and calendar's styles (`dob-*.module.css`) until Silicon UI's DatePicker has a year view. Do not copy
+  library CSS anywhere else.
+- **Guardrails.** `pnpm lint` runs ESLint with `@teamofsilicons/silicon-ui/eslint` (no raw `<button>`, `<input>`,
+  `<select>`, `<textarea>`, `<dialog>`, no borrowed component CSS) and `silicon-ui-check` (no raw spacing, radius,
+  colour or font size in CSS modules). Older code is tolerated by `eslint-suppressions.json` and
+  `silicon-ui-baseline.json`; both may only shrink (`eslint . --prune-suppressions`, `silicon-ui-check --update-baseline`).
+  A redesigned file leaves both. The repository's `.claude/settings.json` runs the same checks after every Claude Code
+  edit, so an agent fixes drift before moving on. Agent rules: `AGENTS.md`, "Silicon UI".
+
+### The account home and navigation (2026-10-12)
+
+Per "Silicon Accounts Redesign Design Review" (repository root):
+
+- **Four pillars** in the dock (`lib/navigation.ts` SECTIONS): Identity `/`, Security `/sign-in-methods`, Access
+  `/apps`, Custodianship `/silicons`. URLs did not change. `/activity` belongs to Security and `/proofs` to Access
+  (`includes`), reached from ⌘K (MORE_DESTINATIONS) and links. Nothing in the dock leaves the site.
+- **Top bar**: brand, ⌘K search, Developers and Docs (marked as leaving), and the account menu (Settings, sign out;
+  on phones also Developers and Docs).
+- **Attention strip** (`components/account/attention/`): at the top of `/`, only when something needs a decision.
+  Custodian requests are answered there with the request deck; the Silicons page now points to it. Account-verification
+  requests belong in it too, but the web API does not list them for the signed-in account yet.
+- **Identity card**: the front is photo, name, id (with Change id and the 10-day reservation), "Member since" (a
+  Silicon: "Created") and the app stamps. The uuid moved to the back as a copy-for-support row; a Silicon's date of
+  birth reads "Created"; the timezone moved to Settings ("Local time").
+- **Beside the card**: metric cards for apps, Silicons in your care and ways in, each a link into its pillar. Recent
+  activity is on Activity.
+- The public landing page keeps its design on tokens; the copy-button script island is gone (the code blocks use
+  Silicon UI's CopyButton).

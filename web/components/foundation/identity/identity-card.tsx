@@ -15,9 +15,9 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { animate, useReducedMotion, type AnimationPlaybackControls } from "motion/react";
-import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
-import { SlotText } from "@/components/silicon-ui/slot-text/slot-text";
-import { Tooltip } from "@/components/silicon-ui/tooltip/tooltip";
+import { CopyButton } from "@teamofsilicons/silicon-ui/copy-button";
+import { SlotText } from "@teamofsilicons/silicon-ui/slot-text";
+import { Tooltip } from "@teamofsilicons/silicon-ui/tooltip";
 import { formatTime } from "@/lib/format";
 import { timezoneLabel, utcOffset } from "@/lib/timezones";
 import styles from "./identity-card.module.css";

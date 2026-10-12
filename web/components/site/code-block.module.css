@@ -33,12 +33,6 @@
 .language::before { content: "·"; margin-right: var(--space-2); color: var(--border-strong); }
 .languageOnly, .language { flex: none; color: var(--text-muted); font-family: var(--font-pixel); font-size: .6875rem; letter-spacing: .02em; }
 .copy { flex: none; }
-/* The copy button's two icons share one cell; the island sets data-state="copied" for a moment after a copy. */
-.copyIcon { display: grid; width: 16px; height: 16px; place-items: center; }
-.copyIcon > svg { grid-area: 1 / 1; transition: opacity var(--duration-fast) var(--ease-standard), transform var(--duration-spring) var(--ease-spring); }
-.copyIcon > [data-icon="copied"] { color: var(--success); opacity: 0; transform: scale(.6); }
-.copy[data-state="copied"] [data-icon="idle"] { opacity: 0; transform: scale(.6); }
-.copy[data-state="copied"] [data-icon="copied"] { opacity: 1; transform: none; }
 
 .pre {
   margin: 0;
@@ -102,4 +96,4 @@
   .pre { padding: var(--space-3) var(--space-4); }
   .header { padding-left: var(--space-3); }
 }
-@media (prefers-reduced-motion: reduce) { .expand, .chevron, .copyIcon > svg { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .expand, .chevron { transition: none; } }

@@ -11,12 +11,12 @@
  */
 import { memo, useCallback, useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
-import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
-import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { ConfirmMorph } from "@teamofsilicons/silicon-ui/confirm-morph";
+import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
+import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader } from "@/components/foundation/layout/layout";
 import type { MyProof } from "@/lib/api/types";
