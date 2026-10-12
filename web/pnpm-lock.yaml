@@ -57,8 +57,8 @@ importers:
         specifier: 5.104.1
         version: 5.104.1(react@19.2.8)
       '@teamofsilicons/silicon-ui':
-        specifier: file:/Users/anil/Documents/silicon-ui-package/dist/teamofsilicons-silicon-ui-0.2.0.tgz
-        version: file:../../silicon-ui-package/dist/teamofsilicons-silicon-ui-0.2.0.tgz(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(eslint@9.39.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: ^0.2.0
+        version: 0.2.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(eslint@9.39.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       lucide-react:
         specifier: 1.52.0
         version: 1.52.0(@types/react@19.3.0)(react@19.2.8)
@@ -1123,9 +1123,8 @@ packages:
     peerDependencies:
       react: ^18 || ^19
 
-  '@teamofsilicons/silicon-ui@file:../../silicon-ui-package/dist/teamofsilicons-silicon-ui-0.2.0.tgz':
-    resolution: {integrity: sha512-4ShkcwlOtzkdkYRUkEKA53j1zvoT0oeq2VgcU8Zfbj7luKW3j46jyQvN34eEmjPe8ZeZN6yWm5UXSwBFaEgYqA==, tarball: file:../../silicon-ui-package/dist/teamofsilicons-silicon-ui-0.2.0.tgz}
-    version: 0.2.0
+  '@teamofsilicons/silicon-ui@0.2.0':
+    resolution: {integrity: sha512-4ShkcwlOtzkdkYRUkEKA53j1zvoT0oeq2VgcU8Zfbj7luKW3j46jyQvN34eEmjPe8ZeZN6yWm5UXSwBFaEgYqA==}
     hasBin: true
     peerDependencies:
       eslint: '>=9'
@@ -3574,7 +3573,7 @@ snapshots:
       '@tanstack/query-core': 5.104.1
       react: 19.2.8
 
-  '@teamofsilicons/silicon-ui@file:../../silicon-ui-package/dist/teamofsilicons-silicon-ui-0.2.0.tgz(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(eslint@9.39.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@teamofsilicons/silicon-ui@0.2.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(eslint@9.39.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@radix-ui/react-accordion': 1.2.21(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-checkbox': 1.3.12(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
