@@ -1,10 +1,12 @@
 /**
  * Renders the site's brand files into public/ from the sources here, with Playwright's Chromium:
  *   og.html          → public/og.png (1200 by 630, the social image every page shares)
- *   icon.svg         → public/icon-192.png, icon-512.png and favicon.ico (16, 32 and 48 px)
+ *   favicon.svg      → public/icon.svg and favicon.ico (16, 32 and 48 px): the browser-tab icon
+ *   icon.svg         → public/icon-192.png and icon-512.png (the mark on its cream tile, for installs)
  *   maskable.svg     → public/icon-maskable-512.png (full bleed, for the web manifest)
  *   apple.svg        → public/apple-touch-icon.png (180 px)
- * public/icon.svg is icon.svg as is. Run it after changing any source: node scripts/brand/render.mjs
+ * public/icon.svg is favicon.svg as is: the mark alone, as the site's header draws it (#1E1E1C, cream #EDE8E0 when the
+ * browser is dark), with no tile. Run it after changing any source: node scripts/brand/render.mjs
  */
 import { readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -33,12 +35,12 @@ writeFileSync(join(out, "icon-192.png"), await render("icon.svg", 192));
 writeFileSync(join(out, "icon-512.png"), await render("icon.svg", 512));
 writeFileSync(join(out, "icon-maskable-512.png"), await render("maskable.svg", 512));
 writeFileSync(join(out, "apple-touch-icon.png"), await render("apple.svg", 180));
-copyFileSync(join(here, "icon.svg"), join(out, "icon.svg"));
+copyFileSync(join(here, "favicon.svg"), join(out, "icon.svg"));
 
 // favicon.ico: PNG images in an ICO container (a 6-byte header, one 16-byte entry per image, then the images).
 const sizes = [16, 32, 48];
 const images = [];
-for (const size of sizes) images.push(await render("icon.svg", size));
+for (const size of sizes) images.push(await render("favicon.svg", size));
 const header = Buffer.alloc(6);
 header.writeUInt16LE(1, 2);
 header.writeUInt16LE(sizes.length, 4);
