@@ -1,5 +1,8 @@
 /** Publishing-only paths. Store browsing, reviews, installation and account settings stay outside this proxy. */
-const APP = "[a-z0-9_-]{3,30}";
+// An existing app's id is 1 to 30 characters: new ids are 3 to 30, but Silicon Apps keeps the historical 1–2
+// character Accounts ids it was configured with (APPS_HISTORICAL_APP_IDS, such as `dm`), and Silicon Apps itself
+// decides which ids exist and who may see them. Creating an app still goes through `apps` (POST) with its own checks.
+const APP = "[a-z0-9_-]{1,30}";
 const RESOURCE = "[A-Za-z0-9_-]+";
 const routes: [string, RegExp][] = [
   ["GET HEAD", /^me$/],
