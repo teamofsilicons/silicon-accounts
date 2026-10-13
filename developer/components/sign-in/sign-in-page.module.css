@@ -4,7 +4,7 @@
 .brand { display: inline-flex; width: fit-content; align-items: center; gap: 10px; color: var(--foreground); font-family: var(--font-pixel); font-size: 1.0625rem; letter-spacing: 0; text-decoration: none; }
 .brand:hover { color: var(--foreground); }
 .mark { display: grid; height: 22px; flex: none; place-items: center; color: var(--foreground); }
-.mark svg { width: auto; height: 14px; }
+.mark svg { width: auto; height: 22px; }
 .card { --sq-r: var(--radius-surface); --sq-fill: var(--surface); --sq-stroke: var(--border); position: relative; display: grid; gap: var(--space-5); padding: var(--space-8); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
 @media (max-width: 480px) { .card { padding: var(--space-6); } }
 .title { margin: 0; color: var(--accent-ink); font-family: var(--font-serif); font-size: clamp(2.125rem, 7vw, 2.625rem); font-weight: 400; letter-spacing: -.01em; line-height: 1.2; text-wrap: balance; }

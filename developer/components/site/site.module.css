@@ -46,7 +46,7 @@
 .brand:hover { color: var(--foreground); }
 .brand:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
 .brandMark { display: grid; height: 22px; flex: none; place-items: center; color: var(--foreground); }
-.brandMark svg { width: auto; height: 14px; }
+.brandMark svg { width: auto; height: 22px; }
 .brandText { white-space: nowrap; }
 
 /* The navigation: one pill, as on teamofsilicons.com. ul.navList outranks base.css's ul[role="list"] padding reset,
