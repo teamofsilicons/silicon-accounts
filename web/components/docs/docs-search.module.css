@@ -46,10 +46,10 @@
   .triggerKey { display: none; }
 }
 
-.overlay { position: fixed; inset: 0; z-index: 70; background: var(--overlay); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.overlay { position: fixed; inset: 0; z-index: var(--layer-overlay); background: var(--overlay); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .overlay[data-state="open"] { animation: fade-in var(--duration-standard) var(--ease-enter) both; }
 .overlay[data-state="closed"] { animation: fade-out var(--duration-fast) var(--ease-standard) both; }
-.positioner { position: fixed; inset: 0; z-index: 71; display: flex; justify-content: center; padding: min(12vh, 110px) var(--space-4) var(--space-4); pointer-events: none; }
+.positioner { position: fixed; inset: 0; z-index: var(--layer-dialog); display: flex; justify-content: center; padding: min(12vh, 110px) var(--space-4) var(--space-4); pointer-events: none; }
 
 .panel {
   --sq-r: var(--radius-panel);

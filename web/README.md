@@ -657,3 +657,16 @@ Per "Silicon Accounts Redesign Design Review" (repository root):
   activity is on Activity.
 - The public landing page keeps its design on tokens; the copy-button script island is gone (the code blocks use
   Silicon UI's CopyButton).
+
+### Silicon UI 0.3, Hanken and the Security pillar (2026-10-17)
+
+Working notes are in `redesign/` (priorities, decisions, log).
+
+- **Silicon UI 0.3.0** from npm. Its z-index rule moved every raw stacking value onto layer tokens: the top bar, the
+  dock and the docs and site headers on `--layer-sticky`; ⌘K and docs search on `--layer-overlay`/`--layer-dialog`.
+- **Type and colour** (`styles/tokens.css`, `app/fonts.ts`): the text face is Silicon UI's Hanken Grotesk, loaded
+  with `next/font` as `--font-hanken-grotesk`; the accent is neutral, the page's own warm ink (paper in dark). Paper
+  colours, Hedvig Letters Serif titles and Geist Pixel labels are unchanged; so is hosted sign-in branding.
+- **Security** (`/sign-in-methods`, title "Security"): emails, phone numbers, Google and Apple, then "Where you are
+  signed in" (moved from Settings: `components/account/security/sessions.tsx`) and a way to Activity. Settings keeps
+  Local time and Delete account.

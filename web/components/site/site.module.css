@@ -7,7 +7,7 @@
 .header {
   position: sticky;
   top: 0;
-  z-index: 40;
+  z-index: var(--layer-sticky);
   background: color-mix(in oklab, var(--background) 82%, transparent);
   -webkit-backdrop-filter: saturate(1.4) blur(14px);
   backdrop-filter: saturate(1.4) blur(14px);

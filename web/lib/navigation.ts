@@ -74,7 +74,7 @@ export interface Section {
 
 export const SECTIONS: readonly Section[] = [
   { key: "identity", label: "Identity", description: "Your card: name, id, photo and details", href: paths.home, icon: IdCard, shortcut: "1" },
-  { key: "security", label: "Security", description: "Your ways in: emails, phone numbers and Google or Apple", href: paths.signInMethods, icon: KeyRound, shortcut: "2", includes: [paths.activity] },
+  { key: "security", label: "Security", description: "Your ways in, where you are signed in, and activity", href: paths.signInMethods, icon: KeyRound, shortcut: "2", includes: [paths.activity] },
   { key: "access", label: "Access", description: "Apps you signed into, what they can see, and apps acting for you", href: paths.apps, icon: LayoutGrid, shortcut: "3", includes: [paths.proofs] },
   { key: "custodianship", label: "Custodianship", description: "Silicons you are custodian of", href: paths.silicons, icon: Cpu, shortcut: "4" },
 ];

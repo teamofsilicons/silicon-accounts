@@ -1,8 +1,9 @@
 /*
  * The Silicon look, mapped onto Silicon UI's semantic tokens (@teamofsilicons/silicon-ui/styles.css, imported first): the
- * look of Silicon Writings (writings.teamofsilicons.com), teamofsilicons.com and the Silicon Apps store. Warm paper,
- * near-black ink, one calm blue, Hedvig Letters Serif for titles, BDO Grotesk for everything you read and press, and
- * Geist Pixel Square for small labels.
+ * look of Silicon Writings (writings.teamofsilicons.com), teamofsilicons.com and the Silicon Apps store: warm paper,
+ * near-black ink, Hedvig Letters Serif for titles and Geist Pixel Square for small labels. Two choices differ from
+ * Writings since 2026-10-17 (web/redesign/decisions.md): the text face is Silicon UI's Hanken Grotesk (--font-body
+ * from the library, not set here), and the accent is neutral, the page's own ink, instead of the calm blue.
  *
  * The account site is light only: lib/theme.ts pins <html data-theme="light">. The dark block below is kept for app
  * branding that forces dark on an app's own hosted sign-in pages or embedded buttons (lib/branding/apply.ts sets
@@ -11,8 +12,8 @@
  * Contrast (WCAG 2.2): every text token clears 4.5:1 on --background, --surface and --surface-muted in its mode. The
  * lowest pairs are light --text-muted #6B675F (5.0:1 on --surface-muted) and dark --text-muted #9A958A (5.6:1).
  * --text-faint is for decoration only (rules, separators), never for text.
- *   --accent-ink   accent-coloured text. #1F5CB1 on the dark page is 2.9:1, so dark uses a lighter blue.
- *   --primary*     the filled button: the calm blue under white text (6.4:1) in light, paper on ink in dark.
+ *   --accent-ink   accent-coloured text: the ink itself (neutral), paper in dark.
+ *   --primary*     the filled button: ink under paper text in light, paper under ink in dark.
  */
 :root, [data-theme="light"] {
   color-scheme: light;
@@ -31,18 +32,19 @@
   --border-subtle: #EFEBE2;
   --border-strong: #D6D0C1;
 
-  --accent: #1F5CB1;
-  --accent-strong: #184A94;
-  --accent-subtle: rgb(31 92 177 / .09);
-  --accent-foreground: #FFFFFF;
-  --accent-ink: #1F5CB1;
+  /* Neutral accent: the page's own ink, so links, focus and filled controls read in the same warm black as the text. */
+  --accent: #1E1E1C;
+  --accent-strong: #0F0F0E;
+  --accent-subtle: rgb(30 30 28 / .07);
+  --accent-foreground: #FFFDF9;
+  --accent-ink: #1E1E1C;
 
-  --primary: #1F5CB1;
-  --primary-hover: #1A4F99;
-  --primary-pressed: #164383;
-  --primary-foreground: #FFFFFF;
+  --primary: #1E1E1C;
+  --primary-hover: #33322F;
+  --primary-pressed: #0F0F0E;
+  --primary-foreground: #FFFDF9;
 
-  --control-on: #1F5CB1;
+  --control-on: #1E1E1C;
   --control-glyph: #FFFFFF;
   --control-track: #E5E0D5;
   --control-track-hover: #DAD4C7;
@@ -66,9 +68,9 @@
 
   --series-1: #1F5CB1; --series-2: #7A4FC4; --series-3: #B7791F; --series-4: #2B7148;
 
-  /* Type. BDO Grotesk is the text and interface face, Hedvig Letters Serif the title face (one weight: never bold it),
-     Geist Pixel Square the face of small labels, dates and ids. All three are self-hosted (styles/fonts.css). */
-  --font-body: "BDO Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Type. --font-body is Silicon UI's (Hanken Grotesk, loaded by app/fonts.ts) and also serves display text here;
+     Hedvig Letters Serif is the title face (one weight: never bold it), Geist Pixel Square the face of small labels,
+     dates and ids (styles/fonts.css). */
   --font-display: var(--font-body);
   --font-serif: "Hedvig Letters Serif", "Iowan Old Style", Georgia, serif;
   --font-pixel: "Geist Pixel Square", ui-monospace, "SF Mono", Menlo, monospace;
@@ -108,18 +110,18 @@
   --border-subtle: #24221E;
   --border-strong: #423E36;
 
-  --accent: #86AEEA;
-  --accent-strong: #B4CDF4;
-  --accent-subtle: rgb(134 174 234 / .13);
+  --accent: #EDE9E0;
+  --accent-strong: #FFFDF9;
+  --accent-subtle: rgb(237 233 224 / .13);
   --accent-foreground: #151412;
-  --accent-ink: #8FB5EE;
+  --accent-ink: #EDE9E0;
 
   --primary: #EDE9E0;
   --primary-hover: #FFFDF9;
   --primary-pressed: #D9D4C9;
   --primary-foreground: #151412;
 
-  --control-on: #86AEEA;
+  --control-on: #EDE9E0;
   --control-glyph: #151412;
   --control-track: #3A362F;
   --control-track-hover: #45403A;

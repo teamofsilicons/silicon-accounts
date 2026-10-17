@@ -6,7 +6,7 @@
   --sq-fill: color-mix(in oklab, var(--surface-raised) 90%, transparent);
   --sq-stroke: var(--border);
   position: fixed;
-  z-index: 40;
+  z-index: var(--layer-sticky);
   bottom: calc(var(--space-inset) + env(safe-area-inset-bottom, 0px));
   left: 50%;
   display: none;
@@ -78,7 +78,7 @@
   --sq-fill: color-mix(in oklab, var(--surface-raised) 92%, transparent);
   --sq-stroke: var(--border);
   position: fixed;
-  z-index: 40;
+  z-index: var(--layer-sticky);
   right: max(var(--space-group), env(safe-area-inset-right, 0px));
   bottom: calc(var(--space-group) + env(safe-area-inset-bottom, 0px));
   left: max(var(--space-group), env(safe-area-inset-left, 0px));

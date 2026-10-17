@@ -64,8 +64,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <>
             <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
             {/* Every face the first paint uses, fetched with the page so text never paints in a fallback first (styles/fonts.css). */}
-            <link rel="preload" href="/fonts/bdo-grotesk/BDOGrotesk-Regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-            <link rel="preload" href="/fonts/bdo-grotesk/BDOGrotesk-Medium.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
             <link rel="preload" href="/fonts/hedvig-letters-serif/HedvigLettersSerif-Regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
             <link rel="preload" href="/fonts/geist-pixel/GeistPixel-Square.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
           </>

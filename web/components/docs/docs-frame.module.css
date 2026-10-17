@@ -13,7 +13,7 @@
 .top {
   position: sticky;
   top: 0;
-  z-index: 40;
+  z-index: var(--layer-sticky);
   height: var(--docs-top);
   border-bottom: 1px solid var(--border-subtle);
   background: color-mix(in oklab, var(--background) 86%, transparent);

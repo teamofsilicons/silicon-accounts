@@ -47,7 +47,7 @@
     "@radix-ui/react-tabs": "1.1.22",
     "@radix-ui/react-tooltip": "1.3.0",
     "@tanstack/react-query": "5.104.1",
-    "@teamofsilicons/silicon-ui": "^0.2.0",
+    "@teamofsilicons/silicon-ui": "^0.3.0",
     "lucide-react": "1.52.0",
     "motion": "14.0.0",
     "next": "16.3.8",

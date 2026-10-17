@@ -373,7 +373,7 @@ const checks: Check[] = [
         const hits = words.split("\n").filter(line => people.test(line));
         if (hits.length) found.push(`${where}: ${hits.map(line => JSON.stringify(line.trim().slice(0, 120))).join(", ")}`);
       };
-      for (const [url, title] of [["/", "Your identity"], ["/sign-in-methods", "Sign-in methods"], ["/apps", "Apps you have signed into"], ["/proofs", "Proofs about you"], ["/silicons", "Silicons in your care"], ["/activity", "Activity"], ["/settings", "Settings"]] as const) {
+      for (const [url, title] of [["/", "Your identity"], ["/sign-in-methods", "Security"], ["/apps", "Apps you have signed into"], ["/proofs", "Proofs about you"], ["/silicons", "Silicons in your care"], ["/activity", "Activity"], ["/settings", "Settings"]] as const) {
         await visit(page, `${env.base}${url}`, title);
         await look(url);
       }

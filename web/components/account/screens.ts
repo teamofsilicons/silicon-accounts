@@ -138,7 +138,8 @@ const shown: ScreenSpec[] = [
 
   // Settings: sessions, and deleting blocked by the Silicons in your care; then free to delete.
   { name: "account-settings", path: "/settings" },
-  { name: "account-settings-signout", path: "/settings", prepare: async page => { await page.getByRole("button", { name: "Sign out", exact: true }).nth(1).click(); await wait(page, 600); } },
+  // Sessions are on the Security pillar since 2026-10-17 (components/account/security/sessions.tsx).
+  { name: "account-security-signout", path: "/sign-in-methods", prepare: async page => { await page.getByRole("button", { name: "Sign out", exact: true }).nth(1).click(); await wait(page, 600); } },
   { name: "account-settings-deletable", path: "/settings", routes: [["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, custodian_of: 0 } })]] },
 
   // Long values: a 94-character display name wraps on the card; a 30-character si:id and a long name wrap on a tile.

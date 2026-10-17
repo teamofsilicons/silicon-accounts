@@ -164,7 +164,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
         run: () => void go(destination.href),
       };
     }),
-    { id: "go.settings", label: "Settings", description: "Your local time, where you are signed in, and your account", group: "Go to", icon: <SettingsIcon size={16} strokeWidth={1.75} />, keywords: ["preferences", "delete", "sessions", "timezone", "time zone"], run: () => void go(paths.settings) },
+    { id: "go.settings", label: "Settings", description: "Your local time and your account", group: "Go to", icon: <SettingsIcon size={16} strokeWidth={1.75} />, keywords: ["preferences", "delete", "timezone", "time zone"], run: () => void go(paths.settings) },
     ...ELSEWHERE.map(site => {
       const Icon = site.icon;
       return {
