@@ -10,6 +10,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Silicon Accounts web
 
+**Redesign in progress:** read `redesign/priorities.md` and `redesign/decisions.md` first, and update them and
+`redesign/log.md` before finishing a task.
+
 The account site: Next.js 16 App Router, React 19, TypeScript strict, pnpm, Silicon UI from npm (`@teamofsilicons/silicon-ui`, rules below), TanStack
 Query in `lib/query/`. `README.md` is the guide: topology, who owns which routes, conventions, hooks, squircles,
 branding runtime, SDK, the Arc local-edit log, the style guide and screenshots. Read it before changing anything.

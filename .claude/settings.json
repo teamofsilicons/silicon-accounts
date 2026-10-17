@@ -12,6 +12,16 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && [ -f web/redesign/priorities.md ] && echo \"Account site redesign: current priorities (web/redesign/priorities.md). Read web/redesign/decisions.md too, and update priorities, decisions and log before finishing.\" && echo && cat web/redesign/priorities.md || true"
+          }
+        ]
+      }
     ]
   }
 }
