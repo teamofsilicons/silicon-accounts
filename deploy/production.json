@@ -9,8 +9,8 @@
   "Region": "us-east-2",
   "Stack": "silicon-accounts-production",
   "Runtime": "native-systemd",
-  "SourceRevision": "81c601c1de1d9e40fb10d5d91922fa3942849ea5",
-  "ArchiveSha256": "ca57566ffebdebc1f0df31cbc3362f1c095574a262a40c204bfd2ec96a60f41d",
+  "SourceRevision": "4b45841b784ea9ed8703c7e380e1e5622a5c2e1c",
+  "ArchiveSha256": "a07b407ae485fe12ed9086f527d2909c3ec650bcc6a171bbf288b35729134d0d",
   "DeveloperUrl": "https://developers.teamofsilicons.com",
   "SecretArn": "arn:aws:secretsmanager:us-east-2:234951665042:secret:silicon-accounts/production/runtime-w3R840",
   "MigrationVersion": 20,
@@ -120,5 +120,15 @@
   "StatusPageVerified": true,
   "OpenSourceLicense": "MIT",
   "McpServersRemoved": true,
-  "Telemetry": "none"
+  "Telemetry": "none",
+  "DeveloperSourceRevision": "4b45841b784ea9ed8703c7e380e1e5622a5c2e1c",
+  "DeveloperRequiredReleaseTargets": [
+    "linux-x86_64",
+    "windows-x86_64",
+    "macos-aarch64"
+  ],
+  "RequiredTargetsInstallCommandId": "cbda4b0e-0f17-43d4-828e-6098a06de8e7",
+  "RequiredTargetsVerifiedAt": "2026-10-18T16:18:06.241822+00:00",
+  "RequiredTargetsBackupKey": "backups/predeploy-20261018T161551Z.dump",
+  "RequiredTargetsApiRebuilt": false
 }

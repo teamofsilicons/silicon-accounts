@@ -1,0 +1,41 @@
+{
+  "source_revision": "4b45841b784ea9ed8703c7e380e1e5622a5c2e1c",
+  "archive_sha256": "a07b407ae485fe12ed9086f527d2909c3ec650bcc6a171bbf288b35729134d0d",
+  "archive_version_id": "4gxr6f3ZzrJsdwRMFWSZbPQAB.eOj_3E",
+  "install_command_id": "cbda4b0e-0f17-43d4-828e-6098a06de8e7",
+  "backup": {
+    "key": "backups/predeploy-20261018T161551Z.dump",
+    "sha256": "2501df7bfc58b5ff0bd2db6af02b46a2f807a38bc21d1549c1b52299d1caec5a",
+    "Size": 508774,
+    "VersionId": "YJqt4ux4aij6L9ZBMRGzn.0TSasN0vO0"
+  },
+  "api_binary_sha256": "b2bbc0fa7352127253cbebc35051eebea6445084fe51950792691ca75a8fa2d6",
+  "api_binary_unchanged": true,
+  "migrations_applied": 0,
+  "checks": [
+    "developer typecheck, lint, build passed",
+    "all four production services and backup timer active",
+    "Accounts /readyz returned 200",
+    "public publishing and manifest docs returned 200",
+    "browser rendered all three required release targets",
+    "live publishing chunks match local build byte for byte",
+    "pg_restore --list validates new backup format; no new restore performed"
+  ],
+  "live_guidance": [
+    {
+      "phrase": "Every release requires Linux x86_64",
+      "url": "https://developers.teamofsilicons.com/_next/static/chunks/21qnu1snsynh5.js",
+      "sha256": "72d7562284adc40efaf1d2c09bf2da7dc6b45b68bba82a2cca1f677734a9b601"
+    },
+    {
+      "phrase": "Include validated packages for Linux x86_64",
+      "url": "https://developers.teamofsilicons.com/_next/static/chunks/2d4i13h8em-5e.js",
+      "sha256": "915f7d8a0bfa070a27c39ddfbcb434fa92207672bb5568090d347dc6358a073b"
+    },
+    {
+      "phrase": "Include validated packages for Linux x86_64",
+      "url": "https://developers.teamofsilicons.com/_next/static/chunks/3yz0--6h_q6or.js",
+      "sha256": "fa3cda3a474dd16b006e6f1769b5bacef40cbae92cbe1ac3fecec2ae532120d1"
+    }
+  ]
+}
