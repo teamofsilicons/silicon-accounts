@@ -44,7 +44,7 @@ silicon-apps setup ring access --visibility public
 silicon-apps setup ring show
 ```
 
-You can save a draft before everything is ready. To publish, you need the description and at least one package that passed validation and is part of a release. You can add up to 20 tags.
+You can save a draft before everything is ready. To publish, you need the description and a release containing validated packages for Linux x86_64, Windows x86_64, and macOS Apple Silicon ARM64. You can add up to 20 tags.
 
 Only the app's administrator can switch it between public and private. [Sharing an app and inviting an author](share.md) give people different kinds of access.
 
@@ -120,7 +120,7 @@ You can add more fields to `accounts --json`, but keep `app_id` exact. A shell o
 
 ## Validate and pack
 
-Put your native executable at `package/bin/ring` and create `package/apps.yaml`:
+Place your native executables for all three required targets under `package/bin/` and create `package/apps.yaml`:
 
 ```yaml
 schema_version: 1
@@ -129,10 +129,14 @@ version: 0.1.0
 command: ring
 targets:
   linux-x86_64:
-    binary: bin/ring
+    binary: bin/linux/ring
+  windows-x86_64:
+    binary: bin/windows/ring.exe
+  macos-aarch64:
+    binary: bin/macos/ring
 ```
 
-This example targets Linux x64, so use the target and native binary you actually built. `silicon-apps targets` lists all nine target names and which runners are configured. `silicon-apps capabilities` is the live check: it asks each runner and marks a target's validation `live` only when its worker answers. A worker that's unavailable can't validate an upload. Today the four Linux workers are live (`linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`), so those are the targets you can upload for. Windows and macOS have no worker yet, and an upload for one of their targets is refused until its worker is live.
+This example includes all three required release targets. You can also package and upload each target separately. `silicon-apps targets` lists all nine target names and which runners are configured. `silicon-apps capabilities` is the live check: it asks each runner and marks a target's validation `live` only when its worker answers. A worker that's unavailable can't validate an upload. Today the four Linux workers are live (`linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`), so those are the targets you can upload for. Windows and macOS have no worker yet, and an upload for one of their targets is refused until its worker is live. Ordinary uploads therefore cannot yet satisfy the new release requirement; runner availability remains a separate deployment prerequisite.
 
 ```sh
 silicon-apps validate ./package
@@ -147,12 +151,14 @@ The [manifest reference](../reference/manifest.md) shows how to add more targets
 
 ```sh
 silicon-apps upload ring --target linux-x86_64 ./ring.tar.gz
+silicon-apps upload ring --target windows-x86_64 ./ring.tar.gz
+silicon-apps upload ring --target macos-aarch64 ./ring.tar.gz
 silicon-apps packages ring
-silicon-apps release ring --version 0.1.0 --package PACKAGE_ID
+silicon-apps release ring --version 0.1.0 --package LINUX_PACKAGE_ID --package WINDOWS_PACKAGE_ID --package MACOS_PACKAGE_ID
 silicon-apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0
 ```
 
-Copy the accepted package ID into the release command, then the development release ID into the promote command. Repeat `--package PACKAGE_ID` when a release has more than one target. Every target is optional, but a release needs at least one.
+Copy all three accepted package IDs into the release command, then the development release ID into the promote command. Linux x86_64, Windows x86_64, and macOS Apple Silicon ARM64 are mandatory in every new release and promotion. Additional targets are optional. Existing releases remain installable.
 
 After you upload a package, Apps runs the three required commands in a separate, isolated environment for its target. If one fails, you get its output, what was expected and why it failed.
 

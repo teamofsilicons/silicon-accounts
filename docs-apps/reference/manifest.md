@@ -57,7 +57,7 @@ Only the fields listed above are accepted. Use separate development and producti
 | `macos-x86_64` | macOS, Intel 64-bit |
 | `macos-aarch64` | macOS, Apple Silicon |
 
-Pick the targets your app supports. You don't need every one, but each release needs at least one.
+Every new release and production promotion requires `linux-x86_64`, `windows-x86_64`, and `macos-aarch64`. Other targets are optional. An individual package can contain one target; all three required targets must be included together when creating a release.
 
 Run `silicon-apps targets` to see which validation workers are configured and how many registered accounts use each target, and `silicon-apps capabilities` to see which ones answer right now. Today the four Linux workers are live (`linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`), so those are the targets you can upload for. Windows and macOS have no worker yet, and an upload for one of their targets is refused until its worker is live. The counts include observed, signed-in accounts, and total reach counts an account once even when it uses several of the targets you picked. The manifest can recognise a target before its validation worker is available.
 
