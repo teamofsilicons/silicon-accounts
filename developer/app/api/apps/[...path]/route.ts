@@ -19,7 +19,7 @@ const PREFIX = "/api/apps/";
 /** Refresh this long before the access token expires. */
 const EARLY_REFRESH_MS = 60_000;
 /** Request headers passed on to the API (everything else, cookies included, stays here). */
-const FORWARD = ["accept", "content-type", "idempotency-key"];
+const FORWARD = ["accept", "content-type", "idempotency-key", "x-apps-platform-confirmed"];
 /** Response headers passed back. */
 const BACK = ["content-type", "retry-after", "x-request-id", "content-disposition"];
 

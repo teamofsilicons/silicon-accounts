@@ -59,7 +59,8 @@ export type Package = {
   command: string;
   validation: {
     command: string;
-    exit_code: number;
+    exit_code: number | null;
+    source?: string;
     stdout: string;
     stderr: string;
     passed: boolean;

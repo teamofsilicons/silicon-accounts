@@ -236,6 +236,7 @@ function Packages({ app, refresh }: Props) {
     packages.reload();
     refresh();
   });
+  const [platformConfirmed, setPlatformConfirmed] = useState(false);
   const [target, setTarget] = useState<string>("macos-aarch64");
   const [file, setFile] = useState<File | null>(null);
   const [uploaded, setUploaded] = useState("");
@@ -248,6 +249,7 @@ function Packages({ app, refresh }: Props) {
       );
       return;
     }
+    setPlatformConfirmed(false);
     setFileError(undefined);
     setFile(selected || null);
     setUploaded("");
@@ -264,14 +266,14 @@ function Packages({ app, refresh }: Props) {
           <h3>Three commands, on every platform</h3>
           <p>
             These commands help every Silicon find its way around your app. They
-            are run when each package is uploaded.
+            are checked by our runner for Linux. For Windows and macOS, you confirm they work on the selected platform.
           </p>
           <div data-sq="surface" className="required-command">
             <code>{app.app_id} --help</code>
             <span>Show the app’s help.</span>
           </div>
           <div data-sq="surface" className="required-command">
-            <code>{app.app_id} silicon-accounts --json</code>
+            <code>{app.app_id} accounts --json</code>
             <span>Return your app_id.</span>
           </div>
           <div data-sq="surface" className="required-command">
@@ -287,7 +289,7 @@ function Packages({ app, refresh }: Props) {
             <select
               data-sq="surface" className="native-input"
               value={target}
-              onChange={(e) => setTarget(e.target.value)}
+              onChange={(e) => { setTarget(e.target.value); setPlatformConfirmed(false); }}
             >
               {TARGETS.map((t) => (
                 <option value={t} key={t}>
@@ -321,22 +323,30 @@ function Packages({ app, refresh }: Props) {
             />
           </label>
           <ErrorNotice error={fileError} />
+          {!target.startsWith("linux-") && (
+            <label className="field-label">
+              <input type="checkbox" checked={platformConfirmed} onChange={(e) => setPlatformConfirmed(e.target.checked)} />
+              I checked this package on {targetLabel(target)} and confirm that --help, accounts --json, and login status --json work.
+            </label>
+          )}
           <Button
-            disabled={!file}
+            disabled={!file || (!target.startsWith("linux-") && !platformConfirmed)}
             loading={mutation.pending}
             onClick={async () => {
-              if (!file) return;
+              if (!file || (!target.startsWith("linux-") && !platformConfirmed)) return;
               const result = await mutation.run(() =>
                 api<Package>(`/apps/${app.app_id}/packages/${target}`, {
                   method: "POST",
                   body: file,
+                  platformConfirmed: !target.startsWith("linux-") && platformConfirmed,
                 }),
               );
               if (result) {
                 setUploaded(
-                  `Package accepted for ${targetLabel(target)}. All three commands passed.`,
+                  `Package accepted for ${targetLabel(target)}. ${target.startsWith("linux-") ? "All three commands passed server validation." : "Your platform confirmation was recorded."}`,
                 );
                 setFile(null);
+                setPlatformConfirmed(false);
               }
             }}
           >
@@ -403,7 +413,7 @@ function Packages({ app, refresh }: Props) {
               <details data-sq="surface" className="package-detail" key={pkg.id}>
                 <summary>
                   <span>{targetLabel(pkg.target)}</span>
-                  <Badge tone="success">Validated</Badge>
+                  <Badge tone="success">{pkg.validation.some((v) => v.source === "uploader_confirmation") ? "Uploader confirmed" : "Validated"}</Badge>
                 </summary>
                 <p className="small muted">
                   {pkg.command} · {(pkg.size / 1024).toFixed(1)} KB
@@ -413,7 +423,7 @@ function Packages({ app, refresh }: Props) {
                   <div key={i} className="validation-result">
                     <strong>{v.command}</strong>
                     <p>Expected: {v.expected}</p>
-                    <p>Exit code: {v.exit_code}</p>
+                    <p>{v.source === "uploader_confirmation" ? "Confirmed by uploader; not run by Silicon Apps." : `Exit code: ${v.exit_code}`}</p>
                     {v.stdout && (
                       <>
                         <span className="small muted">Standard output</span>
