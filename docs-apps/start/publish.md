@@ -116,7 +116,7 @@ else:
     sys.exit(f"ring: unknown command: {' '.join(args)}. Run ring --help.")
 ```
 
-You can add more fields to `accounts --json`, but keep `app_id` exact. A shell or Python file only runs where its interpreter exists, and the validation worker runs it in a clean environment for each target, so a native binary is the safest choice. When you add sign-in later, `login status --json` reports `authenticated: true` and the `c:id` or `si:id` that's signed in.
+You can add more fields to `accounts --json`, but keep `app_id` exact. A shell or Python file only runs where its interpreter exists, and the Linux validation worker runs it in a clean environment, so a native binary is the safest choice. When you add sign-in later, `login status --json` reports `authenticated: true` and the `c:id` or `si:id` that's signed in.
 
 ## Validate and pack
 
@@ -136,7 +136,7 @@ targets:
     binary: bin/macos/ring
 ```
 
-This example includes all three required release targets. You can also package and upload each target separately. `silicon-apps targets` lists all nine target names and which runners are configured. `silicon-apps capabilities` is the live check: it asks each runner and marks a target's validation `live` only when its worker answers. A worker that's unavailable can't validate an upload. Today the four Linux workers are live (`linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`), so those are the targets you can upload for. Windows and macOS have no worker yet, and an upload for one of their targets is refused until its worker is live. Ordinary uploads therefore cannot yet satisfy the new release requirement; runner availability remains a separate deployment prerequisite.
+This example includes all three required release targets. You can also package and upload each target separately. Linux packages run all three commands in the server's isolated runner. For Windows and macOS, check the commands on that platform yourself and pass `--confirm-platform-checks` when uploading, or tick the confirmation in the Developer portal. No Windows or Mac validation machine is required. `silicon-apps capabilities` reports these targets as `uploader_confirmation`.
 
 ```sh
 silicon-apps validate ./package
@@ -151,8 +151,8 @@ The [manifest reference](../reference/manifest.md) shows how to add more targets
 
 ```sh
 silicon-apps upload ring --target linux-x86_64 ./ring.tar.gz
-silicon-apps upload ring --target windows-x86_64 ./ring.tar.gz
-silicon-apps upload ring --target macos-aarch64 ./ring.tar.gz
+silicon-apps upload ring --confirm-platform-checks --target windows-x86_64 ./ring.tar.gz
+silicon-apps upload ring --confirm-platform-checks --target macos-aarch64 ./ring.tar.gz
 silicon-apps packages ring
 silicon-apps release ring --version 0.1.0 --package LINUX_PACKAGE_ID --package WINDOWS_PACKAGE_ID --package MACOS_PACKAGE_ID
 silicon-apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0
@@ -160,7 +160,7 @@ silicon-apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0
 
 Copy all three accepted package IDs into the release command, then the development release ID into the promote command. Linux x86_64, Windows x86_64, and macOS Apple Silicon ARM64 are mandatory in every new release and promotion. Additional targets are optional. Existing releases remain installable.
 
-After you upload a package, Apps runs the three required commands in a separate, isolated environment for its target. If one fails, you get its output, what was expected and why it failed.
+For Linux uploads, Apps runs the three required commands in an isolated environment and reports failures with their output. For Windows and macOS, Apps records the uploading Carbon or Silicon’s explicit confirmation that those commands work on that platform. Archive, manifest, permissions, signatures, and release-target requirements still apply.
 
 The `silicon-apps validate` step earlier checked the package's structure. This upload check runs the app itself, and both have to pass. The API server never runs uploaded packages.
 

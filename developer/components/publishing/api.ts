@@ -19,12 +19,14 @@ export async function api<T>(
     signal?: AbortSignal;
     key?: string;
     contentType?: string;
+    platformConfirmed?: boolean;
   } = {},
 ): Promise<T> {
   const method = options.method || "GET";
   const headers: Record<string, string> = { Accept: "application/json" };
   if (method !== "GET")
     headers["Idempotency-Key"] = options.key || crypto.randomUUID();
+  if (options.platformConfirmed) headers["X-Apps-Platform-Confirmed"] = "true";
   let body: BodyInit | undefined;
   if (options.body instanceof Blob) {
     headers["Content-Type"] = options.contentType || "application/gzip";
@@ -41,6 +43,7 @@ export async function api<T>(
         : new TextEncoder().encode(String(body || ""));
     const digest = await crypto.subtle.digest("SHA-256", bytes);
     fingerprint = `${method}:${path}:${Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("")}`;
+    fingerprint += options.platformConfirmed ? ":platform-confirmed" : "";
     headers["Idempotency-Key"] =
       pendingMutations.get(fingerprint) || headers["Idempotency-Key"];
     pendingMutations.set(fingerprint, headers["Idempotency-Key"]);

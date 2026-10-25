@@ -61,7 +61,7 @@ See [install references](../learn/releases-and-updates.md#choose-a-channel) for 
 | `setup APP show` | Show saved setup |
 | `validate [DIR]` | Report all discovered local package errors |
 | `pack [DIR] --output FILE` | Create a deterministic archive |
-| `upload APP --target TARGET FILE [--sign-key KEY]` | Upload and validate in the target runner; `--sign-key` also signs it with your author key (an ID from `keys list` or a key file) |
+| `upload APP --target TARGET FILE [--sign-key KEY] [--confirm-platform-checks]` | Upload with server validation on Linux; on Windows and macOS, `--confirm-platform-checks` confirms you checked the required commands on that platform; `--sign-key` also signs it with your author key (an ID from `keys list` or a key file) |
 | `packages APP` | List packages and command-validation results |
 | `release APP --version X.Y.Z --package ID [--notes TEXT]` | Create development release; repeat `--package` per target |
 | `releases APP [--channel production\|development]` | List release history |

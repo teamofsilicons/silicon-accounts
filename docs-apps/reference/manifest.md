@@ -63,7 +63,7 @@ Run `silicon-apps targets` to see which validation workers are configured and ho
 
 ## Executable contract
 
-Every target's executable must support `--help`, `accounts --json` with its `app_id`, and `login status --json` with `authenticated` and, when someone is signed in, who it is. Upload validation tests it signed out. The [publishing guide](../start/publish.md#implement-the-three-discovery-commands) explains what each command must return.
+Every target's executable must support `--help`, `accounts --json` with its `app_id`, and `login status --json` with `authenticated` and, when someone is signed in, who it is. Linux upload validation tests it signed out; Windows and macOS uploaders confirm the same behavior. The [publishing guide](../start/publish.md#implement-the-three-discovery-commands) explains what each command must return.
 
 ## Validate, pack and extract
 
@@ -76,4 +76,4 @@ Validation reports every manifest, missing-file and safety error it finds at onc
 
 Paths must be relative, with no parent traversal, backslashes, drive prefixes or absolute roots. Archives can't contain duplicate entries, symbolic links, hard links or special files. Extracting needs an empty destination. The package library caps archives at 512 MiB compressed, 1 GiB extracted and 20,000 entries, and a hosted server or proxy may set a lower upload limit.
 
-The package crate never runs what you upload. The server validates commands in isolated target runners. Optional scripts run on the user's machine only with [explicit installation consent](../learn/releases-and-updates.md#installation-and-scripts).
+The package crate never runs what you upload. The server validates Linux commands in an isolated runner. For Windows and macOS, the uploader must confirm that the commands work on the selected platform. Optional scripts run on the user's machine only with [explicit installation consent](../learn/releases-and-updates.md#installation-and-scripts).
