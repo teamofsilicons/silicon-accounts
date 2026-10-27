@@ -8,6 +8,7 @@ export interface Cell {
 export interface Credentials {
   secret_key: string; database_url: string; database_password: string;
 }
+export interface CreatedCell extends Credentials { cell:Cell; publishable_key:string }
 export interface AppCell {
   cell: Cell | null;
   publishable_key?: string | null;
@@ -32,6 +33,8 @@ export async function cellsRequest<T>(path: string, options: {method?: string; b
   return body as T;
 }
 export const cellsApi = {
+  create: (name:string,cellId:string,key:string)=>cellsRequest<CreatedCell>("/cells",{method:"POST",body:{name,cell_id:cellId,linked_apps:[]},key}),
+  get: (cell:string,signal?:AbortSignal)=>cellsRequest<{cell:Cell}>(`/cells/${encodeURIComponent(cell)}`,{signal}),
   list: (signal?: AbortSignal) => cellsRequest<{cells: Cell[]}>("/cells", {signal}),
   app: (app: string, signal?: AbortSignal) => cellsRequest<AppCell>(`/apps/${encodeURIComponent(app)}/cell`, {signal}),
   enable: (app: string, cell: string | null, key: string) => cellsRequest<AppCell>(`/apps/${encodeURIComponent(app)}/cell`, {method: "POST", body: {cell_id: cell}, key}),

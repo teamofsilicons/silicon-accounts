@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import {paths} from "@/lib/navigation";
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section, Surface } from "@/components/foundation/layout/layout";
@@ -54,6 +56,7 @@ export function AppCellSection({appId}: {appId: string}) {
         <div><Button loading={enable.isPending} disabled={!!connection.error || list.isPending || !!list.error} onClick={() => enable.mutate()}>{cell ? "Use selected cell" : "Enable sign-in"}</Button></div>
       </>}
       {cell && <>
+        <Link href={paths.cell(cell.cell_id)}>Open this cell</Link>
         <CopyField label="Cell URL" value={cell.url} />
         {connection.data?.publishable_key && <CopyField label="Publishable key" value={connection.data.publishable_key} description="Use this in your frontend. Tables apply the signed-in user’s access rules." />}
         {links.length > 1 && <Select label="Frontend redirect" value={link?.redirect_to ?? ""} options={links.map(l => ({value: l.redirect_to, label: l.redirect_to}))} onValueChange={setRedirect} />}

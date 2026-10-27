@@ -288,3 +288,32 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
 Components and their CSS now come from https://ui.teamofsilicons.com/r/{name}.json, with `silicon-foundation` imported once at the root. `components/silicon-ui/registry-manifest.json` records every upstream source checksum. The registry supplies native squircle geometry, semantic spacing and visible keyboard focus. Application tokens retain the configured brand colors. Local adaptations retain dialog focus return and nested Escape priority, combobox keyboard behavior, whole international phone-number entry, and timeline pagination announcements; they live beside the registry source and must survive future updates. Existing custom application surfaces retain their squircle fallback. Historical Arc notes above describe these original application adaptations.
 
 Silicon UI local keyboard fix: ConfirmMorph preserves its pointer re-arming delay, but a separate keyboard activation can confirm immediately. This retains the established revocation flow and is covered by the developer app-verification keyboard regression. Hosted branding also maps round/sharp/squircle corners to Silicon UI tokens and keeps soft/outline primary actions.
+
+## Cells workspace
+
+`CELLS_API_URL` points the server to the Cells control API. The existing sealed
+Accounts cookie is reused by `/api/cells/*`; no Accounts bearer token is sent to
+the browser. Author paths are allowlisted and every mutation requires the same
+origin. Control bodies are capped at 1 MiB; file parts stream with an enforced
+1 GiB ceiling and are not buffered by the proxy. A refresh after an upstream
+refusal asks the browser to resume the part instead of replaying a consumed body.
+
+`/cells` lists cells, creates them, displays initial credentials once, and accepts
+or declines author invitations. `/cells/[cellId]` provides overview, database,
+files, authors, settings and history. Database tools include table creation,
+column inspection, SQL, migration history and generated TypeScript/Rust exports.
+Settings cover origins, callbacks, keys, secrets, deletion and restoration.
+
+Files support paginated paths, download, copy/move/delete, expiring links,
+bucket settings and access presets, managed/S3 provider changes and migration
+retry. Resuming an upload requires the original author session and original
+file; already persisted parts are checked before new parts are sent. No upload
+bearer capability is needed in this author UI. Uploaded active content is served
+as a sandboxed attachment through the BFF.
+
+`pnpm test` covers the proxy boundaries, streamed bodies, refresh behavior and
+resume safety. The adjacent Cells repository's
+`CELLS_PREVIEW=1 CELLS_PREVIEW_SMOKE=1 python3 scripts/test-auth.py` exercises a
+real local Accounts/Cells/Developer stack. Interactive browser validation is
+still pending; HTTP page rendering is not proof of client interactions or layout.
+The remaining Cells capabilities are tracked in that repository's `BUILD.md`.
