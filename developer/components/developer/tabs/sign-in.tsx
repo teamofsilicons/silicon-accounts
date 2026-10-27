@@ -30,9 +30,11 @@ import { SaveBar } from "../parts/save-bar";
 import { SecretField } from "../parts/secret-field";
 import { TagField } from "../parts/tag-field";
 import { MethodList, type MethodRowInfo } from "./method-list";
+import { AppCellSection } from "@/components/cells/app-cell";
 import styles from "./sign-in.module.css";
 
 const ANCHORS = [
+  { id: "signin-cell", label: "Backend", paths: [] },
   { id: "signin-methods", label: "Methods", paths: ["methods", "method_order"] },
   { id: "signin-account-verification", label: "Account verification", paths: [] },
   { id: "signin-google", label: "Google", paths: ["google"] },
@@ -115,6 +117,7 @@ export function SignInTab() {
     <div className={styles.layout} data-room={view.dirty.signin || undefined}>
       <div className={styles.form}>
         <EditorAlerts section="signin" editor={editor} />
+        <AppCellSection key={ctx.appId} appId={ctx.appId} />
 
         {section(
           "signin-methods",

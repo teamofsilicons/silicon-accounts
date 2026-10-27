@@ -19,6 +19,7 @@ const CELLS: &str = "silicon-cells";
 pub(crate) fn router() -> Router<AppState> {
     Router::new()
         .route("/v1/internal/cells/author", post(author))
+        .route("/v1/internal/cells/apps/{app}", post(app_info))
         .route(
             "/v1/internal/cells/links/{cell}/{app}",
             put(link).delete(unlink),
@@ -49,6 +50,64 @@ fn oauth(e: OAuthError) -> ApiError {
 #[serde(deny_unknown_fields)]
 struct AuthorToken {
     access_token: String,
+}
+async fn app_info(
+    State(state): State<AppState>,
+    auth: AppAuth,
+    Path(app): Path<String>,
+    Json(input): Json<AuthorToken>,
+) -> ApiResult<Response> {
+    service(&auth)?;
+    let (actor, _) = verify_author(&state, &input.access_token).await?;
+    let mut tx = state.db.begin().await?;
+    let target = require_app_author(&mut tx, &app, &actor).await?;
+    let authors:Vec<accounts_core::models::Account>=sqlx::query_as("select a.* from accounts a join app_authors au on au.account_uuid=a.uuid where au.app_id=$1 and a.status='active' order by au.joined_at,a.uuid").bind(&app).fetch_all(&mut *tx).await?;
+    let mut authors = authors
+        .iter()
+        .map(accounts_core::views::AccountSummary::from_account)
+        .collect::<Vec<_>>();
+    // Legacy Apps records may have only owner_uuid, before author synchronization.
+    if let Some(owner) = target.owner_uuid.as_deref()
+        && !authors.iter().any(|a| a.uuid == owner)
+        && let Some(owner) = accounts_core::repo::accounts::get(&mut tx, owner).await?
+        && owner.status == AccountStatus::Active
+    {
+        authors.insert(
+            0,
+            accounts_core::views::AccountSummary::from_account(&owner),
+        );
+    }
+    Ok(super::respond::no_store(
+        StatusCode::OK,
+        &json!({"app_id":target.app_id,"name":target.name,"authors":authors}),
+    ))
+}
+async fn require_app_author(
+    conn: &mut sqlx::PgConnection,
+    app: &str,
+    actor: &str,
+) -> ApiResult<accounts_core::models::App> {
+    let target = apps::require_active(conn, app).await?;
+    if target.is_first_party() {
+        return Err(ApiError::forbidden(
+            "first_party_delegation_forbidden",
+            "Accounts and Developer cannot delegate their own identity privileges to a cell.",
+        ));
+    }
+    let coauthor: bool = sqlx::query_scalar(
+        "select exists(select 1 from app_authors where app_id=$1 and account_uuid=$2)",
+    )
+    .bind(app)
+    .bind(actor)
+    .fetch_one(conn)
+    .await?;
+    if target.owner_uuid.as_deref() != Some(actor) && !coauthor {
+        return Err(ApiError::forbidden(
+            "app_author_required",
+            "Linking a cell requires an accepted author of this app.",
+        ));
+    }
+    Ok(target)
 }
 async fn verify_author(state: &AppState, token: &str) -> ApiResult<(String, Value)> {
     let mut conn = state.db.acquire().await?;
@@ -117,26 +176,7 @@ async fn link(
         .bind(format!("cells-link:{cell}:{app}"))
         .execute(&mut *tx)
         .await?;
-    let target = apps::require_active(&mut tx, &app).await?;
-    if target.is_first_party() {
-        return Err(ApiError::forbidden(
-            "first_party_delegation_forbidden",
-            "Accounts and Developer cannot delegate their own identity privileges to a cell.",
-        ));
-    }
-    let coauthor: bool = sqlx::query_scalar(
-        "select exists(select 1 from app_authors where app_id=$1 and account_uuid=$2)",
-    )
-    .bind(&app)
-    .bind(&actor)
-    .fetch_one(&mut *tx)
-    .await?;
-    if target.owner_uuid.as_deref() != Some(&actor) && !coauthor {
-        return Err(ApiError::forbidden(
-            "app_author_required",
-            "Linking a cell requires an accepted author of this app.",
-        ));
-    }
+    require_app_author(&mut tx, &app, &actor).await?;
     // The cell UUID is globally assigned by the Cells service. The app author
     // cannot silently replace a live cell's callback with an unrelated address.
     if let Some(existing)=sqlx::query_scalar::<_,String>("select callback_uri from cells_app_links where cell_uuid=$1 and app_id=$2 and revoked_at is null for update").bind(cell).bind(&app).fetch_optional(&mut *tx).await? && existing!=input.callback_uri {

@@ -107,6 +107,18 @@ impl<'a> AppClient<'a> {
         .json(&json!({"access_token":access_token}))?;
         self.client.execute(request).await?.json()
     }
+    /// Privately inspect an app and its accepted authors for automatic cell creation.
+    /// The supplied live author token must have authority over this app.
+    pub async fn cells_app(&self, app_id: &str, author_token: &str) -> Result<Value> {
+        let request = Request::new(
+            Method::POST,
+            self.client
+                .endpoint(&["v1", "internal", "cells", "apps", app_id]),
+            self.auth(),
+        )
+        .json(&json!({"access_token":author_token}))?;
+        self.client.execute(request).await?.json()
+    }
 
     /// Privately delegate a linked app to a cell, with proof of app authorship.
     /// Cells must independently verify cell authorship before calling this method.

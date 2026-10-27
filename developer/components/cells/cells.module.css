@@ -1,0 +1,4 @@
+.stack { display: grid; gap: 1rem; min-width: 0; }
+.code { display: grid; gap: .75rem; min-width: 0; }
+.code pre { margin: 0; overflow-x: auto; font-size: .82rem; line-height: 1.65; }
+.code > button { justify-self: start; }

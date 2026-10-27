@@ -1,0 +1,13 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { cellsProxyRoute } from "../lib/server/cells-routes";
+
+test("Cells author paths cannot reach private grants, user sessions or another origin", () => {
+  assert.equal(cellsProxyRoute("apps/notes-app/cell", "POST"), "v1/apps/notes-app/cell");
+  assert.equal(cellsProxyRoute("cells/notes/sql", "POST"), "v1/cells/notes/sql");
+  assert.equal(cellsProxyRoute("cells/notes/secrets/SERVICE_KEY", "PUT"), "v1/cells/notes/secrets/SERVICE_KEY");
+  for (const path of ["auth/silicon", "auth/refresh", "internal/cells/author", "rest/v1/users", "cells/../me", "cells/%2e%2e/me", "//attacker.example", "cells/notes\\..\\me", "cells/notes/secrets/KEY/extra"]) {
+    for (const method of ["GET", "POST", "PUT", "DELETE"]) assert.equal(cellsProxyRoute(path, method), null, `${method} ${path}`);
+  }
+  assert.equal(cellsProxyRoute("cells/notes/sql", "GET"), null);
+});
