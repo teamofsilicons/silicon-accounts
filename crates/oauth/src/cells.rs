@@ -150,11 +150,15 @@ async fn link(
         .redirect_uris;
     sqlx::query("insert into cells_app_links(cell_uuid,app_id,callback_uri,linked_by) values($1,$2,$3,$4) on conflict(cell_uuid,app_id) do update set callback_uri=excluded.callback_uri,linked_by=excluded.linked_by,revoked_at=null")
         .bind(cell).bind(&app).bind(&input.callback_uri).bind(&actor).execute(&mut *tx).await?;
+    let (_, generated_secret) = accounts_core::events::new_webhook_secret(&state.keys.keyring)?;
+    let sealed: Vec<u8> = sqlx::query_scalar("update cells_app_links set webhook_secret_enc=coalesce(webhook_secret_enc,$3) where cell_uuid=$1 and app_id=$2 returning webhook_secret_enc")
+        .bind(cell).bind(&app).bind(generated_secret).fetch_one(&mut *tx).await?;
+    let webhook_secret = state.keys.keyring.decrypt_string(&sealed)?;
     audit::record(&mut tx,&audit::AuditEntry{app_id:Some(&app),details:json!({"cell_uuid":cell,"callback_uri":input.callback_uri,"idempotency_key":key.as_str()}),..audit::AuditEntry::new(ActorKind::Account,Some(&actor),"cell.linked")}).await?;
     tx.commit().await?;
     Ok(super::respond::no_store(
         StatusCode::OK,
-        &json!({"cell_uuid":cell,"app_id":app,"callback_uri":input.callback_uri,"redirect_uris":redirects.into_iter().filter(|v|v!=&input.callback_uri).collect::<Vec<_>>()}),
+        &json!({"cell_uuid":cell,"app_id":app,"callback_uri":input.callback_uri,"webhook_secret":webhook_secret,"redirect_uris":redirects.into_iter().filter(|v|v!=&input.callback_uri).collect::<Vec<_>>()}),
     ))
 }
 async fn unlink(

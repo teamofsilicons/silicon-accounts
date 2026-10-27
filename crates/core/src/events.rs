@@ -251,6 +251,7 @@ struct Destination<'a> {
     target_kind: WebhookTargetKind,
     target_id: &'a str,
     subscription_id: Option<Uuid>,
+    cell_uuid: Option<Uuid>,
     delivery_url: Option<&'a str>,
 }
 
@@ -259,7 +260,8 @@ impl<'a> Destination<'a> {
         Destination {
             target_kind: WebhookTargetKind::App,
             target_id: &t.app_id,
-            subscription_id: Some(t.subscription_id),
+            subscription_id: t.subscription_id,
+            cell_uuid: t.cell_uuid,
             delivery_url: match t.delivery {
                 SubscriptionDelivery::Webhook => t.webhook_url.as_deref(),
                 SubscriptionDelivery::Stream => None,
@@ -299,8 +301,8 @@ async fn record_event_with_id(
     };
     let payload = build_payload(event_id, event_type, occurred_at, app_id, silicon, data);
     sqlx::query(
-        "insert into webhook_events (event_id, type, target_kind, target_id, account_uuid, payload, occurred_at, subscription_id) \
-         values ($1, $2, $3, $4, $5, $6, $7, $8)",
+        "insert into webhook_events (event_id, type, target_kind, target_id, account_uuid, payload, occurred_at, subscription_id,cell_uuid) \
+         values ($1, $2, $3, $4, $5, $6, $7, $8,$9)",
     )
     .bind(event_id)
     .bind(event_type)
@@ -310,6 +312,7 @@ async fn record_event_with_id(
     .bind(&payload)
     .bind(occurred_at)
     .bind(to.subscription_id)
+    .bind(to.cell_uuid)
     .execute(&mut *conn)
     .await?;
     let Some(url) = to.delivery_url else {
@@ -342,7 +345,8 @@ async fn record_event_with_id(
 /// webhook URL), the webhook first.
 #[derive(sqlx::FromRow)]
 struct AppTarget {
-    subscription_id: Uuid,
+    subscription_id: Option<Uuid>,
+    cell_uuid: Option<Uuid>,
     delivery: SubscriptionDelivery,
     updates: Option<Value>,
     webhook_url: Option<String>,
@@ -362,7 +366,8 @@ impl AppTarget {
         Destination {
             target_kind: WebhookTargetKind::App,
             target_id: app_id,
-            subscription_id: Some(self.subscription_id),
+            subscription_id: self.subscription_id,
+            cell_uuid: self.cell_uuid,
             delivery_url: match self.delivery {
                 SubscriptionDelivery::Webhook => self.webhook_url.as_deref(),
                 SubscriptionDelivery::Stream => None,
@@ -373,11 +378,14 @@ impl AppTarget {
 
 async fn app_targets(conn: &mut PgConnection, app_id: &str) -> ApiResult<Vec<AppTarget>> {
     Ok(sqlx::query_as(
-        "select s.id as subscription_id, s.delivery, s.updates, c.webhook_url \
+        "select s.id as subscription_id, s.delivery, s.updates, c.webhook_url, null::uuid as cell_uuid \
          from app_event_subscriptions s left join app_signin_configs c on c.app_id = s.app_id \
          where s.app_id = $1 and s.status = 'active' \
            and (s.delivery = 'stream' or c.webhook_url is not null) \
-         order by s.delivery desc",
+         union all select null::uuid,'webhook',null::jsonb, \
+           replace(l.callback_uri,'/auth/callback','/auth/accounts-webhook'),l.cell_uuid \
+         from cells_app_links l where l.app_id=$1 and l.revoked_at is null and l.webhook_secret_enc is not null \
+         order by delivery desc",
     )
     .bind(app_id)
     .fetch_all(&mut *conn)
@@ -431,6 +439,7 @@ pub async fn ping_subscription(
             target_kind: WebhookTargetKind::App,
             target_id: &subscription.app_id,
             subscription_id: Some(subscription.id),
+            cell_uuid: None,
             delivery_url: url.as_deref(),
         },
         None,
@@ -460,6 +469,7 @@ pub async fn emit_to_silicon(
             target_kind: WebhookTargetKind::Silicon,
             target_id: silicon_uuid,
             subscription_id: None,
+            cell_uuid: None,
             delivery_url: url.as_deref(),
         },
         Some(silicon_uuid),
@@ -482,10 +492,15 @@ pub async fn account_id_changed(
         if !t.wants("id_change") {
             continue;
         }
-        let data = json!({
+        let mut data = json!({
             "uuid": account.uuid, "membership_id": t.membership_id, "kind": account.kind,
             "old_id": old_id, "new_id": new_id,
         });
+        if t.cell_uuid.is_some() {
+            // A full public snapshot makes out-of-order cell updates converge;
+            // app-owned webhooks retain their established payload unchanged.
+            data["account"] = json!({"uuid":account.uuid,"id":new_id,"kind":account.kind,"display_name":account.display_name,"pfp_url":account.pfp_url});
+        }
         out.extend(
             record_event(
                 conn,
