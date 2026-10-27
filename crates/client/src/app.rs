@@ -96,6 +96,110 @@ impl<'a> AppClient<'a> {
         matches!(self.auth, AppAuth::Owner(_))
     }
 
+    /// Private Cells-service bridge: verify a live Cells or Developer author token.
+    /// The caller must use Silicon Cells' own app credentials, never a linked app secret.
+    pub async fn cells_author(&self, access_token: &str) -> Result<UserInfo> {
+        let request = Request::new(
+            Method::POST,
+            self.client.endpoint(&["v1", "internal", "cells", "author"]),
+            self.auth(),
+        )
+        .json(&json!({"access_token":access_token}))?;
+        self.client.execute(request).await?.json()
+    }
+
+    /// Privately delegate a linked app to a cell, with proof of app authorship.
+    /// Cells must independently verify cell authorship before calling this method.
+    pub async fn cells_link(
+        &self,
+        cell_uuid: &str,
+        app_id: &str,
+        author_token: &str,
+        callback_uri: &str,
+        key: &str,
+    ) -> Result<Value> {
+        let request = Request::new(
+            Method::PUT,
+            self.client
+                .endpoint(&["v1", "internal", "cells", "links", cell_uuid, app_id]),
+            self.auth(),
+        )
+        .json(&json!({"actor_token":author_token,"callback_uri":callback_uri}))?
+        .idempotency_key(Some(key))?;
+        self.client.execute(request).await?.json()
+    }
+
+    /// Privately unlink an app and end only the sessions issued through that cell.
+    pub async fn cells_unlink(&self, cell_uuid: &str, app_id: &str) -> Result<Value> {
+        let request = Request::new(
+            Method::DELETE,
+            self.client
+                .endpoint(&["v1", "internal", "cells", "links", cell_uuid, app_id]),
+            self.auth(),
+        );
+        self.client.execute(request).await?.json()
+    }
+
+    /// Privately exchange a PKCE authorization code, SLT or rotating refresh token.
+    /// `grant` contains the ordinary grant fields, without client credentials. Reuse
+    /// the same key on network retries: the sealed result avoids consuming a grant twice.
+    pub async fn cells_exchange(
+        &self,
+        cell_uuid: &str,
+        app_id: &str,
+        grant: &Value,
+        key: &str,
+    ) -> Result<TokenResponse> {
+        let request = Request::new(
+            Method::POST,
+            self.client.endpoint(&[
+                "v1", "internal", "cells", "links", cell_uuid, app_id, "token",
+            ]),
+            self.auth(),
+        )
+        .json(grant)?
+        .idempotency_key(Some(key))?;
+        self.client.execute(request).await?.json()
+    }
+
+    /// Privately check a session belonging to this exact cell/app delegation.
+    /// An active result includes the app-scoped account view under `account`.
+    pub async fn cells_introspect(
+        &self,
+        cell_uuid: &str,
+        app_id: &str,
+        token: &str,
+    ) -> Result<Value> {
+        let request = Request::new(
+            Method::POST,
+            self.client.endpoint(&[
+                "v1",
+                "internal",
+                "cells",
+                "links",
+                cell_uuid,
+                app_id,
+                "introspect",
+            ]),
+            self.auth(),
+        )
+        .json(&json!({"token":token}))?;
+        self.client.execute(request).await?.json()
+    }
+
+    /// Privately end a cell/app session with its access or refresh token.
+    pub async fn cells_revoke(&self, cell_uuid: &str, app_id: &str, token: &str) -> Result<Value> {
+        let request = Request::new(
+            Method::POST,
+            self.client.endpoint(&[
+                "v1", "internal", "cells", "links", cell_uuid, app_id, "revoke",
+            ]),
+            self.auth(),
+        )
+        .json(&json!({"token":token}))?;
+        self.client.execute(request).await?.json()
+    }
+
     fn auth(&self) -> Auth<'_> {
         match &self.auth {
             AppAuth::Credentials(secret) => Auth::Basic {

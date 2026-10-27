@@ -96,7 +96,7 @@ async fn membership_live(
     Ok(membership_status(conn, &app.app_id, account_uuid).await? == Some(MembershipStatus::Active))
 }
 
-async fn access_token(
+pub(crate) async fn access_token(
     conn: &mut PgConnection,
     state: &AppState,
     app: &App,

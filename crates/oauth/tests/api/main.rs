@@ -2,6 +2,7 @@
 //! with `tower::ServiceExt::oneshot` (via `accounts_core::test_support`) against a fresh
 //! Postgres database per test (127.0.0.1:5444; start it with scripts/dev-db.sh).
 
+mod cells;
 mod code;
 mod common;
 mod developer;

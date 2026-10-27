@@ -53,6 +53,7 @@
 //!   and `federated`). Code exchanges
 //!   don't add history: the consent step that issued the code already recorded the sign-in.
 
+mod cells;
 mod credentials;
 mod device;
 mod discovery;
@@ -82,6 +83,7 @@ pub const SIGNOUT_REASON_CODE_REUSE: &str =
 /// HTTP routes of this crate (merged into the API router by the server crate).
 pub fn router() -> Router<AppState> {
     Router::new()
+        .merge(cells::router())
         .route("/v1/oauth/token", post(token::token))
         .route("/v1/oauth/revoke", post(revoke::revoke))
         .route("/v1/oauth/introspect", post(introspect::introspect))
