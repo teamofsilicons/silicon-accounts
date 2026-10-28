@@ -12,6 +12,7 @@ import {cellsRequest,type Cell} from "@/lib/cells/api";
 import {resumeAuthorUpload,type UploadStatus} from "@/lib/cells/uploads";
 import {useNavigationGuard} from "@/lib/navigation-guard";
 import {cellPath,useCellData,useCellAction,Failure,bytes,date} from "./shared";
+import {StorageLocations} from "./storage-locations";
 import {FileTrash} from "./trash";
 import {BucketEditor,StorageProvider,type Bucket} from "./storage-settings";
 import styles from "./cells.module.css";
@@ -35,6 +36,7 @@ export function CellFiles({cell}:{cell:Cell}){
     {bucket&&<FileTrash key={bucket.id} cellId={id} bucket={bucket.id}/>}
     <PendingUploads cellId={id} onResume={setUpload}/>
     <StorageProvider cellId={id} cellUuid={cell.uuid}/>
+    <StorageLocations cellId={id}/>
     <Dialog open={edit!==null} onOpenChange={value=>{if(!value)setEdit(null);}}><DialogContent title={edit==="new"?"Create bucket":"Bucket settings"} description="Bucket limits apply when new files are uploaded.">{edit&&<BucketEditor key={typeof edit==="string"?"new":edit.id} cellId={id} bucket={edit==="new"?undefined:edit} onDone={()=>setEdit(null)}/>}</DialogContent></Dialog>
     <Dialog open={upload!==null} onOpenChange={value=>{if(!value)setUpload(null);}}><DialogContent title={upload==="new"?"Upload file":"Resume upload"} description="Uploaded parts are kept for seven days. You can return with the same file to continue.">{upload&&bucket&&<UploadEditor key={typeof upload==="string"?"new":upload.id} cellId={id} bucket={bucket.id} pending={upload==="new"?undefined:upload} onDone={()=>setUpload(null)}/>}</DialogContent></Dialog>
     <Dialog open={action!==null} onOpenChange={value=>{if(!value)setAction(null);}}><DialogContent title={action?`${action.action[0].toUpperCase()+action.action.slice(1)} file`:"File"} description={action?.file.name??""}>{action&&<FileEditor key={`${action.action}:${action.file.id}`} cellId={id} target={action} onDone={()=>setAction(null)}/>}</DialogContent></Dialog>

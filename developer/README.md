@@ -306,7 +306,8 @@ Settings cover origins, callbacks, keys, secrets, deletion and restoration.
 
 Files support paginated paths, download, copy/move/delete, expiring links,
 thirty-day trash and restoration, bucket settings and access presets, managed/S3 provider changes and migration
-retry. Resuming an upload requires the original author session and original
+retry. Storage connections can be repaired without retargeting files, including
+from a deleted cell’s Settings when erasure is blocked. Resuming an upload requires the original author session and original
 file; already persisted parts are checked before new parts are sent. No upload
 bearer capability is needed in this author UI. Uploaded active content is served
 as a sandboxed attachment through the BFF.
