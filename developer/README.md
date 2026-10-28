@@ -318,3 +318,11 @@ resume safety. The adjacent Cells repository's
 real local Accounts/Cells/Developer stack. Interactive browser validation is
 still pending; HTTP page rendering is not proof of client interactions or layout.
 The remaining Cells capabilities are tracked in that repository's `BUILD.md`.
+
+Cells History includes paginated Silicon Ting delivery records and retry controls.
+Registration uses explicit consent from the Cells CLI; the Developer bearer
+session cannot issue that proof. Files shows the latest storage permission check
+and outage state. A 2026-10-28 manual local browser pass retried a rejected
+notification and verified its transition to Accepted by Ting through a controlled
+receiver using real Accounts proofs. Production Ting compatibility and the full
+Cells acceptance pass remain outstanding; see the Cells repository ledger.

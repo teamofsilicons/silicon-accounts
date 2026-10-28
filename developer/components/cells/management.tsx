@@ -11,6 +11,7 @@ import {SecretReveal} from "@/components/developer/parts/secret-reveal";
 import type {Cell} from "@/lib/cells/api";
 import {useCellAction,useCellData,useCellsLeaveGuard,Failure,date} from "./shared";
 import {StorageLocations} from "./storage-locations";
+import {CellNotifications} from "./notifications";
 import styles from "./cells.module.css";
 interface Author {account:{uuid:string;id:string;display_name:string};joined_at:string}
 interface Key {id:string;name:string;kind:string;prefix:string;publishable_key:string|null;revoked_at:string|null}
@@ -24,7 +25,7 @@ export function CellAuthors({cellId,active}:{cellId:string;active:boolean}){
 }
 export function CellHistory({cellId}:{cellId:string}){
   const query=useCellData<{history:{id:number;action:string;actor_uuid:string;occurred_at:string;details:unknown}[]}>(cellId,"/history");
-  return <Section title="History" description="The latest 200 changes to this cell."><Stack><Failure error={query.error}/>{query.isPending?<p role="status">Loading history…</p>:query.data?.history.map(item=><Surface key={item.id}><details><summary>{item.action} · {date(item.occurred_at)}</summary><p className={styles.muted}>Author: {item.actor_uuid}</p><pre className={styles.pre}>{JSON.stringify(item.details,null,2)}</pre></details></Surface>)}</Stack></Section>;
+  return <Stack gap={8}><CellNotifications cellId={cellId}/><Section title="History" description="The latest 200 changes to this cell."><Stack><Failure error={query.error}/>{query.isPending?<p role="status">Loading history…</p>:query.data?.history.map(item=><Surface key={item.id}><details><summary>{item.action} · {date(item.occurred_at)}</summary><p className={styles.muted}>Author: {item.actor_uuid}</p><pre className={styles.pre}>{JSON.stringify(item.details,null,2)}</pre></details></Surface>)}</Stack></Section></Stack>;
 }
 export function CellSettings({cell}:{cell:Cell}){
   return <Stack gap={8}>{cell.status==="active"&&<><OriginSettings key={JSON.stringify(cell.settings)} cell={cell}/><Keys cellId={cell.cell_id}/><Secrets cellId={cell.cell_id}/></>}{cell.status==="deleted"&&<StorageLocations cellId={cell.cell_id}/>}<Lifecycle cell={cell}/></Stack>;
