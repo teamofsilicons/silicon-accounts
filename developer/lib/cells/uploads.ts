@@ -11,7 +11,7 @@ export async function resumeAuthorUpload(cell:string,id:string,file:Blob,signal:
   const status=await cellsRequest<UploadStatus>(base,{signal});
   if(!status.can_resume)throw new Error("Only the author who started this upload can resume it.");
   if(status.status==="complete")return status.result;
-  if(!["uploading","completing"].includes(status.status))throw new Error(`This upload is ${status.status}; it cannot be resumed.`);
+  if(!["creating","uploading","completing"].includes(status.status))throw new Error(`This upload is ${status.status}; it cannot be resumed.`);
   if(file.size!==status.size)throw new Error("Select the original file. Its size differs from this upload.");
   if(!Number.isSafeInteger(status.part_bytes)||status.part_bytes<=0||status.part_bytes>1024**3)throw new Error("The service returned an invalid upload part size.");
   const count=Math.max(1,Math.ceil(file.size/status.part_bytes)),done=new Map<number,number>();

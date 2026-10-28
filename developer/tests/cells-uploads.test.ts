@@ -36,3 +36,11 @@ test("Paused uploads and another author's reservation cannot publish",async()=>{
   assert.equal(api.completed(),0);assert.deepEqual(api.parts,[]);
   fixture(status({can_resume:false}));await assert.rejects(resumeAuthorUpload("notes","upload",new Blob(["abcdef"]),new AbortController().signal,()=>{}),/Only the author/);
 });
+
+
+test("A newly created reservation sends its first parts before publication",async()=>{
+  const api=fixture(status({status:"creating"}));
+  await resumeAuthorUpload("notes","upload",new Blob(["abcdef"]),new AbortController().signal,()=>{});
+  assert.deepEqual(api.parts,[{index:0,text:"abc"},{index:1,text:"def"}]);
+  assert.equal(api.completed(),1);
+});
