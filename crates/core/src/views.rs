@@ -420,6 +420,9 @@ pub struct TokenResponse {
     pub access_token: String,
     pub token_type: String,
     pub expires_in: i64,
+    /// Original JWT expiry; unchanged when a refresh response is recovered.
+    #[serde(with = "crate::timefmt::rfc3339_ms")]
+    pub access_token_expires_at: OffsetDateTime,
     pub refresh_token: String,
     #[serde(with = "crate::timefmt::rfc3339_ms")]
     pub refresh_token_expires_at: OffsetDateTime,

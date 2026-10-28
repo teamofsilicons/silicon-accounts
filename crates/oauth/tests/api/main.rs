@@ -10,6 +10,7 @@ mod device;
 mod discovery;
 mod introspect;
 mod refresh;
+mod refresh_recovery;
 mod revoke;
 mod slt;
 mod sweep;

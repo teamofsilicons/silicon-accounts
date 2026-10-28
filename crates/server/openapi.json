@@ -460,7 +460,7 @@
         ],
         "operationId": "exchangeToken",
         "summary": "Token endpoint (every grant)",
-        "description": "Exchange an authorization code, refresh a sign-in, redeem a Silicon's short-lived token, poll a device code, sign a Silicon in with a key-signed assertion (jwt-bearer, client_id silicon-accounts), or sign a Silicon in with an outside OIDC token it is trusted for (token-exchange, RFC 8693: `subject_token`, `subject_token_type`, `silicon`; `client_id` may be left out). A token exchange checks the token's signature against its issuer's JWKS, `iss`, `aud`, `exp`, `nbf`, `iat` (30 seconds of skew) and one trust's every condition, uses its `jti` once, and answers a sign-in that ends when the outside token expires, at least 30 minutes and at most 12 hours later (`TokenExchangeResponse`); every refusal is `invalid_grant` with the reason, the code in brackets (`invalid_federated_token`, `no_matching_trust`, `issuer_unavailable`), and 60 exchanges per minute per address answer 429 `rate_limited` with `Retry-After`. jwt-bearer shares the limit of `POST /v1/silicons/login`: 60 Silicon sign-in attempts per minute per address across both, then 429 `rate_limited` with `Retry-After`. A short-lived token minted by a sign-in from an outside token starts an app sign-in that ends no later than that sign-in (`refresh_token_expires_at`) and ends when its trust is removed; once the trust is removed or that sign-in has ended, the token is refused with `invalid_grant`. Authenticate with HTTP Basic or `client_id` + `client_secret` in the body, never both. Public clients send `client_id` alone: `silicon-accounts` (the CLI: refresh_token, device_code, jwt-bearer), `developer` (authorization_code with PKCE S256, refresh_token), and apps that turned on `device_flow` (device_code, refresh_token) or `public_client` (authorization_code with PKCE S256, slt, refresh_token). Every other app sends its secret to redeem a short-lived token. Every refresh rotates the refresh token; presenting a used one revokes the whole sign-in. Responses are `Cache-Control: no-store`.",
+        "description": "Exchange an authorization code, refresh a sign-in, redeem a Silicon's short-lived token, poll a device code, sign a Silicon in with a key-signed assertion (jwt-bearer, client_id silicon-accounts), or sign a Silicon in with an outside OIDC token it is trusted for (token-exchange, RFC 8693: `subject_token`, `subject_token_type`, `silicon`; `client_id` may be left out). A token exchange checks the token's signature against its issuer's JWKS, `iss`, `aud`, `exp`, `nbf`, `iat` (30 seconds of skew) and one trust's every condition, uses its `jti` once, and answers a sign-in that ends when the outside token expires, at least 30 minutes and at most 12 hours later (`TokenExchangeResponse`); every refusal is `invalid_grant` with the reason, the code in brackets (`invalid_federated_token`, `no_matching_trust`, `issuer_unavailable`), and 60 exchanges per minute per address answer 429 `rate_limited` with `Retry-After`. jwt-bearer shares the limit of `POST /v1/silicons/login`: 60 Silicon sign-in attempts per minute per address across both, then 429 `rate_limited` with `Retry-After`. A short-lived token minted by a sign-in from an outside token starts an app sign-in that ends no later than that sign-in (`refresh_token_expires_at`) and ends when its trust is removed; once the trust is removed or that sign-in has ended, the token is refused with `invalid_grant`. Authenticate with HTTP Basic or `client_id` + `client_secret` in the body, never both. Public clients send `client_id` alone: `silicon-accounts` (the CLI: refresh_token, device_code, jwt-bearer), `developer` (authorization_code with PKCE S256, refresh_token), and apps that turned on `device_flow` (device_code, refresh_token) or `public_client` (authorization_code with PKCE S256, slt, refresh_token). Every other app sends its secret to redeem a short-lived token. Every new refresh operation rotates the refresh token. With an optional Idempotency-Key, the same authenticated app, token and canonical requested scope can recover the original encrypted result for 24 hours while its successor is unused. Persist and share a random key before sending; retries must use the original key. Unrecognized reuse still revokes the sign-in. Recovery preserves the original access_token_expires_at and decreases expires_in, possibly to zero. Store the successor atomically even then, before refreshing it with a new key. Deploy server support before keyed clients. Responses are `Cache-Control: no-store`.",
         "security": [
           {
             "oauthClient": []
@@ -469,6 +469,18 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/AccountsVersionHeader"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Refresh grant only: a persisted random operation key shared across retries, processes and tabs. Bound to this app, token and canonical requested scope. Do not derive it from the token.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "^[!-~]+$"
+            }
           }
         ],
         "requestBody": {
@@ -547,6 +559,21 @@
           },
           "503": {
             "$ref": "#/components/responses/OAuthUnavailable"
+          },
+          "409": {
+            "description": "Refresh conflict; does not revoke the sign-in. refresh_in_progress: retry the same operation after Retry-After (1 second). idempotency_key_reused: key belongs to another token or scope. refresh_superseded: re-read shared session state. refresh_result_unavailable: recovery expired or unreadable; recover from shared state or sign in again, never retry the old token with a new key.",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
           }
         }
       }
@@ -20880,7 +20907,8 @@
           "refresh_token_expires_at",
           "scope",
           "membership_id",
-          "account"
+          "account",
+          "access_token_expires_at"
         ],
         "properties": {
           "access_token": {
@@ -20895,7 +20923,7 @@
           },
           "expires_in": {
             "type": "integer",
-            "description": "1800 seconds, or fewer when the sign-in ends sooner: an access token never outlives its sign-in."
+            "description": "Remaining access-token lifetime, normally 1800 seconds. Recovery does not restart it and may return zero; save the recovered refresh token before rotating again."
           },
           "refresh_token": {
             "type": "string",
@@ -20919,6 +20947,11 @@
           },
           "account": {
             "$ref": "#/components/schemas/AccountForApp"
+          },
+          "access_token_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original access JWT expiry; unchanged when recovering a refresh result."
           }
         }
       },
@@ -20934,7 +20967,8 @@
           "refresh_token_expires_at",
           "scope",
           "membership_id",
-          "account"
+          "account",
+          "access_token_expires_at"
         ],
         "properties": {
           "access_token": {
@@ -20974,6 +21008,11 @@
           },
           "account": {
             "$ref": "#/components/schemas/AccountForApp"
+          },
+          "access_token_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original access JWT expiry; unchanged when recovering a refresh result."
           }
         }
       },

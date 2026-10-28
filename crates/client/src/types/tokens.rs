@@ -19,8 +19,15 @@ pub struct TokenResponse {
     pub token_type: String,
     /// Seconds until the access token expires.
     pub expires_in: u64,
+    /// Original access JWT expiry. Recovery never extends it; older servers may omit it.
+    #[serde(
+        default,
+        with = "crate::serde_util::rfc3339_ms::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub access_token_expires_at: Option<OffsetDateTime>,
     /// Rotating refresh token (`sar_…`), valid up to 900 days from the first sign-in.
-    /// Every use returns a new one; presenting a used one revokes the whole family.
+    /// New operations rotate it; unrecognized reuse revokes the whole family.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refresh_token: Option<Secret>,
     /// When the refresh token family ends.
@@ -61,9 +68,12 @@ impl TokenResponse {
             .unwrap_or_default()
     }
 
-    /// When the access token expires, counted from `issued_at` (use the time you
-    /// received the response).
+    /// The original access expiry, or for older servers `issued_at + expires_in`.
+    /// Pass the response receipt time as `issued_at`; recovery never restarts the lifetime.
     pub fn access_expires_at(&self, issued_at: OffsetDateTime) -> OffsetDateTime {
+        if let Some(expiry) = self.access_token_expires_at {
+            return expiry;
+        }
         let seconds = i64::try_from(self.expires_in).unwrap_or(i64::MAX);
         issued_at.saturating_add(time::Duration::seconds(seconds))
     }

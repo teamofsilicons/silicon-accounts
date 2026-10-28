@@ -226,8 +226,8 @@ else may have it.
 | `refresh_token` | the newest `sar_…` refresh token you received |
 | `scope` | optional; may only repeat or narrow the granted scopes (`invalid_scope` if it adds one) |
 
-Every refresh returns a new refresh token and kills the old one. If a used refresh token is
-presented, we revoke the whole sign-in (the token family): every access and refresh token in it
+Every new refresh operation returns a new refresh token and spends the old one. If a used token is
+presented without the original operation's `Idempotency-Key`, we revoke the whole sign-in (the token family): every access and refresh token in it
 stops working, and your app gets `membership.signed_out` with reason `refresh_token_reuse`. So
 always store the new token before you use it. `refresh_token_expires_at` doesn't move: a sign-in
 lasts at most 900 days from when it started, and one that has an earlier end (a Silicon's sign-in
@@ -238,10 +238,11 @@ job's sign-in); sign in again.`
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/oauth/token" -u "$APP_ID:$APP_SECRET" \
+  -H "Idempotency-Key: $SAVED_REFRESH_OPERATION_KEY" \
   -d grant_type=refresh_token -d refresh_token="$REFRESH_TOKEN"
 ```
 
-Present the same refresh token again and you get:
+Present the same refresh token again without its original operation key and you get:
 
 ```json
 {
@@ -251,6 +252,44 @@ Present the same refresh token again and you get:
 ```
 
 First-party tokens refresh the same way, with `-d client_id=silicon-accounts` and no secret.
+
+#### Recovering a refresh after a timeout or restart
+
+For `grant_type=refresh_token`, send an optional `Idempotency-Key` (1–200 visible ASCII
+characters). Generate a cryptographically random key, such as a UUID v4, and **persist it with
+the current refresh token before sending**. All tabs, workers and server instances acting on
+that session must use that saved operation. Do not derive the key from the refresh token.
+
+The key is bound to the authenticated app, the exact refresh token and the requested scope
+(scope order is normalized; omitted scope and explicit scope are different requests). Accounts
+commits rotation and an encrypted recovery result in one PostgreSQL transaction. Retrying the
+same operation returns the same token values for up to 24 hours, while the returned successor
+refresh token remains unused and the sign-in, account and membership remain authorized. The
+encryption keyring protects stored responses; tokens and operation keys must not appear in logs.
+
+`access_token_expires_at` is the original JWT expiry. On recovery, `expires_in` is the remaining
+lifetime, possibly **zero**; it never restarts at 1800. Persist the recovered successor first.
+If its access token has expired, refresh the successor using a new saved operation key. Save
+with a version check so a late reply cannot overwrite a newer session or undo logout.
+
+| HTTP / `error` | Action |
+|---|---|
+| 409 `refresh_in_progress` | Another request is processing the same operation. Wait `Retry-After` (1 second), then retry the same token and key. |
+| 409 `idempotency_key_reused` | The key belongs to a different token or scope. Re-read the saved operation; do not change the key and retry a spent token. |
+| 409 `refresh_superseded` | The successor was already refreshed. Re-read the latest shared session; do not overwrite it with an older reply. |
+| 409 `refresh_result_unavailable` | The 24-hour recovery window ended or the encrypted reply cannot be recovered. Re-read shared state; if no successor was saved, start sign-in again. |
+| 400 `invalid_grant` | The sign-in is revoked, expired, unauthorized, or the token was reused outside its original operation. |
+| Network failure / 5xx | Keep the saved operation and session; retry with the same token and key. |
+
+The 409 responses do not revoke the family. Expired and superseded ciphertext is retired;
+request bindings remain so a late recognized retry cannot accidentally rotate again. Logout
+and removed access always take precedence over recovery. Reusing a spent token with a different
+key (or no key) still triggers reuse detection. Clients without a key retain their previous
+behavior. Deploy server support before enabling keyed retries in clients.
+
+The Rust SDK exposes `AppClient::refresh_with_key`,
+`AccountsClient::refresh_first_party_with_key`, `refresh_public_client_with_key` (Accounts/developer),
+and `refresh_app_public_client_with_key` (apps with public sign-in enabled).
 
 ### `grant_type=urn:silicon:params:oauth:grant-type:slt`
 

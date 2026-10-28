@@ -418,7 +418,7 @@ async fn exchange(
                 let token=input.refresh_token.as_deref().ok_or_else(||ApiError::invalid_request("refresh_token is required."))?;
                 let family=super::credentials::refresh_token_info(&mut tx,&state.keys.pepper,token).await?.map(|v|v.family_id);
                 bound(&mut tx,cell,&app,family).await?;
-                grants::refresh::exchange(&state,&ClientAuth{app:target,public:false},&params,&meta).await.map_err(oauth)?
+                grants::refresh::exchange(&state,&ClientAuth{app:target,public:false},&params,&meta,None).await.map_err(oauth)?
             },
             _=>return Err(ApiError::invalid_request("Cells delegation supports authorization_code with S256 PKCE, slt, and refresh_token.")),
         };

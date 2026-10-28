@@ -2,7 +2,8 @@
 //! short-lived tokens, device authorizations). They are kept for [`GRANT_RETENTION_DAYS`] days
 //! after expiring so late presentations still get a precise "already used"/"expired" answer and
 //! a reused authorization code can still revoke the tokens issued from it. Token families and
-//! refresh tokens are sign-in history and are never swept here.
+//! refresh tokens are sign-in history and are never swept here. Expired or revoked encrypted
+//! refresh recovery replies are retired while their request bindings remain.
 
 use std::time::Duration;
 
@@ -16,29 +17,34 @@ pub const GRANT_RETENTION_DAYS: i32 = 7;
 /// How often the sweep runs.
 const SWEEP_EVERY: Duration = Duration::from_mins(15);
 
-/// Rows deleted by one [`purge_expired_grants`] run.
+/// Rows deleted or recovery replies retired by one [`purge_expired_grants`] run.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct PurgedGrants {
     pub authorization_codes: u64,
+    pub refresh_recoveries: u64,
     pub short_lived_tokens: u64,
     pub device_authorizations: u64,
 }
 
 impl PurgedGrants {
-    /// Rows deleted in total.
+    /// Rows deleted or encrypted recovery replies retired in total.
     #[must_use]
     pub fn total(&self) -> u64 {
-        self.authorization_codes + self.short_lived_tokens + self.device_authorizations
+        self.authorization_codes
+            + self.short_lived_tokens
+            + self.device_authorizations
+            + self.refresh_recoveries
     }
 }
 
 /// Deletes authorization codes, short-lived tokens and device authorizations that expired more
-/// than [`GRANT_RETENTION_DAYS`] days ago.
+/// than [`GRANT_RETENTION_DAYS`] days ago, and retires expired/revoked refresh recovery replies.
 ///
 /// # Errors
 ///
 /// A database failure (503 `database_unavailable` when the pool is exhausted, else 500).
 pub async fn purge_expired_grants(pool: &PgPool) -> ApiResult<PurgedGrants> {
+    let refresh_recoveries = accounts_core::repo::refresh_recovery::purge(pool).await?;
     let mut conn = pool.acquire().await?;
     let authorization_codes = sqlx::query(
         "delete from authorization_codes where expires_at < now() - make_interval(days => $1)",
@@ -62,6 +68,7 @@ pub async fn purge_expired_grants(pool: &PgPool) -> ApiResult<PurgedGrants> {
     .await?
     .rows_affected();
     Ok(PurgedGrants {
+        refresh_recoveries,
         authorization_codes,
         short_lived_tokens,
         device_authorizations,
@@ -78,6 +85,7 @@ pub(crate) async fn run(state: AppState) {
         match purge_expired_grants(&state.db).await {
             Ok(purged) if purged.total() > 0 => tracing::info!(
                 authorization_codes = purged.authorization_codes,
+                refresh_recoveries = purged.refresh_recoveries,
                 short_lived_tokens = purged.short_lived_tokens,
                 device_authorizations = purged.device_authorizations,
                 "purged expired grants"

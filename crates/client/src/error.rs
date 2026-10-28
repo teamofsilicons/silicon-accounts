@@ -165,6 +165,9 @@ pub struct OAuthError {
     /// The `X-Request-Id` of the failed request.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub request_id: Option<String>,
+    /// Delay requested by the server, including an in-progress refresh recovery.
+    #[serde(skip)]
+    pub retry_after: Option<Duration>,
 }
 
 impl OAuthError {
@@ -175,6 +178,7 @@ impl OAuthError {
             error: error.into(),
             description,
             request_id: None,
+            retry_after: None,
         }
     }
 
@@ -462,10 +466,11 @@ impl Error {
         }
     }
 
-    /// How long the service asked to wait before retrying (429 / 423 responses).
+    /// How long the service asked to wait before retrying (including OAuth conflicts).
     pub fn retry_after(&self) -> Option<Duration> {
         match self {
             Self::Api(e) => e.retry_after,
+            Self::OAuth(e) => e.retry_after,
             _ => None,
         }
     }
