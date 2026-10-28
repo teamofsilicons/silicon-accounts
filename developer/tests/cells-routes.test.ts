@@ -10,4 +10,8 @@ test("Cells author paths cannot reach private grants, user sessions or another o
     for (const method of ["GET", "POST", "PUT", "DELETE"]) assert.equal(cellsProxyRoute(path, method), null, `${method} ${path}`);
   }
   assert.equal(cellsProxyRoute("cells/notes/sql", "GET"), null);
+  const deleted="12345678-1234-1234-1234-123456789abc";
+  assert.equal(cellsProxyRoute("cells/notes/storage-api/trash/photos","GET"),"v1/cells/notes/storage-api/trash/photos");
+  assert.equal(cellsProxyRoute(`cells/notes/storage-api/trash/${deleted}/restore`,"POST"),`v1/cells/notes/storage-api/trash/${deleted}/restore`);
+  assert.equal(cellsProxyRoute(`cells/notes/storage-api/trash/${deleted}/restore`,"DELETE"),null);
 });

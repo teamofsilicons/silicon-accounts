@@ -29,6 +29,8 @@ const routes: [string, RegExp][] = [
   ["GET HEAD", new RegExp(`^cells/${CELL}/storage-api/files/${BUCKET}$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/storage-api/object/${BUCKET}/.+$`)],
   ["POST", new RegExp(`^cells/${CELL}/storage-api/(files|sign)$`)],
+  ["GET HEAD", new RegExp(`^cells/${CELL}/storage-api/trash/${BUCKET}$`)],
+  ["POST", new RegExp(`^cells/${CELL}/storage-api/trash/${UUID}/restore$`)],
   ["GET HEAD", /^invitations$/],
   ["POST", new RegExp(`^invitations/${UUID}/(accept|decline|cancel)$`)],
 ];

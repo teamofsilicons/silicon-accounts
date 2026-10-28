@@ -12,6 +12,7 @@ import {cellsRequest,type Cell} from "@/lib/cells/api";
 import {resumeAuthorUpload,type UploadStatus} from "@/lib/cells/uploads";
 import {useNavigationGuard} from "@/lib/navigation-guard";
 import {cellPath,useCellData,useCellAction,Failure,bytes,date} from "./shared";
+import {FileTrash} from "./trash";
 import {BucketEditor,StorageProvider,type Bucket} from "./storage-settings";
 import styles from "./cells.module.css";
 interface StoredFile {id:string;bucket:string;name:string;size:number;content_type:string;updated_at:string}
@@ -31,6 +32,7 @@ export function CellFiles({cell}:{cell:Cell}){
         <FileList key={bucket.id} cellId={id} bucket={bucket.id} prefix={prefix} onAction={setAction}/>
       </Stack>:!buckets.isPending&&!buckets.error&&<Surface><p>Create a bucket to start storing files.</p></Surface>}
     </Section>
+    {bucket&&<FileTrash key={bucket.id} cellId={id} bucket={bucket.id}/>}
     <PendingUploads cellId={id} onResume={setUpload}/>
     <StorageProvider cellId={id} cellUuid={cell.uuid}/>
     <Dialog open={edit!==null} onOpenChange={value=>{if(!value)setEdit(null);}}><DialogContent title={edit==="new"?"Create bucket":"Bucket settings"} description="Bucket limits apply when new files are uploaded.">{edit&&<BucketEditor key={typeof edit==="string"?"new":edit.id} cellId={id} bucket={edit==="new"?undefined:edit} onDone={()=>setEdit(null)}/>}</DialogContent></Dialog>

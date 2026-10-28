@@ -305,7 +305,7 @@ column inspection, SQL, migration history and generated TypeScript/Rust exports.
 Settings cover origins, callbacks, keys, secrets, deletion and restoration.
 
 Files support paginated paths, download, copy/move/delete, expiring links,
-bucket settings and access presets, managed/S3 provider changes and migration
+thirty-day trash and restoration, bucket settings and access presets, managed/S3 provider changes and migration
 retry. Resuming an upload requires the original author session and original
 file; already persisted parts are checked before new parts are sent. No upload
 bearer capability is needed in this author UI. Uploaded active content is served
