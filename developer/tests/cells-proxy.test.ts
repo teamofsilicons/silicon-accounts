@@ -48,3 +48,21 @@ test("Downloaded active content stays sandboxed and is delivered as an attachmen
   assert.equal(response.status,200);assert.match(response.headers.get("content-disposition")??"",/^attachment;/);
   assert.match(response.headers.get("content-security-policy")??"",/sandbox/);assert.equal(response.headers.get("set-cookie"),null);
 });
+
+
+test("Backup downloads stream privately with integrity metadata and a fixed safe filename",async()=>{
+  const hash="a".repeat(64);
+  globalThis.fetch=(async(input,init)=>{
+    assert.equal(String(input),`http://cells.test/v1/cells/notes/backups/${id}/download`);
+    assert.equal(new Headers(init?.headers).get("authorization"),"Bearer author-access");
+    return new Response(new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode("dump"));controller.close();}}),{headers:{"content-type":"application/octet-stream","content-length":"4","x-content-sha256":hash,etag:`"${hash}"`,"content-disposition":"inline; filename=unsafe.html","set-cookie":"must-not-forward=1"}});
+  }) as typeof fetch;
+  const {GET}=await import("../app/api/cells/[...path]/route");
+  const response=await GET(request(`cells/notes/backups/${id}/download`));
+  assert.equal(response.headers.get("content-disposition"),`attachment; filename="notes-${id}.dump"`);
+  assert.equal(response.headers.get("x-content-sha256"),hash);
+  assert.equal(response.headers.get("cache-control"),"no-store");
+  assert.equal(response.headers.get("referrer-policy"),"no-referrer");
+  assert.equal(response.headers.get("set-cookie"),null);
+  assert.equal(await response.text(),"dump");
+});

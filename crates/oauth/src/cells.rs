@@ -25,6 +25,10 @@ pub(crate) fn router() -> Router<AppState> {
             put(link).delete(unlink),
         )
         .route(
+            "/v1/internal/cells/links/{cell}/{app}/callback",
+            put(update_callback),
+        )
+        .route(
             "/v1/internal/cells/links/{cell}/{app}/token",
             post(exchange),
         )
@@ -179,8 +183,19 @@ async fn link(
     require_app_author(&mut tx, &app, &actor).await?;
     // The cell UUID is globally assigned by the Cells service. The app author
     // cannot silently replace a live cell's callback with an unrelated address.
-    if let Some(existing)=sqlx::query_scalar::<_,String>("select callback_uri from cells_app_links where cell_uuid=$1 and app_id=$2 and revoked_at is null for update").bind(cell).bind(&app).fetch_optional(&mut *tx).await? && existing!=input.callback_uri {
-        return Err(ApiError::conflict("cell_callback_conflict","Unlink the previous callback before replacing this cell's callback."));
+    if let Some(existing) = sqlx::query_scalar::<_, String>(
+        "select callback_uri from cells_app_links where cell_uuid=$1 and app_id=$2 for update",
+    )
+    .bind(cell)
+    .bind(&app)
+    .fetch_optional(&mut *tx)
+    .await?
+        && existing != input.callback_uri
+    {
+        return Err(ApiError::conflict(
+            "cell_callback_conflict",
+            "The permanent callback of an existing cell delegation cannot be replaced.",
+        ));
     }
     let redirects = apps::signin_row(&mut tx, &app)
         .await?
@@ -201,6 +216,111 @@ async fn link(
         &json!({"cell_uuid":cell,"app_id":app,"callback_uri":input.callback_uri,"webhook_secret":webhook_secret,"redirect_uris":redirects.into_iter().filter(|v|v!=&input.callback_uri).collect::<Vec<_>>()}),
     ))
 }
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CallbackUpdate {
+    base_callback_uri: String,
+    custom_callback_uri: Option<String>,
+    generation: i64,
+}
+
+/// Cells has already proved DNS ownership and TLS readiness. This bridge can
+/// update only an existing delegation, never create authority over another app.
+async fn update_callback(
+    State(state): State<AppState>,
+    auth: AppAuth,
+    Path((cell, app)): Path<(Uuid, String)>,
+    key: IdempotencyKey,
+    Json(input): Json<CallbackUpdate>,
+) -> ApiResult<Response> {
+    service(&auth)?;
+    callback(&input.base_callback_uri)?;
+    if input.generation < 1 {
+        return Err(ApiError::invalid_request(
+            "generation must be a positive integer.",
+        ));
+    }
+    if let Some(custom) = &input.custom_callback_uri {
+        callback(custom)?;
+        let url = url::Url::parse(custom)
+            .map_err(|_| ApiError::invalid_request("The custom callback URL is invalid."))?;
+        if url.scheme() != "https" || custom == &input.base_callback_uri {
+            return Err(ApiError::invalid_request(
+                "A custom callback must use HTTPS and differ from the permanent callback.",
+            ));
+        }
+    }
+    let mut tx = state.db.begin().await?;
+    sqlx::query("select pg_advisory_xact_lock(hashtextextended($1,0))")
+        .bind(format!("cells-link:{cell}:{app}"))
+        .execute(&mut *tx)
+        .await?;
+    let link: Option<(String, Option<String>, i64, bool)> = sqlx::query_as(
+        "select callback_uri,custom_callback_uri,callback_generation,callback_suspended from cells_app_links where cell_uuid=$1 and app_id=$2 and revoked_at is null for update",
+    ).bind(cell).bind(&app).fetch_optional(&mut *tx).await?;
+    let (base, current, generation, suspended) = link.ok_or_else(|| {
+        ApiError::forbidden(
+            "cell_app_not_linked",
+            "This app has no active delegation to this cell.",
+        )
+    })?;
+    let request_hash = idempotency::request_hash(&input);
+    let prior: Option<Vec<u8>> = sqlx::query_scalar(
+        "select request_hash from cells_callback_commands where cell_uuid=$1 and app_id=$2 and key=$3",
+    ).bind(cell).bind(&app).bind(key.as_str()).fetch_optional(&mut *tx).await?;
+    if prior.as_ref().is_some_and(|hash| hash != &request_hash) {
+        return Err(ApiError::conflict(
+            "idempotency_key_reused",
+            "This callback command key already names a different request.",
+        ));
+    }
+    if base != input.base_callback_uri {
+        return Err(ApiError::conflict(
+            "cell_callback_conflict",
+            "The permanent callback does not match this delegation.",
+        ));
+    }
+    if input.generation < generation
+        || input.generation == generation && input.custom_callback_uri != current
+    {
+        return Err(ApiError::conflict(
+            "cell_callback_generation_conflict",
+            "This callback update was superseded by a newer domain generation.",
+        ));
+    }
+    // Removal still succeeds for a disabled app; adding a callback may not grant
+    // fresh sign-in authority to a disabled or first-party app.
+    if input.custom_callback_uri.is_some() {
+        let target = apps::require_active(&mut tx, &app).await?;
+        if target.is_first_party() {
+            return Err(ApiError::forbidden(
+                "first_party_delegation_forbidden",
+                "First-party identity privileges cannot be delegated to a cell.",
+            ));
+        }
+    }
+    if input.generation > generation || suspended {
+        sqlx::query("update cells_app_links set custom_callback_uri=$3,callback_generation=$4,callback_suspended=false where cell_uuid=$1 and app_id=$2")
+            .bind(cell).bind(&app).bind(&input.custom_callback_uri).bind(input.generation)
+            .execute(&mut *tx).await?;
+        audit::record(&mut tx, &audit::AuditEntry {
+            app_id: Some(&app),
+            details: json!({"cell_uuid":cell,"generation":input.generation,"custom_callback_uri":input.custom_callback_uri,"idempotency_key":key.as_str()}),
+            ..audit::AuditEntry::new(ActorKind::App, Some(CELLS), "cell.callback.updated")
+        }).await?;
+    }
+    sqlx::query("insert into cells_callback_commands(cell_uuid,app_id,key,request_hash) values($1,$2,$3,$4) on conflict do nothing")
+        .bind(cell).bind(&app).bind(key.as_str()).bind(request_hash).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(super::respond::no_store(
+        StatusCode::OK,
+        &json!({
+            "cell_uuid":cell,"app_id":app,"callback_uri":base,
+            "custom_callback_uri":input.custom_callback_uri,"generation":input.generation,
+        }),
+    ))
+}
+
 async fn unlink(
     State(state): State<AppState>,
     auth: AppAuth,
@@ -208,7 +328,7 @@ async fn unlink(
 ) -> ApiResult<Response> {
     service(&auth)?;
     let mut tx = state.db.begin().await?;
-    sqlx::query("update cells_app_links set revoked_at=now() where cell_uuid=$1 and app_id=$2 and revoked_at is null").bind(cell).bind(&app).execute(&mut *tx).await?;
+    sqlx::query("update cells_app_links set revoked_at=now(),callback_suspended=true where cell_uuid=$1 and app_id=$2 and revoked_at is null").bind(cell).bind(&app).execute(&mut *tx).await?;
     let families: Vec<Uuid> = sqlx::query_scalar(
         "select family_id from cells_token_families where cell_uuid=$1 and app_id=$2",
     )
@@ -261,18 +381,34 @@ async fn exchange(
     Json(input): Json<Exchange>,
 ) -> ApiResult<Response> {
     service(&auth)?;
+    let mut admission = state.db.begin().await?;
+    let callbacks: Option<(String, Option<String>)> = sqlx::query_as(
+        "select callback_uri,case when callback_suspended then null else custom_callback_uri end from cells_app_links where cell_uuid=$1 and app_id=$2 and revoked_at is null for share",
+    ).bind(cell).bind(&app).fetch_optional(&mut *admission).await?;
+    let (base_callback, custom_callback) = callbacks.ok_or_else(|| {
+        ApiError::forbidden(
+            "cell_app_not_linked",
+            "This app has no active delegation to this cell.",
+        )
+    })?;
+    if input.grant_type == "authorization_code"
+        && input.redirect_uri.as_deref() != Some(base_callback.as_str())
+        && (custom_callback.is_none() || input.redirect_uri != custom_callback)
+    {
+        return Err(ApiError::invalid_request(
+            "The authorization code must return to this cell's current registered callback.",
+        ));
+    }
+    apps::require_active(&mut admission, &app).await?;
     let scope = format!("cells:{cell}:{app}:token");
     // Seal token responses and replay uncertain network responses without consuming
     // a single-use code/SLT twice or accidentally reusing a rotating refresh token.
     let mut response = idempotency::run(&state,Some(key.as_str()),&scope,&input,true,||async {
         let mut tx=state.db.begin().await?;
-        let callback:Option<String>=sqlx::query_scalar("select callback_uri from cells_app_links where cell_uuid=$1 and app_id=$2 and revoked_at is null for share").bind(cell).bind(&app).fetch_optional(&mut *tx).await?;
-        let callback=callback.ok_or_else(||ApiError::forbidden("cell_app_not_linked","This app has no active delegation to this cell."))?;
         let target=apps::require_active(&mut tx,&app).await?;
         let params=TokenParams{grant_type:Some(input.grant_type.clone()),code:input.code.clone(),redirect_uri:input.redirect_uri.clone(),code_verifier:input.code_verifier.clone(),slt:input.slt.clone(),refresh_token:input.refresh_token.clone(),..Default::default()};
         let tokens=match input.grant_type.as_str(){
             "authorization_code"=>{
-                if input.redirect_uri.as_deref()!=Some(&callback){return Err(ApiError::invalid_request("The authorization code must return to this cell's registered callback."));}
                 // Public=true enforces S256 PKCE even though the Cells service has
                 // authenticated. It cannot exchange another backend's stolen code.
                 grants::code::exchange(&state,&ClientAuth{app:target,public:true},&params,&meta).await.map_err(oauth)?
@@ -291,6 +427,7 @@ async fn exchange(
         tx.commit().await?;
         Ok((StatusCode::OK,serde_json::to_value(tokens).map_err(|_|ApiError::internal("Could not encode token response."))?))
     }).await?;
+    admission.commit().await?;
     response.headers_mut().insert(
         "cache-control",
         axum::http::HeaderValue::from_static("no-store"),

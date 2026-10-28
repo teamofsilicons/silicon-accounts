@@ -251,3 +251,216 @@ async fn cells_delegation_requires_authors_and_keeps_sessions_bound_to_one_cell(
         "Unlinking revoked a session that did not belong to the cell"
     );
 }
+
+#[tokio::test]
+async fn cells_custom_callbacks_are_fenced_and_never_replace_the_permanent_callback() {
+    let ctx = TestContext::new().await;
+    let owner = ctx.carbon().await;
+    let (app, app_secret) = ctx.app_owned("domains", Some(&owner.uuid)).await;
+    let secret = random_token(prefix::APP_SECRET);
+    sqlx::query("insert into apps(app_id,name,secret_hash,status,source) values('silicon-cells','Silicon Cells',$1,'active','fake')")
+        .bind(ctx.state.keys.pepper.hash(&secret)).execute(&ctx.db.pool).await.expect("fixture service");
+    let author = ctx.tokens_for(&owner, "developer", &[Scope::Profile]).await;
+    let cell = Uuid::new_v4();
+    let path = format!("/v1/internal/cells/links/{cell}/{}", app.app_id);
+    let update = format!("{path}/callback");
+    let base = "https://permanent.cells.example/auth/callback";
+    let custom = "https://data.example/auth/callback";
+    let body = |generation, alias: Option<&str>| json!({"base_callback_uri":base,"custom_callback_uri":alias,"generation":generation});
+    let send = |body, key: &'static str| {
+        Req::put(&update)
+            .basic("silicon-cells", &secret)
+            .header("idempotency-key", key)
+            .json(body)
+    };
+    let denied = ctx
+        .call(router(), send(body(1, Some(custom)), "unlinked"))
+        .await;
+    assert_eq!(denied.status, 403);
+    let linked = ctx
+        .call(
+            router(),
+            Req::put(&path)
+                .basic("silicon-cells", &secret)
+                .header("idempotency-key", "link")
+                .json(json!({"actor_token":author.access_token,"callback_uri":base})),
+        )
+        .await;
+    assert_eq!(linked.status, 200);
+    let denied = ctx
+        .call(
+            router(),
+            Req::put(&update)
+                .basic(&app.app_id, &app_secret)
+                .header("idempotency-key", "wrong-service")
+                .json(body(1, Some(custom))),
+        )
+        .await;
+    assert_eq!(denied.status, 403);
+    for invalid in [
+        "http://data.example/auth/callback",
+        "https://data.example/elsewhere",
+        "https://user@data.example/auth/callback",
+        "https://data.example/auth/callback?q=1",
+        "https://data.example/auth/callback#x",
+        base,
+    ] {
+        let denied = ctx
+            .call(router(), send(body(1, Some(invalid)), "invalid"))
+            .await;
+        assert_eq!(denied.status, 400);
+    }
+    let denied = ctx.call(router(), send(json!({"base_callback_uri":"https://foreign.example/auth/callback","custom_callback_uri":custom,"generation":1}), "wrong-base")).await;
+    assert_eq!(denied.status, 409);
+    let accepted = ctx
+        .call(router(), send(body(2, Some(custom)), "custom"))
+        .await;
+    assert_eq!(accepted.status, 200);
+    let replay = ctx
+        .call(router(), send(body(2, Some(custom)), "custom"))
+        .await;
+    assert_eq!(replay.json, accepted.json);
+    let config = apps::effective_config(&mut *ctx.conn().await, &ctx.state.settings, &app.app_id)
+        .await
+        .expect("config");
+    assert!(config.redirect_uris.contains(&base.to_owned()));
+    assert!(config.redirect_uris.contains(&custom.to_owned()));
+    ctx.membership(&app.app_id, &owner.uuid, &[Scope::Profile])
+        .await;
+    let mut custom_grant = None;
+    for (callback, key) in [(base, "base-code"), (custom, "custom-code")] {
+        let code = tokens::create_code(
+            &mut *ctx.conn().await,
+            &ctx.state.keys.pepper,
+            &tokens::NewAuthCode {
+                flow_id: "domains-test",
+                app_id: &app.app_id,
+                account_uuid: &owner.uuid,
+                redirect_uri: callback,
+                code_challenge: Some(CHALLENGE),
+                code_challenge_method: Some("S256"),
+                scopes: &[Scope::Profile],
+                nonce: None,
+                browser_session_id: None,
+                auth_time: None,
+            },
+        )
+        .await
+        .expect("code");
+        let grant = json!({"grant_type":"authorization_code","code":code,"redirect_uri":callback,"code_verifier":VERIFIER});
+        let issued = ctx
+            .call(
+                router(),
+                Req::post(&format!("{path}/token"))
+                    .basic("silicon-cells", &secret)
+                    .header("idempotency-key", key)
+                    .json(grant.clone()),
+            )
+            .await;
+        assert_eq!(issued.status, 200);
+        if callback == custom {
+            custom_grant = Some(grant);
+        }
+    }
+    let reused = ctx.call(router(), send(body(3, None), "custom")).await;
+    assert_eq!(reused.status, 409, "A callback key changed request meaning");
+    let removed = ctx.call(router(), send(body(3, None), "remove")).await;
+    assert_eq!(removed.status, 200);
+    let denied = ctx
+        .call(router(), send(body(2, Some(custom)), "custom"))
+        .await;
+    assert_eq!(
+        denied.status, 409,
+        "stale command restored a removed callback"
+    );
+    let denied = ctx
+        .call(router(), send(body(3, Some(custom)), "same-generation"))
+        .await;
+    assert_eq!(denied.status, 409);
+    let denied = ctx
+        .call(
+            router(),
+            Req::post(&format!("{path}/token"))
+                .basic("silicon-cells", &secret)
+                .header("idempotency-key", "custom-code")
+                .json(custom_grant.expect("custom grant")),
+        )
+        .await;
+    assert_eq!(
+        denied.status, 400,
+        "removed callback replayed a saved token response"
+    );
+    let config = apps::effective_config(&mut *ctx.conn().await, &ctx.state.settings, &app.app_id)
+        .await
+        .expect("config");
+    assert!(config.redirect_uris.contains(&base.to_owned()));
+    assert!(!config.redirect_uris.contains(&custom.to_owned()));
+    assert_eq!(
+        ctx.call(router(), send(body(4, Some(custom)), "restore"))
+            .await
+            .status,
+        200
+    );
+    assert_eq!(
+        ctx.call(router(), Req::delete(&path).basic("silicon-cells", &secret))
+            .await
+            .status,
+        200
+    );
+    assert_eq!(
+        ctx.call(router(), send(body(4, Some(custom)), "restore"))
+            .await
+            .status,
+        403
+    );
+    let linked = ctx
+        .call(
+            router(),
+            Req::put(&path)
+                .basic("silicon-cells", &secret)
+                .header("idempotency-key", "relink")
+                .json(json!({"actor_token":author.access_token,"callback_uri":base})),
+        )
+        .await;
+    assert_eq!(linked.status, 200);
+    let config = apps::effective_config(&mut *ctx.conn().await, &ctx.state.settings, &app.app_id)
+        .await
+        .expect("config");
+    assert!(config.redirect_uris.contains(&base.to_owned()));
+    assert!(
+        !config.redirect_uris.contains(&custom.to_owned()),
+        "relink exposed a suspended domain before verification sync"
+    );
+    assert_eq!(
+        ctx.call(router(), send(body(4, Some(custom)), "restore"))
+            .await
+            .status,
+        200
+    );
+    let config = apps::effective_config(&mut *ctx.conn().await, &ctx.state.settings, &app.app_id)
+        .await
+        .expect("config");
+    assert!(config.redirect_uris.contains(&custom.to_owned()));
+    // Ordinary sign-in configuration edits cannot remove either managed callback.
+    sqlx::query("delete from app_signin_configs where app_id=$1")
+        .bind(&app.app_id)
+        .execute(&ctx.db.pool)
+        .await
+        .expect("edit config");
+    let config = apps::effective_config(&mut *ctx.conn().await, &ctx.state.settings, &app.app_id)
+        .await
+        .expect("config");
+    assert!(
+        config.redirect_uris.contains(&base.to_owned())
+            && config.redirect_uris.contains(&custom.to_owned())
+    );
+    // Even after unlink, the assigned base cannot silently become another host.
+    assert_eq!(
+        ctx.call(router(), Req::delete(&path).basic("silicon-cells", &secret))
+            .await
+            .status,
+        200
+    );
+    let denied = ctx.call(router(), Req::put(&path).basic("silicon-cells", &secret).header("idempotency-key", "replace-base").json(json!({"actor_token":author.access_token,"callback_uri":"https://other.example/auth/callback"}))).await;
+    assert_eq!(denied.status, 409);
+}

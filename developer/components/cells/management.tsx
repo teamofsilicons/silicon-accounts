@@ -24,8 +24,8 @@ export function CellAuthors({cellId,active}:{cellId:string;active:boolean}){
   </Stack>;
 }
 export function CellHistory({cellId}:{cellId:string}){
-  const query=useCellData<{history:{id:number;action:string;actor_uuid:string;occurred_at:string;details:unknown}[]}>(cellId,"/history");
-  return <Stack gap={8}><CellNotifications cellId={cellId}/><Section title="History" description="The latest 200 changes to this cell."><Stack><Failure error={query.error}/>{query.isPending?<p role="status">Loading history…</p>:query.data?.history.map(item=><Surface key={item.id}><details><summary>{item.action} · {date(item.occurred_at)}</summary><p className={styles.muted}>Author: {item.actor_uuid}</p><pre className={styles.pre}>{JSON.stringify(item.details,null,2)}</pre></details></Surface>)}</Stack></Section></Stack>;
+  const query=useCellData<{history:{id:number;action:string;actor_uuid:string|null;occurred_at:string;details:unknown}[]}>(cellId,"/history");
+  return <Stack gap={8}><CellNotifications cellId={cellId}/><Section title="History" description="The latest 200 changes to this cell."><Stack><Failure error={query.error}/>{query.isPending?<p role="status">Loading history…</p>:query.data?.history.map(item=><Surface key={item.id}><details><summary>{item.action} · {date(item.occurred_at)}</summary><p className={styles.muted}>{item.actor_uuid?`Author: ${item.actor_uuid}`:"System"}</p><pre className={styles.pre}>{JSON.stringify(item.details,null,2)}</pre></details></Surface>)}</Stack></Section></Stack>;
 }
 export function CellSettings({cell}:{cell:Cell}){
   return <Stack gap={8}>{cell.status==="active"&&<><OriginSettings key={JSON.stringify(cell.settings)} cell={cell}/><Keys cellId={cell.cell_id}/><Secrets cellId={cell.cell_id}/></>}{cell.status==="deleted"&&<StorageLocations cellId={cell.cell_id}/>}<Lifecycle cell={cell}/></Stack>;

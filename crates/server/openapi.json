@@ -19109,6 +19109,646 @@
         },
         "x-internal": true
       }
+    },
+    "/v1/internal/cells/author": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "verifyCellsAuthor",
+        "summary": "Verify current Cells author identity",
+        "description": "Only the authenticated silicon-cells app may use this private delegation bridge. Accepts a live silicon-cells or developer access token and checks current account membership.",
+        "security": [
+          {
+            "appBasic": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The delegated operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid grant, callback or request."
+          },
+          "401": {
+            "description": "Missing or invalid service/author credentials."
+          },
+          "403": {
+            "description": "Wrong service, app author or inactive delegation."
+          },
+          "409": {
+            "description": "The callback generation, immutable base or request key conflicts with current state."
+          }
+        },
+        "x-internal": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "access_token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "access_token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/internal/cells/apps/{app}": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "inspectCellsApp",
+        "summary": "Inspect an app and its accepted authors",
+        "description": "Only the authenticated silicon-cells app may use this private delegation bridge. The supplied author token must have current authorship of this target app.",
+        "security": [
+          {
+            "appBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The delegated operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid grant, callback or request."
+          },
+          "401": {
+            "description": "Missing or invalid service/author credentials."
+          },
+          "403": {
+            "description": "Wrong service, app author or inactive delegation."
+          },
+          "409": {
+            "description": "The callback generation, immutable base or request key conflicts with current state."
+          }
+        },
+        "x-internal": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "access_token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "access_token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/internal/cells/links/{cell}/{app}": {
+      "put": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "linkCellsApp",
+        "summary": "Delegate an app to a cell",
+        "description": "Only the authenticated silicon-cells app may use this private delegation bridge. Requires current target-app authorship. The assigned permanent /auth/callback URI cannot be replaced, including after unlink. Cells independently checks cell authorship. The response may contain a private webhook signing secret.",
+        "security": [
+          {
+            "appBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cell",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stable key for retrying the same operation."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The delegated operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid grant, callback or request."
+          },
+          "401": {
+            "description": "Missing or invalid service/author credentials."
+          },
+          "403": {
+            "description": "Wrong service, app author or inactive delegation."
+          },
+          "409": {
+            "description": "The callback generation, immutable base or request key conflicts with current state."
+          }
+        },
+        "x-internal": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "actor_token": {
+                    "type": "string"
+                  },
+                  "callback_uri": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "actor_token",
+                  "callback_uri"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "unlinkCellsApp",
+        "summary": "Revoke one cell app delegation",
+        "description": "Only the authenticated silicon-cells app may use this private delegation bridge. Revokes only sessions issued through this cell/app pair and suspends the custom callback. The permanent assignment remains for safe relinking.",
+        "security": [
+          {
+            "appBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cell",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The delegated operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid grant, callback or request."
+          },
+          "401": {
+            "description": "Missing or invalid service/author credentials."
+          },
+          "403": {
+            "description": "Wrong service, app author or inactive delegation."
+          },
+          "409": {
+            "description": "The callback generation, immutable base or request key conflicts with current state."
+          }
+        },
+        "x-internal": true
+      }
+    },
+    "/v1/internal/cells/links/{cell}/{app}/callback": {
+      "put": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "updateCellsAppCallback",
+        "summary": "Synchronize one verified custom-domain callback",
+        "description": "Only the authenticated silicon-cells app may use this private delegation bridge. Requires an existing active link and an exact permanent callback match. Cells must verify DNS ownership and TLS before requesting a custom HTTPS /auth/callback. Increasing generations fence delayed updates after replacement/removal. Same generation and desired callback is a no-op; conflicting or stale generations are rejected. Null removes the custom callback while the base remains. Unlink suspends the alias until a current synchronization after relink. Effective OAuth callbacks and delegated code exchanges enforce the current unsuspended alias.",
+        "security": [
+          {
+            "appBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cell",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stable key for retrying the same operation."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The delegated operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid grant, callback or request."
+          },
+          "401": {
+            "description": "Missing or invalid service/author credentials."
+          },
+          "403": {
+            "description": "Wrong service, app author or inactive delegation."
+          },
+          "409": {
+            "description": "The callback generation, immutable base or request key conflicts with current state."
+          }
+        },
+        "x-internal": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "base_callback_uri": {
+                    "type": "string"
+                  },
+                  "custom_callback_uri": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "generation": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "base_callback_uri",
+                  "custom_callback_uri",
+                  "generation"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/internal/cells/links/{cell}/{app}/token": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "exchangeCellsAppToken",
+        "summary": "Exchange a cell-bound grant",
+        "description": "Only the authenticated silicon-cells app may use this private delegation bridge. Authorization codes require S256 PKCE and the exact current base or custom callback. SLT and refresh exchanges bind the resulting family to this cell/app pair. Token responses are sealed for short retry receipts; the delegation and callback are rechecked before receipt replay.",
+        "security": [
+          {
+            "appBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cell",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stable key for retrying the same operation."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The delegated operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid grant, callback or request."
+          },
+          "401": {
+            "description": "Missing or invalid service/author credentials."
+          },
+          "403": {
+            "description": "Wrong service, app author or inactive delegation."
+          },
+          "409": {
+            "description": "The callback generation, immutable base or request key conflicts with current state."
+          }
+        },
+        "x-internal": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "enum": [
+                      "authorization_code",
+                      "slt",
+                      "urn:silicon:params:oauth:grant-type:slt",
+                      "refresh_token"
+                    ]
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "redirect_uri": {
+                    "type": "string"
+                  },
+                  "code_verifier": {
+                    "type": "string"
+                  },
+                  "slt": {
+                    "type": "string"
+                  },
+                  "refresh_token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "grant_type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/internal/cells/links/{cell}/{app}/introspect": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "introspectCellsAppToken",
+        "summary": "Inspect a cell-bound session",
+        "description": "Only the authenticated silicon-cells app may use this private delegation bridge. Only sessions issued through this exact cell/app delegation are eligible.",
+        "security": [
+          {
+            "appBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cell",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The delegated operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid grant, callback or request."
+          },
+          "401": {
+            "description": "Missing or invalid service/author credentials."
+          },
+          "403": {
+            "description": "Wrong service, app author or inactive delegation."
+          },
+          "409": {
+            "description": "The callback generation, immutable base or request key conflicts with current state."
+          }
+        },
+        "x-internal": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/internal/cells/links/{cell}/{app}/revoke": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "revokeCellsAppToken",
+        "summary": "Revoke a cell-bound session",
+        "description": "Only the authenticated silicon-cells app may use this private delegation bridge. Only sessions issued through this exact cell/app delegation are eligible.",
+        "security": [
+          {
+            "appBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cell",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The delegated operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid grant, callback or request."
+          },
+          "401": {
+            "description": "Missing or invalid service/author credentials."
+          },
+          "403": {
+            "description": "Wrong service, app author or inactive delegation."
+          },
+          "409": {
+            "description": "The callback generation, immutable base or request key conflicts with current state."
+          }
+        },
+        "x-internal": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

@@ -118,7 +118,7 @@ pub async fn effective_config(
     let mut config = config.effective(settings, app_id);
     // Managed callbacks are derived from active delegations. An author's normal
     // configuration edits cannot accidentally orphan a linked cell's callback.
-    let callbacks:Vec<String> = sqlx::query_scalar("select distinct callback_uri from cells_app_links where app_id=$1 and revoked_at is null order by callback_uri")
+    let callbacks:Vec<String> = sqlx::query_scalar("select distinct callback from cells_app_links cross join lateral unnest(array[callback_uri,case when callback_suspended then null else custom_callback_uri end]) as callback where app_id=$1 and revoked_at is null and callback is not null order by callback")
         .bind(app_id).fetch_all(&mut *conn).await?;
     for callback in callbacks {
         if !config.redirect_uris.contains(&callback) {

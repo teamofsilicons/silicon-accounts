@@ -141,6 +141,31 @@ impl<'a> AppClient<'a> {
         self.client.execute(request).await?.json()
     }
 
+    /// Set or revoke a verified custom-domain callback on an existing delegation.
+    /// Only Silicon Cells may call this bridge after proving DNS/TLS ownership.
+    /// `generation` must increase on replacement/removal; retry with the same
+    /// generation and body. The permanent callback and webhook address stay fixed.
+    pub async fn cells_callback(
+        &self,
+        cell_uuid: &str,
+        app_id: &str,
+        base_callback_uri: &str,
+        custom_callback_uri: Option<&str>,
+        generation: i64,
+        key: &str,
+    ) -> Result<Value> {
+        let request = Request::new(
+            Method::PUT,
+            self.client.endpoint(&[
+                "v1", "internal", "cells", "links", cell_uuid, app_id, "callback",
+            ]),
+            self.auth(),
+        )
+        .json(&json!({"base_callback_uri":base_callback_uri,"custom_callback_uri":custom_callback_uri,"generation":generation}))?
+        .idempotency_key(Some(key))?;
+        self.client.execute(request).await?.json()
+    }
+
     /// Privately unlink an app and end only the sessions issued through that cell.
     pub async fn cells_unlink(&self, cell_uuid: &str, app_id: &str) -> Result<Value> {
         let request = Request::new(

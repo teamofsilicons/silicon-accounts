@@ -1507,3 +1507,40 @@ async fn federation_and_identity_token_calls() {
     assert_eq!(form["silicon"], "si:scout");
     assert_eq!(form["client_id"], "silicon-accounts");
 }
+
+#[tokio::test]
+async fn cells_callback_update_sends_only_explicit_service_authority() {
+    let mock = Mock::start().await;
+    let client = AccountsClient::new(&mock.url).unwrap();
+    let app = client.as_app("silicon-cells", "fixture-service-secret");
+    let path = "/v1/internal/cells/links/cell/app/callback";
+    let response = json!({"generation":3,"custom_callback_uri":null});
+    let request = check!(
+        mock,
+        "PUT",
+        path,
+        Reply::json(200, response),
+        app.cells_callback(
+            "cell",
+            "app",
+            "https://base.example/auth/callback",
+            None,
+            3,
+            "domain-generation-3"
+        )
+    );
+    assert_eq!(
+        request.json(),
+        json!({"base_callback_uri":"https://base.example/auth/callback","custom_callback_uri":null,"generation":3})
+    );
+    assert_eq!(
+        request.header("idempotency-key"),
+        Some("domain-generation-3")
+    );
+    assert!(
+        request
+            .header("authorization")
+            .is_some_and(|value| value.starts_with("Basic "))
+    );
+    assert!(request.query.is_none());
+}

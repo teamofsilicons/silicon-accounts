@@ -301,7 +301,10 @@ refusal asks the browser to resume the part instead of replaying a consumed body
 `/cells` lists cells, creates them, displays initial credentials once, and accepts
 or declines author invitations. `/cells/[cellId]` provides overview, database,
 files, authors, settings and history. Database tools include table creation,
-column inspection, SQL, migration history and generated TypeScript/Rust exports.
+row editing with primary-key and stale-row checks, column/relation/index controls,
+access presets, CSV/JSON import and result exports, encrypted saved queries, SQL,
+explicit migration source, API reference, extensions and TypeScript/Rust exports.
+Rows and source stay transient in component state; only metadata uses query caches.
 Settings cover origins, callbacks, keys, secrets, deletion and restoration.
 
 Files support paginated paths, download, copy/move/delete, expiring links,

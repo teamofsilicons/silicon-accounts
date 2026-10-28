@@ -1,7 +1,7 @@
 /** Same-origin author proxy. The sealed Accounts session stays on the server. */
 import { NextRequest, NextResponse } from "next/server";
 import { cellsApiUrl } from "@/lib/server/config";
-import { cellsProxyRoute, cellsUploadPart, cellsFunctionBody, cellsFunctionInvocation } from "@/lib/server/cells-routes";
+import { cellsProxyRoute, cellsUploadPart, cellsFunctionBody, cellsFunctionInvocation, cellsBackupDownload } from "@/lib/server/cells-routes";
 import { actionForAppsRefusal, signInStateAtAccounts } from "@/lib/server/apps-refusal";
 import { clearSession, clientHeaders, errorBody, readSession, refreshSession, sameOriginProblem, writeSession } from "@/lib/server/session";
 
@@ -62,7 +62,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     }
     const init: RequestInit & {duplex?: "half"} = {
       method: request.method, headers: outgoing, body: prepared.body,
-      redirect: "manual", cache: "no-store", signal: AbortSignal.any([request.signal, AbortSignal.timeout(cellsFunctionInvocation(path,request.method) ? 310_000 : 120_000)]),
+      redirect: "manual", cache: "no-store", signal: AbortSignal.any([request.signal, AbortSignal.timeout(cellsBackupDownload(path,request.method) ? 1_800_000 : cellsFunctionInvocation(path,request.method) ? 310_000 : 120_000)]),
     };
     if (streaming) init.duplex = "half";
     return fetch(`${cellsApiUrl()}/${path}${request.nextUrl.search}`, init);
@@ -90,6 +90,13 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     }
     if (path.includes("/storage-api/object/") && upstream.ok) {
       response.headers.set("content-disposition", `attachment; filename*=UTF-8''${encodeURIComponent(decodeURIComponent(path.split("/").at(-1) ?? "download"))}`);
+    }
+    if(cellsBackupDownload(path,request.method)&&upstream.ok){
+      const parts=path.split("/");
+      response.headers.set("content-disposition",`attachment; filename="${parts[2]}-${parts[4]}.dump"`);
+      response.headers.set("referrer-policy","no-referrer");
+      const hash=upstream.headers.get("x-content-sha256");
+      if(hash&&/^[a-f0-9]{64}$/u.test(hash))response.headers.set("x-content-sha256",hash);
     }
     response.headers.set("cache-control", "no-store");
     response.headers.set("x-content-type-options", "nosniff");
