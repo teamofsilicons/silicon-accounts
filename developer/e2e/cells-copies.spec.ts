@@ -6,13 +6,13 @@ test("test copies retain uncertain create keys, keep credentials transient and r
   const parent="12345678-1234-1234-1234-123456789abc",id="12345678-1234-1234-1234-123456789abd",operation="12345678-1234-1234-1234-123456789abe",at="2026-10-28T12:00:00Z";
   const cell={uuid:parent,cell_id:"notes",name:"Notes",status:"active",url:"https://notes.cells.example",created_at:at,deleted_at:null,settings:{allowed_origins:[],redirect_urls:[]}};
   let exists=false,lost=true,paused=true,status="active";
-  const changes:{method:string;path:string;body:unknown;key:string|undefined}[]=[];
+  const changes:{method:string;path:string;body:unknown;key:string|undefined}[]=[],listQueries:string[]=[];
   await page.route("**/api/cells/**",async route=>{
     const request=route.request(),url=new URL(request.url()),path=url.pathname.replace("/api/cells","");
     let result:unknown={};
     const copy={parent_uuid:parent,parent_cell_id:"notes",copy:"qa",cell:{...cell,uuid:id,cell_id:"notes--qa",name:"QA",status,url:"https://notes--qa.cells.example"},background_paused:paused,last_operation:operation,prerequisites:["apps_require_explicit_link"],created_at:at,updated_at:at};
     if(path==="/cells/notes")result={cell};
-    else if(path==="/cells/notes/copies"&&request.method()==="GET")result={copies:exists?[copy]:[]};
+    else if(path==="/cells/notes/copies"&&request.method()==="GET"){listQueries.push(url.search);result={copies:exists?[copy]:[]};}
     else if(path==="/cells/notes/copies"&&request.method()==="POST"){
       changes.push({method:request.method(),path,body:request.postDataJSON(),key:request.headers()["idempotency-key"]});
       if(lost){lost=false;return route.abort("failed");}
@@ -25,6 +25,7 @@ test("test copies retain uncertain create keys, keep credentials transient and r
     await route.fulfill({json:result});
   });
   await page.goto("/cells/notes/copies");await expect(page.getByRole("heading",{name:"Test copies",exact:true})).toBeVisible();
+  await page.getByRole("checkbox",{name:"Show deleted copies",exact:true}).check();await expect.poll(()=>listQueries.at(-1)).toContain("include_deleted=true");await page.getByRole("checkbox",{name:"Show deleted copies",exact:true}).uncheck();await expect(page.getByRole("checkbox",{name:"Show deleted copies",exact:true})).not.toBeChecked();await page.getByRole("button",{name:"Refresh copies",exact:true}).click();await expect.poll(()=>listQueries.at(-1)).toContain("include_deleted=false");
   await page.getByRole("button",{name:"Create test copy",exact:true}).click();await page.getByLabel("Copy name",{exact:true}).fill("qa--nested");
   await page.getByRole("button",{name:"Create copy",exact:true}).click();await expect(page.getByText("Use a copy name of 1–30 lowercase letters, digits or hyphens, without consecutive hyphens.",{exact:true})).toBeVisible();expect(changes).toHaveLength(0);
   await page.getByLabel("Copy name",{exact:true}).fill("qa");await page.getByLabel("Display name (optional)",{exact:true}).fill("QA");await page.getByRole("button",{name:"Create copy",exact:true}).click();await expect(page.getByText("Could not reach Silicon Cells.",{exact:true})).toBeVisible();

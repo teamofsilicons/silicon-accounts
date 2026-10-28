@@ -47,7 +47,7 @@ export function AppCellSection({appId}: {appId: string}) {
   ];
   const links = connection.data?.sign_in_links ?? [];
   const link = links.find(l => l.redirect_to === redirect) ?? links[0];
-  const snippet = cell && connection.data?.publishable_key ? `import { createClient } from '@silicon/cells';\n\nconst cell = createClient(${JSON.stringify(cell.url)}, {\n  publishableKey: ${JSON.stringify(connection.data.publishable_key)},\n});\n\n// Finish sign-in when the user returns to your frontend.\nawait cell.consumeCallback();\n${link ? `\nconst signIn = cell.signInUrl({\n  app: ${JSON.stringify(appId)},\n  redirectTo: ${JSON.stringify(link.redirect_to)},\n});` : ""}` : "";
+  const snippet = cell && connection.data?.publishable_key ? `import { createClient } from '@teamofsilicons/cells';\n\nconst cell = createClient(${JSON.stringify(cell.url)}, {\n  publishableKey: ${JSON.stringify(connection.data.publishable_key)},\n});\n\n// Finish sign-in when the user returns to your frontend.\nawait cell.consumeCallback();\n${link ? `\nconst signIn = cell.signInUrl({\n  app: ${JSON.stringify(appId)},\n  redirectTo: ${JSON.stringify(link.redirect_to)},\n});` : ""}` : "";
   return <Section id="signin-cell" title="Your app’s backend" description="Enable sign-in with a cell, which finishes Accounts sign-in and gives your frontend its database. You can also choose a cell you already co-author.">
     <div className={styles.stack}>
       {failure && <Alert tone="danger" title={ApiError.from(failure).message}>{ApiError.from(failure).hint}</Alert>}
