@@ -703,6 +703,7 @@ pub(crate) fn error_from_response(
                     error: code.clone(),
                     description,
                     request_id: header_request_id,
+                    retry_after: header_retry_after.map(Duration::from_secs),
                 }
                 .into();
             }

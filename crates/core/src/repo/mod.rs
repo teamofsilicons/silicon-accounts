@@ -20,6 +20,7 @@ pub mod memberships;
 pub mod otp;
 pub mod photos;
 pub mod rate_limit;
+pub mod refresh_recovery;
 pub mod sessions;
 pub mod subscriptions;
 pub mod tokens;

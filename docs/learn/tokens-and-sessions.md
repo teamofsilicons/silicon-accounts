@@ -39,13 +39,20 @@ An access token is a JWT signed with Ed25519 (`alg: EdDSA`), issued to your app 
 
 ## Refresh tokens: rotated, reuse-detected, 900 days at most
 
-A refresh token is opaque (`sar_…`), and we store it only as a keyed hash, so a copy of our database can't be replayed. Three rules shape it:
+A refresh token is opaque (`sar_…`). Token lookup uses a keyed hash; recoverable refresh replies
+are also stored encrypted with a 24-hour recovery window; expired ciphertext is cleared by the background sweep. A database copy alone reveals no token. Three rules shape it:
 
-1. **It rotates.** Each refresh gives you a new refresh token and spends the old one.
-2. **Reuse ends the sign-in.** If a spent refresh token comes back, two parties hold the sign-in and we can't tell which one is the thief. So we revoke the whole family, the newest tokens included, and tell your app (`membership.signed_out`, reason `refresh_token_reuse`). A stolen refresh token gets at most one use before the theft shows up, instead of quietly living for years.
+1. **It rotates.** Each new refresh operation gives you a new refresh token and spends the old one.
+2. **Unrecognized reuse ends the sign-in.** A spent token presented without its original refresh operation key revokes the whole family, newest tokens included, and tells your app (`membership.signed_out`, reason `refresh_token_reuse`). A recognized retry can recover the already-issued tokens while the successor is unused, within 24 hours, after current authorization is checked.
 3. **900 days, then sign in again.** The limit counts from the moment the account signed in, and refreshing doesn't extend it. A sign-in that starts with an earlier end keeps that end: a Silicon's sign-in made from a short-lived token its CI job minted ends with the job's sign-in. A sliding window would let a stolen token live forever as long as someone keeps using it; a fixed one puts an end on every sign-in.
 
-The cost of rule 2 is that you can't refresh one sign-in twice in parallel. Two workers or two tabs refreshing the same token at the same moment look exactly like a thief and the owner: one succeeds, the other trips reuse detection, and the sign-in ends. Refresh through one place per sign-in (one in-process request shared by all callers, or a lock in your session store), and save the new refresh token before you use anything else from the answer.
+Persist one random `Idempotency-Key` with each pending rotation and share it across workers and
+tabs. Duplicate requests for that operation rotate once; an in-progress request returns a
+retryable conflict. Save the returned tokens atomically before using them, checking the session
+version so a late answer cannot overwrite a later refresh or logout. A process-local lock alone
+does not coordinate multiple servers. [Refresh recovery](../reference/api/oauth.md#recovering-a-refresh-after-a-timeout-or-restart)
+also covers lost replies, restart recovery, and expired recovered access tokens. Unkeyed clients
+retain the old behavior and need an update to use this protection.
 
 ## What ends a sign-in
 

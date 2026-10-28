@@ -69,7 +69,7 @@ let slt = session.short_lived_token("remind").await?; // single use, 2 minutes
 
 Refresh the first-party access token (30 minutes) with
 `client.refresh_first_party(refresh_token)`; refresh tokens rotate on every use and
-presenting a used one revokes the whole session, so always store the new one.
+unrecognized reuse revokes the whole session. Prefer the keyed recovery methods below and always store the new tokens.
 
 ## Quickstart for apps
 
@@ -104,6 +104,25 @@ let tokens = app.exchange_slt(&slt_from_the_silicon).await?;
 // Your own CLI or desktop tool, with `public_client` on and no secret:
 let tokens = client.exchange_slt_public_client("briefcase", &slt_from_the_silicon).await?;
 ```
+
+### Refresh safely
+
+For recoverable refreshes, deploy Accounts refresh-recovery support first, then use
+`app.refresh_with_key(refresh_token, saved_operation_key)`. Public clients use
+`client.refresh_first_party_with_key(...)` or
+`client.refresh_public_client_with_key(client_id, refresh_token, saved_operation_key)` for Accounts/developer,
+and `client.refresh_app_public_client_with_key(...)` for an app with public sign-in enabled.
+Persist a random operation key with the old token **before** the call and share it across
+concurrent workers. Reuse it after timeouts and restarts; a new rotation gets a new key.
+The SDK does not own your session store and does not generate or persist these keys for you.
+
+Recovery returns the original tokens with their original `access_token_expires_at` and a
+decreased `expires_in`. Use `TokenResponse::access_expires_at()`; never assume every successful
+response starts a new 30-minute lifetime. Save the recovered successor atomically even if
+`expires_in` is zero, then rotate it with a new saved key. A 409 `refresh_in_progress` is
+retryable with the same operation; `refresh_superseded` requires rereading shared session
+state. `refresh_result_unavailable` needs shared-state recovery or a new sign-in. These conflicts
+do not mean the family was revoked. Older unkeyed methods retain strict reuse detection.
 
 ### Check access tokens
 

@@ -351,6 +351,24 @@ impl<'a> AppClient<'a> {
         .await
     }
 
+    /// Recoverable refresh. Persist a random key with the old refresh token before sending;
+    /// reuse both after a lost reply and across instances. Store the returned tokens atomically.
+    /// A replay can have `expires_in == 0`: save its successor, then refresh it with a new key.
+    /// Requires an Accounts server with refresh recovery support.
+    pub async fn refresh_with_key(&self, refresh_token: &str, key: &str) -> Result<TokenResponse> {
+        let request = Request::new(
+            Method::POST,
+            self.client.endpoint(&["v1", "oauth", "token"]),
+            self.credentials("Refreshing tokens")?,
+        )
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh_token.trim()),
+        ])
+        .idempotency_key(Some(key))?;
+        self.client.execute(request).await?.json()
+    }
+
     /// Revokes the token family of an access or refresh token issued to this app (the
     /// account gets signed out of the app).
     pub async fn revoke(&self, token: &str) -> Result<()> {

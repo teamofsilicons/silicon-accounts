@@ -461,6 +461,9 @@ impl IntoResponse for OAuthError {
         let headers = response.headers_mut();
         headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
         headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+        if self.error == "refresh_in_progress" {
+            headers.insert(header::RETRY_AFTER, HeaderValue::from_static("1"));
+        }
         if self.status == StatusCode::UNAUTHORIZED {
             headers.insert(
                 header::WWW_AUTHENTICATE,
