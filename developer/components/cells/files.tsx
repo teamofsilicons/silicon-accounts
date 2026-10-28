@@ -14,11 +14,12 @@ import {useNavigationGuard} from "@/lib/navigation-guard";
 import {cellPath,useCellData,useCellAction,Failure,bytes,date} from "./shared";
 import {StorageLocations} from "./storage-locations";
 import {FileTrash} from "./trash";
+import {ImageDownload} from "./image-download";
 import {BucketEditor,StorageProvider,type Bucket} from "./storage-settings";
 import styles from "./cells.module.css";
 interface StoredFile {id:string;bucket:string;name:string;size:number;content_type:string;updated_at:string}
 interface PendingUpload {id:string;bucket:string;name:string;size:number;status:string;expires_at:string}
-type FileAction={file:StoredFile;action:"copy"|"move"|"delete"|"sign"};
+type FileAction={file:StoredFile;action:"copy"|"move"|"delete"|"sign"|"image"};
 export function CellFiles({cell}:{cell:Cell}){
   const id=cell.cell_id,buckets=useCellData<{buckets:Bucket[]}>(id,"/storage/buckets");
   const [chosen,setChosen]=useState(""),[prefix,setPrefix]=useState("");
@@ -39,7 +40,7 @@ export function CellFiles({cell}:{cell:Cell}){
     <StorageLocations cellId={id}/>
     <Dialog open={edit!==null} onOpenChange={value=>{if(!value)setEdit(null);}}><DialogContent title={edit==="new"?"Create bucket":"Bucket settings"} description="Bucket limits apply when new files are uploaded.">{edit&&<BucketEditor key={typeof edit==="string"?"new":edit.id} cellId={id} bucket={edit==="new"?undefined:edit} onDone={()=>setEdit(null)}/>}</DialogContent></Dialog>
     <Dialog open={upload!==null} onOpenChange={value=>{if(!value)setUpload(null);}}><DialogContent title={upload==="new"?"Upload file":"Resume upload"} description="Uploaded parts are kept for seven days. You can return with the same file to continue.">{upload&&bucket&&<UploadEditor key={typeof upload==="string"?"new":upload.id} cellId={id} bucket={bucket.id} pending={upload==="new"?undefined:upload} onDone={()=>setUpload(null)}/>}</DialogContent></Dialog>
-    <Dialog open={action!==null} onOpenChange={value=>{if(!value)setAction(null);}}><DialogContent title={action?`${action.action[0].toUpperCase()+action.action.slice(1)} file`:"File"} description={action?.file.name??""}>{action&&<FileEditor key={`${action.action}:${action.file.id}`} cellId={id} target={action} onDone={()=>setAction(null)}/>}</DialogContent></Dialog>
+    <Dialog open={action!==null} onOpenChange={value=>{if(!value)setAction(null);}}><DialogContent title={action?.action==="image"?"Resize or convert image":action?`${action.action[0].toUpperCase()+action.action.slice(1)} file`:"File"} description={action?.file.name??""}>{action?.action==="image"?<ImageDownload key={action.file.id} cellId={id} file={action.file}/>:action&&<FileEditor key={`${action.action}:${action.file.id}`} cellId={id} target={action} onDone={()=>setAction(null)}/>}</DialogContent></Dialog>
   </Stack>;
 }
 function FileList({cellId,bucket,prefix,onAction}:{cellId:string;bucket:string;prefix:string;onAction:(value:FileAction)=>void}){
@@ -50,6 +51,7 @@ function FileList({cellId,bucket,prefix,onAction}:{cellId:string;bucket:string;p
   const rows=files.data?.pages.flatMap(p=>p.files)??[];
   return <Stack><Failure error={files.error}/>{files.isPending?<p role="status">Loading files…</p>:!rows.length?<p>No files match this path.</p>:<div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">Files in {bucket}</caption><thead><tr><th>Name</th><th>Size</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{rows.map(file=><tr key={file.id}><td>{file.name}<p className={styles.muted}>{file.content_type}</p></td><td>{bytes(file.size)}</td><td>{date(file.updated_at)}</td><td><div className={styles.actions}>
     <a href={`/api/cells${cellPath(cellId,`/storage-api/object/${encodeURIComponent(bucket)}/${file.name.split("/").map(encodeURIComponent).join("/")}`)}`} download={file.name.split("/").at(-1)}>Download</a>
+    {["image/png","image/jpeg","image/webp"].includes(file.content_type.split(";")[0])&&<Button variant="ghost" size="sm" onClick={()=>onAction({file,action:"image"})}>Resize or convert</Button>}
     {(["copy","move","sign","delete"] as const).map(action=><Button key={action} variant="ghost" size="sm" onClick={()=>onAction({file,action})}>{action==="sign"?"Share link":action[0].toUpperCase()+action.slice(1)}</Button>)}
   </div></td></tr>)}</tbody></table></div>}{files.hasNextPage&&<Button variant="secondary" loading={files.isFetchingNextPage} onClick={()=>void files.fetchNextPage()}>Load more files</Button>}</Stack>;
 }

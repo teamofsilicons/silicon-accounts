@@ -55,7 +55,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   const call = async () => {
     const outgoing = new Headers(headers);
     outgoing.set("authorization", `Bearer ${session!.at}`);
-    for (const name of ["accept", "content-type", "idempotency-key", "range", "if-none-match"]) {
+    for (const name of ["accept", "content-type", "idempotency-key", "range", "if-range", "if-none-match"]) {
       const value = request.headers.get(name);
       if (value) outgoing.set(name, value);
     }
