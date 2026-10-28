@@ -25,7 +25,7 @@ test("database editor edits rows, changes schema, saves SQL and keeps source tra
   else if(path===`/cells/notes/database/queries/${id}`){detailReads++;result={query:{id,name:definition.name,execute:false,created_at:at,updated_at:at},definition};}
   else if(path==="/cells/notes/database/extensions")result={extensions:[{name:"vector",title:"Vectors",available_version:"0.8",installed_version:enabled?"0.8":null,schema:enabled?"extensions":null,enabled}]};
   else if(path==="/cells/notes/database/extensions/vector"){enabled=true;result={extension:{name:"vector",title:"Vectors",available_version:"0.8",installed_version:"0.8",schema:"extensions",enabled}};}
-  else if(path==="/cells/notes/database/connections")result={direct:{url:new URL(req.url()).searchParams.get("include_password")==="true"?"postgres://user:private-db-password@localhost/notes":"postgres://user@localhost/notes",mode:"direct"},pooled:null,database_password:new URL(req.url()).searchParams.get("include_password")==="true"?"private-db-password":null};
+  else if(path==="/cells/notes/database/connections"){expect(new URL(req.url()).search).toBe("");result={direct:{url:"postgres://user@localhost/notes",mode:"direct"},pooled:null};}
   else if(path==="/cells/notes/database/reference")result={base_url:"https://notes.cells.example/rest/v1",tables:[],functions:[],authentication:{apikey:"Required"},examples:{read:"GET /notes?limit=100"}};
   else if(path==="/cells/notes/migrations")result={migrations:[{id:1,name:"first",sql:"CREATE TABLE private-migration",source:"sql",author_uuid:id,created_at:at}]};
   else throw new Error(`Unexpected database request ${path}`);await route.fulfill({json:result});
@@ -41,6 +41,70 @@ test("database editor edits rows, changes schema, saves SQL and keeps source tra
  const download=page.waitForEvent("download");await page.getByRole("button",{name:"Export query CSV",exact:true}).click();expect((await download).suggestedFilename()).toBe("notes-query.csv");
  await page.getByRole("button",{name:"Enable extension",exact:true}).click();await expect(page.getByRole("button",{name:"Enabled",exact:true})).toBeDisabled();
  await page.getByRole("button",{name:"Generate API reference",exact:true}).click();await expect(page.getByText("https://notes.cells.example/rest/v1",{exact:true})).toBeVisible();
- await page.getByRole("button",{name:"Reveal database credentials",exact:true}).click();await expect(page.getByRole("button",{name:"Hide credentials",exact:true})).toBeVisible();
- expect(await page.evaluate(()=>JSON.stringify({local:{...localStorage},session:{...sessionStorage}}))).not.toContain("private-");await page.getByRole("button",{name:"Hide credentials",exact:true}).click();await page.reload();expect(await page.content()).not.toContain("private-saved-query");expect(await page.content()).not.toContain("private-result");expect(errors).toEqual([]);
+ await page.getByRole("button",{name:"Show connection addresses",exact:true}).click();await expect(page.getByText("postgres://user@localhost/notes",{exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>JSON.stringify({local:{...localStorage},session:{...sessionStorage}}))).not.toContain("private-");await page.reload();expect(await page.content()).not.toContain("private-saved-query");expect(await page.content()).not.toContain("private-result");expect(errors).toEqual([]);
+});
+
+
+test("database password replacement keeps pending and lost-response retries private and stable",async({page})=>{
+ await mock(page,true);
+ const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));
+ const at=new Date().toISOString(),id="12345678-1234-1234-1234-123456789abc",secret="private-replacement-password";
+ const cell={uuid:id,cell_id:"notes",name:"Notes",status:"active",url:"https://notes.cells.example",created_at:at,deleted_at:null,settings:{allowed_origins:[],redirect_urls:[]}};
+ const requests:{key:string|undefined;body:unknown}[]=[];
+ await page.route("**/api/cells/**",async route=>{
+  const request=route.request(),url=new URL(request.url()),path=url.pathname.replace("/api/cells","");
+  let result:unknown={};
+  if(path==="/cells/notes")result={cell};
+  else if(path==="/cells/notes/tables")result={tables:[]};
+  else if(path==="/cells/notes/database/queries")result={queries:[]};
+  else if(path==="/cells/notes/database/extensions")result={extensions:[]};
+  else if(path==="/cells/notes/database/connections"){
+   expect(request.method()).toBe("GET");expect(url.search).toBe("");
+   result={direct:{url:"postgres://owner@db.example:5432/notes",mode:"direct"},pooled:{url:"postgres://owner@db.example:6432/notes",mode:"transaction"}};
+  }else if(path==="/cells/notes/database/password/rotate"){
+   expect(request.method()).toBe("POST");expect(url.search).toBe("");requests.push({key:request.headers()["idempotency-key"],body:request.postDataJSON()});
+   // The operation completes on the second request, but its response is lost. The next request must replay it.
+   if(requests.length===2)return route.abort("failed");
+   const pending=requests.length===1,expired=requests.length===4;
+   result={rotation:{id,status:pending?"rotating":"succeeded",data_generation:2,created_at:at,completed_at:pending?null:at,error_code:null},database_password:pending||expired?null:secret,credential_expires_at:pending||expired?null:new Date(Date.now()+600_000).toISOString()};
+   return route.fulfill({status:pending?202:200,json:result});
+  }else throw new Error(`Unexpected database request ${request.method()} ${path}`);
+  await route.fulfill({json:result});
+ });
+ await page.goto("/cells/notes/database");
+ await page.getByRole("button",{name:"Show connection addresses",exact:true}).click();
+ await expect(page.getByText("postgres://owner@db.example:6432/notes",{exact:true})).toBeVisible();
+ await expect(page.getByRole("button",{name:"Reveal database credentials",exact:true})).toHaveCount(0);
+ await page.getByRole("button",{name:"Replace database password",exact:true}).click();
+ const dialog=page.getByRole("dialog");
+ await expect(dialog.getByText("Existing direct and pooled database sessions will close. Update your integrations with the new password before reconnecting.",{exact:true})).toBeVisible();
+ expect(requests).toHaveLength(0);
+ await dialog.getByRole("button",{name:"Confirm password replacement",exact:true}).click();
+ await expect(dialog.getByRole("status")).toHaveText("Password replacement is still in progress. Check again to retrieve the new password when it is ready.");
+ expect(await page.evaluate(()=>window.dispatchEvent(new Event("beforeunload",{cancelable:true})))).toBe(false);
+ await dialog.getByRole("button",{name:"Close dialog",exact:true}).click();
+ await page.getByRole("button",{name:"Continue password replacement",exact:true}).click();
+ await dialog.getByRole("button",{name:"Check password replacement",exact:true}).click();
+ await expect(dialog.getByText("Could not reach Silicon Cells.",{exact:true})).toBeVisible();
+ await dialog.getByRole("button",{name:"Retry password replacement",exact:true}).click();
+ await expect(dialog.getByRole("group",{name:"New database password",exact:true})).toBeVisible();
+ expect(requests).toHaveLength(3);expect(requests[0]?.key).toMatch(/^[0-9a-f-]{36}$/u);
+ expect(new Set(requests.map(request=>request.key)).size).toBe(1);expect(requests.map(request=>request.body)).toEqual([{},{},{}]);
+ expect(await page.content()).not.toContain(secret);
+ await dialog.getByRole("button",{name:"Show the database password",exact:true}).click();
+ await expect(dialog.getByText(secret,{exact:true})).toBeVisible();
+ const stored=await page.evaluate(()=>JSON.stringify({local:{...localStorage},session:{...sessionStorage}}));
+ expect(stored).not.toContain(secret);expect(stored).not.toContain(requests[0]!.key!);
+ await page.keyboard.press("Escape");await expect(dialog.getByText(secret,{exact:true})).toBeVisible();
+ await dialog.getByRole("button",{name:"Done — I’ve saved the password",exact:true}).click();
+ await expect(dialog).toHaveCount(0);expect(await page.content()).not.toContain(secret);
+ expect(await page.evaluate(()=>window.dispatchEvent(new Event("beforeunload",{cancelable:true})))).toBe(true);
+ await page.getByRole("button",{name:"Replace database password",exact:true}).click();
+ await dialog.getByRole("button",{name:"Confirm password replacement",exact:true}).click();
+ await expect(dialog.getByRole("status")).toHaveText("The password was replaced, but its display window has expired or it has since been replaced. Replace it again if you did not save the current password.");
+ expect(requests).toHaveLength(4);expect(requests[3]?.key).not.toBe(requests[0]?.key);
+ await expect(dialog.getByRole("group",{name:"New database password",exact:true})).toHaveCount(0);
+ await dialog.getByRole("button",{name:"Done",exact:true}).click();
+ await page.reload();expect(await page.content()).not.toContain(secret);expect(requests).toHaveLength(4);expect(errors).toEqual([]);
 });

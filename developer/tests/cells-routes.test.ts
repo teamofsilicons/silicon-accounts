@@ -176,3 +176,16 @@ test("Database reference and extension controls expose only the safe catalog",()
  assert.equal(cellsProxyRoute("cells/notes/database/extensions/file_fdw","POST"),null);
  assert.equal(cellsProxyRoute("cells/notes/database/extensions/vector","DELETE"),null);
 });
+
+
+test("Database passwords allow explicit replacement and metadata reads only",()=>{
+ const id="12345678-1234-1234-1234-123456789abc";
+ for(const cell of ["notes","notes--qa"]){
+  const root=`cells/${cell}/database`;
+  assert.equal(cellsProxyRoute(`${root}/password/rotate`,"POST"),`v1/${root}/password/rotate`);
+  for(const method of ["GET","HEAD"])assert.equal(cellsProxyRoute(`${root}/password-rotations/${id}`,method),`v1/${root}/password-rotations/${id}`);
+  for(const method of ["GET","HEAD","PUT","DELETE"])assert.equal(cellsProxyRoute(`${root}/password/rotate`,method),null);
+  for(const method of ["POST","PUT","DELETE"])assert.equal(cellsProxyRoute(`${root}/password-rotations/${id}`,method),null);
+  for(const path of [`${root}/password`,`${root}/password-rotations/${id}/password`,`${root}/password-rotations/${id}/%2e%2e`,`${root}/password/rotate/extra`])assert.equal(cellsProxyRoute(path,"GET"),null);
+ }
+});

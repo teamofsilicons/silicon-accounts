@@ -10,6 +10,8 @@ const TEMPLATE = "(?!catalog(?:/|$))[a-z][a-z0-9-]{0,39}";
 const JOB = `(?!preview(?:/|$))${FUNCTION}`;
 const routes: [string, RegExp][] = [
   ["GET HEAD", new RegExp(`^cells/${CELL}/database/(reference|extensions|connections)$`)],
+  ["POST", new RegExp(`^cells/${CELL}/database/password/rotate$`)],
+  ["GET HEAD", new RegExp(`^cells/${CELL}/database/password-rotations/${UUID}$`)],
   ["POST", new RegExp(`^cells/${CELL}/database/extensions/(vector|postgis|pg_trgm|pgcrypto|uuid-ossp|citext|hstore|btree_gist|btree_gin|unaccent)$`)],
   ["POST", new RegExp(`^cells/${CELL}/database/rows/(query|change)$`)],
   ["GET HEAD POST", new RegExp(`^cells/${CELL}/database/queries$`)],
