@@ -7,6 +7,7 @@ import {Textarea} from "@/components/silicon-ui/textarea/textarea";
 import {Select} from "@/components/silicon-ui/select/select";
 import {Dialog,DialogContent} from "@/components/silicon-ui/dialog/dialog";
 import {cellsRequest} from "@/lib/cells/api";
+import {MAX_WASM_BYTES,readCompiledWasm} from "@/lib/cells/wasm";
 import {useCellAction,useCellData,useCellsLeaveGuard,cellPath,Failure,date} from "./shared";
 import styles from "./cells.module.css";
 
@@ -31,23 +32,35 @@ export function CellFunctions({cellId}:{cellId:string}){
     catch(cause){setError(cause);}finally{setLoading(false);}
   }
   return <Stack gap={8}>
-    <Section title="Functions" description="Deploy endpoints from TypeScript or JavaScript, and bring back any earlier version." actions={<Button onClick={()=>openEditor({name:"",fresh:true,definition:{runtime:"javascript",entrypoint:"index.ts",files:{"index.ts":encode(example)},timeout_ms:30000,memory_mb:128,allowed_origins:[],routes:[]}})}>Create function</Button>}>
-      <Stack><Failure error={query.error??error}/>{query.isPending?<p role="status">Loading functions…</p>:query.data?.functions.length?query.data.functions.map(fn=><Surface key={fn.name}><Stack><Cluster justify="between"><div><strong>{fn.name}</strong><p className={styles.muted}>{fn.active_version?"Active":"Disabled"} · Updated {date(fn.updated_at)}</p></div><Button variant={selected===fn.name?"secondary":"ghost"} onClick={()=>setSelected(fn.name)}>Open function</Button></Cluster><code>/functions/{fn.name}</code></Stack></Surface>):!query.error&&<p>Create your first endpoint, or deploy a source folder with the Cells CLI.</p>}</Stack>
+    <Section title="Functions" description="Deploy TypeScript or JavaScript endpoints, upload compiled WebAssembly, and bring back any earlier version." actions={<Cluster><Button onClick={()=>openEditor({name:"",fresh:true,definition:{runtime:"javascript",entrypoint:"index.ts",files:{"index.ts":encode(example)},timeout_ms:30000,memory_mb:128,allowed_origins:[],routes:[]}})}>Create function</Button><Button variant="secondary" onClick={()=>openEditor({name:"",fresh:true,definition:{runtime:"wasm",entrypoint:"function.wasm",files:{},timeout_ms:30000,memory_mb:128,allowed_origins:[],routes:[]}})}>Upload WebAssembly</Button></Cluster>}>
+      <Stack><Failure error={query.error??error}/>{query.isPending?<p role="status">Loading functions…</p>:query.data?.functions.length?query.data.functions.map(fn=><Surface key={fn.name}><Stack><Cluster justify="between"><div><strong>{fn.name}</strong><p className={styles.muted}>{fn.active_version?"Active":"Disabled"} · Updated {date(fn.updated_at)}</p></div><Button variant={selected===fn.name?"secondary":"ghost"} onClick={()=>setSelected(fn.name)}>Open function</Button></Cluster><code>/functions/{fn.name}</code></Stack></Surface>):!query.error&&<p>Create an endpoint, upload a compiled .wasm file, or deploy a source folder with the Cells CLI.</p>}</Stack>
     </Section>
     {selected&&<FunctionDetails key={selected} cellId={cellId} name={selected} onEdit={edit} loading={loading}/>}
-    <Dialog open={editing!==null} onOpenChange={value=>{if(!value&&!editorBusy){if(editorChanged)setDiscard(true);else setEditing(null);}}}><DialogContent title={editing?.fresh?"Create function":"Edit function"} description="Deploying creates an immutable version and makes it active.">{editing&&<FunctionEditor key={`${editing.name}:${editing.fresh}`} cellId={cellId} editing={editing} maxTimeoutMs={query.data?.max_timeout_ms??300000} onChanged={()=>setEditorChanged(true)} onBusy={setEditorBusy} onDone={name=>{setSelected(name);setEditing(null);}}/>}</DialogContent></Dialog>
+    <Dialog open={editing!==null} onOpenChange={value=>{if(!value&&!editorBusy){if(editorChanged)setDiscard(true);else setEditing(null);}}}><DialogContent title={editing?.fresh?(editing.definition.runtime==="wasm"?"Upload WebAssembly":"Create function"):"Edit function"} description="Deploying creates an immutable version and makes it active.">{editing&&<FunctionEditor key={`${editing.name}:${editing.fresh}`} cellId={cellId} editing={editing} maxTimeoutMs={query.data?.max_timeout_ms??300000} onChanged={()=>setEditorChanged(true)} onBusy={setEditorBusy} onDone={name=>{setSelected(name);setEditing(null);}}/>}</DialogContent></Dialog>
     <Dialog open={discard} onOpenChange={setDiscard}><DialogContent title="Discard these changes?" description="Your edits have not been deployed. Existing deployed versions are kept."><Cluster><Button variant="secondary" onClick={()=>setDiscard(false)}>Keep editing</Button><Button variant="danger" onClick={()=>{setDiscard(false);setEditing(null);}}>Discard edits</Button></Cluster></DialogContent></Dialog>
   </Stack>;
 }
 
 function FunctionEditor({cellId,editing,maxTimeoutMs,onDone,onChanged,onBusy}:{cellId:string;editing:Editing;maxTimeoutMs:number;onDone:(name:string)=>void;onChanged:()=>void;onBusy:(busy:boolean)=>void}){
-  const action=useCellAction(cellId),[name,setName]=useState(editing.name),[definition,setDefinition]=useState(editing.definition),[file,setFile]=useState(editing.definition.entrypoint),[addName,setAddName]=useState(""),[origins,setOrigins]=useState(editing.definition.allowed_origins.join("\n")),[routes,setRoutes]=useState(JSON.stringify(editing.definition.routes,null,2)),[dirty,setDirty]=useState(editing.fresh),[error,setError]=useState<unknown>(null);
-  useCellsLeaveGuard(dirty||action.busy,"Your function has changes that have not been deployed.");
+  const action=useCellAction(cellId),[name,setName]=useState(editing.name),[definition,setDefinition]=useState(editing.definition),[file,setFile]=useState(editing.definition.entrypoint),[addName,setAddName]=useState(""),[origins,setOrigins]=useState(editing.definition.allowed_origins.join("\n")),[routes,setRoutes]=useState(JSON.stringify(editing.definition.routes,null,2)),[dirty,setDirty]=useState(editing.fresh),[error,setError]=useState<unknown>(null),[reading,setReading]=useState(false),[uploadError,setUploadError]=useState<unknown>(null);
+  const busy=action.busy||reading;
+  useCellsLeaveGuard(dirty||busy,"Your function has changes that have not been deployed.");
   function update(change:Partial<Definition>){setDefinition(value=>({...value,...change}));setDirty(true);onChanged();}
-  let source:string|null=null;try{source=decode(definition.files[file]??"");}catch{/* Binary assets are preserved without pretending they are editable text. */}
+  let source:string|null=null;if(definition.runtime==="javascript"&&!file.endsWith(".wasm"))try{source=decode(definition.files[file]??"");}catch{/* Binary assets are preserved without pretending they are editable text. */}
+  async function upload(selected:File){
+    setReading(true);onBusy(true);setUploadError(null);
+    try{
+      const picked=await readCompiledWasm(selected),files={...definition.files};
+      delete files[definition.entrypoint];files[picked.entrypoint]=picked.contents;
+      if(Object.values(files).reduce((total,value)=>total+atob(value).length,0)>MAX_WASM_BYTES)throw new Error("The complete function bundle must be at most 1 MiB.");
+      update({runtime:"wasm",entrypoint:picked.entrypoint,files});setFile(picked.entrypoint);
+    }catch(cause){setUploadError({code:"invalid_wasm",message:cause instanceof Error?cause.message:"The compiled file could not be read.",hint:"Choose a supported compiled .wasm file and try again."});}finally{setReading(false);onBusy(false);}
+  }
   async function deploy(){
+    if(reading||uploadError)return;
     setError(null);onBusy(true);
     try{
+      if(definition.runtime==="wasm"&&!definition.files[definition.entrypoint])throw new Error("Choose a compiled .wasm file before deploying.");
       const parsed:unknown=JSON.parse(routes);if(!Array.isArray(parsed)||parsed.some(route=>typeof route!=="object"||route===null||typeof route.method!=="string"||typeof route.path!=="string"))throw new Error("Routes must be an array of method and path objects.");
       const result=await action.run(`${tail(name)}`,"PUT",{...definition,allowed_origins:origins.split("\n").map(s=>s.trim()).filter(Boolean),routes:parsed});
       if(result){setDirty(false);onDone(name);}
@@ -59,16 +72,17 @@ function FunctionEditor({cellId,editing,maxTimeoutMs,onDone,onChanged,onBusy}:{c
     update({files:{...definition.files,[value]:encode("")}});setFile(value);setAddName("");setError(null);
   }
   return <form onSubmit={e=>{e.preventDefault();void deploy();}}><Stack>
-    <Failure error={error??action.error}/><Input label="Function name" required pattern="[a-z][a-z0-9_-]{0,62}" value={name} disabled={!editing.fresh||action.busy} onChange={e=>{setName(e.target.value);setDirty(true);onChanged();}}/>
-    <p className={styles.muted}>Runtime: {definition.runtime==="javascript"?"TypeScript / JavaScript":"WebAssembly"}. Use the CLI to deploy binary files and larger source folders.</p>
-    <Select label="Source file" disabled={action.busy} value={file} onValueChange={setFile} options={Object.keys(definition.files).map(path=>({value:path,label:path}))}/>
-    {source!==null?<Textarea label={`Source: ${file}`} className={styles.codeInput} value={source} spellCheck={false} disabled={action.busy} onChange={e=>update({files:{...definition.files,[file]:encode(e.target.value)}})}/>:<p>This file contains binary bytes and is preserved unchanged.</p>}
-    <Cluster><Input label="New source filename" disabled={action.busy} value={addName} onChange={e=>setAddName(e.target.value)} placeholder="lib/helper.ts"/><Button type="button" variant="secondary" disabled={action.busy} onClick={add}>Add file</Button><Button type="button" variant="ghost" disabled={action.busy||file===definition.entrypoint} onClick={()=>{const files={...definition.files};delete files[file];update({files});setFile(definition.entrypoint);}}>Remove selected file</Button></Cluster>
-    <Select label="Entrypoint" disabled={action.busy} value={definition.entrypoint} onValueChange={entrypoint=>update({entrypoint})} options={Object.keys(definition.files).filter(path=>definition.runtime==="wasm"?path.endsWith(".wasm"):/\.(ts|js|mjs)$/u.test(path)).map(path=>({value:path,label:path}))}/>
-    <Cluster><Input label="Timeout (milliseconds)" disabled={action.busy} type="number" min={50} max={maxTimeoutMs} description={`Maximum ${maxTimeoutMs} milliseconds for this deployment.`} required value={definition.timeout_ms} onChange={e=>update({timeout_ms:Number(e.target.value)})}/><Input label="Memory (MiB)" disabled={action.busy} type="number" min={32} max={2048} required value={definition.memory_mb} onChange={e=>update({memory_mb:Number(e.target.value)})}/></Cluster>
-    <Textarea label="Allowed browser origins" disabled={action.busy} description="One exact origin per line. Cell browser-origin rules also apply." value={origins} onChange={e=>{setOrigins(e.target.value);setDirty(true);onChanged();}} placeholder="https://your-app.example"/>
-    <Textarea label="Custom routes (JSON)" disabled={action.busy} description={'For example: [{"method":"GET","path":"/api/orders/{id}"}]'} value={routes} onChange={e=>{setRoutes(e.target.value);setDirty(true);onChanged();}} spellCheck={false}/>
-    <Button type="submit" loading={action.busy}>Deploy version</Button>
+    <Failure error={error??action.error}/><Input label="Function name" required pattern="[a-z][a-z0-9_-]{0,62}" value={name} disabled={!editing.fresh||busy} onChange={e=>{setName(e.target.value);setDirty(true);onChanged();}}/>
+    <p className={styles.muted}>Runtime: {definition.runtime==="javascript"?"TypeScript / JavaScript":"WebAssembly"}.</p>
+    {definition.runtime==="wasm"?<Stack><Failure error={uploadError}/><Input label="Compiled WebAssembly file" type="file" accept=".wasm,application/wasm" disabled={busy} description="Choose a compiled wasm32-wasip1 command, up to 1 MiB. It must implement the cells.function.v1 request/response protocol." onChange={event=>{const selected=event.target.files?.[0];event.target.value="";if(selected)void upload(selected);}}/>{reading?<p role="status">Checking the compiled module…</p>:definition.files[definition.entrypoint]?<p role="status">{definition.entrypoint} · {atob(definition.files[definition.entrypoint]).length.toLocaleString()} bytes · Binary preserved unchanged</p>:<p>No compiled module selected.</p>}<p className={styles.muted}>The module must export _start and use only WASI Preview 1 imports. Validation does not run it. Deployment also validates the module in the isolated runtime.</p></Stack>:<>
+    <Select label="Source file" disabled={busy} value={file} onValueChange={setFile} options={Object.keys(definition.files).map(path=>({value:path,label:path}))}/>
+    {source!==null?<Textarea label={`Source: ${file}`} className={styles.codeInput} value={source} spellCheck={false} disabled={busy} onChange={e=>update({files:{...definition.files,[file]:encode(e.target.value)}})}/>:<p>This file contains binary bytes and is preserved unchanged.</p>}
+    <Cluster><Input label="New source filename" disabled={busy} value={addName} onChange={e=>setAddName(e.target.value)} placeholder="lib/helper.ts"/><Button type="button" variant="secondary" disabled={busy} onClick={add}>Add file</Button><Button type="button" variant="ghost" disabled={busy||file===definition.entrypoint} onClick={()=>{const files={...definition.files};delete files[file];update({files});setFile(definition.entrypoint);}}>Remove selected file</Button></Cluster></>}
+    <Select label="Entrypoint" disabled={busy} value={definition.entrypoint} onValueChange={entrypoint=>{if(entrypoint&&Object.hasOwn(definition.files,entrypoint))update({entrypoint});}} options={Object.keys(definition.files).filter(path=>definition.runtime==="wasm"?path.endsWith(".wasm"):/\.(ts|js|mjs)$/u.test(path)).map(path=>({value:path,label:path}))}/>
+    <Cluster><Input label="Timeout (milliseconds)" disabled={busy} type="number" min={50} max={maxTimeoutMs} description={`Maximum ${maxTimeoutMs} milliseconds for this deployment.`} required value={definition.timeout_ms} onChange={e=>update({timeout_ms:Number(e.target.value)})}/><Input label="Memory (MiB)" disabled={busy} type="number" min={32} max={2048} required value={definition.memory_mb} onChange={e=>update({memory_mb:Number(e.target.value)})}/></Cluster>
+    <Textarea label="Allowed browser origins" disabled={busy} description="One exact origin per line. Cell browser-origin rules also apply." value={origins} onChange={e=>{setOrigins(e.target.value);setDirty(true);onChanged();}} placeholder="https://your-app.example"/>
+    <Textarea label="Custom routes (JSON)" disabled={busy} description={'For example: [{"method":"GET","path":"/api/orders/{id}"}]'} value={routes} onChange={e=>{setRoutes(e.target.value);setDirty(true);onChanged();}} spellCheck={false}/>
+    <Button type="submit" loading={action.busy||reading} disabled={!!uploadError||(definition.runtime==="wasm"&&!definition.files[definition.entrypoint])}>Deploy version</Button>
   </Stack></form>;
 }
 
