@@ -3,6 +3,7 @@ const CELL = "[a-z][a-z0-9-]{1,28}[a-z0-9]";
 const APP = "[a-z0-9_-]{3,30}";
 const UUID = "[0-9a-f-]{36}";
 const BUCKET = "[a-z0-9][a-z0-9_-]{0,62}";
+const FUNCTION = "[a-z][a-z0-9_-]{0,62}";
 const routes: [string, RegExp][] = [
   ["GET HEAD", /^me$/],
   ["GET HEAD POST", /^cells$/],
@@ -12,6 +13,27 @@ const routes: [string, RegExp][] = [
   ["POST", new RegExp(`^cells/${CELL}/(restore|sql|schema|import)$`)],
   ["PUT", new RegExp(`^cells/${CELL}/(admin|settings)$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/(users|apps|history|tables|secrets|notifications)$`)],
+  ["GET HEAD POST", new RegExp(`^cells/${CELL}/triggers$`)],
+  ["PUT DELETE", new RegExp(`^cells/${CELL}/triggers/${UUID}$`)],
+  ["GET HEAD", new RegExp(`^cells/${CELL}/triggers/${UUID}/deliveries$`)],
+  ["GET HEAD", new RegExp(`^cells/${CELL}/triggers/${UUID}/deliveries/${UUID}$`)],
+  ["POST", new RegExp(`^cells/${CELL}/triggers/${UUID}/deliveries/${UUID}/retry$`)],
+  ["GET HEAD", new RegExp(`^cells/${CELL}/queues$`)],
+  ["GET HEAD PUT PATCH DELETE", new RegExp(`^cells/${CELL}/queues/${FUNCTION}$`)],
+  ["GET HEAD POST", new RegExp(`^cells/${CELL}/queues/${FUNCTION}/messages$`)],
+  ["GET HEAD", new RegExp(`^cells/${CELL}/queues/${FUNCTION}/messages/${UUID}$`)],
+  ["POST", new RegExp(`^cells/${CELL}/queues/${FUNCTION}/messages/${UUID}/retry$`)],
+  ["GET HEAD POST", new RegExp(`^cells/${CELL}/webhooks$`)],
+  ["PATCH DELETE", new RegExp(`^cells/${CELL}/webhooks/${UUID}$`)],
+  ["POST", new RegExp(`^cells/${CELL}/webhooks/${UUID}/rotate-secret$`)],
+  ["GET HEAD", new RegExp(`^cells/${CELL}/webhooks/${UUID}/deliveries$`)],
+  ["GET HEAD", new RegExp(`^cells/${CELL}/webhooks/${UUID}/deliveries/${UUID}$`)],
+  ["POST", new RegExp(`^cells/${CELL}/webhooks/${UUID}/deliveries/${UUID}/retry$`)],
+  ["GET HEAD", new RegExp(`^cells/${CELL}/functions$`)],
+  ["GET HEAD PUT DELETE", new RegExp(`^cells/${CELL}/functions/${FUNCTION}$`)],
+  ["GET HEAD", new RegExp(`^cells/${CELL}/functions/${FUNCTION}/invocations$`)],
+  ["GET HEAD", new RegExp(`^cells/${CELL}/functions/${FUNCTION}/versions/${UUID}$`)],
+  ["POST", new RegExp(`^cells/${CELL}/functions/${FUNCTION}/(activate|invoke)$`)],
   ["POST", new RegExp(`^cells/${CELL}/notifications/${UUID}/retry$`)],
   ["GET HEAD POST", new RegExp(`^cells/${CELL}/(authors|keys|migrations)$`)],
   ["DELETE", new RegExp(`^cells/${CELL}/(authors|keys)/${UUID}$`)],
@@ -45,4 +67,11 @@ export function cellsProxyRoute(path: string, method: string): string | null {
 }
 export function cellsUploadPart(path: string, method: string): boolean {
   return method === "PUT" && new RegExp(`^v1/cells/${CELL}/storage-api/uploads/${UUID}/parts/[0-9]{1,4}$`).test(path);
+}
+export function cellsFunctionBody(path: string, method: string): boolean {
+  return method === "PUT" && new RegExp(`^v1/cells/${CELL}/functions/${FUNCTION}$`).test(path)
+    || cellsFunctionInvocation(path,method);
+}
+export function cellsFunctionInvocation(path: string, method: string): boolean {
+  return method === "POST" && new RegExp(`^v1/cells/${CELL}/functions/${FUNCTION}/invoke$`).test(path);
 }

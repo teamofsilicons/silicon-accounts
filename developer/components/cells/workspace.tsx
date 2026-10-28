@@ -8,9 +8,13 @@ import type {Cell} from "@/lib/cells/api";
 import {useCellData,Failure,date} from "./shared";
 import {CellFiles} from "./files";
 import {CellDatabase} from "./database";
+import {CellTriggers} from "./triggers";
+import {CellQueues} from "./queues";
+import {CellWebhooks} from "./webhooks";
+import {CellFunctions} from "./functions";
 import {CellAuthors,CellHistory,CellSettings} from "./management";
 import styles from "./cells.module.css";
-const tabs=["overview","database","files","authors","settings","history"] as const;
+const tabs=["overview","database","files","functions","webhooks","queues","triggers","authors","settings","history"] as const;
 export function CellWorkspace({cellId,tab}:{cellId:string;tab:string}){
   const query=useCellData<{cell:Cell}>(cellId,"");
   const cell=query.data?.cell;
@@ -18,7 +22,7 @@ export function CellWorkspace({cellId,tab}:{cellId:string;tab:string}){
     <Failure error={query.error}/>{query.isPending&&<p role="status">Loading cell…</p>}
     {cell&&<><nav className={styles.tabs} aria-label="Cell sections">{tabs.map(t=><Link key={t} href={paths.cell(cellId,t)} data-sq="surface" className={styles.tab} aria-current={tab===t?"page":undefined}>{t[0].toUpperCase()+t.slice(1)}</Link>)}</nav>
       {cell.status!=="active"&&<Alert tone="warning" title={`This cell is ${cell.status}.`}>Deleted cells can be restored in Settings within 30 days of deletion.</Alert>}
-      {tab==="settings"?<CellSettings cell={cell}/>:tab==="history"?<CellHistory cellId={cellId}/>:tab==="authors"?<CellAuthors cellId={cellId} active={cell.status==="active"}/>:tab==="overview"?<Overview cell={cell}/>:cell.status!=="active"?null:tab==="files"?<CellFiles cell={cell}/>:<CellDatabase cellId={cellId}/>}
+      {tab==="settings"?<CellSettings cell={cell}/>:tab==="history"?<CellHistory cellId={cellId}/>:tab==="authors"?<CellAuthors cellId={cellId} active={cell.status==="active"}/>:tab==="overview"?<Overview cell={cell}/>:cell.status!=="active"?null:tab==="files"?<CellFiles cell={cell}/>:tab==="functions"?<CellFunctions cellId={cellId}/>:tab==="webhooks"?<CellWebhooks cellId={cellId}/>:tab==="queues"?<CellQueues cellId={cellId}/>:tab==="triggers"?<CellTriggers cellId={cellId}/>:<CellDatabase cellId={cellId}/>}
     </>}
   </Page>;
 }

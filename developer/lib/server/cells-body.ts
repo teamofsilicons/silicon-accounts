@@ -1,7 +1,7 @@
 /** Bounded control JSON and streaming multipart bytes. Never log request bodies. */
 export class CellsBodyLimit extends Error {}
-export async function cellsBody(request: Request, streaming: boolean): Promise<{body: Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array> | undefined; oversized: () => boolean}> {
-  const limit = streaming ? 1024 ** 3 : 1024 ** 2;
+export async function cellsBody(request: Request, streaming: boolean, encodedFunction = false): Promise<{body: Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array> | undefined; oversized: () => boolean}> {
+  const limit = streaming ? 1024 ** 3 : (encodedFunction ? 2 : 1) * 1024 ** 2;
   let oversized = false;
   if (["GET", "HEAD"].includes(request.method)) return {body: undefined, oversized: () => false};
   const length = request.headers.get("content-length");

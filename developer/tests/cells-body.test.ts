@@ -3,6 +3,14 @@ import assert from "node:assert/strict";
 import {cellsBody, CellsBodyLimit} from "../lib/server/cells-body";
 import {cellsProxyRoute, cellsUploadPart} from "../lib/server/cells-routes";
 
+test("Encoded function envelopes allow 2 MiB without raising ordinary control limits",async()=>{
+  const bytes=new Uint8Array(1024**2+1);
+  await assert.rejects(cellsBody(new Request("https://developer.example/api/cells/cells/notes/sql",{method:"POST",body:bytes}),false),CellsBodyLimit);
+  const accepted=await cellsBody(new Request("https://developer.example/api/cells/cells/notes/functions/hello",{method:"PUT",body:bytes}),false,true);
+  assert.equal((accepted.body as Uint8Array).byteLength,bytes.byteLength);
+  await assert.rejects(cellsBody(new Request("https://developer.example/api/cells/cells/notes/functions/hello",{method:"PUT",body:new Uint8Array(2*1024**2+1)}),false,true),CellsBodyLimit);
+});
+
 test("Storage paths allow encoded file names without route or origin escapes", () => {
   const id="12345678-1234-1234-1234-123456789abc";
   const part=`cells/notes/storage-api/uploads/${id}/parts/0`;

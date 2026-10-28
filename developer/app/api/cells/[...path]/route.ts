@@ -1,7 +1,7 @@
 /** Same-origin author proxy. The sealed Accounts session stays on the server. */
 import { NextRequest, NextResponse } from "next/server";
 import { cellsApiUrl } from "@/lib/server/config";
-import { cellsProxyRoute, cellsUploadPart } from "@/lib/server/cells-routes";
+import { cellsProxyRoute, cellsUploadPart, cellsFunctionBody, cellsFunctionInvocation } from "@/lib/server/cells-routes";
 import { actionForAppsRefusal, signInStateAtAccounts } from "@/lib/server/apps-refusal";
 import { clearSession, clientHeaders, errorBody, readSession, refreshSession, sameOriginProblem, writeSession } from "@/lib/server/session";
 
@@ -46,9 +46,10 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     if (failure) return failure;
   }
   const streaming = cellsUploadPart(path, request.method);
-  const tooLarge = () => finish(json(413, errorBody("body_too_large", streaming ? "The file part exceeds 1 GiB." : "The request exceeds 1 MiB.", "Use the upload’s returned part size, or split a bulk request.")));
+  const functionBody = cellsFunctionBody(path, request.method);
+  const tooLarge = () => finish(json(413, errorBody("body_too_large", streaming ? "The file part exceeds 1 GiB." : `The request exceeds ${functionBody ? 2 : 1} MiB.`, functionBody ? "A function bundle or invocation can contain at most 1 MiB of decoded bytes." : "Use the upload’s returned part size, or split a bulk request.")));
   let prepared: Awaited<ReturnType<typeof cellsBody>>;
-  try { prepared = await cellsBody(request, streaming); }
+  try { prepared = await cellsBody(request, streaming, functionBody); }
   catch (error) {
     return error instanceof CellsBodyLimit ? tooLarge() : finish(json(400, errorBody("body_interrupted", "The request body was interrupted.", "Retry with the same operation key or upload part.")));
   }
@@ -61,7 +62,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     }
     const init: RequestInit & {duplex?: "half"} = {
       method: request.method, headers: outgoing, body: prepared.body,
-      redirect: "manual", cache: "no-store", signal: AbortSignal.any([request.signal, AbortSignal.timeout(120_000)]),
+      redirect: "manual", cache: "no-store", signal: AbortSignal.any([request.signal, AbortSignal.timeout(cellsFunctionInvocation(path,request.method) ? 310_000 : 120_000)]),
     };
     if (streaming) init.duplex = "half";
     return fetch(`${cellsApiUrl()}/${path}${request.nextUrl.search}`, init);
