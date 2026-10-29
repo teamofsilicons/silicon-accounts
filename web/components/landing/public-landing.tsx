@@ -15,7 +15,7 @@ export async function PublicLanding({ nonce }: { nonce?: string }) {
   const developer = await developerUrl();
   return (
     <>
-      <SiteHeader docsUrl={`${developer}/docs/accounts`} />
+      <SiteHeader />
       <main id="main" tabIndex={-1}>
         <LandingPage developerUrl={developer} />
       </main>

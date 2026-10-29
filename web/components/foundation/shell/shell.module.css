@@ -1,49 +1,54 @@
-/* The account site's frame: the top bar (brand, search, the other sites, the account menu), the page, and the dock. */
-.shell { position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; }
-/* While the shell is up, what focus (Tab) or an in-page jump brings into view stops clear of the floating dock and the
-   phone bar (WCAG 2.4.11): the browser scrolls a control near the bottom up above them instead of leaving it under.
-   At the top it keeps room, so an edge drawn just above a focused part (a tab panel's accent line, which sits in the
-   gap under its tab list) is never scrolled out of view. */
-:global(html):has(.shell) { scroll-padding-block: var(--space-section) calc(var(--dock-height) + var(--space-section) + env(safe-area-inset-bottom, 0px)); }
+/* The account site's frame: the top bar (brand, search, the account menu), then the section list beside the page (from
+   900px) or in a bottom sheet (below it). */
+.shell { --top-height: 64px; position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; }
+/* What focus (Tab) or an in-page jump brings into view stops clear of the sticky top bar (WCAG 2.4.11). */
+:global(html):has(.shell) { scroll-padding-block: calc(var(--top-height) + var(--space-section)) var(--space-section); }
 
 .top {
-  display: flex;
-  width: 100%;
-  max-width: var(--page-max);
-  height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: var(--layer-sticky);
+  display: grid;
+  height: var(--top-height);
   flex: none;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-inset);
-  margin-inline: auto;
-  padding: 0 var(--gutter);
+  padding: 0 var(--space-inset);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--background);
 }
-/* The wordmark as on Silicon Writings and Silicon Apps: the bare glyph in ink, the name in the pixel face. The padding
-   (taken back by the negative margin, so nothing moves) gives keyboard focus a soft fill to show in. */
-.brand { --sq-r: 10px; --sq-fill: transparent; display: inline-flex; min-width: 0; align-items: center; gap: var(--space-group); margin: calc(var(--space-related) * -1); padding: var(--space-related); background: var(--sq-fill); color: var(--foreground); font-family: var(--font-pixel); font-size: var(--text-lg); letter-spacing: 0; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+/* The wordmark: the bare glyph in ink, the name in the display face. The padding (taken back by the negative margin, so
+   nothing moves) gives keyboard focus a soft fill to show in. */
+.brand { --sq-r: 10px; --sq-fill: transparent; display: inline-flex; min-width: 0; align-items: center; gap: var(--space-group); margin: calc(var(--space-related) * -1); padding: var(--space-related); background: var(--sq-fill); color: var(--foreground); font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: 0; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
 .brand:hover { color: var(--foreground); }
 .brand:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
 .brandMark { display: grid; height: 22px; flex: none; place-items: center; color: var(--foreground); }
 .brandMark svg { width: auto; height: 13px; }
 .brandText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.topEnd { display: flex; min-width: 0; align-items: center; gap: var(--space-group); }
-/* The other sites: plain words with an arrow that says they leave this one, quieter than anything of this site. */
-.elsewhere { display: flex; align-items: center; gap: var(--space-tight); }
-.elsewhereLink { --sq-r: 8px; --sq-fill: transparent; display: inline-flex; height: 32px; align-items: center; gap: var(--space-tight); padding: 0 var(--space-group); background: var(--sq-fill); color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
-.elsewhereLink svg { flex: none; color: var(--text-muted); }
-.elsewhereLink:hover, .elsewhereLink:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
-/* Phones: the other sites are in the account menu, and search is in the phone bar. */
-@media (max-width: 639px) { .elsewhere, .search { display: none; } }
-/* The shortcut inside the search button. */
+/* Search sits in the middle of the bar, as wide as the prototype's field; on narrow screens only its icon shows. */
+.search { width: min(100%, 480px); justify-self: center; }
+.searchLabel { flex: 1; text-align: start; }
 .keys { margin-inline-start: var(--space-tight); color: var(--text-muted); font-family: var(--font-body); font-size: var(--text-xs); }
+@media (max-width: 899px) {
+  .search { width: auto; justify-self: end; }
+  .searchLabel, .keys { display: none; }
+}
+
+.topEnd { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
+
+/* The section list beside the page: sticky under the top bar, scrolling on its own when the window is short. */
+.body { display: grid; min-width: 0; flex: 1; grid-template-columns: 248px minmax(0, 1fr); }
+.aside { position: sticky; top: var(--top-height); height: calc(100dvh - var(--top-height)); overflow-y: auto; padding: var(--space-inset) var(--space-group); border-right: 1px solid var(--border-subtle); }
+@media (max-width: 899px) { .body { display: flex; flex-direction: column; } }
 
 .main { position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; outline: none; }
 .main > * { min-width: 0; }
 .page { display: flex; min-width: 0; flex: 1; flex-direction: column; }
 
 /* Loading and failure states of the shell itself. */
-.loading { display: grid; width: 100%; max-width: var(--page-max); gap: var(--space-block); margin-inline: auto; padding: var(--space-section) var(--gutter) var(--dock-clearance); }
+.loading { display: grid; width: 100%; max-width: var(--page-max); gap: var(--space-block); margin-inline: auto; padding: var(--space-section) var(--gutter) var(--space-page); }
 .loadingHeader { display: grid; gap: var(--space-group); }
 .problem { width: 100%; max-width: calc(var(--page-narrow) + 2 * var(--gutter)); margin: var(--space-page) auto; padding: 0 var(--gutter); }
 
@@ -60,7 +65,7 @@
 @keyframes palette-fade-out { to { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .elsewhereLink { transition: none; }
+  .brand { transition: none; }
   .paletteOverlay[data-state="open"] { animation-duration: var(--duration-instant); }
 }
 

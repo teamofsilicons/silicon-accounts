@@ -7,7 +7,7 @@ Silicon Accounts and Silicon Apps is shared at `https://developers.teamofsilicon
 Building apps is not done here. Everything about an app's sign-in (its methods, Google and Apple, details and flows,
 page styling, redirect URLs, user base and imports, webhooks, App verification proofs, embed snippets) lives on the developer site,
 developers.teamofsilicons.com (`developer/` in this repository, its own Next.js app). This site only links there: the
-dock's Developer item, the landing page's footer and the apps page lead to `developer_url` from `GET /v1/meta`, and
+sidebar's Developers and Docs, the landing page's footer and the apps page lead to `developer_url` from `GET /v1/meta`, and
 `/developer[/*]` redirects there (see Topology).
 
 > **The areas' Playwright checks are paused, out of date with v2.** `components/*/checks.ts` were written for the v1
@@ -72,10 +72,10 @@ RSC, `HEAD` and static Markdown requests. `/docs` goes to the shared `/docs` lan
 `/docs/accounts/<path>`; `/docs.md` goes to `/docs/accounts/index.md`. The old `/docs/search-index.json` goes to the
 shared endpoint at the same path (`/llms.txt` and `/llms-full.txt` are this site's own now). Queries are preserved, and browsers inherit the
 original fragment because `Location` does not replace it. Unknown deep paths reach the developer site's docs 404.
-The account shell's top row, the phone sheet's foot, the command palette ("Other sites") and the signed-out landing
+The account sidebar's foot (beside the page or in the phone sheet), the command palette ("Other sites") and the signed-out landing
 link directly to the developer site and its `/docs` (`ELSEWHERE` in `lib/navigation.ts`), using `developer_url` rather
-than an obsolete account-site docs address. They are never dock sections: the dock holds only this site's six pages
-(number keys 1 to 6). Account pages, API rewrites, hosted sign-in and
+than an obsolete account-site docs address. They are never sections: the sidebar's sections are only this site's pages
+(number keys 1 to 4). Account pages, API rewrites, hosted sign-in and
 the embed remain on the Accounts origin.
 
 The embed page `/embed/v1/buttons` is the one page other sites may frame: `proxy.ts` reads the app's
@@ -115,12 +115,12 @@ shared parts and a first version of each route; each area's builder owns its rou
 | public | `/` when signed out (the landing page, rewritten by `proxy.ts` to `app/landing`), the agent files | `app/landing/`, `components/landing/`, `components/site/`, `app/*.txt`, `lib/agent/` |
 | web-auth | `/sign-in`, `/authorize`, `/authorize/flow/[id]`, `/device`, `/embed/v1/buttons` (polish) | `app/(app)/(auth)/`, `components/auth/` |
 | legacy web-docs | former docs routes redirect through `proxy.ts`; the old renderer and generated build remain temporarily as source, while `developer/` owns the public docs | `app/(app)/(docs)/`, `components/docs/`, `lib/docs/` (guide: `lib/docs/README.md`), `lib/docs-redirects.ts` |
-| foundation | root layout, providers, shell, dock, command palette, theme, squircles, branding runtime, API client and hooks, SDK, `proxy.ts`, `/__kitchen`, screens | `app/layout.tsx`, `components/foundation/`, `components/kitchen/`, `lib/`, `styles/`, `sdk/`, `scripts/` |
+| foundation | root layout, providers, shell, sidebar, command palette, theme, squircles, branding runtime, API client and hooks, SDK, `proxy.ts`, `/__kitchen`, screens | `app/layout.tsx`, `components/foundation/`, `components/kitchen/`, `lib/`, `styles/`, `sdk/`, `scripts/` |
 | Silicon UI | the installed components (local edits below) | `components/silicon-ui/` |
 
 `app/(app)/layout.tsx` mounts the client providers for everything under it (one query cache across the account pages
 and the hosted pages); the root layout and the public landing load none. `app/(app)/(shell)/layout.tsx` wraps the
-account pages in the account shell (dock, ⌘K palette, sign-in gate). `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
+account pages in the account shell (sidebar, ⌘K palette, sign-in gate). `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
 development only: production answers 404 unless the server runs with `ACCOUNTS_KITCHEN=1`.
 
 ## Conventions
@@ -130,10 +130,11 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   the API, the SDK, the embed. Errors say what happened and what to do next, in the server's words when it sent them
   (`message` + `hint`).
 - **Styling.** CSS modules next to each component, tokens from `styles/tokens.css` (the brand mapped onto Arc's
-  semantic roles), no Tailwind. The look is Silicon Writings' and the Silicon Apps store's: cream paper `#FFFDF9`, ink
-  `#1E1E1C`, Hedvig Letters Serif for titles (page titles in `--accent-ink` blue), BDO Grotesk for text, Geist Pixel for
-  the wordmark and small labels, the current item on the beige `--surface-pressed`. Filled primary actions use
-  `--primary*`; `--accent` is for indicators, `--accent-ink` for accent-coloured text.
+  semantic roles), no Tailwind. A neutral `#FCFCFC` page and Silicon UI's grey scale (no beige since 2026-10-18), ink
+  `#1E1E1C`, Silicon UI's fonts only (Geist for titles and the wordmark, Hanken Grotesk for text, the system monospace
+  for code; no serif or pixel face since 2026-10-18), the current item on the grey `--surface-pressed`. Icons are
+  lucide-react; only brand marks (Google, Apple, GitHub, our own) and diagrams are hand-drawn SVG. Filled primary
+  actions use `--primary*`; `--accent` is for indicators, `--accent-ink` for accent-coloured text.
 - **Theme (2026-10-11).** The site is light only. `lib/theme.ts` keeps its exports so callers compile, but the boot
   script pins `data-theme="light"` and clears any stored choice; there is no theme switch anywhere (dock, user menu,
   Settings, palette, public header and footer). The dark tokens in `styles/tokens.css` stay for branded subtrees: an
@@ -156,12 +157,11 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
 - **Telemetry (off since 2026-10-11).** The site records none and has no setting: `lib/telemetry.ts` sends
   `X-Accounts-Telemetry: off` on every API call from the first request on, and sets the `sa_telemetry=off` cookie for
   requests without headers (photos, the hosted sign-in pages). The silicon-accounts CLI keeps its own switch.
-- **Navigation.** `lib/navigation.ts` has every path and the dock's sections. Page changes use View Transitions
-  (`router.push(href, { transitionTypes: ["page-forward"] })`); the dock morphs its highlight.
+- **Navigation.** `lib/navigation.ts` has every path and the sidebar's sections. Page changes use View Transitions
+  (`router.push(href, { transitionTypes: ["page-forward"] })`); the sidebar (Silicon UI NavList) glides its marker.
 - **Unsaved work** asks before it is lost through the navigation guard (`lib/navigation-guard.ts`): a page registers
   `useNavigationGuard(dirty ? { protects, confirm } : null)` (or `question` for the shell's own "Leave this page?"
-  dialog, `<LeaveQuestionHost>`), and the shell asks it before every navigation it starts (the dock and its phone
-  sheet, the brand, the command palette, the section number keys, the user menu's Settings, signing out) and before a
+  dialog, `<LeaveQuestionHost>`), and the shell asks it before every navigation it starts (the brand, the command palette, the section number keys, the user menu's Settings, signing out) and before a
   plain click on any other same-origin link (`useGuardedLinks`, a window capture listener). Links that ask through
   `confirmNavigation` themselves carry `data-guarded-navigation`. Back/Forward, typed addresses, reloads and closing
   the tab cannot be asked through it: keep the work for the tab and set `beforeunload`. The section number keys never
@@ -670,3 +670,18 @@ Working notes are in `redesign/` (priorities, decisions, log).
 - **Security** (`/sign-in-methods`, title "Security"): emails, phone numbers, Google and Apple, then "Where you are
   signed in" (moved from Settings: `components/account/security/sessions.tsx`) and a way to Activity. Settings keeps
   Local time and Delete account.
+
+### The prototype's shell: sidebar and top bar (2026-10-29)
+
+The lead designer's prototype v7, built on Silicon UI screen by screen (`redesign/prototype-map.md`; parts with no API
+in `redesign/api-gaps.md`).
+
+- **Sidebar** (`components/foundation/shell/sidebar.tsx`): Silicon UI NavList ("Account sections") with Home `/`,
+  Silicons `/silicons` (a count of custodian requests waiting), Connected apps `/apps` and Security
+  `/sign-in-methods`; Developers and Docs at its foot, marked as leaving. Beside the page from 900 px, in a bottom sheet
+  opened from the top bar below that. NavList is experimental: allowed in `eslint.config.mjs` (`allowExperimental`).
+  The dock (`dock.tsx`) is gone; sections are no longer called pillars.
+- **Top bar**: brand, "Search your account" (opens ⌘K; icon only under 900 px), the account menu (Settings, sign out);
+  sticky, so `html`'s `scroll-padding-block` keeps focus clear of it at the top.
+- **Providers**: `SiliconProvider link={Link}` (next/link), so links Silicon UI components render move inside the app.
+- **Tokens**: `--dock-height` and `--dock-clearance` are gone; `--page-end` is the room under a page's last content.

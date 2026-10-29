@@ -5,32 +5,50 @@ move done items to Done (with the commit), add what came up, keep Now to one ite
 Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.md). The product contract is
 `../../understanding/UNDERSTANDING.md` (never edited); the design brief is `../../Silicon Accounts Redesign Design Review.md`.
 
-Last updated: 2026-10-17
+Last updated: 2026-10-29
 
 ## Now
-1. **Proofs inside Access:** each app's proofs ("user verification") in that app's details on `/apps`; `/proofs` stays
-   reachable (a thin list or a redirect: design review open question, my default is a thin list linked from Apps).
+1. **Prototype v7, phase 3: Home.** Greeting with id, the needs-you block (custodian requests; Alert warning), the intro
+   card, Your Silicons (two tiles + New Silicon), Your apps (four tiles). Map: [prototype-map.md](prototype-map.md).
 
 ## Next
-2. **Clear the tolerated exceptions:** 23 files in eslint-suppressions.json (raw elements, mostly auth steps and
-   account parts) and the CSS baseline (294 raw values: account apps, proofs, settings, activity modules).
-3. **Use 0.3's parts where they fit:** composable DropdownMenu for row menus, soft Button for controls in the top bar,
-   compact sizes in dense rows (opt in per component in eslint.config.mjs).
-4. **Identity screens:** `pnpm screens --only account-identity` fails while a real API runs on 8589 (the proxy asks it
-   whether the mock session is live and serves the landing page). Run screens with the API stopped, or teach the
-   proxy's check to accept the screens cookie in development.
+2. Account command menu on Silicon UI Dialog instead of direct Radix, if Dialog can hold the palette without its own
+   title row (else report what is missing).
+3. Silicons: list, `/silicons/[uuid]` with Access and Settings tabs, request and offer pages.
+4. Connected apps: list, `/apps/[id]`, Permissions between apps (`/proofs`).
+5. Security (`/security`, `/sign-in-methods` redirects) and Activity.
+6. Personal info (`/personal`) with every edit dialog.
+7. Data & privacy (`/privacy`, `/settings` redirects).
+8. Sign-in steps restyled; their suppressions cleared.
+9. Clear the remaining tolerated exceptions (eslint-suppressions.json, CSS baseline) as each screen is rebuilt.
+10. Identity screens: `pnpm screens --only account-identity` fails while a real API runs on 8589; run with it stopped.
+
+## Waiting on the API
+- Everything in [api-gaps.md](api-gaps.md): notifications, data download, a Silicon's activity, apps and sign-in
+  stats, wrong-keys alerts, automation, cloud services, per-field sharing.
 
 ## Later
-- Command menu and docs search on silicon-ui CommandPalette instead of direct Radix.
+- Move `components/foundation/layout` (Page, PageHeader, Section) to silicon-ui's page layout if #24 ships.
+- Docs search on silicon-ui CommandPalette instead of direct Radix (the account command menu moves in phase 2).
 - Custom surfaces' squircle fallbacks vs silicon-ui corner tokens: decide one system.
 - Generalised decision inbox (custodian requests and account verification), once the API lists verification requests.
 - The developer portal (`../../developer`, ~24k lines on its own Arc UI copies): its own redesign, after this site.
 
 ## Waiting on Anil
-- Design review open questions: Activity in the dock or linked (now linked from Security); Proofs folded fully or a
+- Landing, still open from the audit: sign-up as its own job; CLI fixes (`--self-create` default, one-line installer) are outside this site.
+- Design review open questions: Proofs folded fully or a
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+- 2026-10-29 Shell from the prototype: NavList sidebar (Home, Silicons with a waiting count, Connected apps, Security; Developers and Docs at its foot), sticky top bar with "Search your account", bottom sheet under 900 px; dock and its tokens removed; next/link via SiliconProvider (uncommitted)
+- 2026-10-29 Prototype v7 mapped to Silicon UI and routes (prototype-map.md); API gaps listed for developers (api-gaps.md) (uncommitted)
+- 2026-10-18 Landing as a full landing page: 10 sections on a 12-column frame, sample identity card hero, consent still, FAQ (uncommitted)
+- 2026-10-18 Brand assets neutral: app icon on grey #E3E3E3, og image on #FCFCFC in Geist and Hanken (uncommitted)
+- 2026-10-18 Silicon UI fonts only: Geist titles and wordmark, Hanken text; serif and pixel faces removed (uncommitted)
+- 2026-10-18 Landing rebuilt from the audit, Carbons first: hero, three Carbon reasons, Silicon steps with the STK alert; Docs moved to the footer (uncommitted)
+- 2026-10-18 No beige: #FCFCFC page, neutral greys from Silicon UI; docs checklist tick on lucide Check; landing audit written (uncommitted)
+- 2026-10-18 Identity card as a form: every element is a field, decoration removed (uncommitted)
+- 2026-10-17 Proofs inside Access: each app card lists its live user verifications with Revoke; /proofs has a back link to Apps (uncommitted)
 - 2026-10-17 Security pillar: sessions moved from Settings to /sign-in-methods with a way to Activity ("Silicon UI 0.3, Hanken, neutral accent and the Security pillar")
 - 2026-10-17 Silicon UI 0.3.0 from npm; Hanken Grotesk body font; neutral ink accent; raw z-index on layer tokens (same commit)
 - 2026-10-12 Four pillars in the dock, Developers/Docs in the top bar, attention strip, identity card trim (2f2c184,

@@ -1,56 +1,92 @@
-/* Identity home: the attention strip (its own module), the card, and metric cards beside it. Tokens only. */
+/* Identity home: the attention strip (its own module), the card laid out as a form, and metric cards beside it. Tokens only. */
 .layout { display: grid; grid-template-columns: minmax(0, 640px) minmax(0, 1fr); align-items: start; gap: clamp(var(--space-block), 5vw, var(--space-stage)); }
 @media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 .alertAction { display: block; margin-top: var(--space-group); }
 
-/* ------------------------------------------------- front of the card ------------------------------------------------- */
-.face { position: relative; display: grid; min-width: 0; gap: var(--space-section); }
-/* Details on the front and Back on the back: the same corner of the card, so turning it over and back is one place. */
-.turn.turn { position: absolute; z-index: 1; top: 0; right: 0; }
-/* The name and the back's title leave room for it. */
-.who, .backHead { padding-right: calc(var(--space-screen) + var(--space-section)); }
-@media (max-width: 480px) { .who { padding-right: 0; padding-top: calc(var(--space-block) + var(--space-group)); } }
-.who { display: flex; min-width: 0; align-items: center; gap: var(--space-section); }
-.names { display: grid; min-width: 0; flex: 1; gap: var(--space-related); }
-/* The display name is an inline editor set in the display face: the editor keeps its metrics while editing. */
-.name.name[data-variant] { --size: clamp(var(--text-3xl), 4vw, var(--text-4xl)); --leading: round(var(--size) * 1.2, 2px); --weight: 400; --ink: var(--foreground); }
-.name > :first-child { font-family: var(--font-serif); letter-spacing: -.01em; }
-/* A long name wraps onto more lines instead of being cut off (names run to 100 characters); while it is edited the
-   field is one line again and scrolls (InlineEdit marks the text layer data-layer and its root data-editing). */
-.name:not([data-editing]) [data-layer] { overflow: visible; text-overflow: clip; white-space: pre-wrap; overflow-wrap: anywhere; text-wrap: balance; }
-.badges { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-group); }
-.since { color: var(--text-secondary); font-size: var(--text-xs); }
+/* ------------------------------------------------------- form ------------------------------------------------------- */
+.face { --rule: color-mix(in oklab, var(--foreground) 16%, transparent); display: grid; min-width: 0; gap: var(--space-section); }
 
-/* Recognition only: the id, and room for its reservation note. */
-.fields { display: grid; gap: var(--space-related); padding-top: var(--space-comfort); border-top: 1px dashed color-mix(in oklab, var(--border) 85%, transparent); }
-.field { display: grid; min-width: 0; align-content: start; justify-items: start; gap: var(--space-tight); }
-/* The id never runs under the edge: the morph's frame is held to the space there is (the full id is in the title,
-   and Copy copies all of it). */
+/* Printed labels: the same face for every field on both sides of the card. */
+.label { color: var(--text-secondary); font-family: var(--font-body); font-size: var(--text-xs); letter-spacing: .1em; line-height: 1.3; text-transform: uppercase; }
+
+.issuer { display: grid; min-width: 0; align-content: start; gap: var(--space-tight); }
+.cardType { margin: 0; font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.15; }
+.holder { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+
+/* Front: issuer and status across the top, the form beside the photo. */
+.sheet {
+  display: grid;
+  grid-template-areas: "issuer status" "form photo";
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-section) var(--space-block);
+}
+.sheet > .issuer { grid-area: issuer; }
+.status { grid-area: status; display: grid; justify-items: end; gap: var(--space-tight); margin: 0; text-align: right; }
+.statusValue { font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+.statusValue[data-tone="valid"] { color: var(--success); }
+.statusValue[data-tone="pending"] { color: var(--warning); }
+.statusValue[data-tone="ended"] { color: var(--danger); }
+.sheet > .form { grid-area: form; }
+
+/* The photo, framed by crop marks that show where a new one can be dropped. */
+.photo { grid-area: photo; position: relative; display: grid; justify-self: end; padding: var(--space-related); }
+.crop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --mark: var(--space-inset);
+  --ink: color-mix(in oklab, var(--foreground) 70%, transparent);
+  background:
+    linear-gradient(var(--ink), var(--ink)) top left / var(--mark) 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) top left / 1px var(--mark) no-repeat,
+    linear-gradient(var(--ink), var(--ink)) top right / var(--mark) 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) top right / 1px var(--mark) no-repeat,
+    linear-gradient(var(--ink), var(--ink)) bottom left / var(--mark) 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) bottom left / 1px var(--mark) no-repeat,
+    linear-gradient(var(--ink), var(--ink)) bottom right / var(--mark) 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) bottom right / 1px var(--mark) no-repeat;
+}
+
+/* Fields: label on the left, the value on a ruled line. */
+.form { display: grid; min-width: 0; margin: 0; }
+.row { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); align-items: baseline; gap: var(--space-tight) var(--space-group); padding: var(--space-group) 0 var(--space-related); border-bottom: 1px solid var(--rule); }
+.value { display: grid; min-width: 0; gap: var(--space-related); margin: 0; font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.note { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
+.valueLine { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-tight) var(--space-related); }
+
+/* The name is an inline editor in the serif: the editor keeps its metrics while editing. */
+.name.name[data-variant] { --size: var(--text-2xl); --leading: round(var(--size) * 1.25, 2px); --weight: 500; --ink: var(--foreground); }
+.name > :first-child { font-family: var(--font-display); letter-spacing: var(--tracking-display); }
+/* A long name wraps instead of being cut off (names run to 100 characters); while it is edited the field is one line
+   again and scrolls (InlineEdit marks the text layer data-layer and its root data-editing). */
+.name:not([data-editing]) [data-layer] { overflow: visible; text-overflow: clip; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* The id never runs under its buttons: the morph's frame is held to the space there is (the title has it all). */
 .idValue { display: block; min-width: 0; max-width: 100%; overflow: hidden; font-family: var(--font-mono); font-size: var(--text-sm); font-variant-ligatures: none; letter-spacing: 0; white-space: nowrap; }
 .idMorph { display: block; max-width: 100%; }
-/* Placement only: the ghost button lines up with the field's text. */
-.fieldAction { margin-inline-start: calc(var(--space-group) * -1); }
-.fieldNote { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.rowAction { margin-inline-start: auto; }
 
-.foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-inset); }
-.noStamps { color: var(--text-secondary); font-size: var(--text-sm); }
+/* Bottom of a face: the apps on the front, the way to sign-in methods on the back, and the turn button in one corner. */
+.foot { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-inset); }
+.turn { flex: none; margin-inline-start: auto; }
+.signedInto { display: grid; min-width: 0; flex: 1; gap: var(--space-related); }
+.muted { margin: 0; color: var(--text-muted); font-size: var(--text-sm); line-height: var(--leading-body); }
 .stampsError { display: inline-flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-tight) var(--space-group); color: var(--danger); font-size: var(--text-sm); line-height: var(--leading-body); }
 .stampsSkeleton { display: inline-flex; gap: var(--space-related); }
 
-/* -------------------------------------------------- back of the card -------------------------------------------------- */
-.backHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); }
-.backTitle { margin: 0; font-family: var(--font-serif); font-size: var(--text-3xl); font-weight: 400; letter-spacing: -.01em; line-height: 1.1; }
-.details { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: var(--space-comfort) var(--space-section); margin: 0; padding-top: var(--space-comfort); border-top: 1px dashed color-mix(in oklab, var(--border) 85%, transparent); }
-.details > div { display: grid; min-width: 0; align-content: start; gap: var(--space-related); font-size: var(--text-sm); }
-.details dt { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
-.details dd { display: grid; min-width: 0; gap: var(--space-related); margin: 0; overflow-wrap: anywhere; }
-.valueLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-tight) var(--space-group); }
-.valueLine > button { margin-inline-start: 0; }
+/* Back: contacts. */
 .contact { display: inline-flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-related); }
 .contactText { min-width: 0; overflow-wrap: anywhere; }
-.muted { margin: 0; color: var(--text-muted); font-size: var(--text-sm); line-height: var(--leading-body); }
 .backLink { display: inline-flex; width: fit-content; align-items: center; gap: var(--space-related); color: var(--accent-ink); font-size: var(--text-sm); text-decoration: none; }
 .backLink:hover, .backLink:focus-visible { color: var(--accent-strong); text-decoration: underline; outline: none; }
+
+@media (max-width: 560px) {
+  .sheet { grid-template-areas: "issuer" "status" "photo" "form"; grid-template-columns: minmax(0, 1fr); gap: var(--space-comfort); }
+  .status { justify-items: start; text-align: left; }
+  .photo { justify-self: start; }
+  .row { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* ------------------------------------------------------ glance ------------------------------------------------------ */
 /* Metric cards, each a link into its pillar. */
@@ -60,9 +96,8 @@
 .glanceLink:hover { color: inherit; }
 @media (hover: hover) and (pointer: fine) { .glanceLink:hover { translate: 0 calc(var(--space-tight) * -.5); } }
 
-@media (max-width: 560px) {
-  .who { flex-direction: column; align-items: flex-start; gap: var(--space-comfort); }
-  .foot { align-items: flex-end; }
-}
-
 @media (prefers-reduced-motion: reduce) { .glanceLink { transition: none; } }
+
+/* The landing page's sample card (sample.tsx): a plain portrait and name where the home has its controls. */
+.samplePortrait.samplePortrait { width: 120px; height: 120px; font-family: var(--font-display); font-size: var(--text-4xl); font-weight: 600; }
+.sampleName { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.25; }

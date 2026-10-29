@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /proofs: the User verification proofs apps hold about you, every one of them (the list is read to its end). Each is drawn as the
+ * /proofs, under Access (each app's card on /apps lists its live ones; this page is the full view): the User verification proofs apps hold about you, every one of them (the list is read to its end). Each is drawn as the
  * issuing app acting at the receiving app, with a dash flowing along the connector while it is live and a ring that
  * empties as its current proof token runs out (the issuing app refreshes it; the proof itself can last until its
  * sign-in ends). Revoking one makes the receiving app's next check fail at once.
@@ -21,6 +21,7 @@ import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader } from "@/components/foundation/layout/layout";
 import type { MyProof } from "@/lib/api/types";
 import { formatCountdown, formatDate, formatDateTime, formatRelative } from "@/lib/format";
+import { paths } from "@/lib/navigation";
 import { AnimatedRows } from "../parts/animated-rows";
 import { AppMark } from "../parts/app-mark";
 import { describeError, msUntil, spanText, useNow, useSecondTick } from "../parts/common";
@@ -71,6 +72,7 @@ export function Proofs() {
     <Page width="reading">
       <PageHeader
         title="User verification"
+        back={{ href: paths.apps, label: "Apps" }}
         description="See how apps act on your behalf at other apps. Each user verification lets the receiving app check that action with Silicon Accounts. Revoke one to stop it at once."
       />
       {proofs.error && !proofs.data ? (

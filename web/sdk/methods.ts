@@ -56,7 +56,7 @@ export const METHOD_MARK: Readonly<Record<ButtonMethod, string>> = {
 
 /** The Silicon Accounts mark for the "Powered by" line (fixed colours, never branded). */
 export const POWERED_MARK =
-  '<svg viewBox="0 0 200 200" width="14" height="14" aria-hidden="true"><rect width="200" height="200" rx="48" fill="#EDE8E0"/><g transform="translate(100 100) scale(1.3) translate(-100.46 -99.5)"><circle cx="126.42" cy="99.5" r="29.5" fill="#181818"/><rect x="45" y="74.72" width="49.56" height="49.56" rx="4.72" fill="#181818"/></g></svg>';
+  '<svg viewBox="0 0 200 200" width="14" height="14" aria-hidden="true"><rect width="200" height="200" rx="48" fill="#E3E3E3"/><g transform="translate(100 100) scale(1.3) translate(-100.46 -99.5)"><circle cx="126.42" cy="99.5" r="29.5" fill="#181818"/><rect x="45" y="74.72" width="49.56" height="49.56" rx="4.72" fill="#181818"/></g></svg>';
 
 /** Where "Powered by Silicon Accounts" links. Not configurable: an app cannot remove or change the line. */
 export const POWERED_BY_HREF = "https://accounts.teamofsilicons.com";

@@ -92,7 +92,7 @@ const foundationScreens: ScreenSpec[] = [
     await page.waitForTimeout(600);
   } },
   { name: "shell-nav-sheet", path: "/silicons", widths: [390], fullPage: false, prepare: async page => {
-    await page.locator("[data-vt='dock'] button[aria-haspopup='dialog']").first().click();
+    await page.getByRole("button", { name: "Account sections" }).click();
     await page.waitForTimeout(900);
   } },
   { name: "embed-buttons", path: `/embed/v1/buttons?${EMBED_QUERY("briefcase", "http://127.0.0.1:8593/briefcase/callback")}`, as: "signed-out", waitFor: "#silicon-accounts-embed[data-ready]", widths: [390] },
@@ -219,7 +219,7 @@ async function shoot(browser: Browser, base: string, spec: ScreenSpec, theme: "l
     if (spec.prepare) await spec.prepare(page);
     const file = join(options.out, `${spec.name}--${theme}-${width}.png`);
     if (!spec.element && (spec.fullPage ?? true)) {
-      // Grow the viewport to the page, so fixed parts (the dock) sit where they would at the end of the page instead of
+      // Grow the viewport to the page, so fixed parts (toasts) sit where they would at the end of the page instead of
       // over the middle of a full-page capture.
       const height = await page.evaluate(() => document.documentElement.scrollHeight);
       if (height > (page.viewportSize()?.height ?? 0)) {

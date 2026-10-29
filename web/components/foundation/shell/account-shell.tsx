@@ -1,24 +1,25 @@
 "use client";
 
 /**
- * The account site's frame for signed-in pages. The top bar holds the tools that apply wherever you are: the brand
- * (home), the ⌘K search, the other sites (marked as leaving) and the account menu. The dock below holds only the four
- * pillars of the account, so nothing in it leaves the site. Also the ⌘K palette, number-key shortcuts and page
- * transitions. It also guards the account routes: visitors without a
+ * The account site's frame for signed-in pages, as in the lead designer's prototype (redesign/prototype-map.md): a
+ * top bar with the brand (home), search (the ⌘K palette) and the account menu, and the section list (sidebar.tsx)
+ * beside the page from 900px, in a bottom sheet opened from the top bar below that. Also the ⌘K palette, number-key
+ * shortcuts and page transitions. It also guards the account routes: visitors without a
  * session are sent to sign in and come back to the page they asked for. At "/" a signed-out visitor sees the landing
  * page, rendered bare (without the shell).
  *
- * Every navigation the shell starts (dock, phone sheet, brand, palette, number keys, Settings, signing out) asks the
+ * Every navigation the shell starts (brand, palette, number keys, Settings, signing out) asks the
  * page's navigation guards first (lib/navigation-guard.ts), and so does a plain click on any other link while a guard
  * protects its destination: a page with unsaved work registers one guard and every way out asks.
  */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ViewTransition, useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
-import { ArrowUpRight, LogOut, Search, Settings as SettingsIcon, SwatchBook } from "lucide-react";
+import { ViewTransition, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { LogOut, Menu, Search, Settings as SettingsIcon, SwatchBook } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { BottomSheet } from "@teamofsilicons/silicon-ui/bottom-sheet";
 import { Button } from "@teamofsilicons/silicon-ui/button";
-import { UserMenu, type UserMenuItem, type UserMenuUser } from "@teamofsilicons/silicon-ui/user-menu";
+import { UserMenu, type UserMenuUser } from "@teamofsilicons/silicon-ui/user-menu";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { SkipLink } from "@/components/foundation/layout/layout";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
@@ -28,20 +29,20 @@ import { notifyError } from "@/lib/notify";
 import { beginSignIn, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
 import { BrandMark } from "./brand-mark";
 import { CommandMenu } from "./command-menu";
-import { Dock } from "./dock";
 import { LeaveQuestionHost } from "./leave-question";
+import { Sidebar } from "./sidebar";
 import styles from "./shell.module.css";
 
 const subscribeNothing = () => () => undefined;
 
-/** Phones (under 640px), where the top bar has no room for the other sites' links: they move into the account menu. */
-const PHONE = "(max-width: 639px)";
-const subscribePhone = (change: () => void) => {
-  const media = window.matchMedia(PHONE);
+/** Under 900px the section list moves from beside the page into a bottom sheet. */
+const NARROW = "(max-width: 899px)";
+const subscribeNarrow = (change: () => void) => {
+  const media = window.matchMedia(NARROW);
   media.addEventListener("change", change);
   return () => media.removeEventListener("change", change);
 };
-const readPhone = () => window.matchMedia(PHONE).matches;
+const readNarrow = () => window.matchMedia(NARROW).matches;
 
 function detectApple(): boolean {
   const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
@@ -84,7 +85,8 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const isHome = pathname === "/";
   const active = sectionFor(pathname);
   const developerUrl = useDeveloperUrl();
-  const phone = useSyncExternalStore(subscribePhone, readPhone, () => false);
+  const narrow = useSyncExternalStore(subscribeNarrow, readNarrow, () => false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // Account routes need a session; "/" shows the landing page instead. (Sign-ins come back to /sign-in, which restores
   // the page: this home page never reads a code, state or error from its address.)
@@ -92,7 +94,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
     if (status === "signed_out" && !isHome) beginSignIn(window.location.pathname + window.location.search);
   }, [status, isHome]);
 
-  /** Navigates inside a page transition whose direction follows the dock (no guard asked: the caller did). */
+  /** Navigates inside a page transition whose direction follows the sidebar (no guard asked: the caller did). */
   const push = useCallback((href: string) => {
     router.push(href, { transitionTypes: [navigationType(window.location.pathname, href)] });
   }, [router]);
@@ -228,45 +230,41 @@ export function AccountShell({ children }: { children: ReactNode }) {
           <BrandMark />
           <span className={styles.brandText}>Silicon Accounts</span>
         </Link>
+        <Button variant="secondary" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"} aria-label={narrow ? "Search your account" : undefined}>
+          <Search size={16} strokeWidth={1.75} aria-hidden="true" />
+          <span className={styles.searchLabel}>Search your account</span>
+          <kbd className={styles.keys}>{isApple ? "⌘ K" : "Ctrl K"}</kbd>
+        </Button>
         <span className={styles.topEnd}>
-          {/* The other sites, quiet and out of the dock: full navigations after the page's guards. */}
-          <nav className={styles.elsewhere} aria-label="Other sites">
-            {ELSEWHERE.map(site => {
-              const href = site.href(developerUrl);
-              return (
-                <a key={site.key} href={href} data-sq="surface" className={styles.elsewhereLink} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
-                  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                  event.preventDefault();
-                  void go(href, event.currentTarget);
-                }}>
-                  {site.label}
-                  <ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
-                </a>
-              );
-            })}
-          </nav>
-          <Button variant="secondary" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}>
-            <Search size={16} strokeWidth={1.75} aria-hidden="true" />
-            Search and jump
-            <kbd className={styles.keys}>{isApple ? "⌘ K" : "Ctrl K"}</kbd>
-          </Button>
           {account ? (
             <UserMenu
               user={account}
               showTheme={false}
               onSignOut={menuSignOut}
               align="end"
-              items={[
-                { label: "Settings", icon: <SettingsIcon size={16} strokeWidth={1.75} />, onSelect: () => void go(paths.settings) },
-                // Phones: the other sites live here, marked as leaving, because the top bar has no room for their links.
-                ...(phone ? ELSEWHERE.map<UserMenuItem>(site => ({ label: `${site.label} ↗`, icon: <ArrowUpRight size={16} strokeWidth={1.75} />, onSelect: () => void go(site.href(developerUrl)) })) : []),
-              ]}
+              items={[{ label: "Settings", icon: <SettingsIcon size={16} strokeWidth={1.75} />, onSelect: () => void go(paths.settings) }]}
             />
+          ) : null}
+          {narrow ? (
+            <BottomSheet
+              title="Your account"
+              open={sheetOpen}
+              onOpenChange={setSheetOpen}
+              trigger={<Button variant="ghost" size="sm" aria-label="Account sections"><Menu size={18} strokeWidth={1.75} aria-hidden="true" /></Button>}
+            >
+              <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} />
+            </BottomSheet>
           ) : null}
         </span>
       </header>
-      <main id="main" className={styles.main} tabIndex={-1}>{content}</main>
-      <Dock activeKey={active?.key} onNavigate={go} onOpenPalette={openCommandPalette} />
+      <div className={styles.body}>
+        {narrow ? null : (
+          <aside className={styles.aside}>
+            <Sidebar activeKey={active?.key} developerUrl={developerUrl} />
+          </aside>
+        )}
+        <main id="main" className={styles.main} tabIndex={-1}>{content}</main>
+      </div>
       <CommandMenu />
       <LeaveQuestionHost />
     </div>

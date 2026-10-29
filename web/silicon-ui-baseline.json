@@ -8,7 +8,7 @@
       "spacing": 1
     },
     "components/account/apps/apps.module.css": {
-      "spacing": 7
+      "spacing": 6
     },
     "components/account/home.module.css": {
       "spacing": 1
@@ -23,10 +23,10 @@
       "spacing": 7
     },
     "components/account/settings/settings.module.css": {
-      "spacing": 3
+      "spacing": 2
     },
     "components/account/sign-in-methods/sign-in-methods.module.css": {
-      "spacing": 2
+      "spacing": 1
     },
     "components/account/silicons/request-deck.module.css": {
       "spacing": 1
@@ -55,7 +55,7 @@
       "spacing": 8
     },
     "components/auth/flow/flow.module.css": {
-      "spacing": 14,
+      "spacing": 13,
       "color": 2
     },
     "components/docs/code-block.module.css": {
@@ -71,11 +71,11 @@
       "font-size": 1
     },
     "components/docs/docs-nav.module.css": {
-      "spacing": 9,
+      "spacing": 7,
       "font-size": 1
     },
     "components/docs/docs-search.module.css": {
-      "spacing": 22,
+      "spacing": 21,
       "font-size": 2
     },
     "components/docs/docs-toc.module.css": {
@@ -85,24 +85,16 @@
     },
     "components/docs/prose.module.css": {
       "font-size": 7,
-      "spacing": 25
+      "spacing": 24
     },
     "components/foundation/branding/powered-by.module.css": {
       "spacing": 3,
       "color": 8,
       "radius": 1
     },
-    "components/foundation/identity/identity-card.module.css": {
-      "color": 1,
-      "spacing": 4,
-      "font-size": 1
-    },
     "components/foundation/layout/layout.module.css": {
       "spacing": 3,
       "font-size": 2
-    },
-    "components/foundation/providers.module.css": {
-      "spacing": 1
     },
     "components/kitchen/kitchen.module.css": {
       "spacing": 11,
@@ -120,7 +112,7 @@
       "color": 7
     },
     "components/site/site.module.css": {
-      "spacing": 10,
+      "spacing": 8,
       "font-size": 2
     }
   }

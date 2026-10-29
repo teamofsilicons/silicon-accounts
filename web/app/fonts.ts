@@ -2,8 +2,9 @@
  * Branding fonts that ship through next/font: Geist, Instrument Serif and JetBrains Mono are three of the faces an app
  * may pick for its hosted sign-in pages (lib/branding/fonts.ts). They are downloaded at build and self-hosted under
  * /_next/static/media (font-src 'self'), never preloaded, and a browser only fetches one when an app's branded page
- * actually uses it. The site's own text face, Hanken Grotesk (Silicon UI's --font-body, which reads
- * --font-hanken-grotesk), also ships here and is preloaded; the title and label faces are in styles/fonts.css.
+ * actually uses it. Geist is also Silicon UI's --font-display (titles and the wordmark, through --font-geist), so it
+ * is preloaded along with Hanken Grotesk, Silicon UI's --font-body (through --font-hanken-grotesk): the site's two
+ * faces.
  */
 import { Geist, Hanken_Grotesk, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 
@@ -14,11 +15,11 @@ const hankenGrotesk = Hanken_Grotesk({
   display: "swap",
 });
 
+/** The site's title face: Silicon UI's display font. */
 const geist = Geist({
   subsets: ["latin", "latin-ext"],
   variable: "--font-geist",
   display: "swap",
-  preload: false,
 });
 
 const instrumentSerif = Instrument_Serif({
@@ -37,5 +38,5 @@ const jetbrainsMono = JetBrains_Mono({
   preload: false,
 });
 
-/** The class names that put the site's text face and the three branding font variables on <html>. */
+/** The class names that put the site's two faces and the branding font variables on <html>. */
 export const brandFontVariables = [hankenGrotesk.variable, geist.variable, instrumentSerif.variable, jetbrainsMono.variable].join(" ");

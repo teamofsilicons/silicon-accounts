@@ -1,7 +1,7 @@
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
 <style>
-.bg { fill: #EDE8E0; } .ink { fill: #181818; }
-@media (prefers-color-scheme: dark) { .bg { fill: #181818; } .ink { fill: #EDE8E0; } }
+.bg { fill: #E3E3E3; } .ink { fill: #181818; }
+@media (prefers-color-scheme: dark) { .bg { fill: #181818; } .ink { fill: #E3E3E3; } }
 </style>
 <rect class="bg" width="200" height="200"/>
 <circle class="ink" cx="126.42" cy="99.5" r="29.5"/>
