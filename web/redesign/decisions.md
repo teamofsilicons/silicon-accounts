@@ -94,6 +94,10 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   gone. Why: Anil saw the account menu's picture as a squircle with circular hover, press and loading states (Silicon
   UI's UserMenu draws them as circles); circles also match the prototype. (2026-10-29)
 
+- Silicon UI 0.4.0 from npm (Anil, 2026-10-29); the site depends on ^0.4.0. It brings faster motion (durations about
+  halved, spring tiers fast/moderate/slow/expressive with the old names kept) and fluid hover in NavList and menus; no
+  API changes, so no site code changed. (2026-10-29)
+
 ## Process
 - Keep priorities.md, decisions.md and log.md (this folder) updated with every task; shared-code changes also get a
   README.md note, as the site already does. Why: state lives in repo files, not chat. (2026-10-17)

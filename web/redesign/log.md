@@ -38,3 +38,5 @@ Every change, one line each, newest at the bottom. Format: `- YYYY-MM-DD <commit
 - 2026-10-29 verify: typecheck, lint (baseline 285), tests (28), build pass; screens home (new, full, review, 390), silicons, identity, shell checked; comparison with the prototype's new-account home in .screens/compare/home-new-account.png
 - 2026-10-29 wip avatars: the 30% squircle avatar override removed from styles/tokens.css; every Avatar is Silicon UI's circle, so the account menu's states, Home's Silicon ring and marks, and the identity card's photo agree (styles/tokens.css, README.md)
 - 2026-10-29 verify: lint passes; account menu (rest, hover, open), Home and Personal info checked live against the local stack
+- 2026-10-29 wip deps: @teamofsilicons/silicon-ui ^0.4.0 (diffed against 0.3.0: motion tokens faster with new spring tiers and old names kept, lib/fluid-hover for NavList and menus, no component added, removed or retyped) (package.json, pnpm-lock.yaml)
+- 2026-10-29 verify: typecheck, lint (baseline 285), tests (28) and build pass on 0.4.0; live Home and sidebar hover checked on the local stack; found (not from the upgrade): dev CSP blocks mock Iris photos

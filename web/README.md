@@ -698,3 +698,5 @@ in `redesign/api-gaps.md`).
   deck in a dialog) and asks a Carbon with no phone to add one. The attention strip is gone.
 - **Avatars are circles** (Silicon UI's default): the 30% squircle override is gone from `styles/tokens.css`, so the
   account menu's hover, press and loading states match the picture.
+- **Silicon UI 0.4.0**: faster motion (durations about halved; new spring tiers, old names kept) and fluid hover in
+  NavList and menus. No site code changed.

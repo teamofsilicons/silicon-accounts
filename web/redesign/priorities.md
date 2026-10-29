@@ -30,6 +30,8 @@ Last updated: 2026-10-29
   stats, wrong-keys alerts, automation, cloud services, per-field sharing.
 
 ## Later
+- Local stack: the site's CSP (img-src 'self' https:) blocks mock Iris profile photos from http://127.0.0.1:8594, so
+  local avatars show initials; allow it in development only.
 - Move `components/foundation/layout` (Page, PageHeader, Section) to silicon-ui's page layout if #24 ships.
 - Docs search on silicon-ui CommandPalette instead of direct Radix (the account command menu moves in phase 2).
 - Custom surfaces' squircle fallbacks vs silicon-ui corner tokens: decide one system.
@@ -42,6 +44,7 @@ Last updated: 2026-10-29
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+- 2026-10-29 Silicon UI 0.4.0: faster motion and fluid hover; no site code changes needed
 - 2026-10-29 Coherence pass after Anil's review: page panel on a grey canvas; Home in one centred column, one type scale, one card style; Needs you as rows with the recovery-phone check
 - 2026-10-29 Home from the prototype: greeting with id, Needs you (warning) or "You're all set", dismissible introduction, Your Silicons (2 + New Silicon), Your apps (4); the identity card moved to /personal (Personal info in the sidebar)
 - 2026-10-29 Shell from the prototype: NavList sidebar (Home, Silicons with a waiting count, Connected apps, Security; Developers and Docs at its foot), sticky top bar with "Search your account", bottom sheet under 900 px; dock and its tokens removed; next/link via SiliconProvider (uncommitted)
