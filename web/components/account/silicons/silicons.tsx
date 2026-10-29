@@ -6,7 +6,7 @@
  * rotate its STK, set its webhook, hand it to another Carbon or delete it. Creating a Silicon shows its generated STK
  * exactly once, in a card that stays until you say you stored it.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Cpu, Plus } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
@@ -51,6 +51,9 @@ const fallbackFocus = () => pageMain()?.querySelector<HTMLElement>('[role="listi
 /** Ids longer than this wrap on the tile instead of morphing on one line (a 30-character handle overflows a phone). */
 const LONG_ID = 18;
 
+/** `/silicons?new` opens "Create a Silicon" (Home's New Silicon tile). */
+export const NEW_PARAM = "new";
+
 export function Silicons() {
   const me = useMe();
   const silicons = useEverySilicon();
@@ -67,6 +70,17 @@ export function Silicons() {
   useRegisterCommands(() => (carbon ? [
     { id: "silicons.create", label: "Create a Silicon", description: "You become its custodian; its STK is shown once", group: "Silicons", icon: <Plus size={16} strokeWidth={1.75} />, keywords: ["new", "silicon", "agent", "stk"], run: () => setCreating(true) },
   ] : []), [!!carbon]);
+
+  // Home's "New Silicon" tile links here with ?new: open the create drawer once, and drop the flag from the address.
+  useEffect(() => {
+    if (!carbon) return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has(NEW_PARAM)) return;
+    url.searchParams.delete(NEW_PARAM);
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    // Next frame, after the page has painted; not cancelled, since the flag is already gone from the address.
+    requestAnimationFrame(() => setCreating(true));
+  }, [carbon]);
 
   const list = silicons.data?.items ?? [];
   const selected = list.find(item => item.uuid === openUuid);
@@ -143,10 +157,10 @@ export function Silicons() {
             </div>
           ) : null}
 
-          {/* Requests are answered in one place, the attention strip on the identity home; this page only points there. */}
+          {/* Requests are answered in one place, the needs-you block on Home; this page only points there. */}
           {waiting.length ? (
             <Alert tone="info" title={`${plural(waiting.length, "custodian request")} waiting for you`}>
-              Answer them on your identity page, where everything that needs your decision is in one place.
+              Answer them on Home, where everything that needs your decision is in one place.
               <span className={styles.alertAction}><ButtonLink href={`${paths.home}#${ATTENTION_ID}`} variant="secondary" size="sm">Answer them</ButtonLink></span>
             </Alert>
           ) : null}

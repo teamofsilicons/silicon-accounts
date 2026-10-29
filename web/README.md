@@ -685,3 +685,11 @@ in `redesign/api-gaps.md`).
   sticky, so `html`'s `scroll-padding-block` keeps focus clear of it at the top.
 - **Providers**: `SiliconProvider link={Link}` (next/link), so links Silicon UI components render move inside the app.
 - **Tokens**: `--dock-height` and `--dock-clearance` are gone; `--page-end` is the room under a page's last content.
+
+### Home and Personal info (2026-10-29)
+
+- **Home** (`/`, `components/account/overview/`): the prototype's home. A greeting with your id, Needs you (custodian
+  requests, on `--warning`) or "You're all set", a dismissible introduction (remembered in this browser), Your Silicons
+  (two tiles and New Silicon, which opens Create a Silicon through `/silicons?new`) and Your apps (four tiles).
+- **Personal info** (`/personal`, sidebar section 5, number key 5): the identity card, moved from `/`; the metric cards
+  beside it are gone (Home's tiles lead into each section).

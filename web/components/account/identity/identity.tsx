@@ -1,37 +1,33 @@
 "use client";
 
 /**
- * The identity home ("/" signed in), per "Silicon Accounts Redesign Design Review":
+ * Personal info (/personal): the signed-in account's identity card. What needs a decision and the way into each section
+ * are on Home (overview/overview.tsx).
  *
- * - the attention strip, only when something needs your decision (attention/attention-strip.tsx);
- * - the identity card, laid out as a form: every mark on it is a field. The front is for recognition: who issued it,
+ * - The identity card, laid out as a form: every mark on it is a field. The front is for recognition: who issued it,
  *   which kind of account it is, the holder's custody relationship, whether it is valid, the photo (drop a new one on
  *   it), name (edit in place), id (change it; the old one stays reserved for 10 days), when it was issued and a stamp
  *   for every app you signed into (a Silicon's creation date is its Issued date). Turn it over for your emails, phone
  *   numbers and date of birth, the card number (your uuid, to copy for support) and a Silicon's webhook and STK. Your
- *   timezone lives in Settings;
- * - beside it, counts that lead into each pillar, as metric cards. Wayfinding only: no decisions are made there.
+ *   timezone lives in Settings.
  */
 import { useRef, useState } from "react";
-import Link from "next/link";
 import { AtSign } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
 import { InlineEdit } from "@teamofsilicons/silicon-ui/inline-edit";
-import { MetricCard } from "@teamofsilicons/silicon-ui/metric-card";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { IdentityCard, type StampProps } from "@/components/foundation/identity/identity-card";
 import { Page, PageHeader } from "@/components/foundation/layout/layout";
 import { useTheme } from "@/components/foundation/theme/use-theme";
-import type { Me, MyApp } from "@/lib/api/types";
+import type { Me } from "@/lib/api/types";
 import { useRegisterCommands } from "@/lib/commands";
 import { formatDate } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useRemovePhoto, useUpdateProfile, useUploadPhoto } from "@/lib/query/account";
 import { useMe } from "@/lib/query/session";
-import { AttentionStrip } from "../attention/attention-strip";
-import { appLogo, asCarbon, describeError, reasonError } from "../parts/common";
+import { appLogo, describeError, reasonError } from "../parts/common";
 import { DobEditor } from "../parts/detail-editors";
 import { IdChangeForm } from "../parts/id-change-form";
 import { PhotoControl } from "../parts/photo-control";
@@ -70,7 +66,7 @@ export function Identity() {
   const account = me.data;
   return (
     <Page>
-      <PageHeader title="Your identity" description="One account for every app you use. Your id is yours to change." />
+      <PageHeader title="Personal info" description="How Carbons, Silicons and apps see you. Your id is yours to change." />
       {me.error && !account ? (
         <Alert tone="danger" title="Your account did not load">
           {describeError(me.error)}
@@ -79,8 +75,6 @@ export function Identity() {
       ) : !account ? (
         <LayoutSkeleton />
       ) : (
-        <>
-        <AttentionStrip me={account} />
         <div className={styles.layout}>
           <IdentityCard
             label={`Identity card of ${account.id ?? account.display_name}`}
@@ -97,7 +91,6 @@ export function Identity() {
             )}
             back={<Back me={account} />}
           />
-          <Glance me={account} apps={apps.data?.items} appsFailed={!apps.data && !!apps.error} />
           <Dialog open={changingId} onOpenChange={setChangingId}>
             <DialogContent
               title="Change your id"
@@ -123,7 +116,6 @@ export function Identity() {
             </DialogContent>
           </Dialog>
         </div>
-        </>
       )}
     </Page>
   );
@@ -184,53 +176,13 @@ function Back({ me }: { me: Me }) {
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
-/* Beside the card                                                                                                     */
-/* ------------------------------------------------------------------------------------------------------------------ */
-
-/**
- * Beside the card: a metric card per pillar you can open (apps you are signed into, Silicons in your care, your ways in).
- * Wayfinding only; decisions are made in the attention strip, and the full history is on Activity.
- */
-function Glance({ me, apps, appsFailed }: { me: Me; apps: MyApp[] | undefined; appsFailed: boolean }) {
-  const carbon = asCarbon(me);
-  const signedInto = apps?.filter(item => item.status === "active").length;
-  const cards: Array<{ label: string; value: number | undefined; context: string; failed?: boolean; href: string }> = [
-    { label: "Apps", value: signedInto, context: "Apps you are signed into", failed: appsFailed, href: paths.apps },
-    ...(carbon
-      ? [
-        { label: "Silicons", value: carbon.custodian_of, context: "Silicons in your care", href: paths.silicons },
-        { label: "Ways in", value: carbon.emails.length + carbon.phones.length, context: "Emails and phone numbers you sign in with", href: paths.signInMethods },
-      ]
-      : []),
-  ];
-  return (
-    <aside className={styles.glance} aria-label="At a glance">
-      {cards.map((card, index) => (
-        <Link key={card.label} href={card.href} className={styles.glanceLink} aria-label={card.value === undefined ? card.context : `${card.context}: ${card.value}`}>
-          {card.value !== undefined ? (
-            <MetricCard label={card.label} value={card.value} context={card.context} />
-          ) : card.failed ? (
-            <Alert tone="warning" title={`${card.label} did not load`}>Open the page to try again.</Alert>
-          ) : (
-            <SkeletonBlock width="100%" height="128px" radius="var(--radius-container)" index={index} />
-          )}
-        </Link>
-      ))}
-    </aside>
-  );
-}
-
-/* ------------------------------------------------------------------------------------------------------------------ */
 /* Skeleton                                                                                                            */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
 function LayoutSkeleton() {
   return (
-    <div className={styles.layout} aria-busy="true" aria-label="Loading your identity">
+    <div className={styles.layout} aria-busy="true" aria-label="Loading your personal info">
       <SkeletonBlock width="min(100%, 640px)" height="392px" radius="var(--radius-overlay)" />
-      <div className={styles.glance}>
-        {[0, 1, 2].map(index => <SkeletonBlock key={index} width="100%" height="128px" radius="var(--radius-container)" index={index + 1} />)}
-      </div>
     </div>
   );
 }

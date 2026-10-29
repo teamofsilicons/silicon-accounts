@@ -1,0 +1,68 @@
+/* Home: greeting, needs you, the introduction, then tiles for your Silicons and apps (the prototype's home). */
+.overview { display: grid; min-width: 0; gap: var(--space-block); }
+.alertAction { display: block; margin-top: var(--space-group); }
+
+/* ------------------------------------------------------ greeting ---------------------------------------------------- */
+.greeting { display: flex; min-width: 0; align-items: center; gap: var(--space-comfort); }
+.greetingText { display: grid; min-width: 0; gap: var(--space-tight); }
+.title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); overflow-wrap: anywhere; }
+@media (max-width: 639px) { .title { font-size: var(--text-2xl); } }
+.handle { display: inline-flex; min-width: 0; align-items: center; gap: var(--space-tight); color: var(--text-secondary); font-size: var(--text-sm); }
+
+/* All clear: one quiet line where the needs-you block would be. */
+.allClear { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); margin: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; scroll-margin-top: var(--space-section); }
+.allClear svg { color: var(--success); }
+.allClearNote { color: var(--text-muted); font-weight: 400; }
+
+/* ---------------------------------------------------- introduction -------------------------------------------------- */
+.intro { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border-subtle); display: grid; gap: var(--space-comfort); padding: var(--space-comfort); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.introHead { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-group); }
+.introTitle { margin: 0; color: var(--foreground); font-size: var(--text-lg); font-weight: 500; line-height: var(--leading-snug); }
+.introItems { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-comfort); margin: 0; padding: 0; list-style: none; }
+@media (max-width: 720px) { .introItems { grid-template-columns: minmax(0, 1fr); } }
+.introItem { display: grid; justify-items: start; gap: var(--space-tight); }
+.introName { margin-top: var(--space-tight); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.introText { color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+/* A round mark the size of a md avatar: neutral for apps and the new tile, the Silicon gradient for Silicons. */
+.introMark { display: grid; width: 36px; height: 36px; flex: none; place-items: center; border-radius: var(--radius-full); background: var(--surface-muted); color: var(--text-secondary); }
+.siliconMark { background: var(--silicon-gradient); color: var(--silicon-gradient-foreground); }
+
+/* -------------------------------------------------------- tiles ----------------------------------------------------- */
+.seeAll { color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; }
+.seeAll:hover, .seeAll:focus-visible { color: var(--foreground); text-decoration: underline; }
+
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); }
+.appTiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .appTiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .tiles, .appTiles { grid-template-columns: minmax(0, 1fr); } }
+
+.tile {
+  --sq-r: var(--radius-container);
+  --sq-fill: var(--surface);
+  --sq-stroke: var(--border-subtle);
+  display: grid;
+  min-width: 0;
+  align-content: space-between;
+  gap: var(--space-comfort);
+  padding: var(--space-group) var(--space-inset);
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  text-decoration: none;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.tile:hover { --sq-stroke: var(--border-strong); color: var(--foreground); }
+.tile:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* A Silicon's tile carries the Silicon gradient's soft wash, so Silicons read apart from apps. */
+.siliconTile { --sq-fill: var(--surface); background: var(--silicon-gradient-soft); }
+.newTile { align-content: center; justify-items: start; border-style: dashed; color: var(--text-secondary); }
+.newTile:hover { color: var(--foreground); }
+
+.tileHead { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
+.tileName { min-width: 0; overflow: hidden; font-size: var(--text-base); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.tileFoot { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-related); }
+.tileNote { min-width: 0; overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
+
+.quiet { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+
+@media (prefers-reduced-motion: reduce) { .tile { transition: none; } }

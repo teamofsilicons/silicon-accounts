@@ -373,7 +373,7 @@ const checks: Check[] = [
         const hits = words.split("\n").filter(line => people.test(line));
         if (hits.length) found.push(`${where}: ${hits.map(line => JSON.stringify(line.trim().slice(0, 120))).join(", ")}`);
       };
-      for (const [url, title] of [["/", "Your identity"], ["/sign-in-methods", "Security"], ["/apps", "Apps you have signed into"], ["/proofs", "Proofs about you"], ["/silicons", "Silicons in your care"], ["/activity", "Activity"], ["/settings", "Settings"]] as const) {
+      for (const [url, title] of [["/personal", "Personal info"], ["/sign-in-methods", "Security"], ["/apps", "Apps you have signed into"], ["/proofs", "Proofs about you"], ["/silicons", "Silicons in your care"], ["/activity", "Activity"], ["/settings", "Settings"]] as const) {
         await visit(page, `${env.base}${url}`, title);
         await look(url);
       }
@@ -386,12 +386,12 @@ const checks: Check[] = [
       expect(createText.includes("What Carbons, Silicons and apps type to find it."), `the Create a Silicon id field says: ${createText.slice(0, 400)}`);
       await look("/silicons, Create a Silicon");
       await page.keyboard.press("Escape");
-      await visit(page, `${env.base}/`, "Your identity");
+      await visit(page, `${env.base}/personal`, "Personal info");
       await page.getByRole("button", { name: "Change id" }).first().click();
       const change = page.getByRole("dialog", { name: "Change your id" });
       await change.waitFor({ timeout: 10_000 });
       await settle(page, 300);
-      await look("/, Change your id");
+      await look("/personal, Change your id");
       await page.keyboard.press("Escape");
       expect(found.length === 0, `"people" words: ${found.join("; ")}`);
     },

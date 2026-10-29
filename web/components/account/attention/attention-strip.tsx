@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * The attention strip: one place for everything that needs a decision from you, at the top of the identity home (after
- * Google's "Protect your account"). It renders only when something is waiting, so most of the time it is not there.
+ * Needs you: one place for everything that needs a decision from you, at the top of Home (the prototype's needs-you
+ * block, in Silicon UI's warning colour). It renders only when something is waiting; Home says "You're all set" otherwise.
  *
  * Sources today: custodian requests (a Silicon asking you to be its custodian, or a Carbon handing one to you), answered
  * here with the request deck. Account-verification requests belong here too once the web API lists them for the
@@ -18,7 +18,7 @@ import { useEveryCustodianRequest } from "../parts/queries";
 import { RequestDeck } from "../silicons/request-deck";
 import styles from "./attention.module.css";
 
-/** The strip's id, for links that lead to it ("Answer it on your identity page"). */
+/** The strip's id, for links that lead to it ("Answer them on Home"). */
 export const ATTENTION_ID = "needs-you";
 
 export function AttentionStrip({ me }: { me: Me }) {
@@ -46,7 +46,7 @@ export function AttentionStrip({ me }: { me: Me }) {
         <span className={styles.icon} aria-hidden="true"><Inbox size={20} strokeWidth={1.75} /></span>
         <div className={styles.text}>
           <h2 id={`${ATTENTION_ID}-title`} className={styles.title}>
-            Needs your decision <Badge size="sm" tone="info">{waiting.length}</Badge>
+            Needs you <Badge size="sm" tone="warning">{waiting.length}</Badge>
           </h2>
           <p className={styles.description}>Each request lasts 14 days. A declined Silicon&apos;s account is released; a declined transfer changes nothing.</p>
         </div>

@@ -21,7 +21,7 @@ interface View {
 }
 
 const VIEWS: View[] = [
-  { name: "identity", path: "/", title: "Silicon Accounts", ready: page => page.getByRole("region", { name: /^Identity card of / }).first() },
+  { name: "personal info", path: "/personal", title: "Personal info · Silicon Accounts", ready: page => page.getByRole("region", { name: /^Identity card of / }).first() },
   { name: "security", path: "/sign-in-methods", title: "Security · Silicon Accounts", ready: page => page.getByRole("list", { name: "Your phone numbers", exact: true }) },
   { name: "apps with access", path: "/apps", title: "Apps · Silicon Accounts", ready: page => page.getByRole("list", { name: "Apps with access" }) },
   {

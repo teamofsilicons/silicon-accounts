@@ -3,7 +3,7 @@
  * SECTIONS) and the route paths every page links to. Link with `paths`, never string literals.
  *
  * The sections follow the lead designer's prototype (redesign/prototype-map.md): Home (what needs you, then your
- * Silicons and apps), Silicons, Connected apps, Security, and, as their pages are built, Personal info and Data &
+ * Silicons and apps), Silicons, Connected apps, Security, Personal info and, once its page is built, Data &
  * privacy. Pages that are part of a section without being its front page (Proofs, Activity) are listed under it in
  * `includes`, so the sidebar marks the right section there, and reached from the palette (MORE_DESTINATIONS) and from
  * links.
@@ -13,7 +13,7 @@
  * section. /developer[/*] here redirects there (proxy.ts).
  */
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Braces, History, House, LayoutGrid, Shield, ShieldCheck, Sparkles } from "lucide-react";
+import { BookOpen, Braces, History, House, IdCard, LayoutGrid, Shield, ShieldCheck, Sparkles } from "lucide-react";
 
 /** The developer site when GET /v1/meta does not name one (servers before it existed). */
 export const DEFAULT_DEVELOPER_URL = "https://developers.teamofsilicons.com";
@@ -47,6 +47,7 @@ export const paths = {
   flow: (id: string) => `/authorize/flow/${encodeURIComponent(id)}`,
   device: "/device",
   signInMethods: "/sign-in-methods",
+  personal: "/personal",
   apps: "/apps",
   silicons: "/silicons",
   proofs: "/proofs",
@@ -57,7 +58,7 @@ export const paths = {
   kitchen: "/__kitchen",
 } as const;
 
-export type SectionKey = "home" | "silicons" | "apps" | "security";
+export type SectionKey = "home" | "silicons" | "apps" | "security" | "personal";
 
 export interface Section {
   key: SectionKey;
@@ -78,6 +79,7 @@ export const SECTIONS: readonly Section[] = [
   { key: "silicons", label: "Silicons", description: "Silicons you look after, and requests waiting for you", href: paths.silicons, icon: Sparkles, shortcut: "2" },
   { key: "apps", label: "Connected apps", description: "Apps you signed into, what they can see, and apps acting for you", href: paths.apps, icon: LayoutGrid, shortcut: "3", includes: [paths.proofs] },
   { key: "security", label: "Security", description: "Your ways in, where you are signed in, and activity", href: paths.signInMethods, icon: Shield, shortcut: "4", includes: [paths.activity] },
+  { key: "personal", label: "Personal info", description: "Your card: photo, name, id, date of birth and contact details", href: paths.personal, icon: IdCard, shortcut: "5" },
 ];
 
 /** Account pages that belong to a section but are not in the sidebar: reached from the command palette and from links. */

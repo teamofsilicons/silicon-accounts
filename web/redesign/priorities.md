@@ -8,16 +8,15 @@ Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.m
 Last updated: 2026-10-29
 
 ## Now
-1. **Prototype v7, phase 3: Home.** Greeting with id, the needs-you block (custodian requests; Alert warning), the intro
-   card, Your Silicons (two tiles + New Silicon), Your apps (four tiles). Map: [prototype-map.md](prototype-map.md).
+1. **Prototype v7, phase 4: Silicons.** List, `/silicons/[uuid]` with Access and Settings tabs (replacing the drawer),
+   request and offer pages; Home's Silicon tiles then link to each Silicon. Map: [prototype-map.md](prototype-map.md).
 
 ## Next
 2. Account command menu on Silicon UI Dialog instead of direct Radix, if Dialog can hold the palette without its own
    title row (else report what is missing).
-3. Silicons: list, `/silicons/[uuid]` with Access and Settings tabs, request and offer pages.
 4. Connected apps: list, `/apps/[id]`, Permissions between apps (`/proofs`).
 5. Security (`/security`, `/sign-in-methods` redirects) and Activity.
-6. Personal info (`/personal`) with every edit dialog.
+6. Personal info (`/personal`, the identity card for now) rebuilt as the prototype's rows with every edit dialog.
 7. Data & privacy (`/privacy`, `/settings` redirects).
 8. Sign-in steps restyled; their suppressions cleared.
 9. Clear the remaining tolerated exceptions (eslint-suppressions.json, CSS baseline) as each screen is rebuilt.
@@ -40,6 +39,7 @@ Last updated: 2026-10-29
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+- 2026-10-29 Home from the prototype: greeting with id, Needs you (warning) or "You're all set", dismissible introduction, Your Silicons (2 + New Silicon), Your apps (4); the identity card moved to /personal (Personal info in the sidebar)
 - 2026-10-29 Shell from the prototype: NavList sidebar (Home, Silicons with a waiting count, Connected apps, Security; Developers and Docs at its foot), sticky top bar with "Search your account", bottom sheet under 900 px; dock and its tokens removed; next/link via SiliconProvider (uncommitted)
 - 2026-10-29 Prototype v7 mapped to Silicon UI and routes (prototype-map.md); API gaps listed for developers (api-gaps.md) (uncommitted)
 - 2026-10-18 Landing as a full landing page: 10 sections on a 12-column frame, sample identity card hero, consent still, FAQ (uncommitted)

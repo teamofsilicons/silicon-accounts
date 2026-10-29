@@ -81,14 +81,17 @@ async function drawerTo(page: Page, heading: string) {
 const card = "[data-identity-card]";
 
 const shown: ScreenSpec[] = [
+  // Home: needs you with a custodian request, then all clear with the introduction dismissed.
+  { name: "account-home", path: "/", waitFor: "[data-home]" },
+  { name: "account-home-clear", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })]], prepare: async page => { await click(page, "Dismiss"); await wait(page, 400); } },
   // Identity: the card, its back, the photo menu, the editors and the id dialog with a taken id.
-  { name: "account-identity", path: "/", waitFor: card },
-  { name: "account-identity-details", path: "/", waitFor: card, prepare: async page => { await click(page, "Details"); await wait(page, 1200); } },
-  { name: "account-identity-photo", path: "/", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Change your photo"); await wait(page); } },
+  { name: "account-identity", path: "/personal", waitFor: card },
+  { name: "account-identity-details", path: "/personal", waitFor: card, prepare: async page => { await click(page, "Details"); await wait(page, 1200); } },
+  { name: "account-identity-photo", path: "/personal", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Change your photo"); await wait(page); } },
   // The timezone lives in Settings ("Local time") since the identity card was trimmed to recognition.
   { name: "account-identity-timezone", path: "/settings", fullPage: false, prepare: async page => { await click(page, "Change your timezone"); await wait(page); } },
-  { name: "account-identity-dob", path: "/", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Details"); await wait(page, 1200); await click(page, "Change your date of birth"); await wait(page); } },
-  { name: "account-identity-change-id", path: "/", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Change id"); await wait(page); await page.keyboard.type("shubham"); await wait(page, 1200); } },
+  { name: "account-identity-dob", path: "/personal", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Details"); await wait(page, 1200); await click(page, "Change your date of birth"); await wait(page); } },
+  { name: "account-identity-change-id", path: "/personal", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Change id"); await wait(page); await page.keyboard.type("shubham"); await wait(page, 1200); } },
 
   // Sign-in methods: the lists, adding an email up to the code, and the remove question.
   { name: "account-sign-in-methods", path: "/sign-in-methods" },
@@ -118,6 +121,7 @@ const shown: ScreenSpec[] = [
 
   // Silicons: the deck and tiles, the create drawer, a Silicon's drawer section by section.
   { name: "account-silicons", path: "/silicons" },
+  { name: "account-silicons-new", path: "/silicons?new", fullPage: false, prepare: async page => { await page.waitForSelector("[role='dialog']"); await wait(page, 900); } },
   { name: "account-silicons-create", path: "/silicons", fullPage: false, prepare: async page => {
     await page.locator("[data-create-silicon]").click();
     await page.waitForSelector(drawer);
@@ -143,7 +147,7 @@ const shown: ScreenSpec[] = [
   { name: "account-settings-deletable", path: "/settings", routes: [["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, custodian_of: 0 } })]] },
 
   // Long values: a 94-character display name wraps on the card; a 30-character si:id and a long name wrap on a tile.
-  { name: "account-identity-long-name", path: "/", waitFor: card, routes: [["GET /v1/me", () => ({ json: { ...data.carbon, display_name: longName } })]] },
+  { name: "account-identity-long-name", path: "/personal", waitFor: card, routes: [["GET /v1/me", () => ({ json: { ...data.carbon, display_name: longName } })]] },
   { name: "account-silicons-long", path: "/silicons", routes: [["GET /v1/me/silicons", () => ({ json: data.page([...data.silicons, longSilicon]) })]] },
 
   // A Carbon with nothing yet.

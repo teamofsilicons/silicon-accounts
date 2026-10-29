@@ -45,7 +45,7 @@ Colour by role: needs you → `--warning`, good → `--success`, danger → `--d
 ## Screens
 | Prototype screen | Route | Built from | API |
 |---|---|---|---|
-| Home: greeting + id, needs you / all set, intro card, Your Silicons (2 + New), Your apps (4) | `/` | `account/home.tsx`, attention strip | `me.get`, `me.silicons.list`, `me.custodianRequests.list`, `me.apps.list` |
+| Home: greeting + id, needs you / all set, intro card, Your Silicons (2 + New), Your apps (4) | `/` (built) | `account/overview/`, attention strip | `me.get`, `me.silicons.list`, `me.custodianRequests.list`, `me.apps.list` |
 | Silicons: New Silicon, Waiting for you, grid | `/silicons` | `silicons.tsx`, `create-silicon.tsx`, `request-deck.tsx` | `me.silicons.*`, `me.custodianRequests.*` |
 | Silicon: header (avatar, name, id, status), tabs | `/silicons/[uuid]` | `silicon-drawer.tsx` content | `me.silicons.get` |
 | · Access: secret key | tab | `secret-reveal.tsx` | `rotateStk` |
@@ -57,7 +57,7 @@ Colour by role: needs you → `--warning`, good → `--success`, danger → `--d
 | Permissions between apps (active, ended) | `/proofs` | `proofs/proofs.tsx` | `me.proofs.*` |
 | Security: checkup, Silicon keys, your sign-in (Google, Apple, email code, text code), devices, Activity | `/security` (`/sign-in-methods` redirects) | `sign-in-methods/*`, `security/*` | `me.identities`, `me.emails`, `me.phones`, `me.sessions`, `me.silicons.list` |
 | Activity with filters | `/activity` | `activity/*` | `me.history` (kind filter) |
-| Personal info: photo, name, public id, date of birth, timezone; emails, phones | `/personal` | identity edit parts, `contact-adder.tsx` | `me.update`, `uploadPhoto`, `changeId`, `emails`, `phones` |
+| Personal info: photo, name, public id, date of birth, timezone; emails, phones | `/personal` (the identity card until it is rebuilt as rows) | identity edit parts, `contact-adder.tsx` | `me.update`, `uploadPhoto`, `changeId`, `emails`, `phones` |
 | Data & privacy: what apps see, delete account | `/privacy` (`/settings` redirects) | `settings.tsx` delete flow | `me.apps.list` (scopes), `me.deleteAccount` |
 | Sign in, Google chooser, code, welcome, deleted | `/authorize/flow/[id]` steps | `auth/steps/*` | flows (hosted branding stays) |
 
