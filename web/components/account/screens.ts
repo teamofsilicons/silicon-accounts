@@ -83,6 +83,8 @@ const card = "[data-identity-card]";
 const shown: ScreenSpec[] = [
   // Home: needs you with a custodian request, then all clear with the introduction dismissed.
   { name: "account-home", path: "/", waitFor: "[data-home]" },
+  { name: "account-home-review", path: "/", waitFor: "[data-home]", fullPage: false, prepare: async page => { await click(page, "Review"); await wait(page, 900); } },
+  { name: "account-home-new", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me/apps", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, phones: [], custodian_of: 0 } })]] },
   { name: "account-home-clear", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })]], prepare: async page => { await click(page, "Dismiss"); await wait(page, 400); } },
   // Identity: the card, its back, the photo menu, the editors and the id dialog with a taken id.
   { name: "account-identity", path: "/personal", waitFor: card },

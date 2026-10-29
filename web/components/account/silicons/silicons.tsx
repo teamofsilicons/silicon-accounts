@@ -22,7 +22,7 @@ import { useRegisterCommands } from "@/lib/commands";
 import { paths } from "@/lib/navigation";
 import { formatRelative, plural } from "@/lib/format";
 import { useMe } from "@/lib/query/session";
-import { ATTENTION_ID } from "../attention/attention-strip";
+import { NEEDS_YOU_ID, NEW_SILICON_PARAM } from "../parts/anchors";
 import { AnimatedRows } from "../parts/animated-rows";
 import { asCarbon, asSilicon, describeError, msUntil, personLabel, spanText, stkRotatedAt, useNow } from "../parts/common";
 import { handFocus, pageMain } from "../parts/focus";
@@ -51,9 +51,6 @@ const fallbackFocus = () => pageMain()?.querySelector<HTMLElement>('[role="listi
 /** Ids longer than this wrap on the tile instead of morphing on one line (a 30-character handle overflows a phone). */
 const LONG_ID = 18;
 
-/** `/silicons?new` opens "Create a Silicon" (Home's New Silicon tile). */
-export const NEW_PARAM = "new";
-
 export function Silicons() {
   const me = useMe();
   const silicons = useEverySilicon();
@@ -75,8 +72,8 @@ export function Silicons() {
   useEffect(() => {
     if (!carbon) return;
     const url = new URL(window.location.href);
-    if (!url.searchParams.has(NEW_PARAM)) return;
-    url.searchParams.delete(NEW_PARAM);
+    if (!url.searchParams.has(NEW_SILICON_PARAM)) return;
+    url.searchParams.delete(NEW_SILICON_PARAM);
     window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
     // Next frame, after the page has painted; not cancelled, since the flag is already gone from the address.
     requestAnimationFrame(() => setCreating(true));
@@ -161,7 +158,7 @@ export function Silicons() {
           {waiting.length ? (
             <Alert tone="info" title={`${plural(waiting.length, "custodian request")} waiting for you`}>
               Answer them on Home, where everything that needs your decision is in one place.
-              <span className={styles.alertAction}><ButtonLink href={`${paths.home}#${ATTENTION_ID}`} variant="secondary" size="sm">Answer them</ButtonLink></span>
+              <span className={styles.alertAction}><ButtonLink href={`${paths.home}#${NEEDS_YOU_ID}`} variant="secondary" size="sm">Answer them</ButtonLink></span>
             </Alert>
           ) : null}
 

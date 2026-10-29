@@ -83,6 +83,13 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   back link to Apps and still in ⌘K. Why: a proof only exists because of an app relationship (design review).
   (2026-10-17) (keeping /proofs as a full page: my default, confirm)
 
+- Coherence with the prototype: the page is a white --surface panel on a grey --canvas (neutral-2, so NavList's hover
+  still shows), the top bar and sidebar on the canvas; Home is one centred 760px column with one type scale (2xl
+  display title, base block headings, sm row titles and details) and one card style (hairline --border, container
+  radius) for every block; Needs you is a card of rows (custodian requests reviewed in a dialog; "Add a recovery phone"
+  for a Carbon with no phone). Why: Anil found the first Home incoherent next to the prototype's new-account screen.
+  (2026-10-29)
+
 ## Process
 - Keep priorities.md, decisions.md and log.md (this folder) updated with every task; shared-code changes also get a
   README.md note, as the site already does. Why: state lives in repo files, not chat. (2026-10-17)

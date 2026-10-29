@@ -2,10 +2,11 @@
 
 /**
  * Home ("/" signed in), as in the lead designer's prototype (redesign/prototype-map.md). It answers two questions in order:
- * what needs me, then how are my Silicons and apps doing.
+ * what needs me, then how are my Silicons and apps doing. One centred column, one type scale, one card style.
  *
  * - a greeting with your photo and id (copy it to share);
- * - Needs you (attention/attention-strip.tsx) while something waits for your decision, else "You're all set";
+ * - Needs you: a card of rows, one per thing waiting for you (custodian requests, reviewed in a dialog with the request
+ *   deck; a Carbon with no phone number is asked to add one), else "You're all set";
  * - a short introduction to the account until it is dismissed (remembered in this browser);
  * - Your Silicons: the first two, then a tile to make a new one (a Carbon's own; Silicons look after none);
  * - Your apps: the first four you are signed into.
@@ -13,25 +14,27 @@
  * Tiles lead to their section until each Silicon and app has a page of its own. What the prototype also shows on a
  * tile (a Silicon's last sign-in, how many Silicons use an app) has no API yet: redesign/api-gaps.md.
  */
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
-import { Check, LayoutGrid, Plus, Sparkles, X } from "lucide-react";
+import { Check, LayoutGrid, Plus, Smartphone, Sparkles, X } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Badge, type BadgeTone } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { CopyButton } from "@teamofsilicons/silicon-ui/copy-button";
+import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
+import { ButtonLink } from "@/components/foundation/button-link";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
-import { Page, Section } from "@/components/foundation/layout/layout";
+import { Page } from "@/components/foundation/layout/layout";
 import { useTheme } from "@/components/foundation/theme/use-theme";
-import type { ManagedSilicon, Me, MyApp } from "@/lib/api/types";
+import type { CustodianRequest, ManagedSilicon, Me, MyApp } from "@/lib/api/types";
 import { formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useMe } from "@/lib/query/session";
-import { ATTENTION_ID, AttentionStrip } from "../attention/attention-strip";
-import { appLogo, asCarbon, describeError, useNow } from "../parts/common";
+import { NEEDS_YOU_ID, NEW_SILICON_PARAM } from "../parts/anchors";
+import { appLogo, asCarbon, describeError, msUntil, personLabel, spanText, useNow } from "../parts/common";
 import { useEveryApp, useEveryCustodianRequest, useEverySilicon } from "../parts/queries";
-import { NEW_PARAM } from "../silicons/silicons";
+import { RequestDeck } from "../silicons/request-deck";
 import styles from "./overview.module.css";
 
 const SILICON_TILES = 2;
@@ -44,10 +47,12 @@ export function Overview() {
   if (me.error && !account) {
     return (
       <Page>
-        <Alert tone="danger" title="Your account did not load">
-          {describeError(me.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try again</Button></span>
-        </Alert>
+        <div className={styles.overview}>
+          <Alert tone="danger" title="Your account did not load">
+            {describeError(me.error)}
+            <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try again</Button></span>
+          </Alert>
+        </div>
       </Page>
     );
   }
@@ -66,8 +71,22 @@ export function Overview() {
   );
 }
 
+/** A section of Home: a small heading, an optional "See all", then its content. */
+function Block({ title, href, children }: { title: string; href?: string; children: ReactNode }) {
+  const id = `home-${title.toLowerCase().replace(/\s+/g, "-")}`;
+  return (
+    <section className={styles.block} aria-labelledby={id}>
+      <div className={styles.blockHead}>
+        <h2 id={id} className={styles.blockTitle}>{title}</h2>
+        {href ? <Link href={href} className={styles.seeAll}>See all</Link> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 /* ------------------------------------------------------------------------------------------------------------------ */
-/* Greeting and needs you                                                                                              */
+/* Greeting                                                                                                            */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
 function Greeting({ me }: { me: Me }) {
@@ -78,7 +97,7 @@ function Greeting({ me }: { me: Me }) {
       <div className={styles.greetingText}>
         <h1 className={styles.title}>Welcome back, {first}</h1>
         {me.id ? (
-          <span className={styles.handle}>
+          <span data-sq="surface" className={styles.handle}>
             <span className="mono">{me.id}</span>
             <CopyButton value={me.id} label="Copy your id" iconOnly variant="plain" />
           </span>
@@ -88,19 +107,89 @@ function Greeting({ me }: { me: Me }) {
   );
 }
 
-/** The needs-you block while something waits; "You're all set" once the requests have loaded and none wait. */
+/* ------------------------------------------------------------------------------------------------------------------ */
+/* Needs you                                                                                                           */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+function requestWords(request: CustodianRequest): { title: string; detail: string } {
+  const silicon = request.silicon.display_name || request.silicon.id || "A Silicon";
+  return request.kind === "transfer"
+    ? { title: `${personLabel(request.from)} is handing ${silicon} to you`, detail: "Accept to look after it" }
+    : { title: `${silicon} asks you to look after it`, detail: "It made its own account and named you" };
+}
+
+/** Everything waiting for the account, as rows of one card; "You're all set" when nothing waits. */
 function NeedsYou({ me }: { me: Me }) {
-  const requests = useEveryCustodianRequest();
   const carbon = asCarbon(me);
-  const waiting = requests.data?.items.length ?? 0;
-  if (carbon && (waiting > 0 || (requests.error && !requests.data))) return <AttentionStrip me={me} />;
-  if (carbon && !requests.data) return null;
+  const requests = useEveryCustodianRequest();
+  const now = useNow(30_000);
+  const [reviewing, setReviewing] = useState<CustodianRequest | null>(null);
+  const waiting = carbon ? requests.data?.items ?? [] : [];
+  const noPhone = !!carbon && carbon.phones.length === 0;
+
+  // A Carbon's requests are part of the answer: wait for them rather than say "all set" too early.
+  if (carbon && !requests.data && !requests.error) return null;
+  const failed = !!carbon && !!requests.error && !requests.data;
+  const count = waiting.length + (noPhone ? 1 : 0) + (failed ? 1 : 0);
+
+  if (!count) {
+    return (
+      <p id={NEEDS_YOU_ID} className={styles.allClear} role="status">
+        <Check size={16} strokeWidth={2} aria-hidden="true" />
+        You&apos;re all set
+        <span className={styles.allClearNote}>· nothing needs you right now</span>
+      </p>
+    );
+  }
+
   return (
-    <p id={ATTENTION_ID} className={styles.allClear} role="status">
-      <Check size={16} strokeWidth={2} aria-hidden="true" />
-      You&apos;re all set
-      <span className={styles.allClearNote}>· nothing needs you right now</span>
-    </p>
+    <section id={NEEDS_YOU_ID} data-sq="surface" className={`${styles.card} ${styles.needs}`} aria-labelledby={`${NEEDS_YOU_ID}-title`} tabIndex={-1}>
+      <div className={styles.cardHead}>
+        <h2 id={`${NEEDS_YOU_ID}-title`} className={styles.blockTitle}>Needs you</h2>
+        <Badge size="sm" tone="warning">{count}</Badge>
+      </div>
+      <ul className={styles.rows}>
+        {failed ? (
+          <Row lead={<span className={styles.mark} aria-hidden="true"><Sparkles size={16} strokeWidth={1.75} /></span>} title="Requests waiting for you did not load" detail={describeError(requests.error)}>
+            <Button variant="secondary" size="sm" onClick={() => void requests.refetch()}>Try again</Button>
+          </Row>
+        ) : null}
+        {waiting.map(request => {
+          const words = requestWords(request);
+          const left = msUntil(request.expires_at, now);
+          return (
+            <Row key={request.id} lead={<Avatar name={request.silicon.display_name} src={request.silicon.pfp_url} size="md" />} title={words.title} detail={left > 0 ? `${words.detail} · ${spanText(left)} left to answer` : words.detail}>
+              <Button variant="secondary" size="sm" onClick={() => setReviewing(request)}>Review</Button>
+            </Row>
+          );
+        })}
+        {noPhone ? (
+          <Row lead={<span className={styles.mark} aria-hidden="true"><Smartphone size={16} strokeWidth={1.75} /></span>} title="Add a recovery phone" detail="In case you lose your email">
+            <ButtonLink href={paths.signInMethods} variant="secondary" size="sm">Add</ButtonLink>
+          </Row>
+        ) : null}
+      </ul>
+      <Dialog open={!!reviewing} onOpenChange={open => { if (!open) setReviewing(null); }}>
+        {reviewing ? (
+          <DialogContent title={requestWords(reviewing).title} description="Each request lasts 14 days. A declined Silicon's account is released; a declined transfer changes nothing.">
+            <RequestDeck requests={[reviewing]} now={now} onEmptied={() => setReviewing(null)} />
+          </DialogContent>
+        ) : null}
+      </Dialog>
+    </section>
+  );
+}
+
+function Row({ lead, title, detail, children }: { lead: ReactNode; title: string; detail: string; children: ReactNode }) {
+  return (
+    <li className={styles.row}>
+      {lead}
+      <span className={styles.rowText}>
+        <span className={styles.rowTitle}>{title}</span>
+        <span className={styles.rowDetail}>{detail}</span>
+      </span>
+      <span className={styles.rowAction}>{children}</span>
+    </li>
   );
 }
 
@@ -140,26 +229,26 @@ function Intro({ me }: { me: Me }) {
   const dismissed = useSyncExternalStore(subscribeIntro, () => dismissedThisVisit || readIntroDismissed(), () => true);
   if (dismissed) return null;
   return (
-    <section data-sq="surface" className={styles.intro} aria-labelledby="intro-title">
-      <div className={styles.introHead}>
-        <h2 id="intro-title" className={styles.introTitle}>One account for every Team of Silicons app</h2>
+    <section data-sq="surface" className={`${styles.card} ${styles.intro}`} aria-labelledby="intro-title">
+      <div className={styles.cardHead}>
+        <h2 id="intro-title" className={styles.blockTitle}>One account for every Team of Silicons app</h2>
         <Button variant="ghost" size="sm" aria-label="Dismiss" onClick={dismissIntro}><X size={16} strokeWidth={1.75} aria-hidden="true" /></Button>
       </div>
       <ul className={styles.introItems}>
         <li className={styles.introItem}>
           <Avatar name={me.display_name} src={me.pfp_url} size="md" />
-          <strong className={styles.introName}>You</strong>
-          <span className={styles.introText}>{me.id ? <>Others find you by <span className="mono">{me.id}</span>.</> : "Others find you by your id."}</span>
+          <span className={styles.rowTitle}>You</span>
+          <span className={styles.rowDetail}>{me.id ? <>Others find you by <span className="mono">{me.id}</span>.</> : "Others find you by your id."}</span>
         </li>
         <li className={styles.introItem}>
-          <span className={`${styles.introMark} ${styles.siliconMark}`} aria-hidden="true"><Sparkles size={18} strokeWidth={1.75} /></span>
-          <strong className={styles.introName}>Silicons</strong>
-          <span className={styles.introText}>AI agents you can look after.</span>
+          <span className={`${styles.mark} ${styles.siliconMark}`} aria-hidden="true"><Sparkles size={16} strokeWidth={1.75} /></span>
+          <span className={styles.rowTitle}>Silicons</span>
+          <span className={styles.rowDetail}>AI agents you can look after.</span>
         </li>
         <li className={styles.introItem}>
-          <span className={styles.introMark} aria-hidden="true"><LayoutGrid size={18} strokeWidth={1.75} /></span>
-          <strong className={styles.introName}>Apps</strong>
-          <span className={styles.introText}>Each asks what it can see.</span>
+          <span className={styles.mark} aria-hidden="true"><LayoutGrid size={16} strokeWidth={1.75} /></span>
+          <span className={styles.rowTitle}>Apps</span>
+          <span className={styles.rowDetail}>Each asks what it can see.</span>
         </li>
       </ul>
     </section>
@@ -174,7 +263,7 @@ function YourSilicons() {
   const silicons = useEverySilicon();
   const list = silicons.data?.items ?? [];
   return (
-    <Section title="Your Silicons" actions={list.length ? <Link href={paths.silicons} className={styles.seeAll}>See all</Link> : null}>
+    <Block title="Your Silicons" href={list.length ? paths.silicons : undefined}>
       {silicons.error && !silicons.data ? (
         <Alert tone="danger" title="Your Silicons did not load">
           {describeError(silicons.error)}
@@ -185,13 +274,13 @@ function YourSilicons() {
       ) : (
         <div className={styles.tiles}>
           {list.slice(0, SILICON_TILES).map(silicon => <SiliconTile key={silicon.uuid} silicon={silicon} />)}
-          <Link href={`${paths.silicons}?${NEW_PARAM}`} data-sq="surface" className={`${styles.tile} ${styles.newTile}`}>
-            <span className={styles.introMark} aria-hidden="true"><Plus size={18} strokeWidth={1.75} /></span>
-            <span className={styles.tileName}>New Silicon</span>
+          <Link href={`${paths.silicons}?${NEW_SILICON_PARAM}`} data-sq="surface" className={`${styles.card} ${styles.tile} ${styles.newTile}`}>
+            <span className={styles.mark} aria-hidden="true"><Plus size={16} strokeWidth={1.75} /></span>
+            <span className={styles.rowTitle}>New Silicon</span>
           </Link>
         </div>
       )}
-    </Section>
+    </Block>
   );
 }
 
@@ -204,14 +293,14 @@ function siliconStatus(silicon: ManagedSilicon): { tone: BadgeTone; text: string
 function SiliconTile({ silicon }: { silicon: ManagedSilicon }) {
   const status = siliconStatus(silicon);
   return (
-    <Link href={paths.silicons} data-sq="surface" className={`${styles.tile} ${styles.siliconTile}`}>
+    <Link href={paths.silicons} data-sq="surface" className={`${styles.card} ${styles.tile}`}>
       <span className={styles.tileHead}>
-        <Avatar name={silicon.display_name} src={silicon.pfp_url} size="md" />
-        <span className={styles.tileName}>{silicon.display_name}</span>
+        <span className={styles.siliconRing}><Avatar name={silicon.display_name} src={silicon.pfp_url} size="sm" /></span>
+        <span className={styles.rowTitle}>{silicon.display_name}</span>
       </span>
       <span className={styles.tileFoot}>
         <Badge size="sm" tone={status.tone}>{status.text}</Badge>
-        <span className={`mono ${styles.tileNote}`}>{silicon.id ?? silicon.uuid}</span>
+        <span className={`mono ${styles.rowDetail}`}>{silicon.id ?? silicon.uuid}</span>
       </span>
     </Link>
   );
@@ -223,7 +312,7 @@ function YourApps() {
   const { theme } = useTheme();
   const active = (apps.data?.items ?? []).filter(item => item.status === "active");
   return (
-    <Section title="Your apps" actions={active.length ? <Link href={paths.apps} className={styles.seeAll}>See all</Link> : null}>
+    <Block title="Your apps" href={active.length ? paths.apps : undefined}>
       {apps.error && !apps.data ? (
         <Alert tone="danger" title="Your apps did not load">
           {describeError(apps.error)}
@@ -236,23 +325,21 @@ function YourApps() {
           {active.slice(0, APP_TILES).map(item => <AppTile key={item.app.app_id} item={item} logo={appLogo(item.app, theme)} now={now} />)}
         </div>
       ) : (
-        <p className={styles.quiet}>Apps appear here after you sign in to them.</p>
+        <p data-sq="surface" className={`${styles.card} ${styles.well}`}>Apps appear here after you sign in to them.</p>
       )}
-    </Section>
+    </Block>
   );
 }
 
 function AppTile({ item, logo, now }: { item: MyApp; logo: string | null; now: number }) {
   const used = item.last_signed_in_at ?? item.first_signed_in_at;
   return (
-    <Link href={`${paths.apps}#app-${item.app.app_id}`} data-sq="surface" className={styles.tile}>
+    <Link href={`${paths.apps}#app-${item.app.app_id}`} data-sq="surface" className={`${styles.card} ${styles.tile}`}>
       <span className={styles.tileHead}>
-        <Avatar name={item.app.name} src={logo ?? undefined} size="md" />
-        <span className={styles.tileName}>{item.app.name}</span>
+        <Avatar name={item.app.name} src={logo ?? undefined} size="sm" />
+        <span className={styles.rowTitle}>{item.app.name}</span>
       </span>
-      <span className={styles.tileFoot}>
-        <span className={styles.tileNote}>{used ? `Used ${formatRelative(used, now)}` : "Signed in"}</span>
-      </span>
+      <span className={styles.rowDetail}>{used ? `Used ${formatRelative(used, now)}` : "Signed in"}</span>
     </Link>
   );
 }
@@ -264,7 +351,7 @@ function AppTile({ item, logo, now }: { item: MyApp; logo: string | null; now: n
 function TilesSkeleton({ count }: { count: number }) {
   return (
     <div className={styles.tiles} aria-busy="true" aria-label="Loading">
-      {Array.from({ length: count }, (_, index) => <SkeletonBlock key={index} width="100%" height="104px" radius="var(--radius-container)" index={index} />)}
+      {Array.from({ length: count }, (_, index) => <SkeletonBlock key={index} width="100%" height="92px" radius="var(--radius-container)" index={index} />)}
     </div>
   );
 }
@@ -272,7 +359,7 @@ function TilesSkeleton({ count }: { count: number }) {
 function OverviewSkeleton() {
   return (
     <div className={styles.overview} aria-busy="true" aria-label="Loading your account">
-      <SkeletonBlock width="min(360px, 80%)" height="48px" radius="var(--radius-control)" />
+      <SkeletonBlock width="min(320px, 80%)" height="48px" radius="var(--radius-control)" />
       <SkeletonBlock width="100%" height="120px" radius="var(--radius-container)" index={1} />
       <TilesSkeleton count={3} />
     </div>

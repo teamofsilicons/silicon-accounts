@@ -263,7 +263,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
             <Sidebar activeKey={active?.key} developerUrl={developerUrl} />
           </aside>
         )}
-        <main id="main" className={styles.main} tabIndex={-1}>{content}</main>
+        <main id="main" data-sq-native="" className={styles.main} tabIndex={-1}>{content}</main>
       </div>
       <CommandMenu />
       <LeaveQuestionHost />

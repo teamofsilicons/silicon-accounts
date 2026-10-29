@@ -1,68 +1,72 @@
-/* Home: greeting, needs you, the introduction, then tiles for your Silicons and apps (the prototype's home). */
-.overview { display: grid; min-width: 0; gap: var(--space-block); }
+/* Home: one centred column, one type scale (title, block heading, row title, row detail) and one card style for every
+   block: needs you, the introduction, the tiles and the empty well (the prototype's home). */
+.overview { display: grid; width: 100%; max-width: 760px; min-width: 0; gap: var(--space-block); margin-inline: auto; }
 .alertAction { display: block; margin-top: var(--space-group); }
 
-/* ------------------------------------------------------ greeting ---------------------------------------------------- */
-.greeting { display: flex; min-width: 0; align-items: center; gap: var(--space-comfort); }
-.greetingText { display: grid; min-width: 0; gap: var(--space-tight); }
-.title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); overflow-wrap: anywhere; }
-@media (max-width: 639px) { .title { font-size: var(--text-2xl); } }
-.handle { display: inline-flex; min-width: 0; align-items: center; gap: var(--space-tight); color: var(--text-secondary); font-size: var(--text-sm); }
+/* ---------------------------------------------------- type scale ---------------------------------------------------- */
+.title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); overflow-wrap: anywhere; }
+.blockTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: var(--leading-snug); }
+.rowTitle { min-width: 0; overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug); text-overflow: ellipsis; white-space: nowrap; }
+.rowDetail { min-width: 0; overflow: hidden; color: var(--text-muted); font-size: var(--text-sm); line-height: var(--leading-body); text-overflow: ellipsis; }
 
-/* All clear: one quiet line where the needs-you block would be. */
+/* ------------------------------------------------------ greeting ---------------------------------------------------- */
+.greeting { display: flex; min-width: 0; align-items: center; gap: var(--space-inset); }
+.greetingText { display: grid; min-width: 0; justify-items: start; gap: var(--space-tight); }
+.handle { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); display: inline-flex; min-width: 0; align-items: center; gap: var(--space-hair); padding-inline-start: var(--space-related); background: var(--sq-fill); color: var(--text-secondary); font-size: var(--text-sm); }
+
+/* All clear: one quiet line where the needs-you card would be. */
 .allClear { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); margin: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; scroll-margin-top: var(--space-section); }
 .allClear svg { color: var(--success); }
 .allClearNote { color: var(--text-muted); font-weight: 400; }
 
-/* ---------------------------------------------------- introduction -------------------------------------------------- */
-.intro { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border-subtle); display: grid; gap: var(--space-comfort); padding: var(--space-comfort); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
-.introHead { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-group); }
-.introTitle { margin: 0; color: var(--foreground); font-size: var(--text-lg); font-weight: 500; line-height: var(--leading-snug); }
-.introItems { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-comfort); margin: 0; padding: 0; list-style: none; }
-@media (max-width: 720px) { .introItems { grid-template-columns: minmax(0, 1fr); } }
-.introItem { display: grid; justify-items: start; gap: var(--space-tight); }
-.introName { margin-top: var(--space-tight); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
-.introText { color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
-/* A round mark the size of a md avatar: neutral for apps and the new tile, the Silicon gradient for Silicons. */
-.introMark { display: grid; width: 36px; height: 36px; flex: none; place-items: center; border-radius: var(--radius-full); background: var(--surface-muted); color: var(--text-secondary); }
-.siliconMark { background: var(--silicon-gradient); color: var(--silicon-gradient-foreground); }
+/* -------------------------------------------------------- card ------------------------------------------------------ */
+/* The one card: white on the white page, a hairline edge, the container radius. Variants only change the fill or edge. */
+.card { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); min-width: 0; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); }
+.cardHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); padding: var(--space-group) var(--space-inset); }
 
-/* -------------------------------------------------------- tiles ----------------------------------------------------- */
+/* Needs you: the card with a warning edge, its rows ruled under the heading. */
+.needs { --sq-stroke: color-mix(in oklab, var(--warning) 35%, var(--border)); outline: none; scroll-margin-top: var(--space-section); }
+.needs:focus-visible { --sq-stroke: var(--warning); }
+.rows { margin: 0; padding: 0; list-style: none; }
+.row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-group) var(--space-inset); border-top: 1px solid var(--border-subtle); }
+.rowText { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); }
+.rowAction { display: flex; flex: none; gap: var(--space-related); }
+
+/* A round mark the size of a md avatar: neutral, or the Silicon gradient for Silicons. */
+.mark { display: grid; width: 36px; height: 36px; flex: none; place-items: center; border-radius: var(--radius-full); background: var(--surface-muted); color: var(--text-secondary); }
+.siliconMark { background: var(--silicon-gradient); color: var(--silicon-gradient-foreground); }
+/* A Silicon's avatar sits in a thin gradient ring, so Silicons read apart from apps and people. */
+.siliconRing { display: inline-grid; flex: none; padding: var(--space-hair); border-radius: var(--radius-full); background: var(--silicon-gradient-line); }
+
+/* Introduction: the card on the Silicon gradient's soft wash. */
+.intro { background: var(--silicon-gradient-soft); }
+.introItems { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-inset); margin: 0; padding: 0 var(--space-inset) var(--space-inset); list-style: none; }
+@media (max-width: 640px) { .introItems { grid-template-columns: minmax(0, 1fr); } }
+.introItem { display: grid; justify-items: start; gap: var(--space-tight); }
+.introItem > :first-child { margin-bottom: var(--space-tight); }
+
+/* -------------------------------------------------------- blocks ---------------------------------------------------- */
+.block { display: grid; min-width: 0; gap: var(--space-group); }
+.blockHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-group); }
 .seeAll { color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; }
 .seeAll:hover, .seeAll:focus-visible { color: var(--foreground); text-decoration: underline; }
 
+/* -------------------------------------------------------- tiles ----------------------------------------------------- */
 .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); }
 .appTiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 1100px) { .appTiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 720px) { .tiles, .appTiles { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) { .tiles, .appTiles { grid-template-columns: minmax(0, 1fr); } }
 
-.tile {
-  --sq-r: var(--radius-container);
-  --sq-fill: var(--surface);
-  --sq-stroke: var(--border-subtle);
-  display: grid;
-  min-width: 0;
-  align-content: space-between;
-  gap: var(--space-comfort);
-  padding: var(--space-group) var(--space-inset);
-  border: 1px solid var(--sq-stroke);
-  background: var(--sq-fill);
-  color: var(--foreground);
-  text-decoration: none;
-  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
-}
+.tile { display: grid; align-content: space-between; gap: var(--space-group); padding: var(--space-group); text-decoration: none; transition: border-color var(--duration-fast) var(--ease-standard); }
 .tile:hover { --sq-stroke: var(--border-strong); color: var(--foreground); }
-.tile:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-/* A Silicon's tile carries the Silicon gradient's soft wash, so Silicons read apart from apps. */
-.siliconTile { --sq-fill: var(--surface); background: var(--silicon-gradient-soft); }
-.newTile { align-content: center; justify-items: start; border-style: dashed; color: var(--text-secondary); }
-.newTile:hover { color: var(--foreground); }
-
+.tile:focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
 .tileHead { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
-.tileName { min-width: 0; overflow: hidden; font-size: var(--text-base); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.tileFoot { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-related); }
-.tileNote { min-width: 0; overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
+.tileFoot { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
+.tileFoot > * { flex: none; }
+.tileFoot > .rowDetail { flex: 1; white-space: nowrap; }
+.newTile { --sq-stroke: var(--border-strong); align-content: center; justify-items: center; border-style: dashed; }
 
-.quiet { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+/* The empty well: the card filled with the canvas grey, no edge. */
+.well { --sq-fill: var(--canvas); --sq-stroke: transparent; margin: 0; padding: var(--space-group) var(--space-inset); color: var(--text-muted); font-size: var(--text-sm); }
 
 @media (prefers-reduced-motion: reduce) { .tile { transition: none; } }

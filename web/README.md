@@ -693,3 +693,6 @@ in `redesign/api-gaps.md`).
   (two tiles and New Silicon, which opens Create a Silicon through `/silicons?new`) and Your apps (four tiles).
 - **Personal info** (`/personal`, sidebar section 5, number key 5): the identity card, moved from `/`; the metric cards
   beside it are gone (Home's tiles lead into each section).
+- **Coherence pass**: `--canvas` (neutral-2) under the top bar and sidebar; the page is a white panel on it. Home is one
+  centred column with one type scale and one card style; Needs you lists custodian requests (Review opens the request
+  deck in a dialog) and asks a Carbon with no phone to add one. The attention strip is gone.
