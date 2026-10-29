@@ -700,3 +700,6 @@ in `redesign/api-gaps.md`).
   account menu's hover, press and loading states match the picture.
 - **Silicon UI 0.4.0**: faster motion (durations about halved; new spring tiers, old names kept) and fluid hover in
   NavList and menus. No site code changed.
+- **Local photos**: in development, when `ACCOUNTS_IRIS_BASE_URL` is not set, `proxy.ts` allows the local stack's default
+  mock Iris (`http://127.0.0.1:8594`) in `img-src`, so avatars show their photos when the site runs on its own.
+  Production adds only what it is given.

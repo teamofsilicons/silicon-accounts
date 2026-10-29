@@ -40,3 +40,5 @@ Every change, one line each, newest at the bottom. Format: `- YYYY-MM-DD <commit
 - 2026-10-29 verify: lint passes; account menu (rest, hover, open), Home and Personal info checked live against the local stack
 - 2026-10-29 wip deps: @teamofsilicons/silicon-ui ^0.4.0 (diffed against 0.3.0: motion tokens faster with new spring tiers and old names kept, lib/fluid-hover for NavList and menus, no component added, removed or retyped) (package.json, pnpm-lock.yaml)
 - 2026-10-29 verify: typecheck, lint (baseline 285), tests (28) and build pass on 0.4.0; live Home and sidebar hover checked on the local stack; found (not from the upgrade): dev CSP blocks mock Iris photos
+- 2026-10-29 wip proxy: in development without ACCOUNTS_IRIS_BASE_URL (the site started on its own beside dev.sh --web=external, or the preview), img-src adds the stack's default mock Iris http://127.0.0.1:8594; production unchanged (proxy.ts, README.md)
+- 2026-10-29 verify: typecheck and lint pass; dev CSP header carries http://127.0.0.1:8594; Home's three avatar photos load on the local stack
