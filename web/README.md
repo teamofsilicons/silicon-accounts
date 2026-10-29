@@ -696,3 +696,5 @@ in `redesign/api-gaps.md`).
 - **Coherence pass**: `--canvas` (neutral-2) under the top bar and sidebar; the page is a white panel on it. Home is one
   centred column with one type scale and one card style; Needs you lists custodian requests (Review opens the request
   deck in a dialog) and asks a Carbon with no phone to add one. The attention strip is gone.
+- **Avatars are circles** (Silicon UI's default): the 30% squircle override is gone from `styles/tokens.css`, so the
+  account menu's hover, press and loading states match the picture.

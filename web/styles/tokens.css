@@ -154,8 +154,5 @@
   --radius-panel: 14px; --radius-surface: 18px; --radius-pill: 9999px;
 }
 
-/* Profile pictures are 30% squircles, like the store's (Silicon UI draws circles by default). */
-:root {
-  --avatar-radius: 30%;
-  --avatar-corner-shape: squircle;
-}
+/* Profile pictures are Silicon UI's circles (the 30% squircle override was dropped 2026-10-29: Silicon UI's menu states
+   draw circles, and the prototype's avatars are round). */

@@ -90,6 +90,10 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   for a Carbon with no phone). Why: Anil found the first Home incoherent next to the prototype's new-account screen.
   (2026-10-29)
 
+- Profile pictures are Silicon UI's circles: the 30% squircle override (--avatar-radius, --avatar-corner-shape) is
+  gone. Why: Anil saw the account menu's picture as a squircle with circular hover, press and loading states (Silicon
+  UI's UserMenu draws them as circles); circles also match the prototype. (2026-10-29)
+
 ## Process
 - Keep priorities.md, decisions.md and log.md (this folder) updated with every task; shared-code changes also get a
   README.md note, as the site already does. Why: state lives in repo files, not chat. (2026-10-17)
