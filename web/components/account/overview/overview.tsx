@@ -2,14 +2,18 @@
 
 /**
  * Home ("/" signed in), as in the lead designer's prototype (redesign/prototype-map.md). It answers two questions in order:
- * what needs me, then how are my Silicons and apps doing. One centred column, one type scale, one card style.
+ * what needs me, then how are my Silicons and apps doing. The greeting over a main column and a side column, one type
+ * scale, one tile style (redesign/decisions.md, 2026-10-30).
  *
  * - a greeting with your photo and id (copy it to share);
- * - Needs you: a card of rows, one per thing waiting for you (custodian requests, reviewed in a dialog with the request
+ * Main column:
+ * - Needs you: a tile of rows, one per thing waiting for you (custodian requests, reviewed in a dialog with the request
  *   deck; a Carbon with no phone number is asked to add one), else "You're all set";
- * - a short introduction to the account until it is dismissed (remembered in this browser);
  * - Your Silicons: the first two, then a tile to make a new one (a Carbon's own; Silicons look after none);
  * - Your apps: the first four you are signed into.
+ * Side column (below the main one under 1024px):
+ * - a short introduction to the account until it is dismissed (remembered in this browser);
+ * - Your details: your primary email and phone, on to Personal info.
  *
  * Tiles lead to their section until each Silicon and app has a page of its own. What the prototype also shows on a
  * tile (a Silicon's last sign-in, how many Silicons use an app) has no API yet: redesign/api-gaps.md.
@@ -62,23 +66,30 @@ export function Overview() {
     <Page>
       <div className={styles.overview} data-home="">
         <Greeting me={account} />
-        <NeedsYou me={account} />
-        <Intro me={account} />
-        {asCarbon(account) ? <YourSilicons /> : null}
-        <YourApps />
+        <div className={styles.columns}>
+          <div className={styles.mainColumn}>
+            <NeedsYou me={account} />
+            {asCarbon(account) ? <YourSilicons /> : null}
+            <YourApps />
+          </div>
+          <aside className={styles.sideColumn} aria-label="About your account">
+            <Intro me={account} />
+            <YourDetails me={account} />
+          </aside>
+        </div>
       </div>
     </Page>
   );
 }
 
-/** A section of Home: a small heading, an optional "See all", then its content. */
-function Block({ title, href, children }: { title: string; href?: string; children: ReactNode }) {
+/** A section of Home: a small heading, an optional link ("See all"), then its content. */
+function Block({ title, href, linkLabel = "See all", children }: { title: string; href?: string; linkLabel?: string; children: ReactNode }) {
   const id = `home-${title.toLowerCase().replace(/\s+/g, "-")}`;
   return (
     <section className={styles.block} aria-labelledby={id}>
       <div className={styles.blockHead}>
         <h2 id={id} className={styles.blockTitle}>{title}</h2>
-        {href ? <Link href={href} className={styles.seeAll}>See all</Link> : null}
+        {href ? <Link href={href} className={styles.seeAll}>{linkLabel}</Link> : null}
       </div>
       {children}
     </section>
@@ -118,7 +129,7 @@ function requestWords(request: CustodianRequest): { title: string; detail: strin
     : { title: `${silicon} asks you to look after it`, detail: "It made its own account and named you" };
 }
 
-/** Everything waiting for the account, as rows of one card; "You're all set" when nothing waits. */
+/** Everything waiting for the account, as rows of one tile; "You're all set" when nothing waits. */
 function NeedsYou({ me }: { me: Me }) {
   const carbon = asCarbon(me);
   const requests = useEveryCustodianRequest();
@@ -256,6 +267,40 @@ function Intro({ me }: { me: Me }) {
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
+/* Your details                                                                                                        */
+/* ------------------------------------------------------------------------------------------------------------------ */
+
+/** A Carbon's primary email and phone (else the first); a Silicon's id. Personal info is where they change. */
+function YourDetails({ me }: { me: Me }) {
+  const carbon = asCarbon(me);
+  const email = carbon ? carbon.emails.find(entry => entry.is_primary) ?? carbon.emails[0] : undefined;
+  const phone = carbon ? carbon.phones.find(entry => entry.is_primary) ?? carbon.phones[0] : undefined;
+  return (
+    <Block title="Your details" href={paths.personal} linkLabel="Edit">
+      <dl data-sq="surface" className={`${styles.card} ${styles.details}`}>
+        {carbon ? (
+          <>
+            <Detail label="Email" value={email?.email ?? "None yet"} />
+            <Detail label="Phone" value={phone?.phone ?? "None yet"} />
+          </>
+        ) : (
+          <Detail label="Id" value={me.id ?? "None yet"} />
+        )}
+      </dl>
+    </Block>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.detail}>
+      <dt className={styles.rowDetail}>{label}</dt>
+      <dd className={styles.rowTitle}>{value}</dd>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------------------------------ */
 /* Your Silicons and your apps                                                                                         */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
@@ -351,7 +396,7 @@ function AppTile({ item, logo, now }: { item: MyApp; logo: string | null; now: n
 function TilesSkeleton({ count }: { count: number }) {
   return (
     <div className={styles.tiles} aria-busy="true" aria-label="Loading">
-      {Array.from({ length: count }, (_, index) => <SkeletonBlock key={index} width="100%" height="92px" radius="var(--radius-container)" index={index} />)}
+      {Array.from({ length: count }, (_, index) => <SkeletonBlock key={index} width="100%" height="100px" radius="var(--radius-overlay)" index={index} />)}
     </div>
   );
 }
@@ -360,8 +405,15 @@ function OverviewSkeleton() {
   return (
     <div className={styles.overview} aria-busy="true" aria-label="Loading your account">
       <SkeletonBlock width="min(320px, 80%)" height="48px" radius="var(--radius-control)" />
-      <SkeletonBlock width="100%" height="120px" radius="var(--radius-container)" index={1} />
-      <TilesSkeleton count={3} />
+      <div className={styles.columns}>
+        <div className={styles.mainColumn}>
+          <SkeletonBlock width="100%" height="120px" radius="var(--radius-overlay)" index={1} />
+          <TilesSkeleton count={3} />
+        </div>
+        <div className={styles.sideColumn}>
+          <SkeletonBlock width="100%" height="200px" radius="var(--radius-overlay)" index={2} />
+        </div>
+      </div>
     </div>
   );
 }

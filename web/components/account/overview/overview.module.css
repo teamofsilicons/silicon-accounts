@@ -1,6 +1,14 @@
-/* Home: one centred column, one type scale (title, block heading, row title, row detail) and one card style for every
-   block: needs you, the introduction, the tiles and the empty well (the prototype's home). */
-.overview { display: grid; width: 100%; max-width: 760px; min-width: 0; gap: var(--space-block); margin-inline: auto; }
+/* Home: the greeting over a main column (needs you, Silicons, apps) and a side column (the introduction, your details)
+   that stays in view; one type scale (title, block heading, row title, row detail) and one tile style for every block
+   (redesign/decisions.md, 2026-10-30: flat, tiles, column + aside). */
+.overview { display: grid; width: 100%; max-width: var(--page-max); min-width: 0; gap: var(--space-block); margin-inline: auto; }
+.columns { display: grid; min-width: 0; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); align-items: start; gap: var(--space-block); }
+.mainColumn, .sideColumn { display: grid; min-width: 0; gap: var(--space-block); }
+.sideColumn { position: sticky; top: calc(var(--top-height) + var(--space-section)); }
+@media (max-width: 1023px) {
+  .columns { grid-template-columns: minmax(0, 1fr); }
+  .sideColumn { position: static; }
+}
 .alertAction { display: block; margin-top: var(--space-group); }
 
 /* ---------------------------------------------------- type scale ---------------------------------------------------- */
@@ -19,16 +27,19 @@
 .allClear svg { color: var(--success); }
 .allClearNote { color: var(--text-muted); font-weight: 400; }
 
-/* -------------------------------------------------------- card ------------------------------------------------------ */
-/* The one card: white on the white page, a hairline edge, the container radius. Variants only change the fill or edge. */
-.card { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); min-width: 0; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); }
+/* -------------------------------------------------------- tile ------------------------------------------------------ */
+/* The one block style, a tile: the quiet grey fill on the white page, no edge, the overlay radius. Variants only change
+   the fill. */
+.card { --sq-r: var(--radius-overlay); --sq-fill: var(--canvas); min-width: 0; background: var(--sq-fill); color: var(--foreground); }
 .cardHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); padding: var(--space-group) var(--space-inset); }
 
-/* Needs you: the card with a warning edge, its rows ruled under the heading. */
-.needs { --sq-stroke: color-mix(in oklab, var(--warning) 35%, var(--border)); outline: none; scroll-margin-top: var(--space-section); }
-.needs:focus-visible { --sq-stroke: var(--warning); }
+/* Needs you: a plain tile, its rows under the heading; the warning badge carries the signal (a warning wash reads as
+   beige, which the site does not use). */
+.needs { outline: none; scroll-margin-top: var(--space-section); }
+.needs:focus-visible { outline: 2px solid var(--warning); outline-offset: 2px; }
 .rows { margin: 0; padding: 0; list-style: none; }
-.row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-group) var(--space-inset); border-top: 1px solid var(--border-subtle); }
+.rows { padding-bottom: var(--space-tight); }
+.row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-group) var(--space-inset); }
 .rowText { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); }
 .rowAction { display: flex; flex: none; gap: var(--space-related); }
 
@@ -38,12 +49,16 @@
 /* A Silicon's avatar sits in a thin gradient ring, so Silicons read apart from apps and people. */
 .siliconRing { display: inline-grid; flex: none; padding: var(--space-hair); border-radius: var(--radius-full); background: var(--silicon-gradient-line); }
 
-/* Introduction: the card on the Silicon gradient's soft wash. */
+/* Introduction: the tile on the Silicon gradient's soft wash, its three points stacked in the side column. */
 .intro { background: var(--silicon-gradient-soft); }
-.introItems { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-inset); margin: 0; padding: 0 var(--space-inset) var(--space-inset); list-style: none; }
-@media (max-width: 640px) { .introItems { grid-template-columns: minmax(0, 1fr); } }
-.introItem { display: grid; justify-items: start; gap: var(--space-tight); }
-.introItem > :first-child { margin-bottom: var(--space-tight); }
+.introItems { display: grid; gap: var(--space-inset); margin: 0; padding: 0 var(--space-inset) var(--space-inset); list-style: none; }
+.introItem { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--space-group); row-gap: var(--space-hair); }
+.introItem > :first-child { grid-row: span 2; }
+
+/* Your details: label and value rows. */
+.details { display: grid; gap: var(--space-group); margin: 0; padding: var(--space-inset); }
+.detail { display: grid; min-width: 0; gap: var(--space-hair); }
+.detail dd { margin: 0; }
 
 /* -------------------------------------------------------- blocks ---------------------------------------------------- */
 .block { display: grid; min-width: 0; gap: var(--space-group); }
@@ -53,20 +68,20 @@
 
 /* -------------------------------------------------------- tiles ----------------------------------------------------- */
 .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); }
-.appTiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-@media (max-width: 1100px) { .appTiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.appTiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 640px) { .tiles, .appTiles { grid-template-columns: minmax(0, 1fr); } }
 
-.tile { display: grid; align-content: space-between; gap: var(--space-group); padding: var(--space-group); text-decoration: none; transition: border-color var(--duration-fast) var(--ease-standard); }
-.tile:hover { --sq-stroke: var(--border-strong); color: var(--foreground); }
+.tile { display: grid; align-content: space-between; gap: var(--space-group); padding: var(--space-inset); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+.tile:hover { --sq-fill: var(--surface-muted); color: var(--foreground); }
 .tile:focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
 .tileHead { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
 .tileFoot { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
 .tileFoot > * { flex: none; }
 .tileFoot > .rowDetail { flex: 1; white-space: nowrap; }
-.newTile { --sq-stroke: var(--border-strong); align-content: center; justify-items: center; border-style: dashed; }
+.newTile { --sq-fill: transparent; align-content: center; justify-items: center; border: 1px dashed var(--border-strong); }
+.newTile:hover { --sq-fill: var(--canvas); }
 
-/* The empty well: the card filled with the canvas grey, no edge. */
-.well { --sq-fill: var(--canvas); --sq-stroke: transparent; margin: 0; padding: var(--space-group) var(--space-inset); color: var(--text-muted); font-size: var(--text-sm); }
+/* The empty well: a tile with muted words. */
+.well { margin: 0; padding: var(--space-group) var(--space-inset); color: var(--text-muted); font-size: var(--text-sm); }
 
 @media (prefers-reduced-motion: reduce) { .tile { transition: none; } }

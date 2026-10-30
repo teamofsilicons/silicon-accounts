@@ -344,7 +344,9 @@ branding runtime and the embed/SDK. `?compare=1` renders each specimen in a ligh
 
 `/__layouts` is the layout lab: the account frame in its loading state (skeleton blocks only, no words or data), to
 explore the shell (panel, open, inset, flat), the sidebar (list, rail, grouped), content elements (cards, tiles, rows) and
-the content layout (column, column + aside, list + detail). The choices live in the address
+the content layout (column, column + aside, aside on action, list + detail). Aside on action shows the content layout rule
+(redesign/decisions.md): the narrow column until an action opens the side column with an animation, or a bottom drawer
+under 1024 px. The choices live in the address
 (`?shell=inset&sidebar=rail&elements=tiles&content=split`); `?ui=0` or H hides the controls. Development only, like
 `/__kitchen` (`components/kitchen/layouts/`).
 
@@ -709,3 +711,8 @@ in `redesign/api-gaps.md`).
 - **Local photos**: in development, when `ACCOUNTS_IRIS_BASE_URL` is not set, `proxy.ts` allows the local stack's default
   mock Iris (`http://127.0.0.1:8594`) in `img-src`, so avatars show their photos when the site runs on its own.
   Production adds only what it is given.
+- **Flat shell, tiles, column + aside** (2026-10-30, picked in `/__layouts`): the shell is one white surface; the top
+  bar and the sidebar are parted from the page by hairlines, and the page has no panel. `--canvas` is now the tiles'
+  fill. Home's blocks are tiles (the canvas fill, no edge, the overlay radius), and Home is the greeting over a main
+  column (Needs you, Your Silicons, Your apps) and a sticky side column (the introduction, Your details). It is one
+  column under 1024 px.

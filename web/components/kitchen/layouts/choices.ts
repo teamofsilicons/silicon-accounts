@@ -22,6 +22,7 @@ export const CHOICES = {
   content: [
     { value: "column", label: "Column" },
     { value: "aside", label: "Column + aside" },
+    { value: "reveal", label: "Aside on action" },
     { value: "split", label: "List + detail" },
   ],
 } as const;

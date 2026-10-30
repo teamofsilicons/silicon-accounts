@@ -12,9 +12,10 @@ Last updated: 2026-10-30
    request and offer pages; Home's Silicon tiles then link to each Silicon. Map: [prototype-map.md](prototype-map.md).
 
 ## Next
-2. Carry Home's coherence to every page: PageHeader and Section at Home's type scale, pages in a centred column,
-   blocks on Home's one card style (foundation/layout, shared). Silicons, Apps, Security and Settings still show the old
-   large titles and full-width column inside the new panel.
+2. Carry Home's layout to every page: PageHeader and Section at Home's type scale, blocks as Home's tiles, each page's
+   content layout by the content layout rule (decisions.md: narrow centred column, column + aside, or an aside an
+   action opens with an animation), as Page variants in foundation/layout (shared). Silicons, Apps, Security and Settings still show
+   the old large titles and outlined cards.
 3. Account command menu on Silicon UI Dialog instead of direct Radix, if Dialog can hold the palette without its own
    title row (else report what is missing).
 4. Connected apps: list, `/apps/[id]`, Permissions between apps (`/proofs`).
@@ -37,13 +38,14 @@ Last updated: 2026-10-30
 - The developer portal (`../../developer`, ~24k lines on its own Arc UI copies): its own redesign, after this site.
 
 ## Waiting on Anil
-- Layout exploration in /__layouts: pick a shell, sidebar, element style and content layout; the choice becomes a decision and replaces item 2's direction.
 - Landing, still open from the audit: sign-up as its own job; CLI fixes (`--self-create` default, one-line installer) are outside this site.
 - Design review open questions: Proofs folded fully or a
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
-- 2026-10-30 Layout lab at /__layouts: shell, sidebar, element and content layouts explored in the loading state (uncommitted)
+- 2026-10-30 Content layout rule written and prototyped: "Aside on action" in /__layouts (the column glides aside as the side column opens; a bottom drawer under 1024 px) (uncommitted)
+- 2026-10-30 Flat shell, tiles, column + aside from the layout lab: the live shell has no panel, and Home's blocks are tiles in a main and a side column with Your details (uncommitted)
+- 2026-10-30 Layout lab at /__layouts: shell, sidebar, element and content layouts explored in the loading state (17709c2)
 - 2026-10-29 Local avatars show their photos: in development the CSP allows the stack's default mock Iris
 - 2026-10-29 Silicon UI 0.4.0: faster motion and fluid hover; no site code changes needed
 - 2026-10-29 Coherence pass after Anil's review: page panel on a grey canvas; Home in one centred column, one type scale, one card style; Needs you as rows with the recovery-phone check

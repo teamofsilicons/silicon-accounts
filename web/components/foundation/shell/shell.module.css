@@ -1,6 +1,7 @@
 /* The account site's frame: the top bar (brand, search, the account menu), then the section list beside the page (from
-   900px) or in a bottom sheet (below it). */
-.shell { --top-height: 64px; position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; background: var(--canvas); }
+   900px) or in a bottom sheet (below it). Flat (redesign/decisions.md, 2026-10-30): one white surface, the top bar and
+   the section list parted from the page by hairlines; the page's blocks are the only fills. */
+.shell { --top-height: 64px; position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; background: var(--surface); }
 /* What focus (Tab) or an in-page jump brings into view stops clear of the sticky top bar (WCAG 2.4.11). */
 :global(html):has(.shell) { scroll-padding-block: calc(var(--top-height) + var(--space-section)) var(--space-section); }
 
@@ -15,7 +16,8 @@
   align-items: center;
   gap: var(--space-inset);
   padding: 0 var(--space-inset);
-  background: var(--canvas);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 /* The wordmark: the bare glyph in ink, the name in the display face. The padding (taken back by the negative margin, so
    nothing moves) gives keyboard focus a soft fill to show in. */
@@ -39,13 +41,11 @@
 
 /* The section list beside the page: sticky under the top bar, scrolling on its own when the window is short. */
 .body { display: grid; min-width: 0; flex: 1; grid-template-columns: 248px minmax(0, 1fr); }
-.aside { position: sticky; top: var(--top-height); height: calc(100dvh - var(--top-height)); overflow-y: auto; padding: var(--space-tight) var(--space-group) var(--space-group); }
+.aside { position: sticky; top: var(--top-height); height: calc(100dvh - var(--top-height)); overflow-y: auto; padding: var(--space-group); border-right: 1px solid var(--border); }
 @media (max-width: 899px) { .body { display: flex; flex-direction: column; } }
 
-/* The page: a white panel on the canvas, as in the prototype, so the page reads as one object apart from the chrome.
-   Full bleed, without an edge, under 900px. */
-.main { --sq-r: var(--radius-overlay); position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; margin: 0 var(--space-group) var(--space-group) 0; border: 1px solid var(--border); background: var(--surface); outline: none; }
-@media (max-width: 899px) { .main { --sq-r: 0; margin: 0; border-width: 1px 0 0; } }
+/* The page: on the shell's own surface, beside the section list's hairline (no panel since 2026-10-30). */
+.main { position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; outline: none; }
 .main > * { min-width: 0; }
 .page { display: flex; min-width: 0; flex: 1; flex-direction: column; }
 

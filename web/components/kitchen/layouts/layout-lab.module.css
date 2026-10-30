@@ -104,6 +104,37 @@
 .aside { position: sticky; top: calc(var(--top-height) + var(--space-section)); display: grid; gap: var(--space-block); }
 .lab[data-shell="inset"] .aside { top: var(--space-section); }
 
+/* Aside on action: the narrow column, centred, until an action opens the side column. The page widens to --page-max
+   and its second track grows from nothing, so the column glides to the start while the side column's panel slides
+   and fades in a beat later; closing runs it back. Under 1024px the side column stays shut (a drawer opens instead). */
+.actionPage {
+  display: grid;
+  width: 100%;
+  max-width: 760px;
+  grid-template-columns: minmax(0, 1fr) 0px;
+  align-items: start;
+  column-gap: 0px;
+  margin-inline: auto;
+  padding: var(--space-section) var(--gutter) var(--page-end);
+  transition:
+    max-width var(--duration-expressive) var(--ease-standard),
+    grid-template-columns var(--duration-expressive) var(--ease-standard),
+    column-gap var(--duration-expressive) var(--ease-standard);
+}
+.actionPage[data-open] { max-width: var(--page-max); grid-template-columns: minmax(0, 1fr) 320px; column-gap: var(--space-block); }
+.actionAside { position: sticky; top: calc(var(--top-height) + var(--space-section)); min-width: 0; overflow: clip; }
+.lab[data-shell="inset"] .actionAside { top: var(--space-section); }
+.actionPanel { display: grid; width: 320px; gap: var(--space-block); opacity: 0; transition: opacity var(--duration-considered) var(--ease-standard), translate var(--duration-expressive) var(--ease-standard); translate: var(--space-block) 0; }
+.actionPage[data-open] .actionPanel { opacity: 1; transition-delay: var(--duration-fast); translate: 0 0; }
+.actionHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); }
+/* The row whose detail is open. */
+.row { --sq-r: 0; --sq-fill: transparent; background: var(--sq-fill); transition: background-color var(--duration-standard) var(--ease-standard); }
+.row[data-selected] { --sq-r: var(--radius-control); --sq-fill: var(--surface-pressed); }
+@media (max-width: 1023px) {
+  .actionPage, .actionPage[data-open] { max-width: 760px; grid-template-columns: minmax(0, 1fr); }
+  .actionAside { display: none; }
+}
+
 /* List + detail: the list pane at a fixed width, the detail beside it. */
 .split { display: grid; min-height: 100%; flex: 1; grid-template-columns: 320px minmax(0, 1fr); }
 .listPane { display: grid; align-content: start; gap: var(--space-group); padding: var(--space-inset) var(--space-group); border-right: 1px solid var(--border-subtle); }
@@ -148,4 +179,4 @@
 }
 .reveal { position: fixed; z-index: var(--layer-overlay); right: var(--space-inset); bottom: var(--space-inset); }
 
-@media (prefers-reduced-motion: reduce) { .navRow, .listRow { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .navRow, .listRow, .row, .actionPage, .actionPanel { transition: none; } }

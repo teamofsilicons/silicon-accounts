@@ -10,13 +10,16 @@
  *             flat: one surface, the regions parted by hairlines
  *   sidebar   list (icon and label), rail (icons only), grouped (labelled groups, a leading marker)
  *   elements  cards (an edge), tiles (a fill, no edge), rows (no container, hairlines)
- *   content   column (one centred column), aside (a column and a side column), split (a list beside its detail)
+ *   content   column (one narrow centred column, for little content), aside (a column and a side column from the start),
+ *             reveal (the narrow column until an action opens the side column: the column glides aside as it comes in;
+ *             a bottom drawer under 1024px), split (a list beside its detail)
  *
  *   /__layouts?shell=inset&sidebar=rail&elements=tiles&content=split&ui=0   (ui=0 hides the controls; H toggles them)
  */
-import { useEffect, useState } from "react";
-import { EyeOff, PanelsTopLeft } from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ChevronRight, EyeOff, PanelsTopLeft, X } from "lucide-react";
 import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Drawer, DrawerContent } from "@teamofsilicons/silicon-ui/drawer";
 import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { AXES, CHOICES, type Axis, type Layout } from "./choices";
@@ -58,7 +61,7 @@ export function LayoutLab({ initial, controls: initialControls }: { initial: Lay
         <div className={styles.body}>
           <Sidebar />
           <main data-sq-native="" className={styles.main}>
-            {layout.content === "column" ? <Column /> : layout.content === "aside" ? <WithAside /> : <Split />}
+            {layout.content === "column" ? <Column /> : layout.content === "aside" ? <WithAside /> : layout.content === "reveal" ? <Reveal /> : <Split />}
           </main>
         </div>
       </div>
@@ -185,26 +188,34 @@ function BlockHead({ index }: { index: number }) {
   );
 }
 
-function Row({ index, action = true }: { index: number; action?: boolean }) {
+/** With `onOpen`, the row's action is a real button that opens the side column; `selected` marks the row it shows. */
+function Row({ index, action = true, onOpen, selected }: { index: number; action?: boolean; onOpen?: () => void; selected?: boolean }) {
   return (
-    <li className={styles.row}>
+    <li data-sq="surface" className={styles.row} data-selected={selected ? "" : undefined}>
       <Circle size="36px" index={index} />
       <span className={styles.rowText}>
         <SkeletonBlock width={width(index)} height="12px" radius={LINE} index={index} />
         <SkeletonBlock width={width(index + 3)} height="10px" radius={LINE} index={index} />
       </span>
-      {action ? <SkeletonBlock width="72px" height="28px" radius={CONTROL} index={index} /> : null}
+      {onOpen ? (
+        <Button variant="secondary" size="sm" aria-label="Open in the side column" aria-expanded={selected} onClick={onOpen}>
+          <ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" />
+        </Button>
+      ) : action ? <SkeletonBlock width="72px" height="28px" radius={CONTROL} index={index} /> : null}
     </li>
   );
 }
 
 /** A group of rows in the chosen element style: a card, a filled tile, or bare rows between hairlines. */
-function Rows({ count, from = 0, head = true }: { count: number; from?: number; head?: boolean }) {
+function Rows({ count, from = 0, head = true, onOpen, selected }: { count: number; from?: number; head?: boolean; onOpen?: (index: number) => void; selected?: number | null }) {
   return (
     <section className={styles.block}>
       {head ? <BlockHead index={from} /> : null}
       <ul data-sq="surface" className={styles.group}>
-        {Array.from({ length: count }, (_, offset) => <Row key={offset} index={from + offset} />)}
+        {Array.from({ length: count }, (_, offset) => {
+          const index = from + offset;
+          return <Row key={offset} index={index} onOpen={onOpen ? () => onOpen(index) : undefined} selected={selected === index} />;
+        })}
       </ul>
     </section>
   );
@@ -275,6 +286,88 @@ function WithAside() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Under 1024px the side column has no room beside the page: what an action opens comes up in a bottom drawer. */
+const NARROW_ASIDE = "(max-width: 1023px)";
+const subscribeNarrowAside = (change: () => void) => {
+  const media = window.matchMedia(NARROW_ASIDE);
+  media.addEventListener("change", change);
+  return () => media.removeEventListener("change", change);
+};
+const readNarrowAside = () => window.matchMedia(NARROW_ASIDE).matches;
+
+/**
+ * The narrow centred column until a row's action opens the side column. The page widens and the column glides to the
+ * start as the side column comes in beside it (layout-lab.module.css: .actionPage); Close or Escape reverses it and focus
+ * goes back to the row's button. Under 1024px the same content opens in a bottom drawer instead.
+ */
+function Reveal() {
+  const [open, setOpen] = useState<number | null>(null);
+  const narrow = useSyncExternalStore(subscribeNarrowAside, readNarrowAside, () => false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const returnTo = useRef<HTMLElement | null>(null);
+  const beside = open !== null && !narrow;
+
+  const show = (index: number) => {
+    returnTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setOpen(index);
+  };
+  const close = () => {
+    setOpen(null);
+    returnTo.current?.focus({ preventScroll: true });
+  };
+
+  // Opening beside the column moves focus into it; Escape closes it.
+  useEffect(() => {
+    if (!beside) return;
+    closeRef.current?.focus({ preventScroll: true });
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(null);
+      returnTo.current?.focus({ preventScroll: true });
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [beside]);
+
+  return (
+    <div className={styles.actionPage} data-open={beside ? "" : undefined}>
+      <div className={styles.stack}>
+        <PageHead />
+        <Rows count={3} from={1} onOpen={show} selected={open} />
+        <Tiles count={3} from={4} />
+        <Rows count={2} from={7} onOpen={show} selected={open} />
+      </div>
+      <aside className={styles.actionAside} aria-label="Details" inert={!beside}>
+        <div className={styles.actionPanel}>
+          <span className={styles.actionHead}>
+            <SkeletonBlock width="120px" height="16px" radius={LINE} />
+            <Button ref={closeRef} variant="ghost" size="sm" aria-label="Close" onClick={close}>
+              <X size={16} strokeWidth={1.75} aria-hidden="true" />
+            </Button>
+          </span>
+          <AsideContent />
+        </div>
+      </aside>
+      {narrow ? (
+        <Drawer open={open !== null} onOpenChange={next => { if (!next) setOpen(null); }}>
+          <DrawerContent title="Details" side="bottom">
+            <div className={styles.stack}><AsideContent /></div>
+          </DrawerContent>
+        </Drawer>
+      ) : null}
+    </div>
+  );
+}
+
+function AsideContent() {
+  return (
+    <>
+      <Summary index={1} />
+      <Rows count={2} from={2} />
+    </>
   );
 }
 

@@ -98,6 +98,30 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   halved, spring tiers fast/moderate/slow/expressive with the old names kept) and fluid hover in NavList and menus; no
   API changes, so no site code changed. (2026-10-29)
 
+- Layout: flat shell, list sidebar, tiles, column + aside (Anil, 2026-10-30, picked in the /__layouts lab, which stays
+  as a place for ideas):
+  - The shell is one white surface. The top bar and the sidebar are parted from the page by hairlines; the page panel
+    on a grey canvas is gone.
+  - Blocks are tiles: the neutral-2 fill, no edge, the overlay radius. Needs you is a plain tile, and its warning badge
+    carries the signal, because a warning wash reads as beige.
+  - Content layout follows each page's needs. Home is a main column (what needs you, Silicons, apps) beside a side
+    column (the introduction, your details). List + detail stays the likely fit for Silicons and apps.
+  - Supersedes the coherence pass's panel and canvas and its single 760 px column. (2026-10-30)
+
+- Content layout rule (Anil, 2026-10-30): a page's layout follows how much it holds.
+  - Little content: one narrow column (760 px), centred.
+  - Content that supports the page from the start (summaries, your details): column + aside. The page widens to
+    --page-max and the side column is there on load.
+  - Content an action brings up (an item's detail, a form beside a list): the page starts as the narrow centred column.
+    - The action opens the side column, and that opening animates: the page widens and the column glides to the start
+      (about --duration-expressive on --ease-standard). The side column's panel slides and fades in a beat later.
+      Closing runs it back.
+    - Focus moves to the panel's Close; Close or Escape shuts it and focus returns to the button that opened it. The
+      row that opened it stays marked.
+    - Under 1024 px there is no room beside the page, so the same content opens in Silicon UI's bottom Drawer instead.
+    - Reduced motion: no animation, the state just changes.
+  - Prototyped in /__layouts (Content: "Aside on action"). (2026-10-30)
+
 ## Process
 - Keep priorities.md, decisions.md and log.md (this folder) updated with every task; shared-code changes also get a
   README.md note, as the site already does. Why: state lives in repo files, not chat. (2026-10-17)

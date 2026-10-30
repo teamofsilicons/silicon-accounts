@@ -22,8 +22,8 @@
   --surface: var(--neutral-0);
   --surface-raised: var(--neutral-0);
   --surface-muted: var(--neutral-3);
-  /* The account shell's canvas: the top bar and sidebar sit on it, the page on a --surface panel above it. neutral-2,
-     one step under --surface-muted, so NavList's hover fill still shows on it. */
+  /* The quiet fill of the page's blocks (Home's tiles) on the flat white shell. neutral-2, one step under
+     --surface-muted, so a tile's hover (--surface-muted) still shows on it. */
   --canvas: var(--neutral-2);
   /* The nav pill's current item and quiet fills. */
   --surface-pressed: var(--neutral-4);
