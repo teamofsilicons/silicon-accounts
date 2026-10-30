@@ -42,3 +42,7 @@ Every change, one line each, newest at the bottom. Format: `- YYYY-MM-DD <commit
 - 2026-10-29 verify: typecheck, lint (baseline 285), tests (28) and build pass on 0.4.0; live Home and sidebar hover checked on the local stack; found (not from the upgrade): dev CSP blocks mock Iris photos
 - 2026-10-29 wip proxy: in development without ACCOUNTS_IRIS_BASE_URL (the site started on its own beside dev.sh --web=external, or the preview), img-src adds the stack's default mock Iris http://127.0.0.1:8594; production unchanged (proxy.ts, README.md)
 - 2026-10-29 verify: typecheck and lint pass; dev CSP header carries http://127.0.0.1:8594; Home's three avatar photos load on the local stack
+- 2026-10-30 wip kitchen: /__layouts layout lab, the frame in its loading state with shell (panel, inset, flat), sidebar (list, rail, grouped), elements (cards, tiles, rows) and content (column, aside, list + detail) choices in the address; development only (app/(app)/%5F%5Flayouts, components/kitchen/layouts, README.md)
+- 2026-10-30 verify: typecheck, eslint and silicon-ui-check pass on the new files; every axis checked live at 1440 and 375 px
+- 2026-10-30 wip kitchen: /__layouts gains an Open shell, with no page panel: the top bar, sidebar and page share --background and only the content is surfaces (the look before the coherence pass) (components/kitchen/layouts, README.md)
+- 2026-10-30 verify: eslint, typecheck and silicon-ui-check pass; Open checked beside Panel with cards, tiles and rows at 1440 px and at 375 px

@@ -342,6 +342,12 @@ All edits are of four kinds, and keep Arc's look and motion:
 branding runtime and the embed/SDK. `?compare=1` renders each specimen in a light and a dark pane side by side;
 `?squircle=fallback` shows the Firefox squircle path.
 
+`/__layouts` is the layout lab: the account frame in its loading state (skeleton blocks only, no words or data), to
+explore the shell (panel, open, inset, flat), the sidebar (list, rail, grouped), content elements (cards, tiles, rows) and
+the content layout (column, column + aside, list + detail). The choices live in the address
+(`?shell=inset&sidebar=rail&elements=tiles&content=split`); `?ui=0` or H hides the controls. Development only, like
+`/__kitchen` (`components/kitchen/layouts/`).
+
 `pnpm screens` takes Playwright screenshots (Chromium by default) into `.screens/<name>--<theme>-<width>.png`, both
 themes at 1440 and 390 px. It uses `--base URL`, or a server on `http://localhost:$PORT` (8590), or starts `next dev`
 (and reuses the project's running one, since Next allows only one). The browser's `/v1` calls are answered by

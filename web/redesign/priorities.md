@@ -5,7 +5,7 @@ move done items to Done (with the commit), add what came up, keep Now to one ite
 Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.md). The product contract is
 `../../understanding/UNDERSTANDING.md` (never edited); the design brief is `../../Silicon Accounts Redesign Design Review.md`.
 
-Last updated: 2026-10-29
+Last updated: 2026-10-30
 
 ## Now
 1. **Prototype v7, phase 4: Silicons.** List, `/silicons/[uuid]` with Access and Settings tabs (replacing the drawer),
@@ -37,11 +37,13 @@ Last updated: 2026-10-29
 - The developer portal (`../../developer`, ~24k lines on its own Arc UI copies): its own redesign, after this site.
 
 ## Waiting on Anil
+- Layout exploration in /__layouts: pick a shell, sidebar, element style and content layout; the choice becomes a decision and replaces item 2's direction.
 - Landing, still open from the audit: sign-up as its own job; CLI fixes (`--self-create` default, one-line installer) are outside this site.
 - Design review open questions: Proofs folded fully or a
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+- 2026-10-30 Layout lab at /__layouts: shell, sidebar, element and content layouts explored in the loading state (uncommitted)
 - 2026-10-29 Local avatars show their photos: in development the CSP allows the stack's default mock Iris
 - 2026-10-29 Silicon UI 0.4.0: faster motion and fluid hover; no site code changes needed
 - 2026-10-29 Coherence pass after Anil's review: page panel on a grey canvas; Home in one centred column, one type scale, one card style; Needs you as rows with the recovery-phone check
