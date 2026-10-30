@@ -33,15 +33,15 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     return response;
   };
   const headers = clientHeaders(request);
-  const refresh = async (): Promise<NextResponse | null> => {
-    const result = await refreshSession(session!, headers);
-    if (result.ok) { session = result.session; rotated = true; return null; }
-    if (result.status >= 500 || result.error === "api_unreachable") {
+  const refresh = async (force = false): Promise<NextResponse | null> => {
+    const result = await refreshSession(session!, headers, force);
+    if (result.ok) { rotated = session?.rt !== result.session.rt; session = result.session; return null; }
+    if (result.error !== "invalid_grant") {
       return json(503, errorBody("refresh_failed", "Silicon Accounts could not refresh this sign-in.", "Try again in a moment."));
     }
     return signedOut(true);
   };
-  if (session.ae - Date.now() < 60_000) {
+  {
     const failure = await refresh();
     if (failure) return failure;
   }
@@ -75,7 +75,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
       const action = actionForAppsRefusal(state, rotated);
       if (action === "signed_out") return signedOut(true);
       if (action === "refresh") {
-        const failure = await refresh();
+        const failure = await refresh(true);
         if (failure) return failure;
         if (streaming) return finish(json(503, errorBody("upload_retry", "Your sign-in was refreshed. Resume this upload to send the part again.", "Keep the same file and upload reservation.")));
         upstream = await call();

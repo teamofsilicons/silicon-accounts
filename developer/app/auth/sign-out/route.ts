@@ -12,7 +12,8 @@ export async function POST(request: NextRequest) {
   const problem = sameOriginProblem(request);
   if (problem) return NextResponse.json(errorBody("cross_site_request", problem, "Sign out from the developer site's own menu."), { status: 403 });
   const session = readSession(request);
-  if (session) await revokeSession(session, clientHeaders(request));
+  try { if (session) await revokeSession(session, clientHeaders(request)); }
+  catch { return NextResponse.json(errorBody("sign_out_unavailable", "Sign-out could not be saved.", "Please retry shortly."), { status: 503 }); }
   const response = new NextResponse(null, { status: 204 });
   clearSession(response);
   response.headers.set("Cache-Control", "no-store");

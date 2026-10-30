@@ -28,3 +28,6 @@ npm-debug.log*
 /lib/docs/generated/
 /public/docs/
 /public/docs.md
+
+# Local durable session state
+/.dev/

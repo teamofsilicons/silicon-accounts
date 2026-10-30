@@ -22,7 +22,6 @@ export const dynamic = "force-dynamic";
 
 const PREFIX = "/api/accounts/";
 /** Refresh this long before the access token expires. */
-const EARLY_REFRESH_MS = 60_000;
 /** Request headers passed on to the API (everything else, cookies included, stays here). */
 const FORWARD = ["accept", "content-type", "idempotency-key"];
 /** Response headers passed back. */
@@ -101,19 +100,19 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   let rotated = false;
   const headers = clientHeaders(request);
 
-  const refresh = async (): Promise<NextResponse | null> => {
-    const result = await refreshSession(session as StoredSession, headers);
+  const refresh = async (force = false): Promise<NextResponse | null> => {
+    const result = await refreshSession(session as StoredSession, headers, force);
     if (result.ok) {
+      rotated = session?.rt !== result.session.rt;
       session = result.session;
-      rotated = true;
       return null;
     }
     if (result.error === "api_unreachable") return json(502, errorBody("api_unreachable", result.description, "Wait a moment and try again."));
-    if (result.status >= 500) return json(503, errorBody("refresh_failed", `Refreshing the developer site's sign-in failed: ${result.description}`, "Wait a moment and try again."));
+    if (result.error !== "invalid_grant") return json(503, errorBody("refresh_failed", `Refreshing the developer site's sign-in failed: ${result.description}`, "Wait a moment and try again."));
     return signedOut(`Your sign-in to the developer site ended: ${result.description}`, true);
   };
 
-  if (session.ae - Date.now() < EARLY_REFRESH_MS) {
+  {
     const failure = await refresh();
     if (failure) return failure;
   }
@@ -130,7 +129,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
       }
       if (code === "invalid_token" && !rotated) {
         // Expired in between (or the clock is off): one refresh, one retry.
-        const failure = await refresh();
+        const failure = await refresh(true);
         if (failure) return failure;
         upstream = await call(request, target.path, body, session.at);
       } else if (SIGNED_OUT_CODES.has(code)) {

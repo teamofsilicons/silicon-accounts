@@ -4,14 +4,14 @@
  * https). The browser never sees a token; route handlers read the cookie, refresh the access token when it is about to
  * expire, and call the API with `Authorization: Bearer`.
  *
- * Refresh tokens rotate on every use and a reused one revokes the whole sign-in, so refreshing is single-flight per
- * refresh token in this process, and the answer is remembered for a minute: requests the browser sent with the old
- * cookie before the new one arrived get the same new tokens instead of presenting the used refresh token again.
+ * Current sessions and random refresh-operation keys are durable across every server process.
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { NextRequest, NextResponse } from "next/server";
 import { DEVELOPER_APP_ID, accountsApiUrl, allowedOrigins, callbackUrl, secureCookies } from "./config";
 import { seal, unseal } from "./seal";
+import { createSession, endSession, locateSession } from "./refresh-state";
+import { refreshStore } from "./refresh-store";
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Cookies                                                                                                             */
@@ -34,6 +34,7 @@ const cookieOptions = (maxAge: number) => ({ httpOnly: true, secure: secureCooki
 /** What the session cookie holds (sealed). */
 export interface StoredSession {
   v: 1;
+  sid?: string;
   /** Access token (aud=developer, 30 minutes). */
   at: string;
   /** Refresh token (sar_…, rotates on every use). */
@@ -149,6 +150,7 @@ interface TokenBody {
   access_token?: string;
   refresh_token?: string;
   expires_in?: number;
+  access_token_expires_at?: string;
   refresh_token_expires_at?: string;
   account?: { uuid?: string };
   error?: string;
@@ -183,48 +185,74 @@ async function tokenCall(form: Record<string, string>, headers: Record<string, s
     ok: true,
     session: {
       v: 1,
+      ...(previous?.sid ? { sid: previous.sid } : {}),
       at: body.access_token,
       rt: body.refresh_token,
-      ae: now + Math.max(60, body.expires_in ?? 1800) * 1000,
-      re: Number.isFinite(refreshExpires) ? refreshExpires : now + 900 * 24 * 60 * 60 * 1000,
+      ae: body.access_token_expires_at ? Date.parse(body.access_token_expires_at) : now + (body.expires_in ?? 1800) * 1000,
+      re: Number.isFinite(refreshExpires) ? refreshExpires : previous?.re ?? now + 900 * 24 * 60 * 60 * 1000,
       sub: body.account?.uuid ?? previous?.sub ?? "",
     },
   };
 }
 
 /** Exchanges the code from /auth/callback (PKCE: the verifier proves this server started the sign-in). */
-export function exchangeCode(code: string, verifier: string, headers: Record<string, string>): Promise<TokenResult> {
-  return tokenCall({ grant_type: "authorization_code", code, redirect_uri: callbackUrl(), code_verifier: verifier, client_id: DEVELOPER_APP_ID }, headers);
+export async function exchangeCode(code: string, verifier: string, headers: Record<string, string>): Promise<TokenResult> {
+  try {
+    await refreshStore();
+    const result = await tokenCall({ grant_type: "authorization_code", code, redirect_uri: callbackUrl(), code_verifier: verifier, client_id: DEVELOPER_APP_ID }, headers);
+    return result.ok ? { ok: true, session: await createSession(result.session) } : result;
+  } catch (error) {
+    console.error("Browser session storage failed", error instanceof Error ? error.name : "UnknownError");
+    return storageUnavailable();
+  }
 }
 
-interface RefreshMemo {
-  promise: Promise<TokenResult>;
-  /** Until when a finished refresh is handed to requests that still carry the old refresh token. */
-  until: number;
+function storageUnavailable(): TokenResult {
+  return { ok: false, status: 503, error: "session_storage_unavailable", description: "Your sign-in could not be read or saved. Please retry shortly; your session has not been cleared." };
 }
+const ended = (): TokenResult => ({ ok: false, status: 400, error: "invalid_grant", description: "This sign-in has ended." });
+const pending = (): TokenResult => ({ ok: false, status: 503, error: "refresh_in_progress", description: "Your sign-in is being refreshed. Please retry shortly." });
 
-/** One refresh per refresh token per process (on globalThis: every route handler bundle shares it). */
-const shared = globalThis as typeof globalThis & { __siliconDeveloperRefreshes?: Map<string, RefreshMemo> };
-const memos: Map<string, RefreshMemo> = (shared.__siliconDeveloperRefreshes ??= new Map<string, RefreshMemo>());
-
-/** Rotates the refresh token (single-flight; see the module comment). */
-export function refreshSession(session: StoredSession, headers: Record<string, string>): Promise<TokenResult> {
-  const now = Date.now();
-  for (const [key, memo] of memos) if (memo.until < now) memos.delete(key);
-  const existing = memos.get(session.rt);
-  if (existing) return existing.promise;
-  const promise = tokenCall({ grant_type: "refresh_token", refresh_token: session.rt, client_id: DEVELOPER_APP_ID }, headers, session);
-  const memo: RefreshMemo = { promise, until: now + 120_000 };
-  memos.set(session.rt, memo);
-  void promise.then(result => {
-    // A failure is not remembered for long: a network blip must not end the session for a minute.
-    memo.until = result.ok ? Date.now() + 60_000 : Date.now() + 2_000;
-  });
-  return promise;
+/** Resolves the current server session, rotating only when necessary. Cookie tokens are never authoritative. */
+export async function refreshSession(session: StoredSession, headers: Record<string, string>, force = false): Promise<TokenResult> {
+  try {
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const { store, key, entry } = await locateSession(session);
+      const current = entry.value;
+      if (current.revoked || current.session.re <= Date.now()) return ended();
+      if (!current.operation && (current.session.ae > Date.now() + 60_000 && (!force || current.session.rt !== session.rt))) return { ok: true, session: current.session };
+      if (!current.operation) {
+        // Persist BEFORE sending: a crash, timeout, second process or second tab reuses this random key.
+        if (!await store.write(key, entry.version, { ...current, operation: { key: randomUUID(), token: current.session.rt } }, current.session.re)) continue;
+        continue;
+      }
+      if (current.operation.token !== current.session.rt) return storageUnavailable();
+      const result = await tokenCall({ grant_type: "refresh_token", refresh_token: current.session.rt, client_id: DEVELOPER_APP_ID }, { ...headers, "Idempotency-Key": current.operation.key }, current.session);
+      if (!result.ok) {
+        // A winner may have committed while this request was waiting, or sign-out may have won.
+        const latest = await store.read<typeof current>(key);
+        if (!latest || latest.version !== entry.version) continue;
+        if (["refresh_in_progress", "refresh_superseded"].includes(result.error)) {
+          await new Promise(resolve => setTimeout(resolve, 1_000));
+          continue;
+        }
+        return result; // 409, transport errors, app configuration errors and 5xx never clear the session.
+      }
+      // Save even an already-expired recovered access token: its successor refresh token is still needed.
+      // CAS loses to sign-out or a newer rotation; neither can be overwritten by a late response.
+      await store.write(key, entry.version, { session: result.session }, result.session.re);
+      // Read again even after success: every caller gets the current generation, never its stale reply.
+    }
+    return pending();
+  } catch (error) {
+    console.error("Browser session storage failed", error instanceof Error ? error.name : "UnknownError");
+    return storageUnavailable();
+  }
 }
 
 /** Ends the sign-in at Silicon Accounts (best effort: the cookie is cleared either way). */
 export async function revokeSession(session: StoredSession, headers: Record<string, string>): Promise<void> {
+  await endSession(session);
   try {
     await fetch(`${accountsApiUrl()}/v1/oauth/revoke`, {
       method: "POST",
