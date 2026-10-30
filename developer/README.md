@@ -6,7 +6,7 @@ and setting up an app's authentication (its sign-in methods, Google and Apple, t
 pages, redirect URIs and allowed origins, its user base and imports, its webhook and deliveries, its app verifications, and the
 snippets to embed sign-in). The same app workspace also creates apps, saves seven setup steps, uploads and validates packages, manages releases and authors, and publishes through Silicon Apps. Each service retains its own backend. The portal contains no store catalog; discovery and installation live at apps.teamofsilicons.com.
 
-Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Arc UI, TanStack Query. The
+Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Silicon UI, TanStack Query. The
 product contract is `../understanding/UNDERSTANDING.md` (never edited here); nothing in this app overrides it. Runtime-independent from the rest of this repository: documentation sources are bundled at build time.
 
 ```
@@ -318,14 +318,28 @@ as a sandboxed attachment through the BFF.
 `pnpm test` covers the proxy boundaries, streamed bodies, refresh behavior and
 resume safety. The adjacent Cells repository's
 `CELLS_PREVIEW=1 CELLS_PREVIEW_SMOKE=1 python3 scripts/test-auth.py` exercises a
-real local Accounts/Cells/Developer stack. Interactive browser validation is
-still pending; HTTP page rendering is not proof of client interactions or layout.
-The remaining Cells capabilities are tracked in that repository's `BUILD.md`.
+real local Accounts/Cells/Developer stack. Hosted compiled-Wasm upload, deployment
+and invocation passed in the user’s main Chrome on 29 October 2026; the disposable
+cell was ordinarily deleted and its recovery state verified after reload. HTTP
+page rendering alone is still not proof of a changed interaction or layout.
+See the Cells repository’s `docs/release-0.1.0.md` and dated `BUILD.md`.
 
 Cells History includes paginated Silicon Ting delivery records and retry controls.
 Registration uses explicit consent from the Cells CLI; the Developer bearer
 session cannot issue that proof. Files shows the latest storage permission check
 and outage state. A 2026-10-28 manual local browser pass retried a rejected
 notification and verified its transition to Accepted by Ting through a controlled
-receiver using real Accounts proofs. Production Ting compatibility and the full
-Cells acceptance pass remain outstanding; see the Cells repository ledger.
+receiver using real Accounts proofs. Production Ting catalog registration, explicit shared-Silicon self-delivery and
+Cells acceptance subsequently passed; see the Cells repository release record.
+
+
+Compiled functions can be uploaded through **Functions → Upload WebAssembly**.
+The browser accepts a compiled `.wasm` file directly, preserves its binary bytes,
+and checks the supported command ABI before sending it to the server for isolated
+runtime validation. It never compiles arbitrary source into Wasm. See the Cells
+repository’s `docs/functions.md` for `wasm32-wasip1`, `_start`, WASI Preview 1 and
+`cells.function.v1`. Existing JavaScript/TypeScript editing and versioning remain.
+
+The Cells feature collection is in that repository’s `docs/README.md` and the
+versioned CLI guides. The public docs builder above still includes Accounts and
+Apps only; `/docs/cells` has not been published by this release.
