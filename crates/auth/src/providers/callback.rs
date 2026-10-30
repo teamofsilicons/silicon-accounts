@@ -10,6 +10,9 @@
 //!    is checked the same way. An answer delivered by any other browser is discarded (the leg
 //!    is used up and the flow says why): otherwise a genuine Google or Apple link forwarded to
 //!    a victim would sign the sender's browser in as the victim.
+//!    An explicitly allowed localhost Accounts frontend uses the same parked-answer
+//!    mechanism for Google too: only a ticket returns to localhost, where the binding
+//!    cookie is checked before the provider answer can be consumed.
 //! 3. The leg is consumed (single use), the code is exchanged at the provider's token endpoint
 //!    (Google: client secret + PKCE verifier; Apple: ES256 client secret JWT) and the id_token
 //!    is verified.
@@ -151,7 +154,7 @@ async fn handle(
         (None, via) => receive(state, meta, headers, provider, params, via).await,
     };
     match result {
-        Ok(Next::Flow(flow_id)) => redirect_to_flow(&state.settings, &flow_id),
+        Ok(Next::Flow(flow_id)) => redirect_to_flow(state, &flow_id).await,
         Ok(Next::Continue(location)) => see_other(&location),
         Ok(Next::Redirect(location)) => found(&location),
         Err(e) => error_page(&state.settings, headers, e),
@@ -222,7 +225,8 @@ async fn receive(
     if model::check_binding(state, headers, &flow).is_ok() {
         return process(state, meta, headers, tx, flow, leg, answer).await;
     }
-    if via == Via::Post {
+    let local_origin = local_frontend_origin(&state.settings, &flow);
+    if via == Via::Post || local_origin.is_some() {
         if leg.parked.is_some() {
             return Err(invalid_state(
                 provider,
@@ -230,7 +234,10 @@ async fn receive(
             ));
         }
         // A cross-site form_post carries no SameSite=Lax cookies: park the answer and continue
-        // with a same-site GET, which carries them.
+        // with a same-site GET, which carries them. A configured local frontend also
+        // keeps its binding cookie on localhost, so park Google GET answers as well.
+        // Only an opaque, single-use ticket crosses origins; resume still requires
+        // the original browser binding before exchanging any provider code.
         let ticket = provider_state(&flow.id);
         leg.parked = Some(ParkedAnswer {
             ticket_hash: b64url(&state.keys.pepper.hash(&ticket)),
@@ -239,10 +246,11 @@ async fn receive(
         flow.extras.provider = Some(leg);
         model::save(&mut tx, &flow).await?;
         tx.commit().await?;
-        let location = with_query(
-            &callback_url(&state.settings, provider),
-            &[("ticket", Some(&ticket))],
+        let continuation = local_origin.map_or_else(
+            || callback_url(&state.settings, provider),
+            |origin| format!("{origin}/v1/oauth/callback/{}", provider.as_str()),
         );
+        let location = with_query(&continuation, &[("ticket", Some(&ticket))]);
         return Ok(Next::Continue(location));
     }
     discard(tx, flow, provider).await
@@ -1129,8 +1137,34 @@ async fn resolve_identity(
     Ok(Ok(signup(None)))
 }
 
-fn redirect_to_flow(settings: &Settings, flow_id: &str) -> Response {
-    found(&settings.url(&format!("/authorize/flow/{flow_id}")))
+/// Only the Accounts frontend, on an explicitly allowed loopback origin, can receive
+/// a provider continuation locally. An ordinary app's loopback redirect is not a frontend.
+fn local_frontend_origin(settings: &Settings, flow: &Flow) -> Option<String> {
+    if flow.app_id != accounts_core::FIRST_PARTY_APP_ID {
+        return None;
+    }
+    let url = url::Url::parse(&flow.redirect_uri).ok()?;
+    if url.scheme() != "http" || url.host_str() != Some("localhost") {
+        return None;
+    }
+    let origin = url.origin().ascii_serialization();
+    (origin != settings.public_origin && settings.is_allowed_origin(&origin)).then_some(origin)
+}
+
+async fn redirect_to_flow(state: &AppState, flow_id: &str) -> Response {
+    let result = async {
+        let mut conn = state.db.acquire().await?;
+        let flow = model::get(&mut conn, flow_id).await?;
+        Ok::<_, ApiError>(flow.and_then(|flow| local_frontend_origin(&state.settings, &flow)))
+    }
+    .await;
+    match result {
+        Ok(origin) => found(&format!(
+            "{}/authorize/flow/{flow_id}",
+            origin.as_deref().unwrap_or(&state.settings.public_url)
+        )),
+        Err(error) => error.into_response(),
+    }
 }
 
 /// 302 to a URL on the site.

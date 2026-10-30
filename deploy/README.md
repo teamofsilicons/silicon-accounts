@@ -65,3 +65,16 @@ The standard account UUID cutover is a separate offline operation. Follow
 [the coordinated UUID runbook](../docs/operations/account-uuid-migration.md); the
 installer applies only additive schema migrations and never backfills identities
 automatically.
+
+## Local Accounts frontend against production
+
+`http://localhost:9100` is the explicit development origin for the Accounts frontend.
+Keep it in `ACCOUNTS_EXTRA_ALLOWED_ORIGINS` in Secrets Manager and `/etc/accounts/api.env`.
+Start the frontend with `scripts/dev-live.sh`; its API rewrites target the public HTTPS
+Accounts origin. This is a same-origin local proxy, not credentialed CORS.
+
+First-party Google/Apple flows returning to an explicitly allowed `http://localhost`
+origin park their provider answer on the production API, redirect an opaque single-use
+ticket to the local callback proxy, and require the original flow cookie there before
+exchanging the provider code. The registered provider callback stays on production.
+Other apps do not get this handoff. Do not add wildcard origins or disable cookie security.

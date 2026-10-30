@@ -27,7 +27,7 @@
   "DeveloperHttpsAndPkceVerified": true,
   "GoogleLoginVerified": true,
   "AppleLoginVerified": false,
-  "ApiSha256": "535ba67ec23b6ff7c9d6ce203d6bb56c8f03974105bd314fdc96610a49b81612",
+  "ApiSha256": "d1e5b9eef85b2169af2d0ee0cc701931e0bb8464e0ea519c205abc91e8126c9a",
   "ConfigurationBackupRestoreVerified": true,
   "LatestBackupKey": "backups/predeploy-refresh-recovery-20261028T215614Z.dump",
   "CommonDeveloperPortal": true,
@@ -85,7 +85,7 @@
   "AccountsClientVersion": "0.6.0",
   "VerificationMigrationPreservesTokensTested": true,
   "VerificationRelatedDataPreserved": true,
-  "ApiSourceRevision": "13a70d74883c205c91fa54f36906bf61a1f80e1e",
+  "ApiSourceRevision": "9aa23451173851dab5e24a37132e146f7492d400",
   "AccountsAppId": "silicon-accounts",
   "AccountsIdMigrationPreservationVerified": true,
   "AccountsLegacySignedTokenCompatibilityTested": true,
@@ -134,5 +134,8 @@
   "ArchiveType": "verified-file-delta",
   "RefreshRecoveryEnabled": true,
   "RefreshRecoveryVerification": "deploy/verification-refresh-recovery-2026-10-29.json",
-  "RefreshRecoveryAppClientsUpdated": false
+  "RefreshRecoveryAppClientsUpdated": false,
+  "ActiveRelease": "f94d0bf089d5912503f7be157742d6ec18d0b3ad-api-9aa234511738",
+  "LocalFrontendOrigin": "http://localhost:9100",
+  "LocalFrontendVerifiedAt": "2026-10-30T13:37:25.192302+00:00"
 }

@@ -104,6 +104,24 @@ builds this site into `.next-8690` (`NEXT_DIST_DIR`), so it never touches the de
 `NEXT_DIST_DIR=.next-8690 PORT=8690 ACCOUNTS_API_URL=http://127.0.0.1:8689 pnpm build` (or `pnpm dev`). Next allows
 one `next dev` per build directory at a time. `scripts/e2e.sh` stacks work the same way (`e2e/README.md`).
 
+## Local frontend with live data
+
+Run `scripts/dev-live.sh` from the repository root, then open `http://localhost:9100`.
+This starts only the frontend, with an isolated `.next-live-9100` build directory and
+`ACCOUNTS_API_URL=https://accounts.teamofsilicons.com`. Every account edit uses production data.
+The API must include exactly `http://localhost:9100` in `ACCOUNTS_EXTRA_ALLOWED_ORIGINS`.
+Use `localhost`, not `127.0.0.1` or another port. Requests go through the frontend's existing
+same-origin API rewrites; this does not enable credentialed CORS.
+
+Google and Apple keep their registered production callback URLs. For a first-party flow
+returning to the explicitly allowed localhost origin, the API parks the provider answer and
+returns an opaque single-use ticket to the local callback proxy. It exchanges the answer only
+after the localhost browser presents its original flow cookie, then returns to the local flow
+page. Provider linking sends an absolute return URL on the current frontend origin for the
+same reason. Production Secure/HttpOnly cookies are preserved (use a browser that supports
+Secure cookies on the trusted `localhost` origin); no production cookies are copied from the
+hosted site, and sign-in is separate on localhost.
+
 ## Who owns what
 
 Routes live in `app/`, grouped by area; an area's components live in `components/<area>/`. The foundation built the
