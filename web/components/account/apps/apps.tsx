@@ -4,21 +4,22 @@
  * /apps: every app this account has signed into (the list is read to its end), what each one can see (with the values
  * it gets), and when it last saw you. Removing an app's access signs you out of it everywhere, revokes the proofs it holds about you and tells the
  * app; you can sign in to it again later. Apps that imported you before you ever signed in are listed too, since they
- * hold data about you.
+ * hold data about you. Each app's card also lists the user verifications it holds to act for you at other apps
+ * (ActingForYou), with Revoke in place; /proofs keeps the full view.
  */
 import { useEffect, useState } from "react";
 import { animate } from "motion/react";
 import { ArrowUpRight, LayoutGrid } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
-import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
-import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
-import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { ConfirmMorph } from "@teamofsilicons/silicon-ui/confirm-morph";
+import { CopyButton } from "@teamofsilicons/silicon-ui/copy-button";
+import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
+import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader } from "@/components/foundation/layout/layout";
-import type { Me, MyApp, Scope } from "@/lib/api/types";
+import type { Me, MyApp, MyProof, Scope } from "@/lib/api/types";
 import { formatDate, formatPhone, formatRelative, plural } from "@/lib/format";
 import { useDeveloperUrl, useMe, useMeta } from "@/lib/query/session";
 import { timezoneLabel } from "@/lib/timezones";
@@ -28,7 +29,8 @@ import { asCarbon, describeError, useNow } from "../parts/common";
 import { FitPrompt } from "../parts/fit-prompt";
 import { focusAfterRemoval, pageMain, pressedViewOption } from "../parts/focus";
 import { ListCap } from "../parts/list-cap";
-import { useEveryApp, useRemoveAccess } from "../parts/queries";
+import { useEveryApp, useEveryProof, useRemoveAccess, useRevokeProof } from "../parts/queries";
+import { ActingForYou } from "./acting-for-you";
 import styles from "./apps.module.css";
 
 type View = "access" | "removed";
@@ -71,6 +73,11 @@ export function Apps() {
   const [view, setView] = useState<View>("access");
   const now = useNow(30_000);
   const remove = useRemoveAccess();
+  // User verifications load beside the apps; a card shows its app's live ones (nothing while they load or if they fail).
+  const proofs = useEveryProof();
+  const { mutateAsync: revokeProof } = useRevokeProof();
+  const liveProofsOf = (appId: string): MyProof[] =>
+    (proofs.data?.items ?? []).filter(proof => proof.status === "active" && proof.issuing_app.app_id === appId);
   const items = apps.data?.items ?? [];
   const withAccess = items.filter(item => item.status !== "access_removed");
   const removed = items.filter(item => item.status === "access_removed");
@@ -136,7 +143,7 @@ export function Apps() {
           <h2 className="sr-only">{view === "access" ? "Apps with access" : "Apps whose access you removed"}</h2>
           {shown.length ? (
             <AnimatedRows items={shown} keyOf={item => item.membership_id} layout="grid" className={styles.grid} label={view === "access" ? "Apps with access" : "Apps whose access you removed"}>
-              {item => <AppCard item={item} me={me.data} now={now} onRemove={() => removeAccess(item.app.app_id)} />}
+              {item => <AppCard item={item} me={me.data} now={now} proofs={liveProofsOf(item.app.app_id)} onRevokeProof={revokeProof} onRemove={() => removeAccess(item.app.app_id)} />}
             </AnimatedRows>
           ) : (
             <div data-sq="surface" className={styles.empty}>
@@ -172,7 +179,7 @@ export function Apps() {
   );
 }
 
-function AppCard({ item, me, now, onRemove }: { item: MyApp; me: Me | undefined; now: number; onRemove: () => Promise<unknown> }) {
+function AppCard({ item, me, now, proofs, onRevokeProof, onRemove }: { item: MyApp; me: Me | undefined; now: number; proofs: MyProof[]; onRevokeProof: (proofId: string) => Promise<unknown>; onRemove: () => Promise<unknown> }) {
   const [error, setError] = useState<string | null>(null);
   const app = item.app;
   const scopes: Scope[] = item.granted_scopes.includes("profile") ? item.granted_scopes : ["profile", ...item.granted_scopes];
@@ -230,6 +237,8 @@ function AppCard({ item, me, now, onRemove }: { item: MyApp; me: Me | undefined;
           <dd>{item.active_sessions ? plural(item.active_sessions, "active session") : "None active"}</dd>
         </div>
       </dl>
+
+      {!removed ? <ActingForYou appName={app.name} proofs={proofs} onRevoke={onRevokeProof} /> : null}
 
       <footer className={styles.cardFoot}>
         <span className={styles.membership}>

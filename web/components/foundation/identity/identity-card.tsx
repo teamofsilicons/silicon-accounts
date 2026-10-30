@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * The identity card (the account site's home): a squircle "passport" on warm paper with grain, that tilts very slightly
- * toward the pointer (≤ 3°) and flips in 3D to show its back. Content is the page's: pass `front` and `back`. A click
- * anywhere on a face that is not a control (a button, link, field or its label) flips it too; keyboard users have the
- * face's own button.
+ * The identity card (the account site's home): a squircle card on warm paper that tilts very slightly toward the
+ * pointer (≤ 3°) and flips in 3D to show its back. Content is the page's: pass `front` and `back`. A click anywhere on
+ * a face that is not a control (a button, link, field or its label) flips it too; keyboard users have the face's own
+ * button.
  *
  *   <IdentityCard label="Identity card of c:saket" front={<Front />} back={<Back />} />
  *   // inside either face:
@@ -15,9 +15,9 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { animate, useReducedMotion, type AnimationPlaybackControls } from "motion/react";
-import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
-import { SlotText } from "@/components/silicon-ui/slot-text/slot-text";
-import { Tooltip } from "@/components/silicon-ui/tooltip/tooltip";
+import { CopyButton } from "@teamofsilicons/silicon-ui/copy-button";
+import { SlotText } from "@teamofsilicons/silicon-ui/slot-text";
+import { Tooltip } from "@teamofsilicons/silicon-ui/tooltip";
 import { formatTime } from "@/lib/format";
 import { timezoneLabel, utcOffset } from "@/lib/timezones";
 import styles from "./identity-card.module.css";
@@ -80,8 +80,6 @@ export function IdentityCard({ front, back, label, flipped: flippedProp, default
       state.y += (state.ty - state.y) * 0.14;
       scene.style.setProperty("--id-tilt-x", `${state.x.toFixed(3)}deg`);
       scene.style.setProperty("--id-tilt-y", `${state.y.toFixed(3)}deg`);
-      scene.style.setProperty("--id-light-x", `${(50 + state.y * 12).toFixed(1)}%`);
-      scene.style.setProperty("--id-light-y", `${(20 - state.x * 10).toFixed(1)}%`);
       const moving = Math.abs(state.tx - state.x) > 0.005 || Math.abs(state.ty - state.y) > 0.005;
       state.frame = moving ? requestAnimationFrame(step) : 0;
     };
@@ -170,11 +168,9 @@ export function IdentityCard({ front, back, label, flipped: flippedProp, default
       <div ref={sceneRef} className={cx(styles.scene, className)} data-identity-card="" data-reduced={reduced || undefined} data-settled={defaultFlipped ? "back" : "front"}>
         <div className={styles.card}>
           <section ref={frontRef} data-sq="surface" className={styles.face} aria-label={label} aria-hidden={flipped || undefined} inert={flipped} data-hidden={flipped || undefined} onClick={flipFromPaper}>
-            <CardDecor />
             {front}
           </section>
           <section ref={backRef} data-sq="surface" className={cx(styles.face, styles.back)} aria-label={`${label}, details`} aria-hidden={!flipped || undefined} inert={!flipped} data-hidden={!flipped || undefined} onClick={flipFromPaper}>
-            <CardDecor />
             {back}
           </section>
         </div>
@@ -183,14 +179,6 @@ export function IdentityCard({ front, back, label, flipped: flippedProp, default
   );
 }
 
-function CardDecor() {
-  return (
-    <>
-      <span className={styles.grain} aria-hidden="true" />
-      <span className={styles.sheen} aria-hidden="true" />
-    </>
-  );
-}
 
 export interface IdentityFieldProps {
   label: string;

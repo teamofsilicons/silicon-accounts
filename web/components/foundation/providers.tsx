@@ -3,12 +3,15 @@
 /**
  * Everything every page shares, mounted once by the root layout: the TanStack Query client (errors toast with message
  * and hint; a 401 marks the session gone), the Arc toast stack, and the squircle runtime for browsers without
- * corner-shape. Importing lib/telemetry here opts the browser out of telemetry before any query runs.
+ * corner-shape, and next/link as the link every Silicon UI component renders (NavList, ButtonLink), so their links move
+ * inside the app instead of loading the page again. Importing lib/telemetry here opts the browser out of telemetry before any query runs.
  */
 import "@/lib/telemetry";
+import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { ToastStack, ToastStackProvider, useToastStack } from "@/components/silicon-ui/toast-stack/toast-stack";
+import { SiliconProvider } from "@teamofsilicons/silicon-ui/provider";
+import { ToastStack, ToastStackProvider, useToastStack } from "@teamofsilicons/silicon-ui/toast-stack";
 import { SquircleRuntime } from "@/components/foundation/squircle/squircle";
 import { configureApi } from "@/lib/api/http";
 import { connectToasts } from "@/lib/notify";
@@ -52,16 +55,18 @@ export function Providers({ children, surface = "site", sessionHint = "cookie" }
 
   return (
     <QueryClientProvider client={client}>
-      <ToastStackProvider>
-        <SquircleRuntime />
-        {children}
-        {surface === "site" ? (
-          <>
-            <ToastBridge />
-            <ToastStack label="Notifications" className={styles.toasts} />
-          </>
-        ) : null}
-      </ToastStackProvider>
+      <SiliconProvider link={Link}>
+        <ToastStackProvider>
+          <SquircleRuntime />
+          {children}
+          {surface === "site" ? (
+            <>
+              <ToastBridge />
+              <ToastStack label="Notifications" className={styles.toasts} />
+            </>
+          ) : null}
+        </ToastStackProvider>
+      </SiliconProvider>
     </QueryClientProvider>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 
 /**
- * /sign-in-methods: every way to sign in to this account. Up to 10 emails and 10 phone numbers, all verified with a
+ * /sign-in-methods, the Security pillar: your ways in, where you are signed in, and the way to Activity.
+ *
+ * The ways in: every way to sign in to this account. Up to 10 emails and 10 phone numbers, all verified with a
  * 6-digit code before they count; one of each is primary (apps that can see your email or phone get the primary one),
  * and the primary one cannot be removed until another is made primary. Below them, the Google and Apple accounts
  * connected to this account: connecting one adds its verified email without a code.
@@ -9,12 +11,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { AnimatedCounter } from "@/components/silicon-ui/animated-counter/animated-counter";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
-import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { AnimatedCounter } from "@teamofsilicons/silicon-ui/animated-counter";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { ConfirmMorph } from "@teamofsilicons/silicon-ui/confirm-morph";
+import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader, Section } from "@/components/foundation/layout/layout";
 import type { CarbonMe, EmailView, IdentityView, Meta, PhoneView, Provider } from "@/lib/api/types";
@@ -29,6 +31,8 @@ import { AnimatedRows } from "../parts/animated-rows";
 import { useConnectProvider, useLinkFlow, useRemoveContact, useSetMeView, useUnlinkProvider } from "../parts/queries";
 import { guessCountry } from "@/components/foundation/phone-field/phone-data";
 import { ContactAdder } from "./contact-adder";
+import { ActivityLink } from "../security/activity-link";
+import { Sessions } from "../security/sessions";
 import styles from "./sign-in-methods.module.css";
 
 const LIMIT = 10;
@@ -44,7 +48,7 @@ export function SignInMethods() {
   const silicon = asSilicon(me.data);
   return (
     <Page width="narrow">
-      <PageHeader title="Sign-in methods" description="Every email, phone number and Google or Apple account here signs you in to the same account." />
+      <PageHeader title="Security" description="Your ways in, where you are signed in, and what happened. Every email, phone number and Google or Apple account here signs you in to the same account." />
       {me.error && !me.data ? (
         <Alert tone="danger" title="Your sign-in methods did not load">
           {describeError(me.error)}
@@ -66,6 +70,12 @@ export function SignInMethods() {
       ) : (
         <MethodsSkeleton />
       )}
+      {me.data ? (
+        <>
+          <Sessions />
+          <ActivityLink />
+        </>
+      ) : null}
     </Page>
   );
 }

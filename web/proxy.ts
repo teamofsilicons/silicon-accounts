@@ -101,10 +101,14 @@ async function developerRedirect(request: NextRequest): Promise<NextResponse> {
 /**
  * Default profile photos come from Iris (ACCOUNTS_IRIS_BASE_URL, read at request time like ACCOUNTS_API_URL).
  * Production's Iris is https and already allowed by `https:`. A local stack points it at the testkit's mock Iris
- * (http://127.0.0.1:<port>), whose exact origin is added; only a loopback http origin is ever added.
+ * (http://127.0.0.1:<port>), whose exact origin is added; only a loopback http origin is ever added. In development
+ * without the variable (the site started on its own, beside `scripts/dev.sh --web=external`), it is the stack's
+ * default mock Iris, so local avatars show their photos; production never adds anything it was not given.
  */
+const DEV_MOCK_IRIS = "http://127.0.0.1:8594";
+
 function localIrisImageSource(): string {
-  const raw = process.env.ACCOUNTS_IRIS_BASE_URL?.trim();
+  const raw = process.env.ACCOUNTS_IRIS_BASE_URL?.trim() || (process.env.NODE_ENV === "development" ? DEV_MOCK_IRIS : "");
   if (!raw) return "";
   try {
     const url = new URL(raw);

@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import siliconUi from "@teamofsilicons/silicon-ui/eslint";
 
 export default defineConfig([
   ...nextVitals,
@@ -12,4 +13,8 @@ export default defineConfig([
     files: ["components/site/**", "components/landing/**"],
     rules: { "@next/next/no-html-link-for-pages": "off" },
   },
+  // Silicon UI's guardrails: no re-created components, no borrowed component CSS, no local component copies.
+  // Older violations are recorded in eslint-suppressions.json; it may only shrink (docs/guardrails.md in silicon-ui).
+  // nav-list: the account sidebar (redesign/decisions.md, 2026-10-29), a deliberate opt-in to an experimental component.
+  ...siliconUi({ allowExperimental: ["nav-list"] }),
 ]);

@@ -1,33 +1,30 @@
 "use client";
 
 /**
- * /settings: every browser and terminal signed in to this account (sign any of them out), signing out here, and deleting the account. A Carbon who is custodian of a
+ * /settings: your local time (the timezone every date on the site is shown in) and deleting the account. Where you are
+ * signed in moved to the Security pillar (/sign-in-methods, components/account/security/sessions.tsx). A Carbon who is custodian of a
  * Silicon cannot delete their account until every Silicon has another custodian or is deleted, because a Silicon
  * always has exactly one.
  */
 import { useState } from "react";
-import { ArrowRight, Code, Monitor, Smartphone, SquareTerminal, Trash2 } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { Avatar } from "@/components/silicon-ui/avatar/avatar";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
-import { HoldToConfirm } from "@/components/silicon-ui/hold-to-confirm/hold-to-confirm";
+import { ArrowRight, Clock, Trash2 } from "lucide-react";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { HoldToConfirm } from "@teamofsilicons/silicon-ui/hold-to-confirm";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader, Section } from "@/components/foundation/layout/layout";
 import { ApiError } from "@/lib/api/errors";
-import { SESSION_ORIGINS } from "@/lib/api/labels";
-import type { AccountSummary, SessionInfo } from "@/lib/api/types";
-import { formatDate, formatRelative, plural } from "@/lib/format";
+import type { AccountSummary } from "@/lib/api/types";
+import { plural } from "@/lib/format";
 import { paths } from "@/lib/navigation";
-import { notifyError } from "@/lib/notify";
-import { useDeleteAccount } from "@/lib/query/account";
-import { useMe, useSignOut } from "@/lib/query/session";
-import { AnimatedRows } from "../parts/animated-rows";
-import { asCarbon, asSilicon, describeError, useNow } from "../parts/common";
-import { focusAfterRemoval, pageMain } from "../parts/focus";
-import { useEverySession, useEverySilicon, useSetMeView, useSignOutSession } from "../parts/queries";
+import { useDeleteAccount, useUpdateProfile } from "@/lib/query/account";
+import { useMe } from "@/lib/query/session";
+import { timezoneLabel, utcOffset } from "@/lib/timezones";
+import { asCarbon, asSilicon, describeError } from "../parts/common";
+import { TimezoneEditor } from "../parts/detail-editors";
+import { useEverySilicon, useSetMeView } from "../parts/queries";
 import styles from "./settings.module.css";
 
 /**
@@ -40,72 +37,43 @@ function leaveDeletedAccount(): void {
   window.location.replace(paths.home);
 }
 
-/** A readable name for a session: its label, or how it was made. */
-function sessionName(session: SessionInfo): string {
-  if (session.kind === "developer") return "Silicon Developer";
-  if (session.label) return session.label;
-  if (session.kind === "cli") return session.origin === "silicon_login" ? "A Silicon sign-in" : "The silicon-accounts CLI";
-  return "A browser";
-}
-
-function SessionIcon({ session }: { session: SessionInfo }) {
-  const phone = /iphone|android|mobile/i.test(`${session.label ?? ""} ${session.user_agent ?? ""}`);
-  return (
-    <span className={styles.sessionIcon} aria-hidden="true">
-      {session.kind === "cli" ? <SquareTerminal size={20} strokeWidth={1.75} /> : session.kind === "developer" ? <Code size={20} strokeWidth={1.75} /> : phone ? <Smartphone size={20} strokeWidth={1.75} /> : <Monitor size={20} strokeWidth={1.75} />}
-    </span>
-  );
-}
-
 export function Settings() {
-  const now = useNow(60_000);
   const me = useMe();
-  const sessions = useEverySession();
-  const { signOut, pending: signingOut } = useSignOut();
-  const revoke = useSignOutSession();
+  const updateProfile = useUpdateProfile();
 
-  /**
-   * Signs this browser out: the session ends on the server first, then the site starts afresh at the landing page with
-   * a full load, so no account page lingers and nothing about the account stays in memory.
-   */
-  const signOutHere = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      notifyError(error, "Could not sign out");
-    }
-  };
-
-  const revokeOne = async (session: SessionInfo) => {
-    await revoke.mutateAsync(session.id);
-    // "Signed out" shows in place, then the row folds away; focus goes to the first session left (this browser's).
-    window.setTimeout(() => focusAfterRemoval(() => pageMain()?.querySelector('[role="list"][aria-label="Signed-in sessions"]')), 760);
-  };
-
-  const ordered = [...(sessions.data?.items ?? [])].sort((a, b) => Number(b.current) - Number(a.current));
   const carbon = asCarbon(me.data);
   const silicon = asSilicon(me.data);
 
   return (
     <Page width="narrow">
-      <PageHeader title="Settings" description="Where you are signed in, and your account." />
+      <PageHeader title="Settings" description="Your local time and your account." />
 
-
-      <Section title="Where you are signed in" description="Browsers, terminals and the developer platform signed in to Silicon Accounts. Signing one out ends that session at once; apps you signed into keep their own sessions.">
-        {sessions.error && !sessions.data ? (
-          <Alert tone="danger" title="Your sessions did not load">
-            {describeError(sessions.error)}
-            <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void sessions.refetch()}>Try again</Button></span>
-          </Alert>
-        ) : !sessions.data ? (
-          <SkeletonBlock width="100%" height="216px" radius="var(--radius-panel)" />
-        ) : (
+      <Section title="Local time" description="Dates and times on this site, such as your activity, are shown in this timezone.">
+        {me.data ? (
           <div data-sq="surface" className={styles.group}>
-            <AnimatedRows items={ordered} keyOf={item => item.id} label="Signed-in sessions">
-              {session => <SessionRow session={session} now={now} signingOut={signingOut} onSignOutHere={() => void signOutHere()} onRevoke={() => revokeOne(session)} />}
-            </AnimatedRows>
+            <div className={styles.row}>
+              <div className={styles.rowMain}>
+                <Clock size={20} strokeWidth={1.75} aria-hidden="true" />
+                <span className={styles.rowText}>
+                  <span className={styles.rowTitle}>{timezoneLabel(me.data.timezone)}</span>
+                  <span className={styles.rowMeta}>UTC{utcOffset(me.data.timezone)} · {me.data.timezone}</span>
+                </span>
+              </div>
+              <TimezoneEditor value={me.data.timezone} onSave={timezone => updateProfile.mutateAsync({ timezone })} />
+            </div>
           </div>
+        ) : me.error ? null : (
+          <SkeletonBlock width="100%" height="72px" radius="var(--radius-container)" />
         )}
+      </Section>
+
+      <Section title="Where you are signed in" description="Browsers, terminals and the developer platform signed in to this account are now on Security.">
+        <div>
+          <ButtonLink href={paths.signInMethods} variant="secondary" size="sm">
+            See where you are signed in
+            <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
+          </ButtonLink>
+        </div>
       </Section>
 
       <Section title="Delete your account">
@@ -127,54 +95,6 @@ export function Settings() {
         )}
       </Section>
     </Page>
-  );
-}
-
-function SessionRow({ session, now, signingOut, onSignOutHere, onRevoke }: { session: SessionInfo; now: number; signingOut: boolean; onSignOutHere: () => void; onRevoke: () => Promise<unknown> }) {
-  const [error, setError] = useState<string | null>(null);
-  const how = session.kind === "cli" ? SESSION_ORIGINS[session.origin] : session.kind === "developer" ? "developers.teamofsilicons.com" : null;
-  const facts = [
-    session.current ? "Active now" : session.last_seen_at ? `Active ${formatRelative(session.last_seen_at, now)}` : null,
-    `signed in ${formatDate(session.created_at)}`,
-    how && session.label ? how : null,
-    session.ip ? `IP ${session.ip}` : null,
-  ].filter(Boolean).join(" · ");
-  return (
-    <div className={styles.row}>
-      <div className={styles.rowMain}>
-        <SessionIcon session={session} />
-        <div className={styles.rowText}>
-          <span className={styles.rowTitle}>
-            <span className={styles.name}>{sessionName(session)}</span>
-            {session.current ? <Badge size="sm" tone="info">This browser</Badge> : null}
-          </span>
-          <span className={styles.rowMeta}>{facts}</span>
-          {error ? <span className={styles.rowError} role="alert">{error}</span> : null}
-        </div>
-      </div>
-      <div className={styles.rowAction}>
-        {session.current ? (
-          <Button variant="secondary" size="sm" onClick={onSignOutHere} loading={signingOut}>Sign out</Button>
-        ) : (
-          <ConfirmMorph
-            label="Sign out"
-            prompt="Sign it out?"
-            confirmLabel="Sign out"
-            pendingLabel="Signing out"
-            doneLabel="Signed out"
-            onConfirm={async () => {
-              setError(null);
-              try {
-                await onRevoke();
-              } catch (raw) {
-                setError(describeError(raw));
-                throw raw;
-              }
-            }}
-          />
-        )}
-      </div>
-    </div>
   );
 }
 

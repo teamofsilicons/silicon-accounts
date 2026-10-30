@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/silicon-ui/button/button";
-import { Checkbox } from "@/components/silicon-ui/checkbox/checkbox";
-import { RadioCards } from "@/components/silicon-ui/radio-cards/radio-cards";
-import { RadioGroup } from "@/components/silicon-ui/radio-group/radio-group";
-import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
-import { Switch } from "@/components/silicon-ui/switch/switch";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Checkbox } from "@teamofsilicons/silicon-ui/checkbox";
+import { RadioCards } from "@teamofsilicons/silicon-ui/radio-cards";
+import { RadioGroup } from "@teamofsilicons/silicon-ui/radio-group";
+import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
+import { Switch } from "@teamofsilicons/silicon-ui/switch";
 import { DescriptionItem, DescriptionList, SettingsGroup, SettingsRow } from "@/components/foundation/layout/layout";
 import { Specimen, Specimens, kitchenStyles as styles } from "../specimen";
 

@@ -8,12 +8,12 @@
  * the Silicon twice. Escape in the timezone list closes the list, not the drawer with the form in it.
  */
 import { useMemo, useState, type FormEvent } from "react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { Button } from "@/components/silicon-ui/button/button";
-import { Checkbox } from "@/components/silicon-ui/checkbox/checkbox";
-import { Combobox } from "@/components/silicon-ui/combobox/combobox";
-import { Drawer, DrawerClose, DrawerContent } from "@/components/silicon-ui/drawer/drawer";
-import { Input } from "@/components/silicon-ui/input/input";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Checkbox } from "@teamofsilicons/silicon-ui/checkbox";
+import { Combobox } from "@teamofsilicons/silicon-ui/combobox";
+import { Drawer, DrawerClose, DrawerContent } from "@teamofsilicons/silicon-ui/drawer";
+import { Input } from "@teamofsilicons/silicon-ui/input";
 import { ApiError } from "@/lib/api/errors";
 import type { CarbonMe, SiliconCreated } from "@/lib/api/types";
 import { timezoneOptions } from "@/lib/timezones";

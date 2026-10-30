@@ -66,7 +66,7 @@ export function useLinkFlow(flowId: string | null) {
 
 /**
  * Writes to the cached Me view: `set(me)` replaces it with an answer from the server (and the session summary the
- * dock shows), `patch(fn)` edits it in place (optimistic changes; returns the previous value to roll back with).
+ * account menu shows), `patch(fn)` edits it in place (optimistic changes; returns the previous value to roll back with).
  */
 export function useSetMeView() {
   const client = useQueryClient();

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "/" for a browser with a session cookie: the identity home. A page load of "/" whose cookie the API refuses gets the
+ * "/" for a browser with a session cookie: Home (overview/overview.tsx). A page load of "/" whose cookie the API refuses gets the
  * public landing page from the server instead (proxy.ts asks GET /v1/session first), so signed out here only happens
  * when the session ends while this tab is open: a short card leads to sign in again, or to the landing page.
  */
@@ -9,12 +9,12 @@ import { LogIn } from "lucide-react";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { paths } from "@/lib/navigation";
 import { useSession } from "@/lib/query/session";
-import { Identity } from "./identity/identity";
+import { Overview } from "./overview/overview";
 import styles from "./home.module.css";
 
 export function Home() {
   const { status } = useSession();
-  if (status === "signed_in") return <Identity />;
+  if (status === "signed_in") return <Overview />;
   if (status === "signed_out") return <SignedOut />;
   return null;
 }

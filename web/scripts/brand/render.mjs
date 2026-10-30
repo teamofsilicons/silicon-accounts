@@ -2,12 +2,14 @@
  * Renders the site's brand files into public/ from the sources here, with Playwright's Chromium:
  *   og.html          → public/og.png (1200 by 630, the social image every page shares)
  *   favicon.svg      → public/icon.svg and favicon.ico (16, 32 and 48 px): the browser-tab icon
- *   icon.svg         → public/icon-192.png and icon-512.png (the mark on its cream tile, for installs)
+ *   icon.svg         → public/icon-192.png and icon-512.png (the mark on its grey tile, for installs)
  *   maskable.svg     → public/icon-maskable-512.png (full bleed, for the web manifest)
  *   apple.svg        → public/apple-touch-icon.png (180 px)
- * public/icon.svg is favicon.svg as is: the mark alone with no tile, in ink (#1E1E1C) when the browser is light and
- * cream (#EDE8E0) when it is dark, so it reads on either tab strip; favicon.ico draws the ink. The PNGs draw the light colours. Run it after
- * changing any source: pnpm brand
+ * public/icon.svg is favicon.svg as is: the mark alone with no tile, in ink (#181818) when the browser is light and
+ * Silicon UI's grey (#E3E3E3, --neutral-4) when it is dark, so it reads on either tab strip; favicon.ico draws the ink.
+ * The install icons (icon.svg, maskable.svg, apple.svg) are the mark on the grey tile; the PNGs draw the light colours.
+ * og.html sets Silicon UI's fonts from @fontsource-variable (Geist titles, Hanken Grotesk text) on the #FCFCFC page.
+ * Run it after changing any source: pnpm brand
  */
 import { readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";

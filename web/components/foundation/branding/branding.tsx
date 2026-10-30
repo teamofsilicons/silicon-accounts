@@ -123,7 +123,7 @@ export function PoweredBy({ theme, overlay, className }: PoweredByProps) {
     <div className={cx(styles.powered, overlay && styles.overlay, theme === "dark" && styles.dark, className)} data-powered-by="">
       <p className={styles.pill}>
         <svg className={styles.mark} viewBox="0 0 200 200" aria-hidden="true">
-          <rect width="200" height="200" rx="48" fill="#EDE8E0" />
+          <rect width="200" height="200" rx="48" fill="#E3E3E3" />
           <g transform="translate(100 100) scale(1.3) translate(-100.46 -99.5)">
             <circle cx="126.42" cy="99.5" r="29.5" fill="#181818" />
             <rect x="45" y="74.72" width="49.56" height="49.56" rx="4.72" fill="#181818" />

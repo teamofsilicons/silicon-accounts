@@ -1,0 +1,20 @@
+/* An app's live user verifications inside its card: a label, compact rows, and the way to the full page. */
+.root { display: grid; gap: var(--space-related); padding-top: var(--space-group); border-top: 1px solid var(--border-subtle); }
+.label { color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; }
+.list { display: grid; gap: var(--space-related); margin: 0; padding: 0; list-style: none; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related) var(--space-group); }
+.text { display: grid; min-width: 0; flex: 1 1 160px; gap: var(--space-hair); }
+.name { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; overflow-wrap: anywhere; }
+.meta { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.error { color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
+.more {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: var(--space-tight);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}

@@ -334,7 +334,7 @@ export interface Meta {
   docs_url?: string | null;
   /**
    * The developer site (ACCOUNTS_DEVELOPER_URL; https://developers.teamofsilicons.com, http://localhost:8600 in
-   * development), where apps' sign-in is set up. The dock's Developer item and /developer[/*] lead there. Optional for
+   * development), where apps' sign-in is set up. The sidebar's Developers link and /developer[/*] lead there. Optional for
    * servers before it existed (the site then uses the production address).
    */
   developer_url?: string | null;

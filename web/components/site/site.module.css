@@ -7,7 +7,7 @@
 .header {
   position: sticky;
   top: 0;
-  z-index: 40;
+  z-index: var(--layer-sticky);
   background: color-mix(in oklab, var(--background) 82%, transparent);
   -webkit-backdrop-filter: saturate(1.4) blur(14px);
   backdrop-filter: saturate(1.4) blur(14px);
@@ -33,7 +33,7 @@
   padding: 6px 8px;
   background: var(--sq-fill);
   color: var(--foreground);
-  font-family: var(--font-pixel);
+  font-family: var(--font-display);
   font-size: 1.0625rem;
   letter-spacing: 0;
   text-decoration: none;
@@ -46,28 +46,12 @@
 .brandText { white-space: nowrap; }
 
 .actions { display: flex; flex: none; align-items: center; gap: var(--space-2); margin-left: auto; }
-.navLink {
-  --sq-r: 8px;
-  --sq-fill: transparent;
-  display: inline-flex;
-  height: 32px;
-  align-items: center;
-  padding: 0 10px;
-  background: var(--sq-fill);
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
-}
-.navLink:hover, .navLink:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
-.navExternal { margin-left: 3px; color: var(--text-muted); }
 .account { flex: none; }
 
 /* Footer ----------------------------------------------------------------------------------------------------------- */
 .footer { border-top: 1px solid var(--border-subtle); background: var(--background); }
 .footerInner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 28px; padding: 28px clamp(16px, 2.4vw, 28px); }
-.copyright { margin: 0; color: var(--text-muted); font-family: var(--font-pixel); font-size: .8125rem; }
+.copyright { margin: 0; color: var(--text-muted); font-family: var(--font-body); font-size: .8125rem; }
 .footerLinks { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0; padding: 0; list-style: none; }
 /* The padding keeps each link a 24 px tall target without moving the line. */
 .footerLink { display: inline-block; padding: 2px 0; color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; transition: color var(--duration-fast) var(--ease-standard); }
@@ -80,5 +64,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brand, .navLink, .footerLink { transition: none; }
+  .brand, .footerLink { transition: none; }
 }

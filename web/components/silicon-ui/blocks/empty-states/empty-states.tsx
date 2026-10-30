@@ -3,8 +3,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "motion/react";
-import { motionTokens } from "../../lib/motion-tokens";
-import { Button } from "../../button/button";
+import { motionTokens } from "@teamofsilicons/silicon-ui/motion-tokens";
+import { Button } from "@teamofsilicons/silicon-ui/button";
 import { FRAMES, KINDS, VIEW, shapePath } from "./empty-states-art";
 import type { Frame, Phase, SceneId } from "./empty-states-art";
 import styles from "./empty-states.module.css";

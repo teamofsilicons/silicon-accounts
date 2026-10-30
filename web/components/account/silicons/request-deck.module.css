@@ -6,7 +6,7 @@
   --sq-fill: var(--surface);
   --sq-stroke: color-mix(in oklab, var(--accent) 30%, var(--border));
   position: relative;
-  z-index: calc(10 - var(--i));
+  z-index: calc(9 - var(--i));
   display: grid;
   min-width: 0;
   grid-area: 1 / 1;
