@@ -113,7 +113,7 @@ export function Apps() {
   }, [loaded]);
 
   return (
-    <Page width="default">
+    <Page>
       <PageHeader
         title="Apps you have signed into"
         description="What each app can see about you and when it last saw you. Removing an app's access signs you out of it everywhere and ends its user verifications for you."

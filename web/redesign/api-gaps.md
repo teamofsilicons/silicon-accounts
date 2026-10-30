@@ -14,6 +14,7 @@ them out until the API ships them; nothing is mocked in the product. For the API
 | 7 | Automation (GitHub trust) | Silicon › Access | Trusted repositories (provider, repo, optional branch) that may sign in as the Silicon without an STK: list, add, remove. |
 | 8 | Cloud services (audiences) | Silicon › Access | Allowed token audiences per Silicon: list, add, remove. |
 | 9 | What an app can see, per field | App page | Today it comes from granted scopes and can't be changed. Needed: turn an optional field off for one app without removing the app. |
+| 10 | Carbon pixel avatars | Every app, Personal info › Photo | Iris draws today's default photo (`/pfp/carbon`); it should draw the pixel avatar (lib/pixel-avatar.ts) from the uuid, so every app shows it by default. And a way to store a Carbon's avatar look (hair, face, clothing) on the account, so the editor opens on it on any device; today the site keeps it in the browser beside the uploaded photo. |
 
 Already supported, so not gaps: date of birth and timezone (`me.update`), custodian requests and handover, STK
 rotation, webhooks, proofs, sessions, history by kind.

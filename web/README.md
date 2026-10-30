@@ -716,3 +716,24 @@ in `redesign/api-gaps.md`).
   fill. Home's blocks are tiles (the canvas fill, no edge, the overlay radius), and Home is the greeting over a main
   column (Needs you, Your Silicons, Your apps) and a sticky side column (the introduction, Your details). It is one
   column under 1024 px.
+- **Prototype look** (2026-10-30): the blue accent (`--accent` #3460F0, `--focus-ring` its soft halo), Hanken Grotesk
+  for all text (`--font-display` is `--font-body`), `--page-narrow` 720 px, and `--silicon-mark-*` colours for
+  `parts/silicon-mark.tsx`. In development, `lib/font-preview.ts` adds "Font:" commands to ⌘K and `providers.tsx`
+  re-applies the pick (`data-font` on `<html>`).
+- **Page gap**: 24 px between a page's blocks, as in the prototype.
+- **Inset shell, system font, Carbon avatars** (2026-10-30):
+  - **Shell:** from 900 px the sidebar carries the brand, search, sections, other sites and the account menu
+    (`Sidebar` takes `head` and `account`), and `main` is a panel inset on the canvas. Under 900 px, the top bar and
+    bottom sheet as before.
+  - **Font:** `--font-body` is the system font. The development font switch offers Hanken Grotesk and Geist.
+  - **Avatars:** `lib/pixel-avatar.ts` draws a Carbon's pixel avatar (cells, an SVG data URL, a PNG).
+    `components/foundation/avatar/pixel-avatar.tsx` animates it at large sizes. `lib/carbon-avatar.ts`
+    (`useCarbonPicture`) decides what to show: the photo; a saved avatar, which is the uploaded photo whose look this
+    browser remembers; or the default drawn from the uuid. Personal info › Photo is the editor.
+- **Content layout rule in Page** (`components/foundation/layout`): `<Page>` is a narrow centred column by default
+  (`--page-narrow`, 760 px). It is wide with `width="default"`. With `header` + `aside` it is a column beside a side
+  column from the start (Home). With `header` + `panel` + `panelOpen` and a `SidePanel` (`side-panel.tsx`), an action
+  opens the side column with an animation. A `SidePanel` is a bottom Drawer under 1024 px, takes focus to Close, and
+  returns focus on Close or Escape. Silicons opens a Silicon and Create a Silicon this way; the right-hand drawers are
+  gone. Page titles are at Home's size (`--text-2xl`), section titles at `--text-base`, and `Surface` and
+  `SettingsGroup` are tiles.

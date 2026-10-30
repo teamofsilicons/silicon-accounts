@@ -89,6 +89,24 @@ const valueOf = (item: Contact) => ("email" in item ? item.email : item.phone);
 
 function ContactSection({ channel, carbon }: { channel: "email" | "phone"; carbon: CarbonMe }) {
   const isEmail = channel === "email";
+  const count = (isEmail ? carbon.emails : carbon.phones).length;
+  const pluralNoun = isEmail ? "emails" : "phone numbers";
+  return (
+    <Section
+      title={isEmail ? "Emails" : "Phone numbers"}
+      description={isEmail
+        ? "A code sent to any of these signs you in. Apps that can see your email get the primary one."
+        : "A code texted to any of these signs you in. Apps that can see your phone number get the primary one."}
+      actions={<span className={styles.count} aria-label={`${count} of ${LIMIT} ${pluralNoun}`}><AnimatedCounter value={count} /> of {LIMIT}</span>}
+    >
+      <ContactList channel={channel} carbon={carbon} />
+    </Section>
+  );
+}
+
+/** An account's emails or phone numbers: make one primary, remove one, add one with a code (here and in Personal info). */
+export function ContactList({ channel, carbon }: { channel: "email" | "phone"; carbon: CarbonMe }) {
+  const isEmail = channel === "email";
   const items: Contact[] = isEmail ? carbon.emails : carbon.phones;
   const shown = (value: string) => (isEmail ? value : formatPhone(value));
   const noun = isEmail ? "email" : "phone number";
@@ -129,14 +147,7 @@ function ContactSection({ channel, carbon }: { channel: "email" | "phone"; carbo
   const count = items.length;
 
   return (
-    <Section
-      title={isEmail ? "Emails" : "Phone numbers"}
-      description={isEmail
-        ? "A code sent to any of these signs you in. Apps that can see your email get the primary one."
-        : "A code texted to any of these signs you in. Apps that can see your phone number get the primary one."}
-      actions={<span className={styles.count} aria-label={`${count} of ${LIMIT} ${pluralNoun}`}><AnimatedCounter value={count} /> of {LIMIT}</span>}
-    >
-      <div ref={group} data-sq="surface" className={styles.group}>
+    <div ref={group} data-sq="surface" className={styles.group}>
         <AnimatedRows items={sorted} keyOf={valueOf} label={isEmail ? "Your emails" : "Your phone numbers"}>
           {item => (
             <ContactRow
@@ -157,8 +168,7 @@ function ContactSection({ channel, carbon }: { channel: "email" | "phone"; carbo
             ? <ContactAdder channel={channel} existing={items.map(valueOf)} defaultCountry={country} />
             : <p className={styles.limit}>You have {LIMIT} {pluralNoun}, the most an account can hold. Remove one to add another.</p>}
         </div>
-      </div>
-    </Section>
+    </div>
   );
 }
 

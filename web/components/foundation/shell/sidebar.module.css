@@ -1,4 +1,10 @@
-/* The section list and, at its foot, the other sites. Placement only: rows are NavList's. */
+/* The section list and, at its foot, the other sites; beside the page also the brand and search above it and the
+   account menu below. Placement only: rows are NavList's. */
 .sidebar { display: flex; min-height: 100%; flex-direction: column; gap: var(--space-block); }
 .foot { display: flex; flex-wrap: wrap; gap: var(--space-hair); margin-top: auto; padding-top: var(--space-group); border-top: 1px solid var(--border-subtle); }
 .foot svg { color: var(--text-muted); }
+/* The inset shell's head and foot: the brand and search over the list, the account menu under the other sites.
+   Width follows the aside's padding (no extra inset here), so search matches the nav. The account menu stays
+   Silicon UI's compact trigger — do not stretch it. */
+.head { display: grid; gap: var(--space-inset); padding-top: var(--space-related); }
+.account { display: flex; padding-top: var(--space-group); border-top: 1px solid var(--border-subtle); }

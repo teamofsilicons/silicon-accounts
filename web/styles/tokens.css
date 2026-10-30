@@ -1,8 +1,8 @@
 /*
  * The Silicon look, mapped onto Silicon UI's semantic tokens (@teamofsilicons/silicon-ui/styles.css, imported first):
- * a neutral #FCFCFC page and Silicon UI's grey scale (no beige or warm paper since 2026-10-18), near-black ink, and
- * Silicon UI's fonts (Geist titles, Hanken Grotesk text; no serif or pixel face since 2026-10-18). The accent is
- * neutral, the page's own ink (web/redesign/decisions.md).
+ * a neutral #FCFCFC page and Silicon UI's grey scale (no beige or warm paper since 2026-10-18), near-black ink, the
+ * prototype's blue accent and the system font for all text, titles too (both 2026-10-30, web/redesign/decisions.md).
+ * In development, [data-font] on <html> swaps the face to compare (lib/font-preview.ts).
  *
  * The account site is light only: lib/theme.ts pins <html data-theme="light">. The dark block below is kept for app
  * branding that forces dark on an app's own hosted sign-in pages or embedded buttons (lib/branding/apply.ts sets
@@ -11,7 +11,7 @@
  * Contrast (WCAG 2.2): every text token clears 4.5:1 on --background, --surface and --surface-muted in its mode. The
  * lowest pair is light --text-muted #666666 (5.1:1 on --surface-muted).
  * --text-faint is for decoration only (rules, separators), never for text.
- *   --accent-ink   accent-coloured text: the ink itself (neutral), near-white in dark.
+ *   --accent-ink   accent-coloured text (links): the prototype's blue, a lighter blue in dark.
  *   --primary*     the filled button: ink under page-coloured text in light, the reverse in dark.
  */
 :root, [data-theme="light"] {
@@ -36,12 +36,13 @@
   --border-subtle: oklch(96.5% 0 0);
   --border-strong: oklch(82% 0 0);
 
-  /* Neutral accent: the page's own ink, so links, focus and filled controls read in the same warm black as the text. */
-  --accent: #1E1E1C;
-  --accent-strong: #0F0F0E;
-  --accent-subtle: rgb(30 30 28 / .07);
-  --accent-foreground: var(--background);
-  --accent-ink: #1E1E1C;
+  /* The prototype's blue (v7: --accent #3460F0, --accent-soft #EEF2FE) for links, focus and selected fields; filled
+     buttons stay ink (--primary), as in the prototype. #3460F0 is 5.2:1 on white. */
+  --accent: #3460F0;
+  --accent-strong: #2449C9;
+  --accent-subtle: #EEF2FE;
+  --accent-foreground: #FFFFFF;
+  --accent-ink: #3460F0;
 
   --primary: #1E1E1C;
   --primary-hover: #33322F;
@@ -57,7 +58,8 @@
   --control-thumb-shadow: 0 0 0 .5px rgb(30 30 28 / .08), 0 1px 2px rgb(30 30 28 / .14), 0 2px 6px rgb(30 30 28 / .06);
   --control-fill: var(--control-on);
   --control-on-subtle: color-mix(in oklab, var(--control-on) 10%, transparent);
-  --focus-ring: transparent;
+  /* The prototype's soft blue halo around a focused field. */
+  --focus-ring: var(--accent-subtle);
 
   --success: #2B7148;
   --warning: #8F560D;
@@ -72,9 +74,18 @@
 
   --series-1: #1F5CB1; --series-2: #7A4FC4; --series-3: #B7791F; --series-4: #2B7148;
 
-  /* Type is Silicon UI's own: --font-display (Geist) for titles and the wordmark, --font-body (Hanken Grotesk) for
-     everything else, both loaded by app/fonts.ts, with the library's tracking. Silicon UI has no monospace, so code and
-     ids use the system one. */
+  /* A Silicon's mark: its own two-colour gradient under a white spark (the prototype's SIG colours). parts/silicon-mark
+     picks one pair per Silicon from its uuid. */
+  --silicon-mark-1-from: #8C7BFF; --silicon-mark-1-to: #4FD1C5;
+  --silicon-mark-2-from: #FF8F7A; --silicon-mark-2-to: #FFC86B;
+  --silicon-mark-3-from: #C17CFF; --silicon-mark-3-to: #71C8FF;
+  --silicon-mark-4-from: #4C86FF; --silicon-mark-4-to: #86E3B0;
+  --silicon-mark-ink: #FFFFFF;
+
+  /* The system font for everything, titles and the wordmark too (2026-10-30, after Hanken Grotesk was tried). Silicon
+     UI has no monospace, so code and ids use the system one. */
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: var(--font-body);
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
 
   /* Squircle tuning: corner-shape radius multiplier (matches Figma's 60 % corner smoothing). See styles/squircle.css. */
@@ -88,7 +99,8 @@
 
   /* Page chrome. --page-end is the room under every page's last content (and the phone's home indicator). */
   --page-max: 1120px;
-  --page-narrow: 700px;
+  /* The narrow centred column most pages use: the prototype's 720 px page (the content layout rule, decisions.md). */
+  --page-narrow: 720px;
   --gutter: clamp(16px, 4vw, 32px);
   --page-end: calc(var(--space-page) + env(safe-area-inset-bottom, 0px));
 }
@@ -109,11 +121,11 @@
   --border-subtle: oklch(25% 0 0);
   --border-strong: oklch(40% 0 0);
 
-  --accent: var(--foreground);
-  --accent-strong: oklch(100% 0 0);
-  --accent-subtle: oklch(96% 0 0 / .13);
-  --accent-foreground: var(--background);
-  --accent-ink: var(--foreground);
+  --accent: #7D9BFF;
+  --accent-strong: #A9BDFF;
+  --accent-subtle: #1D2440;
+  --accent-foreground: oklch(19% 0 0);
+  --accent-ink: #7D9BFF;
 
   --primary: var(--foreground);
   --primary-hover: oklch(100% 0 0);
@@ -129,7 +141,7 @@
   --control-thumb-shadow: 0 0 0 .5px rgb(0 0 0 / .3), 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .2);
   --control-fill: oklch(62% 0 0);
   --control-on-subtle: color-mix(in oklab, var(--control-on) 16%, transparent);
-  --focus-ring: transparent;
+  --focus-ring: var(--accent-subtle);
 
   --success: #7FC79A;
   --warning: #E3B55A;
@@ -156,3 +168,8 @@
 
 /* Profile pictures are Silicon UI's circles (the 30% squircle override was dropped 2026-10-29: Silicon UI's menu states
    draw circles, and the prototype's avatars are round). */
+
+/* Font comparison in development (lib/font-preview.ts sets data-font on <html>): Hanken Grotesk or Geist for
+   everything. The system font is the default and needs no attribute. */
+:root[data-font="hanken"] { --font-body: var(--font-hanken-grotesk, "Hanken Grotesk Variable"), system-ui, -apple-system, "Segoe UI", sans-serif; }
+:root[data-font="geist"] { --font-body: var(--font-geist, "Geist Variable"), system-ui, -apple-system, "Segoe UI", sans-serif; }

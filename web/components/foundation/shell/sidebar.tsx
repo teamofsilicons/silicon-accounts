@@ -4,7 +4,10 @@
  * The account site's section list, as in the lead designer's prototype: Silicon UI's NavList with every section (lib/navigation.ts
  * SECTIONS), a count where something waits for the Carbon, and the other sites at the foot, marked as leaving. The
  * shell shows it beside the page from 900px and inside a bottom sheet on narrower screens; both read this one list.
+ * Beside the page (the inset shell) it also carries what a top bar would: `head` (the brand and search) above the
+ * list and `account` (the account menu) at its foot.
  */
+import type { ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { ButtonLink } from "@teamofsilicons/silicon-ui/button-link";
@@ -19,15 +22,20 @@ export interface SidebarProps {
   developerUrl: string;
   /** Called when a row is chosen (closes the phone sheet). */
   onNavigate?: () => void;
+  /** Above the list, beside the page only: the brand and search. */
+  head?: ReactNode;
+  /** At the foot, beside the page only: the account menu. */
+  account?: ReactNode;
 }
 
-export function Sidebar({ activeKey, developerUrl, onNavigate }: SidebarProps) {
+export function Sidebar({ activeKey, developerUrl, onNavigate, head, account }: SidebarProps) {
   const requests = useCustodianRequests();
   const waiting = requests.data?.items.filter(request => request.status === "pending").length ?? 0;
   const counts: Partial<Record<SectionKey, number>> = { silicons: waiting };
 
   return (
     <div className={styles.sidebar}>
+      {head ? <div className={styles.head}>{head}</div> : null}
       <NavList label="Account sections" onNavigate={onNavigate}>
         {SECTIONS.map(section => {
           const Icon = section.icon;
@@ -53,6 +61,7 @@ export function Sidebar({ activeKey, developerUrl, onNavigate }: SidebarProps) {
           </ButtonLink>
         ))}
       </nav>
+      {account ? <div className={styles.account}>{account}</div> : null}
     </div>
   );
 }

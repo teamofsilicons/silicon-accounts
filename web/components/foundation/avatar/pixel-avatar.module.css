@@ -1,0 +1,3 @@
+/* A Carbon's pixel avatar (lib/pixel-avatar.ts), round like every profile picture. */
+.avatar { display: inline-block; width: var(--avatar-size); height: var(--avatar-size); flex: none; overflow: hidden; border-radius: var(--radius-full); corner-shape: round; }
+.avatar svg { display: block; width: 100%; height: 100%; }

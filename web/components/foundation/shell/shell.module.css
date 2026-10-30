@@ -1,7 +1,9 @@
-/* The account site's frame: the top bar (brand, search, the account menu), then the section list beside the page (from
-   900px) or in a bottom sheet (below it). Flat (redesign/decisions.md, 2026-10-30): one white surface, the top bar and
-   the section list parted from the page by hairlines; the page's blocks are the only fills. */
-.shell { --top-height: 64px; position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; background: var(--surface); }
+/* The account site's frame, inset (redesign/decisions.md, 2026-10-30): from 900px the sidebar on the canvas carries
+   the brand, search, the sections and the account menu, and the page is a white panel inset on every side. Under
+   900px a top bar holds the brand, search and the account menu, the sections are in a bottom sheet, and the page is
+   full bleed. --top-height is what sticky things in the page stay clear of. */
+.shell { --top-height: var(--space-related); position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; background: var(--canvas); }
+@media (max-width: 899px) { .shell { --top-height: 64px; background: var(--surface); } }
 /* What focus (Tab) or an in-page jump brings into view stops clear of the sticky top bar (WCAG 2.4.11). */
 :global(html):has(.shell) { scroll-padding-block: calc(var(--top-height) + var(--space-section)) var(--space-section); }
 
@@ -28,12 +30,12 @@
 .brandMark svg { width: auto; height: 13px; }
 .brandText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Search sits in the middle of the bar, as wide as the prototype's field; on narrow screens only its icon shows. */
-.search { width: min(100%, 480px); justify-self: center; }
-.searchLabel { flex: 1; text-align: start; }
+/* Search: full width in the sidebar; on narrow screens (the top bar) only its icon shows. */
+.search { width: 100%; max-width: 100%; justify-self: stretch; }
+.searchLabel { flex: 1; min-width: 0; text-align: start; }
 .keys { margin-inline-start: var(--space-tight); color: var(--text-muted); font-family: var(--font-body); font-size: var(--text-xs); }
 @media (max-width: 899px) {
-  .search { width: auto; justify-self: end; }
+  .search { width: auto; max-width: none; justify-self: end; }
   .searchLabel, .keys { display: none; }
 }
 
@@ -41,11 +43,12 @@
 
 /* The section list beside the page: sticky under the top bar, scrolling on its own when the window is short. */
 .body { display: grid; min-width: 0; flex: 1; grid-template-columns: 248px minmax(0, 1fr); }
-.aside { position: sticky; top: var(--top-height); height: calc(100dvh - var(--top-height)); overflow-y: auto; padding: var(--space-group); border-right: 1px solid var(--border); }
+.aside { position: sticky; top: 0; height: 100vh; height: 100dvh; overflow-y: auto; padding: var(--space-inset) var(--space-group) var(--space-group); }
 @media (max-width: 899px) { .body { display: flex; flex-direction: column; } }
 
-/* The page: on the shell's own surface, beside the section list's hairline (no panel since 2026-10-30). */
-.main { position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; outline: none; }
+/* The page: a white panel inset on every side of the canvas, lifted a little. Full bleed under 900px. */
+.main { --sq-r: var(--radius-overlay); position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; margin: var(--space-related) var(--space-related) var(--space-related) 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-resting); outline: none; }
+@media (max-width: 899px) { .main { --sq-r: 0; margin: 0; border-width: 0; box-shadow: none; } }
 .main > * { min-width: 0; }
 .page { display: flex; min-width: 0; flex: 1; flex-direction: column; }
 

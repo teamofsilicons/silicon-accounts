@@ -1,5 +1,7 @@
 /* Silicons in your care: reveal cards, the request deck and a grid of squircle tiles. */
 .alertAction { display: block; margin-top: var(--space-3); }
+/* The side column a Silicon (or Create a Silicon) opens: room for its forms and secrets. */
+.page { --panel-width: 440px; }
 .reveals { display: grid; min-width: 0; max-width: 760px; gap: var(--space-4); }
 /* "Your Silicons" takes focus by script once the request deck has gone; its heading turns accent ink while it has it. */
 .section:focus-visible h2 { color: var(--accent-ink); }

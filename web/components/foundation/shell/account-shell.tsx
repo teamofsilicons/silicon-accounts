@@ -15,13 +15,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ViewTransition, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { LogOut, Menu, Search, Settings as SettingsIcon, SwatchBook } from "lucide-react";
+import { LogOut, Menu, Search, Settings as SettingsIcon, SwatchBook, Type } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { BottomSheet } from "@teamofsilicons/silicon-ui/bottom-sheet";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { UserMenu, type UserMenuUser } from "@teamofsilicons/silicon-ui/user-menu";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { SkipLink } from "@/components/foundation/layout/layout";
+import { useCarbonPicture } from "@/lib/carbon-avatar";
+import { PREVIEW_FONTS, applyPreviewFont } from "@/lib/font-preview";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
 import { ELSEWHERE, MORE_DESTINATIONS, SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
 import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
@@ -180,7 +182,10 @@ export function AccountShell({ children }: { children: ReactNode }) {
       };
     }),
     ...(process.env.NODE_ENV !== "production"
-      ? [{ id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={1.75} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) }]
+      ? [
+          { id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={1.75} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) },
+          ...PREVIEW_FONTS.map(font => ({ id: `dev.font.${font.key}`, label: `Font: ${font.label}`, description: font.description, group: "Developer", icon: <Type size={16} strokeWidth={1.75} />, keywords: ["font", "typeface", "type", font.key], run: () => applyPreviewFont(font.key) })),
+        ]
       : []),
     { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={1.75} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
   ], [go, doSignOut, developerUrl]);
@@ -207,6 +212,8 @@ export function AccountShell({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [go, paletteOpen, status]);
 
+  // A Carbon's picture is their photo or their pixel avatar (lib/carbon-avatar.ts).
+  const picture = useCarbonPicture(me.data ?? session?.account);
   const account = useMemo<UserMenuUser | null>(() => {
     const summary = session?.account;
     if (!summary) return null;
@@ -214,38 +221,50 @@ export function AccountShell({ children }: { children: ReactNode }) {
     return {
       name: full?.display_name ?? summary.display_name,
       email: full?.id ?? summary.id ?? summary.uuid,
-      avatarSrc: full?.pfp_url ?? summary.pfp_url,
+      avatarSrc: picture?.src ?? full?.pfp_url ?? summary.pfp_url,
     };
-  }, [session, me.data]);
+  }, [session, me.data, picture?.src]);
 
+  const brand = (
+    <Link href={paths.home} data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
+      event.preventDefault();
+      void go(paths.home, event.currentTarget);
+    }}>
+      <BrandMark />
+      <span className={styles.brandText}>Silicon Accounts</span>
+    </Link>
+  );
+  const search = (
+    <Button variant="secondary" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"} aria-label={narrow ? "Search your account" : undefined}>
+      <Search size={16} strokeWidth={1.75} aria-hidden="true" />
+      <span className={styles.searchLabel}>Search your account</span>
+      <kbd className={styles.keys}>{isApple ? "⌘ K" : "Ctrl K"}</kbd>
+    </Button>
+  );
+  const accountMenu = account ? (
+    <UserMenu
+      user={account}
+      showTheme={false}
+      showName={!narrow}
+      onSignOut={menuSignOut}
+      align={narrow ? "end" : "start"}
+      items={[{ label: "Settings", icon: <SettingsIcon size={16} strokeWidth={1.75} />, onSelect: () => void go(paths.settings) }]}
+    />
+  ) : null;
+
+  // The inset shell (redesign/decisions.md, 2026-10-30): from 900px there is no top bar; the sidebar carries the brand
+  // and search above the sections and the account menu at its foot, and the page is a panel inset on every side.
+  // Under 900px a top bar holds the brand, search, the account menu and the sections in a bottom sheet.
   const chrome = (content: ReactNode) => (
     <div className={styles.shell}>
       <SkipLink href="#main" />
-      <header className={styles.top}>
-        <Link href={paths.home} data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
-          if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
-          event.preventDefault();
-          void go(paths.home, event.currentTarget);
-        }}>
-          <BrandMark />
-          <span className={styles.brandText}>Silicon Accounts</span>
-        </Link>
-        <Button variant="secondary" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"} aria-label={narrow ? "Search your account" : undefined}>
-          <Search size={16} strokeWidth={1.75} aria-hidden="true" />
-          <span className={styles.searchLabel}>Search your account</span>
-          <kbd className={styles.keys}>{isApple ? "⌘ K" : "Ctrl K"}</kbd>
-        </Button>
-        <span className={styles.topEnd}>
-          {account ? (
-            <UserMenu
-              user={account}
-              showTheme={false}
-              onSignOut={menuSignOut}
-              align="end"
-              items={[{ label: "Settings", icon: <SettingsIcon size={16} strokeWidth={1.75} />, onSelect: () => void go(paths.settings) }]}
-            />
-          ) : null}
-          {narrow ? (
+      {narrow ? (
+        <header className={styles.top}>
+          {brand}
+          {search}
+          <span className={styles.topEnd}>
+            {accountMenu}
             <BottomSheet
               title="Your account"
               open={sheetOpen}
@@ -254,13 +273,13 @@ export function AccountShell({ children }: { children: ReactNode }) {
             >
               <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} />
             </BottomSheet>
-          ) : null}
-        </span>
-      </header>
+          </span>
+        </header>
+      ) : null}
       <div className={styles.body}>
         {narrow ? null : (
           <aside className={styles.aside}>
-            <Sidebar activeKey={active?.key} developerUrl={developerUrl} />
+            <Sidebar activeKey={active?.key} developerUrl={developerUrl} head={<>{brand}{search}</>} account={accountMenu} />
           </aside>
         )}
         <main id="main" data-sq-native="" className={styles.main} tabIndex={-1}>{content}</main>

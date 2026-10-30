@@ -25,7 +25,7 @@ import { useEverySession, useSignOutSession } from "../parts/queries";
 import styles from "./sessions.module.css";
 
 /** A readable name for a session: its label, or how it was made. */
-function sessionName(session: SessionInfo): string {
+export function sessionName(session: SessionInfo): string {
   if (session.kind === "developer") return "Silicon Developer";
   if (session.label) return session.label;
   if (session.kind === "cli") return session.origin === "silicon_login" ? "A Silicon sign-in" : "The silicon-accounts CLI";

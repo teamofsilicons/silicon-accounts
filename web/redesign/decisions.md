@@ -121,6 +121,48 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
     - Under 1024 px there is no room beside the page, so the same content opens in Silicon UI's bottom Drawer instead.
     - Reduced motion: no animation, the state just changes.
   - Prototyped in /__layouts (Content: "Aside on action"). (2026-10-30)
+  - Applied to the account site (2026-10-30), through Page and SidePanel in components/foundation/layout:
+    - Home is column + aside.
+    - Silicons is the narrow column; a Silicon and Create a Silicon open as the animated side column, replacing the
+      drawers.
+    - Connected apps, Permissions between apps, Activity, Security, Personal info and Settings are the narrow column.
+
+- The prototype is the design (Anil, 2026-10-30): redesign/prototype-v7.html decides content and element design. Each
+  difference with Silicon UI gets a category with a set fix (redesign/prototype-rules.md). Differences are tracked in
+  redesign/prototype-differences.md and shared with Anil at the end of every task. Nothing is added that the
+  prototype does not show. (2026-10-30)
+
+- Accent and font (Anil, 2026-10-30): the prototype's blue accent (#3460F0) for links, focus and selected fields, with
+  its soft blue focus halo; filled buttons stay ink. Hanken Grotesk for all text, titles too, then the system font;
+  no Geist. In development, the ⌘K palette's "Font:" commands switch the face to compare (lib/font-preview.ts).
+  Supersedes the 2026-10-18 neutral accent and Silicon UI's Geist titles. (2026-10-30)
+- Inside the page, elements follow the prototype (Anil, 2026-10-30): white cards with a hairline edge and the title
+  inside, rows, icon tiles, Silicon marks; built from Silicon UI components and tokens. Home is the prototype's single
+  720 px column again; "Your details" and the side column are gone. Supersedes the grey tiles. A Silicon will open as
+  the prototype's own page with tabs, not the side panel. (2026-10-30)
+
+- Personal info is the prototype's page (2026-10-30): a Profile card (photo, name, public id, date of birth, timezone)
+  and a Contact card (emails, phones), each row opening its editor in a dialog. The identity card leaves this page
+  (it stays as the landing page's sample). The timezone is edited here too; Settings still has it until Data &
+  privacy replaces Settings. (2026-10-30)
+
+- Inset shell, system font, Carbon avatars (Anil, 2026-10-30):
+  - The shell is the lab's Inset. From 900 px there is no top bar: the sidebar on the grey canvas carries the brand,
+    search, the sections, the other sites and the account menu, and the page is a white panel inset on every side.
+    Under 900 px, a top bar and a bottom sheet as before. Supersedes the flat shell.
+  - The system font for all text, after Hanken Grotesk was tried. Hanken and Geist stay in the development font
+    switch.
+  - Carbons' default picture is the pixel avatar from Anil's avatar customizer v9, drawn from their uuid. A Carbon
+    can customise it (hair, face, clothing) or use a photo. A saved avatar is uploaded as their photo so every app sees
+    it; the site draws it live and animated at large sizes (the greeting, the editor), and still everywhere else.
+    Silicons keep their marks and photos. (2026-10-30)
+
+- Needs you is a checklist (Anil, 2026-10-30, picked in /__needs). "Finish setting up" lists the prototype's security
+  checkup: a second way in (Google or Apple), a verified email, a recovery phone, and only devices you still use. What
+  is left comes first with its action, what is done is ticked off, and a progress bar counts them; the card goes once
+  all four are done. A device counts as not used lately after 7 days; Keep (remembered in this browser) or Sign out
+  answers it. Requests and handovers aren't setup, so they stay as rows in a Needs you card above the checklist.
+  (2026-10-30)
 
 ## Process
 - Keep priorities.md, decisions.md and log.md (this folder) updated with every task; shared-code changes also get a

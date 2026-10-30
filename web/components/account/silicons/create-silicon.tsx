@@ -12,8 +12,8 @@ import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Checkbox } from "@teamofsilicons/silicon-ui/checkbox";
 import { Combobox } from "@teamofsilicons/silicon-ui/combobox";
-import { Drawer, DrawerClose, DrawerContent } from "@teamofsilicons/silicon-ui/drawer";
 import { Input } from "@teamofsilicons/silicon-ui/input";
+import { SidePanel } from "@/components/foundation/layout/side-panel";
 import { ApiError } from "@/lib/api/errors";
 import type { CarbonMe, SiliconCreated } from "@/lib/api/types";
 import { timezoneOptions } from "@/lib/timezones";
@@ -37,17 +37,21 @@ export function handleFromName(name: string): string {
 }
 
 export function CreateSilicon({ open, onOpenChange, me, onCreated }: CreateSiliconProps) {
+  // Every opening starts with an empty form: a new key each time the panel opens (it stays mounted while it closes).
+  const [opening, setOpening] = useState(0);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setOpening(count => count + 1);
+  }
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className={styles.panel} title="Create a Silicon" description="You become its custodian. It signs in with its si:id and an STK that is shown to you once.">
-        {/* Mounted while the drawer is open, so every opening starts with an empty form. */}
-        <CreateForm me={me} onCreated={created => { onCreated(created); onOpenChange(false); }} />
-      </DrawerContent>
-    </Drawer>
+    <SidePanel open={open} onOpenChange={onOpenChange} title="Create a Silicon" description="You become its custodian. It signs in with its si:id and an STK that is shown to you once." drawerClassName={styles.panel}>
+      <CreateForm key={opening} me={me} onCreated={created => { onCreated(created); onOpenChange(false); }} onCancel={() => onOpenChange(false)} />
+    </SidePanel>
   );
 }
 
-function CreateForm({ me, onCreated }: { me: CarbonMe; onCreated: (created: SiliconCreated) => void }) {
+function CreateForm({ me, onCreated, onCancel }: { me: CarbonMe; onCreated: (created: SiliconCreated) => void; onCancel: () => void }) {
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [handleEdited, setHandleEdited] = useState(false);
@@ -163,9 +167,7 @@ function CreateForm({ me, onCreated }: { me: CarbonMe; onCreated: (created: Sili
       </div>
       {formError ? <Alert tone="danger" title="The Silicon was not created">{formError}</Alert> : null}
       <div className={styles.footer}>
-        <DrawerClose asChild>
-          <Button type="button" variant="ghost" disabled={create.isPending}>Cancel</Button>
-        </DrawerClose>
+        <Button type="button" variant="ghost" disabled={create.isPending} onClick={onCancel}>Cancel</Button>
         <Button type="submit" loading={create.isPending}>Create Silicon</Button>
       </div>
     </form>

@@ -1,92 +1,36 @@
-/* Identity home: the attention strip (its own module), the card laid out as a form, and metric cards beside it. Tokens only. */
-.layout { display: grid; grid-template-columns: minmax(0, 640px); align-items: start; }
-.alertAction { display: block; margin-top: var(--space-group); }
+/* Personal info, from the prototype's own CSS (redesign/prototype-v7.html): .scard (14 px radius, 1 px line, header
+   18/20/12 px, 16 px medium title) and .srow (13/20 px, 14 px gap, 56 px tall, 150 px label column at 12.5 px medium
+   muted, a faint chevron, the row's hover fill). Sizes without a token use the nearest one (prototype-differences.md). */
+.box { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); min-width: 0; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.boxHead { padding: calc(var(--space-inset) + var(--space-hair)) var(--space-comfort) var(--space-group); }
+.boxTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; letter-spacing: -.01em; line-height: var(--leading-snug); }
 
-/* ------------------------------------------------------- form ------------------------------------------------------- */
-.face { --rule: color-mix(in oklab, var(--foreground) 16%, transparent); display: grid; min-width: 0; gap: var(--space-section); }
-
-/* Printed labels: the same face for every field on both sides of the card. */
-.label { color: var(--text-secondary); font-family: var(--font-body); font-size: var(--text-xs); letter-spacing: .1em; line-height: 1.3; text-transform: uppercase; }
-
-.issuer { display: grid; min-width: 0; align-content: start; gap: var(--space-tight); }
-.cardType { margin: 0; font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.15; }
-.holder { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
-
-/* Front: issuer and status across the top, the form beside the photo. */
-.sheet {
-  display: grid;
-  grid-template-areas: "issuer status" "form photo";
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--space-section) var(--space-block);
-}
-.sheet > .issuer { grid-area: issuer; }
-.status { grid-area: status; display: grid; justify-items: end; gap: var(--space-tight); margin: 0; text-align: right; }
-.statusValue { font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
-.statusValue[data-tone="valid"] { color: var(--success); }
-.statusValue[data-tone="pending"] { color: var(--warning); }
-.statusValue[data-tone="ended"] { color: var(--danger); }
-.sheet > .form { grid-area: form; }
-
-/* The photo, framed by crop marks that show where a new one can be dropped. */
-.photo { grid-area: photo; position: relative; display: grid; justify-self: end; padding: var(--space-related); }
-.crop {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  --mark: var(--space-inset);
-  --ink: color-mix(in oklab, var(--foreground) 70%, transparent);
-  background:
-    linear-gradient(var(--ink), var(--ink)) top left / var(--mark) 1px no-repeat,
-    linear-gradient(var(--ink), var(--ink)) top left / 1px var(--mark) no-repeat,
-    linear-gradient(var(--ink), var(--ink)) top right / var(--mark) 1px no-repeat,
-    linear-gradient(var(--ink), var(--ink)) top right / 1px var(--mark) no-repeat,
-    linear-gradient(var(--ink), var(--ink)) bottom left / var(--mark) 1px no-repeat,
-    linear-gradient(var(--ink), var(--ink)) bottom left / 1px var(--mark) no-repeat,
-    linear-gradient(var(--ink), var(--ink)) bottom right / var(--mark) 1px no-repeat,
-    linear-gradient(var(--ink), var(--ink)) bottom right / 1px var(--mark) no-repeat;
-}
-
-/* Fields: label on the left, the value on a ruled line. */
-.form { display: grid; min-width: 0; margin: 0; }
-.row { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); align-items: baseline; gap: var(--space-tight) var(--space-group); padding: var(--space-group) 0 var(--space-related); border-bottom: 1px solid var(--rule); }
-.value { display: grid; min-width: 0; gap: var(--space-related); margin: 0; font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
-.note { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
-.valueLine { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-tight) var(--space-related); }
-
-/* The name is an inline editor in the serif: the editor keeps its metrics while editing. */
-.name.name[data-variant] { --size: var(--text-2xl); --leading: round(var(--size) * 1.25, 2px); --weight: 500; --ink: var(--foreground); }
-.name > :first-child { font-family: var(--font-display); letter-spacing: var(--tracking-display); }
-/* A long name wraps instead of being cut off (names run to 100 characters); while it is edited the field is one line
-   again and scrolls (InlineEdit marks the text layer data-layer and its root data-editing). */
-.name:not([data-editing]) [data-layer] { overflow: visible; text-overflow: clip; white-space: pre-wrap; overflow-wrap: anywhere; }
-
-/* The id never runs under its buttons: the morph's frame is held to the space there is (the title has it all). */
-.idValue { display: block; min-width: 0; max-width: 100%; overflow: hidden; font-family: var(--font-mono); font-size: var(--text-sm); font-variant-ligatures: none; letter-spacing: 0; white-space: nowrap; }
-.idMorph { display: block; max-width: 100%; }
-.rowAction { margin-inline-start: auto; }
-
-/* Bottom of a face: the apps on the front, the way to sign-in methods on the back, and the turn button in one corner. */
-.foot { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-inset); }
-.turn { flex: none; margin-inline-start: auto; }
-.signedInto { display: grid; min-width: 0; flex: 1; gap: var(--space-related); }
-.muted { margin: 0; color: var(--text-muted); font-size: var(--text-sm); line-height: var(--leading-body); }
-.stampsError { display: inline-flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-tight) var(--space-group); color: var(--danger); font-size: var(--text-sm); line-height: var(--leading-body); }
-.stampsSkeleton { display: inline-flex; gap: var(--space-related); }
-
-/* Back: contacts. */
-.contact { display: inline-flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-related); }
-.contactText { min-width: 0; overflow-wrap: anywhere; }
-.backLink { display: inline-flex; width: fit-content; align-items: center; gap: var(--space-related); color: var(--accent-ink); font-size: var(--text-sm); text-decoration: none; }
-.backLink:hover, .backLink:focus-visible { color: var(--accent-strong); text-decoration: underline; outline: none; }
-
+.row { display: flex; width: 100%; min-width: 0; min-height: 56px; align-items: center; gap: calc(var(--space-group) + var(--space-hair)); padding: var(--space-group) var(--space-comfort); border-top: 1px solid var(--border); color: var(--foreground); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+.row:hover { background: var(--canvas); color: var(--foreground); }
+.row:active { background: var(--surface-muted); }
+.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.label { width: 150px; flex: none; color: var(--text-muted); font-size: var(--text-xs); font-weight: 500; letter-spacing: .01em; }
+.value { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); font-size: var(--text-sm); line-height: 1.4; overflow-wrap: anywhere; }
+.detail { color: var(--text-muted); font-size: var(--text-sm); }
+.muted { color: var(--text-muted); }
+.mono { font-family: var(--font-mono); font-size: var(--text-sm); }
+.chevron { flex: none; color: var(--text-faint); }
 @media (max-width: 560px) {
-  .sheet { grid-template-areas: "issuer" "status" "photo" "form"; grid-template-columns: minmax(0, 1fr); gap: var(--space-comfort); }
-  .status { justify-items: start; text-align: left; }
-  .photo { justify-self: start; }
-  .row { grid-template-columns: minmax(0, 1fr); }
+  .row { flex-wrap: wrap; }
+  .label { width: 100%; }
+  .value { flex: 1 1 0; }
 }
+@media (prefers-reduced-motion: reduce) { .row { transition: none; } }
 
-/* The landing page's sample card (sample.tsx): a plain portrait and name where the home has its controls. */
-.samplePortrait.samplePortrait { width: 120px; height: 120px; font-family: var(--font-display); font-size: var(--text-4xl); font-weight: 600; }
-.sampleName { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.25; }
+.alertAction { display: block; margin-top: var(--space-group); }
+.skeleton { display: grid; gap: var(--space-section); }
+.form { display: grid; gap: var(--space-inset); }
+.error { margin: 0; color: var(--danger); font-size: var(--text-sm); }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); margin-top: var(--space-group); }
+.photo { display: flex; justify-content: center; padding: var(--space-related) 0; }
+
+/* The avatar editor: the avatar between two columns of arrows (hair, face, clothing, top to bottom), as in the
+   customizer; then "Or use a photo" (Silicon UI's file upload). */
+.avatarStage { display: grid; grid-template-columns: auto auto auto; align-items: center; justify-content: center; gap: var(--space-section); padding: var(--space-related) 0; }
+.avatarArrows { display: grid; gap: var(--space-section); }
+.srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

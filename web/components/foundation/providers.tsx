@@ -18,6 +18,7 @@ import { connectToasts } from "@/lib/notify";
 import { createQueryClient } from "@/lib/query/client";
 import { queryKeys } from "@/lib/query/keys";
 import { markSignedOut } from "@/lib/query/session";
+import { restorePreviewFont } from "@/lib/font-preview";
 import { applyTheme } from "@/lib/theme";
 import styles from "./providers.module.css";
 
@@ -51,6 +52,11 @@ export function Providers({ children, surface = "site", sessionHint = "cookie" }
   // The boot script painted the stored theme; from here the theme store keeps <html> in sync.
   useEffect(() => {
     if (surface === "site") applyTheme();
+  }, [surface]);
+
+  // Development: the typeface picked in the palette to compare faces (lib/font-preview.ts).
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production" && surface === "site") restorePreviewFont();
   }, [surface]);
 
   return (

@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * One Silicon, as its custodian manages it (a drawer beside the Silicons page): its details, photo and id, its STK
+ * One Silicon, as its custodian manages it (the side column the Silicons page opens, a bottom drawer under 1024px:
+ * SidePanel and the content layout rule): its details, photo and id, its STK
  * (rotate it by holding; the new one is shown once), its webhook (the signing secret is shown once each time it is set),
  * handing it to another Carbon (the card slides toward the recipient; they have 14 days to accept), and deleting it.
  *
- * The drawer is modal, so focus never falls out of it: whenever a control replaces itself (a form becoming a waiting
- * card, a "Removed" button folding away, a stored secret closing), focus moves to what took its place. Escape closes
- * the drawer, except while a control inside has something of its own to close first (the timezone list, a name being
- * edited, a confirm question): Arc's layers handle that themselves (components/silicon-ui/lib/escape.ts).
+ * Whenever a control replaces itself (a form becoming a waiting card, a "Removed" button folding away, a stored secret
+ * closing), focus moves to what took its place. Escape closes the panel, except while a control inside has something
+ * of its own to close first (the timezone list, a name being edited, a confirm question): those layers handle it.
  */
 import { useRef, useState, type FormEvent, type ReactNode, type Ref } from "react";
 import { animate } from "motion/react";
@@ -19,12 +19,12 @@ import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Checkbox } from "@teamofsilicons/silicon-ui/checkbox";
 import { ConfirmMorph } from "@teamofsilicons/silicon-ui/confirm-morph";
 import { CopyButton } from "@teamofsilicons/silicon-ui/copy-button";
-import { Drawer, DrawerContent } from "@teamofsilicons/silicon-ui/drawer";
 import { HoldToConfirm } from "@teamofsilicons/silicon-ui/hold-to-confirm";
 import { InlineEdit } from "@teamofsilicons/silicon-ui/inline-edit";
 import { Input } from "@teamofsilicons/silicon-ui/input";
 import { TextMorph } from "@teamofsilicons/silicon-ui/text-morph";
 import { motionTokens } from "@teamofsilicons/silicon-ui/motion-tokens";
+import { SidePanel } from "@/components/foundation/layout/side-panel";
 import type { AccountSummary, CarbonMe, ManagedSilicon } from "@/lib/api/types";
 import { formatDate, formatRelative } from "@/lib/format";
 import { useUpdateSilicon, useUploadSiliconPhoto } from "@/lib/query/silicons";
@@ -54,10 +54,7 @@ export interface SiliconDrawerProps {
   onRevealDone: (id: string) => void;
   /** The Silicon was deleted and the drawer has closed: remove its tile. */
   onDeleted: (uuid: string) => void;
-  /**
-   * Where keyboard focus goes back to when the drawer closes: the Silicon's tile. Radix returns focus only to a
-   * Dialog.Trigger, and the tiles open the drawer without one, so focus would otherwise drop to the page body.
-   */
+  /** Where keyboard focus goes back to when the panel closes: the Silicon's tile (it may have re-rendered). */
   focusOnClose?: (uuid: string) => HTMLElement | null | undefined;
 }
 
@@ -68,20 +65,18 @@ const LONG_ID = 18;
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export function SiliconDrawer({ silicon, open, onOpenChange, focusOnClose, ...rest }: SiliconDrawerProps) {
-  const returnFocus = (event: Event) => {
-    const target = silicon ? focusOnClose?.(silicon.uuid) : null;
-    if (!target?.isConnected) return;
-    event.preventDefault();
-    target.focus({ preventScroll: true });
-  };
+  if (!silicon) return null;
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      {silicon ? (
-        <DrawerContent className={styles.panel} title={silicon.display_name} description={`${silicon.id ?? "No id"} · uuid ${silicon.uuid}`} onCloseAutoFocus={returnFocus}>
-          <Body key={silicon.uuid} silicon={silicon} onClose={() => onOpenChange(false)} {...rest} />
-        </DrawerContent>
-      ) : null}
-    </Drawer>
+    <SidePanel
+      open={open}
+      onOpenChange={onOpenChange}
+      title={silicon.display_name}
+      description={`${silicon.id ?? "No id"} · uuid ${silicon.uuid}`}
+      returnFocus={() => focusOnClose?.(silicon.uuid)}
+      drawerClassName={styles.panel}
+    >
+      <Body key={silicon.uuid} silicon={silicon} onClose={() => onOpenChange(false)} {...rest} />
+    </SidePanel>
   );
 }
 

@@ -175,7 +175,8 @@ function withYear(date: Date, year: number): Date {
 /** The API accepts dates after 1900-01-01 and before today. */
 const MIN_DOB = new Date(1900, 0, 2);
 
-function DobForm({ value, onSave, onDone }: { value: string; onSave: (dob: string) => Promise<unknown>; onDone: () => void }) {
+/** The date of birth's year list and calendar with Save and Cancel (in a popover, or in Personal info's dialog). */
+export function DobForm({ value, onSave, onDone }: { value: string; onSave: (dob: string) => Promise<unknown>; onDone: () => void }) {
   const [bounds] = useState(() => {
     const today = new Date();
     return { max: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1), year: today.getFullYear() };

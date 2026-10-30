@@ -60,12 +60,20 @@ export function Silicons() {
   const [creating, setCreating] = useState(false);
   const [openUuid, setOpenUuid] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  /** What the side column shows: kept while it closes, so the content fades out with it. */
+  const [panel, setPanel] = useState<"silicon" | "create">("silicon");
   const [fresh, setFresh] = useState<string | null>(null);
   const carbon = asCarbon(me.data);
   const silicon = asSilicon(me.data);
 
+  const startCreating = () => {
+    setPanel("create");
+    setDrawerOpen(false);
+    setCreating(true);
+  };
+
   useRegisterCommands(() => (carbon ? [
-    { id: "silicons.create", label: "Create a Silicon", description: "You become its custodian; its STK is shown once", group: "Silicons", icon: <Plus size={16} strokeWidth={1.75} />, keywords: ["new", "silicon", "agent", "stk"], run: () => setCreating(true) },
+    { id: "silicons.create", label: "Create a Silicon", description: "You become its custodian; its STK is shown once", group: "Silicons", icon: <Plus size={16} strokeWidth={1.75} />, keywords: ["new", "silicon", "agent", "stk"], run: startCreating },
   ] : []), [!!carbon]);
 
   // Home's "New Silicon" tile links here with ?new: open the create drawer once, and drop the flag from the address.
@@ -76,12 +84,17 @@ export function Silicons() {
     url.searchParams.delete(NEW_SILICON_PARAM);
     window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
     // Next frame, after the page has painted; not cancelled, since the flag is already gone from the address.
-    requestAnimationFrame(() => setCreating(true));
+    requestAnimationFrame(() => {
+      setPanel("create");
+      setCreating(true);
+    });
   }, [carbon]);
 
   const list = silicons.data?.items ?? [];
   const selected = list.find(item => item.uuid === openUuid);
   const open = (uuid: string) => {
+    setPanel("silicon");
+    setCreating(false);
     setOpenUuid(uuid);
     setDrawerOpen(true);
   };
@@ -122,17 +135,38 @@ export function Silicons() {
 
   const waiting = requests.data?.items ?? [];
   return (
-    <Page>
-      <PageHeader
-        title="Silicons in your care"
-        description="Every Silicon has exactly one custodian, a Carbon who manages its account: its details, its id, its STK and who looks after it next."
-        actions={carbon ? (
-          <Button data-create-silicon="" onClick={() => setCreating(true)}>
-            <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
-            Create a Silicon
-          </Button>
-        ) : null}
-      />
+    <Page
+      className={styles.page}
+      header={(
+        <PageHeader
+          title="Silicons in your care"
+          description="Every Silicon has exactly one custodian, a Carbon who manages its account: its details, its id, its STK and who looks after it next."
+          actions={carbon ? (
+            <Button data-create-silicon="" onClick={startCreating}>
+              <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
+              Create a Silicon
+            </Button>
+          ) : null}
+        />
+      )}
+      panel={carbon ? (panel === "create" ? (
+        <CreateSilicon open={creating} onOpenChange={setCreating} me={carbon} onCreated={onCreated} />
+      ) : (
+        <SiliconDrawer
+          silicon={selected}
+          open={drawerOpen && !!selected}
+          onOpenChange={setDrawerOpen}
+          me={carbon}
+          now={now}
+          reveals={reveals}
+          onReveal={addReveal}
+          onRevealDone={dismissReveal}
+          onDeleted={deleted}
+          focusOnClose={uuid => tileOf(uuid) ?? fallbackFocus()}
+        />
+      )) : undefined}
+      panelOpen={panel === "create" ? creating : drawerOpen && !!selected}
+    >
       {me.error && !me.data ? (
         <Alert tone="danger" title="Your account did not load">
           {describeError(me.error)}
@@ -176,7 +210,7 @@ export function Silicons() {
                   icon={<Cpu width={24} height={24} strokeWidth={1.5} />}
                   title="No Silicons yet"
                   description="Create one and you become its custodian. A Silicon can also create its own account and name you; its request then waits for you here."
-                  action={<Button variant="secondary" onClick={() => setCreating(true)}><Plus size={16} strokeWidth={1.75} aria-hidden="true" />Create a Silicon</Button>}
+                  action={<Button variant="secondary" onClick={startCreating}><Plus size={16} strokeWidth={1.75} aria-hidden="true" />Create a Silicon</Button>}
                 />
               </div>
             ) : (
@@ -187,19 +221,6 @@ export function Silicons() {
             <ListCap page={silicons.data} noun="Silicons" command="silicon-accounts silicon list" />
           </Section>
 
-          <SiliconDrawer
-            silicon={selected}
-            open={drawerOpen && !!selected}
-            onOpenChange={setDrawerOpen}
-            me={carbon}
-            now={now}
-            reveals={reveals}
-            onReveal={addReveal}
-            onRevealDone={dismissReveal}
-            onDeleted={deleted}
-            focusOnClose={uuid => tileOf(uuid) ?? fallbackFocus()}
-          />
-          <CreateSilicon open={creating} onOpenChange={setCreating} me={carbon} onCreated={onCreated} />
         </>
       )}
     </Page>

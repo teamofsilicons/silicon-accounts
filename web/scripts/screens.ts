@@ -82,11 +82,6 @@ const foundationScreens: ScreenSpec[] = [
   { name: "kitchen-squircle-fallback", path: "/__kitchen?squircle=fallback", waitFor: "[data-kitchen-ready]", widths: [1440], themes: ["light"], settle: 1200 },
   { name: "landing", path: "/", as: "signed-out" },
   { name: "shell-home", path: "/", waitFor: "[data-home]" },
-  { name: "shell-identity-card", path: "/personal", waitFor: "[data-identity-card]", element: "[data-identity-card]" },
-  { name: "shell-identity-card-details", path: "/personal", waitFor: "[data-identity-card]", element: "[data-identity-card]", prepare: async page => {
-    await page.getByRole("button", { name: "Details" }).click();
-    await page.waitForTimeout(1100);
-  } },
   { name: "shell-palette", path: "/", waitFor: "[data-home]", fullPage: false, prepare: async page => {
     await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
     await page.waitForTimeout(600);

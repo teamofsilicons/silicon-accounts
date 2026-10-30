@@ -13,6 +13,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 **Redesign in progress:** read `redesign/priorities.md` and `redesign/decisions.md` first, and update them and
 `redesign/log.md` before finishing a task.
 
+**The prototype is the design:** `redesign/prototype-v7.html` decides what the site shows and how its elements look.
+Follow `redesign/prototype-rules.md`. Build nothing the prototype does not show; when a layout leaves a gap or something
+seems missing, ask Anil instead of inventing it. Where Silicon UI and the prototype disagree, categorise the
+difference there, apply that category's fix, and record it in `redesign/prototype-differences.md`. End every task by
+listing to Anil the differences it leaves or finds.
+
 The account site: Next.js 16 App Router, React 19, TypeScript strict, pnpm, Silicon UI from npm (`@teamofsilicons/silicon-ui`, rules below), TanStack
 Query in `lib/query/`. `README.md` is the guide: topology, who owns which routes, conventions, hooks, squircles,
 branding runtime, SDK, the Arc local-edit log, the style guide and screenshots. Read it before changing anything.

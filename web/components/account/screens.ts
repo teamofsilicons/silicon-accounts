@@ -1,6 +1,6 @@
 /**
  * Screens of the account pages, picked up by scripts/screens.ts and answered by the mock API (scripts/mock/): the
- * identity card and its editors, sign-in methods (adding an email up to the code), apps, proofs, Silicons (the
+ * Personal info and its editors, sign-in methods (adding an email up to the code), apps, proofs, Silicons (the
  * request deck, the create drawer and a Silicon's drawer section by section), activity and settings, long names and
  * ids, plus empty pages.
  *
@@ -65,7 +65,8 @@ const longSilicon = { ...data.silicons[0], uuid: "Lng", id: "si:a_very_long_sili
 
 const click = async (page: Page, name: string | RegExp) => { await page.getByRole("button", { name }).first().click(); };
 const wait = (page: Page, ms = 700) => page.waitForTimeout(ms);
-const drawer = "[role='dialog']";
+/** A Silicon's panel: the side column from 1024px (SidePanel), the bottom drawer under it. */
+const drawer = "[role='dialog'], [data-side-panel][data-open]";
 
 async function openSilicon(page: Page, id: string) {
   await page.getByRole("button", { name: new RegExp(`^Manage ${id}`) }).click();
@@ -78,7 +79,8 @@ async function drawerTo(page: Page, heading: string) {
   await wait(page, 400);
 }
 
-const card = "[data-identity-card]";
+/** Personal info is ready when its Profile card is. */
+const card = "#personal-profile";
 
 const shown: ScreenSpec[] = [
   // Home: needs you with a custodian request, then all clear with the introduction dismissed.
@@ -88,12 +90,11 @@ const shown: ScreenSpec[] = [
   { name: "account-home-clear", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })]], prepare: async page => { await click(page, "Dismiss"); await wait(page, 400); } },
   // Identity: the card, its back, the photo menu, the editors and the id dialog with a taken id.
   { name: "account-identity", path: "/personal", waitFor: card },
-  { name: "account-identity-details", path: "/personal", waitFor: card, prepare: async page => { await click(page, "Details"); await wait(page, 1200); } },
-  { name: "account-identity-photo", path: "/personal", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Change your photo"); await wait(page); } },
-  // The timezone lives in Settings ("Local time") since the identity card was trimmed to recognition.
-  { name: "account-identity-timezone", path: "/settings", fullPage: false, prepare: async page => { await click(page, "Change your timezone"); await wait(page); } },
-  { name: "account-identity-dob", path: "/personal", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Details"); await wait(page, 1200); await click(page, "Change your date of birth"); await wait(page); } },
-  { name: "account-identity-change-id", path: "/personal", waitFor: card, fullPage: false, prepare: async page => { await click(page, "Change id"); await wait(page); await page.keyboard.type("shubham"); await wait(page, 1200); } },
+  { name: "account-identity-name", path: "/personal?edit=name", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
+  { name: "account-identity-photo", path: "/personal?edit=photo", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
+  { name: "account-identity-timezone", path: "/personal?edit=timezone", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
+  { name: "account-identity-dob", path: "/personal?edit=dob", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
+  { name: "account-identity-change-id", path: "/personal?edit=id", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); await page.keyboard.type("shubham"); await wait(page, 1200); } },
 
   // Sign-in methods: the lists, adding an email up to the code, and the remove question.
   { name: "account-sign-in-methods", path: "/sign-in-methods" },
@@ -123,7 +124,7 @@ const shown: ScreenSpec[] = [
 
   // Silicons: the deck and tiles, the create drawer, a Silicon's drawer section by section.
   { name: "account-silicons", path: "/silicons" },
-  { name: "account-silicons-new", path: "/silicons?new", fullPage: false, prepare: async page => { await page.waitForSelector("[role='dialog']"); await wait(page, 900); } },
+  { name: "account-silicons-new", path: "/silicons?new", fullPage: false, prepare: async page => { await page.waitForSelector(drawer); await wait(page, 900); } },
   { name: "account-silicons-create", path: "/silicons", fullPage: false, prepare: async page => {
     await page.locator("[data-create-silicon]").click();
     await page.waitForSelector(drawer);

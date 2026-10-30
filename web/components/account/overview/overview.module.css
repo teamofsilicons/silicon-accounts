@@ -1,87 +1,99 @@
-/* Home: the greeting over a main column (needs you, Silicons, apps) and a side column (the introduction, your details)
-   that stays in view; one type scale (title, block heading, row title, row detail) and one tile style for every block
-   (redesign/decisions.md, 2026-10-30: flat, tiles, column + aside). */
-.overview { display: grid; width: 100%; max-width: var(--page-max); min-width: 0; gap: var(--space-block); margin-inline: auto; }
-.columns { display: grid; min-width: 0; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); align-items: start; gap: var(--space-block); }
-.mainColumn, .sideColumn { display: grid; min-width: 0; gap: var(--space-block); }
-.sideColumn { position: sticky; top: calc(var(--top-height) + var(--space-section)); }
-@media (max-width: 1023px) {
-  .columns { grid-template-columns: minmax(0, 1fr); }
-  .sideColumn { position: static; }
-}
+/* Home, to the prototype (redesign/prototype-v7.html: .greet, .needs, .scard/.srow, .intro, .sechd, .sigrid/.sic,
+   .allclear). Its sizes are mapped onto Silicon UI tokens; where no token matches, the nearest one is used and the
+   difference is listed in redesign/prototype-differences.md. */
+.home { display: grid; min-width: 0; gap: var(--space-section); }
 .alertAction { display: block; margin-top: var(--space-group); }
 
-/* ---------------------------------------------------- type scale ---------------------------------------------------- */
-.title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); overflow-wrap: anywhere; }
-.blockTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: var(--leading-snug); }
-.rowTitle { min-width: 0; overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug); text-overflow: ellipsis; white-space: nowrap; }
-.rowDetail { min-width: 0; overflow: hidden; color: var(--text-muted); font-size: var(--text-sm); line-height: var(--leading-body); text-overflow: ellipsis; }
-
 /* ------------------------------------------------------ greeting ---------------------------------------------------- */
-.greeting { display: flex; min-width: 0; align-items: center; gap: var(--space-inset); }
+.greeting { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-inset); }
+/* Tight stack so the title + handle match the ringed photo beside them. */
 .greetingText { display: grid; min-width: 0; justify-items: start; gap: var(--space-tight); }
-.handle { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); display: inline-flex; min-width: 0; align-items: center; gap: var(--space-hair); padding-inline-start: var(--space-related); background: var(--sq-fill); color: var(--text-secondary); font-size: var(--text-sm); }
+.title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); overflow-wrap: anywhere; }
+/* Your photo in the prototype's ring: a conic gradient of the Silicon colours, a white gap, then the photo. */
+.ring { display: inline-grid; flex: none; padding: var(--space-tight); border-radius: var(--radius-full); corner-shape: round; background: conic-gradient(from 200deg, var(--silicon-mark-1-from), var(--silicon-mark-1-to), var(--silicon-mark-2-to), var(--silicon-mark-2-from), var(--silicon-mark-3-from), var(--silicon-mark-1-from)); }
+.ring > * { box-shadow: 0 0 0 3px var(--surface); }
+/* The handle: your id, mono, in a small grey chip; the chip itself copies on tap. Nested so
+   padding and height beat Button's size rules (.button.sm). */
+.greeting .greetingText .handle { --sq-r: var(--radius-control); --sq-fill: var(--canvas); min-width: 0; min-height: 0; height: auto; padding: var(--space-hair) var(--space-related); border-color: transparent; background: var(--sq-fill); color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 400; line-height: var(--leading-snug); }
+.greeting .greetingText .handle:hover:not(:disabled), .greeting .greetingText .handle:active:not(:disabled) { background: var(--surface-muted); color: var(--foreground); }
 
-/* All clear: one quiet line where the needs-you card would be. */
-.allClear { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); margin: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; scroll-margin-top: var(--space-section); }
-.allClear svg { color: var(--success); }
-.allClearNote { color: var(--text-muted); font-weight: 400; }
+/* -------------------------------------------------------- card ------------------------------------------------------ */
+/* The prototype's card: white, a hairline edge, the container radius, a header with the title inside. */
+.card { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); min-width: 0; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); }
+.cardHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); padding: var(--space-inset) var(--space-comfort) var(--space-group); }
+.cardTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: var(--leading-snug); }
+/* Needs you: the card with a warning-tinted edge. */
+.needs { --sq-stroke: color-mix(in oklab, var(--warning) 35%, var(--border)); outline: none; scroll-margin-top: var(--space-section); }
+.needs:focus-visible { --sq-stroke: var(--warning); }
 
-/* -------------------------------------------------------- tile ------------------------------------------------------ */
-/* The one block style, a tile: the quiet grey fill on the white page, no edge, the overlay radius. Variants only change
-   the fill. */
-.card { --sq-r: var(--radius-overlay); --sq-fill: var(--canvas); min-width: 0; background: var(--sq-fill); color: var(--foreground); }
-.cardHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); padding: var(--space-group) var(--space-inset); }
-
-/* Needs you: a plain tile, its rows under the heading; the warning badge carries the signal (a warning wash reads as
-   beige, which the site does not use). */
-.needs { outline: none; scroll-margin-top: var(--space-section); }
-.needs:focus-visible { outline: 2px solid var(--warning); outline-offset: 2px; }
+/* Rows: a lead (icon tile or mark), a title over a muted line, actions at the end; a hairline above each. */
 .rows { margin: 0; padding: 0; list-style: none; }
-.rows { padding-bottom: var(--space-tight); }
-.row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-group) var(--space-inset); }
+.row { display: flex; min-width: 0; min-height: 56px; align-items: center; gap: var(--space-group); padding: var(--space-group) var(--space-comfort); border-top: 1px solid var(--border); }
 .rowText { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); }
-.rowAction { display: flex; flex: none; gap: var(--space-related); }
+.rowTitle { min-width: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug); }
+.rowDetail { min-width: 0; color: var(--text-muted); font-size: var(--text-sm); line-height: var(--leading-body); }
+.rowAction { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: var(--space-related); }
+@media (max-width: 560px) { .row { flex-wrap: wrap; } .rowAction { width: 100%; padding-inline-start: calc(var(--space-block) + var(--space-related) + var(--space-group)); } }
 
-/* A round mark the size of a md avatar: neutral, or the Silicon gradient for Silicons. */
-.mark { display: grid; width: 36px; height: 36px; flex: none; place-items: center; border-radius: var(--radius-full); background: var(--surface-muted); color: var(--text-secondary); }
-.siliconMark { background: var(--silicon-gradient); color: var(--silicon-gradient-foreground); }
-/* A Silicon's avatar sits in a thin gradient ring, so Silicons read apart from apps and people. */
-.siliconRing { display: inline-grid; flex: none; padding: var(--space-hair); border-radius: var(--radius-full); background: var(--silicon-gradient-line); }
+/* An icon tile: a rounded square holding an icon on the quiet fill. */
+.iconTile { --sq-r: var(--radius-control); --sq-fill: var(--canvas); display: grid; width: 40px; height: 40px; flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
 
-/* Introduction: the tile on the Silicon gradient's soft wash, its three points stacked in the side column. */
-.intro { background: var(--silicon-gradient-soft); }
-.introItems { display: grid; gap: var(--space-inset); margin: 0; padding: 0 var(--space-inset) var(--space-inset); list-style: none; }
-.introItem { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--space-group); row-gap: var(--space-hair); }
-.introItem > :first-child { grid-row: span 2; }
+/* All clear: one green line where Needs you would be. */
+.allClear { --sq-r: var(--radius-container); --sq-fill: color-mix(in oklab, var(--success) 10%, var(--surface)); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); margin: 0; padding: var(--space-related) var(--space-inset); background: var(--sq-fill); color: var(--success); font-size: var(--text-sm); font-weight: 500; scroll-margin-top: var(--space-section); }
+.allClearNote { color: var(--text-secondary); font-weight: 400; }
 
-/* Your details: label and value rows. */
-.details { display: grid; gap: var(--space-group); margin: 0; padding: var(--space-inset); }
-.detail { display: grid; min-width: 0; gap: var(--space-hair); }
-.detail dd { margin: 0; }
+/* ---------------------------------------------------- introduction -------------------------------------------------- */
+.intro { --sq-stroke: color-mix(in oklab, var(--silicon-mark-1-from) 25%, var(--border)); display: grid; gap: var(--space-inset); padding: var(--space-comfort) var(--space-comfort) var(--space-inset); background: linear-gradient(160deg, color-mix(in oklab, var(--silicon-mark-1-from) 9%, var(--surface)), var(--surface) 75%); }
+.introHead { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-group); margin: calc(var(--space-tight) * -1) calc(var(--space-related) * -1) 0 0; }
+.introTitle { margin: var(--space-tight) 0 0; color: var(--foreground); font-size: var(--text-lg); font-weight: 500; line-height: var(--leading-snug); }
+.introItems { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); margin: 0; padding: 0; list-style: none; }
+@media (max-width: 640px) { .introItems { grid-template-columns: minmax(0, 1fr); } }
+.introItem { display: grid; justify-items: start; align-content: start; gap: var(--space-related); color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.introLabel { color: var(--foreground); font-weight: 500; }
+/* "Apps": three dark app marks, overlapping. */
+.appStack { display: inline-flex; }
+.introApp { --sq-r: var(--radius-control); --sq-fill: var(--primary); display: grid; width: 36px; height: 36px; place-items: center; background: var(--sq-fill); box-shadow: 0 0 0 2px var(--surface); color: var(--primary-foreground); }
+.introApp + .introApp { margin-inline-start: calc(var(--space-related) * -1); }
 
-/* -------------------------------------------------------- blocks ---------------------------------------------------- */
-.block { display: grid; min-width: 0; gap: var(--space-group); }
-.blockHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-group); }
-.seeAll { color: var(--text-secondary); font-size: var(--text-sm); text-decoration: none; }
-.seeAll:hover, .seeAll:focus-visible { color: var(--foreground); text-decoration: underline; }
+/* ------------------------------------------------------- sections --------------------------------------------------- */
+.block { display: grid; min-width: 0; gap: var(--space-inset); }
+.sectionHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); margin-top: var(--space-tight); }
+.sectionTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: var(--leading-snug); }
+.seeAll { color: var(--accent-ink); font-size: var(--text-sm); font-weight: 500; text-decoration: none; }
+.seeAll:hover, .seeAll:focus-visible { text-decoration: underline; }
 
 /* -------------------------------------------------------- tiles ----------------------------------------------------- */
 .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); }
-.appTiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (max-width: 640px) { .tiles, .appTiles { grid-template-columns: minmax(0, 1fr); } }
+.appTiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 760px) { .appTiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .tiles { grid-template-columns: minmax(0, 1fr); } .appTiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-.tile { display: grid; align-content: space-between; gap: var(--space-group); padding: var(--space-inset); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
-.tile:hover { --sq-fill: var(--surface-muted); color: var(--foreground); }
-.tile:focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
-.tileHead { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
+.tile { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; min-width: 0; flex-direction: column; gap: var(--space-group); padding: var(--space-group) var(--space-inset) var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+.tile:hover { --sq-fill: var(--canvas); color: var(--foreground); }
+.tile:active { --sq-fill: var(--surface-muted); }
+.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tileHead { display: flex; min-width: 0; align-items: center; gap: var(--space-group); }
+.tileName { min-width: 0; overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .tileFoot { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
-.tileFoot > * { flex: none; }
-.tileFoot > .rowDetail { flex: 1; white-space: nowrap; }
-.newTile { --sq-fill: transparent; align-content: center; justify-items: center; border: 1px dashed var(--border-strong); }
-.newTile:hover { --sq-fill: var(--canvas); }
+.tileDetail { min-width: 0; overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
+/* New Silicon: a dashed tile, centred. */
+.newTile { --sq-stroke: var(--border-strong); align-items: center; justify-content: center; gap: var(--space-tight); border-style: dashed; text-align: center; }
 
-/* The empty well: a tile with muted words. */
-.well { margin: 0; padding: var(--space-group) var(--space-inset); color: var(--text-muted); font-size: var(--text-sm); }
+/* The quiet line in place of empty tiles. */
+.quiet { --sq-r: var(--radius-container); --sq-fill: var(--canvas); margin: 0; padding: var(--space-related) var(--space-inset); background: var(--sq-fill); color: var(--text-muted); font-size: var(--text-sm); }
+
+/* ------------------------------------------------------- dialogs ---------------------------------------------------- */
+.dialogText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); margin-top: var(--space-inset); }
 
 @media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
+
+/* Needs you and Finish setting up, together under one anchor. */
+.needsGroup { display: grid; gap: var(--space-section); outline: none; scroll-margin-top: var(--space-section); }
+/* Finish setting up: the checklist card (the lab's F). */
+.checkHead { display: grid; gap: var(--space-group); padding: var(--space-inset) var(--space-comfort); }
+.checkTitleRow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-group); }
+.checkCount { color: var(--text-muted); font-size: var(--text-sm); }
+.iconTileWarning { --sq-fill: color-mix(in oklab, var(--warning) 12%, var(--surface)); color: var(--warning); }
+.iconTileDone { color: var(--success); }
+.rowDone { color: var(--text-muted); font-size: var(--text-sm); font-weight: 500; text-decoration: line-through; }

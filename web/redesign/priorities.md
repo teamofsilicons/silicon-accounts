@@ -12,10 +12,10 @@ Last updated: 2026-10-30
    request and offer pages; Home's Silicon tiles then link to each Silicon. Map: [prototype-map.md](prototype-map.md).
 
 ## Next
-2. Carry Home's layout to every page: PageHeader and Section at Home's type scale, blocks as Home's tiles, each page's
-   content layout by the content layout rule (decisions.md: narrow centred column, column + aside, or an aside an
-   action opens with an animation), as Page variants in foundation/layout (shared). Silicons, Apps, Security and Settings still show
-   the old large titles and outlined cards.
+2. Finish moving pages to tiles. Page, Section, Surface and SettingsGroup follow the rule and Home's type scale now,
+   but some pages still draw their own outlined cards: Security's lists, Connected apps' cards, Silicon tiles, the
+   identity card and the empty states. Connected apps is the next likely aside on action (an app's detail beside the
+   list).
 3. Account command menu on Silicon UI Dialog instead of direct Radix, if Dialog can hold the palette without its own
    title row (else report what is missing).
 4. Connected apps: list, `/apps/[id]`, Permissions between apps (`/proofs`).
@@ -38,11 +38,17 @@ Last updated: 2026-10-30
 - The developer portal (`../../developer`, ~24k lines on its own Arc UI copies): its own redesign, after this site.
 
 ## Waiting on Anil
+- Home rebuilt to the prototype: review it, then the other pages follow. Open in prototype-differences.md: canvas and page panel, Silicon photos or marks, when a device counts as not used lately, search as a field or the palette, help and app switcher.
 - Landing, still open from the audit: sign-up as its own job; CLI fixes (`--self-create` default, one-line installer) are outside this site.
 - Design review open questions: Proofs folded fully or a
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+- 2026-10-30 Needs you lab (/__needs); Home's Needs you as the picked checklist with requests above it (uncommitted)
+- 2026-10-30 Inset shell; system font; Carbon pixel avatars by default with an editor in Personal info (save uploads it as the photo) (uncommitted)
+- 2026-10-30 Personal info to the prototype: Profile and Contact boxes from its own CSS, whole rows opening their editors by address (uncommitted)
+- 2026-10-30 Home to the prototype's element design (cards, rows, icon tiles, Silicon marks, ring, introduction, tiles) in its states; blue accent; Hanken everywhere with a dev font switch; the prototype rules (uncommitted)
+- 2026-10-30 Content layout rule on every account page: Page's narrow centred column, aside (Home) and an action's animated side column (SidePanel: a Silicon, Create a Silicon); page and section titles at Home's scale; Surface and SettingsGroup as tiles (uncommitted)
 - 2026-10-30 Content layout rule written and prototyped: "Aside on action" in /__layouts (the column glides aside as the side column opens; a bottom drawer under 1024 px) (uncommitted)
 - 2026-10-30 Flat shell, tiles, column + aside from the layout lab: the live shell has no panel, and Home's blocks are tiles in a main and a side column with Your details (uncommitted)
 - 2026-10-30 Layout lab at /__layouts: shell, sidebar, element and content layouts explored in the loading state (17709c2)
