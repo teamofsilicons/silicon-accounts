@@ -1,5 +1,10 @@
 # web-auth: the hosted sign-in pages
 
+The completion page shares one redirect claim between its timer and Continue link. Clicking the link cancels the
+timer, and repeated clicks cannot open the same single-use code again while the destination loads. Run
+`pnpm exec tsx components/auth/test/redirect-browser.mts` from `web/` to check this with the actual component and a
+slow callback, including reduced motion, blocked storage, double clicks, and the timer winning first.
+
 The pages a Carbon sees while signing into an app, the account site's own sign-in, CLI device approval and the embed
 page. Routes are in `app/(app)/(auth)/`, everything else is here. Read `web/README.md` first (topology, conventions, hooks,
 branding runtime); the product contract is `understanding/UNDERSTANDING.md`.
