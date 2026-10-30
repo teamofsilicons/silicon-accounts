@@ -164,6 +164,10 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   answers it. Requests and handovers aren't setup, so they stay as rows in a Needs you card above the checklist.
   (2026-10-30)
 
+- Panel shell (Anil, 2026-10-30): the lab's Panel, as in the prototype. The top bar (brand, search, the account menu)
+  and the sections sit on the canvas, and the page is a white panel beside them. Under 900 px, a top bar and bottom
+  sheet, with the page full bleed. Supersedes the inset shell from earlier the same day. (2026-10-30)
+
 ## Process
 - Keep priorities.md, decisions.md and log.md (this folder) updated with every task; shared-code changes also get a
   README.md note, as the site already does. Why: state lives in repo files, not chat. (2026-10-17)

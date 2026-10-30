@@ -236,35 +236,34 @@ export function AccountShell({ children }: { children: ReactNode }) {
     </Link>
   );
   const search = (
-    <Button variant="secondary" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"} aria-label={narrow ? "Search your account" : undefined}>
+    <Button variant="soft" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"} aria-label={narrow ? "Search your account" : undefined}>
       <Search size={16} strokeWidth={1.75} aria-hidden="true" />
       <span className={styles.searchLabel}>Search your account</span>
-      <kbd className={styles.keys}>{isApple ? "⌘ K" : "Ctrl K"}</kbd>
+      <kbd data-sq="surface" className={styles.keys}>{isApple ? "⌘K" : "Ctrl K"}</kbd>
     </Button>
   );
   const accountMenu = account ? (
     <UserMenu
       user={account}
       showTheme={false}
-      showName={!narrow}
       onSignOut={menuSignOut}
-      align={narrow ? "end" : "start"}
+      align="end"
       items={[{ label: "Settings", icon: <SettingsIcon size={16} strokeWidth={1.75} />, onSelect: () => void go(paths.settings) }]}
     />
   ) : null;
 
-  // The inset shell (redesign/decisions.md, 2026-10-30): from 900px there is no top bar; the sidebar carries the brand
-  // and search above the sections and the account menu at its foot, and the page is a panel inset on every side.
-  // Under 900px a top bar holds the brand, search, the account menu and the sections in a bottom sheet.
+  // The panel shell (redesign/decisions.md, 2026-10-30): the top bar (brand, search, the account menu) and the
+  // sections sit on the canvas and the page is a white panel beside them. Under 900px the sections move into a bottom
+  // sheet from the top bar and the page is full bleed.
   const chrome = (content: ReactNode) => (
     <div className={styles.shell}>
       <SkipLink href="#main" />
-      {narrow ? (
-        <header className={styles.top}>
-          {brand}
-          {search}
-          <span className={styles.topEnd}>
-            {accountMenu}
+      <header className={styles.top}>
+        {brand}
+        {search}
+        <span className={styles.topEnd}>
+          {accountMenu}
+          {narrow ? (
             <BottomSheet
               title="Your account"
               open={sheetOpen}
@@ -273,13 +272,13 @@ export function AccountShell({ children }: { children: ReactNode }) {
             >
               <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} />
             </BottomSheet>
-          </span>
-        </header>
-      ) : null}
+          ) : null}
+        </span>
+      </header>
       <div className={styles.body}>
         {narrow ? null : (
           <aside className={styles.aside}>
-            <Sidebar activeKey={active?.key} developerUrl={developerUrl} head={<>{brand}{search}</>} account={accountMenu} />
+            <Sidebar activeKey={active?.key} developerUrl={developerUrl} />
           </aside>
         )}
         <main id="main" data-sq-native="" className={styles.main} tabIndex={-1}>{content}</main>

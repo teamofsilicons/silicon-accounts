@@ -722,9 +722,9 @@ in `redesign/api-gaps.md`).
   re-applies the pick (`data-font` on `<html>`).
 - **Page gap**: 24 px between a page's blocks, as in the prototype.
 - **Inset shell, system font, Carbon avatars** (2026-10-30):
-  - **Shell:** from 900 px the sidebar carries the brand, search, sections, other sites and the account menu
-    (`Sidebar` takes `head` and `account`), and `main` is a panel inset on the canvas. Under 900 px, the top bar and
-    bottom sheet as before.
+  - **Shell:** the panel shell, as in the prototype. The top bar and sections sit on the canvas and `main` is a white
+    panel beside them. Under 900 px, the top bar and bottom sheet. `Sidebar` still takes `head` and `account` from
+    the inset trial, though nothing passes them now.
   - **Font:** `--font-body` is the system font. The development font switch offers Hanken Grotesk and Geist.
   - **Avatars:** `lib/pixel-avatar.ts` draws a Carbon's pixel avatar (cells, an SVG data URL, a PNG).
     `components/foundation/avatar/pixel-avatar.tsx` animates it at large sizes. `lib/carbon-avatar.ts`

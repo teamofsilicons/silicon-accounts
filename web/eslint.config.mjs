@@ -15,6 +15,7 @@ export default defineConfig([
   },
   // Silicon UI's guardrails: no re-created components, no borrowed component CSS, no local component copies.
   // Older violations are recorded in eslint-suppressions.json; it may only shrink (docs/guardrails.md in silicon-ui).
-  // nav-list: the account sidebar (redesign/decisions.md, 2026-10-29), a deliberate opt-in to an experimental component.
-  ...siliconUi({ allowExperimental: ["nav-list"] }),
+  // nav-list: the account sidebar (redesign/decisions.md, 2026-10-29). button: the search trigger's soft variant
+  // (borderless grey, the bar control), still experimental in Silicon UI 0.4.
+  ...siliconUi({ allowExperimental: ["nav-list", "button"] }),
 ]);

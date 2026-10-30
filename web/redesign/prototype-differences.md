@@ -14,7 +14,7 @@ marked "check" is a first guess, to be confirmed against Silicon UI's code befor
 | Canvas colour | Warm grey `#F2F1EE` | Neutral; no beige (2026-10-18) | asking |
 | Accent | Blue `#3460F0` (links such as "See all", focus) | Blue (2026-10-30) | done |
 | Font | BDO Grotesk, then Hanken Grotesk | The system font (2026-10-30); a palette switch to compare | kept (Anil) |
-| Page panel | White rounded panel on the canvas, top bar above | Inset: the panel on the canvas, no top bar; brand, search and account in the sidebar (2026-10-30) | kept (Anil) |
+| Page panel | White rounded panel on the canvas, top bar above | The same: panel shell (2026-10-30) | done |
 | Blocks | White cards, hairline border, title inside | Cards on Home (2026-10-30); other pages still old | open |
 
 ## Made up, not in the prototype: remove

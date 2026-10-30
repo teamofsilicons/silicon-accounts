@@ -77,3 +77,6 @@ Every change, one line each, newest at the bottom. Format: `- YYYY-MM-DD <commit
 - 2026-10-30 verify: eslint, silicon-ui-check, typecheck; live new-account Home (2 of 4 left); requests card not rechecked with sample data
 - 2026-10-30 fix shell/home: greeting handle is a tighter chip that copies on tap (no CopyButton); sidebar search and account row fill the aside width (no extra head inset) (overview.*, sidebar.module.css, shell.module.css, account-shell.tsx)
 - 2026-10-30 fix home/shell: greeting photo lg (48) with a tighter title/handle stack to match the ring; UserMenu left as Silicon UI's compact trigger (undid the full-width stretch) (overview.*, sidebar.module.css, shell.module.css, account-shell.tsx)
+- 2026-10-30 wip shell: back to the panel shell (top bar and sections on the canvas, page a white panel beside them), as the prototype; Sidebar's head/account props unused (account-shell.tsx, shell.module.css, README.md)
+- 2026-10-30 verify: eslint, silicon-ui-check, typecheck; live at 1440 and 375 px
+- 2026-10-30 fix shell: search trigger is Silicon UI's soft button (grey, no border), muted label, ⌘K as a small key (account-shell.tsx, shell.module.css, eslint.config.mjs)
