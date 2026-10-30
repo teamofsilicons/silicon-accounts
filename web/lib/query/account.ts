@@ -6,7 +6,7 @@
  * Failures toast with the server's message and hint unless the caller passes `meta: { toast: false }` through
  * `mutate(…, …)` options or handles them inline.
  */
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/endpoints";
 import type { ApiError } from "../api/errors";
 import type { EmailView, HistoryKind, Me, PhoneView, ProfileUpdate } from "../api/types";
@@ -183,6 +183,18 @@ export function useUnlinkIdentity() {
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Apps, sessions, history and proofs                                                                                  */
 /* ------------------------------------------------------------------------------------------------------------------ */
+
+/** Several apps' public details (name, logo, homepage; `GET /v1/apps/{app_id}/public`), for Home's popular apps. */
+export function usePublicApps(appIds: readonly string[]) {
+  return useQueries({
+    queries: appIds.map(appId => ({
+      queryKey: queryKeys.app.public(appId),
+      queryFn: ({ signal }: { signal: AbortSignal }) => api.apps.public(appId, signal),
+      staleTime: 10 * 60_000,
+      retry: false,
+    })),
+  });
+}
 
 /** Every app this account signed into (the whole list, every page of 200; see lib/query/pages.ts). */
 export function useMyApps() {

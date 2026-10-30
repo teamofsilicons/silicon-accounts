@@ -17,7 +17,7 @@
  */
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
-import { AtSign, Bell, Briefcase, Check, KeyRound, Laptop, MessageSquare, Plus, Smartphone, X } from "lucide-react";
+import { Bell, Briefcase, Check, MessageSquare, Plus, X } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Badge, type BadgeTone } from "@teamofsilicons/silicon-ui/badge";
@@ -29,9 +29,9 @@ import { PixelAvatar } from "@/components/foundation/avatar/pixel-avatar";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page } from "@/components/foundation/layout/layout";
-import type { CarbonMe, CustodianRequest, ManagedSilicon, Me, MyApp, SessionInfo } from "@/lib/api/types";
+import type { CustodianRequest, ManagedSilicon, Me, MyApp } from "@/lib/api/types";
 import { useCarbonPicture } from "@/lib/carbon-avatar";
-import { formatPhone, formatRelative } from "@/lib/format";
+import { formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useDeclineCustodianRequest } from "@/lib/query/silicons";
 import { useMe } from "@/lib/query/session";
@@ -39,7 +39,7 @@ import { NEEDS_YOU_ID, NEW_SILICON_PARAM } from "../parts/anchors";
 import { AppMark } from "../parts/app-mark";
 import { asCarbon, describeError, msUntil, personLabel, spanText, useNow } from "../parts/common";
 import { useEveryApp, useEveryCustodianRequest, useEverySession, useEverySilicon, useSignOutSession } from "../parts/queries";
-import { sessionName } from "../security/sessions";
+import { STEP_ICON, checkupSteps, keepSession, readKept, subscribeKept, type Step } from "../parts/checkup";
 import { SiliconMark } from "../parts/silicon-mark";
 import { RequestDeck } from "../silicons/request-deck";
 import styles from "./overview.module.css";
@@ -220,63 +220,6 @@ function NeedsYou({ me }: { me: Me }) {
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Finish setting up: the prototype's security checkup as a checklist                                                  */
 /* ------------------------------------------------------------------------------------------------------------------ */
-
-/** A device not used for this long is "not used lately" (Anil, 2026-10-30). */
-const STALE_MS = 7 * 86_400_000;
-
-/** Sessions the Carbon chose to keep although they are not used lately, remembered in this browser. */
-const KEPT_KEY = "accounts.home.kept-sessions";
-const keptListeners = new Set<() => void>();
-const subscribeKept = (listener: () => void) => {
-  keptListeners.add(listener);
-  return () => keptListeners.delete(listener);
-};
-function readKept(): string {
-  try {
-    return window.localStorage.getItem(KEPT_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-function keepSession(id: string) {
-  try {
-    const ids = new Set(readKept().split(",").filter(Boolean));
-    ids.add(id);
-    window.localStorage.setItem(KEPT_KEY, [...ids].join(","));
-  } catch {
-    // Storage blocked: the question comes back next visit.
-  }
-  keptListeners.forEach(listener => listener());
-}
-
-interface Step {
-  key: "provider" | "email" | "phone" | "devices";
-  done: boolean;
-  title: string;
-  detail: string;
-  /** The device not used lately, for Keep and Sign out. */
-  stale?: SessionInfo;
-}
-
-/** The prototype's checkup (Security), in its order: a second way in, a verified email, a recovery phone, devices. */
-function checkupSteps(carbon: CarbonMe, sessions: SessionInfo[] | undefined, now: number, kept: string): Step[] {
-  const providers = carbon.identities.map(identity => (identity.provider === "google" ? "Google" : identity.provider === "apple" ? "Apple" : null)).filter(Boolean);
-  const email = carbon.emails.find(item => item.verified_at && item.is_primary) ?? carbon.emails.find(item => item.verified_at);
-  const phone = carbon.phones.find(item => item.is_primary) ?? carbon.phones[0];
-  const keptIds = new Set(kept.split(",").filter(Boolean));
-  // Until the sessions load, devices count as fine rather than flash a question.
-  const stale = (sessions ?? []).find(item => !item.current && !keptIds.has(item.id) && !!item.last_seen_at && now - Date.parse(item.last_seen_at) > STALE_MS);
-  return [
-    { key: "provider", done: providers.length > 0, title: "Sign in with Google or Apple", detail: providers.length ? `${providers.join(" and ")} signs you in` : "A second way in that isn't a code" },
-    { key: "email", done: !!email, title: "Verified email", detail: email?.email ?? "Add an email" },
-    { key: "phone", done: !!phone, title: "Recovery phone", detail: phone ? formatPhone(phone.phone) : "Gets you in if you lose your email" },
-    stale
-      ? { key: "devices", done: false, title: "Only devices you still use", detail: `${sessionName(stale)} · last used ${formatRelative(stale.last_seen_at ?? stale.created_at, now)}`, stale }
-      : { key: "devices", done: true, title: "Only devices you still use", detail: "Every device was used recently" },
-  ];
-}
-
-const STEP_ICON = { provider: KeyRound, email: AtSign, phone: Smartphone, devices: Laptop } as const;
 
 function Checklist({ steps }: { steps: Step[] }) {
   const signOut = useSignOutSession();

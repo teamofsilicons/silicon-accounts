@@ -24,7 +24,10 @@
 /* The page: a panel on the canvas (panel), a panel inset on every side and lifted a little (inset), or the page itself
    (flat, and open, where it shares the one background and only its content is surfaces). */
 .main { display: flex; min-width: 0; flex-direction: column; }
-.lab[data-shell="panel"] .main { --sq-r: var(--radius-overlay); margin: 0 var(--space-group) var(--space-group) 0; border: 1px solid var(--border); background: var(--surface); }
+.lab[data-shell="panel"] .body { gap: var(--space-related); padding: var(--space-related); }
+.lab[data-shell="panel"] .main { --sq-r: 8px; --sq-k: 1; margin: 0; border: 1px solid var(--border); background: var(--surface); }
+:global(:root) .lab[data-shell="panel"] .main[data-sq-native] { corner-shape: round; border-radius: var(--sq-r); }
+.lab[data-shell="panel"] .sidebar { top: calc(var(--top-height) + var(--space-related)); height: calc(100dvh - var(--top-height) - (var(--space-related) * 2)); padding: 0; }
 .lab[data-shell="inset"] .main { --sq-r: var(--radius-overlay); margin: var(--space-related) var(--space-related) var(--space-related) 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-resting); }
 .lab[data-shell="flat"] .main { background: var(--surface); }
 

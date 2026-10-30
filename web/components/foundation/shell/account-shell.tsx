@@ -14,7 +14,7 @@
  */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ViewTransition, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { ViewTransition, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { LogOut, Menu, Search, Settings as SettingsIcon, SwatchBook, Type } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { BottomSheet } from "@teamofsilicons/silicon-ui/bottom-sheet";
@@ -29,10 +29,12 @@ import { ELSEWHERE, MORE_DESTINATIONS, SECTIONS, navigationType, paths, sectionF
 import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
 import { beginSignIn, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
-import { BrandMark } from "./brand-mark";
+import { PrototypeMark } from "./brand-mark";
+import { DevStatesPanel } from "@/components/foundation/dev/dev-states";
 import { CommandMenu } from "./command-menu";
 import { LeaveQuestionHost } from "./leave-question";
 import { Sidebar } from "./sidebar";
+import { SIDEBAR_STEPS, SidebarResize, useSidebarStep } from "./sidebar-resize";
 import styles from "./shell.module.css";
 
 const subscribeNothing = () => () => undefined;
@@ -89,6 +91,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const developerUrl = useDeveloperUrl();
   const narrow = useSyncExternalStore(subscribeNarrow, readNarrow, () => false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [sidebarStep, setSidebarStep] = useSidebarStep();
 
   // Account routes need a session; "/" shows the landing page instead. (Sign-ins come back to /sign-in, which restores
   // the page: this home page never reads a code, state or error from its address.)
@@ -115,6 +118,11 @@ export function AccountShell({ children }: { children: ReactNode }) {
     }
     push(href);
   }, [pathname, push]);
+
+  // From 900px the page box is the scroller, not the window (shell.module.css), so a new page starts at its top.
+  useEffect(() => {
+    document.getElementById("main")?.scrollTo({ top: 0 });
+  }, [pathname]);
 
   // Links in the pages ask too while a guard protects where they go.
   useGuardedLinks(push);
@@ -226,24 +234,25 @@ export function AccountShell({ children }: { children: ReactNode }) {
   }, [session, me.data, picture?.src]);
 
   const brand = (
-    <Link href={paths.home} data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
+    <Link href={paths.home} aria-label="Accounts home" data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
       if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
       event.preventDefault();
       void go(paths.home, event.currentTarget);
     }}>
-      <BrandMark />
-      <span className={styles.brandText}>Silicon Accounts</span>
+      <PrototypeMark />
+      <span className={styles.brandText}>Team of Silicons <b className={styles.brandProduct}>Accounts</b></span>
     </Link>
   );
   const search = (
     <Button variant="soft" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"} aria-label={narrow ? "Search your account" : undefined}>
-      <Search size={16} strokeWidth={1.75} aria-hidden="true" />
-      <span className={styles.searchLabel}>Search your account</span>
+      <Search size={16} strokeWidth={2.1} aria-hidden="true" />
+      <span className={styles.searchLabel}>Search</span>
       <kbd data-sq="surface" className={styles.keys}>{isApple ? "⌘K" : "Ctrl K"}</kbd>
     </Button>
   );
   const accountMenu = account ? (
     <UserMenu
+      className={styles.account}
       user={account}
       showTheme={false}
       onSignOut={menuSignOut}
@@ -252,9 +261,9 @@ export function AccountShell({ children }: { children: ReactNode }) {
     />
   ) : null;
 
-  // The panel shell (redesign/decisions.md, 2026-10-30): the top bar (brand, search, the account menu) and the
-  // sections sit on the canvas and the page is a white panel beside them. Under 900px the sections move into a bottom
-  // sheet from the top bar and the page is full bleed.
+  // The panel shell (redesign/decisions.md, 2026-10-30): the top bar (brand, search centred, the account menu), then
+  // the sections and the page in 8px of padding (the sections' width in steps, sidebar-resize.tsx). The page is a white box with an 8px corner and a 1px hairline. Under
+  // 900px the sections move into a bottom sheet from the top bar and the page is full bleed.
   const chrome = (content: ReactNode) => (
     <div className={styles.shell}>
       <SkipLink href="#main" />
@@ -275,16 +284,20 @@ export function AccountShell({ children }: { children: ReactNode }) {
           ) : null}
         </span>
       </header>
-      <div className={styles.body}>
+      <div className={styles.body} style={{ "--sidebar-width": `${SIDEBAR_STEPS[sidebarStep]}px` } as CSSProperties}>
         {narrow ? null : (
-          <aside className={styles.aside}>
-            <Sidebar activeKey={active?.key} developerUrl={developerUrl} />
-          </aside>
+          <>
+            <aside id="account-sidebar" className={styles.aside}>
+              <Sidebar activeKey={active?.key} developerUrl={developerUrl} />
+            </aside>
+            <SidebarResize step={sidebarStep} onStep={setSidebarStep} controls="account-sidebar" />
+          </>
         )}
         <main id="main" data-sq-native="" className={styles.main} tabIndex={-1}>{content}</main>
       </div>
       <CommandMenu />
       <LeaveQuestionHost />
+      {process.env.NODE_ENV === "development" ? <DevStatesPanel /> : null}
     </div>
   );
 

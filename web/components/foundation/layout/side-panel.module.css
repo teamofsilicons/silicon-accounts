@@ -1,9 +1,9 @@
 /* The side column an action opens (side-panel.tsx). It is as wide as the Page's --panel-width, scrolls on its own when
-   it is taller than the window, and slides and fades in a beat after the page starts to open. */
+   it is taller than the window (the shell's page box, --scroll-view, from 900px), and slides and fades in a beat after the page starts to open. */
 .panel {
   display: grid;
   width: var(--panel-width, 420px);
-  max-height: calc(100dvh - var(--top-height) - 2 * var(--space-section));
+  max-height: calc(var(--scroll-view, 100dvh - var(--top-height)) - 2 * var(--space-section));
   grid-template-rows: auto minmax(0, 1fr);
   opacity: 0;
   transition:

@@ -5,7 +5,11 @@
  * actually uses it. Geist is also Silicon UI's --font-display (titles and the wordmark, through --font-geist), so it
  * is preloaded along with Hanken Grotesk, Silicon UI's --font-body (through --font-hanken-grotesk): the site's two
  * faces.
+ *
+ * Geist Serif (the geist package, self-hosted by next/font/local as --font-geist-serif) sets Home's "Create your first
+ * Silicon" heading (Anil, 2026-10-31).
  */
+import { GeistSerif } from "geist/font/serif";
 import { Geist, Hanken_Grotesk, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 
 /** The site's text face: Silicon UI's body font for every Silicon product. */
@@ -39,4 +43,4 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 /** The class names that put the site's two faces and the branding font variables on <html>. */
-export const brandFontVariables = [hankenGrotesk.variable, geist.variable, instrumentSerif.variable, jetbrainsMono.variable].join(" ");
+export const brandFontVariables = [hankenGrotesk.variable, geist.variable, GeistSerif.variable, instrumentSerif.variable, jetbrainsMono.variable].join(" ");

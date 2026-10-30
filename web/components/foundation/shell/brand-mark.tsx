@@ -35,6 +35,21 @@ export function BrandMark({ className }: { className?: string }) {
   );
 }
 
+/**
+ * The account shell's mark, as the prototype draws it (redesign/prototype-v7.html, `.mark`): an 11px square with 2px
+ * corners and an 11px circle, 2px apart, in ink.
+ */
+export function PrototypeMark({ className }: { className?: string }) {
+  return (
+    <span className={className ?? styles.brandMark} aria-hidden="true">
+      <svg viewBox="0 0 24 11" fill="currentColor" focusable="false">
+        <rect width="11" height="11" rx="2" />
+        <circle cx="18.5" cy="5.5" r="5.5" />
+      </svg>
+    </span>
+  );
+}
+
 /** "Silicon Accounts" with the mark, as the site's home link text. */
 export function Wordmark() {
   return (

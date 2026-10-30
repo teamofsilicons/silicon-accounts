@@ -16,6 +16,13 @@ export default defineConfig([
   // Silicon UI's guardrails: no re-created components, no borrowed component CSS, no local component copies.
   // Older violations are recorded in eslint-suppressions.json; it may only shrink (docs/guardrails.md in silicon-ui).
   // nav-list: the account sidebar (redesign/decisions.md, 2026-10-29). button: the search trigger's soft variant
-  // (borderless grey, the bar control), still experimental in Silicon UI 0.4.
-  ...siliconUi({ allowExperimental: ["nav-list", "button"] }),
+  // (borderless grey, the bar control), still experimental in Silicon UI 0.4. button-link: the same soft variant for the
+  // sidebar's Developers and Docs chips (2026-10-30). segmented-control: the xs size, in the development-only dev states
+  // panel (components/foundation/dev, 2026-10-31).
+  ...siliconUi({ allowExperimental: ["nav-list", "button", "button-link", "segmented-control"] }),
+  {
+    // The landing frames are not the account shell. How it works steps are text rows from the frame, not Silicon UI buttons.
+    files: ["components/landing/**"],
+    rules: { "no-restricted-syntax": "off" },
+  },
 ]);

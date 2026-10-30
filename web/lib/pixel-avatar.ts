@@ -177,19 +177,20 @@ export function avatarCells(rawChoice: AvatarChoice, frame: AvatarFrame = {}): A
 }
 
 /**
- * The square the picture is drawn in: 15 by 15 cells with the 11 by 13 figure centred across and set a cell and a half
- * down, so a round crop keeps the whole head and cuts only the shoulders, as a portrait does.
+ * The square the picture is drawn in: 15 by 15 cells with the 11 by 13 figure centred across and standing on the bottom
+ * edge (two cells above the head), so the shoulders meet the frame with no gap under them (Anil, 2026-10-30).
  */
 const FRAME = 15;
 const FRAME_LEFT = (FRAME - AVATAR_COLUMNS) / 2;
-const FRAME_TOP = 1.5;
+const FRAME_TOP = FRAME - AVATAR_ROWS;
 export const AVATAR_VIEWBOX = `${-FRAME_LEFT} ${-FRAME_TOP} ${FRAME} ${FRAME}`;
 export const AVATAR_FRAME = { size: FRAME, left: -FRAME_LEFT, top: -FRAME_TOP };
 
-/** A still SVG of the look, as a data URL for an <img>. */
-export function avatarDataUrl(choice: AvatarChoice): string {
+/** A still SVG of the look, as a data URL for an <img>; `background: false` leaves the figure on nothing. */
+export function avatarDataUrl(choice: AvatarChoice, { background = true }: { background?: boolean } = {}): string {
   const rects = avatarCells(choice).map(cell => `<rect x="${cell.c}" y="${cell.r}" width="1.02" height="1.02" fill="${cell.color}" fill-opacity="${cell.opacity}"/>`).join("");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${AVATAR_VIEWBOX}" shape-rendering="crispEdges"><rect x="${-FRAME_LEFT}" y="${-FRAME_TOP}" width="${FRAME}" height="${FRAME}" fill="${BACKGROUND}"/>${rects}</svg>`;
+  const ground = background ? `<rect x="${-FRAME_LEFT}" y="${-FRAME_TOP}" width="${FRAME}" height="${FRAME}" fill="${BACKGROUND}"/>` : "";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${AVATAR_VIEWBOX}" shape-rendering="crispEdges">${ground}${rects}</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
@@ -206,7 +207,7 @@ export async function avatarPng(choice: AvatarChoice, scale = 24): Promise<Blob>
   for (const cell of avatarCells(choice)) {
     context.globalAlpha = cell.opacity;
     context.fillStyle = cell.color;
-    context.fillRect((cell.c + 1) * scale, cell.r * scale, scale, scale);
+    context.fillRect((cell.c + FRAME_LEFT) * scale, (cell.r + FRAME_TOP) * scale, scale, scale);
   }
   context.globalAlpha = 1;
   return new Promise((resolve, reject) => canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error("The avatar could not be drawn."))), "image/png"));

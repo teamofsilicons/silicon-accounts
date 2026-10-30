@@ -29,7 +29,7 @@ function scroller(element: HTMLElement): HTMLElement | null {
 }
 
 /**
- * Scrolls `element` into view by moving only its own scroller (a drawer's body, or the page). `element.focus()` and
+ * Scrolls `element` into view by moving only its own scroller (a drawer's body, the shell's page box, or the page). `element.focus()` and
  * `scrollIntoView()` would also scroll every clipping ancestor, a drawer panel included, and push its header out of
  * sight. "start" puts the element near the top; "nearest" scrolls only as far as needed.
  */

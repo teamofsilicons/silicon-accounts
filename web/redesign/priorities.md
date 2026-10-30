@@ -8,23 +8,24 @@ Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.m
 Last updated: 2026-10-30
 
 ## Now
-1. **Prototype v7, phase 4: Silicons.** List, `/silicons/[uuid]` with Access and Settings tabs (replacing the drawer),
-   request and offer pages; Home's Silicon tiles then link to each Silicon. Map: [prototype-map.md](prototype-map.md).
+1. **Home from a blank canvas** (web/blank-canvas): the shell's top bar, sidebar and an empty 8 px content box; Anil designs what goes in it next. Done: greeting, Needs you, the introduction's cards, Your Silicons and Your apps (direction B). Next: review Home as a whole, then the Silicons pages (phase 4).
 
 ## Next
-2. Finish moving pages to tiles. Page, Section, Surface and SettingsGroup follow the rule and Home's type scale now,
+2. **Prototype v7, phase 4: Silicons.** List, `/silicons/[uuid]` with Access and Settings tabs (replacing the drawer),
+   request and offer pages; Home's Silicon tiles then link to each Silicon. Map: [prototype-map.md](prototype-map.md).
+3. Finish moving pages to tiles. Page, Section, Surface and SettingsGroup follow the rule and Home's type scale now,
    but some pages still draw their own outlined cards: Security's lists, Connected apps' cards, Silicon tiles, the
    identity card and the empty states. Connected apps is the next likely aside on action (an app's detail beside the
    list).
-3. Account command menu on Silicon UI Dialog instead of direct Radix, if Dialog can hold the palette without its own
+4. Account command menu on Silicon UI Dialog instead of direct Radix, if Dialog can hold the palette without its own
    title row (else report what is missing).
-4. Connected apps: list, `/apps/[id]`, Permissions between apps (`/proofs`).
-5. Security (`/security`, `/sign-in-methods` redirects) and Activity.
-6. Personal info (`/personal`, the identity card for now) rebuilt as the prototype's rows with every edit dialog.
-7. Data & privacy (`/privacy`, `/settings` redirects).
-8. Sign-in steps restyled; their suppressions cleared.
-9. Clear the remaining tolerated exceptions (eslint-suppressions.json, CSS baseline) as each screen is rebuilt.
-10. Identity screens: `pnpm screens --only account-identity` fails while a real API runs on 8589; run with it stopped.
+5. Connected apps: list, `/apps/[id]`, Permissions between apps (`/proofs`).
+6. Security (`/security`, `/sign-in-methods` redirects) and Activity.
+7. Personal info (`/personal`, the identity card for now) rebuilt as the prototype's rows with every edit dialog.
+8. Data & privacy (`/privacy`, `/settings` redirects).
+9. Sign-in steps restyled; their suppressions cleared.
+10. Clear the remaining tolerated exceptions (eslint-suppressions.json, CSS baseline) as each screen is rebuilt.
+11. Identity screens: `pnpm screens --only account-identity` fails while a real API runs on 8589; run with it stopped.
 
 ## Waiting on the API
 - Everything in [api-gaps.md](api-gaps.md): notifications, data download, a Silicon's activity, apps and sign-in

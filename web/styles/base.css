@@ -36,7 +36,8 @@ img { height: auto; }
 input, button, textarea, select { font: inherit; letter-spacing: inherit; color: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 a { color: var(--accent-ink); text-decoration-thickness: from-font; text-underline-offset: .2em; }
-a:not([data-variant]):hover { color: var(--accent-strong); }
+/* :where, as for focus below: a component's own hover for its links (NavList's rows) wins over the blue. */
+:where(a:not([data-variant])):hover { color: var(--accent-strong); }
 /* Keyboard focus on a plain link: the hover ink, a full underline and a soft fill (focus never shows as a ring). :where
    keeps it at one pseudo-class of specificity, so a component's own focus rule for its links still wins. */
 :where(a:not([data-variant], [data-sq])):focus-visible {

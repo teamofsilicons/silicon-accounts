@@ -74,3 +74,15 @@ export function useCarbonPicture(me: Pick<Me, "kind" | "uuid" | "pfp_url"> | nul
   const raw = useSyncExternalStore(subscribe, () => (uuid ? readRaw(uuid) : null), () => null);
   return me ? pictureOf(me, parse(raw)) : null;
 }
+
+/**
+ * The Carbon's pixel avatar whatever their picture is, the figure alone (no background square): the look they saved
+ * in this browser, else the one drawn from their uuid. For places that show every Carbon as their avatar, photo or not
+ * (Home's You card). Null until the account is known.
+ */
+export function useCarbonAvatar(me: Pick<Me, "uuid"> | null | undefined): string | null {
+  const uuid = me?.uuid;
+  const raw = useSyncExternalStore(subscribe, () => (uuid ? readRaw(uuid) : null), () => null);
+  if (!uuid) return null;
+  return avatarDataUrl(parse(raw)?.choice ?? choiceFromSeed(uuid), { background: false });
+}

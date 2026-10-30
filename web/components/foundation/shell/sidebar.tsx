@@ -2,13 +2,12 @@
 
 /**
  * The account site's section list, as in the lead designer's prototype: Silicon UI's NavList with every section (lib/navigation.ts
- * SECTIONS), a count where something waits for the Carbon, and the other sites at the foot, marked as leaving. The
+ * SECTIONS), a count where something waits for the Carbon, and the other sites at the foot as small grey chips (Anil, 2026-10-30). The
  * shell shows it beside the page from 900px and inside a bottom sheet on narrower screens; both read this one list.
  * Beside the page (the inset shell) it also carries what a top bar would: `head` (the brand and search) above the
  * list and `account` (the account menu) at its foot.
  */
 import type { ReactNode } from "react";
-import { ArrowUpRight } from "lucide-react";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { ButtonLink } from "@teamofsilicons/silicon-ui/button-link";
 import { NavItem, NavList } from "@teamofsilicons/silicon-ui/nav-list";
@@ -55,9 +54,8 @@ export function Sidebar({ activeKey, developerUrl, onNavigate, head, account }: 
       </NavList>
       <nav className={styles.foot} aria-label="Other sites">
         {ELSEWHERE.map(site => (
-          <ButtonLink key={site.key} href={site.href(developerUrl)} variant="ghost" size="sm" onClick={onNavigate}>
+          <ButtonLink key={site.key} href={site.href(developerUrl)} variant="soft" size="xs" onClick={onNavigate}>
             {site.label}
-            <ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
           </ButtonLink>
         ))}
       </nav>

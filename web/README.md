@@ -443,6 +443,7 @@ Every shared-foundation request from the area builders, resolved in the shared c
 - **Arc**: Combobox, Escape in layers, PhoneInput, Timeline, OTP input, focus states (see Local edits).
 - **Focus states** in the foundation: the shell's brand link (a soft fill), every plain link site-wide
   (`styles/base.css`, zero specificity so a component's own rule wins) and the "Powered by" pill (underline and edge).
+  A plain link's blue hover is held to the same low specificity (2026-10-30), so NavList's rows keep their grey hover.
 - **Dark theme contrast** (`styles/tokens.css`): `--text-muted` #B8B3AB (4.66:1 on `--surface-muted`),
   `--text-secondary` #C2BDB5 (stays the stronger of the two), `--accent-strong` #93B8F1 (info badges 4.85:1).
 - **Branding defaults**: the default dark `danger` is #FF8A80 (5.45:1 on #353432) here, in crates/core
@@ -686,9 +687,37 @@ in `redesign/api-gaps.md`).
 
 - **Sidebar** (`components/foundation/shell/sidebar.tsx`): Silicon UI NavList ("Account sections") with Home `/`,
   Silicons `/silicons` (a count of custodian requests waiting), Connected apps `/apps` and Security
-  `/sign-in-methods`; Developers and Docs at its foot, marked as leaving. Beside the page from 900 px, in a bottom sheet
+  `/sign-in-methods`; Developers and Docs at its foot as small soft chips (`ButtonLink` soft, xs), no arrow. Beside the page from 900 px, in a bottom sheet
   opened from the top bar below that. NavList is experimental: allowed in `eslint.config.mjs` (`allowExperimental`).
-  The dock (`dock.tsx`) is gone; sections are no longer called pillars.
+  The dock (`dock.tsx`) is gone; sections are no longer called pillars. Its width comes in steps (200, 248, 296 px)
+  from a handle on the page box's left edge (`sidebar-resize.tsx`, remembered in localStorage `sa.sidebar-step`).
+- **Dev states** (`lib/dev-states.ts`, `components/foundation/dev/dev-states.tsx`, 2026-10-31): in `next dev` only, a
+  round flask button at the account shell's lower right (a dot counts what is set) opens a compact panel of
+  segmented controls for (account: joined today / no id; Silicon requests:
+  none / a request / a handover / both; devices: all used lately / one unused; Silicons: none / one / three; apps: none
+  / two / six; network: slow / lists fail), plus Reset and "Show introduction again". `request()` in
+  `lib/api/http.ts` asks `devAnswer` for each GET when NODE_ENV is "development": it answers with made-up data, changes
+  the API's answer, delays or fails it. Writes always go to the API. Kept in localStorage `accounts.dev.states`; a
+  change reloads the page. To add a variable, add it to `DEV_VARIABLES` and answer it in `devAnswer`.
+- **Home** (2026-10-31): `app/(app)/(shell)/(account)/page.tsx` in Page's narrow column: `home-identity.tsx` (picture in
+  its ring, greeting, id chip, member since), `home-needs.tsx` (requests, handovers, an unused device),
+  `home-cards.tsx` (the dismissible introduction, `accounts.home.welcome-dismissed`), `home-sections.tsx` (Your
+  Silicons, with a "Create your first Silicon" banner in Geist Serif from the `geist` package while there are none;
+  Your apps).
+- **Checkup** (`components/account/parts/checkup.ts`, 2026-10-31): Home's "Finish setting up" steps (a second way in,
+  a verified email, a recovery phone, devices used in the last 7 days) and the Keep choice remembered in this browser
+  (`accounts.home.kept-sessions`), shared by Home's `home-needs.tsx` and the previous Home.
+- **Picture colours** (`lib/picture-colours.ts`, 2026-10-30): `usePictureColours(src)` reads a picture's main colours (by hue and shade) in a
+  32 px canvas (greys, whites and blacks left out) for Home's ring. Uploaded photos (`/v1/photos/…`, no CORS) are read through the site's own `/v1` proxy; another
+  origin's photo needs CORS to be read;
+  without it, or with under one colour, it returns null and the ring keeps the Silicon colours. `usePicturePalette(src, count)`
+  gives the picture's colours as they are (k-means, dark to light) for Home's You card.
+- **The scrolling page box** (`shell.module.css`, 2026-10-30): from 900 px the shell is the window's height and never
+  scrolls; `#main` (the page box) is the one scroller, with `overscroll-behavior: contain`, and the shell scrolls it to
+  the top on every path change (Next restores the window's scroll, not the box's). Inside it `--top-height` is 0, so
+  what a page pins (`position: sticky`) is measured from the box's top, and `--scroll-view` is the box's visible
+  height (the side panel's `max-height`). `bringIntoView` (components/account/parts/focus.ts) finds the box as the
+  nearest scroller. Under 900 px the document scrolls as before.
 - **Top bar**: brand, "Search your account" (opens ⌘K; icon only under 900 px), the account menu (Settings, sign out);
   sticky, so `html`'s `scroll-padding-block` keeps focus clear of it at the top.
 - **Providers**: `SiliconProvider link={Link}` (next/link), so links Silicon UI components render move inside the app.
@@ -722,9 +751,10 @@ in `redesign/api-gaps.md`).
   re-applies the pick (`data-font` on `<html>`).
 - **Page gap**: 24 px between a page's blocks, as in the prototype.
 - **Inset shell, system font, Carbon avatars** (2026-10-30):
-  - **Shell:** the panel shell, as in the prototype. The top bar and sections sit on the canvas and `main` is a white
-    panel beside them. Under 900 px, the top bar and bottom sheet. `Sidebar` still takes `head` and `account` from
-    the inset trial, though nothing passes them now.
+  - **Shell:** the top bar is the logo, search centred, and the account menu. From 900 px the sidebar and the page sit
+    in 8 px of padding with 8 px between them, and `main` is a white box (8 px corner, 1 px `--border`). Under
+    900 px, the top bar, a bottom sheet, and a full-bleed page. `Sidebar` still takes `head` and `account` from the
+    inset trial, though nothing passes them now.
   - **Font:** `--font-body` is the system font. The development font switch offers Hanken Grotesk and Geist.
   - **Avatars:** `lib/pixel-avatar.ts` draws a Carbon's pixel avatar (cells, an SVG data URL, a PNG).
     `components/foundation/avatar/pixel-avatar.tsx` animates it at large sizes. `lib/carbon-avatar.ts`

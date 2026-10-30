@@ -14,7 +14,16 @@ marked "check" is a first guess, to be confirmed against Silicon UI's code befor
 | Canvas colour | Warm grey `#F2F1EE` | Neutral; no beige (2026-10-18) | asking |
 | Accent | Blue `#3460F0` (links such as "See all", focus) | Blue (2026-10-30) | done |
 | Font | BDO Grotesk, then Hanken Grotesk | The system font (2026-10-30); a palette switch to compare | kept (Anil) |
-| Page panel | White rounded panel on the canvas, top bar above | The same: panel shell (2026-10-30) | done |
+| Page panel | White rounded panel on the canvas, 18 px radius, uneven inset (8 / 12 px) | White box, 8 px corner, 8 px inset, 1 px `#E5E7EB` (Anil, 2026-10-30) | kept (Anil) |
+| Sidebar icons and labels | — | Icons 18 px over NavList's fixed 16 px, labels `--text-base` (16 px) over its 14 px (sidebar.module.css; NavList has no size option); grey hover, not blue (Anil, 2026-10-30) | kept (Anil) |
+| Sidebar width | Fixed | Steps 200 / 248 / 296 px by a handle on the page box's left edge (a grip on hover, no line), remembered per browser; the site's own handle, as ResizablePanels has no steps (sidebar-resize.tsx; Anil, 2026-10-30) | kept (Anil) |
+| Sidebar foot | Developers, Help, Privacy · Terms as muted text links, stacked | Developers and Docs as soft xs ButtonLink chips in a row, no arrow (Anil, 2026-10-30) | kept (Anil) |
+| Account photo | — | 36 px in a 44 px circle, over UserMenu's fixed 32 in 40 (Anil, 2026-10-30) | kept (Anil) |
+| Home identity | Greeting row: ringed round photo, "Welcome back, <first>", id chip with a copy button | At the column's top left: 88 px squircle picture in one ring wrapper (border = 4 px band in the picture's colours, turning; padding = 3 px gap; Avatar hairline and fill removed); to its right "Welcome, <first>" 36 px, the id as a soft xs chip that copies on click, and "Member since <month year>" (not in the prototype) 14 px muted (Anil, 2026-10-30) | kept (Anil) |
+| Home introduction | A dismissible card with a soft Silicon gradient; three columns, picture over label over line | A dismissible grey tile of three 140 px gradient cards (You: the pixel avatar on its own palette; Silicons: the spark; Apps: the grid), 22 px title over a 12 px line, no actions (Anil, 2026-10-31) | kept (Anil) |
+| Home Silicons and apps | Your Silicons: 2 tiles + New Silicon; Your apps: 4 tiles with who uses each | As drawn, plus a "Create your first Silicon" banner when there are none (its own forest-to-sand gradient and grain, off the brand palette, with local colours; Geist Serif heading, the site's only serif). Your apps leads with the popular apps (Briefcase, DM, Ting) as cards with Open or Try, then other apps as small tiles; no "You + N" (no API for it) (Anil, 2026-10-31) | kept (Anil) |
+| Search trigger | A 40 px white pill field (up to 560 px, hairline, shadow), placeholder at the start, no shortcut key | Soft Button 400 px, label at the start and ⌘K at the end, by reaching into Button's label spans (it centres them, with no option) (Anil, 2026-10-30) | kept (Anil) |
+| Top bar | 64 px; the mark (11 px square and circle) and "Team of Silicons **Accounts**" | 56 px: 8 px on top, then a 48 px row (Anil, 2026-10-30); the prototype's mark and name, name hidden under 900 px (the prototype: 820 px) | kept (Anil) |
 | Blocks | White cards, hairline border, title inside | Cards on Home (2026-10-30); other pages still old | open |
 
 ## Made up, not in the prototype: remove

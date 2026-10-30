@@ -1,10 +1,12 @@
-/* The account site's frame, the panel shell (redesign/decisions.md, 2026-10-30), as in the prototype: the top bar
-   (brand, search, the account menu) and the section list on the canvas, the page a white panel beside them. Under
-   900px the sections are in a bottom sheet and the page is full bleed. --top-height is what sticky things stay clear of. */
-.shell { --top-height: 64px; position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; background: var(--canvas); }
+/* The account site's frame (redesign/decisions.md, 2026-10-30): a top bar (brand, search centred, the account menu),
+   then the section list and the page. From 900px the pair sits in 8px of padding (--space-related) with 8px between
+   them, and the page is a white box with the container radius and a 1px hairline. Under 900px the sections are in a
+   bottom sheet and the page is full bleed. --top-height is what sticky things stay clear of.
+   From 900px the frame holds still and only the page box scrolls (Anil, 2026-10-30); see "The scrolling page box". */
+.shell { --shell-top: 56px; --top-height: var(--shell-top); position: relative; display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; background: var(--canvas); }
 @media (max-width: 899px) { .shell { background: var(--surface); } }
 /* What focus (Tab) or an in-page jump brings into view stops clear of the sticky top bar (WCAG 2.4.11). */
-:global(html):has(.shell) { scroll-padding-block: calc(var(--top-height) + var(--space-section)) var(--space-section); }
+@media (max-width: 899px) { :global(html):has(.shell) { scroll-padding-block: calc(var(--top-height) + var(--space-section)) var(--space-section); } }
 
 .top {
   position: sticky;
@@ -13,44 +15,93 @@
   display: grid;
   height: var(--top-height);
   flex: none;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 400px) minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-inset);
-  padding: 0 var(--space-inset);
+  gap: var(--space-related);
+  /* 12px at both sides: UserMenu keeps its panel 12px from the window, so the panel's edge meets the trigger's outer
+     circle; the start matches it (Anil, 2026-10-30). 8px on top over a 48px row (56px in all). */
+  padding: var(--space-related) var(--space-group) 0;
   background: var(--canvas);
 }
-@media (max-width: 899px) { .top { border-bottom: 1px solid var(--border); background: var(--surface); } }
-/* The wordmark: the bare glyph in ink, the name in the display face. The padding (taken back by the negative margin, so
+@media (max-width: 899px) { .top { grid-template-columns: auto minmax(0, 1fr) auto; border-bottom: 1px solid var(--border); background: var(--surface); } }
+/* The wordmark as the prototype draws it (Anil, 2026-10-30): its mark, then "Team of Silicons Accounts" in the body
+   face at 16px, medium, with "Accounts" muted. The padding (taken back by the negative margin, so
    nothing moves) gives keyboard focus a soft fill to show in. */
-.brand { --sq-r: 10px; --sq-fill: transparent; display: inline-flex; min-width: 0; align-items: center; gap: var(--space-group); margin: calc(var(--space-related) * -1); padding: var(--space-related); background: var(--sq-fill); color: var(--foreground); font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: 0; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+.brand { --sq-r: var(--radius-container); --sq-fill: transparent; display: inline-flex; min-width: 0; justify-self: start; align-items: center; gap: var(--space-group); margin: calc(var(--space-related) * -1); padding: var(--space-related); background: var(--sq-fill); color: var(--foreground); font-family: var(--font-body); font-size: var(--text-base); font-weight: 500; letter-spacing: var(--tracking-body); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
 .brand:hover { color: var(--foreground); }
 .brand:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
 .brandMark { display: grid; height: 22px; flex: none; place-items: center; color: var(--foreground); }
-.brandMark svg { width: auto; height: 13px; }
+.brandMark svg { width: auto; height: 11px; }
+.brandProduct { color: var(--text-muted); font-weight: 500; }
 .brandText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Search sits in the middle of the bar: Silicon UI's soft button (grey, no border), muted label, a key for the shortcut.
-   On narrow screens only its icon shows. Doubled class so the mute wins over .soft's ink. */
-.search.search { width: min(100%, 480px); max-width: 100%; justify-self: center; color: var(--text-muted); cursor: text; }
+   400px wide, the label at the start and the key at the end (Anil, 2026-10-30). On narrow screens only its icon shows. Doubled class so the mute wins over .soft's ink. */
+/* Lighter than muted (Anil, 2026-10-30): halfway between --text-muted and --text-faint, in both themes. */
+.search.search { width: min(100%, 400px); max-width: 100%; justify-self: center; color: color-mix(in oklab, var(--text-muted), var(--text-faint)); cursor: text; }
+/* Button centres its contents in nested label spans and has no option to spread them, so this reaches in and lets them
+   fill the width; the label (flex: 1) then pushes the key to the end. A tolerated difference
+   (redesign/prototype-differences.md); drop it once Silicon UI's Button can. */
+.search.search > span, .search.search > span > span, .search.search > span > span > span { width: 100%; flex: 1; justify-content: flex-start; }
+/* "Search" in Button's medium; the icon's stroke (2.1 at 16px, about 1.4px) is set to match it (account-shell.tsx). */
 .searchLabel { flex: 1; min-width: 0; overflow: hidden; text-align: start; text-overflow: ellipsis; }
-.keys { --sq-r: var(--radius-detail); --sq-fill: var(--surface); --sq-stroke: var(--border); display: inline-flex; height: var(--space-comfort); min-width: var(--space-section); flex: none; align-items: center; justify-content: center; margin: 0; padding: 0 var(--space-tight); border: 1px solid var(--sq-stroke); background: var(--sq-fill); box-shadow: var(--shadow-resting); color: var(--text-muted); font-family: var(--font-body); font-size: var(--text-xs); font-weight: 500; line-height: 1; }
+/* The key takes the label's grey (inherited from .search). */
+.keys { --sq-r: var(--radius-detail); --sq-fill: var(--surface); --sq-stroke: var(--border); display: inline-flex; height: var(--space-comfort); min-width: var(--space-section); flex: none; align-items: center; justify-content: center; margin: 0; padding: 0 var(--space-tight); border: 1px solid var(--sq-stroke); background: var(--sq-fill); box-shadow: var(--shadow-resting); color: inherit; font-family: var(--font-body); font-size: var(--text-xs); font-weight: 500; line-height: 1; }
 @media (max-width: 899px) {
   .search.search { width: auto; max-width: none; justify-self: end; cursor: pointer; }
   .searchLabel, .keys { display: none; }
+  /* As the prototype: only the mark on narrow screens. */
+  .brandText { display: none; }
 }
 
-.topEnd { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
+.topEnd { display: flex; min-width: 0; justify-self: end; align-items: center; gap: var(--space-related); }
+/* The account menu's photo at 36px in a 44px circle, not UserMenu's 32 in 40 (Anil, 2026-10-30). UserMenu has no size
+   option, so this reaches into its trigger: a tolerated difference (redesign/prototype-differences.md). */
+.account.account { height: 44px; }
+.account.account [data-size="sm"] { --face-size: 36px; }
 
-/* The section list beside the page: sticky under the top bar, scrolling on its own when the window is short. */
-.body { display: grid; min-width: 0; flex: 1; grid-template-columns: 248px minmax(0, 1fr); }
-.aside { position: sticky; top: var(--top-height); height: calc(100dvh - var(--top-height)); overflow-y: auto; padding: var(--space-tight) var(--space-group) var(--space-group); }
-@media (max-width: 899px) { .body { display: flex; flex-direction: column; } }
+/* Below the top bar: the section list and the page, inset 8px, with 8px between them. */
+.body { --sidebar-width: 248px; position: relative; display: grid; min-width: 0; flex: 1; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); gap: var(--space-related); padding: var(--space-related); transition: grid-template-columns var(--duration-standard) var(--ease-standard); }
+.aside { position: sticky; top: calc(var(--top-height) + var(--space-related)); height: calc(100dvh - var(--top-height) - (var(--space-related) * 2)); overflow-y: auto; }
+@media (max-width: 899px) { .body { display: flex; flex-direction: column; gap: 0; padding: 0; } }
 
-/* The page: a white panel on the canvas, under the top bar and beside the sections. Full bleed under 900px. */
-.main { --sq-r: var(--radius-overlay); position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; margin: 0 var(--space-group) var(--space-group) 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-resting); outline: none; }
-@media (max-width: 899px) { .main { --sq-r: 0; margin: 0; border-width: 0; box-shadow: none; } }
+/* The sidebar's width in steps (sidebar-resize.tsx): a 17px grab area over the page box's left edge. On hover, focus or
+   drag a grip forms, as on Silicon UI's ResizablePanels (no line: the box's own edge stays as it is, Anil 2026-10-30); the grip sits at
+   mid-height (the frame holds still). Under 900px there is no sidebar beside the page, so no handle. */
+.resize { position: absolute; z-index: 2; top: calc(var(--space-related) * 2); bottom: calc(var(--space-related) * 2); left: calc(var(--space-related) + var(--sidebar-width)); width: calc(var(--space-related) * 2 + 1px); cursor: col-resize; touch-action: none; outline: none; }
+.resizeGrip { position: absolute; top: 50%; right: 0; left: 0; display: block; width: 4px; height: 32px; margin: calc(var(--space-inset) * -1) auto 0; border-radius: var(--radius-full); background: var(--border-strong); opacity: 0; pointer-events: none; transform: scaleY(.6); transition: opacity var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), transform var(--duration-standard) var(--ease-standard); }
+@media (hover: hover) and (pointer: fine) {
+  .resize:hover .resizeGrip { opacity: 1; transform: none; }
+}
+.resize:focus-visible .resizeGrip, .resize[data-active] .resizeGrip { opacity: 1; transform: none; }
+.resize[data-active] .resizeGrip { background: var(--foreground); }
+:global(body):has(.resize[data-active]) { cursor: col-resize; user-select: none; -webkit-user-select: none; }
+
+/* The page: a white box with an 8px corner and a 1px #E5E7EB hairline (Anil's blank canvas; dark keeps --border).
+   The squircle radius token is 14px once corners are squircles, so the 8px is set here and drawn round. Full bleed
+   under 900px. */
+.main { --sq-r: 8px; --sq-k: 1; --page-line: #e5e7eb; position: relative; display: flex; min-width: 0; min-height: calc(100dvh - var(--top-height) - (var(--space-related) * 2)); flex: 1; flex-direction: column; margin: 0; border: 1px solid var(--page-line); background: var(--surface); outline: none; }
+:global(:root[data-theme="dark"]) .main { --page-line: var(--border); }
+@media (prefers-color-scheme: dark) { :global(:root:not([data-theme="light"])) .main { --page-line: var(--border); } }
+:global(:root) .shell .main[data-sq-native] { corner-shape: round; border-radius: var(--sq-r); }
+@media (max-width: 899px) {
+  .main { --sq-r: 0; min-height: 0; border-width: 0; }
+  :global(:root) .shell .main[data-sq-native] { border-radius: 0; }
+}
 .main > * { min-width: 0; }
 .page { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+
+/* The scrolling page box (Anil, 2026-10-30): from 900px the shell is exactly the window's height and never scrolls; the
+   top bar, the sidebar and the page box's edge hold still, and the page box is the one scroller, its rubber-band kept
+   inside it. Inside it nothing sits under the top bar, so --top-height is 0 there (what pages pin stays clear of the
+   box's own top) and --scroll-view is the box's visible height (a side panel's limit). The sidebar scrolls on its own
+   only when it is taller than the window. Under 900px the document scrolls as before (the phone's address bar). */
+@media (min-width: 900px) {
+  .shell { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+  .body { min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .aside { position: static; height: auto; min-height: 0; }
+  .main { --top-height: 0px; --scroll-view: calc(100dvh - var(--shell-top) - (var(--space-related) * 2) - 2px); min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: var(--space-section); }
+}
 
 /* Loading and failure states of the shell itself. */
 .loading { display: grid; width: 100%; max-width: var(--page-max); gap: var(--space-block); margin-inline: auto; padding: var(--space-section) var(--gutter) var(--space-page); }
@@ -70,7 +121,7 @@
 @keyframes palette-fade-out { to { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .brand { transition: none; }
+  .brand, .body, .resizeGrip { transition: none; }
   .paletteOverlay[data-state="open"] { animation-duration: var(--duration-instant); }
 }
 

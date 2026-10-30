@@ -168,6 +168,70 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   and the sections sit on the canvas, and the page is a white panel beside them. Under 900 px, a top bar and bottom
   sheet, with the page full bleed. Supersedes the inset shell from earlier the same day. (2026-10-30)
 
+- Homepage frame (Anil, 2026-10-30): the top bar is the logo on the left, search centred, the account menu on the
+  right. Below it, the sidebar and the page sit in 8 px of padding (`--space-related`) with 8 px between them. The
+  page is a white box with an 8 px round corner and a 1 px hairline (`--border`). The squircle radius token is 14 px,
+  so this corner is set at 8 px. Under 900 px the
+  page stays full bleed. The hairline is `#E5E7EB` as Anil asked (a local `--page-line` in shell.module.css, not a
+  token; dark keeps `--border`): confirm whether `--border` itself should become it. (2026-10-30)
+- The page box scrolls, not the window (Anil, 2026-10-30): from 900 px the shell is the window's height and holds still
+  (top bar, sidebar, the box's edge); only the page box scrolls, its rubber-band kept inside it, and a new page starts
+  at its top. Under 900 px the document scrolls as before, so the phone's address bar can collapse. (2026-10-30)
+- Sidebar width in steps (Anil, 2026-10-30): dragging the page box's left edge snaps the sidebar to 200, 248 or 296 px,
+  never free; the site's own handle until Silicon UI's ResizablePanels has steps. (2026-10-30)
+- Home's column (Anil, 2026-10-30): Page's narrow centred column, 720 px (--page-narrow, the prototype's width), as
+  every account page; the identity heads it, at its top left. (2026-10-30)
+- Home's first element (Anil, 2026-10-30): at the column's top left, the Carbon's picture as a large squircle (Avatar
+  xl, 88 px) in its ring, with "Welcome, <first name>" over the Carbon id to its right; the id is a
+  small grey chip (soft xs Button, mono) that copies on click, and "Member since <month year>"
+  (muted text, the account's creation date in its time zone) on its own line under it. The email is set aside for now. Nothing else on Home yet. (2026-10-30)
+- Home's structure, direction B: Silicons first (Anil, 2026-10-31; direction A, live cards with actions, was tried
+  and dropped: the cards aren't designed to hold actions). Greeting, then Needs you when something waits, then the
+  three cards as a plain introduction (title and line only, dismissible), then Your Silicons and Your apps. Your
+  Silicons: with none, one tall banner (Anil, 2026-10-31: its own forest-to-sand gradient, off the brand, with grain;
+  a 36 px Geist Serif heading "Create your first Silicon" on two lines, what a Silicon is in medium, then Create a
+  Silicon; under the "Your Silicons" heading); with some,
+  two tiles (mark, name, si:id) and a New Silicon tile, "See all" in the heading. Your apps (Anil, 2026-10-31): the popular apps, Briefcase, DM and
+  Ting, as cards (logo, name and address from the API's public app details; the prototype's one-liners; Open when
+  signed into, else Try, going to the app), then up to four other apps as small tiles. No "You're all set". (2026-10-31)
+- Home's introduction for a new Carbon (Anil, 2026-10-30): the prototype's content ("One account for every Team of
+  Silicons app"; You, Silicons, Apps and their lines) in a new design: a soft grey tile (canvas fill, no edge) under the
+  greeting, title and dismiss in one row, then the three side by side, each a 36 px picture (your photo, a Silicon
+  mark, a white tile with the apps grid icon) beside a medium label over one secondary line. Dismissal is remembered
+  in this browser. (2026-10-30)
+- Home's Needs you, designed for the new Home (Anil, 2026-10-31): under the greeting, before the introduction, only
+  when something waits: a Silicon's custodian request (Decline / Review), a handover (Review), or a device unused for
+  7 days ("Still using …?", Keep / Sign out). The introduction's grey tile with its rows as one white list; "You're all
+  set" as a slim green strip otherwise. Setup (a second way in, email, recovery phone) is off Home for now: Home should
+  push the core (making Silicons), not setup; the step cards are archived in redesign/archive/setup-step-cards.md.
+  (2026-10-31)
+- Intro copy (Anil, 2026-10-31): title "One Account for Your Silicons & Apps" (an h3, the banner's); You "Your id across apps: <c:id>";
+  Silicons "Give an AI agent its own account."; Apps "Apps for delightful agent creation and interaction." (2026-10-31)
+- The intro's three items become three different cards (Anil, 2026-10-30). You: a small card showing every Carbon as
+  their pixel avatar (photo or not; the figure alone, standing at the lower right) on a 135° gradient of the avatar's
+  own palette (k-means, 4 colours, dark to light, as his gradient generator), the words at the top left, light on a dark
+  palette. The photo version is archived in redesign/archive/you-card-photo.md (trying it). Silicons: the same card (22 px title over a 12 px line, words top left), on the Silicon
+  colours (violet into teal, deepened at the top left), the white Silicon spark large at the lower right. Apps:
+  the same card on the site's blue accent (deepened at the top left) into the Silicon sky blue, the apps grid solid and
+  white at the lower right. Silicons and Apps next. (2026-10-30)
+- Home's ring takes the picture's colours (Anil, 2026-10-30): up to four distinct colours read from the picture
+  (lib/picture-colours.ts), by hue and by shade, made vivid; a picture of one hue shows its deep, middle and light
+  shades, never hues it does not have; a photo the image server will not let the page
+  read keeps the Silicon colours. (2026-10-30)
+- Blank canvas (Anil, 2026-10-30, branch web/blank-canvas): Home is redesigned from nothing. The shell stays; Home's
+  content box is empty (the previous Home stays in components/account/home, unused). (2026-10-30)
+
+- Home's headings (Anil, 2026-10-31): the greeting is the h1 (36 px); every section (Needs you, the introduction, Your
+  Silicons, Your apps) is an h2 at 22 px medium with display tracking; a heading inside a section is an h3 (the
+  first-Silicon banner's). Level follows the outline, size follows the look. (2026-10-31)
+- Home's spacing (Anil, 2026-10-31): one section pattern everywhere: the heading (and its count) on the page, 16 px
+  above the section's content (the introduction is the exception: a banner, its heading and round soft dismiss inside
+  its grey tile, the dismiss's 28 px circle on the tile's 16 px padding); 48 px between sections; 48 px above the greeting and below the last section.
+  Padding in three steps: container tiles 16 px, the hero banner 32 px, small tiles and rows 12 px. (2026-10-31)
+- Dev states (Anil, 2026-10-31): while developing, a States panel puts the site in any state (account, Silicon
+  requests, devices, Silicons, apps, network) by answering the API's reads with made-up data, development only, like
+  the prototype's scenario controls. (2026-10-31)
+
 ## Process
 - Keep priorities.md, decisions.md and log.md (this folder) updated with every task; shared-code changes also get a
   README.md note, as the site already does. Why: state lives in repo files, not chat. (2026-10-17)

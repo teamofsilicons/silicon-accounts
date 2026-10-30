@@ -1,0 +1,38 @@
+/* Home's identity at the top left of the page's column: the picture in its ring, then "Welcome, <first name>" large, the
+   Carbon id chip and "Member since", stacked and centred on the picture; 24px more above it than the column gives (48px from the box's top). */
+.identity { display: flex; align-items: center; gap: var(--space-section); padding-top: var(--space-section); }
+.text { display: grid; min-width: 0; justify-items: start; gap: var(--space-related); }
+/* The prototype's ring (.ring in prototype-v7.html), following the squircle (Anil, 2026-10-30). One wrapper draws
+   both: its border is the 4px colour band (a conic gradient painted on the border box) and its padding is the 3px gap
+   (the page colour painted on the padding box). One radius on the outside; the inner edges follow it. The band turns
+   slowly (still when motion is reduced); its four colours are the picture's (--ring-1 to 4, set by home-identity.tsx)
+   and fade in from the Silicon colours, which stay when the picture cannot be read. */
+@property --ring-turn { syntax: "<angle>"; inherits: false; initial-value: 200deg; }
+@property --ring-1 { syntax: "<color>"; inherits: false; initial-value: transparent; }
+@property --ring-2 { syntax: "<color>"; inherits: false; initial-value: transparent; }
+@property --ring-3 { syntax: "<color>"; inherits: false; initial-value: transparent; }
+@property --ring-4 { syntax: "<color>"; inherits: false; initial-value: transparent; }
+.ring {
+  --ring-width: var(--space-tight);
+  --ring-gap: calc(var(--space-hair) * 1.5);
+  --ring-1: var(--silicon-mark-1-from); --ring-2: var(--silicon-mark-1-to); --ring-3: var(--silicon-mark-2-to); --ring-4: var(--silicon-mark-2-from);
+  display: inline-grid; flex: none;
+  padding: var(--ring-gap); border: var(--ring-width) solid transparent;
+  border-radius: calc(var(--radius-overlay) + var(--ring-gap) + var(--ring-width)); corner-shape: squircle;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(from var(--ring-turn), var(--ring-1), var(--ring-2), var(--ring-3), var(--ring-4), var(--ring-1)) border-box;
+  transition: --ring-1 var(--duration-considered) var(--ease-standard), --ring-2 var(--duration-considered) var(--ease-standard), --ring-3 var(--duration-considered) var(--ease-standard), --ring-4 var(--duration-considered) var(--ease-standard);
+  animation: ring-turn 12s linear infinite;
+}
+@keyframes ring-turn { to { --ring-turn: 560deg; } }
+@media (prefers-reduced-motion: reduce) { .ring { transition: none; animation: none; } }
+/* The picture: Avatar xl (88px), a squircle through its corner variables. Its hairline and grey fill go, so nothing
+   sits between the photo and the gap (doubled class: a tolerated reach into Avatar, redesign/prototype-differences.md). */
+.picture.picture { --avatar-radius: var(--radius-overlay); --avatar-corner-shape: squircle; border: 0; background: none; }
+/* The name in the site's sans, medium, at 36px. */
+.name { margin: 0; color: var(--foreground); font-size: var(--text-3xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-display); }
+/* The chips: Silicon UI's soft xs button (a small grey chip), in the mono face. Doubled class over Button's font. */
+.chip.chip { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0; }
+/* When the account was made: a quiet line under the chip. */
+.since { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
