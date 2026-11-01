@@ -5,7 +5,7 @@
 /* The prototype's ring (.ring in prototype-v7.html), following the squircle (Anil, 2026-10-30). One wrapper draws
    both: its border is the 4px colour band (a conic gradient painted on the border box) and its padding is the 3px gap
    (the page colour painted on the padding box). One radius on the outside; the inner edges follow it. The band turns
-   slowly (still when motion is reduced); its four colours are the picture's (--ring-1 to 4, set by home-identity.tsx)
+   (one turn in 6s; still when motion is reduced); its four colours are the picture's (--ring-1 to 4, set by home-identity.tsx)
    and fade in from the Silicon colours, which stay when the picture cannot be read. */
 @property --ring-turn { syntax: "<angle>"; inherits: false; initial-value: 200deg; }
 @property --ring-1 { syntax: "<color>"; inherits: false; initial-value: transparent; }
@@ -23,10 +23,34 @@
     linear-gradient(var(--surface), var(--surface)) padding-box,
     conic-gradient(from var(--ring-turn), var(--ring-1), var(--ring-2), var(--ring-3), var(--ring-4), var(--ring-1)) border-box;
   transition: --ring-1 var(--duration-considered) var(--ease-standard), --ring-2 var(--duration-considered) var(--ease-standard), --ring-3 var(--duration-considered) var(--ease-standard), --ring-4 var(--duration-considered) var(--ease-standard);
-  animation: ring-turn 12s linear infinite;
+  animation: ring-turn 6s linear infinite;
 }
 @keyframes ring-turn { to { --ring-turn: 560deg; } }
-@media (prefers-reduced-motion: reduce) { .ring { transition: none; animation: none; } }
+
+/* Around the ring, a halo of its own colours (Anil, 2026-10-31): it breathes slowly, always, and on a click (the
+   picture, or the introduction's You card) it flares for a second (data-glow) while the ring spins fast. */
+.halo {
+  --ring-1: var(--silicon-mark-1-from); --ring-2: var(--silicon-mark-1-to); --ring-3: var(--silicon-mark-2-to);
+  display: inline-grid; flex: none; border-radius: calc(var(--radius-overlay) + var(--space-hair) * 1.5 + var(--space-tight)); corner-shape: squircle; cursor: pointer;
+  animation: ring-breathe 4s var(--ease-standard) infinite;
+}
+.halo[data-glow="a"] { animation: ring-glow-a 1.1s var(--ease-standard) both; }
+.halo[data-glow="b"] { animation: ring-glow-b 1.1s var(--ease-standard) both; }
+@keyframes ring-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 var(--space-inset) 0 color-mix(in oklab, var(--ring-2) 40%, transparent); }
+}
+@keyframes ring-glow-a {
+  0% { box-shadow: 0 0 0 0 transparent; }
+  30% { box-shadow: 0 0 var(--space-block) var(--space-tight) color-mix(in oklab, var(--ring-2) 70%, transparent), 0 0 var(--space-inset) 0 color-mix(in oklab, var(--ring-3) 60%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes ring-glow-b {
+  0% { box-shadow: 0 0 0 0 transparent; }
+  30% { box-shadow: 0 0 var(--space-block) var(--space-tight) color-mix(in oklab, var(--ring-2) 70%, transparent), 0 0 var(--space-inset) 0 color-mix(in oklab, var(--ring-3) 60%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .ring, .halo, .halo[data-glow="a"], .halo[data-glow="b"] { transition: none; animation: none; } }
 /* The picture: Avatar xl (88px), a squircle through its corner variables. Its hairline and grey fill go, so nothing
    sits between the photo and the gap (doubled class: a tolerated reach into Avatar, redesign/prototype-differences.md). */
 .picture.picture { --avatar-radius: var(--radius-overlay); --avatar-corner-shape: squircle; border: 0; background: none; }

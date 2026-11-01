@@ -192,7 +192,9 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   a 36 px Geist Serif heading "Create your first Silicon" on two lines, what a Silicon is in medium, then Create a
   Silicon; under the "Your Silicons" heading); with some,
   two tiles (mark, name, si:id) and a New Silicon tile, "See all" in the heading. Your apps (Anil, 2026-10-31): the popular apps, Briefcase, DM and
-  Ting, as cards (logo, name and address from the API's public app details; the prototype's one-liners; Open when
+  Ting, as simple white cards with character: an ink Phosphor icon (20 px, light) beside the app's name in one row,
+  its line (two lines held), then Open (dark primary: yours and ready) or Try (white secondary: a suggestion), and the same icon large, thin and faint
+  running off the corner as a watermark that drifts on hover; name and address from the API's public app details; the prototype's one-liners; Open when
   signed into, else Try, going to the app), then up to four other apps as small tiles. No "You're all set". (2026-10-31)
 - Home's introduction for a new Carbon (Anil, 2026-10-30): the prototype's content ("One account for every Team of
   Silicons app"; You, Silicons, Apps and their lines) in a new design: a soft grey tile (canvas fill, no edge) under the
@@ -214,6 +216,9 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   colours (violet into teal, deepened at the top left), the white Silicon spark large at the lower right. Apps:
   the same card on the site's blue accent (deepened at the top left) into the Silicon sky blue, the apps grid solid and
   white at the lower right. Silicons and Apps next. (2026-10-30)
+- Home's ring moves (Anil, 2026-10-31): it turns once every 6 s inside a halo of its own colours that breathes (4 s);
+  a click on the picture or on the introduction's You card makes the halo flare and the ring spin six times as fast for
+  about a second. Still when motion is reduced. (2026-10-31)
 - Home's ring takes the picture's colours (Anil, 2026-10-30): up to four distinct colours read from the picture
   (lib/picture-colours.ts), by hue and by shade, made vivid; a picture of one hue shows its deep, middle and light
   shades, never hues it does not have; a photo the image server will not let the page
@@ -221,6 +226,8 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
 - Blank canvas (Anil, 2026-10-30, branch web/blank-canvas): Home is redesigned from nothing. The shell stays; Home's
   content box is empty (the previous Home stays in components/account/home, unused). (2026-10-30)
 
+- App card lines (Anil, 2026-10-31): Briefcase "Keep and share files with your Silicons."; DM "Message people and
+  Silicons directly."; Ting "Get notified when your Silicons need you." (2026-10-31)
 - Home's headings (Anil, 2026-10-31): the greeting is the h1 (36 px); every section (Needs you, the introduction, Your
   Silicons, Your apps) is an h2 at 22 px medium with display tracking; a heading inside a section is an h3 (the
   first-Silicon banner's). Level follows the outline, size follows the look. (2026-10-31)

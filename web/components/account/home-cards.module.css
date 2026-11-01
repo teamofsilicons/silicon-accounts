@@ -1,14 +1,14 @@
 /* Home's introduction is a banner, not a section (Anil, 2026-10-31): one soft grey tile (the canvas grey, no edge, the
-   container squircle, 16px inside) holding its heading (an h3) and dismiss button, 24px above the You, Silicons and
+   container squircle, a hairline edge in --border-subtle like the tiles', 20px inside) holding its heading (an h3) and dismiss button, 24px above the You, Silicons and
    Apps cards side by side, 16px between them. 48px under what comes before (the column's 24px and 24px more), like every section.
    One column under 640px. */
-.banner { --sq-r: var(--radius-container); --sq-fill: var(--canvas); display: grid; gap: var(--space-section); margin-top: var(--space-section); padding: var(--space-inset); background: var(--sq-fill); }
+.banner { --sq-r: var(--radius-container); --sq-fill: var(--canvas); --sq-stroke: var(--border-subtle); display: grid; gap: var(--space-section); margin-top: var(--space-section); padding: var(--space-comfort); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
 /* 16px between the cards (the banner's own gap is the 24px under its heading). */
 .head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); }
 /* Home's section headings (h2), one style everywhere: 22px medium, display tracking (Anil, 2026-10-31). */
 .title { margin: 0; color: var(--foreground); font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-display); }
 
-/* Dismiss: lucide's X in a round button (28px circle) sitting on the banner's padding, its edge in line with the
+/* Dismiss: lucide's X in a round button (28px circle) sitting on the banner's 20px padding, its edge in line with the
    cards' right edge; a soft grey circle at rest, darker on hover. */
 .close.close { width: 28px; min-width: 28px; height: 28px; min-height: 28px; flex: none; padding: 0; border-radius: var(--radius-full); corner-shape: round; }
 .items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-inset); margin: 0; padding: 0; list-style: none; }
@@ -26,6 +26,8 @@
 .cardLine { color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; line-height: var(--leading-body); }
 .card[data-on-dark] .cardLabel { color: var(--neutral-0); }
 .card[data-on-dark] .cardLine { color: color-mix(in oklab, var(--neutral-0) 72%, transparent); }
+
+.card[data-clickable] { cursor: pointer; }
 
 /* Tilted a little, each its own way, like cards laid on a table (Anil, 2026-10-30). */
 .you { rotate: -1deg; }

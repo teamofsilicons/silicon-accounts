@@ -43,10 +43,28 @@
 .firstLine { max-width: 34ch; text-wrap: balance; margin: 0; color: color-mix(in oklab, var(--neutral-0) 82%, transparent); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
 .firstAction { margin-top: var(--space-tight); }
 
-/* A popular app: a white card like a tile, taller: its logo, then its name over one line, then Open or Try at its
-   foot (soft when signed into, outlined to try). */
-.appCard { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border-subtle); display: flex; min-width: 0; height: 100%; flex-direction: column; align-items: flex-start; gap: var(--space-group); padding: var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); box-shadow: var(--shadow-resting); }
-.appLine { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
+/* A popular app, simple but with a character of its own (Anil, 2026-10-31): a white card like every tile on Home
+   (faint edge, resting shadow, the container squircle, 16px inside). Its Phosphor icon in ink (20px, light) beside the
+   app's name (16px, medium) in one row; its line (14px, medium, secondary) held to two lines so the cards line up;
+   at the foot, Open as the site's dark primary button (an app already yours, ready to go) or Try as the white
+   secondary (a suggestion). Behind it all, the same icon large and thin at 6% ink, turned a little and running off the
+   bottom right corner; on hover the card lifts like the tiles and the mark drifts. */
+.appCard {
+  --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border-subtle);
+  position: relative; isolation: isolate; display: flex; min-width: 0; height: 100%; min-height: 160px; flex-direction: column; align-items: flex-start; gap: var(--space-related);
+  padding: var(--space-inset); overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); box-shadow: var(--shadow-resting);
+  transition: box-shadow var(--duration-fast) var(--ease-standard), translate var(--duration-fast) var(--ease-standard);
+}
+.appMark { position: absolute; z-index: -1; right: calc(var(--space-section) * -1); bottom: calc(var(--space-section) * -1); color: color-mix(in oklab, var(--foreground) 6%, transparent); rotate: -12deg; pointer-events: none; transition: translate var(--duration-considered) var(--ease-standard), rotate var(--duration-considered) var(--ease-standard), color var(--duration-considered) var(--ease-standard); }
+@media (hover: hover) and (pointer: fine) {
+  .appCard:hover { box-shadow: var(--shadow-raised); translate: 0 calc(var(--space-hair) * -1); }
+  .appCard:hover .appMark { color: color-mix(in oklab, var(--foreground) 9%, transparent); rotate: -6deg; translate: calc(var(--space-tight) * -1) calc(var(--space-tight) * -1); }
+}
+@media (prefers-reduced-motion: reduce) { .appCard, .appMark { transition: none; } }
+.appHead { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
+.appIcon { flex: none; color: var(--foreground); }
+.appName { min-width: 0; overflow: hidden; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: var(--leading-body); text-overflow: ellipsis; white-space: nowrap; }
+.appLine { display: -webkit-box; overflow: hidden; color: var(--text-secondary); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; min-height: calc(var(--text-sm) * var(--leading-body) * 2); }
 .appAction { margin-top: auto; }
 
 @media (prefers-reduced-motion: reduce) { .tile { transition: none; } }

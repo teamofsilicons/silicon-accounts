@@ -703,7 +703,7 @@ in `redesign/api-gaps.md`).
   its ring, greeting, id chip, member since), `home-needs.tsx` (requests, handovers, an unused device),
   `home-cards.tsx` (the dismissible introduction, `accounts.home.welcome-dismissed`), `home-sections.tsx` (Your
   Silicons, with a "Create your first Silicon" banner in Geist Serif from the `geist` package while there are none;
-  Your apps).
+  Your apps, with the popular apps as gradient cards using `@phosphor-icons/react` icons in light weight).
 - **Checkup** (`components/account/parts/checkup.ts`, 2026-10-31): Home's "Finish setting up" steps (a second way in,
   a verified email, a recovery phone, devices used in the last 7 days) and the Keep choice remembered in this browser
   (`accounts.home.kept-sessions`), shared by Home's `home-needs.tsx` and the previous Home.

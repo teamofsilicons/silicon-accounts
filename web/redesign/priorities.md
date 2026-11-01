@@ -5,7 +5,7 @@ move done items to Done (with the commit), add what came up, keep Now to one ite
 Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.md). The product contract is
 `../../understanding/UNDERSTANDING.md` (never edited); the design brief is `../../Silicon Accounts Redesign Design Review.md`.
 
-Last updated: 2026-10-30
+Last updated: 2026-11-01
 
 ## Now
 1. **Home from a blank canvas** (web/blank-canvas): the shell's top bar, sidebar and an empty 8 px content box; Anil designs what goes in it next. Done: greeting, Needs you, the introduction's cards, Your Silicons and Your apps (direction B). Next: review Home as a whole, then the Silicons pages (phase 4).
@@ -45,6 +45,8 @@ Last updated: 2026-10-30
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+- 2026-11-01 Home round two: the introduction as one bordered banner ("One Account for Your Silicons & Apps", round soft dismiss), the ring's spin, breathing halo and click glow, Your apps as simple white cards with Phosphor watermarks, dark Open and new lines (this commit)
+- 2026-10-31 Home from a blank canvas: shell, greeting, Needs you, the introduction's cards, Your Silicons and Your apps, dev states panel (44e0dd0)
 - 2026-10-30 Needs you lab (/__needs); Home's Needs you as the picked checklist with requests above it (uncommitted)
 - 2026-10-30 Inset shell; system font; Carbon pixel avatars by default with an editor in Personal info (save uploads it as the photo) (uncommitted)
 - 2026-10-30 Personal info to the prototype: Profile and Contact boxes from its own CSS, whole rows opening their editors by address (uncommitted)

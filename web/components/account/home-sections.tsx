@@ -6,14 +6,15 @@
  * - Your Silicons, the core of the account. With none yet, one tall banner (its own gradient, grain, a Geist Serif
  *   heading) that says what a Silicon is and offers Create a Silicon (the Silicons page's create panel, /silicons?new). With some, the first two as tiles (mark, name, si:id)
  *   and a New Silicon tile, with "See all" in the heading.
- * - Your apps: the popular apps (Briefcase, DM, Ting) as cards, each with its logo, name, one line and Open (signed
- *   into) or Try (not yet), going to the app; then up to four other apps the Carbon signs into as small tiles; "See
+ * - Your apps: the popular apps (Briefcase, DM, Ting) as simple white cards: an ink icon beside the app's name, one
+ *   line, and Open (signed into) or Try (not yet), going to the app; then up to four other apps the Carbon signs into as small tiles; "See
  *   all" in the heading once there are any.
  *
  * Tiles lead to the Silicons and Connected apps pages (there is no page for one Silicon or one app yet).
  */
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BellIcon, BriefcaseIcon, ChatsCircleIcon, type Icon } from "@phosphor-icons/react";
 import { Plus } from "lucide-react";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { paths } from "@/lib/navigation";
@@ -84,14 +85,16 @@ export function HomeSilicons() {
 }
 
 /**
- * The popular Team of Silicons apps Home offers (Anil, 2026-10-31): their name, logo and address come from the API
- * (`GET /v1/apps/{app_id}/public`); each line is the prototype's own (redesign/prototype-v7.html, APPS).
+ * The popular Team of Silicons apps Home offers (Anil, 2026-10-31): their name and address come from the API
+ * (`GET /v1/apps/{app_id}/public`); each line is Anil's (2026-10-31: what you do there). Each has a
+ * Phosphor icon in ink: small and light beside its name, and again large and thin as a faint watermark running off
+ * the card's corner.
  */
-const POPULAR_APPS = [
-  { appId: "briefcase", line: "Files for Carbons and Silicons" },
-  { appId: "dm", line: "Messages between Carbons and Silicons" },
-  { appId: "ting", line: "Notifications for Silicons" },
-] as const;
+const POPULAR_APPS: { appId: string; line: string; icon: Icon }[] = [
+  { appId: "briefcase", line: "Keep and share files with your Silicons.", icon: BriefcaseIcon },
+  { appId: "dm", line: "Message people and Silicons directly.", icon: ChatsCircleIcon },
+  { appId: "ting", line: "Get notified when your Silicons need you.", icon: BellIcon },
+];
 
 export function HomeApps() {
   const apps = useEveryApp();
@@ -109,16 +112,18 @@ export function HomeApps() {
           const app = popular[index]?.data;
           if (!app) return null;
           const open = joined.has(entry.appId);
+          const AppIcon = entry.icon;
           return (
             <li key={entry.appId}>
               <div data-sq="surface" className={styles.appCard}>
-                <AppMark app={app} size={40} decorative />
-                <span className={styles.tileWords}>
-                  <span className={styles.tileTitle}>{app.name}</span>
-                  <span className={styles.appLine}>{entry.line}</span>
+                <AppIcon className={styles.appMark} size={120} weight="thin" aria-hidden="true" />
+                <span className={styles.appHead}>
+                  <AppIcon className={styles.appIcon} size={20} weight="light" aria-hidden="true" />
+                  <span className={styles.appName}>{app.name}</span>
                 </span>
+                <span className={styles.appLine}>{entry.line}</span>
                 {app.homepage_url ? (
-                  <ButtonLink href={app.homepage_url} external variant={open ? "soft" : "secondary"} size="sm" className={styles.appAction} aria-label={`${open ? "Open" : "Try"} ${app.name}`}>
+                  <ButtonLink href={app.homepage_url} external variant={open ? "primary" : "secondary"} size="sm" className={styles.appAction} aria-label={`${open ? "Open" : "Try"} ${app.name}`}>
                     {open ? "Open" : "Try"}
                   </ButtonLink>
                 ) : null}

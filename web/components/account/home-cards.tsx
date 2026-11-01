@@ -18,6 +18,7 @@ import { Button } from "@teamofsilicons/silicon-ui/button";
 import { useCarbonAvatar } from "@/lib/carbon-avatar";
 import { usePicturePalette } from "@/lib/picture-colours";
 import { useMe, useSession } from "@/lib/query/session";
+import { glowYou } from "./home-identity";
 import styles from "./home-cards.module.css";
 
 const KEY = "accounts.home.welcome-dismissed";
@@ -73,7 +74,7 @@ export function HomeCards() {
         </Button>
       </div>
       <ul className={styles.items}>
-        <Card className={styles.you} style={youStyle} onDark={youOnDark} picture={avatar} label="You"
+        <Card className={styles.you} style={youStyle} onDark={youOnDark} picture={avatar} label="You" onClick={glowYou}
           line={account.id ? <>Your id across apps: <span className={styles.id}>{account.id}</span></> : "Your id across apps."} />
         <Card className={styles.silicons} onDark picture={<Sparkle className={styles.siliconsSpark} fill="currentColor" strokeWidth={1} aria-hidden="true" />}
           label="Silicons" line="Give an AI agent its own account." />
@@ -84,9 +85,10 @@ export function HomeCards() {
   );
 }
 
-function Card({ className, style, onDark, picture, label, line }: { className: string; style?: CSSProperties; onDark?: boolean; picture: ReactNode; label: string; line: ReactNode }) {
+function Card({ className, style, onDark, picture, label, line, onClick }: { className: string; style?: CSSProperties; onDark?: boolean; picture: ReactNode; label: string; line: ReactNode; onClick?: () => void }) {
   return (
-    <li data-sq="clip" className={`${styles.card} ${className}`} style={style} data-on-dark={onDark || undefined}>
+    // The You card's click lights the ring around the picture above (a flourish: nothing else happens).
+    <li data-sq="clip" className={`${styles.card} ${className}`} style={style} data-on-dark={onDark || undefined} data-clickable={onClick ? "" : undefined} onClick={onClick}>
       {picture}
       <span className={styles.cardWords}>
         <span className={styles.cardLabel}>{label}</span>

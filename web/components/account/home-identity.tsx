@@ -8,7 +8,7 @@
  * their pixel avatar (lib/carbon-avatar.ts); the account comes from GET /v1/me, with the session's summary until it
  * arrives.
  */
-import type { CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { useCopyFeedback } from "@teamofsilicons/silicon-ui/lib/use-copy-feedback";
@@ -17,7 +17,44 @@ import { usePictureColours } from "@/lib/picture-colours";
 import { useMe, useSession } from "@/lib/query/session";
 import styles from "./home-identity.module.css";
 
+/** Makes Home's ring glow for a moment (the picture and the introduction's You card call it). */
+const GLOW_EVENT = "accounts:you-glow";
+export function glowYou() {
+  window.dispatchEvent(new Event(GLOW_EVENT));
+}
+const GLOW_MS = 1100;
+
+/**
+ * The ring's glow: on GLOW_EVENT the halo flares for a second (CSS, data-glow, alternating "a" and "b" so a click
+ * during a glow starts it again) and the ring's spin runs six times as fast, then back, keeping its angle. Nothing moves when motion is reduced.
+ */
+function useGlow() {
+  const ring = useRef<HTMLSpanElement>(null);
+  const [glow, setGlow] = useState(0);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onGlow = () => {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      setGlow(count => count + 1);
+      const spin = ring.current?.getAnimations().find(animation => (animation as CSSAnimation).animationName?.includes("ring-turn"));
+      spin?.updatePlaybackRate(6);
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        spin?.updatePlaybackRate(1);
+        setGlow(0);
+      }, GLOW_MS);
+    };
+    window.addEventListener(GLOW_EVENT, onGlow);
+    return () => {
+      window.removeEventListener(GLOW_EVENT, onGlow);
+      clearTimeout(timer);
+    };
+  }, []);
+  return { ring, glow };
+}
+
 export function HomeIdentity() {
+  const { ring, glow } = useGlow();
   const { session } = useSession();
   const me = useMe();
   const account = me.data ?? session?.account;
@@ -33,8 +70,11 @@ export function HomeIdentity() {
 
   return (
     <section className={styles.identity} aria-label="Your account">
-      <span className={styles.ring} style={ringStyle}>
-        <Avatar className={styles.picture} name={account.display_name} src={src} size="xl" />
+      {/* A click on the picture lights the ring (a flourish, not a control: nothing else happens). */}
+      <span className={styles.halo} style={ringStyle} data-glow={glow ? (glow % 2 ? "a" : "b") : undefined} onClick={glowYou}>
+        <span ref={ring} className={styles.ring} style={ringStyle}>
+          <Avatar className={styles.picture} name={account.display_name} src={src} size="xl" />
+        </span>
       </span>
       <div className={styles.text}>
         <h1 className={styles.name}>Welcome, {first}</h1>
