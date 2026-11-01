@@ -112,3 +112,11 @@ marked "check" is a first guess, to be confirmed against Silicon UI's code befor
 
 Silicon sparkline and last sign-in, "You + 2" on app tiles, Notifications, Data download, wrong keys tried, a
 Silicon's activity, automation, cloud services, per-field sharing.
+
+## Silicons (2026-11-01)
+
+| What | Prototype | Site | Status |
+| --- | --- | --- | --- |
+| Silicons list | Page head, Waiting for you, two-column Silicon tiles (mark, name, status, last sign-in) | Three columns of cards in each Silicon's colour pair (name, si:id, key last changed, status); a New Silicon card; the first-Silicon banner when empty. No last sign-in (no API) | kept (Anil) |
+| A Silicon | Breadcrumb, header (mark, name, id, status), stats, tabs Activity / Access / Settings | Back link, a hero in its colours, then the settings on one page; no stats or Activity / Access tabs (no API: api-gaps.md 3–8) | open |
+| Silicons, first visit | An empty state ("No Silicons yet", one line, New Silicon) | Six stories (one idea each, segmented bars, auto-advance, tap or arrows, the last holds three ways to start: create here, Silicon Starter, let one ask you); the site's own component (Silicon UI has no stories); Silicon Starter is not in the prototype (Anil, 2026-11-01) | kept (Anil) |

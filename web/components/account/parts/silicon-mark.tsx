@@ -9,7 +9,8 @@ import styles from "./parts.module.css";
 
 const PAIRS = 4;
 
-function pairOf(seed: string): number {
+/** Which of the four Silicon colour pairs a Silicon wears (1 to 4), from its uuid, so it never changes. */
+export function pairOf(seed: string): number {
   let hash = 0;
   for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   return (hash % PAIRS) + 1;

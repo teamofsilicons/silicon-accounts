@@ -8,8 +8,7 @@ Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.m
 Last updated: 2026-11-01
 
 ## Now
-1. **Home from a blank canvas** (web/blank-canvas): the shell's top bar, sidebar and an empty 8 px content box; Anil designs what goes in it next. Done: greeting, Needs you, the introduction's cards, Your Silicons and Your apps (direction B). Next: review Home as a whole, then the Silicons pages (phase 4).
-
+1. **Silicons, layout B** (web/blank-canvas): list and /silicons/[uuid] built 2026-11-01; next, review them with Anil, then the request and offer pages.
 ## Next
 2. **Prototype v7, phase 4: Silicons.** List, `/silicons/[uuid]` with Access and Settings tabs (replacing the drawer),
    request and offer pages; Home's Silicon tiles then link to each Silicon. Map: [prototype-map.md](prototype-map.md).

@@ -1,171 +1,91 @@
 "use client";
 
 /**
- * /silicons: the Silicons you are custodian of. Requests waiting for you sit on top as a deck (a Silicon asking you to
- * be its custodian, or a Carbon handing one to you). Each Silicon is a tile; open one to change its details or id,
- * rotate its STK, set its webhook, hand it to another Carbon or delete it. Creating a Silicon shows its generated STK
- * exactly once, in a card that stays until you say you stored it.
+ * /silicons, redesigned from scratch (Anil, 2026-11-01, layout B: cards, then a page per Silicon). The Silicons the
+ * Carbon is custodian of, in Home's family:
+ *
+ * - the page heading, "Silicons", with Add a Silicon once there are some (create one here, at /silicons/new, start from
+ *   a Starter, or copy your c:id for a Silicon to name you); a new Silicon's STK is shown once on its page, and stays
+ *   here too until the Carbon says it is stored;
+ * - Waiting for you: custodian requests and handovers, the same rows as Home's Needs you (home-needs.tsx);
+ * - Your Silicons: one card per Silicon in its own colour pair (its mark's), with its name, si:id and when its key
+ *   last changed, opening its page (/silicons/[uuid], silicon-page.tsx); then a New Silicon card. With none, the first
+ *   visit (silicons-intro.tsx): what a Silicon is, what it gets, and the three ways to add one.
  */
-import { useEffect, useState } from "react";
-import { Cpu, Plus } from "lucide-react";
+import { useEffect, type CSSProperties } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowUpRight, AtSign, Cpu, Plus, Sparkle } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
-import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
-import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
+import { DropdownMenu } from "@teamofsilicons/silicon-ui/dropdown-menu";
 import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
-import { TextMorph } from "@teamofsilicons/silicon-ui/text-morph";
-import { ButtonLink } from "@/components/foundation/button-link";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
-import { Page, PageHeader, Section } from "@/components/foundation/layout/layout";
-import type { ManagedSilicon, SiliconCreated } from "@/lib/api/types";
+import { Page, PageHeader } from "@/components/foundation/layout/layout";
+import type { ManagedSilicon } from "@/lib/api/types";
 import { useRegisterCommands } from "@/lib/commands";
+import { formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
-import { formatRelative, plural } from "@/lib/format";
+import { notify } from "@/lib/notify";
 import { useMe } from "@/lib/query/session";
-import { NEEDS_YOU_ID, NEW_SILICON_PARAM } from "../parts/anchors";
-import { AnimatedRows } from "../parts/animated-rows";
-import { asCarbon, asSilicon, describeError, msUntil, personLabel, spanText, stkRotatedAt, useNow } from "../parts/common";
+import { SiliconRequests } from "../home-needs";
+import { NEW_SILICON_PARAM } from "../parts/anchors";
+import { asCarbon, asSilicon, describeError, personLabel, stkRotatedAt, useNow } from "../parts/common";
 import { handFocus, pageMain } from "../parts/focus";
 import { ListCap } from "../parts/list-cap";
-import { useEveryCustodianRequest, useEverySilicon } from "../parts/queries";
-import { addReveal, dismissReveal, dismissRevealsOf, usePendingReveals, type Reveal } from "../parts/reveals";
+import { useEverySilicon } from "../parts/queries";
+import { dismissReveal, usePendingReveals, type Reveal } from "../parts/reveals";
 import { SecretReveal } from "../parts/secret-reveal";
-import { stkSecret } from "../parts/stk";
-import { CreateSilicon } from "./create-silicon";
-import { SiliconDrawer } from "./silicon-drawer";
+import { pairOf } from "../parts/silicon-mark";
+import { STARTER_URL, SiliconsIntro } from "./silicons-intro";
 import styles from "./silicons.module.css";
 
-const host = (url: string | null) => {
-  if (!url) return null;
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
-};
+/** Creating a Silicon: its own page (Anil, 2026-11-01: a page, not a side panel). */
+export const NEW_SILICON_HREF = `${paths.silicons}/new`;
 
-/** A Silicon's tile, to hand focus to (its button is named "Manage si:…"); never one that is leaving. */
-const tileOf = (uuid: string) => pageMain()?.querySelector<HTMLElement>(`[role="listitem"]:not([data-leaving]) [data-silicon="${CSS.escape(uuid)}"]`);
-/** The control to fall back on when nothing more specific is left: the first tile, else Create a Silicon. */
-const fallbackFocus = () => pageMain()?.querySelector<HTMLElement>('[role="listitem"]:not([data-leaving]) [data-silicon]') ?? pageMain()?.querySelector<HTMLElement>("[data-create-silicon]");
-/** Ids longer than this wrap on the tile instead of morphing on one line (a 30-character handle overflows a phone). */
-const LONG_ID = 18;
+/** A Silicon's own page, by uuid (by its si:id in the one case its uuid would read as /silicons/new). */
+export const siliconHref = (silicon: Pick<ManagedSilicon, "uuid" | "id">) =>
+  `${paths.silicons}/${encodeURIComponent(silicon.uuid === "new" && silicon.id ? silicon.id : silicon.uuid)}`;
+
+/** Where focus goes when nothing more specific is left: the first card, else New Silicon. */
+const fallbackFocus = () => pageMain()?.querySelector<HTMLElement>("[data-silicon-card]") ?? pageMain()?.querySelector<HTMLElement>("[data-create-silicon]");
 
 export function Silicons() {
   const me = useMe();
   const silicons = useEverySilicon();
-  const requests = useEveryCustodianRequest();
   const reveals = usePendingReveals();
   const now = useNow(30_000);
-  const [creating, setCreating] = useState(false);
-  const [openUuid, setOpenUuid] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  /** What the side column shows: kept while it closes, so the content fades out with it. */
-  const [panel, setPanel] = useState<"silicon" | "create">("silicon");
-  const [fresh, setFresh] = useState<string | null>(null);
+  const params = useSearchParams();
+  const router = useRouter();
+  const create = () => router.push(NEW_SILICON_HREF);
   const carbon = asCarbon(me.data);
   const silicon = asSilicon(me.data);
 
-  const startCreating = () => {
-    setPanel("create");
-    setDrawerOpen(false);
-    setCreating(true);
-  };
-
   useRegisterCommands(() => (carbon ? [
-    { id: "silicons.create", label: "Create a Silicon", description: "You become its custodian; its STK is shown once", group: "Silicons", icon: <Plus size={16} strokeWidth={1.75} />, keywords: ["new", "silicon", "agent", "stk"], run: startCreating },
+    { id: "silicons.create", label: "Create a Silicon", description: "You become its custodian; its STK is shown once", group: "Silicons", icon: <Plus size={16} strokeWidth={1.75} />, keywords: ["new", "silicon", "agent", "stk"], run: create },
   ] : []), [!!carbon]);
 
-  // Home's "New Silicon" tile links here with ?new: open the create drawer once, and drop the flag from the address.
+  // Older links come with ?new (the create panel this page used to open): they go to the create page now.
+  const wantsNew = params.has(NEW_SILICON_PARAM);
   useEffect(() => {
-    if (!carbon) return;
-    const url = new URL(window.location.href);
-    if (!url.searchParams.has(NEW_SILICON_PARAM)) return;
-    url.searchParams.delete(NEW_SILICON_PARAM);
-    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
-    // Next frame, after the page has painted; not cancelled, since the flag is already gone from the address.
-    requestAnimationFrame(() => {
-      setPanel("create");
-      setCreating(true);
-    });
-  }, [carbon]);
+    if (wantsNew) router.replace(NEW_SILICON_HREF);
+  }, [wantsNew, router]);
 
-  const list = silicons.data?.items ?? [];
-  const selected = list.find(item => item.uuid === openUuid);
-  const open = (uuid: string) => {
-    setPanel("silicon");
-    setCreating(false);
-    setOpenUuid(uuid);
-    setDrawerOpen(true);
-  };
-  const deleted = (uuid: string) => {
-    dismissRevealsOf(uuid);
-    // The drawer gave focus back to this Silicon's tile, which has just gone.
-    handFocus(pageMain(), fallbackFocus);
-  };
-  /** "I've stored it" on the page: the next secret waiting, else the Silicon it was for, else the first tile. */
+  /** "I've stored it": the next secret waiting, else the first card. */
   const stored = (reveal: Reveal) => {
     dismissReveal(reveal.id);
-    handFocus(pageMain(), () => pageMain()?.querySelector<HTMLElement>("[data-page-reveals] [data-reveal] h2") ?? tileOf(reveal.silicon) ?? fallbackFocus());
-  };
-  // Secrets of the Silicon open in the drawer show there; every other one shows on the page.
-  const pageReveals = reveals.filter(item => !(drawerOpen && item.silicon === openUuid));
-
-  const onCreated = (created: SiliconCreated) => {
-    const item = created.silicon;
-    setFresh(item.uuid);
-    window.setTimeout(() => setFresh(current => (current === item.uuid ? null : current)), 4000);
-    const id = item.id ?? item.uuid;
-    const secrets = [
-      ...(created.stk ? [stkSecret(id, created.stk)] : []),
-      ...(created.webhook_secret ? [{ label: "Webhook signing secret", value: created.webhook_secret, note: `Verifies the events sent to ${item.webhook_url ?? "its webhook"}.` }] : []),
-    ];
-    if (secrets.length) {
-      addReveal({
-        silicon: item.uuid,
-        origin: "created",
-        title: created.stk ? `${id} is ready. Store its STK now` : `${id} is ready. Store its webhook secret now`,
-        description: created.stk
-          ? `This is the password ${id} signs in with. Silicon Accounts keeps only its hash, so it can never be shown again; if it is lost, rotate it.`
-          : "Silicon Accounts cannot show it again. Setting the webhook URL again makes a new one.",
-        secrets,
-      });
-    }
+    handFocus(pageMain(), () => pageMain()?.querySelector<HTMLElement>("[data-page-reveals] [data-reveal] h2") ?? fallbackFocus());
   };
 
-  const waiting = requests.data?.items ?? [];
+  const list = silicons.data?.items ?? [];
   return (
     <Page
-      className={styles.page}
       header={(
         <PageHeader
-          title="Silicons in your care"
-          description="Every Silicon has exactly one custodian, a Carbon who manages its account: its details, its id, its STK and who looks after it next."
-          actions={carbon ? (
-            <Button data-create-silicon="" onClick={startCreating}>
-              <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
-              Create a Silicon
-            </Button>
-          ) : null}
+          title="Silicons"
+          actions={carbon && list.length ? <AddSilicon carbonId={carbon.id} onCreate={create} /> : null}
         />
       )}
-      panel={carbon ? (panel === "create" ? (
-        <CreateSilicon open={creating} onOpenChange={setCreating} me={carbon} onCreated={onCreated} />
-      ) : (
-        <SiliconDrawer
-          silicon={selected}
-          open={drawerOpen && !!selected}
-          onOpenChange={setDrawerOpen}
-          me={carbon}
-          now={now}
-          reveals={reveals}
-          onReveal={addReveal}
-          onRevealDone={dismissReveal}
-          onDeleted={deleted}
-          focusOnClose={uuid => tileOf(uuid) ?? fallbackFocus()}
-        />
-      )) : undefined}
-      panelOpen={panel === "create" ? creating : drawerOpen && !!selected}
     >
       {me.error && !me.data ? (
         <Alert tone="danger" title="Your account did not load">
@@ -179,101 +99,106 @@ export function Silicons() {
           description={`${silicon.id ?? "This Silicon"} is looked after by ${silicon.custodian?.id ?? "its custodian"}. Silicons do not look after other Silicons.`}
         />
       ) : !carbon ? (
-        <TilesSkeleton />
+        <CardsSkeleton />
       ) : (
         <>
-          {pageReveals.length ? (
+          {reveals.length ? (
             <div className={styles.reveals} data-page-reveals="">
-              {pageReveals.map(reveal => <SecretReveal key={reveal.id} revealId={reveal.id} title={reveal.title} description={reveal.description} secrets={reveal.secrets} onDone={() => stored(reveal)} focusOnMount />)}
+              {reveals.map(reveal => <SecretReveal key={reveal.id} revealId={reveal.id} title={reveal.title} description={reveal.description} secrets={reveal.secrets} onDone={() => stored(reveal)} focusOnMount />)}
             </div>
           ) : null}
 
-          {/* Requests are answered in one place, the needs-you block on Home; this page only points there. */}
-          {waiting.length ? (
-            <Alert tone="info" title={`${plural(waiting.length, "custodian request")} waiting for you`}>
-              Answer them on Home, where everything that needs your decision is in one place.
-              <span className={styles.alertAction}><ButtonLink href={`${paths.home}#${NEEDS_YOU_ID}`} variant="secondary" size="sm">Answer them</ButtonLink></span>
-            </Alert>
-          ) : null}
+          <SiliconRequests />
 
-          <Section title="Your Silicons" description={silicons.data && list.length ? `${plural(list.length, "Silicon")}. Open one to manage it.` : undefined} data-your-silicons="" tabIndex={-1} className={styles.section}>
+          {silicons.data && list.length === 0 ? (
+            <SiliconsIntro carbonId={carbon.id} onCreate={create} />
+          ) : (
+          <section className={styles.section} aria-labelledby="your-silicons">
+            <h2 id="your-silicons" className={styles.sectionTitle}>Your Silicons</h2>
             {silicons.error && !silicons.data ? (
               <Alert tone="danger" title="Your Silicons did not load">
                 {describeError(silicons.error)}
                 <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void silicons.refetch()}>Try again</Button></span>
               </Alert>
             ) : !silicons.data ? (
-              <TilesSkeleton />
-            ) : list.length === 0 ? (
-              <div data-sq="surface" className={styles.empty}>
-                <EmptyState
-                  icon={<Cpu width={24} height={24} strokeWidth={1.5} />}
-                  title="No Silicons yet"
-                  description="Create one and you become its custodian. A Silicon can also create its own account and name you; its request then waits for you here."
-                  action={<Button variant="secondary" onClick={startCreating}><Plus size={16} strokeWidth={1.75} aria-hidden="true" />Create a Silicon</Button>}
-                />
-              </div>
+              <CardsSkeleton />
             ) : (
-              <AnimatedRows items={list} keyOf={item => item.uuid} layout="grid" className={styles.grid} label="Your Silicons">
-                {item => <Tile silicon={item} now={now} fresh={fresh === item.uuid} onOpen={() => open(item.uuid)} />}
-              </AnimatedRows>
+              <ul className={styles.cards}>
+                {list.map(item => <li key={item.uuid}><SiliconCard silicon={item} now={now} /></li>)}
+                <li>
+                  <Link href={NEW_SILICON_HREF} data-sq="surface" className={styles.newCard}>
+                    <span data-sq="surface" className={styles.newPlus} aria-hidden="true"><Plus size={20} strokeWidth={1.75} /></span>
+                    <span className={styles.newLabel}>New Silicon</span>
+                  </Link>
+                </li>
+              </ul>
             )}
             <ListCap page={silicons.data} noun="Silicons" command="silicon-accounts silicon list" />
-          </Section>
-
+          </section>
+          )}
         </>
       )}
     </Page>
   );
 }
 
-function Tile({ silicon, now, fresh, onOpen }: { silicon: ManagedSilicon; now: number; fresh: boolean; onOpen: () => void }) {
-  const id = silicon.id ?? silicon.uuid;
-  const status = silicon.status === "pending_custodian" ? { tone: "warning" as const, text: "Waiting for a custodian" }
-    : silicon.pending_transfer ? { tone: "info" as const, text: "Transfer pending" }
-      : { tone: "success" as const, text: "Active" };
-  const transferLeft = msUntil(silicon.pending_transfer?.expires_at, now);
-  const rotated = stkRotatedAt(silicon);
-  // The tile is one target, but its button holds only the words that name it: the id and the display name, read as
-  // "Manage si:scout, Scout" (shown name first, id below, by CSS). Every word the button shows is part of its name
-  // (WCAG 2.5.3); the status and the facts are the tile's own text, outside the button, and its ::before stretches over
-  // the whole tile so a click anywhere on it opens the Silicon.
+/**
+ * Add a Silicon, once there are some (Anil, 2026-11-01): the first visit's three ways in a menu. Create one here (the
+ * create panel), start from a Starter (Silicon Starter, in a new tab), or let a Silicon ask you (copies your c:id to
+ * share).
+ */
+function AddSilicon({ carbonId, onCreate }: { carbonId: string | null; onCreate: () => void }) {
+  const copyId = async () => {
+    if (!carbonId) return;
+    try {
+      await navigator.clipboard.writeText(carbonId);
+      notify.success(`Copied ${carbonId}`, "Share it with a Silicon; its request will show here.");
+    } catch {
+      notify.error(new Error("Your browser did not allow copying."), "Couldn't copy your id");
+    }
+  };
   return (
-    <div data-sq="surface" className={styles.tile} data-fresh={fresh || undefined}>
-      <span className={styles.tileTop}>
-        <Avatar name={silicon.display_name} src={silicon.pfp_url} size="lg" />
-        <Badge size="sm" tone={status.tone}>{status.text}</Badge>
-      </span>
-      <button type="button" className={styles.tileOpen} data-silicon={silicon.uuid} onClick={onOpen} aria-label={`Manage ${id}, ${silicon.display_name}`}>
-        {/* A short id morphs when it changes; a long one wraps rather than being cut off at the tile's edge. The space
-            keeps the id and the name two words apart for anything that reads the button's text (it never renders). */}
-        {id.length > LONG_ID ? <span className={styles.tileIdWrap}>{id}</span> : <TextMorph className={styles.tileId}>{id}</TextMorph>}
-        {" "}
-        <span className={styles.tileName} title={silicon.display_name}>{silicon.display_name}</span>
-      </button>
-      <span className={styles.tileFacts}>
-        <span className={styles.tileFact}>
-          <span className={styles.tileLabel}>STK</span>
-          <span className={styles.tileValue}>{rotated ? `rotated ${formatRelative(rotated, now)}` : "never rotated"}</span>
-        </span>
-        <span className={styles.tileFact}>
-          <span className={styles.tileLabel}>Webhook</span>
-          <span className={styles.tileValue}>{host(silicon.webhook_url) ?? "not set"}</span>
-        </span>
-      </span>
-      {silicon.pending_transfer ? (
-        <span className={styles.tileNote}>
-          Waiting for {personLabel(silicon.pending_transfer.to)} to accept{transferLeft > 0 ? `, ${spanText(transferLeft)} left` : ""}
-        </span>
-      ) : null}
-    </div>
+    <DropdownMenu
+      label="Add a Silicon"
+      icon={<Plus size={16} strokeWidth={1.75} />}
+      items={[
+        { label: "Create one here", icon: <Plus size={16} strokeWidth={1.75} />, onSelect: onCreate },
+        { label: "Start from a Starter", icon: <ArrowUpRight size={16} strokeWidth={1.75} />, onSelect: () => window.open(STARTER_URL, "_blank", "noopener") },
+        ...(carbonId ? [{ label: "Copy your id for a Silicon", icon: <AtSign size={16} strokeWidth={1.75} />, onSelect: () => void copyId() }] : []),
+      ]}
+    />
   );
 }
 
-function TilesSkeleton() {
+/**
+ * One Silicon as a card in its own colour pair (its mark's, picked from its uuid), deepened at the top left so its
+ * words read in white: its name, its si:id, and when its key last changed; a status when it is not simply active. The
+ * Silicon spark stands at the lower right. The whole card opens its page.
+ */
+function SiliconCard({ silicon, now }: { silicon: ManagedSilicon; now: number }) {
+  const pair = pairOf(silicon.uuid);
+  const style = { "--card-from": `var(--silicon-mark-${pair}-from)`, "--card-to": `var(--silicon-mark-${pair}-to)` } as CSSProperties;
+  const rotated = stkRotatedAt(silicon);
+  const status = silicon.status === "pending_custodian" ? "Waiting for a custodian"
+    : silicon.pending_transfer ? `Handing over to ${personLabel(silicon.pending_transfer.to)}`
+      : null;
   return (
-    <div className={styles.grid} aria-busy="true" aria-label="Loading your Silicons">
-      {[0, 1, 2].map(index => <SkeletonBlock key={index} width="100%" height="212px" radius="var(--radius-surface)" index={index} />)}
+    <Link href={siliconHref(silicon)} data-sq="clip" data-silicon-card="" className={styles.card} style={style}>
+      <Sparkle className={styles.cardSpark} fill="currentColor" strokeWidth={1} aria-hidden="true" />
+      <span className={styles.cardName}>{silicon.display_name || silicon.id || "A Silicon"}</span>
+      {silicon.id ? <span className={styles.cardId}>{silicon.id}</span> : null}
+      <span className={styles.cardFoot}>
+        {status ? <span className={styles.cardStatus}>{status}</span> : null}
+        <span className={styles.cardFact}>{rotated ? `Key changed ${formatRelative(rotated, now)}` : "Key never changed"}</span>
+      </span>
+    </Link>
+  );
+}
+
+function CardsSkeleton() {
+  return (
+    <div className={styles.cards} aria-busy="true" aria-label="Loading your Silicons">
+      {[0, 1, 2].map(index => <SkeletonBlock key={index} width="100%" height="168px" radius="var(--radius-container)" index={index} />)}
     </div>
   );
 }

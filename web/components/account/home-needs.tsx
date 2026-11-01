@@ -52,14 +52,27 @@ export function HomeNeeds() {
 
   return (
     <div id={NEEDS_YOU_ID} className={styles.group} tabIndex={-1}>
-      <Requests waiting={waiting} failed={failed} error={requests.error} retry={() => void requests.refetch()} stale={stale} now={now} />
+      <Requests id={NEEDS_YOU_ID} title="Needs you" waiting={waiting} failed={failed} error={requests.error} retry={() => void requests.refetch()} stale={stale} now={now} />
     </div>
   );
 }
 
 /* Needs you ------------------------------------------------------------------------------------------------------- */
 
-function Requests({ waiting, failed, error, retry, stale, now }: { waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: SessionInfo | undefined; now: number }) {
+/**
+ * The Silicons page's "Waiting for you" (Anil, 2026-11-01): the same rows and dialogs as Needs you, only the custodian
+ * requests and handovers (no devices); nothing while none wait.
+ */
+export function SiliconRequests() {
+  const requests = useEveryCustodianRequest();
+  const now = useNow(30_000);
+  const waiting = requests.data?.items ?? [];
+  const failed = !!requests.error && !requests.data;
+  if (!waiting.length && !failed) return null;
+  return <Requests id="silicon-requests" title="Waiting for you" waiting={waiting} failed={failed} error={requests.error} retry={() => void requests.refetch()} stale={undefined} now={now} />;
+}
+
+function Requests({ id, title, waiting, failed, error, retry, stale, now }: { id: string; title: string; waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: SessionInfo | undefined; now: number }) {
   const decline = useDeclineCustodianRequest();
   const signOut = useSignOutSession();
   const [reviewing, setReviewing] = useState<CustodianRequest | null>(null);
@@ -71,9 +84,9 @@ function Requests({ waiting, failed, error, retry, stale, now }: { waiting: Cust
   };
 
   return (
-    <section className={styles.section} aria-labelledby={`${NEEDS_YOU_ID}-title`}>
+    <section className={styles.section} aria-labelledby={`${id}-title`}>
       <div className={styles.head}>
-        <h2 id={`${NEEDS_YOU_ID}-title`} className={styles.title}>Needs you</h2>
+        <h2 id={`${id}-title`} className={styles.title}>{title}</h2>
         <Badge size="sm" tone="warning">{count}</Badge>
       </div>
       <div data-sq="surface" className={styles.tile}>

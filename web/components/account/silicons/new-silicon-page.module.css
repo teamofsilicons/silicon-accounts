@@ -1,0 +1,4 @@
+/* /silicons/new: the create form in a white card like Home's tiles (faint edge, resting shadow, the container
+   squircle, 24px inside). */
+.alertAction { display: block; margin-top: var(--space-group); }
+.card { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border-subtle); padding: var(--space-section); border: 1px solid var(--sq-stroke); background: var(--sq-fill); box-shadow: var(--shadow-resting); }

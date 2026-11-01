@@ -169,6 +169,9 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
 - **Phone numbers** go through `components/foundation/phone-field` (`PhoneField`): Arc's picker formats the 49
   countries it lists, and every other number is typed with its country code and sent exactly as typed (the hosted
   pages and the account site's "Add a phone number" both use it; `guessCountry()` starts it in the visitor's country).
+- **Product shots** use the stageshow kit vendored at `components/foundation/stageshow/kit` (Benji Taylor, MIT; see its
+  README): copied, not edited, and outside lint. Shots live with their page (the Silicons stories' in
+  `components/account/silicons/stories/shots.tsx`) and are styled with the site's tokens.
 - **Signing out** waits for the server, then leaves with a full load (`useSignOut()`): no account page stays mounted
   without a session.
 - **Arc rules.** One primary action per surface; destructive actions ask in place (ConfirmMorph) or need a hold;
@@ -707,6 +710,14 @@ in `redesign/api-gaps.md`).
 - **Checkup** (`components/account/parts/checkup.ts`, 2026-10-31): Home's "Finish setting up" steps (a second way in,
   a verified email, a recovery phone, devices used in the last 7 days) and the Keep choice remembered in this browser
   (`accounts.home.kept-sessions`), shared by Home's `home-needs.tsx` and the previous Home.
+- **Silicons** (2026-11-01): `/silicons` (`components/account/silicons/silicons.tsx`): Waiting for you, then the
+  Silicons as colour cards opening `/silicons/[uuid]` (`silicon-page.tsx`, which renders the drawer's
+  `SiliconSettings` with `inPage`); on a first visit `silicons-intro.tsx`, six stories (one idea each; segmented bars,
+  five seconds a beat, tap or arrow keys, hold to pause; the last beat holds three ways to add a Silicon, one of them
+  Silicon Starter at https://starter.teamofsilicons.com); Add a Silicon is a
+  `DropdownMenu` of the same three. Creating one is a page, `/silicons/new` (`new-silicon-page.tsx`, the form from
+  `create-silicon.tsx`; `revealCreated` keeps its STK for its page); no account page uses a side panel any more
+  (`SidePanel` and `SiliconDrawer` remain, unused).
 - **Picture colours** (`lib/picture-colours.ts`, 2026-10-30): `usePictureColours(src)` reads a picture's main colours (by hue and shade) in a
   32 px canvas (greys, whites and blacks left out) for Home's ring. Uploaded photos (`/v1/photos/…`, no CORS) are read through the site's own `/v1` proxy; another
   origin's photo needs CORS to be read;

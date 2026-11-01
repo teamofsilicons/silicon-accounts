@@ -24,11 +24,6 @@
       "count": 4
     }
   },
-  "components/account/silicons/silicons.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "components/auth/flow/dob-field.tsx": {
     "no-restricted-syntax": {
       "count": 5

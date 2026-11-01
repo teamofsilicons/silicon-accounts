@@ -3,9 +3,10 @@
 /**
  * Creating a Silicon you are custodian of (POST /v1/me/silicons): a display name, its si:id (checked as you type, and
  * suggested from the name until you edit it), its timezone (yours by default), an optional webhook, and an optional
- * STK of your own. The generated STK comes back exactly once; the page shows it in a reveal card, which holds the only
- * copy (the mutation keeps none). A retry of the same request reuses its Idempotency-Key, so a lost answer never creates
- * the Silicon twice. Escape in the timezone list closes the list, not the drawer with the form in it.
+ * STK of your own. It is the form of the /silicons/new page (new-silicon-page.tsx; Anil, 2026-11-01: a page, not a side
+ * panel). The generated STK comes back exactly once; revealCreated keeps it for the new Silicon's page to show in a
+ * reveal card, which holds the only copy (the mutation keeps none). A retry of the same request reuses its
+ * Idempotency-Key, so a lost answer never creates the Silicon twice.
  */
 import { useMemo, useState, type FormEvent } from "react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
@@ -13,22 +14,15 @@ import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Checkbox } from "@teamofsilicons/silicon-ui/checkbox";
 import { Combobox } from "@teamofsilicons/silicon-ui/combobox";
 import { Input } from "@teamofsilicons/silicon-ui/input";
-import { SidePanel } from "@/components/foundation/layout/side-panel";
 import { ApiError } from "@/lib/api/errors";
 import type { CarbonMe, SiliconCreated } from "@/lib/api/types";
 import { timezoneOptions } from "@/lib/timezones";
 import { describeError } from "../parts/common";
 import { IdField, useIdCheck } from "../parts/id-field";
 import { useCreateSiliconOnce } from "../parts/queries";
-import { normalizeStk, stkProblem } from "../parts/stk";
+import { addReveal } from "../parts/reveals";
+import { normalizeStk, stkProblem, stkSecret } from "../parts/stk";
 import styles from "./create-silicon.module.css";
-
-export interface CreateSiliconProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  me: CarbonMe;
-  onCreated: (created: SiliconCreated) => void;
-}
 
 /** "Head of Growth" → "head_of_growth": a handle suggestion from a display name (3 to 30 of a-z, 0-9, _ and -). */
 export function handleFromName(name: string): string {
@@ -36,22 +30,30 @@ export function handleFromName(name: string): string {
   return handle.length >= 3 ? handle : "";
 }
 
-export function CreateSilicon({ open, onOpenChange, me, onCreated }: CreateSiliconProps) {
-  // Every opening starts with an empty form: a new key each time the panel opens (it stays mounted while it closes).
-  const [opening, setOpening] = useState(0);
-  const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    if (open) setOpening(count => count + 1);
-  }
-  return (
-    <SidePanel open={open} onOpenChange={onOpenChange} title="Create a Silicon" description="You become its custodian. It signs in with its si:id and an STK that is shown to you once." drawerClassName={styles.panel}>
-      <CreateForm key={opening} me={me} onCreated={created => { onCreated(created); onOpenChange(false); }} onCancel={() => onOpenChange(false)} />
-    </SidePanel>
-  );
+/**
+ * The secrets a new Silicon comes back with (its generated STK, its webhook signing secret), kept as a reveal for its
+ * own page to show once (parts/reveals.ts): the only copy there will ever be.
+ */
+export function revealCreated(created: SiliconCreated) {
+  const item = created.silicon;
+  const id = item.id ?? item.uuid;
+  const secrets = [
+    ...(created.stk ? [stkSecret(id, created.stk)] : []),
+    ...(created.webhook_secret ? [{ label: "Webhook signing secret", value: created.webhook_secret, note: `Verifies the events sent to ${item.webhook_url ?? "its webhook"}.` }] : []),
+  ];
+  if (!secrets.length) return;
+  addReveal({
+    silicon: item.uuid,
+    origin: "created",
+    title: created.stk ? `${id} is ready. Store its STK now` : `${id} is ready. Store its webhook secret now`,
+    description: created.stk
+      ? `This is the password ${id} signs in with. Silicon Accounts keeps only its hash, so it can never be shown again; if it is lost, rotate it.`
+      : "Silicon Accounts cannot show it again. Setting the webhook URL again makes a new one.",
+    secrets,
+  });
 }
 
-function CreateForm({ me, onCreated, onCancel }: { me: CarbonMe; onCreated: (created: SiliconCreated) => void; onCancel: () => void }) {
+export function CreateSiliconForm({ me, onCreated, onCancel }: { me: CarbonMe; onCreated: (created: SiliconCreated) => void; onCancel: () => void }) {
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [handleEdited, setHandleEdited] = useState(false);

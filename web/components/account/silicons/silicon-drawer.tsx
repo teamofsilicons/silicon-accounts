@@ -75,15 +75,22 @@ export function SiliconDrawer({ silicon, open, onOpenChange, focusOnClose, ...re
       returnFocus={() => focusOnClose?.(silicon.uuid)}
       drawerClassName={styles.panel}
     >
-      <Body key={silicon.uuid} silicon={silicon} onClose={() => onOpenChange(false)} {...rest} />
+      <SiliconSettings key={silicon.uuid} silicon={silicon} onClose={() => onOpenChange(false)} {...rest} />
     </SidePanel>
   );
 }
 
-type BodyProps = Omit<SiliconDrawerProps, "silicon" | "open" | "onOpenChange" | "focusOnClose"> & { silicon: ManagedSilicon; onClose: () => void };
+type BodyProps = Omit<SiliconDrawerProps, "silicon" | "open" | "onOpenChange" | "focusOnClose"> & {
+  silicon: ManagedSilicon;
+  onClose: () => void;
+  /** On a Silicon's own page, whose header already shows its photo, name, id and status: the name is edited as a row. */
+  inPage?: boolean;
+};
+export type SiliconSettingsProps = BodyProps;
 type Origin = NonNullable<Reveal["origin"]>;
 
-function Body(props: BodyProps) {
+/** A Silicon's settings (profile, STK, webhook, custodian, delete): the drawer's body, and a Silicon's page. */
+export function SiliconSettings(props: BodyProps) {
   const { silicon, reveals, onRevealDone } = props;
   const body = useRef<HTMLDivElement>(null);
   const headings = useRef<Partial<Record<Origin, HTMLHeadingElement | null>>>({});
@@ -145,7 +152,8 @@ function statusOf(silicon: ManagedSilicon): { tone: "warning" | "info" | "succes
   return { tone: "success", text: "Active" };
 }
 
-function Profile({ silicon }: BodyProps) {
+function Profile(props: BodyProps) {
+  const { silicon } = props;
   const [changingId, setChangingId] = useState(false);
   // One detail editor at a time, inline below the facts: a phone-wide drawer has no room beside the row, and a layer
   // opened from a modal layer is easy to lose.
@@ -203,27 +211,31 @@ function Profile({ silicon }: BodyProps) {
     }
   };
 
+  const nameEditor = (
+    <InlineEdit
+      className={styles.name}
+      label="Display name"
+      value={silicon.display_name}
+      onSave={async next => {
+        try {
+          await save({ display_name: next });
+        } catch (error) {
+          throw reasonError(error);
+        }
+      }}
+      validate={next => (!next ? "Enter a display name." : next.length > 100 ? `A display name can be at most 100 characters (this one has ${next.length}).` : null)}
+    />
+  );
+
   return (
     <section ref={profile} className={styles.profile} aria-label="Profile">
-      <div className={styles.identity}>
+      {props.inPage ? null : <div className={styles.identity}>
         <span className={styles.photo} data-busy={uploading || undefined}>
           <Avatar name={silicon.display_name} src={preview ?? silicon.pfp_url ?? undefined} size="xl" />
           {uploading ? <span className={styles.busy} aria-hidden="true"><LoaderCircle className={styles.spinner} size={22} strokeWidth={1.75} /></span> : null}
         </span>
         <div className={styles.identityText}>
-          <InlineEdit
-            className={styles.name}
-            label="Display name"
-            value={silicon.display_name}
-            onSave={async next => {
-              try {
-                await save({ display_name: next });
-              } catch (error) {
-                throw reasonError(error);
-              }
-            }}
-            validate={next => (!next ? "Enter a display name." : next.length > 100 ? `A display name can be at most 100 characters (this one has ${next.length}).` : null)}
-          />
+          {nameEditor}
           <div className={styles.idLine}>
             {/* A short id morphs when it changes; a long one wraps (the drawer is narrow on phones) rather than being cut. */}
             {(silicon.id?.length ?? 0) > LONG_ID
@@ -233,8 +245,14 @@ function Profile({ silicon }: BodyProps) {
             <Badge size="sm" tone={status.tone}>{status.text}</Badge>
           </div>
         </div>
-      </div>
+      </div>}
       <dl className={styles.facts}>
+        {props.inPage ? (
+          <div>
+            <dt>Name</dt>
+            <dd>{nameEditor}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>uuid</dt>
           <dd><span className={styles.mono}>{silicon.uuid}</span><CopyButton value={silicon.uuid} label="Copy uuid" iconOnly variant="plain" /></dd>

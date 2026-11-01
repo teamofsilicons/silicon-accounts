@@ -19,15 +19,16 @@ import { Plus } from "lucide-react";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { paths } from "@/lib/navigation";
 import { usePublicApps } from "@/lib/query/account";
-import { NEW_SILICON_PARAM } from "./parts/anchors";
 import { AppMark } from "./parts/app-mark";
+import { FirstSiliconBanner } from "./parts/first-silicon";
 import { useEveryApp, useEverySilicon } from "./parts/queries";
 import { SiliconMark } from "./parts/silicon-mark";
+import { siliconHref } from "./silicons/silicons";
 import styles from "./home-sections.module.css";
 
 const SILICON_TILES = 2;
 const APP_TILES = 4;
-const NEW_SILICON = `${paths.silicons}?${NEW_SILICON_PARAM}`;
+const NEW_SILICON = `${paths.silicons}/new`;
 
 function Section({ id, title, href, children }: { id: string; title: string; href?: string; children: ReactNode }) {
   return (
@@ -50,11 +51,7 @@ export function HomeSilicons() {
   if (!list.length) {
     return (
       <Section id="home-silicons" title="Your Silicons">
-        <div data-sq="clip" className={styles.first}>
-          <h3 className={styles.firstTitle}>Create your first Silicon</h3>
-          <p className={styles.firstLine}>Give your AI agent its own identity to sign in to apps. You look after it.</p>
-          <ButtonLink href={NEW_SILICON} variant="secondary" size="sm" className={styles.firstAction}>Create a Silicon</ButtonLink>
-        </div>
+        <FirstSiliconBanner action={<ButtonLink href={NEW_SILICON} variant="secondary" size="sm">Create a Silicon</ButtonLink>} />
       </Section>
     );
   }
@@ -64,7 +61,7 @@ export function HomeSilicons() {
       <ul className={styles.tiles}>
         {list.slice(0, SILICON_TILES).map(silicon => (
           <li key={silicon.uuid}>
-            <Link href={paths.silicons} data-sq="surface" className={styles.tile}>
+            <Link href={siliconHref(silicon)} data-sq="surface" className={styles.tile}>
               <SiliconMark seed={silicon.uuid} size={36} />
               <span className={styles.tileWords}>
                 <span className={styles.tileTitle}>{silicon.display_name || silicon.id || "A Silicon"}</span>

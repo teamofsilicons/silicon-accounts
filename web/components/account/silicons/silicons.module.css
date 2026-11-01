@@ -1,58 +1,44 @@
-/* Silicons in your care: reveal cards, the request deck and a grid of squircle tiles. */
-.alertAction { display: block; margin-top: var(--space-3); }
-/* The side column a Silicon (or Create a Silicon) opens: room for its forms and secrets. */
-.page { --panel-width: 440px; }
-.reveals { display: grid; min-width: 0; max-width: 760px; gap: var(--space-4); }
-/* "Your Silicons" takes focus by script once the request deck has gone; its heading turns accent ink while it has it. */
-.section:focus-visible h2 { color: var(--accent-ink); }
-/* Positioned: a tile that leaves is lifted out of the grid while the rest glide into place. */
-.grid { position: relative; display: grid; min-width: 0; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: var(--space-4); }
-.grid > [role="listitem"] { display: grid; min-width: 0; }
-.empty { --sq-r: var(--radius-surface); --sq-stroke: var(--border); position: relative; border: 1px dashed var(--sq-stroke); }
+/* /silicons (Anil, 2026-11-01, layout B): the page heading, reveal cards, Waiting for you, then Your Silicons as colour
+   cards and a New Silicon card, in Home's section pattern (the heading on the page, 16px above its content, 48px
+   between sections). */
+.alertAction { display: block; margin-top: var(--space-group); }
+.reveals { display: grid; min-width: 0; gap: var(--space-inset); }
 
-/* A tile is one target: its button (.tileOpen) stretches a ::before over all of it, and the tile shows the button's
-   hover, keyboard focus and press. Isolated, so that ::before stays inside the tile. */
-.tile {
-  --sq-r: var(--radius-surface);
-  --sq-fill: var(--surface);
-  --sq-stroke: var(--border);
-  position: relative;
-  isolation: isolate;
-  display: grid;
-  min-width: 0;
-  align-content: start;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  border: 1px solid var(--sq-stroke);
-  background: var(--sq-fill);
-  color: var(--foreground);
-  cursor: pointer;
-  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), transform var(--duration-spring) var(--ease-spring);
-}
-@media (hover: hover) and (pointer: fine) {
-  .tile:hover { --sq-stroke: var(--border-strong); transform: translateY(-2px); }
-}
-.tile:has(.tileOpen:focus-visible) { --sq-stroke: var(--accent); --sq-fill: color-mix(in oklab, var(--accent) 4%, var(--surface)); }
-.tile:active { transform: scale(.985); }
-.tile[data-fresh] { --sq-stroke: var(--accent); --sq-fill: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
+.section { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
+.sectionTitle { margin: 0; color: var(--foreground); font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-display); }
 
-.tileTop { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
-/* The button holds only the name and the id. The id comes first in the markup, so the words the button shows read in
-   the order of its accessible name ("Manage si:scout, Scout"); the name is drawn first. */
-.tileOpen { display: grid; min-width: 0; gap: 2px; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; outline: none; }
-.tileOpen::before { content: ""; position: absolute; inset: 0; z-index: 1; }
-/* Up to two lines of the name (display names run to 100 characters); the drawer shows all of it. Above the stretched
-   target, so its title (the whole name) still shows on hover; a click on it is still a click on the button. */
-.tileName { position: relative; z-index: 2; order: -1; display: -webkit-box; overflow: hidden; color: var(--foreground); font-size: var(--text-lg); font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
-.tileId { display: block; max-width: 100%; overflow: hidden; color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-sm); font-variant-ligatures: none; letter-spacing: 0; white-space: nowrap; }
-.tileIdWrap { min-width: 0; color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-sm); font-variant-ligatures: none; letter-spacing: 0; overflow-wrap: anywhere; }
-.tileFacts { display: grid; min-width: 0; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
-.tileFact { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: var(--space-3); font-size: var(--text-xs); }
-.tileLabel { flex: none; color: var(--text-secondary); }
-.tileValue { min-width: 0; overflow: hidden; color: var(--foreground); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
-.tileNote { color: var(--accent-ink); font-size: var(--text-xs); line-height: var(--leading-body); }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-inset); margin: 0; padding: 0; list-style: none; }
+.cards > li { display: grid; min-width: 0; }
 
-@media (prefers-reduced-motion: reduce) {
-  .tile { transition: none; }
-  .tile:hover, .tile:active { transform: none; }
+/* A Silicon: a card in its own colour pair (--card-from, --card-to, set by silicons.tsx), deepened at the top left so
+   its words read in white; a faint light edge and a light raised shadow, the container squircle; its name (18px,
+   medium), its si:id (mono, softer), and at its foot a status when it has one and when its key last changed. The
+   Silicon spark stands at the lower right. It lifts a little on hover; keyboard focus rings it in the accent. */
+.card {
+  --sq-r: var(--radius-container);
+  position: relative; isolation: isolate; display: flex; min-width: 0; min-height: 168px; flex-direction: column; gap: var(--space-tight);
+  padding: var(--space-inset); overflow: hidden; border: 1px solid color-mix(in oklab, var(--neutral-0) 22%, transparent);
+  background-image: linear-gradient(135deg, color-mix(in oklab, var(--card-from), var(--neutral-11) 42%), var(--card-from) 48%, var(--card-to));
+  background-origin: border-box; box-shadow: var(--shadow-raised); color: var(--neutral-0); text-decoration: none;
+  transition: translate var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
+.card:hover { color: var(--neutral-0); }
+@media (hover: hover) and (pointer: fine) { .card:hover { translate: 0 calc(var(--space-hair) * -1); box-shadow: var(--shadow-floating); } }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cardSpark { position: absolute; z-index: -1; right: var(--space-inset); bottom: var(--space-inset); width: 44px; height: 44px; color: var(--neutral-0); opacity: .9; }
+.cardName { overflow: hidden; color: var(--neutral-0); font-size: var(--text-lg); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-display); text-overflow: ellipsis; white-space: nowrap; }
+.cardId { overflow: hidden; color: color-mix(in oklab, var(--neutral-0) 75%, transparent); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+.cardFoot { display: grid; gap: var(--space-hair); margin-top: auto; padding-right: var(--space-page); }
+.cardStatus { color: var(--neutral-0); font-size: var(--text-xs); font-weight: 600; }
+.cardFact { color: color-mix(in oklab, var(--neutral-0) 82%, transparent); font-size: var(--text-xs); font-weight: 500; }
+
+/* New Silicon: the canvas grey card with a plus, quieter than a Silicon's; it opens the create panel. */
+.newCard { --sq-r: var(--radius-container); --sq-fill: var(--canvas); --sq-stroke: var(--border-subtle); display: flex; min-height: 168px; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+.newCard:hover { --sq-fill: var(--surface-muted); color: var(--foreground); }
+.newCard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.newPlus { --sq-r: var(--radius-control); --sq-fill: var(--surface); display: grid; width: 36px; height: 36px; place-items: center; background: var(--sq-fill); box-shadow: var(--shadow-resting); color: var(--text-secondary); }
+.newLabel { font-size: var(--text-base); font-weight: 500; }
+
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+@media (max-width: 899px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 539px) { .cards { grid-template-columns: minmax(0, 1fr); } }

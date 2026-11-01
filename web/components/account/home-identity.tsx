@@ -86,7 +86,7 @@ export function HomeIdentity() {
 }
 
 /** A small grey chip (the id) that copies its value on click and says so in place, with no separate copy control. */
-function CopyChip({ value, what }: { value: string; what: string }) {
+export function CopyChip({ value, what }: { value: string; what: string }) {
   const { state, copy } = useCopyFeedback();
   const label = state === "copied" ? "Copied" : state === "error" ? "Couldn\u2019t copy" : value;
   return (

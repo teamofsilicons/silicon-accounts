@@ -235,9 +235,34 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   above the section's content (the introduction is the exception: a banner, its heading and round soft dismiss inside
   its grey tile, the dismiss's 28 px circle on the tile's 16 px padding); 48 px between sections; 48 px above the greeting and below the last section.
   Padding in three steps: container tiles 16 px, the hero banner 32 px, small tiles and rows 12 px. (2026-10-31)
+- Silicons, layout B (Anil, 2026-11-01): /silicons is the heading "Silicons" (New Silicon beside it once there are
+  any), Waiting for you (Home's request rows), then Your Silicons as cards, each in its Silicon's own colour pair (name,
+  si:id, when its key last changed, a status when not simply active), and a New Silicon card; on a first visit, stories instead
+  (Anil, 2026-11-01: one idea at a time, not everything at once). Six beats, each a Geist Serif headline, one line, its
+  own colour and one picture: 1 "An AI agent with an identity of its own." 2 "It gets an id, like yours." (your c:id
+  beside si:something) 3 "It signs in with its own key." (STK, shown once) 4 "It signs in to apps by itself." 5 "Every
+  Silicon has one Carbon looking after it." (your picture) 6 "Three ways to start.": make one here, start from a Starter
+  (Silicon Starter, the registry of ready-made Silicons, run with Silicon), let one ask you (your c:id). Segmented bars;
+  five seconds a beat (the last stays); tap right or → for next, left or ← for back, hold to pause; Back / Next
+  buttons; still with reduced motion. With Silicons, Add a Silicon (Silicon UI's DropdownMenu) offers the same three. Each Silicon has its own page, /silicons/[uuid], replacing the drawer: a
+  back link, a hero in its colours (name, si:id, status, in your care since), then its settings (name, uuid, timezone,
+  born, photo, id; STK; webhook; custodian; delete). The prototype's Activity and Access tabs wait on the API
+  (api-gaps.md 3–8). (2026-11-01)
+- No side panels (Anil, 2026-11-01): actions open a page or a modal, never a column beside the page. Create a Silicon
+  is its own page, /silicons/new (the form in a card; creating it goes to the new Silicon's page, where its STK waits,
+  shown once; Cancel goes back); older ?new links redirect there. A Silicon's settings already have their own page.
+  (2026-11-01)
 - Dev states (Anil, 2026-10-31): while developing, a States panel puts the site in any state (account, Silicon
   requests, devices, Silicons, apps, network) by answering the API's reads with made-up data, development only, like
   the prototype's scenario controls. (2026-10-31)
+- Story shots (Anil, 2026-11-01): each of the first five story beats has a small animated product shot built with
+  Benji Taylor's stageshow kit (vendored at components/foundation/stageshow, MIT, not edited, outside lint), in the
+  site's own look and words, in the card's top-right lined up with the bars (in the flow above the words on a card
+  under 540 px). 1: Scout's card arrives in Your Silicons; 2: "scout" typed into the Id field, "si:scout is
+  available."; 3: the STK card, key shown then copied; 4: the CLI signs Scout in and gets a short-lived token for
+  Briefcase (a Silicon never sees an app's sign-in page, so no "Continue as" screen); 5: Scout's request accepted, its
+  mark turning active. Each plays once; its still is the payoff; beats run 5 to 7.5 s; the card is 480 px tall.
+  (2026-11-01)
 
 ## Process
 - Keep priorities.md, decisions.md and log.md (this folder) updated with every task; shared-code changes also get a
