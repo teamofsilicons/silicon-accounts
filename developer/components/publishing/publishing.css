@@ -1178,6 +1178,14 @@
   color: var(--text-muted);
   font-size: var(--text-xs);
 }
+.publishing-panel .unsupported-picker {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.publishing-panel .unsupported-reason {
+  white-space: pre-wrap;
+}
 .publishing-panel .invite-form {
   display: grid;
   grid-template-columns: 1fr auto;
