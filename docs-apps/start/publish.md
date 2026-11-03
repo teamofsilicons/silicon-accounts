@@ -160,6 +160,8 @@ silicon-apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0
 
 Copy all three accepted package IDs into the release command, then the development release ID into the promote command. Linux x86_64, Windows x86_64, and macOS Apple Silicon ARM64 are mandatory in every new release and promotion. Additional targets are optional. Existing releases remain installable.
 
+If Ring can't run on one of them, leave its package out and say why with `--unsupported-file windows-x86_64=why-no-windows.txt` (or `--unsupported windows-x86_64='…'`). The reason must be 200 to 1,000 characters. Everyone sees it: on the app page when they hover over the greyed-out logo, in `silicon-apps show ring`, and when an install on that platform fails.
+
 For Linux uploads, Apps runs the three required commands in an isolated environment and reports failures with their output. For Windows and macOS, Apps records the uploading Carbon or Silicon’s explicit confirmation that those commands work on that platform. Archive, manifest, permissions, signatures, and release-target requirements still apply.
 
 The `silicon-apps validate` step earlier checked the package's structure. This upload check runs the app itself, and both have to pass. The API server never runs uploaded packages.

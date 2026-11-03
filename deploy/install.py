@@ -105,6 +105,7 @@ previous=P('/opt/accounts/current')
 if previous.is_symlink():write('/opt/accounts/previous-release',str(previous.resolve())+'\n',0o600)
 P('/opt/accounts/current.next').unlink(missing_ok=True);P('/opt/accounts/current.next').symlink_to(release);os.replace('/opt/accounts/current.next',previous)
 for name,user,command in [('api','accounts','/opt/accounts/current/bin/accounts-api'),('web','accounts-web','/opt/accounts/current/node/bin/node /opt/accounts/current/web/server.js'),('developer','accounts-developer','/opt/accounts/current/node/bin/node /opt/accounts/current/developer/server.js')]:
+    session_storage = ('StateDirectory=developer-browser-sessions\nStateDirectoryMode=0700\nEnvironment=REFRESH_STATE_PATH=/var/lib/developer-browser-sessions/state.sqlite\nReadWritePaths=/var/lib/developer-browser-sessions\n' if name == 'developer' else '')
     write('/etc/systemd/system/accounts-'+name+'.service',f'''[Unit]
 Description=Silicon Accounts {name}
 After=network-online.target postgresql.service
@@ -123,7 +124,7 @@ PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
 UMask=0077
-[Install]
+{session_storage}[Install]
 WantedBy=multi-user.target
 ''')
 write('/etc/accounts/Caddyfile','''{
