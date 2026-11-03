@@ -1,13 +1,19 @@
 /**
- * The account site's top-level sections (the dock, the phone sheet, number-key shortcuts and the command palette all
- * read this list) and the route paths every page links to. Link with `paths`, never string literals.
+ * The account site's sections (the sidebar, the phone sheet, number-key shortcuts and the command palette all read
+ * SECTIONS) and the route paths every page links to. Link with `paths`, never string literals.
+ *
+ * The sections follow the lead designer's prototype (redesign/prototype-map.md): Home (what needs you, then your
+ * Silicons and apps), Silicons, Connected apps, Security, Personal info and, once its page is built, Data &
+ * privacy. Pages that are part of a section without being its front page (Proofs, Activity) are listed under it in
+ * `includes`, so the sidebar marks the right section there, and reached from the palette (MORE_DESTINATIONS) and from
+ * links.
  *
  * Building apps is not part of the account site. The developer site and its docs (developers.teamofsilicons.com,
- * `developer_url` in GET /v1/meta) are ELSEWHERE: quiet links in the top row, the phone sheet's foot and the command
- * palette, never a dock section. /developer[/*] here redirects there (proxy.ts).
+ * `developer_url` in GET /v1/meta) are ELSEWHERE: quiet links at the sidebar's foot and in the command palette, never a
+ * section. /developer[/*] here redirects there (proxy.ts).
  */
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Braces, Cpu, History, IdCard, KeyRound, LayoutGrid, ShieldCheck } from "lucide-react";
+import { BookOpen, Braces, History, House, IdCard, LayoutGrid, Shield, ShieldCheck, Sparkles } from "lucide-react";
 
 /** The developer site when GET /v1/meta does not name one (servers before it existed). */
 export const DEFAULT_DEVELOPER_URL = "https://developers.teamofsilicons.com";
@@ -41,6 +47,7 @@ export const paths = {
   flow: (id: string) => `/authorize/flow/${encodeURIComponent(id)}`,
   device: "/device",
   signInMethods: "/sign-in-methods",
+  personal: "/personal",
   apps: "/apps",
   silicons: "/silicons",
   proofs: "/proofs",
@@ -51,7 +58,7 @@ export const paths = {
   kitchen: "/__kitchen",
 } as const;
 
-export type SectionKey = "identity" | "sign-in" | "apps" | "silicons" | "proofs" | "activity";
+export type SectionKey = "home" | "silicons" | "apps" | "security" | "personal";
 
 export interface Section {
   key: SectionKey;
@@ -63,16 +70,23 @@ export interface Section {
   icon: LucideIcon;
   /** The number key that jumps here. */
   shortcut: string;
+  /** Other paths of this section (and everything under them). */
+  includes?: readonly string[];
 }
 
 export const SECTIONS: readonly Section[] = [
-  { key: "identity", label: "Identity", description: "Your card: name, id, photo and details", href: paths.home, icon: IdCard, shortcut: "1" },
-  { key: "sign-in", label: "Sign-in", description: "Emails, phone numbers and Google or Apple", href: paths.signInMethods, icon: KeyRound, shortcut: "2" },
-  { key: "apps", label: "Apps", description: "Apps you signed into and what they can see", href: paths.apps, icon: LayoutGrid, shortcut: "3" },
-  { key: "silicons", label: "Silicons", description: "Silicons you are custodian of", href: paths.silicons, icon: Cpu, shortcut: "4" },
-  { key: "proofs", label: "User verification", description: "Apps acting on your behalf", href: paths.proofs, icon: ShieldCheck, shortcut: "5" },
-  { key: "activity", label: "Activity", description: "Sign-ins and changes, by day", href: paths.activity, icon: History, shortcut: "6" },
+  { key: "home", label: "Home", description: "What needs you, then your Silicons and apps", href: paths.home, icon: House, shortcut: "1" },
+  { key: "silicons", label: "Silicons", description: "Silicons you look after, and requests waiting for you", href: paths.silicons, icon: Sparkles, shortcut: "2" },
+  { key: "apps", label: "Connected apps", description: "Apps you signed into, what they can see, and apps acting for you", href: paths.apps, icon: LayoutGrid, shortcut: "3", includes: [paths.proofs] },
+  { key: "security", label: "Security", description: "Your ways in, where you are signed in, and activity", href: paths.signInMethods, icon: Shield, shortcut: "4", includes: [paths.activity] },
+  { key: "personal", label: "Personal info", description: "Your card: photo, name, id, date of birth and contact details", href: paths.personal, icon: IdCard, shortcut: "5" },
 ];
+
+/** Account pages that belong to a section but are not in the sidebar: reached from the command palette and from links. */
+export const MORE_DESTINATIONS = [
+  { key: "proofs", label: "User verification", description: "Apps acting on your behalf at other apps", href: paths.proofs, icon: ShieldCheck },
+  { key: "activity", label: "Activity", description: "Sign-ins and changes, by day", href: paths.activity, icon: History },
+] as const;
 
 /** Another site the account site points to: always a full navigation, marked with an arrow, never the active section. */
 export interface Elsewhere {
@@ -89,10 +103,11 @@ export const ELSEWHERE: readonly Elsewhere[] = [
   { key: "docs", label: "Docs", description: "How Silicon Apps and Silicon Accounts work", icon: BookOpen, href: url => developerDocsUrl(url) },
 ];
 
-/** The section a path belongs to (Settings belongs to none: the dock shows no active section there). */
+/** The section a path belongs to (Settings belongs to none: the sidebar shows no active section there). */
 export function sectionFor(pathname: string): Section | undefined {
   if (pathname === "/" || pathname === "") return SECTIONS[0];
-  return SECTIONS.find(section => section.href !== "/" && (pathname === section.href || pathname.startsWith(`${section.href}/`)));
+  const within = (path: string) => path !== "/" && (pathname === path || pathname.startsWith(`${path}/`));
+  return SECTIONS.find(section => within(section.href) || section.includes?.some(within));
 }
 
 export function sectionIndex(pathname: string): number {
@@ -101,8 +116,8 @@ export function sectionIndex(pathname: string): number {
 }
 
 /**
- * The view-transition type for moving between two paths along the dock: "nav-forward" to the right, "nav-back" to
- * the left, "nav-fade" when either side is not a section (Settings, a nested page).
+ * The view-transition type for moving between two paths in the sidebar's order: "nav-forward" down the list,
+ * "nav-back" up it, "nav-fade" when either side is not a section (Settings, a nested page).
  */
 export function navigationType(from: string, to: string): "nav-forward" | "nav-back" | "nav-fade" {
   const a = sectionIndex(from);

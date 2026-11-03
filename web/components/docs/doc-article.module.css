@@ -22,10 +22,10 @@
 .title {
   margin: 0;
   color: var(--foreground);
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: clamp(2.375rem, 1.7rem + 2.4vw, 3.25rem);
-  font-weight: 400;
-  letter-spacing: -.014em;
+  font-weight: 500;
+  letter-spacing: var(--tracking-display);
   line-height: 1.04;
   text-wrap: balance;
 }
@@ -59,7 +59,7 @@
 .tocInline { display: none; }
 
 /* Related pages and cards. */
-.sectionTitle { margin: 0 0 var(--space-4); color: var(--foreground); font-family: var(--font-serif); font-size: 1.75rem; font-weight: 400; letter-spacing: -.01em; line-height: 1.15; }
+.sectionTitle { margin: 0 0 var(--space-4); color: var(--foreground); font-family: var(--font-display); font-size: 1.75rem; font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.15; }
 .related { margin-top: var(--space-6); padding-top: var(--space-8); border-top: 1px solid var(--border-subtle); }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: var(--space-3); }
 .card {

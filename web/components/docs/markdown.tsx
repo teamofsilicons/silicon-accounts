@@ -8,7 +8,7 @@
  */
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
-import { ArrowUpRight, Info, Lightbulb, MessageSquareWarning, OctagonAlert, TriangleAlert } from "lucide-react";
+import { ArrowUpRight, Check, Info, Lightbulb, MessageSquareWarning, OctagonAlert, TriangleAlert } from "lucide-react";
 import { pageExists } from "@/lib/docs/content";
 import { resolveLink } from "@/lib/docs/links";
 import type { Block, CalloutKind, Inline } from "@/lib/docs/markdown";
@@ -117,7 +117,7 @@ function ListBlock({ block, context }: { block: Extract<Block, { type: "list" }>
     <li key={index} className={item.checked !== null ? styles.task : undefined}>
       {item.checked !== null ? (
         <span className={styles.checkbox} data-checked={item.checked ? "" : undefined} data-sq-native="" role="img" aria-label={item.checked ? "Done" : "Not done"}>
-          {item.checked ? <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg> : null}
+          {item.checked ? <Check strokeWidth={2.25} aria-hidden="true" /> : null}
         </span>
       ) : null}
       <Blocks blocks={item.children} context={context} tight={block.tight} />

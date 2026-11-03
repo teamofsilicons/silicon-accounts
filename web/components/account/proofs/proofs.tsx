@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /proofs: the User verification proofs apps hold about you, every one of them (the list is read to its end). Each is drawn as the
+ * /proofs, under Access (each app's card on /apps lists its live ones; this page is the full view): the User verification proofs apps hold about you, every one of them (the list is read to its end). Each is drawn as the
  * issuing app acting at the receiving app, with a dash flowing along the connector while it is live and a ring that
  * empties as its current proof token runs out (the issuing app refreshes it; the proof itself can last until its
  * sign-in ends). Revoking one makes the receiving app's next check fail at once.
@@ -11,16 +11,17 @@
  */
 import { memo, useCallback, useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
-import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
-import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { ConfirmMorph } from "@teamofsilicons/silicon-ui/confirm-morph";
+import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
+import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader } from "@/components/foundation/layout/layout";
 import type { MyProof } from "@/lib/api/types";
 import { formatCountdown, formatDate, formatDateTime, formatRelative } from "@/lib/format";
+import { paths } from "@/lib/navigation";
 import { AnimatedRows } from "../parts/animated-rows";
 import { AppMark } from "../parts/app-mark";
 import { describeError, msUntil, spanText, useNow, useSecondTick } from "../parts/common";
@@ -71,6 +72,7 @@ export function Proofs() {
     <Page width="reading">
       <PageHeader
         title="User verification"
+        back={{ href: paths.apps, label: "Apps" }}
         description="See how apps act on your behalf at other apps. Each user verification lets the receiving app check that action with Silicon Accounts. Revoke one to stop it at once."
       />
       {proofs.error && !proofs.data ? (

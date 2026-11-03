@@ -46,9 +46,9 @@ export function bringIntoView(element: HTMLElement, align: "start" | "nearest" =
     if (delta) parent.scrollTo({ top: Math.max(0, parent.scrollTop + delta), behavior });
     return;
   }
-  // The page: keep clear of the top row and of the floating dock at the bottom.
+  // The page: keep clear of the sticky top bar, with room below.
   const top = 96;
-  const bottom = window.innerHeight - 120;
+  const bottom = window.innerHeight - 48;
   const delta = align === "start" ? rect.top - top : rect.top < top ? rect.top - top : rect.bottom > bottom ? Math.min(rect.bottom - bottom, rect.top - top) : 0;
   if (delta) window.scrollTo({ top: Math.max(0, window.scrollY + delta), behavior });
 }

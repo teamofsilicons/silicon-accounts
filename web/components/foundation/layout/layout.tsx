@@ -1,6 +1,6 @@
 /**
  * Layout primitives for the account pages:
- *   <Page>            the one page container (gutters, max width, room for the dock)
+ *   <Page>            the one page container (gutters, max width, room at the end)
  *   <PageHeader>      the page's h1 in the display face, a line of context, actions, a back link
  *   <Section>         a titled region (h2) with an optional description and actions
  *   <Stack>/<Cluster>/<Grid>   spacing on the 4px grid
@@ -30,7 +30,7 @@ export interface PageProps {
   label?: string;
 }
 
-/** The page container. One per page; the shell provides the landmark (<main>) and the room below for the dock. */
+/** The page container. One per page; the shell provides the landmark (<main>) and --page-end is the room below. */
 export function Page({ width = "default", className, children, label }: PageProps) {
   return (
     <div className={cx(styles.page, className)} data-width={width} aria-label={label}>

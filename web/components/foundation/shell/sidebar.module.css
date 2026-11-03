@@ -1,0 +1,4 @@
+/* The section list and, at its foot, the other sites. Placement only: rows are NavList's. */
+.sidebar { display: flex; min-height: 100%; flex-direction: column; gap: var(--space-block); }
+.foot { display: flex; flex-wrap: wrap; gap: var(--space-hair); margin-top: auto; padding-top: var(--space-group); border-top: 1px solid var(--border-subtle); }
+.foot svg { color: var(--text-muted); }

@@ -14,7 +14,8 @@ import { api, codeFor, completeDetails, json, lastSeq, postJson, sleep, tag } fr
 import { VARIANTS, auditPage, auditVariants, checkDock, collectConsole, findingsFor, hostedLink, openAccountPage, pageFetch, saveFindings, signedInCarbon, type Findings } from "./_audit";
 
 export const ACCOUNT_PAGES: Array<{ path: string; name: string; ready: RegExp }> = [
-  { path: "/", name: "identity", ready: /./ },
+  { path: "/", name: "home", ready: /./ },
+  { path: "/personal", name: "personal", ready: /./ },
   { path: "/sign-in-methods", name: "sign-in-methods", ready: /Email|email/ },
   { path: "/apps", name: "apps", ready: /App|app/ },
   { path: "/silicons", name: "silicons", ready: /Silicon/ },

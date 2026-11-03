@@ -4,7 +4,7 @@
  * Asking before leaving unsaved work. The App Router cannot block a navigation, so the account site sends every
  * navigation it starts through one gate:
  *
- *   - the shell's own moves (the dock and its phone sheet, the brand, the command palette, the section number keys, the
+ *   - the shell's own moves (the sidebar and its phone sheet, the brand, the command palette, the section number keys, the
  *     user menu's Settings, signing out) call `confirmNavigation(href, …)` before they go;
  *   - a plain click on any other same-origin link (a page's own <Link>) is caught on the window in the capture phase,
  *     before Next's Link sees it, while a guard protects its destination (`useGuardedLinks`, run by the shell). Links

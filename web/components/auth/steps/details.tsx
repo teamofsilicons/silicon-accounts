@@ -15,9 +15,9 @@
  */
 import { useId, useRef, useState } from "react";
 import { Lock } from "lucide-react";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { Checkbox } from "@/components/silicon-ui/checkbox/checkbox";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Checkbox } from "@teamofsilicons/silicon-ui/checkbox";
 import type { ApiError } from "@/lib/api/errors";
 import type { ContactField, FlowChallenge, FlowDetailField, FlowDetails } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";

@@ -1,7 +1,7 @@
 /**
  * The public pages' footer (server-rendered), one quiet line as on Silicon Writings and Silicon Apps: the copyright in
- * the pixel face and a few links (the developer site and its docs by the address GET /v1/meta names, what a Silicon
- * can read here, the store, the service status and the code, MIT).
+ * the pixel face and a few links (the developer site's docs and its guide to adding Silicon Accounts, by the address
+ * GET /v1/meta names; what a Silicon can read here; the store, the service status and the code, MIT).
  */
 import { LINKS } from "@/lib/site";
 import styles from "./site.module.css";
@@ -13,6 +13,7 @@ export interface SiteFooterProps {
 
 export function SiteFooter({ developerUrl }: SiteFooterProps) {
   const links: Array<{ href: string; label: string; external?: boolean }> = [
+    { href: `${developerUrl}/docs`, label: "Docs", external: true },
     { href: `${developerUrl}/docs/accounts`, label: "Add Silicon Accounts to your app", external: true },
     { href: "/llms.txt", label: "llms.txt" },
     { href: "/openapi.json", label: "API" },

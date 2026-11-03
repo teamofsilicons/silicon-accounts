@@ -1,0 +1,117 @@
+{
+  "components/account/parts/id-field.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/account/parts/photo-control.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "components/account/parts/secret-reveal.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/account/sign-in-methods/contact-adder.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "components/account/silicons/silicon-drawer.tsx": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "components/account/silicons/silicons.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/auth/flow/dob-field.tsx": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "components/auth/flow/id-field.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "components/auth/flow/parts.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/auth/steps/choose-method.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "components/auth/steps/details.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "components/auth/steps/opening.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/auth/steps/review.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/auth/steps/signup.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/docs/code-actions.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/docs/docs-header.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/docs/docs-search.tsx": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "components/docs/docs-toc.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/foundation/identity/identity-card.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/foundation/phone-field/phone-field.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "components/kitchen/sections/feedback.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "components/silicon-ui/blocks/empty-states/empty-states.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "components/silicon-ui/blocks/sign-in/sign-in.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  }
+}

@@ -21,8 +21,8 @@ interface View {
 }
 
 const VIEWS: View[] = [
-  { name: "identity", path: "/", title: "Silicon Accounts", ready: page => page.getByRole("region", { name: /^Identity card of / }).first() },
-  { name: "sign-in methods", path: "/sign-in-methods", title: "Sign-in methods · Silicon Accounts", ready: page => page.getByRole("list", { name: "Your phone numbers", exact: true }) },
+  { name: "personal info", path: "/personal", title: "Personal info · Silicon Accounts", ready: page => page.getByRole("region", { name: /^Identity card of / }).first() },
+  { name: "security", path: "/sign-in-methods", title: "Security · Silicon Accounts", ready: page => page.getByRole("list", { name: "Your phone numbers", exact: true }) },
   { name: "apps with access", path: "/apps", title: "Apps · Silicon Accounts", ready: page => page.getByRole("list", { name: "Apps with access" }) },
   {
     name: "apps whose access was removed",
@@ -47,7 +47,7 @@ const VIEWS: View[] = [
     ready: page => page.getByText("Nothing here yet").first(),
     open: async page => page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Custodian", exact: true }).click({ timeout: 30_000 }),
   },
-  { name: "settings", path: "/settings", title: "Settings · Silicon Accounts", ready: page => page.getByRole("list", { name: "Signed-in sessions" }) },
+  { name: "settings", path: "/settings", title: "Settings · Silicon Accounts", ready: page => page.getByRole("heading", { name: "Local time" }) },
 ];
 
 async function show(page: Page, site: string, view: View): Promise<boolean> {

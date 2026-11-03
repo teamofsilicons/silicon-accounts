@@ -1,4 +1,4 @@
-/* The identity card: a squircle object on warm paper (the site's cream) that tilts toward the pointer and flips to show its back. */
+/* The identity card: a squircle card on warm paper that tilts toward the pointer and flips to show its back. */
 .scene {
   --id-tilt-x: 0deg;
   --id-tilt-y: 0deg;
@@ -33,10 +33,10 @@
   --sq-r: var(--radius-surface);
   --sq-fill: var(--id-paper);
   --sq-stroke: var(--id-edge);
-  --id-paper: color-mix(in oklab, var(--surface) 70%, #F4EFE6);
-  --id-edge: var(--border);
+  --id-paper: color-mix(in oklab, var(--surface) 58%, var(--surface-muted));
+  --id-edge: var(--border-strong);
   --id-ink: var(--foreground);
-  --id-hairline: color-mix(in oklab, var(--id-edge) 70%, transparent);
+  --id-hairline: color-mix(in oklab, var(--foreground) 16%, transparent);
   position: relative;
   isolation: isolate;
   display: grid;
@@ -44,48 +44,36 @@
   min-width: 0;
   align-content: start;
   gap: var(--space-6);
-  padding: clamp(var(--space-6), 4vw, var(--space-10));
+  padding: clamp(var(--space-10), 4.5vw, var(--space-12));
   border: 1px solid var(--sq-stroke);
   background: var(--sq-fill);
   color: var(--id-ink);
-  box-shadow: var(--shadow-resting);
+  box-shadow: var(--shadow-raised);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   overflow: clip;
-}
-:global(:root[data-theme="dark"]) .face, :global([data-theme="dark"]) .face {
-  --id-paper: color-mix(in oklab, var(--surface) 86%, #2B4C80);
-  --id-edge: color-mix(in oklab, var(--border) 70%, #3D5A88);
 }
 /* The paper itself flips the card (identity-card.tsx): say so with the pointer; controls keep their own. */
 .face { cursor: pointer; }
 .face :is(input, textarea, [contenteditable]) { cursor: text; }
 .back { transform: rotateY(180deg); }
 
-/* A little grain, like paper. Decoration, behind content. */
-.grain { position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: var(--grain-opacity, .07); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .1 0 0 0 0 .14 0 0 0 0 .22 0 0 0 1.5 -.3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-size: 240px 240px; mix-blend-mode: multiply; }
-:global(:root[data-theme="dark"]) .grain, :global([data-theme="dark"]) .grain { mix-blend-mode: screen; opacity: calc(var(--grain-opacity, .09) * .8); }
-
-/* Interactive while pointed at: the light shifts very slightly with the tilt. */
-.sheen { position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; background: radial-gradient(120% 90% at var(--id-light-x, 30%) var(--id-light-y, 0%), color-mix(in oklab, #FFFFFF 22%, transparent), transparent 55%); transition: opacity var(--duration-considered) var(--ease-standard); mix-blend-mode: soft-light; }
-.scene[data-active] .sheen { opacity: 1; }
-
 /* Fields on the card. */
-.field { display: grid; min-width: 0; gap: 4px; }
+.field { display: grid; min-width: 0; gap: var(--space-hair); }
 .fieldLabel { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
 .fieldValue { display: flex; min-width: 0; align-items: center; gap: var(--space-2); color: var(--id-ink); font-size: var(--text-sm); line-height: var(--leading-body); }
 .fieldText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mono { font-family: var(--font-mono); font-size: calc(var(--text-sm) - 0.5px); letter-spacing: 0; font-variant-ligatures: none; }
+.mono { font-family: var(--font-mono); font-size: var(--text-sm); letter-spacing: 0; font-variant-ligatures: none; }
 
 /* Stamps: the apps this account carries, drawn as the Silicon Apps store draws them: the logo in a squircle with a
    one-pixel line, or the app's letter in the serif on quiet beige. */
-.stamps { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 8px; }
+.stamps { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-related); }
 .stamp { --sq-r: 24%; position: relative; display: grid; width: var(--stamp-size, 40px); height: var(--stamp-size, 40px); flex: none; place-items: center; overflow: hidden; background: var(--surface-pressed); color: var(--text-secondary); text-decoration: none; transition: transform var(--duration-spring) var(--ease-spring); }
 .stamp[data-logo] { background: var(--surface); }
 /* The line sits over the logo, so a light logo keeps its edge on the card's paper. */
 .stamp::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 9%, transparent); pointer-events: none; }
 .stamp img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.monogram { padding-top: .08em; font-family: var(--font-serif); font-size: calc(var(--stamp-size, 40px) * .5); font-weight: 400; line-height: 1; }
+.monogram { padding-top: .08em; font-family: var(--font-display); font-size: calc(var(--stamp-size, 40px) * .5); font-weight: 500; line-height: 1; }
 @media (hover: hover) and (pointer: fine) {
   .stamp:hover { transform: translateY(-2px); color: var(--foreground); z-index: 1; }
 }
@@ -93,12 +81,12 @@
 /* Inside the edge: the squircle clips anything drawn outside it. */
 .stamp:focus-visible::after { box-shadow: inset 0 0 0 2px var(--accent); }
 /* The rest of the apps, one tap away. */
-.more { --sq-r: 24%; --sq-fill: transparent; --sq-stroke: var(--border); display: inline-grid; min-width: 40px; height: 40px; place-items: center; padding: 0 8px; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--text-secondary); font: inherit; font-size: var(--text-sm); font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
+.more { --sq-r: 24%; --sq-fill: transparent; --sq-stroke: var(--border); display: inline-grid; min-width: 40px; height: 40px; place-items: center; padding: 0 var(--space-related); border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--text-secondary); font: inherit; font-size: var(--text-sm); font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
 .more:hover { --sq-fill: var(--surface-muted); color: var(--foreground); }
 .more:focus-visible { outline: none; --sq-fill: var(--surface-muted); --sq-stroke: var(--accent); color: var(--foreground); }
 
 /* The clock. */
-.clock { display: inline-grid; min-width: 0; gap: 2px; color: var(--id-ink); }
+.clock { display: inline-grid; min-width: 0; gap: var(--space-hair); color: var(--id-ink); }
 .clockTime { font-family: var(--font-mono); font-size: var(--text-sm); font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .clockZone { overflow: hidden; color: var(--text-secondary); font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
 
@@ -106,7 +94,6 @@
   .card { transform: none !important; }
   .face { backface-visibility: visible; }
   .back { transform: none; }
-  .sheen { display: none; }
   .stamp, .more { transition: none; }
 }
 

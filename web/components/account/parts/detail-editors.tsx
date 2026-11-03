@@ -11,13 +11,13 @@
  * that list or calendar; the next Escape closes the popover (components/silicon-ui/lib/escape.ts).
  */
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Avatar } from "@/components/silicon-ui/avatar/avatar";
-import { Button } from "@/components/silicon-ui/button/button";
-import { Combobox } from "@/components/silicon-ui/combobox/combobox";
-import { DatePicker } from "@/components/silicon-ui/date-picker/date-picker";
-import { Input } from "@/components/silicon-ui/input/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/silicon-ui/popover/popover";
-import { Select } from "@/components/silicon-ui/select/select";
+import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Combobox } from "@teamofsilicons/silicon-ui/combobox";
+import { DatePicker } from "@teamofsilicons/silicon-ui/date-picker";
+import { Input } from "@teamofsilicons/silicon-ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@teamofsilicons/silicon-ui/popover";
+import { Select } from "@teamofsilicons/silicon-ui/select";
 import { timezoneOptions } from "@/lib/timezones";
 import { describeError } from "./common";
 import partStyles from "./parts.module.css";

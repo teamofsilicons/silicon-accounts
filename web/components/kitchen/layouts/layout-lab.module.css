@@ -1,0 +1,182 @@
+/* The layout lab (/__layouts): the account site's frame in its loading state. The root's data attributes pick the shell,
+   sidebar, element and content variants (layout-lab.tsx); the bones are SkeletonBlock's. */
+.lab { --top-height: 64px; --side-width: 248px; min-height: 100vh; min-height: 100dvh; background: var(--canvas); color: var(--foreground); }
+.lab[data-shell="flat"] { background: var(--surface); }
+.lab[data-shell="open"] { background: var(--background); }
+.lab[data-sidebar="rail"] { --side-width: 76px; }
+.frame { display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; }
+
+/* -------------------------------------------------------- top bar ------------------------------------------------------- */
+.top { position: sticky; top: 0; z-index: var(--layer-sticky); display: grid; height: var(--top-height); flex: none; grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto; align-items: center; gap: var(--space-inset); padding: 0 var(--space-inset); background: var(--canvas); }
+.lab[data-shell="flat"] .top { border-bottom: 1px solid var(--border); background: var(--surface); }
+.lab[data-shell="inset"] .top { display: none; }
+.lab[data-shell="open"] .top { background: var(--background); }
+.brand { display: flex; min-width: 0; align-items: center; gap: var(--space-group); }
+.brandName { display: block; width: 120px; min-width: 0; }
+.search { display: block; width: min(100%, 480px); justify-self: center; }
+.topEnd { display: flex; align-items: center; gap: var(--space-related); }
+.menu { display: none; }
+.circle { display: flex; flex: none; overflow: hidden; border-radius: var(--radius-full); corner-shape: round; }
+
+/* ------------------------------------------------------- the body ------------------------------------------------------- */
+.body { display: grid; min-width: 0; flex: 1; grid-template-columns: var(--side-width) minmax(0, 1fr); }
+
+/* The page: a panel on the canvas (panel), a panel inset on every side and lifted a little (inset), or the page itself
+   (flat, and open, where it shares the one background and only its content is surfaces). */
+.main { display: flex; min-width: 0; flex-direction: column; }
+.lab[data-shell="panel"] .main { --sq-r: var(--radius-overlay); margin: 0 var(--space-group) var(--space-group) 0; border: 1px solid var(--border); background: var(--surface); }
+.lab[data-shell="inset"] .main { --sq-r: var(--radius-overlay); margin: var(--space-related) var(--space-related) var(--space-related) 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-resting); }
+.lab[data-shell="flat"] .main { background: var(--surface); }
+
+/* ------------------------------------------------------- sidebar -------------------------------------------------------- */
+.sidebar { position: sticky; top: var(--top-height); display: flex; height: calc(100dvh - var(--top-height)); min-width: 0; flex-direction: column; gap: var(--space-block); overflow-y: auto; padding: var(--space-tight) var(--space-group) var(--space-group); }
+.lab[data-shell="inset"] .sidebar { top: 0; height: 100dvh; padding-top: var(--space-inset); }
+.lab[data-shell="flat"] .sidebar { padding-top: var(--space-group); border-right: 1px solid var(--border); }
+
+/* The inset shell's sidebar carries what the top bar would: the brand and search at its head, the account at its foot. */
+.sideHead, .account { display: none; }
+.lab[data-shell="inset"] .sideHead { display: grid; gap: var(--space-inset); }
+.lab[data-shell="inset"] .sideHead .brand { padding: var(--space-tight) var(--space-group); }
+.lab[data-shell="inset"] .account { display: flex; align-items: center; gap: var(--space-group); padding: var(--space-related) var(--space-group); }
+.sideSearch { display: block; }
+
+.nav { display: grid; gap: var(--space-group); }
+.navGroup { display: grid; gap: var(--space-hair); }
+.groupLabel { display: none; padding: 0 var(--space-group) var(--space-related); }
+.sideFoot { display: grid; gap: var(--space-hair); margin-top: auto; padding-top: var(--space-group); border-top: 1px solid var(--border-subtle); }
+
+.navRow { --sq-r: var(--radius-control); --sq-fill: transparent; position: relative; display: flex; height: 36px; min-width: 0; align-items: center; gap: var(--space-group); padding: 0 var(--space-group); background: var(--sq-fill); transition: background-color var(--duration-fast) var(--ease-standard); }
+.navRow:hover { --sq-fill: color-mix(in oklab, var(--surface-pressed) 55%, transparent); }
+.navRow[data-active] { --sq-fill: var(--surface-pressed); }
+.lab[data-shell="flat"] .navRow[data-active] { --sq-fill: var(--surface-muted); }
+.navLabel { display: flex; min-width: 0; flex: 1; }
+.navTrail { display: flex; flex: none; }
+
+/* Grouped: headed groups further apart, and the current page marked by a leading bar instead of a fill. */
+.lab[data-sidebar="grouped"] .nav { gap: var(--space-section); }
+.lab[data-sidebar="grouped"] .groupLabel { display: block; }
+.lab[data-sidebar="grouped"] .navRow[data-active] { --sq-fill: transparent; }
+.lab[data-sidebar="grouped"] .navRow[data-active]::before { position: absolute; inset-block: var(--space-related); inset-inline-start: 0; width: 2px; border-radius: var(--radius-full); background: var(--foreground); content: ""; }
+
+/* Rail: icons only, centred; a count becomes a dot on the icon; groups are parted by a hairline. */
+.lab[data-sidebar="rail"] .sidebar { align-items: center; padding-inline: var(--space-related); }
+.lab[data-sidebar="rail"] .nav { gap: var(--space-group); }
+.lab[data-sidebar="rail"] .navGroup + .navGroup { padding-top: var(--space-group); border-top: 1px solid var(--border-subtle); }
+.lab[data-sidebar="rail"] .navRow { width: 44px; height: 44px; justify-content: center; padding: 0; }
+.lab[data-sidebar="rail"] .navLabel, .lab[data-sidebar="rail"] .brandName { display: none; }
+.lab[data-sidebar="rail"] .navTrail { position: absolute; top: var(--space-tight); right: var(--space-tight); width: 8px; height: 8px; overflow: hidden; border-radius: var(--radius-full); }
+.lab[data-sidebar="rail"] .sideHead { justify-items: center; }
+.lab[data-sidebar="rail"] .sideHead .brand { padding: var(--space-tight) 0; }
+.lab[data-sidebar="rail"] .sideSearch { width: 44px; }
+.lab[data-sidebar="rail"] .account { justify-content: center; padding: var(--space-related) 0; }
+
+/* ------------------------------------------------------- elements ------------------------------------------------------- */
+.pageHead { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-inset); }
+.pageTitle { display: grid; min-width: 0; flex: 1; gap: var(--space-group); }
+.block { display: grid; min-width: 0; gap: var(--space-group); }
+.blockHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); }
+.stack { display: grid; min-width: 0; gap: var(--space-block); }
+
+.group { --sq-r: var(--radius-container); --sq-fill: var(--surface); display: grid; margin: 0; padding: 0; background: var(--sq-fill); list-style: none; }
+.row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-group) var(--space-inset); }
+.rowText { display: grid; min-width: 0; flex: 1; gap: var(--space-related); }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); }
+.tiles[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tile { --sq-r: var(--radius-container); --sq-fill: var(--surface); display: grid; min-height: 136px; align-content: space-between; gap: var(--space-section); padding: var(--space-inset); background: var(--sq-fill); }
+
+/* Cards: an edge, rows ruled inside it. */
+.lab[data-elements="cards"] .group, .lab[data-elements="cards"] .tile { border: 1px solid var(--border); }
+.lab[data-elements="cards"] .row + .row { border-top: 1px solid var(--border-subtle); }
+/* Tiles: the canvas grey as a fill, no edge, a rounder corner; rows sit apart by space alone. */
+.lab[data-elements="tiles"] .group, .lab[data-elements="tiles"] .tile { --sq-r: var(--radius-overlay); --sq-fill: var(--canvas); }
+.lab[data-elements="tiles"] .group { padding-block: var(--space-tight); }
+/* Rows: no container; hairlines between rows and over tiles. */
+.lab[data-elements="rows"] .group { --sq-r: 0; border-top: 1px solid var(--border); }
+.lab[data-elements="rows"] .row { padding-inline: 0; border-bottom: 1px solid var(--border-subtle); }
+.lab[data-elements="rows"] .tile { --sq-r: 0; min-height: 112px; padding: var(--space-group) 0 0; border-top: 1px solid var(--border); }
+
+/* -------------------------------------------------------- content ------------------------------------------------------- */
+/* Column: one centred column (Home today). */
+.column { display: grid; width: 100%; max-width: 760px; gap: var(--space-block); margin-inline: auto; padding: var(--space-section) var(--gutter) var(--page-end); }
+/* Column + aside: the page's full width, a side column that stays in view. */
+.wide { display: grid; width: 100%; max-width: var(--page-max); gap: var(--space-block); margin-inline: auto; padding: var(--space-section) var(--gutter) var(--page-end); }
+.twoCol { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); align-items: start; gap: var(--space-block); }
+.aside { position: sticky; top: calc(var(--top-height) + var(--space-section)); display: grid; gap: var(--space-block); }
+.lab[data-shell="inset"] .aside { top: var(--space-section); }
+
+/* Aside on action: the narrow column, centred, until an action opens the side column. The page widens to --page-max
+   and its second track grows from nothing, so the column glides to the start while the side column's panel slides
+   and fades in a beat later; closing runs it back. Under 1024px the side column stays shut (a drawer opens instead). */
+.actionPage {
+  display: grid;
+  width: 100%;
+  max-width: 760px;
+  grid-template-columns: minmax(0, 1fr) 0px;
+  align-items: start;
+  column-gap: 0px;
+  margin-inline: auto;
+  padding: var(--space-section) var(--gutter) var(--page-end);
+  transition:
+    max-width var(--duration-expressive) var(--ease-standard),
+    grid-template-columns var(--duration-expressive) var(--ease-standard),
+    column-gap var(--duration-expressive) var(--ease-standard);
+}
+.actionPage[data-open] { max-width: var(--page-max); grid-template-columns: minmax(0, 1fr) 320px; column-gap: var(--space-block); }
+.actionAside { position: sticky; top: calc(var(--top-height) + var(--space-section)); min-width: 0; overflow: clip; }
+.lab[data-shell="inset"] .actionAside { top: var(--space-section); }
+.actionPanel { display: grid; width: 320px; gap: var(--space-block); opacity: 0; transition: opacity var(--duration-considered) var(--ease-standard), translate var(--duration-expressive) var(--ease-standard); translate: var(--space-block) 0; }
+.actionPage[data-open] .actionPanel { opacity: 1; transition-delay: var(--duration-fast); translate: 0 0; }
+.actionHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); }
+/* The row whose detail is open. */
+.row { --sq-r: 0; --sq-fill: transparent; background: var(--sq-fill); transition: background-color var(--duration-standard) var(--ease-standard); }
+.row[data-selected] { --sq-r: var(--radius-control); --sq-fill: var(--surface-pressed); }
+@media (max-width: 1023px) {
+  .actionPage, .actionPage[data-open] { max-width: 760px; grid-template-columns: minmax(0, 1fr); }
+  .actionAside { display: none; }
+}
+
+/* List + detail: the list pane at a fixed width, the detail beside it. */
+.split { display: grid; min-height: 100%; flex: 1; grid-template-columns: 320px minmax(0, 1fr); }
+.listPane { display: grid; align-content: start; gap: var(--space-group); padding: var(--space-inset) var(--space-group); border-right: 1px solid var(--border-subtle); }
+.listHead { display: flex; align-items: center; justify-content: space-between; padding: var(--space-tight) var(--space-related); }
+.listRows { display: grid; gap: var(--space-hair); margin: 0; padding: 0; list-style: none; }
+.listRow { --sq-r: var(--radius-control); --sq-fill: transparent; display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-group) var(--space-related); background: var(--sq-fill); transition: background-color var(--duration-fast) var(--ease-standard); }
+.listRow:hover { --sq-fill: var(--surface-muted); }
+.listRow[data-active] { --sq-fill: var(--surface-pressed); }
+.detailPane { display: grid; width: 100%; max-width: 860px; align-content: start; gap: var(--space-block); padding: var(--space-section) var(--space-page) var(--page-end); }
+.detailHead { display: flex; min-width: 0; align-items: center; gap: var(--space-inset); }
+.tabs { display: flex; gap: var(--space-section); border-bottom: 1px solid var(--border); }
+.tab { display: flex; padding-bottom: var(--space-group); }
+.tab[data-active] { box-shadow: inset 0 -2px 0 var(--foreground); }
+
+/* -------------------------------------------------------- narrow -------------------------------------------------------- */
+/* Under 900px every shell is a top bar over the page; the sidebar would move into a bottom sheet. */
+@media (max-width: 899px) {
+  .lab[data-shell] .top { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; }
+  .search { width: 36px; justify-self: end; }
+  .menu { display: block; }
+  .body { display: flex; flex-direction: column; }
+  .sidebar { display: none; }
+  .lab[data-shell] .main { --sq-r: 0; flex: 1; margin: 0; border-width: 1px 0 0; box-shadow: none; }
+  .twoCol { grid-template-columns: minmax(0, 1fr); }
+  .aside { position: static; }
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .listPane { border-right: 0; }
+  .detailPane { display: none; }
+}
+@media (max-width: 640px) {
+  .tiles, .tiles[data-count="2"] { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ------------------------------------------------------- controls ------------------------------------------------------- */
+.controls { --sq-r: var(--radius-overlay); --sq-fill: var(--surface); position: fixed; z-index: var(--layer-overlay); bottom: var(--space-inset); left: 50%; display: flex; width: max-content; max-width: calc(100vw - 2 * var(--space-inset)); flex-wrap: wrap; align-items: flex-end; gap: var(--space-inset); padding: var(--space-group) var(--space-inset); border: 1px solid var(--border); background: var(--sq-fill); box-shadow: var(--shadow-floating); translate: -50% 0; }
+.control { display: grid; gap: var(--space-tight); }
+.controlLabel { color: var(--text-muted); font-size: var(--text-xs); }
+/* On a phone the controls are one strip that scrolls sideways, so the page stays in view. */
+@media (max-width: 640px) {
+  .controls { right: var(--space-group); bottom: var(--space-group); left: var(--space-group); width: auto; max-width: none; flex-wrap: nowrap; overflow-x: auto; translate: none; }
+  .control { flex: none; }
+}
+.reveal { position: fixed; z-index: var(--layer-overlay); right: var(--space-inset); bottom: var(--space-inset); }
+
+@media (prefers-reduced-motion: reduce) { .navRow, .listRow, .row, .actionPage, .actionPanel { transition: none; } }

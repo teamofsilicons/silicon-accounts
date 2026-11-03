@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/web/node_modules/.bin/silicon-ui-check --hook",
+            "timeout": 60,
+            "statusMessage": "Checking Silicon UI rules"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && [ -f web/redesign/priorities.md ] && echo \"Account site redesign: current priorities (web/redesign/priorities.md). Read web/redesign/decisions.md too, and update priorities, decisions and log before finishing.\" && echo && cat web/redesign/priorities.md || true"
+          }
+        ]
+      }
+    ]
+  }
+}

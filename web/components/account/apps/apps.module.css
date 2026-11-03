@@ -18,7 +18,7 @@
   padding: var(--space-6);
   border: 1px solid var(--sq-stroke);
   background: var(--sq-fill);
-  scroll-margin-block: var(--space-12) var(--dock-clearance);
+  scroll-margin-block: var(--space-12) var(--page-end);
   transition: border-color var(--duration-considered) var(--ease-standard), background-color var(--duration-considered) var(--ease-standard);
 }
 .card[data-highlight] { --sq-stroke: var(--accent); --sq-fill: color-mix(in oklab, var(--accent) 5%, var(--surface)); }
