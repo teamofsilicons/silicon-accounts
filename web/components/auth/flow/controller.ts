@@ -53,6 +53,7 @@ export interface FlowActions {
   clearNotice: () => void;
   continueAs: () => Promise<ActionResult>;
   switchAccount: () => Promise<ActionResult>;
+  selectAccount: (uuid: string) => Promise<ActionResult>;
   sendEmail: (email: string) => Promise<ActionResult>;
   sendPhone: (phone: string, country?: string) => Promise<ActionResult>;
   resend: () => Promise<ActionResult>;
@@ -158,6 +159,7 @@ export function useFlowController(id: string): FlowController {
       clearNotice: () => setNotice(null),
       continueAs: () => run(() => api.flows.continueAs(id)),
       switchAccount: () => run(() => api.flows.switchAccount(id)),
+      selectAccount: uuid => run(() => api.flows.selectAccount(id, uuid)),
       sendEmail: email => run(() => api.flows.email(id, email), SEND_REFUSALS),
       sendPhone: (phone, country) => run(() => api.flows.phone(id, phone, country), SEND_REFUSALS),
       resend: () => run(() => api.flows.resend(id)),

@@ -58,9 +58,9 @@ export function Identity() {
   const idInput = useRef<HTMLInputElement>(null);
   const changeId = useChangeOwnId();
 
-  useRegisterCommands(() => [
+  useRegisterCommands(() => me.data?.org ? [] : [
     { id: "identity.change-id", label: "Change your id", description: "Pick a new id; the old one stays reserved for you for 10 days", group: "Identity", icon: <AtSign size={16} strokeWidth={1.75} />, keywords: ["id", "handle", "username", "rename"], run: () => setChangingId(true) },
-  ], []);
+  ], [me.data?.org]);
 
   // Apps with a logo of their own come first; the rest follow as their letter, in the order the service gave.
   const stamps: StampProps[] = (apps.data?.items ?? [])
@@ -71,7 +71,7 @@ export function Identity() {
   const account = me.data;
   return (
     <Page>
-      <PageHeader title="Your identity" description="One account for every app you use. Apps keep your uuid; your id is yours to change." />
+      <PageHeader title="Your identity" description={me.data?.org ? `Your work account in ${me.data.org.name}. Your org manages its handle and app access.` : "One account for every app you use. Apps keep your uuid; your id is yours to change."} actions={<Link href="/linked-accounts">Your accounts →</Link>} />
       {me.error && !account ? (
         <Alert tone="danger" title="Your account did not load">
           {describeError(me.error)}
@@ -183,7 +183,7 @@ function Front({ me, stamps, appsLoading, appsFailed, onRetryApps, reserved, onC
             {/* A very long id fades out at the edge instead of running under the next field; the title has it all. */}
             <span className={styles.idValue} title={id || undefined}><TextMorph className={styles.idMorph}>{id || "No id yet"}</TextMorph></span>
           </IdentityField>
-          <button data-sq="surface" type="button" className={partStyles.textAction} onClick={onChangeId}>Change id</button>
+          {me.org ? <span className={styles.fieldNote}>Handle managed by {me.org.name}.</span> : <button data-sq="surface" type="button" className={partStyles.textAction} onClick={onChangeId}>Change id</button>}
           {reserved ? <span className={styles.fieldNote}><span className="mono">{reserved.id}</span> is reserved for you until {formatDate(reserved.until)}.</span> : null}
         </div>
         <div className={styles.field}>
@@ -277,7 +277,7 @@ function Back({ me }: { me: Me }) {
         </Row>
         {silicon ? (
           <>
-            <Row label="Custodian"><span className="mono">{silicon.custodian?.id ?? "Waiting for a custodian to accept"}</span></Row>
+            <Row label="Custodian"><span className="mono">{silicon.org_custodian?.name ?? silicon.custodian?.id ?? "Waiting for a custodian to accept"}</span></Row>
             <Row label="Webhook"><span className={styles.contactText}>{silicon.webhook_url ?? "Not set"}</span></Row>
             <Row label="STK rotated">{stkRotatedAt(silicon) ? formatDate(stkRotatedAt(silicon)) : "Never"}</Row>
           </>

@@ -33,11 +33,12 @@ import { Details } from "./steps/details";
 import { Opening } from "./steps/opening";
 import { Review } from "./steps/review";
 import { Signup } from "./steps/signup";
+import { SelectAccount } from "./steps/select-account";
 import { VerifyCode } from "./steps/verify-code";
 import styles from "./flow/flow.module.css";
 
 /** Views in their usual order (sub-views sort just after their step) for the direction of the morph. */
-const VIEW_ORDER = ["loading", "opening", "choose_method", "verify_code", "signup", "details", "review", "complete", "failed"] as const;
+const VIEW_ORDER = ["loading", "opening", "choose_method", "verify_code", "signup", "select_account", "details", "review", "complete", "failed"] as const;
 
 export function Flow({ id }: { id: string }) {
   const hydrated = useHydrated();
@@ -145,6 +146,8 @@ function FlowPage({ id }: { id: string }) {
         return <VerifyCode flow={flow} ctl={ctl} notice={ctl.notice} onChange={() => setChanging(true)} />;
       case "signup":
         return <Signup flow={flow} ctl={ctl} notice={ctl.notice} />;
+      case "select_account":
+        return <SelectAccount flow={flow} ctl={ctl} notice={ctl.notice} />;
       case "details":
         return <Details flow={flow} ctl={ctl} notice={ctl.notice} />;
       case "review":
@@ -186,7 +189,7 @@ function FlowPage({ id }: { id: string }) {
 function FlowFooter({ flow, step }: { flow: HostedFlow; step: string }) {
   const copy = flow.app.copy;
   const base = step.split(":")[0] ?? "";
-  const legal = ["opening", "choose_method", "signup", "details", "review"].includes(base) && !!(copy.terms_url || copy.privacy_url);
+  const legal = ["opening", "choose_method", "signup", "select_account", "details", "review"].includes(base) && !!(copy.terms_url || copy.privacy_url);
   if (!legal && !copy.support_email) return null;
   return (
     <div className={styles.footer}>

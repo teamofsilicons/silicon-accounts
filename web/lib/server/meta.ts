@@ -41,3 +41,14 @@ export async function developerUrl(): Promise<string> {
 export function resetMetaCache(): void {
   developerCache = null;
 }
+
+/** Only the explicitly configured Organizations origin may receive a local invitation POST. */
+export async function organizationsFormOrigin(): Promise<string> {
+  let configured: unknown = process.env.ACCOUNTS_ORGANIZATIONS_URL;
+  try {
+    const response = await fetch(`${apiUrl()}/v1/meta`, {cache:"no-store",signal:AbortSignal.timeout(2500)});
+    if(response.ok) configured = ((await response.json()) as {organizations_url?: unknown}).organizations_url ?? configured;
+  } catch { /* Configuration fallback is still restricted to loopback. */ }
+  if(typeof configured!=="string") return "";
+  try { const url=new URL(configured);return url.protocol==="http:" && ["localhost","127.0.0.1","[::1]"].includes(url.hostname) && !url.username && !url.password ? ` ${url.origin}` : ""; } catch { return ""; }
+}
