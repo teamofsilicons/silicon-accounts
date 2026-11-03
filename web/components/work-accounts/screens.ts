@@ -79,6 +79,24 @@ const specs: ScreenSpec[] = [
     routes: linked,
   },
   {
+    name: "account-work-link-recovery",
+    path: "/linked-accounts",
+    waitFor: "h1",
+    routes: linked,
+    prepare: async (page) => {
+      await page.evaluate(() =>
+        sessionStorage.setItem(
+          "silicon-accounts:pending-link",
+          "visual-pending-link",
+        ),
+      );
+      await page.reload();
+      await page
+        .getByRole("button", { name: "Finish linking", exact: true })
+        .waitFor();
+    },
+  },
+  {
     name: "account-work-link-request",
     path: "/linked-accounts",
     waitFor: "h1",
@@ -159,6 +177,7 @@ const specs: ScreenSpec[] = [
 export const screens: ScreenSpec[] = specs.map((screen) => ({
   ...screen,
   prepare: async (page) => {
+    await screen.prepare?.(page);
     await page.evaluate(() => {
       document.documentElement.dataset.theme = window.matchMedia(
         "(prefers-color-scheme: dark)",

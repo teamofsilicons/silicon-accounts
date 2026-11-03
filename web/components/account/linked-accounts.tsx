@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Building2, Link2, UserRound } from "lucide-react";
@@ -23,6 +23,33 @@ import {
 } from "@/lib/query/linked-accounts";
 import styles from "./linked-accounts.module.css";
 
+const pendingLinkKey = "silicon-accounts:pending-link";
+function savedPendingLink(): string | null {
+  try {
+    return sessionStorage.getItem(pendingLinkKey);
+  } catch {
+    return null;
+  }
+}
+function subscribePendingLink(listener: () => void) {
+  window.addEventListener("storage", listener);
+  window.addEventListener("pageshow", listener);
+  return () => {
+    window.removeEventListener("storage", listener);
+    window.removeEventListener("pageshow", listener);
+  };
+}
+function clearPendingLink() {
+  try {
+    sessionStorage.removeItem(pendingLinkKey);
+  } catch {}
+  const url = new URL(window.location.href);
+  if (url.searchParams.has("linked")) {
+    url.searchParams.delete("linked");
+    window.history.replaceState(null, "", url);
+  }
+}
+
 export function LinkedAccountsPage({
   completedLink,
 }: {
@@ -43,7 +70,15 @@ export function LinkedAccountsPage({
   const create = useLinkedAccountAction<{ uuid: string }, { id: string }>(
     "personal-account",
   );
-  const [linkId, setLinkId] = useState<string | null>(completedLink ?? null);
+  const storedLink = useSyncExternalStore(
+    subscribePendingLink,
+    savedPendingLink,
+    () => null,
+  );
+  const [chosenLink, setLinkId] = useState<string | null | undefined>(
+    completedLink,
+  );
+  const linkId = chosenLink === undefined ? storedLink : chosenLink;
   const [handle, setHandle] = useState("");
   const [error, setError] = useState<ApiError | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -65,7 +100,7 @@ export function LinkedAccountsPage({
         );
       setLinkId(result.link_id);
       try {
-        sessionStorage.setItem("silicon-accounts:pending-link", result.link_id);
+        sessionStorage.setItem(pendingLinkKey, result.link_id);
       } catch {}
       if (popup) popup.location.href = url.toString();
       else window.location.assign(url.toString());
@@ -80,9 +115,7 @@ export function LinkedAccountsPage({
       setError(null);
       await complete.mutateAsync({ link_id: linkId });
       setLinkId(null);
-      try {
-        sessionStorage.removeItem("silicon-accounts:pending-link");
-      } catch {}
+      clearPendingLink();
       setMessage(
         "Your accounts are linked. Their apps, history and details stay separate.",
       );
@@ -95,6 +128,7 @@ export function LinkedAccountsPage({
     try {
       setError(null);
       await switchAccount.mutateAsync({ account_uuid: uuid });
+      clearPendingLink();
       window.location.assign(
         new URL("/linked-accounts", window.location.origin).toString(),
       );
@@ -203,7 +237,11 @@ export function LinkedAccountsPage({
       >
         {linkId ? (
           <div className={styles.actions}>
-            <p>Finish signing in in the other window, then confirm here.</p>
+            <p>
+              {completedLink
+                ? "The other account has been verified. Confirm to finish linking."
+                : "Finish signing in in the other window, then confirm here."}
+            </p>
             <Button
               loading={complete.isPending}
               onClick={() => void finishLink()}
@@ -214,9 +252,7 @@ export function LinkedAccountsPage({
               variant="ghost"
               onClick={() => {
                 setLinkId(null);
-                try {
-                  sessionStorage.removeItem("silicon-accounts:pending-link");
-                } catch {}
+                clearPendingLink();
               }}
             >
               Cancel
@@ -271,7 +307,10 @@ export function LinkedAccountsPage({
               required
               description="3–30 letters, numbers, hyphens or underscores. Your personal handle has no org suffix."
             />
-            <Button type="submit" loading={create.isPending || switchAccount.isPending}>
+            <Button
+              type="submit"
+              loading={create.isPending || switchAccount.isPending}
+            >
               Create personal account
             </Button>
           </form>
