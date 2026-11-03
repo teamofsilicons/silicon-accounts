@@ -352,6 +352,35 @@ pub fn validate_handle(handle: &str) -> Result<String, IdError> {
     Ok(lower)
 }
 
+/// Dotted identifiers are work accounts; personal creation still rejects them.
+fn validate_account_handle(value: &str) -> Result<String, IdError> {
+    if let Some((handle, org)) = value.split_once('.') {
+        let handle = validate_handle(handle)?;
+        // Org ids have the same alphabet/length, but do not reserve account words.
+        let org = org.trim();
+        if org.len() < HANDLE_MIN {
+            return Err(IdError::TooShort { handle: org.into() });
+        }
+        if org.len() > HANDLE_MAX {
+            return Err(IdError::TooLong { handle: org.into() });
+        }
+        if let Some((i, ch)) = org
+            .chars()
+            .enumerate()
+            .find(|(_, c)| !(c.is_ascii_alphanumeric() || *c == '-' || *c == '_'))
+        {
+            return Err(IdError::InvalidChar {
+                handle: org.into(),
+                ch,
+                position: i + 1,
+            });
+        }
+        Ok(format!("{handle}.{}", org.to_ascii_lowercase()))
+    } else {
+        validate_handle(value)
+    }
+}
+
 /// A valid account id: kind + lowercase handle. Displays/serializes as `c:saket` / `si:scout`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct AccountId {
@@ -390,7 +419,7 @@ impl AccountId {
                 },
             });
         };
-        let handle = validate_handle(rest)?;
+        let handle = validate_account_handle(rest)?;
         Ok(AccountId { kind, handle })
     }
 
@@ -407,7 +436,7 @@ impl AccountId {
             }
             return Ok(id);
         }
-        let handle = validate_handle(s)?;
+        let handle = validate_account_handle(s)?;
         Ok(AccountId { kind, handle })
     }
 
@@ -417,6 +446,10 @@ impl AccountId {
             kind,
             handle: validate_handle(handle)?,
         })
+    }
+
+    pub fn org_id(&self) -> Option<&str> {
+        self.handle.split_once('.').map(|(_, org)| org)
     }
 
     pub fn kind(&self) -> AccountKind {

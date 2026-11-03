@@ -44,6 +44,7 @@ use crate::history::Actor;
 #[serde(deny_unknown_fields)]
 pub struct SltBody {
     pub app_id: String,
+    pub account_uuid: Option<String>,
 }
 
 /// `POST /v1/me/short-lived-tokens`.
@@ -77,7 +78,33 @@ pub async fn create(
     // the account with the session re-checked: an STK rotation or account deletion running at
     // the same time either finishes first (and this refuses) or waits until the token is stored
     // (and the token is older than the rotation, so the app can't exchange it).
-    let account = lock_live_session(&mut tx, &auth, "get a short-lived token").await?;
+    let mut account = lock_live_session(&mut tx, &auth, "get a short-lived token").await?;
+    if let Some(target) = body.account_uuid.as_deref() {
+        if !accounts_core::repo::organizations::linked(&mut tx, &account.uuid, target).await? {
+            return Err(ApiError::forbidden(
+                "account_not_linked",
+                "You can request a token only for your own or a linked account.",
+            ));
+        }
+        account = accounts_core::repo::accounts::require(&mut tx, target).await?;
+        if !account.is_active() {
+            return Err(ApiError::forbidden(
+                "account_not_active",
+                "This linked account is no longer active.",
+            ));
+        }
+        sqlx::query("select uuid from accounts where uuid=$1 for share")
+            .bind(target)
+            .fetch_one(&mut *tx)
+            .await?;
+    }
+    if let Err(e) = accounts_core::repo::organizations::check(&mut tx, &account.uuid, &app_id).await
+    {
+        tx.rollback().await?;
+        accounts_core::repo::organizations::record_refusal(&state.db, &account.uuid, &app_id)
+            .await?;
+        return Err(e);
+    }
     if account.kind == AccountKind::Silicon
         && let Some(allowed) = crate::custodian_apps::allowed_apps(&mut tx, &account.uuid).await?
         && !allowed.contains(&app_id)

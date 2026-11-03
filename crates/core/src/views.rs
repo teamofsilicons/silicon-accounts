@@ -130,6 +130,10 @@ impl From<&Identity> for IdentityView {
 /// `GET /v1/me`. Carbon-only fields are omitted for Silicons and vice versa.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MeView {
+    #[serde(default)]
+    pub org: Option<crate::repo::organizations::Organization>,
+    #[serde(default)]
+    pub org_custodian: Option<crate::repo::organizations::Organization>,
     pub uuid: String,
     pub kind: AccountKind,
     pub id: Option<String>,
@@ -192,6 +196,8 @@ mod opt_opt_ts {
 impl MeView {
     fn base(a: &Account) -> MeView {
         MeView {
+            org: None,
+            org_custodian: None,
             uuid: a.uuid.clone(),
             kind: a.kind,
             id: a.handle.clone(),
@@ -241,7 +247,8 @@ impl MeView {
 
 /// Loads everything `GET /v1/me` shows for an account.
 pub async fn load_me(conn: &mut PgConnection, account: &Account) -> ApiResult<MeView> {
-    match account.kind {
+    let org = crate::repo::organizations::organization(conn, &account.uuid).await?;
+    let mut result = match account.kind {
         AccountKind::Carbon => {
             let emails = crate::repo::contacts::list_emails(conn, &account.uuid).await?;
             let phones = crate::repo::contacts::list_phones(conn, &account.uuid).await?;
@@ -264,9 +271,14 @@ pub async fn load_me(conn: &mut PgConnection, account: &Account) -> ApiResult<Me
                     .map(AccountSummary::from_account),
                 None => None,
             };
-            Ok(MeView::silicon(account, custodian))
+            Ok::<MeView, crate::ApiError>(MeView::silicon(account, custodian))
         }
+    }?;
+    if account.is_silicon() {
+        result.org_custodian = org.clone();
     }
+    result.org = org;
+    Ok(result)
 }
 
 /// What an app sees about an account. `profile` fields are always present; `email`, `phone`,

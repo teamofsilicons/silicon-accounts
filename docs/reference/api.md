@@ -562,3 +562,5 @@ account site's HTML 404 page. On `accounts-api`'s own address, every unknown pat
 - [Limits](limits.md): every rate limit, lifetime, size and count.
 - [Rust client](rust-client.md): the same API from Rust.
 - [Security](../learn/security.md): cookies, the Origin check, token storage, the webhook SSRF guard.
+
+Work identities, account selection, linking and the constrained service bridge are documented in [Work accounts](api/work-accounts.md).

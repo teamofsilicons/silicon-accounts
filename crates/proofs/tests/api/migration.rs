@@ -17,7 +17,17 @@ async fn existing_tokens_history_and_encrypted_retries_survive_the_rename() {
     let (receiver, receiver_secret) = ctx.app("receiver").await;
     let carbon = ctx.carbon().await;
     ctx.membership(&issuer.app_id, &carbon.uuid, &[]).await;
+    // The current token helper reads work metadata; keep this pre-work-account
+    // migration fixture personal-only, then restore its exact historical schema.
+    sqlx::query("alter table accounts add column org_id text")
+        .execute(&ctx.state.db)
+        .await
+        .unwrap();
     ctx.tokens_for(&carbon, &issuer.app_id, &[]).await;
+    sqlx::query("alter table accounts drop column org_id")
+        .execute(&ctx.state.db)
+        .await
+        .unwrap();
     let grant: Uuid = sqlx::query_scalar("select id from token_families where app_id=$1")
         .bind(&issuer.app_id)
         .fetch_one(&ctx.state.db)

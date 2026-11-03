@@ -60,6 +60,47 @@ pub async fn advance(
     flow.extras.provider = None;
     flow.extras.pending = None;
     flow.extras.error = None;
+    if let Some(id) = flow.extras.link_request_id {
+        let n=sqlx::query("update account_link_requests set target_uuid=$2 where id=$1 and expires_at>now() and completed_at is null").bind(id).bind(&account.uuid).execute(&mut *conn).await?.rows_affected();
+        if n == 0 {
+            return Err(ApiError::gone(
+                "link_expired",
+                "The linking request expired.",
+            ));
+        }
+        return complete_with(
+            state,
+            flow,
+            &format!(
+                "{}/linked-accounts?linked={id}",
+                state.settings.public_url.trim_end_matches('/')
+            ),
+        );
+    }
+    if !flow.extras.account_selected {
+        flow.extras.authenticated_account_uuid = Some(account.uuid.clone());
+        let choices = accounts_core::repo::organizations::linked_accounts(
+            conn,
+            &account.uuid,
+            Some(&fa.app.app_id),
+        )
+        .await?;
+        if choices["accounts"].as_array().is_some_and(|a| a.len() > 1) {
+            flow.step = Step::SelectAccount;
+            return Ok(());
+        }
+    }
+    if let Err(error) =
+        accounts_core::repo::organizations::check(conn, &account.uuid, &fa.app.app_id).await
+    {
+        accounts_core::repo::organizations::record_refusal(
+            &state.db,
+            &account.uuid,
+            &fa.app.app_id,
+        )
+        .await?;
+        return Err(error);
+    }
     details::start(conn, state, meta, flow, fa, account).await
 }
 
@@ -87,6 +128,17 @@ pub async fn complete(
     account: &Account,
     grant: Grant,
 ) -> ApiResult<()> {
+    if let Err(error) =
+        accounts_core::repo::organizations::check(conn, &account.uuid, &fa.app.app_id).await
+    {
+        accounts_core::repo::organizations::record_refusal(
+            &state.db,
+            &account.uuid,
+            &fa.app.app_id,
+        )
+        .await?;
+        return Err(error);
+    }
     if !fa.first_party() && !account_domain_allowed(conn, &fa.config, account).await? {
         return Err(domain_not_allowed(fa, None));
     }

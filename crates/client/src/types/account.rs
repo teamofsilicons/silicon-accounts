@@ -196,6 +196,12 @@ pub struct Me {
     /// Carbon only: how many Silicons this Carbon is custodian of.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custodian_of: Option<u64>,
+    /// Work account organization metadata; absent on personal accounts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub org: Option<OrganizationSummary>,
+    /// Organization custodian of an organization-owned Silicon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub org_custodian: Option<OrganizationSummary>,
     /// Silicon only: the custodian Carbon.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custodian: Option<AccountRef>,
@@ -209,6 +215,17 @@ pub struct Me {
         skip_serializing_if = "Option::is_none"
     )]
     pub stk_rotated_at: Option<OffsetDateTime>,
+}
+
+/// Public organization identity shown on a work account.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct OrganizationSummary {
+    /// Stable organization identifier.
+    pub org_id: String,
+    /// Organization display name.
+    pub name: String,
+    /// Optional organization logo.
+    pub logo_url: Option<String>,
 }
 
 impl Me {

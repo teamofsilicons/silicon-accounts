@@ -206,6 +206,12 @@ pub async fn create_carbon(
     settings: &Settings,
     new: NewCarbon,
 ) -> ApiResult<Account> {
+    if new.id.org_id().is_some() {
+        return Err(ApiError::forbidden(
+            "work_account_service_required",
+            "Work accounts are created by Silicon Organizations.",
+        ));
+    }
     if new.id.kind() != AccountKind::Carbon {
         return Err(invalid_id(&IdError::WrongKind {
             input: new.id.to_string(),
@@ -303,6 +309,12 @@ pub async fn create_silicon(
     settings: &Settings,
     new: NewSilicon,
 ) -> ApiResult<Account> {
+    if new.id.org_id().is_some() {
+        return Err(ApiError::forbidden(
+            "work_account_service_required",
+            "Work accounts are created by Silicon Organizations.",
+        ));
+    }
     if new.id.kind() != AccountKind::Silicon {
         return Err(invalid_id(&IdError::WrongKind {
             input: new.id.to_string(),
@@ -398,6 +410,13 @@ pub async fn id_availability_for(
         }
     };
     let full = id.to_string();
+    if id.org_id().is_some() {
+        let occupied:bool=sqlx::query_scalar("select exists(select 1 from accounts where split_part(handle,':',2)=split_part($1,':',2))").bind(&full).fetch_one(&mut *conn).await?;
+        let reserved:bool=sqlx::query_scalar("select exists(select 1 from handle_reservations where split_part(handle,':',2)=split_part($1,':',2) and reserved_until>now() and ($2::text is null or account_uuid<>$2))").bind(&full).bind(requester_uuid).fetch_one(&mut *conn).await?;
+        if occupied || reserved {
+            return Ok(IdAvailability{id:full,available:false,reason:Some(if occupied{"taken"}else{"reserved"}),message:"This work handle is used or reserved by a Carbon or Silicon in the organization.".into(),reclaimable:false});
+        }
+    }
     let owner: Option<String> = sqlx::query_scalar("select uuid from accounts where handle = $1")
         .bind(&full)
         .fetch_optional(&mut *conn)
@@ -587,6 +606,13 @@ pub async fn change_id(
             input: new_id.to_string(),
             expected: account.kind,
         }));
+    }
+    let old_org = old.split_once('.').map(|(_, org)| org);
+    if old_org != new_id.org_id() {
+        return Err(ApiError::forbidden(
+            "work_account_org_immutable",
+            "A personal account cannot become a work account, and a work account cannot change its organization.",
+        ));
     }
     let new_full = new_id.to_string();
     if new_full == old {
@@ -1193,6 +1219,21 @@ pub async fn delete_account(
             request_id: *request_id,
         });
     }
+    if crate::repo::organizations::org_id(&mut tx, account_uuid)
+        .await?
+        .is_some()
+    {
+        let main = crate::repo::organizations::main_uuid(&mut tx, account_uuid).await?;
+        sqlx::query("insert into organization_notification_contacts(account_uuid,email) select $1,email from account_emails where verified_at is not null and (account_uuid=$1 or account_uuid=$2 or account_uuid in(select account_uuid from account_links where main_uuid=$2)) on conflict(account_uuid,email) do update set expires_at='infinity'").bind(account_uuid).bind(main).execute(&mut *tx).await?;
+    }
+    if crate::repo::organizations::org_id(&mut tx, account_uuid)
+        .await?
+        .is_some()
+    {
+        let main = crate::repo::organizations::main_uuid(&mut tx, account_uuid).await?;
+        sqlx::query("insert into organization_notification_accounts(account_uuid,recipient_uuid) select $1,uuid from accounts where uuid<>$1 and status='active' and (uuid=$2 or uuid in(select account_uuid from account_links where main_uuid=$2)) on conflict(account_uuid,recipient_uuid) do update set expires_at='infinity'").bind(account_uuid).bind(main).execute(&mut *tx).await?;
+    }
+    crate::repo::organizations::detach_deleted(&mut tx, account_uuid).await?;
     let default_pfp =
         crate::pfp::default_pfp_url(&settings.iris_base_url, before.kind, account_uuid);
     sqlx::query(

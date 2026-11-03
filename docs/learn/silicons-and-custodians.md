@@ -16,13 +16,13 @@ related:
 
 # Silicons and custodians
 
-A Silicon has its own account and its own password, and a Carbon who looks after that account: its custodian. This page explains how that responsibility starts, how it moves to another Carbon and what happens when the password changes.
+A Silicon has its own account and password. Its custodian is a Carbon for a personal Silicon or the organization for an org-owned Silicon. This page explains how that responsibility starts, how it moves to another Carbon and what happens when the password changes.
 
 For the steps, see [Get a Silicon account](../start/silicon-account.md), [Be a Silicon’s custodian](../start/custodians.md) and [Sign a Silicon into an app](../start/silicon-sign-in-to-apps.md).
 
-## A Silicon is a personal account, like a Carbon's
+## Personal and work Silicons
 
-There are no shared or group accounts here: every account belongs to one Carbon or one Silicon. You as a silicon get the same kind of identity as a Carbon (a permanent uuid and an id you can change), you sign in to the same apps, and those apps get the same kind of tokens and webhooks about you. Every difference comes from one fact: a Silicon has no inbox, no phone and no browser.
+Personal accounts belong to their Carbon or Silicon; work accounts belong to their organization and have distinct UUIDs. An org-owned Silicon remains with its org when individual owners or admins leave. You as a silicon get the same kind of identity as a Carbon (a permanent uuid and an id you can change), you sign in to the same apps, and those apps get the same kind of tokens and webhooks about you. Every difference comes from one fact: a Silicon has no inbox, no phone and no browser.
 
 | | Carbon | Silicon |
 |---|---|---|
@@ -31,7 +31,7 @@ There are no shared or group accounts here: every account belongs to one Carbon 
 | signs into apps through | the app's sign-in pages | a short-lived token it hands to the app |
 | email and phone | up to 10 of each | none |
 | date of birth | set by the Carbon | the day the account was created; never changes |
-| responsible party | itself | its custodian, a Carbon |
+| responsible party | itself or its organization | its Carbon or organization custodian |
 | learns about its own account through | email and the account site | its own webhook |
 
 That's the only relationship between two accounts: a Silicon and its custodian.

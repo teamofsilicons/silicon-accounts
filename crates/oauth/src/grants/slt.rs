@@ -47,6 +47,7 @@ pub(crate) async fn exchange(
     client: &ClientAuth,
     params: &TokenParams,
     meta: &ClientMeta,
+    key: Option<&str>,
 ) -> Result<TokenResponse, OAuthError> {
     let slt = opt(params.slt.as_deref()).ok_or_else(|| {
         OAuthError::invalid_request(format!(
@@ -54,10 +55,30 @@ pub(crate) async fn exchange(
         ))
     })?;
     let app_id = client.app.app_id.as_str();
-    // Consumed (and committed) first: a refused exchange still uses the token up.
-    let token = tokens::consume_slt(&state.db, &state.keys.pepper, slt, app_id)
-        .await
-        .map_err(|e| e.to_oauth())?;
+    let mut tx = state.db.begin().await?;
+    let recovery = if let Some(key) = key {
+        let request = serde_json::to_vec(&("slt", slt, client.public))
+            .map_err(|_| OAuthError::server_error("Could not bind exchange request."))?;
+        let (op, replay) = accounts_core::repo::exchange_recovery::Operation::begin(
+            &mut tx, state, app_id, key, &request,
+        )
+        .await?;
+        if let Some(tokens) = replay {
+            tx.commit().await?;
+            return Ok(tokens);
+        }
+        Some(op)
+    } else {
+        None
+    };
+    let token =
+        match tokens::consume_slt_in_transaction(&mut tx, &state.keys.pepper, slt, app_id).await {
+            Ok(token) => token,
+            Err(error) => {
+                tx.commit().await?;
+                return Err(error.to_oauth());
+            }
+        };
 
     // A secretless exchange (the app's public client) is recorded as such.
     let method = if client.public {
@@ -65,7 +86,6 @@ pub(crate) async fn exchange(
     } else {
         audit::method::SLT
     };
-    let mut tx = state.db.begin().await?;
     let account = match admit(&mut tx, &token, app_id).await? {
         Ok(account) => account,
         Err(refused) => {
@@ -131,6 +151,9 @@ pub(crate) async fn exchange(
         }
         _ => tokens::issue_tokens(&mut tx, &state.keys, &state.settings, request).await?,
     };
+    if let Some(op) = recovery {
+        op.save(&mut tx, state, &response).await?;
+    }
     tx.commit().await?;
     Ok(response)
 }
@@ -146,6 +169,10 @@ async fn admit(
         Ok(account) => account,
         Err(refused) => return Ok(Err(refused)),
     };
+    if let Err(error) = accounts_core::repo::organizations::check(conn, &account.uuid, app_id).await
+    {
+        return Ok(Err(error.into()));
+    }
     // Only Silicons have an STK (`stk_rotated_at` is set when it is created and on each
     // rotation). The same transaction clock stamps both, and a tie counts as "before".
     if let Some(rotated_at) = account.stk_rotated_at.filter(|at| token.created_at <= *at) {

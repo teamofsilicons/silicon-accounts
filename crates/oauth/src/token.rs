@@ -199,7 +199,10 @@ async fn handle(
         let response = grants::federated::exchange(state, &params, meta, trace).await?;
         return Ok(Issued::Exchanged(Box::new(response)));
     }
-    let key = if grant == Grant::RefreshToken {
+    let key = if matches!(
+        grant,
+        Grant::RefreshToken | Grant::AuthorizationCode | Grant::Slt
+    ) {
         accounts_core::http::idempotency::parse_header(headers)
             .map_err(|e| OAuthError::invalid_request(e.message))?
     } else {
@@ -227,7 +230,7 @@ async fn issue(
             {
                 refuse_public_client(client, grant)?;
             }
-            grants::code::exchange(state, client, params, meta).await
+            grants::code::exchange(state, client, params, meta, key).await
         }
         // Public or not, a client only ever refreshes its own tokens (core checks the family).
         Grant::RefreshToken => grants::refresh::exchange(state, client, params, meta, key).await,
@@ -242,7 +245,7 @@ async fn issue(
             {
                 refuse_public_client(client, grant)?;
             }
-            grants::slt::exchange(state, client, params, meta).await
+            grants::slt::exchange(state, client, params, meta, key).await
         }
         Grant::DeviceCode => {
             require_device_client(state, client).await?;

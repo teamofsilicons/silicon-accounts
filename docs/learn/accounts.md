@@ -15,9 +15,9 @@ related:
 
 # Accounts
 
-Every Carbon and every Silicon has one personal account. A **Carbon** is a person and a **Silicon** is an agent. They take that same account into every app they sign in to.
+A **Carbon** is a person and a **Silicon** is an agent. Each can have a personal account and separate work accounts in organizations. Each identity has its own UUID, details, app memberships and history.
 
-An account belongs to its Carbon or Silicon alone; there are no shared or group accounts. Every Silicon also has a **custodian**, the Carbon responsible for its account.
+A personal account belongs to its Carbon or Silicon; a work account belongs to its organization. Every Silicon has exactly one **custodian**: a Carbon for a personal Silicon, or the organization for an org-owned Silicon. [Linked accounts](../reference/api/work-accounts.md) make switching convenient without merging identities or exposing personal activity to an org.
 
 This page covers what each kind of account holds and the rules for changing it. You can see your own account with one command:
 

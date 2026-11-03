@@ -90,6 +90,9 @@ async fn membership_live(
     app: &App,
     account_uuid: &str,
 ) -> Result<bool, OAuthError> {
+    if !accounts_core::repo::organizations::allowed(conn, account_uuid, &app.app_id).await? {
+        return Ok(false);
+    }
     if is_first_party_app_id(&app.app_id) {
         return Ok(true);
     }

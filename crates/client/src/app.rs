@@ -96,6 +96,140 @@ impl<'a> AppClient<'a> {
         matches!(self.auth, AppAuth::Owner(_))
     }
 
+    /// Internal Organizations bridge. Restricted server-side to this app's own credentials.
+    pub async fn organization_request(
+        &self,
+        method: &str,
+        suffix: &[&str],
+        body: Option<&Value>,
+        key: Option<&str>,
+    ) -> Result<Value> {
+        let mut path = vec!["v1", "internal", "organizations"];
+        path.extend_from_slice(suffix);
+        let method = Method::from_bytes(method.as_bytes()).map_err(|_| Error::InvalidInput {
+            message: "Invalid HTTP method".into(),
+            hint: "Use a standard HTTP method.".into(),
+        })?;
+        let mut request =
+            Request::new(method, self.client.endpoint(&path), self.auth()).idempotency_key(key)?;
+        if let Some(body) = body {
+            request = request.json(body)?;
+        }
+        self.client.execute(request).await?.json()
+    }
+    /// Read only the linked identities controlled by the live actor token; never expose these in org administration.
+    pub async fn organization_linked_accounts(&self, access_token: &str) -> Result<Value> {
+        self.organization_request(
+            "POST",
+            &["linked-accounts"],
+            Some(&json!({"access_token":access_token})),
+            None,
+        )
+        .await
+    }
+    /// Verify a live Organizations actor token without exposing its linked identities.
+    pub async fn organization_actor(&self, access_token: &str) -> Result<Value> {
+        self.organization_request(
+            "POST",
+            &["actor"],
+            Some(&json!({"access_token":access_token})),
+            None,
+        )
+        .await
+    }
+    /// Update an organization identity projection with a monotonic version.
+    pub async fn organization_upsert(&self, org: &str, body: &Value, key: &str) -> Result<Value> {
+        self.organization_request("PUT", &[org], Some(body), Some(key))
+            .await
+    }
+    /// Provision a work account with a stable idempotency key; secret replies are shown only to the authorized caller.
+    pub async fn organization_create_account(
+        &self,
+        org: &str,
+        body: &Value,
+        key: &str,
+    ) -> Result<Value> {
+        self.organization_request("POST", &[org, "accounts"], Some(body), Some(key))
+            .await
+    }
+    /// Perform an authorized work-account lifecycle action through the service bridge.
+    pub async fn organization_account_action(
+        &self,
+        org: &str,
+        uuid: &str,
+        action: &str,
+        body: &Value,
+        key: &str,
+    ) -> Result<Value> {
+        self.organization_request(
+            "POST",
+            &[org, "accounts", uuid, action],
+            Some(body),
+            Some(key),
+        )
+        .await
+    }
+    /// Replace the complete effective work-account policy using a monotonic version.
+    pub async fn organization_policy(
+        &self,
+        org: &str,
+        uuid: &str,
+        body: &Value,
+        key: &str,
+    ) -> Result<Value> {
+        self.organization_request(
+            "PUT",
+            &[org, "accounts", uuid, "policy"],
+            Some(body),
+            Some(key),
+        )
+        .await
+    }
+    /// Register an invitation and return its opaque Accounts acceptance ticket.
+    pub async fn organization_invitation(
+        &self,
+        org: &str,
+        body: &Value,
+        key: &str,
+    ) -> Result<Value> {
+        self.organization_request("POST", &[org, "invitations"], Some(body), Some(key))
+            .await
+    }
+    /// Cancel, decline or resend an invitation with stable retry semantics.
+    pub async fn organization_invitation_action(
+        &self,
+        org: &str,
+        id: &str,
+        action: &str,
+        body: &Value,
+        key: &str,
+    ) -> Result<Value> {
+        self.organization_request(
+            "POST",
+            &[org, "invitations", id, action],
+            Some(body),
+            Some(key),
+        )
+        .await
+    }
+    /// Queue private Carbon notification delivery without revealing account email addresses.
+    pub async fn organization_mail(&self, org: &str, body: &Value, key: &str) -> Result<Value> {
+        self.organization_request("POST", &[org, "mail"], Some(body), Some(key))
+            .await
+    }
+    /// Read durable work-account events after an acknowledged cursor.
+    pub async fn organization_events(&self, after: i64) -> Result<Value> {
+        let mut url = self
+            .client
+            .endpoint(&["v1", "internal", "organizations", "events"]);
+        url.query_pairs_mut()
+            .append_pair("after", &after.to_string());
+        self.client
+            .execute(Request::new(Method::GET, url, self.auth()))
+            .await?
+            .json()
+    }
+
     /// Private Cells-service bridge: verify a live Cells or Developer author token.
     /// The caller must use Silicon Cells' own app credentials, never a linked app secret.
     pub async fn cells_author(&self, access_token: &str) -> Result<UserInfo> {
@@ -336,6 +470,43 @@ impl<'a> AppClient<'a> {
             &[("grant_type", SLT_GRANT_TYPE), ("slt", slt.trim())],
         )
         .await
+    }
+
+    /// Recover a code exchange after a lost response. Persist the same key and PKCE proof before the first request.
+    pub async fn exchange_code_with_key(
+        &self,
+        code: &str,
+        redirect_uri: &str,
+        code_verifier: Option<&str>,
+        key: &str,
+    ) -> Result<TokenResponse> {
+        let mut form = vec![
+            ("grant_type", "authorization_code"),
+            ("code", code.trim()),
+            ("redirect_uri", redirect_uri),
+        ];
+        if let Some(verifier) = code_verifier {
+            form.push(("code_verifier", verifier));
+        }
+        let request = Request::new(
+            Method::POST,
+            self.client.endpoint(&["v1", "oauth", "token"]),
+            self.credentials("Exchanging an authorization code")?,
+        )
+        .form(&form)
+        .idempotency_key(Some(key))?;
+        self.client.execute(request).await?.json()
+    }
+    /// Recover an SLT exchange after a lost response. The key is bound to this app and exact SLT.
+    pub async fn exchange_slt_with_key(&self, slt: &str, key: &str) -> Result<TokenResponse> {
+        let request = Request::new(
+            Method::POST,
+            self.client.endpoint(&["v1", "oauth", "token"]),
+            self.credentials("Exchanging a short-lived token")?,
+        )
+        .form(&[("grant_type", SLT_GRANT_TYPE), ("slt", slt.trim())])
+        .idempotency_key(Some(key))?;
+        self.client.execute(request).await?.json()
     }
 
     /// Rotates a refresh token: store the new refresh token from the response; the old one

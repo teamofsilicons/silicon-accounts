@@ -542,3 +542,7 @@ most 30 minutes. Call `introspect` when you need to know at once.
 
 Store the account `uuid` (permanent) or the membership id `{app_id}:{uuid}`. The `c:`/`si:` id is
 for display only: it can change, and apps hear about it through `account.id_changed`.
+
+## Work accounts and durable exchange
+
+`AccountSession` exposes `linked_accounts`, `link_account`, `switch_account`, `create_personal_account`, `short_lived_token_for`, `link_requests`, `accept_link_request`, and `decline_link_request`. `Me` includes optional `org` and `org_custodian`. `AppClient::exchange_code_with_key` and `exchange_slt_with_key` bind durable grant recovery to a stable operation key. Persist that key before the first exchange. The constrained `organization_*` bridge methods require the Organizations app credential and are intended only for that app. See [Work account API](api/work-accounts.md).

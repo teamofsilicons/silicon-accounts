@@ -143,6 +143,11 @@ async fn admit(
         )
         .hint("Sign in to the app another way, for example through its sign-in page."));
     }
+    if let Err(error) = accounts_core::repo::organizations::check(conn, me.uuid(), &d.app_id).await
+    {
+        accounts_core::repo::organizations::record_refusal(&state.db, me.uuid(), &d.app_id).await?;
+        return Err(error);
+    }
     accounts_core::access::carbon_may_sign_in(conn, &config, &me.account, &app.name).await
 }
 

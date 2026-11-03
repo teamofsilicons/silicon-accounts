@@ -1,0 +1,11 @@
+.accounts { display: grid; gap: 24px; }
+.row { background: var(--sq-fill); border: 1px solid var(--sq-stroke); --sq-r: 16px; --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; align-items: center; gap: 16px; padding: 20px; margin-block: 10px; }
+.row > svg { color: var(--text-muted); flex: none; }
+.identity { display: grid; gap: 3px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.identity span, .identity small { color: var(--text-muted); }
+.create { display: grid; gap: 16px; max-width: 440px; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.actions p { flex-basis: 100%; }
+.request { align-items: stretch; flex-direction: column; }
+.request .actions { align-self: flex-start; }
+@media (max-width: 420px) { .row { flex-wrap: wrap; } .row > button { width: 100%; } }

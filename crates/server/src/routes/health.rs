@@ -53,6 +53,7 @@ pub struct Meta {
     pub docs_url: String,
     /// The developer platform, where apps' sign-in is set up (ACCOUNTS_DEVELOPER_URL).
     pub developer_url: String,
+    pub organizations_url: String,
     pub providers: Providers,
     pub delivery: &'static str,
 }
@@ -75,6 +76,8 @@ pub async fn meta(State(state): State<AppState>) -> Json<Meta> {
         silicon_apps_url: s.silicon_apps_url.clone(),
         docs_url: s.docs_url.clone(),
         developer_url: s.developer_url.clone(),
+        organizations_url: std::env::var("ACCOUNTS_ORGANIZATIONS_URL")
+            .unwrap_or_else(|_| "https://organizations.teamofsilicons.com".into()),
         providers: Providers {
             google: s.google.managed_configured(),
             apple: s.apple.managed_configured(),

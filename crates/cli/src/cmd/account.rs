@@ -854,3 +854,72 @@ pub async fn device(ctx: &Ctx, args: DeviceArgs) -> CliResult<Outcome> {
         }
     }
 }
+
+/// Resolve a UUID or current displayed id among the caller's linked accounts.
+pub async fn linked_uuid(ctx: &Ctx, value: &str) -> CliResult<String> {
+    let group = with_session!(ctx, |s| s.linked_accounts())?;
+    group["accounts"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|a| a["uuid"].as_str() == Some(value) || a["id"].as_str() == Some(value))
+        .and_then(|a| a["uuid"].as_str())
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            CliError::invalid(
+                "This account is not in your linked accounts.",
+                "Run silicon-accounts linked-accounts list to see available IDs.",
+            )
+        })
+}
+/// Linked identities, using only the official Accounts package.
+pub async fn linked_accounts(
+    ctx: &Ctx,
+    args: crate::cli::LinkedAccountsArgs,
+) -> CliResult<Outcome> {
+    use crate::cli::LinkedAccountsCommand as C;
+    let value = match args.command.unwrap_or(C::List) {
+        C::List => with_session!(ctx, |s| s.linked_accounts())?,
+        C::Requests => with_session!(ctx, |s| s.link_requests())?,
+        C::Accept { request_id } => with_session!(ctx, |s| s.accept_link_request(&request_id))?,
+        C::Decline { request_id } => with_session!(ctx, |s| s.decline_link_request(&request_id))?,
+        C::Link { .. } => {
+            use std::io::Read;
+            let mut token = String::new();
+            std::io::stdin().read_to_string(&mut token).map_err(|e| {
+                CliError::invalid(
+                    e.to_string(),
+                    "Pipe the independently authenticated target token to stdin.",
+                )
+            })?;
+            with_session!(ctx, |s| s.link_account(token.trim(), None))?
+        }
+        C::Switch { account } => {
+            let uuid = linked_uuid(ctx, &account).await?;
+            let value = with_session!(ctx, |s| s.switch_account(&uuid))?;
+            let tokens: silicon_accounts_client::TokenResponse =
+                serde_json::from_value(value["tokens"].clone()).map_err(|e| {
+                    CliError::invalid(e.to_string(), "The server did not return a valid session.")
+                })?;
+            let me: silicon_accounts_client::Me = serde_json::from_value(value["account"].clone())
+                .map_err(|e| {
+                    CliError::invalid(
+                        e.to_string(),
+                        "The server did not return the selected account.",
+                    )
+                })?;
+            ctx.store_tokens(&tokens, Some(&me), "linked_account")?;
+            serde_json::json!({"authenticated":true,"account":value["account"]})
+        }
+        C::CreatePersonal { id, display_name } => {
+            let key = silicon_accounts_client::random_state();
+            with_session!(ctx, |s| s.create_personal_account(
+                &id,
+                display_name.as_deref(),
+                Some(&key)
+            ))?
+        }
+    };
+    let text = serde_json::to_string_pretty(&value).unwrap_or_default();
+    Ok(Outcome::new(value, text))
+}

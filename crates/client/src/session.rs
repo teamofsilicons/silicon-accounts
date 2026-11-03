@@ -379,8 +379,98 @@ impl<'a> AccountSession<'a> {
 
     // ---- signing into apps --------------------------------------------------------------
 
-    /// `POST /v1/me/short-lived-tokens`: a single-use token (`slt_…`, 2 minutes) the app
-    /// exchanges for your tokens. This is how a Silicon signs into an app.
+    async fn post<T: DeserializeOwned>(
+        &self,
+        segments: &[&str],
+        body: &Value,
+        key: Option<&str>,
+    ) -> Result<T> {
+        self.client
+            .execute(
+                Request::new(Method::POST, self.url(segments), self.auth())
+                    .json(body)?
+                    .idempotency_key(key)?,
+            )
+            .await?
+            .json()
+    }
+    /// List the main account and the personal/work accounts you control.
+    pub async fn linked_accounts(&self) -> Result<Value> {
+        self.get(&["v1", "me", "linked-accounts"]).await
+    }
+    /// Pending organization Silicon links requiring this Silicon or its custodian's consent.
+    pub async fn link_requests(&self) -> Result<Value> {
+        self.get(&["v1", "me", "linked-accounts", "requests"]).await
+    }
+    /// Accept a pending link only as the personal Silicon or its current custodian.
+    pub async fn accept_link_request(&self, id: &str) -> Result<Value> {
+        self.post(
+            &["v1", "me", "linked-accounts", "requests", id, "accept"],
+            &json!({}),
+            None,
+        )
+        .await
+    }
+    /// Decline a pending link only as its recipient or current custodian.
+    pub async fn decline_link_request(&self, id: &str) -> Result<Value> {
+        self.post(
+            &["v1", "me", "linked-accounts", "requests", id, "decline"],
+            &json!({}),
+            None,
+        )
+        .await
+    }
+    /// Link after independent first-party authentication to the target account.
+    pub async fn link_account(
+        &self,
+        target_access_token: &str,
+        key: Option<&str>,
+    ) -> Result<Value> {
+        self.post(
+            &["v1", "me", "linked-accounts", "link"],
+            &json!({"target_access_token":target_access_token}),
+            key,
+        )
+        .await
+    }
+    /// Switch this session to a linked account. Returns a fresh first-party token pair.
+    pub async fn switch_account(&self, uuid: &str) -> Result<Value> {
+        self.post(
+            &["v1", "me", "linked-accounts", "switch"],
+            &json!({"account_uuid":uuid}),
+            None,
+        )
+        .await
+    }
+    /// Create a personal Carbon account from a work account, preserving the work identity.
+    pub async fn create_personal_account(
+        &self,
+        id: &str,
+        display_name: Option<&str>,
+        key: Option<&str>,
+    ) -> Result<Value> {
+        self.post(
+            &["v1", "me", "personal-account"],
+            &json!({"id":id,"display_name":display_name}),
+            key,
+        )
+        .await
+    }
+    /// Mint a single-use app token as a linked identity, after checking its org policy.
+    pub async fn short_lived_token_for(
+        &self,
+        app_id: &str,
+        account_uuid: &str,
+    ) -> Result<ShortLivedToken> {
+        self.post(
+            &["v1", "me", "short-lived-tokens"],
+            &json!({"app_id":app_id,"account_uuid":account_uuid}),
+            None,
+        )
+        .await
+    }
+
+    /// Mint a single-use token (`slt_…`, 2 minutes) for an app to exchange for tokens.
     pub async fn short_lived_token(&self, app_id: &str) -> Result<ShortLivedToken> {
         let body = json!({ "app_id": app_id.trim() });
         self.send(

@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-03T17:12:54Z",
+  "environment": "isolated localhost:8649 / PostgreSQL:5548",
+  "organization": "qaacc-57f7e5d1",
+  "checks": [
+    "Hosted OTP signup creates a personal account",
+    "Creator work identity is distinct, linked, and does not steal the personal email",
+    "Independent target login preserves the initiator cookie; linking rejects an unauthenticated completer",
+    "Work-main creates exactly one personal account, becomes linked main, and retains work email ownership",
+    "Exclusions override additions, revoke issued app tokens, and preserve Accounts access",
+    "Hosted picker shows disabled work identity with an organization reason and server rejects selection",
+    "Closing work invalidates its session while preserving personal and other linked work identities",
+    "Organization event stream contains work activity and no personal linked UUID",
+    "Google mock proof reaches linked picker and signs in as the selected work account",
+    "Apple mock proof reaches linked picker and signs in as the selected work account",
+    "Verified phone sign-in reaches the same linked account picker",
+    "Deleting a personal main preserves and detaches its work account",
+    "Closing a work main preserves linked work and elects the survivor as main"
+  ],
+  "count": 13
+}

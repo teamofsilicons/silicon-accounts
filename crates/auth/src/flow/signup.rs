@@ -646,7 +646,15 @@ pub async fn submit_signup(
     }
 
     consume_session(&mut tx, session.id, &account.uuid).await?;
-    let signed = browser::sign_in(&mut tx, &state, &headers, &meta, &account.uuid).await?;
+    let signed = browser::sign_in(
+        &mut tx,
+        &state,
+        &headers,
+        &meta,
+        &account.uuid,
+        flow.extras.link_request_id.is_some(),
+    )
+    .await?;
     flow.extras.browser_session_id = Some(signed.session_id);
     flow.extras.auth_method = Some(session.method().to_string());
     flow.extras.new_account = true;

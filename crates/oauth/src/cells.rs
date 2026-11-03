@@ -411,9 +411,9 @@ async fn exchange(
             "authorization_code"=>{
                 // Public=true enforces S256 PKCE even though the Cells service has
                 // authenticated. It cannot exchange another backend's stolen code.
-                grants::code::exchange(&state,&ClientAuth{app:target,public:true},&params,&meta).await.map_err(oauth)?
+                grants::code::exchange(&state,&ClientAuth{app:target,public:true},&params,&meta,None).await.map_err(oauth)?
             },
-            "slt"|super::token::SLT_GRANT_TYPE=>grants::slt::exchange(&state,&ClientAuth{app:target,public:false},&params,&meta).await.map_err(oauth)?,
+            "slt"|super::token::SLT_GRANT_TYPE=>grants::slt::exchange(&state,&ClientAuth{app:target,public:false},&params,&meta,None).await.map_err(oauth)?,
             "refresh_token"=>{
                 let token=input.refresh_token.as_deref().ok_or_else(||ApiError::invalid_request("refresh_token is required."))?;
                 let family=super::credentials::refresh_token_info(&mut tx,&state.keys.pepper,token).await?.map(|v|v.family_id);

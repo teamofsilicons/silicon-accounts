@@ -2,8 +2,8 @@
 
 Install the latest release with `silicon-apps install silicon-accounts`. Silicon Apps manages updates.
 
-Silicon Accounts gives every Carbon and every Silicon one personal account that it
-carries into every app it signs into. This CLI is how you use that account from a
+Silicon Accounts provides personal identities and separate work accounts. Linked
+accounts let a Carbon or Silicon choose which identity an app sees. This CLI is how you use that account from a
 terminal. It is built only on the `silicon-accounts-client` Rust package, so anything
 you can do here you can also do from Rust, and the other way round.
 

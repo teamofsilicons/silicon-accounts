@@ -332,6 +332,7 @@ async fn issue_tokens_inner(
             ),
         ));
     }
+    crate::repo::organizations::check(conn, &req.account.uuid, req.app_id).await?;
     let scopes = crate::models::normalize_scopes(req.scopes.to_vec());
     let family = create_family_for(
         conn,
@@ -534,6 +535,11 @@ pub async fn refresh_with_operation(
             account.display_id(),
             account.status
         )));
+    }
+    if let Err(error) = crate::repo::organizations::check(&mut tx, &account.uuid, app_id).await {
+        tx.rollback().await?;
+        crate::repo::organizations::record_refusal(pool, &account.uuid, app_id).await?;
+        return Err(error.into());
     }
     if let Some(recovery) = &recovery {
         // Replays are credentials too: check current membership inside the transaction.
@@ -821,6 +827,7 @@ pub async fn verify_access_token(
             format!("The account {} was deleted.", account.uuid),
         ));
     }
+    crate::repo::organizations::check(conn, &account.uuid, &claims.aud).await?;
     Ok(VerifiedAccess {
         claims,
         family,
@@ -1169,6 +1176,65 @@ pub async fn consume_slt(
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
+    match failure {
+        Some(m) => Err(GrantError::Invalid(m)),
+        None => Ok(t),
+    }
+}
+
+/// Consume under the caller's transaction. Commit client refusals, but commit successful
+/// consumption atomically with the issued tokens and recovery receipt.
+pub async fn consume_slt_in_transaction(
+    conn: &mut PgConnection,
+    pepper: &Pepper,
+    slt: &str,
+    app_id: &str,
+) -> Result<ShortLivedToken, GrantError> {
+    let slt = slt.trim();
+    if !slt.starts_with(prefix::SLT) {
+        let what = crate::crypto::describe_token(slt)
+            .unwrap_or("not a Silicon Accounts short-lived token");
+        return Err(GrantError::Invalid(format!(
+            "slt must be a short-lived token (it starts with slt_), but this is {what}."
+        )));
+    }
+    let row: Option<(ShortLivedToken, bool)> = sqlx::query_as::<_, SltRow>(
+        "select token_hash, account_uuid, app_id, scopes, created_at, expires_at, consumed_at, \
+                family_expires_cap, federation_id, expires_at <= now() as expired from short_lived_tokens \
+         where token_hash = $1 for update",
+    )
+    .bind(pepper.hash(slt))
+    .fetch_optional(&mut *conn)
+    .await?
+    .map(|r| (r.token, r.expired));
+    let Some((t, expired)) = row else {
+        return Err(GrantError::Invalid(
+            "The short-lived token is not known: it is mistyped or was never issued.".into(),
+        ));
+    };
+    if t.consumed_at.is_some() {
+        return Err(GrantError::Invalid(
+            "The short-lived token was already used; each one works once. Get a new one.".into(),
+        ));
+    }
+    let failure = if expired {
+        Some(format!(
+            "The short-lived token expired at {} (they last {SLT_TTL_SECONDS} seconds); get a new one with `silicon-accounts login --app {}`.",
+            crate::timefmt::format_rfc3339_ms(t.expires_at),
+            t.app_id
+        ))
+    } else if t.app_id != app_id {
+        Some(format!(
+            "The short-lived token was issued for the app '{}', not for '{app_id}'; get one for '{app_id}' with `silicon-accounts login --app {app_id}`.",
+            t.app_id
+        ))
+    } else {
+        None
+    };
+    sqlx::query("update short_lived_tokens set consumed_at = now() where token_hash = $1")
+        .bind(&t.token_hash)
+        .execute(&mut *conn)
+        .await?;
     match failure {
         Some(m) => Err(GrantError::Invalid(m)),
         None => Ok(t),

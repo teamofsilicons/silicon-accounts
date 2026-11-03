@@ -65,7 +65,22 @@ pub async fn sign_in(
     headers: &HeaderMap,
     meta: &ClientMeta,
     account_uuid: &str,
+    preserve_browser: bool,
 ) -> ApiResult<SignedIn> {
+    if preserve_browser {
+        let (_, session) = sessions::create(
+            conn,
+            &state.keys.pepper,
+            account_uuid,
+            meta.ip.as_deref(),
+            meta.user_agent.as_deref(),
+        )
+        .await?;
+        return Ok(SignedIn {
+            session_id: session.id,
+            cookie: None,
+        });
+    }
     if let Some(token) = read_cookie(headers, &state.settings, SESSION_COOKIE)
         && let Some(existing) = sessions::lookup(conn, &state.keys.pepper, &token).await?
     {

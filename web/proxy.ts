@@ -34,7 +34,7 @@
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { developerDocsPath } from "@/lib/docs-redirects";
-import { apiUrl, developerUrl } from "@/lib/server/meta";
+import { apiUrl, developerUrl, organizationsFormOrigin } from "@/lib/server/meta";
 import { SESSION_COOKIES, hasSessionCookie } from "@/lib/server/session";
 
 const isDev = process.env.NODE_ENV === "development";
@@ -143,7 +143,7 @@ function clearSessionCookies(request: NextRequest, response: NextResponse): void
   }
 }
 
-function contentSecurityPolicy(nonce: string, frameAncestorsValue: string): string {
+function contentSecurityPolicy(nonce: string, frameAncestorsValue: string, orgFormOrigin = ""): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
@@ -153,7 +153,7 @@ function contentSecurityPolicy(nonce: string, frameAncestorsValue: string): stri
     "connect-src 'self'",
     "object-src 'none'",
     `frame-ancestors ${frameAncestorsValue}`,
-    "form-action 'self' https:",
+    `form-action 'self' https:${orgFormOrigin}`,
     "base-uri 'none'",
   ].join("; ");
 }
@@ -178,7 +178,8 @@ export async function proxy(request: NextRequest) {
   const stale = pathname === "/" && pageLoad && (await staleSession(request));
   const surface = embed ? "embed" : pathname === "/" && (stale || !hasSessionCookie(request.headers.get("cookie"))) ? "public" : "site";
   const ancestors = embed ? await frameAncestors(searchParams.get("app_id") ?? searchParams.get("client_id")) : [];
-  const csp = contentSecurityPolicy(nonce, ancestors.length ? `'self' ${ancestors.join(" ")}` : "'none'");
+  const orgFormOrigin = pathname.startsWith("/work-invitations/") ? await organizationsFormOrigin() : "";
+  const csp = contentSecurityPolicy(nonce, ancestors.length ? `'self' ${ancestors.join(" ")}` : "'none'", orgFormOrigin);
 
   const requestHeaders = new Headers(request.headers);
   // The render must not see a cookie the API refused (the root layout reads it as a hint of a session).
@@ -195,7 +196,7 @@ export async function proxy(request: NextRequest) {
   response.headers.set("Content-Security-Policy", csp);
   if (!ancestors.length) response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Referrer-Policy", pathname.startsWith("/work-invitations/") ? "strict-origin" : "strict-origin-when-cross-origin");
   const https = request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https";
   if (process.env.NODE_ENV === "production" && https) response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
   return response;

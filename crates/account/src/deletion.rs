@@ -45,6 +45,18 @@ pub(crate) async fn delete_me(
     meta: ClientMeta,
     Json(body): Json<DeleteBody>,
 ) -> Result<Response, ApiError> {
+    {
+        let mut conn = state.db.acquire().await?;
+        if accounts_core::repo::organizations::org_id(&mut conn, me.uuid())
+            .await?
+            .is_some()
+        {
+            return Err(ApiError::forbidden(
+                "organization_account_managed",
+                "Leave your organization in Silicon Organizations to close this work account. The last owner must appoint another owner first.",
+            ));
+        }
+    }
     if me.kind() == AccountKind::Silicon {
         let custodian = match &me.account.custodian_uuid {
             Some(c) => {

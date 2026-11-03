@@ -25,6 +25,7 @@ use crate::util::decrypt_text;
 pub struct FlowView {
     pub id: String,
     pub step: Step,
+    pub accounts: Vec<serde_json::Value>,
     #[serde(with = "rfc3339_ms")]
     pub expires_at: OffsetDateTime,
     pub app: FlowAppView,
@@ -154,10 +155,27 @@ pub async fn build(
         _ => None,
     };
 
+    let choices = if flow.step == Step::SelectAccount {
+        match flow.extras.authenticated_account_uuid.as_deref() {
+            Some(uuid) => accounts_core::repo::organizations::linked_accounts(
+                conn,
+                uuid,
+                Some(&fa.app.app_id),
+            )
+            .await?["accounts"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default(),
+            None => vec![],
+        }
+    } else {
+        vec![]
+    };
     let branding = fa.config.branding.clone();
     Ok(FlowView {
         id: flow.id.clone(),
         step: flow.step,
+        accounts: choices,
         expires_at: flow.expires_at,
         app: FlowAppView {
             app_id: fa.app.app_id.clone(),

@@ -23,7 +23,7 @@ import { formatDate, formatRelative, plural } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { notifyError } from "@/lib/notify";
 import { useDeleteAccount } from "@/lib/query/account";
-import { useMe, useSignOut } from "@/lib/query/session";
+import { useMeta, useMe, useSignOut } from "@/lib/query/session";
 import { AnimatedRows } from "../parts/animated-rows";
 import { asCarbon, asSilicon, describeError, useNow } from "../parts/common";
 import { focusAfterRemoval, pageMain } from "../parts/focus";
@@ -58,6 +58,7 @@ function SessionIcon({ session }: { session: SessionInfo }) {
 }
 
 export function Settings() {
+  const meta = useMeta();
   const now = useNow(60_000);
   const me = useMe();
   const sessions = useEverySession();
@@ -114,6 +115,8 @@ export function Settings() {
             {describeError(me.error)}
             <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try again</Button></span>
           </Alert>
+        ) : me.data?.org ? (
+          <div data-sq="surface" className={styles.danger}><p className={styles.dangerText}>This work account belongs to {me.data.org.name}. Leave the org in <a href={meta.data?.organizations_url ?? "https://organizations.teamofsilicons.com"}>Silicon Organizations</a> to close it. The last owner must appoint another owner first.</p></div>
         ) : silicon ? (
           <div data-sq="surface" className={styles.danger}>
             <p className={styles.dangerText}>
