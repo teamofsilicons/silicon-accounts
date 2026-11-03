@@ -138,7 +138,7 @@ async fn upsert(
         let name=string(&body,"name")?.trim();accounts_core::normalize::validate_display_name(name).map_err(|e|ApiError::unprocessable("invalid_display_name",e))?;
         let version=body.get("version").and_then(Value::as_i64).unwrap_or(1);
         let logo=body.get("logo_url").and_then(Value::as_str);
-        if let Some(logo)=logo{accounts_core::normalize::validate_https_url(logo).map_err(|e|ApiError::unprocessable("invalid_logo_url",e))?;}
+        if let Some(logo)=logo{validate_logo_url(logo,state.settings.environment,std::env::var("ACCOUNTS_ORGANIZATIONS_URL").ok().as_deref()).map_err(|e|ApiError::unprocessable("invalid_logo_url",e))?;}
         if version<1{return Err(ApiError::unprocessable("invalid_version","Version must be positive."))}
         let mut tx=state.db.begin().await?;
         let row:Option<(String,Option<String>,i64)>=sqlx::query_as("select name,logo_url,version from organization_projections where org_id=$1 for update").bind(&org).fetch_optional(&mut *tx).await?;
@@ -146,6 +146,112 @@ async fn upsert(
         sqlx::query("insert into organization_projections(org_id,name,logo_url,version) values($1,$2,$3,$4) on conflict(org_id) do update set name=excluded.name,logo_url=excluded.logo_url,version=excluded.version,updated_at=now()").bind(&org).bind(name).bind(logo).bind(version).execute(&mut *tx).await?;
         tx.commit().await?;Ok((StatusCode::OK,json!({"org_id":org,"name":name,"logo_url":logo,"version":version})))
     }).await
+}
+/// Local uploaded logos use the Organizations web proxy during development.
+/// All other logos retain the HTTPS requirement, including every production URL.
+fn validate_logo_url(
+    logo: &str,
+    environment: accounts_core::config::Environment,
+    organizations_url: Option<&str>,
+) -> Result<(), String> {
+    let https_error = match accounts_core::normalize::validate_https_url(logo) {
+        Ok(_) => return Ok(()),
+        Err(error) => error,
+    };
+    if environment != accounts_core::config::Environment::Development {
+        return Err(https_error);
+    }
+    let uploaded_logo = (|| {
+        let base = url::Url::parse(organizations_url?).ok()?;
+        let logo = url::Url::parse(logo.trim()).ok()?;
+        let loopback = match logo.host()? {
+            url::Host::Domain(host) => host == "localhost",
+            url::Host::Ipv4(ip) => ip.is_loopback(),
+            url::Host::Ipv6(ip) => ip.is_loopback(),
+        };
+        let id = logo.path().strip_prefix("/api/orgs/logos/")?;
+        let canonical_id = Uuid::parse_str(id).ok()?.to_string();
+        (loopback
+            && logo.scheme() == "http"
+            && logo.origin() == base.origin()
+            && logo.username().is_empty()
+            && logo.password().is_none()
+            && base.username().is_empty()
+            && base.password().is_none()
+            && logo.query().is_none()
+            && logo.fragment().is_none()
+            && id == canonical_id
+            && logo.as_str().len() <= accounts_core::normalize::MAX_URL_LEN)
+            .then_some(())
+    })();
+    uploaded_logo.ok_or(https_error)
+}
+
+#[cfg(test)]
+mod logo_tests {
+    use super::validate_logo_url;
+    use accounts_core::config::Environment::{Development, Production, Test};
+
+    const ID: &str = "f9df305b-48e7-49d8-b9e2-8a785bb5c4e7";
+
+    #[test]
+    fn development_upload_requires_exact_configured_loopback_origin() {
+        for base in [
+            "http://localhost:8661",
+            "http://127.0.0.1:8661",
+            "http://[::1]:8661",
+        ] {
+            let logo = format!("{base}/api/orgs/logos/{ID}");
+            assert!(validate_logo_url(&logo, Development, Some(base)).is_ok());
+            assert!(validate_logo_url(&logo, Production, Some(base)).is_err());
+            assert!(validate_logo_url(&logo, Test, Some(base)).is_err());
+            assert!(validate_logo_url(&logo, Development, None).is_err());
+        }
+    }
+
+    #[test]
+    fn development_upload_cannot_expand_to_other_origins_or_paths() {
+        let configured = Some("http://localhost:8661");
+        for logo in [
+            format!("http://localhost:8660/api/orgs/logos/{ID}"),
+            format!("http://127.0.0.1:8661/api/orgs/logos/{ID}"),
+            format!("http://user@localhost:8661/api/orgs/logos/{ID}"),
+            format!("http://localhost:8661/api/orgs/logos/{ID}?secret=bad"),
+            format!("http://localhost:8661/api/orgs/logos/{ID}#fragment"),
+            format!("http://localhost:8661/v1/logos/{ID}"),
+            "http://localhost:8661/api/orgs/logos/not-a-uuid".into(),
+        ] {
+            assert!(validate_logo_url(&logo, Development, configured).is_err());
+        }
+        let remote = "http://organizations.example.test";
+        assert!(
+            validate_logo_url(
+                &format!("{remote}/api/orgs/logos/{ID}"),
+                Development,
+                Some(remote)
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn ordinary_https_logo_rules_stay_unchanged() {
+        for environment in [Development, Production, Test] {
+            assert!(
+                validate_logo_url("https://images.example.test/logo.png", environment, None)
+                    .is_ok()
+            );
+            assert!(
+                validate_logo_url(
+                    "https://user:secret@images.example.test/logo.png",
+                    environment,
+                    None
+                )
+                .is_err()
+            );
+            assert!(validate_logo_url("data:image/png;base64,example", environment, None).is_err());
+        }
+    }
 }
 pub(super) async fn reserve_work_handle(
     conn: &mut PgConnection,
