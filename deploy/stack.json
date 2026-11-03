@@ -12,12 +12,12 @@
       "Type": "String"
     },
     "AmiId": {
-      "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
-      "Default": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64"
+      "Type": "AWS::EC2::Image::Id",
+      "Default": "ami-04a5744dbdee14060"
     },
     "InstanceType": {
       "Type": "String",
-      "Default": "t4g.medium",
+      "Default": "t4g.small",
       "AllowedValues": [
         "t4g.small",
         "t4g.medium"
