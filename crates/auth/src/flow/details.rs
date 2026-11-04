@@ -471,7 +471,7 @@ pub async fn start(
     account: &Account,
 ) -> ApiResult<()> {
     flow.extras.details = Default::default();
-    if fa.first_party() {
+    if fa.first_party() && !fa.custom_interface_details() {
         return next::complete(conn, state, meta, flow, fa, account, Grant::Auto).await;
     }
     let plan = Plan::of(flow, &fa.config);
@@ -573,7 +573,11 @@ async fn finish(
         Grant::Chosen(scopes.clone()),
     )
     .await?;
-    record_answer(conn, meta, fa, plan, standing, &scopes).await
+    if fa.interface_id.is_some() {
+        Ok(())
+    } else {
+        record_answer(conn, meta, fa, plan, standing, &scopes).await
+    }
 }
 
 /// The details step on screen; `None` when the app's flow changed and the page is gone.
@@ -602,7 +606,7 @@ pub async fn repair(
         Err(e) if e.is_server_error() => return Err(e),
         Err(_) => return Ok(false),
     };
-    if fa.first_party() {
+    if fa.first_party() && !fa.custom_interface_details() {
         next::complete(conn, state, meta, flow, fa, &account, Grant::Auto).await?;
         return Ok(true);
     }
@@ -868,7 +872,7 @@ async fn begin(
     let flow = load_bound(tx, state, headers, &Method::POST, id, true).await?;
     model::ensure_live(&flow)?;
     model::ensure_step(&flow, steps, action)?;
-    let fa = FlowApp::load(tx, &state.settings, &flow.app_id).await?;
+    let fa = FlowApp::load_for_flow(tx, &state.settings, &flow).await?;
     fa.ensure_active()?;
     let account = browser::require_flow_account(tx, state, headers, &flow).await?;
     Ok((flow, fa, account))
@@ -1127,7 +1131,7 @@ pub async fn verify_detail(
         )
         .hint(format!("GET /v1/flows/{id} to see where it is now.")));
     }
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
     fa.ensure_active()?;
     let kind = match challenge.channel {
         OtpChannel::Email => ContactKind::Email,

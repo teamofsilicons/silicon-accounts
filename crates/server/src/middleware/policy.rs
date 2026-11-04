@@ -9,9 +9,9 @@
 //! `default-src 'none'` CSP.
 //!
 //! CORS: `Access-Control-Allow-Origin: *` (and preflights) only for `/v1/apps/{app_id}/public`,
-//! `/sdk/*` and `/.well-known/*`. Every other response leaves without CORS headers, even if a
-//! handler added some: credentials-bearing endpoints must never be readable cross-origin, and
-//! this is the one place that decides it.
+//! `/sdk/*`, `/.well-known/*`, and the Interface public-client token operations. The latter use
+//! bearer credentials in the request body, enforce registered browser origins and never allow
+//! cross-origin cookies. Cookie-bound flows and verified backend endpoints have no CORS access.
 //!
 //! Errors: a 4xx/5xx whose body is not JSON (axum's 405, a plain-text framework rejection, an
 //! empty 404 from the static file server) is rewritten into the API error shape
@@ -54,7 +54,7 @@ pub async fn response_policy(State(state): State<AppState>, req: Request, next: 
             .headers()
             .contains_key(header::ACCESS_CONTROL_REQUEST_METHOD)
     {
-        let mut response = preflight(req.headers());
+        let mut response = preflight(req.headers(), paths::is_interface_public_token_path(&path));
         finish(&mut response, &state.settings, &path, true);
         return response;
     }
@@ -78,12 +78,16 @@ fn retry_after_on_429(response: &mut Response) {
 }
 
 /// `204` answer to a CORS preflight on a public resource.
-fn preflight(request_headers: &HeaderMap) -> Response {
+fn preflight(request_headers: &HeaderMap, interface_token: bool) -> Response {
     let mut response = StatusCode::NO_CONTENT.into_response();
     let h = response.headers_mut();
     h.insert(
         header::ACCESS_CONTROL_ALLOW_METHODS,
-        HeaderValue::from_static("GET, HEAD, OPTIONS"),
+        HeaderValue::from_static(if interface_token {
+            "POST, OPTIONS"
+        } else {
+            "GET, HEAD, OPTIONS"
+        }),
     );
     h.insert(
         header::ACCESS_CONTROL_MAX_AGE,

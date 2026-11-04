@@ -25,6 +25,11 @@ export type Links = {
   ios?: string;
   custom?: { label: string; url: string; logo: string }[];
 };
+export type InterfaceUseCase = { name: string; files: {name: string; content: string}[] };
+export type InterfaceLicense =
+  | {kind: "preset"; preset: "free" | "attribution" | "attribution_unless_paid" | "permission_required"}
+  | {kind: "link"; url: string}
+  | {kind: "file"; name: string; content: string};
 export type App = {
   app_id: string;
   name: string;
@@ -38,6 +43,9 @@ export type App = {
   domains?: string[];
   account_ids?: string[];
   links: Links;
+  interface_api_documentation_url?: string | null;
+  interface_use_cases?: InterfaceUseCase[] | null;
+  interface_license?: InterfaceLicense | null;
   carousel: Media[];
   published: boolean;
   setup_step: number;

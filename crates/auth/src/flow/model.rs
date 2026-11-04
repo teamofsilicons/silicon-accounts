@@ -320,6 +320,15 @@ pub struct LinkIntent {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct FlowExtras {
+    /// Optional Interface whose registered identity brands this Accounts sign-in.
+    #[serde(default)]
+    pub interface_id: Option<String>,
+    #[serde(default)]
+    pub interface_request_binding: Option<String>,
+    #[serde(default)]
+    pub interface_revision: Option<i64>,
+    #[serde(default)]
+    pub interface_scopes: Vec<String>,
     #[serde(default)]
     pub authenticated_account_uuid: Option<String>,
     #[serde(default)]

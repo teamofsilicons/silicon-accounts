@@ -28,7 +28,8 @@ const px = (value: number) => `${Math.round(value * 100) / 100}px`;
 /** `url("…")` for https and data:image URLs only; anything else is ignored (the server allows https only). */
 function cssUrl(value: string | null): string | null {
   if (!value) return null;
-  if (!/^https:\/\//i.test(value) && !/^data:image\//i.test(value)) return null;
+  const interfacePreview = /^\/api\/interfaces\/interfaces\/[a-z0-9_-]{3,60}\/uploads\/[0-9a-f-]{36}$/i.test(value);
+  if (!/^https:\/\//i.test(value) && !/^data:image\//i.test(value) && !interfacePreview) return null;
   return `url(${JSON.stringify(value)})`;
 }
 

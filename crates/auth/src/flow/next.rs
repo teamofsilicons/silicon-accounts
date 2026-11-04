@@ -139,8 +139,16 @@ pub async fn complete(
         .await?;
         return Err(error);
     }
-    if !fa.first_party() && !account_domain_allowed(conn, &fa.config, account).await? {
+    if !fa.bypass_account_policies() && !account_domain_allowed(conn, &fa.config, account).await? {
         return Err(domain_not_allowed(fa, None));
+    }
+    if flow.extras.interface_id.is_some() {
+        let selected = match &grant {
+            Grant::Auto => needed_scopes(flow, &fa.config),
+            Grant::Chosen(scopes) => scopes.clone(),
+        };
+        flow.extras.interface_scopes =
+            accounts_core::models::scope_strings(&normalize_scopes(selected));
     }
     let mut scopes: Vec<Scope> = if fa.first_party() {
         // The account site and CLI are Silicon Accounts itself: no membership, no consent.
@@ -307,7 +315,7 @@ pub async fn account_domain_allowed(
 /// then asks for (at one of the domains, with a code) before the sign-in completes. Without a
 /// required email nothing would ever ask for one, so such a sign-up is refused before it starts.
 pub fn emailless_signup_allowed(fa: &FlowApp) -> bool {
-    fa.first_party()
+    fa.bypass_account_policies()
         || fa.config.allowed_email_domains.is_empty()
         || fa.config.required_fields.contains(&ContactField::Email)
 }

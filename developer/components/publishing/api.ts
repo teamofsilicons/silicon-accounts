@@ -123,8 +123,12 @@ export const subscribeDrafts = (listener: () => void) => { draftListeners.add(li
 export const draftSnapshot = () => draftRevision;
 export const pendingDrafts = () => [...keptDrafts.values()];
 export function hasPendingSaves() {
-  return [...pendingSaves.values()].some((entry) => entry.dirty());
+  return keptDrafts.size > 0 || [...pendingSaves.values()].some((entry) => entry.dirty());
 }
+/** Explicit-save forms keep their drafts in this tab even if browser history changes steps. */
+export function publishingDraft<T extends object>(key:string):T|undefined {return keptDrafts.get(key)?.value as T|undefined;}
+export function keepPublishingDraft(key:string,value:object) {keptDrafts.set(key,{value,href:window.location.pathname+window.location.search});emitDrafts();}
+export function clearPublishingDraft(key:string) {if(keptDrafts.delete(key))emitDrafts();}
 export async function flushPendingSaves() {
   await Promise.all([...pendingSaves.values()].map((entry) => entry.save()));
 }

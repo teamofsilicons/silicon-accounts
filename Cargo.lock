@@ -2883,6 +2883,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
+ "silicon-accounts-account",
  "silicon-accounts-core",
  "sqlx",
  "thiserror",

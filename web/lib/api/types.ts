@@ -886,6 +886,8 @@ export type FlowIntent = "signin" | "signup";
  */
 export interface FlowCreate {
   link_id?: string;
+  interface_id?: string;
+  interface_request?: string;
   app_id?: string;
   /** Alias of app_id. */
   client_id?: string;

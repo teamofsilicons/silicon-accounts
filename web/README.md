@@ -62,6 +62,8 @@ The rewrite proxy accepts bodies up to 52 MB and waits up to 5 minutes (`experim
 `X-Content-Type-Options: nosniff`, a strict referrer policy. The root layout puts the nonce on the inline theme boot
 script; Next adds it to its own scripts. It skips `/v1`, `/.well-known`, `/_next` and static files.
 
+For a local Interfaces stack, `proxy.ts` also permits images from the loopback origin and port in `INTERFACES_API_URL`, including the equivalent localhost names. Production Interface images use HTTPS and need no exception.
+
 `proxy.ts` also sends every old developer address to the developer site with a `307`: `/developer` to its home and
 `/developer/{app_id}[/{tab}]` to `/apps/{app_id}[/{tab}]` there, query kept. The site's address is `developer_url` from
 `GET /v1/meta` (cached for a minute; `ACCOUNTS_DEVELOPER_URL`, then https://developers.teamofsilicons.com, when the API

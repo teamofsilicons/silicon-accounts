@@ -74,6 +74,7 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_GOOGLE_JWKS_URL",
     "ACCOUNTS_GOOGLE_TOKEN_URL",
     "ACCOUNTS_INTERNAL_TOKEN",
+    "ACCOUNTS_INTERFACES_INTERNAL_TOKEN",
     "ACCOUNTS_IP_TIMEZONE_HEADERS",
     "ACCOUNTS_IRIS_BASE_URL",
     "ACCOUNTS_JWT_KEY_ID",
@@ -307,6 +308,8 @@ pub struct Settings {
     pub developer_origin: String,
     /// ACCOUNTS_INTERNAL_TOKEN (service token for `/v1/internal/*`).
     pub internal_token: Option<SecretString>,
+    /// Dedicated service credential for `/v1/internal/interfaces/*` only.
+    pub interfaces_internal_token: Option<SecretString>,
     /// ACCOUNTS_REPORT_RECIPIENTS.
     pub report_recipients: Vec<String>,
     /// ACCOUNTS_WORKER_ENABLED.
@@ -577,6 +580,7 @@ impl Settings {
             }
             .into(),
             internal_token: None,
+            interfaces_internal_token: None,
             report_recipients: vec![
                 "saketdev12@gmail.com".into(),
                 "shubhastro2@gmail.com".into(),
@@ -888,6 +892,25 @@ impl Settings {
                 "ACCOUNTS_INTERNAL_TOKEN",
                 "must be at least 32 characters so it can't be guessed",
             );
+        }
+        s.interfaces_internal_token = r.secret("ACCOUNTS_INTERFACES_INTERNAL_TOKEN");
+        if let Some(t) = &s.interfaces_internal_token {
+            if t.expose_secret().len() < 32 {
+                r.problem(
+                    "ACCOUNTS_INTERFACES_INTERNAL_TOKEN",
+                    "must be at least 32 characters so it can't be guessed",
+                );
+            }
+            if prod
+                && s.internal_token
+                    .as_ref()
+                    .is_some_and(|apps| apps.expose_secret() == t.expose_secret())
+            {
+                r.problem(
+                    "ACCOUNTS_INTERFACES_INTERNAL_TOKEN",
+                    "must differ from ACCOUNTS_INTERNAL_TOKEN in production",
+                );
+            }
         }
         s.report_recipients = r.list(
             "ACCOUNTS_REPORT_RECIPIENTS",

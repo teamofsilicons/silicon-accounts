@@ -9,7 +9,7 @@
  * the app instead of sending the spent code again. Only addresses that are safe to open (http(s), or a native app's
  * reverse-domain scheme) are ever followed.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useReducedMotion } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { Alert } from "@/components/silicon-ui/alert/alert";
@@ -31,6 +31,20 @@ export function Complete({ flow }: CompleteProps) {
   const blocked = !!flow.redirect_to && !redirectTo;
   // Decided once: a flow this browser already left for shows the way back instead of a second redirect.
   const [spent] = useState(() => wasRedirected(flow.id));
+  const leaving = useRef(false);
+  const redirectTimer = useRef<number | null>(null);
+  // Clicking Continue and the timer share one claim. The document stays alive while the app loads,
+  // so simply marking sessionStorage on click does not stop the scheduled second navigation.
+  const claimRedirect = useCallback(() => {
+    if (leaving.current || wasRedirected(flow.id)) return false;
+    leaving.current = true;
+    markRedirected(flow.id);
+    if (redirectTimer.current !== null) window.clearTimeout(redirectTimer.current);
+    return true;
+  }, [flow.id]);
+  const continueOnce = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!claimRedirect()) event.preventDefault();
+  };
   // prompt=none asked for no page at all, and a failed flow has nothing to show: go at once.
   const silent = flow.step === "failed" || /(^|\s)none(\s|$)/.test(flow.prompt ?? "");
 
@@ -38,12 +52,13 @@ export function Complete({ flow }: CompleteProps) {
   // leaves at 650 ms; the old page stays on screen while the app's own page loads. Reduced motion: a short beat to read.
   useEffect(() => {
     if (spent || !redirectTo) return;
-    const timer = window.setTimeout(() => {
-      markRedirected(flow.id);
-      window.location.replace(redirectTo);
+    redirectTimer.current = window.setTimeout(() => {
+      if (claimRedirect()) window.location.replace(redirectTo);
     }, silent ? 0 : reduce ? 300 : 650);
-    return () => window.clearTimeout(timer);
-  }, [spent, redirectTo, silent, reduce, flow.id]);
+    return () => {
+      if (redirectTimer.current !== null) window.clearTimeout(redirectTimer.current);
+    };
+  }, [spent, redirectTo, silent, reduce, claimRedirect]);
 
   if (blocked) {
     return (
@@ -79,7 +94,7 @@ export function Complete({ flow }: CompleteProps) {
           description={declined ? `You cancelled, so ${appName} gets nothing. Taking you back now.` : failure.description ?? `Taking you back to ${appName}.`}
           noFocus
         />
-        <ButtonLink href={redirectTo ?? "#"} external variant="secondary" className={styles.wide} onClick={() => markRedirected(flow.id)}>Back to {appName}</ButtonLink>
+        <ButtonLink href={redirectTo ?? "#"} external variant="secondary" className={styles.wide} onClick={continueOnce}>Back to {appName}</ButtonLink>
       </>
     );
   }
@@ -94,7 +109,7 @@ export function Complete({ flow }: CompleteProps) {
         noFocus
       />
       <p className="sr-only" role="status">Signed in. Taking you to {appName}.</p>
-      <ButtonLink href={redirectTo ?? "#"} external variant="secondary" className={styles.wide} onClick={() => markRedirected(flow.id)}>
+      <ButtonLink href={redirectTo ?? "#"} external variant="secondary" className={styles.wide} onClick={continueOnce}>
         Continue to {appName}
       </ButtonLink>
     </div>

@@ -95,6 +95,7 @@ Read at request time (`lib/server/config.ts`), never baked into the build:
 | Variable | Default | What |
 | --- | --- | --- |
 | `APPS_API_URL` | dev: `http://127.0.0.1:4310`; prod: `https://apps.teamofsilicons.com` | Silicon Apps upstream, server to server. It must trust the same Silicon Accounts as `ACCOUNTS_API_URL` (its `APPS_ACCOUNTS_URL` is that service's public URL), or it refuses this site's tokens and the pages say so. `scripts/dev.sh` sets it per stack (base + 6). |
+| `INTERFACES_API_URL` | dev: `http://127.0.0.1:8670`; prod: `https://api.interfaces.teamofsilicons.com` | Silicon Interfaces upstream for authoring. The browser calls the same-origin `/api/interfaces/*` proxy and never receives the Accounts access token. |
 | `ACCOUNTS_API_URL` | `http://127.0.0.1:8589` | The Silicon Accounts API, server to server. |
 | `ACCOUNTS_PUBLIC_URL` | dev `http://localhost:8590`, prod `https://accounts.teamofsilicons.com` | The accounts site: hosted sign-in, the SDK. |
 | `DEVELOPER_PUBLIC_URL` (or `ACCOUNTS_DEVELOPER_URL`) | dev `http://localhost:$PORT` (8600), prod `https://developers.teamofsilicons.com` | This site's origin; the redirect URI is exactly `{it}/auth/callback`, as the API's `ACCOUNTS_DEVELOPER_URL` says. |
@@ -225,6 +226,8 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
   group, and the two llms files, with `lastmod`.
 
 ## The app's tabs
+
+Interfaces are managed at `/interfaces`: creation and one-time secret display, invitations, listing and sign-in configuration, creator management, image and release uploads, release creation, publishing readiness, verification requests and history. The BFF forwards only allowlisted author routes, requires the sealed developer session and same-origin mutations, and bounds and streams uploaded files. Publishing app links include the app's interface API documentation, optional Markdown use cases and license; incomplete use cases are kept as a local draft until saved. `/docs/interfaces` is the introductory guide.
 
 - **Publishing** (`components/publishing/`): seven freely traversable setup steps. Autosaves flush before the portal navigates; a failed save blocks links and tabs. Browser Back/Forward keeps a failed draft in memory and offers a return action. Reloading or closing still requires the browser’s unsaved-work warning. Secrets remain component-local and are never written to storage. Releases, author administration, invitations and history share the same app and shell.
 - **Shared identity**: the Apps API validates the first-party developer token’s signature, issuer, expiry and live Accounts token family on every call, then enforces its UUID author/admin policy. The browser never receives or reuses a token directly.

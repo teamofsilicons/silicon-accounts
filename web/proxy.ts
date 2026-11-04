@@ -115,6 +115,18 @@ function localIrisImageSource(): string {
   }
 }
 
+/** The local Interfaces API serves uploaded logos over loopback HTTP. */
+function localInterfaceImageSource(): string {
+  const raw = process.env.INTERFACES_API_URL?.trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) return "";
+    const port = url.port ? `:${url.port}` : "";
+    return ` http://localhost${port} http://127.0.0.1${port} http://[::1]${port}`;
+  } catch { return ""; }
+}
+
 /**
  * Whether the session cookie on a page load of "/" is one the API no longer accepts: true only on a 401 from
  * GET /v1/session. Anything else (signed in, the API slow or unreachable) is false, and the account shell decides in
@@ -148,7 +160,7 @@ function contentSecurityPolicy(nonce: string, frameAncestorsValue: string, orgFo
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    `img-src 'self' https: data: blob:${localIrisImageSource()}`,
+    `img-src 'self' https: data: blob:${localIrisImageSource()}${localInterfaceImageSource()}`,
     "font-src 'self' data:",
     "connect-src 'self'",
     "object-src 'none'",
