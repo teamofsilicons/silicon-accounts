@@ -1,0 +1,15 @@
+{
+  "api_sha256": "c6833280c6356d1166b72616bc78eb5692b569901e52ed3a00121ee11b6802cf",
+  "migrate_sha256": "28518015823f5ae2238fdf4fb1f9ca4d596114b7598dbdc3a3c2af45c89cc826",
+  "local_only": true,
+  "production_records_created": false,
+  "checks_passed": [
+    "exact Linux release artifact starts against fresh migrations",
+    "one verified email offers separate Personal and Work identities",
+    "work identity can be selected after one email sign-in",
+    "remembered work session immediately offers both identities",
+    "personal identity can be selected without another authentication",
+    "remembered personal session immediately offers both identities",
+    "fresh-auth and anonymous flows do not expose linked choices"
+  ]
+}
