@@ -25,6 +25,12 @@ export function InterfacesHome() {
   const [creating,setCreating]=useState(false); const [step,setStep]=useState(0);
   const [name,setName]=useState(""); const [id,setId]=useState(""); const [idEdited,setIdEdited]=useState(false);
   const [apps,setApps]=useState(""); const [kind,setKind]=useState<Kind>("unverified");
+  const eligibility=me.data?.eligibility;
+  // Every creator can use unverified; higher types require an explicit grant.
+  const kindAvailable=kind==="unverified" || (kind==="verified" && eligibility?.verified) || (kind==="trusted" && eligibility?.trusted);
+  const selectedKind:Kind=kindAvailable?kind:"unverified";
+  // Clear a revoked selection immediately, so it cannot reappear if grants change again.
+  if(eligibility && !kindAvailable)setKind("unverified");
   const [logo,setLogo]=useState<File|null>(null); const [logoPreview,setLogoPreview]=useState(""); const [uploadedLogo,setUploadedLogo]=useState<Upload|null>(null);
   const [created,setCreated]=useState<Created|null>(null);
   const [busy,setBusy]=useState(false); const [failure,setFailure]=useState<unknown>(null); const [logoFailure,setLogoFailure]=useState<unknown>(null);
@@ -54,11 +60,11 @@ export function InterfacesHome() {
     event.preventDefault(); if (busy) return;
     if(!name.trim() || new TextEncoder().encode(name.trim()).length>160 || !validId(id)) {setStep(0);setFailure(new Error("Enter a name and an ID of 3–30 lowercase letters, numbers, hyphens or underscores."));return;}
     const selected=appList(apps);
-    if(kind!=="trusted" && !selected.length) {setStep(1);setFailure(new Error("Add at least one app ID to continue."));return;}
+    if(selectedKind!=="trusted" && !selected.length) {setStep(1);setFailure(new Error("Add at least one app ID to continue."));return;}
     if(selected.length>100 || new Set(selected).size!==selected.length || selected.some(x=>!(/^[a-z0-9_-]{3,30}$/.test(x)||/^[a-z][a-z0-9-]{1,39}$/.test(x)))) {setStep(1);setFailure(new Error("Enter up to 100 different app IDs using lowercase letters, numbers, hyphens or underscores."));return;}
     setBusy(true);setFailure(null);
     try {
-      const result=await request<Created>("interfaces",{method:"POST",body:{interface_id:id,name:name.trim(),kind,app_ids:selected}});
+      const result=await request<Created>("interfaces",{method:"POST",body:{interface_id:id,name:name.trim(),kind:selectedKind,app_ids:selected}});
       // Hold the one-time secret before doing anything else. A failed logo upload must never hide it.
       setCreated(result); void cache.invalidateQueries({queryKey:["interfaces","list"]});
       if(logo)try {await attachLogo(result,logo,null);}catch(error){setLogoFailure(error);}
@@ -67,7 +73,7 @@ export function InterfacesHome() {
   function next() {
     setFailure(null);
     if(step===0 && (!name.trim() || new TextEncoder().encode(name.trim()).length>160 || !validId(id))) {setFailure(new Error("Enter a name and an ID of 3–30 lowercase letters, numbers, hyphens or underscores."));return;}
-    if(step===1 && kind!=="trusted" && !appList(apps).length) {setFailure(new Error("Add at least one app ID to continue."));return;}
+    if(step===1 && selectedKind!=="trusted" && !appList(apps).length) {setFailure(new Error("Add at least one app ID to continue."));return;}
     setStep(value=>Math.min(2,value+1));
   }
   function reset() {setCreated(null);setCreating(false);setStep(0);setName("");setId("");setIdEdited(false);setApps("");setKind("unverified");setLogo(null);setLogoPreview("");setUploadedLogo(null);setLogoFailure(null);setFailure(null);}
@@ -86,12 +92,12 @@ export function InterfacesHome() {
           <div className={styles.logoField}><div className={styles.logoPreview} data-sq="surface">{logoPreview?<img src={logoPreview} alt="Selected logo preview"/>:<span aria-hidden="true">{name.trim().charAt(0).toUpperCase()||"+"}</span>}</div><label className={styles.logoChooser}><strong>Logo <span className={styles.muted}>(optional)</span></strong><span>PNG, JPEG or WebP, up to 10 MiB. You can change it later.</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={event=>chooseLogo(event.target.files?.[0]??null)}/>{logo && <span>{logo.name}</span>}</label></div>
         </>}
         {step===1 && <><div className={styles.stepIntro}><h2>Connect your apps</h2><p>Carbons will see these apps and choose whether to share access when they sign in.</p></div>
-          <label className={styles.field}>Interface type<select value={kind} onChange={event=>setKind(event.target.value as Kind)}><option value="unverified">Unverified</option>{me.data?.eligibility?.verified && <option value="verified">Verified</option>}{me.data?.eligibility?.trusted && <option value="trusted">Trusted</option>}</select><span>Most interfaces start unverified. You can request verification or trust after creation.</span></label>
-          <label className={styles.field}>App IDs<textarea rows={3} value={apps} onChange={event=>setApps(event.target.value)} placeholder="write, ring"/><span>Separate app IDs with commas or new lines. {kind==="trusted"?"A trusted interface can start without a list.":"Add at least one app; you can change the list later."}</span></label>
+          {(eligibility?.verified || eligibility?.trusted) && <label className={styles.field}>Interface type<select value={selectedKind} onChange={event=>setKind(event.target.value as Kind)}><option value="unverified">Unverified</option>{eligibility.verified && <option value="verified">Verified</option>}{eligibility.trusted && <option value="trusted">Trusted</option>}</select><span>Most interfaces start unverified. You can request verification or trust after creation.</span></label>}
+          <label className={styles.field}>App IDs<textarea rows={3} value={apps} onChange={event=>setApps(event.target.value)} placeholder="write, ring"/><span>Separate app IDs with commas or new lines. {selectedKind==="trusted"?"A trusted interface can start without a list.":"Add at least one app; you can change the list later."}</span></label>
           <p className={styles.helpLink}><Link href="/docs/interfaces">Learn about interface types and sign-in →</Link></p>
         </>}
         {step===2 && <><div className={styles.stepIntro}><h2>Review and create</h2><p>Your interface starts as a private draft. You can complete publishing and sign-in settings next.</p></div>
-          <dl className={styles.review}><div><dt>Name</dt><dd>{name}</dd></div><div><dt>Interface ID</dt><dd>{id}</dd></div><div><dt>Logo</dt><dd>{logo?.name??"Add later"}</dd></div><div><dt>Type</dt><dd>{kind}</dd></div><div><dt>Apps</dt><dd>{appList(apps).join(", ")||"No fixed app list"}</dd></div></dl>
+          <dl className={styles.review}><div><dt>Name</dt><dd>{name}</dd></div><div><dt>Interface ID</dt><dd>{id}</dd></div><div><dt>Logo</dt><dd>{logo?.name??"Add later"}</dd></div>{(eligibility?.verified || eligibility?.trusted) && <div><dt>Type</dt><dd>{selectedKind}</dd></div>}<div><dt>Apps</dt><dd>{appList(apps).join(", ")||"No fixed app list"}</dd></div></dl>
           <p className={styles.muted}>You’ll receive a secret once after creation. Keep it somewhere secure.</p>
         </>}
         <div className={styles.wizardActions}><Button type="button" variant="secondary" disabled={busy} onClick={()=>{setFailure(null);if(step>0)setStep(step-1);else reset();}}>{step===0?"Cancel":"Back"}</Button>{step<2?<Button key="continue" type="button" onClick={event=>{event.preventDefault();next();}}>Continue</Button>:<Button key="create" type="submit" loading={busy}>Create interface</Button>}</div>
