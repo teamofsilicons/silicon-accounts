@@ -1,7 +1,7 @@
 {
   "verified_on": "2026-11-04",
-  "status": "superseded_artifact_collision_redeployment_pending",
-  "correction": "The initial release hash matched its manifest, but a later live Interface route check showed that a shared Cargo output collision had packaged the wrong binary. The metadata and health checks below do not establish that the chooser fix was deployed. An isolated rebuild and runtime verification are required.",
+  "status": "superseded_artifact_collision",
+  "correction": "The initial release hash matched its manifest, but a later live Interface route check showed that a shared Cargo output collision had packaged the wrong binary. The metadata and health checks below do not establish that the chooser fix was deployed. A separately built artifact was functionally tested and deployed; see verification-linked-signin-corrected-2026-11-04.json.",
   "fix_revision": "c0e4b3db680c4e69c541a596b5f93a1259d50fa1",
   "fix_branch": "fix/linked-signin-chooser",
   "release_metadata_api_revision": "f31c815e1d097c1f8a968bd571ba1a000d89cfcf",

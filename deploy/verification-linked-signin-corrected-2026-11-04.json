@@ -1,0 +1,27 @@
+{
+  "verified_on": "2026-11-04",
+  "status": "verified",
+  "source_revision": "e31484ad2b79f0eabfa016c5ceea929bdd7c6cf1",
+  "source_branch": "release/interfaces-linked-20261104",
+  "release": "e31484ad2b79f0eabfa016c5ceea929bdd7c6cf1-api",
+  "fix_revision": "c0e4b3db680c4e69c541a596b5f93a1259d50fa1",
+  "api_sha256": "c6833280c6356d1166b72616bc78eb5692b569901e52ed3a00121ee11b6802cf",
+  "build_target_directory": "silicon-interfaces/.dev/accounts-target-isolated",
+  "install_command_id": "a2cbda3d-e7ba-4724-ad4a-8724ce2a0535",
+  "independent_postflight_command_id": "efcaba22-cfee-4f12-93a5-5471751e0588",
+  "artifact_runtime_evidence": "verification-linked-signin-artifact-2026-11-04.json",
+  "checks": {
+    "original_source_regression_tests_passed": 54,
+    "exact_linux_artifact_chooser_runtime_checks_passed": 7,
+    "install_completed_successfully": true,
+    "running_proc_exe_hash_matches_functionally_tested_artifact": true,
+    "current_release_symlink_matches": true,
+    "api_web_developer_and_backup_timer_active": true,
+    "public_https_readiness": {"status": 200, "database": "ok"},
+    "public_interface_bridge_route": {"status": 401, "code": "internal_token_required"},
+    "public_interface_sessions_route": {"status": 401, "code": "unauthenticated"},
+    "production_records_created": false,
+    "fixture_containers_and_network_removed": true
+  },
+  "coverage_limit": "The existing production Carbon has no linked work account, so a real production multi-account selection was not performed. The exact binary now running on production independently passed fresh email authentication, both direct choices and returning Personal/Work chooser tests against disposable local data. No production account or organization was created."
+}
