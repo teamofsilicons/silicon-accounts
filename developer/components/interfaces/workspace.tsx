@@ -22,7 +22,7 @@ const lines=(text:string)=>text.split("\n").map(x=>x.trim()).filter(Boolean);
 const list=(values:string[]|undefined)=>(values??[]).join("\n");
 function Failure({error}:{error:unknown}) {if (!error) return null;if(error instanceof Error && !(error instanceof ApiError))return <Alert tone="danger" title={error.message}/>;const err=ApiError.from(error);return <Alert tone="danger" title={err.message}>{err.hint}</Alert>;}
 
-export function InterfaceWorkspace({interfaceId}:{interfaceId:string}) {
+export function InterfaceWorkspace({interfaceId,cellsEnabled}:{interfaceId:string;cellsEnabled:boolean}) {
   const cache=useQueryClient();const router=useRouter();const prefix=`interfaces/${encodeURIComponent(interfaceId)}`;
   const detail=useQuery({queryKey:["interface",interfaceId],queryFn:()=>request<{interface:Interface}>(prefix)});
   const uploads=useQuery({queryKey:["interface",interfaceId,"uploads"],queryFn:()=>request<{uploads:Upload[]}>(`${prefix}/uploads`)});
@@ -112,7 +112,7 @@ export function InterfaceWorkspace({interfaceId}:{interfaceId:string}) {
       <div><strong>Additional links</strong>{(draft.links??[]).map((link,index)=><div key={index} className={styles.linkRow}><Input label={`Link ${index+1} label`} value={link.label} onChange={event=>patch({links:draft.links.map((value,i)=>i===index?{...value,label:event.target.value}:value)})}/><Input label="URL" type="url" value={link.url} onChange={event=>patch({links:draft.links.map((value,i)=>i===index?{...value,url:event.target.value}:value)})}/><Button type="button" variant="secondary" size="sm" onClick={()=>patch({links:draft.links.filter((_,i)=>i!==index)})}>Remove</Button></div>)}<Button type="button" variant="secondary" size="sm" onClick={()=>patch({links:[...(draft.links??[]),{label:"",url:""}]})}>Add link</Button></div>
       <Button disabled={!dirty} loading={busy} onClick={()=>void save()}>Save changes</Button>
     </Stack></fieldset></Surface></Section>
-    <div id="interface-cell"><InterfaceCellSection interfaceId={interfaceId} disabled={dirty||busy} publicClient={detail.data?.interface.signin_config?.public_client!==false}/></div>
+    <div id="interface-cell">{cellsEnabled?<InterfaceCellSection interfaceId={interfaceId} disabled={dirty||busy} publicClient={detail.data?.interface.signin_config?.public_client!==false}/>:<Section title="Sign in with a cell"><Surface><p>Cell sign-in for interfaces is temporarily unavailable. Use Silicon Accounts sign-in directly while this integration is unavailable.</p></Surface></Section>}</div>
     <Section id="interface-uploads" title="Uploads" description="Upload images for your listing and release files for supported platforms."><Surface><Stack>
       <label className={styles.field}>Upload type<select value={category} onChange={event=>{setCategory(event.target.value as "image"|"release");setUploadFile(null);}}><option value="image">Image · PNG, JPEG or WebP, up to 10 MiB</option><option value="release">Release file · up to 512 MiB</option></select></label>
       <label className={styles.field}>File<input type="file" accept={category==="image"?"image/png,image/jpeg,image/webp":undefined} onChange={event=>setUploadFile(event.target.files?.[0]??null)}/></label>

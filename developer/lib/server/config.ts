@@ -122,3 +122,10 @@ export function cellsApiUrl(): string {
 export function interfacesApiUrl(): string {
   return trimSlash(process.env.INTERFACES_API_URL || (isProduction() ? "https://api.interfaces.teamofsilicons.com" : "http://127.0.0.1:8670"));
 }
+
+/** Interface Cell broker release gate, read on every request. Production is
+ * disabled unless explicitly enabled; development defaults on. */
+export function interfaceCellsEnabled(): boolean {
+  const configured = process.env.DEVELOPER_INTERFACE_CELLS_ENABLED;
+  return configured === undefined ? !isProduction() : configured === "true";
+}

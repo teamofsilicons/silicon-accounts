@@ -95,6 +95,7 @@ Read at request time (`lib/server/config.ts`), never baked into the build:
 | Variable | Default | What |
 | --- | --- | --- |
 | `APPS_API_URL` | dev: `http://127.0.0.1:4310`; prod: `https://apps.teamofsilicons.com` | Silicon Apps upstream, server to server. It must trust the same Silicon Accounts as `ACCOUNTS_API_URL` (its `APPS_ACCOUNTS_URL` is that service's public URL), or it refuses this site's tokens and the pages say so. `scripts/dev.sh` sets it per stack (base + 6). |
+| `DEVELOPER_INTERFACE_CELLS_ENABLED` | dev: enabled; prod: disabled | Set exactly `true` to enable Interface Cell setup after the Cells upgrade is verified, or `false` to disable it. Other Cells features are unaffected. |
 | `INTERFACES_API_URL` | dev: `http://127.0.0.1:8670`; prod: `https://api.interfaces.teamofsilicons.com` | Silicon Interfaces upstream for authoring. The browser calls the same-origin `/api/interfaces/*` proxy and never receives the Accounts access token. |
 | `ACCOUNTS_API_URL` | `http://127.0.0.1:8589` | The Silicon Accounts API, server to server. |
 | `ACCOUNTS_PUBLIC_URL` | dev `http://localhost:8590`, prod `https://accounts.teamofsilicons.com` | The accounts site: hosted sign-in, the SDK. |

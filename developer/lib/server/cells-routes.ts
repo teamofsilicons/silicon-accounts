@@ -136,3 +136,8 @@ export function cellsFunctionInvocation(path: string, method: string): boolean {
 export function cellsBackupDownload(path:string,method:string):boolean {
   return ["GET","HEAD"].includes(method) && new RegExp(`^v1/cells/${CELL}/backups/${UUID}/download$`).test(path);
 }
+
+/** Only this new integration is phased; existing Cells and app routes remain available. */
+export function isInterfaceCellRoute(path: string): boolean {
+  return new RegExp(`^v1/interfaces/${INTERFACE}/cell$`).test(path);
+}
