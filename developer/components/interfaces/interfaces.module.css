@@ -3,6 +3,8 @@
 .title { font-size: 1.2rem; font-weight: 650; }
 .muted { color: var(--text-secondary, #666); font-size: .9rem; }
 .field { display: grid; gap: var(--space-2); font-weight: 600; }
+fieldset.field { min-width: 0; margin: 0; padding: 0; border: 0; }
+fieldset.field legend { padding: 0; }
 .field span { font-size: .875rem; font-weight: 400; color: var(--text-secondary, #666); }
 .field textarea, .field select, .field input[type="file"] { color: inherit; background: var(--surface, transparent); border: 1px solid var(--border, #aaa); padding: .7rem; font: inherit; width: 100%; }
 .field textarea { resize: vertical; font-weight: 400; }
@@ -71,3 +73,5 @@
 .settingsGroup details:not([open]) > :not(summary) { display: none; }
 .logoChooser label { display: grid; min-width: 0; gap: var(--space-2); }
 .logoChooser input[type="file"] { width: 100%; min-width: 0; }
+.saveBar { --sq-r: var(--radius-surface); --sq-fill: var(--surface); --sq-stroke: var(--border); position: sticky; z-index: 5; bottom: var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-top: var(--space-6); padding: var(--space-3) var(--space-4); border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-resting); }
+.tabPanel { gap: var(--space-8); }

@@ -55,8 +55,9 @@ test("creators with additional eligibility can choose an available type",async({
   await page.getByRole("button",{name:"Continue",exact:true}).click();
   const type=page.getByLabel("Interface type");
   await expect(type).toBeVisible();
-  await expect(type.locator("option")).toHaveText(["Unverified","Trusted"]);
-  await type.selectOption("trusted");
+  await type.click();
+  await expect(page.getByRole("option")).toHaveText(["Unverified","Trusted"]);
+  await page.getByRole("option",{name:"Trusted"}).click();
   await page.getByRole("button",{name:"Continue",exact:true}).click();
   await expect(page.getByRole("heading",{name:"Review and create"})).toBeVisible();
   await expect(page.locator("dt",{hasText:"Type"})).toBeVisible();
@@ -78,6 +79,7 @@ for(const scenario of [
   await page.getByRole("button",{name:"Create interface",exact:true}).first().click();
   await page.getByLabel("Name",{exact:true}).fill("Example Interface");
   await page.getByRole("button",{name:"Continue",exact:true}).click();
-  await expect(page.getByLabel("Interface type").locator("option")).toHaveText(scenario.options);
-  await expect(page.getByLabel("Interface type")).toHaveValue("unverified");
+  await expect(page.getByLabel("Interface type")).toContainText("Unverified");
+  await page.getByLabel("Interface type").click();
+  await expect(page.getByRole("option")).toHaveText(scenario.options);
 });
