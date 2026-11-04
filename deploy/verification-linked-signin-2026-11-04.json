@@ -1,8 +1,10 @@
 {
   "verified_on": "2026-11-04",
+  "status": "superseded_artifact_collision_redeployment_pending",
+  "correction": "The initial release hash matched its manifest, but a later live Interface route check showed that a shared Cargo output collision had packaged the wrong binary. The metadata and health checks below do not establish that the chooser fix was deployed. An isolated rebuild and runtime verification are required.",
   "fix_revision": "c0e4b3db680c4e69c541a596b5f93a1259d50fa1",
   "fix_branch": "fix/linked-signin-chooser",
-  "deployed_api_revision": "f31c815e1d097c1f8a968bd571ba1a000d89cfcf",
+  "release_metadata_api_revision": "f31c815e1d097c1f8a968bd571ba1a000d89cfcf",
   "deployed_branch": "release/interfaces-linked-20261104",
   "deployed_api_sha256": "9ba3798a81e26a2e257c6909144cd7bd8be5d48cb275775fe9b94af18236a238",
   "preserved_web_revision": "46d8b418a45a1bdfeac84e90854f6f827736cf1f",
@@ -17,7 +19,8 @@
   "checks": {
     "fix_and_integrated_source_pushed": true,
     "public_https_readiness_database_ok": true,
-    "current_release_matches_integrated_revision": true,
+    "current_release_metadata_matches_integrated_revision": true,
+    "running_binary_contains_intended_change": false,
     "api_web_developer_services_active": true,
     "live_single_identity_signin": true,
     "live_linked_accounts_page_read": true,
