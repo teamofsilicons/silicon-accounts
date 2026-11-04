@@ -80,6 +80,12 @@ prompt=none that can't sign in silently ─────────────�
   the chooser (it is always shown when the browser is signed in — flows never auto-continue);
   `none` completes silently or ends `failed` with `login_required` / `consent_required` /
   `interaction_required` and `redirect_to = redirect_uri?error=…&state=…`.
+- **Linked accounts**: a remembered Carbon session with multiple linked identities starts at
+  `select_account`, showing Personal and Work together. It does not require an initial
+  "Continue as" on the main account. Fresh email/provider authentication reaches the same
+  chooser; choosing an identity still checks the live session, link and organization policy.
+  A single identity keeps "Continue as". `prompt=login` and `remember_browser=false` still
+  require fresh authentication, and `prompt=none` never silently picks between linked accounts.
 - **Sign-up prefill**: display name (provider name → email local part → `Carbon 1234`), id
   (`repo::accounts::suggest_id` from the email local part then the name), timezone (IP header →
   browser `timezone` sent to `POST /v1/flows` → UTC), dob (exactly 18 years before the Carbon's own today, counted in the prefilled timezone: just after midnight in Kolkata it is still yesterday in UTC), photo (our default Carbon

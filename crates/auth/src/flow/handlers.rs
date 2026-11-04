@@ -774,7 +774,10 @@ pub async fn select_account(
 ) -> ApiResult<FlowResponse> {
     let mut tx = state.db.begin().await?;
     let mut flow = load_bound(&mut tx, &state, &headers, &HttpMethod::POST, &id, true).await?;
+    model::ensure_live(&flow)?;
     model::ensure_step(&flow, &[Step::SelectAccount], "select an account")?;
+    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    fa.ensure_active()?;
     let proved = flow
         .extras
         .authenticated_account_uuid
@@ -793,6 +796,9 @@ pub async fn select_account(
                 "Sign in again before selecting an account.",
             )
         })?;
+    if !current.is_active_carbon() {
+        return Err(browser::not_active(&current.account));
+    }
     if current.account.uuid != proved
         || !accounts_core::repo::organizations::linked(&mut tx, proved, &body.account_uuid).await?
     {
@@ -808,7 +814,6 @@ pub async fn select_account(
             "This account is no longer active.",
         ));
     }
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
     if let Err(e) =
         accounts_core::repo::organizations::check(&mut tx, &account.uuid, &fa.app.app_id).await
     {

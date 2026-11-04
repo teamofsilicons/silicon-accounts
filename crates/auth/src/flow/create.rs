@@ -438,8 +438,24 @@ pub async fn create_flow(
     if prompt.none {
         // Given the browser's account as it is: when it can't be used, the error says why.
         silent_sign_in(&mut tx, &state, &meta, &mut flow, &fa, current.as_ref()).await?;
-    } else if usable_browser.is_none()
-        && let Some(session) = signup::from_cookie(&mut tx, &state, &headers).await?
+    } else if let Some(browser) = usable_browser {
+        // The browser has already proved this identity. Offer all of its linked accounts
+        // immediately instead of making it continue as the personal/main account first.
+        // This only presents a choice: no account is signed into the app until selected.
+        let choices = accounts_core::repo::organizations::linked_accounts(
+            &mut tx,
+            &browser.account.uuid,
+            Some(&fa.app.app_id),
+        )
+        .await?;
+        if choices["accounts"].as_array().is_some_and(|a| a.len() > 1) {
+            flow.step = Step::SelectAccount;
+            flow.account_uuid = Some(browser.account.uuid.clone());
+            flow.extras.authenticated_account_uuid = Some(browser.account.uuid.clone());
+            flow.extras.browser_session_id = Some(browser.session_id);
+            flow.extras.auth_method = Some(accounts_core::repo::audit::method::SESSION.to_string());
+        }
+    } else if let Some(session) = signup::from_cookie(&mut tx, &state, &headers).await?
         && signup::may_resume(&session, &fa, &state.settings)
     {
         // A sign-up verified in this browser in the last 48 hours continues here.
