@@ -1,0 +1,28 @@
+{
+  "verified_on": "2026-11-04",
+  "fix_revision": "c0e4b3db680c4e69c541a596b5f93a1259d50fa1",
+  "fix_branch": "fix/linked-signin-chooser",
+  "deployed_api_revision": "f31c815e1d097c1f8a968bd571ba1a000d89cfcf",
+  "deployed_branch": "release/interfaces-linked-20261104",
+  "deployed_api_sha256": "9ba3798a81e26a2e257c6909144cd7bd8be5d48cb275775fe9b94af18236a238",
+  "preserved_web_revision": "46d8b418a45a1bdfeac84e90854f6f827736cf1f",
+  "host_verification_command_id": "bea0777e-96f7-4dd4-95e0-8f2239e9cb16",
+  "local_postgresql_tests": {
+    "linked_signin": 5,
+    "flow_details": 17,
+    "providers": 23,
+    "organizations": 9,
+    "all_passed": true
+  },
+  "checks": {
+    "fix_and_integrated_source_pushed": true,
+    "public_https_readiness_database_ok": true,
+    "current_release_matches_integrated_revision": true,
+    "api_web_developer_services_active": true,
+    "live_single_identity_signin": true,
+    "live_linked_accounts_page_read": true,
+    "live_multi_identity_selection": false,
+    "production_test_organization_created": false
+  },
+  "coverage_limit": "The existing Carbon browser identity has one Personal account and no linked Work accounts in production. Its new flow correctly retains Continue as. Direct Personal/Work choices, selection, fresh email authentication, policy changes, stale sessions, unlinking, expiry and disabled apps were verified against disposable local PostgreSQL databases. No production identity or link was created for verification."
+}
