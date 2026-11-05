@@ -44,6 +44,123 @@ fn request(body: Value, key: &str) -> Req {
 }
 
 #[tokio::test]
+async fn broker_sync_rejects_old_or_conflicting_cell_generation() {
+    let mut settings = Settings::for_tests();
+    settings.interfaces_internal_token = Some(SecretString::from(TOKEN));
+    let ctx = TestContext::with_settings(settings).await;
+    let actor = ctx.carbon().await;
+    let (app, _) = ctx.app_owned("interface-target", Some(&actor.uuid)).await;
+    let one = "https://one.cells.example/interface-auth/callback";
+    let two = "https://two.cells.example/interface-auth/callback";
+    let mut body = json!({"interface_id":"potato","actor_uuid":actor.uuid,"revision":1,"name":"Potato","logo_url":null,"kind":"unverified","app_ids":[app.app_id],"redirect_uris":[one,two],"allowed_origins":["https://app.example"],"cell_broker":{"cell_id":"one","callback_url":one,"generation":1},"branding":{},"app_descriptions":{},"active":true});
+    assert_eq!(
+        call(&ctx, request(body.clone(), "broker-one")).await.status,
+        200
+    );
+    body["revision"] = json!(2);
+    body["cell_broker"] = json!({"cell_id":"two","callback_url":two,"generation":2});
+    assert_eq!(
+        call(&ctx, request(body.clone(), "broker-two")).await.status,
+        200
+    );
+    body["revision"] = json!(3);
+    body["cell_broker"] = json!({"cell_id":"one","callback_url":one,"generation":1});
+    assert_eq!(
+        call(&ctx, request(body.clone(), "broker-stale"))
+            .await
+            .status,
+        409
+    );
+    body["cell_broker"] = json!({"cell_id":"one","callback_url":one,"generation":2});
+    assert_eq!(
+        call(&ctx, request(body.clone(), "broker-conflict"))
+            .await
+            .status,
+        409
+    );
+    body["cell_broker"] = Value::Null;
+    assert_eq!(
+        call(&ctx, request(body.clone(), "broker-clear"))
+            .await
+            .status,
+        409
+    );
+    sqlx::query("update apps set status='disabled' where app_id=$1")
+        .bind(body["app_ids"][0].as_str().unwrap())
+        .execute(&ctx.db.pool)
+        .await
+        .unwrap();
+    body["actor_uuid"] = json!("deleted-creator");
+    body["cell_broker_cleanup"] = json!(true);
+    body["cell_broker"] = json!({"cell_id":"two","callback_url":two,"generation":3,"active":false});
+    body["redirect_uris"] = json!([one]);
+    body["name"] = json!("unauthorized change");
+    assert_eq!(
+        call(&ctx, request(body.clone(), "cleanup-tampered"))
+            .await
+            .status,
+        403
+    );
+    body["name"] = json!("Potato");
+    let result = call(&ctx, request(body.clone(), "cleanup-exact")).await;
+    assert_eq!(result.status, 200, "{}", result.json);
+    assert_eq!(
+        call(&ctx, request(body.clone(), "cleanup-exact"))
+            .await
+            .json,
+        result.json
+    );
+    sqlx::query("update apps set status='active' where app_id=$1")
+        .bind(body["app_ids"][0].as_str().unwrap())
+        .execute(&ctx.db.pool)
+        .await
+        .unwrap();
+    body["actor_uuid"] = json!(actor.uuid);
+    body["cell_broker_cleanup"] = json!(false);
+    body["revision"] = json!(4);
+    body["cell_broker"] = json!({"cell_id":"one","callback_url":one,"generation":4,"active":true});
+    assert_eq!(
+        call(&ctx, request(body.clone(), "broker-reselect"))
+            .await
+            .status,
+        200
+    );
+    body["revision"] = json!(5);
+    body["cell_broker"] = json!({"cell_id":"two","callback_url":two,"generation":3,"active":false});
+    assert_eq!(call(&ctx, request(body, "old-tombstone")).await.status, 409);
+}
+
+#[tokio::test]
+async fn unlink_before_initial_link_installs_a_tombstone_against_delayed_link() {
+    let mut settings = Settings::for_tests();
+    settings.interfaces_internal_token = Some(SecretString::from(TOKEN));
+    let ctx = TestContext::with_settings(settings).await;
+    let actor = ctx.carbon().await;
+    let (app, _) = ctx.app_owned("interface-target", Some(&actor.uuid)).await;
+    let callback = "https://one.cells.example/interface-auth/callback";
+    let mut body = json!({"interface_id":"potato","actor_uuid":actor.uuid,"revision":1,"name":"Potato","logo_url":null,"kind":"unverified","app_ids":[app.app_id],"redirect_uris":[],"allowed_origins":[],"branding":{},"app_descriptions":{},"active":true});
+    assert_eq!(
+        call(&ctx, request(body.clone(), "initial")).await.status,
+        200
+    );
+    body["actor_uuid"] = json!("inactive-creator");
+    body["revision"] = json!(2);
+    body["cell_broker_cleanup"] = json!(true);
+    body["cell_broker"] =
+        json!({"cell_id":"one","callback_url":callback,"generation":2,"active":false});
+    assert_eq!(
+        call(&ctx, request(body.clone(), "cleanup")).await.status,
+        200
+    );
+    body["actor_uuid"] = json!(actor.uuid);
+    body["revision"] = json!(3);
+    body["cell_broker_cleanup"] = json!(false);
+    body["cell_broker"] =
+        json!({"cell_id":"one","callback_url":callback,"generation":1,"active":true});
+    assert_eq!(call(&ctx, request(body, "delayed-link")).await.status, 409);
+}
+
+#[tokio::test]
 async fn registry_bridge_enforces_tiers_revisions_and_atomic_secret_replay() {
     let mut settings = Settings::for_tests();
     settings.interfaces_internal_token = Some(SecretString::from(TOKEN));
