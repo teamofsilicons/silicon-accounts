@@ -29,6 +29,7 @@ export function InterfaceCellSection({interfaceId,disabled=false,publicClient=tr
   const failure=enable.error??connection.error??list.error;
   const options=[...(!cell?[{value:"new",label:"Create a cell for this interface"}]:[]),...(list.data?.cells??[]).filter(item=>item.status==="active").map(item=>({value:item.cell_id,label:`${item.name} · ${item.cell_id}`}))];
   return <Section title="Sign in with a cell" description="Use a cell to finish interface sign-in and connect your frontend to its backend."><Surface><Stack>
+    <p>First, save a frontend redirect URI and add its origin under Sign-in. Then create a cell or select one you co-author.</p>
     <Link href="/docs/interfaces#cell-sign-in">Read the Cell sign-in setup guide →</Link>
     {failure&&<Alert tone="danger" title={ApiError.from(failure).message}>{ApiError.from(failure).hint}</Alert>}
     {!publicClient&&<Alert tone="warning" title="Cell sign-in needs a public client">The Cell broker uses PKCE without an interface secret. Enable “Allow browser and native clients” and save if that fits your interface, or use your own confidential backend.</Alert>}
