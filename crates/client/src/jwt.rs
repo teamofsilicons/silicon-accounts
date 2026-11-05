@@ -111,7 +111,9 @@ impl VerifyOptions {
 }
 
 /// Verifies an access token with a JWKS (from [`crate::AccountsClient::jwks`]): EdDSA
-/// signature by a key in the set, `exp`/`nbf`, `aud` and (optionally) `iss`.
+/// signature by a key in the set, `exp`/`nbf`, `aud`, access-token claims,
+/// and (optionally) `iss`. Accounts ID tokens use the same signing key and
+/// audience, but do not have the access-token family and membership claims.
 ///
 /// This cannot see revocation (signed-out accounts, removed access); tokens live at most
 /// 30 minutes. Call `introspect` when you must know about revocation immediately.
@@ -175,7 +177,25 @@ pub fn verify_access_token(jwks: &Jwks, token: &str, options: &VerifyOptions) ->
     validation.set_required_spec_claims(&required);
 
     match decode::<Claims>(token, &key, &validation) {
-        Ok(data) => Ok(data.claims),
+        Ok(data) => {
+            let claims = data.claims;
+            // Accounts ID tokens are signed by the same key and can have the
+            // same issuer, subject, audience and expiry as an access token.
+            // All Accounts access-token issuance paths include these claims;
+            // do not accept a same-audience ID token as an API bearer token.
+            if claims.nbf.is_none()
+                || [
+                    claims.jti.as_deref(),
+                    claims.mid.as_deref(),
+                    claims.fid.as_deref(),
+                ]
+                .iter()
+                .any(|value| value.is_none_or(str::is_empty))
+            {
+                return Err(TokenError::Malformed("missing access-token claims".to_owned()).into());
+            }
+            Ok(claims)
+        }
         Err(e) => Err(match e.kind() {
             ErrorKind::InvalidSignature => TokenError::BadSignature,
             ErrorKind::ExpiredSignature => TokenError::Expired {

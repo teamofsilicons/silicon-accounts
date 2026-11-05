@@ -63,6 +63,7 @@ zeroize.workspace = true
 [dev-dependencies]
 # Integration tests in tests/ use the test-support module of this same crate.
 silicon-accounts-core = { path = ".", features = ["test-support"] }
+silicon-accounts-client.workspace = true
 tower.workspace = true
 
 [lints]

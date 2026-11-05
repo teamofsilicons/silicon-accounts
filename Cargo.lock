@@ -2971,6 +2971,7 @@ dependencies = [
  "serde_path_to_error",
  "serde_urlencoded",
  "sha2 0.10.9",
+ "silicon-accounts-client",
  "silicon-accounts-core",
  "sqlx",
  "subtle",
