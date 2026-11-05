@@ -43,6 +43,96 @@ fn request(body: Value, key: &str) -> Req {
         .json(body)
 }
 
+fn reconcile(body: Value, key: &str) -> Req {
+    Req::post("/v1/internal/interfaces/sync/reconcile")
+        .bearer(TOKEN)
+        .header("idempotency-key", key)
+        .json(body)
+}
+
+#[tokio::test]
+async fn uncertain_cell_link_is_committed_or_fenced_under_concurrency() {
+    let mut settings = Settings::for_tests();
+    settings.interfaces_internal_token = Some(SecretString::from(TOKEN));
+    let ctx = TestContext::with_settings(settings).await;
+    let actor = ctx.carbon().await;
+    let (app, _) = ctx.app_owned("interface-target", Some(&actor.uuid)).await;
+    let callback = "https://one.cells.example/interface-auth/callback";
+    let mut initial = json!({"interface_id":"potato","actor_uuid":actor.uuid,"revision":1,"name":"Potato","logo_url":null,"kind":"unverified","app_ids":[app.app_id],"redirect_uris":[],"allowed_origins":["https://app.example"],"branding":{},"app_descriptions":{},"active":true});
+    assert_eq!(
+        call(&ctx, request(initial.clone(), "initial")).await.status,
+        200
+    );
+    let mut link = initial.clone();
+    link["revision"] = json!(2);
+    link["redirect_uris"] = json!([callback]);
+    link["cell_broker"] =
+        json!({"cell_id":"one","callback_url":callback,"generation":1,"active":true});
+    let unauthorized = Req::post("/v1/internal/interfaces/sync/reconcile")
+        .bearer(APPS_TOKEN)
+        .header("idempotency-key", "cancel")
+        .json(link.clone());
+    assert_eq!(call(&ctx, unauthorized).await.status, 401);
+    let cancelled = call(&ctx, reconcile(link.clone(), "cancel")).await;
+    assert_eq!(cancelled.status, 200, "{}", cancelled.json);
+    assert_eq!(cancelled.json, json!({"status":"cancelled","revision":2}));
+    assert_eq!(
+        call(&ctx, reconcile(link.clone(), "cancel")).await.json,
+        cancelled.json
+    );
+    let delayed = call(&ctx, request(link.clone(), "cancel")).await;
+    assert_eq!(delayed.status, 409);
+    assert_eq!(delayed.error_code(), Some("interface_sync_cancelled"));
+    let mut different = link.clone();
+    different["name"] = json!("Different");
+    assert_eq!(
+        call(&ctx, reconcile(different.clone(), "cancel"))
+            .await
+            .status,
+        409
+    );
+    assert_eq!(call(&ctx, request(different, "cancel")).await.status, 409);
+    assert_eq!(
+        call(&ctx, request(link.clone(), "committed")).await.status,
+        200
+    );
+    assert_eq!(
+        call(&ctx, reconcile(link.clone(), "committed")).await.json,
+        json!({"status":"committed","revision":2})
+    );
+    link["name"] = json!("Different");
+    assert_eq!(call(&ctx, reconcile(link, "committed")).await.status, 409);
+
+    initial["interface_id"] = json!("racing");
+    assert_eq!(
+        call(&ctx, request(initial.clone(), "initial-race"))
+            .await
+            .status,
+        200
+    );
+    initial["revision"] = json!(2);
+    initial["redirect_uris"] = json!([callback]);
+    initial["cell_broker"] =
+        json!({"cell_id":"one","callback_url":callback,"generation":1,"active":true});
+    let (sync, recovery) = tokio::join!(
+        call(&ctx, request(initial.clone(), "race")),
+        call(&ctx, reconcile(initial, "race")),
+    );
+    assert_eq!(recovery.status, 200, "{}", recovery.json);
+    match recovery.json["status"].as_str().unwrap() {
+        "committed" => assert_eq!(sync.status, 200, "{}", sync.json),
+        "cancelled" => {
+            assert_eq!(sync.status, 409);
+            assert_eq!(sync.error_code(), Some("interface_sync_cancelled"));
+        }
+        other => panic!("unexpected recovery status {other}"),
+    }
+    let (receipts, cancellations): (i64, i64) = sqlx::query_as("select (select count(*) from interface_sync_operations where interface_id='racing' and key='race'), (select count(*) from interface_sync_cancellations where interface_id='racing' and key='race')")
+        .fetch_one(&ctx.state.db).await.unwrap();
+    assert_eq!(receipts + cancellations, 1);
+    assert_eq!(receipts == 1, recovery.json["status"] == "committed");
+}
+
 #[tokio::test]
 async fn broker_sync_rejects_old_or_conflicting_cell_generation() {
     let mut settings = Settings::for_tests();

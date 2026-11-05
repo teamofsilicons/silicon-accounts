@@ -56,6 +56,10 @@ fn authorize_interface_service(state: &AppState, headers: &HeaderMap) -> ApiResu
 pub(crate) fn router() -> Router<AppState> {
     Router::new()
         .route("/v1/internal/interfaces/sync", post(sync))
+        .route(
+            "/v1/internal/interfaces/sync/reconcile",
+            post(reconcile_cell_link_sync),
+        )
         .route("/v1/internal/interfaces/sync/ack", post(ack_sync))
         .route(
             "/v1/internal/interfaces/eligibility/{uuid}",
@@ -359,6 +363,23 @@ async fn sync(
         .await?;
     let hash = idempotency::request_hash(&input);
     let scope = format!("interface-sync:{}", input.interface_id);
+    let cancelled: Option<Vec<u8>> = sqlx::query_scalar(
+        "select request_hash from interface_sync_cancellations where interface_id=$1 and key=$2",
+    )
+    .bind(&input.interface_id)
+    .bind(key.as_str())
+    .fetch_optional(&mut *tx)
+    .await?;
+    if let Some(previous) = cancelled {
+        return Err(ApiError::conflict(
+            if previous == hash {
+                "interface_sync_cancelled"
+            } else {
+                "idempotency_key_reused"
+            },
+            "This interface sync cannot be applied.",
+        ));
+    }
     let prior: Option<(Vec<u8>, Value)> = sqlx::query_as("select request_hash,sealed_response from interface_sync_operations where interface_id=$1 and key=$2")
         .bind(&input.interface_id).bind(key.as_str()).fetch_optional(&mut *tx).await?;
     if let Some((stored_hash, sealed)) = prior {
@@ -537,6 +558,94 @@ async fn sync(
     }).await?;
     tx.commit().await?;
     Ok(no_store(StatusCode::OK, body))
+}
+
+/// Fence a specific uncertain Cell-link sync before the registry recovers it.
+/// The same per-interface lock serializes this result with every normal sync.
+async fn reconcile_cell_link_sync(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    key: IdempotencyKey,
+    Json(input): Json<Sync>,
+) -> ApiResult<Response> {
+    authorize_interface_service(&state, &headers)?;
+    validate(&input)?;
+    if input.revision <= 1
+        || input.rotate_secret
+        || input.cell_broker_cleanup
+        || input
+            .cell_broker
+            .as_ref()
+            .is_none_or(|broker| !broker.active)
+    {
+        return Err(ApiError::forbidden(
+            "invalid_cell_link_reconciliation",
+            "Only an exact Cell-link sync may be reconciled.",
+        ));
+    }
+    let mut tx = state.db.begin().await?;
+    sqlx::query("select pg_advisory_xact_lock(hashtextextended($1,0))")
+        .bind(format!("interface-sync:{}", input.interface_id))
+        .execute(&mut *tx)
+        .await?;
+    let hash = idempotency::request_hash(&input);
+    let prior: Option<Vec<u8>> = sqlx::query_scalar(
+        "select request_hash from interface_sync_operations where interface_id=$1 and key=$2",
+    )
+    .bind(&input.interface_id)
+    .bind(key.as_str())
+    .fetch_optional(&mut *tx)
+    .await?;
+    let cancelled: Option<Vec<u8>> = sqlx::query_scalar(
+        "select request_hash from interface_sync_cancellations where interface_id=$1 and key=$2",
+    )
+    .bind(&input.interface_id)
+    .bind(key.as_str())
+    .fetch_optional(&mut *tx)
+    .await?;
+    if prior.is_some() && cancelled.is_some() {
+        return Err(ApiError::internal(
+            "Conflicting interface sync recovery state.",
+        ));
+    }
+    let status = if let Some(previous) = prior {
+        if previous != hash {
+            return Err(ApiError::conflict(
+                "idempotency_key_reused",
+                "The sync operation does not match.",
+            ));
+        }
+        "committed"
+    } else if let Some(previous) = cancelled {
+        if previous != hash {
+            return Err(ApiError::conflict(
+                "idempotency_key_reused",
+                "The sync cancellation does not match.",
+            ));
+        }
+        "cancelled"
+    } else {
+        let exists: bool = sqlx::query_scalar(
+            "select exists(select 1 from interface_auth_clients where interface_id=$1)",
+        )
+        .bind(&input.interface_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if !exists {
+            return Err(ApiError::not_found(
+                "interface_not_found",
+                "The interface was not found.",
+            ));
+        }
+        sqlx::query("insert into interface_sync_cancellations(interface_id,key,request_hash) values($1,$2,$3)")
+            .bind(&input.interface_id).bind(key.as_str()).bind(hash).execute(&mut *tx).await?;
+        "cancelled"
+    };
+    tx.commit().await?;
+    Ok(no_store(
+        StatusCode::OK,
+        json!({"status":status,"revision":input.revision}),
+    ))
 }
 
 #[derive(Deserialize)]

@@ -15,6 +15,15 @@ narrow path does not require the former creator or apps to remain active.
 Stale generations and silent deletion of a binding are rejected, including
 when unlink arrives before the original link.
 
+If an exact Cell-link sync has an uncertain outcome, the authenticated
+Interfaces service may reconcile that same operation key and request body.
+Accounts returns the proposed revision and either `committed`, when the exact
+sync receipt exists, or `cancelled`, after durably fencing that operation.
+Both paths share the ordinary sync advisory lock, so a delayed request cannot
+commit after cancellation. Cancellation rows are retained indefinitely; they
+must not be deleted while an old request can be replayed. Recovery trusts the
+Interfaces service credential and does not return the sealed sync receipt.
+
 Migration 0036 and synchronized Interfaces/Cells code must be installed and
 independently reviewed together before enabling the feature. Exact cross-service
 race/retry and recovery tests, secret provisioning, outage behavior and the
