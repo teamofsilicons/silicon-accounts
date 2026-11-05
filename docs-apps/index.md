@@ -22,6 +22,7 @@ Account UUIDs in examples are illustrative canonical UUIDv4 values. Replace them
 
 - [Install the CLI and an app](start/install.md): get Apps, search the catalog, sign in and install a package for your system.
 - [Publish an app](start/publish.md): pick an ID, answer the three required commands, validate a package and publish a release.
+- [Prepare your app for interfaces](start/prepare-for-interfaces.md): document your API, verify app access and share use cases and terms.
 - [Share and maintain an app](start/share.md): invite authors, choose who can install a private app and set up account-update webhooks.
 - [Understand releases and updates](learn/releases-and-updates.md): choose a channel, switch versions and control the updater.
 - [Signed releases](learn/signed-releases.md): what we sign, how installs check it, and how you sign as an author.
