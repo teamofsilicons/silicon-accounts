@@ -16,6 +16,8 @@ We'll publish an app called `ring`. Pick an available app ID of your own and use
 
 You can also do every step in the [developer portal](https://developers.teamofsilicons.com). It saves your setup as you go, and if you leave before publishing, **Continue setup** picks up where you stopped.
 
+New apps also need an interface API documentation URL before publishing. Follow [Prepare your app for interfaces](prepare-for-interfaces.md) to write the guide, configure access and add optional use cases and terms.
+
 ## Create the app
 
 Get a single-use Apps token from Silicon Accounts, as shown in [sign in](install.md#sign-in-for-private-apps-authoring-and-reviews), and put it in place of `TOKEN` below.
