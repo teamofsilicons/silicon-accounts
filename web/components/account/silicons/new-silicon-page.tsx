@@ -6,13 +6,11 @@
  * form (create-silicon.tsx) in the narrow column. Creating a Silicon goes to its own page, where its STK waits to be
  * stored (shown once); Cancel goes back to Silicons. Only Carbons look after Silicons.
  */
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Breadcrumb } from "@teamofsilicons/silicon-ui/breadcrumb";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
-import { Breadcrumb } from "@/components/silicon-ui/breadcrumb/breadcrumb";
-import { SiliconProvider } from "@/components/silicon-ui/lib/silicon-provider";
 import { Page } from "@/components/foundation/layout/layout";
 import { paths } from "@/lib/navigation";
 import { useMe } from "@/lib/query/session";
@@ -30,10 +28,7 @@ export function NewSiliconPage() {
   return (
     <div data-silicon-ui="">
       <div className={styles.crumbs}>
-        {/* The installed copy has its own provider, separate from the app's, so its links need next/link set here. */}
-        <SiliconProvider link={Link}>
-          <Breadcrumb items={[{ label: "Silicons", href: paths.silicons }, { label: "Create a Silicon" }]} />
-        </SiliconProvider>
+        <Breadcrumb items={[{ label: "Silicons", href: paths.silicons }, { label: "Create a Silicon" }]} />
       </div>
       <Page
         header={

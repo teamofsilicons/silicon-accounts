@@ -176,8 +176,7 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   components keep one line-height and fixed weights, so they can read as off scale: `redesign/prototype-differences.md`.
 - **Silicon UI as it ships** (`[data-silicon-ui]` in `styles/tokens.css`, 2026-11-06): inside this attribute the values the
   site overrides go back to Silicon UI's own (Hanken and Geist, size steps, tracking, greys, neutral accent), so its
-  components look as designed. On `/silicons/new` only, as a trial. That page also uses a Breadcrumb installed with
-  `shadcn add @silicon-ui/breadcrumb` (`components/silicon-ui/`), which lint rejects as a local copy: undecided.
+  components look as designed. On `/silicons/new` only, as a trial.
 - **Product shots** use the stageshow kit vendored at `components/foundation/stageshow/kit` (Benji Taylor, MIT; see its
   README): copied, not edited, and outside lint. Shots live with their page (the Silicons stories' in
   `components/account/silicons/stories/shots.tsx`) and are styled with the site's tokens.

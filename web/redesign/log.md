@@ -201,3 +201,6 @@ Every change, one line each, newest at the bottom. Format: `- YYYY-MM-DD <commit
 - 2026-11-06 wip silicons: /silicons/new form groups on quiet surfaces (Name and Id; More options)
 - 2026-11-06 wip silicons: /silicons/new form group surfaces reverted
 - 2026-11-06 wip silicons: /silicons/new header and form centred at 480; form text 16, helper text 14
+- 2026-11-06 fix: /silicons/new Breadcrumb back on the npm package; the shadcn copy removed; lint passes
+- 2026-11-07 wip silicons: wizard prototype on web/create-silicon-wizard: Stepper with Name and id, then More options; same fields and checks
+- 2026-11-07 wip silicons: wizard has three steps: Name and id, More options, STK

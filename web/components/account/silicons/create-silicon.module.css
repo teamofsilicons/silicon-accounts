@@ -1,13 +1,9 @@
-/* Create a Silicon (/silicons/new): one column of Silicon UI fields, one left edge, in two groups (who it is; More
-   options under a small heading), then the actions, the primary first. */
+/* Create a Silicon (/silicons/new): a wizard in one column: Silicon UI's Stepper, the current step's fields, then the
+   actions, the primary first. */
 /* Centred in the page, and Silicon UI's field type one step up: its fields read --text-sm for labels, values and buttons
    and --text-xs for helper text, so those become 16 and 14 here. */
 .form { --text-sm: 1rem; --text-xs: .875rem; display: grid; width: 100%; min-width: 0; max-width: 480px; gap: var(--space-block); margin-inline: auto; }
 .group { display: grid; min-width: 0; gap: var(--space-comfort); }
-/* The second group stands a page step (48 px) below the first, so the two read as two. */
-.group + .group { margin-top: var(--space-inset); }
-/* A heading stays closer to its first field than the fields are to each other. */
-.lead { display: grid; min-width: 0; gap: var(--space-group); }
-.groupTitle { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-xl); font-weight: 600; letter-spacing: -.02em; line-height: 1.5; }
+.group:focus { outline: none; }
 .suggestions { display: flex; flex-wrap: wrap; gap: var(--space-tight); margin-top: calc(var(--space-tight) * -1); }
 .footer { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); }
