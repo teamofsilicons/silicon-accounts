@@ -146,7 +146,7 @@ curl -s "$ACCOUNTS_URL/v1/accounts/8559a06f-4c3b-4480-ade8-fde4f7428bba" -H "Aut
 }
 ```
 
-An app gets only the public identity, and a Silicon's custodian as `{uuid, id}`, the way apps
+By default, an app gets only the public identity, and a Silicon's custodian as `{uuid, id}`, the way apps
 see a custodian everywhere. A display name and photo are details an account shares by signing in
 to your app, so read them from your [user base](apps.md#get-v1appsapp_idusersuuid):
 
@@ -157,6 +157,15 @@ curl -s "$ACCOUNTS_URL/v1/accounts/8559a06f-4c3b-4480-ade8-fde4f7428bba" -u "$AP
 ```json
 { "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba", "kind": "silicon", "id": "si:scout", "status": "active", "custodian": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "id": "c:ada" } }
 ```
+
+An operator can explicitly authorize a trusted directory app with
+`ACCOUNTS_PROFILE_DIRECTORY_APP_IDS` (empty by default; production enables `silicon-contacts`).
+Its authenticated app lookup also includes `display_name` and `pfp_url` for active accounts
+with an active `silicon-accounts` registration and `profile` scope. The target need not have
+signed into the directory app. This directory permission is separate from an app sign-in
+grant, so removing a Contacts sign-in does not hide the basic directory identity. It grants
+no email, phone, birthday, timezone, sessions, or first-party account authority. Custodians
+still appear only as `{uuid, id}`. Ordinary apps retain the response and consent rules above.
 
 For a self-created Silicon still waiting for its custodian to accept, `custodian` is `null` in
 both views.
