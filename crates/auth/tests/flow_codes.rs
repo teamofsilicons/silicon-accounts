@@ -473,7 +473,7 @@ async fn phone_codes_meet_the_apps_email_domains() {
     assert!(b.cookie("sa_session").is_none(), "nobody was signed in");
     let members = scalar_i64(
         &ctx,
-        "select count(*) from memberships where account_uuid = $1",
+        "select count(*) from memberships where account_uuid = $1 and app_id <> 'silicon-accounts'",
         &outsider.uuid,
     )
     .await;

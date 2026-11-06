@@ -59,7 +59,7 @@ prompt=none that can't sign in silently ─────────────�
   not granted yet, a required email/phone the account doesn't have (verified), an optional detail
   the app asks for now that the Carbon was never offered, or a `scope` detail not granted. Optional
   details left unticked before stay quiet. Nothing new: straight to complete. Never shown for the
-  first-party apps `silicon-accounts` and `developer` (no membership either).
+  first-party apps `silicon-accounts` and `developer` (Silicon Accounts registration is automatic; no consent-managed membership).
 - **The answer record**: finishing the pages writes `consent.granted` to the audit log (actor: the
   Carbon; `details.offered` = every detail the app offered them so far, `details.shared` = what they
   share now). The latest one since the app's access was last removed (`membership.access_removed`)
