@@ -1,0 +1,12 @@
+/* The type inspector's outline and readout: fixed to the viewport at the top layer, never in the pointer's way. They're
+   positioned from the script with transforms. */
+.outline, .card { position: fixed; z-index: var(--layer-tooltip); top: 0; left: 0; pointer-events: none; }
+.outline { outline: 1px solid var(--accent); outline-offset: 1px; }
+.card { display: grid; width: 232px; gap: var(--space-tight); padding: var(--space-related) var(--space-group); border-radius: var(--radius-control); background: var(--foreground); box-shadow: var(--shadow-floating); color: var(--background); font: var(--small); letter-spacing: var(--small-tracking); }
+.card[hidden], .outline[hidden] { display: none; }
+.role { margin: 0; font: var(--label); letter-spacing: var(--label-tracking); }
+.card[data-off] .role { color: var(--neutral-4); }
+.near { margin: 0; color: var(--neutral-5); font: var(--caption); letter-spacing: var(--caption-tracking); }
+.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-hair) var(--space-group); margin: 0; font: var(--caption); letter-spacing: var(--caption-tracking); }
+.facts dt { color: var(--neutral-6); font-weight: 400; }
+.facts dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }

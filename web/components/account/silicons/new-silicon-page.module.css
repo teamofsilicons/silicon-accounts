@@ -1,4 +1,9 @@
-/* /silicons/new: the create form in a white card like Home's tiles (faint edge, resting shadow, the container
-   squircle, 24px inside). */
+/* /silicons/new: the breadcrumbs in a lean row across the top of the content area, then the title and its line as Silicon
+   UI's own pages set them. The breadcrumb and fields keep Silicon UI's look: nothing here restyles them. */
+/* Pinned to the top of the scrolling panel (under the top bar on phones), on the panel's white so content passes behind. */
+.crumbs { position: sticky; z-index: var(--layer-sticky); top: var(--top-height, 0px); padding: var(--space-related) var(--space-inset); background: var(--surface); }
+/* The form's width, so the two share a right edge. The margins keep it 24 px under the breadcrumbs and 32 px above the form. */
+.header { display: grid; width: 100%; max-width: 480px; gap: var(--space-related); margin: calc(var(--space-related) * -1) auto var(--space-related); }
+.title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 600; letter-spacing: var(--tracking-display); line-height: var(--leading-display); }
+.description { margin: 0; color: var(--text-secondary); font-size: var(--text-base); line-height: 1.5; }
 .alertAction { display: block; margin-top: var(--space-group); }
-.card { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border-subtle); padding: var(--space-section); border: 1px solid var(--sq-stroke); background: var(--sq-fill); box-shadow: var(--shadow-resting); }

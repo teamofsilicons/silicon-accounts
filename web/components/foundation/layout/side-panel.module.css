@@ -15,8 +15,8 @@
 
 .head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-group); padding-bottom: var(--space-inset); border-bottom: 1px solid var(--border); }
 .headText { display: grid; min-width: 0; gap: var(--space-hair); }
-.title { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: var(--leading-snug); overflow-wrap: anywhere; }
-.description { margin: 0; color: var(--text-muted); font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.title { margin: 0; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); overflow-wrap: anywhere; }
+.description { margin: 0; color: var(--text-muted); font: var(--small); letter-spacing: var(--small-tracking); overflow-wrap: anywhere; }
 /* Only the body scrolls; overscroll stays in it so the page behind does not move. */
 .body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-top: var(--space-inset); padding-bottom: var(--space-section); }
 

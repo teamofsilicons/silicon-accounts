@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * Creating a Silicon you are custodian of (POST /v1/me/silicons): a display name, its si:id (checked as you type, and
- * suggested from the name until you edit it), its timezone (yours by default), an optional webhook, and an optional
- * STK of your own. It is the form of the /silicons/new page (new-silicon-page.tsx; Anil, 2026-11-01: a page, not a side
+ * Creating a Silicon you are custodian of (POST /v1/me/silicons), one column of plain Silicon UI fields in two groups
+ * (Anil, 2026-11-01): who it is, its name then its si:id (checked as you type, suggested from the name until you edit
+ * it; its status is the Input's own description or error); then More options, for what has a default or is optional:
+ * its timezone (yours), a webhook, an STK of your own; then Create Silicon and Cancel. It is the form of the /silicons/new page (new-silicon-page.tsx; Anil, 2026-11-01: a page, not a side
  * panel). The generated STK comes back exactly once; revealCreated keeps it for the new Silicon's page to show in a
  * reveal card, which holds the only copy (the mutation keeps none). A retry of the same request reuses its
  * Idempotency-Key, so a lost answer never creates the Silicon twice.
@@ -18,7 +19,7 @@ import { ApiError } from "@/lib/api/errors";
 import type { CarbonMe, SiliconCreated } from "@/lib/api/types";
 import { timezoneOptions } from "@/lib/timezones";
 import { describeError } from "../parts/common";
-import { IdField, useIdCheck } from "../parts/id-field";
+import { normalizeHandle, useIdCheck } from "../parts/id-field";
 import { useCreateSiliconOnce } from "../parts/queries";
 import { addReveal } from "../parts/reveals";
 import { normalizeStk, stkProblem, stkSecret } from "../parts/stk";
@@ -132,45 +133,64 @@ export function CreateSiliconForm({ me, onCreated, onCancel }: { me: CarbonMe; o
     }
   };
 
+  // The id's line: a failure or a broken rule as the field's error; otherwise where it stands, else where it came from.
+  const idError = failure?.message ?? errors.id ?? (check.status === "invalid" || check.status === "unavailable" || check.status === "error" ? check.message : null);
+  const idLine = check.status === "available" ? check.message : check.status === "checking" ? "Checking…" : "Suggested from the name. You can change it later.";
+  const suggestions = failure?.suggestions.length ? failure.suggestions : check.status === "unavailable" ? check.suggestions : [];
+
   return (
     <form className={styles.form} onSubmit={submit} noValidate>
-      <Input label="Display name" value={name} onChange={event => onName(event.target.value)} placeholder="Scout" maxLength={100} error={errors.display_name || undefined} autoComplete="off" />
-      <IdField
-        prefix="si:"
-        label="Id"
-        value={handle}
-        onValueChange={value => { setHandle(value); setHandleEdited(true); setFailure(null); }}
-        check={check}
-        error={failure?.message ?? errors.id ?? null}
-        suggestions={failure?.suggestions}
-        description="What Carbons, Silicons and apps type to find it. 3 to 30 of a to z, 0 to 9, - and _."
-      />
-      <div className={styles.field}>
-        <Combobox label="Timezone" options={options} value={timezone} onValueChange={setTimezone} description="Its local time. Yours to start with." />
-        {errors.timezone ? <p className={styles.error} role="alert">{errors.timezone}</p> : null}
-      </div>
-      <Input
-        label="Webhook URL (optional)"
-        type="url"
-        inputMode="url"
-        placeholder="https://scout.example/hooks/accounts"
-        value={webhook}
-        onChange={event => { setWebhook(event.target.value); setErrors(current => ({ ...current, webhook_url: "" })); }}
-        error={errors.webhook_url || undefined}
-        description="Where it hears about its own account (id changes, STK rotations, custodian changes). You get its signing secret once."
-        autoComplete="off"
-        spellCheck={false}
-      />
-      <div className={styles.stk}>
-        <Checkbox label="Choose its STK yourself" description="Otherwise one is generated (stk- and 12 hex digits) and shown to you once." checked={own} onCheckedChange={value => { setOwn(value === true); setErrors(current => ({ ...current, stk: "" })); }} />
-        {own ? (
-          <Input label="STK" className={styles.mono} value={stk} onChange={event => { setStk(event.target.value); setErrors(current => ({ ...current, stk: "" })); }} placeholder="stk-0123456789abcdef" autoComplete="off" spellCheck={false} error={errors.stk || undefined} description="stk- followed by 8 to 32 hex digits. Silicon Accounts keeps only its hash." />
+      <div className={styles.group}>
+        <Input label="Name" value={name} onChange={event => onName(event.target.value)} placeholder="Scout" maxLength={100} error={errors.display_name || undefined} autoComplete="off" />
+        <Input
+          label="Id"
+          value={`si:${handle}`}
+          onChange={event => { setHandle(normalizeHandle(event.target.value, "si:")); setHandleEdited(true); setFailure(null); }}
+          error={idError || undefined}
+          description={idError ? undefined : idLine}
+          autoComplete="off"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          maxLength={64}
+        />
+        {suggestions.length ? (
+          <div className={styles.suggestions}>
+            {suggestions.map(id => (
+              <Button key={id} type="button" variant="secondary" size="xs" onClick={() => { setHandle(normalizeHandle(id, "si:")); setHandleEdited(true); setFailure(null); }}>{id}</Button>
+            ))}
+          </div>
         ) : null}
       </div>
+
+      <section className={styles.group} aria-labelledby="create-more">
+        <div className={styles.lead}>
+          <h2 id="create-more" className={styles.groupTitle}>More options</h2>
+          <Combobox label="Timezone" options={options} value={timezone} onValueChange={setTimezone} description="Its local time. Yours to start with." />
+        </div>
+        {errors.timezone ? <Alert tone="danger" title={errors.timezone} /> : null}
+        <Input
+          label="Webhook URL (optional)"
+          type="url"
+          inputMode="url"
+          placeholder="https://scout.example/hooks/accounts"
+          value={webhook}
+          onChange={event => { setWebhook(event.target.value); setErrors(current => ({ ...current, webhook_url: "" })); }}
+          error={errors.webhook_url || undefined}
+          description="Where it hears about its own account. You get its signing secret once."
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <Checkbox label="Choose its STK yourself" description="Otherwise one is made for it and shown to you once." checked={own} onCheckedChange={value => { setOwn(value === true); setErrors(current => ({ ...current, stk: "" })); }} />
+        {own ? (
+          <Input label="STK" value={stk} onChange={event => { setStk(event.target.value); setErrors(current => ({ ...current, stk: "" })); }} placeholder="stk-0123456789abcdef" autoComplete="off" spellCheck={false} error={errors.stk || undefined} description="stk- followed by 8 to 32 hex digits. Silicon Accounts keeps only its hash." />
+        ) : null}
+      </section>
+
       {formError ? <Alert tone="danger" title="The Silicon was not created">{formError}</Alert> : null}
       <div className={styles.footer}>
-        <Button type="button" variant="ghost" disabled={create.isPending} onClick={onCancel}>Cancel</Button>
         <Button type="submit" loading={create.isPending}>Create Silicon</Button>
+        <Button type="button" variant="ghost" disabled={create.isPending} onClick={onCancel}>Cancel</Button>
       </div>
     </form>
   );

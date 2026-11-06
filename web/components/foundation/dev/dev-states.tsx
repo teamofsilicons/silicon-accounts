@@ -5,14 +5,17 @@
  * with a dot when any variable is set, opens a compact panel: each variable in lib/dev-states.ts (account, Silicon
  * requests, devices, Silicons, apps, network) as a small label over a one-row segmented control, presets that set a
  * whole scenario at once (Just joined), Reset in the header and "Show introduction again" at the foot. A change is kept
- * in this browser and the page reloads, so every block reads it fresh.
+ * in this browser and the page reloads, so every block reads it fresh. "Inspect type" (or ⌥I) turns on the type
+ * inspector (./type-inspector.tsx) and closes the panel, so the page is free to hover; it isn't kept across reloads.
  */
-import { useState, useSyncExternalStore } from "react";
-import { FlaskConical } from "lucide-react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { Crosshair, FlaskConical } from "lucide-react";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@teamofsilicons/silicon-ui/popover";
 import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
+import { Switch } from "@teamofsilicons/silicon-ui/switch";
 import { DEV_PRESETS, DEV_VARIABLES, devStatesInUse, readDevStates, writeDevStates, type DevStates } from "@/lib/dev-states";
+import { TypeInspector } from "./type-inspector";
 import styles from "./dev-states.module.css";
 
 const subscribeNothing = () => () => undefined;
@@ -22,6 +25,20 @@ const INTRO_KEY = "accounts.home.welcome-dismissed";
 export function DevStatesPanel() {
   const saved = useSyncExternalStore(subscribeNothing, () => JSON.stringify(readDevStates()), () => "{}");
   const [open, setOpen] = useState(false);
+  const [inspecting, setInspecting] = useState(false);
+  const stopInspecting = useCallback(() => setInspecting(false), []);
+
+  // ⌥I toggles the inspector from anywhere: an open dialog blocks the flask button, and dialogs have type to inspect too.
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (!event.altKey || event.code !== "KeyI") return;
+      event.preventDefault();
+      setOpen(false);
+      setInspecting(on => !on);
+    };
+    document.addEventListener("keydown", key, true);
+    return () => document.removeEventListener("keydown", key, true);
+  }, []);
   const states = JSON.parse(saved) as DevStates;
   const inUse = devStatesInUse(states);
 
@@ -46,15 +63,15 @@ export function DevStatesPanel() {
   };
 
   return (
-    <div className={styles.dock}>
+    <div className={styles.dock} data-type-inspect-exempt="">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button variant="soft" size="sm" className={styles.trigger} aria-label={inUse ? `Dev states, ${inUse} set` : "Dev states"}>
             <FlaskConical size={16} strokeWidth={1.75} aria-hidden="true" />
           </Button>
         </PopoverTrigger>
-        {inUse ? <span className={styles.dot} aria-hidden="true">{inUse}</span> : null}
-        <PopoverContent side="top" align="end" sideOffset={8} className={styles.panel}>
+        {inspecting ? <span className={styles.dot} aria-hidden="true"><Crosshair size={12} strokeWidth={2} /></span> : inUse ? <span className={styles.dot} aria-hidden="true">{inUse}</span> : null}
+        <PopoverContent side="top" align="end" sideOffset={8} className={styles.panel} data-type-inspect-exempt="">
           <div className={styles.head}>
             <p className={styles.title}>Dev states</p>
             {inUse ? <Button variant="ghost" size="xs" onClick={() => apply({})}>Reset</Button> : <span className={styles.hint}>All real</span>}
@@ -79,11 +96,22 @@ export function DevStatesPanel() {
               </div>
             ))}
           </div>
+          <div className={styles.inspect}>
+            <Switch
+              label="Inspect type (⌥I)"
+              checked={inspecting}
+              onCheckedChange={on => {
+                setInspecting(on);
+                if (on) setOpen(false);
+              }}
+            />
+          </div>
           <div className={styles.foot}>
             <Button variant="ghost" size="xs" onClick={showIntro}>Show introduction again</Button>
           </div>
         </PopoverContent>
       </Popover>
+      {inspecting ? <TypeInspector onExit={stopInspecting} /> : null}
     </div>
   );
 }

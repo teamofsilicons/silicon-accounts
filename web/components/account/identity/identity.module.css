@@ -3,7 +3,7 @@
    muted, a faint chevron, the row's hover fill). Sizes without a token use the nearest one (prototype-differences.md). */
 .box { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); min-width: 0; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
 .boxHead { padding: calc(var(--space-inset) + var(--space-hair)) var(--space-comfort) var(--space-group); }
-.boxTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; letter-spacing: -.01em; line-height: var(--leading-snug); }
+.boxTitle { margin: 0; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); }
 
 .row { display: flex; width: 100%; min-width: 0; min-height: 56px; align-items: center; gap: calc(var(--space-group) + var(--space-hair)); padding: var(--space-group) var(--space-comfort); border-top: 1px solid var(--border); color: var(--foreground); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
 .row:hover { background: var(--canvas); color: var(--foreground); }

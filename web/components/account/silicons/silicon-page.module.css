@@ -14,12 +14,12 @@
   background-origin: border-box; box-shadow: var(--shadow-raised); color: var(--neutral-0);
 }
 .heroSpark { position: absolute; z-index: -1; right: var(--space-block); bottom: var(--space-block); width: 72px; height: 72px; color: var(--neutral-0); opacity: .9; }
-.heroName { color: var(--neutral-0); font-size: var(--text-3xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-display); overflow-wrap: anywhere; }
-.heroId { color: color-mix(in oklab, var(--neutral-0) 78%, transparent); font-family: var(--font-mono); font-size: var(--text-sm); letter-spacing: 0; overflow-wrap: anywhere; }
+.heroName { color: var(--neutral-0); font: var(--h1); letter-spacing: var(--h1-tracking); overflow-wrap: anywhere; }
+.heroId { color: color-mix(in oklab, var(--neutral-0) 78%, transparent); font: var(--small); letter-spacing: var(--small-tracking); font-family: var(--font-mono); overflow-wrap: anywhere; }
 .heroFoot { display: grid; gap: var(--space-hair); margin-top: auto; padding-right: calc(var(--space-page) * 2); }
-.heroStatus { color: var(--neutral-0); font-size: var(--text-sm); font-weight: 600; }
-.heroFact { color: color-mix(in oklab, var(--neutral-0) 82%, transparent); font-size: var(--text-sm); font-weight: 500; }
+.heroStatus { color: var(--neutral-0); font: var(--label); letter-spacing: var(--label-tracking); }
+.heroFact { color: color-mix(in oklab, var(--neutral-0) 82%, transparent); font: var(--small); letter-spacing: var(--small-tracking); }
 
 .settings { margin-top: var(--space-section); }
 
-@media (max-width: 639px) { .hero { min-height: 168px; padding: var(--space-section); } .heroName { font-size: var(--text-2xl); } }
+@media (max-width: 639px) { .hero { min-height: 168px; padding: var(--space-section); } .heroName { font: var(--h2); letter-spacing: var(--h2-tracking); } }

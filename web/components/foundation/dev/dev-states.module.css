@@ -16,4 +16,6 @@
 .label { color: var(--text-muted); font-size: var(--text-xs); }
 .control { width: 100%; }
 
+.inspect { padding: var(--space-group); border-top: 1px solid var(--border-subtle); }
+
 .foot { display: flex; padding: var(--space-tight) var(--space-tight); border-top: 1px solid var(--border-subtle); }

@@ -55,8 +55,8 @@
    sits between the photo and the gap (doubled class: a tolerated reach into Avatar, redesign/prototype-differences.md). */
 .picture.picture { --avatar-radius: var(--radius-overlay); --avatar-corner-shape: squircle; border: 0; background: none; }
 /* The name in the site's sans, medium, at 36px. */
-.name { margin: 0; color: var(--foreground); font-size: var(--text-3xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-display); }
+.name { margin: 0; color: var(--foreground); font: var(--h1); letter-spacing: var(--h1-tracking); }
 /* The chips: Silicon UI's soft xs button (a small grey chip), in the mono face. Doubled class over Button's font. */
 .chip.chip { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0; }
 /* When the account was made: a quiet line under the chip. */
-.since { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+.since { margin: 0; color: var(--text-muted); font: var(--small); letter-spacing: var(--small-tracking); }

@@ -24,7 +24,8 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-size: var(--text-base);
+  font: var(--body);
+  letter-spacing: var(--body-tracking);
 }
 
 h1, h2, h3, h4, h5, h6, p, figure, blockquote, dl, dd { margin: 0; }
@@ -135,3 +136,6 @@ html[data-surface="embed"] body { min-height: 0; background: transparent; transi
   .skip-link { transition: none; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+
+/* The dev type inspector (components/foundation/dev/type-inspector.tsx) is on. */
+html[data-type-inspect] * { cursor: crosshair !important; }

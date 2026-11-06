@@ -58,7 +58,7 @@ marked "check" is a first guess, to be confirmed against Silicon UI's code befor
 | Silicon avatar | Gradient rounded square (30%) with a spark | SiliconMark on Home (parts/silicon-mark.tsx, colours in tokens); the Silicons page still shows photos | 2 | asking (photos or marks everywhere?) |
 | App mark | Dark rounded square with the app's icon | AppMark | 2 (check) | open |
 | Person avatar | Initials on a hue-tinted circle | A Carbon's pixel avatar (Anil's avatar customizer) or their photo | kept (Anil) | done |
-| Type scale | Page title 26 px, card title 16 px, body 14 px, detail 13 px | 2xl, base and sm tokens | 3 | open |
+| Type scale | Page title 26 px, card title 16 px, body 14 px, detail 13 px | Anil's eight-role scale (2026-11-06): h1 39, h3 20, body 16, small 14. Inside Silicon UI: controls and labels 14/1.4/500 (label says 1.2), typed text 400 (label says 500), hints 12/1.4/400 (caption says 500, .02em), component text 14 (body says 16) | 3 | open |
 | Field | 42 px, 10 px radius, accent focus ring | Silicon UI Input; focus without a ring (2026-10-17) | 3, 7 | open |
 | Dialog | 18 px radius, 480 px, 22/24 px padding | Silicon UI Dialog | 3 (check) | open |
 | Toast | Dark, 14 px radius | ToastStack | 3 (check) | open |
@@ -120,3 +120,4 @@ Silicon's activity, automation, cloud services, per-field sharing.
 | Silicons list | Page head, Waiting for you, two-column Silicon tiles (mark, name, status, last sign-in) | Three columns of cards in each Silicon's colour pair (name, si:id, key last changed, status); a New Silicon card; the first-Silicon banner when empty. No last sign-in (no API) | kept (Anil) |
 | A Silicon | Breadcrumb, header (mark, name, id, status), stats, tabs Activity / Access / Settings | Back link, a hero in its colours, then the settings on one page; no stats or Activity / Access tabs (no API: api-gaps.md 3–8) | open |
 | Silicons, first visit | An empty state ("No Silicons yet", one line, New Silicon) | Six stories (one idea each, segmented bars, auto-advance, tap or arrows, the last holds three ways to start: create here, Silicon Starter, let one ask you); the site's own component (Silicon UI has no stories); Silicon Starter is not in the prototype (Anil, 2026-11-01) | kept (Anil) |
+| Create a Silicon | A New Silicon dialog with Name alone (the Silicon's mark beside it, the id as a hint) | A page; Name, then the id field (the API needs one), then the API's timezone, webhook and own STK under More options; no mark beside the field (Silicon UI's Input has no slot for it or a prefix: requests/silicon-ui-input-prefix.md) | kept (Anil) |

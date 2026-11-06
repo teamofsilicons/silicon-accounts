@@ -169,6 +169,15 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
 - **Phone numbers** go through `components/foundation/phone-field` (`PhoneField`): Arc's picker formats the 49
   countries it lists, and every other number is typed with its country code and sent exactly as typed (the hosted
   pages and the account site's "Add a phone number" both use it; `guessCountry()` starts it in the visitor's country).
+- **Type scale** (`styles/tokens.css`, 2026-11-06): eight roles, each a `font` shorthand with its tracking beside it:
+  `font: var(--h1); letter-spacing: var(--h1-tracking);`. display 49, h1 39, h2 25, h3 20, body 16, small 14, caption 12,
+  label 14. A family set after `font:` (mono, the story serif) keeps the role's size and line. Silicon UI's `--text-lg` to
+  `--text-5xl` are moved onto the scale in the same file, so its components and older pages land on it too. Its
+  components keep one line-height and fixed weights, so they can read as off scale: `redesign/prototype-differences.md`.
+- **Silicon UI as it ships** (`[data-silicon-ui]` in `styles/tokens.css`, 2026-11-06): inside this attribute the values the
+  site overrides go back to Silicon UI's own (Hanken and Geist, size steps, tracking, greys, neutral accent), so its
+  components look as designed. On `/silicons/new` only, as a trial. That page also uses a Breadcrumb installed with
+  `shadcn add @silicon-ui/breadcrumb` (`components/silicon-ui/`), which lint rejects as a local copy: undecided.
 - **Product shots** use the stageshow kit vendored at `components/foundation/stageshow/kit` (Benji Taylor, MIT; see its
   README): copied, not edited, and outside lint. Shots live with their page (the Silicons stories' in
   `components/account/silicons/stories/shots.tsx`) and are styled with the site's tokens.
@@ -702,6 +711,11 @@ in `redesign/api-gaps.md`).
   `lib/api/http.ts` asks `devAnswer` for each GET when NODE_ENV is "development": it answers with made-up data, changes
   the API's answer, delays or fails it. Writes always go to the API. Kept in localStorage `accounts.dev.states`; a
   change reloads the page. To add a variable, add it to `DEV_VARIABLES` and answer it in `devAnswer`.
+- **Type inspector** (`components/foundation/dev/type-inspector.tsx`, 2026-11-06): in `next dev` only, "Inspect type" in
+  the dev states panel, or ⌥I from anywhere (the only way in while a dialog is open). The cursor becomes a crosshair and
+  hovering text shows its role, or "Off scale" with the nearest role and what differs, plus size, line, weight, tracking
+  and family. Clicks in the page do nothing while it's on; Esc turns it off. Roles are read from the tokens through
+  hidden probes. The family is the first name in the computed stack, because browsers don't say which face rendered.
 - **Home** (2026-10-31): `app/(app)/(shell)/(account)/page.tsx` in Page's narrow column: `home-identity.tsx` (picture in
   its ring, greeting, id chip, member since), `home-needs.tsx` (requests, handovers, an unused device),
   `home-cards.tsx` (the dismissible introduction, `accounts.home.welcome-dismissed`), `home-sections.tsx` (Your

@@ -8,21 +8,21 @@
 .tile { --sq-r: var(--radius-container); --sq-fill: var(--canvas); display: grid; padding: var(--space-inset); background: var(--sq-fill); }
 .head { display: flex; align-items: center; gap: var(--space-related); }
 /* Home's section headings (h2), one style everywhere: 22px medium, display tracking (Anil, 2026-10-31). */
-.title { margin: 0; color: var(--foreground); font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-display); }
+.title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
 
 /* The rows: one white list with hairlines between rows. */
 .rows { --sq-r: var(--radius-control); display: grid; margin: 0; padding: 0; overflow: hidden; background: var(--surface); box-shadow: var(--shadow-resting); list-style: none; }
 .row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-group); }
 .row + .row { border-top: 1px solid var(--border-subtle); }
 .text { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); }
-.rowTitle { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
-.rowDetail { overflow: hidden; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); text-overflow: ellipsis; white-space: nowrap; }
+.rowTitle { color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.rowDetail { overflow: hidden; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
 .actions { display: flex; flex: none; align-items: center; gap: var(--space-related); }
 
 /* Icon tiles: grey with the row's icon (a device, a request that did not load). */
 .icon { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); display: grid; width: 36px; height: 36px; flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
 
-.dialogText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.dialogText { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
 .dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); margin-top: var(--space-section); }
 .mono { font-family: var(--font-mono); letter-spacing: 0; }
 

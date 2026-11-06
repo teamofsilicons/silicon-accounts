@@ -263,6 +263,19 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   Briefcase (a Silicon never sees an app's sign-in page, so no "Continue as" screen); 5: Scout's request accepted, its
   mark turning active. Each plays once; its still is the payoff; beats run 5 to 7.5 s; the card is 480 px tall.
   (2026-11-01)
+- Form hierarchy (Anil, 2026-11-01, tried on Create a Silicon): one column of plain Silicon UI fields, one left
+  edge, in groups that read as groups: who it is (Name, then the id, its status in the Input's own description or
+  error), then More options under a small heading 48 px below (timezone, webhook, own STK), then the primary action
+  first and Cancel. No card, no mark beside a field, no Accordion (it is for supporting information, and its panel
+  padding breaks a form's right edge). The first try (a mark beside the name, an Accordion) was dropped. If it holds,
+  Security and Personal info follow. (2026-11-01)
+- Type scale (Anil, 2026-11-06, replacing the five roles of 2026-11-01): eight roles in styles/tokens.css: display
+  49/1.1/700/-.02em, h1 39/1.15/700/-.02em, h2 25/1.25/600/-.01em, h3 20/1.3/600, body 16/1.5/400, small 14/1.45/400,
+  caption 12/1.4/500/.02em, label 14/1.2/500. Each is a `font` shorthand plus a `-tracking` token. Silicon UI's steps
+  from --text-lg up are remapped onto the scale so its components follow without a patch. Display: Home's greeting,
+  story headlines. h1: page titles. h2: sections. h3: groups and card titles. Under 640 px display drops to h1.
+- Type inspector (Anil, 2026-11-06): a dev-only hover readout of a text's role and font, on from the dev states panel or
+  ⌥I. Clicks are swallowed while it's on, because the dev server points at the live API.
 
 ## Process
 - Keep priorities.md, decisions.md and log.md (this folder) updated with every task; shared-code changes also get a
@@ -270,3 +283,7 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
 - Follow web/AGENTS.md and Silicon UI's rules: missing component means stop and report; files you redesign leave
   eslint-suppressions.json and silicon-ui-baseline.json entirely. (2026-10-17)
 - Work on branch web/redesign, cut from web/silicon-ui-package (2 local commits not yet on origin). (2026-10-17)
+- Silicon UI as it ships (Anil, 2026-11-06): the components looked unlike Silicon UI because styles/tokens.css overrides
+  its fonts, sizes, tracking and colours. /silicons/new now restores them inside [data-silicon-ui] as a trial: a 480 px
+  centred column, sticky breadcrumbs, form text 16 and helper text 14. It doesn't use the eight-role scale. Rolling it out
+  means deleting the overrides from tokens.css, which replaces the scale and the blue accent across the site.

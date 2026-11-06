@@ -5,7 +5,7 @@ move done items to Done (with the commit), add what came up, keep Now to one ite
 Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.md). The product contract is
 `../../understanding/UNDERSTANDING.md` (never edited); the design brief is `../../Silicon Accounts Redesign Design Review.md`.
 
-Last updated: 2026-11-01
+Last updated: 2026-11-06
 
 ## Now
 1. **Silicons, layout B** (web/blank-canvas): list and /silicons/[uuid] built 2026-11-01; next, review them with Anil, then the request and offer pages.
@@ -38,12 +38,14 @@ Last updated: 2026-11-01
 - The developer portal (`../../developer`, ~24k lines on its own Arc UI copies): its own redesign, after this site.
 
 ## Waiting on Anil
+- The new type scale: judge it on the pages with the type inspector. h1 at 39 in the 720 px column, and the story headlines' serif at 700, need a look.
 - Home rebuilt to the prototype: review it, then the other pages follow. Open in prototype-differences.md: canvas and page panel, Silicon photos or marks, when a device counts as not used lately, search as a field or the palette, help and app switcher.
 - Landing, still open from the audit: sign-up as its own job; CLI fixes (`--self-create` default, one-line installer) are outside this site.
 - Design review open questions: Proofs folded fully or a
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+- 2026-11-06 Eight-role type scale and a dev type inspector (uncommitted)
 - 2026-11-01 Home round two: the introduction as one bordered banner ("One Account for Your Silicons & Apps", round soft dismiss), the ring's spin, breathing halo and click glow, Your apps as simple white cards with Phosphor watermarks, dark Open and new lines (this commit)
 - 2026-10-31 Home from a blank canvas: shell, greeting, Needs you, the introduction's cards, Your Silicons and Your apps, dev states panel (44e0dd0)
 - 2026-10-30 Needs you lab (/__needs); Home's Needs you as the picked checklist with requests above it (uncommitted)
