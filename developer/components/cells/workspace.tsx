@@ -40,6 +40,6 @@ export function CellWorkspace({cellId,tab}:{cellId:string;tab:string}){
   </Page>;
 }
 function Overview({cell}:{cell:Cell}){
-  return <Stack gap={8}><Section title="Connection"><Surface><Stack><CopyField label="Cell URL" value={cell.url}/><p className={styles.muted}>Use a publishable key and a signed-in account in your frontend. Keep secret keys and database credentials on your backend.</p><Link href={paths.cell(cell.cell_id,"settings")}>Manage keys and settings →</Link></Stack></Surface></Section>
+  return <Stack gap={8}><Section title="Connection"><Surface><Stack><CopyField label="Cell URL" value={cell.url}/>{cell.auth_url&&cell.auth_url!==cell.url&&<CopyField label="Authentication URL" value={cell.auth_url} description="Use this address for cookie-based sign-in; it stays the same when the Cell ID changes."/>}<p className={styles.muted}>Use a publishable key and a signed-in account in your frontend. Keep secret keys and database credentials on your backend.</p><Link href={paths.cell(cell.cell_id,"settings")}>Manage keys and settings →</Link></Stack></Surface></Section>
     <Section title="Cell"><DescriptionList><DescriptionItem label="ID">{cell.cell_id}</DescriptionItem><DescriptionItem label="Status">{cell.status}</DescriptionItem><DescriptionItem label="Created">{date(cell.created_at)}</DescriptionItem>{cell.deleted_at&&<DescriptionItem label="Deleted">{date(cell.deleted_at)}</DescriptionItem>}</DescriptionList></Section></Stack>;
 }

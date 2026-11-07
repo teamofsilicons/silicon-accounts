@@ -1,7 +1,7 @@
 /** The developer browser uses only its same-origin BFF, never Accounts tokens. */
 import { ApiError } from "@/lib/api/errors";
 export interface Cell {
-  uuid: string; cell_id: string; name: string; status: string; url: string;
+  uuid: string; cell_id: string; name: string; status: string; url: string; auth_url?: string;
   created_at: string; deleted_at: string | null;
   settings: {allowed_origins: string[]; redirect_urls: string[]};
 }

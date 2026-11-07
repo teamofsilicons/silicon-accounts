@@ -91,3 +91,15 @@ test("a denied Cell ID change keeps the current page and shows the error",async(
   await expect(page.getByRole("alert").filter({hasText:"Only the Cell admin can change its ID."})).toBeVisible();
   await expect(page).toHaveURL(/\/cells\/old\/settings$/);await expect(page.getByLabel("New Cell ID")).toBeEnabled();
 });
+
+test("a renamed Cell shows its stable cookie sign-in address when different",async({page})=>{
+  await mock(page,true);
+  await page.route("**/api/cells/**",route=>{const path=new URL(route.request().url()).pathname;
+    if(path==="/api/cells/cells/renamed")return route.fulfill({json:{cell:{...makeCell("renamed"),auth_url:"https://original.cells.teamofsilicons.com"}}});
+    if(path==="/api/cells/cells/unchanged")return route.fulfill({json:{cell:{...makeCell("unchanged"),auth_url:"https://unchanged.cells.teamofsilicons.com"}}});
+    return route.fulfill({json:{}});
+  });
+  await page.goto("/cells/renamed");await expect(page.getByText("Authentication URL",{exact:true})).toBeVisible();
+  await expect(page.getByText("Use this address for cookie-based sign-in; it stays the same when the Cell ID changes.")).toBeVisible();
+  await page.goto("/cells/unchanged");await expect(page.getByText("Authentication URL",{exact:true})).toHaveCount(0);
+});
