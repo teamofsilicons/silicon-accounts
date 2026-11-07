@@ -31,7 +31,7 @@ const routes: [string, RegExp][] = [
   ["GET HEAD POST", new RegExp(`^apps/${APP}/cell$`)],
   ["GET HEAD POST", new RegExp(`^interfaces/${INTERFACE}/cell$`)],
   ["GET HEAD DELETE", new RegExp(`^cells/${CELL}$`)],
-  ["POST", new RegExp(`^cells/${CELL}/(restore|sql|schema|import)$`)],
+  ["POST", new RegExp(`^cells/${CELL}/(restore|rename|sql|schema|import)$`)],
   ["PUT", new RegExp(`^cells/${CELL}/(admin|settings)$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/(users|apps|history|tables|secrets|notifications)$`)],
   ["GET HEAD POST", new RegExp(`^cells/${CELL}/ting-subscriptions$`)],

@@ -1,5 +1,6 @@
 "use client";
 import {useState} from "react";
+import {useRouter} from "next/navigation";
 import {Section,Surface,Stack,Cluster} from "@/components/foundation/layout/layout";
 import {Button} from "@/components/silicon-ui/button/button";
 import {Input} from "@/components/silicon-ui/input/input";
@@ -9,9 +10,11 @@ import {Dialog,DialogContent} from "@/components/silicon-ui/dialog/dialog";
 import {CopyField} from "@/components/developer/parts/copy-field";
 import {SecretReveal} from "@/components/developer/parts/secret-reveal";
 import type {Cell} from "@/lib/cells/api";
+import {paths} from "@/lib/navigation";
 import {useCellAction,useCellData,useCellsLeaveGuard,Failure,date} from "./shared";
 import {StorageLocations} from "./storage-locations";
 import {CellNotifications} from "./notifications";
+import {CellIdInput} from "./cell-id-input";
 import styles from "./cells.module.css";
 interface Author {account:{uuid:string;id:string;display_name:string};joined_at:string}
 interface Key {id:string;name:string;kind:string;prefix:string;publishable_key:string|null;revoked_at:string|null}
@@ -28,7 +31,11 @@ export function CellHistory({cellId}:{cellId:string}){
   return <Stack gap={8}><CellNotifications cellId={cellId}/><Section title="History" description="The latest 200 changes to this cell."><Stack><Failure error={query.error}/>{query.isPending?<p role="status">Loading history…</p>:query.data?.history.map(item=><Surface key={item.id}><details><summary>{item.action} · {date(item.occurred_at)}</summary><p className={styles.muted}>{item.actor_uuid?`Author: ${item.actor_uuid}`:"System"}</p><pre className={styles.pre}>{JSON.stringify(item.details,null,2)}</pre></details></Surface>)}</Stack></Section></Stack>;
 }
 export function CellSettings({cell}:{cell:Cell}){
-  return <Stack gap={8}>{cell.status==="active"&&<><OriginSettings key={JSON.stringify(cell.settings)} cell={cell}/><Keys cellId={cell.cell_id}/><Secrets cellId={cell.cell_id}/></>}{cell.status==="deleted"&&<StorageLocations cellId={cell.cell_id}/>}<Lifecycle cell={cell}/></Stack>;
+  return <Stack gap={8}>{cell.status==="active"&&<><CellIdSettings cell={cell}/><OriginSettings key={JSON.stringify(cell.settings)} cell={cell}/><Keys cellId={cell.cell_id}/><Secrets cellId={cell.cell_id}/></>}{cell.status==="deleted"&&<StorageLocations cellId={cell.cell_id}/>}<Lifecycle cell={cell}/></Stack>;
+}
+function CellIdSettings({cell}:{cell:Cell}){
+  const router=useRouter(),action=useCellAction(cell.cell_id),[id,setId]=useState("");
+  return <Section title="Cell ID" description="Only the Cell admin can change its ID."><form onSubmit={async event=>{event.preventDefault();const result=await action.run<{cell:Cell;changed:boolean}>("/rename","POST",{cell_id:id});if(result)router.replace(paths.cell(result.cell.cell_id,"settings"));}}><Stack><Failure error={action.error}/><p>Your Cell gets a new address. Existing Cell URLs remain usable, and registered sign-in callbacks keep their original address.</p><CellIdInput label="New Cell ID" value={id} onChange={setId} disabled={action.busy}/><p>New Cell URL: https://{id||"your-cell-id"}.cells.teamofsilicons.com</p><div><Button type="submit" disabled={!id||id===cell.cell_id} loading={action.busy}>Change Cell ID</Button></div></Stack></form></Section>;
 }
 function OriginSettings({cell}:{cell:Cell}){
   const action=useCellAction(cell.cell_id),[origins,setOrigins]=useState(cell.settings.allowed_origins.join("\n")),[redirects,setRedirects]=useState(cell.settings.redirect_urls.join("\n")),[saved,setSaved]=useState(false);
