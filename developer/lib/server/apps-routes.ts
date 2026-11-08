@@ -8,6 +8,7 @@ const routes: [string, RegExp][] = [
   ["GET HEAD", new RegExp(`^apps/availability/${APP}$`)],
   ["GET HEAD PATCH", new RegExp(`^apps/${APP}$`)],
   ["PUT", new RegExp(`^apps/${APP}/access$`)],
+  ["GET HEAD PUT", new RegExp(`^apps/${APP}/storage-schema$`)],
   ["GET HEAD", new RegExp(`^apps/${APP}/(packages|releases|authors|invites|history|readiness)$`)],
   ["POST", new RegExp(`^apps/${APP}/(media|releases|invites|publish|admin|authors/leave|secret/rotate|webhook/rotate)$`)],
   ["POST", new RegExp(`^apps/${APP}/packages/${RESOURCE}$`)],

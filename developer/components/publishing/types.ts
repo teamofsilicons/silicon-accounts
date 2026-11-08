@@ -31,6 +31,7 @@ export type InterfaceLicense =
   | {kind: "link"; url: string}
   | {kind: "file"; name: string; content: string};
 export type App = {
+  user_storage?: import("./storage-schema").StorageSchema | null;
   app_id: string;
   name: string;
   description: string;

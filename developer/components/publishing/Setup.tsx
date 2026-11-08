@@ -35,6 +35,7 @@ import {
 } from "./ui";
 import { Releases } from "./Management";
 import { InterfaceMetadata } from "./InterfaceMetadata";
+import { UserStorage } from "./UserStorage";
 type Props = { app: App; refresh: () => void };
 export function Setup({
   app,
@@ -43,7 +44,7 @@ export function Setup({
   go,
 }: Props & { step: number; go: (step: number) => Promise<void> }) {
   return step === 1 ? (
-    <Details app={app} refresh={refresh} />
+    <><Details app={app} refresh={refresh} /><UserStorage key={app.app_id} app={app} refresh={refresh}/></>
   ) : step === 2 ? (
     <Access app={app} refresh={refresh} />
   ) : step === 3 ? (
