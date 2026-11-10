@@ -321,7 +321,7 @@ async fn migration_transfers_only_pending_silicon_callbacks_and_preserves_apps()
         .execute(&mut *conn)
         .await
         .unwrap();
-    sqlx::raw_sql(include_str!("../../../migrations/0036_silicon_tings.sql"))
+    sqlx::raw_sql(include_str!("../../../migrations/0038_silicon_tings.sql"))
         .execute(&mut *conn)
         .await
         .unwrap();
