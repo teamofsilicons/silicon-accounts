@@ -122,5 +122,8 @@ on the deployed baseline `7f1aa7c`. Both sites passed builds, typecheck, lint an
 production routing; web and Developer unit suites passed 29 and 97 tests.
 Three browser checks covered publishing-only access, non-author denial and
 existing package upload confirmation, with desktop/mobile visual review.
-CLI 0.7.0 packages passed native verification on all nine targets in workflow run
-42823876740; the receipt records their publication state separately from deployment.
+CLI 0.7.0 is published on all nine targets as production release
+`70dd7da4-8ee6-46c3-8a8b-84357bc0de4e`. Packages passed native verification in
+workflow run 42823876740, Linux server validation, and uploader attestation for
+Windows/macOS. The receipt records package hashes and publication separately
+from service deployment.

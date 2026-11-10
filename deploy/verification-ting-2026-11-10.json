@@ -62,7 +62,89 @@
     "source_revision": "6b35b926bdee283a3e2dc7d48efe86a222a1b854",
     "workflow_run": 42823876740,
     "verified_targets": 9,
-    "published": false
+    "published": true,
+    "production_release_id": "70dd7da4-8ee6-46c3-8a8b-84357bc0de4e",
+    "production_published_at": "2026-11-10T14:13:55.209788493+00:00",
+    "development_release_id": "e05bf9e1-4832-4b3d-a63b-1d512a432568",
+    "packages": [
+      {
+        "target": "linux-aarch64",
+        "package_id": "55118f2e-7351-41cc-a486-98137c06b6ee",
+        "sha256": "4ae57d0123341752d87ea0d8701efd821daa6c568ed6e93c78f93e872873236a",
+        "checks_passed": true
+      },
+      {
+        "target": "linux-armv7hf",
+        "package_id": "c4681dcf-3155-49c3-a66f-26be0483cef6",
+        "sha256": "93eb7c04c121e7b6f17f26b561af0c0e51938be3185db83ead0468d7aefebab0",
+        "checks_passed": true
+      },
+      {
+        "target": "linux-i686",
+        "package_id": "e04a1f2c-70c6-4b0e-ac6c-8b78428ee120",
+        "sha256": "50e9665f57e2a35b183ccbf1cb49156435468b6da7aed96bd639bcde5e760ecd",
+        "checks_passed": true
+      },
+      {
+        "target": "linux-x86_64",
+        "package_id": "614a3b58-3a31-47c7-888c-0e4999cdd0b2",
+        "sha256": "0cdc412346ffa0fcea4b1fdadf098359ce80233d0eb3dd56634f49ed9181c90b",
+        "checks_passed": true
+      },
+      {
+        "target": "macos-aarch64",
+        "package_id": "83a8dccb-5133-4759-b817-ee93b553efa6",
+        "sha256": "17d420fa42fd80744cb11d565a4bb7f3089b63d742d5263cf4fb4b6331c45ab6",
+        "checks_passed": true
+      },
+      {
+        "target": "macos-x86_64",
+        "package_id": "5c0f319a-6ac6-41df-a3bc-c25811943b1a",
+        "sha256": "8446d66c6f79255627e52a8264cc0cbb751eaa5be0cf42e38b58624b5a5f64c1",
+        "checks_passed": true
+      },
+      {
+        "target": "windows-aarch64",
+        "package_id": "c4f72f3f-f7ce-422a-91ed-c0d1a77e6b26",
+        "sha256": "9af22c1afff2e5d4c72f755c45b1bc47cc40611104bcd7b8270cb478457f1c51",
+        "checks_passed": true
+      },
+      {
+        "target": "windows-i686",
+        "package_id": "85794a20-a5a6-476d-a7cb-8f35db5b1848",
+        "sha256": "efa1dcff6485ff42f014a6036babbec3d1d30c454cdf4534a70f346460c4e9dc",
+        "checks_passed": true
+      },
+      {
+        "target": "windows-x86_64",
+        "package_id": "99b575b4-9db5-4274-8a28-7cce78fc9b11",
+        "sha256": "c9c3d9686da8f48b3c3537c2910beea9eb3b09dcd5fab73cfe3ac291005bdf41",
+        "checks_passed": true
+      }
+    ],
+    "managed_install": {
+      "app_id": "silicon-accounts",
+      "author_key_id": null,
+      "channel": "production",
+      "command": "silicon-accounts",
+      "install_script": "none",
+      "installed_at": "2026-11-10T14:14:58.190256+00:00",
+      "package_id": "83a8dccb-5133-4759-b817-ee93b553efa6",
+      "release_id": "70dd7da4-8ee6-46c3-8a8b-84357bc0de4e",
+      "server": "https://apps.teamofsilicons.com",
+      "sha256": "17d420fa42fd80744cb11d565a4bb7f3089b63d742d5263cf4fb4b6331c45ab6",
+      "signature_key_id": "apps-2026-10",
+      "signed_by": null,
+      "target": "macos-aarch64",
+      "version": "0.7.0"
+    },
+    "managed_cli_live_enrollment_verified": true,
+    "public_catalog": {
+      "http": 200,
+      "version": "0.7.0",
+      "release_id": "70dd7da4-8ee6-46c3-8a8b-84357bc0de4e",
+      "package_count": 9
+    }
   },
   "developer_overlay": {
     "revision": "2a12ead2b61def4c0899576797a883d7f5151c11",
