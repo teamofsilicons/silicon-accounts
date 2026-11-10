@@ -38,7 +38,7 @@ async fn backfill_preserves_accounts_memberships_and_signin_history() {
             .unwrap();
 
     let report = accounts_core::db::migrate(&db.pool).await.unwrap();
-    assert_eq!(report.applied_now.len(), 1);
+    // Later additive migrations may also run; registration remains the first.
     assert_eq!(report.applied_now[0].version, 37);
     let after: serde_json::Value =
         sqlx::query_scalar("select jsonb_agg(to_jsonb(a) order by uuid) from accounts a")

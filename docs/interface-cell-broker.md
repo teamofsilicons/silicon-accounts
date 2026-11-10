@@ -1,3 +1,10 @@
+---
+title: Interface Cell broker candidate
+description: Pending cross-service requirements for authorizing an Interface through its selected Cell.
+kind: informative
+order: 95
+---
+
 # Interface Cell broker candidate
 
 This is an unshipped contract. The Interfaces service syncs a selected Cell
