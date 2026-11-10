@@ -2,7 +2,10 @@
 .group h2 { margin: 0; font: 600 13px var(--font-body); color: var(--text-muted); }
 .choice { background: var(--sq-fill); border: 1px solid var(--sq-stroke); --sq-r: 16px; --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; align-items: center; gap: 14px; padding: 16px; }
 .choice[data-blocked] { --sq-fill: var(--surface-subtle); }
-.icon { flex: none; color: var(--text-muted); }
+.avatar { align-self: flex-start; margin-top: 2px; }
+.organization { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.organizationLogo, .organization > svg { flex: 0 0 16px; }
+.organizationLogo { object-fit: contain; }
 .identity { display: grid; gap: 3px; flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
 .identity strong { font-size: 15px; }
 .identity span, .identity p { color: var(--text-muted); }
