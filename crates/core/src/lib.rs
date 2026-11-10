@@ -46,6 +46,7 @@ pub mod repo;
 pub mod silicon_keys;
 pub mod state;
 pub mod timefmt;
+pub mod ting;
 pub mod uuid_migration;
 pub mod views;
 

@@ -48,6 +48,16 @@ impl<'a> AccountSession<'a> {
         }
     }
 
+    /// Explicitly allow Silicon Accounts notifications through Ting for this Silicon.
+    pub async fn enable_ting_notifications(&self) -> Result<serde_json::Value> {
+        self.post(
+            &["v1", "me", "notifications", "ting"],
+            &serde_json::json!({}),
+            None,
+        )
+        .await
+    }
+
     /// The client this session uses.
     pub fn client(&self) -> &'a AccountsClient {
         self.client

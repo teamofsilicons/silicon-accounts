@@ -49,14 +49,6 @@ async fn a_custodian_uploads_its_silicons_photo() {
         .await;
     ctx.membership(&app.app_id, &silicon.uuid, &[Scope::Profile])
         .await;
-    let r = call(
-        &ctx,
-        Req::put(&format!("/v1/me/silicons/{}/webhook", silicon.uuid))
-            .bearer(&t)
-            .json(json!({"url": "http://127.0.0.1:8593/hooks/s"})),
-    )
-    .await;
-    assert_eq!(r.status, 200, "{}", r.json);
 
     let r = call(
         &ctx,

@@ -278,7 +278,7 @@ function Back({ me }: { me: Me }) {
         {silicon ? (
           <>
             <Row label="Custodian"><span className="mono">{silicon.org_custodian?.name ?? silicon.custodian?.id ?? "Waiting for a custodian to accept"}</span></Row>
-            <Row label="Webhook"><span className={styles.contactText}>{silicon.webhook_url ?? "Not set"}</span></Row>
+            <Row label="Notifications"><span className={styles.contactText}>Silicon Ting</span></Row>
             <Row label="STK rotated">{stkRotatedAt(silicon) ? formatDate(stkRotatedAt(silicon)) : "Never"}</Row>
           </>
         ) : null}

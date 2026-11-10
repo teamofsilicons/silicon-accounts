@@ -65,7 +65,7 @@ async fn an_overdue_request_is_expired_when_read() {
     let created = self_created(
         &ctx,
         saket.handle.as_deref().expect("id"),
-        json!({"webhook_url": "http://127.0.0.1:8593/hooks/overdue"}),
+        json!({"ting_session_id":"recv_11111111111111111111111111111111"}),
     )
     .await;
     let id = created["request"]["id"].as_str().expect("id");

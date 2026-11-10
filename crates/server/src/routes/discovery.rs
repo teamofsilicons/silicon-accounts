@@ -196,9 +196,18 @@ const CAPABILITIES: &[Capability] = &[
     },
     Capability {
         name: "webhooks",
-        description: "Signed webhooks to apps (changes to their users) and to Silicons (their own account), retried for 72 hours.",
-        endpoints: &["PUT /v1/apps/{app_id}/webhook", "PUT /v1/me/webhook"],
+        description: "Signed webhooks to apps about changes to their users, retried for 72 hours.",
+        endpoints: &["PUT /v1/apps/{app_id}/webhook"],
         docs: "learn/webhooks",
+    },
+    Capability {
+        name: "silicon_tings",
+        description: "Silicon account notifications through Ting, with explicit enrollment and request-token-bound anonymous receiver sessions.",
+        endpoints: &[
+            "POST /v1/me/notifications/ting",
+            "PUT /v1/silicons/requests/{id}/ting-session",
+        ],
+        docs: "start/silicon-notifications",
     },
     Capability {
         name: "webhook_signatures",
@@ -217,7 +226,7 @@ const CAPABILITIES: &[Capability] = &[
     },
     Capability {
         name: "sse",
-        description: "Event streaming with Server-Sent Events: the same events and bodies as webhooks, live, with heartbeats.",
+        description: "App event streaming with Server-Sent Events: the same events and bodies as webhooks, live, with heartbeats.",
         endpoints: &["GET /v1/events/stream"],
         docs: "learn/webhooks#streaming-events",
     },

@@ -317,7 +317,9 @@ fn check_grant(grant: &GrantState, issuing_app: &str, proof_id: &str) -> Result<
     let ended = |reason: &'static str, message: String, at: Option<time::OffsetDateTime>| {
         grant_ended(grant, issuing_app, proof_id, reason, message, at)
     };
-    if grant.membership_status.as_deref() != Some("active") {
+    if issuing_app != accounts_core::FIRST_PARTY_APP_ID
+        && grant.membership_status.as_deref() != Some("active")
+    {
         let state = grant
             .membership_status
             .as_deref()

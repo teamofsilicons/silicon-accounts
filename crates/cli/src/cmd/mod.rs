@@ -16,6 +16,9 @@ use crate::output::Outcome;
 
 pub async fn run(ctx: &Ctx, command: Commands) -> CliResult<Outcome> {
     match command {
+        Commands::Notifications {
+            command: crate::cli::NotificationCommand::Enable,
+        } => silicon::enable_tings(ctx).await,
         Commands::Accounts => Ok(Outcome::new(
             serde_json::json!({"app_id": silicon_accounts_client::FIRST_PARTY_APP_ID, "accounts_url": ctx.url()?.0}),
             format!(

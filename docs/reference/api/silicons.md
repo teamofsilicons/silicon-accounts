@@ -1,6 +1,6 @@
 ---
 title: Silicon and custodian endpoints
-description: Everything a Silicon and its custodian call, from creating the Silicon and signing in with an STK, a key or a trusted CI token to app tokens, identity tokens for clouds, webhooks, transfers and custodian requests.
+description: Everything a Silicon and its custodian call, from creating the Silicon and signing in with an STK, a key or a trusted CI token to app tokens, identity tokens for clouds, Ting notifications, transfers and custodian requests.
 kind: informative
 order: 64
 related:
@@ -117,12 +117,12 @@ You as a Silicon create your own account and name your custodian. Public. **Idem
 | `timezone` | no | IANA; defaults to the caller's network timezone, else `UTC` |
 | `pfp_url` | no | an https URL; default photo otherwise |
 | `stk` | no | a self-chosen STK; one is generated when absent |
-| `webhook_url` | no | where to tell the Silicon about its account ([webhooks](webhooks.md#silicon-events)) |
+| `ting_session_id` | no | live anonymous `recv_…` session for minimal request hints; see [Ting notifications](../../start/silicon-notifications.md) |
 
 ```sh
 curl -s -X POST "$ACCOUNTS_URL/v1/silicons" -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: self-create-herald-1' \
-  -d '{"id":"si:herald","display_name":"Herald","custodian":"c:ada","webhook_url":"https://herald.example/hooks"}'
+  -d '{"id":"si:herald","display_name":"Herald","custodian":"c:ada","ting_session_id":"recv_0123456789abcdef0123456789abcdef"}'
 ```
 
 **201**:
@@ -142,7 +142,7 @@ curl -s -X POST "$ACCOUNTS_URL/v1/silicons" -H 'Content-Type: application/json' 
     "updated_at": "2026-10-07T02:34:08.658Z",
     "version": 1,
     "custodian": null,
-    "webhook_url": "https://herald.example/hooks",
+    "webhook_url": null,
     "stk_rotated_at": "2026-10-07T02:34:08.658Z"
   },
   "stk": "stk-861670c73e74",
@@ -154,12 +154,12 @@ curl -s -X POST "$ACCOUNTS_URL/v1/silicons" -H 'Content-Type: application/json' 
     "expires_at": "2026-10-21T02:34:08.658Z"
   },
   "request_token": "sarq_sAxjNa9SIvyZfMkBYWvw25NvdivWXzI0qIpASTZpCqA",
-  "webhook_secret": "whsec_BqmI8GNA_IVKUQ_BvosOYPnFcNb-biuSDBCnqZP2Oyo"
+  "webhook_secret": null
 }
 ```
 
-Save `stk`, `request_token` and `webhook_secret` now: we show them only once. `stk` is null when
-you chose your own, and `webhook_secret` is null without a `webhook_url`.
+Save `stk` and `request_token` now: we show them only once. `stk` is null when
+you chose your own, and the legacy `webhook_secret` field is always null.
 
 The account is `pending_custodian` and can't sign in until your custodian accepts, which they
 have 14 days to do. Your custodian gets an email. If you named an email that has no account, the
@@ -188,8 +188,7 @@ c:id), 429 `rate_limited`.
 ### `GET /v1/silicons/requests/{id}`
 
 Your custodian's decision, while you wait. **request token**: `Authorization: Bearer sarq_…`.
-Poll it (start at 5 seconds and double up to 60; that is plenty), or set a webhook and wait for
-`silicon.custodian.accepted`.
+Poll it (start at 5 seconds and double up to 60; that is plenty), or attach an anonymous Ting session for a `silicon-accounts.custodianRequestChanged` hint, then fetch the decision here.
 
 ```json
 {
@@ -372,8 +371,7 @@ The rules, each refused with 422 `validation_failed` and the field in `details.f
 Other errors: 422 `issuer_unreachable` (its discovery document couldn't be read, names another
 issuer, or names a `jwks_uri` that isn't public https), 409 `federation_exists`
 (`details.federation_id`), 409 `too_many_federations` (20 live trusts), 403 `federated_session`
-(this session itself came from an outside token), 403 `account_not_active`. The Silicon's webhook
-and event stream get `silicon.federation.added`.
+(this session itself came from an outside token), 403 `account_not_active`. The Silicon receives through Ting `silicon.federation.added`.
 
 ### `GET /v1/silicons/{id}/federations`
 
@@ -386,7 +384,7 @@ and event stream get `silicon.federation.added`.
 `token_revoked`): the CI sign-ins, and the app sign-ins made from the short-lived tokens they
 minted, whose apps get `membership.signed_out` with reason `session_revoked` (a refresh then says
 `federation_removed`). Repeating it changes nothing. 404 `federation_not_found`. The Silicon's
-webhook and event stream get `silicon.federation.removed` with `ended_sessions` (both kinds
+Ting notification carries `silicon.federation.removed` with `ended_sessions` (both kinds
 counted). Ending a CI sign-in any other way (signing it out, or `DELETE /v1/me/sessions/{id}`) doesn't
 end the app sign-ins made from its short-lived tokens; they still end when the CI sign-in would
 have. App sign-ins made from such tokens before the 9 October 2026 API release aren't linked to
@@ -422,8 +420,7 @@ allows one.
 audience is printable ASCII without spaces, at most 400 characters, and looks like a host name,
 URL or URN: it holds `.`, `:` or `/`. That rule means an audience can never equal an app id, so an
 identity token can't pass for a sign-in token at one of our apps. Our own URL is refused for the
-same reason. At most 20. Errors: 422 `validation_failed` (`audiences[2]`). The Silicon's webhook
-and event stream get `silicon.identity_audiences.changed`.
+same reason. At most 20. Errors: 422 `validation_failed` (`audiences[2]`). The Silicon receives through Ting `silicon.identity_audiences.changed`.
 
 ### `POST /v1/me/identity-tokens`
 
@@ -504,216 +501,20 @@ custodian's [allow-list](#get-and-put-v1mesiliconsuuidallowed-apps) doesn't name
 }
 ```
 
-## The Silicon's own webhook
+## Ting notifications
 
-**account (Silicon).** Your own webhook tells you about your own account. It is separate from app
-webhooks but follows the same delivery rules ([webhooks](webhooks.md#silicon-events)): signed,
-retried for 72 hours, and listed and replayed like an app's. Your custodian has the same controls
-under [`/v1/me/silicons/{uuid}/webhook`](#get-v1mesiliconsuuidwebhookdeliveries).
+`POST /v1/me/notifications/ting` explicitly enables the Accounts subscription using the Silicon's
+first-party bearer sign-in. Returns `{enabled,channel,app_id,subscription_id,account_uuid}`. No caller-supplied
+recipient or app is accepted.
 
-### `PUT /v1/me/webhook`
+`POST /v1/silicons` accepts optional `ting_session_id`, an anonymous live `recv_…` receiver with
+`silicon-accounts` in its app allowlist. `PUT /v1/silicons/requests/{id}/ting-session` accepts
+`{"session_id":"recv_…"}` and requires the matching `sarq_` bearer token. Repeating the binding is idempotent;
+changing it cancels old pending session hints and sends a fresh minimal request-ID hint.
 
-`{"url": "https://scout.example/hooks"}` → **200** `{"webhook_url", "webhook_secret"}`. You get a
-new signing secret every time, shown once. The URL must be https and reach a public address (see
-[the SSRF guard](../../learn/security.md#webhooks-never-reach-private-networks)), or you get 422
-`validation_failed`.
-
-### `DELETE /v1/me/webhook`
-
-**204.** You stop getting events.
-
-### `POST /v1/me/webhook/test`
-
-Queues a `ping`. **202**:
-
-```json
-{
-  "event_id": "01a11436-f26d-712b-ab1c-1d4871081f95",
-  "delivery_id": "01a11436-f26d-712b-ab1c-1d49ea870a85",
-  "type": "ping",
-  "url": "https://scout.example/hooks",
-  "superseded_pings": 0
-}
-```
-
-Only the newest test ping is retried (`superseded_pings` counts the older ones it replaced). 10
-test pings per Silicon per hour. 409 `webhook_not_set` when you have no webhook.
-
-### `GET /v1/me/webhook/deliveries`
-
-Your webhook's deliveries, newest first: the same list and fields an app gets for its own
-([`GET /v1/apps/{app_id}/webhook/deliveries`](apps.md#get-v1appsapp_idwebhookdeliveries)). Query:
-`status` (`pending`, `delivered` or `failed`), `limit`, `cursor`
-([pagination](../api.md#pagination)).
-
-```sh
-curl -s "$ACCOUNTS_URL/v1/me/webhook/deliveries?status=failed&limit=20" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-```json
-{
-  "items": [
-    {
-      "id": "01a11744-eaec-703b-a4b8-0992f2b1d35b",
-      "event_id": "01a11744-eaec-703b-a4b8-099116cc3fdb",
-      "type": "ping",
-      "status": "failed",
-      "attempts": 2,
-      "last_status": 503,
-      "created_at": "2026-10-04T16:49:15.830Z",
-      "…": "the same fields as the next one"
-    },
-    {
-      "id": "01a11744-e17f-7540-ae01-473546d7b233",
-      "event_id": "01a11744-e17f-7540-ae01-47342cdeb80f",
-      "type": "silicon.updated",
-      "account_uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
-      "url": "https://scout.example/hooks",
-      "status": "failed",
-      "attempts": 2,
-      "last_status": 503,
-      "last_error": "HTTP 503 Service Unavailable: the endpoint must answer with a 2xx status within 10 seconds. Response body: { \"ok\": false, … }",
-      "next_attempt_at": null,
-      "last_attempt_at": "2026-10-07T16:49:14.588Z",
-      "delivered_at": null,
-      "created_at": "2026-10-04T16:49:13.821Z",
-      "manual_replays": 0
-    }
-  ],
-  "next_cursor": null
-}
-```
-
-That is a `silicon.updated` and a test `ping` that failed for good. (In the local run we moved
-their creation 72 hours back, so their second failed attempt was their last.) `attempts` counts
-the attempts since the delivery was created or last replayed, and `next_attempt_at` is set only
-while it is `pending`. A `status` other than those three is 400 `invalid_query`.
-
-### `GET /v1/me/webhook/deliveries/{delivery_id}`
-
-One delivery, with the list's fields and these differences:
-
-- `attempts` becomes the list of every attempt, before and after replays, each
-  `{attempted_at, status_code, error, duration_ms}`, and the count moves to `attempt_count`;
-- `payload` is added: the exact body that was signed;
-- `payload_redacted` is added, always `false` here: every event of your webhook is about you, so
-  nothing is withheld.
-
-The `silicon.updated` from above, after a replay:
-
-```json
-{
-  "id": "01a11744-e17f-7540-ae01-473546d7b233",
-  "event_id": "01a11744-e17f-7540-ae01-47342cdeb80f",
-  "type": "silicon.updated",
-  "status": "delivered",
-  "attempt_count": 1,
-  "attempts": [
-    { "attempted_at": "2026-10-07T16:49:13.573Z", "status_code": 503, "error": "HTTP 503 Service Unavailable: …", "duration_ms": 2 },
-    { "attempted_at": "2026-10-07T16:49:14.588Z", "status_code": 503, "error": "HTTP 503 Service Unavailable: …", "duration_ms": 2 },
-    { "attempted_at": "2026-10-07T16:49:17.586Z", "status_code": 200, "error": null, "duration_ms": 2 }
-  ],
-  "delivered_at": "2026-10-07T16:49:17.586Z",
-  "manual_replays": 1,
-  "payload": {
-    "app_id": null,
-    "data": { "changed": ["display_name"], "id": "si:scout", "silicon": { "…": "your Me at that moment" }, "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba" },
-    "event_id": "01a11744-e17f-7540-ae01-47342cdeb80f",
-    "occurred_at": "2026-10-07T16:49:12.575Z",
-    "silicon": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
-    "type": "silicon.updated"
-  },
-  "payload_redacted": false,
-  "…": "the list's other fields"
-}
-```
-
-404 `delivery_not_found` when the id isn't a delivery of your webhook:
-
-```json
-{
-  "error": {
-    "code": "delivery_not_found",
-    "message": "No webhook delivery 'b88d701b-3853-4a3c-96f5-223b63a7e8b4' exists for the Silicon si:scout.",
-    "hint": "List the Silicon's deliveries with GET /v1/me/webhook/deliveries to find delivery ids.",
-    "details": { "delivery_id": "b88d701b-3853-4a3c-96f5-223b63a7e8b4" }
-  }
-}
-```
-
-### `POST /v1/me/webhook/replay`
-
-Sends deliveries again. **Idempotent** (24 hours). The body is one of:
-
-- `{"delivery_ids": ["…"]}`: 1 to 100 deliveries, failed or delivered;
-- `{"status": "failed", "since": "2026-10-01T00:00:00Z"}`: up to 100 failed deliveries, oldest
-  first. `since` is optional and keeps only the deliveries created since then.
-
-Each one goes back to `pending` with the same `event_id` and payload. It goes to your **current**
-URL, signed with your **current** secret, with a fresh 72 hours of retries, and its
-`manual_replays` goes up by one.
-
-```sh
-curl -s -X POST "$ACCOUNTS_URL/v1/me/webhook/replay" -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
-  -d '{"status":"failed"}'
-```
-
-**200**:
-
-```json
-{
-  "replayed": ["01a11744-e17f-7540-ae01-473546d7b233"],
-  "skipped": [],
-  "remaining": 0,
-  "not_replayable": 1,
-  "url": "https://scout.example/hooks"
-}
-```
-
-In the local run, the `silicon.updated` arrived again 0.8 seconds later, with the same
-`event_id`.
-
-- `remaining` (by status): failed deliveries still waiting. Call again, with a new
-  `Idempotency-Key`, until it is 0.
-- `not_replayable`: failed test pings, which are never replayed (a replay would get around the
-  limit of 10 test pings an hour). Send a new one with `POST /v1/me/webhook/test`. Here it is the
-  failed `ping` from the list above.
-- `skipped` (by ids): each id that wasn't replayed, with a `reason` (`not_found`,
-  `already_pending` or `test_ping`) and a `message`:
-
-```json
-{
-  "replayed": [],
-  "skipped": [
-    { "delivery_id": "01a11744-eaec-703b-a4b8-0992f2b1d35b", "event_id": "01a11744-eaec-703b-a4b8-099116cc3fdb", "type": "ping", "reason": "test_ping", "message": "Test pings are not replayed (that would get around the limit of 10 test pings an hour); send a new one with POST /v1/me/webhook/test." },
-    { "delivery_id": "96690737-515c-48d3-b104-4b42d8a0a1cb", "reason": "not_found", "message": "No webhook delivery '96690737-515c-48d3-b104-4b42d8a0a1cb' exists for the Silicon si:scout." }
-  ],
-  "remaining": 0,
-  "not_replayable": 1,
-  "url": "https://scout.example/hooks"
-}
-```
-
-Errors: 409 `webhook_not_set` (there is no webhook to send them to, so set one, then replay), 422
-`validation_failed` (neither or both of `delivery_ids` and `status`, more than 100 ids, an id that
-isn't a delivery id, a `status` other than `failed`, `since` without `status` or not RFC 3339, an
-unknown field), 409 `idempotency_key_reused`.
-
-```json
-{
-  "error": {
-    "code": "webhook_not_set",
-    "message": "si:scout has no webhook, so there is nowhere to send replayed deliveries.",
-    "hint": "Set one first with PUT /v1/me/webhook {\"url\": \"https://…\"}, then replay: deliveries go to the current URL, signed with the current secret."
-  }
-}
-```
-
-A delivery that falls due while you have no webhook fails at once, and says so in `last_error`.
-Replay it once you set a URL again. Every replay goes in your history (`GET /v1/me/history`,
-`silicon.webhook.replayed`), and in your custodian's too when they did the replay.
+Own webhook endpoints (including custodian management and replay) now return
+`410 silicon_notifications_moved`; creation rejects `webhook_url`. Account/request-token event streams
+also return 410. App-authenticated streams are unchanged. See [notification delivery and session semantics](../../start/silicon-notifications.md).
 
 ## The custodian's side
 
@@ -730,8 +531,8 @@ The Silicons you are custodian of: `{"items": [Silicon view…], "next_cursor"}`
 
 Creates a Silicon with you as its custodian. It is active at once. **Idempotent** (10 minutes).
 The body has `id` and `display_name` (required), and `timezone`, `pfp_url`, `stk` and
-`webhook_url` (optional, as for self-creation). **201**
-`{"silicon": Silicon view, "stk": "stk-…" | null, "webhook_secret": "whsec_…" | null}`.
+(all optional except `id` and `display_name`). **201**
+`{"silicon": Silicon view, "stk": "stk-…" | null, "webhook_secret": null}`.
 
 ```json
 {
@@ -751,7 +552,7 @@ Errors: 422 `invalid_id`, 422 `validation_failed` (a bad `stk`, `timezone`, `web
 ### `PATCH /v1/me/silicons/{uuid}`
 
 `{"display_name"?, "timezone"?, "pfp_url"?}`, where `pfp_url: null` means the default photo.
-**200** Silicon view. The Silicon's webhook gets `silicon.updated`, and apps that see a changed
+**200** Silicon view. The Silicon receives through Ting `silicon.updated`, and apps that see a changed
 field get `account.updated`. A Silicon's `dob` can't change (422 `dob_immutable`). Its id changes
 through `/id`; sending a different `id` here is 422 `validation_failed`, naming that endpoint.
 
@@ -768,53 +569,10 @@ The Silicon's profile photo, uploaded by its custodian, with the same rules as
 [`POST /v1/me/photo`](accounts.md#post-v1mephoto). **Idempotent.** **201**
 `{"pfp_url", "photo", "silicon": Silicon view}`.
 
-### `PUT` / `DELETE /v1/me/silicons/{uuid}/webhook`
+### Retired Silicon webhook endpoints
 
-The Silicon's webhook, set by its custodian. `{"url"}` → **200**
-`{"webhook_url", "webhook_secret"}` (a new secret each time, shown once). DELETE → **204**.
-
-### `GET /v1/me/silicons/{uuid}/webhook/deliveries`
-
-The Silicon's webhook deliveries, for its custodian. The same query (`status`, `limit`,
-`cursor`), list and fields as [`GET /v1/me/webhook/deliveries`](#get-v1mewebhookdeliveries).
-
-```sh
-curl -s "$ACCOUNTS_URL/v1/me/silicons/si:scout/webhook/deliveries?status=failed" \
-  -H "Authorization: Bearer $CARBON_TOKEN"
-```
-
-### `GET /v1/me/silicons/{uuid}/webhook/deliveries/{delivery_id}`
-
-One delivery with its attempts and exact payload, as in
-[`GET /v1/me/webhook/deliveries/{delivery_id}`](#get-v1mewebhookdeliveriesdelivery_id).
-404 `delivery_not_found`.
-
-### `POST /v1/me/silicons/{uuid}/webhook/replay`
-
-Replays the Silicon's deliveries, with the same body, rules and answer as
-[`POST /v1/me/webhook/replay`](#post-v1mewebhookreplay). **Idempotent** (24 hours).
-
-```sh
-curl -s -X POST "$ACCOUNTS_URL/v1/me/silicons/8559a06f-4c3b-4480-ade8-fde4f7428bba/webhook/replay" \
-  -H "Authorization: Bearer $CARBON_TOKEN" -H 'Content-Type: application/json' \
-  -H "Idempotency-Key: $(uuidgen)" -d '{"status":"failed"}'
-```
-
-```json
-{
-  "replayed": ["01a11744-f53c-7178-a600-f37c5960484a"],
-  "skipped": [],
-  "remaining": 0,
-  "not_replayable": 1,
-  "url": "https://scout.example/hooks"
-}
-```
-
-The replay shows in both your history and the Silicon's ("By c:saket"). Errors are as for the
-Silicon's own replay, and here 409 `webhook_not_set` points at
-`PUT /v1/me/silicons/{uuid}/webhook`. After a transfer, the new custodian has the deliveries and
-the old one gets 404 `silicon_not_found`. A Silicon calling these routes gets 403 `carbon_only`,
-and a Carbon calling `/v1/me/webhook/…` gets 403 `silicon_only`.
+All `/v1/me/silicons/{uuid}/webhook` configuration, delivery and replay routes return
+`410 silicon_notifications_moved`. The Silicon enables Ting under its own identity.
 
 ### `POST /v1/me/silicons/{uuid}/stk`
 
@@ -836,7 +594,7 @@ Silicon is revoked (`revoked_sessions` counts them):
 - its tokens answer 401 `token_revoked` (`stk_rotated`);
 - apps get `membership.signed_out` with reason `stk_rotated`;
 - short-lived tokens issued before are refused;
-- the Silicon's webhook gets `silicon.stk_rotated`.
+- the Silicon receives through Ting `silicon.stk_rotated`.
 
 A chosen STK that isn't `stk-` plus 8 to 32 hex characters is 422 `validation_failed` (field
 `stk`).
@@ -918,7 +676,7 @@ Errors: 422 `validation_failed` (not an app id, Silicon Accounts' own apps, more
 Deletes the Silicon's account. Send `{"confirm": "si:scout"}` with its current id. **204.** The
 effects are the same as [deleting an account](accounts.md#delete-v1me): apps get
 `account.deleted`, the id is reserved for 10 days, and sign-ins and User verification proofs end.
-We keep the Silicon's webhook so the events already queued still arrive. Errors: 422
+Pending full account notifications are cancelled after deletion; a bound anonymous request session can receive only a minimal request hint. Errors: 422
 `confirmation_required` / `confirmation_mismatch`.
 
 ## Requests addressed to you

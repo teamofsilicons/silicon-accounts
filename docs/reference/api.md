@@ -298,7 +298,6 @@ Every endpoint that accepts a key, and how long we keep its result:
 | `POST /v1/silicons` (self-create) | 10 min |
 | `POST /v1/me/silicons`, `POST /v1/me/silicons/{uuid}/stk` | 10 min |
 | `POST /v1/me/silicons/{uuid}/photo` | 24 h |
-| `POST /v1/me/webhook/replay`, `POST /v1/me/silicons/{uuid}/webhook/replay` | 24 h |
 | `PATCH /v1/apps/{app_id}/signin-config`, `POST /v1/apps/{app_id}/imports` | 24 h |
 | `PUT /v1/apps/{app_id}/webhook`, `POST /v1/apps/{app_id}/webhook/rotate-secret`, `POST /v1/apps/{app_id}/webhook/generate-secret` | 10 min |
 | `POST /v1/apps/{app_id}/webhook/test`, `POST /v1/apps/{app_id}/webhook/replay` | 24 h |
@@ -447,12 +446,6 @@ Every endpoint, grouped like the pages that describe it. **Idem.** marks the one
 | `DELETE /v1/silicons/{id}/federations/{federation_id}` | account (the Silicon or its custodian) | | 204 |
 | `GET /v1/silicons/{id}/identity-audiences` | account (the Silicon or its custodian) | | 200 audiences |
 | `PUT /v1/silicons/{id}/identity-audiences` | account (custodian) | | 200 audiences |
-| `PUT /v1/me/webhook` | account (Silicon) | | 200 webhook + secret |
-| `DELETE /v1/me/webhook` | account (Silicon) | | 204 |
-| `POST /v1/me/webhook/test` | account (Silicon) | | 202 queued ping |
-| `GET /v1/me/webhook/deliveries` | account (Silicon) | | 200 list |
-| `GET /v1/me/webhook/deliveries/{delivery_id}` | account (Silicon) | | 200 delivery |
-| `POST /v1/me/webhook/replay` | account (Silicon) | yes | 200 result |
 | `GET /v1/me/silicons` | account (Carbon) | | 200 list |
 | `POST /v1/me/silicons` | account (Carbon) | yes | 201 Silicon + STK |
 | `GET /v1/me/silicons/{uuid}` | account (Carbon, custodian) | | 200 Silicon |
@@ -460,11 +453,6 @@ Every endpoint, grouped like the pages that describe it. **Idem.** marks the one
 | `DELETE /v1/me/silicons/{uuid}` | account (Carbon, custodian) | | 204 |
 | `POST /v1/me/silicons/{uuid}/id` | account (Carbon, custodian) | | 200 Silicon |
 | `POST /v1/me/silicons/{uuid}/photo` | account (Carbon, custodian) | yes | 201 photo |
-| `PUT /v1/me/silicons/{uuid}/webhook` | account (Carbon, custodian) | | 200 webhook + secret |
-| `DELETE /v1/me/silicons/{uuid}/webhook` | account (Carbon, custodian) | | 204 |
-| `GET /v1/me/silicons/{uuid}/webhook/deliveries` | account (Carbon, custodian) | | 200 list |
-| `GET /v1/me/silicons/{uuid}/webhook/deliveries/{delivery_id}` | account (Carbon, custodian) | | 200 delivery |
-| `POST /v1/me/silicons/{uuid}/webhook/replay` | account (Carbon, custodian) | yes | 200 result |
 | `POST /v1/me/silicons/{uuid}/stk` | account (Carbon, custodian) | yes | 200 new STK |
 | `POST /v1/me/silicons/{uuid}/transfer` | account (Carbon, custodian) | | 201 request |
 | `DELETE /v1/me/silicons/{uuid}/transfer` | account (Carbon, custodian) | | 204 |
@@ -534,7 +522,7 @@ event type. The endpoints that set a webhook and list or replay its deliveries a
 
 | Method and path | Auth | Idem. | Success |
 |---|---|---|---|
-| `GET /v1/events/stream` | app, account or request token | | 200 Server-Sent Events |
+| `GET /v1/events/stream` | app | | 200 Server-Sent Events; account/request callers use Ting (410) |
 
 ### Service · [service.md](api/service.md)
 
@@ -564,3 +552,12 @@ account site's HTML 404 page. On `accounts-api`'s own address, every unknown pat
 - [Security](../learn/security.md): cookies, the Origin check, token storage, the webhook SSRF guard.
 
 Work identities, account selection, linking and the constrained service bridge are documented in [Work accounts](api/work-accounts.md).
+
+### Silicon Ting notifications
+
+| Endpoint | Auth | Result |
+|---|---|---|
+| `POST /v1/me/notifications/ting` | Silicon bearer session | enroll in Accounts notifications |
+| `PUT /v1/silicons/requests/{id}/ting-session` | matching private request token | attach an anonymous Ting receiver |
+
+See [setup, sessions and reconnects](../start/silicon-notifications.md). Own-Silicon callback routes return `410 silicon_notifications_moved`.

@@ -115,7 +115,8 @@ logs, and `silicon-accounts report` and `POST /v1/reports` take it in the messag
 | `account_deleted` | 401 / 403 / 404 / 409 | the account was deleted: 401 for its own tokens, 403 at Silicon sign-in, 404 at lookups, 409 when it happened during the request |
 | `origin_not_allowed` | 403 | a cookie-authenticated POST/PUT/PATCH/DELETE came without the account site's `Origin`; use a Bearer token instead of the cookie |
 | `carbon_only` | 403 | a Silicon called an endpoint for Carbons (emails, phones, custodian side…) |
-| `silicon_only` | 403 | a Carbon called an endpoint for Silicons (`/v1/me/webhook…`: its own webhook, deliveries and replay) |
+| `silicon_only` / `silicon_required` | 403 | a Carbon called an endpoint for Silicons |
+| `silicon_notifications_moved` | 410 | own-Silicon callbacks and account/request event streams moved to Ting; see [setup](../start/silicon-notifications.md) |
 | `account_not_active` | 403 | the account isn't active (pending custodian, unfinished import) |
 | `app_credentials_required` | 401 | an app endpoint got no credentials |
 | `invalid_app_credentials` | 401 | unknown app_id, wrong secret, or malformed Basic header |

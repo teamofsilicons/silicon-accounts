@@ -156,6 +156,9 @@ pub async fn verify(
     let membership_id = account.membership_id(app_id);
     match membership.as_ref().map(|m| m.status) {
         Some(MembershipStatus::Active) => {}
+        // Accounts owns the sign-in itself and intentionally has no membership row.
+        // Audience, token family and active-account checks above still apply.
+        None if app_id == accounts_core::FIRST_PARTY_APP_ID => {}
         other => {
             let state = match other {
                 None => format!("there is no membership {membership_id}"),

@@ -62,15 +62,11 @@ pub fn chosen_stk(input: Option<&str>) -> Result<Option<String>, String> {
     }
 }
 
-/// A webhook URL (https in production; http and private hosts only when the service allows it).
-pub fn webhook_url(settings: &Settings, input: Option<&str>) -> Result<Option<String>, String> {
+/// Reject retired callback configuration with migration guidance.
+pub fn webhook_url(_settings: &Settings, input: Option<&str>) -> Result<Option<String>, String> {
     match input {
         None => Ok(None),
-        Some(s) if s.trim().is_empty() => Err(
-            "is empty; leave webhook_url out for no webhook, or pass an https URL like https://example.com/webhooks"
-                .into(),
-        ),
-        Some(s) => normalize::validate_webhook_url(settings, s).map(|u| Some(u.to_string())),
+        Some(_) => Err("Silicon account webhooks were replaced by Ting. Use notifications enable, or ting_session_id for a pending self-creation.".into()),
     }
 }
 

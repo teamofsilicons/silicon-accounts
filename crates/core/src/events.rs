@@ -12,8 +12,8 @@
 //! deliveries until the app is re-enabled (or the delivery window ends, after which they can be
 //! replayed), so the app never misses a change made while it was disabled.
 //!
-//! Silicon events are always recorded (the Silicon reads them on `GET /v1/events/stream`, its
-//! custodian too); they get a delivery when the Silicon has a webhook URL.
+//! Silicon events are recorded for audit and transactionally enqueued for Ting. They never
+//! create callback deliveries; authenticated Ting sessions own live delivery.
 //!
 //! Call these helpers inside the same transaction as the change so events exist exactly when the
 //! change commits. They return the deliveries they queued.
@@ -41,7 +41,7 @@ pub mod types {
     /// App-facing custodian change of a member Silicon.
     pub const SILICON_CUSTODIAN_CHANGED: &str = "silicon.custodian_changed";
     pub const PING: &str = "ping";
-    // Silicon webhooks
+    // Silicon account events (delivered through Ting)
     pub const SILICON_CREATED: &str = "silicon.created";
     pub const SILICON_CUSTODIAN_ACCEPTED: &str = "silicon.custodian.accepted";
     pub const SILICON_CUSTODIAN_DECLINED: &str = "silicon.custodian.declined";
@@ -49,7 +49,7 @@ pub mod types {
     pub const SILICON_UPDATED: &str = "silicon.updated";
     pub const SILICON_ID_CHANGED: &str = "silicon.id_changed";
     pub const SILICON_STK_ROTATED: &str = "silicon.stk_rotated";
-    /// Silicon-facing custodian change (to the Silicon's own webhook).
+    /// Silicon-facing custodian change (through Ting).
     pub const SILICON_OWN_CUSTODIAN_CHANGED: &str = "silicon.custodian.changed";
     /// A trust relationship for outside OIDC tokens was added to the Silicon.
     pub const SILICON_FEDERATION_ADDED: &str = "silicon.federation.added";
@@ -315,6 +315,10 @@ async fn record_event_with_id(
     .bind(to.cell_uuid)
     .execute(&mut *conn)
     .await?;
+    if to.target_kind == WebhookTargetKind::Silicon {
+        crate::ting::enqueue(conn, to.target_id, event_id, event_type, &payload).await?;
+        return Ok((event_id, None));
+    }
     let Some(url) = to.delivery_url else {
         return Ok((event_id, None));
     };
@@ -457,12 +461,6 @@ pub async fn emit_to_silicon(
     event_type: &str,
     data: Value,
 ) -> ApiResult<Option<EmittedEvent>> {
-    let url: Option<String> =
-        sqlx::query_scalar("select webhook_url from accounts where uuid = $1 and kind = 'silicon'")
-            .bind(silicon_uuid)
-            .fetch_optional(&mut *conn)
-            .await?
-            .flatten();
     record_event(
         conn,
         Destination {
@@ -470,7 +468,7 @@ pub async fn emit_to_silicon(
             target_id: silicon_uuid,
             subscription_id: None,
             cell_uuid: None,
-            delivery_url: url.as_deref(),
+            delivery_url: None,
         },
         Some(silicon_uuid),
         event_type,

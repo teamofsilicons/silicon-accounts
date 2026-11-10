@@ -885,14 +885,6 @@ async fn silicon_photos_and_their_history_through_the_whole_service() {
     assert_eq!(r.status, 200, "{}", r.json);
     let r = send(
         &ctx,
-        Req::put(&format!("/v1/me/silicons/{uuid}/webhook"))
-            .bearer(&token)
-            .json(json!({"url": "https://hooks.example.test/shot"})),
-    )
-    .await;
-    assert_eq!(r.status, 200, "{}", r.json);
-    let r = send(
-        &ctx,
         Req::get("/v1/me/history?kind=security").bearer(&token),
     )
     .await;
@@ -902,18 +894,12 @@ async fn silicon_photos_and_their_history_through_the_whole_service() {
     for expected in [
         format!("STK of {id} rotated"),
         format!("New profile photo for {id}"),
-        format!("Webhook of {id} set"),
     ] {
         assert!(
             titles.contains(&expected.as_str()),
             "{expected}: {titles:?}"
         );
     }
-    let webhook = items
-        .iter()
-        .find(|i| i["meta"]["action"] == "silicon.webhook.set")
-        .expect("webhook entry");
-    assert_eq!(webhook["detail"], "Events go to https://hooks.example.test");
     for item in &items {
         assert_eq!(item["meta"]["silicon"]["uuid"], uuid.as_str(), "{item}");
         assert_eq!(item["meta"]["silicon"]["id"], id.as_str());

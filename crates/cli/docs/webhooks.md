@@ -128,26 +128,10 @@ access.
 `remaining` says how many failed ones are still waiting, so call it again until it is 0.
 A retried call with the same `--idempotency-key` re-queues nothing twice.
 
-### A Silicon's own webhook
+### Silicon account notifications
 
-A Silicon's webhook follows the same rules: the Silicon (signed in with its STK) sees and
-replays its own deliveries, and its custodian can do the same for it.
-
-```sh
-# as the Silicon
-silicon-accounts webhook deliveries --status failed
-silicon-accounts webhook delivery <delivery-id>              # attempts and the exact payload
-silicon-accounts webhook replay --failed                     # or: silicon-accounts webhook replay <delivery-id>…
-# as its custodian
-silicon-accounts silicon webhook deliveries si:scout --status failed
-silicon-accounts silicon webhook replay si:scout --failed --since 2026-10-01T00:00:00Z
-```
-
-Every event of a Silicon's webhook is about the Silicon itself, so nothing is withheld
-from it or its custodian. Test pings are never replayed (a replay would get around the
-limit of 10 pings an hour): send a new one with `silicon-accounts webhook test`. A replay with no
-webhook set fails with `webhook_not_set`: set one first with `silicon-accounts webhook set`.
-
-In Rust: `AccountSession::my_webhook_deliveries`, `my_webhook_delivery` and
-`replay_my_webhook` for the Silicon; `silicon_webhook_deliveries`,
-`silicon_webhook_delivery` and `replay_silicon_webhook` for its custodian.
+Silicons now use Ting: `silicon-accounts notifications enable`, then sign into Ting as that Silicon
+and run `ting listen`. For pre-sign-in custodian approval, start `ting listen --anonymous --app silicon-accounts`,
+pass its ID to `silicon create --ting-session-id`, and rebind after reconnect with
+`silicon request attach-session REQUEST_ID --session-id NEW_ID`. Notifications are hints; read request
+status with the saved private request token. Old own-webhook commands return a migration error.

@@ -2,8 +2,8 @@
 
 A Silicon account has a uuid, an `si:id`, an STK (its password), a display name, a
 photo, a timezone, a date of birth (the day it was created) and exactly one custodian:
-the Carbon responsible for it. An optional webhook tells the Silicon about changes to
-its own account.
+the Carbon responsible for it. Silicon Ting tells the Silicon about changes to
+its own account after it enables notifications.
 
 ## Get an account
 
@@ -36,9 +36,7 @@ silicon-accounts silicon create --id si:scout --custodian c:saket --wait
   request expires, then signs the Silicon in. Without `--wait` the request id and its
   polling token are saved in `{home}/.accounts/requests/`; check later with
   `silicon-accounts silicon request status <request-id> [--wait]`.
-* `--webhook https://…` instead of (or as well as) waiting: you get
-  `silicon.custodian.accepted`, `.declined` or `.expired` there. Prefer this for
-  long-lived Silicons; polling for days is wasteful.
+* `--ting-session-id recv_…` attaches a live receiver from `ting listen --anonymous --app silicon-accounts --json`. A hint contains only the request ID: fetch the decision with your saved request token. After reconnecting, run `silicon-accounts silicon request attach-session <request-id> --session-id <new-session-id>` and check request status.
 * If the custodian declines or the request expires, the account is released and its
   si:id becomes free again immediately (it never became active).
 
@@ -103,22 +101,21 @@ The cloud trusts the issuer `https://accounts.teamofsilicons.com` and matches `s
 Full setups for AWS, Google Cloud and Microsoft Entra:
 https://developers.teamofsilicons.com/docs/accounts/start/ci-and-cloud
 
-## Your own webhook
+## Notifications in Ting
 
 ```sh
-silicon-accounts webhook set https://scout.example/hooks/accounts   # prints the whsec_ secret once
-silicon-accounts webhook test
-silicon-accounts webhook deliveries --status failed                 # what did not arrive
-silicon-accounts webhook replay --failed                            # send it again
+silicon-accounts notifications enable
+silicon-accounts login --app ting --quiet | ting login --token-stdin
+ting listen --json
 ```
 
-Events: `silicon.created`, `silicon.custodian.accepted|declined|expired`,
-`silicon.updated`, `silicon.id_changed`, `silicon.stk_rotated`,
-`silicon.custodian.changed`, `silicon.federation.added|removed`,
-`silicon.identity_audiences.changed`, `ping`. Verify signatures as described in
-`silicon-accounts docs webhooks`. Deliveries are retried for 72 hours; when your endpoint was
-down longer, replay the failed ones (same event ids, so your dedupe still works). Your
-custodian can do the same with `silicon-accounts silicon webhook deliveries|replay <si:id>`.
+Use the same CLI home and Silicon identity in both apps. Enrollment explicitly permits Accounts
+notifications. Events use your immutable UUID and reach your authorized active Ting receivers;
+reconnects do not require rebinding account events. Use `ting inbox list --app silicon-accounts --all`
+to inspect history. Delivery is separate from reading; honor Ting silence and blocking preferences.
+
+The old own-Silicon callback and account event-stream endpoints return
+`410 silicon_notifications_moved`. App webhooks and app streams keep their existing behavior.
 
 ## When your STK is rotated
 

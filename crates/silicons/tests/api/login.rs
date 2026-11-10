@@ -356,7 +356,7 @@ async fn a_rotation_kills_the_old_stk_at_once() {
     let old_session = first.json["access_token"].as_str().expect("jwt");
     let r = call(
         &ctx,
-        Req::put("/v1/me/webhook")
+        Req::post("/v1/me/notifications/ting")
             .bearer(old_session)
             .json(json!({"url": "http://127.0.0.1:8593/hooks/x"})),
     )

@@ -88,6 +88,7 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_REPORT_RECIPIENTS",
     "ACCOUNTS_SILICON_APPS_URL",
     "ACCOUNTS_TOKEN_PEPPER",
+    "ACCOUNTS_TING_URL",
     "ACCOUNTS_TRUST_FORWARDED_FOR",
     "ACCOUNTS_TWILIO_ACCOUNT_SID",
     "ACCOUNTS_TWILIO_API_URL",
@@ -297,6 +298,8 @@ pub struct Settings {
     pub trust_forwarded_for: bool,
     /// ACCOUNTS_SILICON_APPS_URL.
     pub silicon_apps_url: String,
+    /// Ting API origin for Silicon account delivery.
+    pub ting_url: String,
     /// ACCOUNTS_DOCS_URL: where the published docs live (`GET /v1/meta` `docs_url`).
     pub docs_url: String,
     /// ACCOUNTS_DEVELOPER_URL without a trailing slash: the developer platform
@@ -563,6 +566,7 @@ impl Settings {
             ],
             trust_forwarded_for: false,
             silicon_apps_url: "https://apps.teamofsilicons.com".into(),
+            ting_url: "https://backend.ting.teamofsilicons.com".into(),
             docs_url: DEFAULT_DOCS_URL.into(),
             developer_url: if prod {
                 DEFAULT_DEVELOPER_URL
@@ -899,6 +903,21 @@ impl Settings {
                     "ACCOUNTS_REPORT_RECIPIENTS",
                     format!("'{rcpt}' is not a valid email address"),
                 );
+            }
+        }
+        s.ting_url = r.http_url(
+            "ACCOUNTS_TING_URL",
+            "https://backend.ting.teamofsilicons.com",
+        );
+        if let Ok(url) = Url::parse(&s.ting_url) {
+            if !url.username().is_empty()
+                || url.password().is_some()
+                || url.query().is_some()
+                || url.fragment().is_some()
+                || url.path() != "/"
+                || (prod && url.scheme() != "https")
+            {
+                r.problem("ACCOUNTS_TING_URL", "must be an origin without credentials, path, query or fragment; production requires HTTPS");
             }
         }
         s.worker_enabled = r.bool("ACCOUNTS_WORKER_ENABLED", true);

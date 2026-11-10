@@ -298,148 +298,50 @@ async fn an_app_streams_its_subscription_and_resumes() {
 }
 
 #[tokio::test]
-async fn silicons_and_their_custodians_stream_silicon_events() {
+async fn accounts_and_pending_requests_use_ting_instead_of_accounts_streams() {
     let ctx = TestContext::new().await;
     let hub = StreamHub::with_timing(fast());
     let carbon = ctx.carbon().await;
-    let (silicon, _stk) = ctx.silicon(&carbon.uuid).await;
-    let silicon_token = token(&ctx, &silicon).await;
-    let carbon_token = token(&ctx, &carbon).await;
-
-    let mut own = open(
-        router(&ctx, &hub),
-        Req::get("/v1/events/stream").bearer(&silicon_token),
+    let (silicon, _) = ctx.silicon(&carbon.uuid).await;
+    let created = send(
+        &ctx,
+        Req::post("/v1/silicons").json(
+            json!({"id": "si:pending-ting","display_name":"Pending","custodian":carbon.handle}),
+        ),
     )
     .await;
-    assert_eq!(own.status, 200);
-    let mut custodian = open(
-        router(&ctx, &hub),
-        Req::get("/v1/events/stream?types=silicon.updated").bearer(&carbon_token),
-    )
-    .await;
-    assert_eq!(custodian.status, 200);
-    // The account site's session works too.
+    assert_eq!(created.status, 201, "{}", created.json);
     let cookie = ctx.browser_session(&carbon).await;
-    let mut by_cookie = open(
-        router(&ctx, &hub),
+    for request in [
+        Req::get("/v1/events/stream").bearer(&token(&ctx, &silicon).await),
+        Req::get("/v1/events/stream").bearer(&token(&ctx, &carbon).await),
+        Req::get("/v1/events/stream").bearer(created.json["request_token"].as_str().unwrap()),
         Req::get("/v1/events/stream").session(&ctx.state.settings, &cookie),
-    )
-    .await;
-    assert_eq!(by_cookie.status, 200);
-
-    // The custodian renames the Silicon, which has no webhook: the event is still recorded.
-    let r = send(
-        &ctx,
-        Req::patch(&format!("/v1/me/silicons/{}", silicon.uuid))
-            .bearer(&carbon_token)
-            .json(json!({"display_name": "Scout Live"})),
-    )
-    .await;
-    assert_eq!(r.status, 200, "{}", r.json);
-    for s in [&mut own, &mut custodian, &mut by_cookie] {
-        let ev = s.event().await;
-        assert_eq!(ev.event.as_deref(), Some("silicon.updated"));
-        let body = ev.json();
-        assert_eq!(body["silicon"], silicon.uuid.as_str());
-        assert_eq!(body["app_id"], Value::Null);
-        assert_eq!(body["data"]["changed"], json!(["display_name"]));
+    ] {
+        let r = open(router(&ctx, &hub), request).await;
+        assert_eq!(r.status, 410);
+        assert_eq!(
+            r.error().await["error"]["code"],
+            "silicon_notifications_moved"
+        );
     }
-    let deliveries: i64 =
-        sqlx::query_scalar("select count(*) from webhook_deliveries where target_id = $1")
-            .bind(&silicon.uuid)
-            .fetch_one(&ctx.state.db)
-            .await
-            .expect("count");
-    assert_eq!(deliveries, 0, "no webhook, no delivery");
-
-    // Rotating the STK ends the Silicon's sign-ins: its stream closes.
-    let r = send(
-        &ctx,
-        Req::post(&format!("/v1/me/silicons/{}/stk", silicon.uuid)).bearer(&carbon_token),
-    )
-    .await;
-    assert_eq!(r.status, 200, "{}", r.json);
-    let rotated = own.event().await;
-    assert_eq!(rotated.event.as_deref(), Some("silicon.stk_rotated"));
-    let closed = own.event().await;
-    assert_eq!(closed.event.as_deref(), Some("stream.closed"));
-    assert_eq!(closed.json()["reason"], "access_removed");
-
-    // Nobody without credentials, and an app's token is not an account's.
-    let s = open(router(&ctx, &hub), Req::get("/v1/events/stream")).await;
-    assert_eq!(s.status, 401);
-    assert_eq!(s.error().await["error"]["code"], "unauthenticated");
-}
-
-#[tokio::test]
-async fn a_waiting_silicon_streams_until_its_custodian_decides() {
-    let ctx = TestContext::new().await;
-    let hub = StreamHub::with_timing(fast());
-    let carbon = ctx.carbon().await;
-    let handle = carbon.handle.clone().expect("c:id");
-    let r = send(
-        &ctx,
-        Req::post("/v1/silicons").json(json!({
-            "id": format!("si:waiting-{}", accounts_core::test_support::rand_suffix()),
-            "display_name": "Waiting",
-            "custodian": handle,
-        })),
-    )
-    .await;
-    assert_eq!(r.status, 201, "{}", r.json);
-    let request_token = r.json["request_token"].as_str().expect("token").to_string();
-    let request_id = r.json["request"]["id"]
-        .as_str()
-        .expect("request id")
-        .to_string();
-
-    let mut s = open(
-        router(&ctx, &hub),
-        Req::get("/v1/events/stream").bearer(&request_token),
-    )
-    .await;
-    assert_eq!(s.status, 200);
-    let carbon_token = token(&ctx, &carbon).await;
-    let r = send(
-        &ctx,
-        Req::post(&format!("/v1/me/custodian-requests/{request_id}/accept")).bearer(&carbon_token),
-    )
-    .await;
-    assert_eq!(r.status, 204, "{}", r.json);
-    let accepted = s.event().await;
-    assert_eq!(
-        accepted.event.as_deref(),
-        Some("silicon.custodian.accepted")
-    );
-    assert_eq!(accepted.json()["data"]["request_id"], request_id.as_str());
-    let closed = s.event().await;
-    assert_eq!(closed.json()["reason"], "request_decided");
-
-    // Reconnecting after the decision closes at once; the decision can still be read again.
-    let mut again = open(
-        router(&ctx, &hub),
-        Req::get("/v1/events/stream")
-            .bearer(&request_token)
-            .header("last-event-id", accepted.id.as_deref().expect("id")),
-    )
-    .await;
-    assert_eq!(again.status, 200);
-    assert_eq!(again.event().await.json()["reason"], "request_decided");
-
-    let s = open(
-        router(&ctx, &hub),
-        Req::get("/v1/events/stream").bearer("sarq_not_a_real_token"),
-    )
-    .await;
-    assert_eq!(s.status, 401);
-    assert_eq!(s.error().await["error"]["code"], "invalid_request_token");
+    assert_eq!(hub.open_streams(), 0);
+    let unauth = open(router(&ctx, &hub), Req::get("/v1/events/stream")).await;
+    assert_eq!(unauth.status, 401);
 }
 
 #[tokio::test]
 async fn streams_are_limited_and_end_cleanly() {
     let ctx = TestContext::new().await;
-    let carbon = ctx.carbon().await;
-    let carbon_token = token(&ctx, &carbon).await;
+    let (app, secret) = ctx.app("limited").await;
+    let subscription = send(
+        &ctx,
+        Req::post(&format!("/v1/apps/{}/subscriptions", app.app_id))
+            .basic(&app.app_id, &secret)
+            .json(json!({"delivery":"stream","updates":["id_change"]})),
+    )
+    .await;
+    assert_eq!(subscription.status, 201, "{}", subscription.json);
 
     // Five per caller; the sixth is told when to come back.
     let hub = StreamHub::with_timing(fast());
@@ -447,7 +349,7 @@ async fn streams_are_limited_and_end_cleanly() {
     for _ in 0..5 {
         let s = open(
             router(&ctx, &hub),
-            Req::get("/v1/events/stream").bearer(&carbon_token),
+            Req::get("/v1/events/stream").basic(&app.app_id, &secret),
         )
         .await;
         assert_eq!(s.status, 200);
@@ -455,7 +357,7 @@ async fn streams_are_limited_and_end_cleanly() {
     }
     let s = open(
         router(&ctx, &hub),
-        Req::get("/v1/events/stream").bearer(&carbon_token),
+        Req::get("/v1/events/stream").basic(&app.app_id, &secret),
     )
     .await;
     assert_eq!(s.status, 429);
@@ -473,7 +375,7 @@ async fn streams_are_limited_and_end_cleanly() {
     }
     let s = open(
         router(&ctx, &hub),
-        Req::get("/v1/events/stream").bearer(&carbon_token),
+        Req::get("/v1/events/stream").basic(&app.app_id, &secret),
     )
     .await;
     assert_eq!(s.status, 503);
@@ -486,7 +388,7 @@ async fn streams_are_limited_and_end_cleanly() {
     });
     let mut s = open(
         router(&ctx, &short),
-        Req::get("/v1/events/stream").bearer(&carbon_token),
+        Req::get("/v1/events/stream").basic(&app.app_id, &secret),
     )
     .await;
     let mut heartbeats = 0;
@@ -501,40 +403,4 @@ async fn streams_are_limited_and_end_cleanly() {
     };
     assert!(heartbeats >= 1, "a quiet stream sends heartbeats");
     assert_eq!(closed.json()["reason"], "max_duration");
-
-    // A bearer stream ends when its token expires.
-    let expiring = StreamHub::with_timing(fast());
-    let mut conn = ctx.conn().await;
-    let short_token = {
-        let mut settings = (*ctx.state.settings).clone();
-        settings.access_token_ttl_seconds = 1;
-        let tokens = accounts_core::repo::tokens::issue_tokens(
-            &mut conn,
-            &ctx.state.keys,
-            &settings,
-            accounts_core::repo::tokens::IssueRequest {
-                account: &carbon,
-                app_id: accounts_core::FIRST_PARTY_APP_ID,
-                origin: accounts_core::models::TokenOrigin::CliCode,
-                scopes: &[accounts_core::models::Scope::Profile],
-                browser_session_id: None,
-                label: Some("short"),
-                ip: None,
-                user_agent: None,
-                nonce: None,
-                auth_time: None,
-            },
-        )
-        .await
-        .expect("tokens");
-        tokens.access_token
-    };
-    drop(conn);
-    let mut s = open(
-        router(&ctx, &expiring),
-        Req::get("/v1/events/stream").bearer(&short_token),
-    )
-    .await;
-    assert_eq!(s.status, 200);
-    assert_eq!(s.event().await.json()["reason"], "token_expired");
 }
