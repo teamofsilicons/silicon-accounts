@@ -36,6 +36,8 @@ test("Cells author paths cannot reach private grants, user sessions or another o
   const deleted="12345678-1234-1234-1234-123456789abc";
   assert.equal(cellsProxyRoute("cells/notes/notifications","GET"),"v1/cells/notes/notifications");
   assert.equal(cellsProxyRoute(`cells/notes/notifications/${deleted}/retry`,"POST"),`v1/cells/notes/notifications/${deleted}/retry`);
+  assert.equal(cellsProxyRoute("cells/notes/notifications/live","POST"),"v1/cells/notes/notifications/live");
+  for(const method of ["GET","HEAD","PUT","DELETE"])assert.equal(cellsProxyRoute("cells/notes/notifications/live",method),null);
   // A Developer token is not Cells consent; the browser must not proxy proof enrollment.
   assert.equal(cellsProxyRoute("notifications/subscription","POST"),null);
   assert.equal(cellsProxyRoute(`cells/notes/notifications/${deleted}/retry`,"GET"),null);

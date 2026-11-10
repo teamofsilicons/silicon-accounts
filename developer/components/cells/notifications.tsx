@@ -8,6 +8,7 @@ import {CopyField} from "@/components/developer/parts/copy-field";
 import {cellsRequest} from "@/lib/cells/api";
 import {cellPath,useCellAction,Failure,date} from "./shared";
 import styles from "./cells.module.css";
+import {LiveNotifications} from "./live-notifications";
 
 interface Delivery {id:string;kind:string;recipient:string;status:string;attempts:number;last_error:string|null;created_at:string;sent_at:string|null;next_at:string}
 interface Page {configured:boolean;active:boolean;deliveries:Delivery[];next:string|null}
@@ -22,14 +23,19 @@ const reasons:Record<string,string>={
   ting_invalid_receipt:"Ting did not confirm acceptance. Delivery will retry.",
   ting_unavailable:"Ting is unavailable. Delivery will retry.",
   ting_unreachable:"Ting could not be reached. Delivery will retry.",
+  ting_idempotency_window_expired:"The safe retry window ended. Check Ting’s original receipt before taking further action.",
+  ting_blocked_by_recipient:"The recipient blocked this notification in Ting.",
+  ting_legacy_delivery_review:"This older delivery needs review before migration to the new Ting catalog.",
 };
 export function CellNotifications({cellId}:{cellId:string}){
+  const [live,setLive]=useState(false);
   const [pages,setPages]=useState<(string|null)[]>([null]);
   const cursor=pages.at(-1),tail=`/notifications${cursor?`?before=${encodeURIComponent(cursor)}`:""}`;
-  const query=useQuery({queryKey:["cells",cellId,tail],queryFn:({signal})=>cellsRequest<Page>(cellPath(cellId,tail),{signal}),refetchInterval:10000});
+  const query=useQuery({queryKey:["cells",cellId,tail],queryFn:({signal})=>cellsRequest<Page>(cellPath(cellId,tail),{signal}),refetchInterval:live?false:10000});
   const retry=useCellAction(cellId);
   return <Section title="Notifications" description="Delivery records for this cell’s Silicon Ting notifications." actions={<Button variant="ghost" loading={query.isFetching} onClick={()=>void query.refetch()}>Refresh notifications</Button>}><Stack>
     <Failure error={query.error??retry.error}/>
+    {query.data?.configured&&query.data.active&&<LiveNotifications key={cellId} cellId={cellId} onConnected={setLive}/>}
     {query.data&&!query.data.configured&&<Alert tone="info" title="Delivery is paused">The service has not connected to Silicon Ting. Queued records are retained.</Alert>}
     <details><summary>Receive Cells notifications</summary><p className={styles.muted}>After signing in to the Cells CLI, run this once to allow Cells notifications through Silicon Ting.</p><CopyField label="Enable notifications" value="silicon-cells notifications enable"/></details>
     {query.isPending?<p role="status">Loading notifications…</p>:query.data?.deliveries.length===0?<p>No notification records on this page.</p>:query.data?.deliveries.map(item=><Surface key={item.id}><Stack>

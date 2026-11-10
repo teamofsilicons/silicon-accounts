@@ -333,5 +333,34 @@ Registration uses explicit consent from the Cells CLI; the Developer bearer
 session cannot issue that proof. Files shows the latest storage permission check
 and outage state. A 2026-10-28 manual local browser pass retried a rejected
 notification and verified its transition to Accepted by Ting through a controlled
-receiver using real Accounts proofs. Production Ting compatibility and the full
-Cells acceptance pass remain outstanding; see the Cells repository ledger.
+receiver using real Accounts proofs. Production Ting catalog registration, explicit shared-Silicon self-delivery and
+Cells acceptance subsequently passed; see the Cells repository release record.
+
+
+Compiled functions can be uploaded through **Functions → Upload WebAssembly**.
+The browser accepts a compiled `.wasm` file directly, preserves its binary bytes,
+and checks the supported command ABI before sending it to the server for isolated
+runtime validation. It never compiles arbitrary source into Wasm. See the Cells
+repository’s `docs/functions.md` for `wasm32-wasip1`, `_start`, WASI Preview 1 and
+`cells.function.v1`. Existing JavaScript/TypeScript editing and versioning remain.
+
+The Cells feature collection is in that repository’s `docs/README.md` and the
+versioned CLI guides. The public docs builder above still includes Accounts and
+Apps only; `/docs/cells` has not been published by this release.
+
+## Cells Ting 0.4 sessions
+
+The Cells History notification panel can explicitly opt into live updates.
+`POST /api/cells/cells/{cell}/notifications/live` is the sole new proxy route;
+it keeps the existing CSRF checks and sealed Accounts session. Cells opens and
+bounds the Ting receiver server-side. Only empty refresh hints return as SSE;
+private records are refetched through author-only routes. Polling resumes when
+the live connection ends, and stopping/unmounting cancels the stream. It does
+not grant the account a durable Ting subscription or change its preferences.
+
+Event Ting recipient configuration accepts account UUID lines and session JSON
+lines (`{"session_id":"recv_…","for":"ACCOUNT_UUID"}`). The backend preserves
+original targets and cancels old pending targets on replacement. The original
+recipient form is shown only in the explicit private delivery detail. See the
+Cells repository's `docs/ting-sessions.md` and `docs/ting-types.json` for the
+required catalog/migration and deployment boundary.
