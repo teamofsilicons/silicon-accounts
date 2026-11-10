@@ -1,0 +1,73 @@
+.card { display: grid; gap: var(--space-4); align-content: start; }
+.editor { border: 0; margin: 0; padding: 0; min-width: 0; }
+.title { font-size: 1.2rem; font-weight: 650; }
+.muted { color: var(--text-secondary, #666); font-size: .9rem; }
+.field { display: grid; gap: var(--space-2); font-weight: 600; }
+.field span { font-size: .875rem; font-weight: 400; color: var(--text-secondary, #666); }
+.field textarea, .field select, .field input[type="file"] { color: inherit; background: var(--surface, transparent); border: 1px solid var(--border, #aaa); padding: .7rem; font: inherit; width: 100%; }
+.field textarea { resize: vertical; font-weight: 400; }
+.code { font-family: monospace !important; font-size: .85rem !important; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.actions label { font-weight: 400; }
+.upload { display: grid; gap: var(--space-2); border-top: 1px solid var(--border, #ddd); padding-top: var(--space-4); overflow-wrap: anywhere; }
+.upload span { color: var(--text-secondary, #666); font-size: .875rem; }
+.preview { max-width: min(100%, 20rem); max-height: 12rem; object-fit: contain; object-position: left center; }
+.flowStep { display: grid; gap: var(--space-4); border-top: 1px solid var(--border, #ddd); padding-top: var(--space-4); }
+.colorRow { display: flex; align-items: center; gap: var(--space-3); font-weight: 400; }
+.linkRow { display: grid; grid-template-columns: 1fr 2fr auto; gap: var(--space-3); align-items: end; margin: var(--space-3) 0; }
+@media (max-width: 640px) { .linkRow { grid-template-columns: 1fr; } }
+
+/* Interfaces follow Accounts' blank-canvas visual language: neutral surfaces, system type,
+   ink actions and a blue accent. Keep the existing dark mode legible too. */
+.portal {
+  --font-serif: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --accent: #3460f0; --accent-strong: #2449c9; --accent-ink: #3460f0;
+  --accent-subtle: #eef2fe; --focus-ring: #eef2fe;
+  --foreground: #1e1e1c; --text-secondary: #666; --surface: #fff;
+  --surface-raised: #fff; --surface-muted: #f5f5f5; --border: #ededed; --border-subtle: #f5f5f5;
+  --primary: #1e1e1c; --primary-hover: #33322f; --primary-pressed: #0f0f0e; --primary-foreground: #fcfcfc;
+  color: var(--foreground); font-family: var(--font-serif);
+}
+:global([data-theme="dark"]) .portal {
+  --accent: #7d9bff; --accent-strong: #a9bdff; --accent-ink: #a9bdff; --accent-subtle: #1d2440;
+  --focus-ring: #1d2440; --foreground: #f5f5f5; --text-secondary: #c4c4c4; --surface: #252525;
+  --surface-raised: #2b2b2b; --surface-muted: #313131; --border: #424242; --border-subtle: #393939;
+  --primary: #f5f5f5; --primary-hover: #fff; --primary-pressed: #ddd; --primary-foreground: #1e1e1c;
+}
+.createCard { box-shadow: 0 1px 2px rgb(30 30 28 / .04); }
+.steps { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); list-style: none; padding: 0 0 var(--space-5); margin: 0 0 var(--space-6); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: .875rem; }
+.steps li { display: flex; align-items: center; gap: var(--space-2); }
+.steps li span { --sq-r: 50%; --sq-fill: var(--surface); --sq-stroke: var(--border); display: inline-grid; place-items: center; width: 1.65rem; height: 1.65rem; border: 1px solid var(--border); background: var(--sq-fill); font-size: .75rem; }
+.steps li[aria-current="step"] { color: var(--foreground); font-weight: 650; }
+.steps li[aria-current="step"] span { background: var(--foreground); border-color: var(--foreground); color: var(--surface); }
+.stepIntro { display: grid; gap: var(--space-2); }
+.stepIntro h2 { margin: 0; color: var(--foreground); font-size: 1.35rem; font-weight: 650; letter-spacing: -.02em; }
+.stepIntro p, .notice p { margin: 0; color: var(--text-secondary); line-height: 1.55; }
+.logoField { display: flex; align-items: flex-start; gap: var(--space-4); }
+.logoPreview { --sq-r: 16px; --sq-fill: var(--surface-muted); --sq-stroke: var(--border); display: grid; flex: none; place-items: center; width: 80px; height: 80px; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); font-size: 1.7rem; font-weight: 650; }
+.logoPreview img { width: 100%; height: 100%; object-fit: contain; }
+.logoChooser { display: grid; min-width: 0; gap: var(--space-2); font-size: .875rem; }
+.logoChooser > span { color: var(--text-secondary); overflow-wrap: anywhere; }
+.logoChooser input { max-width: 100%; font: inherit; color: inherit; }
+.review { margin: 0; display: grid; }
+.review div { display: grid; grid-template-columns: minmax(7rem, 1fr) minmax(0, 2fr); gap: var(--space-4); padding: var(--space-3) 0; border-top: 1px solid var(--border); }
+.review dt { color: var(--text-secondary); }
+.review dd { margin: 0; overflow-wrap: anywhere; }
+.wizardActions { display: flex; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.helpLink { margin: 0; }
+.notice { display: grid; gap: var(--space-3); }
+@media (max-width: 480px) { .logoField { align-items: flex-start; } .review div { grid-template-columns: 1fr; gap: var(--space-1); } }
+
+:global(html):has(.portal), :global(body):has(.portal) { background: #fcfcfc; }
+:global(html[data-theme="dark"]):has(.portal), :global(html[data-theme="dark"]) :global(body):has(.portal) { background: #1e1e1e; }
+.portal > header h1 { color: var(--foreground); font-size: clamp(1.75rem, 1.5rem + 1vw, 2rem); font-weight: 500; letter-spacing: -.025em; }
+.sectionNav { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border); font-size: .875rem; }
+.sectionNav a { color: var(--text-secondary); text-decoration: none; }
+.sectionNav a:hover, .sectionNav a:focus-visible { color: var(--accent-ink); text-decoration: underline; }
+.settingsGroup { border-block: 1px solid var(--border); padding: var(--space-4) 0; }
+.settingsGroup > summary { cursor: pointer; font-weight: 650; }
+.settingsGroup > summary + * { margin-top: var(--space-5); }
+/* Closed preview content has fixed virtual dimensions; keep it out of the page's scrollable bounds. */
+.settingsGroup details:not([open]) > :not(summary) { display: none; }
+.logoChooser label { display: grid; min-width: 0; gap: var(--space-2); }
+.logoChooser input[type="file"] { width: 100%; min-width: 0; }

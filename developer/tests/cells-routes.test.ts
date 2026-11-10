@@ -21,6 +21,9 @@ test("Test copies have explicit control routes and independent routable addresse
 });
 
 test("Cells author paths cannot reach private grants, user sessions or another origin", () => {
+  assert.equal(cellsProxyRoute("interfaces/potato/cell", "GET"), "v1/interfaces/potato/cell");
+  assert.equal(cellsProxyRoute("interfaces/potato/cell", "POST"), "v1/interfaces/potato/cell");
+  assert.equal(cellsProxyRoute("interfaces/potato/cell", "DELETE"), null);
   assert.equal(cellsProxyRoute("apps/notes-app/cell", "POST"), "v1/apps/notes-app/cell");
   assert.equal(cellsProxyRoute("cells/notes/sql", "POST"), "v1/cells/notes/sql");
   assert.equal(cellsProxyRoute("cells/notes/secrets/SERVICE_KEY", "PUT"), "v1/cells/notes/secrets/SERVICE_KEY");

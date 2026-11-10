@@ -3,6 +3,7 @@ const PARENT = "[a-z][a-z0-9-]{1,28}[a-z0-9]";
 const COPY = "[a-z](?:[a-z0-9-]{0,28}[a-z0-9])?";
 const CELL = `${PARENT}(?:--${COPY})?`;
 const APP = "[a-z0-9_-]{3,30}";
+const INTERFACE = "[a-z0-9_-]{3,60}";
 const UUID = "[0-9a-f-]{36}";
 const BUCKET = "[a-z0-9][a-z0-9_-]{0,62}";
 const FUNCTION = "[a-z][a-z0-9_-]{0,62}";
@@ -28,6 +29,7 @@ const routes: [string, RegExp][] = [
   ["GET HEAD POST", /^cells$/],
   ["GET HEAD", /^cells\/availability$/],
   ["GET HEAD POST", new RegExp(`^apps/${APP}/cell$`)],
+  ["GET HEAD POST", new RegExp(`^interfaces/${INTERFACE}/cell$`)],
   ["GET HEAD DELETE", new RegExp(`^cells/${CELL}$`)],
   ["POST", new RegExp(`^cells/${CELL}/(restore|sql|schema|import)$`)],
   ["PUT", new RegExp(`^cells/${CELL}/(admin|settings)$`)],
@@ -133,4 +135,9 @@ export function cellsFunctionInvocation(path: string, method: string): boolean {
 
 export function cellsBackupDownload(path:string,method:string):boolean {
   return ["GET","HEAD"].includes(method) && new RegExp(`^v1/cells/${CELL}/backups/${UUID}/download$`).test(path);
+}
+
+/** Only this new integration is phased; existing Cells and app routes remain available. */
+export function isInterfaceCellRoute(path: string): boolean {
+  return new RegExp(`^v1/interfaces/${INTERFACE}/cell$`).test(path);
 }

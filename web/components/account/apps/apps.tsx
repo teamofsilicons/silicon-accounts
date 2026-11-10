@@ -30,6 +30,7 @@ import { focusAfterRemoval, pageMain, pressedViewOption } from "../parts/focus";
 import { ListCap } from "../parts/list-cap";
 import { useEveryApp, useRemoveAccess } from "../parts/queries";
 import styles from "./apps.module.css";
+import { InterfaceAccess } from "./interface-access";
 
 type View = "access" | "removed";
 
@@ -111,6 +112,7 @@ export function Apps() {
         title="Apps you have signed into"
         description="What each app can see about you and when it last saw you. Removing an app's access signs you out of it everywhere and ends its user verifications for you."
       />
+      <InterfaceAccess />
       {apps.error && !apps.data ? (
         <Alert tone="danger" title="Your apps did not load">
           {describeError(apps.error)}

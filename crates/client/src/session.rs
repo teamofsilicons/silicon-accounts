@@ -348,6 +348,34 @@ impl<'a> AccountSession<'a> {
             .map(|_| ())
     }
 
+    /// Active Interface sessions of this account.
+    pub async fn interface_sessions(&self) -> Result<Vec<crate::InterfaceSessionInfo>> {
+        #[derive(serde::Deserialize)]
+        struct Response {
+            sessions: Vec<crate::InterfaceSessionInfo>,
+        }
+        let result: Response = self.get(&["v1", "me", "interface-sessions"]).await?;
+        Ok(result.sessions)
+    }
+
+    /// End one Interface session and its app-token families.
+    pub async fn revoke_interface_session(&self, id: &str) -> Result<()> {
+        self.send(
+            Method::DELETE,
+            &["v1", "me", "interface-sessions", id],
+            None,
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// End every session for this Interface without removing independent app sign-ins.
+    pub async fn remove_interface_access(&self, id: &str) -> Result<()> {
+        self.send(Method::DELETE, &["v1", "me", "interfaces", id], None)
+            .await
+            .map(|_| ())
+    }
+
     /// `GET /v1/me/sessions`: browser sessions and CLI sign-ins.
     pub async fn sessions(&self) -> Result<Vec<SessionInfo>> {
         self.all(&["v1", "me", "sessions"]).await

@@ -730,7 +730,75 @@ async function renderButtons(target: Element | string, options?: RenderOptions):
   };
 }
 
-const api = { version: __ACCOUNTS_WEB_VERSION__, authorizeUrl, signIn, renderButtons, mountFrame, handleCallback };
+/** A browser Interface sign-in. Its state, verifier and exchange key stay in this tab. */
+export interface InterfaceSignInOptions { interfaceId: string; redirectUri: string; method?: "google" | "apple" }
+export interface InterfaceCallback { interfaceId: string; redirectUri: string; state: string; code: string; codeVerifier: string; operationKey: string }
+export interface InterfaceAccount { uuid: string; id: string | null; kind: "carbon" | "silicon"; display_name: string; email?: string | null; phone?: string | null; dob?: string; timezone?: string }
+export interface InterfaceAppAccess { access_token: string; token_type: string; expires_in: number; access_token_expires_at: string; scope: string; account: Record<string, unknown> }
+export interface InterfaceTokens { interface_id: string; session_id: string; expires_at: string; account: InterfaceAccount; refresh_token: string; apps: Record<string, InterfaceAppAccess> }
+export interface InterfaceIntrospection { active: boolean; interface_id?: string; session_id?: string; expires_at?: string; account?: InterfaceAccount }
+const INTERFACE_STORAGE_PREFIX = "silicon-accounts:interface:";
+
+/** Creates a state and S256 verifier, saves them in this tab, and returns the hosted URL. */
+async function interfaceAuthorizeUrl(options: InterfaceSignInOptions): Promise<string> {
+  if (!options.interfaceId || !options.redirectUri) throw sdkError("invalid_request", "interfaceId and a registered redirectUri are required.");
+  const state = randomToken(24);
+  const verifier = randomToken(32);
+  const challenge = await s256(verifier);
+  const operationKey = randomToken(24);
+  try {
+    sessionStorage.setItem(INTERFACE_STORAGE_PREFIX + state, JSON.stringify({ interfaceId: options.interfaceId, redirectUri: options.redirectUri, state, verifier, operationKey }));
+  } catch { throw sdkError("storage_unavailable", "this browser cannot safely remember the sign-in. Enable session storage and try again."); }
+  const query = new URLSearchParams({ interface_id: options.interfaceId, redirect_uri: options.redirectUri, state, code_challenge: challenge, code_challenge_method: "S256" });
+  if (options.method) query.set("method", options.method);
+  return `${base}/interface-authorize?${query.toString()}`;
+}
+/** Starts Interface sign-in in this browser tab. */
+async function interfaceSignIn(options: InterfaceSignInOptions): Promise<void> { location.assign(await interfaceAuthorizeUrl(options)); }
+/** Checks the callback against this tab's saved state. Keep it until the exchange is saved. */
+function interfaceHandleCallback(url?: string): InterfaceCallback {
+  const parsed = new URL(url ?? location.href, location.href);
+  const state = parsed.searchParams.get("state");
+  if (!state) throw sdkError("missing_state", "the Interface callback has no state.");
+  let record: { interfaceId?: string; redirectUri?: string; state?: string; verifier?: string; operationKey?: string } | null = null;
+  try { record = JSON.parse(sessionStorage.getItem(INTERFACE_STORAGE_PREFIX + state) ?? "null"); } catch { record = null; }
+  if (!record || record.state !== state || !record.interfaceId || !record.redirectUri || !record.verifier || !record.operationKey) throw sdkError("unknown_state", "this tab did not start the Interface sign-in.");
+  const registered = new URL(record.redirectUri);
+  if (parsed.origin !== registered.origin || parsed.pathname !== registered.pathname) throw sdkError("redirect_mismatch", "the Interface callback is not on its registered return address.");
+  const error = parsed.searchParams.get("error");
+  if (error) throw sdkError(error, "the Interface sign-in was not completed.");
+  const code = parsed.searchParams.get("code");
+  if (!code) throw sdkError("not_a_callback", "the Interface callback has no authorization code.");
+  return { interfaceId: record.interfaceId, redirectUri: record.redirectUri, state, code, codeVerifier: record.verifier, operationKey: record.operationKey };
+}
+/** Forget a callback only after saving the successful token result. */
+function interfaceClearCallback(state: string): void { sessionStorage.removeItem(INTERFACE_STORAGE_PREFIX + state); }
+async function interfacePost<T>(path: string, body: object, operationKey?: string): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (operationKey) headers["Idempotency-Key"] = operationKey;
+  const response = await fetch(`${base}/v1/interface-auth/${path}`, { method: "POST", headers, body: JSON.stringify(body), credentials: "omit", cache: "no-store" });
+  const value = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
+  if (!response.ok) throw sdkError(value?.error?.code ?? `http_${response.status}`, value?.error?.message ?? "the Interface request failed.");
+  return value as T;
+}
+/** Exchange a callback; the saved operation key makes an uncertain retry safe. */
+async function interfaceExchangeCode(callback: InterfaceCallback): Promise<InterfaceTokens> {
+  return interfacePost("token", { interface_id: callback.interfaceId, grant_type: "authorization_code", code: callback.code, redirect_uri: callback.redirectUri, code_verifier: callback.codeVerifier }, callback.operationKey);
+}
+/** Rotate an Interface session. Persist a fresh operation key before sending and reuse it on retries. */
+async function interfaceRefresh(interfaceId: string, refreshToken: string, operationKey: string, appId?: string): Promise<InterfaceTokens> {
+  if (!operationKey) throw sdkError("missing_operation_key", "save a fresh operation key before refreshing.");
+  return interfacePost("token", { interface_id: interfaceId, grant_type: "refresh_token", refresh_token: refreshToken, ...(appId ? { app_id: appId } : {}) }, operationKey);
+}
+/** Check or end an Interface session using its current refresh credential. */
+const interfaceApi = {
+  authorizeUrl: interfaceAuthorizeUrl, signIn: interfaceSignIn, handleCallback: interfaceHandleCallback,
+  clearCallback: interfaceClearCallback, exchangeCode: interfaceExchangeCode, refresh: interfaceRefresh,
+  introspect: (interfaceId: string, refreshToken: string) => interfacePost<InterfaceIntrospection>("introspect", { interface_id: interfaceId, refresh_token: refreshToken }),
+  revoke: (interfaceId: string, refreshToken: string) => interfacePost<{ revoked: boolean }>("revoke", { interface_id: interfaceId, refresh_token: refreshToken }),
+};
+
+const api = { version: __ACCOUNTS_WEB_VERSION__, authorizeUrl, signIn, renderButtons, mountFrame, handleCallback, interface: interfaceApi };
 (window as unknown as { SiliconAccounts: typeof api }).SiliconAccounts = api;
 document.dispatchEvent(new CustomEvent("silicon-accounts:ready", { detail: api }));
 

@@ -59,7 +59,7 @@ prompt=none that can't sign in silently ─────────────�
   not granted yet, a required email/phone the account doesn't have (verified), an optional detail
   the app asks for now that the Carbon was never offered, or a `scope` detail not granted. Optional
   details left unticked before stay quiet. Nothing new: straight to complete. Never shown for the
-  first-party apps `silicon-accounts` and `developer` (no membership either).
+  first-party apps `silicon-accounts` and `developer` (Silicon Accounts registration is automatic; no consent-managed membership).
 - **The answer record**: finishing the pages writes `consent.granted` to the audit log (actor: the
   Carbon; `details.offered` = every detail the app offered them so far, `details.shared` = what they
   share now). The latest one since the app's access was last removed (`membership.access_removed`)
@@ -80,6 +80,12 @@ prompt=none that can't sign in silently ─────────────�
   the chooser (it is always shown when the browser is signed in — flows never auto-continue);
   `none` completes silently or ends `failed` with `login_required` / `consent_required` /
   `interaction_required` and `redirect_to = redirect_uri?error=…&state=…`.
+- **Linked accounts**: a remembered Carbon session with multiple linked identities starts at
+  `select_account`, showing Personal and Work together. It does not require an initial
+  "Continue as" on the main account. Fresh email/provider authentication reaches the same
+  chooser; choosing an identity still checks the live session, link and organization policy.
+  A single identity keeps "Continue as". `prompt=login` and `remember_browser=false` still
+  require fresh authentication, and `prompt=none` never silently picks between linked accounts.
 - **Sign-up prefill**: display name (provider name → email local part → `Carbon 1234`), id
   (`repo::accounts::suggest_id` from the email local part then the name), timezone (IP header →
   browser `timezone` sent to `POST /v1/flows` → UTC), dob (exactly 18 years before the Carbon's own today, counted in the prefilled timezone: just after midnight in Kolkata it is still yesterday in UTC), photo (our default Carbon

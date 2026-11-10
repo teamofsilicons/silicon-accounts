@@ -42,6 +42,7 @@ use tokio::task::JoinHandle;
 mod cli_login;
 mod device;
 pub mod flow;
+mod interfaces;
 pub mod link;
 pub mod providers;
 mod session;
@@ -52,6 +53,7 @@ mod util;
 /// HTTP routes of this crate (see the build spec 02-api.md, sections marked `[auth]`).
 pub fn router() -> Router<AppState> {
     Router::new()
+        .merge(interfaces::router())
         // Hosted sign-in flow.
         .route("/v1/flows", post(flow::create::create_flow))
         .route("/v1/flows/{id}", get(flow::handlers::get_flow))

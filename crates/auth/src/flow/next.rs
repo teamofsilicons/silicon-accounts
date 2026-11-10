@@ -114,7 +114,7 @@ pub enum Grant {
     Chosen(Vec<Scope>),
 }
 
-/// Ends the flow with an authorization code: membership (except for the first-party app),
+/// Ends the flow with an authorization code: app membership (first-party registration already exists),
 /// sign-in history, the code, and `redirect_to = redirect_uri?code=…&state=…`.
 ///
 /// Error: 403 `email_domain_not_allowed` when the account has no verified email at the app's
@@ -139,11 +139,19 @@ pub async fn complete(
         .await?;
         return Err(error);
     }
-    if !fa.first_party() && !account_domain_allowed(conn, &fa.config, account).await? {
+    if !fa.bypass_account_policies() && !account_domain_allowed(conn, &fa.config, account).await? {
         return Err(domain_not_allowed(fa, None));
     }
+    if flow.extras.interface_id.is_some() {
+        let selected = match &grant {
+            Grant::Auto => needed_scopes(flow, &fa.config),
+            Grant::Chosen(scopes) => scopes.clone(),
+        };
+        flow.extras.interface_scopes =
+            accounts_core::models::scope_strings(&normalize_scopes(selected));
+    }
     let mut scopes: Vec<Scope> = if fa.first_party() {
-        // The account site and CLI are Silicon Accounts itself: no membership, no consent.
+        // The account site and CLI are Silicon Accounts itself: automatic registration, no consent.
         vec![Scope::Profile]
     } else {
         let (scopes, mode) = match grant {
@@ -307,7 +315,7 @@ pub async fn account_domain_allowed(
 /// then asks for (at one of the domains, with a code) before the sign-in completes. Without a
 /// required email nothing would ever ask for one, so such a sign-up is refused before it starts.
 pub fn emailless_signup_allowed(fa: &FlowApp) -> bool {
-    fa.first_party()
+    fa.bypass_account_policies()
         || fa.config.allowed_email_domains.is_empty()
         || fa.config.required_fields.contains(&ContactField::Email)
 }

@@ -394,7 +394,7 @@ async fn cancelling_sends_access_denied_back() {
     assert!(query_param(to, "code").is_none());
     let n = scalar_i64(
         &ctx,
-        "select count(*) from memberships where account_uuid = $1",
+        "select count(*) from memberships where account_uuid = $1 and app_id <> 'silicon-accounts'",
         &carbon.uuid,
     )
     .await;

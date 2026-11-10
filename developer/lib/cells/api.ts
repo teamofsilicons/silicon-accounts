@@ -16,6 +16,7 @@ export interface AppCell {
   created?: boolean;
   credentials?: Credentials;
 }
+export interface InterfaceCell extends Omit<AppCell, "sign_in_links"> { sign_in_links?: {redirect_to:string;sign_in:string}[]; }
 export async function cellsRequest<T>(path: string, options: {method?: string; body?: unknown; key?: string; signal?: AbortSignal} = {}): Promise<T> {
   if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) throw new Error("Use a relative Cells author path.");
   const headers = new Headers({accept: "application/json"});
@@ -38,4 +39,6 @@ export const cellsApi = {
   list: (signal?: AbortSignal) => cellsRequest<{cells: Cell[]}>("/cells", {signal}),
   app: (app: string, signal?: AbortSignal) => cellsRequest<AppCell>(`/apps/${encodeURIComponent(app)}/cell`, {signal}),
   enable: (app: string, cell: string | null, key: string) => cellsRequest<AppCell>(`/apps/${encodeURIComponent(app)}/cell`, {method: "POST", body: {cell_id: cell}, key}),
+  interface: (id:string,signal?:AbortSignal)=>cellsRequest<InterfaceCell>(`/interfaces/${encodeURIComponent(id)}/cell`,{signal}),
+  enableInterface: (id:string,cell:string|null,key:string)=>cellsRequest<InterfaceCell>(`/interfaces/${encodeURIComponent(id)}/cell`,{method:"POST",body:cell?{cell_id:cell}:{},key}),
 };

@@ -118,3 +118,14 @@ export function appsApiUrl(): string {
 export function cellsApiUrl(): string {
   return trimSlash(process.env.CELLS_API_URL || (isProduction() ? "https://api.cells.teamofsilicons.com" : "http://127.0.0.1:4490"));
 }
+/** Interfaces' API is called by the developer server, never directly by the browser. */
+export function interfacesApiUrl(): string {
+  return trimSlash(process.env.INTERFACES_API_URL || (isProduction() ? "https://api.interfaces.teamofsilicons.com" : "http://127.0.0.1:8670"));
+}
+
+/** Interface Cell broker release gate, read on every request. Production is
+ * disabled unless explicitly enabled; development defaults on. */
+export function interfaceCellsEnabled(): boolean {
+  const configured = process.env.DEVELOPER_INTERFACE_CELLS_ENABLED;
+  return configured === undefined ? !isProduction() : configured === "true";
+}

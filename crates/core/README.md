@@ -429,6 +429,14 @@ use it for you.
 
 ## repo::memberships
 
+Every non-deleted Carbon and Silicon has a `silicon-accounts` membership from creation.
+Migration 0037 installs an `accounts` INSERT trigger and backfills missing memberships;
+this includes bulk imports, pending Silicons, and organization work accounts. Registration
+uses the existing `signin` source category with `profile` scope, but leaves sign-in timestamps
+null and issues no sessions, tokens, or notifications. Account status still controls whether
+an identity can authenticate. Existing memberships and deleted tombstones stay unchanged.
+Other apps continue to require their own consent or import flow.
+
 - `upsert_signin(&mut conn, app_id, uuid, MembershipSource::Signin|Slt, &scopes, GrantMode::Replace|Union)`
   — active, sign-in times, granted scopes (Replace when the Carbon went through the details pages
   of the hosted flow, Union for SLT/continue-as).

@@ -398,7 +398,15 @@ async fn process(
     let code = answer.code.clone().unwrap_or_default();
 
     // 2. Exchange the code and verify the id_token (no database locks held meanwhile).
-    let outcome = exchange_and_verify(state, &flow.app_id, provider, &leg, code.trim()).await;
+    let outcome = exchange_and_verify(
+        state,
+        &flow.app_id,
+        flow.extras.interface_id.as_deref(),
+        provider,
+        &leg,
+        code.trim(),
+    )
+    .await;
     let (fa, client, claims) = match outcome {
         Ok(v) => v,
         Err(e) if linking => return finish_link(state, &flow_id, provider, Err(e)).await,
@@ -708,6 +716,7 @@ async fn record_error(
 async fn exchange_and_verify(
     state: &AppState,
     app_id: &str,
+    interface_id: Option<&str>,
     provider: Provider,
     leg: &ProviderLeg,
     code: &str,
@@ -716,9 +725,14 @@ async fn exchange_and_verify(
     let to_flow = |e: ApiError| FlowError::from_api(&e);
     let (fa, client) = {
         let mut conn = state.db.acquire().await.map_err(|e| to_flow(e.into()))?;
-        let fa = FlowApp::load(&mut conn, &state.settings, app_id)
+        let mut fa = FlowApp::load(&mut conn, &state.settings, app_id)
             .await
             .map_err(to_flow)?;
+        if let Some(interface_id) = interface_id {
+            fa.apply_interface(&mut conn, interface_id)
+                .await
+                .map_err(to_flow)?;
+        }
         fa.ensure_active().map_err(to_flow)?;
         let method = match provider {
             Provider::Google => accounts_core::models::Method::Google,
@@ -1131,7 +1145,7 @@ async fn resolve_identity(
         }
     }
 
-    if !fa.config.allow_signup && !fa.first_party() {
+    if !fa.config.allow_signup && !fa.bypass_account_policies() {
         return Ok(Err(FlowError::from_api(&next::signup_not_allowed(fa))));
     }
     Ok(Ok(signup(None)))

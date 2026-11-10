@@ -43,6 +43,7 @@ pub use view::FlowView;
 pub struct FlowApp {
     pub app: App,
     pub config: SigninConfig,
+    pub interface_id: Option<String>,
 }
 
 impl FlowApp {
@@ -56,10 +57,90 @@ impl FlowApp {
             .await?
             .ok_or_else(|| apps::unknown_app(app_id))?;
         let config = apps::effective_config(conn, settings, app_id).await?;
-        Ok(FlowApp { app, config })
+        Ok(FlowApp {
+            app,
+            config,
+            interface_id: None,
+        })
     }
 
-    /// A first-party app (`silicon-accounts`, `developer`): no details pages, no membership.
+    /// Load the ordinary Accounts identity while enforcing this Interface's
+    /// configured methods and copy throughout its hosted sign-in.
+    pub async fn load_for_flow(
+        conn: &mut PgConnection,
+        settings: &Settings,
+        flow: &Flow,
+    ) -> ApiResult<FlowApp> {
+        let mut fa = Self::load(conn, settings, &flow.app_id).await?;
+        if let Some(id) = &flow.extras.interface_id {
+            fa.apply_interface(conn, id).await?;
+        }
+        Ok(fa)
+    }
+
+    pub async fn apply_interface(
+        &mut self,
+        conn: &mut PgConnection,
+        interface_id: &str,
+    ) -> ApiResult<()> {
+        if self.app.app_id != accounts_core::FIRST_PARTY_APP_ID {
+            return Err(accounts_core::ApiError::invalid_request(
+                "Interface appearance requires an Accounts sign-in.",
+            ));
+        }
+        let config: Option<serde_json::Value> = sqlx::query_scalar(
+            "select signin_config from interface_auth_clients where interface_id=$1 and active",
+        )
+        .bind(interface_id)
+        .fetch_optional(conn)
+        .await?;
+        let config = config.ok_or_else(|| {
+            accounts_core::ApiError::forbidden(
+                "interface_disabled",
+                "This interface is no longer accepting sign-ins.",
+            )
+        })?;
+        let mut patch = serde_json::Map::new();
+        for key in [
+            "methods",
+            "method_order",
+            "copy",
+            "required_fields",
+            "optional_fields",
+            "flow",
+            "allow_signup",
+            "remember_browser",
+            "allowed_email_domains",
+        ] {
+            if let Some(value) = config.get(key) {
+                patch.insert(key.into(), value.clone());
+            }
+        }
+        self.interface_id = Some(interface_id.to_owned());
+        self.config = self
+            .config
+            .apply_patch(
+                &serde_json::Value::Object(patch),
+                accounts_core::models::signin_config::ConfigSecretsPresent::default(),
+            )
+            .map_err(accounts_core::ApiError::validation)?;
+        Ok(())
+    }
+
+    /// The Accounts app itself bypasses app policies; an Interface does not.
+    pub fn bypass_account_policies(&self) -> bool {
+        self.first_party() && self.interface_id.is_none()
+    }
+
+    /// An Interface can provide its own details/review pages without becoming an app.
+    pub fn custom_interface_details(&self) -> bool {
+        self.interface_id.is_some()
+            && (!self.config.required_fields.is_empty()
+                || !self.config.optional_fields.is_empty()
+                || self.config.flow.is_some())
+    }
+
+    /// A first-party app (`silicon-accounts`, `developer`): no details pages or consent-managed membership.
     pub fn first_party(&self) -> bool {
         self.app.is_first_party()
     }

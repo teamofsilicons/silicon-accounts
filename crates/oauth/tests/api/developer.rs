@@ -67,7 +67,7 @@ async fn the_developer_platform_signs_in_with_pkce_and_no_secret() {
     assert_eq!(body["account"]["uuid"], carbon.uuid.as_str());
     let memberships: i64 = scalar(
         &ctx,
-        "select count(*) from memberships where account_uuid = $1",
+        "select count(*) from memberships where account_uuid = $1 and app_id = 'developer'",
         &carbon.uuid,
     )
     .await;

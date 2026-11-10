@@ -99,7 +99,7 @@ pub async fn get_flow(
     let mut tx = state.db.begin().await?;
     let mut flow = load_bound(&mut tx, &state, &headers, &HttpMethod::GET, &id, true).await?;
     model::ensure_live(&flow)?;
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
     let browser = browser::current(&mut tx, &state, &headers).await?;
     let mut cookies = Vec::new();
     if flow.extras.pending.is_some() && !flow.step.is_terminal() {
@@ -248,7 +248,7 @@ pub async fn continue_as(
         &[Step::ChooseMethod, Step::VerifyCode],
         "continue as the browser's account",
     )?;
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
     fa.ensure_active()?;
     if !fa.config.remember_browser {
         return Err(ApiError::forbidden(
@@ -338,7 +338,7 @@ pub async fn switch_account(
         ],
         "switch account",
     )?;
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
     // "Not you?" on the sign-up step: that sign-up ends here (its verified email, phone or
     // provider account can't be resumed by the next flow in this browser) and the browser
     // forgets it. The cookie is cleared only when it names that sign-up, so a stale tab never
@@ -439,7 +439,7 @@ async fn send_signin_code(
         &[Step::ChooseMethod, Step::VerifyCode],
         "send a sign-in code",
     )?;
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
     fa.ensure_active()?;
     let method = match channel {
         OtpChannel::Email => Method::Email,
@@ -514,7 +514,7 @@ pub async fn resend_code(
             "Send a code first: POST /v1/flows/{id}/details/add with {{\"email\": …}} or {{\"phone\": …}}."
         )));
     };
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
     fa.ensure_active()?;
     if flow.step == Step::Details {
         browser::require_flow_account(&mut tx, &state, &headers, &flow).await?;
@@ -624,7 +624,7 @@ pub async fn verify_code(
         )
         .hint(format!("GET /v1/flows/{id} to see where it is now.")));
     }
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
     if let Err(e) = fa.ensure_active() {
         return persist_failure(tx, &mut flow, e).await;
     }
@@ -705,7 +705,7 @@ pub async fn verify_code(
         }
         // `after_proof` removed an unproven row: the address belongs to nobody.
         Holder::Free | Holder::Unproven(_) => {
-            if !fa.config.allow_signup && !fa.first_party() {
+            if !fa.config.allow_signup && !fa.bypass_account_policies() {
                 let e = next::signup_not_allowed(&fa);
                 return persist_failure(tx, &mut flow, e).await;
             }
@@ -774,7 +774,10 @@ pub async fn select_account(
 ) -> ApiResult<FlowResponse> {
     let mut tx = state.db.begin().await?;
     let mut flow = load_bound(&mut tx, &state, &headers, &HttpMethod::POST, &id, true).await?;
+    model::ensure_live(&flow)?;
     model::ensure_step(&flow, &[Step::SelectAccount], "select an account")?;
+    let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
+    fa.ensure_active()?;
     let proved = flow
         .extras
         .authenticated_account_uuid
@@ -793,6 +796,9 @@ pub async fn select_account(
                 "Sign in again before selecting an account.",
             )
         })?;
+    if !current.is_active_carbon() {
+        return Err(browser::not_active(&current.account));
+    }
     if current.account.uuid != proved
         || !accounts_core::repo::organizations::linked(&mut tx, proved, &body.account_uuid).await?
     {
@@ -808,7 +814,6 @@ pub async fn select_account(
             "This account is no longer active.",
         ));
     }
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
     if let Err(e) =
         accounts_core::repo::organizations::check(&mut tx, &account.uuid, &fa.app.app_id).await
     {

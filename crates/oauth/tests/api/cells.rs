@@ -10,6 +10,156 @@ use serde_json::json;
 use uuid::Uuid;
 
 #[tokio::test]
+async fn interface_broker_requires_cells_service_and_current_exact_binding() {
+    let ctx = TestContext::new().await;
+    let owner = ctx.carbon().await;
+    let (other, other_secret) = ctx.app_owned("other-service", Some(&owner.uuid)).await;
+    let secret = random_token(prefix::APP_SECRET);
+    sqlx::query("insert into apps(app_id,name,secret_hash,status,source) values('silicon-cells','Silicon Cells',$1,'active','fake')")
+        .bind(ctx.state.keys.pepper.hash(&secret)).execute(&ctx.db.pool).await.unwrap();
+    let callback = "https://one.cells.example/interface-auth/callback";
+    let redirect = "https://app.example/approved";
+    sqlx::query("insert into interface_auth_clients(interface_id,owner_uuid,revision,kind,name,app_ids,redirect_uris,allowed_origins,branding,signin_config,app_descriptions,active,secret_hash,cell_broker) values('potato',$1,1,'unverified','Potato',array['notes'], $2,$3,'{}','{}','{}',true,$4,$5)")
+        .bind(&owner.uuid).bind(vec![callback,redirect]).bind(vec!["https://app.example"])
+        .bind(ctx.state.keys.pepper.hash("test-secret"))
+        .bind(json!({"cell_id":"one","callback_url":callback,"generation":1}))
+        .execute(&ctx.db.pool).await.unwrap();
+    let path = "/v1/internal/cells/interfaces/potato/authorize";
+    let input = json!({"cell_id":"one","callback_url":callback,"generation":1,"origin":"https://app.example","redirect_uri":redirect});
+    let wrong = ctx
+        .call(
+            router(),
+            Req::post(path)
+                .basic(&other.app_id, &other_secret)
+                .json(input.clone()),
+        )
+        .await;
+    assert_eq!(wrong.status, 403);
+    let allowed = ctx
+        .call(
+            router(),
+            Req::post(path)
+                .basic("silicon-cells", &secret)
+                .json(input.clone()),
+        )
+        .await;
+    assert_eq!(allowed.status, 200);
+    assert_eq!(allowed.json, json!({"authorized":true,"revision":1}));
+    sqlx::query("update interface_auth_clients set allowed_origins=array['https://app.example','https://frontend.example'] where interface_id='potato'").execute(&ctx.db.pool).await.unwrap();
+    let mut separate_origin = input.clone();
+    separate_origin["origin"] = json!("https://frontend.example");
+    assert_eq!(
+        ctx.call(
+            router(),
+            Req::post(path)
+                .basic("silicon-cells", &secret)
+                .json(separate_origin)
+        )
+        .await
+        .status,
+        200
+    );
+    let mut missing_target = input.clone();
+    missing_target
+        .as_object_mut()
+        .unwrap()
+        .remove("redirect_uri");
+    assert!(
+        ctx.call(
+            router(),
+            Req::post(path)
+                .basic("silicon-cells", &secret)
+                .json(missing_target)
+        )
+        .await
+        .status
+        .is_client_error()
+    );
+    let mut other_path = input.clone();
+    other_path["redirect_uri"] = json!("https://app.example/removed");
+    assert_eq!(
+        ctx.call(
+            router(),
+            Req::post(path)
+                .basic("silicon-cells", &secret)
+                .json(other_path)
+        )
+        .await
+        .status,
+        403
+    );
+    let mut update = ctx.db.pool.begin().await.unwrap();
+    sqlx::query(
+        "update interface_auth_clients set revision=2,redirect_uris=$1 where interface_id='potato'",
+    )
+    .bind(vec![callback])
+    .execute(&mut *update)
+    .await
+    .unwrap();
+    // Authorization must wait for a concurrent config update and then see
+    // its committed removal, rather than returning the old redirect policy.
+    let pending = ctx.call(
+        router(),
+        Req::post(path)
+            .basic("silicon-cells", &secret)
+            .json(input.clone()),
+    );
+    tokio::pin!(pending);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(100), &mut pending)
+            .await
+            .is_err()
+    );
+    update.commit().await.unwrap();
+    assert_eq!(pending.await.status, 403);
+    sqlx::query("update interface_auth_clients set redirect_uris=$1 where interface_id='potato'")
+        .bind(vec![callback, redirect])
+        .execute(&ctx.db.pool)
+        .await
+        .unwrap();
+    sqlx::query("update interface_auth_clients set revision=2,allowed_origins='{}' where interface_id='potato'").execute(&ctx.db.pool).await.unwrap();
+    assert_eq!(
+        ctx.call(
+            router(),
+            Req::post(path)
+                .basic("silicon-cells", &secret)
+                .json(input.clone())
+        )
+        .await
+        .status,
+        403
+    );
+    sqlx::query("update interface_auth_clients set revision=3,allowed_origins=array['https://app.example'],cell_broker=$1 where interface_id='potato'")
+        .bind(json!({"cell_id":"one","callback_url":callback,"generation":2,"active":false}))
+        .execute(&ctx.db.pool).await.unwrap();
+    let mut inactive = input.clone();
+    inactive["generation"] = json!(2);
+    assert_eq!(
+        ctx.call(
+            router(),
+            Req::post(path)
+                .basic("silicon-cells", &secret)
+                .json(inactive)
+        )
+        .await
+        .status,
+        403
+    );
+    sqlx::query("update interface_auth_clients set revision=4,cell_broker=$1 where interface_id='potato'")
+        .bind(json!({"cell_id":"two","callback_url":"https://two.cells.example/interface-auth/callback","generation":3,"active":true}))
+        .execute(&ctx.db.pool).await.unwrap();
+    assert_eq!(
+        ctx.call(
+            router(),
+            Req::post(path).basic("silicon-cells", &secret).json(input)
+        )
+        .await
+        .status,
+        403
+    );
+}
+
+#[tokio::test]
 async fn cells_delegation_requires_authors_and_keeps_sessions_bound_to_one_cell() {
     let ctx = TestContext::new().await;
     let owner = ctx.carbon().await;

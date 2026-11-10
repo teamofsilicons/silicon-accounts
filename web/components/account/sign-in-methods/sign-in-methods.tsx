@@ -21,7 +21,7 @@ import type { CarbonMe, EmailView, IdentityView, Meta, PhoneView, Provider } fro
 import { formatDate, formatPhone, formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useMakePrimaryEmail, useMakePrimaryPhone } from "@/lib/query/account";
-import { useMe, useMeta } from "@/lib/query/session";
+import { sameSitePath, useMe, useMeta } from "@/lib/query/session";
 import { asCarbon, asSilicon, describeError, useNow } from "../parts/common";
 import { FitPrompt } from "../parts/fit-prompt";
 import { focusAfterRemoval } from "../parts/focus";
@@ -40,11 +40,15 @@ const defaultCountry = (): string => guessCountry();
 export function SignInMethods() {
   const me = useMe();
   const meta = useMeta();
+  const router = useRouter();
+  const params = useSearchParams();
+  const returnTo = params.get("return_to");
   const carbon = asCarbon(me.data);
   const silicon = asSilicon(me.data);
   return (
     <Page width="narrow">
       <PageHeader title="Sign-in methods" description="Every email, phone number and Google or Apple account here signs you in to the same account." />
+      {returnTo?.startsWith("/interface-authorize?") ? <Alert tone="info" title="Return to your Interface"><span>Add and verify the required detail, then continue your sign-in.</span> <Button variant="secondary" size="sm" onClick={() => { const safe = sameSitePath(returnTo); if (safe) router.push(safe); }}>Return to sign-in</Button></Alert> : null}
       {me.error && !me.data ? (
         <Alert tone="danger" title="Your sign-in methods did not load">
           {describeError(me.error)}

@@ -412,6 +412,120 @@ async fn lookup_by_current_id_only() {
     assert_eq!(r.json["uuid"], carbon.uuid);
 }
 
+#[tokio::test]
+async fn trusted_directory_reads_only_names_and_photos_of_registered_active_accounts() {
+    let mut ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let (silicon, _) = ctx.silicon(&carbon.uuid).await;
+    let pending = pending_silicon(&ctx).await;
+    let (directory, secret) = ctx.app("directory").await;
+    let (ordinary, ordinary_secret) = ctx.app("ordinary").await;
+    let path = format!("/v1/accounts/{}", carbon.uuid);
+    // Even a correctly authenticated app needs the operator's explicit grant.
+    let r = call(&ctx, Req::get(&path).basic(&directory.app_id, &secret)).await;
+    assert!(r.json.get("pfp_url").is_none());
+    std::sync::Arc::make_mut(&mut ctx.state.settings)
+        .profile_directory_app_ids
+        .push(directory.app_id.clone());
+    for account in [&carbon, &silicon] {
+        for path in [
+            format!("/v1/accounts/{}", account.uuid),
+            format!("/v1/accounts/by-id/{}", account.handle.as_ref().unwrap()),
+        ] {
+            let r = call(&ctx, Req::get(&path).basic(&directory.app_id, &secret)).await;
+            assert_status(&r, 200);
+            assert_eq!(r.json["display_name"], account.display_name);
+            assert_eq!(r.json["pfp_url"], account.pfp_url);
+            for key in r.json.as_object().unwrap().keys() {
+                assert!(
+                    [
+                        "uuid",
+                        "id",
+                        "kind",
+                        "status",
+                        "display_name",
+                        "pfp_url",
+                        "custodian"
+                    ]
+                    .contains(&key.as_str()),
+                    "unexpected directory field: {key}"
+                );
+            }
+            if let Some(custodian) = r.json.get("custodian") {
+                assert_eq!(
+                    custodian,
+                    &json!({"uuid": carbon.uuid, "id": carbon.handle})
+                );
+            }
+        }
+    }
+    let count: i64 = sqlx::query_scalar("select count(*) from memberships where app_id=$1")
+        .bind(&directory.app_id)
+        .fetch_one(&ctx.state.db)
+        .await
+        .unwrap();
+    assert_eq!(
+        count, 0,
+        "directory lookups do not enroll accounts in the requesting app"
+    );
+
+    // Removing a sign-in grant does not remove the operator's separate directory capability.
+    ctx.membership(
+        &directory.app_id,
+        &carbon.uuid,
+        &[accounts_core::models::Scope::Profile],
+    )
+    .await;
+    sqlx::query(
+        "update memberships set status='access_removed',granted_scopes='{}' where app_id=$1",
+    )
+    .bind(&directory.app_id)
+    .execute(&ctx.state.db)
+    .await
+    .unwrap();
+    let r = call(&ctx, Req::get(&path).basic(&directory.app_id, &secret)).await;
+    assert_eq!(r.json["pfp_url"], carbon.pfp_url);
+    let r = call(
+        &ctx,
+        Req::get(&path).basic(&ordinary.app_id, &ordinary_secret),
+    )
+    .await;
+    assert!(r.json.get("display_name").is_none() && r.json.get("pfp_url").is_none());
+    let r = call(
+        &ctx,
+        Req::get(&format!("/v1/accounts/{}", pending.uuid)).basic(&directory.app_id, &secret),
+    )
+    .await;
+    assert!(r.json.get("display_name").is_none() && r.json.get("pfp_url").is_none());
+    sqlx::query("update accounts set status='unclaimed' where uuid=$1")
+        .bind(&carbon.uuid)
+        .execute(&ctx.state.db)
+        .await
+        .unwrap();
+    let r = call(&ctx, Req::get(&path).basic(&directory.app_id, &secret)).await;
+    assert!(r.json.get("pfp_url").is_none());
+    sqlx::query("update accounts set status='active' where uuid=$1")
+        .bind(&carbon.uuid)
+        .execute(&ctx.state.db)
+        .await
+        .unwrap();
+    sqlx::query("update memberships set granted_scopes='{}' where app_id='silicon-accounts' and account_uuid=$1")
+        .bind(&carbon.uuid).execute(&ctx.state.db).await.unwrap();
+    let r = call(&ctx, Req::get(&path).basic(&directory.app_id, &secret)).await;
+    assert!(r.json.get("pfp_url").is_none());
+    sqlx::query("update accounts set status='deleted',handle=null where uuid=$1")
+        .bind(&silicon.uuid)
+        .execute(&ctx.state.db)
+        .await
+        .unwrap();
+    let r = call(
+        &ctx,
+        Req::get(&format!("/v1/accounts/{}", silicon.uuid)).basic(&directory.app_id, &secret),
+    )
+    .await;
+    assert_error(&r, 404, "account_deleted");
+}
+
 /// An app whose access the Carbon removed was told on /apps it "can no longer see anything about
 /// you", and its user base shows "Access removed" and the default photo whatever the Carbon
 /// changes afterwards. The lookups once answered any app the account's current display name and

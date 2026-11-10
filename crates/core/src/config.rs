@@ -66,6 +66,7 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_ENVIRONMENT",
     "ACCOUNTS_EXPOSE_DEV_OUTBOX",
     "ACCOUNTS_EXTRA_ALLOWED_ORIGINS",
+    "ACCOUNTS_PROFILE_DIRECTORY_APP_IDS",
     "ACCOUNTS_FEDERATION_ALLOW_LOOPBACK",
     "ACCOUNTS_GOOGLE_AUTH_URL",
     "ACCOUNTS_GOOGLE_CLIENT_ID",
@@ -74,6 +75,7 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_GOOGLE_JWKS_URL",
     "ACCOUNTS_GOOGLE_TOKEN_URL",
     "ACCOUNTS_INTERNAL_TOKEN",
+    "ACCOUNTS_INTERFACES_INTERNAL_TOKEN",
     "ACCOUNTS_IP_TIMEZONE_HEADERS",
     "ACCOUNTS_IRIS_BASE_URL",
     "ACCOUNTS_JWT_KEY_ID",
@@ -260,6 +262,9 @@ pub struct Settings {
     pub public_origin: String,
     /// ACCOUNTS_EXTRA_ALLOWED_ORIGINS, normalized to origins.
     pub extra_allowed_origins: Vec<String>,
+    /// ACCOUNTS_PROFILE_DIRECTORY_APP_IDS. Explicitly trusted apps allowed to read the
+    /// display name/photo of active, registered Accounts identities. Empty by default.
+    pub profile_directory_app_ids: Vec<String>,
     /// ACCOUNTS_DATABASE_URL.
     pub database_url: SecretString,
     /// ACCOUNTS_DATABASE_MAX_CONNECTIONS.
@@ -310,6 +315,8 @@ pub struct Settings {
     pub developer_origin: String,
     /// ACCOUNTS_INTERNAL_TOKEN (service token for `/v1/internal/*`).
     pub internal_token: Option<SecretString>,
+    /// Dedicated service credential for `/v1/internal/interfaces/*` only.
+    pub interfaces_internal_token: Option<SecretString>,
     /// ACCOUNTS_REPORT_RECIPIENTS.
     pub report_recipients: Vec<String>,
     /// ACCOUNTS_WORKER_ENABLED.
@@ -515,6 +522,7 @@ impl Settings {
             public_url: "http://localhost:8590".into(),
             public_origin: "http://localhost:8590".into(),
             extra_allowed_origins: Vec::new(),
+            profile_directory_app_ids: Vec::new(),
             database_url: SecretString::from("postgres://postgres@127.0.0.1:5444/silicon_accounts"),
             database_max_connections: 32,
             web_dist: None,
@@ -581,6 +589,7 @@ impl Settings {
             }
             .into(),
             internal_token: None,
+            interfaces_internal_token: None,
             report_recipients: vec![
                 "saketdev12@gmail.com".into(),
                 "shubhastro2@gmail.com".into(),
@@ -671,6 +680,14 @@ impl Settings {
             }
         }
         s.extra_allowed_origins = extras;
+        s.profile_directory_app_ids = r.list("ACCOUNTS_PROFILE_DIRECTORY_APP_IDS", "");
+        for app_id in &s.profile_directory_app_ids {
+            if let Err(message) = crate::ids::validate_app_id(app_id) {
+                r.problem("ACCOUNTS_PROFILE_DIRECTORY_APP_IDS", message);
+            }
+        }
+        s.profile_directory_app_ids.sort();
+        s.profile_directory_app_ids.dedup();
 
         if let Some(v) = r.secret("ACCOUNTS_DATABASE_URL") {
             s.database_url = v;
@@ -892,6 +909,25 @@ impl Settings {
                 "ACCOUNTS_INTERNAL_TOKEN",
                 "must be at least 32 characters so it can't be guessed",
             );
+        }
+        s.interfaces_internal_token = r.secret("ACCOUNTS_INTERFACES_INTERNAL_TOKEN");
+        if let Some(t) = &s.interfaces_internal_token {
+            if t.expose_secret().len() < 32 {
+                r.problem(
+                    "ACCOUNTS_INTERFACES_INTERNAL_TOKEN",
+                    "must be at least 32 characters so it can't be guessed",
+                );
+            }
+            if prod
+                && s.internal_token
+                    .as_ref()
+                    .is_some_and(|apps| apps.expose_secret() == t.expose_secret())
+            {
+                r.problem(
+                    "ACCOUNTS_INTERFACES_INTERNAL_TOKEN",
+                    "must differ from ACCOUNTS_INTERNAL_TOKEN in production",
+                );
+            }
         }
         s.report_recipients = r.list(
             "ACCOUNTS_REPORT_RECIPIENTS",
@@ -1117,6 +1153,20 @@ mod tests {
         assert_eq!(s.report_recipients.len(), 3);
         assert!(s.is_allowed_origin("http://localhost:8590"));
         assert!(!s.is_allowed_origin("http://localhost:5190"));
+        assert!(s.profile_directory_app_ids.is_empty());
+    }
+
+    #[test]
+    fn directory_access_requires_explicit_app_ids() {
+        let s = Settings::from_lookup(lookup(&[(
+            "ACCOUNTS_PROFILE_DIRECTORY_APP_IDS",
+            " silicon-contacts, silicon-contacts ",
+        )]))
+        .unwrap();
+        assert_eq!(s.profile_directory_app_ids, ["silicon-contacts"]);
+        assert!(
+            Settings::from_lookup(lookup(&[("ACCOUNTS_PROFILE_DIRECTORY_APP_IDS", "*")])).is_err()
+        );
     }
 
     #[test]

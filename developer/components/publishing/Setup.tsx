@@ -34,6 +34,7 @@ import {
   safeUrl,
 } from "./ui";
 import { Releases } from "./Management";
+import { InterfaceMetadata } from "./InterfaceMetadata";
 type Props = { app: App; refresh: () => void };
 export function Setup({
   app,
@@ -464,10 +465,10 @@ function AppLinks({ app, refresh }: Props) {
   const links = save.draft.links;
   const update = (next: Partial<Links>) =>
     save.update({ links: { ...links, ...next } });
-  return (
+  return (<>
     <Section
       title="Connect the rest of your app"
-      description="These links are optional. Add the places people can learn more or use your app."
+      description="These general links are optional. Interface API documentation is required before publishing a new app; add it in the section below."
     >
       <div className="form-stack">
         {(
@@ -548,6 +549,8 @@ function AppLinks({ app, refresh }: Props) {
         <SaveStatus {...save} />
       </div>
     </Section>
+    <InterfaceMetadata app={app} refresh={refresh} />
+    </>
   );
 }
 function AppMedia({ app, refresh }: Props) {
