@@ -128,7 +128,7 @@ async fn invite_action(
             let mut delivered=0;
             if let Some(target)=target {
                 let mut notification=body.get("notification").cloned().ok_or_else(||ApiError::unprocessable("notification_required","Provide a notification."))?;
-                if string(&notification,"type")?!="silicon-organizations.invite.sent"{return Err(ApiError::unprocessable("invalid_notification_type","Use silicon-organizations.invite.sent for invitation notifications."))}
+                validate_notification_type(string(&notification,"type")?)?;
                 let stable_key=string(&notification,"key")?.to_owned();
                 notification["for"]=json!(target);notification["key"]=json!(format!("{stable_key}:invite:{id}"));
                 let base=std::env::var("ACCOUNTS_TING_URL").unwrap_or_else(|_|"https://ting.teamofsilicons.com".into());
@@ -415,4 +415,38 @@ async fn mail(
         if let Some(uuid)=body.get("to_uuid").and_then(Value::as_str){sqlx::query("delete from organization_notification_contacts where account_uuid=$1").bind(uuid).execute(&mut *tx).await?;}
         tx.commit().await?;Ok((StatusCode::ACCEPTED,result))
     }).await
+}
+
+// Keep historical requests replayable while Organizations rolls onto Ting 0.4.
+// Do not rewrite the type or key: both are part of the durable send fingerprint.
+fn validate_notification_type(kind: &str) -> ApiResult<()> {
+    match kind {
+        "silicon-organizations.inviteSent" | "silicon-organizations.invite.sent" => Ok(()),
+        _ => Err(ApiError::unprocessable(
+            "invalid_notification_type",
+            "Use silicon-organizations.inviteSent for invitation notifications.",
+        )),
+    }
+}
+
+#[cfg(test)]
+mod notification_tests {
+    use super::validate_notification_type;
+
+    #[test]
+    fn accepts_current_and_replayable_legacy_invites_only() {
+        for kind in [
+            "silicon-organizations.inviteSent",
+            "silicon-organizations.invite.sent",
+        ] {
+            assert!(validate_notification_type(kind).is_ok());
+        }
+        for kind in [
+            "other.inviteSent",
+            "silicon-organizations.roleChanged",
+            "silicon-organizations.inviteSent.extra",
+        ] {
+            assert!(validate_notification_type(kind).is_err());
+        }
+    }
 }
