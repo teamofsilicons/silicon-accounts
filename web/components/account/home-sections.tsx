@@ -6,28 +6,27 @@
  * - Your Silicons, the core of the account. With none yet, one tall banner (its own gradient, grain, a Geist Serif
  *   heading) that says what a Silicon is and offers Create a Silicon (the Silicons page's create panel, /silicons?new). With some, the first two as tiles (mark, name, si:id)
  *   and a New Silicon tile, with "See all" in the heading.
- * - Your apps: the popular apps (Briefcase, DM, Ting) as simple white cards: an ink icon beside the app's name, one
- *   line, and Open (signed into) or Try (not yet), going to the app; then up to four other apps the Carbon signs into as small tiles; "See
- *   all" in the heading once there are any.
+ * - Your apps: the apps the Carbon signs into, then the popular apps not signed in to yet, all in one card. See HomeApps.
  *
  * Tiles lead to the Silicons and Connected apps pages (there is no page for one Silicon or one app yet).
  */
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BellIcon, BriefcaseIcon, ChatsCircleIcon, type Icon } from "@phosphor-icons/react";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { ButtonLink } from "@/components/foundation/button-link";
+import { formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { usePublicApps } from "@/lib/query/account";
 import { AppMark } from "./parts/app-mark";
-import { FirstSiliconBanner } from "./parts/first-silicon";
+import { withAppIcon } from "./parts/app-icons";
+import { useNow } from "./parts/common";
 import { useEveryApp, useEverySilicon } from "./parts/queries";
 import { SiliconMark } from "./parts/silicon-mark";
 import { siliconHref } from "./silicons/silicons";
 import styles from "./home-sections.module.css";
 
 const SILICON_TILES = 2;
-const APP_TILES = 4;
+const APP_CARDS = 6;
 const NEW_SILICON = `${paths.silicons}/new`;
 
 function Section({ id, title, href, children }: { id: string; title: string; href?: string; children: ReactNode }) {
@@ -35,7 +34,8 @@ function Section({ id, title, href, children }: { id: string; title: string; hre
     <section className={styles.section} aria-labelledby={id}>
       <div className={styles.head}>
         <h2 id={id} className={styles.title}>{title}</h2>
-        {href ? <Link href={href} className={styles.seeAll}>See all</Link> : null}
+        {/* A quiet link (a soft button was too loud): label weight with a chevron (Anil, 2026-11-10). */}
+        {href ? <Link href={href} className={styles.seeAll}>See All<ChevronRight size={14} strokeWidth={2} aria-hidden="true" /></Link> : null}
       </div>
       {children}
     </section>
@@ -47,14 +47,9 @@ export function HomeSilicons() {
   if (!silicons.data) return null;
   const list = silicons.data.items;
 
-  // No Silicons yet: the section's one banner (Anil, 2026-10-31).
-  if (!list.length) {
-    return (
-      <Section id="home-silicons" title="Your Silicons">
-        <FirstSiliconBanner action={<ButtonLink href={NEW_SILICON} variant="secondary" size="sm">Create a Silicon</ButtonLink>} />
-      </Section>
-    );
-  }
+  // No Silicons yet: no section for now (Anil, 2026-11-11); the introduction above presents Silicons. The first-Silicon
+  // banner it showed (parts/first-silicon.tsx) is kept for when Home wants it back.
+  if (!list.length) return null;
 
   return (
     <Section id="home-silicons" title="Your Silicons" href={paths.silicons}>
@@ -62,7 +57,7 @@ export function HomeSilicons() {
         {list.slice(0, SILICON_TILES).map(silicon => (
           <li key={silicon.uuid}>
             <Link href={siliconHref(silicon)} data-sq="surface" className={styles.tile}>
-              <SiliconMark seed={silicon.uuid} size={36} />
+              <SiliconMark seed={silicon.uuid} size={28} />
               <span className={styles.tileWords}>
                 <span className={styles.tileTitle}>{silicon.display_name || silicon.id || "A Silicon"}</span>
                 {silicon.id ? <span className={styles.tileId}>{silicon.id}</span> : null}
@@ -72,7 +67,7 @@ export function HomeSilicons() {
         ))}
         <li>
           <Link href={NEW_SILICON} data-sq="surface" className={`${styles.tile} ${styles.newTile}`}>
-            <span data-sq="surface" className={styles.plus} aria-hidden="true"><Plus size={18} strokeWidth={1.75} /></span>
+            <span data-sq="surface" className={styles.plus} aria-hidden="true"><Plus size={16} strokeWidth={1.75} /></span>
             <span className={styles.tileTitle}>New Silicon</span>
           </Link>
         </li>
@@ -83,66 +78,77 @@ export function HomeSilicons() {
 
 /**
  * The popular Team of Silicons apps Home offers (Anil, 2026-10-31): their name and address come from the API
- * (`GET /v1/apps/{app_id}/public`); each line is Anil's (2026-10-31: what you do there). Each has a
- * Phosphor icon in ink: small and light beside its name, and again large and thin as a faint watermark running off
- * the card's corner.
+ * (`GET /v1/apps/{app_id}/public`); each line is Anil's (2026-10-31: what you do there). Their marks are Anil's app
+ * icons (parts/app-icons.ts, 2026-11-10), as are Write's and Writings'.
  */
-const POPULAR_APPS: { appId: string; line: string; icon: Icon }[] = [
-  { appId: "briefcase", line: "Keep and share files with your Silicons.", icon: BriefcaseIcon },
-  { appId: "dm", line: "Message people and Silicons directly.", icon: ChatsCircleIcon },
-  { appId: "ting", line: "Get notified when your Silicons need you.", icon: BellIcon },
+const POPULAR_APPS: { appId: string; line: string }[] = [
+  { appId: "briefcase", line: "Keep and share files with your Silicons." },
+  { appId: "dm", line: "Message people and Silicons directly." },
+  { appId: "ting", line: "Get notified when your Silicons need you." },
 ];
 
+/** An app's address without the scheme, for the line under an app that has no line of Anil's. */
+function domainOf(url: string | null): string | null {
+  if (!url) return null;
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return null; }
+}
+
+/**
+ * Your apps (Anil, 2026-11-10): one grid, every app in the same tile + footer card. First the apps the Carbon signs
+ * into, most recent first: their mark, name and line (Anil's line for the popular apps, else the app's address), when
+ * they last signed in and Open. Then the popular apps (Briefcase, DM, Ting) not signed in to yet: "Not signed in yet"
+ * and Try (soft). Up to APP_CARDS; "See all" goes to Connected apps. Which apps show here is still open (Anil is
+ * thinking of a different logic); the separate Try an app section is gone.
+ *
+ * With no app signed in to, the section doesn't show: the introduction above presents apps (Anil, 2026-11-11).
+ */
 export function HomeApps() {
   const apps = useEveryApp();
+  const now = useNow(60_000);
   const popular = usePublicApps(POPULAR_APPS.map(item => item.appId));
   if (!apps.data) return null;
-  // Only apps the Carbon still signs into (not those whose access they removed).
-  const list = apps.data.items.filter(item => item.status === "active");
-  const joined = new Set(list.map(item => item.app.app_id));
-  const others = list.filter(item => !POPULAR_APPS.some(entry => entry.appId === item.app.app_id));
+  // Only apps the Carbon still signs into (not those whose access they removed), most recent first.
+  const list = apps.data.items
+    .filter(item => item.status === "active")
+    .sort((a, b) => (b.last_signed_in_at ?? "").localeCompare(a.last_signed_in_at ?? ""));
+  if (!list.length) return null;
+  const untried = POPULAR_APPS.flatMap((entry, index) => {
+    const app = popular[index]?.data;
+    return app && !list.some(item => item.app.app_id === entry.appId) ? [{ entry, app }] : [];
+  });
+  const cards = [
+    ...list.map(item => {
+      const line = POPULAR_APPS.find(candidate => candidate.appId === item.app.app_id)?.line ?? domainOf(item.app.homepage_url);
+      return { app: item.app, line, when: item.last_signed_in_at ? formatRelative(item.last_signed_in_at, now) : null, joined: true };
+    }),
+    ...untried.map(({ entry, app }) => ({ app, line: entry.line, when: null, joined: false })),
+  ].slice(0, APP_CARDS);
 
   return (
-    <Section id="home-apps" title="Your apps" href={list.length ? paths.apps : undefined}>
+    <Section id="home-apps" title="Your apps" href={paths.apps}>
       <ul className={styles.tiles}>
-        {POPULAR_APPS.map((entry, index) => {
-          const app = popular[index]?.data;
-          if (!app) return null;
-          const open = joined.has(entry.appId);
-          const AppIcon = entry.icon;
-          return (
-            <li key={entry.appId}>
-              <div data-sq="surface" className={styles.appCard}>
-                <AppIcon className={styles.appMark} size={120} weight="thin" aria-hidden="true" />
-                <span className={styles.appHead}>
-                  <AppIcon className={styles.appIcon} size={20} weight="light" aria-hidden="true" />
+        {cards.map(({ app, line, when, joined }) => (
+          <li key={app.app_id}>
+            <div data-sq="surface" className={styles.appCard}>
+              <div className={styles.appTop}>
+                <AppMark app={withAppIcon(app)} size={40} className={styles.appMark} decorative />
+                <span className={styles.appWords}>
                   <span className={styles.appName}>{app.name}</span>
+                  {line ? <span className={styles.appLine}>{line}</span> : null}
                 </span>
-                <span className={styles.appLine}>{entry.line}</span>
+              </div>
+              <div className={styles.appFooter}>
+                <span className={styles.appFact}>{when ? <>Signed in <span className={styles.appWhen}>{when}</span></> : "Not signed in yet"}</span>
                 {app.homepage_url ? (
-                  <ButtonLink href={app.homepage_url} external variant={open ? "primary" : "secondary"} size="sm" className={styles.appAction} aria-label={`${open ? "Open" : "Try"} ${app.name}`}>
-                    {open ? "Open" : "Try"}
+                  <ButtonLink href={app.homepage_url} external variant={joined ? "secondary" : "soft"} size="xs" aria-label={`${joined ? "Open" : "Try"} ${app.name}`}>
+                    {joined ? "Open" : "Try"}
                   </ButtonLink>
                 ) : null}
               </div>
-            </li>
-          );
-        })}
+            </div>
+          </li>
+        ))}
       </ul>
-      {others.length ? (
-        <ul className={`${styles.tiles} ${styles.four}`}>
-          {others.slice(0, APP_TILES).map(item => (
-            <li key={item.app.app_id}>
-              <Link href={paths.apps} data-sq="surface" className={styles.tile}>
-                <AppMark app={item.app} size={36} decorative />
-                <span className={styles.tileWords}>
-                  <span className={styles.tileTitle}>{item.app.name}</span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </Section>
   );
 }

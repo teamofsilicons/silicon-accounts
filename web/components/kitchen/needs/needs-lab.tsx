@@ -19,6 +19,7 @@ import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Progress } from "@teamofsilicons/silicon-ui/progress";
 import { SiliconMark } from "@/components/account/parts/silicon-mark";
+import { CompactNeeds } from "./needs-compact";
 import styles from "./needs-lab.module.css";
 
 interface Item {
@@ -50,7 +51,7 @@ const DEVICE: Item = {
   lead: tone => tile(<Laptop size={16} strokeWidth={1.75} />, tone),
   title: "Still using Terminal · silicon-accounts CLI?",
   detail: "Last used 12 days ago",
-  actions: <><Button variant="ghost" size="sm">Keep</Button><Button variant="secondary" size="sm">Sign out</Button></>,
+  actions: <><Button variant="ghost" size="sm">Keep</Button><Button variant="secondary" size="sm">Sign Out</Button></>,
 };
 
 const ONE = [PHONE];
@@ -70,8 +71,10 @@ export function NeedsLab() {
     <main className={styles.lab}>
       <header className={styles.intro}>
         <h1 className={styles.title}>Needs you: alternatives</h1>
-        <p className={styles.lede}>Each design with one thing waiting, then three. Sample words; buttons do nothing here.</p>
+        <p className={styles.lede}>First the compact versions (2026-11-11, at Home&rsquo;s width, three things then one), then the earlier alternatives. Sample words; buttons do nothing here.</p>
       </header>
+      <CompactNeeds />
+      <h2 className={styles.title}>Earlier alternatives</h2>
       {DESIGNS.map(design => (
         <section key={design.id} className={styles.design} aria-labelledby={`design-${design.id}`}>
           <div className={styles.designHead}>

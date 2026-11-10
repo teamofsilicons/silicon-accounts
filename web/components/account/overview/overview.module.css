@@ -8,7 +8,7 @@
 .greeting { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-inset); }
 /* Tight stack so the title + handle match the ringed photo beside them. */
 .greetingText { display: grid; min-width: 0; justify-items: start; gap: var(--space-tight); }
-.title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); overflow-wrap: anywhere; }
+.title { margin: 0; color: var(--foreground); font: var(--h1); letter-spacing: var(--h1-tracking); overflow-wrap: anywhere; }
 /* Your photo in the prototype's ring: a conic gradient of the Silicon colours, a white gap, then the photo. */
 .ring { display: inline-grid; flex: none; padding: var(--space-tight); border-radius: var(--radius-full); corner-shape: round; background: conic-gradient(from 200deg, var(--silicon-mark-1-from), var(--silicon-mark-1-to), var(--silicon-mark-2-to), var(--silicon-mark-2-from), var(--silicon-mark-3-from), var(--silicon-mark-1-from)); }
 .ring > * { box-shadow: 0 0 0 3px var(--surface); }

@@ -1,0 +1,78 @@
+/* /__banner: introduction banner alternatives (banner-lab.tsx). Each design at Home's column width, on tokens and the
+   type roles. Lines between rows sit on unrounded rows (decisions.md: lines between rows are straight). */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-max) + 2 * var(--gutter)); gap: var(--space-page); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; justify-items: start; gap: var(--space-related); }
+.title { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.switches { display: flex; flex-wrap: wrap; gap: var(--space-group); }
+.lede { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+
+.design { display: grid; gap: var(--space-inset); }
+.designHead { display: grid; gap: var(--space-tight); }
+.designName { margin: 0; font: var(--h3); letter-spacing: var(--h3-tracking); }
+.designNote { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+/* The page around each design: Home's background, the column centred at its width. */
+.stage { padding: var(--space-block) var(--gutter); border-radius: var(--radius-container); background: var(--background); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.column { width: 100%; max-width: var(--page-narrow); margin-inline: auto; }
+
+/* Shared ----------------------------------------------------------------------------------------------------------- */
+.box { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-group); padding: var(--space-inset) var(--space-inset) var(--space-group); }
+.headText { display: grid; gap: var(--space-hair); }
+.boxTitle { margin: 0; font: var(--h3); letter-spacing: var(--h3-tracking); }
+.sectionTitle { margin: 0; font: var(--h2); letter-spacing: var(--h2-tracking); }
+.meta { color: var(--text-secondary); font: var(--small); font-variant-numeric: tabular-nums; letter-spacing: var(--small-tracking); white-space: nowrap; }
+.text { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); }
+.rowTitle { color: var(--foreground); font: var(--body); font-weight: var(--weight-medium); letter-spacing: var(--body-tracking); }
+.rowLine { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+/* A step's mark: its icon on a grey tile, a tick on green once done. */
+.mark { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); display: grid; width: var(--control-height-sm); height: var(--control-height-sm); flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
+.mark[data-done] { --sq-fill: color-mix(in oklab, var(--success) 14%, var(--surface)); color: var(--success); }
+
+/* All done: one quiet line, then it goes. */
+.allSet { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; align-items: center; gap: var(--space-group); padding: var(--space-group) var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.allSetText { flex: 1; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.allSetText strong { color: var(--foreground); font-weight: var(--weight-medium); }
+
+/* A · Checklist ---------------------------------------------------------------------------------------------------- */
+.progress { margin: 0 var(--space-inset) var(--space-related); width: auto; }
+.rows { display: grid; margin: 0; padding: 0; list-style: none; }
+.row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-group) var(--space-inset); border-top: 1px solid var(--border-subtle); }
+.row[data-done] .rowTitle { color: var(--text-secondary); font-weight: var(--weight-regular); }
+
+/* B · Guided ------------------------------------------------------------------------------------------------------- */
+.guided { padding: 0 var(--space-inset) var(--space-related); }
+.guidedBody { display: flex; align-items: center; gap: var(--space-inset); }
+.guidedText { display: grid; flex: 1; justify-items: start; gap: var(--space-group); }
+.picture { --sq-r: var(--radius-container); --sq-fill: var(--surface-muted); display: grid; width: var(--space-stage); height: var(--space-stage); flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
+
+/* C · Cards -------------------------------------------------------------------------------------------------------- */
+.cardsBlock { display: grid; gap: var(--space-related); }
+.cardsBlock .head { padding: 0; }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); margin: 0; padding: 0; list-style: none; }
+.card { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; align-content: start; justify-items: start; gap: var(--space-related); padding: var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.card[data-done] { --sq-fill: var(--background); --sq-stroke: var(--border-subtle); }
+.cardTitle { margin-top: var(--space-tight); color: var(--foreground); font: var(--body); font-weight: var(--weight-medium); letter-spacing: var(--body-tracking); }
+.card[data-done] .cardTitle { color: var(--text-secondary); }
+.cardAction { margin-top: var(--space-tight); }
+@media (max-width: 639px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+
+/* D · Strip -------------------------------------------------------------------------------------------------------- */
+.strip { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; align-items: center; gap: var(--space-group); padding: var(--space-group) var(--space-group) var(--space-group) var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+@media (max-width: 639px) { .strip { flex-wrap: wrap; } }
+
+/* E · Stepper ------------------------------------------------------------------------------------------------------ */
+.stepperBody { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-inset); margin-top: var(--space-related); }
+.stepperAction { flex: none; }
+
+/* F · Welcome sheet ------------------------------------------------------------------------------------------------ */
+.sheetStage { display: grid; place-items: center; min-height: calc(var(--space-screen) * 2); }
+.sheetList { display: grid; gap: var(--space-inset); margin: 0; padding: 0; list-style: none; }
+.sheetItem { display: flex; align-items: flex-start; gap: var(--space-group); }
+.sheetActions { display: flex; justify-content: flex-end; margin-top: var(--space-section); }
+.picker { width: min(100%, 22rem); }
+.code { color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-xs); font-weight: var(--weight-regular); letter-spacing: 0; }
+.ratio { display: grid; gap: var(--space-related); }
+.ratioName { margin: 0; color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.ratioNote { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+/* Wider than Home's column by a page step on each side (720 + 2 × 48). */
+.columnWide { width: 100%; max-width: calc(var(--page-narrow) + var(--space-page) * 2); margin-inline: auto; }

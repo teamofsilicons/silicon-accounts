@@ -77,7 +77,7 @@ export function Sessions() {
         <Alert tone="danger" title="Your sessions did not load">
           {describeError(sessions.error)}
           <span className={styles.alertAction}>
-            <Button variant="secondary" size="sm" onClick={() => void sessions.refetch()}>Try again</Button>
+            <Button variant="secondary" size="sm" onClick={() => void sessions.refetch()}>Try Again</Button>
           </span>
         </Alert>
       ) : !sessions.data ? (
@@ -126,7 +126,7 @@ function SessionRow({ session, now, signingOut, onSignOutHere, onRevoke }: { ses
       </div>
       <div className={styles.action}>
         {session.current ? (
-          <Button variant="secondary" size="sm" onClick={onSignOutHere} loading={signingOut}>Sign out</Button>
+          <Button variant="secondary" size="sm" onClick={onSignOutHere} loading={signingOut}>Sign Out</Button>
         ) : (
           <ConfirmMorph
             label="Sign out"

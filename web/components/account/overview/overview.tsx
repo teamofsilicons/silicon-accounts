@@ -56,7 +56,7 @@ export function Overview() {
       <Page>
         <Alert tone="danger" title="Your account did not load">
           {describeError(me.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try again</Button></span>
+          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try Again</Button></span>
         </Alert>
       </Page>
     );
@@ -177,7 +177,7 @@ function NeedsYou({ me }: { me: Me }) {
       <ul className={styles.rows}>
         {failed ? (
           <Row lead={<span data-sq="surface" className={styles.iconTile} aria-hidden="true"><X size={16} strokeWidth={1.75} /></span>} title="Requests waiting for you did not load" detail={describeError(requests.error)}>
-            <Button variant="secondary" size="sm" onClick={() => void requests.refetch()}>Try again</Button>
+            <Button variant="secondary" size="sm" onClick={() => void requests.refetch()}>Try Again</Button>
           </Row>
         ) : null}
         {waiting.map(request => request.kind === "transfer" ? (
@@ -242,7 +242,7 @@ function Checklist({ steps }: { steps: Step[] }) {
               {step.key === "devices" && step.stale ? (
                 <>
                   <Button variant="ghost" size="sm" onClick={() => step.stale && keepSession(step.stale.id)}>Keep</Button>
-                  <Button variant="secondary" size="sm" loading={signOut.isPending} onClick={() => step.stale && void signOut.mutateAsync(step.stale.id).catch(() => undefined)}>Sign out</Button>
+                  <Button variant="secondary" size="sm" loading={signOut.isPending} onClick={() => step.stale && void signOut.mutateAsync(step.stale.id).catch(() => undefined)}>Sign Out</Button>
                 </>
               ) : (
                 <ButtonLink href={paths.signInMethods} variant="secondary" size="sm">{step.key === "provider" ? "Connect" : "Add"}</ButtonLink>
@@ -358,7 +358,7 @@ function YourSilicons() {
       {silicons.error && !silicons.data ? (
         <Alert tone="danger" title="Your Silicons did not load">
           {describeError(silicons.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void silicons.refetch()}>Try again</Button></span>
+          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void silicons.refetch()}>Try Again</Button></span>
         </Alert>
       ) : !silicons.data ? (
         <TilesSkeleton count={3} />
@@ -410,7 +410,7 @@ function YourApps() {
       {apps.error && !apps.data ? (
         <Alert tone="danger" title="Your apps did not load">
           {describeError(apps.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void apps.refetch()}>Try again</Button></span>
+          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void apps.refetch()}>Try Again</Button></span>
         </Alert>
       ) : !apps.data ? (
         <TilesSkeleton count={4} />

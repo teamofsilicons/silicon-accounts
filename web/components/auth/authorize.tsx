@@ -95,7 +95,7 @@ function AuthorizeStart({ query }: AuthorizeProps) {
         title="Nothing to sign in to"
         message="This address is where apps send you to sign in, and this visit did not come from an app."
         hint="Open the app you want to use and choose to sign in there. To manage your own account, go to your account."
-        actions={[{ label: "Go to your account", href: paths.home }]}
+        actions={[{ label: "Go to Your Account", href: paths.home }]}
       />
     );
   }
@@ -126,7 +126,7 @@ function AuthorizeStart({ query }: AuthorizeProps) {
 function AuthorizeProblem({ error, appId, redirectUri, onRetry }: { error: ApiError; appId: string | null; redirectUri: string | null; onRetry: () => void }) {
   const backTo = safeRedirect(error.redirectTo);
   const details: Array<[string, string | null]> = [["app_id", appId], ["redirect_uri", redirectUri]];
-  const retry = [{ label: "Try again", onClick: onRetry }];
+  const retry = [{ label: "Try Again", onClick: onRetry }];
   // A limit, an outage, or a request that never got an answer (status 0: the network, or this page itself).
   const retryable = error.code === "rate_limited" || error.status === 0 || error.status >= 500;
   const brokenLink = !retryable && error.code !== "app_disabled" && error.status >= 400;
@@ -150,9 +150,9 @@ function AuthorizeProblem({ error, appId, redirectUri, onRetry }: { error: ApiEr
   const actions = (() => {
     if (retryable) return retry;
     // The server checked the redirect URI before building this: going back tells the app what went wrong.
-    if (backTo) return [{ label: "Back to the app", href: backTo, external: true, variant: "secondary" as const }];
+    if (backTo) return [{ label: "Back to the App", href: backTo, external: true, variant: "secondary" as const }];
     // Nowhere safe to send the visitor back to: their own account is a way out of the dead end.
-    return [{ label: "Go to your account", href: paths.home }];
+    return [{ label: "Go to Your Account", href: paths.home }];
   })();
   /** What the visitor reads (the server's words, written for the app's developers, go to the details). */
   const words = (() => {

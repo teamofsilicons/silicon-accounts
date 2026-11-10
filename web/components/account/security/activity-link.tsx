@@ -14,7 +14,7 @@ export function ActivityLink() {
         <History size={20} strokeWidth={1.75} aria-hidden="true" className={styles.icon} />
         <p className={styles.text}>Check here when something looks wrong: a sign-in you don&apos;t recognise, a new way in, an app you removed.</p>
         <ButtonLink href={paths.activity} variant="secondary" size="sm">
-          See activity
+          See Activity
           <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
         </ButtonLink>
       </div>

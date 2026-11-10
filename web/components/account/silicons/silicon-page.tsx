@@ -41,7 +41,7 @@ export function SiliconPage({ uuid }: { uuid: string }) {
       <Page header={<PageHeader title="Silicon" back={back} />}>
         <Alert tone="danger" title="This Silicon did not load">
           {describeError(silicons.error ?? me.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void silicons.refetch()}>Try again</Button></span>
+          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void silicons.refetch()}>Try Again</Button></span>
         </Alert>
       </Page>
     );
@@ -59,7 +59,7 @@ export function SiliconPage({ uuid }: { uuid: string }) {
         <EmptyState
           title="No Silicon here"
           description="It may have been deleted or handed to another Carbon, or it was never in your care."
-          action={<ButtonLink href={paths.silicons} variant="secondary">See your Silicons</ButtonLink>}
+          action={<ButtonLink href={paths.silicons} variant="secondary">See Your Silicons</ButtonLink>}
         />
       </Page>
     );

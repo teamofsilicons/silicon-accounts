@@ -1,0 +1,43 @@
+/* Security (security.tsx), on Home's rules (Anil, 2026-11-10): Home's column (896, --page-narrow), sections 32px apart
+   (the column's 16 and 16 more) with an h2 16px above a boxed list; one white list with a clear border and no resting
+   shadow; rows 8px high and 12px at the sides, straight dividers between them (rows aren't rounded); a 28px mark; the
+   title in body over one line in --text-soft; title-case buttons, outlined, with a quiet soft Keep. */
+
+.section { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
+.head { display: flex; align-items: center; gap: var(--space-related); }
+.title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
+
+.rows { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); list-style: none; }
+.row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-related) var(--space-group); }
+.row + .row, .row + .foot { border-top: 1px solid var(--border-subtle); }
+.text { display: grid; min-width: 0; flex: 1; gap: 0; }
+.rowTitle { min-width: 0; overflow: hidden; color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.rowDetail { min-width: 0; overflow: hidden; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+/* The information in a line ("3 weeks ago"), in the text colour, as on Home's app cards. */
+.strong { color: var(--foreground); font-variant-numeric: tabular-nums; }
+.rowError { color: var(--danger); font: var(--small); letter-spacing: var(--small-tracking); }
+.actions { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--space-related); }
+/* Keep on Home's lighter soft fill (home-needs.module.css). */
+.keep { display: contents; --surface-muted: var(--neutral-2); --surface-pressed: var(--neutral-3); }
+.foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); padding: var(--space-related) var(--space-group); }
+
+/* 28px marks: a grey tile with an icon, or a logo on its own (Google, Apple, a browser). */
+.icon { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
+.provider { display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; color: var(--foreground); }
+.logo { display: block; width: var(--control-height-xs); height: var(--control-height-xs); }
+
+/* Activity: one row that is the link, a chevron at its end. */
+.linkRow { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-related) var(--space-group); border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); text-decoration: none; transition: box-shadow var(--duration-fast) var(--ease-standard); }
+@media (hover: hover) and (pointer: fine) { .linkRow:hover { box-shadow: var(--shadow-raised); } }
+.linkRow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chevron { flex: none; color: var(--text-muted); }
+
+.alertAction { display: block; margin-top: var(--space-related); }
+.skeleton { display: grid; gap: var(--space-section); margin-top: var(--space-section); }
+
+@media (prefers-reduced-motion: reduce) { .linkRow { transition: none; } }
+@media (max-width: 639px) {
+  /* Two buttons (Keep and Sign Out) go under the words on a phone; a single button stays at the row's end. */
+  .row[data-wide] { flex-wrap: wrap; }
+  .row[data-wide] .actions { width: 100%; justify-content: flex-start; padding-left: calc(var(--control-height-xs) + var(--space-tight) + var(--space-group)); }
+}

@@ -1,0 +1,105 @@
+/* /__banner visual directions (banner-visuals.tsx). Layers, bottom up: the banner's surface; .art, the picture with
+   its fade or scrim; the content; floating pieces with soft shadows. Tokens throughout; the pictures are
+   public/banner/bg-*.webp. */
+
+/* The surface and its picture layer ------------------------------------------------------------------------------ */
+.banner { --sq-r: var(--radius-overlay); --sq-fill: var(--surface); --sq-stroke: var(--border); position: relative; isolation: isolate; display: flex; overflow: hidden; min-height: calc(var(--space-screen) * 3.25); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.art { position: absolute; z-index: -1; inset: 0; background-repeat: no-repeat; background-size: cover; pointer-events: none; }
+
+/* Shared type and pieces */
+.headLine { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-group); }
+.title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
+.titleLarge { margin: 0; color: var(--foreground); font: var(--display); letter-spacing: var(--display-tracking); }
+.titleOnDark { margin: 0; color: var(--primary-foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
+.lede { margin: var(--space-tight) 0 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.ledeOnDark { margin: var(--space-tight) 0 0; color: color-mix(in oklab, var(--primary-foreground) 72%, transparent); font: var(--small); letter-spacing: var(--small-tracking); }
+.dismiss, .dismissOnDark { flex: none; }
+.banner > .dismiss, .banner > .dismissOnDark { position: absolute; top: var(--space-group); right: var(--space-group); }
+/* On dark pictures the ghost button's grey would vanish: its colour comes from the token it reads. */
+.dismissOnDark { --text-secondary: color-mix(in oklab, var(--primary-foreground) 80%, transparent); --surface-muted: color-mix(in oklab, var(--primary-foreground) 14%, transparent); --foreground: var(--primary-foreground); }
+.allSet, .allSetOnDark { display: flex; align-items: center; gap: var(--space-related); margin: var(--space-group) 0 0; color: var(--success); font: var(--body); font-weight: var(--weight-medium); letter-spacing: var(--body-tracking); }
+.allSetOnDark { color: var(--primary-foreground); }
+.progress { width: 100%; margin-top: var(--space-group); }
+
+.mark { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); display: grid; width: var(--control-height-xs); height: var(--control-height-xs); flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
+.mark[data-done] { --sq-fill: color-mix(in oklab, var(--success) 14%, var(--surface)); color: var(--success); }
+.markGlass { --sq-r: var(--radius-control); --sq-fill: color-mix(in oklab, var(--primary-foreground) 16%, transparent); display: grid; width: var(--control-height-xs); height: var(--control-height-xs); flex: none; place-items: center; background: var(--sq-fill); color: var(--primary-foreground); }
+
+/* Step rows: on white (lines between, the rows unrounded) or glass on a dark picture. */
+.rows, .rowsGlass { display: grid; margin: var(--space-group) 0 0; padding: 0; list-style: none; }
+.row { display: flex; min-width: 0; min-height: var(--control-height-md); align-items: center; gap: var(--space-group); padding-block: var(--space-related); }
+.rows .row + .row { border-top: 1px solid var(--border-subtle); }
+.rowTitle { flex: 1; min-width: 0; color: var(--foreground); font: var(--body); font-weight: var(--weight-medium); letter-spacing: var(--body-tracking); }
+.row[data-done] .rowTitle { color: var(--text-secondary); font-weight: var(--weight-regular); }
+.rowMeta { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.rowsGlass { gap: var(--space-tight); }
+.rowsGlass .row { --sq-r: var(--radius-control); padding-inline: var(--space-group); border-radius: var(--radius-control); background: color-mix(in oklab, var(--primary-foreground) 10%, transparent); backdrop-filter: blur(var(--space-group)); }
+.rowsGlass .rowTitle { color: var(--primary-foreground); }
+.rowsGlass .row[data-done] .rowTitle, .rowsGlass .rowMeta { color: color-mix(in oklab, var(--primary-foreground) 64%, transparent); }
+
+.cardTitle { color: var(--foreground); font: var(--body); font-weight: var(--weight-medium); letter-spacing: var(--body-tracking); }
+.cardLine { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+
+/* Meadow: the dithered green at the lower right; white over the left, where the words sit. ----------------------- */
+.meadow .art { background-image: linear-gradient(100deg, var(--surface) 30%, color-mix(in oklab, var(--surface) 0%, transparent) 70%), url("/banner/bg-126.webp"); background-position: center, right bottom; background-size: auto, cover; }
+.meadowWords { display: grid; align-content: start; width: 58%; padding: var(--space-comfort); }
+.list { display: grid; gap: var(--space-related); margin: var(--space-inset) 0 0; padding: 0; list-style: none; }
+.listItem { display: flex; align-items: center; gap: var(--space-group); color: var(--text-secondary); font: var(--body); letter-spacing: var(--body-tracking); }
+.listItem[data-next] { color: var(--foreground); font-weight: var(--weight-medium); }
+/* A done step: its words struck through in their own colour, on the words only (not the mark). */
+.listItem[data-done] > span:last-child { text-decoration: line-through; }
+.floatCard { --sq-r: var(--radius-container); --sq-fill: var(--surface); position: absolute; right: var(--space-comfort); bottom: var(--space-comfort); display: grid; width: 15rem; gap: var(--space-tight); padding: var(--space-inset); background: var(--sq-fill); box-shadow: var(--shadow-floating); }
+.floatEyebrow { color: var(--accent-ink); font: var(--caption); letter-spacing: var(--caption-tracking); text-transform: uppercase; }
+.floatTitle { color: var(--foreground); font: var(--body); font-weight: var(--weight-medium); letter-spacing: var(--body-tracking); }
+.floatLine { margin-bottom: var(--space-related); color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+
+/* Hills: a picture band with the greeting in its sky; the step cards straddle its lower edge. -------------------- */
+.hills { display: grid; }
+.hillsBand { --sq-r: var(--radius-overlay); --sq-fill: var(--surface); position: relative; isolation: isolate; overflow: hidden; min-height: calc(var(--space-screen) * 2.25); padding: var(--space-comfort) var(--space-comfort) var(--space-stage); background: var(--sq-fill); }
+.hillsBand .art { background-image: url("/banner/bg-127.webp"); background-position: center 70%; }
+.hillsCards { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); margin: calc(var(--space-stage) * -1) var(--space-comfort) 0; padding: 0; list-style: none; }
+.hillsCard { --sq-r: var(--radius-container); --sq-fill: var(--surface); display: grid; align-content: start; justify-items: start; gap: var(--space-related); padding: var(--space-inset); background: var(--sq-fill); box-shadow: var(--shadow-raised); }
+.hillsCard[data-done] { --sq-fill: color-mix(in oklab, var(--surface) 82%, transparent); backdrop-filter: blur(var(--space-group)); }
+.hillsAllSet { margin: calc(var(--space-block) * -1) var(--space-comfort) 0; }
+
+/* Golden: warm watercolour, a frosted panel, the avatar over its edge. ----------------------------------------- */
+.golden { align-items: center; padding: var(--space-stage) var(--space-comfort) var(--space-comfort); }
+.golden .art { background-image: url("/banner/bg-110.webp"); background-position: center; }
+.goldenPanel { --sq-r: var(--radius-container); --sq-fill: color-mix(in oklab, var(--surface) 78%, transparent); position: relative; width: min(100%, 26rem); margin-inline: auto; padding: var(--space-block) var(--space-comfort) var(--space-group); background: var(--sq-fill); box-shadow: var(--shadow-raised); backdrop-filter: blur(var(--space-inset)) saturate(1.2); }
+/* The ring takes the avatar's own shape (Silicon UI's avatar tokens), so ring and picture match. */
+.goldenAvatar { position: absolute; top: 0; left: var(--space-comfort); display: block; line-height: 0; translate: 0 -55%; border-radius: var(--avatar-radius); corner-shape: var(--avatar-corner-shape); box-shadow: 0 0 0 var(--space-tight) var(--surface), var(--shadow-raised); }
+
+/* Peach: the gradient on the right; a stack of step cards in it, the next in front. --------------------------- */
+.peach { align-items: center; padding: var(--space-comfort); }
+.peach .art { background-image: linear-gradient(90deg, var(--surface) 22%, color-mix(in oklab, var(--surface) 0%, transparent) 62%), url("/banner/bg-102.webp"); background-position: center, right center; background-size: auto, cover; }
+.peachWords { display: grid; justify-items: start; gap: var(--space-related); width: 45%; }
+.peachWords .lede { margin: 0; }
+.peachStack { position: relative; display: grid; flex: 1; place-items: center; min-height: calc(var(--space-screen) * 2.4); }
+.peachCard { --sq-r: var(--radius-container); --sq-fill: var(--surface); position: relative; z-index: 3; grid-area: 1 / 1; display: grid; justify-items: start; gap: var(--space-related); width: 17rem; padding: var(--space-inset); background: var(--sq-fill); box-shadow: var(--shadow-floating); transition: translate var(--duration-standard) var(--ease-standard), scale var(--duration-standard) var(--ease-standard); }
+.peachCard[data-depth="1"] { z-index: 2; translate: var(--space-comfort) calc(var(--space-group) * -1); scale: .94; opacity: .9; box-shadow: var(--shadow-raised); }
+.peachCard[data-depth="2"] { z-index: 1; translate: calc(var(--space-comfort) * 2) calc(var(--space-group) * -2); scale: .88; opacity: .75; box-shadow: var(--shadow-resting); }
+
+/* Forest: full bleed under a dark scrim on the left; light words, glass rows. ---------------------------------- */
+.forest { --sq-stroke: transparent; padding: var(--space-comfort); }
+.forest .art { background-image: linear-gradient(90deg, color-mix(in oklab, var(--foreground) 78%, transparent) 25%, color-mix(in oklab, var(--foreground) 0%, transparent) 75%), url("/banner/bg-139.webp"); background-position: center, center 40%; background-size: auto, cover; }
+.forestWords { width: min(100%, 24rem); }
+
+/* Stage: dark; the figure fades in from the right; a glowing Silicon mark. ------------------------------------- */
+.stage { --sq-fill: var(--foreground); --sq-stroke: transparent; align-items: flex-end; padding: var(--space-comfort); }
+.stage .art { left: 35%; background-image: linear-gradient(90deg, var(--foreground) 0%, color-mix(in oklab, var(--foreground) 0%, transparent) 45%), url("/banner/bg-024.webp"); background-position: center, center 30%; background-size: auto, cover; }
+.stageWords { display: grid; justify-items: start; gap: var(--space-tight); width: min(100%, 22rem); }
+.stageMark { margin-bottom: var(--space-related); border-radius: var(--radius-container); box-shadow: 0 0 var(--space-block) var(--space-tight) color-mix(in oklab, var(--silicon-mark-1-from) 55%, transparent); }
+.stageActions { display: flex; align-items: center; gap: var(--space-group); margin-top: var(--space-group); }
+.stageCount { color: color-mix(in oklab, var(--primary-foreground) 60%, transparent); font: var(--small); letter-spacing: var(--small-tracking); }
+
+@media (max-width: 639px) {
+  .meadowWords, .peachWords { width: 100%; }
+  .meadow, .peach { flex-direction: column; align-items: stretch; }
+  .floatCard { position: relative; right: auto; bottom: auto; width: auto; margin: 0 var(--space-comfort) var(--space-comfort); }
+  .hillsCards { grid-template-columns: minmax(0, 1fr); }
+  .stage .art { left: 0; opacity: .45; }
+  /* Narrow: the words cover the whole width, so the wash does too. */
+  .forest .art { background-image: linear-gradient(180deg, color-mix(in oklab, var(--foreground) 72%, transparent), color-mix(in oklab, var(--foreground) 52%, transparent)), url("/banner/bg-139.webp"); }
+}
+/* The cards behind are only their shape: their words would show through the one in front. */
+.peachCard:not([data-depth="0"]) > * { visibility: hidden; }

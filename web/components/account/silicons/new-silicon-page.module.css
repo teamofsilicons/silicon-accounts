@@ -1,9 +1,11 @@
-/* /silicons/new: the breadcrumbs in a lean row across the top of the content area, then the title and its line as Silicon
-   UI's own pages set them. The breadcrumb and fields keep Silicon UI's look: nothing here restyles them. */
-/* Pinned to the top of the scrolling panel (under the top bar on phones), on the panel's white so content passes behind. */
-.crumbs { position: sticky; z-index: var(--layer-sticky); top: var(--top-height, 0px); padding: var(--space-related) var(--space-inset); background: var(--surface); }
-/* The form's width, so the two share a right edge. The margins keep it 24 px under the breadcrumbs and 32 px above the form. */
-.header { display: grid; width: 100%; max-width: 480px; gap: var(--space-related); margin: calc(var(--space-related) * -1) auto var(--space-related); }
-.title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 600; letter-spacing: var(--tracking-display); line-height: var(--leading-display); }
-.description { margin: 0; color: var(--text-secondary); font-size: var(--text-base); line-height: 1.5; }
+/* /silicons/new: one box in the narrow column under the page bar. It isn't Silicon UI's Card, which clips (it would cut off the
+   Timezone list), and nothing here restyles a component. */
+/* A fixed 480 px, so the fields and map fill it but for one even padding. */
+.box { --sq-r: var(--radius-overlay); width: 100%; max-width: 480px; margin-inline: auto; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-raised); }
+
+/* The top of the box: the watercolour image (public/) with light text: the page's line, then the Stepper. */
+.header { --sq-r: var(--radius-overlay); --sq-bl: 0; --sq-br: 0; display: grid; min-height: 148px; align-content: space-between; gap: var(--space-group); padding: var(--space-inset); background: url("/BG%20131%20%E2%80%94%20Pastel%20Cloud%20Painting.png") left bottom / 120% auto; color: var(--on-media); }
+.description { max-width: 44ch; margin: 0; font-size: var(--text-base); line-height: 1.5; }
+
+.body { padding: var(--space-inset); }
 .alertAction { display: block; margin-top: var(--space-group); }

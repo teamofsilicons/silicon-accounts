@@ -2,7 +2,9 @@
 
 /**
  * Personal info (/personal), built to the lead designer's prototype (redesign/prototype-v7.html: personal, .scard,
- * .srow): the page title, then two bordered boxes of rows. Each whole row opens its editor in a dialog: a row is a
+ * .srow) on Silicon UI (Anil, 2026-11-09): the page bar (parts/page-bar.tsx), then a Silicon UI Card per group with its
+ * rows. Silicon UI has no settings row yet (redesign/requests/silicon-ui-settings-list.md), so the rows are drawn here
+ * with tokens and the type roles until it ships. Each whole row opens its editor in a dialog: a row is a
  * link to `?edit=<field>`, and the dialog follows the address (closing it drops the parameter, and focus goes back to
  * the row), so an editor can be linked to, as from the palette's "Change your id".
  *
@@ -21,11 +23,12 @@ import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Calendar } from "@teamofsilicons/silicon-ui/calendar";
+import { Card } from "@teamofsilicons/silicon-ui/card";
 import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
 import { Input } from "@teamofsilicons/silicon-ui/input";
 import { Select } from "@teamofsilicons/silicon-ui/select";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
-import { Page, PageHeader } from "@/components/foundation/layout/layout";
+import { Page } from "@/components/foundation/layout/layout";
 import type { CarbonMe, Me } from "@/lib/api/types";
 import { useCarbonPicture } from "@/lib/carbon-avatar";
 import { useRegisterCommands } from "@/lib/commands";
@@ -36,6 +39,7 @@ import { useMe } from "@/lib/query/session";
 import { asCarbon, describeError } from "../parts/common";
 import { TimezoneForm } from "../parts/detail-editors";
 import { IdChangeForm } from "../parts/id-change-form";
+import { PageBar } from "../parts/page-bar";
 import { PhotoControl } from "../parts/photo-control";
 import { useChangeOwnId } from "../parts/queries";
 import { ContactList } from "../sign-in-methods/sign-in-methods";
@@ -72,35 +76,37 @@ export function Identity() {
   const close = () => router.replace(paths.personal, { scroll: false });
 
   return (
-    <Page>
-      <PageHeader title="Personal info" />
-      {me.error && !account ? (
-        <Alert tone="danger" title="Your account did not load">
-          {describeError(me.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try again</Button></span>
-        </Alert>
-      ) : !account ? (
-        <PageSkeleton />
-      ) : (
-        <>
-          <Box title="Profile">
-            <Row label="Photo" edit="photo"><Avatar name={account.display_name} src={picture?.src ?? account.pfp_url} size="md" /></Row>
-            <Row label="Name" edit="name">{account.display_name}</Row>
-            <Row
-              label="Public id"
-              edit="id"
-              detail={reserved ? <><span className="mono">{reserved.id}</span> stays reserved for you until {formatDate(reserved.until)}.</> : undefined}
-            >
-              <span className={styles.mono}>{account.id ?? account.uuid}</span>
-            </Row>
-            <Row label="Date of birth" edit="dob">{account.dob ? formatDate(`${account.dob}T12:00:00Z`) : <span className={styles.muted}>Not added</span>}</Row>
-            <Row label="Timezone" edit="timezone">{account.timezone}</Row>
-          </Box>
-          {carbon ? <ContactBox carbon={carbon} /> : null}
-          <Editors me={account} editing={editing} onClose={close} onReserved={setReserved} />
-        </>
-      )}
-    </Page>
+    <div>
+      <PageBar title="Personal info" />
+      <Page>
+        {me.error && !account ? (
+          <Alert tone="danger" title="Your account did not load">
+            {describeError(me.error)}
+            <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try Again</Button></span>
+          </Alert>
+        ) : !account ? (
+          <PageSkeleton />
+        ) : (
+          <>
+            <Box title="Profile">
+              <Row label="Photo" edit="photo"><Avatar name={account.display_name} src={picture?.src ?? account.pfp_url} size="md" /></Row>
+              <Row label="Name" edit="name">{account.display_name}</Row>
+              <Row
+                label="Public id"
+                edit="id"
+                detail={reserved ? <><span className="mono">{reserved.id}</span> stays reserved for you until {formatDate(reserved.until)}.</> : undefined}
+              >
+                <span className={styles.mono}>{account.id ?? account.uuid}</span>
+              </Row>
+              <Row label="Date of birth" edit="dob">{account.dob ? formatDate(`${account.dob}T12:00:00Z`) : <span className={styles.muted}>Not added</span>}</Row>
+              <Row label="Timezone" edit="timezone">{account.timezone}</Row>
+            </Box>
+            {carbon ? <ContactBox carbon={carbon} /> : null}
+            <Editors me={account} editing={editing} onClose={close} onReserved={setReserved} />
+          </>
+        )}
+      </Page>
+    </div>
   );
 }
 
@@ -122,14 +128,12 @@ function ContactBox({ carbon }: { carbon: CarbonMe }) {
   );
 }
 
-/** The prototype's .scard: a bordered box with its title inside, then its rows. */
+/** The prototype's .scard: Silicon UI's Card, its title the group's, then its rows. */
 function Box({ title, children }: { title: string; children: ReactNode }) {
-  const id = `personal-${title.toLowerCase()}`;
   return (
-    <section data-sq="surface" className={styles.box} aria-labelledby={id}>
-      <div className={styles.boxHead}><h2 id={id} className={styles.boxTitle}>{title}</h2></div>
-      {children}
-    </section>
+    <Card title={title}>
+      <div className={styles.rows}>{children}</div>
+    </Card>
   );
 }
 

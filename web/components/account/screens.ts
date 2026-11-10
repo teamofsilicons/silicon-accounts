@@ -85,6 +85,69 @@ const card = "#personal-profile";
 const shown: ScreenSpec[] = [
   // Home: needs you with a custodian request, then all clear with the introduction dismissed.
   { name: "account-home", path: "/", waitFor: "[data-home]" },
+  { name: "account-font-lab", path: "/personal", waitFor: card, fullPage: false, prepare: async page => {
+    const openLab = async () => {
+      await page.getByRole("button", { name: /^Dev tools/ }).click();
+      await page.getByText("Font lab", { exact: true }).locator("..").getByRole("button", { name: "Open" }).click();
+    };
+    await openLab();
+    let lab = page.locator('aside[aria-label="Font lab"]');
+    const fonts = () => lab.getByRole("combobox", { name: "Font" });
+    await fonts().first().click();
+    await page.getByRole("option", { name: "Hanken Grotesk" }).click();
+    await fonts().last().click();
+    await page.getByRole("option", { name: "Inter" }).click();
+    const text = lab.getByRole("region", { name: "Text" });
+    await text.getByRole("slider", { name: "Text size" }).press("ArrowRight");
+    await text.getByRole("slider", { name: "Weight" }).press("ArrowRight");
+    await text.getByRole("slider", { name: "Letter spacing" }).press("ArrowRight");
+    await text.getByRole("slider", { name: "Line height" }).press("ArrowRight");
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).fontSize)).toBe("17px");
+    await expect.poll(() => page.evaluate(() => {
+      const style = getComputedStyle(document.body), size = parseFloat(style.fontSize);
+      return [Number(style.fontWeight), Number((parseFloat(style.letterSpacing) / size).toFixed(3)), Number((parseFloat(style.lineHeight) / size).toFixed(2))];
+    })).toEqual([410, 0.005, 1.55]);
+    await expect.poll(() => page.evaluate(() => document.head.querySelector('style[data-dev-style="2-font-lab"]')?.textContent ?? "")).toContain("--body: 410 17px/1.55 var(--font-body)");
+    await expect.poll(() => page.evaluate(() => document.head.querySelector('style[data-dev-style="2-font-lab"]')?.textContent ?? "")).toContain("--body-tracking: 0.005em");
+    let link = lab.getByRole("checkbox", { name: "Use same font for display and body" });
+    await link.click();
+    await expect(link).toHaveAttribute("aria-checked", "true");
+    await expect(fonts().last()).toBeDisabled();
+    await expect(text.getByRole("slider", { name: "Text size" })).toBeEnabled();
+    await expect(fonts().last()).toContainText("Hanken Grotesk");
+    await expect.poll(() => page.evaluate(() => document.head.querySelector('style[data-dev-style="2-font-lab"]')?.textContent ?? "")).toContain("--font-body: var(--font-hanken-grotesk)");
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await lab.getByRole("button", { name: "Copy CSS" }).click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("--font-display: var(--font-hanken-grotesk)");
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("--body: 410 17px/1.55 var(--font-body)");
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForSelector(card);
+    await openLab();
+    lab = page.locator('aside[aria-label="Font lab"]');
+    link = lab.getByRole("checkbox", { name: "Use same font for display and body" });
+    await expect(link).toHaveAttribute("aria-checked", "true");
+    await expect(fonts().last()).toBeDisabled();
+    const savedText = lab.getByRole("region", { name: "Text" });
+    await expect(savedText.getByRole("slider", { name: "Text size" })).toHaveAttribute("aria-valuenow", "17");
+    await expect(savedText.getByRole("slider", { name: "Weight" })).toHaveAttribute("aria-valuenow", "410");
+    await expect(savedText.getByRole("slider", { name: "Letter spacing" })).toHaveAttribute("aria-valuenow", "0.005");
+    await expect(savedText.getByRole("slider", { name: "Line height" })).toHaveAttribute("aria-valuenow", "1.55");
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).fontSize)).toBe("17px");
+    await link.click();
+    await expect(fonts().last()).toBeEnabled();
+    await expect(fonts().last()).toContainText("Inter");
+    await lab.getByRole("button", { name: "Reset", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("accounts.dev.font-lab"))).toBeNull();
+    await expect(lab.getByRole("region", { name: "Text" }).getByRole("slider", { name: "Text size" })).toHaveAttribute("aria-valuenow", "16");
+    await expect(savedText.getByRole("slider", { name: "Weight" })).toHaveAttribute("aria-valuenow", "400");
+    await expect(savedText.getByRole("slider", { name: "Letter spacing" })).toHaveAttribute("aria-valuenow", "0");
+    await expect(savedText.getByRole("slider", { name: "Line height" })).toHaveAttribute("aria-valuenow", "1.5");
+    await fonts().first().click();
+    await page.getByRole("option", { name: "Hanken Grotesk" }).click();
+    await link.click();
+    await expect(fonts().last()).toBeDisabled();
+    await lab.getByRole("region", { name: "Text" }).getByRole("slider", { name: "Line height" }).scrollIntoViewIfNeeded();
+  } },
   { name: "account-home-review", path: "/", waitFor: "[data-home]", fullPage: false, prepare: async page => { await click(page, "Review"); await wait(page, 900); } },
   { name: "account-home-new", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me/apps", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, phones: [], custodian_of: 0 } })]] },
   { name: "account-home-clear", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })]], prepare: async page => { await click(page, "Dismiss"); await wait(page, 400); } },
@@ -94,6 +157,23 @@ const shown: ScreenSpec[] = [
   { name: "account-identity-photo", path: "/personal?edit=photo", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
   { name: "account-identity-timezone", path: "/personal?edit=timezone", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
   { name: "account-identity-dob", path: "/personal?edit=dob", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
+  { name: "account-identity-year-select", path: "/personal?edit=dob", waitFor: "[role='dialog']", fullPage: false, prepare: async page => {
+    await page.getByRole("combobox", { name: "Year" }).click();
+    await page.getByRole("option", { name: "1998", exact: true }).press("End");
+    const alignment = (year: string) => page.evaluate(expected => {
+      const viewport = document.querySelector<HTMLElement>("[data-radix-select-viewport]");
+      const item = viewport?.querySelector<HTMLElement>("[role='option'][data-highlighted]");
+      const highlight = viewport?.querySelector<HTMLElement>("span[aria-hidden='true']");
+      if (!viewport || !item || !highlight || item.textContent !== expected || viewport.scrollTop === 0) return Infinity;
+      const a = item.getBoundingClientRect(), b = highlight.getBoundingClientRect();
+      return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.width - b.width), Math.abs(a.height - b.height));
+    }, year);
+    await expect.poll(() => alignment("1900")).toBeLessThan(1);
+    const next = await page.getByRole("option", { name: "1901", exact: true }).boundingBox();
+    if (!next) throw new Error("Year 1901 is not visible after scrolling");
+    await page.mouse.move(next.x + next.width / 2, next.y + next.height / 2);
+    await expect.poll(() => alignment("1901")).toBeLessThan(1);
+  } },
   { name: "account-identity-change-id", path: "/personal?edit=id", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); await page.keyboard.type("shubham"); await wait(page, 1200); } },
 
   // Sign-in methods: the lists, adding an email up to the code, and the remove question.

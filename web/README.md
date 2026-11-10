@@ -168,15 +168,30 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   fire while any dialog, drawer, sheet, menu or listbox is open.
 - **Phone numbers** go through `components/foundation/phone-field` (`PhoneField`): Arc's picker formats the 49
   countries it lists, and every other number is typed with its country code and sent exactly as typed (the hosted
-  pages and the account site's "Add a phone number" both use it; `guessCountry()` starts it in the visitor's country).
-- **Type scale** (`styles/tokens.css`, 2026-11-06): eight roles, each a `font` shorthand with its tracking beside it:
-  `font: var(--h1); letter-spacing: var(--h1-tracking);`. display 49, h1 39, h2 25, h3 20, body 16, small 14, caption 12,
-  label 14. A family set after `font:` (mono, the story serif) keeps the role's size and line. Silicon UI's `--text-lg` to
-  `--text-5xl` are moved onto the scale in the same file, so its components and older pages land on it too. Its
-  components keep one line-height and fixed weights, so they can read as off scale: `redesign/prototype-differences.md`.
-- **Silicon UI as it ships** (`[data-silicon-ui]` in `styles/tokens.css`, 2026-11-06): inside this attribute the values the
-  site overrides go back to Silicon UI's own (Hanken and Geist, size steps, tracking, greys, neutral accent), so its
-  components look as designed. On `/silicons/new` only, as a trial.
+  pages and the account site's "Add a phone number" both use it; `guessCountry()` starts it in the visitor's country). Its two switches ("Country Not in the List?", "Choose the Country From the List") are Silicon UI ghost buttons (2026-11-10).
+- **Density** (`styles/tokens.css`, 2026-11-10, branch `compact`): the site is compact: Silicon UI's control
+  heights one step shorter (sm 32, md 36, lg 40), its larger spacing steps one step down (--space-comfort 16,
+  --space-section 16, --space-block 24, --space-page 32), and the title roles one step down (display 28, h1 22, h2 18,
+  h3 16); text stays at 16. `:root[data-density="comfortable"]` holds the scale before; the dev panel's Look → Density
+  sets it, kept in this browser (`accounts.dev.density`), to compare.
+- **Typography** (`styles/tokens.css`, `app/fonts.ts`, 2026-11-09): Silicon UI's typography as it ships, in Hanken
+  Grotesk for text and titles (preloaded; Silicon UI ships Geist for titles). Its tokens are untouched: `--text-xs` to
+  `--text-5xl` (12, 14, 16, 18, 22, 28, 36, 52, 72 px), `--tracking-display` -.03em and `--tracking-body` -.01em,
+  `--leading-display` 1.1 and `--leading-body` 1.4; ours adds `--weight-title` 600, `--weight-medium` 500 and
+  `--weight-regular` 400. Eight roles are built on them, each a `font` shorthand with its tracking beside it
+  (`font: var(--h1); letter-spacing: var(--h1-tracking);`): display 36, h1 28, h2 22 (title weight), h3 18 (medium,
+  Silicon UI's card titles), body 16, label 14 (medium), small 14, caption 12 (medium). The roles are declared once on
+  `:root`, so changing a token changes every role and every Silicon UI component. Use a role, never a raw size; a family
+  set after `font:` (mono, the story serif) keeps the role's size and line. Silicon UI's components keep fixed weights
+  (500, 400): `redesign/prototype-differences.md`. Colours are ours: #FCFCFC, Silicon UI's greys, the blue accent.
+- **Page bar** (`components/account/parts/page-bar.tsx`, 2026-11-07): on /silicons, /silicons/new, /apps and /personal: a parent link, the title (`--h1`, as on every page) under it, supporting buttons on its right, pinned with a line under it.
+- **Personal info** (`components/account/identity/identity.tsx`, 2026-11-09): the page bar, then a Silicon UI Card
+  for Profile and one for Contact. Their rows (label, value, chevron; the whole row opens its editor by `?edit=`) are
+  drawn on tokens and the type roles until Silicon UI has a settings list: `redesign/requests/silicon-ui-settings-list.md`
+  (a draft, not filed).
+- **Sky bands** (`components/account/silicons/sky-bands.tsx`, `lib/sky.ts`, `lib/world-dots.ts`, 2026-11-07): a time zone picker
+  that paints each offset with its current sky, using the `--sky-*` tokens. `timezoneBands()` in `lib/timezones.ts` groups every
+  IANA zone by current offset. The Combobox is the one place the zone is written and the keyboard way in. A click on the strip goes by place through a hidden overlay (`lib/zone-at.ts`, `lib/zone-cells.ts`, `lib/zone-places.ts`), generated from Natural Earth and zone.tab: the country there, then its zone for that spot. `lib/world-dots.ts` is generated from Natural Earth 50m.
 - **Product shots** use the stageshow kit vendored at `components/foundation/stageshow/kit` (Benji Taylor, MIT; see its
   README): copied, not edited, and outside lint. Shots live with their page (the Silicons stories' in
   `components/account/silicons/stories/shots.tsx`) and are styled with the site's tokens.
@@ -360,6 +375,16 @@ the content layout (column, column + aside, aside on action, list + detail). Asi
 under 1024 px. The choices live in the address
 (`?shell=inset&sidebar=rail&elements=tiles&content=split`); `?ui=0` or H hides the controls. Development only, like
 `/__kitchen` (`components/kitchen/layouts/`).
+
+`/__text` (2026-11-10) compares text grey ladders with a step between the text and the secondary text (Now, A to E, from Refactoring UI's palette), on a Home column beside today's greys (`components/kitchen/text/`, the ladders in `lib/text-ladders.ts`).
+`/__cards` (2026-11-11) compares card systems for Your Silicons and Your apps (tile, tile + footer, picture, stacked), both sections in one anatomy, and Home's app card in six paddings (`components/kitchen/cards/`).
+
+`/__banner` (2026-11-10) is the introduction banner's lab. Its main view is `IntroBanner`
+(`components/kitchen/banner/intro-banner.tsx`), a prototype proposed to Silicon UI
+(`redesign/requests/silicon-ui-intro-banner.md`): four templates (`checklist`, `cards`, `panel`, `spotlight`), any
+picture from `public/banner/` (Super Visuals BG 024, 102, 110, 126, 127, 139; `tone` light or dark), and a state
+switch (just joined, one done, all done). The earlier visual explorations and structures stay one switch away.
+Development only, like `/__kitchen`.
 
 `pnpm screens` takes Playwright screenshots (Chromium by default) into `.screens/<name>--<theme>-<width>.png`, both
 themes at 1440 and 390 px. It uses `--base URL`, or a server on `http://localhost:$PORT` (8590), or starts `next dev`
@@ -702,19 +727,42 @@ in `redesign/api-gaps.md`).
   opened from the top bar below that. NavList is experimental: allowed in `eslint.config.mjs` (`allowExperimental`).
   The dock (`dock.tsx`) is gone; sections are no longer called pillars. Its width comes in steps (200, 248, 296 px)
   from a handle on the page box's left edge (`sidebar-resize.tsx`, remembered in localStorage `sa.sidebar-step`).
-- **Dev states** (`lib/dev-states.ts`, `components/foundation/dev/dev-states.tsx`, 2026-10-31): in `next dev` only, a
-  round flask button at the account shell's lower right (a dot counts what is set) opens a compact panel of
-  segmented controls for (account: joined today / no id; Silicon requests:
-  none / a request / a handover / both; devices: all used lately / one unused; Silicons: none / one / three; apps: none
-  / two / six; network: slow / lists fail), plus Reset and "Show introduction again". `request()` in
-  `lib/api/http.ts` asks `devAnswer` for each GET when NODE_ENV is "development": it answers with made-up data, changes
-  the API's answer, delays or fails it. Writes always go to the API. Kept in localStorage `accounts.dev.states`; a
-  change reloads the page. To add a variable, add it to `DEV_VARIABLES` and answer it in `devAnswer`.
-- **Type inspector** (`components/foundation/dev/type-inspector.tsx`, 2026-11-06): in `next dev` only, "Inspect type" in
-  the dev states panel, or ⌥I from anywhere (the only way in while a dialog is open). The cursor becomes a crosshair and
-  hovering text shows its role, or "Off scale" with the nearest role and what differs, plus size, line, weight, tracking
-  and family. Clicks in the page do nothing while it's on; Esc turns it off. Roles are read from the tokens through
-  hidden probes. The family is the first name in the computed stack, because browsers don't say which face rendered.
+- **Dev tools** (`components/foundation/dev/dev-states.tsx`, 2026-10-31, regrouped 2026-11-08 and 2026-11-09): in
+  `next dev` only, a round flask button at the account shell's lower right (a dot counts what is changed, a crosshair
+  while inspecting) opens a panel in three groups. **Data** (`lib/dev-states.ts`): segmented controls for account
+  (joined today / no id), Silicon requests (none / a request / a handover / both), devices (all used lately / one
+  unused), Silicons (0 / 1 / 3), apps (0 / 2 / 6) and network (slow / lists fail), then the Just joined scenario and
+  Show introduction. `request()` in `lib/api/http.ts` asks `devAnswer` for each GET when NODE_ENV is "development": it
+  answers with made-up data, changes the API's answer, delays or fails it. Writes always go to the API. Kept in
+  localStorage `accounts.dev.states`; a change reloads the page. To add a variable, add it to `DEV_VARIABLES` and answer
+  it in `devAnswer`. **Look**: Typography (the type lab, ⌥F) and Text edits (their count, Copy CSS and Clear).
+  **Inspect**: Edit text (⌥I) and Spacing (⌥S). Reset all clears data, the type lab and text edits. The dev tools'
+  own text keeps Silicon UI's shipped type (`[data-type-inspect-exempt]` in `styles/tokens.css`), so it doesn't move
+  while the page's type changes.
+- **Type lab** (`components/foundation/dev/type-lab.tsx`, `lib/type-lab.ts`, 2026-11-09, the font lab grown): Open
+  in the dev panel's Look group (or ⌥F) shows a live panel that sets Silicon UI's type tokens on `:root`, so every
+  page and component retypes at once: a preset (Silicon UI in Hanken, Silicon UI with Geist titles), the text and title faces (bundled only: the CSP keeps fonts to 'self'), Inter's and Hanken's cv01 and ss03,
+  the nine size steps, tracking and line height for display and body, and the three weights. No colours. Kept in
+  localStorage `accounts.dev.type-lab` on every page until Reset; Copy CSS gives a `:root` block for tokens.css. Faces
+  besides Hanken: Geist, Inter (never preloaded), Work Sans (next/font), and TeX Gyre Heros, Liberation Sans and Cooper
+  Hewitt, self-hosted from `assets/fonts/` (each folder holds its licence).
+- **Browser logos** (`public/browsers/`, `components/account/parts/browser.ts`, 2026-11-10): the browsers' own full-colour
+  logos (Chrome, Safari, Firefox, Edge, Opera, Brave, Vivaldi, Samsung Internet) from github.com/alrra/browser-logos,
+  MIT, its LICENSE.txt beside them. `browserOf(session)` reads the browser from a session's label, then its user
+  agent (Edge, Opera and the rest before Chrome, Chrome before Safari); Home's Needs you shows it on a device row, and
+  anything else keeps the laptop icon.
+- **Edit text** (`components/foundation/dev/type-inspector.tsx`, `lib/text-edits.ts`, 2026-11-06, editing
+  2026-11-09): in `next dev` only, "Edit text" in the dev panel, or ⌥I from anywhere (the only way in while a dialog is
+  open). The cursor becomes a crosshair and hovering text shows its role, or "Off scale" with the nearest role and what
+  differs, plus size, line, weight, tracking and family. Clicking text opens an editor for the CSS rule that styles it,
+  named by its source file and class (read from the development stylesheets' source comments), with a Select when
+  several rules apply and a mark on Silicon UI's own rules: role, font, size (a step or custom px), weight, letter
+  spacing, line height and colour (picked by plain name with a dot of it: ours, Primary to Danger; platform.openai.com's seven text colours, lib/text-edits.ts OPENAI_COLOURS; or a custom one). "Every one like it" reaches every text that
+  rule styles, on every page; "Just this one" changes the clicked text alone (its path from the nearest id or `<main>`,
+  which holds while the page's structure does). Edits are kept in localStorage `accounts.dev.text-edits` until Reset this text, Clear or Reset all. Copy CSS in
+  the panel gives the edits by file; Silicon UI's rules are marked as needing a token or a request, since components
+  aren't restyled in code. Other clicks in the page do nothing while it's on; Esc closes the editor, then turns it off.
+- **Spacing inspector** (`components/foundation/dev/spacing-inspector.tsx`, 2026-11-08): in `next dev` only, "Inspect spacing" in the dev panel or ⌥S. Drag a marquee: every box it touches is outlined with its radius, padding (content box dashed), the space between neighbouring children, text boxes and leaf sizes, clipped to the marquee. Esc turns it off; only one inspector is on at a time. Shares the crosshair rule in `styles/base.css`.
 - **Home** (2026-10-31): `app/(app)/(shell)/(account)/page.tsx` in Page's narrow column: `home-identity.tsx` (picture in
   its ring, greeting, id chip, member since), `home-needs.tsx` (requests, handovers, an unused device),
   `home-cards.tsx` (the dismissible introduction, `accounts.home.welcome-dismissed`), `home-sections.tsx` (Your
@@ -751,7 +799,7 @@ in `redesign/api-gaps.md`).
 
 - **Home** (`/`, `components/account/overview/`): the prototype's home. A greeting with your id, Needs you (custodian
   requests, on `--warning`) or "You're all set", a dismissible introduction (remembered in this browser), Your Silicons
-  (two tiles and New Silicon, which opens Create a Silicon through `/silicons?new`) and Your apps (four tiles).
+  (two tiles and New Silicon, which opens Create a Silicon through `/silicons?new`) and Your apps (up to six tile + footer cards: apps you sign into, then Briefcase, DM or Ting not used yet).
 - **Personal info** (`/personal`, sidebar section 5, number key 5): the identity card, moved from `/`; the metric cards
   beside it are gone (Home's tiles lead into each section).
 - **Coherence pass**: `--canvas` (neutral-2) under the top bar and sidebar; the page is a white panel on it. Home is one
@@ -771,8 +819,8 @@ in `redesign/api-gaps.md`).
   column under 1024 px.
 - **Prototype look** (2026-10-30): the blue accent (`--accent` #3460F0, `--focus-ring` its soft halo), Hanken Grotesk
   for all text (`--font-display` is `--font-body`), `--page-narrow` 720 px, and `--silicon-mark-*` colours for
-  `parts/silicon-mark.tsx`. In development, `lib/font-preview.ts` adds "Font:" commands to ⌘K and `providers.tsx`
-  re-applies the pick (`data-font` on `<html>`).
+  `parts/silicon-mark.tsx`. The font preview in ⌘K is gone (2026-11-09): the dev panel's type lab
+  replaces it.
 - **Page gap**: 24 px between a page's blocks, as in the prototype.
 - **Inset shell, system font, Carbon avatars** (2026-10-30):
   - **Shell:** the top bar is the logo, search centred, and the account menu. From 900 px the sidebar and the page sit

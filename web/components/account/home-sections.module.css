@@ -1,54 +1,56 @@
 /* Home's Your Silicons and Your apps, in Home's section pattern: a heading row (the section heading, a quiet "See all"
-   at the end), 16px above its content; 48px under what comes before, like every section. Tiles are small white cards (faint edge,
-   resting shadow, the container squircle): a 36px mark beside a medium name over a muted mono id. */
+   at the end), 16px above its content; 32px under what comes before, like every section. Tiles are small white cards:
+   since 2026-11-11 (Anil, the spacing audit) one edge for every card on Home, a clear border and no resting shadow (a
+   shadow only on hover), 12px inside, a 28px mark beside the name over a muted mono id, 2px apart. */
 .section { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
-.head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-group); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); }
 /* Home's section headings (h2), one style everywhere: 22px medium, display tracking (Anil, 2026-10-31). */
 .title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
-.seeAll { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); text-decoration: none; }
+.seeAll { display: inline-flex; align-items: center; gap: var(--space-hair); color: var(--text-secondary); font: var(--label); letter-spacing: var(--label-tracking); text-decoration: none; }
 .seeAll:hover { color: var(--foreground); }
 
 .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); margin: 0; padding: 0; list-style: none; }
-.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.tile { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border-subtle); display: flex; min-width: 0; height: 100%; align-items: center; gap: var(--space-group); padding: var(--space-group); border: 1px solid var(--sq-stroke); background: var(--sq-fill); box-shadow: var(--shadow-resting); color: var(--foreground); text-decoration: none; transition: box-shadow var(--duration-fast) var(--ease-standard), translate var(--duration-fast) var(--ease-standard); }
+.tile { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; min-width: 0; height: 100%; align-items: center; gap: var(--space-group); padding: var(--space-group); border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); text-decoration: none; transition: box-shadow var(--duration-fast) var(--ease-standard), translate var(--duration-fast) var(--ease-standard); }
 .tile:hover { color: var(--foreground); }
 @media (hover: hover) and (pointer: fine) { .tile:hover { box-shadow: var(--shadow-raised); translate: 0 calc(var(--space-hair) * -1); } }
 .tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .tileWords { display: grid; min-width: 0; gap: var(--space-hair); }
-.tileTitle { overflow: hidden; color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.tileTitle { overflow: hidden; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); text-overflow: ellipsis; white-space: nowrap; }
 .tileId { overflow: hidden; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); font-family: var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
 
 /* New Silicon: the grey tile with a plus, quieter than a Silicon's. */
 .newTile { --sq-fill: var(--canvas); --sq-stroke: transparent; box-shadow: none; }
-.plus { --sq-r: var(--radius-control); --sq-fill: var(--surface); display: grid; width: 36px; height: 36px; flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
+.plus { --sq-r: var(--radius-control); --sq-fill: var(--surface); display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
 
 
 
-/* A popular app, simple but with a character of its own (Anil, 2026-10-31): a white card like every tile on Home
-   (faint edge, resting shadow, the container squircle, 16px inside). Its Phosphor icon in ink (20px, light) beside the
-   app's name (16px, medium) in one row; its line (14px, medium, secondary) held to two lines so the cards line up;
-   at the foot, Open as the site's dark primary button (an app already yours, ready to go) or Try as the white
-   secondary (a suggestion). Behind it all, the same icon large and thin at 6% ink, turned a little and running off the
-   bottom right corner; on hover the card lifts like the tiles and the mark drifts. */
-.appCard {
-  --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border-subtle);
-  position: relative; isolation: isolate; display: flex; min-width: 0; height: 100%; min-height: 160px; flex-direction: column; align-items: flex-start; gap: var(--space-related);
-  padding: var(--space-inset); overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); box-shadow: var(--shadow-resting);
-  transition: box-shadow var(--duration-fast) var(--ease-standard), translate var(--duration-fast) var(--ease-standard);
-}
-.appMark { position: absolute; z-index: -1; right: calc(var(--space-section) * -1); bottom: calc(var(--space-section) * -1); color: color-mix(in oklab, var(--foreground) 6%, transparent); rotate: -12deg; pointer-events: none; transition: translate var(--duration-considered) var(--ease-standard), rotate var(--duration-considered) var(--ease-standard), color var(--duration-considered) var(--ease-standard); }
-@media (hover: hover) and (pointer: fine) {
-  .appCard:hover { box-shadow: var(--shadow-raised); translate: 0 calc(var(--space-hair) * -1); }
-  .appCard:hover .appMark { color: color-mix(in oklab, var(--foreground) 9%, transparent); rotate: -6deg; translate: calc(var(--space-tight) * -1) calc(var(--space-tight) * -1); }
-}
-@media (prefers-reduced-motion: reduce) { .appCard, .appMark { transition: none; } }
-.appHead { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
-.appIcon { flex: none; color: var(--foreground); }
-.appName { min-width: 0; overflow: hidden; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); text-overflow: ellipsis; white-space: nowrap; }
-.appLine { display: -webkit-box; overflow: hidden; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; min-height: calc(var(--text-sm) * var(--leading-body) * 2); }
-.appAction { margin-top: auto; }
+/* A popular app as tile + footer (Anil, 2026-11-11, from /__cards): Home's card (clear border, no resting shadow,
+   12px inside). The top: the app's Phosphor icon on a 28px grey tile beside its name (body) over its description
+   (small, secondary, up to two lines). Then a hairline and a footer: when you last signed in (or "Not signed in yet")
+   at the start, the action at the end: Open (outlined) for an app you use, Try (soft) for one you haven't. The footer
+   isn't rounded, so its hairline is straight; the cards in a row share one height. */
+.appCard { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; min-width: 0; height: 100%; grid-template-rows: 1fr auto; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+/* 8px all round, and the height from a minimum instead of padding (Anil, 2026-11-10): the top is at least 112px, the
+   words at its top and the room below them. (The name beside the icon with the line below it was tried and taken back;
+   it is kept in /__cards.) */
+.appTop { display: flex; min-width: 0; min-height: calc(var(--space-page) * 3 + var(--space-inset)); align-items: flex-start; gap: var(--space-group); padding: var(--space-related); }
+/* Room for the name and two lines (the line's clamp) on every card (Anil, 2026-11-10), so app cards are one height in
+   every row, whether their line is a one-line address or a two-line description. */
+.appWords { display: grid; min-width: 0; min-height: calc((var(--text-base) + 2 * var(--text-sm)) * var(--leading-body) + var(--space-hair)); align-content: start; gap: var(--space-hair); }
+.appName { min-width: 0; overflow: hidden; color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.appLine { display: -webkit-box; overflow: hidden; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.appFooter { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--space-related); padding: var(--space-related); border-top: 1px solid var(--border-subtle); }
+.appFact { min-width: 0; overflow: hidden; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+/* The when in "Signed in 2 weeks ago" (Anil, 2026-11-10): the information, so it's in the text colour; "Signed in"
+   stays secondary. */
+.appWhen { color: var(--foreground); font-variant-numeric: tabular-nums; }
+
+
+/* The app's icon (Anil, 2026-11-10): 40px with a light hairline, drawn as the squircle's stroke so it follows the curve
+   (natively a border; in the fallback the ring over the clipped picture). */
+.appMark { --sq-stroke: var(--border-subtle); border: 1px solid var(--sq-stroke); }
 
 @media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
 @media (max-width: 639px) {
-  .tiles, .four { grid-template-columns: minmax(0, 1fr); }
+  .tiles { grid-template-columns: minmax(0, 1fr); }
 }

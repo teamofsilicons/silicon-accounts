@@ -285,7 +285,7 @@ function SignupForm({ flow, ctl, notice, prefill }: SignupProps & { prefill: Flo
         icon={provenIcon}
         destination={proven}
         note={prefill.provider ? `Verified by ${providerName}` : "Verified with a code"}
-        action={<Button variant="ghost" size="sm" loading={leaving} disabled={!!pending} onClick={() => void notYou()} aria-label="Not you? Use another account">Not you?</Button>}
+        action={<Button variant="ghost" size="sm" loading={leaving} disabled={!!pending} onClick={() => void notYou()} aria-label="Not you? Use another account">Not You?</Button>}
       />
       <form className={styles.form} noValidate onSubmit={event => void submit(event)}>
         <div className={styles.photoField}>
@@ -299,10 +299,10 @@ function SignupForm({ flow, ctl, notice, prefill }: SignupProps & { prefill: Flo
             <span className={styles.fieldLabel}>Profile photo</span>
             <div className={styles.photoActions}>
               <Button type="button" variant="secondary" size="sm" onClick={() => fileInput.current?.click()}>
-                <span className={styles.buttonIcon}><ImageUp size={16} strokeWidth={1.75} aria-hidden="true" />{showsUpload ? "Choose another" : "Upload photo"}</span>
+                <span className={styles.buttonIcon}><ImageUp size={16} strokeWidth={1.75} aria-hidden="true" />{showsUpload ? "Choose Another" : "Upload Photo"}</span>
               </Button>
               {prefill.provider_pfp_url && photo !== "provider" ? (
-                <Button type="button" variant="ghost" size="sm" onClick={() => { setPhoto("provider"); setPhotoError(null); }}>Use {providerName} photo</Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => { setPhoto("provider"); setPhotoError(null); }}>Use {providerName} Photo</Button>
               ) : null}
               {photo === "upload" || photo === "provider" || (photo === "prefill" && removablePrefill) ? (
                 <Button type="button" variant="ghost" size="sm" onClick={() => { setPhoto("default"); setPhotoError(null); }}>Remove</Button>

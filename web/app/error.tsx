@@ -23,9 +23,9 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
           <code>silicon-accounts report</code>.
         </p>
         <div className={styles.actions}>
-          <Button variant="secondary" onClick={reset}>Try again</Button>
+          <Button variant="secondary" onClick={reset}>Try Again</Button>
           {/* A plain <a>, so a full load: the page that failed may have broken the client router. */}
-          <ButtonLink href="/" variant="ghost">Go to your account</ButtonLink>
+          <ButtonLink href="/" variant="ghost">Go to Your Account</ButtonLink>
         </div>
         {error.digest ? <p className={styles.details}>Reference {error.digest}</p> : null}
       </div>

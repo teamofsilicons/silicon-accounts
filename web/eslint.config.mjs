@@ -21,7 +21,8 @@ export default defineConfig([
   // (borderless grey, the bar control), still experimental in Silicon UI 0.4. button-link: the same soft variant for the
   // sidebar's Developers and Docs chips (2026-10-30). segmented-control: the xs size, in the development-only dev states
   // panel (components/foundation/dev, 2026-10-31).
-  ...siliconUi({ allowExperimental: ["nav-list", "button", "button-link", "segmented-control"] }),
+  // dropdown-menu: its parts, for Add a Silicon's menu on /silicons to carry the Silicon UI scope (an experiment, 2026-11-07).
+  ...siliconUi({ allowExperimental: ["nav-list", "button", "button-link", "segmented-control", "dropdown-menu"] }),
   {
     // The landing frames are not the account shell. How it works steps are text rows from the frame, not Silicon UI buttons.
     files: ["components/landing/**"],

@@ -14,11 +14,6 @@
       "count": 1
     }
   },
-  "components/account/sign-in-methods/contact-adder.tsx": {
-    "no-restricted-syntax": {
-      "count": 2
-    }
-  },
   "components/account/silicons/silicon-drawer.tsx": {
     "no-restricted-syntax": {
       "count": 4
@@ -87,11 +82,6 @@
   "components/foundation/identity/identity-card.tsx": {
     "no-restricted-syntax": {
       "count": 1
-    }
-  },
-  "components/foundation/phone-field/phone-field.tsx": {
-    "no-restricted-syntax": {
-      "count": 2
     }
   },
   "components/kitchen/sections/feedback.tsx": {

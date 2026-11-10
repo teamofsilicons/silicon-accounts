@@ -36,7 +36,7 @@ import { Sessions } from "../security/sessions";
 import styles from "./sign-in-methods.module.css";
 
 const LIMIT = 10;
-const PROVIDER_NAMES: Record<Provider, string> = { google: "Google", apple: "Apple" };
+export const PROVIDER_NAMES: Record<Provider, string> = { google: "Google", apple: "Apple" };
 
 /** The visitor's likely country for local phone numbers: the timezone's country, else the browser language's region. */
 const defaultCountry = (): string => guessCountry();
@@ -52,7 +52,7 @@ export function SignInMethods() {
       {me.error && !me.data ? (
         <Alert tone="danger" title="Your sign-in methods did not load">
           {describeError(me.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try again</Button></span>
+          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try Again</Button></span>
         </Alert>
       ) : silicon ? (
         <EmptyState
@@ -147,7 +147,8 @@ export function ContactList({ channel, carbon }: { channel: "email" | "phone"; c
   const count = items.length;
 
   return (
-    <div ref={group} data-sq="surface" className={styles.group}>
+    <div ref={group} className={styles.list}>
+      {count ? (
         <AnimatedRows items={sorted} keyOf={valueOf} label={isEmail ? "Your emails" : "Your phone numbers"}>
           {item => (
             <ContactRow
@@ -162,12 +163,13 @@ export function ContactList({ channel, carbon }: { channel: "email" | "phone"; c
             />
           )}
         </AnimatedRows>
-        {count === 0 ? <p className={styles.emptyRow}>No {noun} yet. Add one to sign in with a code.</p> : null}
-        <div className={styles.adderRow} data-adder="">
-          {count < LIMIT
-            ? <ContactAdder channel={channel} existing={items.map(valueOf)} defaultCountry={country} />
-            : <p className={styles.limit}>You have {LIMIT} {pluralNoun}, the most an account can hold. Remove one to add another.</p>}
-        </div>
+      ) : null}
+      {/* Nothing yet: the dialog was opened to add one, so the form opens at once (no "No phone number yet" line). */}
+      <div className={styles.adderRow} data-adder="" data-first={count ? undefined : ""}>
+        {count < LIMIT
+          ? <ContactAdder channel={channel} existing={items.map(valueOf)} defaultCountry={country} startOpen={count === 0} />
+          : <p className={styles.limit}>You have {LIMIT} {pluralNoun}, the most an account can hold. Remove one to add another.</p>}
+      </div>
     </div>
   );
 }
@@ -190,42 +192,53 @@ interface ContactRowProps {
   onRemove: () => Promise<unknown>;
 }
 
+/**
+ * One email or phone number, on Home's rules (Anil, 2026-11-10): the value in body (a quiet Primary badge on the primary
+ * one) over one line in --text-soft (how it was verified, or why the primary can't go); Make Primary and Remove as
+ * outlined buttons. Remove asks in place: the row's buttons become Cancel and a red Remove.
+ */
 function ContactRow({ value, shown, item, noun, promoting, busy, onMakePrimary, onRemove }: ContactRowProps) {
   const [error, setError] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const remove = async () => {
+    setError(null);
+    setRemoving(true);
+    try {
+      await onRemove();
+    } catch (raw) {
+      setError(describeError(raw));
+      setRemoving(false);
+      setAsking(false);
+    }
+  };
   return (
     <div className={styles.row} data-primary={item.is_primary || undefined}>
       <div className={styles.rowMain}>
         <div className={styles.rowTitle}>
           <span className={styles.value} title={value}>{shown}</span>
-          {item.is_primary ? <Badge size="sm" tone="info">Primary</Badge> : null}
-          {!item.verified_at ? <Badge size="sm" tone="warning">Not verified</Badge> : null}
+          {item.is_primary ? <Badge size="sm" tone="neutral">Primary</Badge> : null}
+          {!item.verified_at ? <Badge size="sm" tone="warning">Not Verified</Badge> : null}
         </div>
         <span className={styles.rowMeta}>
-          {item.is_primary ? `Your primary ${noun}. To remove it, make another ${noun} primary first.` : verifiedText(item)}
+          {asking ? `Remove ${shown}? It stops signing you in.` : item.is_primary ? `Your primary ${noun}. To remove it, make another one primary first.` : verifiedText(item)}
         </span>
         {error ? <span className={styles.rowError} role="alert">{error}</span> : null}
       </div>
       <div className={styles.rowActions}>
-        {!item.is_primary && item.verified_at ? (
-          <Button variant="ghost" size="sm" onClick={onMakePrimary} loading={promoting} disabled={busy && !promoting}>Make primary</Button>
-        ) : null}
-        <ConfirmMorph
-          label="Remove"
-          prompt={<FitPrompt full={`Remove ${shown}?`} short={noun === "email" ? "Remove this email?" : "Remove this number?"} tiny="Remove it?" />}
-          confirmLabel="Remove"
-          pendingLabel="Removing"
-          doneLabel="Removed"
-          disabled={item.is_primary}
-          onConfirm={async () => {
-            setError(null);
-            try {
-              await onRemove();
-            } catch (raw) {
-              setError(describeError(raw));
-              throw raw;
-            }
-          }}
-        />
+        {asking ? (
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setAsking(false)} disabled={removing}>Cancel</Button>
+            <Button variant="danger" size="sm" onClick={() => void remove()} loading={removing}>Remove</Button>
+          </>
+        ) : (
+          <>
+            {!item.is_primary && item.verified_at ? (
+              <Button variant="secondary" size="sm" onClick={onMakePrimary} loading={promoting} disabled={busy && !promoting}>Make Primary</Button>
+            ) : null}
+            {!item.is_primary ? <Button variant="secondary" size="sm" onClick={() => setAsking(true)} aria-label={`Remove ${shown}`}>Remove</Button> : null}
+          </>
+        )}
       </div>
     </div>
   );
@@ -235,7 +248,7 @@ function ContactRow({ value, shown, item, noun, promoting, busy, onMakePrimary, 
 /* Google and Apple                                                                                                    */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-function ProviderMark({ provider }: { provider: Provider }) {
+export function ProviderMark({ provider }: { provider: Provider }) {
   return (
     <span className={styles.providerMark} aria-hidden="true">
       {provider === "google" ? (
@@ -302,7 +315,7 @@ function ProvidersSection({ carbon, meta, metaError, metaPending, metaRetrying, 
           <div className={styles.connect} data-connect="">
             <Alert tone="danger" title="Connecting Google or Apple is unavailable for now">
               {describeError(metaError)}{identities.length ? " The accounts linked above still sign you in." : ""}
-              <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={onRetryMeta} loading={metaRetrying}>Try again</Button></span>
+              <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={onRetryMeta} loading={metaRetrying}>Try Again</Button></span>
             </Alert>
           </div>
         ) : metaPending ? (
@@ -395,7 +408,7 @@ const LINK_ERRORS: Record<string, string> = {
 };
 
 /** The outcome of connecting Google or Apple (`?linked=…` or `?link_error=…`), read once; the address is cleaned up. */
-function LinkResult() {
+export function LinkResult() {
   const search = useSearchParams();
   const router = useRouter();
   const [result] = useState(() => {

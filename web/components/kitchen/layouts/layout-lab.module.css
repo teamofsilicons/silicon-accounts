@@ -90,12 +90,15 @@
 /* Cards: an edge, rows ruled inside it. */
 .lab[data-elements="cards"] .group, .lab[data-elements="cards"] .tile { border: 1px solid var(--border); }
 .lab[data-elements="cards"] .row + .row { border-top: 1px solid var(--border-subtle); }
+/* A selected row is rounded, so the lines at its edges would bend with its corners: they hide there instead. */
+.lab[data-elements="cards"] .row[data-selected], .lab[data-elements="cards"] .row[data-selected] + .row { border-top-color: transparent; }
 /* Tiles: the canvas grey as a fill, no edge, a rounder corner; rows sit apart by space alone. */
 .lab[data-elements="tiles"] .group, .lab[data-elements="tiles"] .tile { --sq-r: var(--radius-overlay); --sq-fill: var(--canvas); }
 .lab[data-elements="tiles"] .group { padding-block: var(--space-tight); }
 /* Rows: no container; hairlines between rows and over tiles. */
 .lab[data-elements="rows"] .group { --sq-r: 0; border-top: 1px solid var(--border); }
 .lab[data-elements="rows"] .row { padding-inline: 0; border-bottom: 1px solid var(--border-subtle); }
+.lab[data-elements="rows"] .row[data-selected], .lab[data-elements="rows"] .row:has(+ .row[data-selected]) { border-bottom-color: transparent; }
 .lab[data-elements="rows"] .tile { --sq-r: 0; min-height: 112px; padding: var(--space-group) 0 0; border-top: 1px solid var(--border); }
 
 /* -------------------------------------------------------- content ------------------------------------------------------- */

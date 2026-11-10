@@ -64,7 +64,7 @@ export function Feedback() {
           <Button size="sm" variant="secondary" onClick={() => {
             const id = notify.loading("Rotating the STK", "Signing si:scout out everywhere");
             setTimeout(() => notify.update(id, { type: "success", title: "STK rotated", description: "The old STK stopped working." }), 1400);
-          }}>Loading, then done</Button>
+          }}>Loading, Then Done</Button>
         </div>
         <p className={styles.note}>A single toast, in place:</p>
         <Toast title="Copied" description="c:saket is on your clipboard." open={toastOpen} duration={0} onOpenChange={open => { setToastOpen(open); if (!open) setTimeout(() => setToastOpen(true), 1600); }} />

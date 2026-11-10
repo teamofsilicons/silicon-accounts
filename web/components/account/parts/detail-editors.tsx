@@ -121,7 +121,7 @@ export function TimezoneForm({ value, onSave, onDone, autoFocus }: TimezoneFormP
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.actions}>
         <Button variant="ghost" size="sm" onClick={onDone} disabled={pending}>Cancel</Button>
-        <Button size="sm" onClick={() => void save()} loading={pending} disabled={!draft || draft === value}>Save timezone</Button>
+        <Button size="sm" onClick={() => void save()} loading={pending} disabled={!draft || draft === value}>Save Timezone</Button>
       </div>
     </div>
   );
@@ -220,7 +220,7 @@ export function DobForm({ value, onSave, onDone }: { value: string; onSave: (dob
       {error ? <p className={styles.error} role="alert">{error}</p> : draft && !changed ? <span className={styles.hint}>Pick a different date to save it.</span> : null}
       <div className={styles.actions}>
         <Button variant="ghost" size="sm" onClick={onDone} disabled={pending}>Cancel</Button>
-        <Button size="sm" onClick={() => void save()} loading={pending} disabled={!changed}>Save date</Button>
+        <Button size="sm" onClick={() => void save()} loading={pending} disabled={!changed}>Save Date</Button>
       </div>
     </div>
   );
@@ -350,7 +350,7 @@ export function PhotoUrlForm({ value, name, onSave, onDone, autoFocus }: PhotoUr
       ) : null}
       <div className={styles.actions}>
         <Button type="button" variant="ghost" size="sm" onClick={onDone} disabled={pending}>Cancel</Button>
-        <Button type="submit" size="sm" loading={pending} disabled={!url || url === value}>Save photo</Button>
+        <Button type="submit" size="sm" loading={pending} disabled={!url || url === value}>Save Photo</Button>
       </div>
     </form>
   );

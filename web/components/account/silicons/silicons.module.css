@@ -1,44 +1,16 @@
-/* /silicons (Anil, 2026-11-01, layout B): the page heading, reveal cards, Waiting for you, then Your Silicons as colour
-   cards and a New Silicon card, in Home's section pattern (the heading on the page, 16px above its content, 48px
-   between sections). */
+/* /silicons (Anil, 2026-11-01, layout B): the page heading, reveal cards, Waiting for you, then Your Silicons as Silicon UI Cards
+   and a New Silicon card, in Home's section pattern. */
 .alertAction { display: block; margin-top: var(--space-group); }
 .reveals { display: grid; min-width: 0; gap: var(--space-inset); }
 
 .section { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
 .sectionTitle { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
 
-.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-inset); margin: 0; padding: 0; list-style: none; }
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-inset); margin: 0; padding: 0; list-style: none; }
 .cards > li { display: grid; min-width: 0; }
 
-/* A Silicon: a card in its own colour pair (--card-from, --card-to, set by silicons.tsx), deepened at the top left so
-   its words read in white; a faint light edge and a light raised shadow, the container squircle; its name (18px,
-   medium), its si:id (mono, softer), and at its foot a status when it has one and when its key last changed. The
-   Silicon spark stands at the lower right. It lifts a little on hover; keyboard focus rings it in the accent. */
-.card {
-  --sq-r: var(--radius-container);
-  position: relative; isolation: isolate; display: flex; min-width: 0; min-height: 168px; flex-direction: column; gap: var(--space-tight);
-  padding: var(--space-inset); overflow: hidden; border: 1px solid color-mix(in oklab, var(--neutral-0) 22%, transparent);
-  background-image: linear-gradient(135deg, color-mix(in oklab, var(--card-from), var(--neutral-11) 42%), var(--card-from) 48%, var(--card-to));
-  background-origin: border-box; box-shadow: var(--shadow-raised); color: var(--neutral-0); text-decoration: none;
-  transition: translate var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
-}
-.card:hover { color: var(--neutral-0); }
-@media (hover: hover) and (pointer: fine) { .card:hover { translate: 0 calc(var(--space-hair) * -1); box-shadow: var(--shadow-floating); } }
-.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.cardSpark { position: absolute; z-index: -1; right: var(--space-inset); bottom: var(--space-inset); width: 44px; height: 44px; color: var(--neutral-0); opacity: .9; }
-.cardName { overflow: hidden; color: var(--neutral-0); font: var(--h3); letter-spacing: var(--h3-tracking); text-overflow: ellipsis; white-space: nowrap; }
-.cardId { overflow: hidden; color: color-mix(in oklab, var(--neutral-0) 75%, transparent); font: var(--caption); letter-spacing: var(--caption-tracking); font-family: var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
-.cardFoot { display: grid; gap: var(--space-hair); margin-top: auto; padding-right: var(--space-page); }
-.cardStatus { color: var(--neutral-0); font: var(--caption); letter-spacing: var(--caption-tracking); }
-.cardFact { color: color-mix(in oklab, var(--neutral-0) 82%, transparent); font: var(--caption); letter-spacing: var(--caption-tracking); }
-
-/* New Silicon: the canvas grey card with a plus, quieter than a Silicon's; it opens the create panel. */
-.newCard { --sq-r: var(--radius-container); --sq-fill: var(--canvas); --sq-stroke: var(--border-subtle); display: flex; min-height: 168px; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
-.newCard:hover { --sq-fill: var(--surface-muted); color: var(--foreground); }
-.newCard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.newPlus { --sq-r: var(--radius-control); --sq-fill: var(--surface); display: grid; width: 36px; height: 36px; place-items: center; background: var(--sq-fill); box-shadow: var(--shadow-resting); color: var(--text-secondary); }
-.newLabel { font: var(--label); letter-spacing: var(--label-tracking); }
-
-@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
-@media (max-width: 899px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 539px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+
+/* An experiment after OpenAI's Usage page: Add a Silicon at 15 px icons with 14 px text, the icon 4 px from its label. */
+.tight.tight { gap: var(--space-tight); }
+.triggerIcon { flex: none; color: var(--text-secondary); }

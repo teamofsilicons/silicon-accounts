@@ -13,6 +13,7 @@ marked "check" is a first guess, to be confirmed against Silicon UI's code befor
 |---|---|---|---|
 | Canvas colour | Warm grey `#F2F1EE` | Neutral; no beige (2026-10-18) | asking |
 | Accent | Blue `#3460F0` (links such as "See all", focus) | Blue (2026-10-30) | done |
+| Content column | 720 px | 896 px (2026-11-11, Anil, branch compact; 800 and 960 tried): every narrow page wider | decided |
 | Font | BDO Grotesk, then Hanken Grotesk | The system font (2026-10-30); a palette switch to compare | kept (Anil) |
 | Page panel | White rounded panel on the canvas, 18 px radius, uneven inset (8 / 12 px) | White box, 8 px corner, 8 px inset, 1 px `#E5E7EB` (Anil, 2026-10-30) | kept (Anil) |
 | Sidebar icons and labels | — | Icons 18 px over NavList's fixed 16 px, labels `--text-base` (16 px) over its 14 px (sidebar.module.css; NavList has no size option); grey hover, not blue (Anil, 2026-10-30) | kept (Anil) |
@@ -58,7 +59,7 @@ marked "check" is a first guess, to be confirmed against Silicon UI's code befor
 | Silicon avatar | Gradient rounded square (30%) with a spark | SiliconMark on Home (parts/silicon-mark.tsx, colours in tokens); the Silicons page still shows photos | 2 | asking (photos or marks everywhere?) |
 | App mark | Dark rounded square with the app's icon | AppMark | 2 (check) | open |
 | Person avatar | Initials on a hue-tinted circle | A Carbon's pixel avatar (Anil's avatar customizer) or their photo | kept (Anil) | done |
-| Type scale | Page title 26 px, card title 16 px, body 14 px, detail 13 px | Anil's eight-role scale (2026-11-06): h1 39, h3 20, body 16, small 14. Inside Silicon UI: controls and labels 14/1.4/500 (label says 1.2), typed text 400 (label says 500), hints 12/1.4/400 (caption says 500, .02em), component text 14 (body says 16) | 3 | open |
+| Type scale | Page title 26 px, card title 16 px, body 14 px, detail 13 px | Silicon UI's typography (2026-11-09), compact on branch compact (2026-11-10): display 28, h1 22, h2 18, h3 16, body 16, small 14; Silicon UI components keep fixed weights (500, 400), which the type lab's weights don't reach. Inside Silicon UI: controls and labels 14/1.4/500 (label says 1.2), typed text 400 (label says 500), hints 12/1.4/400 (caption says 500, .02em), component text 14 (body says 16) | 3 | open |
 | Field | 42 px, 10 px radius, accent focus ring | Silicon UI Input; focus without a ring (2026-10-17) | 3, 7 | open |
 | Dialog | 18 px radius, 480 px, 22/24 px padding | Silicon UI Dialog | 3 (check) | open |
 | Toast | Dark, 14 px radius | ToastStack | 3 (check) | open |
@@ -121,3 +122,16 @@ Silicon's activity, automation, cloud services, per-field sharing.
 | A Silicon | Breadcrumb, header (mark, name, id, status), stats, tabs Activity / Access / Settings | Back link, a hero in its colours, then the settings on one page; no stats or Activity / Access tabs (no API: api-gaps.md 3–8) | open |
 | Silicons, first visit | An empty state ("No Silicons yet", one line, New Silicon) | Six stories (one idea each, segmented bars, auto-advance, tap or arrows, the last holds three ways to start: create here, Silicon Starter, let one ask you); the site's own component (Silicon UI has no stories); Silicon Starter is not in the prototype (Anil, 2026-11-01) | kept (Anil) |
 | Create a Silicon | A New Silicon dialog with Name alone (the Silicon's mark beside it, the id as a hint) | A page; Name, then the id field (the API needs one), then the API's timezone, webhook and own STK under More options; no mark beside the field (Silicon UI's Input has no slot for it or a prefix: requests/silicon-ui-input-prefix.md) | kept (Anil) |
+
+## Security (2026-11-10)
+
+- **Change on a Silicon key** goes to the Silicon's page (its key rotation lives there) instead of opening a rotate
+  dialog on Security. Category: our flow; the rotation form isn't shared yet.
+- **Email code / Text code** have an Edit button that opens the list in a dialog, where the prototype's row itself
+  opens it. Category: Silicon UI has no clickable list row; a button is the closest.
+- **Devices** show when each was last active and its IP; the prototype shows a place ("Kolkata, India"), which the API
+  doesn't give. Category: API gap.
+- **Sign Out of All Other Devices** signs each session out one by one; the API has no single call. Category: API gap.
+- **The phone field's arrow overlaps the calling code** and **the dialog's close button is a bordered square**: both
+  are Silicon UI's (PhoneInput, Dialog). Category: Silicon UI; filed as
+  teamofsilicons/silicon-ui#28 (PhoneInput) and #29 (Dialog close). The dialog title keeps Silicon UI's fixed 500 weight.

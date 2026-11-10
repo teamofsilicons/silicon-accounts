@@ -1,15 +1,15 @@
 /*
  * The Silicon look, mapped onto Silicon UI's semantic tokens (@teamofsilicons/silicon-ui/styles.css, imported first):
- * a neutral #FCFCFC page and Silicon UI's grey scale (no beige or warm paper since 2026-10-18), near-black ink, the
- * prototype's blue accent and the system font for all text, titles too (both 2026-10-30, web/redesign/decisions.md).
- * In development, [data-font] on <html> swaps the face to compare (lib/font-preview.ts).
+ * Silicon UI's typography as it ships, in Hanken Grotesk for titles too (Anil, 2026-11-09, after Radix was tried and
+ * undone), and our colours: a neutral #FCFCFC page and Silicon UI's grey scale, near-black ink and the prototype's blue
+ * accent. In development the dev panel's type lab sets the type tokens live and Edit text restyles one kind of text.
  *
  * The account site is light only: lib/theme.ts pins <html data-theme="light">. The dark block below is kept for app
  * branding that forces dark on an app's own hosted sign-in pages or embedded buttons (lib/branding/apply.ts sets
  * data-theme on that subtree); it is Silicon UI's neutral dark.
  *
- * Contrast (WCAG 2.2): every text token clears 4.5:1 on --background, --surface and --surface-muted in its mode. The
- * lowest pair is light --text-muted #666666 (5.1:1 on --surface-muted).
+ * Contrast (WCAG 2.2): every text token clears 4.5:1 on --background, --surface and --surface-muted in its mode, except
+ * light --text-muted while OpenAI's #8F8F8F is tried (2.8:1 on --surface-muted); #666666 was 5.1:1.
  * --text-faint is for decoration only (rules, separators), never for text.
  *   --accent-ink   accent-coloured text (links): the prototype's blue, a lighter blue in dark.
  *   --primary*     the filled button: ink under page-coloured text in light, the reverse in dark.
@@ -27,10 +27,18 @@
   --canvas: var(--neutral-2);
   /* The nav pill's current item and quiet fills. */
   --surface-pressed: var(--neutral-4);
-  --foreground: #1E1E1C;
-  --text-secondary: var(--neutral-8);
-  /* One step darker than Silicon UI's --neutral-7, which is under 4.5:1 on --surface-muted. */
-  --text-muted: #666666;
+  /* The text greys, ladder C from /__text (Anil, 2026-11-10): even steps of about 12 in lightness (L*), after comparing
+     with Refactoring UI's palette. OpenAI's text was 4 → 40 (#0D0D0D → #5D5D5D), too big a jump.
+       --foreground      #1B1B1B  L 10  names, titles, headings (17:1 on white; ≈ the primary button, #181818)
+       --text-soft       #353535  L 22  the line under a name: an app's description or address (new)
+       --text-secondary  #505050  L 34  facts and quiet links: "Signed in…", "See all" (8:1)
+       --text-muted      #8E8E8E  L 59  ids (si:zap)
+     Before: OpenAI's #0D0D0D, #5D5D5D, #8F8F8F (2026-11-09); ours #1E1E1C, var(--neutral-8), #666666 before that. */
+  --foreground: #1B1B1B;
+  --text-soft: #353535;
+  --text-secondary: #505050;
+  /* Under 4.5:1: 3.3:1 on --background, 2.9:1 on --surface-muted (#666666 was 5.1:1). */
+  --text-muted: #8E8E8E;
   --text-faint: var(--neutral-6);
   --border: oklch(93.5% 0 0);
   --border-subtle: oklch(96.5% 0 0);
@@ -44,10 +52,12 @@
   --accent-foreground: #FFFFFF;
   --accent-ink: #3460F0;
 
-  --primary: #1E1E1C;
-  --primary-hover: #33322F;
-  --primary-pressed: #0F0F0E;
-  --primary-foreground: var(--background);
+  /* Trying platform.openai.com's buttons (Anil, 2026-11-10): its filled button is #181818 under white. Ours were
+     --primary #1E1E1C, --primary-hover #33322F, --primary-pressed #0F0F0E, --primary-foreground var(--background). */
+  --primary: #181818;
+  --primary-hover: #2E2E2E;
+  --primary-pressed: #0D0D0D;
+  --primary-foreground: #FFFFFF;
 
   --control-on: #1E1E1C;
   --control-glyph: #FFFFFF;
@@ -82,58 +92,64 @@
   --silicon-mark-4-from: #4C86FF; --silicon-mark-4-to: #86E3B0;
   --silicon-mark-ink: #FFFFFF;
 
-  /* The system font for everything, titles and the wordmark too (2026-10-30, after Hanken Grotesk was tried). Silicon
-     UI has no monospace, so code and ids use the system one. */
-  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Silicon UI's typography as it ships (Anil, 2026-11-09): its size steps (--text-xs 12 to --text-5xl 72 px), tracking
+     (display -.03em, body -.01em) and line heights (display 1.1, body 1.4) come from its styles.css untouched; only the
+     title face is Hanken here too, where Silicon UI ships Geist. Silicon UI has no monospace, so code and ids use the
+     system one. Every component reads these tokens, so the dev panel's type lab retypes the whole interface. */
+  /* Trying the system font as the site's face (Anil, 2026-11-09); Hanken was:
+     var(--font-hanken-grotesk, "Hanken Grotesk Variable"), sans-serif */
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-display: var(--font-body);
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+  /* Weights for our own text. Silicon UI's components keep their fixed 500 and 400 (prototype-differences.md). */
+  --weight-title: 600;
+  --weight-medium: 500;
+  --weight-regular: 400;
 
-  /* The type scale (Anil, 2026-11-06). Each role is a `font` shorthand with its tracking beside it, because `font`
-     can't carry tracking: `font: var(--h1); letter-spacing: var(--h1-tracking);`. Sizes in rem, written here in px:
-     display 49 / 1.1  700 -.02em  Home's greeting, story headlines
-     h1      39 / 1.15 700 -.02em  a page's title
-     h2      25 / 1.25 600 -.01em  a section
-     h3      20 / 1.3  600         a group in a page, a card's title
-     body    16 / 1.5  400         what you read
-     small   14 / 1.45 400         descriptions, hints, notes
-     caption 12 / 1.4  500  .02em  small labels and timestamps
-     label   14 / 1.2  500         buttons, inputs, a row's title
-     A rule that sets a family after `font:` (mono, the story serif) keeps the role's size and line. Mono only for code
-     and ids. Silicon UI's components use one --leading-body and fixed weights: redesign/prototype-differences.md. */
-  --display: 700 3.0625rem/1.1 var(--font-body);
-  --display-tracking: -.02em;
-  --h1: 700 2.4375rem/1.15 var(--font-body);
-  --h1-tracking: -.02em;
-  --h2: 600 1.5625rem/1.25 var(--font-body);
-  --h2-tracking: -.01em;
-  --h3: 600 1.25rem/1.3 var(--font-body);
-  --h3-tracking: 0em;
-  --body: 400 1rem/1.5 var(--font-body);
-  --body-tracking: 0em;
-  --small: 400 .875rem/1.45 var(--font-body);
-  --small-tracking: 0em;
-  --caption: 500 .75rem/1.4 var(--font-body);
-  --caption-tracking: .02em;
-  --label: 500 .875rem/1.2 var(--font-body);
-  --label-tracking: 0em;
-
-  /* Silicon UI's size steps above base, moved onto the scale, so its components and the pages that still use steps
-     land on it too. xs, sm and base already match. */
-  --text-lg: 1.25rem;
-  --text-xl: 1.5625rem;
-  --text-2xl: 1.5625rem;
-  --text-3xl: 2.4375rem;
-  --text-4xl: 3.0625rem;
-  --text-5xl: 3.0625rem;
+  /* The type roles, built on those tokens and declared only here, so a change to a token flows through every role. Each
+     is a `font` shorthand with its tracking beside it, because `font` can't carry tracking:
+     `font: var(--h1); letter-spacing: var(--h1-tracking);`. In px, at Silicon UI's steps:
+     display 28 2xl title   display line  Home's greeting, story headlines
+     h1      22 xl  title   display line  a page's title
+     h2      18 lg  title   body line     a section
+     h3      16 base medium body line     an item's title: a card, a tile, a group
+     body    16 base regular              what you read (16, as before Radix)
+     Compact (branch compact, Anil 2026-11-10): one step down from comfortable, which was display 36, h1 28, h2 22,
+     h3 18 (the density block below keeps those).
+     label   14 sm  medium                buttons, inputs, a row's title
+     small   14 sm  regular               descriptions, meta, timestamps, hints
+     caption 12 xs  medium                small labels and ids
+     A rule that sets a family after `font:` (mono, the story serif) keeps the role's size and line. */
+  --display: var(--weight-title) var(--text-2xl)/var(--leading-display) var(--font-display);
+  --display-tracking: var(--tracking-display);
+  --h1: var(--weight-title) var(--text-xl)/var(--leading-display) var(--font-display);
+  --h1-tracking: var(--tracking-display);
+  --h2: var(--weight-title) var(--text-lg)/var(--leading-body) var(--font-display);
+  --h2-tracking: var(--tracking-display);
+  --h3: var(--weight-medium) var(--text-base)/var(--leading-body) var(--font-body);
+  --h3-tracking: var(--tracking-body);
+  --body: var(--weight-regular) var(--text-base)/var(--leading-body) var(--font-body);
+  --body-tracking: var(--tracking-body);
+  --label: var(--weight-medium) var(--text-sm)/var(--leading-body) var(--font-body);
+  --label-tracking: var(--tracking-body);
+  --small: var(--weight-regular) var(--text-sm)/var(--leading-body) var(--font-body);
+  --small-tracking: var(--tracking-body);
+  --caption: var(--weight-medium) var(--text-xs)/var(--leading-body) var(--font-body);
+  --caption-tracking: var(--tracking-body);
 
   /* The older pages' steps, until each moves to a role above. */
-  --tracking-body: 0em;
-  --tracking-display: -.02em;
-  --tracking-heading: -.01em;
+  --tracking-heading: var(--tracking-display);
   --leading-tight: 1.2;
   --leading-snug: 1.3;
   --leading-read: 1.5;
-  --weight-title: 600;
+
+  /* Sky bands (lib/sky.ts): the sky through a day, tuned to sit with the cloud header on Create a Silicon. */
+  --sky-night: #2A2C5B;
+  --sky-dawn: #E9A58F;
+  --sky-morning: #F8DDA6;
+  --sky-noon: #8EC3E8;
+  --sky-afternoon: #C6DDEA;
+  --sky-dusk: #EF8B56;
 
   /* Squircle tuning: corner-shape radius multiplier (matches Figma's 60 % corner smoothing). See styles/squircle.css. */
   --sq-k: 1.6;
@@ -146,10 +162,18 @@
 
   /* Page chrome. --page-end is the room under every page's last content (and the phone's home indicator). */
   --page-max: 1120px;
-  /* The narrow centred column most pages use: the prototype's 720 px page (the content layout rule, decisions.md). */
-  --page-narrow: 720px;
+  /* The narrow centred column most pages use: the prototype's 720 px page (the content layout rule, decisions.md),
+     widened to 800 px, then 960, then 896 px, Tailwind's max-w-4xl and 56 × 16 (Anil, 2026-11-11, branch compact):
+     three cards a row are about 291 px each. */
+  --page-narrow: 896px;
   --gutter: clamp(16px, 4vw, 32px);
   --page-end: calc(var(--space-page) + env(safe-area-inset-bottom, 0px));
+}
+
+/* Trying platform.openai.com's outlined button (Anil, 2026-11-10): its edge is ink at 16%, clearer than our --border.
+   Silicon UI's secondary Button reads --border for its edge, so only the token is set, on that variant. */
+[data-theme="light"] [data-variant="secondary"], :root:not([data-theme="dark"]) [data-variant="secondary"] {
+  --border: color-mix(in oklab, var(--foreground) 16%, transparent);
 }
 
 :root[data-theme="dark"], [data-theme="dark"] {
@@ -161,6 +185,7 @@
   --surface-muted: oklch(26% 0 0);
   --surface-pressed: oklch(30% 0 0);
   --foreground: oklch(96% 0 0);
+  --text-soft: oklch(86% 0 0);
   --text-secondary: oklch(77% 0 0);
   --text-muted: oklch(64% 0 0);
   --text-faint: oklch(42% 0 0);
@@ -216,36 +241,41 @@
 /* Profile pictures are Silicon UI's circles (the 30% squircle override was dropped 2026-10-29: Silicon UI's menu states
    draw circles, and the prototype's avatars are round). */
 
-/* Silicon UI as it ships, inside [data-silicon-ui] (Anil, 2026-11-06, trying it on /silicons/new): the values the rest
-   of this file overrides, put back: Hanken and Geist, its size steps, tracking, greys, neutral accent and no focus halo.
-   Copied from @teamofsilicons/silicon-ui/styles.css. */
-[data-silicon-ui] {
-  --font-display: var(--font-geist, "Geist Variable"), sans-serif;
-  --font-body: var(--font-hanken-grotesk, "Hanken Grotesk Variable"), sans-serif;
-  --text-lg: 1.125rem; --text-xl: 1.375rem; --text-2xl: 1.75rem; --text-3xl: 2.25rem; --text-4xl: 3.25rem; --text-5xl: 4.5rem;
-  --tracking-display: -.03em; --tracking-body: -.01em;
-  --leading-display: 1.1; --leading-body: 1.4;
-  --surface-muted: var(--neutral-2);
-  --surface-pressed: var(--neutral-3);
-  --foreground: var(--neutral-11);
-  --text-muted: var(--neutral-7);
-  --accent: oklch(33% 0 0);
-  --accent-strong: oklch(24% 0 0);
-  --accent-subtle: oklch(33% 0 0 / .1);
-  --accent-foreground: var(--background);
-  --primary: var(--foreground);
-  --primary-foreground: var(--background);
-  --control-on: oklch(23% 0 0);
-  --focus-ring: transparent;
-  --success: oklch(49% .19 150);
-  --warning: oklch(58% .18 75);
-  --danger: oklch(54% .21 25);
-  color: var(--foreground);
-  font: 400 var(--text-sm)/1.5 var(--font-body);
-  letter-spacing: var(--tracking-body);
+
+/* Compact (Anil, 2026-11-10, branch compact): TOS apps share one interface, designed for compactness, and home stays
+   simple. Text stays at a 16 base; what tightens is the space around it and the controls:
+   - controls one step shorter: sm 32 (was 36), md 36 (was 44), lg 40 (was 50); xs stays 24;
+   - the larger spacing steps one step down: --space-comfort 16 (20), --space-section 16 (24), --space-block 24 (32),
+     --space-page 32 (48). The small steps (2 to 16) stay, so components keep their insides; sections, pages and
+     panels close up. Home's sections are 32 apart (was 48; 48 tried again 2026-11-10, back to 32);
+   - the title roles one step down (the roles above).
+   The dev panel's Density switch puts <html data-density="comfortable">, the scale before, to compare. */
+:root {
+  --control-height-sm: 2rem; --control-height-md: 2.25rem; --control-height-lg: 2.5rem;
+  --space-comfort: 16px; --space-section: 16px; --space-block: 24px; --space-page: 32px;
+}
+:root[data-density="comfortable"] {
+  --control-height-sm: 2.25rem; --control-height-md: 2.75rem; --control-height-lg: 3.125rem;
+  --space-comfort: 20px; --space-section: 24px; --space-block: 32px; --space-page: 48px;
+  --display: var(--weight-title) var(--text-3xl)/var(--leading-display) var(--font-display);
+  --h1: var(--weight-title) var(--text-2xl)/var(--leading-display) var(--font-display);
+  --h2: var(--weight-title) var(--text-xl)/var(--leading-body) var(--font-display);
+  --h3: var(--weight-medium) var(--text-lg)/var(--leading-body) var(--font-body);
 }
 
-/* Font comparison in development (lib/font-preview.ts sets data-font on <html>): Hanken Grotesk or Geist for
-   everything. The system font is the default and needs no attribute. */
-:root[data-font="hanken"] { --font-body: var(--font-hanken-grotesk, "Hanken Grotesk Variable"), system-ui, -apple-system, "Segoe UI", sans-serif; }
-:root[data-font="geist"] { --font-body: var(--font-geist, "Geist Variable"), system-ui, -apple-system, "Segoe UI", sans-serif; }
+/* The dev tools' own text (development only: the dev panel, the type lab, the inspectors, all marked
+   [data-type-inspect-exempt]) keeps Silicon UI's shipped type while the type lab changes the page's tokens, so the
+   controls don't move under the pointer. Declared on the element, these win over the lab's :root values. */
+[data-type-inspect-exempt] {
+  /* Trying the system font as the site's face (Anil, 2026-11-09); Hanken was:
+     var(--font-hanken-grotesk, "Hanken Grotesk Variable"), sans-serif */
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: var(--font-body);
+  --text-xs: .75rem; --text-sm: .875rem; --text-base: 1rem; --text-lg: 1.125rem;
+  --text-xl: 1.375rem; --text-2xl: 1.75rem; --text-3xl: 2.25rem; --text-4xl: 3.25rem; --text-5xl: 4.5rem;
+  --tracking-display: -.03em; --tracking-body: -.01em;
+  --leading-display: 1.1; --leading-body: 1.4;
+  font-family: var(--font-body);
+  font-feature-settings: normal;
+  letter-spacing: var(--tracking-body);
+}

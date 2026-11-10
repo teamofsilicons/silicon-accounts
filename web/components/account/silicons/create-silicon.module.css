@@ -1,9 +1,14 @@
 /* Create a Silicon (/silicons/new): a wizard in one column: Silicon UI's Stepper, the current step's fields, then the
-   actions, the primary first. */
+   actions on the right, the primary last. */
 /* Centred in the page, and Silicon UI's field type one step up: its fields read --text-sm for labels, values and buttons
    and --text-xs for helper text, so those become 16 and 14 here. */
 .form { --text-sm: 1rem; --text-xs: .875rem; display: grid; width: 100%; min-width: 0; max-width: 480px; gap: var(--space-block); margin-inline: auto; }
 .group { display: grid; min-width: 0; gap: var(--space-comfort); }
 .group:focus { outline: none; }
+/* An available id reads as success. Silicon UI's Input has no success state, so its hint and border tokens are set here. */
+.available { --text-muted: var(--success); --border-strong: var(--success); min-width: 0; }
 .suggestions { display: flex; flex-wrap: wrap; gap: var(--space-tight); margin-top: calc(var(--space-tight) * -1); }
-.footer { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); }
+.footer { display: flex; flex-flow: row-reverse wrap; align-items: center; gap: var(--space-related); }
+/* Markers only. Silicon UI's compact Stepper still captions the current step and has no option to drop it, so it's hidden
+   here; screen readers keep every step's name. */
+.steps.steps.steps > span[aria-hidden="true"] { display: none; }

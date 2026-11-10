@@ -118,7 +118,7 @@ export function FrontFace({ me, photo, name, stamps, appsLoading = false, appsFa
           {appsFailed ? (
             <span className={styles.stampsError} role="alert">
               <span>Your apps did not load, so their stamps are missing.</span>
-              {onRetryApps ? <Button variant="ghost" size="sm" onClick={onRetryApps}>Try again</Button> : null}
+              {onRetryApps ? <Button variant="ghost" size="sm" onClick={onRetryApps}>Try Again</Button> : null}
             </span>
           ) : appsLoading ? (
             <span className={styles.stampsSkeleton} aria-hidden="true">

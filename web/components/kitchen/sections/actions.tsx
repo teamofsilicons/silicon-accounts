@@ -27,18 +27,18 @@ export function Actions() {
       <Specimen title="Button: one primary per surface">
         <div className={styles.row}>
           <Button onClick={() => setLabel(current => (current === "Save changes" ? "Saved" : "Save changes"))}>{label}</Button>
-          <Button variant="secondary">Add an email</Button>
+          <Button variant="secondary">Add an Email</Button>
           <Button variant="ghost">Cancel</Button>
         </div>
         <div className={styles.row}>
-          <Button variant="danger">Remove access</Button>
+          <Button variant="danger">Remove Access</Button>
           <Button loading>Saving</Button>
-          <Button variant="secondary" disabled>Not yet</Button>
+          <Button variant="secondary" disabled>Not Yet</Button>
         </div>
         <div className={styles.row}>
           <Button size="sm" variant="secondary">Small</Button>
           <Button size="lg">Create a Silicon<ArrowRight {...icon} /></Button>
-          <ButtonLink href="#actions" variant="ghost">A link that looks like a button</ButtonLink>
+          <ButtonLink href="#actions" variant="ghost">A Link That Looks Like a Button</ButtonLink>
         </div>
       </Specimen>
       <Specimen title="ActionButton and CopyButton">
@@ -77,7 +77,7 @@ export function Actions() {
             <Button variant="secondary" aria-label="Sign out"><LogOut {...icon} /></Button>
           </Tooltip>
           <Popover>
-            <PopoverTrigger asChild><Button variant="secondary">What is a uuid?</Button></PopoverTrigger>
+            <PopoverTrigger asChild><Button variant="secondary">What Is a UUID?</Button></PopoverTrigger>
             <PopoverContent>
               <p className={styles.prose}>Your uuid never changes. Apps store it; your c:id is only what people see, and you can change it.</p>
             </PopoverContent>

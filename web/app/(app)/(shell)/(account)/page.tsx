@@ -5,7 +5,8 @@
  * and Your apps (home-sections.tsx).
  * The previous Home stays in components/account/overview, unused. Without a session, proxy.ts serves the public
  * landing page at this address instead (app/landing), so crawlers only ever see the landing; this view keeps the
- * root's title (the site's name) and its noindex.
+ * root's title (the site's name) and its noindex. Its text is the site's type system (Inter on the Radix scale,
+ * styles/tokens.css; Anil, 2026-11-09).
  */
 import { HomeIdentity } from "@/components/account/home-identity";
 import { HomeCards } from "@/components/account/home-cards";

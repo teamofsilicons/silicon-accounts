@@ -137,5 +137,5 @@ html[data-surface="embed"] body { min-height: 0; background: transparent; transi
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 
-/* The dev type inspector (components/foundation/dev/type-inspector.tsx) is on. */
-html[data-type-inspect] * { cursor: crosshair !important; }
+/* A dev inspector (components/foundation/dev/type-inspector.tsx or spacing-inspector.tsx) is on. */
+html[data-type-inspect] *, html[data-spacing-inspect] * { cursor: crosshair !important; }

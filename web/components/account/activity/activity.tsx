@@ -134,7 +134,7 @@ export function Activity() {
       {history.error && !history.data ? (
         <Alert tone="danger" title="Your activity did not load">
           {describeError(history.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void history.refetch()}>Try again</Button></span>
+          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void history.refetch()}>Try Again</Button></span>
         </Alert>
       ) : !history.data || !zoneKnown ? (
         <div className={styles.skeleton} aria-busy="true" aria-label="Loading your activity">
@@ -158,7 +158,7 @@ export function Activity() {
           </div>
           {history.hasNextPage ? (
             <div className={styles.more}>
-              <Button ref={moreButton} variant="secondary" onClick={() => void showOlder()} loading={history.isFetchingNextPage}>Show older activity</Button>
+              <Button ref={moreButton} variant="secondary" onClick={() => void showOlder()} loading={history.isFetchingNextPage}>Show Older Activity</Button>
             </div>
           ) : null}
           {history.isFetchNextPageError ? <p className={styles.error} role="alert">{describeError(history.error)}</p> : null}

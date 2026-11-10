@@ -78,7 +78,7 @@ export function Proofs() {
       {proofs.error && !proofs.data ? (
         <Alert tone="danger" title="Your verifications did not load">
           {describeError(proofs.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void proofs.refetch()}>Try again</Button></span>
+          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void proofs.refetch()}>Try Again</Button></span>
         </Alert>
       ) : !proofs.data ? (
         <div className={styles.list} aria-busy="true" aria-label="Loading your verifications">

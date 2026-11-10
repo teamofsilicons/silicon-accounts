@@ -55,3 +55,5 @@
 @media (max-width: 639px) {
   .items { grid-template-columns: minmax(0, 1fr); gap: var(--space-inset); }
 }
+/* The picture cards on Home (Anil, 2026-11-11): the same space above as every Home section. */
+.place { margin-top: var(--space-section); }

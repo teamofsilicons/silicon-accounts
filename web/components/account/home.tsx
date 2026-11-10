@@ -26,7 +26,7 @@ function SignedOut() {
         <h1 className={styles.title}>You&apos;re signed out</h1>
         <p className={styles.text}>Your session in this browser ended. Sign in again to see your account, your apps and your Silicons.</p>
         <div className={styles.actions}>
-          <ButtonLink href={paths.signIn} size="lg" external><LogIn size={16} strokeWidth={1.75} aria-hidden="true" />Sign in</ButtonLink>
+          <ButtonLink href={paths.signIn} size="lg" external><LogIn size={16} strokeWidth={1.75} aria-hidden="true" />Sign In</ButtonLink>
           <ButtonLink href={paths.home} size="lg" variant="ghost" external>About Silicon Accounts</ButtonLink>
         </div>
       </div>

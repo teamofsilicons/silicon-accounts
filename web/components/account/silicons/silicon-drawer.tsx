@@ -346,7 +346,7 @@ function Profile(props: BodyProps) {
                 />
               </div>
             ) : (
-              <Button ref={changeIdButton} variant="secondary" size="sm" onClick={() => setChangingId(true)}>Change its id</Button>
+              <Button ref={changeIdButton} variant="secondary" size="sm" onClick={() => setChangingId(true)}>Change Its ID</Button>
             )}
           </HeightFrame>
         </div>
@@ -504,7 +504,7 @@ function WebhookBlock({ silicon, onReveal }: BodyProps) {
             <Input ref={urlInput} label="Webhook URL" type="url" inputMode="url" placeholder="https://scout.example/hooks/accounts" value={url} onChange={event => { setUrl(event.target.value); setError(null); }} error={error ?? undefined} autoComplete="off" spellCheck={false} />
             <div className={styles.actions}>
               {editing ? <Button type="button" variant="ghost" size="sm" onClick={cancelEdit} disabled={setWebhook.isPending}>Cancel</Button> : null}
-              <Button type="submit" variant="secondary" size="sm" loading={setWebhook.isPending}>{current ? "Save new URL" : "Set webhook"}</Button>
+              <Button type="submit" variant="secondary" size="sm" loading={setWebhook.isPending}>{current ? "Save New URL" : "Set Webhook"}</Button>
             </div>
           </form>
         ) : (
@@ -635,7 +635,7 @@ function TransferBlock({ silicon, me, now }: BodyProps) {
             </div>
             {error ? <p className={styles.error} role="alert">{error}</p> : null}
             <div className={styles.actions}>
-              <Button type="submit" variant="secondary" size="sm" loading={sending}>Send transfer request</Button>
+              <Button type="submit" variant="secondary" size="sm" loading={sending}>Send Transfer Request</Button>
             </div>
           </form>
         )}

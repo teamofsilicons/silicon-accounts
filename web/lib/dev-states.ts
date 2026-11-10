@@ -17,7 +17,7 @@ export interface DevVariable {
 
 /** The variables, in the panel's order. The first option of each is the default. */
 export const DEV_VARIABLES: DevVariable[] = [
-  { key: "account", label: "Account", options: [{ value: "real", label: "Real" }, { value: "new", label: "New today" }, { value: "no-id", label: "No id" }] },
+  { key: "account", label: "Account", options: [{ value: "real", label: "Real" }, { value: "no-id", label: "No id" }] },
   { key: "requests", label: "Silicon requests", options: [{ value: "real", label: "Real" }, { value: "none", label: "None" }, { value: "request", label: "Request" }, { value: "handover", label: "Handover" }, { value: "both", label: "Both" }] },
   { key: "devices", label: "Devices", options: [{ value: "real", label: "Real" }, { value: "recent", label: "All recent" }, { value: "unused", label: "One unused" }] },
   { key: "silicons", label: "Silicons", options: [{ value: "real", label: "Real" }, { value: "none", label: "0" }, { value: "one", label: "1" }, { value: "three", label: "3" }] },
@@ -27,7 +27,7 @@ export const DEV_VARIABLES: DevVariable[] = [
 
 /** Whole scenarios in one click: each sets every variable it names (the rest go back to Real). */
 export const DEV_PRESETS: { key: string; label: string; states: DevStates; showIntro?: boolean }[] = [
-  { key: "joined", label: "Just joined", states: { account: "new", requests: "none", devices: "recent", silicons: "none", apps: "none" }, showIntro: true },
+  { key: "joined", label: "Just joined", states: { requests: "none", devices: "recent", silicons: "none", apps: "none" }, showIntro: true },
 ];
 
 const KEY = "accounts.dev.states";
@@ -103,8 +103,8 @@ function apps(count: number): MyApp[] {
 
 function requests(kind: "request" | "handover" | "both"): CustodianRequest[] {
   const out: CustodianRequest[] = [];
-  if (kind !== "handover") out.push({ id: "dvR1", kind: "initial", status: "pending", silicon: summary("dvR1s", "silicon", "si:researcher", "Researcher"), from: null, to: null, created_at: iso(-2 * DAY), expires_at: iso(12 * DAY), decided_at: null } as unknown as CustodianRequest);
-  if (kind !== "request") out.push({ id: "dvR2", kind: "transfer", status: "pending", silicon: summary("dvR2s", "silicon", "si:ledger", "Ledger"), from: summary("dvC1", "carbon", "c:saket", "Saket"), to: null, created_at: iso(-DAY), expires_at: iso(13 * DAY), decided_at: null } as unknown as CustodianRequest);
+  if (kind !== "handover") out.push({ id: "dvR1", kind: "initial", status: "pending", silicon: summary("dvR1s", "silicon", "si:researcher", "Researcher"), from: null, to: null, created_at: iso(-9 * DAY), expires_at: iso(5 * DAY), decided_at: null } as unknown as CustodianRequest);
+  if (kind !== "request") out.push({ id: "dvR2", kind: "transfer", status: "pending", silicon: summary("dvR2s", "silicon", "si:ledger", "Ledger"), from: summary("dvC1", "carbon", "c:saket", "Saket"), to: null, created_at: iso(-12 * DAY), expires_at: iso(2 * DAY), decided_at: null } as unknown as CustodianRequest);
   return out;
 }
 
@@ -134,7 +134,6 @@ export function devAnswer(method: string, path: string): DevAnswer | null {
   if (states.network === "slow") answer.delay = 1500;
   if (states.network === "failing" && LISTS.includes(path)) return { ...answer, fail: true };
 
-  if (path === "/v1/me" && states.account === "new") answer.patch = real => ({ ...(real as Me), created_at: iso(-5 * 60_000) });
   if (path === "/v1/me" && states.account === "no-id") answer.patch = real => ({ ...(real as Me), id: null });
   if (path === "/v1/me/custodian-requests" && states.requests && states.requests !== "real") answer.replace = page(states.requests === "none" ? [] : requests(states.requests as "request" | "handover" | "both"));
   if (path === "/v1/me/sessions" && states.devices === "recent") answer.patch = real => ({ ...(real as Page<SessionInfo>), items: (real as Page<SessionInfo>).items.map(item => ({ ...item, last_seen_at: iso(-60_000) })) });

@@ -1,156 +1,330 @@
-/*
- * The landing page's layout (web/redesign/audits/landing.md, "Structure and layout"). Every section sits in one
- * container (--page-max wide with --gutter on each side) on a 12-column grid at 1024 px and up, and one column below.
- * The hero fills the first screen; two sections (the problem, For Silicons) sit on a full-bleed muted band so the
- * scroll alternates. Running text stays under ~60ch. Tokens only (silicon-ui-check).
- */
+/* Columns hero, Figma node 72:39. Measures and colours are that frame's, so this file is listed in
+   siliconUi.ignore: the values are the landing framework's, not Silicon UI tokens. */
 .page {
-  --header: var(--site-header-height, 64px);
-  --rhythm: clamp(var(--space-stage), 10vw, calc(var(--space-screen) + var(--space-block) + var(--space-related)));
-  padding-bottom: var(--rhythm);
+  min-height: 100vh;
+  background: #fcfcfc;
+  color: #1e1e1c;
+  font-family: "Hanken Grotesk", "Hanken Grotesk Variable", var(--font-hanken-grotesk), sans-serif;
 }
-.container { width: 100%; max-width: calc(var(--page-max) + 2 * var(--gutter)); margin-inline: auto; padding-inline: var(--gutter); }
 
-/* Shared pieces ---------------------------------------------------------------------------------------------------- */
-.head { display: grid; align-content: start; gap: var(--space-group); max-width: 60ch; }
-.label { margin: 0; color: var(--text-muted); font-size: var(--text-sm); font-weight: 500; }
-.sectionTitle { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.15; text-wrap: balance; }
-.intro { margin: 0; color: var(--text-secondary); font-size: var(--text-lg); line-height: 1.6; text-wrap: pretty; }
-.note { margin: 0; color: var(--text-muted); font-size: var(--text-sm); line-height: 1.6; text-wrap: pretty; }
-.intro a, .note a { color: var(--text-secondary); }
-.icon { color: var(--foreground); }
-.page :not(pre) > code { padding: .1em .35em; border-radius: var(--radius-control); background: var(--surface-muted); color: var(--foreground); font-size: .86em; }
-.band :not(pre) > code { background: var(--surface); }
-.page code[data-nowrap] { white-space: nowrap; }
-
-.section { margin-top: var(--rhythm); scroll-margin-top: var(--header); }
-.band { margin-top: var(--rhythm); padding-block: var(--space-screen); background: var(--surface-muted); scroll-margin-top: var(--header); }
-
-/* Label and title on the left (4 columns), the content on the right (from column 5 or 6). */
-.split { display: grid; gap: var(--space-block); }
-
-.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-group) var(--space-section); }
-.actions[data-centred] { justify-content: center; }
-/* The second way in: words, not a second button. */
-.quiet { display: inline-flex; align-items: center; gap: var(--space-related); padding: var(--space-related) 0; color: var(--text-secondary); font-size: var(--text-base); text-decoration: none; }
-.quiet svg { flex: none; color: var(--text-muted); transition: transform var(--duration-fast) var(--ease-standard); }
-.quiet:hover, .quiet:focus-visible { color: var(--foreground); text-decoration: underline; text-underline-offset: .22em; }
-@media (hover: hover) and (pointer: fine) { .quiet:hover svg { transform: translateY(2px); } }
-
-/* 2 Hero ----------------------------------------------------------------------------------------------------------- */
-.hero { display: grid; align-items: center; padding-block: var(--space-stage) var(--space-page); }
-.heroGrid { display: grid; align-items: center; gap: var(--space-page); }
-.heroText { display: grid; justify-items: start; gap: var(--space-comfort); }
-.title { margin: 0; color: var(--accent-ink); font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.08; text-wrap: balance; }
-.lede { max-width: 44ch; margin: 0 0 var(--space-group); color: var(--text-secondary); font-size: var(--text-lg); line-height: 1.6; text-wrap: pretty; }
-.heroCard { display: grid; gap: var(--space-group); width: 100%; max-width: 560px; margin: 0; justify-self: center; }
-.caption { color: var(--text-muted); font-size: var(--text-xs); text-align: center; }
-
-/* The problem band starts right under the hero, so its top peeks into the first screen. */
-.hero + .band { margin-top: 0; }
-
-/* 3 The problem ---------------------------------------------------------------------------------------------------- */
-.pair { display: grid; gap: var(--space-block); }
-.statement { display: grid; align-content: start; gap: var(--space-related); max-width: 40ch; }
-.statementTitle { margin: var(--space-related) 0 0; color: var(--foreground); font-size: var(--text-lg); font-weight: 500; }
-.statement p { margin: 0; color: var(--text-secondary); font-size: var(--text-lg); line-height: 1.6; text-wrap: pretty; }
-
-/* 4 For Carbons ---------------------------------------------------------------------------------------------------- */
-.cards { display: grid; gap: var(--space-section); margin: var(--space-block) 0 var(--space-stage); }
-/* How signing in goes: numbered steps on one hairline. */
-/* Lists with role="list" lose their margin to base.css, so the space above sits on .cards. */
-.flow { display: grid; gap: var(--space-section); padding: 0; list-style: none; counter-reset: flow; }
-.flowStep { position: relative; display: grid; gap: var(--space-tight); padding-left: var(--space-block); counter-increment: flow; }
-.flowStep::before { content: counter(flow); position: absolute; top: 0; left: 0; display: grid; width: var(--space-section); height: var(--space-section); place-items: center; border: 1px solid var(--border-strong); border-radius: var(--radius-full); background: var(--background); color: var(--foreground); font-size: var(--text-xs); font-weight: 500; }
-.flowTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: var(--space-section); }
-.flowText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6; }
-
-/* 5 What an app sees ----------------------------------------------------------------------------------------------- */
-.showcase { display: grid; align-items: center; gap: var(--space-page); }
-.showcaseText { display: grid; gap: var(--space-section); }
-.shot {
-  --sq-r: var(--radius-overlay);
-  --sq-fill: var(--surface-muted);
+.nav {
+  display: flex;
+  height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 80px;
+  background: #fffdf9;
+}
+.navLeft { display: flex; align-items: center; gap: 40px; min-width: 0; }
+.logo { display: block; height: 24px; flex: none; }
+.logo img { display: block; width: 167px; height: 24px; }
+.navLinks { display: flex; align-items: center; min-width: 0; }
+.navLinks a {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 14px;
+  border-radius: 200px;
+  color: #181818;
+  font-size: 14px;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.navLinks a:hover { background: rgb(24 24 24 / 6%); }
+.navActions { display: flex; align-items: center; gap: 8px; padding: 2px; }
+.github {
   display: grid;
-  place-items: start center;
-  max-height: 560px;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 200px;
+}
+.github:hover { background: rgb(24 24 24 / 6%); }
+
+.primary, .secondary {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: -0.14px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 150ms cubic-bezier(.215, .61, .355, 1), transform 150ms cubic-bezier(.215, .61, .355, 1);
+}
+.primary {
+  border: 1px solid #17468c;
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 12%) 0%, rgb(255 255 255 / 0%) 50%), linear-gradient(180deg, #3070c4 0%, #1f5cb1 100%);
+  box-shadow: inset 0 -1px 0 rgb(24 74 146 / 50%), inset 0 -3px 6px rgb(8 32 110 / 18%), inset 0 1px 0 rgb(169 198 245 / 55%), 0 1px 0.5px rgb(16 54 159 / 12%), 0 2px 2px rgb(16 54 159 / 16%);
+  color: #fff;
+}
+.primary:hover { background-image: linear-gradient(180deg, rgb(255 255 255 / 12%) 0%, rgb(255 255 255 / 0%) 50%), linear-gradient(180deg, #3c79c8 0%, #2c66b6 100%); }
+.secondary {
+  border: 1px solid rgb(0 0 0 / 9%);
+  background-image: linear-gradient(180deg, #fff 0%, #f7f7f8 100%);
+  box-shadow: inset 0 -1px 0 rgb(0 0 0 / 6%), 0 1px 0.5px rgb(0 0 0 / 3%), 0 2px 2px rgb(0 0 0 / 4%);
+  color: #1e1e1c;
+}
+.secondary:hover { background-image: linear-gradient(180deg, #f5f5f5 0%, #ededee 100%); }
+.primary:active, .secondary:active { transform: scale(0.99); }
+@media (prefers-reduced-motion: reduce) {
+  .primary, .secondary { transition: none; }
+  .primary:active, .secondary:active { transform: none; }
+}
+
+.hero {
+  position: relative;
+  height: 700px;
   overflow: hidden;
-  padding: var(--space-block) var(--space-block) 0;
-  background: var(--sq-fill);
-  mask-image: linear-gradient(to bottom, black 78%, transparent);
+  background: #fcfcfc;
 }
-.shotImage { display: block; width: min(100%, 358px); height: auto; }
-.facts { display: grid; gap: var(--space-group); margin: 0; padding: 0; list-style: none; }
-.facts li { padding-left: var(--space-inset); border-left: 2px solid var(--border-strong); color: var(--text-secondary); font-size: var(--text-base); line-height: 1.6; text-wrap: pretty; }
-
-/* 6 For Silicons --------------------------------------------------------------------------------------------------- */
-.sticky { display: grid; align-content: start; gap: var(--space-section); }
-.steps { display: grid; gap: var(--space-page); margin: 0; padding: 0; list-style: none; counter-reset: step; }
-.step { position: relative; display: grid; gap: var(--space-group); min-width: 0; padding-left: calc(var(--space-block) + var(--space-related)); counter-increment: step; }
-.step::before { content: counter(step, decimal-leading-zero); position: absolute; top: .2em; left: 0; color: var(--text-muted); font-size: var(--text-sm); font-weight: 500; font-variant-numeric: tabular-nums; }
-.stepTitle { margin: 0; color: var(--foreground); font-size: var(--text-lg); font-weight: 500; line-height: 1.4; }
-.stepText { margin: 0 0 var(--space-tight); color: var(--text-secondary); font-size: var(--text-base); line-height: 1.65; text-wrap: pretty; }
-
-/* 7 Safe by design ------------------------------------------------------------------------------------------------- */
-.safety { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
-.safetyItem { display: grid; align-content: start; gap: var(--space-related); padding: var(--space-section) 0; border-bottom: 1px solid var(--border); }
-.safetyTitle { margin: var(--space-tight) 0 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; }
-.safetyText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6; text-wrap: pretty; }
-
-/* 8 Questions ------------------------------------------------------------------------------------------------------ */
-.accordion { min-width: 0; }
-
-/* 9 Closing call to action ----------------------------------------------------------------------------------------- */
-.closing { --sq-r: var(--radius-overlay); --sq-fill: var(--surface-muted); display: grid; justify-items: center; gap: var(--space-comfort); padding: var(--space-screen) var(--space-section); background: var(--sq-fill); text-align: center; }
-.closingTitle { max-width: 20ch; margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.1; text-wrap: balance; }
-.closingText { margin: 0 0 var(--space-group); color: var(--text-secondary); font-size: var(--text-lg); }
-
-/* Tablet: two columns where they still read --------------------------------------------------------------------------- */
-@media (min-width: 720px) {
-  .title { font-size: var(--text-4xl); }
-  .sectionTitle { font-size: var(--text-3xl); }
-  .closingTitle { font-size: var(--text-4xl); }
-  .pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .flow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .flowStep { padding: var(--space-block) var(--space-section) 0 0; }
-  /* The hairline that joins the three numbers. */
-  .flow { position: relative; }
-  .flow::before { content: ""; position: absolute; top: calc(var(--space-section) / 2); right: 0; left: 0; border-top: 1px solid var(--border); }
-  .safety { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-block); }
+.shader { position: absolute; inset: 0; }
+/* The accent is a 1000×400 frame clipped at the hero's top left. The columns fill inside it is the
+   full 1440×700 shader, and the radial SVG fades that frame out. */
+.accent {
+  position: absolute;
+  top: -200px;
+  left: -500px;
+  width: 1000px;
+  height: 400px;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: url(/brand/accent-mask.svg);
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  mask-mode: alpha;
 }
+.content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  align-items: flex-start;
+  padding: 128px 96px 0;
+}
+.copy { display: flex; width: min(576px, 100%); flex-direction: column; gap: 40px; }
+.heading { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow {
+  margin: 0;
+  color: #1f5cb1;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.32px;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+.copy h1 {
+  margin: 0;
+  color: #1e1e1c;
+  font-family: "GT Alpina Trial", "GT Alpina Trial Light", serif;
+  font-size: 36px;
+  font-weight: 300;
+  letter-spacing: -1.08px;
+  line-height: 44px;
+}
+.lede {
+  margin: 0;
+  max-width: 520px;
+  color: #585858;
+  font-size: 16px;
+  letter-spacing: -0.16px;
+  line-height: 24px;
+}
+.actions { display: flex; gap: 12px; padding: 2px; }
 
-/* Desktop: the 12-column grid ------------------------------------------------------------------------------------------- */
-@media (min-width: 1024px) {
-  /* The first screen, less a strip where the next band shows. */
-  .hero { min-height: min(calc(100svh - var(--header) - var(--space-stage)), 760px); padding-block: var(--space-page); }
-  .heroGrid, .split, .showcase { grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--space-section); }
-  .heroText { grid-column: 1 / span 6; }
-  .heroCard { grid-column: 7 / span 6; max-width: 520px; justify-self: end; }
-  .title { font-size: var(--text-5xl); }
-
-  .split > :first-child { grid-column: 1 / span 4; }
-  .split > :last-child { grid-column: 5 / span 8; }
-  .split > .steps { grid-column: 6 / span 7; }
-
-  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-
-  .shot { grid-column: 1 / span 7; }
-  .showcaseText { grid-column: 9 / span 4; }
-
-  .sticky { position: sticky; top: calc(var(--header) + var(--space-block)); align-self: start; }
-
-  .safety { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .nav { padding-inline: 20px; }
+  .navLinks { display: none; }
+  .hero { height: auto; min-height: 640px; }
+  .content { padding: 64px 20px 48px; }
+  .accent { display: none; }
 }
 
-/* Phones: the image follows its text. */
-@media (max-width: 1023px) {
-  .shot { order: 2; }
+/* How it works, Figma node 93:322. One viewport of scroll per step; the stage sticks. */
+.howScene { height: 300vh; }
+.howPin {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 100vh;
+  align-items: center;
+  padding: 0 96px;
 }
-@media (max-width: 520px) {
-  .step { padding-left: 0; padding-top: var(--space-section); }
-  .step::before { top: 0; }
-  .actions { gap: var(--space-group); }
+.howSplit {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 96px;
+}
+.howWriting { display: flex; width: 576px; flex: none; flex-direction: column; gap: 48px; }
+.howHeader { display: flex; flex-direction: column; gap: 16px; }
+.howHeader h2 {
+  margin: 0;
+  color: #1e1e1c;
+  font-family: "GT Alpina Trial", "GT Alpina Trial Light", serif;
+  font-size: 32px;
+  font-weight: 300;
+  letter-spacing: -0.32px;
+  line-height: 40px;
+}
+.howLede { margin: 0; max-width: 520px; color: #585858; font-size: 16px; letter-spacing: -0.16px; line-height: 24px; }
+.steps { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.step {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 20px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.step:focus-visible { outline: 2px solid #1f5cb1; outline-offset: 2px; }
+.stepActive { background: #f2f2f2; }
+.stepNum { flex: none; font-size: 14px; font-weight: 500; letter-spacing: -0.14px; line-height: 1.2; color: #666; }
+.stepActive .stepNum { color: #1f5cb1; }
+.stepText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 6px; }
+.stepTitle { font-size: 20px; font-weight: 500; letter-spacing: -0.2px; line-height: 1.3; color: #585858; }
+.stepActive .stepTitle { color: #1e1e1c; }
+.stepBody { display: none; margin: 0; color: #585858; font-size: 16px; font-weight: 400; letter-spacing: -0.16px; line-height: 24px; }
+.stepActive .stepBody { display: block; }
+.stepSnippet { display: none; }
+
+.stage {
+  position: relative;
+  display: flex;
+  width: 576px;
+  height: 560px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 20px;
+}
+.stageShader { position: absolute; inset: 0; }
+.vignette {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  width: 360px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 15px rgb(20 24 40 / 22%), 0 1px 0.5px rgb(20 24 40 / 4%);
+  opacity: 0;
+  translate: -50% calc(-50% + 8px);
+  transition: opacity 240ms cubic-bezier(.215, .61, .355, 1), translate 240ms cubic-bezier(.215, .61, .355, 1);
+}
+.vignetteOn { opacity: 1; translate: -50% -50%; }
+.cardTitle { margin: 0; color: #0b0b0b; font-size: 16px; font-weight: 500; letter-spacing: -0.16px; line-height: 1.4; }
+.methods { display: flex; width: 100%; flex-direction: column; gap: 8px; }
+.method, .inkButton, .dangerButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-weight: 500;
+  letter-spacing: -0.14px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.method {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #eaeaea;
+  background: #fff;
+  color: #0b0b0b;
+  font-size: 14px;
+}
+.inkButton {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #0b0b0b;
+  background: #0b0b0b;
+  color: #fff;
+  font-size: 14px;
+}
+.dangerButton {
+  height: 24px;
+  flex: none;
+  padding: 0 8px;
+  border: 1px solid #eaeaea;
+  background: #fff;
+  color: #c8352b;
+  font-size: 12px;
+  letter-spacing: -0.12px;
+}
+.powered { margin: 0; color: #7d7d7d; font-size: 12px; font-weight: 400; letter-spacing: -0.12px; line-height: 1.4; }
+.appRow, .detailRow { display: flex; width: 100%; align-items: center; gap: 10px; }
+.appHead { display: flex; width: 100%; align-items: center; gap: 10px; }
+.avatar {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  border: 1px solid #eaeaea;
+  border-radius: 999px;
+  background: #f7f7f7;
+  color: #0b0b0b;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.12px;
+  line-height: 1.4;
+}
+.rows, .apps { display: flex; width: 100%; flex-direction: column; }
+.detailRow { padding: 10px 0; border-top: 1px solid #eaeaea; }
+.detailName, .appName { margin: 0; color: #0b0b0b; font-size: 14px; font-weight: 500; letter-spacing: -0.14px; line-height: 1.4; }
+.detailName { flex: 1; min-width: 0; }
+.detailNote, .appState { margin: 0; color: #7d7d7d; font-size: 12px; font-weight: 400; letter-spacing: -0.12px; line-height: 1.4; white-space: nowrap; }
+.appMeta { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.appRow { padding: 10px 0; }
+.appRow + .appRow { border-top: 1px solid #eaeaea; }
+.box {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  place-items: center;
+  border-radius: 2px;
+}
+.boxOn { border: 1px solid #1d1d1d; background: #1d1d1d; }
+.boxOff { border: 1px solid #c4c4c4; background: #fff; }
+.box img { display: block; width: 18px; height: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vignette, .vignetteOn { translate: -50% -50%; transition: opacity 240ms linear; }
 }
 
-@media (prefers-reduced-motion: reduce) { .quiet svg { transition: none; } }
+@media (max-width: 900px) {
+  .howScene { height: auto; }
+  .howPin { position: static; height: auto; padding: 64px 20px; }
+  .howSplit { flex-direction: column; align-items: stretch; gap: 32px; }
+  .howWriting { width: auto; }
+  .stage { display: none; }
+  .step .stepBody { display: block; }
+  .step { background: #f2f2f2; }
+  .stepNum { color: #1f5cb1; }
+  .stepTitle { color: #1e1e1c; }
+  .stepSnippet { display: flex; justify-content: center; padding: 8px 20px 20px; }
+  .stepSnippet .vignette { position: relative; left: auto; top: auto; opacity: 1; translate: none; }
+}

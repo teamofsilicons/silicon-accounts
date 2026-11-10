@@ -8,13 +8,14 @@
  */
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
+import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { ConfirmMorph } from "@teamofsilicons/silicon-ui/confirm-morph";
 import Link from "next/link";
 import type { MyProof } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
 import { paths } from "@/lib/navigation";
-import { AppMark } from "../parts/app-mark";
-import { describeError } from "../parts/common";
+import { useTheme } from "@/components/foundation/theme/use-theme";
+import { appLogo, describeError } from "../parts/common";
 import { FitPrompt } from "../parts/fit-prompt";
 import styles from "./acting-for-you.module.css";
 
@@ -28,7 +29,7 @@ export function ActingForYou({ appName, proofs, onRevoke }: { appName: string; p
       </ul>
       <Link href={paths.proofs} className={styles.more}>
         User verification details
-        <ArrowRight size={14} strokeWidth={1.75} aria-hidden="true" />
+        <ArrowRight size={14} strokeWidth={2} aria-hidden="true" />
       </Link>
     </section>
   );
@@ -36,11 +37,12 @@ export function ActingForYou({ appName, proofs, onRevoke }: { appName: string; p
 
 function ProofRow({ proof, onRevoke }: { proof: MyProof; onRevoke: (proofId: string) => Promise<unknown> }) {
   const [error, setError] = useState<string | null>(null);
+  const { theme } = useTheme();
   const receiving = proof.receiving_app;
   const allowed = proof.scopes.length ? proof.scopes.join(", ") : `anything ${receiving.name} accepts`;
   return (
     <li className={styles.row}>
-      <AppMark app={receiving} size={24} />
+      <Avatar name={receiving.name} src={appLogo(receiving, theme) ?? undefined} size="sm" />
       <span className={styles.text}>
         <span className={styles.name}>{receiving.name}</span>
         <span className={styles.meta}>May do {allowed} · ends by {formatDate(proof.expires_at)}</span>

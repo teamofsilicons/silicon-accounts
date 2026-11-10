@@ -5,11 +5,12 @@ move done items to Done (with the commit), add what came up, keep Now to one ite
 Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.md). The product contract is
 `../../understanding/UNDERSTANDING.md` (never edited); the design brief is `../../Silicon Accounts Redesign Design Review.md`.
 
-Last updated: 2026-11-06
+Last updated: 2026-11-09
 
 ## Now
 1. **Silicons, layout B** (web/blank-canvas): list and /silicons/[uuid] built 2026-11-01; next, review them with Anil, then the request and offer pages.
 ## Next
+1a. Redesign Your Silicons and Your apps on Home on the chosen type set (Anil, 2026-11-08); the introduction banner is Anil's to redesign.
 2. **Prototype v7, phase 4: Silicons.** List, `/silicons/[uuid]` with Access and Settings tabs (replacing the drawer),
    request and offer pages; Home's Silicon tiles then link to each Silicon. Map: [prototype-map.md](prototype-map.md).
 3. Finish moving pages to tiles. Page, Section, Surface and SettingsGroup follow the rule and Home's type scale now,
@@ -19,7 +20,9 @@ Last updated: 2026-11-06
 4. Account command menu on Silicon UI Dialog instead of direct Radix, if Dialog can hold the palette without its own
    title row (else report what is missing).
 5. Connected apps: list, `/apps/[id]`, Permissions between apps (`/proofs`).
-6. Security (`/security`, `/sign-in-methods` redirects) and Activity.
+6. Security redesigned on Home's rules (2026-11-10, uncommitted): review with Anil (its email and phone list restyled
+   too); update the e2e suites written for the old page; then `/security` (`/sign-in-methods` redirects)
+   and Activity.
 7. Personal info (`/personal`, the identity card for now) rebuilt as the prototype's rows with every edit dialog.
 8. Data & privacy (`/privacy`, `/settings` redirects).
 9. Sign-in steps restyled; their suppressions cleared.
@@ -31,6 +34,9 @@ Last updated: 2026-11-06
   stats, wrong-keys alerts, automation, cloud services, per-field sharing.
 
 ## Later
+- Publish Silicon UI 0.4.1 and update this site's package dependency when Anil resumes the release. Deferred at his request (2026-11-08). The prepared upstream patch is `silicon-ui-select-0.4.1.patch`; the site uses the tested pnpm patch for 0.4.0 in the meantime.
+- Add a Silicon's chevron: Silicon UI's DropdownMenuTrigger draws it at stroke 1.8 (about 1.13 px at 15 px) with no prop, while our icons are at 2. Anil wants 2 everywhere; choose between our own Button trigger via `asChild` (loses the flip on open) or a Silicon UI request for a chevron stroke option (2026-11-07).
+- Make a Silicon's optional webhook URL easy to find now it's out of the create wizard; it lives in the Silicon page's settings (decisions.md, 2026-11-07).
 - Move `components/foundation/layout` (Page, PageHeader, Section) to silicon-ui's page layout if #24 ships.
 - Docs search on silicon-ui CommandPalette instead of direct Radix (the account command menu moves in phase 2).
 - Custom surfaces' squircle fallbacks vs silicon-ui corner tokens: decide one system.
@@ -38,13 +44,28 @@ Last updated: 2026-11-06
 - The developer portal (`../../developer`, ~24k lines on its own Arc UI copies): its own redesign, after this site.
 
 ## Waiting on Anil
-- The new type scale: judge it on the pages with the type inspector. h1 at 39 in the 720 px column, and the story headlines' serif at 700, need a look.
+- Confirm the Super Visuals licence: Home's introduction now shows BG 110, 102 and 127 (picture cards, 2026-11-11). Say whether to file the Silicon UI IntroBanner request (redesign/requests/silicon-ui-intro-banner.md) (2026-11-10).
+- Review the compact experiment (branch `compact`; dev panel → Look → Density to compare) and say what to keep, and whether Home gets more air (2026-11-10).
+- File the Silicon UI settings list request (redesign/requests/silicon-ui-settings-list.md, a draft); Personal info's rows move onto it once it ships (2026-11-09).
+- Settle the typography in the dev panel's type lab and Edit text, then Copy CSS into styles/tokens.css and the pages' CSS; Silicon UI rules that need a change become tokens or requests (2026-11-09).
+- Two Silicon UI sizes sit outside its steps: 21 px on /apps and /activity, 12.96 px in Home's app mark initials; check them in Edit text (2026-11-09).
+- Needs you: Sign out on an unused device as primary instead of secondary? Bring the setup steps (recovery phone, email, sign-in provider) back as rows? (2026-11-08)
+- Silicon UI request: a tone for Progress, so Needs you's bar can turn amber and red with its time left (2026-11-08).
+- The first-visit story headlines are display (36) now; check them on /silicons (2026-11-09).
 - Home rebuilt to the prototype: review it, then the other pages follow. Open in prototype-differences.md: canvas and page panel, Silicon photos or marks, when a device counts as not used lately, search as a field or the palette, help and app switcher.
 - Landing, still open from the audit: sign-up as its own job; CLI fixes (`--self-create` default, one-line installer) are outside this site.
 - Design review open questions: Proofs folded fully or a
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+- 2026-11-09 Personal info on the page bar and Silicon UI Cards; a settings list request drafted for Silicon UI (uncommitted, web/radix-type)
+- 2026-11-09 Radix undone: Silicon UI's typography in Hanken everywhere with our colours, no [data-silicon-ui] wrapper; the type lab and Edit text in the dev panel replace the type sets and the font lab (uncommitted, web/radix-type)
+- 2026-11-09 Radix Themes' scale and light Slate in Inter made the site's system in styles/tokens.css (uncommitted, web/radix-type)
+- 2026-11-09 Needs you: the device's age under its question, neutral count (uncommitted, web/home-type-needs)
+- 2026-11-09 Linear as a fourth dev type set (uncommitted, web/home-type-needs)
+- 2026-11-08 Font lab adds body size, weight, letter spacing and line height controls, saved with its existing settings and included in Copy CSS (uncommitted, web/home-type-needs)
+- 2026-11-08 Select option highlight aligned in the account site's installed Silicon UI package; Font lab can link display and body fonts (uncommitted, web/home-type-needs)
+- 2026-11-08 Four type sizes; Needs you as the countdown list (uncommitted, web/home-type-needs)
 - 2026-11-06 Eight-role type scale and a dev type inspector (uncommitted)
 - 2026-11-01 Home round two: the introduction as one bordered banner ("One Account for Your Silicons & Apps", round soft dismiss), the ring's spin, breathing halo and click glow, Your apps as simple white cards with Phosphor watermarks, dark Open and new lines (this commit)
 - 2026-10-31 Home from a blank canvas: shell, greeting, Needs you, the introduction's cards, Your Silicons and Your apps, dev states panel (44e0dd0)

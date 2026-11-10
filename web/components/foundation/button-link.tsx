@@ -2,8 +2,8 @@
  * Silicon UI's ButtonLink with the app's router: navigation goes through a link, never a button with a router push.
  * Same variants and sizes as <Button>; the hosted pages' button styles (data-variant) apply.
  *
- *   <ButtonLink href={paths.signIn} size="lg">Sign in</ButtonLink>
- *   <ButtonLink href="https://apps.teamofsilicons.com" variant="secondary" external>Make an app</ButtonLink>
+ *   <ButtonLink href={paths.signIn} size="lg">Sign In</ButtonLink>
+ *   <ButtonLink href="https://apps.teamofsilicons.com" variant="secondary" external>Make an App</ButtonLink>
  */
 import Link from "next/link";
 import { ButtonLink as SiliconButtonLink, type ButtonLinkProps as SiliconButtonLinkProps } from "@teamofsilicons/silicon-ui/button-link";

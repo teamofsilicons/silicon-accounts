@@ -91,7 +91,7 @@ export function Review({ flow, ctl, notice }: ReviewProps) {
       <FlowAlert error={problem} app={app} onSwitch={() => ctl.switchAccount()} />
       <div className={styles.actions}>
         <Button className={styles.wide} loading={pending === "approve"} disabled={!!pending && pending !== "approve"} onClick={() => void act("approve", () => ctl.review(true))}>
-          Share and continue
+          Share and Continue
         </Button>
         <Button variant="secondary" className={styles.wide} loading={pending === "back"} disabled={!!pending && pending !== "back"} onClick={() => void act("back", () => ctl.detailsBack())}>
           Back

@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * Home's introduction for a new Carbon (Anil, 2026-10-31, direction B): three cards, You, Silicons and Apps, under
- * "One Account for Your Silicons & Apps" (an h3: a banner, not a section). They only present the account (a title and one line each); the actions
- * live in Home's sections below (home-sections.tsx). Shown until dismissed, which this browser remembers.
+ * Home's introduction for a new Carbon: "One Account for Your Silicons & Apps" and three things it covers (You,
+ * Silicons, Apps), a title and one line each; the actions live in Home's sections below (home-sections.tsx). Shown
+ * while it is useful: until the account has a Silicon and has signed in to an app (Anil, 2026-11-11), or until
+ * dismissed, which this browser remembers.
  *
- * - You: the Carbon's pixel avatar on a gradient of its own colours.
- * - Silicons: the white Silicon spark on the Silicon colours.
- * - Apps: the white apps grid on the blue accent.
- *
- * Each is a small card: words on its gradient's dark end, the picture standing at the lower right. The You card's
- * photo version is archived in redesign/archive/you-card-photo.md.
+ * Since 2026-11-11 (Anil, picked in /__banner) it is the picture cards (parts/picture-cards.tsx): no background or box,
+ * an h3, three cards of one design in Home's column, each a 16:9 Super Visuals picture (BG 110, 102, 127) over its
+ * words. The gradient cards it replaced (2026-10-31, direction B: the pixel avatar on its own colours, the Silicon
+ * spark, the apps grid) stay below as HomeCardsView, for the lab's record; the You card's photo version is archived in
+ * redesign/archive/you-card-photo.md.
  */
 import { useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { LayoutGrid, Sparkle, X } from "lucide-react";
@@ -18,7 +18,8 @@ import { Button } from "@teamofsilicons/silicon-ui/button";
 import { useCarbonAvatar } from "@/lib/carbon-avatar";
 import { usePicturePalette } from "@/lib/picture-colours";
 import { useMe, useSession } from "@/lib/query/session";
-import { glowYou } from "./home-identity";
+import { PictureCards } from "./parts/picture-cards";
+import { useEveryApp, useEverySilicon } from "./parts/queries";
 import styles from "./home-cards.module.css";
 
 const KEY = "accounts.home.welcome-dismissed";
@@ -54,6 +55,29 @@ export function HomeCards() {
   const { session } = useSession();
   const me = useMe();
   const account = me.data ?? session?.account;
+  const silicons = useEverySilicon();
+  const apps = useEveryApp();
+  if (dismissed || !account) return null;
+  // Only while it's useful (Anil, 2026-11-11): gone once the account has a Silicon and signs in to an app, the two
+  // things it introduces. Hidden until both lists are read, so it never shows and then vanishes.
+  if (!silicons.data || !apps.data) return null;
+  const hasSilicon = silicons.data.items.length > 0;
+  const usesAnApp = apps.data.items.some(item => item.status === "active");
+  if (hasSilicon && usesAnApp) return null;
+  return (
+    <PictureCards className={styles.place} title="One Account for Your Silicons & Apps" onDismiss={dismiss} cards={[
+      { id: "you", picture: { src: "/banner/bg-110.webp" }, title: "You", line: account.id ? `Your id across apps: ${account.id}` : "Your id across apps." },
+      { id: "silicons", picture: { src: "/banner/bg-102.webp", focus: "right center" }, title: "Silicons", line: "Give an AI agent its own account." },
+      { id: "apps", picture: { src: "/banner/bg-127.webp", focus: "center 70%" }, title: "Apps", line: "Apps for delightful agent creation and interaction." },
+    ]} />
+  );
+}
+
+/**
+ * The gradient-card banner Home showed until 2026-11-11, kept for the banner lab (/__banner), which draws it with a
+ * sample account as the record of what came before the picture cards.
+ */
+export function HomeCardsView({ account, onDismiss, onYou }: { account: { uuid: string; id?: string | null }; onDismiss?: () => void; onYou?: () => void }) {
   // The You card shows every Carbon as their pixel avatar, photo or not. Its gradient is the avatar's own palette, dark
   // to light (lib/picture-colours.ts); its words turn light when the colours behind them are dark. The Silicon colours
   // until the avatar is read.
@@ -61,7 +85,6 @@ export function HomeCards() {
   const palette = usePicturePalette(src, 4);
   const youStyle = palette ? (Object.fromEntries(palette.map((colour, index) => [`--you-${index + 1}`, colour.css])) as CSSProperties) : undefined;
   const youOnDark = palette ? palette[1].lightness < 150 : false;
-  if (dismissed || !account) return null;
   // eslint-disable-next-line @next/next/no-img-element -- the pixel avatar is a data URL, shown as is.
   const avatar = src ? <img className={styles.youPicture} src={src} alt="" decoding="async" /> : null;
 
@@ -69,12 +92,12 @@ export function HomeCards() {
     <section data-sq="surface" className={styles.banner} aria-labelledby="home-cards-title">
       <div className={styles.head}>
         <h3 id="home-cards-title" className={styles.title}>One Account for Your Silicons &amp; Apps</h3>
-        <Button variant="soft" size="xs" className={styles.close} aria-label="Dismiss" onClick={dismiss}>
+        <Button variant="soft" size="xs" className={styles.close} aria-label="Dismiss" onClick={onDismiss}>
           <X size={16} strokeWidth={1.75} aria-hidden="true" />
         </Button>
       </div>
       <ul className={styles.items}>
-        <Card className={styles.you} style={youStyle} onDark={youOnDark} picture={avatar} label="You" onClick={glowYou}
+        <Card className={styles.you} style={youStyle} onDark={youOnDark} picture={avatar} label="You" onClick={onYou}
           line={account.id ? <>Your id across apps: <span className={styles.id}>{account.id}</span></> : "Your id across apps."} />
         <Card className={styles.silicons} onDark picture={<Sparkle className={styles.siliconsSpark} fill="currentColor" strokeWidth={1} aria-hidden="true" />}
           label="Silicons" line="Give an AI agent its own account." />

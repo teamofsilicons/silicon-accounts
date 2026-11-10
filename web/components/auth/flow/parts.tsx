@@ -651,7 +651,7 @@ export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, su
         />
       )}
       <Button type="submit" className={styles.wide} loading={pending} disabled={waiting > 0}>
-        {waiting > 0 ? `Try again in ${formatCountdown(waiting)}` : submitLabel}
+        {waiting > 0 ? `Try Again in ${formatCountdown(waiting)}` : submitLabel}
       </Button>
     </form>
   );

@@ -35,7 +35,7 @@ export interface ChooseMethodProps {
   /** Came back from the code to send it somewhere else: show the field only, with a way back. */
   changing?: boolean;
   onBack?: () => void;
-  /** Every method from the start (the Carbon chose "Other ways to sign in" on the Opening page). */
+  /** Every method from the start (the Carbon chose "Other Ways to Sign In" on the Opening page). */
   wide?: boolean;
 }
 
@@ -123,7 +123,7 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
       initialKind={initialKind}
       initialEmail={memory.email ?? ""}
       initialPhone={memory.phone ?? ""}
-      submitLabel={changing ? "Send code" : "Continue"}
+      submitLabel={changing ? "Send Code" : "Continue"}
       onSubmit={send}
       autoFocus={fine && !signedIn}
       errorContext={{ app: flow.app.name }}
@@ -148,7 +148,7 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
             Continue as {firstName(signedIn.display_name)}
           </Button>
           <Button variant="secondary" className={styles.wide} loading={busy === "switch"} disabled={busy === "continue"} onClick={() => void chooseAnother()}>
-            Use another account
+            Use Another Account
           </Button>
         </div>
       ) : methods.length ? (
@@ -166,7 +166,7 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
               {providerButtons}
             </>
           )}
-          {narrowed ? <button type="button" className={styles.textButton} onClick={() => setShowAll(true)}>{signup ? "Other ways to sign up" : "Other ways to sign in"}</button> : null}
+          {narrowed ? <button type="button" className={styles.textButton} onClick={() => setShowAll(true)}>{signup ? "Other Ways to Sign Up" : "Other Ways to Sign In"}</button> : null}
           {changing && onBack ? <button type="button" className={styles.textButton} onClick={onBack}>Back to the code</button> : null}
         </div>
       ) : (

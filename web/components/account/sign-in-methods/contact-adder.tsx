@@ -30,13 +30,15 @@ export interface ContactAdderProps {
   existing: string[];
   /** ISO country for local phone numbers. */
   defaultCountry?: string;
+  /** Open on the form instead of the Add button (a list with nothing in it yet: adding is why it was opened). */
+  startOpen?: boolean;
 }
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function ContactAdder({ channel, existing, defaultCountry = "US" }: ContactAdderProps) {
+export function ContactAdder({ channel, existing, defaultCountry = "US", startOpen = false }: ContactAdderProps) {
   const now = useNow(1000);
-  const [step, setStep] = useState<Step>({ kind: "closed" });
+  const [step, setStep] = useState<Step>(startOpen ? { kind: "enter" } : { kind: "closed" });
   const [value, setValue] = useState("");
   /** Why the typed phone number cannot be sent yet (PhoneField's own words), or null. */
   const [phoneProblem, setPhoneProblem] = useState<string | null>("Enter the phone number to add.");
@@ -138,10 +140,10 @@ export function ContactAdder({ channel, existing, defaultCountry = "US" }: Conta
   return (
     <HeightFrame morphKey={step.kind} className={styles.adderFrame}>
       {step.kind === "closed" ? (
-        <button ref={opener} data-sq="surface" type="button" className={styles.addButton} onClick={open}>
-          <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
-          Add {channel === "email" ? "an email" : "a phone number"}
-        </button>
+        <Button ref={opener} type="button" variant="secondary" size="sm" className={styles.addButton} onClick={open}>
+          <Plus size={16} strokeWidth={2} aria-hidden="true" />
+          Add {channel === "email" ? "an Email" : "a Phone Number"}
+        </Button>
       ) : step.kind === "enter" ? (
         <form className={styles.adder} onSubmit={(event: FormEvent) => { event.preventDefault(); void send(); }} noValidate>
           {channel === "phone" ? (
@@ -173,7 +175,7 @@ export function ContactAdder({ channel, existing, defaultCountry = "US" }: Conta
           )}
           <div className={styles.adderActions}>
             <Button type="button" variant="ghost" onClick={close} disabled={sending}>Cancel</Button>
-            <Button type="submit" loading={sending}>Send code</Button>
+            <Button type="submit" loading={sending}>Send Code</Button>
           </div>
         </form>
       ) : (
@@ -197,13 +199,13 @@ export function ContactAdder({ channel, existing, defaultCountry = "US" }: Conta
           />
           </div>
           <div className={styles.codeActions}>
-            <button type="button" className={styles.linkButton} onClick={() => { setStep({ kind: "enter" }); setError(null); focusField(); }}>
-              Use a different {noun}
-            </button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => { setStep({ kind: "enter" }); setError(null); focusField(); }}>
+              Use a Different {noun === "email" ? "Email" : "Number"}
+            </Button>
             <span className={styles.codeRight}>
               {resendIn > 0 && !expired ? <span className={styles.resendNote}>New code in {formatCountdown(resendIn)}</span> : null}
               <Button type="button" variant="ghost" size="sm" onClick={close}>Cancel</Button>
-              <Button type="button" variant="secondary" size="sm" onClick={() => void send()} loading={sending} disabled={resendIn > 0 && !expired}>Send a new code</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => void send()} loading={sending} disabled={resendIn > 0 && !expired}>Send a New Code</Button>
             </span>
           </div>
           <span className="sr-only" role="status">{verify.isPending ? "Checking the code" : ""}</span>

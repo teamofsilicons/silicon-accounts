@@ -276,7 +276,7 @@ export function SignIn({ demoCode = "123456", onSignIn }: SignInProps) {
                 </form>
                 <div className={styles.divider}>or</div>
                 <div className={styles.alternatives}>
-                  <Button type="button" variant="secondary" className={styles.wide} loading={busy === "passkey"} onClick={() => signInWith("passkey")}><KeyRound size={16} strokeWidth={1.75} aria-hidden="true" />Sign in with a passkey</Button>
+                  <Button type="button" variant="secondary" className={styles.wide} loading={busy === "passkey"} onClick={() => signInWith("passkey")}><KeyRound size={16} strokeWidth={1.75} aria-hidden="true" />Sign In with a Passkey</Button>
                   <div className={styles.sso} role="group" aria-label="Single sign-on">
                     {providers.map(provider => <Button key={provider} type="button" variant="secondary" className={styles.ssoButton} aria-label={`Continue with ${provider}`} loading={busy === provider} onClick={() => signInWith(provider)}>{provider === "Google" ? <GoogleLogo /> : <svg className={styles.providerMark} width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={providerMarks[provider]} /></svg>}{provider}</Button>)}
                   </div>
@@ -314,7 +314,7 @@ export function SignIn({ demoCode = "123456", onSignIn }: SignInProps) {
                   <div><dt>Signed in with</dt><dd>{method}</dd></div>
                   <div><dt>This browser</dt><dd>Remembered for 30 days</dd></div>
                 </motion.dl>
-                <motion.div {...rise(2)}><Button type="button" variant="secondary" className={styles.wide} onClick={signOut}>Sign out</Button></motion.div>
+                <motion.div {...rise(2)}><Button type="button" variant="secondary" className={styles.wide} onClick={signOut}>Sign Out</Button></motion.div>
               </motion.div>}
             </AnimatePresence>
           </div>

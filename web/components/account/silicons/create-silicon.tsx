@@ -2,9 +2,9 @@
 
 /**
  * Creating a Silicon you are custodian of (POST /v1/me/silicons), as a three-step wizard on Silicon UI's Stepper (Anil,
- * 2026-11-07, a prototype): first its name and si:id (checked as you type, suggested from the name until you edit it; its
- * status is the Input's own description or error), then More options: its timezone (yours) and a webhook, then its STK:
- * made for it, or your own. Continue checks the step it leaves; Create Silicon sends them all, and a refusal goes back to
+ * 2026-11-07, a prototype): its name and si:id (checked as you type, suggested from the name until you edit it; its status
+ * is the Input's own description or error), its timezone (this browser's to start with, picked on Sky bands), then its STK: made for it, or
+ * your own. Continue checks the step it leaves; Create Silicon sends them all, and a refusal goes back to
  * the step with the field at fault. Silicon UI's MultiStepForm isn't in 0.4, so the steps are held here.
  *
  * The generated STK comes back exactly once; revealCreated keeps it for the new Silicon's page to show in a reveal card,
@@ -12,6 +12,7 @@
  * answer never creates the Silicon twice.
  */
 import { useMemo, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Checkbox } from "@teamofsilicons/silicon-ui/checkbox";
@@ -20,17 +21,18 @@ import { Input } from "@teamofsilicons/silicon-ui/input";
 import { Stepper } from "@teamofsilicons/silicon-ui/stepper";
 import { ApiError } from "@/lib/api/errors";
 import type { CarbonMe, SiliconCreated } from "@/lib/api/types";
-import { timezoneOptions } from "@/lib/timezones";
+import { browserTimezone, timezoneOptions } from "@/lib/timezones";
 import { describeError } from "../parts/common";
 import { normalizeHandle, useIdCheck } from "../parts/id-field";
 import { useCreateSiliconOnce } from "../parts/queries";
 import { addReveal } from "../parts/reveals";
 import { normalizeStk, stkProblem, stkSecret } from "../parts/stk";
+import { SkyBands } from "./sky-bands";
 import styles from "./create-silicon.module.css";
 
 const STEPS = [
   { id: "name", label: "Name and id" },
-  { id: "more", label: "More options" },
+  { id: "timezone", label: "Timezone" },
   { id: "stk", label: "STK" },
 ];
 
@@ -66,22 +68,22 @@ export function revealCreated(created: SiliconCreated) {
   });
 }
 
-export function CreateSiliconForm({ me, onCreated, onCancel }: { me: CarbonMe; onCreated: (created: SiliconCreated) => void; onCancel: () => void }) {
+/** `stepsIn`, when given, is where the Stepper shows: the page's banner. */
+export function CreateSiliconForm({ me, onCreated, onCancel, stepsIn }: { me: CarbonMe; onCreated: (created: SiliconCreated) => void; onCancel: () => void; stepsIn?: HTMLElement | null }) {
   const [step, setStep] = useState(0);
   const stepBody = useRef<HTMLDivElement>(null);
   const arrivedAt = useRef(0);
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [handleEdited, setHandleEdited] = useState(false);
-  const [timezone, setTimezone] = useState(me.timezone);
-  const [webhook, setWebhook] = useState("");
+  const [timezone, setTimezone] = useState(() => browserTimezone() ?? me.timezone);
   const [own, setOwn] = useState(false);
   const [stk, setStk] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<{ message: string; suggestions: string[] } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const check = useIdCheck("si:", handle, null);
-  const options = useMemo(() => timezoneOptions(undefined, [me.timezone]), [me.timezone]);
+  const options = useMemo(() => timezoneOptions(undefined, [me.timezone, timezone]), [me.timezone, timezone]);
   const create = useCreateSiliconOnce();
 
   // Focus lands on the step itself: its first field may be a Combobox, which opens on focus.
@@ -107,15 +109,6 @@ export function CreateSiliconForm({ me, onCreated, onCancel }: { me: CarbonMe; o
       const problem = stkProblem(stk);
       if (problem) next.stk = problem;
     }
-    const url = webhook.trim();
-    if (url) {
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") next.webhook_url = "A webhook URL must start with https://.";
-      } catch {
-        next.webhook_url = `“${url}” is not a full URL. Start it with https://.`;
-      }
-    }
     return next;
   };
 
@@ -133,17 +126,12 @@ export function CreateSiliconForm({ me, onCreated, onCancel }: { me: CarbonMe; o
       });
     }
     const nameReady = !found.display_name && check.status === "available";
-    const moreReady = !found.webhook_url;
     if (step === 0) {
       if (nameReady) go(1);
       return;
     }
-    if (step === 1) {
-      if (moreReady) go(2);
-      return;
-    }
+    if (step === 1) return go(2);
     if (!nameReady) go(0);
-    else if (!moreReady) go(1);
     if (Object.values(found).some(Boolean) || check.status !== "available") return;
     setFailure(null);
     setFormError(null);
@@ -153,7 +141,6 @@ export function CreateSiliconForm({ me, onCreated, onCancel }: { me: CarbonMe; o
         id: check.id,
         display_name: name.trim(),
         timezone: timezone || undefined,
-        webhook_url: webhook.trim() || undefined,
         stk: own ? normalizeStk(stk) : undefined,
       });
       onCreated(created);
@@ -166,7 +153,7 @@ export function CreateSiliconForm({ me, onCreated, onCancel }: { me: CarbonMe; o
       } else if (Object.keys(fields).length) {
         setErrors(fields);
         if (fields.display_name || fields.id) go(0);
-        else if (fields.timezone || fields.webhook_url) go(1);
+        else if (fields.timezone) go(1);
       } else {
         setFormError(describeError(error));
       }
@@ -178,24 +165,28 @@ export function CreateSiliconForm({ me, onCreated, onCancel }: { me: CarbonMe; o
   const idLine = check.status === "available" ? check.message : check.status === "checking" ? "Checking…" : "Suggested from the name. You can change it later.";
   const suggestions = failure?.suggestions.length ? failure.suggestions : check.status === "unavailable" ? check.suggestions : [];
 
+  const stepper = <Stepper steps={STEPS} current={step} onStepSelect={go} label="Create a Silicon" compact className={styles.steps} />;
+
   return (
     <form className={styles.form} onSubmit={submit} noValidate>
-      <Stepper steps={STEPS} current={step} onStepSelect={go} label="Create a Silicon" />
+      {stepsIn ? createPortal(stepper, stepsIn) : stepper}
       {step === 0 ? (
         <div ref={stepBody} className={styles.group} tabIndex={-1}>
           <Input label="Name" value={name} onChange={event => onName(event.target.value)} placeholder="Scout" maxLength={100} error={errors.display_name || undefined} autoComplete="off" />
-          <Input
-            label="Id"
-            value={`si:${handle}`}
-            onChange={event => { setHandle(normalizeHandle(event.target.value, "si:")); setHandleEdited(true); setFailure(null); }}
-            error={idError || undefined}
-            description={idError ? undefined : idLine}
-            autoComplete="off"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            maxLength={64}
-          />
+          <div className={check.status === "available" && !idError ? styles.available : undefined}>
+            <Input
+              label="Id"
+              value={`si:${handle}`}
+              onChange={event => { setHandle(normalizeHandle(event.target.value, "si:")); setHandleEdited(true); setFailure(null); }}
+              error={idError || undefined}
+              description={idError ? undefined : idLine}
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={64}
+            />
+          </div>
           {suggestions.length ? (
             <div className={styles.suggestions}>
               {suggestions.map(id => (
@@ -206,20 +197,9 @@ export function CreateSiliconForm({ me, onCreated, onCancel }: { me: CarbonMe; o
         </div>
       ) : step === 1 ? (
         <div ref={stepBody} className={styles.group} tabIndex={-1}>
+          <SkyBands value={timezone} onChange={setTimezone} />
           <Combobox label="Timezone" options={options} value={timezone} onValueChange={setTimezone} description="Its local time. Yours to start with." />
           {errors.timezone ? <Alert tone="danger" title={errors.timezone} /> : null}
-          <Input
-            label="Webhook URL (optional)"
-            type="url"
-            inputMode="url"
-            placeholder="https://scout.example/hooks/accounts"
-            value={webhook}
-            onChange={event => { setWebhook(event.target.value); setErrors(current => ({ ...current, webhook_url: "" })); }}
-            error={errors.webhook_url || undefined}
-            description="Where it hears about its own account. You get its signing secret once."
-            autoComplete="off"
-            spellCheck={false}
-          />
         </div>
       ) : (
         <div ref={stepBody} className={styles.group} tabIndex={-1}>

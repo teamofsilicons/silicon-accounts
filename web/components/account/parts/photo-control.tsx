@@ -157,7 +157,7 @@ export function PhotoControl({ name, src, upload, remove, size = 112, audience =
                 }}
               />
             ) : <span className={styles.menuNote}>This is the default photo.</span>}
-            <Button variant="secondary" size="sm" onClick={choose} loading={uploading}>Choose a photo</Button>
+            <Button variant="secondary" size="sm" onClick={choose} loading={uploading}>Choose a Photo</Button>
           </div>
         </PopoverContent>
       </Popover>

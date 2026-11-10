@@ -1,0 +1,81 @@
+/* /__cards (cards-lab.tsx): four card systems for Your Silicons and Your apps, on Home's card rules: a clear border and
+   no resting shadow (a shadow on hover), 12px inside, 2px from title to line, 28px marks, body titles. */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-max) + 2 * var(--gutter)); gap: var(--space-page); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; justify-items: start; gap: var(--space-related); }
+.title { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.lede { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.system { display: grid; gap: var(--space-inset); }
+.systemHead { display: grid; gap: var(--space-tight); }
+.systemName { margin: 0; font: var(--h3); letter-spacing: var(--h3-tracking); }
+.systemNote { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.stage { padding: var(--space-block) var(--gutter); border-radius: var(--radius-container); background: var(--background); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.column { display: grid; gap: var(--space-block); width: 100%; max-width: var(--page-narrow); margin-inline: auto; }
+
+/* Home's section pattern */
+.section { display: grid; gap: var(--space-inset); }
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-group); }
+.sectionTitle { margin: 0; font: var(--h2); letter-spacing: var(--h2-tracking); }
+.seeAll { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); margin: 0; padding: 0; list-style: none; }
+.grid > li { display: grid; min-width: 0; }
+
+/* The card every system shares */
+.card { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); min-width: 0; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); text-decoration: none; transition: box-shadow var(--duration-fast) var(--ease-standard), translate var(--duration-fast) var(--ease-standard); }
+@media (hover: hover) and (pointer: fine) { a.card:hover { box-shadow: var(--shadow-raised); translate: 0 calc(var(--space-hair) * -1); } }
+a.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.words { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); }
+.cardTitle { overflow: hidden; color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.cardLine { overflow: hidden; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.cardId { overflow: hidden; color: var(--text-secondary); font: var(--small); font-family: var(--font-mono); letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+.fact { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.fact[data-tone="warning"] { color: var(--warning); }
+.appIcon { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; background: var(--sq-fill); color: var(--foreground); }
+.chevron { flex: none; color: var(--text-muted); }
+
+/* 1 · Tile */
+.tile { display: flex; align-items: center; gap: var(--space-group); padding: var(--space-group); }
+
+/* 2 · Tile + footer: the hairline runs the card's width (the card is rounded, the footer is not, so the line is straight). */
+.footerCard { display: grid; grid-template-rows: 1fr auto; }
+.footerTop { display: flex; align-items: center; gap: var(--space-group); padding: var(--space-group); }
+.footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-related); padding: var(--space-related) var(--space-group); border-top: 1px solid var(--border-subtle); }
+
+/* 3 · Picture: a 3:1 band (short, so it labels rather than leads), the words under it. */
+.pictureCard { display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+.band { display: block; aspect-ratio: 3 / 1; background-position: center; background-size: cover; border-bottom: 1px solid var(--border-subtle); }
+.pictureWords { display: grid; align-content: start; gap: var(--space-related); padding: var(--space-group); }
+
+/* 4 · Stacked */
+.stacked { display: grid; align-content: start; justify-items: start; gap: var(--space-hair); padding: var(--space-group); }
+.stacked > :first-child { margin-bottom: var(--space-related); }
+.stacked .cardLine { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.stacked .fact { margin-top: var(--space-tight); }
+.stackedAction { margin-top: var(--space-group); }
+
+/* New Silicon: grey, no border, a plus; as tall as its neighbours. */
+.newCard { --sq-fill: var(--canvas); --sq-stroke: transparent; display: flex; align-items: center; gap: var(--space-group); padding: var(--space-group); }
+.newCard[data-tall], .newCard[data-picture] { flex-direction: column; justify-content: center; }
+.plus { --sq-r: var(--radius-control); --sq-fill: var(--surface); display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
+
+/* Apps · Home's card, spacing: Home's app card (home-sections.module.css) with its paddings from --top-pad / --foot-pad. */
+.spacing { display: grid; gap: var(--space-group); }
+.spacingName { margin: 0; font: var(--body); letter-spacing: var(--body-tracking); }
+.homeCard { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; min-width: 0; height: 100%; grid-template-rows: 1fr auto; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.homeTop { display: flex; min-width: 0; align-items: flex-start; gap: var(--space-group); padding: var(--top-pad); }
+.homeMark { --sq-stroke: var(--border-subtle); border: 1px solid var(--sq-stroke); }
+.homeWords { display: grid; min-width: 0; gap: var(--space-hair); }
+.homeName { overflow: hidden; color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.homeLine { display: -webkit-box; overflow: hidden; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.homeFooter { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--space-related); padding: var(--foot-pad); border-top: 1px solid var(--border-subtle); }
+.homeFact { min-width: 0; overflow: hidden; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+
+/* Apps · Home's card, layouts */
+.tallTop { min-height: calc(var(--space-page) * 3 + var(--space-inset)); }
+.belowTop { display: grid; min-width: 0; align-content: start; gap: var(--space-related); padding: var(--top-pad); }
+.belowHead { display: flex; min-width: 0; align-items: center; gap: var(--space-group); }
+.homeWhen { color: var(--foreground); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 639px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+/* Anil's app spec: what's new in the app reads in the accent ink; a small label on the heading. */
+.footerCard[data-activity] .cardLine { color: var(--accent-ink); font-weight: var(--weight-medium); }
+.badge { margin-left: var(--space-related); padding: var(--space-hair) var(--space-related); border-radius: var(--radius-full); background: var(--accent-subtle); color: var(--accent-ink); font: var(--caption); letter-spacing: var(--caption-tracking); vertical-align: middle; }

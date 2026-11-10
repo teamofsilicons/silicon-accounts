@@ -227,7 +227,7 @@ function DetailsPage({ flow, ctl, notice, details }: DetailsProps & { details: F
         <AccountRow
           account={account}
           size="sm"
-          action={<Button variant="ghost" size="sm" loading={pending === "switch"} disabled={locked && pending !== "switch"} onClick={() => void act("switch", () => ctl.switchAccount())}>Switch account</Button>}
+          action={<Button variant="ghost" size="sm" loading={pending === "switch"} disabled={locked && pending !== "switch"} onClick={() => void act("switch", () => ctl.switchAccount())}>Switch Account</Button>}
         />
       ) : null}
       <ul data-sq="surface" className={styles.shareList} aria-label={`Details shared with ${app}`}>
@@ -290,7 +290,7 @@ function DetailsPage({ flow, ctl, notice, details }: DetailsProps & { details: F
                     kinds={[view.endsWith("phone") ? "phone" : "email"]}
                     initialEmail={lastValue?.kind === "email" ? lastValue.value : ""}
                     initialPhone={lastValue?.kind === "phone" ? lastValue.value : ""}
-                    submitLabel="Send code"
+                    submitLabel="Send Code"
                     onSubmit={send}
                     autoFocus={fine && first && !challenge}
                     note={view.endsWith("phone") ? "We text a 6 digit code to this number." : "We email a 6 digit code to this address."}

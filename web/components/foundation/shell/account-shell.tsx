@@ -15,7 +15,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ViewTransition, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { LogOut, Menu, Search, Settings as SettingsIcon, SwatchBook, Type } from "lucide-react";
+import { LogOut, Menu, Search, Settings as SettingsIcon, SwatchBook } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { BottomSheet } from "@teamofsilicons/silicon-ui/bottom-sheet";
 import { Button } from "@teamofsilicons/silicon-ui/button";
@@ -23,7 +23,6 @@ import { UserMenu, type UserMenuUser } from "@teamofsilicons/silicon-ui/user-men
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { SkipLink } from "@/components/foundation/layout/layout";
 import { useCarbonPicture } from "@/lib/carbon-avatar";
-import { PREVIEW_FONTS, applyPreviewFont } from "@/lib/font-preview";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
 import { ELSEWHERE, MORE_DESTINATIONS, SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
 import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
@@ -192,7 +191,6 @@ export function AccountShell({ children }: { children: ReactNode }) {
     ...(process.env.NODE_ENV !== "production"
       ? [
           { id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={1.75} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) },
-          ...PREVIEW_FONTS.map(font => ({ id: `dev.font.${font.key}`, label: `Font: ${font.label}`, description: font.description, group: "Developer", icon: <Type size={16} strokeWidth={1.75} />, keywords: ["font", "typeface", "type", font.key], run: () => applyPreviewFont(font.key) })),
         ]
       : []),
     { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={1.75} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
@@ -315,7 +313,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
         <Alert tone="danger" title="Silicon Accounts is not answering">
           {error?.message ?? "The session could not be loaded."} {error?.hint ?? "Check your connection, then try again."}
           <span style={{ display: "block", marginTop: "var(--space-3)" }}>
-            <Button variant="secondary" size="sm" onClick={refetch}>Try again</Button>
+            <Button variant="secondary" size="sm" onClick={refetch}>Try Again</Button>
           </span>
         </Alert>
       </div>

@@ -1,0 +1,30 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "web",
+        "dev"
+      ],
+      "port": 8590
+    },
+    {
+      "name": "web-live",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "web",
+        "dev"
+      ],
+      "env": {
+        "PORT": "9100",
+        "ACCOUNTS_API_URL": "https://accounts.teamofsilicons.com",
+        "NEXT_DIST_DIR": ".next-9100"
+      },
+      "port": 9100
+    }
+  ]
+}

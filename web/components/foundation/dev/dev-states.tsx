@@ -1,117 +1,261 @@
 "use client";
 
 /**
- * The dev states panel (Anil, 2026-10-31), development only: a small round button at the account shell's lower right,
- * with a dot when any variable is set, opens a compact panel: each variable in lib/dev-states.ts (account, Silicon
- * requests, devices, Silicons, apps, network) as a small label over a one-row segmented control, presets that set a
- * whole scenario at once (Just joined), Reset in the header and "Show introduction again" at the foot. A change is kept
- * in this browser and the page reloads, so every block reads it fresh. "Inspect type" (or ⌥I) turns on the type
- * inspector (./type-inspector.tsx) and closes the panel, so the page is free to hover; it isn't kept across reloads.
+ * The dev tools panel (Anil, 2026-10-31; regrouped 2026-11-08), development only: a small round button at the account
+ * shell's lower right opens a compact panel in three groups, each row a label beside its control:
+ *
+ * - Data: each variable in lib/dev-states.ts (account, Silicon requests, devices, Silicons, apps, network) as a segmented
+ *   control, then the scenarios (Just joined) and "Show introduction again". A change is kept in this browser and the page
+ *   reloads, so every block reads it fresh.
+ * - Look: the type lab (./type-lab.tsx, ⌥F), which sets Silicon UI's type tokens for the whole interface, and the text
+ *   edits made by clicking text with Edit text on (lib/text-edits.ts), with their count, Copy CSS and Clear. Both stay on
+ *   across pages and reloads until reset; their stylesheets are kept in <head> here, the type lab first so a text's own
+ *   edit wins.
+ * - Inspect: Edit text, the type inspector that edits what it's clicked on (./type-inspector.tsx, ⌥I), and the marquee
+ *   spacing inspector (./spacing-inspector.tsx, ⌥S); one at a time, and turning one on closes the panel so the page is
+ *   free to use.
+ *
+ * Look also has Density: the site is compact; Comfortable puts the scale from before back, to compare.
+ *
+ * The button's dot counts what is changed (data variables, the type lab, text edits), or shows a crosshair while an
+ * inspector is on. Reset all in the header puts everything back and reloads.
  */
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Crosshair, FlaskConical } from "lucide-react";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
+import { CopyButton } from "@teamofsilicons/silicon-ui/copy-button";
 import { Popover, PopoverContent, PopoverTrigger } from "@teamofsilicons/silicon-ui/popover";
 import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
 import { Switch } from "@teamofsilicons/silicon-ui/switch";
 import { DEV_PRESETS, DEV_VARIABLES, devStatesInUse, readDevStates, writeDevStates, type DevStates } from "@/lib/dev-states";
+import { editCount, parseTextEdits, readTextEditsText, subscribeTextEdits, textEditsCopy, textEditsCss, writeTextEdits } from "@/lib/text-edits";
+import { parseTypeLab, readTypeLabText, subscribeTypeLab, typeLabCss, writeTypeLab } from "@/lib/type-lab";
+import { SpacingInspector } from "./spacing-inspector";
 import { TypeInspector } from "./type-inspector";
+import { TYPE_LAB_SHEET, TypeLab } from "./type-lab";
 import styles from "./dev-states.module.css";
+
+type Inspector = "type" | "spacing" | null;
 
 const subscribeNothing = () => () => undefined;
 /** The introduction's dismissed flag (components/account/home-cards.tsx). */
 const INTRO_KEY = "accounts.home.welcome-dismissed";
 
-export function DevStatesPanel() {
-  const saved = useSyncExternalStore(subscribeNothing, () => JSON.stringify(readDevStates()), () => "{}");
-  const [open, setOpen] = useState(false);
-  const [inspecting, setInspecting] = useState(false);
-  const stopInspecting = useCallback(() => setInspecting(false), []);
+/**
+ * A stylesheet kept in <head> while `css` has anything in it. Each call owns one element, made on first use, so the
+ * order of the calls is the order of the sheets.
+ */
+function useHeadStyle(name: string, css: string) {
+  useEffect(() => {
+    if (!css) return;
+    const sheet = document.createElement("style");
+    sheet.dataset.devStyle = name;
+    sheet.textContent = css;
+    const later = [...document.head.querySelectorAll<HTMLStyleElement>("style[data-dev-style]")].find(other => other.dataset.devStyle! > name);
+    document.head.insertBefore(sheet, later ?? null);
+    return () => sheet.remove();
+  }, [name, css]);
+}
 
-  // ⌥I toggles the inspector from anywhere: an open dialog blocks the flask button, and dialogs have type to inspect too.
+const forgetIntro = () => {
+  try {
+    window.localStorage.removeItem(INTRO_KEY);
+  } catch {
+    // Storage blocked: nothing was remembered.
+  }
+};
+
+/**
+ * Density (Anil, 2026-11-10, branch compact): the site is compact (styles/tokens.css); this puts the comfortable scale
+ * from before back on <html data-density="comfortable">, kept in this browser, to compare.
+ */
+const DENSITY_KEY = "accounts.dev.density";
+const densityListeners = new Set<() => void>();
+const subscribeDensity = (listener: () => void) => {
+  densityListeners.add(listener);
+  return () => densityListeners.delete(listener);
+};
+const readDensity = () => {
+  try {
+    return window.localStorage.getItem(DENSITY_KEY) === "comfortable" ? "comfortable" : "compact";
+  } catch {
+    return "compact";
+  }
+};
+const writeDensity = (density: string) => {
+  try {
+    if (density === "comfortable") window.localStorage.setItem(DENSITY_KEY, density);
+    else window.localStorage.removeItem(DENSITY_KEY);
+  } catch {
+    // Storage blocked: the choice lasts until the page reloads.
+  }
+  densityListeners.forEach(listener => listener());
+};
+const DENSITY_OPTIONS = [{ value: "compact", label: "Compact" }, { value: "comfortable", label: "Comfortable" }];
+
+export function DevStatesPanel() {
+  const states = JSON.parse(useSyncExternalStore(subscribeNothing, () => JSON.stringify(readDevStates()), () => "{}")) as DevStates;
+  const typeLab = parseTypeLab(useSyncExternalStore(subscribeTypeLab, readTypeLabText, () => "{}"));
+  const textEdits = parseTextEdits(useSyncExternalStore(subscribeTextEdits, readTextEditsText, () => "{}"));
+  const density = useSyncExternalStore(subscribeDensity, readDensity, () => "compact");
+  const [open, setOpen] = useState(false);
+  const [inspector, setInspector] = useState<Inspector>(null);
+  const [labOpen, setLabOpen] = useState(false);
+  // The React Compiler keeps these two stable, so the inspectors' and the lab's listeners aren't re-added each render.
+  const stopInspecting = () => setInspector(null);
+  const closeLab = () => setLabOpen(false);
+
+  // Sorted by name in <head>: "1-type-lab" before "2-text-edits", so a text's own edit wins over the tokens.
+  const labCss = typeLabCss(typeLab);
+  const editsCss = textEditsCss(textEdits);
+  const edits = editCount(textEdits);
+  useHeadStyle(TYPE_LAB_SHEET, labCss);
+  useHeadStyle("2-text-edits", editsCss);
+
+  useEffect(() => {
+    if (density === "comfortable") document.documentElement.dataset.density = density;
+    else delete document.documentElement.dataset.density;
+  }, [density]);
+
+  // ⌥I, ⌥S and ⌥F from anywhere: an open dialog blocks the flask button, and dialogs have type to inspect too.
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if (!event.altKey || event.code !== "KeyI") return;
+      if (!event.altKey || !["KeyI", "KeyS", "KeyF"].includes(event.code)) return;
       event.preventDefault();
       setOpen(false);
-      setInspecting(on => !on);
+      if (event.code === "KeyF") setLabOpen(on => !on);
+      else {
+        const next = event.code === "KeyI" ? "type" : "spacing";
+        setInspector(current => (current === next ? null : next));
+      }
     };
     document.addEventListener("keydown", key, true);
     return () => document.removeEventListener("keydown", key, true);
   }, []);
-  const states = JSON.parse(saved) as DevStates;
-  const inUse = devStatesInUse(states);
+
+  const changed = devStatesInUse(states) + (labCss ? 1 : 0) + edits + (density === "comfortable" ? 1 : 0);
 
   const apply = (next: DevStates) => {
     writeDevStates(next);
     window.location.reload();
   };
-  const forgetIntro = () => {
-    try {
-      window.localStorage.removeItem(INTRO_KEY);
-    } catch {
-      // Storage blocked: nothing was remembered.
-    }
+  const resetAll = () => {
+    writeTypeLab({});
+    writeTextEdits({});
+    writeDensity("compact");
+    apply({});
   };
-  const showIntro = () => {
-    forgetIntro();
-    window.location.reload();
-  };
-  const preset = (choice: (typeof DEV_PRESETS)[number]) => {
-    if (choice.showIntro) forgetIntro();
-    apply(choice.states);
+  const inspect = (which: Exclude<Inspector, null>, on: boolean) => {
+    setInspector(on ? which : null);
+    if (on) setOpen(false);
   };
 
   return (
     <div className={styles.dock} data-type-inspect-exempt="">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="soft" size="sm" className={styles.trigger} aria-label={inUse ? `Dev states, ${inUse} set` : "Dev states"}>
-            <FlaskConical size={16} strokeWidth={1.75} aria-hidden="true" />
+          <Button variant="soft" size="sm" className={styles.trigger} aria-label={changed ? `Dev tools, ${changed} changed` : "Dev tools"}>
+            <FlaskConical size={16} strokeWidth={2} aria-hidden="true" />
           </Button>
         </PopoverTrigger>
-        {inspecting ? <span className={styles.dot} aria-hidden="true"><Crosshair size={12} strokeWidth={2} /></span> : inUse ? <span className={styles.dot} aria-hidden="true">{inUse}</span> : null}
+        {inspector ? <span className={styles.dot} aria-hidden="true"><Crosshair size={12} strokeWidth={2} /></span> : changed ? <span className={styles.dot} aria-hidden="true">{changed}</span> : null}
         <PopoverContent side="top" align="end" sideOffset={8} className={styles.panel} data-type-inspect-exempt="">
           <div className={styles.head}>
-            <p className={styles.title}>Dev states</p>
-            {inUse ? <Button variant="ghost" size="xs" onClick={() => apply({})}>Reset</Button> : <span className={styles.hint}>All real</span>}
+            <p className={styles.title}>Dev tools</p>
+            {changed ? <Button variant="ghost" size="xs" onClick={resetAll}>Reset All</Button> : <span className={styles.hint}>Nothing changed</span>}
           </div>
-          <div className={styles.presets}>
-            {DEV_PRESETS.map(choice => (
-              <Button key={choice.key} variant="soft" size="xs" onClick={() => preset(choice)}>{choice.label}</Button>
-            ))}
-          </div>
-          <div className={styles.fields}>
-            {DEV_VARIABLES.map(variable => (
-              <div key={variable.key} className={styles.field}>
-                <span className={styles.label}>{variable.label}</span>
-                <SegmentedControl
-                  size="xs"
-                  label={variable.label}
-                  className={styles.control}
-                  options={variable.options}
-                  value={states[variable.key] ?? variable.options[0]?.value ?? "real"}
-                  onValueChange={value => apply({ ...states, [variable.key]: value })}
-                />
+
+          <div className={styles.body}>
+            <section className={styles.group} aria-labelledby="dev-data">
+              <div className={styles.groupHead}>
+                <p id="dev-data" className={styles.groupTitle}>Data</p>
+                <span className={styles.hint}>Reloads the page</span>
               </div>
-            ))}
-          </div>
-          <div className={styles.inspect}>
-            <Switch
-              label="Inspect type (⌥I)"
-              checked={inspecting}
-              onCheckedChange={on => {
-                setInspecting(on);
-                if (on) setOpen(false);
-              }}
-            />
-          </div>
-          <div className={styles.foot}>
-            <Button variant="ghost" size="xs" onClick={showIntro}>Show introduction again</Button>
+              {DEV_VARIABLES.map(variable => (
+                <div key={variable.key} className={styles.stacked}>
+                  <span className={styles.label}>{variable.label}</span>
+                  <SegmentedControl
+                    size="xs"
+                    label={variable.label}
+                    className={styles.control}
+                    options={variable.options}
+                    value={states[variable.key] ?? variable.options[0]?.value ?? "real"}
+                    onValueChange={value => apply({ ...states, [variable.key]: value })}
+                  />
+                </div>
+              ))}
+              <div className={styles.stacked}>
+                <span className={styles.label}>Scenario</span>
+                <div className={styles.buttons}>
+                  {DEV_PRESETS.map(choice => (
+                    <Button key={choice.key} variant="soft" size="xs" onClick={() => {
+                      if (choice.showIntro) forgetIntro();
+                      apply(choice.states);
+                    }}>{choice.label}</Button>
+                  ))}
+                  <Button variant="soft" size="xs" onClick={() => {
+                    forgetIntro();
+                    window.location.reload();
+                  }}>Show Introduction</Button>
+                </div>
+              </div>
+            </section>
+
+            <section className={styles.group} aria-labelledby="dev-look">
+              <div className={styles.groupHead}>
+                <p id="dev-look" className={styles.groupTitle}>Look</p>
+                <span className={styles.hint}>Kept until reset</span>
+              </div>
+              <div className={styles.row}>
+                <span className={styles.label}>Density</span>
+                <SegmentedControl size="xs" label="Density" options={DENSITY_OPTIONS} value={density} onValueChange={writeDensity} />
+              </div>
+              <div className={styles.row}>
+                <span className={styles.label}>Typography</span>
+                <div className={styles.buttons}>
+                  <Button variant="soft" size="xs" onClick={() => {
+                    setLabOpen(on => !on);
+                    setOpen(false);
+                  }}>{labOpen ? "Close" : "Open"}</Button>
+                  {labCss ? <Badge size="sm" tone="info">On</Badge> : null}
+                  <kbd className={styles.key}>⌥F</kbd>
+                </div>
+              </div>
+              <div className={styles.row}>
+                <span className={styles.label}>Text edits</span>
+                <div className={styles.buttons}>
+                  {edits ? (
+                    <>
+                      <Badge size="sm" tone="info">{edits}</Badge>
+                      <CopyButton value={textEditsCopy(textEdits)} label="Copy CSS" />
+                      <Button variant="ghost" size="xs" onClick={() => writeTextEdits({})}>Clear</Button>
+                    </>
+                  ) : <span className={styles.hint}>Click text with Edit text on</span>}
+                </div>
+              </div>
+            </section>
+
+            <section className={styles.group} aria-labelledby="dev-inspect">
+              <div className={styles.groupHead}>
+                <p id="dev-inspect" className={styles.groupTitle}>Inspect</p>
+                <span className={styles.hint}>Esc to stop</span>
+              </div>
+              <div className={styles.switchRow}>
+                <Switch label="Edit text" checked={inspector === "type"} onCheckedChange={on => inspect("type", on)} />
+                <kbd className={styles.key}>⌥I</kbd>
+              </div>
+              <div className={styles.switchRow}>
+                <Switch label="Spacing" checked={inspector === "spacing"} onCheckedChange={on => inspect("spacing", on)} />
+                <kbd className={styles.key}>⌥S</kbd>
+              </div>
+            </section>
           </div>
         </PopoverContent>
       </Popover>
-      {inspecting ? <TypeInspector onExit={stopInspecting} /> : null}
+      {inspector === "type" ? <TypeInspector onExit={stopInspecting} /> : null}
+      {inspector === "spacing" ? <SpacingInspector onExit={stopInspecting} /> : null}
+      {labOpen ? <TypeLab onClose={closeLab} /> : null}
     </div>
   );
 }

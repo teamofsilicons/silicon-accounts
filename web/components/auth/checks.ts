@@ -658,7 +658,7 @@ const hostedChecks: MockCheck[] = [
     path: flowPath("briefcase", "signup"),
     run: async ({ page, requests }) => {
       const chooser = page.waitForEvent("filechooser");
-      await page.getByRole("button", { name: /Upload photo/ }).click();
+      await page.getByRole("button", { name: /Upload Photo/ }).click();
       await (await chooser).setFiles({ name: "me.png", mimeType: "image/png", buffer: png() });
       await expect(page.getByText("me.png is ready. It becomes your photo when you continue.").first()).toBeVisible();
       expect(requests.filter(request => request.method === "POST" && request.path.endsWith("/signup/photo"))).toHaveLength(1);
@@ -676,10 +676,10 @@ const hostedChecks: MockCheck[] = [
     routes: [["POST /v1/flows/:id/signup/photo", () => apiError(413, "photo_too_large", "The photo is 3145728 bytes; profile photos are limited to 2 MB (2097152 bytes).", "Resize or compress the image below 2 MB.")]],
     run: async ({ page }) => {
       const chooser = page.waitForEvent("filechooser");
-      await page.getByRole("button", { name: /Upload photo/ }).click();
+      await page.getByRole("button", { name: /Upload Photo/ }).click();
       await (await chooser).setFiles({ name: "big.png", mimeType: "image/png", buffer: png() });
       await expect(page.getByText(/Photos can be at most 2 MB/).first()).toBeVisible();
-      await expect(page.getByRole("button", { name: /Upload photo/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Upload Photo/ })).toBeVisible();
       const sent = nextPost(page, "/signup");
       await page.getByRole("button", { name: "Create account" }).click();
       expect((await sent).pfp_url).toBeUndefined();
@@ -765,12 +765,12 @@ const hostedChecks: MockCheck[] = [
       await page.goto(`${base}${flowPath("briefcase", "signup")}`);
       await expect(heading(page, "Set up your account")).toBeVisible();
       await expect(page.getByText("The photo you uploaded becomes your photo when you continue.").first()).toBeVisible();
-      await expect(page.getByRole("button", { name: /Choose another/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Choose Another/ })).toBeVisible();
       const preview = page.locator(`main img[src="${uploaded}"]`);
       await expect(preview).toHaveCount(1);
       await page.getByRole("button", { name: "Remove", exact: true }).click();
       await expect(page.getByRole("button", { name: "Remove", exact: true })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: /Upload photo/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Upload Photo/ })).toBeVisible();
       // The preview is no longer the upload (the initials stand in for the default photo).
       await expect(preview).toHaveCount(0);
       const sent = nextPost(page, "/signup");
@@ -1523,7 +1523,7 @@ const liveChecks: LiveCheck[] = [
       await chip.click();
       await expect(idField).toHaveValue(chosen.replace(/^c:/, ""));
       const chooser = page.waitForEvent("filechooser");
-      await page.getByRole("button", { name: /Upload photo/ }).click();
+      await page.getByRole("button", { name: /Upload Photo/ }).click();
       await (await chooser).setFiles({ name: "me.png", mimeType: "image/png", buffer: png() });
       await expect(page.getByText("me.png is ready. It becomes your photo when you continue.").first()).toBeVisible();
       await page.getByRole("textbox", { name: "Display name" }).fill("Web Auth Tester");
@@ -1801,7 +1801,7 @@ const liveChecks: LiveCheck[] = [
       await page.keyboard.type(await env.code(email, sentAt));
       await expect(heading(page, "Set up your account")).toBeVisible();
       const chooser = page.waitForEvent("filechooser");
-      await page.getByRole("button", { name: /Upload photo/ }).click();
+      await page.getByRole("button", { name: /Upload Photo/ }).click();
       await (await chooser).setFiles({ name: "me.png", mimeType: "image/png", buffer: png() });
       await expect(page.getByText("me.png is ready. It becomes your photo when you continue.").first()).toBeVisible();
       await page.reload();
@@ -1994,7 +1994,7 @@ const liveChecks: LiveCheck[] = [
       await page.getByRole("textbox", { name: "Email" }).fill(email);
       await page.getByRole("button", { name: "Send code" }).click();
       await expect(page.getByText(/Too many codes were sent to/).first()).toBeVisible();
-      await expect(page.getByRole("button", { name: /Try again in \d+:\d\d/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Try Again in \d+:\d\d/ })).toBeVisible();
       await context.close();
     },
   },

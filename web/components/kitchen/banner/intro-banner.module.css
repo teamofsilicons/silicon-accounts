@@ -1,0 +1,79 @@
+/* IntroBanner (intro-banner.tsx): one surface, the picture on its own layer, the content over it. Four templates share
+   the same parts; data-tone (the picture's) only matters where words sit on the picture: the cards band and the
+   spotlight. Tokens and type roles throughout. */
+
+.banner { --sq-r: var(--radius-overlay); --sq-fill: var(--surface); --sq-stroke: var(--border); position: relative; isolation: isolate; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.art { position: absolute; z-index: -1; inset: 0; background-repeat: no-repeat; background-size: cover; pointer-events: none; }
+
+/* The banner's own words read --ib-ink and --ib-ink-2, so a dark picture turns them light without touching the
+   tokens the Silicon UI buttons inside read. Only the dismiss button, a ghost on the picture, gets light tokens. */
+.banner { --ib-ink: var(--foreground); --ib-ink-2: var(--text-secondary); --ib-tile: var(--surface-muted); }
+.banner[data-template="spotlight"][data-tone="dark"], .banner[data-template="cards"][data-tone="dark"] .band {
+  --ib-ink: var(--primary-foreground);
+  --ib-ink-2: color-mix(in oklab, var(--primary-foreground) 74%, transparent);
+  --ib-tile: color-mix(in oklab, var(--primary-foreground) 14%, transparent);
+}
+.banner[data-template="spotlight"][data-tone="dark"] .dismiss, .banner[data-template="cards"][data-tone="dark"] .band .dismiss {
+  --text-secondary: var(--ib-ink-2); --foreground: var(--ib-ink); --surface-muted: var(--ib-tile);
+}
+
+/* Shared parts */
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-group); }
+.headText { display: grid; gap: var(--space-tight); min-width: 0; }
+.title { margin: 0; color: var(--ib-ink); font: var(--h2); letter-spacing: var(--h2-tracking); }
+.description, .meta { margin: 0; color: var(--ib-ink-2); font: var(--small); letter-spacing: var(--small-tracking); }
+.dismiss { flex: none; }
+.banner > .dismiss, .banner[data-template="checklist"] .dismiss { position: absolute; top: var(--space-group); right: var(--space-group); }
+.mark { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); display: grid; width: var(--control-height-xs); height: var(--control-height-xs); flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
+.mark[data-done] { --sq-fill: color-mix(in oklab, var(--success) 14%, var(--surface)); color: var(--success); }
+.stepTitle { min-width: 0; color: var(--ib-ink); font: var(--body); font-weight: var(--weight-medium); letter-spacing: var(--body-tracking); }
+.stepLine { margin: 0; color: var(--ib-ink-2); font: var(--small); letter-spacing: var(--small-tracking); }
+/* Done: struck through in its own colour; waiting: quieter, no button. */
+[data-done] > .stepTitle { color: var(--ib-ink-2); font-weight: var(--weight-regular); text-decoration: line-through; }
+
+/* Rows (checklist and panel): unrounded, so the lines between them stay straight. */
+.rows { display: grid; margin: var(--space-group) 0 0; padding: 0; list-style: none; }
+.row { display: flex; min-height: var(--control-height-md); align-items: center; gap: var(--space-group); padding-block: var(--space-related); }
+.row + .row { border-top: 1px solid var(--border-subtle); }
+.row .stepTitle { flex: 1; }
+.rowAction { flex: none; }
+.row:not([data-next]):not([data-done]) > .stepTitle { color: var(--ib-ink-2); font-weight: var(--weight-regular); }
+
+/* checklist: words on the surface, the picture fading in from the end side. */
+.banner[data-template="checklist"] .art { left: 45%; mask-image: linear-gradient(90deg, transparent, var(--foreground) 70%); }
+.banner[data-template="checklist"] .body { width: 60%; padding: var(--space-comfort); }
+
+/* panel: the picture fills; a frosted panel holds everything. */
+.banner[data-template="panel"] { padding: var(--space-block) var(--space-comfort); }
+.banner[data-template="panel"] .body { --sq-r: var(--radius-container); --sq-fill: color-mix(in oklab, var(--surface) 80%, transparent); width: min(100%, 26rem); padding: var(--space-comfort) var(--space-comfort) var(--space-related); background: var(--sq-fill); box-shadow: var(--shadow-raised); backdrop-filter: blur(var(--space-inset)) saturate(1.2); }
+
+/* cards: a picture band with the title; the step cards overlap its lower edge. */
+.banner[data-template="cards"] { padding-bottom: var(--space-comfort); }
+.band { --sq-r: var(--radius-overlay); position: relative; isolation: isolate; overflow: hidden; padding: var(--space-comfort) var(--space-comfort) var(--space-stage); }
+.banner[data-template="cards"][data-tone="dark"] .band .art::after { position: absolute; inset: 0; background: linear-gradient(180deg, color-mix(in oklab, var(--primary) 70%, transparent), color-mix(in oklab, var(--primary) 20%, transparent)); content: ""; }
+.cards { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); margin: calc(var(--space-block) * -1) var(--space-comfort) 0; padding: 0; list-style: none; }
+.card { --sq-r: var(--radius-container); --sq-fill: var(--surface); display: grid; align-content: start; justify-items: start; gap: var(--space-related); padding: var(--space-inset); background: var(--sq-fill); box-shadow: var(--shadow-raised); }
+.cardAction { margin-top: var(--space-tight); }
+
+/* spotlight: only the next step, large, on the picture; a scrim from the start side keeps the words calm. */
+.banner[data-template="spotlight"] { display: flex; min-height: calc(var(--space-screen) * 3); align-items: flex-end; padding: var(--space-comfort); }
+.banner[data-template="spotlight"] .art::after { position: absolute; inset: 0; background: linear-gradient(90deg, var(--sq-fill) 15%, color-mix(in oklab, var(--sq-fill) 0%, transparent) 70%); content: ""; }
+.banner[data-template="spotlight"][data-tone="dark"] { --sq-fill: var(--primary); --sq-stroke: transparent; }
+.spotlight { display: grid; justify-items: start; gap: var(--space-tight); width: min(100%, 24rem); }
+.spotTitle { margin: 0; color: var(--ib-ink); font: var(--h1); letter-spacing: var(--h1-tracking); }
+.spotAction { margin-top: var(--space-group); }
+.dots { display: flex; gap: var(--space-tight); margin-top: var(--space-inset); }
+.dots > span { width: var(--space-group); height: var(--space-tight); border-radius: var(--radius-full); background: var(--ib-tile); }
+.dots > span[data-on] { background: var(--success); }
+.dots > span[data-next] { width: var(--space-section); background: var(--ib-ink); }
+
+@media (max-width: 639px) {
+  .banner[data-template="checklist"] .art { left: 0; top: 55%; mask-image: linear-gradient(180deg, transparent, var(--foreground) 70%); }
+  .banner[data-template="checklist"] .body { width: 100%; }
+  .banner[data-template="panel"] { padding: var(--space-section) var(--space-inset); }
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  /* The next step's button goes under its title, in line with it, so the title never wraps beside it. */
+  .row[data-next] { flex-wrap: wrap; row-gap: var(--space-related); }
+  .rowAction { flex-basis: 100%; padding-inline-start: calc(var(--control-height-xs) + var(--space-group)); }
+  .banner[data-template="spotlight"] .art::after { background: linear-gradient(0deg, var(--sq-fill) 35%, color-mix(in oklab, var(--sq-fill) 30%, transparent)); }
+}

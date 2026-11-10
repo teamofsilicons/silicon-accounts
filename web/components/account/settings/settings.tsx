@@ -70,7 +70,7 @@ export function Settings() {
       <Section title="Where you are signed in" description="Browsers, terminals and the developer platform signed in to this account are now on Security.">
         <div>
           <ButtonLink href={paths.signInMethods} variant="secondary" size="sm">
-            See where you are signed in
+            See Where You Are Signed In
             <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
           </ButtonLink>
         </div>
@@ -80,7 +80,7 @@ export function Settings() {
         {me.error && !me.data ? (
           <Alert tone="danger" title="Your account did not load">
             {describeError(me.error)}
-            <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try again</Button></span>
+            <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try Again</Button></span>
           </Alert>
         ) : silicon ? (
           <div data-sq="surface" className={styles.danger}>
@@ -148,7 +148,7 @@ function DeleteAccount({ id, custodianOf, onDeleted }: { id: string; custodianOf
             </ul>
           ) : null}
           <ButtonLink href={paths.silicons} variant="secondary" size="sm" className={styles.blockedLink}>
-            Hand over or delete your Silicons
+            Hand Over or Delete Your Silicons
             <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
           </ButtonLink>
         </div>

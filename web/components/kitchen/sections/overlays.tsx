@@ -19,12 +19,12 @@ export function Overlays() {
       <Specimen title="Dialog: a decision that must interrupt" single>
         <div className={styles.row}>
           <Dialog>
-            <DialogTrigger asChild><Button variant="secondary">Delete your account</Button></DialogTrigger>
+            <DialogTrigger asChild><Button variant="secondary">Delete Your Account</Button></DialogTrigger>
             <DialogContent title="Delete your account?" description="Every app you signed into is told, and your id stays reserved for 10 days.">
               <p className={styles.prose}>You are custodian of no Silicons, so nothing blocks this.</p>
               <div className={styles.row}>
-                <DialogClose asChild><Button variant="ghost">Keep my account</Button></DialogClose>
-                <Button variant="danger">Delete account</Button>
+                <DialogClose asChild><Button variant="ghost">Keep My Account</Button></DialogClose>
+                <Button variant="danger">Delete Account</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -33,7 +33,7 @@ export function Overlays() {
       <Specimen title="Drawer: record details beside the page" single>
         <div className={styles.row}>
           <Drawer>
-            <DrawerTrigger asChild><Button variant="secondary">Open user details</Button></DrawerTrigger>
+            <DrawerTrigger asChild><Button variant="secondary">Open User Details</Button></DrawerTrigger>
             <DrawerContent title="Saket Dev" description="briefcase:a8K · signed in 2 minutes ago">
               <DescriptionList>
                 <DescriptionItem label="Id"><span className={styles.mono}>c:saket</span></DescriptionItem>
@@ -46,7 +46,7 @@ export function Overlays() {
       </Specimen>
       <Specimen title="BottomSheet: tasks on phones" single>
         <div className={styles.row}>
-          <BottomSheet title="Transfer si:scout" description="The new custodian has 14 days to accept." trigger={<Button variant="secondary">Open sheet</Button>}>
+          <BottomSheet title="Transfer si:scout" description="The new custodian has 14 days to accept." trigger={<Button variant="secondary">Open Sheet</Button>}>
             <Input label="New custodian" placeholder="c:shubham or name@example.com" />
           </BottomSheet>
         </div>

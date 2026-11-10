@@ -10,6 +10,125 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   for tools and other sites, dock for account destinations only. Why: Anil asked for these three. (2026-10-17)
 
 ## Design
+
+- **Security on Home's rules, in the prototype's order (Anil, 2026-11-10).** The pinned page bar (as Connected apps);
+  Checkup (a recovery phone when there is none, a device not used lately: Keep or Sign Out; hidden when nothing needs
+  you), Silicon keys (when each key was made, Change on the Silicon's page), Your sign-in (Google, Apple, Email code,
+  Text code; Edit opens the email or phone list in a dialog), Devices (this device marked, Sign Out on the others, Sign
+  Out of All Other Devices), then one row to Activity. Every section is Home's boxed list. The old page
+  (sign-in-methods.tsx) is no longer routed; its parts are reused.
+- **Text greys in even steps, ladder C (Anil, 2026-11-10, from /__text).** OpenAI's text went 4 → 40 in lightness
+  (#0D0D0D → #5D5D5D), too big a jump; compared with Refactoring UI's palette (15, 24, 34), the text greys now step
+  about 12 apart: --foreground #1B1B1B (10), a new --text-soft #353535 (22) for the line under a name (an app's
+  description or address), --text-secondary #505050 (34) for facts and quiet links, --text-muted #8E8E8E (59) for ids.
+  Muted stays under 4.5:1 for now. On Home, --text-soft is the app cards' lines and Needs you's line under a title.
+- **Home's apps are one grid, for now (Anil, 2026-11-10).** Yours + Try (a separate Try an app section, as Adobe,
+  Microsoft 365 and Atlassian do) was tried and taken out: apps sit together in Your apps, the ones you sign into first
+  (most recent first, Open), then Briefcase, DM or Ting not used yet ("Not signed in yet", Try), up to six, every one
+  the same tile + footer card. Which apps show there is still open: Anil is thinking of a different logic. App icons
+  are Anil's (public/icons), 40px with a light hairline. The card: 8px all round; its height comes from a minimum (the top at least 112px, the
+  words at its top and room below), not padding, so every app card is one height. The name and its line sit beside
+  the icon (the line below the icon was tried and taken back; both in /__cards); in "Signed in 2 weeks ago" the time
+  is in the text colour, since it is the information.
+- **Home's app cards are tile + footer (Anil, 2026-11-11).** Icon, name and description on top; a footer with when you
+  last signed in and Open or Try. For apps you use, the description stands in for what's new in the app (unread
+  messages, notifications) until the apps give a count; the account API has none.
+
+- **Home's empty sections are hidden, for now (Anil, 2026-11-11).** With no Silicons, Your Silicons doesn't show (no
+  first-Silicon banner); with no app signed in to, Your apps doesn't show (no Try suggestions). The introduction above
+  presents both until the account has them.
+- **Home's introduction shows only while it's useful (Anil, 2026-11-11).** It hides once the account has a Silicon and
+  has signed in to an app (the two things it introduces), as well as when dismissed. The dismissal is still this
+  browser's; keeping it on the account needs a place on the server.
+
+- **The content column is 896px (Anil, 2026-11-11, branch compact).** `--page-narrow` went from the prototype's 720px
+  to 800px, 960px, then 896px (Tailwind's max-w-4xl, 56 × 16): every narrow page widens, and Home's three-card rows
+  get about 291px a card (two a row, 442px).
+
+- **Home's introduction is the picture cards (Anil, 2026-11-11).** Picked in /__banner: no background or box, the h3
+  "One Account for Your Silicons & Apps" with a quiet dismiss, three cards of one design in Home's column (about 230px
+  each), each a 16:9 Super Visuals picture (BG 110, 102, 127; nothing on the picture) over its title and one line, the
+  same words as before. It replaces the gradient cards (kept as HomeCardsView for the lab). The pictures' licence is
+  still to confirm before this ships.
+
+- **Button labels in title case (Anil, 2026-11-11).** Every button's label is in title case, as Apple does ("Sign Out",
+  "Create a Silicon", "Go to Your Account"): each word capitalised except articles, short conjunctions and short
+  prepositions in the middle (a, an, the, and, or, to, of, in, on, for, with…), unless they're part of the verb ("Sign
+  In", "Hand Over"); ids and acronyms as they are (c:anil, ID, UUID). Only button labels (Button, ButtonLink, the
+  actions of status pages and error cards); headings, fields, menus and body text stay in sentence case.
+
+- **The introduction banner is a template, proposed to Silicon UI (Anil, 2026-11-10).** Every TOS app shows a new
+  person a banner, so it belongs in Silicon UI, named by its template (how it's laid out) and not by its picture:
+  `checklist`, `cards`, `panel`, `spotlight`; any picture fits any template, with `tone` light or dark. Kept simple: one
+  action (the next step's), done steps struck through in their own colour, one line when all are done, always
+  dismissible. Prototype: `/__banner` (`components/kitchen/banner/intro-banner.tsx`); request draft:
+  `redesign/requests/silicon-ui-intro-banner.md`. Home keeps its current banner until a template is chosen.
+
+- **Lines between rows are straight (Anil, 2026-11-10).** A divider is never the edge (border or shadow) of a rounded
+  element, because it bends with the corners. A rounded row (for a hover or selected fill) draws its line as its own
+  1px element, or hides the line beside it while filled; an unrounded row or its container may use a border.
+
+- **Compact, uniform across TOS (Anil, 2026-11-10; branch `compact`, an experiment).** TOS's apps share one
+  interface, and the ecosystem's apps (the Interface app especially) are control panels, so the interface is designed
+  for compactness; home still feels like home, which means simple. Simple is few kinds of things, always the same, not
+  extra space. The sidebar showed the feeling but is not the source of truth. Decided so far:
+  - text keeps a 16 base (Linear's 13–14 was too small);
+  - controls one step shorter (32 / 36 / 40), the larger spacing steps one step down (sections 32 apart on Home, was
+    48), the title roles one step down (page titles 22, sections 18, items 16);
+  - Home keeps a bit more air in the end, but first it shows the shared spacing, to see what it changes;
+  - the dev panel's Density switch compares it with the comfortable scale before.
+  Still to decide: whether this moves into Silicon UI (its control heights and spacing are what make it uniform across
+  apps), rows over cards, quieter buttons, wider layouts, and how this updates the v7 prototype as the design.
+- Typography to compare (Anil, 2026-11-08): OpenAI's platform and Raphael Salaja's site, read from their computed styles,
+  as dev type sets (lib/type-sets.ts). OpenAI: page title 36/590, section 20/600/32, item 16/500, body 16/400/24, rows
+  14/400/20 at -0.16px, badge 12/600; canvas #F3F3F3, white surfaces, text #0D0D0D and #5D5D5D, borders
+  rgba(13,13,13,.12). Its face, OpenAI Sans, can't be bundled, so Inter stands in. Raphael: Inter (cv01, ss03), all 14/400,
+  hierarchy by colour (#21201C, #63635E) on warm #FDFDFC. Home's order stays: the banner is for new accounts only and
+  may be the loudest; Anil redesigns it. Your Silicons and Your apps get redesigned once a set is picked. (2026-11-08)
+- Needs you's device row (Anil, 2026-11-09): its age is a second line under the question, "Last active 9 days ago",
+  instead of sitting in the time column, which is kept for deadlines; the count badge is neutral, since a count is not a
+  warning. The row title stays h3 and the buttons stay as Silicon UI ships them.
+- One whole system instead of our mix (Anil, 2026-11-09, branch web/radix-type): Radix Themes' type scale and Radix
+  Colors' light Slate, in Inter, tried as a Radix type set and then made the site's own in styles/tokens.css (replacing
+  the four sizes of 2026-11-08, our greys and the system font; Inter is preloaded; Home's `.silicon-ui-fonts` is gone). Page title step 7 (28/36, 700), sections step 5 (20/28,
+  700), item titles and labels step 2 medium (14/20, 500), body step 2 (14/20), meta step 1 (12/16); text Slate 12 or 11
+  only; fills Slate 3-5, borders Slate 6-8, white surfaces. Bold only for page and section titles. The size steps
+  (--text-*) move onto the same four sizes (base 14, as Radix's step 2), so the shell's wordmark, sidebar links and
+  Silicon UI components land on the scale too: every line on Home is 28, 20, 14 or 12.
+- Linear as a fourth type set (Anil, 2026-11-09), from linear.app's CSS variables: Inter (cv01, ss03), weights 510 and
+  590, titles 17/20/24/32 at 590 (-.012em, -.022em from 32), text 15/1.6 at -.011em, UI 13/1.5, meta 12. Mapped as
+  display 32, h1 24, h2 20, h3 15/590, body 15, small 13, label 13/510, caption 12. linear.app is dark only, so the
+  colours stay ours. The dev panel's type set row now has its label above it, so the four options fit.
+- Radix undone; Silicon UI's typography everywhere (Anil, 2026-11-09, web/radix-type): four sizes weren't enough. The site
+  now uses Silicon UI's type tokens as they ship (sizes 12 to 72 in nine steps, tracking -.03em and -.01em, line heights
+  1.1 and 1.4) in Hanken Grotesk for text and titles, with our colours back (#FCFCFC, Silicon UI's greys, the blue
+  accent; the Slate greys are gone). The eight roles are rebuilt on those tokens and declared once on :root: display 36,
+  h1 28, h2 22 at the title weight (600), h3 18 medium, body 16 (Anil: the earlier 16 base), label and small 14, caption 12. The `[data-silicon-ui]`
+  wrapper is gone, so /silicons, /silicons/new, /apps and the page bar share the site's look, and every page title is the
+  h1 role (28). Inter is no longer preloaded.
+- Typography is tried in the interface, not in sets (Anil, 2026-11-09): the type sets (Ours, OpenAI, Raphael, Linear)
+  and the ⌘K font preview are removed. The dev panel's type lab sets Silicon UI's type tokens for the whole interface
+  (faces, the nine sizes, tracking, line heights, weights; no colours), and Edit text changes one kind of text, colour
+  included, by clicking it: the edit belongs to the CSS rule that styles the text, so it reaches every text that rule
+  styles. Silicon UI's own rules can be tried there but move into code only as a token or a request to Silicon UI.
+- Personal info on Silicon UI (Anil, 2026-11-09): the page bar like Silicons and Connected apps, then a Silicon UI Card
+  per group (Profile, Contact). Silicon UI has no settings row, so the prototype's rows stay ours (label 14 secondary,
+  value 14, chevron, the whole row opens its editor), inset in the Card with a hover fill, until a settings list ships;
+  the request is drafted in redesign/requests/silicon-ui-settings-list.md, not filed.
+- Fonts (Anil, 2026-11-08): Silicon UI's display face is Hanken Grotesk too, not Geist, inside `[data-silicon-ui]`; Home
+  sets its text in Silicon UI's face through `.silicon-ui-fonts` (styles/tokens.css), which changes only the faces, not
+  the rest of the look. Ids stay in the system monospace. (2026-11-08)
+- Four type sizes and nothing else (Anil, 2026-11-08, direction 3 of four explored): 32 (h1, Home's greeting, display),
+  20 (h2: sections, banners, the page bar's title), 16 (h3: an item's title in a row, tile or card; body) and 14
+  (small, caption, label). It replaces the eight roles of 2026-11-06, whose 25 and 20 between 14 and 39 made every
+  section shout. The roles are re-declared inside `[data-silicon-ui]` so they take that scope's family. Silicon UI's own
+  components keep their sizes (a Card's title stays 18, its status 12). (2026-11-08)
+- Needs you is a countdown list (Anil, 2026-11-08, direction C of four): one white list; a request shows how much of its
+  14 days is gone (Silicon UI Progress) and its time left on the title's line, grey over 7 days, amber 3 to 7, red under
+  3 ("Ends today" under a day); soonest first, the unused device last. Every row's actions share one column so the
+  times line up. At most one strong button per row: Review primary; Decline and Keep ghost; Sign out and Try again
+  secondary. The bar is the product's accent in every row because Progress has no tone. (2026-11-08)
+- Connected apps uses the page bar and Silicon UI as it ships, like /silicons (Anil, 2026-11-07): Card per app, its parts in their slots; the page bar moved to `components/account/parts/` for every account page. (2026-11-07)
 - Silicon UI 0.3.0 published to npm (Anil, 2026-10-17); the site depends on ^0.3.0. Why: keeps CI and deploys on npm. (2026-10-17)
 - Text face: Silicon UI's Hanken Grotesk (loaded with next/font as --font-hanken-grotesk); BDO Grotesk no longer
   preloaded. Accent: neutral, the page's warm ink (#1E1E1C, paper in dark), not silicon-ui's cool grey neutral.
@@ -278,6 +397,7 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   ⌥I. Clicks are swallowed while it's on, because the dev server points at the live API.
 
 ## Process
+- Font lab (Anil, 2026-11-08): "Use same font for display and body" starts off. When on, the heading face drives both, the Text selector shows it but cannot be changed, and the saved separate text choice returns when turned off. Body size, weight, letter spacing and line height remain independently adjustable with either font choice. The shared Select's option highlight is corrected in Silicon UI source and patched into the account site. Anil deferred the npm release and package upgrade; the site keeps its tested pnpm patch for 0.4.0 until he resumes that work.
 - Keep priorities.md, decisions.md and log.md (this folder) updated with every task; shared-code changes also get a
   README.md note, as the site already does. Why: state lives in repo files, not chat. (2026-10-17)
 - Follow web/AGENTS.md and Silicon UI's rules: missing component means stop and report; files you redesign leave
@@ -287,3 +407,17 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   its fonts, sizes, tracking and colours. /silicons/new now restores them inside [data-silicon-ui] as a trial: a 480 px
   centred column, sticky breadcrumbs, form text 16 and helper text 14. It doesn't use the eight-role scale. Rolling it out
   means deleting the overrides from tokens.css, which replaces the scale and the blue accent across the site.
+- Sky bands (Anil, 2026-11-07, a trial on web/create-silicon-card): Create a Silicon's timezone step paints the world with each
+  offset's current sky, one band per offset, over every IANA zone. Previous and next buttons step through the bands and pick each one's best known city;
+  the Combobox still reaches all zones. An available id shows in success green through scoped tokens.
+- For the Silicon UI drafts: Input has no success state; MultiStepForm isn't in 0.4; compact Stepper can't drop its caption; Combobox has no error prop; Card clips its contents.
+- Webhook URL out of the create wizard (Anil, 2026-11-07): it left Create a Silicon to keep the flow short. It stays a real
+  feature: creating without one is fine, and you add one if you want after. A Silicon's own page already has a Webhook block in
+  its settings (WebhookBlock, silicon-drawer.tsx), so that's the place today; whether the interface should offer it anywhere
+  more visible is open. The API still takes `webhook_url` at creation, and revealCreated still shows a signing secret if one
+  comes back.
+- Sky bands clicks go by place (Anil, 2026-11-07): a hidden 1° overlay, never drawn, holds the zone for each land cell: the
+  country there, then that country's zone with that spot's offset, so Gujarat is Kolkata and southern Africa is Johannesburg.
+  Zones in a country with the same clock all year read as the best known. Steps still go by band. Crowded Europe is rough at
+  1°, to revisit. The boundary offsets are from 2012, so a few recent changes rely on the nearest-zone fallback; Russia always
+  does. Create a Silicon defaults to the browser's time zone, then the Carbon's.

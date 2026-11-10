@@ -170,7 +170,7 @@ function DeckCard({ request, index, total, now, decide, onDecided }: DeckCardPro
           onConfirm={decline}
           disabled={accepting}
         />
-        <Button data-deck-primary="" onClick={() => void accept()} loading={accepting}>{request.kind === "initial" ? "Accept and become custodian" : "Accept the transfer"}</Button>
+        <Button data-deck-primary="" onClick={() => void accept()} loading={accepting}>{request.kind === "initial" ? "Accept and Become Custodian" : "Accept the Transfer"}</Button>
       </div>
     </div>
   );
