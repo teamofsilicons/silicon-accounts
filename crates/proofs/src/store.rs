@@ -68,7 +68,7 @@ macro_rules! sign_in_revoked_at_sql {
 /// permanent here.
 macro_rules! grant_inactive_sql {
     () => {
-        "(f.kind = 'user_verification' and ((f.issuing_app <> 'silicon-accounts' and m.status is distinct from 'active') or a.status is distinct from 'active'))"
+        "(f.kind = 'user_verification' and (m.status is distinct from 'active' or a.status is distinct from 'active'))"
     };
 }
 
@@ -99,7 +99,7 @@ macro_rules! effective_revoked_at_sql {
             " then ",
             sign_in_revoked_at_sql!(),
             " when f.expires_at <= now() then null \
-               when f.kind = 'user_verification' and (f.issuing_app <> 'silicon-accounts' and m.status is distinct from 'active') then m.access_removed_at \
+               when f.kind = 'user_verification' and m.status is distinct from 'active' then m.access_removed_at \
                when f.kind = 'user_verification' and a.status is distinct from 'active' then a.deleted_at \
                else null end)"
         )
@@ -115,7 +115,7 @@ macro_rules! effective_reason_sql {
             "(case when f.revoked_at is not null then f.revoke_reason when ",
             sign_in_revoked_sql!(),
             " then 'sign_in_revoked' when f.expires_at <= now() then null \
-               when f.kind = 'user_verification' and (f.issuing_app <> 'silicon-accounts' and m.status is distinct from 'active') then 'membership_inactive' \
+               when f.kind = 'user_verification' and m.status is distinct from 'active' then 'membership_inactive' \
                when f.kind = 'user_verification' and a.status is distinct from 'active' then 'account_inactive' \
                else null end)"
         )
@@ -574,7 +574,7 @@ pub async fn verify_lookup(
                 ia.status <> 'active' as issuer_inactive, \
                 coalesce(not ($2 = any(f.audiences)), true) as not_audience, \
                 (f.kind = 'user_verification' and not coalesce(tf.id is not null and tf.revoked_at is null \
-                    and tf.expires_at > now() and (f.issuing_app = 'silicon-accounts' or m.status = 'active') and a.status = 'active', false)) as grant_ended \
+                    and tf.expires_at > now() and m.status = 'active' and a.status = 'active', false)) as grant_ended \
          from proof_tokens t \
          join proof_families f on f.id = t.family_id \
          join apps ia on ia.app_id = f.issuing_app",

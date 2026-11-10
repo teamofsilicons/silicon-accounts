@@ -227,7 +227,7 @@ async fn request_hints_are_minimal_rebinding_needs_its_token_and_dead_sessions_n
 }
 
 #[tokio::test]
-async fn explicit_enrollment_uses_the_silicons_live_first_party_grant_without_a_membership() {
+async fn explicit_enrollment_uses_the_silicons_live_first_party_grant_and_membership() {
     let (ctx, rx, server) = fixture().await;
     let carbon = ctx.carbon().await;
     let (silicon, _) = ctx.silicon(&carbon.uuid).await;
@@ -239,7 +239,7 @@ async fn explicit_enrollment_uses_the_silicons_live_first_party_grant_without_a_
     .fetch_one(&ctx.state.db)
     .await
     .unwrap();
-    assert_eq!(memberships, 0);
+    assert_eq!(memberships, 1);
     let enabled = ctx
         .call(
             accounts_silicons::router(),
