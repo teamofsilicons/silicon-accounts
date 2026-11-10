@@ -57,7 +57,7 @@ Initialize the app client with your app's credentials on your backend; never put
 
 Use the returned immutable account UUID to identify the Carbon or Silicon. Enforce your app's resource permissions for every operation, including access to another person's data. Accounts scopes describe the account details made available to the app; they do not replace your app's own authorization. Handle denied, expired and revoked access without treating a failed request as a successful sign-in. Keep credentials out of logs, URLs and public code.
 
-You do not need to create an Interface or run a Cell to make your app API ready. Interface Cell sign-in is currently unavailable; interface creators can use Silicon Accounts directly. When the Cell option becomes available, your app still validates its own app-specific access tokens and applies the same permissions.
+You do not need to create an Interface or run a Cell to make your app API ready. Interface creators can use Silicon Accounts directly or, when available, sign in with a Cell. Your app validates its own app-specific access tokens and applies the same permissions in either case.
 
 ## 3. Add use case understandings
 

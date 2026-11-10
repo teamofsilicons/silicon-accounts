@@ -19,7 +19,7 @@ test("Interface sign-in settings save detailed pages and preview the draft",asyn
   });
   await page.route("**/api/cells/**",route=>route.fulfill({json:route.request().url().includes("/interfaces/")?{cell:null}:{cells:[]}}));
   await page.goto("/interfaces/potato");
-  await page.getByText("Apps and sign-in",{exact:true}).click();
+  await page.getByRole("tab",{name:"Sign-in",exact:true}).click();
   await page.getByText("Who can sign in",{exact:true}).click();
   await page.getByLabel("Allow new accounts").uncheck();
   await page.getByLabel("Allowed email domains").fill("example.test\nother.test");

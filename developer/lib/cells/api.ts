@@ -1,7 +1,7 @@
 /** The developer browser uses only its same-origin BFF, never Accounts tokens. */
 import { ApiError } from "@/lib/api/errors";
 export interface Cell {
-  uuid: string; cell_id: string; name: string; status: string; url: string;
+  uuid: string; cell_id: string; name: string; status: string; url: string; auth_url?: string;
   created_at: string; deleted_at: string | null;
   settings: {allowed_origins: string[]; redirect_urls: string[]};
 }
@@ -17,6 +17,7 @@ export interface AppCell {
   credentials?: Credentials;
 }
 export interface InterfaceCell extends Omit<AppCell, "sign_in_links"> { sign_in_links?: {redirect_to:string;sign_in:string}[]; }
+export type CellConnectionChoice = {cell_id:string} | {create_cell_id:string};
 export async function cellsRequest<T>(path: string, options: {method?: string; body?: unknown; key?: string; signal?: AbortSignal} = {}): Promise<T> {
   if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) throw new Error("Use a relative Cells author path.");
   const headers = new Headers({accept: "application/json"});
@@ -38,7 +39,7 @@ export const cellsApi = {
   get: (cell:string,signal?:AbortSignal)=>cellsRequest<{cell:Cell}>(`/cells/${encodeURIComponent(cell)}`,{signal}),
   list: (signal?: AbortSignal) => cellsRequest<{cells: Cell[]}>("/cells", {signal}),
   app: (app: string, signal?: AbortSignal) => cellsRequest<AppCell>(`/apps/${encodeURIComponent(app)}/cell`, {signal}),
-  enable: (app: string, cell: string | null, key: string) => cellsRequest<AppCell>(`/apps/${encodeURIComponent(app)}/cell`, {method: "POST", body: {cell_id: cell}, key}),
+  enable: (app: string, choice: CellConnectionChoice, key: string) => cellsRequest<AppCell>(`/apps/${encodeURIComponent(app)}/cell`, {method: "POST", body: choice, key}),
   interface: (id:string,signal?:AbortSignal)=>cellsRequest<InterfaceCell>(`/interfaces/${encodeURIComponent(id)}/cell`,{signal}),
-  enableInterface: (id:string,cell:string|null,key:string)=>cellsRequest<InterfaceCell>(`/interfaces/${encodeURIComponent(id)}/cell`,{method:"POST",body:cell?{cell_id:cell}:{},key}),
+  enableInterface: (id:string,choice:CellConnectionChoice,key:string)=>cellsRequest<InterfaceCell>(`/interfaces/${encodeURIComponent(id)}/cell`,{method:"POST",body:choice,key}),
 };

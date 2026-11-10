@@ -3,14 +3,22 @@
 import Link from "next/link";
 import {useEffect, useState, type FormEvent} from "react";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
-import {Page, PageHeader, Section, Surface, Stack, Grid} from "@/components/foundation/layout/layout";
+import {Page, PageHeader, Section, Surface, Stack} from "@/components/foundation/layout/layout";
 import {Button} from "@/components/silicon-ui/button/button";
 import {Input} from "@/components/silicon-ui/input/input";
+import {Textarea} from "@/components/silicon-ui/textarea/textarea";
+import {Select} from "@/components/silicon-ui/select/select";
+import {FileDropzone} from "@/components/silicon-ui/file-dropzone/file-dropzone";
 import {Alert} from "@/components/silicon-ui/alert/alert";
+import {Badge} from "@/components/silicon-ui/badge/badge";
+import {EmptyState} from "@/components/silicon-ui/empty-state/empty-state";
+import {AppIcon} from "@/components/developer/parts/app-icon";
+import {ArrowRight,Braces,Plus} from "lucide-react";
+import homeStyles from "@/components/developer/home/developer-home.module.css";
 import {SecretReveal} from "@/components/developer/parts/secret-reveal";
 import {useCellsLeaveGuard} from "@/components/cells/shared";
 import {ApiError} from "@/lib/api/errors";
-import {request, type Interface, type Kind, type Me, type Upload} from "./api";
+import {request, mediaUrl, type Interface, type Kind, type Me, type Upload} from "./api";
 import styles from "./interfaces.module.css";
 
 type Created = {interface:Interface;interface_secret:string};
@@ -25,6 +33,12 @@ export function InterfacesHome() {
   const [creating,setCreating]=useState(false); const [step,setStep]=useState(0);
   const [name,setName]=useState(""); const [id,setId]=useState(""); const [idEdited,setIdEdited]=useState(false);
   const [apps,setApps]=useState(""); const [kind,setKind]=useState<Kind>("unverified");
+  const eligibility=me.data?.eligibility;
+  // Every creator can use unverified; higher types require an explicit grant.
+  const kindAvailable=kind==="unverified" || (kind==="verified" && eligibility?.verified) || (kind==="trusted" && eligibility?.trusted);
+  const selectedKind:Kind=kindAvailable?kind:"unverified";
+  // Clear a revoked selection immediately, so it cannot reappear if grants change again.
+  if(eligibility && !kindAvailable)setKind("unverified");
   const [logo,setLogo]=useState<File|null>(null); const [logoPreview,setLogoPreview]=useState(""); const [uploadedLogo,setUploadedLogo]=useState<Upload|null>(null);
   const [created,setCreated]=useState<Created|null>(null);
   const [busy,setBusy]=useState(false); const [failure,setFailure]=useState<unknown>(null); const [logoFailure,setLogoFailure]=useState<unknown>(null);
@@ -54,11 +68,11 @@ export function InterfacesHome() {
     event.preventDefault(); if (busy) return;
     if(!name.trim() || new TextEncoder().encode(name.trim()).length>160 || !validId(id)) {setStep(0);setFailure(new Error("Enter a name and an ID of 3–30 lowercase letters, numbers, hyphens or underscores."));return;}
     const selected=appList(apps);
-    if(kind!=="trusted" && !selected.length) {setStep(1);setFailure(new Error("Add at least one app ID to continue."));return;}
+    if(selectedKind!=="trusted" && !selected.length) {setStep(1);setFailure(new Error("Add at least one app ID to continue."));return;}
     if(selected.length>100 || new Set(selected).size!==selected.length || selected.some(x=>!(/^[a-z0-9_-]{3,30}$/.test(x)||/^[a-z][a-z0-9-]{1,39}$/.test(x)))) {setStep(1);setFailure(new Error("Enter up to 100 different app IDs using lowercase letters, numbers, hyphens or underscores."));return;}
     setBusy(true);setFailure(null);
     try {
-      const result=await request<Created>("interfaces",{method:"POST",body:{interface_id:id,name:name.trim(),kind,app_ids:selected}});
+      const result=await request<Created>("interfaces",{method:"POST",body:{interface_id:id,name:name.trim(),kind:selectedKind,app_ids:selected}});
       // Hold the one-time secret before doing anything else. A failed logo upload must never hide it.
       setCreated(result); void cache.invalidateQueries({queryKey:["interfaces","list"]});
       if(logo)try {await attachLogo(result,logo,null);}catch(error){setLogoFailure(error);}
@@ -67,13 +81,13 @@ export function InterfacesHome() {
   function next() {
     setFailure(null);
     if(step===0 && (!name.trim() || new TextEncoder().encode(name.trim()).length>160 || !validId(id))) {setFailure(new Error("Enter a name and an ID of 3–30 lowercase letters, numbers, hyphens or underscores."));return;}
-    if(step===1 && kind!=="trusted" && !appList(apps).length) {setFailure(new Error("Add at least one app ID to continue."));return;}
+    if(step===1 && selectedKind!=="trusted" && !appList(apps).length) {setFailure(new Error("Add at least one app ID to continue."));return;}
     setStep(value=>Math.min(2,value+1));
   }
   function reset() {setCreated(null);setCreating(false);setStep(0);setName("");setId("");setIdEdited(false);setApps("");setKind("unverified");setLogo(null);setLogoPreview("");setUploadedLogo(null);setLogoFailure(null);setFailure(null);}
   async function invitation(inviteId:string,action:"accept"|"decline") {setFailure(null);try {await request(`invites/${inviteId}/${action}`,{method:"POST",body:{}});void cache.invalidateQueries({queryKey:["interfaces"]});}catch(error){setFailure(error);}}
   const alert=failure!=null && <Alert tone="danger" title={failure instanceof Error && !(failure instanceof ApiError) ? failure.message : ApiError.from(failure).message}>{failure instanceof ApiError ? failure.hint : undefined}</Alert>;
-  if(creating) return <Page width="narrow" className={styles.portal}><PageHeader title={created?"Your interface is ready":"Create an interface"} description={created?"Store your secret to finish setup.":"Start with the essentials. You can change the details before publishing."}/>
+  if(creating) return <Page width="narrow"><PageHeader title={created?"Your interface is ready":"Create an interface"} description={created?"Store your secret to finish setup.":"Start with the essentials. You can change the details before publishing."}/>
     {alert}
     {created && !busy ? <SecretReveal title="Save your interface secret" description="Keep this on your server or in a password manager. It will not be shown again." secrets={[{label:"Interface secret",value:created.interface_secret}]} onDone={reset} doneLabel="I’ve saved the secret">
       {logoFailure ? <div className={styles.notice}><p>Your interface was created, but its logo could not be saved. You can retry now or add it in settings later.</p><Button type="button" variant="secondary" onClick={()=>void retryLogo()}>Retry logo upload</Button></div> : <p>{logo?"Your logo is ready. ":"You can add a logo later. "}After saving your secret, open {created.interface.name} to finish setup.</p>}
@@ -83,26 +97,30 @@ export function InterfacesHome() {
         {step===0 && <><div className={styles.stepIntro}><h2>Make it yours</h2><p>Give your interface a name and a recognizable logo.</p></div>
           <Input label="Name" value={name} onChange={event=>{setName(event.target.value);if(!idEdited)setId(suggestedId(event.target.value));}} placeholder="e.g. My workspace" maxLength={160} autoComplete="off"/>
           <Input label="Interface ID" value={id} onChange={event=>{setId(event.target.value);setIdEdited(true);}} description="A permanent ID, 3–30 lowercase letters, numbers, hyphens or underscores." autoComplete="off" spellCheck={false}/>
-          <div className={styles.logoField}><div className={styles.logoPreview} data-sq="surface">{logoPreview?<img src={logoPreview} alt="Selected logo preview"/>:<span aria-hidden="true">{name.trim().charAt(0).toUpperCase()||"+"}</span>}</div><label className={styles.logoChooser}><strong>Logo <span className={styles.muted}>(optional)</span></strong><span>PNG, JPEG or WebP, up to 10 MiB. You can change it later.</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={event=>chooseLogo(event.target.files?.[0]??null)}/>{logo && <span>{logo.name}</span>}</label></div>
+          <div className={styles.logoField}><div className={styles.logoPreview} data-sq="surface">{logoPreview?<img src={logoPreview} alt="Selected logo preview"/>:<span aria-hidden="true">{name.trim().charAt(0).toUpperCase()||"+"}</span>}</div><div className={styles.logoChooser}><strong>Logo <span className={styles.muted}>(optional)</span></strong><FileDropzone label="Choose a logo" description="PNG, JPEG or WebP, up to 10 MiB. You can change it later." accept="image/png,image/jpeg,image/webp" note="PNG, JPEG or WebP" maxSize={10*1024*1024} multiple={false} defaultItems={logo?[{id:"selected-logo",name:logo.name,size:logo.size,file:logo,preview:logoPreview}]:undefined} onFilesChange={files=>chooseLogo(files[0]??null)}/></div></div>
         </>}
         {step===1 && <><div className={styles.stepIntro}><h2>Connect your apps</h2><p>Carbons will see these apps and choose whether to share access when they sign in.</p></div>
-          <label className={styles.field}>Interface type<select value={kind} onChange={event=>setKind(event.target.value as Kind)}><option value="unverified">Unverified</option>{me.data?.eligibility?.verified && <option value="verified">Verified</option>}{me.data?.eligibility?.trusted && <option value="trusted">Trusted</option>}</select><span>Most interfaces start unverified. You can request verification or trust after creation.</span></label>
-          <label className={styles.field}>App IDs<textarea rows={3} value={apps} onChange={event=>setApps(event.target.value)} placeholder="write, ring"/><span>Separate app IDs with commas or new lines. {kind==="trusted"?"A trusted interface can start without a list.":"Add at least one app; you can change the list later."}</span></label>
+          {(eligibility?.verified || eligibility?.trusted) && <Select label="Interface type" description="Most interfaces start unverified. You can request verification or trust after creation." value={selectedKind} onValueChange={value=>setKind(value as Kind)} options={[{value:"unverified",label:"Unverified"},...(eligibility.verified?[{value:"verified",label:"Verified"}]:[]),...(eligibility.trusted?[{value:"trusted",label:"Trusted"}]:[])]}/>}
+          <Textarea label="App IDs" description={`Separate app IDs with commas or new lines. ${selectedKind==="trusted"?"A trusted interface can start without a list.":"Add at least one app; you can change the list later."}`} rows={3} value={apps} onChange={event=>setApps(event.target.value)} placeholder="write, ring"/>
           <p className={styles.helpLink}><Link href="/docs/interfaces">Learn about interface types and sign-in →</Link></p>
         </>}
         {step===2 && <><div className={styles.stepIntro}><h2>Review and create</h2><p>Your interface starts as a private draft. You can complete publishing and sign-in settings next.</p></div>
-          <dl className={styles.review}><div><dt>Name</dt><dd>{name}</dd></div><div><dt>Interface ID</dt><dd>{id}</dd></div><div><dt>Logo</dt><dd>{logo?.name??"Add later"}</dd></div><div><dt>Type</dt><dd>{kind}</dd></div><div><dt>Apps</dt><dd>{appList(apps).join(", ")||"No fixed app list"}</dd></div></dl>
+          <dl className={styles.review}><div><dt>Name</dt><dd>{name}</dd></div><div><dt>Interface ID</dt><dd>{id}</dd></div><div><dt>Logo</dt><dd>{logo?.name??"Add later"}</dd></div>{(eligibility?.verified || eligibility?.trusted) && <div><dt>Type</dt><dd>{selectedKind}</dd></div>}<div><dt>Apps</dt><dd>{appList(apps).join(", ")||"No fixed app list"}</dd></div></dl>
           <p className={styles.muted}>You’ll receive a secret once after creation. Keep it somewhere secure.</p>
         </>}
         <div className={styles.wizardActions}><Button type="button" variant="secondary" disabled={busy} onClick={()=>{setFailure(null);if(step>0)setStep(step-1);else reset();}}>{step===0?"Cancel":"Back"}</Button>{step<2?<Button key="continue" type="button" onClick={event=>{event.preventDefault();next();}}>Continue</Button>:<Button key="create" type="submit" loading={busy}>Create interface</Button>}</div>
       </Stack></form>
     </Surface>}
   </Page>;
-  return <Page className={styles.portal}><PageHeader title="Your interfaces" description="Bring Silicon apps together in a place that feels like yours." actions={<Button onClick={()=>{setCreating(true);setFailure(null);}}>Create interface</Button>}/>
+  return <Page><PageHeader title="Your interfaces" description="Bring Silicon apps together and manage your interface sign-in and publishing." actions={<Button variant="secondary" onClick={()=>{setCreating(true);setFailure(null);}}><Plus size={16} strokeWidth={1.75} aria-hidden="true"/>New interface</Button>}/>
     {alert}
     {list.error && <Alert tone="danger" title={ApiError.from(list.error).message}>{ApiError.from(list.error).hint}</Alert>}
     <Section title="Your interfaces" description="Manage sign-in, creators, publishing and releases.">
-      {list.isPending ? <p role="status">Loading interfaces…</p> : list.data?.interfaces.length ? <Grid>{list.data.interfaces.map(item=><Surface key={item.interface_id} className={styles.card}><Link href={`/interfaces/${encodeURIComponent(item.interface_id)}`} className={styles.title}>{item.name}</Link><p className={styles.muted}>{item.interface_id} · {item.pending_operation ? "Save needs attention" : item.published ? "Published" : "Draft"}</p><Link href={`/interfaces/${encodeURIComponent(item.interface_id)}`}>Manage →</Link></Surface>)}</Grid> : !list.error ? <Surface><p>No interfaces yet. Create your first one to get started.</p><Button onClick={()=>{setCreating(true);setFailure(null);}}>Create interface</Button></Surface> : null}
+      {list.isPending ? <p role="status">Loading interfaces…</p> : list.data?.interfaces.length ? <ul className={homeStyles.grid} role="list" aria-label="Your interfaces">{list.data.interfaces.map(item=><li key={item.interface_id}><Link href={`/interfaces/${encodeURIComponent(item.interface_id)}`} data-sq="surface" className={homeStyles.tile}>
+        <span className={homeStyles.tileTop}><AppIcon name={item.name} src={item.logo_url?mediaUrl(item.interface_id,item.logo_url):null} size={56} decorative/><Badge size="sm" tone={item.pending_operation?"warning":item.published?"success":"neutral"}>{item.pending_operation?"Save needs attention":item.published?"Published":"Draft"}</Badge></span>
+        <span className={homeStyles.tileText}><span className={homeStyles.tileName}>{item.name}</span><span className={homeStyles.tileId}>{item.interface_id}</span></span>
+        <span className={homeStyles.tileFoot}><span className={homeStyles.tileSource}>{item.published?"Manage interface":"Continue setup"}</span><ArrowRight className={homeStyles.tileArrow} size={16} strokeWidth={1.75} aria-hidden="true"/></span>
+      </Link></li>)}</ul> : !list.error ? <Surface padding="none"><EmptyState icon={<Braces size={24} strokeWidth={1.5}/>} title="No interfaces yet" description="Create an interface to bring apps together and configure sign-in." action={<Button onClick={()=>{setCreating(true);setFailure(null);}}>Create interface</Button>}/></Surface> : null}
     </Section>
     {me.data?.invites?.filter(x=>x.status==="pending").length ? <Section title="Invitations"><Stack>{me.data.invites.filter(x=>x.status==="pending").map(invite=><Surface key={invite.id}><Stack><strong>{invite.interface_name || invite.interface_id}</strong><div className={styles.actions}><Button size="sm" onClick={()=>void invitation(invite.id,"accept")}>Accept</Button><Button size="sm" variant="secondary" onClick={()=>void invitation(invite.id,"decline")}>Decline</Button></div></Stack></Surface>)}</Stack></Section> : null}
   </Page>;

@@ -6,12 +6,15 @@ import { useNavigate } from "./navigation";
 import { api, useMutation, useResource } from "./api";
 import type { App } from "./types";
 import { Button, ErrorNotice, Input, Modal, SecretModal, Textarea } from "./ui";
+import { StorageFields } from "./UserStorage";
+import { parseStorageRows, type StorageRow } from "./storage-schema";
 export function CreateApp({ open, close }: { open: boolean; close: () => void }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [id, setId] = useState("");
   const [description, setDescription] = useState("");
   const [logo, setLogo] = useState("");
+  const [storage, setStorage] = useState<StorageRow[]>([]);
   const [checked, setChecked] = useState("");
   const [secret, setSecret] = useState<string | null>(null);
   const [created, setCreated] = useState("");
@@ -47,7 +50,7 @@ export function CreateApp({ open, close }: { open: boolean; close: () => void })
             const result = await mutation.run(() =>
               api<{ app: App; app_secret: string }>("/apps", {
                 method: "POST",
-                body: { name, app_id: id, description, logo },
+                body: { name, app_id: id, description, logo, ...(storage.length ? {user_storage: parseStorageRows(storage)} : {}) },
               }),
             );
             if (result) {
@@ -109,6 +112,8 @@ export function CreateApp({ open, close }: { open: boolean; close: () => void })
             type="url"
             placeholder="https://…"
           />
+          <h3>User storage (optional)</h3>
+          <StorageFields rows={storage} onChange={setStorage}/>
           <ErrorNotice error={mutation.error} />
           <Button
             type="submit"
