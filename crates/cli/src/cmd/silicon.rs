@@ -281,6 +281,28 @@ pub async fn silicon(ctx: &Ctx, args: SiliconArgs) -> CliResult<Outcome> {
             ))
         }
         SiliconCommand::Request(request) => match request.command {
+            RequestCommand::AttachSession {
+                request_id,
+                session_id,
+            } => {
+                let path = request_file(ctx, &request_id)?;
+                let stored: StoredRequest = home::read_json(&path)?.ok_or_else(|| {
+                    CliError::invalid(
+                        "No saved request in this home.",
+                        "Use the same --home that created the Silicon.",
+                    )
+                })?;
+                let client = AccountsClient::new(&stored.url)?;
+                let value = client
+                    .silicon_request_ting_session(&request_id, &stored.request_token, &session_id)
+                    .await?;
+                Ok(Outcome::new(
+                    value,
+                    format!(
+                        "Custodian request {request_id} now notifies Ting session {session_id}. Check request status after reconnecting."
+                    ),
+                ))
+            }
             RequestCommand::Status {
                 request_id,
                 wait,
@@ -441,6 +463,12 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
     };
 
     if let Some(session) = carbon {
+        if args.ting_session_id.is_some() {
+            return Err(CliError::invalid(
+                "--ting-session-id is only for self-creation.",
+                "Use --self-create, or sign in as the created Silicon and run notifications enable.",
+            ));
+        }
         if let Some(custodian) = &args.custodian {
             let wanted = custodian.trim().to_ascii_lowercase();
             let is_me = if wanted.contains('@') {
@@ -519,6 +547,7 @@ async fn create(ctx: &Ctx, args: SiliconCreateArgs) -> CliResult<Outcome> {
         pfp_url: args.pfp_url.clone(),
         stk: stk.clone(),
         webhook_url: args.webhook.clone(),
+        ting_session_id: args.ting_session_id.clone(),
     };
     let client = ctx.client()?;
     let created = client.silicon_self_create(&request, Some(&key)).await?;
@@ -1351,4 +1380,14 @@ async fn silicon_keys(ctx: &Ctx, command: SiliconKeysCommand) -> CliResult<Outco
             ))
         }
     }
+}
+
+pub async fn enable_tings(ctx: &Ctx) -> CliResult<Outcome> {
+    ctx.session_of(AccountKind::Silicon, "Enabling account notifications")
+        .await?;
+    let result = with_session!(ctx, |s| s.enable_ting_notifications())?;
+    Ok(Outcome::new(
+        result,
+        "Accounts notifications enabled in Ting. Sign into Ting as this Silicon, then run ting listen. Use Ting preferences or revoke its Accounts subscription to stop notifications.",
+    ))
 }

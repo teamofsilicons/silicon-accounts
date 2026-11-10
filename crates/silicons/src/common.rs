@@ -15,12 +15,10 @@
 //! other, so concurrent requests of one account never wait on one another.
 
 use accounts_core::error::{ApiError, ApiResult};
-use accounts_core::events;
 use accounts_core::http::{AccountAuth, AuthVia};
 use accounts_core::ids::AccountId;
 use accounts_core::models::{Account, AccountKind, AccountStatus};
 use accounts_core::repo::{accounts, rate_limit};
-use accounts_core::state::AppState;
 use accounts_core::timefmt::format_rfc3339_ms;
 use sqlx::PgConnection;
 use time::OffsetDateTime;
@@ -140,18 +138,6 @@ pub fn request_not_found(raw: &str) -> ApiError {
     )
     .hint("List the requests waiting for you with GET /v1/me/custodian-requests (`silicon-accounts custodian requests`). Requests named by email show up once that email is verified on your account.")
     .detail("request_id", raw.trim())
-}
-
-/// Stores a new webhook URL with a fresh signing secret; returns the secret (show it once).
-pub async fn set_silicon_webhook(
-    conn: &mut PgConnection,
-    state: &AppState,
-    silicon_uuid: &str,
-    url: &str,
-) -> ApiResult<String> {
-    let (secret, enc) = events::new_webhook_secret(&state.keys.keyring)?;
-    accounts::set_silicon_webhook(conn, silicon_uuid, Some(url), Some(&enc)).await?;
-    Ok(secret)
 }
 
 /// 429 when `bucket` has already used up its current window, without counting this request

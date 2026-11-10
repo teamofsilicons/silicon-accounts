@@ -1,7 +1,6 @@
 //! `GET /v1/me/custodian-requests` and accepting / declining a self-created Silicon's request.
 
-use accounts_core::events;
-use accounts_core::models::{AccountStatus, WebhookTargetKind};
+use accounts_core::models::AccountStatus;
 use accounts_core::test_support::{CarbonSpec, Req, TestContext};
 use serde_json::{Value, json};
 
@@ -107,7 +106,7 @@ async fn accepting_activates_the_silicon_with_me_as_custodian() {
     let created = self_created(
         &ctx,
         me.handle.as_deref().expect("id"),
-        json!({"webhook_url": "http://127.0.0.1:8593/hooks/accepted"}),
+        json!({"ting_session_id":"recv_11111111111111111111111111111111"}),
     )
     .await;
     let uuid = created["silicon"]["uuid"].as_str().expect("uuid");
@@ -157,14 +156,14 @@ async fn accepting_activates_the_silicon_with_me_as_custodian() {
 }
 
 #[tokio::test]
-async fn declining_releases_the_silicon_and_still_reaches_its_webhook() {
+async fn declining_releases_the_silicon_and_queues_a_minimal_ting_hint() {
     let ctx = TestContext::new().await;
     let me = ctx.carbon().await;
     let t = token(&ctx, &me).await;
     let created = self_created(
         &ctx,
         me.handle.as_deref().expect("id"),
-        json!({"webhook_url": "http://127.0.0.1:8593/hooks/declined"}),
+        json!({"ting_session_id":"recv_11111111111111111111111111111111"}),
     )
     .await;
     let uuid = created["silicon"]["uuid"].as_str().expect("uuid");
@@ -183,22 +182,10 @@ async fn declining_releases_the_silicon_and_still_reaches_its_webhook() {
     assert_eq!(p["data"]["id"], sid);
     assert_eq!(p["data"]["released"], true);
     assert_eq!(p["data"]["custodian"], me.handle.clone().expect("id"));
-    // The worker delivers to the Silicon's *current* webhook: it must still be there.
-    let mut conn = ctx.conn().await;
-    let url = events::current_url(&mut conn, WebhookTargetKind::Silicon, uuid)
-        .await
-        .expect("url");
-    assert_eq!(url.as_deref(), Some("http://127.0.0.1:8593/hooks/declined"));
-    let secret = events::current_secret(
-        &mut conn,
-        &ctx.state.keys.keyring,
-        WebhookTargetKind::Silicon,
-        uuid,
-    )
-    .await
-    .expect("secret");
-    assert_eq!(secret.as_deref(), created["webhook_secret"].as_str());
-    drop(conn);
+    let hint:serde_json::Value=sqlx::query_scalar("select payload from silicon_tings where account_uuid=$1 and session_id is not null order by created_at desc,id desc limit 1")
+        .bind(uuid).fetch_one(&ctx.state.db).await.unwrap();
+    assert_eq!(hint["data"], json!({"request_id":id}));
+    assert!(hint.get("for").is_none());
 
     // Released at once: no 10-day reservation, anyone can take the id.
     let other = ctx.carbon().await;

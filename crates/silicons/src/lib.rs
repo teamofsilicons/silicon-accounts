@@ -12,9 +12,10 @@
 //! | `GET`/`PUT /v1/silicons/{id}/identity-audiences` | the Silicon or its custodian (`PUT`: the custodian) | the outside services the Silicon may get identity tokens for |
 //! | `POST /v1/me/identity-tokens` | session (Silicon) | an OIDC identity token for one allowed outside audience (AWS, Google Cloud, Microsoft Entra) |
 //! | `POST /v1/me/short-lived-tokens` | session | a 2-minute single-use token to sign into one app |
-//! | `PUT`/`DELETE /v1/me/webhook`, `POST /v1/me/webhook/test` | session (Silicon) | the Silicon's own webhook |
-//! | `GET /v1/me/webhook/deliveries[/{id}]`, `POST /v1/me/webhook/replay` (IDEMPOTENT) | session (Silicon) | its webhook's deliveries: list, inspect, replay |
-//! | `/v1/me/silicons…` | session (Carbon) | the custodian's side: create, view, edit, photo upload, id, webhook (and its deliveries), STK, transfer, delete, the Silicon's apps, sign-ins and allowed apps |
+//! | `POST /v1/me/notifications/ting` | Silicon bearer session | explicitly enable Accounts notifications in Ting |
+//! | `PUT /v1/silicons/requests/{id}/ting-session` | matching request token | bind minimal hints to an anonymous receiver |
+//! | own-Silicon webhook routes | retired | 410 with Ting migration guidance |
+//! | `/v1/me/silicons…` | session (Carbon) | the custodian's side: create, view, edit, photo upload, id, STK, transfer, delete, the Silicon's apps, sign-ins and allowed apps |
 //! | `/v1/me/custodian-requests…` | session (Carbon) | requests addressed to me: list, accept, decline |
 //!
 //! [`spawn_background`] starts the custodian-request expiry sweep (every minute). Overdue
@@ -25,10 +26,9 @@
 //! plus [`SELF_CREATE_ATTEMPTS_PER_IP`] attempts of any outcome; at most
 //! [`MAX_PENDING_PER_CUSTODIAN`] self-created Silicons waiting for the same c:id or email
 //! address; [`MAX_STK_FAILURES`] wrong STKs lock sign-in for [`LOCK_SECONDS`];
-//! [`WEBHOOK_TESTS_PER_SILICON`] test pings per hour.
+//! pending-request session changes are limited to 60 per hour per request.
 //!
-//! Responses carrying a freshly generated secret (STK, `sarq_` request token, `whsec_` webhook
-//! secret) are replayable with an Idempotency-Key for 10 minutes and stored sealed with the
+//! Responses carrying a freshly generated secret (STK or `sarq_` request token) are replayable with an Idempotency-Key for 10 minutes and stored sealed with the
 //! keyring meanwhile, never in clear (core's `idempotency::run` with `secret_bearing`).
 //!
 //! Generic self-service (`GET/PATCH /v1/me`, `POST /v1/me/id`) for Silicons lives in the account
@@ -46,14 +46,13 @@ mod keys;
 mod lifecycle;
 mod login;
 mod notify;
-mod own_webhook;
 mod requests;
 mod self_create;
 mod slt;
 mod stk;
 pub mod sweep;
+mod ting;
 mod views;
-mod webhook_deliveries;
 
 use accounts_core::AppState;
 use axum::Router;
@@ -65,15 +64,18 @@ use tokio::task::JoinHandle;
 
 pub use identity::IDENTITY_TOKENS_PER_SILICON;
 pub use login::{LOCK_SECONDS, MAX_STK_FAILURES};
-pub use own_webhook::WEBHOOK_TESTS_PER_SILICON;
 pub use requests::{MAX_PENDING_PER_CUSTODIAN, REQUEST_TTL_DAYS};
 pub use self_create::SELF_CREATE_ATTEMPTS_PER_IP;
 pub use sweep::{SWEEP_INTERVAL, SweepReport, expire_overdue};
-pub use webhook_deliveries::MAX_REPLAY;
 
 /// HTTP routes of this crate (see the table above and the build spec 02-api.md).
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/v1/me/notifications/ting", post(ting::enable))
+        .route(
+            "/v1/silicons/requests/{id}/ting-session",
+            put(ting::bind_request),
+        )
         .route("/v1/silicons", post(self_create::create))
         .route("/v1/silicons/login", post(login::login))
         .route("/v1/silicons/{id}/keys", get(keys::list).post(keys::add))
@@ -99,23 +101,11 @@ pub fn router() -> Router<AppState> {
             get(self_create::request_status),
         )
         .route("/v1/me/short-lived-tokens", post(slt::create))
-        .route(
-            "/v1/me/webhook",
-            put(own_webhook::set).delete(own_webhook::remove),
-        )
-        .route("/v1/me/webhook/test", post(own_webhook::test))
-        .route(
-            "/v1/me/webhook/deliveries",
-            get(webhook_deliveries::own_list),
-        )
-        .route(
-            "/v1/me/webhook/deliveries/{id}",
-            get(webhook_deliveries::own_show),
-        )
-        .route(
-            "/v1/me/webhook/replay",
-            post(webhook_deliveries::own_replay),
-        )
+        .route("/v1/me/webhook", put(ting::retired).delete(ting::retired))
+        .route("/v1/me/webhook/test", post(ting::retired))
+        .route("/v1/me/webhook/deliveries", get(ting::retired))
+        .route("/v1/me/webhook/deliveries/{id}", get(ting::retired))
+        .route("/v1/me/webhook/replay", post(ting::retired))
         .route(
             "/v1/me/silicons",
             get(custodian::list).post(custodian::create),
@@ -133,20 +123,17 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/v1/me/silicons/{uuid}/webhook",
-            put(custodian::set_webhook).delete(custodian::remove_webhook),
+            put(ting::retired).delete(ting::retired),
         )
         .route(
             "/v1/me/silicons/{uuid}/webhook/deliveries",
-            get(webhook_deliveries::custodian_list),
+            get(ting::retired),
         )
         .route(
             "/v1/me/silicons/{uuid}/webhook/deliveries/{id}",
-            get(webhook_deliveries::custodian_show),
+            get(ting::retired),
         )
-        .route(
-            "/v1/me/silicons/{uuid}/webhook/replay",
-            post(webhook_deliveries::custodian_replay),
-        )
+        .route("/v1/me/silicons/{uuid}/webhook/replay", post(ting::retired))
         .route("/v1/me/silicons/{uuid}/stk", post(custodian::rotate_stk))
         .route(
             "/v1/me/silicons/{uuid}/apps",

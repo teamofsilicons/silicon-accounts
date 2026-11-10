@@ -289,7 +289,7 @@ async fn a_new_flow_resumes_a_verified_sign_up_in_the_same_browser() {
 }
 
 #[tokio::test]
-async fn the_first_party_app_completes_without_consent_or_membership() {
+async fn the_first_party_app_completes_with_automatic_registration_without_consent() {
     let ctx = TestContext::new().await;
     let mut b = Browser::new(&ctx);
     let flow = email_signup(
@@ -310,13 +310,13 @@ async fn the_first_party_app_completes_without_consent_or_membership() {
     let uuid = flow["signed_in_as"]["uuid"].as_str().expect("uuid");
     let n = scalar_i64(
         &ctx,
-        "select count(*) from memberships where account_uuid = $1",
+        "select count(*) from memberships where account_uuid = $1 and app_id = 'silicon-accounts' and status = 'active'",
         uuid,
     )
     .await;
     assert_eq!(
-        n, 0,
-        "the account site is not an app the account signed into"
+        n, 1,
+        "the account is registered with Silicon Accounts at creation"
     );
     // The browser is signed in for the site.
     let r = b.get(&ctx, "/v1/session").await;

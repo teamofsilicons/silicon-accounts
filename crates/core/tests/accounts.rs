@@ -433,7 +433,7 @@ async fn deletion_reserves_id_frees_contacts_and_revokes_everything() {
 }
 
 #[tokio::test]
-async fn releasing_a_silicon_frees_its_id_immediately_and_keeps_its_webhook() {
+async fn releasing_a_silicon_frees_its_id_and_records_its_decision() {
     let ctx = TestContext::new().await;
     let carbon = ctx.carbon().await;
     let (s, request_id) = ctx
@@ -466,8 +466,7 @@ async fn releasing_a_silicon_frees_its_id_immediately_and_keeps_its_webhook() {
         accounts_core::events::declined_reason::DECLINED,
     )
     .await
-    .expect("event")
-    .expect("the Silicon has a webhook");
+    .expect("event");
     assert_eq!(
         accounts::release_silicon(&mut conn, &s.uuid, "system")
             .await
@@ -490,27 +489,13 @@ async fn releasing_a_silicon_frees_its_id_immediately_and_keeps_its_webhook() {
         .await
         .expect("q");
     assert!(avail.available);
-    // The worker can still deliver the declined event: URL and secret are kept.
-    use accounts_core::models::WebhookTargetKind;
-    assert_eq!(
-        accounts_core::events::current_url(&mut conn, WebhookTargetKind::Silicon, &s.uuid)
-            .await
-            .expect("url")
-            .as_deref(),
-        Some("http://127.0.0.1:8593/si/hooks")
-    );
-    assert_eq!(
-        accounts_core::events::current_secret(
-            &mut conn,
-            &ctx.state.keys.keyring,
-            WebhookTargetKind::Silicon,
-            &s.uuid
-        )
+    // The decision is durable in the Ting outbox; no callback delivery is created.
+    let count: i64 = sqlx::query_scalar("select count(*) from silicon_tings where account_uuid=$1")
+        .bind(&s.uuid)
+        .fetch_one(&mut *conn)
         .await
-        .expect("secret")
-        .as_deref(),
-        Some("whsec_test")
-    );
+        .unwrap();
+    assert_eq!(count, 1);
     // The declined request stays declined (release only cancels pending ones).
     let status: String = sqlx::query_scalar("select status from custodian_requests where id = $1")
         .bind(request_id)
@@ -597,11 +582,6 @@ async fn deleting_a_custodian_is_refused_and_waiting_silicons_are_released() {
             .expect("q")
             .is_none()
     );
-    assert_eq!(
-        released.webhook_url.as_deref(),
-        Some("http://127.0.0.1:8593/si/w"),
-        "the webhook stays so the declined event can be delivered"
-    );
     let (status, decided_by): (String, Option<String>) =
         sqlx::query_as("select status, decided_by from custodian_requests where id = $1")
             .bind(request_id)
@@ -613,7 +593,7 @@ async fn deleting_a_custodian_is_refused_and_waiting_silicons_are_released() {
         ("cancelled", Some(carbon.uuid.as_str()))
     );
     let payload: serde_json::Value = sqlx::query_scalar(
-        "select e.payload from webhook_events e join webhook_deliveries d on d.event_id = e.event_id \
+        "select e.payload from webhook_events e join silicon_tings d on d.event_id = e.event_id \
           where e.target_kind = 'silicon' and e.target_id = $1 and e.type = 'silicon.custodian.declined' \
             and d.status = 'pending'",
     )

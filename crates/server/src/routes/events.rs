@@ -456,6 +456,9 @@ pub async fn stream(
     caller: Caller,
     Query(q): Query<StreamQuery>,
 ) -> Result<Response, ApiError> {
+    if !matches!(&caller, Caller::App { .. }) {
+        return Err(accounts_core::ting::retired());
+    }
     let (feed, permit_key, check) = match caller {
         Caller::App { app, secret } => {
             let mut conn = state.db.acquire().await?;

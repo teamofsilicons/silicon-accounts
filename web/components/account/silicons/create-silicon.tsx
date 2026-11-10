@@ -2,7 +2,7 @@
 
 /**
  * Creating a Silicon you are custodian of (POST /v1/me/silicons): a display name, its si:id (checked as you type, and
- * suggested from the name until you edit it), its timezone (yours by default), an optional webhook, and an optional
+ * suggested from the name until you edit it), its timezone (yours by default), an optional
  * STK of your own. The generated STK comes back exactly once; the page shows it in a reveal card, which holds the only
  * copy (the mutation keeps none). A retry of the same request reuses its Idempotency-Key, so a lost answer never creates
  * the Silicon twice. Escape in the timezone list closes the list, not the drawer with the form in it.
@@ -52,7 +52,6 @@ function CreateForm({ me, onCreated }: { me: CarbonMe; onCreated: (created: Sili
   const [handle, setHandle] = useState("");
   const [handleEdited, setHandleEdited] = useState(false);
   const [timezone, setTimezone] = useState(me.timezone);
-  const [webhook, setWebhook] = useState("");
   const [own, setOwn] = useState(false);
   const [stk, setStk] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -77,15 +76,6 @@ function CreateForm({ me, onCreated }: { me: CarbonMe; onCreated: (created: Sili
       const problem = stkProblem(stk);
       if (problem) next.stk = problem;
     }
-    const url = webhook.trim();
-    if (url) {
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") next.webhook_url = "A webhook URL must start with https://.";
-      } catch {
-        next.webhook_url = `“${url}” is not a full URL. Start it with https://.`;
-      }
-    }
     return next;
   };
 
@@ -109,7 +99,6 @@ function CreateForm({ me, onCreated }: { me: CarbonMe; onCreated: (created: Sili
         id: check.id,
         display_name: name.trim(),
         timezone: timezone || undefined,
-        webhook_url: webhook.trim() || undefined,
         stk: own ? normalizeStk(stk) : undefined,
       });
       onCreated(created);
@@ -143,18 +132,7 @@ function CreateForm({ me, onCreated }: { me: CarbonMe; onCreated: (created: Sili
         <Combobox label="Timezone" options={options} value={timezone} onValueChange={setTimezone} description="Its local time. Yours to start with." />
         {errors.timezone ? <p className={styles.error} role="alert">{errors.timezone}</p> : null}
       </div>
-      <Input
-        label="Webhook URL (optional)"
-        type="url"
-        inputMode="url"
-        placeholder="https://scout.example/hooks/accounts"
-        value={webhook}
-        onChange={event => { setWebhook(event.target.value); setErrors(current => ({ ...current, webhook_url: "" })); }}
-        error={errors.webhook_url || undefined}
-        description="Where it hears about its own account (id changes, STK rotations, custodian changes). You get its signing secret once."
-        autoComplete="off"
-        spellCheck={false}
-      />
+      <p>Account notifications are delivered through Silicon Ting. After signing in, the Silicon can enable them with <code>silicon-accounts notifications enable</code>.</p>
       <div className={styles.stk}>
         <Checkbox label="Choose its STK yourself" description="Otherwise one is generated (stk- and 12 hex digits) and shown to you once." checked={own} onCheckedChange={value => { setOwn(value === true); setErrors(current => ({ ...current, stk: "" })); }} />
         {own ? (

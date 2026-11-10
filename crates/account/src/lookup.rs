@@ -224,11 +224,15 @@ pub(crate) struct AccountLookup {
 /// Silicons the custodian as `{"uuid","id"}` (`null` while a self-created Silicon waits for its
 /// custodian to accept), the way apps see a custodian everywhere.
 ///
-/// Never the display name or photo. Those are details an account shares with an app by signing
+/// Normally excludes the display name and photo. Those are details an account shares with an app by signing
 /// in to it, and it can take them back by removing the app's access, so an app reads them from
 /// its user base (`GET /v1/apps/{app_id}/users/{uuid}`), which follows that: an account that
 /// removed the app's access shows none of its data there, whatever it changes afterwards. A
-/// lookup that answered them to any app would undo that with one call.
+/// lookup that answered them to any app would undo that with one call. The operator may
+/// explicitly grant a trusted directory app basic names/photos via
+/// ACCOUNTS_PROFILE_DIRECTORY_APP_IDS. This separate directory capability requires an active
+/// account with an active Silicon Accounts registration; it never grants private fields,
+/// sessions, first-party authentication, or access to the target's other apps.
 #[derive(Debug, Serialize)]
 pub(crate) struct AppLookup {
     uuid: String,
@@ -236,14 +240,34 @@ pub(crate) struct AppLookup {
     id: Option<String>,
     status: AccountStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
+    display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pfp_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     custodian: Option<Option<CustodianRef>>,
 }
 
 async fn lookup_view(
     conn: &mut PgConnection,
+    settings: &accounts_core::config::Settings,
     caller: &Caller,
     account: &Account,
 ) -> ApiResult<LookupView> {
+    let directory_profile = match caller {
+        Caller::App(app)
+            if account.status == AccountStatus::Active
+                && settings.profile_directory_app_ids.contains(&app.app_id) =>
+        {
+            sqlx::query_scalar::<_, bool>(
+                "select exists(select 1 from memberships where app_id='silicon-accounts' \
+                 and account_uuid=$1 and status='active' and 'profile'=any(granted_scopes))",
+            )
+            .bind(&account.uuid)
+            .fetch_one(&mut *conn)
+            .await?
+        }
+        _ => false,
+    };
     let custodian = match (account.kind, &account.custodian_uuid) {
         (AccountKind::Carbon, _) => None,
         (AccountKind::Silicon, Some(c)) => Some(accounts::get(conn, c).await?),
@@ -259,6 +283,8 @@ async fn lookup_view(
             kind: account.kind,
             id: account.handle.clone(),
             status: account.status,
+            display_name: directory_profile.then(|| account.display_name.clone()),
+            pfp_url: directory_profile.then(|| account.pfp_url.clone()),
             custodian: custodian.map(|c| {
                 c.map(|c| CustodianRef {
                     uuid: c.uuid,
@@ -318,7 +344,9 @@ pub(crate) async fn by_uuid(
         .hint("Deleted accounts can't be looked up; remove it from your records (apps also got an account.deleted webhook)."));
     }
     tracing::debug!(caller = %caller.describe(), uuid, "account lookup");
-    Ok(Json(lookup_view(&mut conn, &caller, &account).await?))
+    Ok(Json(
+        lookup_view(&mut conn, &state.settings, &caller, &account).await?,
+    ))
 }
 
 /// `GET /v1/accounts/by-id/{id}` — app or session (see [`LOOKUPS_PER_MINUTE`]); the same answer
@@ -360,5 +388,7 @@ pub(crate) async fn by_id(
         .hint(hint));
     };
     tracing::debug!(caller = %caller.describe(), id = %full, "account lookup by id");
-    Ok(Json(lookup_view(&mut conn, &caller, &account).await?))
+    Ok(Json(
+        lookup_view(&mut conn, &state.settings, &caller, &account).await?,
+    ))
 }

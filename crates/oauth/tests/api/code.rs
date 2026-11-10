@@ -522,7 +522,7 @@ async fn access_removed_after_the_code_was_issued_refuses_it() {
     assert!(s(&r.json, "error_description").contains("has to sign in to the app again"));
     let status: String = scalar(
         &ctx,
-        "select status from memberships where account_uuid = $1",
+        "select status from memberships where account_uuid = $1 and app_id <> 'silicon-accounts'",
         &carbon.uuid,
     )
     .await;
@@ -570,7 +570,7 @@ async fn an_exchange_during_an_access_removal_waits_for_it_and_is_refused() {
     );
     let status: String = scalar(
         &ctx,
-        "select status from memberships where account_uuid = $1",
+        "select status from memberships where account_uuid = $1 and app_id <> 'silicon-accounts'",
         &carbon.uuid,
     )
     .await;

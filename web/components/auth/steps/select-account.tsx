@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Building2, UserRound } from "lucide-react";
+import { Building2 } from "lucide-react";
+import { Avatar } from "@/components/silicon-ui/avatar/avatar";
 import { Button } from "@/components/silicon-ui/button/button";
 import type { ApiError } from "@/lib/api/errors";
 import type { FlowController } from "../flow/controller";
@@ -56,25 +57,32 @@ export function SelectAccount({
                 data-sq="surface"
                 data-blocked={account.allowed === false || undefined}
               >
-                <span className={styles.icon} aria-hidden="true">
-                  {account.org?.logo_url ? (
-                    <Image
-                      src={account.org.logo_url}
-                      width={32}
-                      height={32}
-                      alt=""
-                      unoptimized
-                    />
-                  ) : work ? (
-                    <Building2 size={22} />
-                  ) : (
-                    <UserRound size={22} />
-                  )}
-                </span>
+                <Avatar
+                  className={styles.avatar}
+                  name={account.display_name}
+                  src={account.pfp_url || undefined}
+                  size="md"
+                />
                 <div className={styles.identity}>
                   <strong>{account.display_name}</strong>
                   <span>{account.id}</span>
-                  {account.org ? <span>{account.org.name}</span> : null}
+                  {account.org ? (
+                    <span className={styles.organization}>
+                      {account.org.logo_url ? (
+                        <Image
+                          className={styles.organizationLogo}
+                          src={account.org.logo_url}
+                          width={16}
+                          height={16}
+                          alt=""
+                          unoptimized
+                        />
+                      ) : (
+                        <Building2 size={16} aria-hidden="true" />
+                      )}
+                      <span>{account.org.name}</span>
+                    </span>
+                  ) : null}
                   {account.allowed === false ? (
                     <p>
                       {account.reason ??

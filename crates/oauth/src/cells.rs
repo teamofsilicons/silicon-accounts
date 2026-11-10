@@ -19,6 +19,10 @@ const CELLS: &str = "silicon-cells";
 pub(crate) fn router() -> Router<AppState> {
     Router::new()
         .route("/v1/internal/cells/author", post(author))
+        .route(
+            "/v1/internal/cells/interfaces/{interface}/authorize",
+            post(interface_broker_authorize),
+        )
         .route("/v1/internal/cells/apps/{app}", post(app_info))
         .route(
             "/v1/internal/cells/links/{cell}/{app}",
@@ -37,6 +41,59 @@ pub(crate) fn router() -> Router<AppState> {
             post(introspect),
         )
         .route("/v1/internal/cells/links/{cell}/{app}/revoke", post(revoke))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct InterfaceBrokerRequest {
+    cell_id: String,
+    callback_url: String,
+    generation: i64,
+    origin: String,
+    redirect_uri: String,
+}
+
+async fn interface_broker_authorize(
+    State(state): State<AppState>,
+    auth: AppAuth,
+    Path(interface): Path<String>,
+    Json(input): Json<InterfaceBrokerRequest>,
+) -> ApiResult<Response> {
+    service(&auth)?;
+    let mut tx = state.db.begin().await?;
+    let row: Option<(i64, bool, Vec<String>, Vec<String>, Option<Value>)> = sqlx::query_as(
+        "select revision,active,redirect_uris,allowed_origins,cell_broker from interface_auth_clients where interface_id=$1 for share")
+        .bind(&interface).fetch_optional(&mut *tx).await?;
+    let Some((revision, true, redirects, origins, Some(broker))) = row else {
+        return Err(ApiError::forbidden(
+            "cell_broker_denied",
+            "The Cell broker is not authorized.",
+        ));
+    };
+    let matches = input.generation > 0
+        && broker
+            .get("active")
+            .map_or(true, |value| value.as_bool() == Some(true))
+        && broker["generation"].as_i64() == Some(input.generation)
+        && broker["cell_id"].as_str() == Some(input.cell_id.as_str())
+        && broker["callback_url"].as_str() == Some(input.callback_url.as_str())
+        && redirects.contains(&input.callback_url)
+        && origins.contains(&input.origin)
+        && redirects.contains(&input.redirect_uri)
+        && input.redirect_uri != input.callback_url
+        && url::Url::parse(&input.redirect_uri)
+            .ok()
+            .is_some_and(|url| url.path() != "/interface-auth/callback");
+    if !matches {
+        return Err(ApiError::forbidden(
+            "cell_broker_denied",
+            "The Cell broker is not authorized.",
+        ));
+    }
+    tx.commit().await?;
+    Ok(super::respond::no_store(
+        StatusCode::OK,
+        &json!({"authorized":true,"revision":revision}),
+    ))
 }
 fn service(auth: &AppAuth) -> ApiResult<()> {
     if auth.app.app_id != CELLS {

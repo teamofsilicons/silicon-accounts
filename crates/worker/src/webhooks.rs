@@ -140,7 +140,7 @@ pub async fn claim_due(
     Ok(sqlx::query_as::<_, ClaimedDelivery>(
         "with due as ( \
            select d.id from webhook_deliveries d join webhook_events e on e.event_id=d.event_id \
-            where d.status = 'pending' and d.next_attempt_at <= now() \
+            where d.target_kind = 'app' and d.status = 'pending' and d.next_attempt_at <= now() \
               and (d.locked_until is null or d.locked_until <= now()) \
               and e.identity_migrated_at is null \
             order by d.next_attempt_at, d.created_at \

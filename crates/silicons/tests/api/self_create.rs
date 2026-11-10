@@ -24,7 +24,7 @@ async fn self_create_by_cid_makes_a_pending_silicon_with_a_request() {
             "display_name": "  Scout  ",
             "custodian": custodian_id.to_uppercase(),
             "timezone": "asia/kolkata",
-            "webhook_url": "http://127.0.0.1:8593/hooks/scout",
+            "ting_session_id": "recv_11111111111111111111111111111111",
         }),
     )
     .await;
@@ -45,7 +45,7 @@ async fn self_create_by_cid_makes_a_pending_silicon_with_a_request() {
     assert_eq!(silicon["display_name"], "Scout");
     assert_eq!(silicon["timezone"], "Asia/Kolkata");
     assert_eq!(silicon["custodian"], serde_json::Value::Null);
-    assert_eq!(silicon["webhook_url"], "http://127.0.0.1:8593/hooks/scout");
+    assert!(silicon["webhook_url"].is_null());
     assert_eq!(
         silicon["dob"],
         accounts_core::timefmt::format_date(time::OffsetDateTime::now_utc().date())
@@ -82,12 +82,7 @@ async fn self_create_by_cid_makes_a_pending_silicon_with_a_request() {
             .expect("token")
             .starts_with("sarq_")
     );
-    assert!(
-        body["webhook_secret"]
-            .as_str()
-            .expect("secret")
-            .starts_with("whsec_")
-    );
+    assert!(body["webhook_secret"].is_null());
 
     // Stored state: request addressed by uuid, token stored only as a hash.
     let (status, kind, to_uuid, to_email, _) = request_row(&ctx, request_id).await;
@@ -128,7 +123,7 @@ async fn self_create_by_cid_makes_a_pending_silicon_with_a_request() {
     assert_eq!(payload["data"]["silicon"]["id"], id);
     assert_eq!(
         delivery_urls(&ctx, &uuid, "silicon.created").await,
-        vec!["http://127.0.0.1:8593/hooks/scout".to_string()]
+        Vec::<String>::new()
     );
 
     // The custodian was emailed at their primary email, naming the Silicon by its si:id only
@@ -482,8 +477,8 @@ async fn self_create_is_idempotent_and_never_stores_the_chosen_stk_in_clear() {
 async fn generated_secrets_are_replayed_but_never_stored_in_clear() {
     let ctx = TestContext::new().await;
     let saket = ctx.carbon().await;
-    let body = json!({"id": silicon_id("sealed"), "display_name": "Sealed", "custodian": saket.handle,
-                      "webhook_url": "http://127.0.0.1:8593/hooks/sealed"});
+    let body =
+        json!({"id": silicon_id("sealed"), "display_name": "Sealed", "custodian": saket.handle});
     let req = || {
         Req::post("/v1/silicons")
             .header("idempotency-key", "self-create-sealed")
@@ -491,7 +486,7 @@ async fn generated_secrets_are_replayed_but_never_stored_in_clear() {
     };
     let first = call(&ctx, req()).await;
     assert_eq!(first.status, 201, "{}", first.json);
-    let secrets: Vec<String> = ["stk", "request_token", "webhook_secret"]
+    let secrets: Vec<String> = ["stk", "request_token"]
         .iter()
         .map(|k| first.json[k].as_str().expect("secret").to_string())
         .collect();

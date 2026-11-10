@@ -140,7 +140,7 @@ impl FlowApp {
                 || self.config.flow.is_some())
     }
 
-    /// A first-party app (`silicon-accounts`, `developer`): no details pages, no membership.
+    /// A first-party app (`silicon-accounts`, `developer`): no details pages or consent-managed membership.
     pub fn first_party(&self) -> bool {
         self.app.is_first_party()
     }

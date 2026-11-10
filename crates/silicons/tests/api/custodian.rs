@@ -16,7 +16,7 @@ async fn a_carbon_creates_an_active_silicon_and_is_its_custodian() {
     let r = call(
         &ctx,
         Req::post("/v1/me/silicons").bearer(&t).json(json!({
-            "id": id, "display_name": "Made", "webhook_url": "http://127.0.0.1:8593/hooks/made",
+            "id": id, "display_name": "Made",
         })),
     )
     .await;
@@ -36,12 +36,7 @@ async fn a_carbon_creates_an_active_silicon_and_is_its_custodian() {
     );
     let stk = r.json["stk"].as_str().expect("generated");
     assert!(stk.starts_with("stk-") && stk.len() == 16);
-    assert!(
-        r.json["webhook_secret"]
-            .as_str()
-            .expect("secret")
-            .starts_with("whsec_")
-    );
+    assert!(r.json["webhook_secret"].is_null());
     let uuid = silicon["uuid"].as_str().expect("uuid");
 
     // It signs in right away with the STK it was given.
@@ -212,14 +207,6 @@ async fn update_tells_member_apps_and_the_silicon() {
     let saket = ctx.carbon().await;
     let t = token(&ctx, &saket).await;
     let (silicon, _) = ctx.silicon(&saket.uuid).await;
-    let set = call(
-        &ctx,
-        Req::put(&format!("/v1/me/silicons/{}/webhook", silicon.uuid))
-            .bearer(&t)
-            .json(json!({"url": "http://127.0.0.1:8593/hooks/upd"})),
-    )
-    .await;
-    assert_eq!(set.status, 200, "{}", set.json);
     let (sees_tz, _) = ctx.app("seestz").await;
     let (profile_only, _) = ctx.app("profile").await;
     ctx.set_app_webhook(&sees_tz.app_id, "http://127.0.0.1:8593/seestz/webhooks")
@@ -345,14 +332,6 @@ async fn id_change_reserves_the_old_id_and_notifies() {
     let t = token(&ctx, &saket).await;
     let (silicon, _) = ctx.silicon(&saket.uuid).await;
     let old = silicon.handle.clone().expect("id");
-    let set = call(
-        &ctx,
-        Req::put(&format!("/v1/me/silicons/{}/webhook", silicon.uuid))
-            .bearer(&t)
-            .json(json!({"url": "http://127.0.0.1:8593/hooks/idc"})),
-    )
-    .await;
-    assert_eq!(set.status, 200);
     let (app, _) = ctx.app("member").await;
     ctx.set_app_webhook(&app.app_id, "http://127.0.0.1:8593/member/webhooks")
         .await;
@@ -423,63 +402,12 @@ async fn id_change_reserves_the_old_id_and_notifies() {
 }
 
 #[tokio::test]
-async fn custodian_manages_the_silicon_webhook() {
-    let ctx = TestContext::new().await;
-    let saket = ctx.carbon().await;
-    let t = token(&ctx, &saket).await;
-    let (silicon, _) = ctx.silicon(&saket.uuid).await;
-    let r = call(
-        &ctx,
-        Req::put(&format!("/v1/me/silicons/{}/webhook", silicon.uuid))
-            .bearer(&t)
-            .json(json!({"url": "http://127.0.0.1:8593/hooks/c"})),
-    )
-    .await;
-    assert_eq!(r.status, 200, "{}", r.json);
-    assert!(
-        r.json["webhook_secret"]
-            .as_str()
-            .expect("s")
-            .starts_with("whsec_")
-    );
-    let shown = call(
-        &ctx,
-        Req::get(&format!("/v1/me/silicons/{}", silicon.uuid)).bearer(&t),
-    )
-    .await;
-    assert_eq!(shown.json["webhook_url"], "http://127.0.0.1:8593/hooks/c");
-    let r = call(
-        &ctx,
-        Req::delete(&format!("/v1/me/silicons/{}/webhook", silicon.uuid)).bearer(&t),
-    )
-    .await;
-    assert_eq!(r.status, 204);
-    assert_eq!(account(&ctx, &silicon.uuid).await.webhook_url, None);
-    let r = call(
-        &ctx,
-        Req::put(&format!("/v1/me/silicons/{}/webhook", silicon.uuid))
-            .bearer(&t)
-            .json(json!({"url": "javascript:alert(1)"})),
-    )
-    .await;
-    assert_eq!(r.status, 422);
-}
-
-#[tokio::test]
 async fn stk_rotation_kills_the_old_stk_and_every_session() {
     let ctx = TestContext::new().await;
     let saket = ctx.carbon().await;
     let t = token(&ctx, &saket).await;
     let (silicon, old_stk) = ctx.silicon(&saket.uuid).await;
     let id = silicon.handle.clone().expect("id");
-    let set = call(
-        &ctx,
-        Req::put(&format!("/v1/me/silicons/{}/webhook", silicon.uuid))
-            .bearer(&t)
-            .json(json!({"url": "http://127.0.0.1:8593/hooks/rot"})),
-    )
-    .await;
-    assert_eq!(set.status, 200);
     // Signed into two apps (one with a webhook) and the first-party app.
     let (remind, _) = ctx.app("remind").await;
     let (quiet, _) = ctx.app("quiet").await;
@@ -670,8 +598,7 @@ async fn created_and_rotated_stks_are_replayed_but_never_stored_in_clear() {
     let t = token(&ctx, &saket).await;
 
     // POST /v1/me/silicons: a generated STK and a webhook secret.
-    let body = json!({"id": silicon_id("sealed"), "display_name": "Sealed",
-                      "webhook_url": "http://127.0.0.1:8593/hooks/sealed"});
+    let body = json!({"id": silicon_id("sealed"), "display_name": "Sealed"});
     let create = || {
         Req::post("/v1/me/silicons")
             .bearer(&t)
@@ -681,12 +608,7 @@ async fn created_and_rotated_stks_are_replayed_but_never_stored_in_clear() {
     let first = call(&ctx, create()).await;
     assert_eq!(first.status, 201, "{}", first.json);
     let stored = stored_idempotent_response(&ctx, "create-sealed").await;
-    for needle in [
-        first.json["stk"].as_str().expect("stk"),
-        first.json["webhook_secret"].as_str().expect("secret"),
-        "stk-",
-        "whsec_",
-    ] {
+    for needle in [first.json["stk"].as_str().expect("stk"), "stk-", "whsec_"] {
         assert!(
             !stored.contains(needle),
             "{needle} is stored in clear: {stored}"

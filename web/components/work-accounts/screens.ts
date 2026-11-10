@@ -8,7 +8,7 @@ const choices = [
     ...carbonSummary,
     uuid: "wrk",
     id: "c:alex.studio",
-    org,
+    org: { ...org, logo_url: "/icon-192.png" },
     is_main: false,
     allowed: true,
     reason: null,

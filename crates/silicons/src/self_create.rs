@@ -69,6 +69,8 @@ pub struct SelfCreateBody {
     pub custodian: String,
     #[serde(default)]
     pub webhook_url: Option<String>,
+    #[serde(default)]
+    pub ting_session_id: Option<String>,
 }
 
 /// The request as hashed for Idempotency-Key matching. A chosen STK is replaced by a keyed hash:
@@ -107,6 +109,9 @@ async fn self_create(
     body: SelfCreateBody,
 ) -> ApiResult<(StatusCode, Value)> {
     let settings = &state.settings;
+    if let Some(id) = &body.ting_session_id {
+        accounts_core::ting::validate_session(id)?;
+    }
     let id = input::silicon_id(&body.id)?;
     let mut fields = FieldErrors::new();
     let display_name = check(
@@ -239,6 +244,16 @@ async fn self_create(
         },
     )
     .await?;
+    if let Some(session_id) = &body.ting_session_id {
+        sqlx::query(
+            "insert into silicon_ting_requests(request_id,session_id,generation) values($1,$2,$3)",
+        )
+        .bind(request.id)
+        .bind(session_id)
+        .bind(uuid::Uuid::new_v4())
+        .execute(&mut *tx)
+        .await?;
+    }
     let info = views::request_info(&mut tx, &request).await?;
     notify::silicon_created(&mut tx, &silicon, Some(&info)).await?;
     let mail =
@@ -343,7 +358,7 @@ async fn ensure_custodian_has_room(
 }
 
 /// The `sarq_` token from `Authorization: Bearer …`.
-fn request_token(headers: &HeaderMap) -> ApiResult<String> {
+pub(crate) fn request_token(headers: &HeaderMap) -> ApiResult<String> {
     let missing = || {
         ApiError::unauthenticated(
             "request_token_required",

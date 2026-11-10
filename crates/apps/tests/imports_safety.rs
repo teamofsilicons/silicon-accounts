@@ -437,12 +437,13 @@ async fn a_dry_run_is_not_an_account_lookup() {
             .contains(&target.uuid),
         "{out:?}"
     );
-    let members: i64 =
-        sqlx::query_scalar("select count(*) from memberships where account_uuid = $1")
-            .bind(&target.uuid)
-            .fetch_one(&ctx.state.db)
-            .await
-            .expect("count");
+    let members: i64 = sqlx::query_scalar(
+        "select count(*) from memberships where account_uuid = $1 and app_id <> 'silicon-accounts'",
+    )
+    .bind(&target.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("count");
     assert_eq!(members, 0, "a dry run writes nothing");
 }
 

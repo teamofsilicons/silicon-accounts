@@ -56,6 +56,10 @@ fn authorize_interface_service(state: &AppState, headers: &HeaderMap) -> ApiResu
 pub(crate) fn router() -> Router<AppState> {
     Router::new()
         .route("/v1/internal/interfaces/sync", post(sync))
+        .route(
+            "/v1/internal/interfaces/sync/reconcile",
+            post(reconcile_cell_link_sync),
+        )
         .route("/v1/internal/interfaces/sync/ack", post(ack_sync))
         .route(
             "/v1/internal/interfaces/eligibility/{uuid}",
@@ -143,6 +147,10 @@ struct Sync {
     app_ids: Vec<String>,
     redirect_uris: Vec<String>,
     allowed_origins: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cell_broker: Option<CellBroker>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    cell_broker_cleanup: bool,
     branding: Value,
     #[serde(default = "empty_object")]
     signin_config: Value,
@@ -150,6 +158,23 @@ struct Sync {
     active: bool,
     #[serde(default)]
     rotate_secret: bool,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct CellBroker {
+    cell_id: String,
+    callback_url: String,
+    generation: i64,
+    #[serde(default = "broker_active")]
+    active: bool,
+}
+
+fn broker_active() -> bool {
+    true
+}
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 fn empty_object() -> Value {
@@ -234,6 +259,29 @@ fn validate(input: &Sync) -> ApiResult<()> {
     for origin in &input.allowed_origins {
         validate_interface_url(origin, true).map_err(ApiError::invalid_request)?;
     }
+    if let Some(broker) = &input.cell_broker {
+        if broker.generation <= 0
+            || broker.cell_id.is_empty()
+            || broker.cell_id.len() > 100
+            || !broker
+                .cell_id
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        {
+            return Err(ApiError::invalid_request(
+                "Invalid current Cell broker binding.",
+            ));
+        }
+        validate_interface_url(&broker.callback_url, false).map_err(ApiError::invalid_request)?;
+        let callback = url::Url::parse(&broker.callback_url)
+            .map_err(|_| ApiError::invalid_request("Invalid Cell callback."))?;
+        if callback.path() != "/interface-auth/callback"
+            || callback.query().is_some()
+            || callback.fragment().is_some()
+        {
+            return Err(ApiError::invalid_request("Invalid Cell callback."));
+        }
+    }
     if input
         .signin_config
         .get("public_client")
@@ -306,13 +354,32 @@ async fn sync(
     authorize_interface_service(&state, &headers)?;
     validate(&input)?;
     let mut tx = state.db.begin().await?;
-    active_account(&mut tx, &input.actor_uuid).await?;
+    if !input.cell_broker_cleanup {
+        active_account(&mut tx, &input.actor_uuid).await?;
+    }
     sqlx::query("select pg_advisory_xact_lock(hashtextextended($1,0))")
         .bind(format!("interface-sync:{}", input.interface_id))
         .execute(&mut *tx)
         .await?;
     let hash = idempotency::request_hash(&input);
     let scope = format!("interface-sync:{}", input.interface_id);
+    let cancelled: Option<Vec<u8>> = sqlx::query_scalar(
+        "select request_hash from interface_sync_cancellations where interface_id=$1 and key=$2",
+    )
+    .bind(&input.interface_id)
+    .bind(key.as_str())
+    .fetch_optional(&mut *tx)
+    .await?;
+    if let Some(previous) = cancelled {
+        return Err(ApiError::conflict(
+            if previous == hash {
+                "interface_sync_cancelled"
+            } else {
+                "idempotency_key_reused"
+            },
+            "This interface sync cannot be applied.",
+        ));
+    }
     let prior: Option<(Vec<u8>, Value)> = sqlx::query_as("select request_hash,sealed_response from interface_sync_operations where interface_id=$1 and key=$2")
         .bind(&input.interface_id).bind(key.as_str()).fetch_optional(&mut *tx).await?;
     if let Some((stored_hash, sealed)) = prior {
@@ -326,16 +393,66 @@ async fn sync(
         tx.commit().await?;
         return Ok(no_store(StatusCode::OK, body));
     }
-    let old: Option<(String,i64,String,Vec<String>)> = sqlx::query_as("select owner_uuid,revision,kind,app_ids from interface_auth_clients where interface_id=$1 for update")
+    let old: Option<(String,i64,String,Vec<String>,Option<Value>)> = sqlx::query_as("select owner_uuid,revision,kind,app_ids,cell_broker from interface_auth_clients where interface_id=$1 for update")
         .bind(&input.interface_id).fetch_optional(&mut *tx).await?;
     if old
         .as_ref()
-        .is_some_and(|(_, revision, _, _)| input.revision <= *revision)
+        .is_some_and(|(_, revision, _, _, _)| input.revision <= *revision)
     {
         return Err(ApiError::conflict(
             "interface_revision_conflict",
             "This interface revision is stale or already applied.",
         ));
+    }
+    if input.cell_broker_cleanup {
+        let Some((_, _, _, _, previous)) = &old else {
+            return Err(ApiError::forbidden(
+                "invalid_cell_broker_cleanup",
+                "No current broker can be unlinked.",
+            ));
+        };
+        let previous: Option<CellBroker> = previous
+            .clone()
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|_| ApiError::internal("Invalid prior Cell broker."))?;
+        let next = input.cell_broker.as_ref().ok_or_else(|| {
+            ApiError::forbidden("invalid_cell_broker_cleanup", "A tombstone is required.")
+        })?;
+        let valid_transition = !next.active
+            && match previous {
+                Some(previous) => {
+                    previous.active
+                        && next.cell_id == previous.cell_id
+                        && next.callback_url == previous.callback_url
+                        && previous.generation.checked_add(1) == Some(next.generation)
+                }
+                None => next.generation > 1,
+            };
+        let unchanged: bool = sqlx::query_scalar("select name=$2 and logo_url is not distinct from $3 and kind=$4 and app_ids=$5 and array_remove(redirect_uris,$6)=$7 and allowed_origins=$8 and branding=$9 and signin_config=$10 and app_descriptions=$11 and active=$12 from interface_auth_clients where interface_id=$1")
+            .bind(&input.interface_id).bind(&input.name).bind(&input.logo_url).bind(&input.kind).bind(&input.app_ids)
+            .bind(&next.callback_url).bind(&input.redirect_uris).bind(&input.allowed_origins).bind(&input.branding).bind(&input.signin_config)
+            .bind(&input.app_descriptions).bind(input.active).fetch_one(&mut *tx).await?;
+        if !valid_transition || !unchanged || input.rotate_secret {
+            return Err(ApiError::forbidden(
+                "invalid_cell_broker_cleanup",
+                "Only the current Cell broker can be unlinked.",
+            ));
+        }
+    } else {
+        if input
+            .cell_broker
+            .as_ref()
+            .is_some_and(|broker| !broker.active)
+            && old
+                .as_ref()
+                .is_none_or(|(_, _, _, _, previous)| previous.is_none())
+        {
+            return Err(ApiError::forbidden(
+                "invalid_cell_broker_cleanup",
+                "Use authenticated Cell cleanup to create a tombstone.",
+            ));
+        }
     }
     let rank = |kind: &str| match kind {
         "trusted" => 2,
@@ -344,7 +461,7 @@ async fn sync(
     };
     if old
         .as_ref()
-        .map_or(true, |(_, _, kind, _)| rank(&input.kind) > rank(kind))
+        .map_or(true, |(_, _, kind, _, _)| rank(&input.kind) > rank(kind))
     {
         let allowed: Option<(bool, bool)> = sqlx::query_as(
             "select verified,trusted from interface_creator_eligibility where account_uuid=$1",
@@ -360,15 +477,53 @@ async fn sync(
             ));
         }
     }
-    for app_id in &input.app_ids {
-        apps::require_active(&mut tx, app_id).await?;
+    if let Some((_, _, _, _, Some(previous))) = &old {
+        let previous: CellBroker = serde_json::from_value(previous.clone())
+            .map_err(|_| ApiError::internal("Invalid prior Cell broker."))?;
+        let next = input.cell_broker.as_ref().ok_or_else(|| {
+            ApiError::conflict(
+                "cell_broker_stale",
+                "A Cell broker binding cannot be silently discarded.",
+            )
+        })?;
+        if next.generation < previous.generation
+            || (next.generation == previous.generation && *next != previous)
+        {
+            return Err(ApiError::conflict(
+                "cell_broker_stale",
+                "This Cell broker selection is stale.",
+            ));
+        }
+        if previous.active && !next.active && !input.cell_broker_cleanup {
+            return Err(ApiError::forbidden(
+                "invalid_cell_broker_cleanup",
+                "Use authenticated Cell cleanup to unlink a broker.",
+            ));
+        }
+    }
+    if !input.cell_broker_cleanup {
+        for app_id in &input.app_ids {
+            apps::require_active(&mut tx, app_id).await?;
+        }
     }
     let make_secret = old.is_none() || input.rotate_secret;
     let secret = make_secret.then(|| crypto::random_token("sif_secret_"));
     let secret_hash = secret.as_ref().map(|s| state.keys.pepper.hash(s));
     sqlx::query("insert into interface_auth_clients(interface_id,owner_uuid,revision,kind,name,logo_url,app_ids,redirect_uris,allowed_origins,branding,signin_config,app_descriptions,active,secret_hash) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,coalesce($14,(select secret_hash from interface_auth_clients where interface_id=$1))) on conflict(interface_id) do update set revision=excluded.revision,kind=excluded.kind,name=excluded.name,logo_url=excluded.logo_url,app_ids=excluded.app_ids,redirect_uris=excluded.redirect_uris,allowed_origins=excluded.allowed_origins,branding=excluded.branding,signin_config=excluded.signin_config,app_descriptions=excluded.app_descriptions,active=excluded.active,secret_hash=coalesce($14,interface_auth_clients.secret_hash),updated_at=now()")
         .bind(&input.interface_id).bind(&input.actor_uuid).bind(input.revision).bind(&input.kind).bind(&input.name).bind(&input.logo_url).bind(&input.app_ids).bind(&input.redirect_uris).bind(&input.allowed_origins).bind(&input.branding).bind(&input.signin_config).bind(&input.app_descriptions).bind(input.active).bind(&secret_hash).execute(&mut *tx).await?;
-    if let Some((_, _, previous_kind, previous_apps)) = &old {
+    sqlx::query("update interface_auth_clients set cell_broker=$2 where interface_id=$1")
+        .bind(&input.interface_id)
+        .bind(
+            input
+                .cell_broker
+                .as_ref()
+                .map(serde_json::to_value)
+                .transpose()
+                .map_err(|_| ApiError::internal("Invalid Cell broker."))?,
+        )
+        .execute(&mut *tx)
+        .await?;
+    if let Some((_, _, previous_kind, previous_apps, _)) = &old {
         let removed: Vec<String> = previous_apps
             .iter()
             .filter(|id| !input.app_ids.contains(id))
@@ -403,6 +558,94 @@ async fn sync(
     }).await?;
     tx.commit().await?;
     Ok(no_store(StatusCode::OK, body))
+}
+
+/// Fence a specific uncertain Cell-link sync before the registry recovers it.
+/// The same per-interface lock serializes this result with every normal sync.
+async fn reconcile_cell_link_sync(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    key: IdempotencyKey,
+    Json(input): Json<Sync>,
+) -> ApiResult<Response> {
+    authorize_interface_service(&state, &headers)?;
+    validate(&input)?;
+    if input.revision <= 1
+        || input.rotate_secret
+        || input.cell_broker_cleanup
+        || input
+            .cell_broker
+            .as_ref()
+            .is_none_or(|broker| !broker.active)
+    {
+        return Err(ApiError::forbidden(
+            "invalid_cell_link_reconciliation",
+            "Only an exact Cell-link sync may be reconciled.",
+        ));
+    }
+    let mut tx = state.db.begin().await?;
+    sqlx::query("select pg_advisory_xact_lock(hashtextextended($1,0))")
+        .bind(format!("interface-sync:{}", input.interface_id))
+        .execute(&mut *tx)
+        .await?;
+    let hash = idempotency::request_hash(&input);
+    let prior: Option<Vec<u8>> = sqlx::query_scalar(
+        "select request_hash from interface_sync_operations where interface_id=$1 and key=$2",
+    )
+    .bind(&input.interface_id)
+    .bind(key.as_str())
+    .fetch_optional(&mut *tx)
+    .await?;
+    let cancelled: Option<Vec<u8>> = sqlx::query_scalar(
+        "select request_hash from interface_sync_cancellations where interface_id=$1 and key=$2",
+    )
+    .bind(&input.interface_id)
+    .bind(key.as_str())
+    .fetch_optional(&mut *tx)
+    .await?;
+    if prior.is_some() && cancelled.is_some() {
+        return Err(ApiError::internal(
+            "Conflicting interface sync recovery state.",
+        ));
+    }
+    let status = if let Some(previous) = prior {
+        if previous != hash {
+            return Err(ApiError::conflict(
+                "idempotency_key_reused",
+                "The sync operation does not match.",
+            ));
+        }
+        "committed"
+    } else if let Some(previous) = cancelled {
+        if previous != hash {
+            return Err(ApiError::conflict(
+                "idempotency_key_reused",
+                "The sync cancellation does not match.",
+            ));
+        }
+        "cancelled"
+    } else {
+        let exists: bool = sqlx::query_scalar(
+            "select exists(select 1 from interface_auth_clients where interface_id=$1)",
+        )
+        .bind(&input.interface_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if !exists {
+            return Err(ApiError::not_found(
+                "interface_not_found",
+                "The interface was not found.",
+            ));
+        }
+        sqlx::query("insert into interface_sync_cancellations(interface_id,key,request_hash) values($1,$2,$3)")
+            .bind(&input.interface_id).bind(key.as_str()).bind(hash).execute(&mut *tx).await?;
+        "cancelled"
+    };
+    tx.commit().await?;
+    Ok(no_store(
+        StatusCode::OK,
+        json!({"status":status,"revision":input.revision}),
+    ))
 }
 
 #[derive(Deserialize)]

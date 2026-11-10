@@ -216,6 +216,23 @@ impl AccountsClient {
         .await
     }
 
+    /// Bind/rebind a pending creation's minimal Ting hints using its private request token.
+    pub async fn silicon_request_ting_session(
+        &self,
+        request_id: &str,
+        request_token: &str,
+        session_id: &str,
+    ) -> Result<serde_json::Value> {
+        self.send_json(
+            Method::PUT,
+            self.endpoint(&["v1", "silicons", "requests", request_id, "ting-session"]),
+            Auth::Bearer(request_token),
+            &serde_json::json!({"session_id":session_id}),
+            None,
+        )
+        .await
+    }
+
     /// `GET /v1/silicons/requests/{id}`: the status of a self-created Silicon's custodian
     /// request, authenticated with the `sarq_…` request token.
     pub async fn silicon_request_status(

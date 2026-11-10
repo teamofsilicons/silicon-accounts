@@ -34,6 +34,9 @@ pub struct SiliconSelfCreate {
     /// Webhook endpoint for notifications about this account.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub webhook_url: Option<String>,
+    /// Live anonymous Ting receiver for minimal custodian-request change hints.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ting_session_id: Option<String>,
 }
 
 /// Response of a Silicon self-create. Store `stk` and `webhook_secret` now: they are

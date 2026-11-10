@@ -1,0 +1,29 @@
+{
+  "revision": "124a84fcf674aa206d2619a6ed1c3c1d2d5e1cce",
+  "baseline": "accounts-broker-4dea1b8e6891-cdb70f7a16cc-41b12571faf8",
+  "bucket": "silicon-accounts-production-backups-zgctnskyqqre",
+  "files": {
+    "0037_automatic_accounts_membership.sql": "fbed0c37b5af20dfba28bac0ed3c3d9cd3581a68e15b6ce57f62c1e00c7e4e94",
+    "accounts-migrate": "77691f366a7040b2a161e48cceedb4ed78f1bb126141fa8f128a98e15af4bde8"
+  },
+  "release": "accounts-registration-124a84fcf674-77691f366a70",
+  "backup_key": "backups/predeploy-registration-20261106T163436Z.dump",
+  "backup_sha256": "592df5b954d20c76dc2cad1040e9e38994d6bd867e3d2bc3347d01824e331e2a",
+  "unchanged_runtime_tree_sha256": "38a1b381cfefea03da75b740b9f7fca49c4f20652a7b0a1f911b09ce9239d4d9",
+  "migration_version": 37,
+  "verified_at": "2026-11-06T16:34:39.380284+00:00",
+  "counts": [
+    "carbon|active|10|10",
+    "silicon|active|11|11",
+    "silicon|deleted|1|0"
+  ],
+  "future_creation_probe": "passed; transaction rolled back",
+  "services_restarted": false,
+  "ssm_command_id": "90622755-7ac5-49a2-908e-f544ef9d4d8d",
+  "instance_id": "i-05f96f7a17449a2e0",
+  "tests_passed": 348,
+  "api_revision": "4dea1b8e689138028de2a4488a6e76f8eb672f4e",
+  "api_sha256": "cdb70f7a16ccdf73b607628ac082e9be259aca8aae5e59271d7eea02d19788b9",
+  "pull_request": "https://github.com/teamofsilicons/silicon-accounts/pull/19",
+  "deployment_script_sha256": "1d9ebb00dd4bd94836fe97d1b6486822c0f6b65a8f3c1ed0433a3e988daf2739"
+}

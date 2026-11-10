@@ -69,7 +69,7 @@ export function IdChangeForm({ prefix, currentId, uuid, subject, submit, onChang
           : <>Pick an id Carbons and Silicons can type. </>}
         {subject === "self"
           ? <>Every app you have signed into is told. Apps know you by your uuid <span className="mono">{uuid}</span>, which never changes.</>
-          : <>Its webhook and every app it has signed into are told. Apps know it by its uuid <span className="mono">{uuid}</span>, which never changes.</>}
+          : <>It is notified through Ting, and every app it has signed into is told. Apps know it by its uuid <span className="mono">{uuid}</span>, which never changes.</>}
       </p>
       <IdField
         prefix={prefix}

@@ -13,6 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 silicon-accounts-core.workspace = true
+silicon-accounts-proofs.workspace = true
 axum.workspace = true
 serde.workspace = true
 serde_json.workspace = true

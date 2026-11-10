@@ -531,6 +531,18 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
                 "webhook_secret": null
             }),
         ),
+        ("PUT", "/v1/silicons/requests/req-1/ting-session")
+            if auth.as_deref() == Some("Bearer sarq_poll") =>
+        {
+            (
+                200,
+                json!({"request_id":"req-1","session_id":json_body["session_id"],"channel":"ting"}),
+            )
+        }
+        ("POST", "/v1/me/notifications/ting") if silicon_bearer => (
+            200,
+            json!({"enabled":true,"channel":"ting","app_id":"silicon-accounts","account_uuid":SILICON_UUID,"subscription_id":"sub-1"}),
+        ),
         ("GET", "/v1/silicons/requests/req-1") if auth.as_deref() == Some("Bearer sarq_poll") => {
             st.request_polls += 1;
             let status = if st.request_polls >= st.accept_on_poll {

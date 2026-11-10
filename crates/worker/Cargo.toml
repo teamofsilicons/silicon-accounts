@@ -13,6 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 silicon-accounts-core.workspace = true
+silicon-accounts-proofs.workspace = true
 axum.workspace = true
 futures.workspace = true
 reqwest.workspace = true
@@ -26,6 +27,7 @@ url.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+silicon-accounts-silicons.workspace = true
 silicon-accounts-core = { workspace = true, features = ["test-support"] }
 async-trait.workspace = true
 axum.workspace = true

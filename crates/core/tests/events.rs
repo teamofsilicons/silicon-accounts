@@ -154,7 +154,7 @@ async fn account_updated_respects_each_apps_scopes() {
 }
 
 #[tokio::test]
-async fn silicon_webhooks_and_custodian_changes() {
+async fn silicon_tings_and_custodian_changes() {
     let ctx = TestContext::new().await;
     let old = ctx.carbon().await;
     let new = ctx.carbon().await;
@@ -193,7 +193,7 @@ async fn silicon_webhooks_and_custodian_changes() {
     let kinds: Vec<&str> = emitted.iter().map(|e| e.event_type.as_str()).collect();
     assert!(
         kinds.contains(&types::SILICON_CUSTODIAN_CHANGED)
-            && kinds.contains(&types::SILICON_OWN_CUSTODIAN_CHANGED),
+            && !kinds.contains(&types::SILICON_OWN_CUSTODIAN_CHANGED),
         "{kinds:?}"
     );
     let own: Vec<(String, Value)> = sqlx::query_as(
@@ -243,7 +243,13 @@ async fn silicon_webhooks_and_custodian_changes() {
     let emitted = events::notify_profile_updated(&mut conn, &s, &[AccountField::Timezone])
         .await
         .expect("emit");
-    assert_eq!(emitted.len(), 2, "app + the Silicon itself");
+    assert_eq!(emitted.len(), 1, "only the app gets a webhook delivery");
+    let n: i64 = sqlx::query_scalar("select count(*) from silicon_tings where account_uuid=$1")
+        .bind(&s.uuid)
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
+    assert_eq!(n, 2, "custodian and profile changes use Ting");
     let (_, payload) = events_for(&ctx, &app.app_id).await.pop().expect("event");
     assert_eq!(payload["data"]["account"]["custodian"]["uuid"], old.uuid);
     assert_eq!(payload["data"]["account"]["timezone"], "UTC");
@@ -397,13 +403,7 @@ async fn a_custodians_new_id_reaches_its_silicons_apps() {
         .map(|e| (e.target_id.clone(), e.event_type.clone()))
         .collect();
     kinds.sort();
-    let mut expected = vec![
-        (briefcase.app_id.clone(), types::ACCOUNT_UPDATED.to_string()),
-        (
-            other_silicon.uuid.clone(),
-            types::SILICON_UPDATED.to_string(),
-        ),
-    ];
+    let mut expected = vec![(briefcase.app_id.clone(), types::ACCOUNT_UPDATED.to_string())];
     expected.sort();
     assert_eq!(
         kinds, expected,

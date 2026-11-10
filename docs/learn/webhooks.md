@@ -44,17 +44,11 @@ The receiver checked the signature with `dm`'s secret and answered `200`. From t
 - **Permission ends.** A sign-out, a removed access or a deleted account means your app may no longer act for the account. These events arrive as soon as it happens, and the tokens and User verification proofs involved have already stopped working ([How proofs work](proofs.md#what-a-user-verification-proof-stands-on)).
 - **A Silicon's custodian changes.** Apps that show who is responsible for a Silicon learn about transfers.
 
-## Two kinds of webhook
+## App webhooks and Silicon notifications
 
-| | app webhook | Silicon webhook |
-|---|---|---|
-| set by | the app (its credentials) or one of its authors, `PUT /v1/apps/{app_id}/webhook` | the Silicon (`PUT /v1/me/webhook`) or its custodian (`PUT /v1/me/silicons/{uuid}/webhook`), or at creation (`webhook_url`) |
-| about | every account with a live membership with the app | the Silicon's own account |
-| body | `"app_id": "<the app>"`, `"silicon": null` | `"app_id": null`, `"silicon": "<the Silicon's uuid>"` |
-| deliveries and replay | the app or one of its authors: `GET /v1/apps/{app_id}/webhook/deliveries`, `POST /v1/apps/{app_id}/webhook/replay` | the Silicon: `GET /v1/me/webhook/deliveries`, `POST /v1/me/webhook/replay`; its custodian: `GET /v1/me/silicons/{uuid}/webhook/deliveries`, `POST /v1/me/silicons/{uuid}/webhook/replay` |
-
-Both are signed the same way, follow the same retry rules and are listed and replayed the same way
-(see [Replay](#replay) for the two differences).
+Apps receive signed Accounts webhooks or their subscribed event streams. Silicons receive their own
+account notifications through [Ting](../start/silicon-notifications.md). The Silicon payload reference
+below describes the original envelope now carried inside Ting `data`.
 
 ## Who receives an app event
 
@@ -87,8 +81,8 @@ A sign-out (`membership.signed_out`) doesn't end the membership. The account is 
 | `event_id` | Unique per event and receiver. Every attempt and replay of it carries the same id (also in `X-Accounts-Event-Id`). Skip events you already handled by this id. |
 | `type` | The event type (also in `X-Accounts-Event-Type`). |
 | `occurred_at` | When the change happened at Silicon Accounts (RFC 3339, milliseconds, UTC), not when this attempt was sent. |
-| `app_id` | The receiving app, for app webhooks; `null` for Silicon webhooks. |
-| `silicon` | The receiving Silicon's uuid, for Silicon webhooks; `null` for app webhooks. |
+| `app_id` | The receiving app, for app webhooks; `null` for Silicon events inside Ting `data`. |
+| `silicon` | The receiving Silicon's uuid, for Silicon events inside Ting `data`; `null` for app webhooks. |
 | `data` | The event's data, below. |
 
 Don't depend on the order of keys (the body above arrives with sorted keys today), and ignore fields you don't know, because we can add new ones. Each delivery is a `POST` with `Content-Type: application/json`, `User-Agent: SiliconAccounts-Webhooks/1` and these headers:
@@ -114,7 +108,6 @@ The signature header is a comma-separated list of `v1=…` entries, and today it
 We generate the secret, show it once when it's made and store it encrypted.
 
 - **An app's webhook** follows one rule wherever you save it: in Silicon Accounts (`PUT /v1/apps/{app_id}/webhook`, `silicon-accounts app webhook set`, the developer platform's Webhooks tab, or moving the URL with `PATCH /v1/apps/{app_id}/subscriptions/{subscription_id}`) or in Silicon Apps (its `PUT /v1/apps/{app_id}/webhook`, `silicon-apps webhook APP set`, the publishing step on the developer platform). Saving the URL, the same one or another, keeps the secret (Silicon Accounts answers `"secret": null`). A new one is made, and shown once, only when none is stored: the first save, or the first after the webhook was removed. A secret you made with `POST …/webhook/generate-secret` before the URL existed is kept too. `"preserve_secret"` (true or false) is still accepted and changes nothing. Creating the webhook with `POST /v1/apps/{app_id}/subscriptions` (`"delivery": "webhook"`) is the exception: it always makes a new secret and shows it once. To replace the secret, rotate it: `POST …/webhook/rotate-secret` in Silicon Accounts (409 `webhook_not_set` when there is no URL) or `POST …/webhook/generate-secret` (even before a URL is set), which both answer `{"secret"}`, or `POST /v1/apps/{app_id}/webhook/rotate` in Silicon Apps, which answers `{"webhook_secret"}`.
-- **A Silicon's own webhook** (`PUT /v1/me/webhook`, `PUT /v1/me/silicons/{uuid}/webhook`): a new secret every time the URL is set, even to the same URL, with no way to keep it and no separate rotate endpoint.
 
 Both services write the same app webhook, so the last save wins. Whatever made it, a new secret signs everything from that moment, including retries and replays of older events, and the old one stops at once.
 
@@ -157,7 +150,7 @@ Some deliveries fail at once, because no retry could succeed: the app removed it
 
 ## Replay
 
-A failed delivery isn't lost. The app (or one of its authors) replays it with `POST /v1/apps/{app_id}/webhook/replay`, and a Silicon with `POST /v1/me/webhook/replay` (its custodian with `POST /v1/me/silicons/{uuid}/webhook/replay`). You name either delivery ids (up to 100, failed or already delivered) or a status (`{"status": "failed", "since": …}`: the oldest 100 per call, queued oldest first). They are still sent in parallel, so keep applying them by version or `occurred_at`. `GET …/webhook/deliveries` on the same paths lists the deliveries to choose from. A replay:
+A failed delivery isn't lost. The app (or one of its authors) replays it with `POST /v1/apps/{app_id}/webhook/replay`. You name either delivery ids (up to 100, failed or already delivered) or a status (`{"status": "failed", "since": …}`: the oldest 100 per call, queued oldest first). They are still sent in parallel, so keep applying them by version or `occurred_at`. `GET …/webhook/deliveries` on the same paths lists the deliveries to choose from. A replay:
 
 - keeps the `event_id` and the exact payload, so the receiver's duplicate check works;
 - goes to the receiver's **current** URL, signed with its **current** secret, so a moved endpoint or a rotated secret is no obstacle;
@@ -169,15 +162,13 @@ Events that tell the app the relationship ended can still be replayed: `membersh
 
 For example, in a local test we replayed Briefcase's failed deliveries after a Carbon removed its access. The response included the access-removal delivery and `"not_replayable": 1`, and the earlier account-update payload stayed hidden.
 
-A Silicon's webhook has no such rule. Every event on it is about the Silicon itself, so nothing is withheld from the Silicon or its custodian, and a delivery's detail always shows its whole `payload`. It has a different rule instead: **test pings are never replayed**. A Silicon may queue 10 test pings an hour, and only its newest one is retried, so the test can't be used to aim signed traffic at someone else's server. Replaying old pings would get around both limits. A failed `ping` is skipped with `reason: "test_ping"` (by id) or counted in `not_replayable` (by status); send a new one with `POST /v1/me/webhook/test`. In the local run, after a `silicon.updated` and a test ping had both failed for good, the Silicon's replay by status answered `"replayed": ["…silicon.updated delivery…"], "not_replayable": 1`, and the `silicon.updated` arrived again 0.8 seconds later with its original `event_id`.
-
 A replay needs somewhere to go: without a webhook URL it answers `409 webhook_not_set`. Deliveries that fall due while there is no URL fail at once and say why in `last_error`, so they are ready to replay once a URL is set again.
 
 ## Ordering
 
 Nothing guarantees that events arrive in the order they happened. Two real examples from the local runs:
 
-- A Silicon changed its display name, then its id, 18 ms apart. Its own webhook received `silicon.id_changed` (occurred 02:35:40.965) 11 ms **before** `silicon.updated` (occurred 02:35:40.947).
+- A Silicon changed its display name, then its id, 18 ms apart. Its legacy callback received (before the Ting migration) `silicon.id_changed` (occurred 02:35:40.965) 11 ms **before** `silicon.updated` (occurred 02:35:40.947).
 - A Carbon did the same at `briefcase`, and `account.id_changed` (occurred 02:37:49.326) arrived before `account.updated` (occurred 02:37:49.316).
 
 In both cases the update that arrived later still carries the **old** id (`data.account.id`, or `data.silicon.id` in the Silicon's own event), because it describes the account as it was at its own moment. A receiver that copies it blindly would undo the id change. Ways to stay correct, from simplest to cheapest:
@@ -229,61 +220,11 @@ silicon-accounts app subscription create webhook https://briefcase.example/webho
 silicon-accounts app subscription update <id> --pause
 ```
 
-## Streaming events
+## Streaming app events
 
-Webhooks need a public URL that answers within 10 seconds. A Silicon on a laptop, a script, or
-an app that would rather pull than be pushed can open the event stream instead.
-`GET /v1/events/stream` keeps one HTTP response open and writes each event as it happens, as
-[Server-Sent Events](../reference/api/webhooks.md#event-stream).
-
-```sh
-# an app: create a stream subscription once, then listen
-curl -s -X POST "$ACCOUNTS_URL/v1/apps/$APP_ID/subscriptions" -u "$APP_ID:$APP_SECRET" \
-  -H 'Content-Type: application/json' -d '{"delivery":"stream"}'
-curl -N "$ACCOUNTS_URL/v1/events/stream" -u "$APP_ID:$APP_SECRET"
-
-# a Silicon: its own events, with its access token
-curl -N "$ACCOUNTS_URL/v1/events/stream" -H "Authorization: Bearer $TOKEN"
-```
-
-Here is what a Silicon saw 0.4 seconds after its custodian renamed it (a local run):
-
-```
-retry: 5000
-: connected
-
-id: 01a11e46-8684-715b-b2ac-c80931069cf7
-event: silicon.updated
-data: {"app_id":null,"data":{"changed":["display_name"],"id":"si:streamer","silicon":{"…":"…"},"uuid":"4143123f-b494-481c-adbf-c14b14cfccc0"},"event_id":"01a11e46-8684-715b-b2ac-c80931069cf7","occurred_at":"2026-10-09T01:28:20.129Z","silicon":"4143123f-b494-481c-adbf-c14b14cfccc0","type":"silicon.updated"}
-
-: heartbeat
-```
-
-How the stream fits with webhooks:
-
-- **Same events, same bodies.** `data` is exactly what the webhook would POST, so parse it with
-  the same code. There is no signature, because the stream comes over your own authenticated
-  connection.
-- **Who gets what.** An app gets its stream subscription's events. A Silicon gets its own events,
-  without needing a webhook: its custodian's decision, changes to its account, an STK rotation.
-  A Carbon gets the events of the Silicons it is custodian of. A Silicon that created its own
-  account and is still waiting for its custodian can listen with its `sarq_` request token and
-  hear the decision the moment it is made.
-- **Resume, never miss.** Every event carries its `event_id` as the SSE `id`. Reconnect with
-  `Last-Event-ID` (browsers do this for you) and you get everything after it. As with webhooks,
-  delivery is at least once, so dedupe on `event_id`.
-- **Order.** Within one stream, events arrive in the order their changes were saved, which
-  webhooks can't promise. An event waits until every change saved before it has finished, so a
-  long-running change elsewhere can delay the stream by its own length.
-- **Liveness.** A `: heartbeat` comment comes after 15 seconds of quiet. Before we close a stream
-  you get `event: stream.closed` with a `reason`. Refresh your token for `token_expired`, and
-  reconnect with `Last-Event-ID` after `max_duration` (streams last an hour) or
-  `server_restarting`.
-- **Limits.** 5 open streams per app or account on each API server (the count is kept in each
-  server's memory, so with several servers the total can be higher), and each stream lasts at most
-  an hour. One stream carries the whole feed, so one is usually enough. Silicon Apps' own event
-  streams have other limits: 10 per token or session, 30 minutes each
-  ([Apps events](/docs/apps/reference/events)).
+Apps can register a stream subscription and authenticate to `GET /v1/events/stream` with their app credentials.
+Their stream retains resume cursors, filtering and revocation checks. Account, custodian and pending-request
+streams have been retired; use [Ting sessions](../start/silicon-notifications.md) for Silicon notifications.
 
 ## App events
 

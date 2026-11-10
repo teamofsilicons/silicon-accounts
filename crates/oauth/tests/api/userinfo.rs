@@ -331,7 +331,7 @@ async fn an_apps_token_reads_the_account_only_while_the_membership_is_active() {
     ctx.exec("update memberships set status = 'active'").await;
     assert_eq!(userinfo(&ctx, access).await.status, 200);
 
-    // First-party tokens have no membership and keep working.
+    // First-party tokens use automatic registration and keep working.
     let first_party = ctx.first_party_tokens(&carbon).await;
     assert_eq!(userinfo(&ctx, &first_party.access_token).await.status, 200);
 }

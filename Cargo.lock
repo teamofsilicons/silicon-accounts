@@ -2896,7 +2896,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-cli"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "assert_cmd",
  "axum",
@@ -3064,6 +3064,7 @@ dependencies = [
  "serde_json",
  "silicon-accounts-client",
  "silicon-accounts-core",
+ "silicon-accounts-proofs",
  "sqlx",
  "time",
  "tokio",
@@ -3082,6 +3083,8 @@ dependencies = [
  "serde",
  "serde_json",
  "silicon-accounts-core",
+ "silicon-accounts-proofs",
+ "silicon-accounts-silicons",
  "sqlx",
  "time",
  "tokio",

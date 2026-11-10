@@ -41,13 +41,10 @@ use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::common::{
-    ensure_id_free, lock_my_silicon, lock_own_account, my_silicon, set_silicon_webhook,
-};
-use crate::history::{Actor, custody, url_origin};
+use crate::common::{ensure_id_free, lock_my_silicon, lock_own_account, my_silicon};
+use crate::history::{Actor, custody};
 use crate::input::{self, CarbonTarget, check};
 use crate::notify;
-use crate::own_webhook::{WebhookBody, webhook_url};
 use crate::requests::{self, NewRequest, kind};
 use crate::self_create::idempotency_fingerprint;
 use crate::views::{self, SiliconItem};
@@ -479,58 +476,6 @@ pub async fn change_id(
     tx.commit().await?;
     let mut conn = state.db.acquire().await?;
     Ok(Json(views::silicon_item(&mut conn, &change.account).await?))
-}
-
-// ---- webhook --------------------------------------------------------------------------------
-
-/// `PUT /v1/me/silicons/{uuid}/webhook`.
-pub async fn set_webhook(
-    State(state): State<AppState>,
-    me: CarbonAuth,
-    meta: ClientMeta,
-    Path(key): Path<String>,
-    Json(body): Json<WebhookBody>,
-) -> Result<Json<Value>, ApiError> {
-    let url = webhook_url(&state, &body)?;
-    let mut tx = state.db.begin().await?;
-    let silicon = lock_my_silicon(&mut tx, me.uuid(), &key).await?;
-    let secret = set_silicon_webhook(&mut tx, &state, &silicon.uuid, &url).await?;
-    Actor::account(me.uuid(), meta.ip.as_deref())
-        .record_for(
-            &mut tx,
-            "silicon.webhook.set",
-            &[Some(&silicon.uuid), Some(me.uuid())],
-            &silicon.uuid,
-            json!({"url_origin": url_origin(&url), "by": "custodian"}),
-        )
-        .await?;
-    tx.commit().await?;
-    Ok(Json(json!({"webhook_url": url, "webhook_secret": secret})))
-}
-
-/// `DELETE /v1/me/silicons/{uuid}/webhook`.
-pub async fn remove_webhook(
-    State(state): State<AppState>,
-    me: CarbonAuth,
-    meta: ClientMeta,
-    Path(key): Path<String>,
-) -> Result<Response, ApiError> {
-    let mut tx = state.db.begin().await?;
-    let silicon = lock_my_silicon(&mut tx, me.uuid(), &key).await?;
-    if silicon.webhook_url.is_some() {
-        accounts::set_silicon_webhook(&mut tx, &silicon.uuid, None, None).await?;
-        Actor::account(me.uuid(), meta.ip.as_deref())
-            .record_for(
-                &mut tx,
-                "silicon.webhook.removed",
-                &[Some(&silicon.uuid), Some(me.uuid())],
-                &silicon.uuid,
-                json!({"by": "custodian"}),
-            )
-            .await?;
-    }
-    tx.commit().await?;
-    Ok(StatusCode::NO_CONTENT.into_response())
 }
 
 // ---- STK ------------------------------------------------------------------------------------

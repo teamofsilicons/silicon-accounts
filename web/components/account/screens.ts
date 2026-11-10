@@ -126,7 +126,7 @@ const shown: ScreenSpec[] = [
   } },
   { name: "account-silicons-drawer", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); } },
   { name: "account-silicons-drawer-stk", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); await drawerTo(page, "STK"); } },
-  { name: "account-silicons-drawer-webhook", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); await drawerTo(page, "Webhook"); } },
+  { name: "account-silicons-drawer-notifications", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); await page.locator(drawer).getByRole("heading", { name: "Notifications", exact: true }).evaluate(element => element.scrollIntoView({ block: "start" })); await wait(page, 600); } },
   { name: "account-silicons-drawer-transfer", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:head_of_growth"); await drawerTo(page, "Custodian"); } },
   { name: "account-silicons-drawer-delete", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); await drawerTo(page, "Delete this Silicon"); } },
   { name: "account-silicons-drawer-change-id", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:head_of_growth"); await click(page, "Change its id"); await wait(page, 600); await page.keyboard.type("scout"); await wait(page, 1300); } },

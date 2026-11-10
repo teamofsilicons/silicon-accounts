@@ -239,7 +239,7 @@
             "name": "require",
             "in": "query",
             "required": false,
-            "description": "Comma-separated capability names that must be supported, like `sse,subscriptions,webhooks`. Known names: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, llms_txt. Aliases are accepted too, such as `event_stream`, `event_streaming`, `events_stream`, `server_sent_events` and `streaming` for `sse`.",
+            "description": "Comma-separated capability names that must be supported, like `sse,subscriptions,webhooks`. Known names: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, silicon_tings, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, llms_txt. Aliases are accepted too, such as `event_stream`, `event_streaming`, `events_stream`, `server_sent_events` and `streaming` for `sse`.",
             "schema": {
               "type": "string"
             }
@@ -8444,7 +8444,7 @@
         ],
         "operationId": "selfCreateSilicon",
         "summary": "A Silicon creates its own account",
-        "description": "The Silicon names its custodian, who gets an email and has 14 days to accept. Until then the account is `pending_custodian` and can't sign in. Store `stk`, `request_token` and `webhook_secret` now: they are shown once. 10 successful self-creations per hour per IP (60 attempts); at most 20 waiting for the same Carbon.",
+        "description": "Create a pending Silicon; save the STK and private request token. Optionally attach a live anonymous Ting session for minimal request hints. The custodian has 14 days to accept.",
         "security": [],
         "parameters": [
           {
@@ -8605,7 +8605,7 @@
         ],
         "operationId": "getSiliconRequest",
         "summary": "The custodian's decision",
-        "description": "For the waiting Silicon. Poll it (5 seconds doubling to 60 is plenty), listen on `GET /v1/events/stream` with the same request token, or set a webhook and wait for `silicon.custodian.accepted`. After a decline or expiry the Silicon is released: `silicon.status` is deleted and its id is free again.",
+        "description": "Read the authoritative custodian decision with its private request token. Poll, or fetch after a hint from an attached anonymous Ting session.",
         "security": [
           {
             "requestToken": []
@@ -12339,8 +12339,8 @@
           "Webhooks"
         ],
         "operationId": "setMyWebhook",
-        "summary": "Set your webhook (Silicon)",
-        "description": "A new signing secret every time, shown once. The URL must be https and reach a public address.",
+        "summary": "Retired: use Silicon Ting",
+        "description": "Returns 410 silicon_notifications_moved. Enable account notifications with POST /v1/me/notifications/ting.",
         "security": [
           {
             "bearerAuth": []
@@ -12365,54 +12365,26 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "The webhook and its new secret.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SiliconWebhookSecret"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/SiliconOnly"
-          },
-          "413": {
-            "$ref": "#/components/responses/PayloadTooLarge"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
           }
-        }
+        },
+        "deprecated": true
       },
       "delete": {
         "tags": [
           "Webhooks"
         ],
         "operationId": "removeMyWebhook",
-        "summary": "Remove your webhook (Silicon)",
-        "description": "The Silicon stops getting events. A delivery that falls due while no URL is set fails at once; replay it after setting one.",
+        "summary": "Retired: use Silicon Ting",
+        "description": "Returns 410 silicon_notifications_moved. Enable account notifications with POST /v1/me/notifications/ting.",
         "security": [
           {
             "bearerAuth": []
@@ -12427,33 +12399,18 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Removed: no more events.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/SiliconOnly"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/v1/me/webhook/test": {
@@ -12462,8 +12419,8 @@
           "Webhooks"
         ],
         "operationId": "testMyWebhook",
-        "summary": "Send yourself a test ping (Silicon)",
-        "description": "Only the newest test ping is retried. 10 test pings per Silicon per hour.",
+        "summary": "Retired: use Silicon Ting",
+        "description": "Returns 410 silicon_notifications_moved. Enable account notifications with POST /v1/me/notifications/ting.",
         "security": [
           {
             "bearerAuth": []
@@ -12478,71 +12435,18 @@
           }
         ],
         "responses": {
-          "202": {
-            "description": "Queued.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SiliconWebhookTest"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/SiliconOnly"
-          },
-          "409": {
-            "description": "Conflict.\n\n- `webhook_not_set`: a test ping, secret rotation or replay without a webhook URL: set one first",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                },
-                "example": {
-                  "error": {
-                    "code": "webhook_not_set",
-                    "message": "The app 'briefcase' has no webhook URL, so there is nowhere to send events.",
-                    "hint": "Set one first with PUT /v1/apps/{app_id}/webhook {\"url\":\"https://...\"}."
-                  }
                 }
               }
-            },
-            "x-error-codes": [
-              "webhook_not_set"
-            ]
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
+            }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/v1/me/webhook/deliveries": {
@@ -12551,8 +12455,8 @@
           "Webhooks"
         ],
         "operationId": "listMyWebhookDeliveries",
-        "summary": "Your webhook's deliveries (Silicon)",
-        "description": "Newest first.",
+        "summary": "Retired: use Silicon Ting",
+        "description": "Returns 410 silicon_notifications_moved. Enable account notifications with POST /v1/me/notifications/ting.",
         "security": [
           {
             "bearerAuth": []
@@ -12587,55 +12491,18 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Deliveries.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
             "content": {
               "application/json": {
                 "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/Page"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "items": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/WebhookDelivery"
-                          }
-                        }
-                      }
-                    }
-                  ]
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/SiliconOnly"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/v1/me/webhook/deliveries/{id}": {
@@ -12644,8 +12511,8 @@
           "Webhooks"
         ],
         "operationId": "getMyWebhookDelivery",
-        "summary": "One delivery with its attempts (Silicon)",
-        "description": "Every attempt and the exact payload that was signed. Nothing is withheld: every event of a Silicon's webhook is about the Silicon.",
+        "summary": "Retired: use Silicon Ting",
+        "description": "Returns 410 silicon_notifications_moved. Enable account notifications with POST /v1/me/notifications/ting.",
         "security": [
           {
             "bearerAuth": []
@@ -12663,67 +12530,18 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "The delivery.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WebhookDeliveryDetail"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/SiliconOnly"
-          },
-          "404": {
-            "description": "Not found.\n\n- `delivery_not_found`: no such webhook delivery for this app, or for this Silicon (`/v1/me/webhook/deliveries…`)",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                },
-                "example": {
-                  "error": {
-                    "code": "delivery_not_found",
-                    "message": "No such webhook delivery for this app, or for this Silicon (/v1/me/webhook/deliveries…)."
-                  }
                 }
               }
-            },
-            "x-error-codes": [
-              "delivery_not_found"
-            ]
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
+            }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/v1/me/webhook/replay": {
@@ -12732,8 +12550,8 @@
           "Webhooks"
         ],
         "operationId": "replayMyWebhookDeliveries",
-        "summary": "Send deliveries again (Silicon)",
-        "description": "Each delivery goes back to pending with the same event_id and payload, to the current URL, signed with the current secret, with a fresh 72 hours of retries. With `status: failed`, call again (new Idempotency-Key) until `remaining` is 0. Test pings are never replayed (`test_ping`).",
+        "summary": "Retired: use Silicon Ting",
+        "description": "Returns 410 silicon_notifications_moved. Enable account notifications with POST /v1/me/notifications/ting.",
         "security": [
           {
             "bearerAuth": []
@@ -12761,80 +12579,18 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "What was replayed.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              },
-              "Idempotent-Replayed": {
-                "$ref": "#/components/headers/IdempotentReplayed"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReplayResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/SiliconOnly"
-          },
-          "409": {
-            "description": "Conflict.\n\n- `webhook_not_set`: a test ping, secret rotation or replay without a webhook URL: set one first\n- `idempotency_key_reused`: the key was used for a different body on this endpoint; use a new key for a new request\n- `idempotency_in_progress`: a request with this key is still running; retry in a few seconds\n- `idempotency_result_unavailable`: the stored secret-bearing result can no longer be decrypted, so it isn't run again; check the current state (e.g. list your Silicons) before retrying with a new key",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                },
-                "example": {
-                  "error": {
-                    "code": "webhook_not_set",
-                    "message": "The app 'briefcase' has no webhook URL, so there is nowhere to send events.",
-                    "hint": "Set one first with PUT /v1/apps/{app_id}/webhook {\"url\":\"https://...\"}."
-                  }
                 }
               }
-            },
-            "x-error-codes": [
-              "webhook_not_set",
-              "idempotency_key_reused",
-              "idempotency_in_progress",
-              "idempotency_result_unavailable"
-            ]
-          },
-          "413": {
-            "$ref": "#/components/responses/PayloadTooLarge"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
+            }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/v1/me/silicons/{uuid}/webhook": {
@@ -12843,8 +12599,8 @@
           "Webhooks"
         ],
         "operationId": "setSiliconWebhook",
-        "summary": "Set a Silicon's webhook (custodian)",
-        "description": "A new secret each time, shown once.",
+        "summary": "Retired: use Silicon Ting",
+        "description": "Returns 410 silicon_notifications_moved. Enable account notifications with POST /v1/me/notifications/ting.",
         "security": [
           {
             "bearerAuth": []
@@ -12872,81 +12628,26 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "The webhook and its new secret.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SiliconWebhookSecret"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/CarbonOnly"
-          },
-          "404": {
-            "description": "Not found.\n\n- `silicon_not_found`: not a Silicon you are custodian of (other Carbons' Silicons are never revealed)",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                },
-                "example": {
-                  "error": {
-                    "code": "silicon_not_found",
-                    "message": "Not a Silicon you are custodian of (other Carbons' Silicons are never revealed)."
-                  }
                 }
               }
-            },
-            "x-error-codes": [
-              "silicon_not_found"
-            ]
-          },
-          "413": {
-            "$ref": "#/components/responses/PayloadTooLarge"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
+            }
           }
-        }
+        },
+        "deprecated": true
       },
       "delete": {
         "tags": [
           "Webhooks"
         ],
         "operationId": "removeSiliconWebhook",
-        "summary": "Remove a Silicon's webhook (custodian)",
-        "description": "The Silicon stops getting events.",
+        "summary": "Retired: use Silicon Ting",
+        "description": "Returns 410 silicon_notifications_moved. Enable account notifications with POST /v1/me/notifications/ting.",
         "security": [
           {
             "bearerAuth": []
@@ -12964,60 +12665,18 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Removed.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/CarbonOnly"
-          },
-          "404": {
-            "description": "Not found.\n\n- `silicon_not_found`: not a Silicon you are custodian of (other Carbons' Silicons are never revealed)",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                },
-                "example": {
-                  "error": {
-                    "code": "silicon_not_found",
-                    "message": "Not a Silicon you are custodian of (other Carbons' Silicons are never revealed)."
-                  }
                 }
               }
-            },
-            "x-error-codes": [
-              "silicon_not_found"
-            ]
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
+            }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/v1/me/silicons/{uuid}/webhook/deliveries": {
@@ -13026,8 +12685,8 @@
           "Webhooks"
         ],
         "operationId": "listSiliconWebhookDeliveries",
-        "summary": "A Silicon's webhook deliveries (custodian)",
-        "description": "Newest first: the same list and fields as GET /v1/me/webhook/deliveries. After a transfer the new custodian has the deliveries.",
+        "summary": "Retired: use Silicon Ting",
+        "description": "Returns 410 silicon_notifications_moved. Enable account notifications with POST /v1/me/notifications/ting.",
         "security": [
           {
             "bearerAuth": []
@@ -13065,82 +12724,18 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Deliveries.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/Page"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "items": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/WebhookDelivery"
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/CarbonOnly"
-          },
-          "404": {
-            "description": "Not found.\n\n- `silicon_not_found`: not a Silicon you are custodian of (other Carbons' Silicons are never revealed)",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                },
-                "example": {
-                  "error": {
-                    "code": "silicon_not_found",
-                    "message": "Not a Silicon you are custodian of (other Carbons' Silicons are never revealed)."
-                  }
                 }
               }
-            },
-            "x-error-codes": [
-              "silicon_not_found"
-            ]
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
+            }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/v1/me/silicons/{uuid}/webhook/deliveries/{id}": {
@@ -13149,8 +12744,8 @@
           "Webhooks"
         ],
         "operationId": "getSiliconWebhookDelivery",
-        "summary": "One of a Silicon's deliveries (custodian)",
-        "description": "Every attempt and the exact payload that was signed.",
+        "summary": "Retired: use Silicon Ting",
+        "description": "Returns 410 silicon_notifications_moved. Enable account notifications with POST /v1/me/notifications/ting.",
         "security": [
           {
             "bearerAuth": []
@@ -13171,68 +12766,18 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "The delivery.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WebhookDeliveryDetail"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/CarbonOnly"
-          },
-          "404": {
-            "description": "Not found.\n\n- `silicon_not_found`: not a Silicon you are custodian of (other Carbons' Silicons are never revealed)\n- `delivery_not_found`: no such webhook delivery for this app, or for this Silicon (`/v1/me/webhook/deliveries…`)",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                },
-                "example": {
-                  "error": {
-                    "code": "silicon_not_found",
-                    "message": "Not a Silicon you are custodian of (other Carbons' Silicons are never revealed)."
-                  }
                 }
               }
-            },
-            "x-error-codes": [
-              "silicon_not_found",
-              "delivery_not_found"
-            ]
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
+            }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/v1/me/silicons/{uuid}/webhook/replay": {
@@ -13241,8 +12786,8 @@
           "Webhooks"
         ],
         "operationId": "replaySiliconWebhookDeliveries",
-        "summary": "Replay a Silicon's deliveries (custodian)",
-        "description": "Each delivery goes back to pending with the same event_id and payload, to the current URL, signed with the current secret, with a fresh 72 hours of retries. With `status: failed`, call again (new Idempotency-Key) until `remaining` is 0.",
+        "summary": "Retired: use Silicon Ting",
+        "description": "Returns 410 silicon_notifications_moved. Enable account notifications with POST /v1/me/notifications/ting.",
         "security": [
           {
             "bearerAuth": []
@@ -13273,107 +12818,18 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "What was replayed.",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              },
-              "Idempotent-Replayed": {
-                "$ref": "#/components/headers/IdempotentReplayed"
-              }
-            },
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReplayResult"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/CarbonOnly"
-          },
-          "404": {
-            "description": "Not found.\n\n- `silicon_not_found`: not a Silicon you are custodian of (other Carbons' Silicons are never revealed)",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                },
-                "example": {
-                  "error": {
-                    "code": "silicon_not_found",
-                    "message": "Not a Silicon you are custodian of (other Carbons' Silicons are never revealed)."
-                  }
-                }
-              }
-            },
-            "x-error-codes": [
-              "silicon_not_found"
-            ]
-          },
-          "409": {
-            "description": "Conflict.\n\n- `webhook_not_set`: a test ping, secret rotation or replay without a webhook URL: set one first\n- `idempotency_key_reused`: the key was used for a different body on this endpoint; use a new key for a new request\n- `idempotency_in_progress`: a request with this key is still running; retry in a few seconds\n- `idempotency_result_unavailable`: the stored secret-bearing result can no longer be decrypted, so it isn't run again; check the current state (e.g. list your Silicons) before retrying with a new key",
-            "headers": {
-              "X-Request-Id": {
-                "$ref": "#/components/headers/RequestId"
-              },
-              "Accounts-Version": {
-                "$ref": "#/components/headers/AccountsVersion"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                },
-                "example": {
-                  "error": {
-                    "code": "webhook_not_set",
-                    "message": "The app 'briefcase' has no webhook URL, so there is nowhere to send events.",
-                    "hint": "Set one first with PUT /v1/apps/{app_id}/webhook {\"url\":\"https://...\"}."
-                  }
-                }
-              }
-            },
-            "x-error-codes": [
-              "webhook_not_set",
-              "idempotency_key_reused",
-              "idempotency_in_progress",
-              "idempotency_result_unavailable"
-            ]
-          },
-          "413": {
-            "$ref": "#/components/responses/PayloadTooLarge"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/v1/apps/{app_id}/webhook": {
@@ -14898,19 +14354,10 @@
         ],
         "operationId": "streamEvents",
         "summary": "Stream events as they happen (SSE)",
-        "description": "The same events as webhooks, pushed over one long HTTP response. Who gets what:\n\n- an app (Basic credentials): the events of its stream subscription, with the same bodies as its webhook (it needs a stream subscription);\n- a Silicon (bearer token): its own Silicon events (silicon.created, silicon.custodian.accepted, silicon.custodian.declined, silicon.custodian.expired, silicon.updated, silicon.id_changed, silicon.stk_rotated, silicon.custodian.changed, ping);\n- a Carbon (bearer token or cookie): the Silicon events of the Silicons it is custodian of;\n- a self-created Silicon still waiting for its custodian: its own events, with its `sarq_` request token.\n\nAt most 5 open streams per app or account. Server-Sent Events. The first frame is `retry: 5000`. Then one frame per event:\n\n```\nid: <event_id>\nevent: <type>\ndata: <the webhook body JSON>\n```\n\nA comment line `: heartbeat` arrives after 15 seconds without events. Before the server ends the stream it sends `event: stream.closed` with data `{\"reason\", \"message\"}`, reason `token_expired`, `access_removed`, `subscription_deleted`, `request_decided`, `max_duration` or `server_restarting`. Reconnect with `Last-Event-ID`. Delivery is at least once: dedupe on `event_id`.",
+        "description": "App-authenticated SSE for an app stream subscription. Dedupe by event_id and resume with Last-Event-ID. Account, custodian and request-token callers receive 410 silicon_notifications_moved and use Ting instead.",
         "security": [
           {
             "appBasic": []
-          },
-          {
-            "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
-          },
-          {
-            "requestToken": []
           }
         ],
         "parameters": [
@@ -15097,6 +14544,16 @@
             "x-error-codes": [
               "stream_capacity_reached"
             ]
+          },
+          "410": {
+            "description": "410 silicon_notifications_moved: Silicon account notifications use Ting.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -19776,6 +19233,165 @@
           }
         }
       }
+    },
+    "/v1/me/notifications/ting": {
+      "post": {
+        "tags": [
+          "Silicons"
+        ],
+        "operationId": "enableSiliconTingNotifications",
+        "summary": "Permit Accounts notifications in Ting",
+        "description": "Requires the Silicon’s first-party bearer session. Registers only this account through a short-lived User verification proof tied to its live sign-in. Idempotent registration; respects Ting preferences.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enabled: channel, app_id, subscription_id and account_uuid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "enabled",
+                    "channel",
+                    "app_id",
+                    "subscription_id",
+                    "account_uuid"
+                  ],
+                  "properties": {
+                    "enabled": {
+                      "const": true
+                    },
+                    "channel": {
+                      "const": "ting"
+                    },
+                    "app_id": {
+                      "const": "silicon-accounts"
+                    },
+                    "subscription_id": {
+                      "type": "string"
+                    },
+                    "account_uuid": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SiliconOnly"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/silicons/requests/{id}/ting-session": {
+      "put": {
+        "tags": [
+          "Silicons"
+        ],
+        "operationId": "bindSiliconRequestTingSession",
+        "summary": "Attach or replace a pending request’s Ting receiver",
+        "description": "The matching private sarq_ token is required, including after a decision. Repeating a binding is idempotent. Rebinding cancels queued old hints and emits a fresh request_id-only hint; always fetch authoritative status after reconnect. Limited to 60 changes per hour per request.",
+        "security": [
+          {
+            "requestToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The custodian request's id, from the self-create answer.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "session_id"
+                ],
+                "properties": {
+                  "session_id": {
+                    "type": "string",
+                    "pattern": "^recv_[0-9a-fA-F]{32}$",
+                    "description": "Live Ting receiver session ID."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bound: request_id, session_id and channel=ting.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RequestTokenUnauthorized"
+          },
+          "404": {
+            "description": "Not found.\n\n- `custodian_request_not_found`: no such request (or not addressed to you)",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "custodian_request_not_found",
+                    "message": "No such request (or not addressed to you)."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "custodian_request_not_found"
+            ]
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -22135,11 +21751,17 @@
           },
           "webhook_url": {
             "type": "string",
-            "description": "Where to tell the Silicon about its account (https, public address)."
+            "description": "Retired. Non-null values are rejected; use Ting notifications.",
+            "deprecated": true
           },
           "custodian": {
             "type": "string",
             "description": "The Carbon's c:id, or an email address (which may not have an account yet)."
+          },
+          "ting_session_id": {
+            "type": "string",
+            "pattern": "^recv_[0-9a-fA-F]{32}$",
+            "description": "Anonymous session returned by ting listen --anonymous --app silicon-accounts --json. Receives only request_id hints."
           }
         },
         "additionalProperties": false
@@ -22174,7 +21796,8 @@
           },
           "webhook_url": {
             "type": "string",
-            "description": "Where to tell the Silicon about its account (https, public address)."
+            "description": "Retired. Non-null values are rejected; use Ting notifications.",
+            "deprecated": true
           }
         },
         "additionalProperties": false
@@ -26154,7 +25777,7 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/Capability"
             },
-            "description": "Keyed by capability name: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, llms_txt."
+            "description": "Keyed by capability name: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, silicon_tings, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, llms_txt."
           },
           "auth_methods": {
             "type": "array",

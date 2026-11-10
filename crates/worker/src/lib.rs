@@ -33,6 +33,7 @@ use tokio::task::JoinHandle;
 pub mod cleanup;
 pub mod messages;
 pub mod pipeline;
+pub mod tings;
 pub mod webhooks;
 
 /// HTTP routes of this crate: none (the worker only runs background loops).
@@ -40,7 +41,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
 }
 
-/// Starts the webhook, message and cleanup loops. They run until the process exits or their
+/// Starts the webhook, Ting, message and cleanup loops. They run until the process exits or their
 /// handles are aborted; use [`spawn_background_until`] for a graceful stop.
 pub fn spawn_background(state: AppState) -> Vec<JoinHandle<()>> {
     spawn_background_until(state, Shutdown::never())
@@ -49,7 +50,7 @@ pub fn spawn_background(state: AppState) -> Vec<JoinHandle<()>> {
 /// Starts the loops. Once `shutdown` triggers they stop claiming work, let the sends in flight
 /// finish (at most about one 10 s send timeout) and return.
 pub fn spawn_background_until(state: AppState, shutdown: Shutdown) -> Vec<JoinHandle<()>> {
-    let mut handles = Vec::with_capacity(3);
+    let mut handles = Vec::with_capacity(4);
     match webhooks::WebhookDeliverer::new(&state) {
         Ok(deliverer) => handles.push(tokio::spawn(webhooks::run(deliverer, shutdown.clone()))),
         Err(e) => {
@@ -59,6 +60,7 @@ pub fn spawn_background_until(state: AppState, shutdown: Shutdown) -> Vec<JoinHa
         }
     }
     handles.push(tokio::spawn(messages::run(state.clone(), shutdown.clone())));
+    handles.push(tokio::spawn(tings::run(state.clone(), shutdown.clone())));
     handles.push(tokio::spawn(cleanup::run(state, shutdown)));
     handles
 }

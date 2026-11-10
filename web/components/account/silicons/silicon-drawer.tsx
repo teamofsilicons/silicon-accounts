@@ -35,7 +35,7 @@ import { FitPrompt } from "../parts/fit-prompt";
 import { handFocus } from "../parts/focus";
 import { HeightFrame } from "../parts/height-frame";
 import { IdChangeForm } from "../parts/id-change-form";
-import { useCancelTransferSettled, useChangeSiliconIdInForm, useDeleteSiliconSettled, useRemoveSiliconWebhookSettled, useRotateStkOnce, useSetSiliconWebhookOnce, useSiliconDefaultPhoto, useStartTransfer } from "../parts/queries";
+import { useCancelTransferSettled, useChangeSiliconIdInForm, useDeleteSiliconSettled, useRotateStkOnce, useSiliconDefaultPhoto, useStartTransfer } from "../parts/queries";
 import { type NewReveal, type Reveal } from "../parts/reveals";
 import { SecretReveal } from "../parts/secret-reveal";
 import { normalizeStk, stkProblem, stkSecret } from "../parts/stk";
@@ -112,8 +112,9 @@ function Body(props: BodyProps) {
       <Block title="STK" headingRef={el => { headings.current.stk = el; }} description={`The password ${id} signs in with. Rotating it ends the old one at once and signs ${id} out of every app.`}>
         <StkBlock {...props} />
       </Block>
-      <Block title="Webhook" headingRef={el => { headings.current.webhook = el; }} description={`Where Silicon Accounts tells ${id} about its own account: id and detail changes, STK rotations and custodian changes. Every event is signed.`}>
-        <WebhookBlock {...props} />
+      <Block title="Notifications" headingRef={el => { headings.current.webhook = el; }} description={`Silicon Ting delivers account changes to ${id}'s authorized sessions.`}>
+        <p>Sign in as this Silicon and run <code>silicon-accounts notifications enable</code>, then sign into Ting with the same identity and run <code>ting listen</code>.</p>
+        <p>Notifications remain in Ting’s inbox when no receiver is connected. After STK rotation, the Silicon must sign in again.</p>
       </Block>
       <Block title="Custodian" description={`You are ${id}'s custodian. To hand it to another Carbon, name them; they have 14 days to accept, and until then nothing changes.`}>
         <TransferBlock {...props} />
@@ -408,106 +409,6 @@ function StkBlock({ silicon, now, onReveal }: BodyProps) {
           onConfirm={() => void rotate()}
         />
       </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------------------------------------------------------ */
-/* Webhook                                                                                                             */
-/* ------------------------------------------------------------------------------------------------------------------ */
-
-function urlProblem(raw: string): string | null {
-  const value = raw.trim();
-  if (!value) return "Enter the URL the Silicon receives events at.";
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return `“${value}” is not a full URL. Start it with https://, for example https://scout.example/hooks/accounts.`;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return `A webhook URL must start with https:// (this one starts with ${url.protocol}//).`;
-  return null;
-}
-
-function WebhookBlock({ silicon, onReveal }: BodyProps) {
-  const [editing, setEditing] = useState(false);
-  const [url, setUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const scope = useRef<HTMLDivElement>(null);
-  const urlInput = useRef<HTMLInputElement>(null);
-  const changeButton = useRef<HTMLButtonElement>(null);
-  const setWebhook = useSetSiliconWebhookOnce();
-  const removeWebhook = useRemoveSiliconWebhookSettled();
-  const id = silicon.id ?? silicon.uuid;
-  const startEdit = () => {
-    setUrl(silicon.webhook_url ?? "");
-    setError(null);
-    setEditing(true);
-    handFocus(scope.current, () => urlInput.current);
-  };
-  const cancelEdit = () => {
-    setEditing(false);
-    handFocus(scope.current, () => changeButton.current);
-  };
-  const save = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const problem = urlProblem(url);
-    if (problem) return setError(problem);
-    setError(null);
-    try {
-      const answer = await setWebhook.run({ uuid: silicon.uuid, url: url.trim() });
-      setEditing(false);
-      // The secret card that opens takes focus (it is read once and must be stored).
-      onReveal({
-        silicon: silicon.uuid,
-        origin: "webhook",
-        title: `${id}'s webhook signing secret`,
-        description: `Events to ${answer.webhook_url} are signed with it (X-Accounts-Signature: v1=HMAC-SHA256 of "{timestamp}.{body}"). A new secret is made each time the URL is set.`,
-        secrets: [{ label: "Signing secret", value: answer.webhook_secret }],
-      });
-    } catch (raw) {
-      setError(describeError(raw));
-    }
-  };
-  const remove = async () => {
-    setError(null);
-    try {
-      await removeWebhook.mutateAsync(silicon.uuid);
-    } catch (raw) {
-      setError(describeError(raw));
-      throw raw;
-    }
-    window.setTimeout(() => {
-      setUrl("");
-      handFocus(scope.current, () => urlInput.current);
-    }, RESULT_MS + 60);
-  };
-  const current = silicon.webhook_url;
-  return (
-    <div ref={scope} className={styles.scope}>
-      <HeightFrame morphKey={`${editing}-${!!current}`}>
-        {editing || !current ? (
-          <form className={styles.stack} onSubmit={save} noValidate>
-            <Input ref={urlInput} label="Webhook URL" type="url" inputMode="url" placeholder="https://scout.example/hooks/accounts" value={url} onChange={event => { setUrl(event.target.value); setError(null); }} error={error ?? undefined} autoComplete="off" spellCheck={false} />
-            <div className={styles.actions}>
-              {editing ? <Button type="button" variant="ghost" size="sm" onClick={cancelEdit} disabled={setWebhook.isPending}>Cancel</Button> : null}
-              <Button type="submit" variant="secondary" size="sm" loading={setWebhook.isPending}>{current ? "Save new URL" : "Set webhook"}</Button>
-            </div>
-          </form>
-        ) : (
-          <div className={styles.stack}>
-            <div data-sq="surface" className={styles.urlBox}>
-              <span className={styles.url} title={current}>{current}</span>
-              <CopyButton value={current} label="Copy webhook URL" iconOnly variant="plain" />
-            </div>
-            <div className={styles.actions}>
-              <ConfirmMorph label="Remove webhook" prompt={<FitPrompt full="Stop sending it events?" short="Stop sending it events?" tiny="Stop events?" />} confirmLabel="Remove" pendingLabel="Removing" doneLabel="Removed" onConfirm={remove} />
-              <Button ref={changeButton} variant="secondary" size="sm" onClick={startEdit}>Change URL</Button>
-            </div>
-            {error ? <p className={styles.error} role="alert">{error}</p> : null}
-          </div>
-        )}
-      </HeightFrame>
     </div>
   );
 }

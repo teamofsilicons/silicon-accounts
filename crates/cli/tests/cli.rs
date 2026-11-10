@@ -222,6 +222,14 @@ fn silicon_login_whoami_slt_and_logout() {
     assert_eq!(json["kind"], "silicon");
     assert_eq!(json["id"], "si:scout");
     assert_eq!(json["uuid"], "b9Z");
+    let enabled = env
+        .cmd()
+        .args(["notifications", "enable", "--json"])
+        .output()
+        .unwrap();
+    assert!(enabled.status.success());
+    assert_eq!(stdout_json(&enabled)["enabled"], true);
+    assert_eq!(mock.count("POST", "/v1/me/notifications/ting"), 1);
 
     // The session is stored privately and remembers its URL.
     let session_path = env.state_file("session.json");

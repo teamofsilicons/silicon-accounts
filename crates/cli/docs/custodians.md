@@ -32,7 +32,6 @@ silicon-accounts silicon update si:scout --photo ./scout.png    # uploads its ph
 silicon-accounts id available si:scout --for si:scout_v2  # is an old id of this Silicon free to take back?
 silicon-accounts silicon id si:scout si:scout_v2          # apps are told; the uuid never changes
 silicon-accounts silicon rotate-stk si:scout              # prints the new STK once
-silicon-accounts silicon webhook set si:scout https://scout.example/hooks
 silicon-accounts silicon transfer si:scout --to c:shubham
 silicon-accounts silicon cancel-transfer si:scout
 silicon-accounts silicon delete si:scout --confirm si:scout
@@ -67,3 +66,7 @@ silicon-accounts silicon create --id si:scout --display-name Scout
 
 You become its custodian at once. The STK is printed exactly once; only its hash is
 stored, so if it's lost, rotate it.
+
+## Notifications
+
+The Silicon enables Accounts notifications with `silicon-accounts notifications enable` after signing in. Ting delivers them to its authorized sessions; see `silicon-accounts docs silicons`.

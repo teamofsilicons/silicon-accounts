@@ -66,6 +66,7 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_ENVIRONMENT",
     "ACCOUNTS_EXPOSE_DEV_OUTBOX",
     "ACCOUNTS_EXTRA_ALLOWED_ORIGINS",
+    "ACCOUNTS_PROFILE_DIRECTORY_APP_IDS",
     "ACCOUNTS_FEDERATION_ALLOW_LOOPBACK",
     "ACCOUNTS_GOOGLE_AUTH_URL",
     "ACCOUNTS_GOOGLE_CLIENT_ID",
@@ -89,6 +90,7 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_REPORT_RECIPIENTS",
     "ACCOUNTS_SILICON_APPS_URL",
     "ACCOUNTS_TOKEN_PEPPER",
+    "ACCOUNTS_TING_URL",
     "ACCOUNTS_TRUST_FORWARDED_FOR",
     "ACCOUNTS_TWILIO_ACCOUNT_SID",
     "ACCOUNTS_TWILIO_API_URL",
@@ -260,6 +262,9 @@ pub struct Settings {
     pub public_origin: String,
     /// ACCOUNTS_EXTRA_ALLOWED_ORIGINS, normalized to origins.
     pub extra_allowed_origins: Vec<String>,
+    /// ACCOUNTS_PROFILE_DIRECTORY_APP_IDS. Explicitly trusted apps allowed to read the
+    /// display name/photo of active, registered Accounts identities. Empty by default.
+    pub profile_directory_app_ids: Vec<String>,
     /// ACCOUNTS_DATABASE_URL.
     pub database_url: SecretString,
     /// ACCOUNTS_DATABASE_MAX_CONNECTIONS.
@@ -298,6 +303,8 @@ pub struct Settings {
     pub trust_forwarded_for: bool,
     /// ACCOUNTS_SILICON_APPS_URL.
     pub silicon_apps_url: String,
+    /// Ting API origin for Silicon account delivery.
+    pub ting_url: String,
     /// ACCOUNTS_DOCS_URL: where the published docs live (`GET /v1/meta` `docs_url`).
     pub docs_url: String,
     /// ACCOUNTS_DEVELOPER_URL without a trailing slash: the developer platform
@@ -515,6 +522,7 @@ impl Settings {
             public_url: "http://localhost:8590".into(),
             public_origin: "http://localhost:8590".into(),
             extra_allowed_origins: Vec::new(),
+            profile_directory_app_ids: Vec::new(),
             database_url: SecretString::from("postgres://postgres@127.0.0.1:5444/silicon_accounts"),
             database_max_connections: 32,
             web_dist: None,
@@ -566,6 +574,7 @@ impl Settings {
             ],
             trust_forwarded_for: false,
             silicon_apps_url: "https://apps.teamofsilicons.com".into(),
+            ting_url: "https://backend.ting.teamofsilicons.com".into(),
             docs_url: DEFAULT_DOCS_URL.into(),
             developer_url: if prod {
                 DEFAULT_DEVELOPER_URL
@@ -671,6 +680,14 @@ impl Settings {
             }
         }
         s.extra_allowed_origins = extras;
+        s.profile_directory_app_ids = r.list("ACCOUNTS_PROFILE_DIRECTORY_APP_IDS", "");
+        for app_id in &s.profile_directory_app_ids {
+            if let Err(message) = crate::ids::validate_app_id(app_id) {
+                r.problem("ACCOUNTS_PROFILE_DIRECTORY_APP_IDS", message);
+            }
+        }
+        s.profile_directory_app_ids.sort();
+        s.profile_directory_app_ids.dedup();
 
         if let Some(v) = r.secret("ACCOUNTS_DATABASE_URL") {
             s.database_url = v;
@@ -924,6 +941,21 @@ impl Settings {
                 );
             }
         }
+        s.ting_url = r.http_url(
+            "ACCOUNTS_TING_URL",
+            "https://backend.ting.teamofsilicons.com",
+        );
+        if let Ok(url) = Url::parse(&s.ting_url) {
+            if !url.username().is_empty()
+                || url.password().is_some()
+                || url.query().is_some()
+                || url.fragment().is_some()
+                || url.path() != "/"
+                || (prod && url.scheme() != "https")
+            {
+                r.problem("ACCOUNTS_TING_URL", "must be an origin without credentials, path, query or fragment; production requires HTTPS");
+            }
+        }
         s.worker_enabled = r.bool("ACCOUNTS_WORKER_ENABLED", true);
         s.webhook_allow_private = r.bool("ACCOUNTS_WEBHOOK_ALLOW_PRIVATE", !prod);
         s.federation_allow_loopback = r.bool("ACCOUNTS_FEDERATION_ALLOW_LOOPBACK", false);
@@ -1121,6 +1153,20 @@ mod tests {
         assert_eq!(s.report_recipients.len(), 3);
         assert!(s.is_allowed_origin("http://localhost:8590"));
         assert!(!s.is_allowed_origin("http://localhost:5190"));
+        assert!(s.profile_directory_app_ids.is_empty());
+    }
+
+    #[test]
+    fn directory_access_requires_explicit_app_ids() {
+        let s = Settings::from_lookup(lookup(&[(
+            "ACCOUNTS_PROFILE_DIRECTORY_APP_IDS",
+            " silicon-contacts, silicon-contacts ",
+        )]))
+        .unwrap();
+        assert_eq!(s.profile_directory_app_ids, ["silicon-contacts"]);
+        assert!(
+            Settings::from_lookup(lookup(&[("ACCOUNTS_PROFILE_DIRECTORY_APP_IDS", "*")])).is_err()
+        );
     }
 
     #[test]

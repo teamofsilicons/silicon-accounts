@@ -194,6 +194,8 @@ fn silicon_self_create_saves_the_request_and_waits_for_the_custodian() {
             "c:saket",
             "--timezone",
             "Europe/Berlin",
+            "--ting-session-id",
+            "recv_11111111111111111111111111111111",
             "--json",
         ])
         .output()
@@ -228,6 +230,35 @@ fn silicon_self_create_saves_the_request_and_waits_for_the_custodian() {
         "display name defaults from the id"
     );
     assert_eq!(body["timezone"], "Europe/Berlin");
+
+    assert_eq!(
+        body["ting_session_id"],
+        "recv_11111111111111111111111111111111"
+    );
+    // An unrelated --url must never receive the saved request's private token.
+    let unrelated = Mock::start();
+    env.cmd()
+        .args([
+            "--url",
+            &unrelated.url,
+            "silicon",
+            "request",
+            "attach-session",
+            "req-1",
+            "--session-id",
+            "recv_22222222222222222222222222222222",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("sarq_").not());
+    let bindings = mock.requests("PUT", "/v1/silicons/requests/req-1/ting-session");
+    assert_eq!(bindings.len(), 1);
+    assert_eq!(bindings[0].0.as_deref(), Some("Bearer sarq_poll"));
+    assert_eq!(
+        unrelated.count("PUT", "/v1/silicons/requests/req-1/ting-session"),
+        0
+    );
 
     // Later, from the saved request token: still pending…
     let output = env

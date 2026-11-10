@@ -344,7 +344,7 @@ async fn the_openapi_document_names_every_capability() {
         listed.sort_unstable();
         assert_eq!(listed, served, "the {what} description in openapi.json");
     }
-    assert_eq!(served.len(), 26, "{served:?}");
+    assert_eq!(served.len(), 27, "{served:?}");
     assert!(!served.iter().any(|n| n == "mcp"), "{served:?}");
     let text = serde_json::to_string(&doc).expect("openapi.json");
     assert!(!text.to_ascii_lowercase().contains("mcp"));

@@ -78,3 +78,23 @@ origin park their provider answer on the production API, redirect an opaque sing
 ticket to the local callback proxy, and require the original flow cookie there before
 exchanging the provider code. The registered provider callback stays on production.
 Other apps do not get this handoff. Do not add wildcard origins or disable cookie security.
+
+## Automatic Silicon Accounts registration — 2026-11-06
+
+Migration 0037 registers all non-deleted identities with `silicon-accounts` and installs an
+account INSERT trigger for future registrations. Production now has 10/10 active Carbons
+and 11/11 active Silicons registered. The deleted Silicon remains a tombstone without a new
+membership. The migration creates no sessions or sign-in timestamps and grants no other app
+access. Existing memberships are preserved.
+
+The rollout changed only the embedded `accounts-migrate` binary in a verified copy of the
+current composite release. API, web, Developer, Node, and Caddy files were unchanged; no
+service restart was needed. Source is based on the deployed interface broker revision, not
+the older `main` snapshot. Future full releases must include migrations 0029–0037 and retain
+the current composite frontend builds. The historical component revisions in production.json
+are not an authoritative description of this composite release.
+
+Receipt: [verification-automatic-registration-2026-11-06.json](verification-automatic-registration-2026-11-06.json).
+The predeployment PostgreSQL backup was verified and uploaded. Production checks covered
+complete membership coverage, idempotent rerun, migration readiness, and Carbon/Silicon
+creation in a rolled-back transaction. Local verification: 348 integration tests passed.
