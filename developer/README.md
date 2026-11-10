@@ -6,6 +6,8 @@ and setting up an app's authentication (its sign-in methods, Google and Apple, t
 pages, redirect URIs and allowed origins, its user base and imports, its webhook and deliveries, its app verifications, and the
 snippets to embed sign-in). The same app workspace also creates apps, saves seven setup steps, uploads and validates packages, manages releases and authors, and publishes through Silicon Apps. Each service retains its own backend. The portal contains no store catalog; discovery and installation live at apps.teamofsilicons.com.
 
+Your apps combines all pages of the Accounts configuration list and the Silicon Apps author list. Publishing-only apps, including Silicon Accounts itself, expose Publishing, Releases, Authors and History after Apps confirms authorship. Their protected Accounts configuration remains inaccessible; publishing authorship does not grant access to it.
+
 Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Arc UI, TanStack Query. The
 product contract is `../understanding/UNDERSTANDING.md` (never edited here); nothing in this app overrides it. Runtime-independent from the rest of this repository: documentation sources are bundled at build time.
 
