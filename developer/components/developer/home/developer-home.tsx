@@ -11,28 +11,31 @@ import { Button } from "@/components/silicon-ui/button/button";
 import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader, Surface } from "@/components/foundation/layout/layout";
-import type { OwnedApp } from "@/lib/api/types";
 import { useRegisterCommands } from "@/lib/commands";
 import { formatCount } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useOwnedApps } from "@/lib/query/developer";
-import { useResource } from "@/components/publishing/api";
+import { api as publishingApi } from "@/components/publishing/api";
+import { useWholeList } from "@/lib/query/pages";
+import { useSession } from "@/lib/query/session";
 import type { App as PublishingApp } from "@/components/publishing/types";
 import { CreateApp } from "@/components/publishing/CreateApp";
 import { SOURCE_LABEL, appStatus } from "../lib/labels";
 import { AppIcon } from "../parts/app-icon";
 import styles from "./developer-home.module.css";
+import { mergeAppCatalog, type CatalogApp } from "./catalog";
 
 const usersLabel = (count: number) => `${formatCount(count)} ${count === 1 ? "user" : "users"}`;
 
-function AppTile({ app, publishing }: { app: OwnedApp; publishing?: PublishingApp }) {
+function AppTile({ app, publishing }: { app: CatalogApp; publishing?: PublishingApp }) {
   const status = appStatus(app.status);
   const source = SOURCE_LABEL[app.source] ?? app.source;
   // The link's name is what the tile shows, in the order it shows it, with pauses (WCAG 2.5.3). The {" "} between the
   // parts keep the tile's own text in words too; the grid and flex boxes ignore them in layout.
-  const name = [app.status !== "active" ? status.label : null, app.name, app.app_id, usersLabel(app.users), source].filter(Boolean).join(", ");
+  const audience = app.users === null ? `${formatCount(publishing?.installs ?? 0)} installs` : usersLabel(app.users);
+  const name = [app.status !== "active" ? status.label : null, app.name, app.app_id, audience, source].filter(Boolean).join(", ");
   return (
-    <Link href={paths.developerApp(app.app_id, publishing && !publishing.published ? "publishing" : undefined)} data-sq="surface" className={styles.tile} data-status={app.status} aria-label={name}>
+    <Link href={paths.developerApp(app.app_id, !app.accountsAccess || (publishing && !publishing.published) ? "publishing" : undefined)} data-sq="surface" className={styles.tile} data-status={app.status} aria-label={name}>
       <span className={styles.tileTop}>
         <AppIcon name={app.name} src={app.logo_url} size={56} decorative />
         {app.status !== "active" ? <Badge size="sm" tone={status.tone}>{status.label}</Badge> : null}
@@ -42,7 +45,7 @@ function AppTile({ app, publishing }: { app: OwnedApp; publishing?: PublishingAp
         <span className={styles.tileId}>{app.app_id}</span>
       </span>{" "}
       <span className={styles.tileFoot}>
-        <span className={styles.tileStat}><Users size={14} strokeWidth={1.75} aria-hidden="true" />{usersLabel(app.users)}</span>{" "}
+        <span className={styles.tileStat}><Users size={14} strokeWidth={1.75} aria-hidden="true" />{audience}</span>{" "}
         <span className={styles.tileSource}>{publishing && !publishing.published ? "Continue setup" : source}</span>
         <ArrowRight className={styles.tileArrow} size={16} strokeWidth={1.75} aria-hidden="true" />
       </span>
@@ -81,9 +84,14 @@ function TileSkeletons() {
 export function DeveloperHome() {
   const router = useRouter();
   const owned = useOwnedApps();
-  const publishing = useResource<{items: PublishingApp[]}>("/apps?mine=true&limit=100");
+  const { status: sessionStatus } = useSession();
+  const publishing = useWholeList<PublishingApp>(["publishing", "owned-apps"], async query => {
+    const params = new URLSearchParams({ mine: "true", limit: "100", sort: "newest", offset: query.cursor ?? "0" });
+    const page = await publishingApi<{ items: PublishingApp[]; next_offset?: number | null }>(`/apps?${params}`);
+    return { items: page.items, next_cursor: page.next_offset == null ? null : String(page.next_offset) };
+  }, sessionStatus === "signed_in");
   const [newApp, setNewApp] = useState(false);
-  const apps = owned.data?.items;
+  const apps = owned.data || publishing.data ? mergeAppCatalog(owned.data?.items ?? [], publishing.data?.items ?? []) : undefined;
 
   useRegisterCommands(() => [
     ...[{
@@ -102,7 +110,7 @@ export function DeveloperHome() {
       group: "Your apps",
       icon: <Braces size={16} strokeWidth={1.75} />,
       keywords: [app.app_id, "app", "developer"],
-      run: () => router.push(paths.developerApp(app.app_id)),
+      run: () => router.push(paths.developerApp(app.app_id, app.accountsAccess ? undefined : "publishing")),
     })),
   ], [apps, router]);
 
@@ -150,11 +158,11 @@ export function DeveloperHome() {
       {publishingError ? (
         <Alert tone="warning" title="Publishing details could not be loaded" className={styles.notice}>
           {publishingError.message}{publishingError.hint ? ` ${publishingError.hint}` : ""}
-          <span className={styles.alertActions}><Button size="sm" variant="secondary" onClick={publishing.reload}>Try again</Button></span>
+          <span className={styles.alertActions}><Button size="sm" variant="secondary" onClick={() => void publishing.refetch()}>Try again</Button></span>
         </Alert>
       ) : null}
       {content}
-      <CreateApp open={newApp} close={() => { setNewApp(false); void owned.refetch(); }} />
+      <CreateApp open={newApp} close={() => { setNewApp(false); void owned.refetch(); void publishing.refetch(); }} />
     </Page>
   );
 }

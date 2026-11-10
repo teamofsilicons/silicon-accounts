@@ -12,8 +12,9 @@ import { STEPS, type App, type Readiness } from "./types";
 import { Badge, Button, Empty, ErrorNotice, Loading } from "./ui";
 import "./publishing.css";
 
-function Workspace({ section }: { section: "publishing" | "releases" | "authors" | "history" }) {
-  const { appId } = useDeveloperApp();
+export type PublishingSection = "publishing" | "releases" | "authors" | "history";
+
+export function PublishingWorkspace({ appId, section }: { appId: string; section: PublishingSection }) {
   const resource = useResource<App>(`/apps/${appId}`);
   const [params, setParams] = useSearchParams();
   const [navigationError, setNavigationError] = useState<Error>();
@@ -44,6 +45,10 @@ function Workspace({ section }: { section: "publishing" | "releases" | "authors"
       <div data-sq="surface" className="setup-main"><Setup key={`${appId}-${step}`} app={app} step={step} refresh={resource.reload} go={go} />{step < 7 && <div className="setup-footer"><Button variant="secondary" disabled={step === 1} onClick={() => void go(step - 1)}>Back</Button><Button onClick={() => void go(step + 1)}>Continue <ArrowRight size={16} /></Button></div>}</div>
     </div>}
   </div>;
+}
+function Workspace({ section }: { section: PublishingSection }) {
+  const { appId } = useDeveloperApp();
+  return <PublishingWorkspace appId={appId} section={section} />;
 }
 export const PublishingTab = () => <Workspace section="publishing" />;
 export const ReleasesTab = () => <Workspace section="releases" />;

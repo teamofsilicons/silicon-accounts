@@ -47,7 +47,9 @@ import { obtainEditor, releaseEditor, retainEditor, useEditor } from "../lib/edi
 import { announceKeptDraft, draftSections, forgetKeptDraft } from "../lib/kept-drafts";
 import { SOURCE_LABEL, appStatus } from "../lib/labels";
 import { AppIcon, AppIconUpload } from "../parts/app-icon";
-import { api as appsApi } from "@/components/publishing/api";
+import { api as appsApi, useResource } from "@/components/publishing/api";
+import type { App as PublishingApp } from "@/components/publishing/types";
+import { PublishingWorkspace, type PublishingSection } from "@/components/publishing/workspace";
 import { DeveloperTabPage, preloadTabs } from "./tab-page";
 import { developerDocumentTitle } from "./titles";
 import styles from "./app.module.css";
@@ -89,10 +91,44 @@ export function AppScope({ appId, children }: { appId: string; children: ReactNo
   const meta = useMeta();
   let content: ReactNode;
   if (query.data) content = <Loaded key={appId} appId={appId} app={query.data} meta={meta.data} />;
+  else if (query.error && [403, 404].includes(query.error.status)) content = <PublishingOnly appId={appId} error={query.error} retry={() => void query.refetch()} />;
   else if (query.error) content = <Problem appId={appId} error={query.error} retry={() => void query.refetch()} />;
   else content = <HeaderSkeleton />;
   // The page renders nothing, but it stays in the tree: it carries the redirect of an unknown tab.
   return <Page width="default">{content}{children}</Page>;
+}
+
+const PUBLISHING_SECTIONS: PublishingSection[] = ["publishing", "releases", "authors", "history"];
+
+/** An Apps author need not administer the app's Accounts sign-in configuration. */
+function PublishingOnly({ appId, error, retry }: { appId: string; error: ApiError; retry: () => void }) {
+  const resource = useResource<PublishingApp>(`/apps/${appId}`);
+  const pathname = usePathname();
+  const requested = tabOf(pathname);
+  const section = PUBLISHING_SECTIONS.find(tab => tab === requested) ?? "publishing";
+  const app = resource.data;
+  if (resource.loading && !app) return <HeaderSkeleton />;
+  if (resource.error) return <Problem appId={appId} error={resource.error as ApiError} retry={resource.reload} />;
+  if (!app?.is_author) return <Problem appId={appId} error={error} retry={retry} />;
+  return <>
+    <header className={styles.header}>
+      <Link href={paths.developer} className={styles.back}><ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />Your apps</Link>
+      <div className={styles.identity}>
+        <AppIcon name={app.name} src={app.logo} size={64} decorative />
+        <div className={styles.identityText}><h1 className={styles.title}>{app.name}</h1><div className={styles.facts}><span className={styles.appId}>{app.app_id}</span><span className={styles.factDivider} aria-hidden="true" /><span>Silicon Apps</span></div></div>
+      </div>
+    </header>
+    <div className={styles.tabFrame}>
+      <Tabs value={section} onValueChange={next => {
+        if (!PUBLISHING_SECTIONS.includes(next as PublishingSection)) return;
+        const href = paths.developerApp(appId, next as PublishingSection);
+        void confirmNavigation(href).then(allowed => { if (allowed) window.history.pushState(null, "", href); });
+      }} activationMode="manual" className={styles.tabs}>
+        <TabsList aria-label={`${app.name} sections`}>{PUBLISHING_SECTIONS.map(tab => <TabsTrigger key={tab} value={tab}>{DEVELOPER_TAB_LABELS[tab]}</TabsTrigger>)}</TabsList>
+        <TabsContent value={section} className={styles.panel}><PublishingWorkspace appId={appId} section={section} /></TabsContent>
+      </Tabs>
+    </div>
+  </>;
 }
 
 function HeaderSkeleton() {
