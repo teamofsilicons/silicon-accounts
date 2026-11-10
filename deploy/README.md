@@ -98,3 +98,29 @@ Receipt: [verification-automatic-registration-2026-11-06.json](verification-auto
 The predeployment PostgreSQL backup was verified and uploaded. Production checks covered
 complete membership coverage, idempotent rerun, migration readiness, and Carbon/Silicon
 creation in a rolled-back transaction. Local verification: 348 integration tests passed.
+
+## Silicon notifications through Ting — 2026-11-10
+
+API and web source `869bb868e6b0` are live with migration 0038. The old API was
+stopped before the verified backup and migration, so the previous callback sender
+could not race the cutover. Runtime configuration, Node, Caddy and the deployed
+Contacts, Interfaces, registration and chooser features were retained. All twelve
+Accounts notification types registered in Ting. Verification using only
+`si:saket-agents` covered idempotent consent enrollment, an accepted outbox send,
+durable inbox retrieval and delivery to an authenticated terminal receiver.
+The labelled probes did not change profile data or notify another account.
+
+Developer source `2a12ead2b61d` additionally fixes the app list and workspace for
+publishing authors without access to Accounts sign-in configuration. Silicon
+Accounts' protected first-party record remains protected; its publishing authors
+can manage the store listing, releases, authors and history through Silicon Apps.
+The Developer overlay preserved API and account-site files byte for byte.
+
+Receipt: [verification-ting-2026-11-10.json](verification-ting-2026-11-10.json).
+Rust validation passed 1,029 tests; the single OpenAPI coverage failure is identical
+on the deployed baseline `7f1aa7c`. Both sites passed builds, typecheck, lint and
+production routing; web and Developer unit suites passed 29 and 97 tests.
+Three browser checks covered publishing-only access, non-author denial and
+existing package upload confirmation, with desktop/mobile visual review.
+CLI 0.7.0 packages passed native verification on all nine targets in workflow run
+42823876740; the receipt records their publication state separately from deployment.

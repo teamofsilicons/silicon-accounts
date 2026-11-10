@@ -1,0 +1,90 @@
+{
+  "release": "accounts-ting-869bb868e6b0",
+  "revision": "869bb868e6b07027f7321dbf54f5d19ae6e3615f",
+  "baseline": "orgs-ting-relay-7f1aa7c-c0db8bbb81b4",
+  "bucket": "silicon-accounts-production-backups-zgctnskyqqre",
+  "backup_key": "backups/predeploy-ting-20261110T133215Z.dump",
+  "backup_sha256": "44521302ba7e147e78034e2d99c9921d0ba00e093356b8123a067e3b16afd04d",
+  "migration_version": 38,
+  "unchanged_configuration": true,
+  "health": "passed",
+  "verified_at": "2026-11-10T13:32:19.261564+00:00",
+  "validation": {
+    "rust_passed": 1029,
+    "rust_failed": 1,
+    "ignored": 3,
+    "only_failure": "OpenAPI route coverage",
+    "baseline": "7f1aa7ce6a3301bfd9acda8ecafcfb543dddf4af",
+    "baseline_failure_identical": true,
+    "ting_integration_tests": 5,
+    "web_tests": 29,
+    "developer_tests": 97,
+    "production_routing_tests": 2
+  },
+  "public_checks": {
+    "/healthz": {
+      "status": 200
+    },
+    "/readyz": {
+      "status": 200
+    },
+    "/v1/meta": {
+      "status": 200
+    },
+    "/.well-known/openid-configuration": {
+      "status": 200
+    },
+    "/openapi.json": {
+      "status": 200,
+      "ting_enrollment": true,
+      "session_binding": true
+    },
+    "/docs/accounts/start/silicon-notifications": {
+      "status": 200,
+      "ting_guide": true
+    },
+    "/docs/accounts/start/silicon-notifications.md": {
+      "status": 200,
+      "ting_guide": true
+    }
+  },
+  "ting": {
+    "registered_types": 12,
+    "recipient": "si:saket-agents",
+    "enrollment_idempotent": true,
+    "subscription_id": "sub_1d2eccb1a7534c69a010013227601a85",
+    "live_receiver_session": "recv_bce1244634444635b6b1ebe0ad7fe1e5",
+    "live_receiver_verified": true,
+    "durable_inbox_verified": true
+  },
+  "cli": {
+    "version": "0.7.0",
+    "source_revision": "6b35b926bdee283a3e2dc7d48efe86a222a1b854",
+    "workflow_run": 42823876740,
+    "verified_targets": 9,
+    "published": false
+  },
+  "developer_overlay": {
+    "revision": "2a12ead2b61def4c0899576797a883d7f5151c11",
+    "release": "accounts-ting-portal-2a12ead2b61d",
+    "baseline": "accounts-ting-869bb868e6b0",
+    "health": "passed",
+    "api_web_runtime_unchanged": true,
+    "verified_at": "2026-11-10T13:59:48Z"
+  },
+  "retired_routes": {
+    "/v1/me/webhook": {
+      "status": 410,
+      "code": "silicon_notifications_moved"
+    },
+    "/v1/me/webhook/deliveries": {
+      "status": 410,
+      "code": "silicon_notifications_moved"
+    }
+  },
+  "developer_browser_checks": {
+    "publishing_only": 2,
+    "existing_platform_confirmation": 1,
+    "desktop_and_mobile_reviewed": true
+  }
+}
